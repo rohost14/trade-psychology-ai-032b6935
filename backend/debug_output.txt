@@ -1,0 +1,6 @@
+Connected to DB
+Count for specified ID: 0
+Total positions in table: 2
+All Rows:
+(UUID('2f02d324-00f0-49e0-861f-cb516b1eb4cb'), UUID('4c42235d-bfe0-4f54-902c-c5dfb04f669a'))
+(UUID('bf9037fa-3c05-4181-aaa4-659be8c04f1a'), UUID('4c42235d-bfe0-4f54-902c-c5dfb04f669a'))

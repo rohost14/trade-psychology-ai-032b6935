@@ -1,0 +1,10 @@
+Test 1: Count all positions for broker_account_id
+  Total positions: 0
+
+Test 2: Count by status
+
+Test 3: Query with status='open' (exact match)
+  Found 0 records
+
+Test 4: Using SQLAlchemy ORM (like the API does)
+  Found 0 positions

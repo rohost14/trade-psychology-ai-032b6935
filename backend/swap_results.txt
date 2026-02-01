@@ -1,0 +1,13 @@
+Swapping positions tables...
+
+Step 1: Renaming 'positions' to 'positions_backup'...
+  ✓ Done
+
+Step 2: Renaming 'positions_history' to 'positions'...
+  ✓ Done
+
+==================================================
+✓✓✓ TABLE SWAP SUCCESSFUL ✓✓✓
+==================================================
+
+The table 'positions' now has the correct schema!

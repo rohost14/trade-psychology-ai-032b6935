@@ -1,0 +1,16 @@
+fastapi>=0.109.0
+uvicorn[standard]>=0.27.0
+sqlalchemy[asyncio]>=2.0.25
+asyncpg
+pydantic>=2.5.0
+pydantic-settings
+python-jose[cryptography]
+passlib[bcrypt]
+celery[redis]
+redis
+httpx
+twilio>=8.10.0
+python-multipart
+cryptography
+apscheduler>=3.10.4
+python-dateutil

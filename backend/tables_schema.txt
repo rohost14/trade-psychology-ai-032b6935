@@ -1,0 +1,25 @@
+Tables found: [('users_profile',), ('positions',), ('broker_accounts',), ('trades',), ('risk_events',), ('risk_state_snapshots',), ('risk_alerts',), ('risk_guardians',), ('alembic_version',), ('positions_history',), ('whatsapp_alerts',)]
+
+checking table: users_profile
+Columns: ['id', 'full_name', 'phone', 'created_at', 'updated_at']
+checking table: positions
+Columns: ['id', 'user_id', 'broker_account_id', 'tradingsymbol', 'exchange', 'instrument_token', 'asset_class', 'instrument_type', 'product', 'quantity', 'average_price', 'last_price', 'close_price', 'pnl', 'day_pnl', 'value', 'buy_value', 'sell_value', 'synced_at', 'created_at', 'raw_payload']
+checking table: broker_accounts
+Columns: ['id', 'user_id', 'broker_name', 'access_token', 'refresh_token', 'api_key', 'status', 'connected_at', 'last_sync_at', 'broker_user_id', 'broker_email', 'created_at', 'updated_at', 'guardian_phone', 'guardian_name']
+checking table: trades
+Columns: ['id', 'user_id', 'broker_account_id', 'order_id', 'exchange_order_id', 'parent_order_id', 'placed_by', 'tradingsymbol', 'exchange', 'transaction_type', 'order_type', 'product', 'quantity', 'filled_quantity', 'pending_quantity', 'cancelled_quantity', 'price', 'trigger_price', 'average_price', 'status', 'status_message', 'asset_class', 'instrument_type', 'product_type', 'pnl', 'order_timestamp', 'exchange_timestamp', 'created_at', 'updated_at', 'raw_payload']
+checking table: risk_events
+Columns: ['id', 'user_id', 'pattern_type', 'severity', 'risk_score', 'evidence', 'acknowledged', 'acknowledged_at', 'detected_at', 'created_at']
+checking table: risk_state_snapshots
+Columns: ['id', 'user_id', 'date', 'total_risk_score', 'risk_level', 'metrics', 'summary', 'created_at', 'updated_at']
+checking table: risk_alerts
+Columns: ['id', 'user_id', 'broker_account_id', 'pattern_type', 'severity', 'message', 'details', 'trigger_trade_id', 'related_trade_ids', 'detected_at', 'acknowledged_at', 'created_at']
+checking table: risk_guardians
+Columns: ['id', 'user_id', 'guardian_name', 'guardian_phone', 'guardian_whatsapp', 'verified', 'verification_code', 'verified_at', 'notify_on_danger', 'notify_on_caution', 'active', 'created_at', 'updated_at']
+checking table: alembic_version
+Columns: ['version_num']
+checking table: positions_history
+Columns: ['id', 'broker_account_id', 'tradingsymbol', 'exchange', 'instrument_type', 'product', 'total_quantity', 'average_entry_price', 'average_exit_price', 'realized_pnl', 'first_entry_time', 'last_exit_time', 'holding_duration_minutes', 'order_ids', 'status', 'created_at', 'updated_at']
+FOUND MATCH in table: positions_history
+checking table: whatsapp_alerts
+Columns: ['id', 'user_id', 'message_type', 'recipient_phone', 'message_body', 'status', 'twilio_sid', 'error_message', 'sent_at', 'delivered_at', 'failed_at', 'created_at']

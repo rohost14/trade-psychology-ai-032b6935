@@ -1,0 +1,34 @@
+=== DATABASE INVESTIGATION ===
+
+1. ALL TABLES IN DATABASE:
+   Tables found: ['alembic_version', 'broker_accounts', 'positions', 'positions_backup', 'risk_alerts', 'risk_events', 'risk_guardians', 'risk_state_snapshots', 'trades', 'users_profile', 'whatsapp_alerts']
+
+2. COLUMNS IN 'positions' TABLE:
+   - id (uuid)
+   - broker_account_id (uuid)
+   - tradingsymbol (character varying)
+   - exchange (character varying)
+   - instrument_type (character varying)
+   - product (character varying)
+   - total_quantity (integer)
+   - average_entry_price (numeric)
+   - average_exit_price (numeric)
+   - realized_pnl (numeric)
+   - first_entry_time (timestamp with time zone)
+   - last_exit_time (timestamp with time zone)
+   - holding_duration_minutes (integer)
+   - order_ids (ARRAY)
+   - status (character varying)
+   - created_at (timestamp with time zone)
+   - updated_at (timestamp with time zone)
+
+   ✓ Has 'total_quantity' column: True
+
+3. DATABASE URL:
+   postgresql+asyncpg://***@db.cyezwqurzbqyvjtceyce.supabase.co:5432/postgres
+
+4. POSITIONS TABLE DATA:
+   Total records: 1
+
+   Breakdown by status:
+     - closed: 1

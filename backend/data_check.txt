@@ -1,0 +1,3 @@
+Checking positions_history...
+Status breakdown: [('closed', 1)]
+Count for target broker_id: 0
