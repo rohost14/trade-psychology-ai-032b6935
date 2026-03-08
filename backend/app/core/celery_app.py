@@ -82,12 +82,13 @@ celery_app.conf.update(
             "task": "app.tasks.report_tasks.generate_commodity_eod",
             "schedule": crontab(hour=23, minute=45),
         },
-        # Reconciliation poller — every 3 minutes, all day.
-        # The task itself skips outside 09:14–15:31 IST on weekdays.
-        # Catches trades missed by webhooks (network blips, Celery downtime).
-        "reconcile-trades": {
+        # EOD reconciliation — runs once daily at 4:00 AM IST (off-peak).
+        # Catches any trades missed by webhooks during the previous trading day.
+        # Staggered internally: 10 accounts per second to respect Kite rate limits.
+        # NOT a polling loop — webhooks + KiteTicker handle real-time.
+        "eod-reconcile": {
             "task": "app.tasks.reconciliation_tasks.reconcile_trades",
-            "schedule": crontab(minute="*/3"),
+            "schedule": crontab(hour=4, minute=0),
         },
     },
 )

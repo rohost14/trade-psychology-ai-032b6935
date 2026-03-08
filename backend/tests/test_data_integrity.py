@@ -263,47 +263,40 @@ class TestRedisLocks:
 
 class TestReconciliationPoller:
 
-    def test_skip_outside_market_hours(self):
-        """Poller must skip when called outside 09:14–15:31 IST."""
+    def test_reconciliation_runs_once_daily(self):
+        """
+        Reconciliation is scheduled as a fixed 4 AM Celery Beat task.
+        No runtime market-hours gate needed — the schedule IS the gate.
+        Verify the beat schedule entry exists with the correct crontab.
+        """
+        from app.core.celery_app import celery_app
+        schedule = celery_app.conf.beat_schedule
+        assert "eod-reconcile" in schedule, "eod-reconcile beat entry missing"
+        entry = schedule["eod-reconcile"]
+        assert entry["task"] == "app.tasks.reconciliation_tasks.reconcile_trades"
+        # Crontab fires at hour=4, minute=0
+        assert entry["schedule"].hour == frozenset([4])
+        assert entry["schedule"].minute == frozenset([0])
+
+    def test_yesterday_window_used(self):
+        """
+        At 4 AM, reconciliation looks at yesterday's trades (not today's).
+        Verify _today_ist_start_utc returns yesterday's midnight IST.
+        """
         import pytz
-        from app.tasks.reconciliation_tasks import _is_reconcile_window
+        from app.tasks.reconciliation_tasks import _today_ist_start_utc
 
         IST = pytz.timezone("Asia/Kolkata")
+        result = _today_ist_start_utc()
 
-        # Before market open
-        before_open = datetime.now(IST).replace(hour=8, minute=0)
-        assert _is_reconcile_window(before_open) is False
+        # Should be yesterday's midnight IST converted to UTC
+        yesterday_ist_midnight = (
+            datetime.now(IST) - timedelta(days=1)
+        ).replace(hour=0, minute=0, second=0, microsecond=0)
+        expected_utc = yesterday_ist_midnight.astimezone(timezone.utc)
 
-        # After market close
-        after_close = datetime.now(IST).replace(hour=16, minute=0)
-        assert _is_reconcile_window(after_close) is False
-
-    def test_run_during_market_hours(self):
-        """Poller must run during market hours on a weekday."""
-        import pytz
-        from app.tasks.reconciliation_tasks import _is_reconcile_window
-
-        IST = pytz.timezone("Asia/Kolkata")
-
-        # Mid-session
-        mid_session = datetime.now(IST).replace(hour=12, minute=0)
-        # Force to a weekday (Monday=0)
-        days_ahead = (0 - mid_session.weekday()) % 7
-        mid_session_weekday = mid_session + timedelta(days=days_ahead)
-        assert _is_reconcile_window(mid_session_weekday) is True
-
-    def test_skip_on_weekend(self):
-        """Poller must skip on Saturday and Sunday."""
-        import pytz
-        from app.tasks.reconciliation_tasks import _is_reconcile_window
-
-        IST = pytz.timezone("Asia/Kolkata")
-        now = datetime.now(IST).replace(hour=11, minute=0)
-
-        # Force to Saturday (weekday=5)
-        days_to_saturday = (5 - now.weekday()) % 7
-        saturday = now + timedelta(days=days_to_saturday)
-        assert _is_reconcile_window(saturday) is False
+        diff_seconds = abs((result - expected_utc).total_seconds())
+        assert diff_seconds < 5  # Within 5 seconds (timing jitter)
 
     def test_missing_orders_are_requeued(self):
         """

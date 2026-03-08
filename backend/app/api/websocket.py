@@ -208,12 +208,25 @@ async def websocket_prices(
                     })
 
                 elif action == "subscribe_positions":
-                    # Get all position instruments for this account
+                    # 1. Subscribe this frontend connection to position symbols
                     instruments = await get_position_instruments(account_id)
                     await manager.subscribe(account_id, instruments)
+
+                    # 2. Start/connect the KiteTicker for live Kite prices.
+                    #    This is the missing link — without this, the frontend
+                    #    is listening but nobody is pulling prices from Kite.
+                    try:
+                        from app.services.price_stream_service import price_stream
+                        from app.core.database import SessionLocal
+                        async with SessionLocal() as db:
+                            await price_stream.start_account(UUID(account_id), db)
+                    except Exception as e:
+                        logger.error(f"Failed to start price stream for {account_id[:8]}: {e}")
+
                     await websocket.send_json({
                         "type": "subscribed",
                         "instruments": list(instruments),
+                        "live": True,
                     })
 
                 else:

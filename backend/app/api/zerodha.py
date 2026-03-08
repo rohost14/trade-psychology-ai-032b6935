@@ -22,7 +22,7 @@ from app.services.margin_service import margin_service
 from app.services.order_analytics_service import order_analytics_service
 from app.services.instrument_service import instrument_service
 from app.services.trade_sync_service import TradeSyncService
-from app.services.price_stream_service import price_stream_manager, start_price_stream
+from app.services.price_stream_service import price_stream
 from app.services.token_manager import token_manager
 from app.models.user import User
 from app.models.broker_account import BrokerAccount
@@ -317,6 +317,13 @@ async def disconnect_broker(
         account.updated_at = datetime.now(timezone.utc)
 
         await db.commit()
+
+        # Stop KiteTicker for this account — token is now invalid
+        try:
+            from app.services.price_stream_service import price_stream
+            await price_stream.stop_account(broker_account_id)
+        except Exception as e:
+            logger.error(f"Failed to stop price stream on disconnect: {e}")
 
         return {"success": True}
     except HTTPException:
@@ -778,7 +785,7 @@ async def start_stream(
 ) -> Any:
     """Start real-time price streaming for account positions."""
     try:
-        await start_price_stream(broker_account_id, db)
+        await price_stream.start_account(broker_account_id, db)
 
         return {
             "success": True,
@@ -802,8 +809,7 @@ async def stop_stream(
         if not account or not account.access_token:
             raise HTTPException(status_code=404, detail="Broker account not connected")
 
-        access_token = account.decrypt_token(account.access_token)
-        await price_stream_manager.cleanup_ticker(access_token)
+        await price_stream.stop_account(broker_account_id)
 
         return {"success": True, "message": "Price stream stopped."}
 

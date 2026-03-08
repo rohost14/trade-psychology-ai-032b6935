@@ -104,6 +104,14 @@ def process_webhook_trade(self, trade_data: Dict[str, Any], broker_account_id: s
                 except Exception as e:
                     logger.error(f"Failed to sync positions in webhook: {e}")
 
+                # Refresh KiteTicker subscriptions — new position may have opened.
+                # This ensures the live price stream immediately covers any new instrument.
+                try:
+                    from app.services.price_stream_service import price_stream
+                    await price_stream.refresh_subscriptions(account_id, db)
+                except Exception as e:
+                    logger.error(f"Failed to refresh price subscriptions: {e}")
+
                 # Only run the signal pipeline for COMPLETE trades
                 if trade_data.get("status") != "COMPLETE":
                     return {"success": True, "trade_id": str(trade.id)}

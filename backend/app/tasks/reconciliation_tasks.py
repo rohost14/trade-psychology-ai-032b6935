@@ -1,15 +1,19 @@
 """
 Reconciliation Tasks (Celery Beat)
 
-Polls Kite API every 3 minutes during market hours to catch any trades
-that were missed by webhooks (network blip, Celery downtime, retry exhaustion).
+Runs once daily at 4:00 AM IST (off-peak) to catch any trades missed
+by webhooks during the previous trading day.
+
+This is NOT a polling loop. Webhooks + KiteTicker on_order_update handle
+real-time order updates. This is the safety net only.
 
 Logic:
-  kite_complete_orders - our_stored_order_ids = missing trades
-  → re-queue each missing trade as a process_webhook_trade task
+  kite_complete_orders (yesterday) - our_stored_order_ids = missing trades
+  → re-queue missing trades via process_webhook_trade
 
-This is the safety net for C-03/C-04. It does NOT replace webhooks —
-webhooks remain the primary path. This poller catches the gaps.
+Staggered to respect Kite rate limits:
+  Process 10 accounts per second → 1000 users = ~100 seconds total.
+  All done at 4 AM, no user impact.
 """
 
 import logging
@@ -40,11 +44,11 @@ TRACKED_PRODUCTS = {"MIS", "NRML", "MTF"}
 @celery_app.task(name="app.tasks.reconciliation_tasks.reconcile_trades")
 def reconcile_trades():
     """
-    Celery Beat task — runs every 3 minutes.
+    Celery Beat task — runs once daily at 4:00 AM IST.
 
-    Skips immediately if market is closed (weekends, holidays, off-hours).
-    For each connected account, finds COMPLETE orders that exist in Kite
-    but not in our DB, and re-queues them for processing.
+    Finds COMPLETE orders from the previous trading day that exist in Kite
+    but not in our DB. Re-queues them for processing.
+    Staggered: 10 accounts per second to respect Kite rate limits.
     """
     import asyncio
     return asyncio.get_event_loop().run_until_complete(_reconcile_all_accounts())
@@ -52,14 +56,6 @@ def reconcile_trades():
 
 async def _reconcile_all_accounts():
     """Inner async function — reconciles all connected broker accounts."""
-
-    # Skip outside equity/F&O market hours (09:15 - 15:31 IST, weekdays only)
-    # We use a 1-minute buffer past 15:30 to catch last-minute fills
-    now_ist = datetime.now(IST)
-    if not _is_reconcile_window(now_ist):
-        logger.debug(f"[reconcile] Outside market window ({now_ist.strftime('%H:%M IST')}), skipping.")
-        return {"skipped": True, "reason": "outside_market_hours"}
-
     async with SessionLocal() as db:
         # Get all connected accounts with a valid (non-revoked) token
         result = await db.execute(
@@ -78,7 +74,10 @@ async def _reconcile_all_accounts():
             return {"accounts_checked": 0}
 
         total_missing = 0
-        for account in accounts:
+        # Stagger: process 10 accounts per second to respect Kite rate limits.
+        # 1000 users → ~100 seconds at 4 AM. No user impact.
+        BATCH_SIZE = 10
+        for i, account in enumerate(accounts):
             try:
                 missing = await _reconcile_account(account, db)
                 total_missing += missing
@@ -87,6 +86,9 @@ async def _reconcile_all_accounts():
                     f"[reconcile] Failed for account {account.id}: {e}",
                     exc_info=True
                 )
+            # Pause 1 second after every batch of 10
+            if (i + 1) % BATCH_SIZE == 0:
+                await asyncio.sleep(1)
 
     logger.info(
         f"[reconcile] Done. {len(accounts)} accounts checked, "
@@ -177,23 +179,12 @@ async def _reconcile_account(account: BrokerAccount, db) -> int:
     return queued
 
 
-def _is_reconcile_window(now_ist: datetime) -> bool:
-    """
-    Returns True if we should run reconciliation right now.
-
-    Window: 09:14 – 15:31 IST, weekdays only.
-    (1 min before open to catch pre-open fills, 1 min after close for stragglers)
-    """
-    from datetime import time as dtime
-
-    if now_ist.weekday() >= 5:  # Saturday=5, Sunday=6
-        return False
-
-    current = now_ist.time()
-    return dtime(9, 14) <= current <= dtime(15, 31)
-
-
 def _today_ist_start_utc() -> datetime:
-    """Return today's market day start (00:00 IST) as UTC datetime."""
-    today_ist = datetime.now(IST).replace(hour=0, minute=0, second=0, microsecond=0)
-    return today_ist.astimezone(timezone.utc)
+    """
+    Return yesterday's market day start (00:00 IST) as UTC datetime.
+    At 4 AM IST, 'yesterday' is the trading day we want to reconcile.
+    """
+    yesterday_ist = (
+        datetime.now(IST) - timedelta(days=1)
+    ).replace(hour=0, minute=0, second=0, microsecond=0)
+    return yesterday_ist.astimezone(timezone.utc)

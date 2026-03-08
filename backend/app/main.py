@@ -31,16 +31,25 @@ if settings.SENTRY_DSN:
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    # Startup logic
     logger.info("Starting up TradeMentor AI Backend...")
-    
+
     # Start retention scheduler
     from app.tasks.retention_tasks import start_scheduler
     start_scheduler()
     logger.info("Retention scheduler started")
-    
+
+    # Reconnect KiteTicker for all accounts that had open positions
+    # before the server restarted (prevents stale prices after deploys).
+    try:
+        from app.services.price_stream_service import price_stream
+        from app.core.database import SessionLocal
+        async with SessionLocal() as db:
+            await price_stream.restart_all(db)
+    except Exception as e:
+        logger.error(f"Price stream restart failed on startup: {e}")
+
     yield
-    
+
     # Shutdown logic
     logger.info("Shutting down...")
 
