@@ -42,6 +42,16 @@ class BehavioralEvent(Base):
     # e.g. {"consecutive_losses": 4, "session_pnl": -5200,
     #       "time_since_last_loss_minutes": 3, "position_size_increase_pct": 150}
 
+    # Session context (migration 039)
+    session_id = Column(
+        UUID(as_uuid=True),
+        ForeignKey("trading_sessions.id", ondelete="SET NULL"),
+        nullable=True,
+    )
+    risk_score_at_event = Column(Numeric(5, 2), nullable=True)
+    account_equity_at_event = Column(Numeric(15, 4), nullable=True)
+    position_exposure_at_event = Column(Numeric(15, 4), nullable=True)
+
     # Timing
     detected_at = Column(TIMESTAMP(timezone=True), nullable=False, server_default=text("now()"))
 

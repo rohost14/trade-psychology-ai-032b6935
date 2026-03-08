@@ -23,7 +23,13 @@ class RiskAlert(Base):
     
     detected_at = Column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))
     acknowledged_at = Column(DateTime(timezone=True))
-    
+
+    # Delivery state machine (migration 038)
+    delivered_push_at = Column(DateTime(timezone=True), nullable=True)
+    delivered_whatsapp_at = Column(DateTime(timezone=True), nullable=True)
+    expired_at = Column(DateTime(timezone=True), nullable=True)
+    resolved_at = Column(DateTime(timezone=True), nullable=True)
+
     created_at = Column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))
     
     # Relationships

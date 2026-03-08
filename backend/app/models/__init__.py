@@ -16,6 +16,8 @@ from app.models.completed_trade_feature import CompletedTradeFeature
 from app.models.incomplete_position import IncompletePosition
 from app.models.behavioral_event import BehavioralEvent
 from app.models.alert_checkpoint import AlertCheckpoint
+from app.models.trading_session import TradingSession
+from app.models.position_ledger import PositionLedger
 
 __all__ = [
     "User",
@@ -36,4 +38,6 @@ __all__ = [
     "IncompletePosition",
     "BehavioralEvent",
     "AlertCheckpoint",
+    "TradingSession",
+    "PositionLedger",
 ]
