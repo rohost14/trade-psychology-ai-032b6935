@@ -24,6 +24,7 @@ celery_app = Celery(
         "app.tasks.alert_tasks",
         "app.tasks.report_tasks",
         "app.tasks.checkpoint_tasks",
+        "app.tasks.reconciliation_tasks",
     ]
 )
 
@@ -50,6 +51,7 @@ celery_app.conf.update(
         "app.tasks.alert_tasks.*": {"queue": "alerts"},
         "app.tasks.report_tasks.*": {"queue": "reports"},
         "app.tasks.checkpoint_tasks.*": {"queue": "alerts"},
+        "app.tasks.reconciliation_tasks.*": {"queue": "trades"},
     },
 
     # Rate limiting (prevent overwhelming Zerodha API)
@@ -79,6 +81,13 @@ celery_app.conf.update(
         "commodity-eod": {
             "task": "app.tasks.report_tasks.generate_commodity_eod",
             "schedule": crontab(hour=23, minute=45),
+        },
+        # Reconciliation poller — every 3 minutes, all day.
+        # The task itself skips outside 09:14–15:31 IST on weekdays.
+        # Catches trades missed by webhooks (network blips, Celery downtime).
+        "reconcile-trades": {
+            "task": "app.tasks.reconciliation_tasks.reconcile_trades",
+            "schedule": crontab(minute="*/3"),
         },
     },
 )

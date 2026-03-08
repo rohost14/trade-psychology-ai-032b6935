@@ -293,21 +293,55 @@ async def _build_trading_context(
     return "\n".join(lines)
 
 
+# Cache TTL for coach insight: 15 minutes
+_COACH_INSIGHT_TTL_MINUTES = 15
+
+
 @router.get("/insight")
 async def get_coach_insight(
     broker_account_id: UUID = Depends(get_verified_broker_account_id),
     db: AsyncSession = Depends(get_db)
 ):
     """
-    Generate AI-powered coach insight based on current trading state.
-    Updates every time user refreshes dashboard.
+    Return AI coach insight for the current trading session.
+
+    Non-blocking: checks DB cache first (15-min TTL). On cache miss,
+    returns a fallback immediately and fires a Celery task to generate
+    the real LLM insight in the background. The next request (frontend
+    polls once after 5s) will get the cached LLM response.
     """
     try:
         now_ist = datetime.now(IST)
         today_start_ist = now_ist.replace(hour=0, minute=0, second=0, microsecond=0)
         today_start_utc = today_start_ist.astimezone(timezone.utc)
 
-        # Today's closed positions
+        # ----------------------------------------------------------------
+        # 1. Check cache (UserProfile.ai_cache["coach_insight"])
+        # ----------------------------------------------------------------
+        profile_result = await db.execute(
+            select(UserProfile).where(UserProfile.broker_account_id == broker_account_id)
+        )
+        user_profile = profile_result.scalar_one_or_none()
+
+        if user_profile and user_profile.ai_cache:
+            cached = user_profile.ai_cache.get("coach_insight")
+            if cached:
+                try:
+                    generated_at = datetime.fromisoformat(cached["generated_at"])
+                    age_minutes = (datetime.now(timezone.utc) - generated_at).total_seconds() / 60
+                    if age_minutes < _COACH_INSIGHT_TTL_MINUTES:
+                        return {
+                            "insight": cached["insight"],
+                            "risk_state": cached.get("risk_state", "safe"),
+                            "timestamp": cached["generated_at"],
+                            "cached": True,
+                        }
+                except Exception:
+                    pass  # Bad cache entry — fall through to generate
+
+        # ----------------------------------------------------------------
+        # 2. Build context (fast DB queries, no LLM)
+        # ----------------------------------------------------------------
         pos_result = await db.execute(
             select(Position).where(
                 Position.broker_account_id == broker_account_id,
@@ -317,11 +351,8 @@ async def get_coach_insight(
         )
         positions_today = list(pos_result.scalars().all())
         total_pnl = sum(float(p.realized_pnl or p.pnl or 0) for p in positions_today)
-
-        # Risk state from today's loss pattern
         recent_losses = [p for p in positions_today[-5:] if float(p.realized_pnl or p.pnl or 0) < 0]
 
-        # Today's alerts
         patterns_active = []
         try:
             alerts_result = await db.execute(
@@ -330,8 +361,9 @@ async def get_coach_insight(
                     RiskAlert.detected_at >= today_start_utc
                 )
             )
-            alerts = alerts_result.scalars().all()
-            patterns_active = list(set(a.pattern_type for a in alerts if a.pattern_type))
+            patterns_active = list(set(
+                a.pattern_type for a in alerts_result.scalars().all() if a.pattern_type
+            ))
         except Exception:
             pass
 
@@ -342,11 +374,6 @@ async def get_coach_insight(
         else:
             risk_state = "safe"
 
-        profile_result = await db.execute(
-            select(UserProfile).where(UserProfile.broker_account_id == broker_account_id)
-        )
-        user_profile = profile_result.scalar_one_or_none()
-
         user_profile_context = ""
         if user_profile:
             user_profile_context = (
@@ -356,26 +383,35 @@ async def get_coach_insight(
                 f"Known weaknesses: {', '.join(user_profile.known_weaknesses or []) or 'None reported'}."
             )
 
-        time_of_day = "Post-market"
         now_min = now_ist.hour * 60 + now_ist.minute
         if 9 * 60 + 15 <= now_min < 12 * 60:
             time_of_day = "Morning session"
         elif 12 * 60 <= now_min <= 15 * 60 + 30:
             time_of_day = "Afternoon session"
+        else:
+            time_of_day = "Post-market"
 
-        insight = await ai_service.generate_coach_insight(
-            risk_state=risk_state,
-            total_pnl=total_pnl,
-            patterns_active=patterns_active,
-            recent_trades=len(positions_today),
-            time_of_day=time_of_day,
-            user_profile_context=user_profile_context
-        )
-
-        return {
-            "insight": insight,
+        context = {
             "risk_state": risk_state,
-            "timestamp": datetime.now(timezone.utc).isoformat()
+            "total_pnl": total_pnl,
+            "patterns_active": patterns_active,
+            "recent_trades": len(positions_today),
+            "time_of_day": time_of_day,
+            "user_profile_context": user_profile_context,
+        }
+
+        # ----------------------------------------------------------------
+        # 3. Queue LLM generation in background, return fallback immediately
+        # ----------------------------------------------------------------
+        from app.tasks.report_tasks import generate_coach_insight_task
+        generate_coach_insight_task.delay(str(broker_account_id), context)
+
+        fallback = _coach_fallback(risk_state, total_pnl)
+        return {
+            "insight": fallback,
+            "risk_state": risk_state,
+            "timestamp": datetime.now(timezone.utc).isoformat(),
+            "status": "generating",  # Frontend polls once after 5s
         }
 
     except Exception as e:
@@ -385,6 +421,17 @@ async def get_coach_insight(
             "risk_state": "safe",
             "timestamp": datetime.now(timezone.utc).isoformat()
         }
+
+
+def _coach_fallback(risk_state: str, total_pnl: float) -> str:
+    """Return a fast rule-based fallback while LLM generates in background."""
+    if risk_state == "danger":
+        return "High-risk session. Step back, review your trades before continuing."
+    if risk_state == "caution":
+        return "Caution zone. Reduce size, stick to your rules."
+    if total_pnl > 0:
+        return "Good session so far. Protect your gains — don't give them back."
+    return "Focus on process, not P&L. One good trade at a time."
 
 
 @router.post("/chat", response_model=ChatResponse)
