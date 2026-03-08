@@ -1,5 +1,5 @@
 import os
-import requests
+import httpx
 import json
 from typing import List, Dict, Optional
 import logging
@@ -20,60 +20,57 @@ class AIService:
         
         if not self.api_key:
             logger.warning("OPENROUTER_API_KEY not set. AI features will use fallback logic.")
-        
+        else:
+            logger.info(f"AI Service initialized with OpenRouter key (configured={bool(self.api_key)})")
+
         # Model selection (cost-efficient)
-        self.primary_model = "anthropic/claude-3.5-haiku"  # $0.80/1M tokens, fast
-        self.reasoning_model = "openai/gpt-4o-mini"  # $0.15/1M tokens, reasoning capable
-        self.free_model = "google/gemini-flash-1.5-8b"  # Free tier fallback
-    
-    def _make_request(
-        self, 
-        messages: List[Dict], 
+        self.primary_model = "anthropic/claude-3.5-haiku"
+        self.reasoning_model = "openai/gpt-4o-mini"
+        self.free_model = "google/gemini-flash-1.5-8b"
+
+    async def _make_request(
+        self,
+        messages: List[Dict],
         model: str,
         temperature: float = 0.7,
         max_tokens: int = 1000,
         use_reasoning: bool = False
     ) -> Optional[Dict]:
-        """Make request to OpenRouter API."""
-        
+        """Make async request to OpenRouter API using httpx."""
+
         if not self.api_key:
-            logger.warning("No API key, skipping AI request")
+            logger.warning("No API key configured, skipping AI request")
             return None
-        
+
         headers = {
             "Authorization": f"Bearer {self.api_key}",
             "Content-Type": "application/json",
-            "HTTP-Referer": "https://trademental.ai",  # Optional: for rankings
-            "X-Title": "TradeMentor AI"  # Optional: show in rankings
+            "HTTP-Referer": "https://trademental.ai",
+            "X-Title": "TradeMentor AI"
         }
-        
+
         payload = {
             "model": model,
             "messages": messages,
             "temperature": temperature,
             "max_tokens": max_tokens
         }
-        
-        # Add reasoning for complex analysis
+
         if use_reasoning:
             payload["reasoning"] = {"enabled": True}
-        
+
         try:
-            response = requests.post(
-                self.base_url,
-                headers=headers,
-                data=json.dumps(payload),
-                timeout=30
-            )
-            
+            async with httpx.AsyncClient(timeout=30.0) as client:
+                response = await client.post(self.base_url, headers=headers, json=payload)
+
             if response.status_code != 200:
-                logger.error(f"OpenRouter API error: {response.status_code} - {response.text}")
+                logger.error(f"OpenRouter API error: {response.status_code} - {response.text[:300]}")
                 return None
-            
+
             result = response.json()
             return result['choices'][0]['message']
-            
-        except requests.exceptions.Timeout:
+
+        except httpx.TimeoutException:
             logger.error("OpenRouter API timeout")
             return None
         except Exception as e:
@@ -172,7 +169,7 @@ Be direct and practical. Focus on behavior modification, not theory."""
         ]
         
         # Use reasoning model for complex psychological analysis
-        response = self._make_request(
+        response = await self._make_request(
             messages=messages,
             model=self.reasoning_model,
             temperature=0.7,
@@ -218,7 +215,8 @@ Be direct and practical. Focus on behavior modification, not theory."""
     
     def _fallback_persona(self, negative_patterns: List[Dict], positive_patterns: List[Dict]) -> Dict:
         """Rule-based fallback when AI unavailable."""
-        
+        logger.warning(f"AI_FALLBACK: Using rule-based persona (negative={len(negative_patterns)}, positive={len(positive_patterns)})")
+
         pattern_names = [p['name'] for p in negative_patterns]
         
         # Rule-based classification
@@ -253,13 +251,273 @@ Be direct and practical. Focus on behavior modification, not theory."""
             "next_steps": f"Primary focus: Address your {negative_patterns[0]['name'] if negative_patterns else 'position sizing'}. Set a hard rule: no more than 3 trades after a loss until you've taken a 15-minute break. Track compliance daily for 2 weeks."
         }
     
+    async def generate_analytics_narrative(
+        self,
+        tab: str,
+        data: dict,
+        behavior_score: int = None,
+        patterns: list = None,
+    ) -> dict:
+        """
+        Generate AI narrative for an analytics tab.
+        Hybrid: LLM when API key available, rule-based templates otherwise.
+
+        Args:
+            tab: One of 'overview', 'behavior', 'performance', 'risk'
+            data: Tab-specific metrics dict
+            behavior_score: Optional behavior score (0-100)
+            patterns: Optional list of detected pattern names
+
+        Returns:
+            {
+                "narrative": "Your trading this month...",
+                "key_insight": "Most impactful: ...",
+                "action_item": "Consider...",
+            }
+        """
+        # Try LLM first
+        if self.api_key:
+            result = await self._llm_narrative(tab, data, behavior_score, patterns)
+            if result:
+                logger.info(f"AI_USAGE tab={tab} model={self.primary_model} type=narrative")
+                return result
+
+        # Fallback to rule-based
+        return self._rule_based_narrative(tab, data, behavior_score, patterns)
+
+    async def _llm_narrative(
+        self,
+        tab: str,
+        data: dict,
+        behavior_score: int = None,
+        patterns: list = None,
+    ) -> dict | None:
+        """LLM-powered narrative generation using Claude Haiku."""
+        system_prompt = (
+            "You are a trading psychology analyst for Indian F&O traders. "
+            "Given the data below, write a concise 3-5 sentence analysis. "
+            "Be specific with numbers. Use ₹ for currency. "
+            "Focus on actionable insights, not generic advice."
+        )
+
+        # Build tab-specific data summary
+        if tab == "overview":
+            user_prompt = self._overview_prompt(data)
+        elif tab == "behavior":
+            user_prompt = self._behavior_prompt(data, behavior_score, patterns)
+        elif tab == "performance":
+            user_prompt = self._performance_prompt(data)
+        elif tab == "risk":
+            user_prompt = self._risk_prompt(data)
+        else:
+            return None
+
+        messages = [
+            {"role": "system", "content": system_prompt},
+            {"role": "user", "content": user_prompt},
+        ]
+
+        response = await self._make_request(
+            messages=messages,
+            model=self.primary_model,
+            temperature=0.7,
+            max_tokens=300,
+            use_reasoning=False,
+        )
+
+        if not response:
+            return None
+
+        content = response.get("content", "").strip()
+        if not content:
+            return None
+
+        # Parse structured response (LLM returns 3 sections separated by newlines)
+        lines = [l.strip() for l in content.split("\n") if l.strip()]
+        narrative = lines[0] if lines else content
+        key_insight = lines[1] if len(lines) > 1 else ""
+        action_item = lines[2] if len(lines) > 2 else ""
+
+        # If LLM didn't split cleanly, use full text as narrative
+        if len(lines) <= 1:
+            narrative = content
+            key_insight = ""
+            action_item = ""
+
+        return {
+            "narrative": narrative,
+            "key_insight": key_insight,
+            "action_item": action_item,
+        }
+
+    def _overview_prompt(self, data: dict) -> str:
+        kpis = data.get("kpis", {})
+        return (
+            f"Analyze this trader's overview for the period:\n"
+            f"- Total P&L: ₹{kpis.get('total_pnl', 0):,.2f}\n"
+            f"- Trades: {kpis.get('total_trades', 0)} (Win Rate: {kpis.get('win_rate', 0)}%)\n"
+            f"- Profit Factor: {kpis.get('profit_factor', 0)}\n"
+            f"- Expectancy: ₹{kpis.get('expectancy', 0):,.2f}\n"
+            f"- Best Day: ₹{kpis.get('largest_win', 0):,.2f}, Worst Day: ₹{kpis.get('largest_loss', 0):,.2f}\n"
+            f"- Win Streak: {kpis.get('max_win_streak', 0)}, Loss Streak: {kpis.get('max_loss_streak', 0)}\n\n"
+            f"Provide exactly 3 lines:\n1. A narrative paragraph (3-5 sentences)\n"
+            f"2. Key Insight: one sentence starting with 'Key Insight:'\n"
+            f"3. Action Item: one sentence starting with 'Action:'"
+        )
+
+    def _behavior_prompt(self, data: dict, score: int = None, patterns: list = None) -> str:
+        pattern_str = ", ".join(patterns[:5]) if patterns else "None detected"
+        return (
+            f"Analyze this trader's behavioral patterns:\n"
+            f"- Behavior Score: {score or 'N/A'}/100\n"
+            f"- Patterns Detected: {pattern_str}\n"
+            f"- Emotional Tax: ₹{data.get('emotional_tax', 0):,.2f}\n\n"
+            f"Provide exactly 3 lines:\n1. A narrative paragraph (3-5 sentences)\n"
+            f"2. Key Insight: one sentence starting with 'Key Insight:'\n"
+            f"3. Action Item: one sentence starting with 'Action:'"
+        )
+
+    def _performance_prompt(self, data: dict) -> str:
+        top_instr = data.get("by_instrument", [{}])[0] if data.get("by_instrument") else {}
+        return (
+            f"Analyze this trader's performance breakdown:\n"
+            f"- Total Trades: {data.get('total_trades', 0)}\n"
+            f"- Top Instrument: {top_instr.get('symbol', 'N/A')} ({top_instr.get('trades', 0)} trades, "
+            f"WR: {top_instr.get('win_rate', 0)}%)\n"
+            f"- Direction: LONG {data.get('by_direction', {}).get('LONG', {}).get('win_rate', 0)}% WR, "
+            f"SHORT {data.get('by_direction', {}).get('SHORT', {}).get('win_rate', 0)}% WR\n\n"
+            f"Provide exactly 3 lines:\n1. A narrative paragraph (3-5 sentences)\n"
+            f"2. Key Insight: one sentence starting with 'Key Insight:'\n"
+            f"3. Action Item: one sentence starting with 'Action:'"
+        )
+
+    def _risk_prompt(self, data: dict) -> str:
+        dd = data.get("max_drawdown", {})
+        return (
+            f"Analyze this trader's risk metrics:\n"
+            f"- Max Drawdown: ₹{dd.get('amount', 0):,.2f}\n"
+            f"- Daily Volatility: ₹{data.get('daily_volatility', 0):,.2f}\n"
+            f"- VaR (95%): ₹{data.get('var_95', 0):,.2f}\n"
+            f"- Risk/Reward Ratio: {data.get('risk_reward_ratio', 0)}\n\n"
+            f"Provide exactly 3 lines:\n1. A narrative paragraph (3-5 sentences)\n"
+            f"2. Key Insight: one sentence starting with 'Key Insight:'\n"
+            f"3. Action Item: one sentence starting with 'Action:'"
+        )
+
+    def _rule_based_narrative(
+        self,
+        tab: str,
+        data: dict,
+        behavior_score: int = None,
+        patterns: list = None,
+    ) -> dict:
+        """Rule-based template narrative when LLM is unavailable."""
+        if tab == "overview":
+            kpis = data.get("kpis", {})
+            total_pnl = kpis.get("total_pnl", 0)
+            win_rate = kpis.get("win_rate", 0)
+            pf = kpis.get("profit_factor", 0)
+            expectancy = kpis.get("expectancy", 0)
+
+            pnl_word = "profit" if total_pnl >= 0 else "loss"
+            wr_assessment = "above average" if win_rate >= 50 else "below the 50% threshold"
+
+            narrative = (
+                f"Your net {pnl_word} of ₹{abs(total_pnl):,.0f} over {kpis.get('total_trades', 0)} trades "
+                f"shows a win rate of {win_rate}%, which is {wr_assessment}. "
+            )
+            if pf > 1.5:
+                narrative += f"Your profit factor of {pf:.2f} is strong — your wins significantly outweigh your losses. "
+            elif pf > 1:
+                narrative += f"Your profit factor of {pf:.2f} is positive but could improve with better loss management. "
+            elif pf > 0:
+                narrative += f"Your profit factor of {pf:.2f} is below 1 — losses are outweighing wins. "
+
+            if expectancy > 0:
+                key_insight = f"Key Insight: Positive expectancy of ₹{expectancy:,.0f} per trade means your edge is real."
+            else:
+                key_insight = f"Key Insight: Negative expectancy of ₹{expectancy:,.0f} per trade — focus on cutting losses earlier."
+
+            action_item = "Action: Review your worst trading day and identify the pattern that caused it."
+            return {"narrative": narrative, "key_insight": key_insight, "action_item": action_item}
+
+        elif tab == "behavior":
+            score = behavior_score or 50
+            pattern_list = patterns or []
+
+            if score >= 80:
+                narrative = "Excellent behavioral discipline. Your patterns show strong emotional control and consistent execution."
+            elif score >= 60:
+                narrative = f"Moderate discipline with {len(pattern_list)} active pattern(s). Some emotional trading detected but manageable."
+            else:
+                narrative = f"Multiple behavioral patterns active ({len(pattern_list)}). Emotional trading is significantly impacting your P&L."
+
+            tax = data.get("emotional_tax", 0)
+            if tax > 0:
+                key_insight = f"Key Insight: Emotional trading has cost you ₹{tax:,.0f} — this is recoverable with discipline changes."
+            else:
+                key_insight = "Key Insight: No measurable emotional tax detected. Maintain your current discipline."
+
+            if pattern_list:
+                action_item = f"Action: Focus on eliminating {pattern_list[0]} — it's your highest-impact improvement area."
+            else:
+                action_item = "Action: Keep journaling every trade to maintain awareness of your emotional state."
+            return {"narrative": narrative, "key_insight": key_insight, "action_item": action_item}
+
+        elif tab == "performance":
+            total = data.get("total_trades", 0)
+            top_instr = data.get("by_instrument", [{}])[0] if data.get("by_instrument") else {}
+            symbol = top_instr.get("symbol", "your primary instrument")
+            wr = top_instr.get("win_rate", 0)
+
+            narrative = f"Across {total} trades, {symbol} is your most traded instrument with a {wr}% win rate. "
+            long_wr = data.get("by_direction", {}).get("LONG", {}).get("win_rate", 0)
+            short_wr = data.get("by_direction", {}).get("SHORT", {}).get("win_rate", 0)
+            if long_wr > short_wr + 10:
+                narrative += "You perform notably better on long trades — consider reducing short-side exposure."
+            elif short_wr > long_wr + 10:
+                narrative += "Your short trades outperform longs — lean into this directional edge."
+
+            key_insight = f"Key Insight: Your best direction is {'LONG' if long_wr >= short_wr else 'SHORT'} ({max(long_wr, short_wr)}% WR)."
+            action_item = "Action: Increase position size on your highest win-rate setups and reduce on the weakest."
+            return {"narrative": narrative, "key_insight": key_insight, "action_item": action_item}
+
+        elif tab == "risk":
+            dd = data.get("max_drawdown", {}).get("amount", 0)
+            vol = data.get("daily_volatility", 0)
+            rr = data.get("risk_reward_ratio", 0)
+
+            narrative = f"Your max drawdown of ₹{abs(dd):,.0f} "
+            if abs(dd) > vol * 3:
+                narrative += "is significant — over 3x your daily volatility. This suggests occasional large losses are dragging performance."
+            else:
+                narrative += "is within normal range relative to your daily volatility."
+
+            if rr >= 2:
+                key_insight = f"Key Insight: Your risk/reward ratio of {rr:.1f} is excellent — you're making more on wins than losing on losses."
+            elif rr >= 1:
+                key_insight = f"Key Insight: Risk/reward of {rr:.1f} is acceptable but ideally should be above 2.0."
+            else:
+                key_insight = f"Key Insight: Risk/reward of {rr:.1f} is poor — your losses are larger than your wins on average."
+
+            action_item = "Action: Set a hard daily loss limit at 2x your average daily P&L to prevent drawdown deepening."
+            return {"narrative": narrative, "key_insight": key_insight, "action_item": action_item}
+
+        # Fallback
+        return {
+            "narrative": "Insufficient data for analysis. Continue trading and journaling.",
+            "key_insight": "",
+            "action_item": "Action: Trade at least 20 positions to enable meaningful analysis.",
+        }
+
     async def generate_coach_insight(
         self,
         risk_state: str,
         total_pnl: float,
         patterns_active: List[str],
         recent_trades: int,
-        time_of_day: str
+        time_of_day: str,
+        user_profile_context: str = ""
     ) -> str:
         """
         Generate contextual coach message with variable tone.
@@ -289,7 +547,7 @@ Never be generic. Reference specific data when relevant."""
 - Trades today: {recent_trades}
 - Time: {time_of_day}
 - Active alerts: {', '.join(patterns_active) if patterns_active else 'None'}
-
+{user_profile_context}
 Generate ONLY the coach message (1-2 sentences, no explanation, no preamble)."""
 
         messages = [
@@ -297,7 +555,7 @@ Generate ONLY the coach message (1-2 sentences, no explanation, no preamble)."""
             {"role": "user", "content": user_prompt}
         ]
         
-        response = self._make_request(
+        response = await self._make_request(
             messages=messages,
             model=self.primary_model,  # Use fast model for simple task
             temperature=0.8,
@@ -318,7 +576,8 @@ Generate ONLY the coach message (1-2 sentences, no explanation, no preamble)."""
     
     def _fallback_insight(self, risk_state: str, total_pnl: float, patterns_active: List[str]) -> str:
         """Fallback insight when AI unavailable."""
-        
+        logger.warning(f"AI_FALLBACK: Using rule-based insight (risk={risk_state}, pnl={total_pnl:.0f})")
+
         if risk_state == 'danger':
             return "⚠️ RISK BREACH. Stop trading immediately. Review your rules."
         elif risk_state == 'caution' and patterns_active:
@@ -329,8 +588,6 @@ Generate ONLY the coach message (1-2 sentences, no explanation, no preamble)."""
             return "Strong execution today. Lock in gains and follow your plan. 👍"
         elif total_pnl < -1000:
             return "Down day. Stick to your process. Don't chase recovery."
-        elif recent_trades == 0:
-            return "No trades yet. Remember: patience is a position. Wait for A+ setups."
         else:
             return "All clear. Trade with discipline and follow your rules."
 
@@ -383,7 +640,7 @@ Output the message string only."""
             {"role": "user", "content": user_prompt}
         ]
         
-        response = self._make_request(
+        response = await self._make_request(
             messages=messages,
             model=self.primary_model,
             temperature=0.7,
@@ -407,26 +664,65 @@ Output the message string only."""
         self,
         user_message: str,
         trading_context: str,
-        chat_history: List[Dict]
+        chat_history: List[Dict],
+        rag_context: Optional[str] = None,
+        ai_persona: str = "coach"
     ) -> str:
         """
         Generate conversational response for trading coach chat.
-        Uses trading context to provide personalized advice.
+        Uses trading context and RAG context to provide personalized advice.
+
+        Args:
+            user_message: User's chat message
+            trading_context: Current trading stats and patterns
+            chat_history: Previous messages in conversation
+            rag_context: Optional RAG-retrieved relevant content (journal entries, knowledge base)
+            ai_persona: User's preferred AI personality (coach, mentor, friend, strict)
         """
+        # Build context section
+        context_section = trading_context
 
-        system_prompt = f"""You are TradeMentor, an expert F&O trading psychology coach. You help Indian traders improve their discipline and avoid emotional trading mistakes.
+        if rag_context:
+            context_section += f"\n\n**Retrieved Context (from user's history and knowledge base):**\n{rag_context}"
 
-Your personality:
-- Direct and practical, no fluff
-- Empathetic but firm about discipline
-- Always refer to actual data when available
-- Give specific, actionable advice
-- Use ₹ for currency (Indian Rupee)
-- Keep responses concise (2-4 sentences unless detailed analysis requested)
+        # Persona-aware personality
+        persona_traits = {
+            "coach": "Supportive and encouraging, focused on building good habits. Empathetic but firm about discipline.",
+            "mentor": "Wise and experienced, shares trading wisdom from years of experience. Speaks with authority and depth.",
+            "friend": "Casual and relatable, empathetic listener who speaks like a fellow trader. Uses conversational tone.",
+            "strict": "No-nonsense and brutally honest, focused on accountability and discipline. Doesn't sugarcoat.",
+        }
+        persona_desc = persona_traits.get(ai_persona, persona_traits["coach"])
 
-{trading_context}
+        system_prompt = f"""You are TradeMentor — a sharp, experienced F&O trading coach who knows this trader personally. You have access to their REAL trading data below. Use it.
 
-Base your advice on this actual trading data. If asked about patterns or performance, refer to real numbers. If data is insufficient, acknowledge it and give general guidance."""
+**Your personality:** {persona_desc}
+
+**ABSOLUTE RULES — follow these without exception:**
+
+1. ALWAYS USE THE DATA BELOW. The trading context contains their actual positions, P&L, journal entries, and patterns. When they ask about their trades, ANSWER FROM THIS DATA. Never say "I don't have access to your data" or "no data available" — the data IS right here.
+
+2. TALK LIKE A REAL PERSON. You're a coach sitting across the table, not a help desk. Use natural, flowing sentences. No bullet points. No numbered lists. No headers. No "Here are some suggestions:" format. Just talk.
+
+3. NEVER say these things:
+   - "I apologize" / "I'm sorry but" / "Unfortunately"
+   - "I suggest maintaining a trading journal" (THEY ALREADY HAVE ONE — you can see their journal entries below)
+   - "Consider setting up a tracking system" / "Record your entry/exit times" (THIS APP IS THEIR TRACKING SYSTEM)
+   - "Based on general best practices" (use THEIR specific data, not generic advice)
+   - "I don't have enough data to" (if the data section below shows trades, USE THEM)
+
+4. BE SPECIFIC. Instead of "your recent trades show some losses", say "your BANKNIFTY trade on Monday lost Rs.2,400 in 12 minutes — that's the revenge pattern showing up again." Use actual symbols, dates, amounts, and durations from the data.
+
+5. KEEP IT SHORT. 2-4 sentences for simple questions. Only go longer if they ask for detailed analysis. Don't pad with generic advice.
+
+6. USE Rs. FOR CURRENCY (Indian Rupee).
+
+7. When data genuinely doesn't exist (zero trades, empty sections), say it straight: "You haven't closed any positions in the last 7 days. Once you start trading, I'll be able to give you real insights." Don't offer generic tips instead.
+
+**THEIR ACTUAL TRADING DATA:**
+{context_section}
+
+Remember: You know this trader. You've seen their patterns. Talk to them like you've been coaching them for months."""
 
         # Build messages with history
         messages = [{"role": "system", "content": system_prompt}]
@@ -441,7 +737,7 @@ Base your advice on this actual trading data. If asked about patterns or perform
         # Add current user message
         messages.append({"role": "user", "content": user_message})
 
-        response = self._make_request(
+        response = await self._make_request(
             messages=messages,
             model=self.primary_model,
             temperature=0.7,
@@ -457,19 +753,46 @@ Base your advice on this actual trading data. If asked about patterns or perform
         return content
 
     def _fallback_chat_response(self, user_message: str, trading_context: str) -> str:
-        """Fallback when AI unavailable."""
+        """Fallback when AI unavailable. Tries to extract real data from context."""
+        logger.warning(f"AI_FALLBACK: Using rule-based chat response (message={user_message[:50]})")
         msg_lower = user_message.lower()
 
+        # Try to extract key stats from the trading context
+        has_positions = "Closed Positions" in trading_context and "None found" not in trading_context
+        has_open = "Currently Open Positions" in trading_context
+        has_alerts = "Behavioral Alerts" in trading_context
+
+        # Extract P&L if available
+        pnl_str = ""
+        if "Net P&L:" in trading_context:
+            try:
+                pnl_line = [l for l in trading_context.split("\n") if "Net P&L:" in l][0]
+                pnl_str = pnl_line.split("Net P&L:")[1].strip()
+            except (IndexError, ValueError):
+                pass
+
+        if 'last trade' in msg_lower or 'recent trade' in msg_lower:
+            if has_positions:
+                return f"Your recent trades are all tracked here — check your dashboard for the full breakdown. Your 7-day net P&L is {pnl_str or 'on the dashboard'}. Want me to dig into a specific trade or symbol?"
+            return "No closed positions in the last 7 days. Once you make some trades, I'll have your full history right here."
+
         if 'mistake' in msg_lower or 'wrong' in msg_lower:
-            return "Looking at your data, focus on position sizing and avoid trading during the first 15 minutes after market open. Most emotional mistakes happen when we chase early moves."
-        elif 'improve' in msg_lower or 'better' in msg_lower:
-            return "Three things to improve: 1) Set a daily loss limit and stick to it, 2) Wait for confirmation before entries, 3) Journal every trade with your emotional state."
-        elif 'pattern' in msg_lower:
-            return "I can see your trading patterns in the data. The most impactful change would be reducing trade frequency - quality over quantity leads to better results."
-        elif 'time' in msg_lower or 'when' in msg_lower:
-            return "Based on general patterns, avoid trading in the first 15 mins (9:15-9:30) and last 30 mins (3:00-3:30). Your best setups likely come mid-morning."
-        else:
-            return "Focus on your process, not just profits. Set clear rules before market opens and follow them strictly. What specific aspect of your trading would you like to discuss?"
+            if has_alerts:
+                return "I can see some behavioral patterns firing in your recent trading. The biggest thing most traders mess up is trading right after a loss — that revenge instinct kicks in fast. Take a look at your alerts on the dashboard."
+            return "The most common mistake I see is chasing trades right after a loss. That revenge instinct is real. Next time you take a loss, step away for 15 minutes before your next trade."
+
+        if 'improve' in msg_lower or 'better' in msg_lower:
+            return "The single biggest improvement for most traders? Fewer trades, better quality. Pick your best setup and only trade that for a week. You'll be surprised how much your win rate improves."
+
+        if 'pattern' in msg_lower:
+            if has_alerts:
+                return "Your behavioral patterns are tracked automatically — I can see the alerts from the last 7 days. The key is noticing when they trigger and what you were feeling at that moment. Which pattern are you most curious about?"
+            return "No behavioral patterns triggered recently, which is a good sign. Keep trading with discipline and I'll flag anything that comes up."
+
+        if has_positions:
+            return f"Your 7-day numbers are right here — {pnl_str or 'check your dashboard for the details'}. What would you like to dig into? I can talk about specific trades, patterns, or your overall approach."
+
+        return "I'm your trading coach — I can see all your trades, patterns, and journal entries right here. Ask me anything about your trading and I'll give you a straight answer."
 
 # Singleton instance
 ai_service = AIService()

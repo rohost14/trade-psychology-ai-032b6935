@@ -8,7 +8,10 @@ from app.models.trade import Trade
 from app.models.risk_alert import RiskAlert
 from app.models.position import Position
 from app.models.broker_account import BrokerAccount
-from app.services.alert_service import AlertService
+from app.models.push_subscription import PushSubscription
+from app.services.daily_reports_service import daily_reports_service
+from app.services.whatsapp_service import whatsapp_service
+from app.services.push_notification_service import push_notification_service
 from app.core.config import settings
 import logging
 
@@ -22,7 +25,7 @@ class RetentionService:
     """
     
     def __init__(self):
-        self.alert_service = AlertService()
+        pass
     
     async def send_eod_report(
         self,
@@ -31,65 +34,104 @@ class RetentionService:
         db: AsyncSession
     ) -> bool:
         """
-        Generate and send End-of-Day report via WhatsApp.
-        
+        Generate and send End-of-Day report via WhatsApp + Push Notification.
+
         Called by cron at 3:30 PM IST daily.
+        Uses the comprehensive daily_reports_service for rich insights.
         """
         try:
-            # Get today's data
-            today_start = datetime.now(timezone.utc).replace(hour=0, minute=0, second=0, microsecond=0)
-            today_end = datetime.now(timezone.utc)
-            
-            # Get today's trades
-            trades_result = await db.execute(
-                select(Trade).where(
-                    Trade.broker_account_id == broker_account_id,
-                    Trade.order_timestamp >= today_start,
-                    Trade.order_timestamp <= today_end,
-                    Trade.status == "COMPLETE"
-                )
+            # Generate comprehensive post-market report
+            report = await daily_reports_service.generate_post_market_report(
+                broker_account_id=broker_account_id,
+                db=db
             )
-            today_trades = trades_result.scalars().all()
-            
-            # Get today's alerts
-            alerts_result = await db.execute(
-                select(RiskAlert).where(
-                    RiskAlert.broker_account_id == broker_account_id,
-                    RiskAlert.detected_at >= today_start,
-                    RiskAlert.detected_at <= today_end
-                )
-            )
-            today_alerts = alerts_result.scalars().all()
-            
-            # Get current positions for P&L
-            positions_result = await db.execute(
-                select(Position).where(
-                    Position.broker_account_id == broker_account_id
-                )
-            )
-            positions = positions_result.scalars().all()
-            total_pnl = sum(p.pnl or 0 for p in positions)
-            
-            # Generate report message
-            message = self._format_eod_report(
-                trades=today_trades,
-                alerts=today_alerts,
-                total_pnl=total_pnl
-            )
-            
+
+            if not report.get("has_trades"):
+                logger.info(f"No trades today for {broker_account_id}, skipping EOD report")
+                return True
+
+            # Format for WhatsApp
+            message = self._format_eod_report_v2(report)
+
             # Send via WhatsApp
-            twilio_message = self.alert_service.client.messages.create(
-                body=message,
-                from_=self.alert_service.from_number,
-                to=f"whatsapp:{phone_number}"
-            )
-            
-            logger.info(f"EOD report sent: {twilio_message.sid}")
+            try:
+                await whatsapp_service.send_message(phone_number, message)
+                logger.info(f"EOD WhatsApp report sent for {broker_account_id}")
+            except Exception as e:
+                logger.error(f"WhatsApp EOD failed: {e}")
+
+            # Also send push notification
+            try:
+                summary = report["summary"]
+                pnl = summary["total_pnl"]
+                pnl_emoji = "📈" if pnl >= 0 else "📉"
+
+                await push_notification_service.send_notification(
+                    broker_account_id=broker_account_id,
+                    db=db,
+                    title="📊 Your Post-Market Report",
+                    body=f"{pnl_emoji} P&L: ₹{pnl:,.0f} | {summary['total_trades']} trades | {summary['win_rate']}% win rate",
+                    data={"type": "post_market_report", "url": "/reports"}
+                )
+                logger.info(f"EOD push notification sent for {broker_account_id}")
+            except Exception as e:
+                logger.error(f"Push notification failed: {e}")
+
             return True
-            
+
         except Exception as e:
             logger.error(f"Failed to send EOD report: {e}", exc_info=True)
             return False
+
+    def _format_eod_report_v2(self, report: dict) -> str:
+        """Format comprehensive EOD report for WhatsApp."""
+        summary = report["summary"]
+        patterns = report.get("patterns_detected", [])
+        lessons = report.get("key_lessons", [])
+        tomorrow = report.get("tomorrow_focus", {})
+        journey = report.get("emotional_journey", {})
+
+        # Header
+        pnl = summary["total_pnl"]
+        pnl_emoji = "📈" if pnl >= 0 else "📉"
+
+        msg = f"📊 *POST-MARKET REPORT*\n\n"
+
+        # Summary
+        msg += f"{pnl_emoji} *P&L:* ₹{pnl:,.2f}\n"
+        msg += f"📝 *Trades:* {summary['total_trades']} ({summary['win_rate']}% win rate)\n"
+        msg += f"💰 *Best:* ₹{summary['largest_win']:,.0f} | *Worst:* ₹{summary['largest_loss']:,.0f}\n\n"
+
+        # Emotional Journey (simplified)
+        if journey.get("timeline"):
+            msg += "*Emotional Journey:*\n"
+            emojis = [t["emoji"] for t in journey["timeline"][:6]]
+            msg += " → ".join(emojis) + "\n\n"
+
+        # Patterns
+        if patterns:
+            danger_patterns = [p for p in patterns if p["severity"] == "danger"]
+            if danger_patterns:
+                msg += "*⚠️ Patterns Detected:*\n"
+                for p in danger_patterns[:3]:
+                    msg += f"• {p['pattern'].replace('_', ' ').title()} at {p['time']}\n"
+                msg += "\n"
+        else:
+            msg += "✅ *No danger patterns today*\n\n"
+
+        # Key Lesson
+        if lessons:
+            lesson = lessons[0]
+            msg += f"*💡 Key Lesson:*\n{lesson['lesson']}\n\n"
+
+        # Tomorrow Focus
+        if tomorrow:
+            msg += f"*🎯 Tomorrow's Focus:*\n{tomorrow.get('primary', 'Stay disciplined')}\n"
+            msg += f"Rule: {tomorrow.get('rule', 'Follow your plan')}\n"
+
+        msg += f"\n_TradeMentor AI_"
+
+        return msg
     
     def _format_eod_report(
         self,
@@ -163,63 +205,113 @@ class RetentionService:
         db: AsyncSession
     ) -> bool:
         """
-        Generate and send Morning Brief via WhatsApp.
-        
+        Generate and send Morning Brief via WhatsApp + Push Notification.
+
         Called by cron at 8:30 AM IST daily.
+        Uses the comprehensive daily_reports_service for rich insights.
         """
         try:
-            # Get yesterday's summary
-            yesterday = datetime.now(timezone.utc) - timedelta(days=1)
-            yesterday_start = yesterday.replace(hour=0, minute=0, second=0, microsecond=0)
-            yesterday_end = yesterday.replace(hour=23, minute=59, second=59, microsecond=999999)
-            
-            # Yesterday's alerts
-            alerts_result = await db.execute(
-                select(RiskAlert).where(
-                    RiskAlert.broker_account_id == broker_account_id,
-                    RiskAlert.detected_at >= yesterday_start,
-                    RiskAlert.detected_at <= yesterday_end
-                )
+            # Generate comprehensive morning briefing
+            briefing = await daily_reports_service.generate_morning_briefing(
+                broker_account_id=broker_account_id,
+                db=db
             )
-            yesterday_alerts = alerts_result.scalars().all()
-            
-            # Get current risk state (from last 4 hours of alerts)
-            recent_cutoff = datetime.now(timezone.utc) - timedelta(hours=4)
-            recent_alerts_result = await db.execute(
-                select(RiskAlert).where(
-                    RiskAlert.broker_account_id == broker_account_id,
-                    RiskAlert.detected_at >= recent_cutoff,
-                    RiskAlert.acknowledged_at.is_(None)
-                )
-            )
-            recent_alerts = recent_alerts_result.scalars().all()
-            
-            # Determine risk state
-            risk_state = "safe"
-            if any(a.severity == "danger" for a in recent_alerts):
-                risk_state = "danger"
-            elif any(a.severity == "caution" for a in recent_alerts):
-                risk_state = "caution"
-            
-            # Generate message
-            message = self._format_morning_brief(
-                yesterday_alerts=yesterday_alerts,
-                current_risk_state=risk_state
-            )
-            
+
+            # Format for WhatsApp
+            message = self._format_morning_brief_v2(briefing)
+
             # Send via WhatsApp
-            twilio_message = self.alert_service.client.messages.create(
-                body=message,
-                from_=self.alert_service.from_number,
-                to=f"whatsapp:{phone_number}"
-            )
-            
-            logger.info(f"Morning brief sent: {twilio_message.sid}")
+            try:
+                await whatsapp_service.send_message(phone_number, message)
+                logger.info(f"Morning brief WhatsApp sent for {broker_account_id}")
+            except Exception as e:
+                logger.error(f"WhatsApp morning brief failed: {e}")
+
+            # Also send push notification
+            try:
+                readiness = briefing.get("readiness_score", {})
+                score = readiness.get("score", 100)
+                status = readiness.get("status", "ready")
+
+                if status == "warning":
+                    title = "⚠️ Morning Alert: High Risk Day"
+                elif status == "caution":
+                    title = "🟡 Morning Brief: Trade Carefully"
+                else:
+                    title = "🌅 Morning Brief: Ready to Trade"
+
+                # Build body with watch-outs
+                watch_outs = briefing.get("watch_outs", [])
+                if watch_outs:
+                    body = watch_outs[0].get("message", "Review your morning briefing")
+                else:
+                    body = f"Readiness: {score}/100. {readiness.get('message', 'Stay disciplined!')}"
+
+                await push_notification_service.send_notification(
+                    broker_account_id=broker_account_id,
+                    db=db,
+                    title=title,
+                    body=body,
+                    data={"type": "morning_briefing", "url": "/reports"}
+                )
+                logger.info(f"Morning push notification sent for {broker_account_id}")
+            except Exception as e:
+                logger.error(f"Push notification failed: {e}")
+
             return True
-            
+
         except Exception as e:
             logger.error(f"Failed to send morning brief: {e}", exc_info=True)
             return False
+
+    def _format_morning_brief_v2(self, briefing: dict) -> str:
+        """Format comprehensive morning briefing for WhatsApp."""
+        readiness = briefing.get("readiness_score", {})
+        day_warning = briefing.get("day_warning")
+        recent = briefing.get("recent_summary", {})
+        watch_outs = briefing.get("watch_outs", [])
+        checklist = briefing.get("checklist", [])
+
+        msg = f"🌅 *MORNING READINESS BRIEF*\n"
+        msg += f"_{briefing.get('day_name', 'Today')}_\n\n"
+
+        # Readiness Score
+        score = readiness.get("score", 100)
+        status = readiness.get("status", "ready")
+        if status == "warning":
+            score_emoji = "🔴"
+        elif status == "caution":
+            score_emoji = "🟡"
+        else:
+            score_emoji = "✅"
+
+        msg += f"{score_emoji} *Readiness:* {score}/100\n"
+        msg += f"{readiness.get('message', '')}\n\n"
+
+        # Day Warning
+        if day_warning and day_warning.get("is_danger_day"):
+            msg += f"⚠️ *WARNING:* {day_warning['message']}\n\n"
+
+        # Recent Summary
+        if recent.get("has_recent_trades"):
+            msg += f"*Recent:* {recent.get('message', '')}\n\n"
+
+        # Watch-Outs (top 3)
+        if watch_outs:
+            msg += "*Today's Watch-Outs:*\n"
+            for wo in watch_outs[:3]:
+                msg += f"{wo['icon']} {wo['message']}\n"
+            msg += "\n"
+
+        # Quick Checklist
+        msg += "*Mental Checklist:*\n"
+        for item in checklist[:3]:
+            msg += f"☐ {item['item']}\n"
+
+        msg += f"\n*What's your ONE rule for today?*\n"
+        msg += f"\n_Markets open at 9:15 AM_\n_TradeMentor AI_"
+
+        return msg
     
     def _format_morning_brief(
         self,

@@ -54,7 +54,7 @@ export function StreakTrackerCard({ streak, goalDays = 30 }: StreakTrackerCardPr
           <p className="text-5xl font-bold font-mono text-primary">
             {streak.current_streak_days}
           </p>
-          <p className="text-sm text-muted-foreground mt-1">days following all goals</p>
+          <p className="text-sm text-muted-foreground mt-1">days without a high/critical alert</p>
         </div>
         
         {/* Progress to Goal */}
@@ -89,9 +89,9 @@ export function StreakTrackerCard({ streak, goalDays = 30 }: StreakTrackerCardPr
                   day.status === 'empty' && "bg-muted"
                 )}
                 title={
-                  day.status === 'success' ? 'All goals followed' :
-                  day.status === 'broken' ? 'Goals broken' :
-                  day.status === 'non-trading' ? 'Non-trading day' :
+                  day.status === 'success' ? 'Clean — no high/critical alert' :
+                  day.status === 'broken' ? 'High or critical alert triggered' :
+                  day.status === 'non-trading' ? 'No alerts recorded' :
                   'No data'
                 }
               />
@@ -100,15 +100,15 @@ export function StreakTrackerCard({ streak, goalDays = 30 }: StreakTrackerCardPr
           <div className="flex items-center gap-4 text-xs text-muted-foreground">
             <div className="flex items-center gap-1">
               <div className="w-3 h-3 rounded-sm bg-success" />
-              <span>Followed</span>
+              <span>Clean</span>
             </div>
             <div className="flex items-center gap-1">
               <div className="w-3 h-3 rounded-sm bg-destructive" />
-              <span>Broken</span>
+              <span>Alert triggered</span>
             </div>
             <div className="flex items-center gap-1">
               <div className="w-3 h-3 rounded-sm bg-muted-foreground/30" />
-              <span>No trading</span>
+              <span>No data</span>
             </div>
           </div>
         </div>

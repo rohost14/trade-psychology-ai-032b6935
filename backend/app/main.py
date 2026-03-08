@@ -4,8 +4,29 @@ from fastapi.responses import JSONResponse
 from fastapi.middleware.cors import CORSMiddleware
 from app.core.config import settings
 import logging
+import sentry_sdk
+from sentry_sdk.integrations.fastapi import FastApiIntegration
+from sentry_sdk.integrations.asyncio import AsyncioIntegration
+from sentry_sdk.integrations.logging import LoggingIntegration
 
 logger = logging.getLogger(__name__)
+
+# Sentry — initialise before the app starts so all errors are captured
+# Set SENTRY_DSN in .env. Without DSN, this is a no-op (safe to leave in).
+if settings.SENTRY_DSN:
+    sentry_sdk.init(
+        dsn=settings.SENTRY_DSN,
+        environment=settings.ENVIRONMENT,
+        integrations=[
+            FastApiIntegration(),
+            AsyncioIntegration(),
+            LoggingIntegration(level=logging.WARNING, event_level=logging.ERROR),
+        ],
+        traces_sample_rate=0.1,   # 10% of requests traced (low overhead)
+        profiles_sample_rate=0.0,  # profiling off for now
+        send_default_pii=False,    # no personal data in error reports
+    )
+    logger.info("Sentry initialised")
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -31,7 +52,7 @@ app = FastAPI(
 # CORS - Allow frontend to call backend
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],  # For hackathon - allow all
+    allow_origins=settings.BACKEND_CORS_ORIGINS,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -41,10 +62,10 @@ app.add_middleware(
 # Global Exception Handler
 @app.exception_handler(Exception)
 async def global_exception_handler(request: Request, exc: Exception):
-    print(f"Global exception: {exc}")
+    logger.error(f"Global exception: {exc}", exc_info=True)
     return JSONResponse(
         status_code=500,
-        content={"message": "Internal Server Error", "detail": str(exc)},
+        content={"message": "Internal Server Error"},
     )
 
 # Health Check
@@ -81,4 +102,28 @@ app.include_router(reports.router, prefix="/api/reports", tags=["reports"])
 
 from app.api import goals
 app.include_router(goals.router, prefix="/api/goals", tags=["goals"])
+
+from app.api import websocket
+app.include_router(websocket.router, prefix="/api", tags=["websocket"])
+
+from app.api import notifications
+app.include_router(notifications.router, prefix="/api/notifications", tags=["notifications"])
+
+from app.api import journal
+app.include_router(journal.router, prefix="/api/journal", tags=["journal"])
+
+from app.api import profile
+app.include_router(profile.router, prefix="/api/profile", tags=["profile"])
+
+from app.api import cooldown
+app.include_router(cooldown.router, prefix="/api/cooldown", tags=["cooldown"])
+
+from app.api import personalization
+app.include_router(personalization.router, prefix="/api/personalization", tags=["personalization"])
+
+from app.api import danger_zone
+app.include_router(danger_zone.router, prefix="/api/danger-zone", tags=["danger-zone"])
+
+from app.api import shield
+app.include_router(shield.router, prefix="/api/shield", tags=["shield"])
 

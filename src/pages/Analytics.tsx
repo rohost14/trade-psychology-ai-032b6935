@@ -1,171 +1,32 @@
-import { useState, useEffect } from 'react';
-import { motion } from 'framer-motion';
+import { useState } from 'react';
 import { Link } from 'react-router-dom';
-import { BarChart3, Link2, Loader2 } from 'lucide-react';
-import PerformanceSummaryCard from '@/components/analytics/PerformanceSummaryCard';
-import BehavioralInsightsCard from '@/components/analytics/BehavioralInsightsCard';
-import TimeAnalysisCard from '@/components/analytics/TimeAnalysisCard';
-import AIInsightsCard from '@/components/analytics/AIInsightsCard';
-import ProfitCurveChart from '@/components/analytics/ProfitCurveChart';
+import { BarChart3, Link2 } from 'lucide-react';
+import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
 import { Button } from '@/components/ui/button';
+import { cn } from '@/lib/utils';
 import { useBroker } from '@/contexts/BrokerContext';
-import { api } from '@/lib/api';
+import ExportReportButton from '@/components/analytics/ExportReportButton';
+import OverviewTab from '@/components/analytics/OverviewTab';
+import BehaviorTab from '@/components/analytics/BehaviorTab';
+import PerformanceTab from '@/components/analytics/PerformanceTab';
+import RiskTab from '@/components/analytics/RiskTab';
 
-interface PerformanceData {
-  totalPnl: number;
-  winRate: number;
-  totalTrades: number;
-  avgWin: number;
-  avgLoss: number;
-  profitFactor: number;
-  bestDay: { date: string; pnl: number };
-  worstDay: { date: string; pnl: number };
-}
-
-interface BehavioralPattern {
-  id: string;
-  name: string;
-  type: 'danger' | 'strength';
-  count: number;
-  impact: string;
-  description: string;
-  trend: 'up' | 'down' | 'stable';
-}
-
-interface TimeData {
-  hour: string;
-  pnl: number;
-  trades: number;
-  wins?: number;
-  losses?: number;
-}
-
-interface AIInsight {
-  id: string;
-  title: string;
-  description: string;
-  action: string;
-  priority: 'high' | 'medium' | 'low';
-}
+const PERIOD_OPTIONS = [
+  { label: '7D', days: 7 },
+  { label: '14D', days: 14 },
+  { label: '30D', days: 30 },
+  { label: '90D', days: 90 },
+] as const;
 
 export default function Analytics() {
   const { isConnected, isLoading: brokerLoading, account } = useBroker();
-  const [isLoading, setIsLoading] = useState(true);
-  const [performanceData, setPerformanceData] = useState<PerformanceData | null>(null);
-  const [behavioralPatterns, setBehavioralPatterns] = useState<BehavioralPattern[]>([]);
-  const [timeData, setTimeData] = useState<TimeData[]>([]);
-  const [aiInsights, setAiInsights] = useState<AIInsight[]>([]);
-  const [hourlyPnlData, setHourlyPnlData] = useState<TimeData[]>([]);
-
-  useEffect(() => {
-    if (!isConnected || !account) {
-      setIsLoading(false);
-      return;
-    }
-
-    const fetchAnalytics = async () => {
-      setIsLoading(true);
-      try {
-        // Fetch trades for analysis
-        const tradesRes = await api.get('/api/trades/', {
-          params: { broker_account_id: account.id, limit: 200 }
-        });
-        const trades = tradesRes.data.trades || [];
-
-        if (trades.length === 0) {
-          setIsLoading(false);
-          return;
-        }
-
-        // Calculate performance data from trades
-        const winners = trades.filter((t: any) => (t.pnl || 0) > 0);
-        const losers = trades.filter((t: any) => (t.pnl || 0) < 0);
-        const totalPnl = trades.reduce((sum: number, t: any) => sum + (t.pnl || 0), 0);
-        const avgWin = winners.length > 0
-          ? winners.reduce((sum: number, t: any) => sum + (t.pnl || 0), 0) / winners.length
-          : 0;
-        const avgLoss = losers.length > 0
-          ? losers.reduce((sum: number, t: any) => sum + (t.pnl || 0), 0) / losers.length
-          : 0;
-
-        setPerformanceData({
-          totalPnl,
-          winRate: trades.length > 0 ? (winners.length / trades.length) * 100 : 0,
-          totalTrades: trades.length,
-          avgWin,
-          avgLoss,
-          profitFactor: avgLoss !== 0 ? Math.abs(avgWin / avgLoss) : 0,
-          bestDay: { date: '-', pnl: 0 },
-          worstDay: { date: '-', pnl: 0 },
-        });
-
-        // Try to fetch behavioral analysis from backend
-        try {
-          const behavioralRes = await api.get('/api/behavioral/patterns', {
-            params: { broker_account_id: account.id }
-          });
-          const patterns = behavioralRes.data.patterns || [];
-          setBehavioralPatterns(patterns.map((p: any) => ({
-            id: p.id || String(Math.random()),
-            name: p.pattern_type || p.name,
-            type: p.severity === 'danger' ? 'danger' : 'strength',
-            count: p.count || 1,
-            impact: p.impact || '₹0',
-            description: p.description || '',
-            trend: 'stable' as const,
-          })));
-        } catch (e) {
-          console.log('Behavioral patterns not available');
-        }
-
-        // Calculate hourly performance
-        const hourlyMap = new Map<string, { pnl: number; trades: number; wins: number; losses: number }>();
-        trades.forEach((t: any) => {
-          const hour = new Date(t.order_timestamp || t.created_at).getHours();
-          const hourKey = `${hour}:00`;
-          const existing = hourlyMap.get(hourKey) || { pnl: 0, trades: 0, wins: 0, losses: 0 };
-          existing.pnl += t.pnl || 0;
-          existing.trades += 1;
-          if ((t.pnl || 0) > 0) existing.wins += 1;
-          else if ((t.pnl || 0) < 0) existing.losses += 1;
-          hourlyMap.set(hourKey, existing);
-        });
-
-        const hourlyData = Array.from(hourlyMap.entries())
-          .map(([hour, data]) => ({ hour, ...data }))
-          .sort((a, b) => parseInt(a.hour) - parseInt(b.hour));
-
-        setTimeData(hourlyData);
-        setHourlyPnlData(hourlyData);
-
-      } catch (error) {
-        console.error('Failed to fetch analytics:', error);
-      } finally {
-        setIsLoading(false);
-      }
-    };
-
-    fetchAnalytics();
-  }, [isConnected, account]);
-
-  // Loading state
-  if (brokerLoading || isLoading) {
-    return (
-      <div className="max-w-5xl mx-auto pb-12 flex items-center justify-center min-h-[60vh]">
-        <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
-      </div>
-    );
-  }
+  const [days, setDays] = useState(30);
 
   // Not connected state
-  if (!isConnected) {
+  if (!brokerLoading && !isConnected) {
     return (
-      <div className="max-w-5xl mx-auto pb-12">
-        <motion.div
-          className="flex flex-col items-center justify-center min-h-[60vh]"
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-        >
+      <div className="max-w-6xl mx-auto pb-12">
+        <div className="flex flex-col items-center justify-center min-h-[60vh]">
           <div className="p-4 rounded-full bg-primary/10 mb-6">
             <Link2 className="h-12 w-12 text-primary" />
           </div>
@@ -179,83 +40,73 @@ export default function Analytics() {
               Connect Zerodha
             </Button>
           </Link>
-        </motion.div>
-      </div>
-    );
-  }
-
-  // No data state
-  if (!performanceData || performanceData.totalTrades === 0) {
-    return (
-      <div className="max-w-5xl mx-auto pb-12">
-        <motion.div
-          initial={{ opacity: 0, y: -10 }}
-          animate={{ opacity: 1, y: 0 }}
-          className="mb-6"
-        >
-          <h1 className="text-2xl font-bold text-foreground">Analytics</h1>
-          <p className="text-sm text-muted-foreground mt-1">
-            Weekly performance insights and behavioral patterns
-          </p>
-        </motion.div>
-
-        <motion.div
-          className="flex flex-col items-center justify-center min-h-[50vh] bg-card rounded-lg border border-border"
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-        >
-          <div className="p-4 rounded-full bg-muted mb-6">
-            <BarChart3 className="h-12 w-12 text-muted-foreground" />
-          </div>
-          <h2 className="text-xl font-semibold text-foreground mb-2">No Trading Data Yet</h2>
-          <p className="text-muted-foreground text-center max-w-md">
-            Start trading to see your performance analytics and behavioral patterns here.
-            Your data will appear after you make some trades.
-          </p>
-        </motion.div>
+        </div>
       </div>
     );
   }
 
   return (
-    <div className="max-w-5xl mx-auto pb-12">
+    <div className="max-w-6xl mx-auto pb-12">
       {/* Page Header */}
-      <motion.div
-        initial={{ opacity: 0, y: -10 }}
-        animate={{ opacity: 1, y: 0 }}
-        className="mb-6"
-      >
-        <h1 className="text-2xl font-bold text-foreground">Analytics</h1>
-        <p className="text-sm text-muted-foreground mt-1">
-          Weekly performance insights and behavioral patterns
-        </p>
-      </motion.div>
-
-      {/* Content */}
-      <div className="space-y-6">
-        {/* Performance Summary */}
-        <PerformanceSummaryCard data={performanceData} />
-
-        {/* Behavioral Patterns - Dangers & Strengths */}
-        {behavioralPatterns.length > 0 && (
-          <BehavioralInsightsCard patterns={behavioralPatterns} />
-        )}
-
-        {/* Time Analysis */}
-        {timeData.length > 0 && (
-          <TimeAnalysisCard hourlyData={timeData} />
-        )}
-
-        {/* P&L Curve */}
-        {hourlyPnlData.length > 0 && (
-          <ProfitCurveChart hourlyData={hourlyPnlData} />
-        )}
-
-        {/* AI Insights */}
-        {aiInsights.length > 0 && (
-          <AIInsightsCard insights={aiInsights} />
-        )}
+      <div className="mb-6 flex items-start justify-between">
+        <div>
+          <h1 className="text-2xl font-bold text-foreground">Analytics</h1>
+          <p className="text-sm text-muted-foreground mt-1">
+            Performance insights and behavioral patterns
+          </p>
+        </div>
+        <div className="flex items-center gap-3">
+          {/* Period Selector */}
+          <div className="flex items-center gap-1 p-1 bg-muted rounded-lg">
+            {PERIOD_OPTIONS.map((opt) => (
+              <button
+                key={opt.days}
+                onClick={() => setDays(opt.days)}
+                className={cn(
+                  'px-3 py-1.5 text-xs font-medium rounded-md transition-all',
+                  days === opt.days
+                    ? 'bg-background text-foreground shadow-sm'
+                    : 'text-muted-foreground hover:text-foreground'
+                )}
+              >
+                {opt.label}
+              </button>
+            ))}
+          </div>
+          {account?.id && <ExportReportButton brokerAccountId={account.id} />}
+        </div>
       </div>
+
+      {/* Tabs */}
+      <Tabs defaultValue="overview">
+        <TabsList className="w-full justify-start bg-muted/50 mb-6">
+          <TabsTrigger value="overview" className="gap-1.5">
+            Overview
+          </TabsTrigger>
+          <TabsTrigger value="behavior" className="gap-1.5">
+            Behavior
+          </TabsTrigger>
+          <TabsTrigger value="performance" className="gap-1.5">
+            Performance
+          </TabsTrigger>
+          <TabsTrigger value="risk" className="gap-1.5">
+            Risk
+          </TabsTrigger>
+        </TabsList>
+
+        <TabsContent value="overview">
+          <OverviewTab days={days} />
+        </TabsContent>
+        <TabsContent value="behavior">
+          <BehaviorTab days={days} />
+        </TabsContent>
+        <TabsContent value="performance">
+          <PerformanceTab days={days} />
+        </TabsContent>
+        <TabsContent value="risk">
+          <RiskTab days={days} />
+        </TabsContent>
+      </Tabs>
     </div>
   );
 }

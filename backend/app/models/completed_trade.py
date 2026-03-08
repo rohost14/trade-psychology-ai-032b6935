@@ -1,0 +1,63 @@
+import uuid
+from datetime import datetime, timezone
+from sqlalchemy import Column, String, Integer, Boolean, Numeric, TIMESTAMP, text, ForeignKey, ARRAY
+from sqlalchemy.dialects.postgresql import UUID
+from sqlalchemy.orm import relationship
+from app.core.database import Base
+
+
+class CompletedTrade(Base):
+    """
+    Flat-to-flat trade round (Layer 3: Decision Lifecycle).
+
+    Created ONLY when a position goes from non-zero to zero via FIFO matching.
+    One row = one complete trading decision.
+
+    Immutable once created — historical facts are never rewritten.
+    """
+    __tablename__ = "completed_trades"
+
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    broker_account_id = Column(UUID(as_uuid=True), ForeignKey("broker_accounts.id", ondelete="CASCADE"), nullable=False, index=True)
+
+    # Instrument
+    tradingsymbol = Column(String(100), nullable=False)
+    exchange = Column(String(20), nullable=False)
+    instrument_type = Column(String(20))       # EQ, FUT, CE, PE
+    product = Column(String(20))               # MIS, NRML, MTF
+
+    # Round
+    direction = Column(String(10))             # LONG, SHORT
+    total_quantity = Column(Integer)            # Peak position size (in units, lot_size already factored)
+    num_entries = Column(Integer, default=1)    # Count of entry fills (not unique trade_ids)
+    num_exits = Column(Integer, default=1)      # Count of exit fills (not unique trade_ids)
+
+    # Prices (weighted averages from FIFO matching)
+    avg_entry_price = Column(Numeric(15, 4))
+    avg_exit_price = Column(Numeric(15, 4))
+
+    # P&L
+    realized_pnl = Column(Numeric(15, 4))
+
+    # Timing
+    entry_time = Column(TIMESTAMP(timezone=True))
+    exit_time = Column(TIMESTAMP(timezone=True))
+    duration_minutes = Column(Integer)
+
+    # Direction flip: true when closing fill both closed this round
+    # AND opened the reverse direction (psychologically significant)
+    closed_by_flip = Column(Boolean, default=False)
+
+    # Fill references — audit trail back to trades table ONLY (not for counting)
+    entry_trade_ids = Column(ARRAY(String))
+    exit_trade_ids = Column(ARRAY(String))
+
+    # Status — always 'closed' (immutable once created)
+    status = Column(String(20), default='closed')
+
+    created_at = Column(TIMESTAMP(timezone=True), server_default=text("now()"))
+    updated_at = Column(TIMESTAMP(timezone=True), server_default=text("now()"))
+
+    # Relationships
+    broker_account = relationship("BrokerAccount")
+    feature = relationship("CompletedTradeFeature", back_populates="completed_trade", uselist=False, cascade="all, delete-orphan")

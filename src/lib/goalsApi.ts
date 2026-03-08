@@ -14,9 +14,7 @@ export interface GoalsApiResponse {
 
 export async function fetchGoals(brokerAccountId: string): Promise<GoalsApiResponse | null> {
   try {
-    const response = await api.get('/api/goals/', {
-      params: { broker_account_id: brokerAccountId }
-    });
+    const response = await api.get('/api/goals/');
     return response.data;
   } catch (error) {
     console.error('Error fetching goals:', error);
@@ -33,8 +31,6 @@ export async function updateGoals(
     const response = await api.put('/api/goals/', {
       ...updates,
       reason,
-    }, {
-      params: { broker_account_id: brokerAccountId }
     });
     return response.data;
   } catch (error) {
@@ -50,7 +46,7 @@ export async function logGoalBroken(
 ): Promise<boolean> {
   try {
     await api.post('/api/goals/log-broken', null, {
-      params: { broker_account_id: brokerAccountId, goal_name: goalName, cost }
+      params: { goal_name: goalName, cost }
     });
     return true;
   } catch (error) {
@@ -68,8 +64,6 @@ export async function updateStreak(
     const response = await api.post('/api/goals/streak/increment', {
       all_goals_followed: allGoalsFollowed,
       goals_broken: goalsBroken,
-    }, {
-      params: { broker_account_id: brokerAccountId }
     });
     return response.data;
   } catch (error) {
@@ -80,9 +74,7 @@ export async function updateStreak(
 
 export async function fetchStreak(brokerAccountId: string): Promise<StreakData | null> {
   try {
-    const response = await api.get('/api/goals/streak', {
-      params: { broker_account_id: brokerAccountId }
-    });
+    const response = await api.get('/api/goals/streak');
     return response.data;
   } catch (error) {
     console.error('Error fetching streak:', error);

@@ -1,12 +1,17 @@
 from fastapi import APIRouter, Depends, HTTPException
+from pydantic import BaseModel
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, desc
 from uuid import UUID
 from datetime import datetime, timezone
+from typing import List
 import logging
 
 from app.core.database import get_db
-from app.models.goal import TradingGoal, CommitmentLog, StreakData
+from app.api.deps import get_verified_broker_account_id
+from app.models.goal import Goal, CommitmentLog, StreakData
+
+
 from app.schemas.goal import (
     TradingGoalResponse,
     TradingGoalUpdate,
@@ -18,6 +23,11 @@ from app.schemas.goal import (
 
 router = APIRouter()
 logger = logging.getLogger(__name__)
+
+
+class StreakIncrementRequest(BaseModel):
+    all_goals_followed: bool = True
+    goals_broken: List[str] = []
 
 
 def get_days_until_review() -> int:
@@ -40,19 +50,19 @@ def is_review_window_open() -> bool:
 
 @router.get("/", response_model=GoalsFullResponse)
 async def get_goals(
-    broker_account_id: UUID,
+    broker_account_id: UUID = Depends(get_verified_broker_account_id),
     db: AsyncSession = Depends(get_db)
 ):
     """Get all goals data for a broker account."""
     # Get or create goals
     result = await db.execute(
-        select(TradingGoal).where(TradingGoal.broker_account_id == broker_account_id)
+        select(Goal).where(Goal.broker_account_id == broker_account_id)
     )
     goals = result.scalar_one_or_none()
 
     if not goals:
         # Create default goals
-        goals = TradingGoal(broker_account_id=broker_account_id)
+        goals = Goal(broker_account_id=broker_account_id)
         db.add(goals)
         await db.commit()
         await db.refresh(goals)
@@ -95,51 +105,56 @@ async def get_goals(
 
 @router.put("/", response_model=TradingGoalResponse)
 async def update_goals(
-    broker_account_id: UUID,
     updates: TradingGoalUpdate,
+    broker_account_id: UUID = Depends(get_verified_broker_account_id),
     db: AsyncSession = Depends(get_db)
 ):
     """Update trading goals."""
-    result = await db.execute(
-        select(TradingGoal).where(TradingGoal.broker_account_id == broker_account_id)
-    )
-    goals = result.scalar_one_or_none()
-
-    if not goals:
-        goals = TradingGoal(broker_account_id=broker_account_id)
-        db.add(goals)
-
-    # Track changes for commitment log
-    changes = []
-    update_data = updates.model_dump(exclude_unset=True, exclude={'reason'})
-
-    for field, new_value in update_data.items():
-        old_value = getattr(goals, field)
-        if old_value != new_value:
-            changes.append(f"{field}: {old_value} → {new_value}")
-            setattr(goals, field, new_value)
-
-    goals.last_modified_at = datetime.now(timezone.utc)
-
-    # Log the change
-    if changes:
-        log_entry = CommitmentLog(
-            broker_account_id=broker_account_id,
-            log_type="goal_modified",
-            description="; ".join(changes),
-            reason=updates.reason or "User modified goals",
+    try:
+        result = await db.execute(
+            select(Goal).where(Goal.broker_account_id == broker_account_id)
         )
-        db.add(log_entry)
+        goals = result.scalar_one_or_none()
 
-    await db.commit()
-    await db.refresh(goals)
+        if not goals:
+            goals = Goal(broker_account_id=broker_account_id)
+            db.add(goals)
 
-    return goals
+        # Track changes for commitment log
+        changes = []
+        update_data = updates.model_dump(exclude_unset=True, exclude={'reason'})
+
+        for field, new_value in update_data.items():
+            old_value = getattr(goals, field)
+            if old_value != new_value:
+                changes.append(f"{field}: {old_value} -> {new_value}")
+                setattr(goals, field, new_value)
+
+        goals.last_modified_at = datetime.now(timezone.utc)
+
+        # Log the change
+        if changes:
+            log_entry = CommitmentLog(
+                broker_account_id=broker_account_id,
+                log_type="goal_modified",
+                description="; ".join(changes),
+                reason=updates.reason or "User modified goals",
+            )
+            db.add(log_entry)
+
+        await db.commit()
+        await db.refresh(goals)
+
+        return goals
+    except Exception as e:
+        await db.rollback()
+        logger.error(f"Failed to update goals: {e}")
+        raise HTTPException(status_code=500, detail="Internal server error")
 
 
 @router.get("/commitment-log", response_model=CommitmentLogResponse)
 async def get_commitment_log(
-    broker_account_id: UUID,
+    broker_account_id: UUID = Depends(get_verified_broker_account_id),
     limit: int = 50,
     db: AsyncSession = Depends(get_db)
 ):
@@ -160,38 +175,43 @@ async def get_commitment_log(
 
 @router.post("/log-broken")
 async def log_goal_broken(
-    broker_account_id: UUID,
-    goal_name: str,
+    broker_account_id: UUID = Depends(get_verified_broker_account_id),
+    goal_name: str = "",
     cost: float = 0,
     db: AsyncSession = Depends(get_db)
 ):
     """Log when a goal is broken."""
-    log_entry = CommitmentLog(
-        broker_account_id=broker_account_id,
-        log_type="goal_broken",
-        description=f"{goal_name} was not followed",
-        cost=cost,
-    )
-    db.add(log_entry)
+    try:
+        log_entry = CommitmentLog(
+            broker_account_id=broker_account_id,
+            log_type="goal_broken",
+            description=f"{goal_name} was not followed",
+            cost=cost,
+        )
+        db.add(log_entry)
 
-    # Reset streak
-    streak_result = await db.execute(
-        select(StreakData).where(StreakData.broker_account_id == broker_account_id)
-    )
-    streak = streak_result.scalar_one_or_none()
+        # Reset streak
+        streak_result = await db.execute(
+            select(StreakData).where(StreakData.broker_account_id == broker_account_id)
+        )
+        streak = streak_result.scalar_one_or_none()
 
-    if streak:
-        streak.current_streak_days = 0
-        streak.streak_start_date = None
+        if streak:
+            streak.current_streak_days = 0
+            streak.streak_start_date = None
 
-    await db.commit()
+        await db.commit()
 
-    return {"status": "logged", "goal": goal_name, "cost": cost}
+        return {"status": "logged", "goal": goal_name, "cost": cost}
+    except Exception as e:
+        await db.rollback()
+        logger.error(f"Failed to log broken goal: {e}")
+        raise HTTPException(status_code=500, detail="Internal server error")
 
 
 @router.get("/streak", response_model=StreakDataResponse)
 async def get_streak(
-    broker_account_id: UUID,
+    broker_account_id: UUID = Depends(get_verified_broker_account_id),
     db: AsyncSession = Depends(get_db)
 ):
     """Get streak data."""
@@ -217,79 +237,83 @@ async def get_streak(
 
 @router.post("/streak/increment")
 async def increment_streak(
-    broker_account_id: UUID,
-    all_goals_followed: bool,
-    goals_broken: list[str] = [],
+    body: StreakIncrementRequest,
+    broker_account_id: UUID = Depends(get_verified_broker_account_id),
     db: AsyncSession = Depends(get_db)
 ):
     """Update streak for today."""
-    result = await db.execute(
-        select(StreakData).where(StreakData.broker_account_id == broker_account_id)
-    )
-    streak = result.scalar_one_or_none()
+    try:
+        result = await db.execute(
+            select(StreakData).where(StreakData.broker_account_id == broker_account_id)
+        )
+        streak = result.scalar_one_or_none()
 
-    if not streak:
-        streak = StreakData(broker_account_id=broker_account_id)
-        db.add(streak)
+        if not streak:
+            streak = StreakData(broker_account_id=broker_account_id)
+            db.add(streak)
 
-    today = datetime.now(timezone.utc).strftime("%Y-%m-%d")
+        today = datetime.now(timezone.utc).strftime("%Y-%m-%d")
 
-    # Check if already recorded today
-    daily_status = streak.daily_status or []
-    if daily_status and daily_status[0].get("date") == today:
-        return {"status": "already_recorded", "streak": streak.current_streak_days}
+        # Check if already recorded today
+        daily_status = streak.daily_status or []
+        if daily_status and daily_status[0].get("date") == today:
+            return {"status": "already_recorded", "streak": streak.current_streak_days}
 
-    # Add today's status
-    daily_status.insert(0, {
-        "date": today,
-        "all_goals_followed": all_goals_followed,
-        "goals_broken": goals_broken,
-        "trading_day": True,
-    })
+        # Add today's status
+        daily_status.insert(0, {
+            "date": today,
+            "all_goals_followed": body.all_goals_followed,
+            "goals_broken": body.goals_broken,
+            "trading_day": True,
+        })
 
-    # Keep last 60 days
-    streak.daily_status = daily_status[:60]
+        # Keep last 60 days
+        streak.daily_status = daily_status[:60]
 
-    # Update streak count
-    if all_goals_followed:
-        streak.current_streak_days += 1
-        if not streak.streak_start_date:
-            streak.streak_start_date = datetime.now(timezone.utc)
-        if streak.current_streak_days > streak.longest_streak_days:
-            streak.longest_streak_days = streak.current_streak_days
+        # Update streak count
+        if body.all_goals_followed:
+            streak.current_streak_days += 1
+            if not streak.streak_start_date:
+                streak.streak_start_date = datetime.now(timezone.utc)
+            if streak.current_streak_days > streak.longest_streak_days:
+                streak.longest_streak_days = streak.current_streak_days
 
-        # Check milestones
-        milestones = streak.milestones_achieved or []
-        milestone_thresholds = [
-            (7, "7-Day Discipline"),
-            (14, "2-Week Warrior"),
-            (30, "Monthly Master"),
-            (60, "Trading Zen"),
-        ]
-        for days, label in milestone_thresholds:
-            if streak.current_streak_days == days:
-                if not any(m.get("days") == days for m in milestones):
-                    milestones.append({
-                        "days": days,
-                        "achieved_at": datetime.now(timezone.utc).isoformat(),
-                        "label": label,
-                    })
-                    # Log milestone
-                    log_entry = CommitmentLog(
-                        broker_account_id=broker_account_id,
-                        log_type="streak_milestone",
-                        description=f"Achieved {label} streak!",
-                    )
-                    db.add(log_entry)
-        streak.milestones_achieved = milestones
-    else:
-        streak.current_streak_days = 0
-        streak.streak_start_date = None
+            # Check milestones
+            milestones = streak.milestones_achieved or []
+            milestone_thresholds = [
+                (7, "7-Day Discipline"),
+                (14, "2-Week Warrior"),
+                (30, "Monthly Master"),
+                (60, "Trading Zen"),
+            ]
+            for days, label in milestone_thresholds:
+                if streak.current_streak_days == days:
+                    if not any(m.get("days") == days for m in milestones):
+                        milestones.append({
+                            "days": days,
+                            "achieved_at": datetime.now(timezone.utc).isoformat(),
+                            "label": label,
+                        })
+                        # Log milestone
+                        log_entry = CommitmentLog(
+                            broker_account_id=broker_account_id,
+                            log_type="streak_milestone",
+                            description=f"Achieved {label} streak!",
+                        )
+                        db.add(log_entry)
+            streak.milestones_achieved = milestones
+        else:
+            streak.current_streak_days = 0
+            streak.streak_start_date = None
 
-    await db.commit()
+        await db.commit()
 
-    return {
-        "status": "updated",
-        "streak": streak.current_streak_days,
-        "longest": streak.longest_streak_days,
-    }
+        return {
+            "status": "updated",
+            "streak": streak.current_streak_days,
+            "longest": streak.longest_streak_days,
+        }
+    except Exception as e:
+        await db.rollback()
+        logger.error(f"Failed to increment streak: {e}")
+        raise HTTPException(status_code=500, detail="Internal server error")

@@ -31,3 +31,42 @@ __pycache__/
 .env
 .venv
 venv/
+
+# Backend debug/one-off scripts
+backend/debug_*.py
+backend/check_database.py
+backend/get_tables.py
+backend/verify_standardization.py
+backend/run_dashboard_tests.py
+backend/run_migration_027.py
+backend/run_schema_tests.bat
+backend/run_schema_tests.py
+
+# Output / generated text files
+backend/tables.txt
+backend/tables_utf8.txt
+backend/scripts/all_patterns.txt
+backend/scripts/all_patterns_utf8.txt
+backend/scripts/db_out.txt
+backend/scripts/db_out_utf8.txt
+backend/tests/test_results.txt
+backend/tests/test_results_utf8.txt
+backend/tests/dashboard_test_results.txt
+lint_results.txt
+
+# Internal working docs (not part of the product)
+issues.md
+qa_report.md
+
+# Claude Code
+.claude/
+
+# Windows artifacts
+*.lnk
+nul
+
+# Vite temp files
+*.timestamp-*.mjs
+
+# Binary documents (track in Google Drive/Notion instead)
+*.docx

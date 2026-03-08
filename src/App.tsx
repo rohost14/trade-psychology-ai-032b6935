@@ -9,10 +9,11 @@ import { BrokerProvider } from "./contexts/BrokerContext";
 import Layout from "./components/Layout";
 import Dashboard from "./pages/Dashboard";
 import Analytics from "./pages/Analytics";
-import MoneySaved from "./pages/MoneySaved";
-import Goals from "./pages/Goals";
+import BlowupShield from "./pages/BlowupShield";
+import MyPatterns from "./pages/MyPatterns";
 import Chat from "./pages/Chat";
 import Settings from "./pages/Settings";
+import MoneySaved from "./pages/MoneySaved";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -31,9 +32,10 @@ const App = () => (
                   <Route index element={<Navigate to="/dashboard" replace />} />
                   <Route path="dashboard" element={<Dashboard />} />
                   <Route path="analytics" element={<Analytics />} />
-                  <Route path="money-saved" element={<MoneySaved />} />
-                  <Route path="goals" element={<Goals />} />
+                  <Route path="blowup-shield" element={<BlowupShield />} />
+                  <Route path="my-patterns" element={<MyPatterns />} />
                   <Route path="chat" element={<Chat />} />
+                  <Route path="money-saved" element={<MoneySaved />} />
                   <Route path="settings" element={<Settings />} />
                 </Route>
                 <Route path="*" element={<NotFound />} />

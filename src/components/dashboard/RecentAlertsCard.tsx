@@ -1,8 +1,7 @@
 import { useState } from 'react';
-import { AlertCircle, CheckCircle2, AlertTriangle, XCircle, Check, ChevronDown, Bell, Sparkles, Lightbulb } from 'lucide-react';
+import { AlertCircle, CheckCircle2, AlertTriangle, XCircle, Check, ChevronDown, Bell, Lightbulb } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { formatRelativeTime } from '@/lib/formatters';
-import { motion, AnimatePresence } from 'framer-motion';
 import type { Alert } from '@/types/api';
 
 interface RecentAlertsCardProps {
@@ -13,68 +12,51 @@ interface RecentAlertsCardProps {
 const severityConfig = {
   critical: {
     icon: XCircle,
-    badgeClass: 'bg-destructive/15 text-destructive border border-destructive/25',
-    iconClass: 'text-destructive',
-    bgClass: 'hover:bg-destructive/5',
-    glowClass: 'hover:shadow-[inset_0_0_24px_-10px_hsl(var(--destructive)/0.25)]',
+    badgeClass: 'bg-red-50 text-red-700 dark:bg-red-900/20 dark:text-red-400',
+    iconClass: 'text-red-600 dark:text-red-400',
   },
   high: {
     icon: AlertCircle,
-    badgeClass: 'bg-destructive/15 text-destructive border border-destructive/25',
-    iconClass: 'text-destructive',
-    bgClass: 'hover:bg-destructive/5',
-    glowClass: 'hover:shadow-[inset_0_0_24px_-10px_hsl(var(--destructive)/0.25)]',
+    badgeClass: 'bg-red-50 text-red-700 dark:bg-red-900/20 dark:text-red-400',
+    iconClass: 'text-red-600 dark:text-red-400',
   },
   medium: {
     icon: AlertTriangle,
-    badgeClass: 'bg-warning/15 text-warning border border-warning/25',
-    iconClass: 'text-warning',
-    bgClass: 'hover:bg-warning/5',
-    glowClass: 'hover:shadow-[inset_0_0_24px_-10px_hsl(var(--warning)/0.25)]',
+    badgeClass: 'bg-amber-50 text-amber-700 dark:bg-amber-900/20 dark:text-amber-400',
+    iconClass: 'text-amber-600 dark:text-amber-400',
   },
   positive: {
     icon: CheckCircle2,
-    badgeClass: 'bg-success/15 text-success border border-success/25',
-    iconClass: 'text-success',
-    bgClass: 'hover:bg-success/5',
-    glowClass: 'hover:shadow-[inset_0_0_24px_-10px_hsl(var(--success)/0.25)]',
+    badgeClass: 'bg-green-50 text-green-700 dark:bg-green-900/20 dark:text-green-400',
+    iconClass: 'text-green-600 dark:text-green-400',
   },
 };
 
 export default function RecentAlertsCard({ alerts, onAcknowledge }: RecentAlertsCardProps) {
   const [expandedId, setExpandedId] = useState<string | null>(null);
-  const [acknowledgedIds, setAcknowledgedIds] = useState<Set<string>>(new Set());
+  // Track locally acknowledged IDs (for immediate UI feedback before backend confirms)
+  const [localAckedIds, setLocalAckedIds] = useState<Set<string>>(new Set());
 
   const handleAcknowledge = (alertId: string) => {
-    setAcknowledgedIds((prev) => new Set([...prev, alertId]));
+    setLocalAckedIds((prev) => new Set([...prev, alertId]));
     onAcknowledge?.(alertId);
   };
 
   const counts = {
-    critical: alerts.filter(a => a.severity === 'critical').length,
-    high: alerts.filter(a => a.severity === 'high').length,
+    high: alerts.filter(a => a.severity === 'critical' || a.severity === 'high').length,
     medium: alerts.filter(a => a.severity === 'medium').length,
     positive: alerts.filter(a => a.severity === 'positive').length,
   };
 
-  const hasAlerts = alerts.length > 0;
-
   return (
-    <div className="card-premium hover-glow-warning">
+    <div className="bg-card rounded-lg border border-border">
       {/* Header */}
-      <div className="px-6 py-5 border-b border-border/40 bg-gradient-to-r from-warning/8 to-transparent relative overflow-hidden">
-        {/* Subtle mesh */}
-        <div className="absolute inset-0 bg-gradient-mesh opacity-30 pointer-events-none" />
-        
-        <div className="relative flex items-center justify-between">
-          <div className="flex items-center gap-4">
-            <motion.div 
-              className="p-3 rounded-2xl bg-gradient-to-br from-warning/25 to-warning/10 border border-warning/20 shadow-lg"
-              whileHover={{ scale: 1.08, rotate: 5 }}
-              transition={{ type: 'spring', stiffness: 300 }}
-            >
-              <Bell className="h-5 w-5 text-warning" />
-            </motion.div>
+      <div className="px-6 py-5 border-b border-border">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            <div className="p-2.5 rounded-lg bg-amber-100 dark:bg-amber-900/30">
+              <Bell className="h-5 w-5 text-amber-600 dark:text-amber-400" />
+            </div>
             <div>
               <h3 className="text-lg font-semibold text-foreground">Behavioral Alerts</h3>
               <p className="text-sm text-muted-foreground">{alerts.length} pattern{alerts.length !== 1 ? 's' : ''} detected</p>
@@ -82,189 +64,111 @@ export default function RecentAlertsCard({ alerts, onAcknowledge }: RecentAlerts
           </div>
           <div className="flex items-center gap-2">
             {counts.high > 0 && (
-              <motion.span 
-                className="badge-premium bg-destructive/15 text-destructive border-destructive/25"
-                initial={{ scale: 0 }}
-                animate={{ scale: 1 }}
-                transition={{ type: 'spring', delay: 0.1 }}
-              >
+              <span className="inline-flex items-center gap-1 px-2 py-1 rounded-md text-xs font-medium bg-red-50 text-red-700 dark:bg-red-900/20 dark:text-red-400">
                 <AlertCircle className="h-3.5 w-3.5" />
                 {counts.high}
-              </motion.span>
+              </span>
             )}
             {counts.medium > 0 && (
-              <motion.span 
-                className="badge-premium bg-warning/15 text-warning border-warning/25"
-                initial={{ scale: 0 }}
-                animate={{ scale: 1 }}
-                transition={{ type: 'spring', delay: 0.15 }}
-              >
+              <span className="inline-flex items-center gap-1 px-2 py-1 rounded-md text-xs font-medium bg-amber-50 text-amber-700 dark:bg-amber-900/20 dark:text-amber-400">
                 <AlertTriangle className="h-3.5 w-3.5" />
                 {counts.medium}
-              </motion.span>
+              </span>
             )}
             {counts.positive > 0 && (
-              <motion.span 
-                className="badge-premium bg-success/15 text-success border-success/25"
-                initial={{ scale: 0 }}
-                animate={{ scale: 1 }}
-                transition={{ type: 'spring', delay: 0.2 }}
-              >
+              <span className="inline-flex items-center gap-1 px-2 py-1 rounded-md text-xs font-medium bg-green-50 text-green-700 dark:bg-green-900/20 dark:text-green-400">
                 <CheckCircle2 className="h-3.5 w-3.5" />
                 {counts.positive}
-              </motion.span>
+              </span>
             )}
           </div>
         </div>
       </div>
 
       {/* Alerts List */}
-      {hasAlerts ? (
-        <div className="divide-y divide-border/40">
-          {alerts.slice(0, 5).map((alert, index) => {
+      {alerts.length > 0 ? (
+        <div className="divide-y divide-border">
+          {alerts.slice(0, 5).map((alert) => {
             const config = severityConfig[alert.severity];
             const Icon = config.icon;
             const isExpanded = expandedId === alert.id;
-            const isAcknowledged = acknowledgedIds.has(alert.id);
+            const isAcknowledged = alert.acknowledged || localAckedIds.has(alert.id);
 
             return (
-              <motion.div
+              <div
                 key={alert.id}
                 className={cn(
-                  'transition-all duration-300 cursor-pointer',
-                  config.bgClass,
-                  config.glowClass,
+                  'transition-colors cursor-pointer hover:bg-muted/50',
                   isAcknowledged && 'opacity-50'
                 )}
                 onClick={() => setExpandedId(isExpanded ? null : alert.id)}
-                initial={{ opacity: 0, x: -15 }}
-                animate={{ opacity: 1, x: 0 }}
-                transition={{ delay: index * 0.06, type: 'spring', stiffness: 120 }}
               >
                 {/* Alert Row */}
                 <div className="px-6 py-4">
-                  <div className="flex items-start gap-3.5">
-                    <motion.div
-                      initial={{ scale: 0 }}
-                      animate={{ scale: 1 }}
-                      transition={{ delay: 0.1 + index * 0.05, type: 'spring' }}
-                      className="mt-0.5"
-                    >
-                      <Icon className={cn('h-5 w-5 shrink-0', config.iconClass)} />
-                    </motion.div>
+                  <div className="flex items-start gap-3">
+                    <Icon className={cn('h-5 w-5 shrink-0 mt-0.5', config.iconClass)} />
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center gap-2 flex-wrap">
-                        <span className={cn('badge-premium text-[10px] uppercase', config.badgeClass)}>
+                        <span className={cn('inline-flex items-center px-2 py-0.5 rounded text-xs font-medium uppercase', config.badgeClass)}>
                           {alert.severity}
                         </span>
-                        <span className="text-xs text-muted-foreground font-medium">
+                        <span className="text-xs text-muted-foreground">
                           {formatRelativeTime(alert.timestamp)}
                         </span>
                         {isAcknowledged && (
-                          <motion.div
-                            initial={{ scale: 0 }}
-                            animate={{ scale: 1 }}
-                            transition={{ type: 'spring' }}
-                            className="flex items-center gap-1 text-success"
-                          >
-                            <Check className="h-3.5 w-3.5" />
-                          </motion.div>
+                          <Check className="h-3.5 w-3.5 text-green-600" />
                         )}
                       </div>
-                      <p className="text-[15px] font-medium text-foreground mt-2">{alert.pattern}</p>
-                      <p className="text-sm text-muted-foreground mt-1 line-clamp-2 leading-relaxed">{alert.description}</p>
+                      <p className="text-sm font-medium text-foreground mt-2">{alert.pattern}</p>
+                      <p className="text-sm text-muted-foreground mt-1 line-clamp-2">{alert.description}</p>
                     </div>
-                    <motion.div
-                      animate={{ rotate: isExpanded ? 180 : 0 }}
-                      transition={{ duration: 0.25 }}
-                      className="p-1"
-                    >
-                      <ChevronDown className="h-5 w-5 text-muted-foreground shrink-0" />
-                    </motion.div>
+                    <ChevronDown className={cn(
+                      'h-5 w-5 text-muted-foreground transition-transform',
+                      isExpanded && 'rotate-180'
+                    )} />
                   </div>
                 </div>
 
                 {/* Expanded Content */}
-                <AnimatePresence>
-                  {isExpanded && (
-                    <motion.div
-                      initial={{ height: 0, opacity: 0 }}
-                      animate={{ height: 'auto', opacity: 1 }}
-                      exit={{ height: 0, opacity: 0 }}
-                      transition={{ duration: 0.25, ease: [0.16, 1, 0.3, 1] }}
-                      className="overflow-hidden"
-                    >
-                      <div className="px-6 pb-5 pt-0">
-                        <div className="ml-8 pl-4 border-l-2 border-border/50">
-                          {/* Why it matters */}
-                          <motion.div 
-                            className="flex items-start gap-3 p-4 rounded-xl bg-gradient-to-r from-accent/80 to-accent/40 border border-border/50 mb-4"
-                            initial={{ y: 10, opacity: 0 }}
-                            animate={{ y: 0, opacity: 1 }}
-                            transition={{ delay: 0.1 }}
-                          >
-                            <Lightbulb className="h-5 w-5 text-primary mt-0.5 shrink-0" />
-                            <div>
-                              <p className="text-sm font-semibold text-foreground">Why this matters</p>
-                              <p className="text-sm text-muted-foreground mt-1.5 leading-relaxed">
-                                {alert.why_it_matters || 'This pattern affects your trading performance.'}
-                              </p>
-                            </div>
-                          </motion.div>
-
-                          {/* Acknowledge Button */}
-                          {!isAcknowledged && (
-                            <motion.button
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                handleAcknowledge(alert.id);
-                              }}
-                              className="w-full flex items-center justify-center gap-2 px-4 py-3.5 rounded-xl bg-gradient-to-r from-primary to-primary/90 text-primary-foreground text-sm font-semibold hover:opacity-90 transition-all duration-300 shadow-lg"
-                              whileHover={{ scale: 1.01, y: -1 }}
-                              whileTap={{ scale: 0.99 }}
-                              initial={{ y: 10, opacity: 0 }}
-                              animate={{ y: 0, opacity: 1 }}
-                              transition={{ delay: 0.15 }}
-                            >
-                              <Check className="h-4 w-4" />
-                              Acknowledge
-                            </motion.button>
-                          )}
+                {isExpanded && (
+                  <div className="px-6 pb-4">
+                    <div className="ml-8 pl-4 border-l-2 border-border">
+                      {/* Why it matters */}
+                      <div className="flex items-start gap-3 p-4 rounded-lg bg-muted/50 border border-border mb-4">
+                        <Lightbulb className="h-5 w-5 text-primary mt-0.5 shrink-0" />
+                        <div>
+                          <p className="text-sm font-medium text-foreground">Why this matters</p>
+                          <p className="text-sm text-muted-foreground mt-1">
+                            {alert.why_it_matters || 'This pattern affects your trading performance.'}
+                          </p>
                         </div>
                       </div>
-                    </motion.div>
-                  )}
-                </AnimatePresence>
-              </motion.div>
+
+                      {/* Acknowledge Button */}
+                      {!isAcknowledged && (
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleAcknowledge(alert.id);
+                          }}
+                          className="w-full flex items-center justify-center gap-2 px-4 py-3 rounded-lg bg-primary text-primary-foreground text-sm font-medium hover:bg-primary/90 transition-colors"
+                        >
+                          <Check className="h-4 w-4" />
+                          Acknowledge
+                        </button>
+                      )}
+                    </div>
+                  </div>
+                )}
+              </div>
             );
           })}
         </div>
       ) : (
-        <div className="py-16 text-center">
-          <motion.div 
-            className="inline-flex items-center justify-center w-16 h-16 rounded-2xl bg-gradient-to-br from-success/25 to-success/10 border border-success/20 mb-4 shadow-lg"
-            initial={{ scale: 0 }}
-            animate={{ scale: 1 }}
-            transition={{ type: 'spring', stiffness: 200 }}
-          >
-            <CheckCircle2 className="h-8 w-8 text-success" />
-          </motion.div>
-          <motion.p 
-            className="text-base font-semibold text-foreground"
-            initial={{ opacity: 0, y: 10 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.2 }}
-          >
-            All clear!
-          </motion.p>
-          <motion.p 
-            className="text-sm text-muted-foreground mt-1"
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            transition={{ delay: 0.3 }}
-          >
-            No behavioral alerts detected
-          </motion.p>
+        <div className="py-12 text-center">
+          <CheckCircle2 className="h-10 w-10 text-green-500/40 mx-auto mb-3" />
+          <p className="font-medium text-foreground">All clear!</p>
+          <p className="text-sm text-muted-foreground mt-1">No behavioral alerts detected</p>
         </div>
       )}
     </div>

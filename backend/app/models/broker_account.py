@@ -1,31 +1,59 @@
-from sqlalchemy import String, TIMESTAMP, text, UUID
-from sqlalchemy.orm import Mapped, mapped_column
+from sqlalchemy import String, TIMESTAMP, text, UUID, ARRAY, Boolean, ForeignKey
+from sqlalchemy.dialects.postgresql import JSONB
+from sqlalchemy.orm import Mapped, mapped_column, relationship
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.future import select
-from cryptography.fernet import Fernet
+from cryptography.fernet import Fernet, InvalidToken
 import uuid
-from datetime import datetime
+from datetime import datetime, timezone
+from typing import List, Optional, TYPE_CHECKING
 from app.core.database import Base
 from app.core.config import settings
 
+if TYPE_CHECKING:
+    from app.models.user import User
+    from app.models.push_subscription import PushSubscription
+
 class BrokerAccount(Base):
     __tablename__ = "broker_accounts"
-    
+
     id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
-    user_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), nullable=True)
+    # FK to users.id — NOT NULL after migration 032
+    user_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True),
+        ForeignKey("users.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True
+    )
     broker_name: Mapped[str] = mapped_column(String, default="zerodha")
-    access_token: Mapped[str] = mapped_column(String, nullable=True) # Encrypted
-    refresh_token: Mapped[str] = mapped_column(String, nullable=True) # Encrypted
+    access_token: Mapped[str] = mapped_column(String, nullable=True)
+    refresh_token: Mapped[str] = mapped_column(String, nullable=True)
     api_key: Mapped[str] = mapped_column(String, nullable=True)
     status: Mapped[str] = mapped_column(String)
     connected_at: Mapped[datetime] = mapped_column(TIMESTAMP(timezone=True), nullable=True)
     last_sync_at: Mapped[datetime] = mapped_column(TIMESTAMP(timezone=True), nullable=True)
     broker_user_id: Mapped[str] = mapped_column(String, nullable=True)
     broker_email: Mapped[str] = mapped_column(String, nullable=True)
-    guardian_phone: Mapped[str] = mapped_column(String, nullable=True)  # Risk guardian's phone number
-    guardian_name: Mapped[str] = mapped_column(String, nullable=True)   # Guardian's name
+
+    # Kite-specific fields
+    user_type: Mapped[Optional[str]] = mapped_column(String(20), nullable=True)
+    exchanges: Mapped[Optional[List[str]]] = mapped_column(ARRAY(String), nullable=True)
+    products: Mapped[Optional[List[str]]] = mapped_column(ARRAY(String), nullable=True)
+    order_types: Mapped[Optional[List[str]]] = mapped_column(ARRAY(String), nullable=True)
+    meta: Mapped[Optional[dict]] = mapped_column(JSONB, default={})
+    avatar_url: Mapped[Optional[str]] = mapped_column(String, nullable=True)
+    demat_consent: Mapped[bool] = mapped_column(default=False)
+    sync_status: Mapped[str] = mapped_column(String(20), default="pending")
+    token_revoked_at: Mapped[Optional[datetime]] = mapped_column(TIMESTAMP(timezone=True), nullable=True)
+
     created_at: Mapped[datetime] = mapped_column(TIMESTAMP(timezone=True), server_default=text("now()"))
     updated_at: Mapped[datetime] = mapped_column(TIMESTAMP(timezone=True), server_default=text("now()"))
+
+    # Relationships
+    user: Mapped["User"] = relationship("User", back_populates="broker_accounts")
+    push_subscriptions: Mapped[List["PushSubscription"]] = relationship(
+        "PushSubscription", back_populates="broker_account", cascade="all, delete-orphan"
+    )
 
     @staticmethod
     def _get_fernet():
@@ -36,11 +64,11 @@ class BrokerAccount(Base):
         return f.encrypt(token.encode()).decode()
 
     def decrypt_token(self, encrypted_token: str) -> str:
-        f = self._get_fernet()
-        return f.decrypt(encrypted_token.encode()).decode()
-    
-    @classmethod
-    async def get_by_user_id(cls, session: AsyncSession, user_id: uuid.UUID) -> "BrokerAccount | None":
-        stmt = select(cls).where(cls.user_id == user_id)
-        result = await session.execute(stmt)
-        return result.scalars().first()
+        try:
+            f = self._get_fernet()
+            return f.decrypt(encrypted_token.encode()).decode()
+        except (InvalidToken, Exception) as e:
+            raise ValueError(
+                "Failed to decrypt access token — ENCRYPTION_KEY may have changed or token is corrupted. "
+                "Please reconnect your Zerodha account."
+            ) from e

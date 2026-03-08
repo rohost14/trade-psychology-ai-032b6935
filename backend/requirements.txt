@@ -9,8 +9,17 @@ passlib[bcrypt]
 celery[redis]
 redis
 httpx
+kiteconnect>=5.0.1
+websockets>=11.0
 twilio>=8.10.0
 python-multipart
 cryptography
 apscheduler>=3.10.4
 python-dateutil
+pytz
+pywebpush
+sentry-sdk[fastapi]>=2.0.0
+
+# Testing
+pytest>=8.0.0
+pytest-asyncio>=0.23.0

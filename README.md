@@ -1,73 +1,30 @@
-# Welcome to your Lovable project
+# TradeMentor AI
 
-## Project info
+TradeMentor AI is an intelligent behavioral analysis platform designed to help traders improve their performance by analyzing their trading psychology. It connects directly with your brokerage account to monitor trades in real-time, detect emotional trading patterns, and provides AI-driven insights to help you maintain discipline.
 
-**URL**: https://lovable.dev/projects/REPLACE_WITH_PROJECT_ID
+## Problem Solved
+Most traders fail not because of a lack of technical knowledge, but due to psychological barriers. Emotional decisions lead to:
+- Revenge Trading: Trying to win back losses immediately with high risk.
+- Overtrading: Taking low-quality setups out of boredom or compulsion.
+- Tilt: emotional frustration leading to irrational decisions.
+- Gambler's Fallacy: Believing a win is "due" after a series of losses.
+- Loss Aversion: Holding losing trades for too long hoping they will turn around.
 
-## How can I edit this code?
+TradeMentor AI acts as a real-time risk guardian and behavioral analyst, offering objective feedback and automated risk management when you need it most.
 
-There are several ways of editing your application.
+## Key Features
+- Real-time Broker Integration: Seamlessly connects with Zerodha (Kite Connect) to fetch orders and positions instantly.
+- Behavioral Pattern Detection: Algorithms analyze your trading frequency, P&L fluctuations, and timing to flag risky behaviors.
+- AI Behavioral Insights: Uses LLMs (via OpenRouter/Anthropic) to provide personalized analysis of your trading behavior and psychology.
+- Instant Alerts: Sends critical risk alerts and daily summaries via WhatsApp (Twilio) to keep you accountable.
+- Performance Dashboard: A modern, responsive React frontend to visualize your trading metrics and psychological state.
 
-**Use Lovable**
+## Tech Stack
+- Frontend: React (Vite), Tailwind CSS, TypeScript
+- Backend: FastAPI (Python)
+- Database: PostgreSQL (Supabase)
 
-Simply visit the [Lovable Project](https://lovable.dev/projects/REPLACE_WITH_PROJECT_ID) and start prompting.
-
-Changes made via Lovable will be committed automatically to this repo.
-
-**Use your preferred IDE**
-
-If you want to work locally using your own IDE, you can clone this repo and push changes. Pushed changes will also be reflected in Lovable.
-
-The only requirement is having Node.js & npm installed - [install with nvm](https://github.com/nvm-sh/nvm#installing-and-updating)
-
-Follow these steps:
-
-```sh
-# Step 1: Clone the repository using the project's Git URL.
-git clone <YOUR_GIT_URL>
-
-# Step 2: Navigate to the project directory.
-cd <YOUR_PROJECT_NAME>
-
-# Step 3: Install the necessary dependencies.
-npm i
-
-# Step 4: Start the development server with auto-reloading and an instant preview.
-npm run dev
-```
-
-**Edit a file directly in GitHub**
-
-- Navigate to the desired file(s).
-- Click the "Edit" button (pencil icon) at the top right of the file view.
-- Make your changes and commit the changes.
-
-**Use GitHub Codespaces**
-
-- Navigate to the main page of your repository.
-- Click on the "Code" button (green button) near the top right.
-- Select the "Codespaces" tab.
-- Click on "New codespace" to launch a new Codespace environment.
-- Edit files directly within the Codespace and commit and push your changes once you're done.
-
-## What technologies are used for this project?
-
-This project is built with:
-
-- Vite
-- TypeScript
-- React
-- shadcn-ui
-- Tailwind CSS
-
-## How can I deploy this project?
-
-Simply open [Lovable](https://lovable.dev/projects/REPLACE_WITH_PROJECT_ID) and click on Share -> Publish.
-
-## Can I connect a custom domain to my Lovable project?
-
-Yes, you can!
-
-To connect a domain, navigate to Project > Settings > Domains and click Connect Domain.
-
-Read more here: [Setting up a custom domain](https://docs.lovable.dev/features/custom-domain#custom-domain)
+## Infrastructure
+- Database: Supabase Postgres
+- LLM: OpenRouter
+- Broker API: Kite Connect

@@ -1,12 +1,25 @@
-// Alert Context Provider - Global state for behavioral alerts
-// Provides pattern analysis across the app
+// Alert Context Provider — Single source of truth for behavioral alerts
+//
+// Architecture:
+//   - alerts (persistent)  = fetched from backend risk_alerts table (polled every 60s)
+//   - patterns (ephemeral) = computed client-side for real-time session toasts ONLY
+//   - localStorage         = completely removed — backend is the persistent store
+//   - capital              = resolved from Kite margin (equity.total) or profile fallback
+//
+// Capital resolution priority:
+//   1. profile.trading_capital (user-declared in Settings)
+//   2. Kite equity.total (live margin data — automatically derived, zero user effort)
+//   3. 100,000 hardcoded floor (cold start / not connected)
 
 import { createContext, useContext, useState, useEffect, useCallback, ReactNode } from 'react';
 import { BehaviorPattern, PatternSeverity, PatternType } from '@/types/patterns';
 import { Trade } from '@/types/api';
 import { detectAllPatterns, getPatternStats } from '@/lib/patternDetector';
-import { getGoals } from '@/lib/goalsManager';
 import { toast } from 'sonner';
+import { api } from '@/lib/api';
+import { buildPatternConfig, UserProfileThresholds } from '@/lib/patternConfig';
+
+const CAPITAL_FLOOR = 100_000; // Rs 1L floor — used only when nothing else is available
 
 export interface AlertNotification {
   id: string;
@@ -16,25 +29,30 @@ export interface AlertNotification {
 }
 
 interface AlertContextValue {
-  // Patterns
+  // Ephemeral session patterns (client-side, for stats + real-time detection)
   patterns: BehaviorPattern[];
-  
-  // Alerts
+
+  // Persistent alerts from backend risk_alerts table
   alerts: AlertNotification[];
   unacknowledgedCount: number;
-  
-  // Stats
+
+  // Stats (from session patterns)
   stats: {
     total: number;
     by_severity: Record<PatternSeverity, number>;
     by_type: Partial<Record<PatternType, number>>;
     total_cost: number;
   };
-  
+
   // State
   isAnalyzing: boolean;
   lastAnalyzed: Date | null;
-  
+  traderProfile: UserProfileThresholds | null;
+
+  // Resolved trading capital — use this everywhere instead of traderProfile.trading_capital
+  // Source: profile.trading_capital → Kite equity.total → 100,000 floor
+  capital: number;
+
   // Actions
   runAnalysis: (trades: Trade[]) => void;
   acknowledgeAlert: (alertId: string) => void;
@@ -44,91 +62,186 @@ interface AlertContextValue {
 
 const AlertContext = createContext<AlertContextValue | undefined>(undefined);
 
-const ALERTS_STORAGE_KEY = 'tradementor_pattern_alerts';
-const SHOWN_PATTERNS_KEY = 'tradementor_shown_patterns';
+// ---------------------------------------------------------------------------
+// Backend pattern_type → frontend PatternType mapping
+// ---------------------------------------------------------------------------
+const BACKEND_TO_FRONTEND_TYPE: Record<string, string> = {
+  'consecutive_loss':  'consecutive_losses',
+  'revenge_sizing':    'revenge_trading',
+  'tilt_loss_spiral':  'revenge_trading',
+  'overtrading':       'overtrading',
+  'fomo':              'fomo',
+};
+
+function formatPatternName(patternType: string): string {
+  const names: Record<string, string> = {
+    'consecutive_loss':              'Consecutive Loss Spiral',
+    'consecutive_losses':            'Consecutive Losses',
+    'revenge_sizing':                'Revenge Sizing',
+    'revenge_trading':               'Revenge Trading',
+    'overtrading':                   'Overtrading Burst',
+    'fomo':                          'FOMO Entry',
+    'tilt_loss_spiral':              'Tilt / Loss Spiral',
+    'position_sizing':               'Oversized Position',
+    'same_instrument_chasing':       'Same Instrument Chasing',
+    'loss_aversion':                 'Loss Aversion',
+    'early_exit':                    'Early Exit',
+    'no_stoploss':                   'No Stop-Loss',
+    'winning_streak_overconfidence': 'Winning Streak Overconfidence',
+  };
+  return names[patternType]
+    || patternType.split('_').map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' ');
+}
+
+function mapBackendAlert(a: any): AlertNotification {
+  const frontendType = (BACKEND_TO_FRONTEND_TYPE[a.pattern_type] || a.pattern_type) as PatternType;
+  const detected_at = a.detected_at || a.created_at;
+  return {
+    id: String(a.id),
+    pattern: {
+      id:                  String(a.id),
+      type:                frontendType,
+      name:                formatPatternName(a.pattern_type),
+      severity:            a.severity as PatternSeverity,
+      description:         a.message,
+      detected_at,
+      insight:             a.details?.insight || '',
+      historical_insight:  a.details?.historical_insight || '',
+      estimated_cost:      a.details?.estimated_cost ?? 0,
+      trades_involved:     [],
+      frequency_this_week:  0,
+      frequency_this_month: 0,
+    },
+    shown_at:     detected_at,
+    acknowledged: a.acknowledged_at != null,
+  };
+}
 
 const getSeverityLabel = (severity: PatternSeverity) => {
   switch (severity) {
     case 'critical': return '🚨 Critical';
-    case 'high': return '⚠️ High Alert';
-    case 'medium': return '⚡ Caution';
-    case 'low': return 'ℹ️ Info';
+    case 'high':     return '⚠️ High Alert';
+    case 'medium':   return '⚡ Caution';
+    case 'low':      return 'ℹ️ Info';
   }
 };
 
 export function AlertProvider({ children }: { children: ReactNode }) {
-  const [patterns, setPatterns] = useState<BehaviorPattern[]>([]);
-  const [alerts, setAlerts] = useState<AlertNotification[]>([]);
-  const [shownPatternIds, setShownPatternIds] = useState<Set<string>>(new Set());
-  const [isAnalyzing, setIsAnalyzing] = useState(false);
-  const [lastAnalyzed, setLastAnalyzed] = useState<Date | null>(null);
+  const [patterns,           setPatterns]           = useState<BehaviorPattern[]>([]);
+  const [alerts,             setAlerts]             = useState<AlertNotification[]>([]);
+  const [isAnalyzing,        setIsAnalyzing]        = useState(false);
+  const [lastAnalyzed,       setLastAnalyzed]       = useState<Date | null>(null);
+  const [traderProfile,      setTraderProfile]      = useState<UserProfileThresholds | null>(null);
+  const [capital,            setCapital]            = useState<number>(CAPITAL_FLOOR);
+  const [lastTradeSignature, setLastTradeSignature] = useState<string>('');
 
-  // Load persisted data on mount
+  // Session-only set — tracks pattern_type+date combos already shown as toasts.
+  // Seeded from backend alerts on load so we never re-toast a known alert.
+  const [shownPatternKeys, setShownPatternKeys] = useState<Set<string>>(new Set());
+
+  // ---------------------------------------------------------------------------
+  // Capital resolution: profile.trading_capital → Kite equity.total → floor
+  // Called once on mount. If profile has manual capital, no margin call needed.
+  // ---------------------------------------------------------------------------
   useEffect(() => {
+    async function resolveCapitalAndProfile() {
+      try {
+        const res = await api.get('/api/profile/');
+        const profile = res.data?.profile as UserProfileThresholds | null;
+        if (profile) setTraderProfile(profile);
+
+        if (profile?.trading_capital && profile.trading_capital > 0) {
+          // Tier 1: user has explicitly set their capital — trust it
+          setCapital(profile.trading_capital);
+          return;
+        }
+
+        // Tier 2: derive from live Kite equity margin (zero user effort)
+        try {
+          const mRes = await api.get('/api/zerodha/margins');
+          const equityTotal: number = mRes.data?.equity?.total ?? 0;
+          if (equityTotal > 0) {
+            setCapital(equityTotal);
+            return;
+          }
+        } catch {
+          // Margins not available (not connected, market closed, etc.) — fall through
+        }
+
+        // Tier 3: floor — user is not connected or hasn't traded yet
+        setCapital(CAPITAL_FLOOR);
+      } catch {
+        // Profile fetch failed (not authenticated yet) — keep floor
+      }
+    }
+
+    resolveCapitalAndProfile();
+  }, []);
+
+  // ---------------------------------------------------------------------------
+  // Backend alert polling — risk_alerts is the ONLY persistent alert store
+  // ---------------------------------------------------------------------------
+  const fetchAlerts = useCallback(async () => {
     try {
-      const storedAlerts = localStorage.getItem(ALERTS_STORAGE_KEY);
-      if (storedAlerts) {
-        setAlerts(JSON.parse(storedAlerts));
-      }
-      
-      const storedShown = localStorage.getItem(SHOWN_PATTERNS_KEY);
-      if (storedShown) {
-        setShownPatternIds(new Set(JSON.parse(storedShown)));
-      }
-    } catch (e) {
-      console.error('Error loading alert data:', e);
+      const res = await api.get('/api/risk/alerts', { params: { hours: 48 } });
+      const raw: any[] = res.data.alerts || [];
+      setAlerts(raw.map(mapBackendAlert));
+
+      // Seed shownPatternKeys from today's backend alerts so runAnalysis won't re-toast them
+      const today = new Date().toDateString();
+      setShownPatternKeys(prev => {
+        const next = new Set(prev);
+        raw.forEach(a => {
+          const alertDate = new Date(a.detected_at || a.created_at).toDateString();
+          if (alertDate === today) {
+            const fType = BACKEND_TO_FRONTEND_TYPE[a.pattern_type] || a.pattern_type;
+            next.add(`${fType}_${today}`);
+          }
+        });
+        return next;
+      });
+    } catch {
+      // Non-fatal — user may not be authenticated yet
     }
   }, []);
 
-  // Persist alerts
   useEffect(() => {
-    try {
-      localStorage.setItem(ALERTS_STORAGE_KEY, JSON.stringify(alerts.slice(0, 100)));
-    } catch (e) {
-      console.error('Error saving alerts:', e);
-    }
-  }, [alerts]);
+    fetchAlerts();
+    const interval = setInterval(fetchAlerts, 60_000); // poll every 60s
+    return () => clearInterval(interval);
+  }, [fetchAlerts]);
 
-  // Persist shown pattern IDs
-  useEffect(() => {
-    try {
-      localStorage.setItem(SHOWN_PATTERNS_KEY, JSON.stringify([...shownPatternIds]));
-    } catch (e) {
-      console.error('Error saving shown patterns:', e);
-    }
-  }, [shownPatternIds]);
-
+  // ---------------------------------------------------------------------------
+  // runAnalysis — client-side real-time detection
+  // PURPOSE: toasts only. Does NOT update `alerts` (backend owns that).
+  // Uses resolved `capital` (from Kite or profile) — never a hardcoded guess.
+  // ---------------------------------------------------------------------------
   const runAnalysis = useCallback((trades: Trade[]) => {
     if (trades.length === 0 || isAnalyzing) return;
-    
+
+    // Signature check — skip if same trade set as last run
+    const latestTrade = trades[0];
+    const signature = `${trades.length}_${latestTrade?.id}_${latestTrade?.traded_at}`;
+    if (signature === lastTradeSignature) return;
+
     setIsAnalyzing(true);
-    
+    setLastTradeSignature(signature);
+
     try {
-      const goals = getGoals();
-      const detected = detectAllPatterns(trades, goals.starting_capital);
-      
+      const config   = buildPatternConfig(traderProfile);
+      const detected = detectAllPatterns(trades, capital, config);
+
       setPatterns(detected);
       setLastAnalyzed(new Date());
-      
-      // Find new patterns (not already shown)
-      const newAlerts: AlertNotification[] = [];
-      const newShownIds = new Set(shownPatternIds);
-      
+
+      // Toast for patterns not yet in backend (real-time gap before next sync)
+      const today  = new Date().toDateString();
+      const newKeys = new Set(shownPatternKeys);
+
       for (const pattern of detected) {
-        // Check if this exact pattern was already shown
-        if (!shownPatternIds.has(pattern.id)) {
-          newShownIds.add(pattern.id);
-          
-          const alert: AlertNotification = {
-            id: `alert_${pattern.id}`,
-            pattern,
-            shown_at: new Date().toISOString(),
-            acknowledged: false,
-          };
-          
-          newAlerts.push(alert);
-          
-          // Show toast for high-severity patterns (only for NEW patterns)
+        const key = `${pattern.type}_${today}`;
+        if (!newKeys.has(key)) {
+          newKeys.add(key);
           if (pattern.severity === 'critical' || pattern.severity === 'high') {
             toast.error(`${getSeverityLabel(pattern.severity)}: ${pattern.name}`, {
               description: pattern.description,
@@ -142,23 +255,33 @@ export function AlertProvider({ children }: { children: ReactNode }) {
           }
         }
       }
-      
-      if (newAlerts.length > 0) {
-        setAlerts(prev => [...newAlerts, ...prev].slice(0, 100));
-        setShownPatternIds(newShownIds);
+
+      // Cap session set size to prevent memory leak on very long sessions
+      if (newKeys.size > 500) {
+        const iter = newKeys.values();
+        for (let i = 0; i < newKeys.size - 500; i++) newKeys.delete(iter.next().value);
       }
-      
+      setShownPatternKeys(newKeys);
+
     } catch (error) {
       console.error('Pattern analysis error:', error);
     } finally {
       setIsAnalyzing(false);
     }
-  }, [shownPatternIds, isAnalyzing]);
+  }, [isAnalyzing, lastTradeSignature, traderProfile, capital, shownPatternKeys]);
 
-  const acknowledgeAlert = useCallback((alertId: string) => {
-    setAlerts(prev => 
-      prev.map(a => a.id === alertId ? { ...a, acknowledged: true } : a)
-    );
+  // ---------------------------------------------------------------------------
+  // Alert actions
+  // ---------------------------------------------------------------------------
+  const acknowledgeAlert = useCallback(async (alertId: string) => {
+    // Optimistic local update + backend persist
+    setAlerts(prev => prev.map(a => a.id === alertId ? { ...a, acknowledged: true } : a));
+    try {
+      await api.post(`/api/risk/alerts/${alertId}/acknowledge`);
+    } catch {
+      // Revert optimistic update on failure
+      setAlerts(prev => prev.map(a => a.id === alertId ? { ...a, acknowledged: false } : a));
+    }
   }, []);
 
   const acknowledgeAll = useCallback(() => {
@@ -167,32 +290,30 @@ export function AlertProvider({ children }: { children: ReactNode }) {
 
   const clearAllAlerts = useCallback(() => {
     setAlerts([]);
-    setShownPatternIds(new Set());
-    localStorage.removeItem(ALERTS_STORAGE_KEY);
-    localStorage.removeItem(SHOWN_PATTERNS_KEY);
+    setShownPatternKeys(new Set());
   }, []);
 
   const unacknowledgedCount = alerts.filter(a => !a.acknowledged).length;
-  
-  const stats = patterns.length > 0 
-    ? getPatternStats(patterns) 
+
+  const stats = patterns.length > 0
+    ? getPatternStats(patterns)
     : { total: 0, by_severity: { critical: 0, high: 0, medium: 0, low: 0 }, by_type: {}, total_cost: 0 };
 
   return (
-    <AlertContext.Provider
-      value={{
-        patterns,
-        alerts,
-        unacknowledgedCount,
-        stats,
-        isAnalyzing,
-        lastAnalyzed,
-        runAnalysis,
-        acknowledgeAlert,
-        acknowledgeAll,
-        clearAllAlerts,
-      }}
-    >
+    <AlertContext.Provider value={{
+      patterns,
+      alerts,
+      unacknowledgedCount,
+      stats,
+      isAnalyzing,
+      lastAnalyzed,
+      traderProfile,
+      capital,
+      runAnalysis,
+      acknowledgeAlert,
+      acknowledgeAll,
+      clearAllAlerts,
+    }}>
       {children}
     </AlertContext.Provider>
   );
@@ -200,8 +321,6 @@ export function AlertProvider({ children }: { children: ReactNode }) {
 
 export function useAlerts() {
   const context = useContext(AlertContext);
-  if (!context) {
-    throw new Error('useAlerts must be used within AlertProvider');
-  }
+  if (!context) throw new Error('useAlerts must be used within AlertProvider');
   return context;
 }

@@ -11,6 +11,7 @@ export default defineConfig(({ mode }) => ({
     hmr: {
       overlay: false,
     },
+    allowedHosts: true, // Allow all hosts (for Cloudflare tunnel, ngrok, etc.)
   },
   plugins: [react(), mode === "development" && componentTagger()].filter(Boolean),
   resolve: {

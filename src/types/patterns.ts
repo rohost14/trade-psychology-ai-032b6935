@@ -15,7 +15,11 @@ export type PatternType =
   | 'early_exit'
   | 'position_sizing'
   | 'loss_aversion'
-  | 'winning_streak_overconfidence';
+  | 'winning_streak_overconfidence'
+  | 'consecutive_losses'
+  | 'capital_drawdown'
+  | 'same_instrument_chasing'
+  | 'all_loss_session';
 
 export type PatternSeverity = 'low' | 'medium' | 'high' | 'critical';
 

@@ -22,6 +22,10 @@ const PATTERN_NAMES: Record<PatternType, string> = {
   position_sizing: 'Position Sizing',
   loss_aversion: 'Loss Aversion',
   winning_streak_overconfidence: 'Overconfidence',
+  consecutive_losses: 'Consecutive Losses',
+  capital_drawdown: 'Capital Drawdown',
+  same_instrument_chasing: 'Same Instrument Chasing',
+  all_loss_session: 'All-Loss Session',
 };
 
 // ============================================
@@ -165,7 +169,7 @@ export function calculateGoalAdherence(
   });
   
   // Risk per trade adherence
-  const maxRiskAmount = (goals.starting_capital * goals.max_risk_per_trade_percent) / 100;
+  const maxRiskAmount = (goals.current_capital * goals.max_risk_per_trade_percent) / 100;
   let tradesWithinRisk = 0;
   let tradesExceedingRisk = 0;
   let riskExceededCost = 0;
@@ -242,6 +246,14 @@ function generateInsight(
       return `Early exits left ${costFormatted} on the table. Consider trailing stops instead of fixed exits.`;
     case 'no_stoploss':
       return `Trading without stop losses cost ${costFormatted}. Always define your exit before entering.`;
+    case 'consecutive_losses':
+      return `Consecutive loss streaks cost ${costFormatted}. After 3+ losses, your edge is likely gone for the day.`;
+    case 'capital_drawdown':
+      return `Capital drawdown events cost ${costFormatted}. Protecting capital is more important than making it back.`;
+    case 'same_instrument_chasing':
+      return `Chasing the same instrument cost ${costFormatted}. Fixation on one stock amplifies losses.`;
+    case 'all_loss_session':
+      return `All-loss sessions cost ${costFormatted}. When nothing works, the best trade is no trade.`;
     default:
       return `This pattern cost ${costFormatted} across ${occurrences} occurrences.`;
   }
@@ -330,6 +342,18 @@ export function getTopRecommendations(tax: EmotionalTax, limit: number = 3): str
         break;
       case 'fomo':
         recommendations.push('Wait for 2 confirmations before entering after a big move');
+        break;
+      case 'consecutive_losses':
+        recommendations.push('Stop trading after 3 consecutive losses — take a 30-minute break');
+        break;
+      case 'capital_drawdown':
+        recommendations.push('Set a hard daily loss limit and stop when you hit it');
+        break;
+      case 'same_instrument_chasing':
+        recommendations.push('After 2 losses on the same instrument, move to a different setup');
+        break;
+      case 'all_loss_session':
+        recommendations.push('When every trade loses, stop for the day — your edge is absent');
         break;
       default:
         recommendations.push(`Address ${breakdown.pattern_name} to save ₹${breakdown.avg_cost_per_occurrence.toLocaleString('en-IN')} per occurrence`);

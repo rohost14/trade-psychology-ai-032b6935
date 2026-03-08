@@ -99,7 +99,13 @@ export function useGoals(): UseGoalsReturn {
           current_capital: data.goals.current_capital,
         } as TradingGoals);
 
-        setCommitmentLog(data.commitment_log || []);
+        setCommitmentLog(
+          (data.commitment_log || []).map((entry: any) => ({
+            ...entry,
+            type: entry.log_type || entry.type,
+            id: String(entry.id),
+          }))
+        );
         setStreakData(data.streak || getLocalStreakData());
         setIsReviewOpen(data.is_review_open);
         setDaysUntilReview(data.days_until_review);

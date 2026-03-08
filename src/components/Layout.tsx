@@ -7,139 +7,122 @@ import {
   Settings,
   Shield,
   Menu,
-  CircleDot,
-  Power,
-  PiggyBank,
-  Target,
+  X,
+  Brain,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
-import { Sheet, SheetContent, SheetTrigger } from '@/components/ui/sheet';
-import {
-  Tooltip,
-  TooltipContent,
-  TooltipTrigger,
-} from '@/components/ui/tooltip';
 import { ThemeToggle } from './ThemeToggle';
 import { AlertHistorySheet } from '@/components/alerts/AlertHistorySheet';
+import TokenExpiredBanner from '@/components/alerts/TokenExpiredBanner';
 import { useAlerts } from '@/contexts/AlertContext';
+import { useBroker } from '@/contexts/BrokerContext';
 
 const navigation = [
   { name: 'Dashboard', href: '/dashboard', icon: LayoutDashboard },
   { name: 'Analytics', href: '/analytics', icon: TrendingUp },
-  { name: 'Money Saved', href: '/money-saved', icon: PiggyBank },
-  { name: 'Goals', href: '/goals', icon: Target },
-  { name: 'AI Chat', href: '/chat', icon: MessageSquare },
+  { name: 'Shield', href: '/blowup-shield', icon: Shield },
+  { name: 'My Patterns', href: '/my-patterns', icon: Brain },
+  { name: 'Chat', href: '/chat', icon: MessageSquare },
   { name: 'Settings', href: '/settings', icon: Settings },
 ];
 
+// Mobile bottom nav items (limited to 5)
+const mobileNavItems = navigation.slice(0, 5);
+
 export default function Layout() {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const [isReconnecting, setIsReconnecting] = useState(false);
   const location = useLocation();
   const { alerts, unacknowledgedCount, acknowledgeAlert, acknowledgeAll, clearAllAlerts } = useAlerts();
+  const { isConnected, isTokenExpired, connect } = useBroker();
 
-  // Full nav items for mobile
-  const MobileNavItems = ({ onItemClick }: { onItemClick?: () => void }) => (
-    <nav className="space-y-2">
-      {navigation.map((item) => {
-        const isActive = location.pathname === item.href;
-        return (
-          <NavLink
-            key={item.name}
-            to={item.href}
-            onClick={onItemClick}
-            className={cn(
-              'flex items-center gap-3 px-4 py-3 rounded-xl text-base font-medium transition-all duration-200',
-              isActive
-                ? 'bg-primary text-primary-foreground shadow-md'
-                : 'text-muted-foreground hover:bg-accent hover:text-foreground hover-lift'
-            )}
-          >
-            <item.icon className="h-5 w-5 flex-shrink-0" />
-            <span>{item.name}</span>
-          </NavLink>
-        );
-      })}
-    </nav>
-  );
-
-  // Icon-only nav for desktop slim sidebar
-  const DesktopNavItems = () => (
-    <nav className="space-y-2">
-      {navigation.map((item) => {
-        const isActive = location.pathname === item.href;
-        return (
-          <Tooltip key={item.name} delayDuration={0}>
-            <TooltipTrigger asChild>
-              <NavLink
-                to={item.href}
-                className={cn(
-                  'flex items-center justify-center w-11 h-11 rounded-xl transition-all duration-200',
-                  isActive
-                    ? 'bg-primary text-primary-foreground shadow-md'
-                    : 'text-muted-foreground hover:bg-accent hover:text-foreground hover-lift'
-                )}
-              >
-                <item.icon className="h-5 w-5" />
-              </NavLink>
-            </TooltipTrigger>
-            <TooltipContent side="right" className="font-medium text-sm">
-              {item.name}
-            </TooltipContent>
-          </Tooltip>
-        );
-      })}
-    </nav>
-  );
+  const handleReconnect = async () => {
+    setIsReconnecting(true);
+    try {
+      await connect();
+    } catch (error) {
+      console.error('Reconnect failed:', error);
+    } finally {
+      setIsReconnecting(false);
+    }
+  };
 
   return (
     <div className="min-h-screen bg-background">
-      {/* Sticky Top Bar */}
-      <header className="sticky top-0 z-50 h-16 border-b border-border bg-card/95 backdrop-blur supports-[backdrop-filter]:bg-card/80">
-        <div className="flex h-full items-center justify-between px-4 lg:px-6">
-          {/* Left: Logo + Mobile Menu */}
-          <div className="flex items-center gap-3">
-            {/* Mobile Menu Button */}
-            <Sheet open={mobileMenuOpen} onOpenChange={setMobileMenuOpen}>
-              <SheetTrigger asChild className="lg:hidden">
-                <Button variant="ghost" size="icon" className="lg:hidden h-10 w-10 hover-scale">
-                  <Menu className="h-5 w-5" />
-                  <span className="sr-only">Open menu</span>
-                </Button>
-              </SheetTrigger>
-              <SheetContent side="left" className="w-80 p-0">
-                <div className="flex h-16 items-center gap-3 border-b border-border px-6">
-                  <div className="p-2 rounded-lg bg-primary/10">
-                    <Shield className="h-6 w-6 text-primary" />
-                  </div>
-                  <span className="text-lg font-bold text-foreground">TradeMentor AI</span>
-                </div>
-                <div className="p-4">
-                  <MobileNavItems onItemClick={() => setMobileMenuOpen(false)} />
-                </div>
-              </SheetContent>
-            </Sheet>
-
+      {/* Desktop Header */}
+      <header className="hidden md:block sticky top-0 z-50 bg-card border-b border-border">
+        <div className="max-w-7xl mx-auto px-6">
+          <div className="flex h-16 items-center justify-between">
             {/* Logo */}
-            <div className="flex items-center gap-3">
-              <div className="p-2 rounded-lg bg-primary/10">
-                <Shield className="h-5 w-5 text-primary" />
+            <div className="flex items-center gap-8">
+              <div className="flex items-center gap-2">
+                <Shield className="h-6 w-6 text-primary" />
+                <span className="text-lg font-semibold text-foreground">TradeMentor</span>
               </div>
-              <span className="text-base font-bold text-foreground hidden sm:block">
-                TradeMentor AI
-              </span>
+
+              {/* Desktop Nav */}
+              <nav className="flex items-center gap-1">
+                {navigation.map((item) => {
+                  const isActive = location.pathname === item.href;
+                  return (
+                    <NavLink
+                      key={item.name}
+                      to={item.href}
+                      className={cn(
+                        'px-3 py-2 rounded-md text-sm font-medium transition-colors',
+                        isActive
+                          ? 'bg-primary/10 text-primary'
+                          : 'text-muted-foreground hover:text-foreground hover:bg-muted'
+                      )}
+                    >
+                      {item.name}
+                    </NavLink>
+                  );
+                })}
+              </nav>
+            </div>
+
+            {/* Right side */}
+            <div className="flex items-center gap-3">
+              {/* Connection status */}
+              <div className={cn(
+                'flex items-center gap-2 px-3 py-1.5 rounded-full text-xs font-medium',
+                isTokenExpired
+                  ? 'bg-amber-50 text-amber-700 dark:bg-amber-900/20 dark:text-amber-400'
+                  : isConnected
+                    ? 'bg-green-50 text-green-700 dark:bg-green-900/20 dark:text-green-400'
+                    : 'bg-muted text-muted-foreground'
+              )}>
+                <span className={cn(
+                  'w-2 h-2 rounded-full',
+                  isTokenExpired ? 'bg-amber-500' : isConnected ? 'bg-green-500' : 'bg-gray-400'
+                )} />
+                {isTokenExpired ? 'Expired' : isConnected ? 'Connected' : 'Offline'}
+              </div>
+
+              <AlertHistorySheet
+                alerts={alerts}
+                unacknowledgedCount={unacknowledgedCount}
+                onAcknowledge={acknowledgeAlert}
+                onAcknowledgeAll={acknowledgeAll}
+                onClearAll={clearAllAlerts}
+              />
+              <ThemeToggle />
             </div>
           </div>
+        </div>
+      </header>
 
-          {/* Right: Status + Actions */}
+      {/* Mobile Header */}
+      <header className="md:hidden sticky top-0 z-50 bg-card border-b border-border">
+        <div className="flex h-14 items-center justify-between px-4">
           <div className="flex items-center gap-2">
-            {/* Connection Status */}
-            <div className="flex items-center gap-2 px-3 py-1.5 rounded-full bg-success/10 border border-success/20">
-              <CircleDot className="h-3 w-3 text-success animate-pulse" />
-              <span className="text-xs font-medium text-success hidden sm:block">Live</span>
-            </div>
+            <Shield className="h-5 w-5 text-primary" />
+            <span className="font-semibold text-foreground">TradeMentor</span>
+          </div>
 
-            {/* Alert Bell */}
+          <div className="flex items-center gap-2">
             <AlertHistorySheet
               alerts={alerts}
               unacknowledgedCount={unacknowledgedCount}
@@ -147,41 +130,84 @@ export default function Layout() {
               onAcknowledgeAll={acknowledgeAll}
               onClearAll={clearAllAlerts}
             />
-
-            {/* Theme Toggle */}
             <ThemeToggle />
-
-            {/* Disconnect Button */}
-            <Tooltip delayDuration={0}>
-              <TooltipTrigger asChild>
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  className="text-muted-foreground hover:text-destructive h-9 w-9 p-0 hover-scale"
-                >
-                  <Power className="h-4 w-4" />
-                </Button>
-              </TooltipTrigger>
-              <TooltipContent>Disconnect</TooltipContent>
-            </Tooltip>
+            <Button
+              variant="ghost"
+              size="icon"
+              className="h-9 w-9"
+              onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
+            >
+              {mobileMenuOpen ? <X className="h-5 w-5" /> : <Menu className="h-5 w-5" />}
+            </Button>
           </div>
         </div>
+
+        {/* Mobile menu dropdown */}
+        {mobileMenuOpen && (
+          <div className="border-t border-border bg-card px-4 py-3">
+            <nav className="space-y-1">
+              {navigation.map((item) => {
+                const isActive = location.pathname === item.href;
+                return (
+                  <NavLink
+                    key={item.name}
+                    to={item.href}
+                    onClick={() => setMobileMenuOpen(false)}
+                    className={cn(
+                      'flex items-center gap-3 px-3 py-2 rounded-md text-sm font-medium',
+                      isActive
+                        ? 'bg-primary/10 text-primary'
+                        : 'text-muted-foreground hover:bg-muted'
+                    )}
+                  >
+                    <item.icon className="h-5 w-5" />
+                    {item.name}
+                  </NavLink>
+                );
+              })}
+            </nav>
+          </div>
+        )}
       </header>
 
-      {/* Main Layout */}
-      <div className="flex">
-        {/* Sticky Slim Sidebar (Desktop) */}
-        <aside className="hidden lg:flex flex-col items-center w-[72px] border-r border-border bg-card min-h-[calc(100vh-4rem)] sticky top-16 py-4">
-          <DesktopNavItems />
-        </aside>
+      {/* Token Expired Banner */}
+      {isTokenExpired && (
+        <TokenExpiredBanner
+          onReconnect={handleReconnect}
+          isReconnecting={isReconnecting}
+        />
+      )}
 
-        {/* Main Content - generous padding */}
-        <main className="flex-1 min-w-0">
-          <div className="p-5 lg:p-8">
-            <Outlet />
-          </div>
-        </main>
-      </div>
+      {/* Main Content */}
+      <main className="pb-20 md:pb-8">
+        <div className="max-w-7xl mx-auto px-4 md:px-6 py-6">
+          <Outlet />
+        </div>
+      </main>
+
+      {/* Mobile Bottom Nav */}
+      <nav className="md:hidden fixed bottom-0 left-0 right-0 z-50 bg-card border-t border-border">
+        <div className="flex items-center justify-around h-16 px-2">
+          {mobileNavItems.map((item) => {
+            const isActive = location.pathname === item.href;
+            return (
+              <NavLink
+                key={item.name}
+                to={item.href}
+                className={cn(
+                  'flex flex-col items-center justify-center flex-1 h-full py-2 transition-colors',
+                  isActive
+                    ? 'text-primary'
+                    : 'text-muted-foreground'
+                )}
+              >
+                <item.icon className={cn('h-5 w-5', isActive && 'text-primary')} />
+                <span className="text-xs mt-1 font-medium">{item.name}</span>
+              </NavLink>
+            );
+          })}
+        </div>
+      </nav>
     </div>
   );
 }

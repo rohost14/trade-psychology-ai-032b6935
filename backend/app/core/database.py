@@ -12,7 +12,8 @@ engine = create_async_engine(
     connect_args={
         "server_settings": {
             "application_name": "tradementor_backend"
-        }
+        },
+        "statement_cache_size": 0  # REQUIRED for Supabase Transaction Pooler (PgBouncer)
     }
 )
 
@@ -32,5 +33,8 @@ async def get_db():
     async with SessionLocal() as session:
         try:
             yield session
+        except Exception:
+            await session.rollback()
+            raise
         finally:
             await session.close()

@@ -1,26 +1,21 @@
-from twilio.rest import Client
 from typing import Optional
 import logging
 from uuid import UUID
 
-from app.core.config import settings
 from app.models.risk_alert import RiskAlert
 from app.models.broker_account import BrokerAccount
+from app.services.whatsapp_service import whatsapp_service
 
 logger = logging.getLogger(__name__)
 
 class AlertService:
     """
     Send WhatsApp alerts for critical risk patterns.
-    Currently uses Twilio WhatsApp API.
+    Delegates sending to the shared whatsapp_service singleton.
     """
-    
+
     def __init__(self):
-        self.client = Client(
-            settings.TWILIO_ACCOUNT_SID,
-            settings.TWILIO_AUTH_TOKEN
-        )
-        self.from_number = settings.TWILIO_WHATSAPP_FROM
+        pass
     
     async def send_risk_alert(
         self,
@@ -47,16 +42,11 @@ class AlertService:
             
             # Format message based on pattern type
             message = self._format_alert_message(risk_alert, broker_account)
-            
-            # Send via Twilio
-            twilio_message = self.client.messages.create(
-                body=message,
-                from_=self.from_number,
-                to=f"whatsapp:{phone_number}"
-            )
-            
-            logger.info(f"WhatsApp alert sent: {twilio_message.sid}")
-            return True
+
+            sent = await whatsapp_service.send_message(phone_number, message)
+            if sent:
+                logger.info(f"WhatsApp alert sent for alert {risk_alert.id}")
+            return sent
             
         except Exception as e:
             logger.error(f"Failed to send WhatsApp alert: {e}", exc_info=True)
@@ -139,16 +129,8 @@ class AlertService:
                 "Your WhatsApp alerts are configured correctly!\n\n"
                 "You'll receive urgent notifications here when dangerous trading patterns are detected."
             )
-            
-            twilio_message = self.client.messages.create(
-                body=message,
-                from_=self.from_number,
-                to=f"whatsapp:{phone_number}"
-            )
-            
-            logger.info(f"Test alert sent: {twilio_message.sid}")
-            return True
-            
+            return await whatsapp_service.send_message(phone_number, message)
+
         except Exception as e:
             logger.error(f"Failed to send test alert: {e}", exc_info=True)
             return False
@@ -157,38 +139,26 @@ class AlertService:
         self,
         risk_alert: RiskAlert,
         broker_account: BrokerAccount,
-        user_phone: str
+        user_phone: str,
+        guardian_phone: Optional[str] = None,
+        guardian_name: Optional[str] = None,
     ) -> bool:
         """
         Send alert to user AND their risk guardian (if configured).
+        guardian_phone and guardian_name come from the User table (caller's responsibility).
         """
         try:
-            # Send to user
-            user_sent = await self.send_risk_alert(
-                risk_alert,
-                broker_account,
-                user_phone
-            )
-            
-            # Send to guardian if configured
-            guardian_sent = False
-            if broker_account.guardian_phone:
+            user_sent = await self.send_risk_alert(risk_alert, broker_account, user_phone)
+
+            if guardian_phone:
                 guardian_message = self._format_guardian_alert(
-                    risk_alert,
-                    broker_account
+                    risk_alert, broker_account, guardian_name=guardian_name
                 )
-                
-                twilio_message = self.client.messages.create(
-                    body=guardian_message,
-                    from_=self.from_number,
-                    to=f"whatsapp:{broker_account.guardian_phone}"
-                )
-                
-                logger.info(f"Guardian alert sent: {twilio_message.sid}")
-                guardian_sent = True
-            
+                await whatsapp_service.send_message(guardian_phone, guardian_message)
+                logger.info(f"Guardian alert sent for alert {risk_alert.id}")
+
             return user_sent
-            
+
         except Exception as e:
             logger.error(f"Failed to send guardian alert: {e}", exc_info=True)
             return False
@@ -196,12 +166,13 @@ class AlertService:
     def _format_guardian_alert(
         self,
         alert: RiskAlert,
-        broker_account: BrokerAccount
+        broker_account: BrokerAccount,
+        guardian_name: Optional[str] = None,
     ) -> str:
         """Format alert for risk guardian."""
-        
-        guardian_name = broker_account.guardian_name or "Guardian"
-        user_name = broker_account.broker_user_id  # Use Zerodha ID for now
+
+        guardian_name = guardian_name or "Guardian"
+        user_name = broker_account.broker_user_id
         
         header = f"⚠️ *RISK GUARDIAN ALERT*\n\n"
         
