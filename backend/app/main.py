@@ -4,6 +4,7 @@ from fastapi.responses import JSONResponse
 from fastapi.middleware.cors import CORSMiddleware
 from app.core.config import settings
 import logging
+import uuid
 import sentry_sdk
 from sentry_sdk.integrations.fastapi import FastApiIntegration
 from sentry_sdk.integrations.asyncio import AsyncioIntegration
@@ -49,7 +50,6 @@ app = FastAPI(
 )
 
 # CORS Middleware
-# CORS - Allow frontend to call backend
 app.add_middleware(
     CORSMiddleware,
     allow_origins=settings.BACKEND_CORS_ORIGINS,
@@ -57,6 +57,36 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+
+# ---------------------------------------------------------------------------
+# Request-ID middleware
+# Generates a unique ID per request, injects into logs, returns in header.
+# Every log line during a request now includes the request_id, making it
+# trivial to trace all log output for a single API call in Sentry/CloudWatch.
+# ---------------------------------------------------------------------------
+@app.middleware("http")
+async def request_id_middleware(request: Request, call_next):
+    request_id = request.headers.get("X-Request-ID") or str(uuid.uuid4())
+    # Store on request state so route handlers can access it if needed
+    request.state.request_id = request_id
+
+    # Inject into the logging context for this request
+    old_factory = logging.getLogRecordFactory()
+
+    def record_factory(*args, **kwargs):
+        record = old_factory(*args, **kwargs)
+        record.request_id = request_id
+        return record
+
+    logging.setLogRecordFactory(record_factory)
+    try:
+        response = await call_next(request)
+    finally:
+        logging.setLogRecordFactory(old_factory)
+
+    response.headers["X-Request-ID"] = request_id
+    return response
 
 
 # Global Exception Handler
@@ -69,9 +99,41 @@ async def global_exception_handler(request: Request, exc: Exception):
     )
 
 # Health Check
+# Returns 200 only when DB and Redis are reachable.
+# Returns 503 if either dependency is down — lets load balancers / uptime
+# monitors detect infrastructure failures automatically.
 @app.get("/health")
 async def health_check():
-    return {"status": "ok", "app": settings.PROJECT_NAME}
+    from app.core.database import SessionLocal
+    from sqlalchemy import text
+
+    checks = {"db": "error", "redis": "error"}
+    healthy = True
+
+    # DB check
+    try:
+        async with SessionLocal() as session:
+            await session.execute(text("SELECT 1"))
+        checks["db"] = "ok"
+    except Exception as e:
+        logger.error(f"Health check DB failed: {e}")
+        healthy = False
+
+    # Redis check
+    try:
+        import redis as redis_lib
+        r = redis_lib.from_url(settings.REDIS_URL, decode_responses=True, socket_timeout=2)
+        r.ping()
+        checks["redis"] = "ok"
+    except Exception as e:
+        logger.error(f"Health check Redis failed: {e}")
+        healthy = False
+
+    status_code = 200 if healthy else 503
+    return JSONResponse(
+        status_code=status_code,
+        content={"status": "ok" if healthy else "degraded", **checks},
+    )
 
 @app.get("/")
 async def root():
