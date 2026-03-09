@@ -14,6 +14,25 @@ logger = logging.getLogger(__name__)
 
 # Sentry — initialise before the app starts so all errors are captured
 # Set SENTRY_DSN in .env. Without DSN, this is a no-op (safe to leave in).
+def _sentry_before_send(event, hint):
+    """
+    Filter out non-actionable events before they reach Sentry.
+
+    KeyboardInterrupt  — user pressed Ctrl+C (normal shutdown, not a bug)
+    CancelledError     — asyncio task cancelled during shutdown (normal)
+    SystemExit         — process exit (normal)
+    """
+    exc_info = hint.get("exc_info")
+    if exc_info:
+        exc_type = exc_info[0]
+        if exc_type in (KeyboardInterrupt, SystemExit):
+            return None  # Drop — don't send to Sentry
+        # asyncio.CancelledError
+        if exc_type.__name__ in ("CancelledError", "asyncio.CancelledError"):
+            return None
+    return event
+
+
 if settings.SENTRY_DSN:
     sentry_sdk.init(
         dsn=settings.SENTRY_DSN,
@@ -26,6 +45,7 @@ if settings.SENTRY_DSN:
         traces_sample_rate=0.1,   # 10% of requests traced (low overhead)
         profiles_sample_rate=0.0,  # profiling off for now
         send_default_pii=False,    # no personal data in error reports
+        before_send=_sentry_before_send,
     )
     logger.info("Sentry initialised")
 
