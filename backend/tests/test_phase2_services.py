@@ -325,6 +325,73 @@ class TestPositionLedgerDB:
         # pnl = (22500 - 22000) * 50 = 25000
         assert e2.realized_pnl == Decimal("25000.0000")
 
+    async def test_late_fill_out_of_order(self, db, broker):
+        """
+        Late fill arrives out of chronological order (webhook delay).
+
+        Sequence in TIME order:
+          10:00 BUY 50 @ 100   → OPEN, net=50
+          10:02 BUY 25 @ 95    → INCREASE, net=75, avg=(50*100+25*95)/75 = 98.33
+          10:05 SELL 75 @ 120  → CLOSE, pnl=(120-98.33)*75 = 1625
+
+        Arrival order (webhook delay on fill at 10:02):
+          10:00 BUY 50 arrives first  → processed normally
+          10:05 SELL 75 arrives second → processed against LONG 50 (wrong without replay)
+          10:02 BUY 25 arrives LATE   → triggers replay, corrects all entries
+
+        After replay: SELL 75 must reflect avg_entry of 98.33, not 100.
+        """
+        from datetime import timezone
+
+        base = datetime(2026, 1, 15, 10, 0, 0, tzinfo=timezone.utc)
+        t1 = base                                           # 10:00
+        t2 = base.replace(minute=2)                        # 10:02
+        t3 = base.replace(minute=5)                        # 10:05
+
+        ord1 = f"ORD_{uuid4().hex[:8]}"
+        ord2 = f"ORD_{uuid4().hex[:8]}"
+        ord3 = f"ORD_{uuid4().hex[:8]}"
+
+        symbol, exchange = "NIFTY25FEB25000CE", "NFO"
+
+        # Step 1: 10:00 BUY 50 arrives, processed normally
+        f1 = FillData(broker.id, symbol, exchange, ord1, 50, Decimal("100"), t1, f"{ord1}:0")
+        e1, _ = await PositionLedgerService.apply_fill(f1, db)
+        assert e1.entry_type == "OPEN"
+        assert e1.position_qty_after == 50
+
+        # Step 2: 10:05 SELL 75 arrives (before 10:02 fill) — wrong state
+        f3 = FillData(broker.id, symbol, exchange, ord3, -75, Decimal("120"), t3, f"{ord3}:0")
+        e3, _ = await PositionLedgerService.apply_fill(f3, db)
+        # At this point, state is WRONG (computed against LONG 50, not LONG 75)
+        # We don't assert correctness here — it will be fixed by the late fill replay
+
+        # Step 3: 10:02 BUY 25 arrives LATE → triggers replay
+        f2 = FillData(broker.id, symbol, exchange, ord2, 25, Decimal("95"), t2, f"{ord2}:0")
+        e2, is_new = await PositionLedgerService.apply_fill(f2, db)
+        assert is_new is True  # new fill, not a duplicate
+
+        # After replay: verify all 3 entries are correct in time order
+        await db.refresh(e1)
+        await db.refresh(e2)
+        await db.refresh(e3)
+
+        # e1: BUY 50 @ 100 — unchanged (before the late fill)
+        assert e1.entry_type == "OPEN"
+        assert e1.position_qty_after == 50
+
+        # e2: BUY 25 @ 95 — INCREASE on top of 50 long, avg = (5000+2375)/75 = 98.33
+        assert e2.entry_type == "INCREASE"
+        assert e2.position_qty_after == 75
+        expected_avg = Decimal("98.3333")
+        assert abs(e2.avg_entry_price_after - expected_avg) < Decimal("0.001")
+
+        # e3: SELL 75 @ 120 — now CLOSE, pnl = (120 - 98.3333) * 75 = 1625
+        assert e3.entry_type == "CLOSE"
+        assert e3.position_qty_after == 0
+        expected_pnl = (Decimal("120") - e2.avg_entry_price_after) * 75
+        assert abs(e3.realized_pnl - expected_pnl) < Decimal("1")  # within ₹1
+
     async def test_get_realized_pnl_range(self, db, broker):
         """get_realized_pnl sums CLOSE/DECREASE/FLIP entries in range."""
         now = now_utc()
