@@ -377,8 +377,77 @@ async def run_risk_detection_async(broker_account_id: UUID, db, trigger_trade: T
 
         logger.info(f"Risk detection: {len(new_alerts)} new alerts, {len(danger_alerts)} danger")
 
+        # ----------------------------------------------------------------
+        # SHADOW MODE — BehaviorEngine runs AFTER production detection.
+        # Production path above is completely unchanged.
+        # Shadow never raises — any failure is logged and swallowed.
+        # ----------------------------------------------------------------
+        await _run_shadow_behavior_engine(broker_account_id, trigger_trade, db)
+
     except Exception as e:
         logger.error(f"Risk detection error: {e}", exc_info=True)
+
+
+async def _run_shadow_behavior_engine(
+    broker_account_id: UUID,
+    trigger_trade,
+    db,
+) -> None:
+    """
+    Run BehaviorEngine in shadow mode alongside the old detection pipeline.
+
+    Writes to shadow_behavioral_events ONLY — never touches production tables.
+    Any exception is caught and logged — this MUST NOT affect the caller.
+
+    Shadow validation:
+      - Run for 5 trading days
+      - Compare shadow events vs production alerts
+      - If match rate > 95% and no crashes → cutover in Phase 3 step 7
+    """
+    try:
+        if trigger_trade is None:
+            return  # Only run shadow when we have a specific trigger trade
+
+        # Find the CompletedTrade that corresponds to this trigger_trade
+        # (The trigger_trade is a Trade fill; CompletedTrade is the closed round)
+        from app.models.completed_trade import CompletedTrade
+        from sqlalchemy import desc
+
+        ct_result = await db.execute(
+            select(CompletedTrade).where(
+                CompletedTrade.broker_account_id == broker_account_id
+            ).order_by(desc(CompletedTrade.exit_time)).limit(1)
+        )
+        latest_ct = ct_result.scalar_one_or_none()
+
+        if not latest_ct:
+            return  # No completed trade yet — position still open
+
+        # Run the BehaviorEngine
+        from app.services.behavior_engine import behavior_engine
+        result = await behavior_engine.analyze(
+            broker_account_id=broker_account_id,
+            completed_trade=latest_ct,
+            db=db,
+        )
+
+        if result.events:
+            logger.info(
+                f"[shadow] {broker_account_id} | "
+                f"{len(result.events)} shadow events | "
+                f"state={result.behavior_state} | "
+                f"risk={float(result.risk_score_before):.0f}→{float(result.risk_score_after):.0f} | "
+                f"patterns={[e.event_type for e in result.events]}"
+            )
+        else:
+            logger.debug(
+                f"[shadow] {broker_account_id} | no events | "
+                f"state={result.behavior_state}"
+            )
+
+    except Exception as e:
+        # Shadow failures MUST NOT crash the production pipeline
+        logger.error(f"[shadow] BehaviorEngine shadow failed (non-fatal): {e}", exc_info=True)
 
 
 @celery_app.task

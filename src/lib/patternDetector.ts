@@ -1,6 +1,11 @@
 // Pattern Detection Engine for TradeMentor AI
 // Detects behavioral patterns from trade data
 // Philosophy: Show facts, not restrictions
+//
+// SESSION PREVIEW — client-side estimates for immediate feedback only.
+// The server BehaviorEngine (behavior_engine.py) is the authoritative record.
+// Client patterns may differ slightly from server due to session scoping.
+// Phase 5 removes client detection once server delivers events via WebSocket.
 
 import { Trade } from '@/types/api';
 import {
