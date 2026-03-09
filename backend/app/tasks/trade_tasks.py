@@ -355,6 +355,14 @@ async def run_risk_detection_async(broker_account_id: UUID, db, trigger_trade: T
 
         await db.commit()
 
+        # ── Alert consolidation (P-02) ─────────────────────────────────
+        # Apply two filters BEFORE sending notifications:
+        #   1. 5-minute bucket: suppress if same pattern already notified in last 5 min
+        #   2. Hard cap: if session has fired 8+ alerts today, record but don't notify
+        new_alerts = await _apply_alert_consolidation(
+            broker_account_id, new_alerts, db
+        )
+
         # Send WhatsApp for DANGER alerts
         danger_alerts = [a for a in new_alerts if a.severity == "danger"]
         if danger_alerts:
@@ -386,6 +394,82 @@ async def run_risk_detection_async(broker_account_id: UUID, db, trigger_trade: T
 
     except Exception as e:
         logger.error(f"Risk detection error: {e}", exc_info=True)
+
+
+async def _apply_alert_consolidation(
+    broker_account_id: UUID,
+    alerts: list,
+    db,
+) -> list:
+    """
+    Alert consolidation (P-02):
+    1. 5-minute bucket: suppress notification if same pattern_type was already
+       notified within the last 5 minutes (record the alert, just don't notify)
+    2. Hard cap: if session has fired 8+ alerts today, suppress further notifications
+       (user would tune out anyway — alert fatigue is worse than no alert)
+
+    Returns the subset of alerts that should trigger notifications.
+    All alerts are already saved to DB before this function runs.
+    """
+    from app.models.risk_alert import RiskAlert
+    from app.models.trading_session import TradingSession
+    from sqlalchemy import and_
+    import pytz
+
+    now_utc = datetime.now(timezone.utc)
+    five_min_ago = now_utc - timedelta(minutes=5)
+    today_ist = datetime.now(pytz.timezone("Asia/Kolkata")).date()
+
+    # Check today's session alert count
+    session_result = await db.execute(
+        select(TradingSession).where(
+            and_(
+                TradingSession.broker_account_id == broker_account_id,
+                TradingSession.session_date == today_ist,
+            )
+        )
+    )
+    session = session_result.scalar_one_or_none()
+    session_alert_count = session.alerts_fired if session else 0
+
+    HARD_CAP = 8
+    if session_alert_count >= HARD_CAP:
+        logger.info(
+            f"[consolidation] {broker_account_id}: session alert cap reached "
+            f"({session_alert_count}/{HARD_CAP}). Suppressing {len(alerts)} notifications."
+        )
+        return []  # All alerts saved to DB, none will notify
+
+    # 5-minute bucket: check for recent same-pattern alerts
+    recent_result = await db.execute(
+        select(RiskAlert).where(
+            and_(
+                RiskAlert.broker_account_id == broker_account_id,
+                RiskAlert.detected_at >= five_min_ago,
+            )
+        )
+    )
+    recent_patterns = {a.pattern_type for a in recent_result.scalars().all()}
+
+    notifiable = []
+    for alert in alerts:
+        if alert.pattern_type in recent_patterns:
+            logger.debug(
+                f"[consolidation] {broker_account_id}: suppressing {alert.pattern_type} "
+                f"— already fired in last 5 min"
+            )
+        else:
+            notifiable.append(alert)
+            recent_patterns.add(alert.pattern_type)
+
+    # Increment session alert count for notifiable alerts
+    if notifiable and session:
+        from app.services.trading_session_service import TradingSessionService
+        for _ in notifiable:
+            await TradingSessionService.increment_alerts_fired(session.id, db)
+        await db.commit()
+
+    return notifiable
 
 
 async def _run_shadow_behavior_engine(

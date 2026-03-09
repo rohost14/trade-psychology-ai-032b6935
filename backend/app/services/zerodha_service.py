@@ -150,13 +150,25 @@ class ZerodhaClient:
         access_token: str = None,
         data: Dict = None,
         params=None,
-        timeout: float = 10.0
+        timeout: float = 10.0,
+        broker_account_id=None,   # Optional — enables circuit breaker when provided
     ) -> Dict[str, Any]:
-        """Make rate-limited API request using persistent client"""
+        """Make rate-limited API request using persistent client."""
+        from app.services.circuit_breaker_service import circuit_breaker
+
+        # Circuit breaker check — only when broker_account_id is provided
+        if broker_account_id:
+            allowed = await circuit_breaker.allow_request(broker_account_id)
+            if not allowed:
+                raise KiteAPIError(
+                    "Kite API circuit breaker is OPEN — service temporarily degraded.",
+                    status_code=503,
+                    error_type="CircuitOpen",
+                )
+
         await self.rate_limiter.acquire()
 
         headers = self._get_headers(access_token) if access_token else {"X-Kite-Version": "3"}
-
         client = await self._get_client()
 
         try:
@@ -169,17 +181,33 @@ class ZerodhaClient:
             else:
                 raise ValueError(f"Unsupported method: {method}")
 
-            return self._handle_response(response)
+            result = self._handle_response(response)
 
-        except httpx.TimeoutException:
-            raise KiteNetworkError("Request timed out", status_code=408)
+            # Record success for circuit breaker
+            if broker_account_id:
+                await circuit_breaker.record_success(broker_account_id)
+
+            return result
+
+        except (KiteTokenExpiredError, KiteAuthError):
+            # Auth errors are not infrastructure failures — don't trip the circuit
+            raise
+        except (httpx.TimeoutException, KiteNetworkError, KiteAPIError) as e:
+            # Infrastructure failures — record for circuit breaker
+            if broker_account_id:
+                await circuit_breaker.record_failure(broker_account_id)
+
+            if isinstance(e, httpx.TimeoutException):
+                raise KiteNetworkError("Request timed out", status_code=408)
+            raise
         except httpx.RequestError as e:
-            # Check if client was closed unexpectedly
+            if broker_account_id:
+                await circuit_breaker.record_failure(broker_account_id)
             if isinstance(e, httpx.PoolTimeout):
-                 # Retry once with new client
                 await self.close()
                 self._client = httpx.AsyncClient(timeout=10.0)
-                return await self._request(method, url, access_token, data, params, timeout)
+                return await self._request(method, url, access_token, data, params, timeout,
+                                           broker_account_id)
             raise KiteNetworkError(f"Network error: {str(e)}")
         
 

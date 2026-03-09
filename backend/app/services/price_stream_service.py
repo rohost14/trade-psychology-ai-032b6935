@@ -168,10 +168,11 @@ class ZerodhaTicker:
     def _on_ticks(self, ws, ticks):
         """
         Called by KiteTicker thread for every price update.
-        Throttled to 1 broadcast/sec/instrument, then forwarded
-        to the asyncio event loop via run_coroutine_threadsafe.
+        Throttled to 1 broadcast/sec/instrument, then:
+          1. Written to Redis LTP cache (TTL=2s) — for position monitor
+          2. Forwarded to asyncio event loop for WebSocket broadcast
         """
-        if not self._loop or not self.on_tick_callback:
+        if not self._loop:
             return
 
         import time
@@ -179,9 +180,8 @@ class ZerodhaTicker:
 
         for tick in ticks:
             instrument_token = tick.get("instrument_token")
-            # KiteTicker provides tradingsymbol in tick data with MODE_FULL/QUOTE.
-            # With MODE_LTP it may be absent — fall back to token string.
             symbol = tick.get("tradingsymbol") or str(instrument_token)
+            last_price = tick.get("last_price")
 
             # Throttle: skip if updated within the last second
             last = self._last_tick_times.get(symbol, 0.0)
@@ -190,17 +190,30 @@ class ZerodhaTicker:
             self._last_tick_times[symbol] = now
 
             price_data = {
-                "last_price": tick.get("last_price"),
+                "last_price": last_price,
                 "change": tick.get("change"),
                 "change_percent": tick.get("change_percent"),
                 "instrument_token": instrument_token,
             }
 
-            # Hand off to the event loop thread — safe cross-thread call.
-            asyncio.run_coroutine_threadsafe(
-                self.on_tick_callback(symbol, price_data),
-                self._loop,
-            )
+            # 1. Write to Redis LTP cache (TTL=2s)
+            # Key: ltp:{instrument_token}  Value: price
+            # Position monitor reads from here — no REST API polling needed.
+            if last_price is not None:
+                try:
+                    from app.core.config import settings
+                    import redis as redis_lib
+                    r = redis_lib.from_url(settings.REDIS_URL, decode_responses=True)
+                    r.set(f"ltp:{instrument_token}", str(last_price), ex=2)
+                except Exception:
+                    pass  # Redis write failure never blocks the tick pipeline
+
+            # 2. Broadcast to frontend via WebSocket (if callback set)
+            if self.on_tick_callback:
+                asyncio.run_coroutine_threadsafe(
+                    self.on_tick_callback(symbol, price_data),
+                    self._loop,
+                )
 
     def _on_close(self, ws, code, reason):
         self._connected = False
@@ -473,3 +486,23 @@ class SharedPriceStream(PriceStreamProvider):
 
 # MIGRATION: change PerUserPriceStream() → SharedPriceStream() when partnership arrives.
 price_stream: PriceStreamProvider = PerUserPriceStream()
+
+
+def get_cached_ltp(instrument_token: int) -> Optional[float]:
+    """
+    Read last traded price from Redis cache.
+    Returns None if cache miss (price not yet received or TTL expired).
+
+    Used by:
+    - Position monitor (avoid REST API polling)
+    - Position P&L calculations during market hours
+    TTL is 2 seconds — stale after that, treat as unavailable.
+    """
+    try:
+        from app.core.config import settings
+        import redis as redis_lib
+        r = redis_lib.from_url(settings.REDIS_URL, decode_responses=True, socket_timeout=1)
+        val = r.get(f"ltp:{instrument_token}")
+        return float(val) if val is not None else None
+    except Exception:
+        return None

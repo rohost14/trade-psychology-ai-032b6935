@@ -210,6 +210,22 @@ class ShieldService:
                         if money_saved is not None else 0
                     )
 
+                # P-05: Compute capital_at_alert for no-position cases
+                # (MIS auto-squared after 3:20PM, or alert after position closed)
+                capital_at_alert = None
+                if calc_status == "no_positions" and trigger_info:
+                    try:
+                        from app.core.trading_defaults import estimate_capital_at_risk
+                        capital_at_alert = round(estimate_capital_at_risk(
+                            instrument_type=None,
+                            tradingsymbol=trigger_info.get("tradingsymbol", ""),
+                            direction="LONG",
+                            avg_entry_price=trigger_info.get("average_price", 0),
+                            total_quantity=trigger_info.get("quantity", 0),
+                        ))
+                    except Exception:
+                        pass
+
                 timeline.append({
                     "id": str(alert.id),
                     "detected_at": alert.detected_at.isoformat() if alert.detected_at else None,
@@ -220,6 +236,7 @@ class ShieldService:
                     "trigger_symbol": trigger_symbol,
                     "trigger_trade": trigger_info,
                     "capital_defended": capital_defended,
+                    "capital_at_alert": capital_at_alert,  # P-05: shown when no position
                     "details": alert.details,
                     "calculation_status": calc_status,
                     "money_saved": round(money_saved) if money_saved is not None else None,

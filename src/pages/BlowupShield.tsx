@@ -485,9 +485,16 @@ export default function BlowupShieldPage() {
                     ) : event.calculation_status === 'no_positions' ? (
                       <div className="flex items-center gap-2 text-muted-foreground">
                         <Info className="h-3 w-3 flex-shrink-0" />
-                        <span>
-                          No open position in {event.trigger_symbol} at alert time — nothing to track.
-                        </span>
+                        <div className="flex flex-col gap-0.5">
+                          <span>
+                            Position was auto-squared before checkpoint — counterfactual not available.
+                          </span>
+                          {(event as any).capital_at_alert > 0 && (
+                            <span className="text-xs">
+                              Capital at risk at alert time: <span className="font-mono text-foreground">{formatCurrency((event as any).capital_at_alert)}</span>
+                            </span>
+                          )}
+                        </div>
                       </div>
                     ) : (
                       <div className="flex items-center gap-2 text-muted-foreground">

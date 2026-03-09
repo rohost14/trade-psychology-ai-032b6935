@@ -1684,15 +1684,15 @@ Every issue in this document assigned to exactly one phase. Nothing untracked.
 
 ### Progress Tracker
 
-| Phase | Description | Status | Blocker |
-|-------|-------------|--------|---------|
-| 0 | Safety Net (Sentry, AOF, C-00, H-00) | ✅ Complete | None |
-| 1 | Data Integrity (idempotency, locks, poller) | ⬜ Not started | Phase 0 |
-| 2 | Foundation Tables (migrations 031-034 + services) | ⬜ Not started | Phase 0 |
-| 3 | Unified BehaviorEngine (shadow → cutover) | ⬜ Not started | Phase 2 |
-| 4 | Redis Streams Event Pipeline (dual-write → cutover) | ⬜ Not started | Phase 1 + 2 + 3 |
-| 5 | Real-Time Layer (monitor, consolidation, circuit breaker) | ⬜ Not started | Phase 4 |
-| 6 | Product Quality (backfill, coach memory, goals wiring) | ⬜ Not started | Phase 3 + 4 |
+| Phase | Description | Status | Notes |
+|-------|-------------|--------|-------|
+| 0 | Safety Net (Sentry, AOF, C-00, H-00) | ✅ Complete | |
+| 1 | Data Integrity (idempotency, locks, reconciliation) | ✅ Complete | 230 tests |
+| 2 | Foundation Tables (position_ledger, trading_sessions) | ✅ Complete | 264 tests, migrations 036-039 applied |
+| 3 | Unified BehaviorEngine | ⚠️ Shadow only — NOT in production | Items 1-5,8-9 done. Items 6-7 (cutover) pending script validation. Old engines still serve production. |
+| 4 | Redis Streams Event Pipeline | 🔜 DEFERRED — do after 50+ users | Overkill at current scale (<5 users). Phase 1 locks sufficient. Revisit at scale. |
+| 5 | Real-Time Layer (monitor, consolidation, circuit breaker) | 🔄 In progress | Started 2026-03-10 |
+| 6 | Product Quality (backfill, coach memory, goals wiring) | ⬜ Not started | |
 
 ---
 

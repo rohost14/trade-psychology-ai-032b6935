@@ -12,6 +12,11 @@ from celery import Celery
 from celery.schedules import crontab
 from app.core.config import settings
 
+# celery-redbeat: Beat schedule stored in Redis, survives worker restarts.
+# Without this, Beat state is in-memory and all scheduled tasks are lost
+# when the worker restarts (e.g. deploy, crash, OOM).
+REDBEAT_REDIS_URL = settings.REDIS_URL
+
 # Create Celery app
 # No result backend — all tasks are fire-and-forget.
 # Using Redis as result backend causes data loss on restart and wastes memory.
@@ -25,6 +30,7 @@ celery_app = Celery(
         "app.tasks.report_tasks",
         "app.tasks.checkpoint_tasks",
         "app.tasks.reconciliation_tasks",
+        "app.tasks.position_monitor_tasks",
     ]
 )
 
@@ -52,6 +58,7 @@ celery_app.conf.update(
         "app.tasks.report_tasks.*": {"queue": "reports"},
         "app.tasks.checkpoint_tasks.*": {"queue": "alerts"},
         "app.tasks.reconciliation_tasks.*": {"queue": "trades"},
+        "app.tasks.position_monitor_tasks.*": {"queue": "trades"},
     },
 
     # Rate limiting (prevent overwhelming Zerodha API)
@@ -64,6 +71,11 @@ celery_app.conf.update(
     # Retry settings
     task_acks_late=True,
     task_reject_on_worker_lost=True,
+
+    # celery-redbeat: persist Beat schedule in Redis so it survives restarts.
+    # Run Beat with: celery -A app.core.celery_app beat -S redbeat.RedBeatScheduler
+    beat_scheduler="redbeat.RedBeatScheduler",
+    redbeat_redis_url=settings.REDIS_URL,
 
     # Beat schedule for periodic tasks (uses crontab)
     beat_schedule={
@@ -83,12 +95,17 @@ celery_app.conf.update(
             "schedule": crontab(hour=23, minute=45),
         },
         # EOD reconciliation — runs once daily at 4:00 AM IST (off-peak).
-        # Catches any trades missed by webhooks during the previous trading day.
-        # Staggered internally: 10 accounts per second to respect Kite rate limits.
-        # NOT a polling loop — webhooks + KiteTicker handle real-time.
         "eod-reconcile": {
             "task": "app.tasks.reconciliation_tasks.reconcile_trades",
             "schedule": crontab(hour=4, minute=0),
+        },
+        # Position monitor — every 30 seconds during market hours.
+        # Checks open positions for holding_loser, overexposure.
+        # Uses Redis LTP cache from KiteTicker — zero REST API calls.
+        # Task self-guards: skips outside 09:15–15:25 IST and on weekends.
+        "position-monitor": {
+            "task": "app.tasks.position_monitor_tasks.monitor_open_positions",
+            "schedule": 30.0,  # every 30 seconds
         },
     },
 )
