@@ -18,6 +18,12 @@ const outcomeConfig = {
   ignored: { label: 'Ignored', icon: XCircle, color: 'text-red-600 dark:text-red-400', bg: 'bg-red-100 dark:bg-red-900/30' },
 } as const;
 
+// Cache shield data for 5 minutes — it doesn't change second-to-second
+const CACHE_TTL_MS = 5 * 60 * 1000;
+const shieldCache: { data: { summary: ShieldSummary; timeline: ShieldTimelineItem[]; patterns: PatternBreakdown[] } | null; ts: number; accountId: string | null } = {
+  data: null, ts: 0, accountId: null,
+};
+
 export default function BlowupShieldPage() {
   const { account } = useBroker();
   const [summary, setSummary] = useState<ShieldSummary | null>(null);
@@ -27,8 +33,24 @@ export default function BlowupShieldPage() {
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    async function fetchShieldData() {
-      if (!account?.id) { setLoading(false); return; }
+    if (!account?.id) { setLoading(false); return; }
+
+    async function fetchShieldData(force = false) {
+      // Serve from cache if fresh and same account
+      const now = Date.now();
+      if (
+        !force &&
+        shieldCache.data &&
+        shieldCache.accountId === account.id &&
+        now - shieldCache.ts < CACHE_TTL_MS
+      ) {
+        setSummary(shieldCache.data.summary);
+        setTimeline(shieldCache.data.timeline);
+        setPatterns(shieldCache.data.patterns);
+        setLoading(false);
+        return;
+      }
+
       try {
         setLoading(true);
         const [summaryRes, timelineRes, patternsRes] = await Promise.all([
@@ -36,9 +58,19 @@ export default function BlowupShieldPage() {
           api.get<{ timeline: ShieldTimelineItem[] }>('/api/shield/timeline?limit=50'),
           api.get<{ patterns: PatternBreakdown[] }>('/api/shield/patterns'),
         ]);
-        setSummary(summaryRes.data);
-        setTimeline(timelineRes.data.timeline);
-        setPatterns(patternsRes.data.patterns);
+        const fresh = {
+          summary: summaryRes.data,
+          timeline: timelineRes.data.timeline,
+          patterns: patternsRes.data.patterns,
+        };
+        // Update cache
+        shieldCache.data = fresh;
+        shieldCache.ts = Date.now();
+        shieldCache.accountId = account.id;
+
+        setSummary(fresh.summary);
+        setTimeline(fresh.timeline);
+        setPatterns(fresh.patterns);
         setError(null);
       } catch (err) {
         console.error('Failed to fetch shield data:', err);
@@ -47,7 +79,15 @@ export default function BlowupShieldPage() {
         setLoading(false);
       }
     }
+
     fetchShieldData();
+
+    // Re-fetch when tab becomes visible (but only if cache has expired)
+    const onVisible = () => {
+      if (document.visibilityState === 'visible') fetchShieldData();
+    };
+    document.addEventListener('visibilitychange', onVisible);
+    return () => document.removeEventListener('visibilitychange', onVisible);
   }, [account?.id]);
 
   if (loading) {

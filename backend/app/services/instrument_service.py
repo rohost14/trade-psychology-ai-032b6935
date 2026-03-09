@@ -3,7 +3,7 @@ Instrument master management.
 Downloads and caches Kite instruments for symbol lookups.
 """
 
-from datetime import datetime, date
+from datetime import datetime, date, timezone
 from typing import Optional, List, Dict
 from uuid import UUID
 from sqlalchemy.ext.asyncio import AsyncSession
