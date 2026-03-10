@@ -1,6 +1,6 @@
 """
 Shared utilities for validation scenario scripts.
-Connects to the same DB as the app using settings from .env
+Uses raw asyncpg (no ORM) — direct SQL, no mapping issues.
 """
 
 import asyncio
@@ -8,65 +8,80 @@ import os
 import sys
 import uuid
 from datetime import datetime, timedelta, timezone
-from decimal import Decimal
 
-# Add backend root to path so we can import app modules
+# Add backend root to path
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
 
-from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession, async_sessionmaker
-from sqlalchemy.pool import NullPool
-from sqlalchemy import select, text
-
+import asyncpg
 from app.core.config import settings
-from app.models.broker_account import BrokerAccount
-from app.models.trade import Trade
-from app.models.completed_trade import CompletedTrade
 
-# All test data is tagged for easy cleanup
-TEST_TAG = "TEST_SCENARIO_VALIDATE"
+# All test data tagged for cleanup (must be <= 20 chars — trades.tag VARCHAR(20))
+TEST_TAG = "TEST_SCENARIO"
 
 
-def make_engine():
-    return create_async_engine(
-        settings.DATABASE_URL,
-        poolclass=NullPool,
-        connect_args={"statement_cache_size": 0},
-    )
+def _pg_url() -> str:
+    """Convert asyncpg-compatible URL from SQLAlchemy DATABASE_URL."""
+    url = settings.DATABASE_URL
+    # SQLAlchemy uses postgresql+asyncpg:// — asyncpg needs postgresql://
+    url = url.replace("postgresql+asyncpg://", "postgresql://")
+    return url
 
 
-async def get_broker_account_id() -> uuid.UUID:
-    """Get the first connected broker account (your real account)."""
-    engine = make_engine()
-    Session = async_sessionmaker(engine, class_=AsyncSession, expire_on_commit=False)
-    async with Session() as db:
-        result = await db.execute(
-            select(BrokerAccount).where(BrokerAccount.status == "connected")
+async def get_connection():
+    """Get a raw asyncpg connection."""
+    return await asyncpg.connect(_pg_url(), statement_cache_size=0)
+
+
+async def get_broker_account_id() -> str:
+    """
+    Get the broker account ID to use for test data.
+    Shows all connected accounts and asks you to pick — no wrong account inserts.
+    Returns account ID as string.
+    """
+    conn = await get_connection()
+    try:
+        rows = await conn.fetch(
+            """
+            SELECT id, broker_user_id, broker_email, connected_at
+            FROM broker_accounts
+            WHERE status = 'connected'
+            ORDER BY connected_at DESC
+            """
         )
-        account = result.scalars().first()
-        if not account:
-            print("\n❌  No connected broker account found.")
-            print("    Connect Zerodha in the app first, then re-run this script.")
-            sys.exit(1)
-        print(f"✅  Using broker account: {account.broker_email or account.broker_user_id}")
-        print(f"    Account ID: {account.id}")
-        await engine.dispose()
-        return account.id
+    finally:
+        await conn.close()
 
+    if not rows:
+        print("\n❌  No connected broker account found.")
+        print("    Connect Zerodha in the app first.")
+        sys.exit(1)
 
-def now_ist():
-    """Current time as IST-aware datetime."""
-    import pytz
-    return datetime.now(pytz.timezone("Asia/Kolkata"))
+    if len(rows) == 1:
+        row = rows[0]
+        print(f"✅  Using: {row['broker_email'] or row['broker_user_id']}")
+        print(f"    Account ID: {row['id']}")
+        return str(row['id'])
 
+    print(f"\n⚠️   Found {len(rows)} connected accounts. Pick your real Zerodha account:")
+    for i, row in enumerate(rows):
+        print(f"    [{i+1}] {row['broker_email'] or row['broker_user_id']}  (ID: {row['id']})")
 
-def utc_offset(minutes: int = 0) -> datetime:
-    """Return a UTC datetime offset by N minutes from now."""
-    return datetime.now(timezone.utc) + timedelta(minutes=minutes)
+    while True:
+        choice = input(f"\nEnter number [1-{len(rows)}]: ").strip()
+        try:
+            idx = int(choice) - 1
+            if 0 <= idx < len(rows):
+                row = rows[idx]
+                print(f"✅  Using: {row['broker_email'] or row['broker_user_id']}")
+                return str(row['id'])
+        except ValueError:
+            pass
+        print(f"    Enter a number between 1 and {len(rows)}")
 
 
 async def insert_completed_trade(
-    db: AsyncSession,
-    broker_account_id: uuid.UUID,
+    conn,
+    broker_account_id: str,
     symbol: str,
     exchange: str,
     instrument_type: str,
@@ -75,40 +90,46 @@ async def insert_completed_trade(
     avg_entry: float,
     avg_exit: float,
     pnl: float,
-    entry_offset_min: int,   # minutes ago for entry
-    duration_min: int,       # how long the trade lasted
-) -> CompletedTrade:
-    """Insert one CompletedTrade record. Returns the inserted object."""
+    entry_offset_min: int,
+    duration_min: int,
+) -> str:
+    """Insert one CompletedTrade via raw SQL. Returns the new ID."""
     now = datetime.now(timezone.utc)
     entry_time = now + timedelta(minutes=entry_offset_min)
     exit_time = entry_time + timedelta(minutes=duration_min)
+    ct_id = str(uuid.uuid4())
 
-    ct = CompletedTrade(
-        broker_account_id=broker_account_id,
-        tradingsymbol=symbol,
-        exchange=exchange,
-        instrument_type=instrument_type,
-        product="MIS",
-        direction=direction,
-        total_quantity=qty,
-        num_entries=1,
-        num_exits=1,
-        avg_entry_price=Decimal(str(avg_entry)),
-        avg_exit_price=Decimal(str(avg_exit)),
-        realized_pnl=Decimal(str(pnl)),
-        entry_time=entry_time,
-        exit_time=exit_time,
-        duration_minutes=duration_min,
-        status="closed",
+    await conn.execute(
+        """
+        INSERT INTO completed_trades (
+            id, broker_account_id, tradingsymbol, exchange,
+            instrument_type, product, direction,
+            total_quantity, num_entries, num_exits,
+            avg_entry_price, avg_exit_price, realized_pnl,
+            entry_time, exit_time, duration_minutes,
+            closed_by_flip, status, created_at, updated_at
+        ) VALUES (
+            $1, $2, $3, $4,
+            $5, $6, $7,
+            $8, $9, $10,
+            $11, $12, $13,
+            $14, $15, $16,
+            false, 'closed', now(), now()
+        )
+        """,
+        ct_id, broker_account_id, symbol, exchange,
+        instrument_type, "MIS", direction,
+        qty, 1, 1,
+        avg_entry, avg_exit, pnl,
+        entry_time, exit_time, duration_min,
     )
-    db.add(ct)
-    await db.flush()
-    return ct
+    print(f"   → CompletedTrade: {symbol} {direction} qty={qty} pnl=₹{pnl:,.0f}")
+    return ct_id
 
 
 async def insert_trade(
-    db: AsyncSession,
-    broker_account_id: uuid.UUID,
+    conn,
+    broker_account_id: str,
     symbol: str,
     exchange: str,
     transaction_type: str,
@@ -116,40 +137,38 @@ async def insert_trade(
     price: float,
     pnl: float,
     offset_min: int,
-) -> Trade:
-    """
-    Insert a Trade record (needed for RiskDetector production pipeline).
-    Uses a unique test order_id so it doesn't conflict with real trades.
-    """
+) -> str:
+    """Insert one Trade (raw fill) via raw SQL. Returns the new ID."""
     order_id = f"TEST_{uuid.uuid4().hex[:12].upper()}"
+    trade_id = str(uuid.uuid4())
     order_time = datetime.now(timezone.utc) + timedelta(minutes=offset_min)
 
-    t = Trade(
-        broker_account_id=broker_account_id,
-        order_id=order_id,
-        tradingsymbol=symbol,
-        exchange=exchange,
-        transaction_type=transaction_type,
-        order_type="MARKET",
-        product="MIS",
-        quantity=qty,
-        filled_quantity=qty,
-        pending_quantity=0,
-        cancelled_quantity=0,
-        price=price,
-        average_price=price,
-        pnl=pnl,
-        status="COMPLETE",
-        asset_class="FNO",
-        instrument_type="FUT",
-        product_type="MIS",
-        order_timestamp=order_time,
-        tag=TEST_TAG,       # ← marks it as test data
-        guid=TEST_TAG,      # ← secondary marker
+    await conn.execute(
+        """
+        INSERT INTO trades (
+            id, broker_account_id, order_id, tradingsymbol, exchange,
+            transaction_type, order_type, product,
+            quantity, filled_quantity, pending_quantity, cancelled_quantity,
+            price, average_price, pnl,
+            status, asset_class, instrument_type, product_type,
+            tag, guid, order_timestamp, created_at, updated_at
+        ) VALUES (
+            $1, $2, $3, $4, $5,
+            $6, $7, $8,
+            $9, $9, 0, 0,
+            $10, $10, $11,
+            'COMPLETE', 'FNO', 'FUT', 'MIS',
+            $12, $12, $13, now(), now()
+        )
+        """,
+        trade_id, broker_account_id, order_id, symbol, exchange,
+        transaction_type, "MARKET", "MIS",
+        qty,
+        price, pnl,
+        TEST_TAG, order_time,
     )
-    db.add(t)
-    await db.flush()
-    return t
+    print(f"   → Trade: {symbol} {transaction_type} qty={qty} @ ₹{price:,.0f}")
+    return trade_id
 
 
 def print_banner(script_num: int, title: str):
