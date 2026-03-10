@@ -9,7 +9,7 @@ Async tasks for:
 
 import logging
 from uuid import UUID
-from datetime import datetime, timezone
+from datetime import datetime, timezone, timedelta
 from typing import Dict, Any
 
 from app.core.celery_app import celery_app
