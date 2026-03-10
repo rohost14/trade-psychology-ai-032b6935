@@ -51,32 +51,41 @@ async def get_broker_account_id() -> str:
     finally:
         await conn.close()
 
-    if not rows:
-        print("\n❌  No connected broker account found.")
+    # Filter out test accounts from the test suite
+    # Real Zerodha accounts have proper emails and user IDs, not qa.internal
+    real_accounts = [
+        r for r in rows
+        if not (r['broker_email'] or '').endswith('@qa.internal')
+        and not (r['broker_user_id'] or '').startswith('QA')
+        and r['broker_user_id'] is not None
+    ]
+
+    if not real_accounts:
+        print("\n❌  No real connected broker account found.")
         print("    Connect Zerodha in the app first.")
         sys.exit(1)
 
-    if len(rows) == 1:
-        row = rows[0]
+    if len(real_accounts) == 1:
+        row = real_accounts[0]
         print(f"✅  Using: {row['broker_email'] or row['broker_user_id']}")
         print(f"    Account ID: {row['id']}")
         return str(row['id'])
 
-    print(f"\n⚠️   Found {len(rows)} connected accounts. Pick your real Zerodha account:")
-    for i, row in enumerate(rows):
+    print(f"\n⚠️   Found {len(real_accounts)} real accounts. Pick your Zerodha account:")
+    for i, row in enumerate(real_accounts):
         print(f"    [{i+1}] {row['broker_email'] or row['broker_user_id']}  (ID: {row['id']})")
 
     while True:
-        choice = input(f"\nEnter number [1-{len(rows)}]: ").strip()
+        choice = input(f"\nEnter number [1-{len(real_accounts)}]: ").strip()
         try:
             idx = int(choice) - 1
-            if 0 <= idx < len(rows):
-                row = rows[idx]
+            if 0 <= idx < len(real_accounts):
+                row = real_accounts[idx]
                 print(f"✅  Using: {row['broker_email'] or row['broker_user_id']}")
                 return str(row['id'])
         except ValueError:
             pass
-        print(f"    Enter a number between 1 and {len(rows)}")
+        print(f"    Enter a number between 1 and {len(real_accounts)}")
 
 
 async def insert_completed_trade(
