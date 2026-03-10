@@ -9,8 +9,14 @@ interface RecentAlertsCardProps {
   onAcknowledge?: (alertId: string) => void;
 }
 
-const severityConfig = {
+const severityConfig: Record<string, { icon: any; badgeClass: string; iconClass: string }> = {
   critical: {
+    icon: XCircle,
+    badgeClass: 'bg-red-50 text-red-700 dark:bg-red-900/20 dark:text-red-400',
+    iconClass: 'text-red-600 dark:text-red-400',
+  },
+  // Backend aliases for critical
+  danger: {
     icon: XCircle,
     badgeClass: 'bg-red-50 text-red-700 dark:bg-red-900/20 dark:text-red-400',
     iconClass: 'text-red-600 dark:text-red-400',
@@ -21,6 +27,12 @@ const severityConfig = {
     iconClass: 'text-red-600 dark:text-red-400',
   },
   medium: {
+    icon: AlertTriangle,
+    badgeClass: 'bg-amber-50 text-amber-700 dark:bg-amber-900/20 dark:text-amber-400',
+    iconClass: 'text-amber-600 dark:text-amber-400',
+  },
+  // Backend alias for medium
+  caution: {
     icon: AlertTriangle,
     badgeClass: 'bg-amber-50 text-amber-700 dark:bg-amber-900/20 dark:text-amber-400',
     iconClass: 'text-amber-600 dark:text-amber-400',
@@ -89,7 +101,7 @@ export default function RecentAlertsCard({ alerts, onAcknowledge }: RecentAlerts
       {alerts.length > 0 ? (
         <div className="divide-y divide-border">
           {alerts.slice(0, 5).map((alert) => {
-            const config = severityConfig[alert.severity];
+            const config = severityConfig[alert.severity] ?? severityConfig['high'];
             const Icon = config.icon;
             const isExpanded = expandedId === alert.id;
             const isAcknowledged = alert.acknowledged || localAckedIds.has(alert.id);
