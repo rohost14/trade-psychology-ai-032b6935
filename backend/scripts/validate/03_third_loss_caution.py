@@ -11,7 +11,7 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspa
 
 from scenario_utils import (
     get_broker_account_id, get_connection,
-    insert_completed_trade, insert_trade,
+    insert_completed_trade, insert_trade, trigger_detection,
     print_banner, print_expect, print_check, print_wait, print_done,
 )
 
@@ -39,6 +39,7 @@ async def main():
     finally:
         await conn.close()
 
+    await trigger_detection(broker_account_id)
     print_done("NIFTY LONG → stopped out, loss ₹4,200 (3 consecutive losses)")
     print()
     print("━" * 60)

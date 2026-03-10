@@ -180,6 +180,35 @@ async def insert_trade(
     return trade_id
 
 
+async def trigger_detection(broker_account_id: str):
+    """
+    Trigger backend risk detection after inserting test data.
+    This is what webhooks normally do — runs RiskDetector + BehavioralEvaluator
+    so alerts appear in the dashboard alerts panel.
+    """
+    from uuid import UUID
+    from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession, async_sessionmaker
+    from sqlalchemy.pool import NullPool
+
+    engine = create_async_engine(
+        settings.DATABASE_URL,
+        poolclass=NullPool,
+        connect_args={"statement_cache_size": 0},
+    )
+    Session = async_sessionmaker(engine, class_=AsyncSession, expire_on_commit=False)
+
+    async with Session() as db:
+        try:
+            from app.tasks.trade_tasks import run_risk_detection_async
+            print("   → Triggering backend behavioral detection...")
+            await run_risk_detection_async(UUID(broker_account_id), db)
+            print("   → Detection complete. Check Alerts panel.")
+        except Exception as e:
+            print(f"   ⚠️  Detection error (non-fatal): {e}")
+
+    await engine.dispose()
+
+
 def print_banner(script_num: int, title: str):
     print("\n" + "=" * 60)
     print(f"  Script {script_num:02d}: {title}")

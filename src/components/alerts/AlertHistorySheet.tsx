@@ -86,7 +86,11 @@ export function AlertHistorySheet({
   };
 
   const renderAlert = (alert: AlertNotification) => {
-    const config = severityConfig[alert.pattern.severity];
+    // Backend uses 'danger'/'caution', frontend map uses 'high'/'medium' — fall back to high
+    const severity = alert.pattern.severity;
+    const config = severityConfig[severity]
+      ?? severityConfig['high']
+      ?? Object.values(severityConfig)[0];
     const Icon = config.icon;
     
     return (
