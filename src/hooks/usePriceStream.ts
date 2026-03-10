@@ -73,12 +73,14 @@ interface UsePriceStreamReturn {
 }
 
 const WS_RECONNECT_DELAY = 3000;
+const WS_MAX_RECONNECT_DELAY = 60000; // cap at 60s — stops log spam when Kite key not configured
 const PING_INTERVAL = 30000;
 
 export function usePriceStream(brokerAccountId?: string): UsePriceStreamReturn {
   const [prices, setPrices] = useState<Record<string, PriceData>>({});
   const [isConnected, setIsConnected] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const reconnectDelayRef = useRef(WS_RECONNECT_DELAY);
   const [lastTrade, setLastTrade] = useState<TradeUpdate | null>(null);
   const [lastAlert, setLastAlert] = useState<AlertData | null>(null);
 
@@ -120,6 +122,7 @@ export function usePriceStream(brokerAccountId?: string): UsePriceStreamReturn {
         if (!mountedRef.current) return;
         setIsConnected(true);
         setError(null);
+        reconnectDelayRef.current = WS_RECONNECT_DELAY; // reset backoff on success
 
         // Start ping interval
         pingIntervalRef.current = setInterval(() => {
@@ -189,13 +192,16 @@ export function usePriceStream(brokerAccountId?: string): UsePriceStreamReturn {
           clearInterval(pingIntervalRef.current);
         }
 
-        // Attempt reconnection (unless clean close or auth failure)
+        // Attempt reconnection with exponential backoff (unless clean close or auth failure)
         if (event.code !== 1000 && event.code !== 4001) {
+          const delay = reconnectDelayRef.current;
           reconnectTimeoutRef.current = setTimeout(() => {
             if (mountedRef.current) {
+              // Double the delay each attempt, cap at 60s
+              reconnectDelayRef.current = Math.min(delay * 2, WS_MAX_RECONNECT_DELAY);
               connect();
             }
-          }, WS_RECONNECT_DELAY);
+          }, delay);
         }
       };
     } catch (e) {

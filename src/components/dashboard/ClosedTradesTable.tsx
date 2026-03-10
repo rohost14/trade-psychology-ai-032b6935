@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import React, { useState } from 'react';
 import { ArrowUpRight, ArrowDownRight, Clock } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { formatCurrency, formatPrice } from '@/lib/formatters';
@@ -155,9 +155,9 @@ export default function ClosedTradesTable({ trades, isLoading, onTradeClick }: C
           </thead>
           <tbody>
             {groups.map((group) => (
-              <>
+              <React.Fragment key={group.label}>
                 {/* Date separator row */}
-                <tr key={`sep-${group.label}`} className="bg-muted/20">
+                <tr className="bg-muted/20">
                   <td colSpan={5} className="px-4 py-1.5">
                     <span className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wide">
                       {group.label}
@@ -215,7 +215,7 @@ export default function ClosedTradesTable({ trades, isLoading, onTradeClick }: C
                     </tr>
                   );
                 })}
-              </>
+              </React.Fragment>
             ))}
           </tbody>
         </table>
