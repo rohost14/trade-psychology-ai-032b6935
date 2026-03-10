@@ -94,6 +94,8 @@ export default function Dashboard() {
   const [tradesError, setTradesError] = useState<string | null>(null);
   const [riskState, setRiskState] = useState<RiskStateData | null>(null);
   const [dataLoaded, setDataLoaded] = useState(false);
+  // Session P&L in its own state — never wiped during riskState refetches
+  const [sessionPnlDisplay, setSessionPnlDisplay] = useState<number>(0);
 
   const [tradeStats, setTradeStats] = useState<{
     trades_today: number;
@@ -345,8 +347,10 @@ export default function Dashboard() {
       margin_available: margins?.equity?.available ?? undefined,
     });
 
-    // Update session P&L in risk state (combined realized + unrealized)
-    setRiskState(prev => prev ? { ...prev, unrealized_pnl: sessionPnl } : null);
+    // Store session P&L in dedicated state (never wiped during riskState refetches)
+    setSessionPnlDisplay(sessionPnl);
+    // Also keep riskState in sync when it exists
+    setRiskState(prev => prev ? { ...prev, unrealized_pnl: sessionPnl } : prev);
   }, [closedTrades, positions, margins]);
 
   const handleSync = async () => {
@@ -472,13 +476,16 @@ export default function Dashboard() {
   }
 
   // Default risk state while loading
-  const displayRiskState = riskState || {
-    risk_state: 'safe' as const,
-    status_message: 'Loading...',
-    active_patterns: [],
-    unrealized_pnl: 0,
-    ai_recommendations: [],
-    last_synced: 'Loading...'
+  const displayRiskState = {
+    ...(riskState || {
+      risk_state: 'safe' as const,
+      status_message: 'Loading...',
+      active_patterns: [],
+      ai_recommendations: [],
+      last_synced: 'Loading...'
+    }),
+    // Use stable sessionPnlDisplay — never flickers to 0 during riskState refetches
+    unrealized_pnl: sessionPnlDisplay,
   };
 
   return (
