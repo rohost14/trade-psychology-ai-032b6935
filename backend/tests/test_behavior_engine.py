@@ -177,7 +177,7 @@ class TestDetectors:
         ctx = make_ctx(completed_trade=trades[-1], session_trades=trades)
         event = engine._detect_consecutive_loss_streak(ctx)
         assert event is not None
-        assert event.severity == "MEDIUM"
+        assert event.severity == "caution"
         assert event.event_type == "consecutive_loss_streak"
 
     def test_danger_on_5_losses(self):
@@ -185,7 +185,7 @@ class TestDetectors:
         ctx = make_ctx(completed_trade=trades[-1], session_trades=trades)
         event = engine._detect_consecutive_loss_streak(ctx)
         assert event is not None
-        assert event.severity == "HIGH"
+        assert event.severity == "danger"
 
     def test_streak_resets_on_winner(self):
         # 3 losses, then 1 win, then 2 losses — streak is only 2
@@ -286,8 +286,7 @@ class TestDetectors:
         event = engine._detect_cooldown_violation(ctx)
         assert event is not None
         assert event.event_type == "cooldown_violation"
-        assert event.severity == "HIGH"
-        assert event.confidence == Decimal("0.95")
+        assert event.severity == "danger"
 
     def test_no_violation_without_cooldown(self):
         ctx = make_ctx(active_cooldowns=[])

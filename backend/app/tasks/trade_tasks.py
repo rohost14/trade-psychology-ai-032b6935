@@ -16,13 +16,16 @@ from app.core.celery_app import celery_app
 from app.core.database import SessionLocal
 from app.core.config import settings
 from app.services.trade_sync_service import TradeSyncService
-from app.services.risk_detector import RiskDetector
 from app.services.pnl_calculator import pnl_calculator
 from app.models.user import User
 from app.models.trade import Trade
 from app.models.broker_account import BrokerAccount
 from app.utils.trade_classifier import classify_trade
-from sqlalchemy import select, update
+from sqlalchemy import select, update, and_
+
+# RiskDetector + BehavioralEvaluator — DEPRECATED (Phase 3 cutover)
+# Kept in codebase for reference, no longer called from pipeline.
+# Delete after 1 week of stable BehaviorEngine operation.
 
 logger = logging.getLogger(__name__)
 
@@ -308,22 +311,43 @@ def run_risk_detection(broker_account_id: str, trigger_trade_id: str = None):
 async def run_risk_detection_async(broker_account_id: UUID, db, trigger_trade: Trade = None):
     """
     Internal async helper for risk detection.
-    Used when already in async context (webhook processing).
+
+    Phase 3 cutover: uses BehaviorEngine as the single detection source.
+    RiskDetector + BehavioralEvaluator are deprecated and no longer called.
+
+    BehaviorEngine:
+    - Session-scoped (today only, not 24h rolling)
+    - Cumulative risk score via TradingSession
+    - Returns RiskAlert objects ready for dedup + notification
     """
     try:
-        risk_detector = RiskDetector()
-        alerts = await risk_detector.detect_patterns(
-            broker_account_id,
-            db,
-            trigger_trade=trigger_trade
-        )
-
-        # Save new alerts
         from app.models.risk_alert import RiskAlert
-        from sqlalchemy import and_
-        from datetime import timedelta, timezone
+        from app.models.completed_trade import CompletedTrade
+        from app.services.behavior_engine import behavior_engine
+        from sqlalchemy import desc
 
-        # Deduplicate against last 24 hours
+        # Find the most recent CompletedTrade for this account (the closed position)
+        ct_result = await db.execute(
+            select(CompletedTrade)
+            .where(CompletedTrade.broker_account_id == broker_account_id)
+            .order_by(desc(CompletedTrade.exit_time))
+            .limit(1)
+        )
+        latest_ct = ct_result.scalar_one_or_none()
+
+        if not latest_ct:
+            # No completed trade yet — position still open, nothing to analyze
+            return
+
+        # Run BehaviorEngine — returns RiskAlert objects
+        result = await behavior_engine.analyze(
+            broker_account_id=broker_account_id,
+            completed_trade=latest_ct,
+            db=db,
+        )
+        alerts = result.alerts  # List[RiskAlert], ready to save
+
+        # ── Deduplicate against last 24 hours ─────────────────────────
         cutoff = datetime.now(timezone.utc) - timedelta(hours=24)
         existing_result = await db.execute(
             select(RiskAlert).where(
@@ -333,21 +357,13 @@ async def run_risk_detection_async(broker_account_id: UUID, db, trigger_trade: T
                 )
             )
         )
-        existing_alerts = existing_result.scalars().all()
-        existing_keys = set()
-        for a in existing_alerts:
-            if a.trigger_trade_id:
-                existing_keys.add((str(a.trigger_trade_id), a.pattern_type))
-            else:
-                # Account-level alerts (no specific trigger trade) — dedup by type
-                existing_keys.add(("_account_", a.pattern_type))
+        existing_keys = {
+            ("_account_", a.pattern_type) for a in existing_result.scalars().all()
+        }
 
         new_alerts = []
         for alert in alerts:
-            if alert.trigger_trade_id:
-                key = (str(alert.trigger_trade_id), alert.pattern_type)
-            else:
-                key = ("_account_", alert.pattern_type)
+            key = ("_account_", alert.pattern_type)
             if key not in existing_keys:
                 db.add(alert)
                 new_alerts.append(alert)
@@ -355,42 +371,28 @@ async def run_risk_detection_async(broker_account_id: UUID, db, trigger_trade: T
 
         await db.commit()
 
-        # ── Alert consolidation (P-02) ─────────────────────────────────
-        # Apply two filters BEFORE sending notifications:
-        #   1. 5-minute bucket: suppress if same pattern already notified in last 5 min
-        #   2. Hard cap: if session has fired 8+ alerts today, record but don't notify
-        new_alerts = await _apply_alert_consolidation(
-            broker_account_id, new_alerts, db
-        )
+        # ── Alert consolidation (5-min bucket + hard cap) ─────────────
+        new_alerts = await _apply_alert_consolidation(broker_account_id, new_alerts, db)
 
-        # Send WhatsApp for DANGER alerts
+        # ── Send notifications for danger alerts ──────────────────────
         danger_alerts = [a for a in new_alerts if a.severity == "danger"]
-        if danger_alerts:
-            # Queue alert sending task
-            for alert in danger_alerts:
-                send_danger_alert.delay(
-                    str(broker_account_id),
-                    str(alert.id)
-                )
+        for alert in danger_alerts:
+            send_danger_alert.delay(str(broker_account_id), str(alert.id))
 
-        # Trigger AlertCheckpoint for danger/critical alerts (real counterfactual P&L)
-        checkpoint_alerts = [a for a in new_alerts if a.severity in ("danger", "critical")]
-        if checkpoint_alerts:
+        # ── Create BlowupShield checkpoints for danger alerts ─────────
+        for alert in danger_alerts:
             from app.tasks.checkpoint_tasks import create_alert_checkpoint
-            for alert in checkpoint_alerts:
-                create_alert_checkpoint.apply_async(
-                    args=[str(alert.id), str(broker_account_id)],
-                    countdown=10,
-                )
+            create_alert_checkpoint.apply_async(
+                args=[str(alert.id), str(broker_account_id)],
+                countdown=10,
+            )
 
-        logger.info(f"Risk detection: {len(new_alerts)} new alerts, {len(danger_alerts)} danger")
-
-        # ----------------------------------------------------------------
-        # SHADOW MODE — BehaviorEngine runs AFTER production detection.
-        # Production path above is completely unchanged.
-        # Shadow never raises — any failure is logged and swallowed.
-        # ----------------------------------------------------------------
-        await _run_shadow_behavior_engine(broker_account_id, trigger_trade, db)
+        logger.info(
+            f"[BehaviorEngine] {broker_account_id}: {len(new_alerts)} new alerts "
+            f"({len(danger_alerts)} danger) | "
+            f"state={result.behavior_state} | "
+            f"risk={float(result.risk_score_before):.0f}→{float(result.risk_score_after):.0f}"
+        )
 
     except Exception as e:
         logger.error(f"Risk detection error: {e}", exc_info=True)
@@ -471,67 +473,6 @@ async def _apply_alert_consolidation(
 
     return notifiable
 
-
-async def _run_shadow_behavior_engine(
-    broker_account_id: UUID,
-    trigger_trade,
-    db,
-) -> None:
-    """
-    Run BehaviorEngine in shadow mode alongside the old detection pipeline.
-
-    Writes to shadow_behavioral_events ONLY — never touches production tables.
-    Any exception is caught and logged — this MUST NOT affect the caller.
-
-    Shadow validation:
-      - Run for 5 trading days
-      - Compare shadow events vs production alerts
-      - If match rate > 95% and no crashes → cutover in Phase 3 step 7
-    """
-    try:
-        if trigger_trade is None:
-            return  # Only run shadow when we have a specific trigger trade
-
-        # Find the CompletedTrade that corresponds to this trigger_trade
-        # (The trigger_trade is a Trade fill; CompletedTrade is the closed round)
-        from app.models.completed_trade import CompletedTrade
-        from sqlalchemy import desc
-
-        ct_result = await db.execute(
-            select(CompletedTrade).where(
-                CompletedTrade.broker_account_id == broker_account_id
-            ).order_by(desc(CompletedTrade.exit_time)).limit(1)
-        )
-        latest_ct = ct_result.scalar_one_or_none()
-
-        if not latest_ct:
-            return  # No completed trade yet — position still open
-
-        # Run the BehaviorEngine
-        from app.services.behavior_engine import behavior_engine
-        result = await behavior_engine.analyze(
-            broker_account_id=broker_account_id,
-            completed_trade=latest_ct,
-            db=db,
-        )
-
-        if result.events:
-            logger.info(
-                f"[shadow] {broker_account_id} | "
-                f"{len(result.events)} shadow events | "
-                f"state={result.behavior_state} | "
-                f"risk={float(result.risk_score_before):.0f}→{float(result.risk_score_after):.0f} | "
-                f"patterns={[e.event_type for e in result.events]}"
-            )
-        else:
-            logger.debug(
-                f"[shadow] {broker_account_id} | no events | "
-                f"state={result.behavior_state}"
-            )
-
-    except Exception as e:
-        # Shadow failures MUST NOT crash the production pipeline
-        logger.error(f"[shadow] BehaviorEngine shadow failed (non-fatal): {e}", exc_info=True)
 
 
 @celery_app.task

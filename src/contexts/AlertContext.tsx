@@ -117,12 +117,15 @@ function mapBackendAlert(a: any): AlertNotification {
   };
 }
 
-const getSeverityLabel = (severity: PatternSeverity) => {
+const getSeverityLabel = (severity: string) => {
   switch (severity) {
-    case 'critical': return '🚨 Critical';
+    case 'critical':
+    case 'danger':   return '🚨 Danger';
     case 'high':     return '⚠️ High Alert';
-    case 'medium':   return '⚡ Caution';
+    case 'medium':
+    case 'caution':  return '⚡ Caution';
     case 'low':      return 'ℹ️ Info';
+    default:         return '⚠️ Alert';
   }
 };
 
