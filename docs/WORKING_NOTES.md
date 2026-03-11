@@ -23,21 +23,22 @@
 - 037: trading_sessions table ✅
 - 038: alert state machine columns on risk_alerts ✅
 - 039: behavioral event context on behavioral_events ✅
-- **040: shadow_behavioral_events** — needs to be run ⚠️
+- **040: shadow_behavioral_events** — SKIP (shadow mode removed)
+- **041: coach_sessions** ✅ Applied
 
 ---
 
-## Phase Status
+## Phase Status (as of 2026-03-12)
 
 | Phase | Status | Key fact |
 |-------|--------|----------|
 | 0 | ✅ Done | Sentry, Redis, webhook 500 fix, reconnect fix |
 | 1 | ✅ Done | idempotency, Redis locks, EOD reconciliation, /health |
 | 2 | ✅ Done | position_ledger + trading_sessions + services + late fill |
-| 3 | ⚠️ Shadow only | BehaviorEngine runs BUT old engines serve production. Items 6-7 pending validation. |
-| 4 | 🔜 Deferred | Too complex for <5 users. Revisit at 50+ users. |
-| 5 | 🔄 In progress | Started 2026-03-10 |
-| 6 | ⬜ Not started | |
+| 3 | ✅ Done | BehaviorEngine in production. danger/caution severity. RiskDetector deprecated. |
+| 4 | 🔜 Deferred | Do at 50+ users. Phase 1 locks sufficient. |
+| 5 | ✅ Done (6/8) | Items 3 (WS replay) + 8 (Prometheus) deferred to Phase 4 |
+| 6 | ✅ Done (5/7) | Items 4 (PositionLedger cutover) + 6 (AI split) deferred |
 
 ---
 

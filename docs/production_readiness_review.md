@@ -1687,12 +1687,12 @@ Every issue in this document assigned to exactly one phase. Nothing untracked.
 | Phase | Description | Status | Notes |
 |-------|-------------|--------|-------|
 | 0 | Safety Net (Sentry, AOF, C-00, H-00) | ✅ Complete | |
-| 1 | Data Integrity (idempotency, locks, reconciliation) | ✅ Complete | 230 tests |
-| 2 | Foundation Tables (position_ledger, trading_sessions) | ✅ Complete | 264 tests, migrations 036-039 applied |
-| 3 | Unified BehaviorEngine | ⚠️ Shadow only — NOT in production | Items 1-5,8-9 done. Items 6-7 (cutover) pending script validation. Old engines still serve production. |
-| 4 | Redis Streams Event Pipeline | 🔜 DEFERRED — do after 50+ users | Overkill at current scale (<5 users). Phase 1 locks sufficient. Revisit at scale. |
-| 5 | Real-Time Layer (monitor, consolidation, circuit breaker) | 🔄 In progress | Started 2026-03-10 |
-| 6 | Product Quality (backfill, coach memory, goals wiring) | ⬜ Not started | |
+| 1 | Data Integrity (idempotency, locks, reconciliation) | ✅ Complete | 296 tests |
+| 2 | Foundation Tables (position_ledger, trading_sessions) | ✅ Complete | Migrations 036-039 applied |
+| 3 | Unified BehaviorEngine | ✅ In production | BehaviorEngine is live. RiskDetector deprecated. danger/caution severity. |
+| 4 | Redis Streams Event Pipeline | 🔜 DEFERRED | Do at 50+ users. Phase 1 locks sufficient for now. |
+| 5 | Real-Time Layer | ✅ Complete (6/8) | Items 3 (WS replay) + 8 (Prometheus) deferred to Phase 4. |
+| 6 | Product Quality | ✅ Complete (5/7) | Items 4 (PositionLedger cutover) + 6 (AI split) deferred. |
 
 ---
 
