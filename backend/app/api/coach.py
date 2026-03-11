@@ -447,6 +447,9 @@ async def chat_with_coach(
     and behavioral patterns.
     """
     try:
+        from app.models.coach_session import CoachSession
+        from sqlalchemy import desc
+
         # Build rich trading context from positions + journal (7 days)
         trading_context = await _build_trading_context(broker_account_id, db)
 
@@ -457,7 +460,28 @@ async def chat_with_coach(
         user_profile = profile_result.scalar_one_or_none()
         ai_persona = user_profile.ai_persona if user_profile and user_profile.ai_persona else "coach"
 
-        # Try RAG for semantic journal/KB search (optional enhancement, won't break if it fails)
+        # ── P-04: Coach conversation memory ───────────────────────────
+        # Fetch last 3 session summaries and inject as context
+        session_memory = ""
+        try:
+            mem_result = await db.execute(
+                select(CoachSession)
+                .where(
+                    CoachSession.broker_account_id == broker_account_id,
+                    CoachSession.summary != None,  # noqa: E711
+                )
+                .order_by(desc(CoachSession.started_at))
+                .limit(3)
+            )
+            past_sessions = mem_result.scalars().all()
+            if past_sessions:
+                session_memory = "\n\nPrevious conversation context:\n" + "\n".join(
+                    f"- {s.summary}" for s in reversed(past_sessions)
+                )
+        except Exception as mem_err:
+            logger.debug(f"Session memory load skipped: {mem_err}")
+
+        # Try RAG for semantic journal/KB search
         rag_context = None
         try:
             rag_context = await rag_service.get_chat_context(
@@ -469,14 +493,69 @@ async def chat_with_coach(
         except Exception as e:
             logger.debug(f"RAG context skipped (non-critical): {e}")
 
+        # Inject session memory into trading context
+        full_context = trading_context + session_memory
+
         # Generate AI response
         response = await ai_service.generate_chat_response(
             user_message=request.message,
-            trading_context=trading_context,
+            trading_context=full_context,
             chat_history=[m.dict() for m in (request.history or [])],
             rag_context=rag_context or None,
             ai_persona=ai_persona
         )
+
+        # ── Save this exchange to the current session ──────────────────
+        try:
+            today_start = datetime.now(timezone.utc).replace(hour=0, minute=0, second=0)
+
+            # Get or create today's session
+            sess_result = await db.execute(
+                select(CoachSession)
+                .where(
+                    CoachSession.broker_account_id == broker_account_id,
+                    CoachSession.started_at >= today_start,
+                )
+                .order_by(desc(CoachSession.started_at))
+                .limit(1)
+            )
+            current_session = sess_result.scalar_one_or_none()
+
+            if not current_session:
+                current_session = CoachSession(
+                    broker_account_id=broker_account_id,
+                    messages=[],
+                )
+                db.add(current_session)
+
+            # Append this exchange
+            msgs = list(current_session.messages or [])
+            msgs.append({"role": "user", "content": request.message,
+                         "ts": datetime.now(timezone.utc).isoformat()})
+            msgs.append({"role": "assistant", "content": response,
+                         "ts": datetime.now(timezone.utc).isoformat()})
+            current_session.messages = msgs
+
+            # Generate summary after 4+ exchanges (8 messages)
+            if len(msgs) >= 8 and not current_session.summary:
+                topics = set()
+                for msg in msgs:
+                    if msg["role"] == "user":
+                        content = msg["content"][:100].lower()
+                        if any(w in content for w in ["loss", "losing", "down"]):
+                            topics.add("losses")
+                        if any(w in content for w in ["trade", "position", "entry"]):
+                            topics.add("trades")
+                        if any(w in content for w in ["pattern", "behavior", "habit"]):
+                            topics.add("patterns")
+                current_session.summary = (
+                    f"Session discussed: {', '.join(topics) or 'general trading topics'}. "
+                    f"{len(msgs)//2} exchanges."
+                )
+
+            await db.commit()
+        except Exception as sess_err:
+            logger.debug(f"Session save skipped (non-critical): {sess_err}")
 
         return ChatResponse(
             response=response,

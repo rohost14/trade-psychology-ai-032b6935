@@ -330,9 +330,16 @@ export default function Settings() {
                   </div>
                   <div>
                     <p className="text-sm font-medium text-emerald-700 dark:text-emerald-300">Connected to Zerodha</p>
-                    <p className="text-xs text-emerald-600 dark:text-emerald-400">
-                      Last synced: {formatLastSync(account.last_sync_at)}
-                    </p>
+                    {account.sync_status === 'syncing' ? (
+                      <p className="text-xs text-amber-600 dark:text-amber-400 flex items-center gap-1">
+                        <span className="inline-block h-2 w-2 rounded-full bg-amber-400 animate-pulse" />
+                        Loading your trading data…
+                      </p>
+                    ) : (
+                      <p className="text-xs text-emerald-600 dark:text-emerald-400">
+                        Last synced: {formatLastSync(account.last_sync_at)}
+                      </p>
+                    )}
                   </div>
                 </div>
                 <div className="flex gap-2">

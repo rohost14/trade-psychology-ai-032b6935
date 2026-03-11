@@ -221,6 +221,13 @@ async def zerodha_callback(
                 broker_account_id=existing_account.id
             )
 
+            # Trigger background sync to refresh today's data on reconnect
+            try:
+                from app.tasks.trade_tasks import sync_trades_for_account
+                sync_trades_for_account.delay(str(existing_account.id))
+            except Exception as sync_err:
+                logger.warning(f"Could not queue reconnect sync: {sync_err}")
+
             return RedirectResponse(
                 url=f"{frontend_url}/settings?connected=true&code={_store_auth_code(jwt_token, str(existing_account.id))}",
                 status_code=302
@@ -259,8 +266,19 @@ async def zerodha_callback(
                 broker_account_id=broker_account.id
             )
 
+            # P-01: Trigger initial data sync for new connection
+            # Kite API only provides today's data — historical data accumulates over time.
+            # sync_status = "syncing" so frontend shows "Loading your data..." state.
+            broker_account.sync_status = "syncing"
+            await db.commit()
+            try:
+                from app.tasks.trade_tasks import sync_trades_for_account
+                sync_trades_for_account.delay(str(broker_account.id))
+            except Exception as sync_err:
+                logger.warning(f"Could not queue initial sync: {sync_err}")
+
             return RedirectResponse(
-                url=f"{frontend_url}/settings?connected=true&token={jwt_token}&broker_account_id={broker_account.id}",
+                url=f"{frontend_url}/settings?connected=true&code={_store_auth_code(jwt_token, str(broker_account.id))}",
                 status_code=302
             )
 

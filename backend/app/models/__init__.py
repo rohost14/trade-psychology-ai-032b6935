@@ -18,6 +18,7 @@ from app.models.behavioral_event import BehavioralEvent
 from app.models.alert_checkpoint import AlertCheckpoint
 from app.models.trading_session import TradingSession
 from app.models.position_ledger import PositionLedger
+from app.models.coach_session import CoachSession
 
 __all__ = [
     "User",

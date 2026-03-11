@@ -58,6 +58,9 @@ export default function Personalization() {
   const [timeAnalysis, setTimeAnalysis] = useState<TimeAnalysis | null>(null);
   const [symbolAnalysis, setSymbolAnalysis] = useState<SymbolAnalysis | null>(null);
   const [interventionTiming, setInterventionTiming] = useState<InterventionTiming | null>(null);
+  const [behavioralInsights, setBehavioralInsights] = useState<any[]>([]);
+  const [behavioralStatus, setBehavioralStatus] = useState<string>('loading');
+  const [sessionsAnalyzed, setSessionsAnalyzed] = useState<number>(0);
   const [isLoading, setIsLoading] = useState(true);
   const [isLearning, setIsLearning] = useState(false);
   const [lastLearned, setLastLearned] = useState<string | null>(null);
@@ -69,11 +72,12 @@ export default function Personalization() {
       setIsLoading(true);
 
       // Fetch all personalization data in parallel
-      const [insightsRes, timeRes, symbolRes, interventionRes] = await Promise.allSettled([
+      const [insightsRes, timeRes, symbolRes, interventionRes, behavioralRes] = await Promise.allSettled([
         api.get(`/api/personalization/insights`),
         api.get(`/api/personalization/time-analysis`),
         api.get(`/api/personalization/symbol-analysis`),
         api.get(`/api/personalization/intervention-timing`),
+        api.get(`/api/profile/behavioral-insights`),
       ]);
 
       if (insightsRes.status === 'fulfilled') {
@@ -88,6 +92,11 @@ export default function Personalization() {
       }
       if (interventionRes.status === 'fulfilled') {
         setInterventionTiming(interventionRes.value.data);
+      }
+      if (behavioralRes.status === 'fulfilled') {
+        setBehavioralInsights(behavioralRes.value.data.insights || []);
+        setBehavioralStatus(behavioralRes.value.data.status || 'insufficient_data');
+        setSessionsAnalyzed(behavioralRes.value.data.sessions_analyzed || 0);
       }
     } catch (error) {
       console.error('Failed to fetch personalization data:', error);
@@ -149,6 +158,47 @@ export default function Personalization() {
 
   return (
     <div className="container mx-auto p-6 space-y-6">
+
+      {/* P-06: What the system has learned — shown ABOVE the settings form */}
+      {behavioralStatus === 'active' && behavioralInsights.length > 0 && (
+        <Card className="border-primary/30 bg-primary/5">
+          <CardHeader className="pb-3">
+            <CardTitle className="flex items-center gap-2 text-base">
+              <Brain className="h-5 w-5 text-primary" />
+              What we've learned about you
+            </CardTitle>
+            <CardDescription>
+              Based on {sessionsAnalyzed} trading sessions — your personal thresholds, not defaults.
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-3">
+            {behavioralInsights.map((insight: any, i: number) => (
+              <div key={i} className="flex items-start gap-3 p-3 rounded-lg bg-background border border-border">
+                <Sparkles className="h-4 w-4 text-primary mt-0.5 flex-shrink-0" />
+                <div>
+                  <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-0.5">
+                    {insight.category}
+                  </p>
+                  <p className="text-sm text-foreground">{insight.insight}</p>
+                </div>
+              </div>
+            ))}
+          </CardContent>
+        </Card>
+      )}
+
+      {behavioralStatus === 'insufficient_data' && (
+        <Card className="border-dashed">
+          <CardContent className="pt-4 pb-4 text-center">
+            <Brain className="h-8 w-8 text-muted-foreground/50 mx-auto mb-2" />
+            <p className="text-sm font-medium text-foreground">Behavioral learning in progress</p>
+            <p className="text-xs text-muted-foreground mt-1">
+              Trade for at least 5 sessions and we'll show you what we've learned about your patterns.
+            </p>
+          </CardContent>
+        </Card>
+      )}
+
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>

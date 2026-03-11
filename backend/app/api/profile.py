@@ -605,3 +605,88 @@ async def _get_or_create_profile(broker_account_id: UUID, db: AsyncSession) -> U
         await db.flush()
 
     return profile
+
+
+@router.get("/behavioral-insights")
+async def get_behavioral_insights(
+    broker_account_id: UUID = Depends(get_verified_broker_account_id),
+    db: AsyncSession = Depends(get_db),
+):
+    """
+    P-06: Surface what the system has learned from the user's trading history.
+
+    Returns observed behavioral patterns in human-readable form.
+    These come from behavioral_baseline_service (runs nightly) and
+    trading_sessions accumulated since Phase 3.
+
+    This is the product differentiator — no other app shows this.
+    """
+    try:
+        profile = await _get_or_create_profile(broker_account_id, db)
+        baseline = (profile.detected_patterns or {}).get("baseline")
+
+        insights = []
+
+        if not baseline:
+            return {
+                "insights": [],
+                "status": "insufficient_data",
+                "message": "Trade for at least 5 sessions to see your behavioral patterns.",
+            }
+
+        session_count = baseline.get("session_count", 0)
+        daily_limit = baseline.get("daily_trade_limit")
+        burst = baseline.get("burst_trades_per_15min")
+        revenge_window = baseline.get("revenge_window_min")
+        consec_caution = baseline.get("consecutive_loss_caution")
+        consec_danger = baseline.get("consecutive_loss_danger")
+
+        if daily_limit:
+            insights.append({
+                "category": "Trading Frequency",
+                "insight": f"You typically trade {daily_limit} times on an active day.",
+                "source": "observed",
+                "threshold_key": "daily_trade_limit",
+                "threshold_value": daily_limit,
+            })
+
+        if burst:
+            insights.append({
+                "category": "Overtrading Risk",
+                "insight": f"Your burst trading threshold is {burst} trades per 15 minutes — alerts fire above this.",
+                "source": "observed",
+                "threshold_key": "burst_trades_per_15min",
+                "threshold_value": burst,
+            })
+
+        if revenge_window:
+            insights.append({
+                "category": "Revenge Trading",
+                "insight": f"You tend to re-enter within {revenge_window} minutes after a loss — the system watches for this.",
+                "source": "observed",
+                "threshold_key": "revenge_window_min",
+                "threshold_value": revenge_window,
+            })
+
+        if consec_caution and consec_danger:
+            insights.append({
+                "category": "Loss Streak Tolerance",
+                "insight": (
+                    f"You get cautious after {consec_caution} consecutive losses "
+                    f"and reach danger territory at {consec_danger}."
+                ),
+                "source": "observed",
+                "threshold_key": "consecutive_loss_caution",
+                "threshold_value": consec_caution,
+            })
+
+        return {
+            "insights": insights,
+            "status": "active",
+            "sessions_analyzed": session_count,
+            "message": f"Based on {session_count} trading sessions.",
+        }
+
+    except Exception as e:
+        logger.error(f"Behavioral insights failed: {e}")
+        raise HTTPException(status_code=500, detail="Internal server error")
