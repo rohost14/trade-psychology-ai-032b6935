@@ -18,6 +18,7 @@ from app.api.deps import get_verified_broker_account_id
 from app.models.journal_entry import JournalEntry
 from app.models.trade import Trade
 from app.models.completed_trade import CompletedTrade
+from app.models.position import Position
 from app.services.rag_service import rag_service
 
 router = APIRouter()
@@ -197,15 +198,45 @@ async def create_journal_entry(
     try:
         trade_uuid = UUID(data.trade_id) if data.trade_id else None
 
-        # Verify trade ownership — trade must belong to the requesting broker account
+        # Verify trade ownership — trade must belong to the requesting broker account.
+        # The ID can come from completed_trades, positions, or trades table depending
+        # on whether the user is journaling a closed trade or open position.
         if trade_uuid:
-            ownership_check = await db.execute(
+            owned = False
+
+            # Check completed_trades first (most common — closed trades)
+            ct_check = await db.execute(
                 select(CompletedTrade.id).where(
                     CompletedTrade.id == trade_uuid,
                     CompletedTrade.broker_account_id == broker_account_id,
                 )
             )
-            if not ownership_check.scalar_one_or_none():
+            if ct_check.scalar_one_or_none():
+                owned = True
+
+            # Check positions table (open positions)
+            if not owned:
+                pos_check = await db.execute(
+                    select(Position.id).where(
+                        Position.id == trade_uuid,
+                        Position.broker_account_id == broker_account_id,
+                    )
+                )
+                if pos_check.scalar_one_or_none():
+                    owned = True
+
+            # Check raw trades table (individual fills)
+            if not owned:
+                trade_check = await db.execute(
+                    select(Trade.id).where(
+                        Trade.id == trade_uuid,
+                        Trade.broker_account_id == broker_account_id,
+                    )
+                )
+                if trade_check.scalar_one_or_none():
+                    owned = True
+
+            if not owned:
                 raise HTTPException(
                     status_code=403,
                     detail="Trade does not belong to your account",
