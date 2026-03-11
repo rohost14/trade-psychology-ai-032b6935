@@ -63,11 +63,11 @@ export function BrokerProvider({ children }: { children: ReactNode }) {
   const syncInProgressRef = useRef(false);
   const initialSyncDoneRef = useRef(false);
 
-  // Check for OAuth callback params (token + broker_account_id in URL)
+  // Check for OAuth callback params — now uses secure code exchange (M-08)
+  // Backend sends ?code= instead of ?token= so JWT never appears in URL/history
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
-    const token = params.get('token');
-    const brokerAccountId = params.get('broker_account_id');
+    const code = params.get('code');
     const connected = params.get('connected');
     const error = params.get('error');
 
@@ -77,15 +77,26 @@ export function BrokerProvider({ children }: { children: ReactNode }) {
       window.history.replaceState({}, '', window.location.pathname);
     }
 
-    if (connected === 'true' && token) {
-      // Store JWT for all future API calls
-      localStorage.setItem(AUTH_TOKEN_KEY, token);
-      if (brokerAccountId) {
-        localStorage.setItem(BROKER_ACCOUNT_KEY, brokerAccountId);
-      }
-      // Mark that we need initial sync after account loads
-      initialSyncDoneRef.current = false;
+    if (connected === 'true' && code) {
+      // Exchange the one-time code for a JWT (code expires in 30s, single-use)
+      // Remove code from URL immediately before the async exchange completes
       window.history.replaceState({}, '', window.location.pathname);
+
+      api.post('/api/zerodha/auth/exchange', { code })
+        .then(res => {
+          const { token, broker_account_id } = res.data;
+          localStorage.setItem(AUTH_TOKEN_KEY, token);
+          if (broker_account_id) {
+            localStorage.setItem(BROKER_ACCOUNT_KEY, broker_account_id);
+          }
+          initialSyncDoneRef.current = false;
+          // Reload to trigger account fetch with new token
+          window.location.reload();
+        })
+        .catch(err => {
+          console.error('Auth code exchange failed:', err);
+          toast.error('Connection failed — please try again.', { duration: 8000 });
+        });
     }
   }, []);
 

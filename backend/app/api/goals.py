@@ -22,7 +22,63 @@ from app.schemas.goal import (
 )
 
 router = APIRouter()
+
 logger = logging.getLogger(__name__)
+
+
+async def _sync_goals_to_profile(broker_account_id: UUID, goals: Goal, db: AsyncSession):
+    """
+    P-03: Sync goal limits → UserProfile thresholds so BehaviorEngine uses
+    the user's stated goals instead of cold-start defaults.
+
+    Mapping:
+      Goal.max_daily_loss          → UserProfile.daily_loss_limit
+      Goal.max_trades_per_day      → UserProfile.daily_trade_limit
+      Goal.max_position_size_pct   → UserProfile.max_position_size
+      Goal.starting_capital        → UserProfile.trading_capital (only if profile has none)
+      Goal.min_time_between_trades → UserProfile.cooldown_after_loss
+    """
+    try:
+        from app.models.user_profile import UserProfile
+        from datetime import datetime, timezone
+
+        result = await db.execute(
+            select(UserProfile).where(UserProfile.broker_account_id == broker_account_id)
+        )
+        profile = result.scalar_one_or_none()
+        if not profile:
+            return
+
+        changed = False
+
+        if goals.max_daily_loss is not None:
+            profile.daily_loss_limit = goals.max_daily_loss
+            changed = True
+
+        if goals.max_trades_per_day is not None:
+            profile.daily_trade_limit = goals.max_trades_per_day
+            changed = True
+
+        if goals.max_position_size_percent is not None:
+            profile.max_position_size = goals.max_position_size_percent
+            changed = True
+
+        if goals.min_time_between_trades_minutes is not None:
+            profile.cooldown_after_loss = goals.min_time_between_trades_minutes
+            changed = True
+
+        # Only set trading_capital from goals if profile doesn't already have one
+        if goals.starting_capital and not profile.trading_capital:
+            profile.trading_capital = goals.starting_capital
+            changed = True
+
+        if changed:
+            profile.updated_at = datetime.now(timezone.utc)
+            await db.commit()
+            logger.info(f"[goals→profile] Synced thresholds for {broker_account_id}")
+
+    except Exception as e:
+        logger.warning(f"[goals→profile] Sync failed (non-fatal): {e}")
 
 
 class StreakIncrementRequest(BaseModel):
@@ -144,6 +200,10 @@ async def update_goals(
 
         await db.commit()
         await db.refresh(goals)
+
+        # P-03: Sync goal limits → UserProfile thresholds
+        # BehaviorEngine reads from UserProfile, so this wires goals to detection.
+        await _sync_goals_to_profile(broker_account_id, goals, db)
 
         return goals
     except Exception as e:

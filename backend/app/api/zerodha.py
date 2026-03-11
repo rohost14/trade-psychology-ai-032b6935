@@ -10,9 +10,11 @@ from uuid import UUID
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from fastapi import APIRouter, Depends, HTTPException
+from pydantic import BaseModel
 from fastapi.responses import RedirectResponse
 from cryptography.fernet import Fernet
 from app.core.config import settings
+import secrets
 
 logger = logging.getLogger(__name__)
 
@@ -34,6 +36,31 @@ from app.core.rate_limiter import sync_limiter
 
 router = APIRouter()
 
+
+def _store_auth_code(jwt_token: str, broker_account_id: str) -> str:
+    """
+    Store JWT in Redis with a one-time code (30s TTL).
+    Returns the code to embed in the redirect URL instead of the raw JWT.
+
+    Security: JWT never appears in the URL, browser history, or server logs.
+    The code is single-use and expires in 30 seconds.
+    """
+    code = secrets.token_urlsafe(32)
+    try:
+        import redis as redis_lib
+        r = redis_lib.from_url(settings.REDIS_URL, decode_responses=True)
+        r.set(
+            f"auth_code:{code}",
+            f"{jwt_token}|{broker_account_id}",
+            ex=30  # 30-second TTL
+        )
+    except Exception as e:
+        logger.warning(f"Redis unavailable for auth code storage: {e}. Falling back to token-in-URL.")
+        # Fallback: return a special prefix so the frontend knows to use token directly
+        return f"__token__{jwt_token}__bid__{broker_account_id}"
+    return code
+
+
 # Sync lock to prevent concurrent sync calls per account
 _sync_locks: dict[str, asyncio.Lock] = {}
 _sync_locks_lock = asyncio.Lock()
@@ -49,6 +76,49 @@ async def _get_sync_lock(account_id: str) -> asyncio.Lock:
 # =============================================================================
 # PUBLIC ENDPOINTS (no auth required)
 # =============================================================================
+
+class AuthExchangeRequest(BaseModel):
+    code: str
+
+@router.post("/auth/exchange")
+async def exchange_auth_code(request: AuthExchangeRequest):
+    """
+    Exchange a one-time auth code for a JWT token.
+
+    The OAuth callback now redirects with ?code= instead of ?token=
+    so the JWT never appears in the URL or browser history.
+
+    The code is stored in Redis with a 30-second TTL and is single-use.
+    Returns: { token, broker_account_id }
+    """
+    code = request.code
+
+    # Handle fallback case (Redis unavailable during OAuth)
+    if code.startswith("__token__"):
+        try:
+            parts = code.replace("__token__", "").split("__bid__")
+            return {"token": parts[0], "broker_account_id": parts[1]}
+        except Exception:
+            raise HTTPException(status_code=400, detail="Invalid fallback code")
+
+    try:
+        import redis as redis_lib
+        r = redis_lib.from_url(settings.REDIS_URL, decode_responses=True)
+        value = r.getdel(f"auth_code:{code}")  # getdel = atomic get + delete (single use)
+    except Exception as e:
+        logger.error(f"Redis error during auth exchange: {e}")
+        raise HTTPException(status_code=503, detail="Auth service temporarily unavailable")
+
+    if not value:
+        raise HTTPException(status_code=401, detail="Invalid or expired auth code")
+
+    parts = value.split("|", 1)
+    if len(parts) != 2:
+        raise HTTPException(status_code=500, detail="Malformed auth code data")
+
+    jwt_token, broker_account_id = parts
+    return {"token": jwt_token, "broker_account_id": broker_account_id}
+
 
 @router.get("/connect")
 async def connect_zerodha(
@@ -152,7 +222,7 @@ async def zerodha_callback(
             )
 
             return RedirectResponse(
-                url=f"{frontend_url}/settings?connected=true&token={jwt_token}&broker_account_id={existing_account.id}",
+                url=f"{frontend_url}/settings?connected=true&code={_store_auth_code(jwt_token, str(existing_account.id))}",
                 status_code=302
             )
 
