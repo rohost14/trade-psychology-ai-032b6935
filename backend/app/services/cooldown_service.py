@@ -121,7 +121,7 @@ class CooldownService:
         ).order_by(Cooldown.expires_at.desc())
 
         result = await db.execute(query)
-        active_cooldown = result.scalar_one_or_none()
+        active_cooldown = result.scalars().first()  # most recent active cooldown
 
         if active_cooldown:
             return CooldownResult(
