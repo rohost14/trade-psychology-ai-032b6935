@@ -266,9 +266,8 @@ def sync_trades_for_account(self, broker_account_id: str):
 @celery_app.task
 def run_risk_detection(broker_account_id: str, trigger_trade_id: str = None):
     """
-    Run risk pattern detection for an account.
-
-    Called after trade processing or on schedule.
+    Run risk pattern detection for an account via BehaviorEngine.
+    Phase 3 cutover: delegates to run_risk_detection_async (BehaviorEngine).
     """
     import asyncio
 
@@ -276,8 +275,6 @@ def run_risk_detection(broker_account_id: str, trigger_trade_id: str = None):
         async with SessionLocal() as db:
             try:
                 account_id = UUID(broker_account_id)
-
-                # Get trigger trade if provided
                 trigger_trade = None
                 if trigger_trade_id:
                     result = await db.execute(
@@ -285,24 +282,11 @@ def run_risk_detection(broker_account_id: str, trigger_trade_id: str = None):
                     )
                     trigger_trade = result.scalar_one_or_none()
 
-                risk_detector = RiskDetector()
-                alerts = await risk_detector.detect_patterns(
-                    account_id,
-                    db,
-                    trigger_trade=trigger_trade
-                )
-
-                # Save alerts
-                for alert in alerts:
-                    db.add(alert)
-
-                await db.commit()
-
-                logger.info(f"Risk detection complete: {len(alerts)} alerts")
-                return {"alerts_created": len(alerts)}
+                await run_risk_detection_async(account_id, db, trigger_trade)
+                return {"success": True}
 
             except Exception as e:
-                logger.error(f"Risk detection failed: {e}", exc_info=True)
+                logger.error(f"Risk detection task failed: {e}", exc_info=True)
                 return {"error": str(e)}
 
     return asyncio.get_event_loop().run_until_complete(_detect())
