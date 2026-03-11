@@ -1,4 +1,4 @@
-import { RefreshCw, Shield, AlertTriangle, CheckCircle2, Activity, Zap, TrendingUp, Target } from 'lucide-react';
+import { Shield, AlertTriangle, CheckCircle2, Activity, Zap, TrendingUp, Target } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 import { formatCurrencyWithSign } from '@/lib/formatters';
@@ -25,7 +25,7 @@ interface RiskGuardianStats {
 interface RiskGuardianCardProps {
   data: RiskGuardianData;
   stats?: RiskGuardianStats;
-  onSync?: () => void;
+  onSync?: () => void;  // kept for API compatibility, no longer shown (prices live via KiteTicker)
   isLoading?: boolean;
 }
 
@@ -101,15 +101,8 @@ export default function RiskGuardianCard({ data, stats: propStats, onSync, isLoa
                 {formatCurrencyWithSign(data.unrealized_pnl)}
               </p>
             </div>
-            <Button
-              variant="outline"
-              size="icon"
-              onClick={onSync}
-              disabled={isLoading}
-              className="h-10 w-10"
-            >
-              <RefreshCw className={cn('h-4 w-4', isLoading && 'animate-spin')} />
-            </Button>
+            {/* Sync button removed — prices now live via KiteTicker.
+                Trade sync is available in Settings if needed. */}
           </div>
         </div>
       </div>

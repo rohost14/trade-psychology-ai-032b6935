@@ -534,7 +534,8 @@ class BehaviorEngine:
     def _detect_excess_exposure(self, ctx: EngineContext) -> Optional[DetectedEvent]:
         ct = ctx.completed_trade
         capital = ctx.thresholds.get("trading_capital")
-        if not capital or capital <= 0:
+        # Guard: skip if capital is clearly wrong/unconfigured
+        if not capital or float(capital) < 10000:
             return None
 
         capital_at_risk = estimate_capital_at_risk(
@@ -566,8 +567,10 @@ class BehaviorEngine:
 
         if not daily_loss_limit or daily_loss_limit <= 0:
             capital = ctx.thresholds.get("trading_capital")
-            if capital:
-                daily_loss_limit = capital * 0.05
+            # Guard: trading_capital must be >= ₹10,000 to be sensible for F&O trading.
+            # Values below this indicate a misconfigured profile (e.g. ₹0.30 from test data).
+            if capital and float(capital) >= 10000:
+                daily_loss_limit = float(capital) * 0.05
             else:
                 return None
 
