@@ -57,10 +57,11 @@ export default function TokenExpiredBanner({ onReconnect, isReconnecting }: Toke
                                     </motion.div>
                                     <div>
                                         <p className="text-sm font-medium text-foreground">
-                                            Your Zerodha session has expired
+                                            Zerodha session expired — live sync paused
                                         </p>
                                         <p className="text-xs text-muted-foreground">
-                                            Reconnect to continue syncing trades and receiving alerts
+                                            Analytics, journal, chat and trade history still work.
+                                            Reconnect to resume live prices and alerts.
                                         </p>
                                     </div>
                                 </div>

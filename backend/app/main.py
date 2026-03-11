@@ -79,9 +79,19 @@ app = FastAPI(
 )
 
 # CORS Middleware
+# Security guard: allow_credentials=True + wildcard origins = XSS escalation risk.
+# This assertion prevents a misconfigured production deploy from being exploitable.
+# On localhost BACKEND_CORS_ORIGINS is ["http://localhost:8080"] so this never fires.
+_cors_origins = settings.BACKEND_CORS_ORIGINS
+if "*" in _cors_origins and settings.ENVIRONMENT != "development":
+    raise RuntimeError(
+        "SECURITY: allow_credentials=True cannot be used with allow_origins=['*'] "
+        "in non-development environments. Set BACKEND_CORS_ORIGINS to explicit domains."
+    )
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=settings.BACKEND_CORS_ORIGINS,
+    allow_origins=_cors_origins,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -157,6 +167,25 @@ async def health_check():
     except Exception as e:
         logger.error(f"Health check Redis failed: {e}")
         healthy = False
+
+    # Circuit breaker summary (informational only — never makes health degraded)
+    try:
+        from app.services.circuit_breaker_service import circuit_breaker, CircuitState
+        from app.models.broker_account import BrokerAccount
+        from sqlalchemy import select as sa_select
+        async with SessionLocal() as session:
+            result = await session.execute(
+                sa_select(BrokerAccount.id).where(BrokerAccount.status == "connected")
+            )
+            account_ids = result.scalars().all()
+        open_circuits = []
+        for aid in account_ids:
+            state = await circuit_breaker.get_state(aid)
+            if state != CircuitState.CLOSED:
+                open_circuits.append(str(aid)[:8])
+        checks["circuit_breakers"] = "all_closed" if not open_circuits else f"open:{open_circuits}"
+    except Exception:
+        checks["circuit_breakers"] = "unknown"
 
     status_code = 200 if healthy else 503
     return JSONResponse(

@@ -71,7 +71,7 @@ const sidebarVariants: Variants = {
 
 export default function Dashboard() {
   const navigate = useNavigate();
-  const { isConnected, isLoading: brokerLoading, account, connect, syncTrades, syncStatus, syncError } = useBroker();
+  const { isConnected, isLoading: brokerLoading, account, connect, syncTrades, syncStatus, syncError, isTokenExpired } = useBroker();
   const { alerts, runAnalysis, acknowledgeAlert } = useAlerts();
   const { showOnboarding, completeOnboarding, skipOnboarding } = useOnboarding();
 
@@ -495,8 +495,24 @@ export default function Dashboard() {
       animate="visible"
       variants={containerVariants}
     >
+      {/* Degraded mode banner — token expired but historical data still works */}
+      {isTokenExpired && dataLoaded && (
+        <motion.div
+          className="mb-4 p-3 rounded-lg bg-amber-500/10 border border-amber-500/20 flex items-center justify-between"
+          initial={{ opacity: 0, y: -10 }}
+          animate={{ opacity: 1, y: 0 }}
+        >
+          <div className="flex items-center gap-2">
+            <AlertTriangle className="h-4 w-4 text-amber-600 dark:text-amber-400" />
+            <span className="text-sm text-amber-700 dark:text-amber-300">
+              Live sync paused — showing last known data. Analytics, chat and history still work.
+            </span>
+          </div>
+        </motion.div>
+      )}
+
       {/* Sync error banner (when data is loaded but sync had errors) */}
-      {syncStatus === 'error' && dataLoaded && (
+      {syncStatus === 'error' && dataLoaded && !isTokenExpired && (
         <motion.div
           className="mb-4 p-3 rounded-lg bg-destructive/10 border border-destructive/20 flex items-center justify-between"
           initial={{ opacity: 0, y: -10 }}

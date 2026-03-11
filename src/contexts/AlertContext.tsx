@@ -93,7 +93,32 @@ function formatPatternName(patternType: string): string {
     || patternType.split('_').map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' ');
 }
 
-function mapBackendAlert(a: any): AlertNotification {
+// Type for raw backend alert (what the API actually returns)
+interface BackendAlert {
+  id: string;
+  pattern_type: string;
+  severity: string;  // 'danger' | 'caution' | 'high' | 'medium' | 'low' | 'critical'
+  message: string;
+  details?: Record<string, unknown>;
+  detected_at?: string;
+  created_at?: string;
+  acknowledged_at?: string | null;
+}
+
+// Map backend severity strings to frontend PatternSeverity
+function normalizeSeverity(s: string): PatternSeverity {
+  const map: Record<string, PatternSeverity> = {
+    danger:   'high',
+    critical: 'critical',
+    high:     'high',
+    caution:  'medium',
+    medium:   'medium',
+    low:      'low',
+  };
+  return map[s.toLowerCase()] ?? 'medium';
+}
+
+function mapBackendAlert(a: BackendAlert): AlertNotification {
   const frontendType = (BACKEND_TO_FRONTEND_TYPE[a.pattern_type] || a.pattern_type) as PatternType;
   const detected_at = a.detected_at || a.created_at;
   return {
@@ -102,7 +127,7 @@ function mapBackendAlert(a: any): AlertNotification {
       id:                  String(a.id),
       type:                frontendType,
       name:                formatPatternName(a.pattern_type),
-      severity:            a.severity as PatternSeverity,
+      severity:            normalizeSeverity(a.severity),
       description:         a.message,
       detected_at,
       insight:             a.details?.insight || '',
