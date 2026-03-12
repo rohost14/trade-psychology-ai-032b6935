@@ -237,11 +237,9 @@ export default function Dashboard() {
   }, [fetchPositions, fetchTrades, fetchRiskState]);
 
   // Load data when sync completes or on initial mount
-  // Uses a ref to prevent double-fetching for the same sync cycle
   useEffect(() => {
     if (!isConnected || !accountId) return;
 
-    // Create a key for this fetch trigger to deduplicate
     const fetchKey = `${syncStatus}-${accountId}`;
 
     if (syncStatus === 'success' || syncStatus === 'error') {
@@ -256,6 +254,36 @@ export default function Dashboard() {
       }
     }
   }, [isConnected, accountId, syncStatus, dataLoaded, fetchAllData]);
+
+  // Auto-refresh trade data every 60 seconds during market hours.
+  // This is a lightweight DB read (not a Zerodha API call) so it's cheap.
+  // Ensures new trades appear within 60s of executing without manual sync.
+  useEffect(() => {
+    if (!isConnected || !accountId || isTokenExpired) return;
+
+    const isMarketHours = () => {
+      const now = new Date();
+      // IST = UTC+5:30
+      const istOffset = 5.5 * 60 * 60 * 1000;
+      const ist = new Date(now.getTime() + istOffset);
+      const h = ist.getUTCHours();
+      const m = ist.getUTCMinutes();
+      const minutes = h * 60 + m;
+      const day = ist.getUTCDay(); // 0=Sun, 6=Sat
+      if (day === 0 || day === 6) return false;
+      return minutes >= 9 * 60 + 15 && minutes <= 15 * 60 + 30;
+    };
+
+    const interval = setInterval(() => {
+      if (document.visibilityState === 'visible' && isMarketHours()) {
+        // Silent refresh — no loading spinner, just update data in background
+        fetchTrades();
+        fetchPositions();
+      }
+    }, 60_000); // every 60 seconds
+
+    return () => clearInterval(interval);
+  }, [isConnected, accountId, isTokenExpired, fetchTrades, fetchPositions]);
 
   // Run pattern analysis on TODAY's trades only (D14: use both entry + exit data)
   // Only analyzes today's trading session to avoid generating alerts for historical trades.
