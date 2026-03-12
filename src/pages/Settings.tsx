@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import {
   Link2,
   Link2Off,
@@ -226,7 +226,19 @@ export default function Settings() {
     }
   };
 
+  // Rate limit: max 1 sync per 2 minutes. Prevents accidental spam-clicking.
+  const lastSyncAttemptRef = useRef<number>(0);
+  const SYNC_COOLDOWN_MS = 2 * 60 * 1000; // 2 minutes
+
   const handleSync = async () => {
+    const now = Date.now();
+    const elapsed = now - lastSyncAttemptRef.current;
+    if (elapsed < SYNC_COOLDOWN_MS) {
+      const remaining = Math.ceil((SYNC_COOLDOWN_MS - elapsed) / 1000);
+      toast.info(`Please wait ${remaining}s before syncing again.`);
+      return;
+    }
+    lastSyncAttemptRef.current = now;
     setIsSyncing(true);
     try {
       const result = await syncTrades();

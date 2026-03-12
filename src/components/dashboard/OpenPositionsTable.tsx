@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import { TrendingUp, TrendingDown, Briefcase, Radio } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { formatCurrency, formatPrice, formatNumber, formatCurrencyWithSign } from '@/lib/formatters';
-import { usePriceStream } from '@/hooks/usePriceStream';
+import { useWebSocket } from '@/contexts/WebSocketContext';
 import { useBroker } from '@/contexts/BrokerContext';
 import type { Position } from '@/types/api';
 
@@ -51,7 +51,7 @@ function PriceCell({ symbol, staticPrice, livePrice }: { symbol: string; staticP
 export default function OpenPositionsTable({ positions, isLoading, onPositionClick }: OpenPositionsTableProps) {
   const openPositions = positions.filter((p) => p.status === 'open');
   const { account } = useBroker();
-  const { prices, isConnected, subscribe } = usePriceStream(account?.id);
+  const { prices, isConnected, subscribe } = useWebSocket();
 
   // Subscribe to position symbols when positions change
   useEffect(() => {

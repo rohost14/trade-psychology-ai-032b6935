@@ -6,6 +6,7 @@ import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import { ThemeProvider } from "./components/ThemeProvider";
 import { AlertProvider } from "./contexts/AlertContext";
 import { BrokerProvider } from "./contexts/BrokerContext";
+import { WebSocketProvider } from "./contexts/WebSocketContext";
 import Layout from "./components/Layout";
 import Dashboard from "./pages/Dashboard";
 import Analytics from "./pages/Analytics";
@@ -22,6 +23,7 @@ const App = () => (
   <ThemeProvider>
     <QueryClientProvider client={queryClient}>
       <BrokerProvider>
+        <WebSocketProvider>
         <AlertProvider>
           <TooltipProvider>
             <Toaster />
@@ -43,6 +45,7 @@ const App = () => (
             </BrowserRouter>
           </TooltipProvider>
         </AlertProvider>
+        </WebSocketProvider>
       </BrokerProvider>
     </QueryClientProvider>
   </ThemeProvider>

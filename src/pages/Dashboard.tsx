@@ -20,6 +20,7 @@ import { api } from '@/lib/api';
 import { Position, Trade, CompletedTrade } from '@/types/api';
 import { useAlerts } from '@/contexts/AlertContext';
 import { useBroker } from '@/contexts/BrokerContext';
+import { useWebSocket } from '@/contexts/WebSocketContext';
 import { useOnboarding } from '@/hooks/useOnboarding';
 import { useMargins } from '@/hooks/useMargins';
 
@@ -72,6 +73,7 @@ const sidebarVariants: Variants = {
 export default function Dashboard() {
   const navigate = useNavigate();
   const { isConnected, isLoading: brokerLoading, account, connect, syncTrades, syncStatus, syncError, isTokenExpired } = useBroker();
+  const { lastTradeEvent } = useWebSocket();
   const { alerts, runAnalysis, acknowledgeAlert } = useAlerts();
   const { showOnboarding, completeOnboarding, skipOnboarding } = useOnboarding();
 
@@ -255,35 +257,16 @@ export default function Dashboard() {
     }
   }, [isConnected, accountId, syncStatus, dataLoaded, fetchAllData]);
 
-  // Auto-refresh trade data every 60 seconds during market hours.
-  // This is a lightweight DB read (not a Zerodha API call) so it's cheap.
-  // Ensures new trades appear within 60s of executing without manual sync.
+  // React to WebSocket trade events — no polling needed.
+  // When Celery processes a trade (webhook → FIFO → BehaviorEngine),
+  // it publishes to Redis → FastAPI forwards via WebSocket → lastTradeEvent changes.
+  // This replaces ALL time-based polling for trade and position data.
   useEffect(() => {
-    if (!isConnected || !accountId || isTokenExpired) return;
-
-    const isMarketHours = () => {
-      const now = new Date();
-      // IST = UTC+5:30
-      const istOffset = 5.5 * 60 * 60 * 1000;
-      const ist = new Date(now.getTime() + istOffset);
-      const h = ist.getUTCHours();
-      const m = ist.getUTCMinutes();
-      const minutes = h * 60 + m;
-      const day = ist.getUTCDay(); // 0=Sun, 6=Sat
-      if (day === 0 || day === 6) return false;
-      return minutes >= 9 * 60 + 15 && minutes <= 15 * 60 + 30;
-    };
-
-    const interval = setInterval(() => {
-      if (document.visibilityState === 'visible' && isMarketHours()) {
-        // Silent refresh — no loading spinner, just update data in background
-        fetchTrades();
-        fetchPositions();
-      }
-    }, 60_000); // every 60 seconds
-
-    return () => clearInterval(interval);
-  }, [isConnected, accountId, isTokenExpired, fetchTrades, fetchPositions]);
+    if (!lastTradeEvent || !isConnected || isTokenExpired) return;
+    // Silent background refresh — no loading spinner
+    fetchTrades();
+    fetchPositions();
+  }, [lastTradeEvent]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Run pattern analysis on TODAY's trades only (D14: use both entry + exit data)
   // Only analyzes today's trading session to avoid generating alerts for historical trades.

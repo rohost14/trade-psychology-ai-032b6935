@@ -18,6 +18,12 @@ import { detectAllPatterns, getPatternStats } from '@/lib/patternDetector';
 import { toast } from 'sonner';
 import { api } from '@/lib/api';
 import { buildPatternConfig, UserProfileThresholds } from '@/lib/patternConfig';
+import { useWebSocket } from '@/contexts/WebSocketContext';
+
+// Re-export hook for AlertContext internal use (avoids circular import issues)
+function useWebSocketAlerts() {
+  return useWebSocket();
+}
 
 const CAPITAL_FLOOR = 100_000; // Rs 1L floor — used only when nothing else is available
 
@@ -233,11 +239,19 @@ export function AlertProvider({ children }: { children: ReactNode }) {
     }
   }, []);
 
+  // Initial fetch on mount
   useEffect(() => {
     fetchAlerts();
-    const interval = setInterval(fetchAlerts, 60_000); // poll every 60s
-    return () => clearInterval(interval);
   }, [fetchAlerts]);
+
+  // React to WebSocket alert events — replaces 60s polling.
+  // When BehaviorEngine creates a new alert, Celery publishes to Redis,
+  // FastAPI forwards via WebSocket, lastAlertEvent changes here.
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  const { lastAlertEvent } = useWebSocketAlerts();
+  useEffect(() => {
+    if (lastAlertEvent) fetchAlerts();
+  }, [lastAlertEvent]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // ---------------------------------------------------------------------------
   // runAnalysis — client-side real-time detection

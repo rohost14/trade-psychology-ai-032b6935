@@ -108,12 +108,19 @@ def process_webhook_trade(self, trade_data: Dict[str, Any], broker_account_id: s
                     logger.error(f"Failed to sync positions in webhook: {e}")
 
                 # Refresh KiteTicker subscriptions — new position may have opened.
-                # This ensures the live price stream immediately covers any new instrument.
                 try:
                     from app.services.price_stream_service import price_stream
                     await price_stream.refresh_subscriptions(account_id, db)
                 except Exception as e:
                     logger.error(f"Failed to refresh price subscriptions: {e}")
+
+                # Notify frontend via WebSocket that positions/trades changed.
+                # publish_event is sync (Celery context) and never crashes the pipeline.
+                from app.core.event_bus import publish_event
+                publish_event(str(account_id), "position_update", {
+                    "order_id": trade_data.get("order_id"),
+                    "status": trade_data.get("status"),
+                })
 
                 # Only run the signal pipeline for COMPLETE trades
                 if trade_data.get("status") != "COMPLETE":
@@ -377,6 +384,19 @@ async def run_risk_detection_async(broker_account_id: UUID, db, trigger_trade: T
             f"state={result.behavior_state} | "
             f"risk={float(result.risk_score_before):.0f}→{float(result.risk_score_after):.0f}"
         )
+
+        # Notify frontend via WebSocket — new alerts available, refresh immediately.
+        if new_alerts:
+            from app.core.event_bus import publish_event
+            publish_event(str(broker_account_id), "alert_update", {
+                "count": len(new_alerts),
+                "has_danger": len(danger_alerts) > 0,
+                "behavior_state": result.behavior_state,
+            })
+
+        # Also notify trade update so dashboard refreshes completed trades.
+        from app.core.event_bus import publish_event
+        publish_event(str(broker_account_id), "trade_update", {})
 
     except Exception as e:
         logger.error(f"Risk detection error: {e}", exc_info=True)

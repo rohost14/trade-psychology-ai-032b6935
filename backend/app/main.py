@@ -68,6 +68,17 @@ async def lifespan(app: FastAPI):
     except Exception as e:
         logger.error(f"Price stream restart failed on startup: {e}")
 
+    # Start Redis event subscriber — bridges Celery → WebSocket in real-time.
+    # When Celery processes a trade or creates an alert, it publishes to Redis.
+    # This background task receives those events and pushes to connected browsers.
+    try:
+        import asyncio as _asyncio
+        from app.core.event_bus import start_event_subscriber
+        _asyncio.create_task(start_event_subscriber())
+        logger.info("Redis event subscriber started.")
+    except Exception as e:
+        logger.error(f"Event subscriber failed to start: {e}")
+
     yield
 
     # Shutdown logic
