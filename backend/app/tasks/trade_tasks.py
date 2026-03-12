@@ -114,13 +114,34 @@ def process_webhook_trade(self, trade_data: Dict[str, Any], broker_account_id: s
                 except Exception as e:
                     logger.error(f"Failed to refresh price subscriptions: {e}")
 
-                # Notify frontend via WebSocket that positions/trades changed.
-                # publish_event is sync (Celery context) and never crashes the pipeline.
+                # Publish position update event (durable, replayable)
                 from app.core.event_bus import publish_event
                 publish_event(str(account_id), "position_update", {
                     "order_id": trade_data.get("order_id"),
                     "status": trade_data.get("status"),
                 })
+
+                # Fetch fresh margin from Kite and push to frontend.
+                # Replaces useMargins.ts 30s polling — margin is pushed on every
+                # trade webhook so frontend always has up-to-date margin data.
+                try:
+                    from app.models.broker_account import BrokerAccount
+                    from app.services.zerodha_service import zerodha_client, KiteTokenExpiredError
+                    import json as _json
+
+                    account_record = await db.get(BrokerAccount, account_id)
+                    if account_record and account_record.access_token and not account_record.token_revoked_at:
+                        access_token = account_record.decrypt_token(account_record.access_token)
+                        margins = await zerodha_client.get_margins(access_token)
+                        # Cache in Redis for fast reads (5 min TTL)
+                        _r = _get_redis_client()
+                        _r.set(f"margin:{account_id}", _json.dumps(margins), ex=300)
+                        # Push to frontend via stream
+                        publish_event(str(account_id), "margin_update", margins)
+                except KiteTokenExpiredError:
+                    pass  # Token expired — margin update skipped, not an error
+                except Exception as _me:
+                    logger.debug(f"Margin update skipped: {_me}")
 
                 # Only run the signal pipeline for COMPLETE trades
                 if trade_data.get("status") != "COMPLETE":

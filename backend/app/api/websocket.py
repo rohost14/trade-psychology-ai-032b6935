@@ -149,6 +149,7 @@ manager = ConnectionManager()
 async def websocket_prices(
     websocket: WebSocket,
     token: Optional[str] = Query(None),
+    since: Optional[str] = Query(None),  # last_event_id for replay on reconnect
 ):
     """
     WebSocket endpoint for real-time price updates.
@@ -178,6 +179,39 @@ async def websocket_prices(
 
     account_id = str(account_uuid)
     await manager.connect(websocket, account_id)
+
+    # Event replay — send all events missed since last connection
+    # Client sends ?since=last_event_id on reconnect.
+    # '0-0' = replay all stored events (up to ACCOUNT_MAXLEN=500).
+    # Missing/empty since = skip replay (first connection).
+    if since is not None:
+        try:
+            from app.core.event_bus import replay_events_for_account
+            replay_since = since if since else "0-0"
+            missed_events = await replay_events_for_account(account_id, replay_since, limit=200)
+
+            for event_id, fields in missed_events:
+                try:
+                    import json as _json
+                    await websocket.send_json({
+                        "type": "replay",
+                        "event_id": event_id,
+                        "event_type": fields.get("type"),
+                        "data": _json.loads(fields.get("data", "{}")),
+                    })
+                except Exception:
+                    break  # client disconnected during replay
+
+            # Signal replay complete so client knows it has full context
+            last_replay_id = missed_events[-1][0] if missed_events else since
+            await websocket.send_json({
+                "type": "replay_complete",
+                "last_event_id": last_replay_id,
+                "replayed": len(missed_events),
+            })
+            logger.info(f"[ws] Replayed {len(missed_events)} events for {account_id[:8]}")
+        except Exception as e:
+            logger.warning(f"[ws] Event replay failed (non-fatal): {e}")
 
     try:
         while True:

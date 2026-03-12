@@ -458,8 +458,27 @@ async def get_margins(
     broker_account_id: UUID = Depends(get_verified_broker_account_id),
     db: AsyncSession = Depends(get_db)
 ) -> Any:
-    """Get account margin status and utilization."""
+    """
+    Get account margin status and utilization.
+
+    Serves from Redis cache if available (written by trade webhook pipeline).
+    Falls back to live Kite API call on cache miss (first load, cache expired).
+    This endpoint is called ONCE on page load — not polled.
+    Real-time updates arrive via WebSocket margin_update events.
+    """
     try:
+        # Try Redis cache first (written by trade_tasks.py on every webhook)
+        import json as _json
+        try:
+            import redis as redis_lib
+            r = redis_lib.from_url(settings.REDIS_URL, decode_responses=True)
+            cached = r.get(f"margin:{broker_account_id}")
+            if cached:
+                return _json.loads(cached)
+        except Exception:
+            pass  # Cache miss — fall through to live fetch
+
+        # Cache miss: fetch live from Kite
         result = await margin_service.get_margin_status(broker_account_id, db)
 
         if "error" in result:
