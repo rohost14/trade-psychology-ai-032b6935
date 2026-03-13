@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useBroker } from '@/contexts/BrokerContext';
+import { useWebSocket } from '@/contexts/WebSocketContext';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -41,6 +42,7 @@ const DANGER_LEVEL_CONFIG = {
 
 export default function DangerZone() {
   const { account } = useBroker();
+  const { lastTradeEvent, lastAlertEvent } = useWebSocket();
   const [status, setStatus] = useState<DangerZoneStatus | null>(null);
   const [summary, setSummary] = useState<DangerZoneSummary | null>(null);
   const [thresholds, setThresholds] = useState<DangerZoneThresholds | null>(null);
@@ -92,12 +94,15 @@ export default function DangerZone() {
     }
   }, [account?.id]);
 
+  // Initial load
   useEffect(() => {
     fetchData();
-    // Refresh every 30 seconds
-    const interval = setInterval(fetchData, 30000);
-    return () => clearInterval(interval);
   }, [fetchData]);
+
+  // Refetch when a trade fills or a risk alert fires — data only changes at these moments
+  useEffect(() => {
+    if (lastTradeEvent || lastAlertEvent) fetchData();
+  }, [lastTradeEvent, lastAlertEvent]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const handleTriggerIntervention = async () => {
     if (!account?.id) return;

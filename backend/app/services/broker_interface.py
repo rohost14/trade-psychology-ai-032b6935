@@ -22,6 +22,7 @@ from enum import Enum
 class BrokerType(Enum):
     """Supported broker types."""
     ZERODHA = "zerodha"
+    DHAN = "dhan"
     ANGELONE = "angelone"
     UPSTOX = "upstox"
     FYERS = "fyers"
@@ -213,8 +214,11 @@ class BrokerInterface(ABC):
     # ==========================================================================
 
     @abstractmethod
-    async def get_instruments(self, access_token: str, exchange: Optional[str] = None) -> List[Dict]:
-        """Get instrument master data."""
+    async def get_instruments(self, exchange: Optional[str] = None, access_token: Optional[str] = None) -> List[Dict]:
+        """
+        Get instrument master data.
+        access_token is optional — some brokers (Kite) don't require auth for instruments.
+        """
         pass
 
     # ==========================================================================
@@ -227,15 +231,26 @@ class BrokerInterface(ABC):
         pass
 
     # ==========================================================================
+    # Optional: Live Prices
+    # ==========================================================================
+
+    async def get_ltp(self, access_token: str, instruments: List[str]) -> Dict[str, float]:
+        """
+        Get last traded price for a list of instruments.
+        instruments: list of "EXCHANGE:SYMBOL" strings e.g. ["NSE:INFY", "NFO:NIFTY24JANFUT"]
+        Returns dict of {"EXCHANGE:SYMBOL": last_price}.
+
+        Optional — only brokers with LTP endpoints need to implement this.
+        Default raises NotImplementedError.
+        """
+        raise NotImplementedError(f"{self.broker_name} does not support get_ltp")
+
+    # ==========================================================================
     # Optional: Order Placement (for future)
     # ==========================================================================
 
     async def place_order(self, access_token: str, order_params: Dict) -> Dict:
-        """
-        Place an order. Optional - not all implementations need this.
-
-        Default implementation raises NotImplementedError.
-        """
+        """Place an order. Optional — default raises NotImplementedError."""
         raise NotImplementedError(f"{self.broker_name} does not support order placement")
 
     async def modify_order(self, access_token: str, order_id: str, order_params: Dict) -> Dict:
@@ -283,6 +298,40 @@ class BrokerFactory:
 # ==========================================================================
 # Broker-specific exceptions
 # ==========================================================================
+
+def get_broker_service(broker_name: str) -> "BrokerInterface":
+    """
+    Return the correct broker service for a given broker_account.broker_name string.
+
+    Usage (in routes or tasks):
+        from app.services.broker_interface import get_broker_service
+        service = get_broker_service(account.broker_name)
+        trades = await service.get_trades(access_token)
+
+    To add a new broker (e.g. Dhan):
+        1. Create backend/app/services/dhan_service.py implementing BrokerInterface
+        2. Register it: BrokerFactory.register(BrokerType.DHAN, DhanClient)
+        3. Ensure registration runs at import time (bottom of dhan_service.py)
+        4. Add "dhan" to the broker_name_map below
+        5. Update zerodha.py OAuth callback to handle Dhan's OAuth flow
+    """
+    # Import here to avoid circular imports — registrations happen at import time
+    import app.services.zerodha_service  # noqa: F401 — registers ZerodhaClient
+
+    broker_name_map: Dict[str, BrokerType] = {
+        "zerodha": BrokerType.ZERODHA,
+        "dhan": BrokerType.DHAN,
+        "angelone": BrokerType.ANGELONE,
+        "upstox": BrokerType.UPSTOX,
+        "fyers": BrokerType.FYERS,
+    }
+
+    broker_type = broker_name_map.get(broker_name.lower())
+    if not broker_type:
+        raise ValueError(f"Unsupported broker: '{broker_name}'. Supported: {list(broker_name_map)}")
+
+    return BrokerFactory.create(broker_type)
+
 
 class BrokerError(Exception):
     """Base exception for broker errors."""

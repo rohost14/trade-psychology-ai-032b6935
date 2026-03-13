@@ -45,17 +45,12 @@ When resuming after context loss: Read TRACKER.md → find current task → read
 
 ## Current Session
 
-- **Session**: 15
-- **Started**: 2026-03-07
-- **Working on**: Screen-by-screen review of cross-cutting features
-- **Previous sessions summary (11-14):**
-  - Session 11: Pattern detection production-grade rebuild (3-tier thresholds, IST timezone fix, BehavioralEvaluator + RiskDetector profile params, Settings "Trading Limits" card, migration 028)
-  - Session 12: Goals + DangerZone → "My Patterns" merge (DangerLevel bug fixed, _LEVEL_ORDER + _upgrade_level, new My Patterns page, 24hr cooldown removed)
-  - Session 13: Production Audit (32/38 addressable issues fixed, 6 deferred)
-  - Session 14: BlowupShield redesign — AlertCheckpoint counterfactual P&L system (checkpoint_tasks.py, alert_checkpoint.py model, alert_checkpoint_service.py, migration 029, ShieldService fully rewritten, frontend BlowupShield.tsx rewritten)
-  - Session 15: 212/212 tests passing; cross-cutting A–H reviewed (8 bugs fixed); SYSTEM_ARCHITECTURE.md updated (2200 lines, 18 sections, accurate)
-- **Build**: ALL 212 tests pass (5 test files)
-- **Session 16 (current)**: Full architecture review complete. Master doc: `docs/production_readiness_review.md`. All architecture docs merged. Migrations 022-029 confirmed applied. Phased execution plan (Phase 0–6) added with dependency map. Next: START Phase 0 — Sentry + AOF + C-00 (webhook 500) + H-00 (broker_email reconnect).
+- **Session**: 18 (2026-03-13)
+- **Previous sessions summary (16-17):**
+  - Session 16: Full architecture review. production_readiness_review.md. Phase 0–6 plan. Migrations 022-029 confirmed applied.
+  - Session 17: Phases 0–3 complete. BehaviorEngine live. Hotfixes: instrument_service timezone, shield N+1, BlowupShield re-fetch, Sentry shutdown filter, position_ledger late-fill. 296/296 tests.
+  - Session 18: Phase 4 Redis Streams implemented EARLY (not waiting for 50+ users). Full polling removal. WS replay. last_event_id localStorage. Zero polling intervals. DangerZone.tsx + MyPatterns.tsx still have 30s polling (pending conversion).
+- **Build**: 296/296 tests pass (6 test files)
 
 ---
 
@@ -63,9 +58,11 @@ When resuming after context loss: Read TRACKER.md → find current task → read
 
 - All audit fixes verified (42/42 issues FIXED)
 - Frontend builds: YES
-- Backend: 212/212 tests passing
-- Migrations pending in Supabase: 022, 023, 024, 025, 028, 029
-- Trade Architecture Overhaul: COMPLETE (all 12 steps)
-- AlertCheckpoint system: COMPLETE (sessions 14-15)
-- Uncommitted changes: ~150+ files (single "Initial commit" so far)
+- Backend: 296/296 tests passing
+- All migrations applied: 035–041 (040 skipped)
+- Trade Architecture Overhaul: COMPLETE
+- AlertCheckpoint system: COMPLETE
+- Redis Streams / zero-polling: COMPLETE (Phase 4 done)
+- WebSocket replay on reconnect: COMPLETE
+- Phases 0–6: ALL DONE (with minor deferred items per WORKING_NOTES)
 - Architecture doc: `docs/SYSTEM_ARCHITECTURE.md`

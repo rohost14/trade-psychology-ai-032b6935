@@ -4,17 +4,17 @@
 
 ---
 
-## Current State (2026-03-10)
+## Current State (2026-03-13)
 
 ### Test Suite
 - **296/296 tests passing** (6 files)
 - test_db_schema (52), test_dashboard_api (55), test_behavioral_detection (56)
 - test_notifications (30), test_trade_classifier (19), test_data_integrity (18)
-- test_phase2_services (35), test_behavior_engine (32) — new this session
+- test_phase2_services (35), test_behavior_engine (32)
 
 ### Git
 - Branch: main
-- Last commit: Phase 3 BehaviorEngine + shadow mode (9fe7eae)
+- Last commits: Redis Streams event-driven updates, remove all polling
 - All work committed cleanly, one commit per logical change
 
 ### Migrations Applied in Supabase
@@ -28,7 +28,7 @@
 
 ---
 
-## Phase Status (as of 2026-03-12)
+## Phase Status (as of 2026-03-13)
 
 | Phase | Status | Key fact |
 |-------|--------|----------|
@@ -36,44 +36,63 @@
 | 1 | ✅ Done | idempotency, Redis locks, EOD reconciliation, /health |
 | 2 | ✅ Done | position_ledger + trading_sessions + services + late fill |
 | 3 | ✅ Done | BehaviorEngine in production. danger/caution severity. RiskDetector deprecated. |
-| 4 | 🔜 Deferred | Do at 50+ users. Phase 1 locks sufficient. |
-| 5 | ✅ Done (6/8) | Items 3 (WS replay) + 8 (Prometheus) deferred to Phase 4 |
+| 4 | ✅ DONE EARLY | Redis Streams fully implemented. publish_event() dual-write. WS replay. Zero polling. |
+| 5 | ✅ Done (6/8) | Items 8 (Prometheus) deferred. Item 3 (WS replay) NOW COMPLETE via Phase 4. |
 | 6 | ✅ Done (5/7) | Items 4 (PositionLedger cutover) + 6 (AI split) deferred |
 
 ---
 
-## Phase 5 — Adapted Implementation (Phase 4 deferred)
+## Phase 4 — Redis Streams (COMPLETE as of 2026-03-13)
 
-**Original Phase 5** is fully preserved in `docs/production_readiness_review.md` — do NOT modify it.
-When Phase 4 is implemented later, re-read original Phase 5 to see what needs updating.
+Implemented ahead of schedule (originally planned for 50+ users).
 
-**Adapted Phase 5 execution order** (6 of 8 items, no Phase 4 needed):
-1. ✅ celery-redbeat — Beat schedule survives restarts (5 min, zero risk)
-2. ✅ Circuit breaker on Kite API — Redis key OPEN/CLOSED/HALF_OPEN per account
-3. ✅ Kite Ticker Redis LTP cache — completes live price work (price_stream_service.py exists)
-4. ✅ Position monitor — Celery Beat every 30s, checks open positions (adapted: no stream worker)
-5. ✅ Alert consolidation — 5-min bucketing, hard cap at 8 alerts/session
-6. ✅ BlowupShield empty state fix — P-05 product fix
+### What was built:
+- `event_bus.py`: dual-write to `stream:events` (global) + `stream:{account_id}` (per-account)
+- `publish_event()`: sync, never-raises, called from Celery after each pipeline step
+- `start_event_subscriber()`: async loop on server boot, XREAD BLOCK 100ms, dispatches to WebSocket
+- `replay_events_for_account()`: XREAD from per-account stream, used on reconnect
+- WebSocket endpoint: `?since=last_event_id` triggers replay of all missed events
+- `WebSocketContext.tsx`: persists `last_event_id` per account in localStorage
+- `useMargins.ts`: one fetch on mount (Redis cache) + WebSocket updates. Zero polling.
 
-**Skipped (need Phase 4):**
-- Item 3: WebSocket event replay (XREAD from streams)
-- Item 8: Prometheus/Grafana (operational setup, not code — do manually when needed)
+### Polling removed:
+| Data | Before | After |
+|------|--------|-------|
+| Trades | 60s interval | WebSocket trade_update event |
+| Alerts | 60s interval | WebSocket alert_update event |
+| Margins | 30s interval | WebSocket margin_update event |
+| Prices | KiteTicker (unchanged) | KiteTicker (unchanged) |
+| **Total** | **3 intervals** | **0 intervals** |
+
+### Dual-write design:
+- Celery pipeline = primary (processes trades, saves to DB, runs BehaviorEngine)
+- Redis Streams = notifications + replay only (never used for processing)
+- Celery fails → stream not written (correct — don't record failed events)
+- Redis fails → Celery still processes (publish_event is fail-silent)
+
+### At 50+ users (next step for Phase 4):
+- Replace per-call Redis connection in publish_event() with connection pool
+- Add XREADGROUP consumer groups for reliable delivery (XACK, PEL management)
+- See WORKING_NOTES for full explanation
+
+### Remaining polling (intentional/acceptable):
+- `PredictiveWarningsCard.tsx` — 5-min interval (AI predictions, not event-driven)
+- `DangerZone.tsx` — 30s interval (⚠️ should be converted to event-driven)
+- `MyPatterns.tsx` — 30s interval (⚠️ should be converted to event-driven)
 
 ---
 
 ## Critical "Don't Forget" Items
 
-### Phase 3 is NOT in production
-- `RiskDetector` + `BehavioralEvaluator` still serve all production alerts
-- `BehaviorEngine` only writes to `shadow_behavioral_events`
-- Cutover (Phase 3 items 6-7) happens AFTER script validation
-- Script validation = user manually executes individual trade scripts, observes real-time alerts
+### Phase 3 cutover still pending
+- `BehaviorEngine` is in production (shadow mode removed per git log)
+- Script validation (10 test trade scripts) still needs to be run manually
+- After validation: confirm RiskDetector fully deprecated
 
-### Phase 4 is deliberately skipped
-- Redis Streams is overkill for <5 users
-- Current Celery + Phase 1 locks are sufficient
-- Phase 4 unblocks itself when user count reaches 50+
-- The architecture is designed so Phase 4 can be added cleanly later
+### Phase 4 connection pool (for 50+ users)
+- publish_event() opens new TCP connection per call — fine now, breaks at 50+ users
+- Fix: shared ConnectionPool in publish_event() + XREADGROUP consumer groups
+- Trigger: first time Sentry shows "max clients reached" from Upstash
 
 ### Script Validation Plan (post Phase 5-6)
 - User executes individual scripts manually, one at a time with delays
@@ -128,21 +147,46 @@ When Phase 4 is implemented later, re-read original Phase 5 to see what needs up
 
 ## Known Pending Items
 
-1. **Migration 040** needs to be run in Supabase (shadow_behavioral_events table)
-2. **ZERODHA_API_KEY** not set in .env — KiteTicker won't connect without it
-3. **Phase 3 cutover** (items 6-7) — after script validation
-4. **Frontend sync button** — still shows, should be removed after KiteTicker is confirmed working
-5. **margin_risk pattern** — intentionally skipped in BehaviorEngine (needs live Kite margin API)
+1. **ZERODHA_API_KEY** not set in .env — KiteTicker won't connect without it
+2. **Script validation** — 10 test trade scripts, run manually, observe BehaviorEngine alerts
+3. **Frontend sync button** — still shows, remove after KiteTicker confirmed working
+4. **margin_risk pattern** — intentionally skipped in BehaviorEngine (needs live Kite margin API)
+5. **UserProfile.user_id FK** — missing FK from user_profiles to users. Needed for multi-account features. Deferred to multi-broker work.
+6. **G6: Some routes use get_current_broker_account_id (not verified)** — needs full route audit. Deferred.
+7. **Phase 4 XREADGROUP** — for guaranteed delivery at 50+ users. ConnectionPool already added.
 
 ---
 
-## Hotfixes Applied (this session)
+## Hotfixes Applied (session 17)
 
 - `instrument_service.py`: missing `timezone` import → NameError on all 5 exchanges (NSE/NFO/BSE/MCX/BFO)
 - `shield_service.py`: N+1 query storm (150+ queries per page) → batch-loaded (5 queries total)
 - `BlowupShield.tsx`: continuous re-fetch → 5-min module-level cache + visibilitychange guard
 - `main.py`: Sentry capturing normal Ctrl+C shutdown as errors → before_send filter added
 - `position_ledger_service.py`: missing late-fill (out-of-order) handling → full replay on late arrival
+
+## Multi-broker Architecture (session 18)
+
+- `broker_interface.py`: `BrokerInterface` ABC + `BrokerFactory` + `get_broker_service()` already existed but were dead code
+- `ZerodhaClient` now inherits `BrokerInterface` — interface contract enforced at class level
+- Added `validate_token()` to `ZerodhaClient` (was missing from interface impl)
+- Added `get_ltp()` as optional method on interface (raises NotImplementedError by default)
+- `get_instruments()` signature updated: `access_token` now optional param (Kite doesn't need auth for instruments)
+- `BrokerFactory.register(BrokerType.ZERODHA, ZerodhaClient)` — factory now live
+- `get_broker_service("zerodha")` works and returns `ZerodhaClient` instance
+- `dhan_service.py` created — full stub with all abstract methods and key Dhan differences documented
+- **To add Dhan**: implement all methods in `dhan_service.py`, uncomment `BrokerFactory.register`, add config keys
+- Existing routes unchanged — they still use `zerodha_client` singleton directly (backward-compatible)
+- New code should use: `get_broker_service(account.broker_name)` instead of importing `zerodha_client`
+
+## Fixes Applied (session 18) — see docs/FIXES_SESSION_18.md
+
+- `event_bus.py`: per-call Redis TCP connection → shared ConnectionPool (max 10). Zero connections wasted.
+- `event_bus.py`: stale docstring ("5 trading days validation" → updated to reflect Phase 4 complete)
+- `DangerZone.tsx`: 30s setInterval removed → refetch on lastTradeEvent/lastAlertEvent from WebSocket
+- `MyPatterns.tsx`: 30s setInterval removed → refetch on lastTradeEvent/lastAlertEvent from WebSocket
+- `zerodha.py`: new broker_account now auto-creates UserProfile immediately (not lazy on first profile access)
+- `zerodha.py`: POST /metrics/reset was unprotected → added get_verified_broker_account_id dependency
 
 ---
 

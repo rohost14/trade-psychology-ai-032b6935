@@ -9,6 +9,7 @@ from functools import wraps
 from typing import Dict, Any, List, Optional
 from urllib.parse import urlencode
 from app.core.config import settings
+from app.services.broker_interface import BrokerInterface, BrokerType, BrokerFactory
 
 logger = logging.getLogger(__name__)
 
@@ -76,7 +77,7 @@ class RateLimiter:
 _rate_limiter = RateLimiter(calls_per_second=3.0)
 
 
-class ZerodhaClient:
+class ZerodhaClient(BrokerInterface):
     LOGIN_URL = "https://kite.zerodha.com/connect/login"
     TOKEN_URL = "https://api.kite.trade/session/token"
     BASE_URL = "https://api.kite.trade"
@@ -85,6 +86,14 @@ class ZerodhaClient:
         self.api_key = settings.ZERODHA_API_KEY
         self.api_secret = settings.ZERODHA_API_SECRET
         self.rate_limiter = _rate_limiter
+
+    @property
+    def broker_type(self) -> BrokerType:
+        return BrokerType.ZERODHA
+
+    @property
+    def broker_name(self) -> str:
+        return "Zerodha Kite"
 
     def _get_headers(self, access_token: str) -> Dict[str, str]:
         """Build authorization headers"""
@@ -405,7 +414,7 @@ class ZerodhaClient:
         result = await self._request("GET", url, access_token)
         return result.get("data", {})
 
-    async def get_instruments(self, exchange: str = None) -> List[Dict[str, Any]]:
+    async def get_instruments(self, exchange: str = None, access_token: str = None) -> List[Dict[str, Any]]:
         """
         Fetch instrument master (CSV format).
 
@@ -506,6 +515,20 @@ class ZerodhaClient:
             logger.error(f"Failed to revoke token: {e}")
             return False
 
+    async def validate_token(self, access_token: str) -> bool:
+        """
+        Check if an access token is still valid by making a cheap profile API call.
+        Returns True if valid, False if expired or invalid.
+        """
+        try:
+            await self.get_profile(access_token)
+            return True
+        except (KiteTokenExpiredError, KiteAuthError):
+            return False
+        except Exception:
+            # Network error etc. — don't assume token is invalid
+            return True
+
     def validate_postback_checksum(self, payload: Dict, checksum: str) -> bool:
         """
         Validate Kite postback checksum for webhook security.
@@ -522,5 +545,9 @@ class ZerodhaClient:
         return expected == checksum
 
 
-# Singleton instance
+# Singleton instance — used directly by existing routes (backward-compatible).
+# New code should prefer: get_broker_service(account.broker_name)
 zerodha_client = ZerodhaClient()
+
+# Register with factory so get_broker_service("zerodha") returns ZerodhaClient
+BrokerFactory.register(BrokerType.ZERODHA, ZerodhaClient)

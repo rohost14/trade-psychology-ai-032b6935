@@ -10,11 +10,21 @@ Architecture:
     - Global: subscriber reads ONE stream, dispatches to correct WebSocket by account_id
     - Per-account: client reconnects with last_event_id → XREAD → replay missed events
 
-  Dual-write validation:
-    Celery pipeline (primary) runs as-is.
-    Every processed event also appended to streams.
-    Streams are used ONLY for notifications + replay, not for processing.
-    After 5 trading days of validated dual-write → Phase 4 cutover replaces Celery.
+  Design:
+    Celery pipeline = primary (processes trades, saves to DB, runs BehaviorEngine).
+    Redis Streams = notifications + replay only. Never used for processing.
+    Celery fails → stream not written (correct — don't record failed events).
+    Redis fails → Celery still processes (publish_event is fail-silent).
+
+  Multi-instance scaling (when using multiple backend processes):
+    Each FastAPI instance runs its own start_event_subscriber() reading the same global stream.
+    WebSocket connections are sticky to one instance (use sticky sessions on load balancer).
+    Each instance dispatches only to its local WebSocket connections; ignores others silently.
+    No pub/sub needed — Redis Streams fan-out handles it.
+
+  At 50+ users:
+    Replace per-call sync connection with ConnectionPool (already done — see _get_sync_redis).
+    Add XREADGROUP consumer groups for guaranteed delivery (XACK + dead letter handling).
 
   Stream limits (MAXLEN with ~ = approximate trimming):
     stream:events:       MAXLEN ~50000  (global, all accounts)
@@ -51,6 +61,26 @@ ACCOUNT_STREAM_PREFIX = "stream:"
 GLOBAL_MAXLEN = 50000
 ACCOUNT_MAXLEN = 500
 
+# Shared sync connection pool for Celery workers.
+# Initialized lazily on first publish_event() call.
+# Prevents opening a new TCP connection per call (critical at 50+ users).
+_sync_pool = None
+
+
+def _get_sync_redis():
+    """Return a Redis client borrowing from the shared sync connection pool."""
+    global _sync_pool
+    if _sync_pool is None:
+        import redis as redis_lib
+        from app.core.config import settings
+        _sync_pool = redis_lib.ConnectionPool.from_url(
+            settings.REDIS_URL,
+            decode_responses=True,
+            max_connections=10,
+        )
+    import redis as redis_lib
+    return redis_lib.Redis(connection_pool=_sync_pool)
+
 
 def publish_event(
     broker_account_id: str,
@@ -60,18 +90,16 @@ def publish_event(
     """
     Publish an event from a Celery worker (sync context).
 
-    Writes to BOTH streams atomically:
+    Writes to BOTH streams:
       - stream:events        (global, for real-time WebSocket push)
       - stream:{account_id}  (per-account, for replay on app open)
 
     Returns the stream entry ID, or None if Redis unavailable.
     Never raises — event bus failure must not crash the pipeline.
+    Uses a shared connection pool — no new TCP connection per call.
     """
     try:
-        from app.core.config import settings
-        import redis as redis_lib
-
-        r = redis_lib.from_url(settings.REDIS_URL, decode_responses=True)
+        r = _get_sync_redis()
         fields = {
             "type": event_type,
             "account_id": broker_account_id,

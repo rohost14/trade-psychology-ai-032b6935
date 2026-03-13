@@ -261,6 +261,13 @@ async def zerodha_callback(
             await db.commit()
             await db.refresh(broker_account)
 
+            # Create UserProfile immediately so BehaviorEngine has thresholds from day one.
+            # Without this, risk detection falls back to Tier 3 universal defaults for the
+            # first session (until the user visits Settings and triggers auto-create).
+            from app.models.user_profile import UserProfile
+            db.add(UserProfile(broker_account_id=broker_account.id))
+            await db.commit()
+
             jwt_token = create_access_token(
                 user_id=user.id,
                 broker_account_id=broker_account.id
@@ -302,8 +309,10 @@ async def get_metrics() -> Any:
     return metrics.get_metrics()
 
 @router.post("/metrics/reset")
-async def reset_metrics() -> Any:
-    """Reset all metrics."""
+async def reset_metrics(
+    broker_account_id: UUID = Depends(get_verified_broker_account_id),
+) -> Any:
+    """Reset all metrics. Requires valid auth token."""
     metrics.reset()
     return {"success": True, "message": "Metrics reset"}
 

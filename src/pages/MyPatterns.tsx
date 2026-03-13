@@ -16,6 +16,7 @@ import { toast } from 'sonner';
 import { api } from '@/lib/api';
 import { useBroker } from '@/contexts/BrokerContext';
 import { useAlerts } from '@/contexts/AlertContext';
+import { useWebSocket } from '@/contexts/WebSocketContext';
 import { EmotionalTaxCard } from '@/components/goals/EmotionalTaxCard';
 import { StreakTrackerCard } from '@/components/goals/StreakTrackerCard';
 import { calculateEmotionalTax, getTopRecommendations } from '@/lib/emotionalTaxCalculator';
@@ -203,6 +204,7 @@ const MILESTONE_LABELS: Record<number, string> = {
 export default function MyPatterns() {
   const { isConnected, isLoading: brokerLoading, account } = useBroker();
   const { traderProfile, capital } = useAlerts();
+  const { lastTradeEvent, lastAlertEvent } = useWebSocket();
 
   const [trades, setTrades] = useState<Trade[]>([]);
   const [status, setStatus] = useState<DangerZoneStatus | null>(null);
@@ -279,11 +281,15 @@ export default function MyPatterns() {
     }
   }, [account?.id]);
 
+  // Initial load
   useEffect(() => {
     fetchStatus();
-    const interval = setInterval(fetchStatus, 30000);
-    return () => clearInterval(interval);
   }, [fetchStatus]);
+
+  // Refetch when a trade fills or a risk alert fires — streak and danger level change at these moments
+  useEffect(() => {
+    if (lastTradeEvent || lastAlertEvent) fetchStatus();
+  }, [lastTradeEvent, lastAlertEvent]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Fetch trades for pattern analysis
   useEffect(() => {
