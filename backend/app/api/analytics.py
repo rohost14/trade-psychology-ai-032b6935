@@ -1192,39 +1192,34 @@ async def get_ai_summary(
         else:
             tab_data = {}
 
-        # 3. Generate narrative
+        # 3. Fire Celery task to generate narrative — non-blocking.
+        # The task writes the result to UserProfile.ai_cache; the next
+        # request will return it as a cache hit.
         bscore = tab_data.get("behavior_score") if tab == "behavior" else None
         pats = patterns if tab == "behavior" else None
-        narrative_result = await ai_service.generate_analytics_narrative(
-            tab=tab,
-            data=tab_data,
-            behavior_score=bscore,
-            patterns=pats,
-        )
 
-        # 4. Cache the result
-        generated_at = datetime.now(timezone.utc).isoformat()
-        cache_entry = {
-            **narrative_result,
-            "generated_at": generated_at,
-        }
+        try:
+            from app.tasks.report_tasks import generate_analytics_narrative_task
+            generate_analytics_narrative_task.delay(
+                str(broker_account_id),
+                tab,
+                days,
+                tab_data,
+                bscore,
+                pats,
+            )
+        except Exception as task_err:
+            logger.warning(f"Could not queue narrative generation: {task_err}")
 
-        profile_result = await db.execute(
-            select(UserProfile).where(UserProfile.broker_account_id == broker_account_id)
-        )
-        profile = profile_result.scalar_one_or_none()
-        if profile:
-            current_cache = dict(profile.ai_cache or {})
-            current_cache[cache_key] = cache_entry
-            profile.ai_cache = current_cache
-            await db.commit()
-
+        # 4. Return immediately with "generating" status.
+        # Frontend shows a spinner; it re-polls after ~5s (same pattern as coach insight).
         return {
-            "narrative": narrative_result.get("narrative", ""),
-            "key_insight": narrative_result.get("key_insight", ""),
-            "action_item": narrative_result.get("action_item", ""),
+            "narrative": None,
+            "key_insight": None,
+            "action_item": None,
             "cached": False,
-            "generated_at": generated_at,
+            "status": "generating",
+            "generated_at": None,
         }
     except HTTPException:
         raise

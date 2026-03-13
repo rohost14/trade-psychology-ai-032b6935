@@ -203,20 +203,64 @@ def process_webhook_trade(self, trade_data: Dict[str, Any], broker_account_id: s
                         )
                         raise self.retry(countdown=5)
 
-                    # Calculate P&L for SELL trades in real-time
-                    if trade_data.get("transaction_type") == "SELL":
-                        try:
-                            calculated_pnl = await pnl_calculator.calculate_trade_pnl_realtime(trade, db)
-                            if calculated_pnl is not None:
-                                await db.execute(
-                                    update(Trade)
-                                    .where(Trade.id == trade.id)
-                                    .values(pnl=float(calculated_pnl))
+                    # PositionLedger: append-only fill record.
+                    # Handles partial fills, flips, out-of-order, idempotency.
+                    # Replaces calculate_trade_pnl_realtime for the real-time path.
+                    try:
+                        from app.services.position_ledger_service import (
+                            PositionLedgerService, FillData
+                        )
+                        from decimal import Decimal as _Decimal
+
+                        qty = trade.filled_quantity or trade.quantity or 0
+                        # +qty = BUY (adds to long / reduces short)
+                        # -qty = SELL (reduces long / adds to short)
+                        signed_qty = qty if trade.transaction_type == "BUY" else -qty
+
+                        fill = FillData(
+                            broker_account_id=account_id,
+                            tradingsymbol=trade.tradingsymbol or "",
+                            exchange=trade.exchange or "",
+                            fill_order_id=trade.order_id or str(trade.id),
+                            fill_qty=signed_qty,
+                            fill_price=_Decimal(str(trade.average_price or trade.price or 0)),
+                            occurred_at=trade.order_timestamp or datetime.now(timezone.utc),
+                            idempotency_key=f"{trade.order_id}:ledger",
+                        )
+
+                        ledger_entry, is_new = await PositionLedgerService.apply_fill(fill, db)
+                        await db.flush()
+
+                        # If this fill realized P&L, write it back to Trade.pnl
+                        # (backward compat for any code still reading Trade.pnl)
+                        if is_new and ledger_entry.realized_pnl:
+                            await db.execute(
+                                update(Trade)
+                                .where(Trade.id == trade.id)
+                                .values(pnl=float(ledger_entry.realized_pnl))
+                            )
+
+                        # If position just closed: create CompletedTrade from ledger immediately
+                        if is_new and ledger_entry.entry_type in ("CLOSE", "FLIP"):
+                            ct = await PositionLedgerService.build_completed_trade_on_close(
+                                ledger_entry, db
+                            )
+                            if ct:
+                                db.add(ct)
+                                logger.info(
+                                    f"[ledger] CompletedTrade: {ct.tradingsymbol} "
+                                    f"{ct.direction} pnl={ct.realized_pnl}"
                                 )
-                                await db.commit()
-                                logger.info(f"P&L calculated for SELL {trade.order_id}: {calculated_pnl}")
-                        except Exception as e:
-                            logger.error(f"Real-time P&L calculation failed: {e}")
+
+                        await db.commit()
+                        logger.info(
+                            f"[ledger] {ledger_entry.entry_type} {trade.tradingsymbol} "
+                            f"qty={signed_qty:+d} @ {trade.average_price}"
+                        )
+
+                    except Exception as e:
+                        logger.error(f"PositionLedger apply_fill failed: {e}", exc_info=True)
+                        # Non-fatal: P&L write fails gracefully, pipeline continues
 
                 finally:
                     if redis_client and fifo_lock_acquired:

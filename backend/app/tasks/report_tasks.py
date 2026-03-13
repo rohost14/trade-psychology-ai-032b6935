@@ -319,3 +319,72 @@ def generate_coach_insight_task(broker_account_id: str, context: dict):
 
     return asyncio.get_event_loop().run_until_complete(_generate())
 
+
+
+@celery_app.task(name="app.tasks.report_tasks.generate_analytics_narrative_task")
+def generate_analytics_narrative_task(
+    broker_account_id: str,
+    tab: str,
+    days: int,
+    tab_data: dict,
+    behavior_score=None,
+    patterns=None,
+):
+    """
+    Async Celery task to generate an analytics tab narrative via LLM and cache it.
+
+    Called by GET /analytics/ai-summary on cache miss. The API returns a
+    fallback immediately; this task writes the real LLM response to
+    UserProfile.ai_cache["{tab}_{days}"] so the next request returns it instantly.
+
+    tab_data: pre-gathered data dict for the tab (computed by the API handler
+              before firing this task — avoids re-querying the DB here).
+    behavior_score / patterns: extra context for the "behavior" tab.
+    """
+    import asyncio as _asyncio
+
+    async def _generate():
+        async with SessionLocal() as db:
+            try:
+                from app.services.ai_service import ai_service
+                from app.models.user_profile import UserProfile
+                from datetime import datetime, timezone
+                from sqlalchemy import select
+
+                account_id = UUID(broker_account_id)
+                cache_key = f"{tab}_{days}"
+
+                narrative_result = await ai_service.generate_analytics_narrative(
+                    tab=tab,
+                    data=tab_data,
+                    behavior_score=behavior_score,
+                    patterns=patterns,
+                )
+
+                if not narrative_result:
+                    return {"error": "LLM returned empty response"}
+
+                generated_at = datetime.now(timezone.utc).isoformat()
+                cache_entry = {**narrative_result, "generated_at": generated_at}
+
+                profile_result = await db.execute(
+                    select(UserProfile).where(UserProfile.broker_account_id == account_id)
+                )
+                profile = profile_result.scalar_one_or_none()
+
+                if profile:
+                    current_cache = dict(profile.ai_cache or {})
+                    current_cache[cache_key] = cache_entry
+                    profile.ai_cache = current_cache
+                    await db.commit()
+                    logger.info(
+                        f"Analytics narrative cached: {tab} for {broker_account_id}"
+                    )
+
+                return narrative_result
+
+            except Exception as e:
+                logger.error(f"Analytics narrative generation failed: {e}", exc_info=True)
+                return {"error": str(e)}
+
+    return _asyncio.get_event_loop().run_until_complete(_generate())

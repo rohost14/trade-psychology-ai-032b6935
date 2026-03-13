@@ -13,11 +13,14 @@ Handles all real F&O edge cases correctly:
 Design rules:
   - apply_fill is the ONLY write method. Everything else is read-only.
   - apply_fill is idempotent: same idempotency_key = return existing entry.
-  - This service NEVER writes to trades, positions, completed_trades, or P&L.
   - All position state is derived from the ledger (no side state).
 
-Phase 2: isolated, tested.
-Phase 3: replaces pnl_calculator.py FIFO as source of truth.
+Real-time path (Phase 3 cutover):
+  - apply_fill() called from process_webhook_trade after every COMPLETE fill
+  - ledger entry's realized_pnl used to update Trade.pnl (replaces calculate_trade_pnl_realtime)
+  - build_completed_trade_on_close() called on CLOSE/FLIP to create CompletedTrade immediately
+  - Batch FIFO (pnl_calculator) still runs on EOD reconciliation/initial sync —
+    it overwrites CompletedTrades for the recompute window (both should agree on P&L)
 """
 
 import logging
@@ -315,6 +318,113 @@ class PositionLedgerService:
         )
         total = result.scalar_one_or_none()
         return Decimal(str(total or 0))
+
+    # ------------------------------------------------------------------
+    # CompletedTrade derivation from ledger
+    # ------------------------------------------------------------------
+
+    @staticmethod
+    async def build_completed_trade_on_close(
+        close_entry: "PositionLedger",
+        db: AsyncSession,
+    ) -> Optional["CompletedTrade"]:
+        """
+        Build a CompletedTrade from the ledger when a position is fully closed.
+
+        Should be called immediately after apply_fill() returns a CLOSE or FLIP entry.
+        Queries all ledger entries in the current round (from the last close/start
+        to this entry) and aggregates them into a CompletedTrade.
+
+        Returns None if the data is insufficient to build a valid trade.
+        Does NOT add the CompletedTrade to the session — caller does that.
+        """
+        if close_entry.entry_type not in ("CLOSE", "FLIP"):
+            return None
+
+        from app.models.completed_trade import CompletedTrade as CTModel
+
+        # Load all ledger entries for this symbol up to (and including) the close entry
+        result = await db.execute(
+            select(PositionLedger)
+            .where(
+                and_(
+                    PositionLedger.broker_account_id == close_entry.broker_account_id,
+                    PositionLedger.tradingsymbol == close_entry.tradingsymbol,
+                    PositionLedger.exchange == close_entry.exchange,
+                )
+            )
+            .order_by(PositionLedger.occurred_at.asc(), PositionLedger.created_at.asc())
+        )
+        all_entries: List[PositionLedger] = list(result.scalars().all())
+
+        # Find the start of the current round: the entry immediately after the
+        # most recent previous CLOSE or FLIP (or the very beginning if none).
+        round_start_idx = 0
+        for i, entry in enumerate(all_entries):
+            if entry.id == close_entry.id:
+                break
+            if entry.entry_type in ("CLOSE", "FLIP"):
+                round_start_idx = i + 1
+
+        round_entries = all_entries[round_start_idx:]
+
+        if not round_entries:
+            return None
+
+        # Separate entry fills (OPEN/INCREASE) from exit fills (DECREASE/CLOSE/FLIP)
+        entry_fills = [e for e in round_entries if e.entry_type in ("OPEN", "INCREASE")]
+        exit_fills = [e for e in round_entries if e.entry_type in ("DECREASE", "CLOSE", "FLIP")]
+
+        if not entry_fills or not exit_fills:
+            return None
+
+        total_entry_qty = sum(abs(e.fill_qty) for e in entry_fills)
+        total_exit_qty = sum(abs(e.fill_qty) for e in exit_fills)
+
+        if total_entry_qty == 0 or total_exit_qty == 0:
+            return None
+
+        # Weighted average prices
+        avg_entry = (
+            sum(Decimal(str(e.fill_price)) * abs(e.fill_qty) for e in entry_fills)
+            / total_entry_qty
+        ).quantize(_PRICE_PRECISION, rounding=ROUND_HALF_UP)
+
+        avg_exit = (
+            sum(Decimal(str(e.fill_price)) * abs(e.fill_qty) for e in exit_fills)
+            / total_exit_qty
+        ).quantize(_PRICE_PRECISION, rounding=ROUND_HALF_UP)
+
+        # Total realized P&L is the sum of all exit-side entries
+        total_pnl = sum(e.realized_pnl for e in exit_fills)
+
+        # Timing
+        entry_time = min(e.occurred_at for e in entry_fills)
+        exit_time = max(e.occurred_at for e in exit_fills)
+        duration = max(0, int((exit_time - entry_time).total_seconds() / 60))
+
+        # Direction from first entry fill
+        direction = "LONG" if entry_fills[0].fill_qty > 0 else "SHORT"
+
+        return CTModel(
+            broker_account_id=close_entry.broker_account_id,
+            tradingsymbol=close_entry.tradingsymbol,
+            exchange=close_entry.exchange,
+            direction=direction,
+            total_quantity=total_entry_qty,
+            num_entries=len(entry_fills),
+            num_exits=len(exit_fills),
+            avg_entry_price=float(avg_entry),
+            avg_exit_price=float(avg_exit),
+            realized_pnl=float(total_pnl),
+            entry_time=entry_time,
+            exit_time=exit_time,
+            duration_minutes=duration,
+            closed_by_flip=(close_entry.entry_type == "FLIP"),
+            entry_trade_ids=[e.fill_order_id for e in entry_fills],
+            exit_trade_ids=[e.fill_order_id for e in exit_fills],
+            status="closed",
+        )
 
     # ------------------------------------------------------------------
     # Internal helpers
