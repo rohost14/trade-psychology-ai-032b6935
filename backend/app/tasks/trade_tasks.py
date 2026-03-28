@@ -57,7 +57,7 @@ def _release_lock(redis_client, key: str):
 
 
 @celery_app.task(bind=True, max_retries=3, default_retry_delay=60)
-def process_webhook_trade(self, trade_data: Dict[str, Any], broker_account_id: str):
+def process_webhook_trade(self, trade_data: Dict[str, Any], broker_account_id: str, request_id: str = "-"):
     """
     Process a single trade from Zerodha webhook.
 
@@ -70,6 +70,8 @@ def process_webhook_trade(self, trade_data: Dict[str, Any], broker_account_id: s
     - behavior_lock: only one behavioral detection per account at a time (item 5).
     """
     import asyncio
+    from app.core.request_context import request_id_var
+    request_id_var.set(request_id)
 
     async def _process():
         async with SessionLocal() as db:
@@ -160,22 +162,21 @@ def process_webhook_trade(self, trade_data: Dict[str, Any], broker_account_id: s
                     )
                     return {"success": True, "trade_id": str(trade.id), "skipped": True}
 
-                # Mark pipeline as started — atomic claim.
-                # If two workers race here, the UNIQUE index on (account, order_id)
-                # means only one upsert succeeded; the second will see processed_at set.
+                # Atomic pipeline claim: UPDATE ... WHERE processed_at IS NULL.
+                # rowcount == 1 means WE set it; rowcount == 0 means another worker
+                # already claimed this trade. This is the only safe race-free pattern —
+                # the previous two-step read/write approach had a TOCTOU window.
                 now_utc = datetime.now(timezone.utc)
-                await db.execute(
+                claim_result = await db.execute(
                     update(Trade)
-                    .where(Trade.id == trade.id, Trade.processed_at == None)  # noqa: E711
+                    .where(Trade.id == trade.id, Trade.processed_at.is_(None))
                     .values(processed_at=now_utc)
                 )
                 await db.commit()
 
-                # Verify we won the race (another worker may have beaten us)
-                fresh = await db.get(Trade, trade.id)
-                if fresh and fresh.processed_at != now_utc:
+                if claim_result.rowcount != 1:
                     logger.info(
-                        f"Trade {trade.order_id}: lost processed_at race. Skipping."
+                        f"Trade {trade.order_id}: lost processed_at race (rowcount=0). Skipping."
                     )
                     return {"success": True, "trade_id": str(trade.id), "skipped": True}
 
@@ -188,20 +189,23 @@ def process_webhook_trade(self, trade_data: Dict[str, Any], broker_account_id: s
 
                 try:
                     redis_client = _get_redis_client()
-                    # Retry acquiring the lock up to 3 times with 2s gap
-                    for attempt in range(3):
-                        fifo_lock_acquired = _acquire_lock(redis_client, fifo_lock_key, ttl_seconds=30)
+                    # Retry acquiring the lock up to 4 times with exponential backoff.
+                    # TTL=120s: PositionLedger apply_fill + CompletedTrade build + strategy
+                    # detection can collectively take ~2s; 120s gives 60× safety margin.
+                    import asyncio as _asyncio
+                    for attempt in range(4):
+                        fifo_lock_acquired = _acquire_lock(redis_client, fifo_lock_key, ttl_seconds=120)
                         if fifo_lock_acquired:
                             break
-                        import asyncio as _asyncio
-                        await _asyncio.sleep(2)
+                        backoff = 2 ** attempt  # 1s, 2s, 4s, 8s
+                        await _asyncio.sleep(backoff)
 
                     if not fifo_lock_acquired:
                         logger.warning(
                             f"Could not acquire fifo_lock for {broker_account_id} "
                             f"after 3 attempts. Retrying task."
                         )
-                        raise self.retry(countdown=5)
+                        raise self.retry(countdown=min(2 ** self.request.retries * 10, 300))
 
                     # PositionLedger: append-only fill record.
                     # Handles partial fills, flips, out-of-order, idempotency.
@@ -245,12 +249,55 @@ def process_webhook_trade(self, trade_data: Dict[str, Any], broker_account_id: s
                             ct = await PositionLedgerService.build_completed_trade_on_close(
                                 ledger_entry, db
                             )
+                            if ct is None:
+                                logger.warning(
+                                    f"[ledger] build_completed_trade_on_close returned None "
+                                    f"for entry {ledger_entry.id} ({ledger_entry.tradingsymbol}). "
+                                    f"No behavioral analysis will run for this trade."
+                                )
                             if ct:
                                 db.add(ct)
+                                await db.flush()  # give ct.id before strategy detection
                                 logger.info(
                                     f"[ledger] CompletedTrade: {ct.tradingsymbol} "
                                     f"{ct.direction} pnl={ct.realized_pnl}"
                                 )
+
+                                # Strategy detection — runs before BehaviorEngine so
+                                # the engine can suppress false alerts on strategy legs.
+                                # Detects straddle/strangle/spread/iron condor etc.
+                                try:
+                                    from app.services.strategy_detector import detect_and_save
+                                    sg = await detect_and_save(ct, db)
+                                    if sg:
+                                        logger.info(
+                                            f"[strategy] {sg.strategy_type} detected for "
+                                            f"{ct.tradingsymbol} | net_pnl={float(sg.net_pnl or 0):+,.0f}"
+                                        )
+                                except Exception as _sd_e:
+                                    # Log as ERROR: if strategy detection fails, the behavior
+                                    # engine won't suppress false alerts on losing hedge legs.
+                                    logger.error(
+                                        f"Strategy detection failed for {ct.tradingsymbol} "
+                                        f"(behavior engine will not suppress hedge alerts): {_sd_e}",
+                                        exc_info=True,
+                                    )
+
+                            # GTT discipline tracking — detect SL honour vs override
+                            try:
+                                from app.services.gtt_service import (
+                                    record_gtt_honored, record_gtt_overridden, has_active_gtt
+                                )
+                                variety = trade_data.get("variety", "regular")
+                                order_id = trade_data.get("order_id", "")
+                                sym = trade.tradingsymbol or ""
+                                if variety == "gtt":
+                                    await record_gtt_honored(account_id, sym, order_id, db)
+                                elif variety == "regular":
+                                    if await has_active_gtt(account_id, sym, db):
+                                        await record_gtt_overridden(account_id, sym, order_id, db)
+                            except Exception as _gtt_e:
+                                logger.debug(f"GTT tracking skipped: {_gtt_e}")
 
                         await db.commit()
                         logger.info(
@@ -260,6 +307,9 @@ def process_webhook_trade(self, trade_data: Dict[str, Any], broker_account_id: s
 
                     except Exception as e:
                         logger.error(f"PositionLedger apply_fill failed: {e}", exc_info=True)
+                        # Roll back any flushed-but-uncommitted ledger data so that the
+                        # behavior detection step below doesn't accidentally commit partial state.
+                        await db.rollback()
                         # Non-fatal: P&L write fails gracefully, pipeline continues
 
                 finally:
@@ -298,15 +348,66 @@ def process_webhook_trade(self, trade_data: Dict[str, Any], broker_account_id: s
                     if redis_client and behavior_lock_acquired:
                         _release_lock(redis_client, behavior_lock_key)
 
+                # ── Event-driven position checks (replaces beat tasks) ──────
+                # These are fire-and-forget — failures don't retry the trade task.
+                try:
+                    from app.tasks.position_monitor_tasks import (
+                        check_position_overexposure,
+                        check_holding_loser_scheduled,
+                    )
+                    # Immediate overexposure check for this symbol
+                    check_position_overexposure.delay(
+                        broker_account_id, trade.tradingsymbol or ""
+                    )
+                    # For BUY fills: schedule holding-loser check 30 min out.
+                    # Use SETNX chain key so multiple BUY fills don't spawn
+                    # parallel chains — only one chain active per account.
+                    if trade.transaction_type == "BUY":
+                        chain_key = f"holding_loser_chain:{broker_account_id}"
+                        if redis_client and redis_client.set(
+                            chain_key, 0, ex=1900, nx=True
+                        ):
+                            check_holding_loser_scheduled.apply_async(
+                                args=[broker_account_id, 0],
+                                countdown=1800,  # 30 minutes
+                            )
+                except Exception as _pm_e:
+                    logger.debug(f"Position monitor trigger skipped: {_pm_e}")
+
+                # ── Portfolio concentration analysis for this account ────────
+                try:
+                    from app.tasks.portfolio_radar_tasks import run_portfolio_radar_for_account
+                    run_portfolio_radar_for_account.delay(broker_account_id)
+                except Exception as _pr_e:
+                    logger.debug(f"Portfolio radar trigger skipped: {_pr_e}")
+
                 return {"success": True, "trade_id": str(trade.id)}
 
             except Exception as e:
                 logger.error(f"Trade processing failed: {e}", exc_info=True)
                 await db.rollback()
-                raise self.retry(exc=e)
+                try:
+                    raise self.retry(exc=e, countdown=min(2 ** self.request.retries * 10, 300))
+                except Exception as dlq_exc:
+                    from celery.exceptions import MaxRetriesExceededError
+                    if isinstance(dlq_exc, MaxRetriesExceededError):
+                        try:
+                            import sentry_sdk
+                            sentry_sdk.capture_message(
+                                f"[DLQ] process_webhook_trade exhausted retries: "
+                                f"order={trade_data.get('order_id')} account={broker_account_id}. Trade may be lost.",
+                                level="error",
+                            )
+                        except Exception:
+                            pass
+                        logger.error(
+                            f"[DLQ] process_webhook_trade: order {trade_data.get('order_id')} "
+                            f"lost after {self.max_retries} retries for account {broker_account_id}"
+                        )
+                    raise
 
     # Run async function in sync context
-    return asyncio.get_event_loop().run_until_complete(_process())
+    return asyncio.run(_process())
 
 
 @celery_app.task(bind=True, max_retries=2)
@@ -330,9 +431,45 @@ def sync_trades_for_account(self, broker_account_id: str):
 
             except Exception as e:
                 logger.error(f"Sync failed for {broker_account_id}: {e}", exc_info=True)
-                raise self.retry(exc=e)
+                raise self.retry(exc=e, countdown=min(2 ** self.request.retries * 10, 300))
 
-    return asyncio.get_event_loop().run_until_complete(_sync())
+    return asyncio.run(_sync())
+
+
+@celery_app.task(bind=True, max_retries=2)
+def seed_gtt_triggers_for_account(self, broker_account_id: str):
+    """
+    Seed GTT tracking table once on login/reconnect.
+
+    After this initial seed, all GTT state changes arrive via webhook:
+      variety='gtt'     → record_gtt_honored    (SL triggered automatically)
+      variety='regular' → record_gtt_overridden  (manual exit while GTT was active)
+    No recurring poll needed.
+    """
+    import asyncio
+
+    async def _seed():
+        async with SessionLocal() as db:
+            try:
+                from app.models.broker_account import BrokerAccount
+                from sqlalchemy import select
+                from app.services.gtt_service import sync_gtt_triggers
+
+                result = await db.execute(
+                    select(BrokerAccount).where(BrokerAccount.id == UUID(broker_account_id))
+                )
+                account = result.scalar_one_or_none()
+                if not account or not account.access_token:
+                    return
+
+                access_token = account.decrypt_token(account.access_token)
+                await sync_gtt_triggers(UUID(broker_account_id), access_token, db)
+                logger.info(f"GTT seed complete for {broker_account_id[:8]}")
+            except Exception as e:
+                logger.error(f"GTT seed failed for {broker_account_id}: {e}", exc_info=True)
+                raise self.retry(exc=e, countdown=60)
+
+    asyncio.run(_seed())
 
 
 @celery_app.task
@@ -361,7 +498,7 @@ def run_risk_detection(broker_account_id: str, trigger_trade_id: str = None):
                 logger.error(f"Risk detection task failed: {e}", exc_info=True)
                 return {"error": str(e)}
 
-    return asyncio.get_event_loop().run_until_complete(_detect())
+    return asyncio.run(_detect())
 
 
 async def run_risk_detection_async(broker_account_id: UUID, db, trigger_trade: Trade = None):
@@ -544,63 +681,96 @@ async def _apply_alert_consolidation(
 
 
 
-@celery_app.task
-def send_danger_alert(broker_account_id: str, alert_id: str):
+@celery_app.task(bind=True, max_retries=3)
+def send_danger_alert(self, broker_account_id: str, alert_id: str):
     """Send WhatsApp and Push notifications for danger pattern."""
     import asyncio
 
     async def _send():
         async with SessionLocal() as db:
+            from app.models.risk_alert import RiskAlert
+            from app.services.alert_service import AlertService
+            from app.services.push_notification_service import push_service
+
+            result = await db.execute(
+                select(RiskAlert).where(RiskAlert.id == UUID(alert_id))
+            )
+            alert = result.scalar_one_or_none()
+            if not alert:
+                return {"error": "Alert not found"}
+
+            account_result = await db.execute(
+                select(BrokerAccount).where(BrokerAccount.id == UUID(broker_account_id))
+            )
+            account = account_result.scalar_one_or_none()
+            if not account:
+                return {"error": "Account not found"}
+
+            results = {"whatsapp": False, "push": {"sent": 0, "failed": 0}}
+
+            # 1. Push notification — non-fatal, device delivery is best-effort
             try:
-                from app.models.risk_alert import RiskAlert
-                from app.services.alert_service import AlertService
-                from app.services.push_notification_service import push_service
-
-                # Get alert
-                result = await db.execute(
-                    select(RiskAlert).where(RiskAlert.id == UUID(alert_id))
-                )
-                alert = result.scalar_one_or_none()
-
-                if not alert:
-                    return {"error": "Alert not found"}
-
-                # Get broker account for user info
-                account_result = await db.execute(
-                    select(BrokerAccount).where(
-                        BrokerAccount.id == UUID(broker_account_id)
-                    )
-                )
-                account = account_result.scalar_one_or_none()
-
-                if not account:
-                    return {"error": "Account not found"}
-
-                results = {"whatsapp": False, "push": {"sent": 0, "failed": 0}}
-
-                # 1. Send Push Notification (to user's browser/device)
-                try:
-                    push_result = await push_service.send_risk_alert_notification(alert, db)
-                    results["push"] = push_result
-                    logger.info(f"Push notification: {push_result}")
-                except Exception as e:
-                    logger.error(f"Push notification failed: {e}")
-
-                # 2. Send WhatsApp alert (to guardian if configured)
-                user = await db.get(User, account.user_id) if account.user_id else None
-                phone = user.guardian_phone if user else None
-                if phone:
-                    try:
-                        alert_service = AlertService()
-                        sent = await alert_service.send_risk_alert(alert, account, phone)
-                        results["whatsapp"] = sent
-                    except Exception as e:
-                        logger.error(f"WhatsApp alert failed: {e}")
-
-                return results
-
+                push_result = await push_service.send_risk_alert_notification(alert, db)
+                results["push"] = push_result
+                logger.info(f"Push notification: {push_result}")
             except Exception as e:
-                logger.error(f"Alert send failed: {e}", exc_info=True)
-                return {"error": str(e)}
+                logger.error(f"Push notification failed: {e}")
 
-    return asyncio.get_event_loop().run_until_complete(_send())
+            # 2. WhatsApp alert — propagates on failure so task can retry
+            user = await db.get(User, account.user_id) if account.user_id else None
+            phone = user.guardian_phone if user else None
+            if phone:
+                alert_service = AlertService()
+                sent = await alert_service.send_risk_alert(alert, account, phone)
+                results["whatsapp"] = sent
+
+            return results
+
+    try:
+        return asyncio.run(_send())
+    except Exception as exc:
+        logger.error(f"send_danger_alert failed (attempt {self.request.retries + 1}): {exc}")
+        raise self.retry(exc=exc, countdown=min(2 ** self.request.retries * 30, 300))
+
+
+@celery_app.task
+def eod_sync_all_accounts():
+    """
+    End-of-day sync for all connected broker accounts.
+
+    Scheduled at 3:35 PM IST (Monday–Friday) — 5 minutes after NSE/NFO/BSE/BFO close.
+    This is the ONLY periodic sync. No polling during the day.
+
+    Purpose:
+      - Ensure all today's fills are in DB (catches any missed webhooks)
+      - Create CompletedTrades for cross-day positions (overnight holds closed today)
+        using kite.positions()["net"] data, which expires at end of day
+      - Feed accurate EOD state into behavioral analysis and daily reports
+
+    Not triggered by Celery Beat alone — also called explicitly when needed
+    (e.g., MCX accounts that trade past 15:30).
+    """
+    import asyncio
+
+    async def _sync_all():
+        async with SessionLocal() as db:
+            result = await db.execute(
+                select(BrokerAccount).where(
+                    BrokerAccount.status == "connected",
+                    BrokerAccount.access_token.isnot(None),
+                )
+            )
+            accounts = result.scalars().all()
+            logger.info(f"[EOD sync] Starting for {len(accounts)} connected account(s)")
+
+            for account in accounts:
+                try:
+                    sync_trades_for_account.delay(str(account.id))
+                    logger.info(f"[EOD sync] Queued sync for account {account.id}")
+                except Exception as e:
+                    logger.error(f"[EOD sync] Failed to queue {account.id}: {e}")
+
+            return {"queued": len(accounts)}
+
+    import asyncio as _asyncio
+    return _asyncio.run(_sync_all())

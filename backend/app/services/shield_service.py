@@ -137,6 +137,9 @@ class ShieldService:
                     "unavailable": cp_unavailable,
                 },
                 "data_points": cp_complete,
+                # True when some checkpoints are still being calculated — capital_defended
+                # is a lower bound. The UI should show "₹X+" or a "calculating" indicator.
+                "is_partial": cp_calculating > 0,
             }
         except Exception as e:
             logger.error(f"Shield summary failed: {e}", exc_info=True)
@@ -226,6 +229,27 @@ class ShieldService:
                     except Exception:
                         pass
 
+                # Position details from checkpoint snapshot
+                position_details = None
+                if checkpoint and checkpoint.positions_snapshot:
+                    pos = checkpoint.positions_snapshot[0]
+                    position_details = {
+                        "tradingsymbol": pos.get("tradingsymbol"),
+                        "quantity": pos.get("quantity"),
+                        "avg_entry_price": pos.get("avg_entry_price"),
+                        "ltp_at_alert": pos.get("ltp_at_alert"),
+                        "unrealised_pnl": pos.get("unrealised_pnl"),
+                    }
+
+                # Human-readable narrative
+                context_narrative = self._build_narrative(
+                    money_saved=money_saved,
+                    user_actual_pnl=user_actual_pnl,
+                    counterfactual_pnl_t30=counterfactual_pnl_t30,
+                    outcome=outcome,
+                    symbol=trigger_symbol,
+                )
+
                 timeline.append({
                     "id": str(alert.id),
                     "detected_at": alert.detected_at.isoformat() if alert.detected_at else None,
@@ -248,6 +272,8 @@ class ShieldService:
                         round(user_actual_pnl)
                         if user_actual_pnl is not None else None
                     ),
+                    "position_details": position_details,
+                    "context_narrative": context_narrative,
                 })
 
             return timeline
@@ -507,6 +533,43 @@ class ShieldService:
                 daily_counts[day_key] = daily_counts.get(day_key, 0) + 1
 
         return sum(1 for c in daily_counts.values() if c >= 5)
+
+    def _build_narrative(
+        self,
+        money_saved: Optional[float],
+        user_actual_pnl: Optional[float],
+        counterfactual_pnl_t30: Optional[float],
+        outcome: str,
+        symbol: str,
+    ) -> Optional[str]:
+        """One-sentence story explaining what the alert actually achieved."""
+        if money_saved is None or user_actual_pnl is None or counterfactual_pnl_t30 is None:
+            return None
+
+        verb = "exited" if outcome == "heeded" else "reduced exposure to"
+
+        if money_saved >= 0:
+            if counterfactual_pnl_t30 < 0:
+                return (
+                    f"You {verb} {symbol} for ₹{user_actual_pnl:+,.0f}. "
+                    f"Had you held 30 min longer, the loss would have been "
+                    f"₹{abs(counterfactual_pnl_t30):,.0f}. "
+                    f"Alert saved you ₹{money_saved:,.0f}."
+                )
+            else:
+                return (
+                    f"You {verb} {symbol}. "
+                    f"Your P&L: ₹{user_actual_pnl:+,.0f} vs "
+                    f"₹{counterfactual_pnl_t30:+,.0f} if held to T+30. "
+                    f"Net benefit: ₹{money_saved:,.0f}."
+                )
+        else:
+            return (
+                f"The market recovered after the alert. "
+                f"You got ₹{user_actual_pnl:+,.0f}, but {symbol} was worth "
+                f"₹{counterfactual_pnl_t30:+,.0f} at T+30 — "
+                f"₹{abs(money_saved):,.0f} left on the table (reported honestly)."
+            )
 
     def _empty_summary(self) -> Dict:
         return {

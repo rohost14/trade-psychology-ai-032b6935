@@ -126,6 +126,11 @@ def setup_logging():
 
     root_logger.addHandler(console_handler)
 
+    # Inject request_id from ContextVar into every log record (works in both
+    # HTTP server and Celery workers — the ContextVar is set at task/request start)
+    from app.core.request_context import RequestIdFilter
+    root_logger.addFilter(RequestIdFilter())
+
     # Reduce noise from third-party libraries
     logging.getLogger("httpx").setLevel(logging.WARNING)
     logging.getLogger("httpcore").setLevel(logging.WARNING)

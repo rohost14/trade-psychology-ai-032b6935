@@ -1,5 +1,4 @@
 import { useState, useEffect } from 'react';
-import { motion } from 'framer-motion';
 import {
   TrendingUp,
   TrendingDown,
@@ -87,7 +86,7 @@ export default function ProgressTrackingCard({ brokerAccountId }: ProgressTracki
     );
   }
 
-  if (!data) {
+  if (!data || !data.comparison || !data.this_week || !data.last_week || !data.streaks || !data.alerts) {
     return null;
   }
 
@@ -151,11 +150,7 @@ export default function ProgressTrackingCard({ brokerAccountId }: ProgressTracki
 
       {/* Streak Banner */}
       {data.streaks.current_streak > 0 && (
-        <motion.div
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          className="px-6 py-3 bg-gradient-to-r from-amber-500/10 to-orange-500/10 border-b border-amber-500/20"
-        >
+        <div className="px-6 py-3 bg-gradient-to-r from-amber-500/10 to-orange-500/10 border-b border-amber-500/20 animate-fade-in">
           <div className="flex items-center gap-3">
             <Flame className="h-5 w-5 text-amber-500" />
             <div>
@@ -170,7 +165,7 @@ export default function ProgressTrackingCard({ brokerAccountId }: ProgressTracki
               <Award className="h-5 w-5 text-amber-500 ml-auto" />
             )}
           </div>
-        </motion.div>
+        </div>
       )}
 
       {/* Metrics Grid */}

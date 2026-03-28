@@ -1,6 +1,6 @@
 import logging
 import uuid
-from datetime import datetime, date, timedelta, timezone
+from datetime import datetime, date, time, timedelta, timezone
 from typing import Dict, Any, List, Optional
 from zoneinfo import ZoneInfo
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -13,12 +13,14 @@ from app.models.position import Position
 from app.models.broker_account import BrokerAccount
 from app.models.order import Order
 from app.models.holding import Holding
+from app.models.completed_trade import CompletedTrade
 from app.utils.trade_classifier import classify_trade
 from app.services.zerodha_service import zerodha_client
 from app.services.pnl_calculator import pnl_calculator
 from app.services.instrument_service import instrument_service
 from app.models.instrument import Instrument
 from sqlalchemy.dialects.postgresql import insert
+from sqlalchemy import func as sa_func
 
 logger = logging.getLogger(__name__)
 
@@ -148,7 +150,23 @@ class TradeSyncService:
         result = await db.execute(stmt)
         existing_trade = result.scalars().first()
 
+        # Terminal statuses — a trade in these states must NEVER be overwritten by a
+        # later postback. Zerodha sometimes delivers webhooks out of order (COMPLETE
+        # can arrive before OPEN, or a duplicate OPEN can arrive after COMPLETE).
+        _TERMINAL = {"COMPLETE", "REJECTED", "CANCELLED"}
+
         if existing_trade:
+            # Reject status downgrades: COMPLETE/REJECTED/CANCELLED → anything else.
+            # This prevents out-of-order postbacks from corrupting finalized trades.
+            new_status = (trade_data.get("status") or "").upper()
+            old_status = (existing_trade.status or "").upper()
+            if old_status in _TERMINAL and new_status and new_status != old_status:
+                logger.warning(
+                    f"Rejected status downgrade for order {trade_data.get('order_id')}: "
+                    f"{old_status} → {new_status} (out-of-order webhook, ignoring)"
+                )
+                return existing_trade, False
+
             # Update - but preserve previously calculated P&L
             existing_pnl = existing_trade.pnl
             for key, value in trade_data.items():
@@ -251,9 +269,11 @@ class TradeSyncService:
                     stats["errors"].append(f"Trade Sync ID {trade_data.get('trade_id')}: {str(e)}")
 
             # 2. Sync Positions (Snapshot) — upsert to preserve historical data
+            overnight_closed_positions: List[Dict[str, Any]] = []
             try:
                 pos_stats = await cls.sync_positions(broker_account_id, db, access_token)
                 stats["positions_synced"] = pos_stats.get("synced", 0)
+                overnight_closed_positions = pos_stats.get("overnight_closed", [])
                 if pos_stats.get("errors"):
                     stats["errors"].extend(pos_stats["errors"])
             except Exception as e:
@@ -279,6 +299,20 @@ class TradeSyncService:
             except Exception as e:
                 logger.error(f"P&L calculation failed: {e}")
                 stats["errors"].append(f"P&L Calculation: {str(e)}")
+
+            # 4b. Backfill CompletedTrades for cross-day positions FIFO couldn't match
+            # Runs AFTER pnl_calculator so we only create records FIFO missed.
+            if overnight_closed_positions:
+                try:
+                    backfilled = await cls._backfill_overnight_completed_trades(
+                        broker_account_id, overnight_closed_positions, db
+                    )
+                    stats["overnight_trades_backfilled"] = backfilled
+                    if backfilled:
+                        logger.info(f"Backfilled {backfilled} cross-day CompletedTrade(s)")
+                except Exception as e:
+                    logger.error(f"Overnight CompletedTrade backfill failed (non-fatal): {e}")
+                    stats["errors"].append(f"Overnight Backfill: {str(e)}")
 
             # 5. Risk detection decoupled from sync pipeline
             # Moved to post-sync step in zerodha.py sync_all_data().
@@ -507,8 +541,8 @@ class TradeSyncService:
                  return {"synced": 0, "errors": ["Broker not connected"]}
             access_token = account.decrypt_token(account.access_token)
 
-        stats = {"synced": 0, "errors": []}
-        
+        stats: Dict[str, Any] = {"synced": 0, "errors": [], "overnight_closed": []}
+
         try:
             positions_resp = await zerodha_client.get_positions(access_token)
             net_positions = positions_resp.get("net", [])
@@ -535,6 +569,33 @@ class TradeSyncService:
                 (p.tradingsymbol, p.exchange, p.product): p
                 for p in existing_result.scalars().all()
             }
+
+            # Build entry-time lookups from today's completed BUY trades in DB.
+            # first_entry: earliest BUY today → when user first entered the position
+            # last_entry:  latest BUY today  → when user most recently added to it
+            # Both are stored on the Position row so position_monitor can calculate
+            # hold duration without re-querying trades each time.
+            today_start = datetime.now(timezone.utc).replace(
+                hour=0, minute=0, second=0, microsecond=0
+            )
+            trade_ts_result = await db.execute(
+                select(Trade).where(
+                    Trade.broker_account_id == broker_account_id,
+                    Trade.transaction_type == "BUY",
+                    Trade.order_timestamp >= today_start,
+                    Trade.filled_quantity > 0,
+                ).order_by(Trade.order_timestamp.asc())
+            )
+            _first_entry_map: dict[tuple, datetime] = {}
+            _last_entry_map: dict[tuple, datetime] = {}
+            for _t in trade_ts_result.scalars().all():
+                _k = (_t.tradingsymbol, _t.product)
+                if _t.order_timestamp:
+                    if _k not in _first_entry_map:
+                        _first_entry_map[_k] = _t.order_timestamp
+                    _last_entry_map[_k] = _t.order_timestamp  # always overwrite → keeps latest
+            # Keep backward-compat alias used below
+            _entry_time_map = _first_entry_map
 
             seen_keys = set()
 
@@ -579,19 +640,33 @@ class TradeSyncService:
                         "synced_at": datetime.now(timezone.utc),
                     }
 
+                    _pkey = (pos.get("tradingsymbol"), pos.get("product"))
+                    _first_ts = _first_entry_map.get(_pkey)
+                    _last_ts = _last_entry_map.get(_pkey)
+
                     async with db.begin_nested():
                         if existing:
-                            # Update existing — preserves first_entry_time, created_at, order_ids
+                            # Update existing — preserve first_entry_time if already set;
+                            # backfill from trade timestamp if still NULL.
+                            # Always update last_entry_time to today's latest BUY.
                             for field, value in update_fields.items():
                                 setattr(existing, field, value)
+                            if existing.first_entry_time is None and _first_ts:
+                                existing.first_entry_time = _first_ts
+                            if _last_ts:
+                                existing.last_entry_time = _last_ts
+                            elif existing.last_entry_time is None and existing.first_entry_time:
+                                existing.last_entry_time = existing.first_entry_time
                             existing.updated_at = datetime.now(timezone.utc)
                         else:
-                            # Insert new position
+                            # Insert new position with full entry time data
                             position = Position(
                                 broker_account_id=broker_account_id,
                                 tradingsymbol=pos.get("tradingsymbol"),
                                 exchange=pos.get("exchange"),
                                 product=pos.get("product"),
+                                first_entry_time=_first_ts,
+                                last_entry_time=_last_ts or _first_ts,
                                 **update_fields,
                             )
                             db.add(position)
@@ -607,8 +682,191 @@ class TradeSyncService:
                     existing_pos.status = "closed"
                     existing_pos.synced_at = datetime.now(timezone.utc)
 
+            # Identify cross-day closes: qty=0 today but was held overnight.
+            # These need a CompletedTrade that FIFO can't create (missing entry leg).
+            # Returned so the caller can backfill AFTER pnl_calculator runs.
+            for pos in net_positions:
+                if pos.get("product") not in TRACKED_PRODUCTS:
+                    continue
+                qty = int(pos.get("quantity", 0))
+                overnight_qty = int(pos.get("overnight_quantity", 0))
+                realised = float(pos.get("realised", 0.0))
+                if qty == 0 and overnight_qty != 0 and abs(realised) > 0.01:
+                    # M1 guard: only backfill if we have at least one BUY trade in DB for
+                    # this symbol today. Prevents phantom CompletedTrade records for
+                    # positions opened on another platform or before our tracking started.
+                    _symbol = pos.get("tradingsymbol")
+                    _today_ist = datetime.now(IST).date()
+                    _today_start_utc = datetime.combine(
+                        _today_ist, time(0, 0), tzinfo=IST
+                    ).astimezone(timezone.utc)
+                    try:
+                        _entry_count = await db.scalar(
+                            select(sa_func.count()).select_from(Trade).where(
+                                Trade.broker_account_id == broker_account_id,
+                                Trade.tradingsymbol == _symbol,
+                                Trade.transaction_type == "BUY",
+                                Trade.order_timestamp >= _today_start_utc,
+                            )
+                        )
+                        if not _entry_count:
+                            logger.info(
+                                f"[overnight] {_symbol}: no BUY entry in DB today — "
+                                f"skipping backfill (untracked position)"
+                            )
+                            continue
+                    except Exception as _m1e:
+                        logger.warning(f"[overnight] M1 guard query failed for {_symbol}: {_m1e}")
+                    stats["overnight_closed"].append(pos)
+
         except Exception as e:
             logger.error(f"Error fetching positions: {e}")
             stats["errors"].append(f"Positions Fetch: {str(e)}")
-            
+
         return stats
+
+    @classmethod
+    async def _backfill_overnight_completed_trades(
+        cls,
+        broker_account_id: uuid.UUID,
+        overnight_positions: List[Dict[str, Any]],
+        db: AsyncSession,
+    ) -> int:
+        """
+        Create CompletedTrade records for cross-day positions that FIFO couldn't match.
+
+        Called AFTER pnl_calculator.calculate_and_update_pnl so we only act on
+        positions that FIFO missed (missing yesterday's entry leg in DB).
+
+        Data accuracy:
+          - avg_entry_price: Zerodha's carry-forward average_price (100% accurate)
+          - avg_exit_price:  day_sell_price (LONG) / day_buy_price (SHORT) — weighted
+                             average of today's exit fills (100% accurate)
+          - realized_pnl:    Zerodha's own FIFO realised field (100% accurate)
+          - exit_time:       latest exchange_timestamp of today's matching exit trade in DB
+          - entry_time:      previous trading day 15:30 IST (approximation — exact entry
+                             timestamp not available without historical trade data)
+          - duration_minutes: derived from entry_time → exit_time (approximate)
+
+        No polling — runs once as part of the sync pipeline.
+        """
+        today_ist = datetime.now(IST).date()
+        today_start_utc = datetime.combine(today_ist, time(0, 0), tzinfo=IST).astimezone(timezone.utc)
+
+        def prev_trading_day_close(today: date) -> datetime:
+            """Return 15:30 IST on the most recent trading day before today."""
+            d = today - timedelta(days=1)
+            # Skip weekends
+            while d.weekday() >= 5:
+                d -= timedelta(days=1)
+            return datetime.combine(d, time(15, 30), tzinfo=IST).astimezone(timezone.utc)
+
+        created = 0
+        for pos in overnight_positions:
+            symbol = pos.get("tradingsymbol")
+            exchange = pos.get("exchange", "NSE")
+            product = pos.get("product")
+            overnight_qty = int(pos.get("overnight_quantity", 0))
+
+            try:
+                # Skip if a CompletedTrade for this symbol already exists today
+                # (FIFO created it successfully — it had the entry leg in DB)
+                existing = await db.scalar(
+                    select(sa_func.count()).select_from(CompletedTrade).where(
+                        CompletedTrade.broker_account_id == broker_account_id,
+                        CompletedTrade.tradingsymbol == symbol,
+                        CompletedTrade.exit_time >= today_start_utc,
+                    )
+                )
+                if existing and existing > 0:
+                    logger.debug(f"[overnight] CompletedTrade already exists for {symbol} today — skipping")
+                    continue
+
+                direction = "LONG" if overnight_qty > 0 else "SHORT"
+                qty = abs(overnight_qty)
+
+                avg_entry = float(pos.get("average_price") or 0)
+                # Exit price: day_sell_price for LONG close, day_buy_price for SHORT cover
+                if direction == "LONG":
+                    avg_exit = float(pos.get("day_sell_price") or 0)
+                    exit_tx = "SELL"
+                else:
+                    avg_exit = float(pos.get("day_buy_price") or 0)
+                    exit_tx = "BUY"
+
+                # Skip if we can't determine prices (shouldn't happen for valid closes)
+                if avg_entry == 0 or avg_exit == 0:
+                    logger.warning(f"[overnight] {symbol}: zero entry/exit price — skipping")
+                    continue
+
+                realized_pnl = float(pos.get("realised") or 0)
+
+                # Get actual exit time from today's trades in DB
+                exit_time_row = await db.scalar(
+                    select(sa_func.max(Trade.exchange_timestamp)).where(
+                        Trade.broker_account_id == broker_account_id,
+                        Trade.tradingsymbol == symbol,
+                        Trade.transaction_type == exit_tx,
+                        Trade.exchange_timestamp >= today_start_utc,
+                    )
+                )
+                exit_time = exit_time_row or datetime.combine(
+                    today_ist,
+                    time(15, 30) if exchange in ("NSE", "BSE", "NFO", "BFO") else time(17, 0),
+                    tzinfo=IST,
+                ).astimezone(timezone.utc)
+
+                entry_time = prev_trading_day_close(today_ist)
+                duration_minutes = max(1, int((exit_time - entry_time).total_seconds() / 60))
+
+                # Derive instrument_type from symbol suffix
+                sym_upper = symbol.upper()
+                if sym_upper.endswith("FUT"):
+                    instrument_type = "FUT"
+                elif sym_upper.endswith("CE"):
+                    instrument_type = "CE"
+                elif sym_upper.endswith("PE"):
+                    instrument_type = "PE"
+                else:
+                    instrument_type = "EQ"
+
+                # Capture EOD close_price for BTST overnight-reversal detection.
+                # Zerodha's /positions response includes close_price = previous EOD close.
+                # For an overnight NRML hold that closes today, that IS the entry-day close.
+                overnight_close = float(pos.get("close_price") or 0) or None
+
+                ct = CompletedTrade(
+                    broker_account_id=broker_account_id,
+                    tradingsymbol=symbol,
+                    exchange=exchange,
+                    instrument_type=instrument_type,
+                    product=product,
+                    direction=direction,
+                    total_quantity=qty,
+                    num_entries=1,   # exact count unknown without historical fills
+                    num_exits=1,
+                    avg_entry_price=avg_entry,
+                    avg_exit_price=avg_exit,
+                    realized_pnl=realized_pnl,
+                    entry_time=entry_time,
+                    exit_time=exit_time,
+                    duration_minutes=duration_minutes,
+                    closed_by_flip=False,
+                    entry_trade_ids=[],
+                    exit_trade_ids=[],
+                    status="closed",
+                    overnight_close_price=overnight_close,
+                )
+                db.add(ct)
+                await db.flush()
+                created += 1
+                logger.info(
+                    f"[overnight] Created CompletedTrade for {symbol} "
+                    f"({direction} {qty} @ entry={avg_entry} exit={avg_exit} "
+                    f"pnl={realized_pnl:.2f})"
+                )
+
+            except Exception as e:
+                logger.error(f"[overnight] Failed to backfill {symbol}: {e}")
+
+        return created

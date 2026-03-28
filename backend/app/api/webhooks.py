@@ -112,15 +112,52 @@ async def zerodha_postback(
         logger.warning(f"No valid user tag in postback: {tag}")
         return {"status": "ok", "message": "No user tag"}
 
-    # 4. Verify account exists — deleted account = 200 (nothing to recover)
+    # 4. Verify account exists and is active — return 200 for all non-active states
+    #    so Zerodha does NOT retry (these are permanent states, retrying won't help).
     result = await db.execute(
-        select(BrokerAccount.id).where(BrokerAccount.id == broker_account_id)
+        select(BrokerAccount.id, BrokerAccount.status).where(
+            BrokerAccount.id == broker_account_id
+        )
     )
-    if not result.scalar_one_or_none():
-        logger.error(f"Broker account not found: {broker_account_id}")
+    row = result.first()
+    if not row:
+        logger.warning(f"Postback for unknown account {broker_account_id} — discarding")
         return {"status": "ok", "message": "Account not found"}
+    acct_status = row[1]
+    if acct_status == "deleted":
+        logger.info(
+            f"Postback for deleted account {broker_account_id} "
+            f"(order {form_dict.get('order_id')}) — discarding (DPDP erasure)"
+        )
+        return {"status": "ok", "message": "Account deleted"}
+    if acct_status == "suspended":
+        logger.warning(
+            f"Postback for suspended account {broker_account_id} "
+            f"(order {form_dict.get('order_id')}) — discarding"
+        )
+        return {"status": "ok", "message": "Account suspended"}
+    if acct_status != "connected":
+        logger.warning(
+            f"Postback for account {broker_account_id} with status={acct_status!r} "
+            f"(order {form_dict.get('order_id')}) — discarding"
+        )
+        return {"status": "ok", "message": f"Account status: {acct_status}"}
 
     # 5. Build trade data for processing
+    # H3: Early reject when all timestamps are NULL — impossible to do behavioral analysis
+    _ts_fields = (
+        form_dict.get("order_timestamp"),
+        form_dict.get("exchange_timestamp"),
+        form_dict.get("fill_timestamp"),
+    )
+    if not any(_ts_fields):
+        logger.error(
+            f"Postback rejected — order {form_dict.get('order_id')} "
+            f"(status={form_dict.get('status')}): all timestamps are NULL. "
+            f"Cannot determine entry/hold time for behavioral analysis."
+        )
+        return {"status": "ok", "message": "No timestamps"}
+
     trade_data = {
         "order_id": form_dict.get("order_id"),
         "exchange_order_id": form_dict.get("exchange_order_id"),
@@ -153,7 +190,8 @@ async def zerodha_postback(
     # 6. Dispatch to processing — infrastructure failures return 500 so Zerodha retries
     try:
         if CELERY_ENABLED:
-            task = process_webhook_trade.delay(trade_data, str(broker_account_id))
+            request_id = getattr(request.state, "request_id", "-")
+            task = process_webhook_trade.delay(trade_data, str(broker_account_id), request_id)
             logger.info(f"Trade queued for processing: {task.id}")
             return {"status": "queued", "task_id": task.id}
         else:

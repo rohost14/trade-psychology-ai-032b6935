@@ -1,9 +1,11 @@
-// Alert Context Provider — Single source of truth for behavioral alerts
+// Alert Context Provider — Backend-only behavioral alerts
 //
 // Architecture:
-//   - alerts (persistent)  = fetched from backend risk_alerts table (polled every 60s)
-//   - patterns (ephemeral) = computed client-side for real-time session toasts ONLY
-//   - localStorage         = completely removed — backend is the persistent store
+//   - Single engine: backend BehaviorEngine is the ONLY detection engine.
+//     Frontend patternDetector.ts has been removed.
+//   - alerts (persistent)  = fetched from backend risk_alerts table
+//   - WebSocket events     = trigger immediate refetch when new alert fires
+//   - Toast on new alerts  = shown when WebSocket fires a new alert
 //   - capital              = resolved from Kite margin (equity.total) or profile fallback
 //
 // Capital resolution priority:
@@ -11,14 +13,12 @@
 //   2. Kite equity.total (live margin data — automatically derived, zero user effort)
 //   3. 100,000 hardcoded floor (cold start / not connected)
 
-import { createContext, useContext, useState, useEffect, useCallback, ReactNode } from 'react';
-import { BehaviorPattern, PatternSeverity, PatternType } from '@/types/patterns';
-import { Trade } from '@/types/api';
-import { detectAllPatterns, getPatternStats } from '@/lib/patternDetector';
+import { createContext, useContext, useState, useEffect, useCallback, useRef, ReactNode } from 'react';
+import { PatternSeverity, PatternType } from '@/types/patterns';
 import { toast } from 'sonner';
 import { api } from '@/lib/api';
-import { buildPatternConfig, UserProfileThresholds } from '@/lib/patternConfig';
 import { useWebSocket } from '@/contexts/WebSocketContext';
+import { isMarketOpen } from '@/lib/exchangeConstants';
 
 // Re-export hook for AlertContext internal use (avoids circular import issues)
 function useWebSocketAlerts() {
@@ -27,40 +27,48 @@ function useWebSocketAlerts() {
 
 const CAPITAL_FLOOR = 100_000; // Rs 1L floor — used only when nothing else is available
 
+// Profile shape (6 user-declared fields; all others are backend-derived)
+export interface UserProfileThresholds {
+  daily_trade_limit?: number;
+  cooldown_after_loss?: number;
+  trading_capital?: number;
+  max_position_size?: number;
+  sl_percent_futures?: number;
+  sl_percent_options?: number;
+}
+
 export interface AlertNotification {
   id: string;
-  pattern: BehaviorPattern;
-  shown_at: string;
+  pattern: {
+    id: string;
+    type: PatternType;
+    name: string;
+    severity: PatternSeverity;
+    description: string;
+    detected_at: string | undefined;
+    insight: unknown;
+    historical_insight: unknown;
+    estimated_cost: number;
+    trades_involved: string[];
+    frequency_this_week: number;
+    frequency_this_month: number;
+  };
+  shown_at: string | undefined;
   acknowledged: boolean;
 }
 
 interface AlertContextValue {
-  // Ephemeral session patterns (client-side, for stats + real-time detection)
-  patterns: BehaviorPattern[];
-
   // Persistent alerts from backend risk_alerts table
   alerts: AlertNotification[];
   unacknowledgedCount: number;
 
-  // Stats (from session patterns)
-  stats: {
-    total: number;
-    by_severity: Record<PatternSeverity, number>;
-    by_type: Partial<Record<PatternType, number>>;
-    total_cost: number;
-  };
-
-  // State
-  isAnalyzing: boolean;
-  lastAnalyzed: Date | null;
+  // User profile (6 fields) — still useful for Settings display
   traderProfile: UserProfileThresholds | null;
 
-  // Resolved trading capital — use this everywhere instead of traderProfile.trading_capital
-  // Source: profile.trading_capital → Kite equity.total → 100,000 floor
+  // Resolved trading capital
   capital: number;
 
   // Actions
-  runAnalysis: (trades: Trade[]) => void;
   acknowledgeAlert: (alertId: string) => void;
   acknowledgeAll: () => void;
   clearAllAlerts: () => void;
@@ -77,23 +85,55 @@ const BACKEND_TO_FRONTEND_TYPE: Record<string, string> = {
   'tilt_loss_spiral':  'revenge_trading',
   'overtrading':       'overtrading',
   'fomo':              'fomo',
+  'fomo_entry':        'fomo',
+  'revenge_trade':     'revenge_trading',
+  'martingale_behaviour': 'position_sizing',
+  'size_escalation':   'position_sizing',
+  'excess_exposure':   'position_sizing',
+  'session_meltdown':  'capital_drawdown',
+  'no_stoploss':       'no_stoploss',
+  'early_exit':        'early_exit',
+  'winning_streak_overconfidence': 'winning_streak_overconfidence',
+  'panic_exit':        'early_exit',
+  'rapid_reentry':     'same_instrument_chasing',
+  'rapid_flip':        'same_instrument_chasing',
+  'burst_trading':     'overtrading',
+  'consecutive_loss_streak': 'consecutive_losses',
+  'options_direction_confusion': 'options_direction_confusion',
+  'options_premium_avg_down':    'options_premium_avg_down',
+  'iv_crush_behavior':           'iv_crush_behavior',
 };
 
 function formatPatternName(patternType: string): string {
   const names: Record<string, string> = {
     'consecutive_loss':              'Consecutive Loss Spiral',
     'consecutive_losses':            'Consecutive Losses',
+    'consecutive_loss_streak':       'Consecutive Loss Streak',
     'revenge_sizing':                'Revenge Sizing',
     'revenge_trading':               'Revenge Trading',
-    'overtrading':                   'Overtrading Burst',
+    'revenge_trade':                 'Revenge Trade',
+    'overtrading':                   'Overtrading',
+    'burst_trading':                 'Burst Trading',
     'fomo':                          'FOMO Entry',
+    'fomo_entry':                    'FOMO Entry',
     'tilt_loss_spiral':              'Tilt / Loss Spiral',
     'position_sizing':               'Oversized Position',
-    'same_instrument_chasing':       'Same Instrument Chasing',
+    'excess_exposure':               'Excess Exposure',
+    'size_escalation':               'Size Escalation',
+    'martingale_behaviour':          'Martingale / Averaging Down',
+    'same_instrument_chasing':       'Instrument Chasing',
+    'rapid_reentry':                 'Rapid Re-entry',
+    'rapid_flip':                    'Rapid Direction Flip',
     'loss_aversion':                 'Loss Aversion',
     'early_exit':                    'Early Exit',
+    'panic_exit':                    'Panic Exit',
     'no_stoploss':                   'No Stop-Loss',
-    'winning_streak_overconfidence': 'Winning Streak Overconfidence',
+    'winning_streak_overconfidence': 'Overconfidence (Win Streak)',
+    'session_meltdown':              'Session Meltdown',
+    'capital_drawdown':              'Capital Drawdown',
+    'options_direction_confusion':   'Direction Confusion',
+    'options_premium_avg_down':      'Premium Averaging Down',
+    'iv_crush_behavior':             'IV Crush',
   };
   return names[patternType]
     || patternType.split('_').map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' ');
@@ -103,7 +143,7 @@ function formatPatternName(patternType: string): string {
 interface BackendAlert {
   id: string;
   pattern_type: string;
-  severity: string;  // 'danger' | 'caution' | 'high' | 'medium' | 'low' | 'critical'
+  severity: string;
   message: string;
   details?: Record<string, unknown>;
   detected_at?: string;
@@ -138,7 +178,7 @@ function mapBackendAlert(a: BackendAlert): AlertNotification {
       detected_at,
       insight:             a.details?.insight || '',
       historical_insight:  a.details?.historical_insight || '',
-      estimated_cost:      a.details?.estimated_cost ?? 0,
+      estimated_cost:      (a.details?.estimated_cost as number) ?? 0,
       trades_involved:     [],
       frequency_this_week:  0,
       frequency_this_month: 0,
@@ -148,34 +188,25 @@ function mapBackendAlert(a: BackendAlert): AlertNotification {
   };
 }
 
-const getSeverityLabel = (severity: string) => {
-  switch (severity) {
-    case 'critical':
-    case 'danger':   return '🚨 Danger';
-    case 'high':     return '⚠️ High Alert';
-    case 'medium':
-    case 'caution':  return '⚡ Caution';
-    case 'low':      return 'ℹ️ Info';
-    default:         return '⚠️ Alert';
-  }
+const SEVERITY_LABEL: Record<string, string> = {
+  critical: '🚨 Danger',
+  danger:   '🚨 Danger',
+  high:     '⚠️ High Alert',
+  medium:   '⚡ Caution',
+  caution:  '⚡ Caution',
+  low:      'ℹ️ Info',
 };
 
 export function AlertProvider({ children }: { children: ReactNode }) {
-  const [patterns,           setPatterns]           = useState<BehaviorPattern[]>([]);
-  const [alerts,             setAlerts]             = useState<AlertNotification[]>([]);
-  const [isAnalyzing,        setIsAnalyzing]        = useState(false);
-  const [lastAnalyzed,       setLastAnalyzed]       = useState<Date | null>(null);
-  const [traderProfile,      setTraderProfile]      = useState<UserProfileThresholds | null>(null);
-  const [capital,            setCapital]            = useState<number>(CAPITAL_FLOOR);
-  const [lastTradeSignature, setLastTradeSignature] = useState<string>('');
+  const [alerts,        setAlerts]        = useState<AlertNotification[]>([]);
+  const [traderProfile, setTraderProfile] = useState<UserProfileThresholds | null>(null);
+  const [capital,       setCapital]       = useState<number>(CAPITAL_FLOOR);
 
-  // Session-only set — tracks pattern_type+date combos already shown as toasts.
-  // Seeded from backend alerts on load so we never re-toast a known alert.
-  const [shownPatternKeys, setShownPatternKeys] = useState<Set<string>>(new Set());
+  // Track IDs already toasted so we never double-toast the same alert
+  const toastedIdsRef = useRef<Set<string>>(new Set());
 
   // ---------------------------------------------------------------------------
   // Capital resolution: profile.trading_capital → Kite equity.total → floor
-  // Called once on mount. If profile has manual capital, no margin call needed.
   // ---------------------------------------------------------------------------
   useEffect(() => {
     async function resolveCapitalAndProfile() {
@@ -185,12 +216,10 @@ export function AlertProvider({ children }: { children: ReactNode }) {
         if (profile) setTraderProfile(profile);
 
         if (profile?.trading_capital && profile.trading_capital > 0) {
-          // Tier 1: user has explicitly set their capital — trust it
           setCapital(profile.trading_capital);
           return;
         }
 
-        // Tier 2: derive from live Kite equity margin (zero user effort)
         try {
           const mRes = await api.get('/api/zerodha/margins');
           const equityTotal: number = mRes.data?.equity?.total ?? 0;
@@ -199,13 +228,12 @@ export function AlertProvider({ children }: { children: ReactNode }) {
             return;
           }
         } catch {
-          // Margins not available (not connected, market closed, etc.) — fall through
+          // Not connected or market closed — fall through
         }
 
-        // Tier 3: floor — user is not connected or hasn't traded yet
         setCapital(CAPITAL_FLOOR);
       } catch {
-        // Profile fetch failed (not authenticated yet) — keep floor
+        // Not authenticated yet — keep floor
       }
     }
 
@@ -213,115 +241,72 @@ export function AlertProvider({ children }: { children: ReactNode }) {
   }, []);
 
   // ---------------------------------------------------------------------------
-  // Backend alert polling — risk_alerts is the ONLY persistent alert store
+  // Fetch alerts from backend — single source of truth
   // ---------------------------------------------------------------------------
-  const fetchAlerts = useCallback(async () => {
+  const fetchAlerts = useCallback(async (showToasts = false) => {
     try {
       const res = await api.get('/api/risk/alerts', { params: { hours: 48 } });
-      const raw: any[] = res.data.alerts || [];
-      setAlerts(raw.map(mapBackendAlert));
+      const raw: BackendAlert[] = res.data.alerts || [];
+      const mapped = raw.map(mapBackendAlert);
+      setAlerts(mapped);
 
-      // Seed shownPatternKeys from today's backend alerts so runAnalysis won't re-toast them
-      const today = new Date().toDateString();
-      setShownPatternKeys(prev => {
-        const next = new Set(prev);
-        raw.forEach(a => {
-          const alertDate = new Date(a.detected_at || a.created_at).toDateString();
-          if (alertDate === today) {
-            const fType = BACKEND_TO_FRONTEND_TYPE[a.pattern_type] || a.pattern_type;
-            next.add(`${fType}_${today}`);
+      if (showToasts) {
+        for (let i = 0; i < mapped.length; i++) {
+          const alert = mapped[i];
+          const rawAlert = raw[i];
+          if (!alert.acknowledged && !toastedIdsRef.current.has(alert.id)) {
+            // Always mark as seen so we don't revisit on the next WebSocket event
+            toastedIdsRef.current.add(alert.id);
+
+            // Gate: only show real-time toast during market hours for this exchange.
+            // Alert is always saved to DB and visible in Alerts history.
+            // NSE/NFO/BSE/BFO close at 15:30; MCX runs until 23:30; CDS until 17:00.
+            const exchange = (rawAlert.details?.exchange as string | undefined) ?? 'NSE';
+            if (!isMarketOpen(exchange)) continue;
+
+            const sev = alert.pattern.severity;
+            const label = SEVERITY_LABEL[sev] ?? '⚠️ Alert';
+            if (sev === 'critical' || sev === 'high') {
+              toast.error(`${label}: ${alert.pattern.name}`, {
+                description: alert.pattern.description,
+                duration: 8000,
+              });
+            } else if (sev === 'medium') {
+              toast.warning(`${label}: ${alert.pattern.name}`, {
+                description: alert.pattern.description,
+                duration: 5000,
+              });
+            }
           }
-        });
-        return next;
-      });
+        }
+      } else {
+        // Seed toasted set from existing alerts (prevent re-toast on next WS event)
+        mapped.forEach(a => toastedIdsRef.current.add(a.id));
+      }
     } catch {
       // Non-fatal — user may not be authenticated yet
     }
   }, []);
 
-  // Initial fetch on mount
+  // Initial fetch — seed toasted IDs, no toasts
   useEffect(() => {
-    fetchAlerts();
+    fetchAlerts(false);
   }, [fetchAlerts]);
 
-  // React to WebSocket alert events — replaces 60s polling.
-  // When BehaviorEngine creates a new alert, Celery publishes to Redis,
-  // FastAPI forwards via WebSocket, lastAlertEvent changes here.
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+  // React to WebSocket alert events — refetch and toast new ones
   const { lastAlertEvent } = useWebSocketAlerts();
   useEffect(() => {
-    if (lastAlertEvent) fetchAlerts();
+    if (lastAlertEvent) fetchAlerts(true);
   }, [lastAlertEvent]); // eslint-disable-line react-hooks/exhaustive-deps
-
-  // ---------------------------------------------------------------------------
-  // runAnalysis — client-side real-time detection
-  // PURPOSE: toasts only. Does NOT update `alerts` (backend owns that).
-  // Uses resolved `capital` (from Kite or profile) — never a hardcoded guess.
-  // ---------------------------------------------------------------------------
-  const runAnalysis = useCallback((trades: Trade[]) => {
-    if (trades.length === 0 || isAnalyzing) return;
-
-    // Signature check — skip if same trade set as last run
-    const latestTrade = trades[0];
-    const signature = `${trades.length}_${latestTrade?.id}_${latestTrade?.traded_at}`;
-    if (signature === lastTradeSignature) return;
-
-    setIsAnalyzing(true);
-    setLastTradeSignature(signature);
-
-    try {
-      const config   = buildPatternConfig(traderProfile);
-      const detected = detectAllPatterns(trades, capital, config);
-
-      setPatterns(detected);
-      setLastAnalyzed(new Date());
-
-      // Toast for patterns not yet in backend (real-time gap before next sync)
-      const today  = new Date().toDateString();
-      const newKeys = new Set(shownPatternKeys);
-
-      for (const pattern of detected) {
-        const key = `${pattern.type}_${today}`;
-        if (!newKeys.has(key)) {
-          newKeys.add(key);
-          if (pattern.severity === 'critical' || pattern.severity === 'high') {
-            toast.error(`${getSeverityLabel(pattern.severity)}: ${pattern.name}`, {
-              description: pattern.description,
-              duration: 8000,
-            });
-          } else if (pattern.severity === 'medium') {
-            toast.warning(`${getSeverityLabel(pattern.severity)}: ${pattern.name}`, {
-              description: pattern.description,
-              duration: 5000,
-            });
-          }
-        }
-      }
-
-      // Cap session set size to prevent memory leak on very long sessions
-      if (newKeys.size > 500) {
-        const iter = newKeys.values();
-        for (let i = 0; i < newKeys.size - 500; i++) newKeys.delete(iter.next().value);
-      }
-      setShownPatternKeys(newKeys);
-
-    } catch (error) {
-      console.error('Pattern analysis error:', error);
-    } finally {
-      setIsAnalyzing(false);
-    }
-  }, [isAnalyzing, lastTradeSignature, traderProfile, capital, shownPatternKeys]);
 
   // ---------------------------------------------------------------------------
   // Alert actions
   // ---------------------------------------------------------------------------
   const acknowledgeAlert = useCallback(async (alertId: string) => {
-    // Optimistic local update + backend persist
     setAlerts(prev => prev.map(a => a.id === alertId ? { ...a, acknowledged: true } : a));
     try {
       await api.post(`/api/risk/alerts/${alertId}/acknowledge`);
     } catch {
-      // Revert optimistic update on failure
       setAlerts(prev => prev.map(a => a.id === alertId ? { ...a, acknowledged: false } : a));
     }
   }, []);
@@ -332,26 +317,16 @@ export function AlertProvider({ children }: { children: ReactNode }) {
 
   const clearAllAlerts = useCallback(() => {
     setAlerts([]);
-    setShownPatternKeys(new Set());
   }, []);
 
   const unacknowledgedCount = alerts.filter(a => !a.acknowledged).length;
 
-  const stats = patterns.length > 0
-    ? getPatternStats(patterns)
-    : { total: 0, by_severity: { critical: 0, high: 0, medium: 0, low: 0 }, by_type: {}, total_cost: 0 };
-
   return (
     <AlertContext.Provider value={{
-      patterns,
       alerts,
       unacknowledgedCount,
-      stats,
-      isAnalyzing,
-      lastAnalyzed,
       traderProfile,
       capital,
-      runAnalysis,
       acknowledgeAlert,
       acknowledgeAll,
       clearAllAlerts,

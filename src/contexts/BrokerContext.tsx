@@ -1,5 +1,7 @@
 import { createContext, useContext, useState, useEffect, useCallback, useRef, ReactNode } from 'react';
 import { api, AUTH_TOKEN_KEY } from '@/lib/api';
+import { isGuestMode, enableGuestMode, disableGuestMode, GUEST_MODE_KEY } from '@/lib/guestMode';
+import { DEMO_ACCOUNT } from '@/lib/demoData';
 import { toast } from 'sonner';
 
 export interface BrokerAccount {
@@ -19,6 +21,7 @@ interface BrokerContextValue {
   isConnected: boolean;
   isLoading: boolean;
   account: BrokerAccount | null;
+  isGuest: boolean;
 
   // Token validation state
   tokenStatus: 'valid' | 'expired' | 'checking' | 'unknown';
@@ -35,6 +38,8 @@ interface BrokerContextValue {
   refresh: () => Promise<void>;
   syncTrades: () => Promise<SyncResult | null>;
   validateToken: () => Promise<boolean>;
+  enterGuestMode: () => void;
+  exitGuestMode: () => void;
 }
 
 interface SyncResult {
@@ -104,6 +109,14 @@ export function BrokerProvider({ children }: { children: ReactNode }) {
   const loadAccount = useCallback(async () => {
     setIsLoading(true);
     try {
+      // Guest mode: use demo account without hitting the backend
+      if (isGuestMode()) {
+        setAccount(DEMO_ACCOUNT as BrokerAccount);
+        setSyncStatus('success');
+        setIsLoading(false);
+        return;
+      }
+
       const authToken = localStorage.getItem(AUTH_TOKEN_KEY);
       if (!authToken) {
         // No auth token - user hasn't connected yet
@@ -242,9 +255,10 @@ export function BrokerProvider({ children }: { children: ReactNode }) {
       setAccount(null);
       setSyncStatus('idle');
       setLastSyncResult(null);
-      localStorage.removeItem(AUTH_TOKEN_KEY);
-      localStorage.removeItem(BROKER_ACCOUNT_KEY);
-      localStorage.removeItem(LAST_SYNC_KEY);
+      // Clear all tradementor_* keys (alerts, goals, last_event_*, etc.)
+      Object.keys(localStorage)
+        .filter(k => k.startsWith('tradementor'))
+        .forEach(k => localStorage.removeItem(k));
     } catch (error) {
       console.error('Failed to disconnect:', error);
       throw error;
@@ -289,9 +303,40 @@ export function BrokerProvider({ children }: { children: ReactNode }) {
     }
   }, [account, validateToken]);
 
+  // Proactively warn 2 minutes before JWT expires so the user isn't surprised
+  useEffect(() => {
+    const token = localStorage.getItem(AUTH_TOKEN_KEY);
+    if (!token) return;
+
+    let exp: number | null = null;
+    try {
+      exp = JSON.parse(atob(token.split('.')[1])).exp ?? null;
+    } catch {
+      return;
+    }
+    if (!exp) return;
+
+    const msUntilWarn = exp * 1000 - Date.now() - 2 * 60 * 1000;
+    if (msUntilWarn <= 0) {
+      setTokenStatus('expired');
+      return;
+    }
+
+    const timer = setTimeout(() => {
+      setTokenStatus('expired');
+      toast.warning('Session expiring soon — please reconnect to Zerodha.', { duration: 10000 });
+    }, msUntilWarn);
+
+    return () => clearTimeout(timer);
+  // Re-run only when the account changes (i.e., new token stored after OAuth)
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [account]);
+
   // Listen for token expiry events from API interceptor (D12)
+  // Ignored in guest mode — unmocked routes return 401 which would corrupt guest session
   useEffect(() => {
     const handler = () => {
+      if (isGuestMode()) return;
       setTokenStatus('expired');
     };
     window.addEventListener('tradementor:token-expired', handler);
@@ -302,12 +347,31 @@ export function BrokerProvider({ children }: { children: ReactNode }) {
     await loadAccount();
   }, [loadAccount]);
 
+  const enterGuestMode = useCallback(() => {
+    enableGuestMode();
+    setAccount(DEMO_ACCOUNT as BrokerAccount);
+    setTokenStatus('valid');
+    setSyncStatus('success');
+    initialSyncDoneRef.current = true;
+  }, []);
+
+  const exitGuestMode = useCallback(() => {
+    disableGuestMode();
+    setAccount(null);
+    setTokenStatus('unknown');
+    setSyncStatus('idle');
+    initialSyncDoneRef.current = false;
+    // Remove guest mode key from localStorage
+    localStorage.removeItem(GUEST_MODE_KEY);
+  }, []);
+
   return (
     <BrokerContext.Provider
       value={{
         isConnected: account?.status === 'connected',
         isLoading,
         account,
+        isGuest: isGuestMode(),
         tokenStatus,
         isTokenExpired: tokenStatus === 'expired',
         syncStatus,
@@ -318,6 +382,8 @@ export function BrokerProvider({ children }: { children: ReactNode }) {
         refresh,
         syncTrades,
         validateToken,
+        enterGuestMode,
+        exitGuestMode,
       }}
     >
       {children}

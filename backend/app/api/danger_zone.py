@@ -15,6 +15,7 @@ import logging
 
 from app.core.database import get_db
 from app.api.deps import get_verified_broker_account_id
+from app.core.rate_limit import rate_limit
 from app.services.danger_zone_service import (
     danger_zone_service,
     DangerZoneStatus,
@@ -113,7 +114,8 @@ async def get_danger_zone_status(
 @router.post("/trigger-intervention")
 async def trigger_intervention(
     broker_account_id: UUID = Depends(get_verified_broker_account_id),
-    db: AsyncSession = Depends(get_db)
+    db: AsyncSession = Depends(get_db),
+    _: None = Depends(rate_limit(max_calls=4, window_seconds=900)),
 ) -> InterventionResponse:
     """
     Trigger intervention based on current danger level.

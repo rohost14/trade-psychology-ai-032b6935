@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { ArrowUpRight, ArrowDownRight, Clock } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { formatCurrency, formatPrice } from '@/lib/formatters';
+import { formatSymbol } from '@/lib/exchangeConstants';
 import type { CompletedTrade } from '@/types/api';
 
 interface ClosedTradesTableProps {
@@ -88,6 +89,13 @@ export default function ClosedTradesTable({ trades, isLoading, onTradeClick }: C
   }
 
   if (!trades.length) {
+    const watchList = [
+      { stat: '94%', label: 'of traders who take >7 trades/day lose money', source: 'SEBI FY2023' },
+      { stat: '73%', label: 'of trades placed within 15 min of a loss are also losing trades', source: 'SEBI data' },
+      { stat: '2.7×', label: 'faster: retail closes winners vs holding losers (disposition effect)', source: 'SEBI FY2022' },
+      { stat: '3 losses', label: 'in a row is when emotional impairment measurably starts', source: 'Behavioral research' },
+    ];
+
     return (
       <div className="bg-card rounded-lg border border-border">
         <div className="px-6 py-5 border-b border-border">
@@ -101,10 +109,20 @@ export default function ClosedTradesTable({ trades, isLoading, onTradeClick }: C
             </div>
           </div>
         </div>
-        <div className="py-12 text-center">
-          <Clock className="h-10 w-10 text-muted-foreground/40 mx-auto mb-3" />
-          <p className="font-medium text-foreground">No completed trades yet</p>
-          <p className="text-sm text-muted-foreground mt-1">Completed trade rounds will appear here</p>
+        <div className="px-6 py-8">
+          <p className="text-sm font-medium text-foreground mb-1">Waiting for your first trade</p>
+          <p className="text-sm text-muted-foreground mb-6">
+            Once you trade, we'll analyze every round — entry to exit — and watch for these patterns in real time.
+          </p>
+          <div className="grid grid-cols-2 gap-3">
+            {watchList.map((item, i) => (
+              <div key={i} className="p-3 rounded-lg bg-muted/50 border border-border/60">
+                <p className="text-lg font-bold text-primary">{item.stat}</p>
+                <p className="text-xs text-foreground mt-0.5 leading-snug">{item.label}</p>
+                <p className="text-[10px] text-muted-foreground mt-1">{item.source}</p>
+              </div>
+            ))}
+          </div>
         </div>
       </div>
     );
@@ -145,7 +163,6 @@ export default function ClosedTradesTable({ trades, isLoading, onTradeClick }: C
           <thead>
             <tr className="border-b border-border bg-muted/30">
               <th className="px-4 py-2 text-left text-[11px] font-medium uppercase tracking-wide text-muted-foreground">Symbol</th>
-              <th className="px-3 py-2 text-center text-[11px] font-medium uppercase tracking-wide text-muted-foreground">Dir</th>
               <th className="px-3 py-2 text-right text-[11px] font-medium uppercase tracking-wide text-muted-foreground">Qty</th>
               <th className="px-3 py-2 text-right text-[11px] font-medium uppercase tracking-wide text-muted-foreground">Entry</th>
               <th className="px-3 py-2 text-right text-[11px] font-medium uppercase tracking-wide text-muted-foreground">Exit</th>
@@ -158,7 +175,7 @@ export default function ClosedTradesTable({ trades, isLoading, onTradeClick }: C
               <React.Fragment key={group.label}>
                 {/* Date separator row */}
                 <tr className="bg-muted/20">
-                  <td colSpan={5} className="px-4 py-1.5">
+                  <td colSpan={4} className="px-4 py-1.5">
                     <span className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wide">
                       {group.label}
                     </span>
@@ -188,18 +205,18 @@ export default function ClosedTradesTable({ trades, isLoading, onTradeClick }: C
                       className="border-t border-border/50 hover:bg-muted/50 transition-colors cursor-pointer"
                     >
                       <td className="px-4 py-2.5">
-                        <div className="text-sm font-medium text-foreground">{trade.tradingsymbol}</div>
-                        <div className="text-[10px] text-muted-foreground tabular-nums">{formatTime(trade.exit_time)}</div>
-                      </td>
-                      <td className="px-3 py-2.5 text-center">
-                        <span className={cn(
-                          'text-[10px] font-medium',
-                          trade.direction === 'LONG'
-                            ? 'text-green-700 dark:text-green-400'
-                            : 'text-red-700 dark:text-red-400'
-                        )}>
-                          {trade.direction === 'LONG' ? 'B' : 'S'}
-                        </span>
+                        {(() => {
+                          const { primary, secondary } = formatSymbol(trade.tradingsymbol);
+                          return (
+                            <>
+                              <div className="text-sm font-medium text-foreground">{primary}</div>
+                              <div className="text-[10px] text-muted-foreground tabular-nums">
+                                {secondary ? <span className="mr-1.5">{secondary}</span> : null}
+                                {formatTime(trade.exit_time)}
+                              </div>
+                            </>
+                          );
+                        })()}
                       </td>
                       <td className="px-3 py-2.5 text-right text-sm tabular-nums text-foreground">{trade.total_quantity}</td>
                       <td className="px-3 py-2.5 text-right text-sm tabular-nums text-muted-foreground">{formatPrice(trade.avg_entry_price)}</td>
@@ -252,7 +269,16 @@ export default function ClosedTradesTable({ trades, isLoading, onTradeClick }: C
                   >
                     <div className="flex items-center justify-between">
                       <div className="flex items-center gap-2">
-                        <span className="font-medium text-foreground">{trade.tradingsymbol}</span>
+                        <div>
+                          <span className="font-medium text-foreground text-sm">
+                            {formatSymbol(trade.tradingsymbol).primary}
+                          </span>
+                          {formatSymbol(trade.tradingsymbol).secondary && (
+                            <span className="ml-1 text-[10px] text-muted-foreground">
+                              {formatSymbol(trade.tradingsymbol).secondary}
+                            </span>
+                          )}
+                        </div>
                         <span className={cn(
                           'px-1.5 py-0.5 rounded text-[10px] font-medium',
                           trade.direction === 'LONG'

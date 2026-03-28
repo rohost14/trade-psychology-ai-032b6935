@@ -7,6 +7,7 @@ Scheduled tasks for:
 - Weekly summaries
 """
 
+import asyncio
 import logging
 from uuid import UUID
 from datetime import datetime, timezone
@@ -21,172 +22,204 @@ from sqlalchemy import select
 
 logger = logging.getLogger(__name__)
 
+BATCH_SIZE = 20  # accounts processed concurrently per batch
+
+
+# ---------------------------------------------------------------------------
+# Per-account helpers — each opens its own session (safe for asyncio.gather)
+# ---------------------------------------------------------------------------
+
+async def _get_delivery_channels(account_id: UUID, db) -> tuple:
+    """Return (phone,) for report delivery via WhatsApp."""
+    account = await db.get(BrokerAccount, account_id)
+    user = await db.get(User, account.user_id) if account and account.user_id else None
+    phone = user.guardian_phone if user else None
+    return phone, None  # email delivery removed
+
+
+async def _send_eod_for_account(account_id: UUID, retention_service: RetentionService) -> bool:
+    """Send equity EOD report for one account via WhatsApp and/or email."""
+    async with SessionLocal() as db:
+        try:
+            goal_result = await db.execute(
+                select(Goal).where(Goal.broker_account_id == account_id)
+            )
+            goal = goal_result.scalar_one_or_none()
+            if goal and goal.primary_segment == "COMMODITY":
+                return False
+
+            phone, email = await _get_delivery_channels(account_id, db)
+            if not phone and not email:
+                logger.info(f"No delivery channel for account {account_id}, skipping EOD")
+                return False
+
+            await retention_service.send_eod_report(
+                broker_account_id=account_id,
+                phone_number=phone,
+                db=db,
+            )
+            return True
+        except Exception as e:
+            logger.error(f"EOD report failed for {account_id}: {e}")
+            return False
+
+
+async def _send_commodity_eod_for_account(account_id: UUID, retention_service: RetentionService) -> bool:
+    """Send commodity EOD report for one account."""
+    async with SessionLocal() as db:
+        try:
+            phone, email = await _get_delivery_channels(account_id, db)
+            if not phone and not email:
+                logger.info(f"No delivery channel for account {account_id}, skipping commodity EOD")
+                return False
+
+            await retention_service.send_eod_report(
+                broker_account_id=account_id,
+                phone_number=phone,
+                db=db,
+            )
+            return True
+        except Exception as e:
+            logger.error(f"Commodity EOD failed for {account_id}: {e}")
+            return False
+
+
+async def _send_morning_brief_for_account(account_id: UUID, retention_service: RetentionService) -> bool:
+    """Send morning brief for one account via WhatsApp and/or email."""
+    async with SessionLocal() as db:
+        try:
+            phone, email = await _get_delivery_channels(account_id, db)
+            if not phone and not email:
+                logger.info(f"No delivery channel for account {account_id}, skipping morning brief")
+                return False
+
+            await retention_service.send_morning_brief(
+                broker_account_id=account_id,
+                phone_number=phone,
+                db=db,
+            )
+            return True
+        except Exception as e:
+            logger.error(f"Morning brief failed for {account_id}: {e}")
+            return False
+
+
+# ---------------------------------------------------------------------------
+# Celery tasks
+# ---------------------------------------------------------------------------
 
 @celery_app.task
 def generate_eod_reports():
     """
-    Generate and send EOD reports for all users.
-
+    Generate and send EOD reports for all equity users.
     Runs at 4:00 PM IST (after equity market close).
+    Accounts processed in parallel batches of 20.
     """
-    import asyncio
-
     async def _generate():
         async with SessionLocal() as db:
-            try:
-                result = await db.execute(
-                    select(BrokerAccount).where(BrokerAccount.status == "connected")
-                )
-                accounts = result.scalars().all()
+            result = await db.execute(
+                select(BrokerAccount.id).where(BrokerAccount.status == "connected")
+            )
+            account_ids = result.scalars().all()
 
-                retention_service = RetentionService()
-                sent_count = 0
-                errors = []
+        if not account_ids:
+            return {"sent": 0, "errors": 0}
 
-                for account in accounts:
-                    try:
-                        goal_result = await db.execute(
-                            select(Goal).where(Goal.broker_account_id == account.id)
-                        )
-                        goal = goal_result.scalar_one_or_none()
-                        segment = goal.primary_segment if goal else "EQUITY"
+        retention_service = RetentionService()
+        all_results = []
+        for i in range(0, len(account_ids), BATCH_SIZE):
+            batch = account_ids[i:i + BATCH_SIZE]
+            batch_results = await asyncio.gather(
+                *[_send_eod_for_account(aid, retention_service) for aid in batch],
+                return_exceptions=True,
+            )
+            all_results.extend(batch_results)
 
-                        if segment == "COMMODITY":
-                            continue
+        sent = sum(1 for r in all_results if r is True)
+        errors = sum(1 for r in all_results if isinstance(r, Exception) or r is False)
+        logger.info(f"EOD reports: {sent} sent, {errors} skipped/failed of {len(account_ids)}")
+        return {"sent": sent, "errors": errors}
 
-                        user = await db.get(User, account.user_id) if account.user_id else None
-                        phone = user.guardian_phone if user else None
-                        if not phone:
-                            logger.info(f"No guardian phone for account {account.id}, skipping")
-                            continue
-
-                        await retention_service.send_eod_report(
-                            broker_account_id=account.id,
-                            phone_number=phone,
-                            db=db
-                        )
-                        sent_count += 1
-
-                    except Exception as e:
-                        logger.error(f"EOD report failed for {account.id}: {e}")
-                        errors.append(str(account.id))
-
-                logger.info(f"EOD reports: {sent_count} sent, {len(errors)} failed")
-                return {"sent": sent_count, "errors": errors}
-
-            except Exception as e:
-                logger.error(f"EOD batch failed: {e}", exc_info=True)
-                return {"error": str(e)}
-
-    return asyncio.get_event_loop().run_until_complete(_generate())
+    return asyncio.run(_generate())
 
 
 @celery_app.task
 def generate_commodity_eod():
     """
     Generate EOD reports for commodity traders.
-
     Runs at 11:45 PM IST (after MCX close).
+    Accounts processed in parallel batches of 20.
     """
-    import asyncio
-
     async def _generate():
         async with SessionLocal() as db:
-            try:
-                result = await db.execute(
-                    select(BrokerAccount, Goal)
-                    .join(Goal, BrokerAccount.id == Goal.broker_account_id)
-                    .where(
-                        BrokerAccount.status == "connected",
-                        Goal.primary_segment == "COMMODITY"
-                    )
+            result = await db.execute(
+                select(BrokerAccount.id)
+                .join(Goal, BrokerAccount.id == Goal.broker_account_id)
+                .where(
+                    BrokerAccount.status == "connected",
+                    Goal.primary_segment == "COMMODITY",
                 )
-                rows = result.all()
+            )
+            account_ids = result.scalars().all()
 
-                retention_service = RetentionService()
-                sent_count = 0
+        if not account_ids:
+            return {"sent": 0}
 
-                for account, goal in rows:
-                    try:
-                        user = await db.get(User, account.user_id) if account.user_id else None
-                        phone = user.guardian_phone if user else None
-                        if not phone:
-                            logger.info(f"No guardian phone for account {account.id}, skipping")
-                            continue
+        retention_service = RetentionService()
+        all_results = []
+        for i in range(0, len(account_ids), BATCH_SIZE):
+            batch = account_ids[i:i + BATCH_SIZE]
+            batch_results = await asyncio.gather(
+                *[_send_commodity_eod_for_account(aid, retention_service) for aid in batch],
+                return_exceptions=True,
+            )
+            all_results.extend(batch_results)
 
-                        await retention_service.send_eod_report(
-                            broker_account_id=account.id,
-                            phone_number=phone,
-                            db=db
-                        )
-                        sent_count += 1
+        sent = sum(1 for r in all_results if r is True)
+        logger.info(f"Commodity EOD reports: {sent} sent of {len(account_ids)}")
+        return {"sent": sent}
 
-                    except Exception as e:
-                        logger.error(f"Commodity EOD failed for {account.id}: {e}")
-
-                logger.info(f"Commodity EOD reports: {sent_count} sent")
-                return {"sent": sent_count}
-
-            except Exception as e:
-                logger.error(f"Commodity EOD batch failed: {e}", exc_info=True)
-                return {"error": str(e)}
-
-    return asyncio.get_event_loop().run_until_complete(_generate())
+    return asyncio.run(_generate())
 
 
 @celery_app.task
 def send_morning_prep():
     """
     Send morning preparation messages.
-
     Runs at 8:30 AM IST (before market open).
+    Accounts processed in parallel batches of 20.
     """
-    import asyncio
-
     async def _send():
         async with SessionLocal() as db:
-            try:
-                result = await db.execute(
-                    select(BrokerAccount).where(BrokerAccount.status == "connected")
-                )
-                accounts = result.scalars().all()
+            result = await db.execute(
+                select(BrokerAccount.id).where(BrokerAccount.status == "connected")
+            )
+            account_ids = result.scalars().all()
 
-                retention_service = RetentionService()
-                sent_count = 0
+        if not account_ids:
+            return {"sent": 0}
 
-                for account in accounts:
-                    try:
-                        user = await db.get(User, account.user_id) if account.user_id else None
-                        phone = user.guardian_phone if user else None
-                        if not phone:
-                            logger.info(f"No guardian phone for account {account.id}, skipping")
-                            continue
+        retention_service = RetentionService()
+        all_results = []
+        for i in range(0, len(account_ids), BATCH_SIZE):
+            batch = account_ids[i:i + BATCH_SIZE]
+            batch_results = await asyncio.gather(
+                *[_send_morning_brief_for_account(aid, retention_service) for aid in batch],
+                return_exceptions=True,
+            )
+            all_results.extend(batch_results)
 
-                        await retention_service.send_morning_brief(
-                            broker_account_id=account.id,
-                            phone_number=phone,
-                            db=db
-                        )
-                        sent_count += 1
+        sent = sum(1 for r in all_results if r is True)
+        logger.info(f"Morning briefs: {sent} sent of {len(account_ids)}")
+        return {"sent": sent}
 
-                    except Exception as e:
-                        logger.error(f"Morning brief failed for {account.id}: {e}")
-
-                logger.info(f"Morning briefs: {sent_count} sent")
-                return {"sent": sent_count}
-
-            except Exception as e:
-                logger.error(f"Morning brief batch failed: {e}", exc_info=True)
-                return {"error": str(e)}
-
-    return asyncio.get_event_loop().run_until_complete(_send())
+    return asyncio.run(_send())
 
 
 @celery_app.task
 def send_weekly_summary(broker_account_id: str):
     """
     Send weekly performance summary to a user.
-
     Called on Sundays or triggered manually.
     """
     import asyncio
@@ -253,7 +286,39 @@ def send_weekly_summary(broker_account_id: str):
                 logger.error(f"Weekly summary failed: {e}", exc_info=True)
                 return {"error": str(e)}
 
-    return asyncio.get_event_loop().run_until_complete(_send())
+    return asyncio.run(_send())
+
+
+@celery_app.task
+def send_weekly_summaries_batch():
+    """
+    Trigger weekly summary for all connected accounts.
+    Runs every Sunday at 8:00 PM IST.
+    """
+    async def _batch():
+        async with SessionLocal() as db:
+            try:
+                result = await db.execute(
+                    select(BrokerAccount).where(BrokerAccount.status == "connected")
+                )
+                accounts = result.scalars().all()
+
+                queued = 0
+                for account in accounts:
+                    user = await db.get(User, account.user_id) if account.user_id else None
+                    if not (user and user.guardian_phone):
+                        continue
+                    send_weekly_summary.apply_async(args=[str(account.id)])
+                    queued += 1
+
+                logger.info(f"Weekly summaries queued: {queued}")
+                return {"queued": queued}
+
+            except Exception as e:
+                logger.error(f"Weekly summaries batch failed: {e}", exc_info=True)
+                return {"error": str(e)}
+
+    return asyncio.run(_batch())
 
 
 @celery_app.task(name="app.tasks.report_tasks.generate_coach_insight_task")
@@ -294,7 +359,6 @@ def generate_coach_insight_task(broker_account_id: str, context: dict):
                 if not insight:
                     return {"error": "LLM returned empty response"}
 
-                # Write to cache
                 profile_result = await db.execute(
                     select(UserProfile).where(UserProfile.broker_account_id == account_id)
                 )
@@ -317,8 +381,7 @@ def generate_coach_insight_task(broker_account_id: str, context: dict):
                 logger.error(f"Coach insight generation failed: {e}", exc_info=True)
                 return {"error": str(e)}
 
-    return asyncio.get_event_loop().run_until_complete(_generate())
-
+    return asyncio.run(_generate())
 
 
 @celery_app.task(name="app.tasks.report_tasks.generate_analytics_narrative_task")
@@ -387,4 +450,4 @@ def generate_analytics_narrative_task(
                 logger.error(f"Analytics narrative generation failed: {e}", exc_info=True)
                 return {"error": str(e)}
 
-    return _asyncio.get_event_loop().run_until_complete(_generate())
+    return _asyncio.run(_generate())

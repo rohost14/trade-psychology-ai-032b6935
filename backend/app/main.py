@@ -53,6 +53,28 @@ if settings.SENTRY_DSN:
 async def lifespan(app: FastAPI):
     logger.info("Starting up TradeMentor AI Backend...")
 
+    # Warn if ADMIN_JWT_SECRET is not set — admin panel will 404 silently without it.
+    if not settings.ADMIN_JWT_SECRET:
+        logger.warning(
+            "ADMIN_JWT_SECRET is not set. All /api/admin/* endpoints will return 404. "
+            "Set this env var to enable the admin panel."
+        )
+    else:
+        logger.info("ADMIN_JWT_SECRET configured — admin panel enabled.")
+
+    # Validate ENCRYPTION_KEY at startup — fail fast rather than breaking users at runtime.
+    # A changed or invalid key makes all stored tokens undecryptable.
+    try:
+        from cryptography.fernet import Fernet
+        Fernet(settings.ENCRYPTION_KEY.encode())
+        logger.info("ENCRYPTION_KEY validated OK.")
+    except Exception as e:
+        raise RuntimeError(
+            f"ENCRYPTION_KEY is invalid: {e}. "
+            "Generate a valid key with: python -c \"from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())\". "
+            "WARNING: changing this key will make all stored access tokens undecryptable — users must reconnect."
+        ) from e
+
     # Start retention scheduler
     from app.tasks.retention_tasks import start_scheduler
     start_scheduler()
@@ -71,10 +93,26 @@ async def lifespan(app: FastAPI):
     # Start Redis event subscriber — bridges Celery → WebSocket in real-time.
     # When Celery processes a trade or creates an alert, it publishes to Redis.
     # This background task receives those events and pushes to connected browsers.
+    _event_subscriber_task = None
     try:
         import asyncio as _asyncio
         from app.core.event_bus import start_event_subscriber
-        _asyncio.create_task(start_event_subscriber())
+
+        def _on_subscriber_done(task):
+            """Log if the subscriber dies unexpectedly (not a clean shutdown cancel)."""
+            if task.cancelled():
+                return  # Normal shutdown
+            exc = task.exception()
+            if exc:
+                logger.critical(f"[event_bus] Event subscriber task died: {exc}", exc_info=exc)
+                try:
+                    import sentry_sdk
+                    sentry_sdk.capture_exception(exc)
+                except Exception:
+                    pass
+
+        _event_subscriber_task = _asyncio.create_task(start_event_subscriber())
+        _event_subscriber_task.add_done_callback(_on_subscriber_done)
         logger.info("Redis event subscriber started.")
     except Exception as e:
         logger.error(f"Event subscriber failed to start: {e}")
@@ -116,24 +154,53 @@ app.add_middleware(
 # trivial to trace all log output for a single API call in Sentry/CloudWatch.
 # ---------------------------------------------------------------------------
 @app.middleware("http")
+async def security_headers_middleware(request: Request, call_next):
+    response = await call_next(request)
+    response.headers["X-Content-Type-Options"] = "nosniff"
+    response.headers["X-Frame-Options"] = "DENY"
+    response.headers["Referrer-Policy"] = "strict-origin-when-cross-origin"
+    # CSP: allow same-origin scripts/styles + Sentry DSN reporting endpoint.
+    # Tighten further in production by replacing 'unsafe-inline' with nonces.
+    response.headers["Content-Security-Policy"] = (
+        "default-src 'self'; "
+        "script-src 'self' 'unsafe-inline'; "
+        "style-src 'self' 'unsafe-inline'; "
+        "img-src 'self' data:; "
+        "connect-src 'self' https://*.sentry.io wss:; "
+        "frame-ancestors 'none'; "
+        "base-uri 'self'"
+    )
+    return response
+
+
+@app.middleware("http")
+async def maintenance_mode_middleware(request: Request, call_next):
+    """Return 503 for all non-health API requests when MAINTENANCE_MODE is true.
+    The /health endpoint always passes through so load balancers can still check.
+    """
+    if settings.MAINTENANCE_MODE and request.url.path not in ("/health", "/"):
+        return JSONResponse(
+            status_code=503,
+            content={"detail": settings.MAINTENANCE_MESSAGE},
+            headers={"Retry-After": "300"},
+        )
+    return await call_next(request)
+
+
+@app.middleware("http")
 async def request_id_middleware(request: Request, call_next):
+    from app.core.request_context import request_id_var
+
     request_id = request.headers.get("X-Request-ID") or str(uuid.uuid4())
-    # Store on request state so route handlers can access it if needed
     request.state.request_id = request_id
 
-    # Inject into the logging context for this request
-    old_factory = logging.getLogRecordFactory()
-
-    def record_factory(*args, **kwargs):
-        record = old_factory(*args, **kwargs)
-        record.request_id = request_id
-        return record
-
-    logging.setLogRecordFactory(record_factory)
+    # Set ContextVar so all log records in this request carry request_id
+    # (works via RequestIdFilter registered in setup_logging)
+    token = request_id_var.set(request_id)
     try:
         response = await call_next(request)
     finally:
-        logging.setLogRecordFactory(old_factory)
+        request_id_var.reset(token)
 
     response.headers["X-Request-ID"] = request_id
     return response
@@ -237,6 +304,9 @@ app.include_router(goals.router, prefix="/api/goals", tags=["goals"])
 from app.api import websocket
 app.include_router(websocket.router, prefix="/api", tags=["websocket"])
 
+from app.api import portfolio_radar
+app.include_router(portfolio_radar.router)
+
 from app.api import notifications
 app.include_router(notifications.router, prefix="/api/notifications", tags=["notifications"])
 
@@ -257,4 +327,29 @@ app.include_router(danger_zone.router, prefix="/api/danger-zone", tags=["danger-
 
 from app.api import shield
 app.include_router(shield.router, prefix="/api/shield", tags=["shield"])
+
+from app.api import prometheus_metrics
+app.include_router(prometheus_metrics.router, tags=["monitoring"])
+
+from app.api import guardrails
+app.include_router(guardrails.router, prefix="/api/guardrails", tags=["guardrails"])
+
+from app.api import portfolio_chat
+app.include_router(portfolio_chat.router, prefix="/api/portfolio-chat", tags=["portfolio-chat"])
+
+# Admin panel — separate JWT auth, returns 404 for non-admins
+from app.api.admin import auth as admin_auth, overview as admin_overview
+from app.api.admin import users as admin_users, system as admin_system
+from app.api.admin import insights as admin_insights, config_api as admin_config
+from app.api.admin import audit as admin_audit, broadcast as admin_broadcast
+from app.api.admin import tasks as admin_tasks
+app.include_router(admin_auth.router,      prefix="/api/admin/auth", tags=["admin"])
+app.include_router(admin_overview.router,  prefix="/api/admin",      tags=["admin"])
+app.include_router(admin_users.router,     prefix="/api/admin",      tags=["admin"])
+app.include_router(admin_system.router,    prefix="/api/admin",      tags=["admin"])
+app.include_router(admin_insights.router,  prefix="/api/admin",      tags=["admin"])
+app.include_router(admin_config.router,    prefix="/api/admin",      tags=["admin"])
+app.include_router(admin_audit.router,     prefix="/api/admin",      tags=["admin"])
+app.include_router(admin_broadcast.router, prefix="/api/admin",      tags=["admin"])
+app.include_router(admin_tasks.router,     prefix="/api/admin",      tags=["admin"])
 

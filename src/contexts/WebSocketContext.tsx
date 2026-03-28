@@ -48,6 +48,7 @@ interface WebSocketContextValue {
   lastTradeEvent: TradeEvent | null;
   lastAlertEvent: AlertEvent | null;
   isConnected: boolean;
+  isReconnecting: boolean;
   subscribe: (instruments: string[]) => void;
   subscribeToPositions: () => void;
 }
@@ -58,6 +59,7 @@ const WebSocketContext = createContext<WebSocketContextValue>({
   lastTradeEvent: null,
   lastAlertEvent: null,
   isConnected: false,
+  isReconnecting: false,
   subscribe: () => {},
   subscribeToPositions: () => {},
 });
@@ -77,6 +79,8 @@ export function WebSocketProvider({ children }: { children: React.ReactNode }) {
   const [lastTradeEvent, setLastTradeEvent] = useState<TradeEvent | null>(null);
   const [lastAlertEvent, setLastAlertEvent] = useState<AlertEvent | null>(null);
   const [isConnected, setIsConnected] = useState(false);
+  const [isReconnecting, setIsReconnecting] = useState(false);
+  const hasConnectedRef = useRef(false); // true once we've had a successful auth_ok
 
   const wsRef = useRef<WebSocket | null>(null);
   const pingRef = useRef<ReturnType<typeof setInterval> | null>(null);
@@ -127,7 +131,6 @@ export function WebSocketProvider({ children }: { children: React.ReactNode }) {
       const url = new URL(base);
       url.protocol = url.protocol === 'https:' ? 'wss:' : 'ws:';
       url.pathname = '/api/ws/prices';
-      url.searchParams.set('token', token);
 
       // Send last_event_id for replay — backend sends all missed events
       const lastEventId = getLastEventId(account.id);
@@ -135,28 +138,21 @@ export function WebSocketProvider({ children }: { children: React.ReactNode }) {
         url.searchParams.set('since', lastEventId);
       }
 
+      // Token is NOT in the URL (SEC-C02) — sent as the first message after connect
+      // to prevent it appearing in proxy/nginx access logs and browser history.
       const ws = new WebSocket(url.toString());
       wsRef.current = ws;
 
       ws.onopen = () => {
         if (!mountedRef.current) return;
-        setIsConnected(true);
-        reconnectDelayRef.current = WS_RECONNECT_BASE;
+        // First message MUST be auth — isConnected set on auth_ok, not here
+        ws.send(JSON.stringify({ action: 'auth', token }));
 
         pingRef.current = setInterval(() => {
           if (ws.readyState === WebSocket.OPEN) {
             ws.send(JSON.stringify({ action: 'ping' }));
           }
         }, PING_INTERVAL);
-
-        // Auto-subscribe to open position instruments
-        ws.send(JSON.stringify({ action: 'subscribe_positions' }));
-
-        // Flush pending subscriptions
-        if (pendingSubscriptions.current.length > 0) {
-          ws.send(JSON.stringify({ action: 'subscribe', instruments: pendingSubscriptions.current }));
-          pendingSubscriptions.current = [];
-        }
       };
 
       ws.onmessage = (event) => {
@@ -166,6 +162,19 @@ export function WebSocketProvider({ children }: { children: React.ReactNode }) {
           const ts = new Date().toISOString();
 
           switch (msg.type) {
+            // ── Auth confirmed — now safe to subscribe ────────────────────
+            case 'auth_ok':
+              setIsConnected(true);
+              setIsReconnecting(false);
+              hasConnectedRef.current = true;
+              reconnectDelayRef.current = WS_RECONNECT_BASE;
+              ws.send(JSON.stringify({ action: 'subscribe_positions' }));
+              if (pendingSubscriptions.current.length > 0) {
+                ws.send(JSON.stringify({ action: 'subscribe', instruments: pendingSubscriptions.current }));
+                pendingSubscriptions.current = [];
+              }
+              break;
+
             // ── Live price tick ───────────────────────────────────────────
             case 'price':
               if (msg.instrument && msg.data) {
@@ -225,6 +234,13 @@ export function WebSocketProvider({ children }: { children: React.ReactNode }) {
               if (msg.last_event_id && account?.id) {
                 setLastEventId(account.id, msg.last_event_id);
               }
+              // When replay was truncated (hit the 200-event limit), the event log
+              // is incomplete — force a full data refresh so UI is not stale.
+              if (msg.truncated) {
+                console.warn('[WebSocket] Replay truncated — forcing full data refresh');
+                setLastTradeEvent({ status: 'replay_truncated', timestamp: ts });
+                setLastAlertEvent({ count: 0, has_danger: false, timestamp: ts });
+              }
               break;
 
             // ignore: pong, subscribed, unsubscribed, error
@@ -240,6 +256,10 @@ export function WebSocketProvider({ children }: { children: React.ReactNode }) {
         if (pingRef.current) clearInterval(pingRef.current);
 
         if (event.code !== 1000 && event.code !== 4001) {
+          // Only show reconnecting indicator if we've had a successful connection before
+          if (hasConnectedRef.current) {
+            setIsReconnecting(true);
+          }
           const delay = reconnectDelayRef.current;
           reconnectRef.current = setTimeout(() => {
             if (mountedRef.current) {
@@ -282,6 +302,7 @@ export function WebSocketProvider({ children }: { children: React.ReactNode }) {
       lastTradeEvent,
       lastAlertEvent,
       isConnected,
+      isReconnecting,
       subscribe,
       subscribeToPositions,
     }}>

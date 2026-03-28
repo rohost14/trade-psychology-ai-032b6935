@@ -52,6 +52,12 @@ class CompletedTrade(Base):
     entry_trade_ids = Column(ARRAY(String))
     exit_trade_ids = Column(ARRAY(String))
 
+    # BTST analytics
+    overnight_close_price = Column(Numeric(15, 4), nullable=True)
+    # Set only for multi-day NRML holds: closing price of the instrument at EOD of entry day.
+    # Sourced from Zerodha's close_price field at the moment the position is closed.
+    # Used to detect "overnight reversals" (was profitable at EOD, closed at loss next day).
+
     # Status — always 'closed' (immutable once created)
     status = Column(String(20), default='closed')
 

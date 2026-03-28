@@ -1,25 +1,33 @@
 """
 Reconciliation Tasks (Celery Beat)
 
-Runs once daily at 4:00 AM IST (off-peak) to catch any trades missed
-by webhooks during the previous trading day.
+Runs once daily at 4:00 AM IST (off-peak). Two jobs:
 
-This is NOT a polling loop. Webhooks + KiteTicker on_order_update handle
-real-time order updates. This is the safety net only.
+  1. Missing-trade reconciliation:
+     kite_complete_orders (yesterday) - our_stored_order_ids = missing trades
+     → re-queue missing trades via process_webhook_trade
 
-Logic:
-  kite_complete_orders (yesterday) - our_stored_order_ids = missing trades
-  → re-queue missing trades via process_webhook_trade
+  2. Expired-position cleanup:
+     F&O contracts that expire worthless generate no close order — the
+     position stays open in our DB indefinitely. This job parses each
+     open position's tradingsymbol to extract the expiry_date and zeros
+     out any that have passed.
+
+     Monthly contracts (expiry_date.day == 1 proxy): zeroed after the
+     full expiry month has passed (conservative — avoids false positives).
+     Weekly contracts (exact expiry_date): zeroed the next morning.
 
 Staggered to respect Kite rate limits:
   Process 10 accounts per second → 1000 users = ~100 seconds total.
   All done at 4 AM, no user impact.
 """
 
+import calendar
 import logging
-from datetime import datetime, date, timezone, timedelta
+from datetime import date, datetime, timezone, timedelta
 from uuid import UUID
 from typing import List, Dict, Any
+from zoneinfo import ZoneInfo
 
 import pytz
 
@@ -33,6 +41,11 @@ from sqlalchemy import select, and_
 logger = logging.getLogger(__name__)
 
 IST = pytz.timezone("Asia/Kolkata")
+_IST_TZ = ZoneInfo("Asia/Kolkata")
+
+# NSE/BSE F&O market closes at 15:30 IST — use as canonical expiry time
+_FNO_CLOSE_HOUR = 15
+_FNO_CLOSE_MINUTE = 30
 
 # Only reconcile COMPLETE orders — open/pending orders have no P&L to protect
 RECONCILE_STATUS = "COMPLETE"
@@ -51,11 +64,13 @@ def reconcile_trades():
     Staggered: 10 accounts per second to respect Kite rate limits.
     """
     import asyncio
-    return asyncio.get_event_loop().run_until_complete(_reconcile_all_accounts())
+    return asyncio.run(_reconcile_all_accounts())
 
 
 async def _reconcile_all_accounts():
     """Inner async function — reconciles all connected broker accounts."""
+    today_ist = datetime.now(_IST_TZ).date()
+
     async with SessionLocal() as db:
         # Get all connected accounts with a valid (non-revoked) token
         result = await db.execute(
@@ -74,6 +89,7 @@ async def _reconcile_all_accounts():
             return {"accounts_checked": 0}
 
         total_missing = 0
+        total_expired = 0
         # Stagger: process 10 accounts per second to respect Kite rate limits.
         # 1000 users → ~100 seconds at 4 AM. No user impact.
         BATCH_SIZE = 10
@@ -86,15 +102,28 @@ async def _reconcile_all_accounts():
                     f"[reconcile] Failed for account {account.id}: {e}",
                     exc_info=True
                 )
+            try:
+                expired = await _expire_stale_positions(account.id, today_ist)
+                total_expired += expired
+            except Exception as e:
+                logger.error(
+                    f"[reconcile] Expiry cleanup failed for account {account.id}: {e}",
+                    exc_info=True
+                )
             # Pause 1 second after every batch of 10
             if (i + 1) % BATCH_SIZE == 0:
                 await asyncio.sleep(1)
 
     logger.info(
         f"[reconcile] Done. {len(accounts)} accounts checked, "
-        f"{total_missing} missing trades re-queued."
+        f"{total_missing} missing trades re-queued, "
+        f"{total_expired} expired positions zeroed."
     )
-    return {"accounts_checked": len(accounts), "missing_requeued": total_missing}
+    return {
+        "accounts_checked": len(accounts),
+        "missing_requeued": total_missing,
+        "expired_positions": total_expired,
+    }
 
 
 async def _reconcile_account(account: BrokerAccount, db) -> int:
@@ -177,6 +206,108 @@ async def _reconcile_account(account: BrokerAccount, db) -> int:
             logger.error(f"[reconcile] Failed to re-queue {order_id}: {e}")
 
     return queued
+
+
+def _is_contract_expired(expiry_date: date, today: date) -> bool:
+    """
+    Return True if an F&O contract is definitively past its expiry.
+
+    Monthly contracts (expiry_date.day == 1 proxy from instrument_parser):
+      The parser uses day=1 because it doesn't resolve the exact last-Thursday.
+      We only mark expired after the full expiry month has passed — conservative,
+      avoids false positives mid-month.
+
+    Weekly contracts (exact date from instrument_parser):
+      Expired when expiry_date < today.
+    """
+    if expiry_date.day == 1:
+        # Monthly proxy: safe only once the entire expiry month has passed
+        last_day = calendar.monthrange(expiry_date.year, expiry_date.month)[1]
+        return today > date(expiry_date.year, expiry_date.month, last_day)
+    else:
+        # Weekly (exact date): expired the next calendar day
+        return expiry_date < today
+
+
+async def _expire_stale_positions(account_id: UUID, today_ist: date) -> int:
+    """
+    Zero out open positions for F&O contracts past their expiry date.
+
+    Called per-account from _reconcile_all_accounts. Opens its own session
+    so writes are isolated from the read-only reconciliation session.
+
+    Returns count of positions expired.
+    """
+    from app.models.position import Position
+    from app.services.instrument_parser import parse_symbol
+
+    async with SessionLocal() as db:
+        result = await db.execute(
+            select(Position).where(
+                and_(
+                    Position.broker_account_id == account_id,
+                    Position.total_quantity != 0,
+                )
+            )
+        )
+        open_positions = result.scalars().all()
+
+        # Max-age cutoff: F&O position not updated in 60 days is almost certainly
+        # from an expired contract whose symbol format parse_symbol() couldn't parse.
+        # Flag as stale rather than silently leaving indefinitely.
+        _max_age_cutoff = datetime.now(timezone.utc) - timedelta(days=60)
+
+        expired_count = 0
+        for pos in open_positions:
+            parsed = parse_symbol(pos.tradingsymbol)
+
+            # Only CE/PE/FUT have expiry dates; EQ returns expiry_date=None
+            if parsed.instrument_type not in ("CE", "PE", "FUT"):
+                continue
+
+            if not parsed.expiry_date:
+                # Couldn't parse expiry (e.g. non-NSE symbol format or MCX contract).
+                # Fallback: if position hasn't been updated in 60 days, mark as stale.
+                last_update = pos.updated_at or pos.created_at
+                if last_update and last_update < _max_age_cutoff:
+                    logger.warning(
+                        f"[reconcile] Unparseable expiry, position stale 60+ days: "
+                        f"{pos.tradingsymbol} (account={str(account_id)[:8]}, "
+                        f"qty={pos.total_quantity}, last_updated={last_update.date()}). "
+                        f"Marking stale — manual review may be needed."
+                    )
+                    pos.status = "stale"
+                    expired_count += 1
+                continue
+
+            if not _is_contract_expired(parsed.expiry_date, today_ist):
+                continue
+
+            # Expiry has passed — zero out the position
+            old_qty = pos.total_quantity
+            pos.total_quantity = 0
+            pos.status = "expired"
+            # Use 15:30 IST on the expiry date as canonical exit time
+            pos.last_exit_time = datetime(
+                parsed.expiry_date.year,
+                parsed.expiry_date.month,
+                parsed.expiry_date.day,
+                _FNO_CLOSE_HOUR,
+                _FNO_CLOSE_MINUTE,
+                0,
+                tzinfo=_IST_TZ,
+            )
+            expired_count += 1
+            logger.warning(
+                f"[reconcile] Expired position zeroed: {pos.tradingsymbol} "
+                f"(account={str(account_id)[:8]}, qty={old_qty}, "
+                f"expiry={parsed.expiry_date})"
+            )
+
+        if expired_count:
+            await db.commit()
+
+        return expired_count
 
 
 def _today_ist_start_utc() -> datetime:

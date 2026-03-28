@@ -267,7 +267,10 @@ class PushNotificationService:
             "overtrading": "Overtrading",
             "martingale": "Martingale Sizing",
             "tilt_loss_spiral": "Loss Spiral",
-            "fomo": "FOMO Entry"
+            "fomo": "FOMO Entry",
+            "options_direction_confusion": "Direction Confusion",
+            "options_premium_avg_down": "Premium Averaging Down",
+            "iv_crush_behavior": "IV Crush",
         }
 
         pattern_name = pattern_names.get(alert.pattern_type, alert.pattern_type.replace("_", " ").title())

@@ -1,10 +1,12 @@
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select
+from sqlalchemy import select, func, desc
 from datetime import datetime, timedelta, date, timezone
 from typing import Optional
 from pydantic import BaseModel
 import logging
+
+from app.models.generated_report import GeneratedReport
 
 from app.core.database import get_db
 from app.api.deps import get_verified_broker_account_id
@@ -403,3 +405,64 @@ async def send_whatsapp_report(
     except Exception as e:
         logger.error(f"Failed to generate WhatsApp report: {e}")
         raise HTTPException(status_code=500, detail="Internal server error")
+
+
+# =============================================================================
+# REPORTS HUB — Saved Reports
+# =============================================================================
+
+@router.get("/saved")
+async def list_saved_reports(
+    broker_account_id: UUID = Depends(get_verified_broker_account_id),
+    report_type: Optional[str] = None,
+    limit: int = 30,
+    offset: int = 0,
+    db: AsyncSession = Depends(get_db),
+):
+    """List saved reports, most recent first. Optionally filter by report_type."""
+    query = (
+        select(GeneratedReport)
+        .where(GeneratedReport.broker_account_id == broker_account_id)
+        .order_by(desc(GeneratedReport.report_date), desc(GeneratedReport.generated_at))
+        .limit(min(limit, 100))
+        .offset(offset)
+    )
+    if report_type:
+        query = query.where(GeneratedReport.report_type == report_type)
+
+    result = await db.execute(query)
+    reports = result.scalars().all()
+
+    count_query = select(func.count()).select_from(GeneratedReport).where(
+        GeneratedReport.broker_account_id == broker_account_id
+    )
+    if report_type:
+        count_query = count_query.where(GeneratedReport.report_type == report_type)
+    total_result = await db.execute(count_query)
+    total = total_result.scalar_one()
+
+    return {
+        "reports": [r.to_summary_dict() for r in reports],
+        "total": total,
+        "limit": limit,
+        "offset": offset,
+    }
+
+
+@router.get("/saved/{report_id}")
+async def get_saved_report(
+    report_id: UUID,
+    broker_account_id: UUID = Depends(get_verified_broker_account_id),
+    db: AsyncSession = Depends(get_db),
+):
+    """Get a single saved report with full data."""
+    result = await db.execute(
+        select(GeneratedReport).where(
+            GeneratedReport.id == report_id,
+            GeneratedReport.broker_account_id == broker_account_id,
+        )
+    )
+    report = result.scalar_one_or_none()
+    if not report:
+        raise HTTPException(status_code=404, detail="Report not found")
+    return report.to_dict()

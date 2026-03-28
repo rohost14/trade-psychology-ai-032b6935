@@ -29,6 +29,7 @@ class BrokerAccount(Base):
     access_token: Mapped[str] = mapped_column(String, nullable=True)
     refresh_token: Mapped[str] = mapped_column(String, nullable=True)
     api_key: Mapped[str] = mapped_column(String, nullable=True)
+    api_secret_enc: Mapped[Optional[str]] = mapped_column(String, nullable=True)
     status: Mapped[str] = mapped_column(String)
     connected_at: Mapped[datetime] = mapped_column(TIMESTAMP(timezone=True), nullable=True)
     last_sync_at: Mapped[datetime] = mapped_column(TIMESTAMP(timezone=True), nullable=True)
@@ -72,3 +73,18 @@ class BrokerAccount(Base):
                 "Failed to decrypt access token — ENCRYPTION_KEY may have changed or token is corrupted. "
                 "Please reconnect your Zerodha account."
             ) from e
+
+    def decrypt_api_secret(self) -> Optional[str]:
+        """Return plaintext api_secret, or None if not stored (use global credentials)."""
+        if not self.api_secret_enc:
+            return None
+        try:
+            f = self._get_fernet()
+            return f.decrypt(self.api_secret_enc.encode()).decode()
+        except (InvalidToken, Exception):
+            return None
+
+    @staticmethod
+    def encrypt_api_secret(api_secret: str) -> str:
+        f = Fernet(settings.ENCRYPTION_KEY.encode())
+        return f.encrypt(api_secret.encode()).decode()

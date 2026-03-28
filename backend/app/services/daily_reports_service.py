@@ -25,6 +25,7 @@ from app.models.position import Position
 from app.models.risk_alert import RiskAlert
 from app.models.user_profile import UserProfile
 from app.models.cooldown import Cooldown
+from app.models.completed_trade import CompletedTrade
 
 logger = logging.getLogger(__name__)
 
@@ -135,6 +136,9 @@ class DailyReportsService:
         tomorrow_focus = self._generate_tomorrow_focus(positions, alerts, profile)
         time_analysis = self._generate_time_analysis(positions)
 
+        # BTST section: check today for overnight reversals (days=1)
+        btst_today = await self._get_btst_summary(broker_account_id, db, days=1)
+
         return {
             "report_type": "post_market",
             "report_date": report_date.isoformat(),
@@ -147,6 +151,9 @@ class DailyReportsService:
             "tomorrow_focus": tomorrow_focus,
             "time_analysis": time_analysis,
             "open_positions": len(open_positions),
+
+            # BTST: overnight reversal data for today (None if no BTST trades)
+            "btst_today": btst_today,
 
             "has_trades": len(positions) > 0,
             "trade_count": len(positions)
@@ -525,12 +532,44 @@ class DailyReportsService:
         )
         recent_positions = list(recent_result.scalars().all())
 
+        # Fetch 7-day and 30-day positions for trend stats (exclude today)
+        seven_days_ago_utc = (now_ist - timedelta(days=7)).astimezone(timezone.utc)
+        thirty_days_ago_utc = (now_ist - timedelta(days=30)).astimezone(timezone.utc)
+
+        trend_7d_result = await db.execute(
+            select(Position).where(
+                and_(
+                    Position.broker_account_id == broker_account_id,
+                    Position.status == "closed",
+                    Position.last_exit_time >= seven_days_ago_utc,
+                    Position.last_exit_time < yesterday_end_utc,
+                )
+            )
+        )
+        positions_7d = list(trend_7d_result.scalars().all())
+
+        trend_30d_result = await db.execute(
+            select(Position).where(
+                and_(
+                    Position.broker_account_id == broker_account_id,
+                    Position.status == "closed",
+                    Position.last_exit_time >= thirty_days_ago_utc,
+                    Position.last_exit_time < yesterday_end_utc,
+                )
+            )
+        )
+        positions_30d = list(trend_30d_result.scalars().all())
+
         # Generate briefing sections
         day_warning = self._generate_day_warning(day_name, profile)
         recent_summary = self._generate_recent_summary(yesterday_positions, yesterday_alerts)
         watch_outs = self._generate_watch_outs(profile, recent_positions, day_name, yesterday_alerts)
         readiness_checklist = self._generate_readiness_checklist(profile, yesterday_positions, yesterday_alerts)
         readiness_score = self._calculate_readiness_score(profile, recent_positions, day_name)
+        trend_stats = self._generate_trend_stats(positions_7d, positions_30d)
+
+        # BTST section: last 7 days summary (if any BTST trades existed)
+        btst_weekly = await self._get_btst_summary(broker_account_id, db, days=7)
 
         return {
             "report_type": "morning_briefing",
@@ -543,9 +582,49 @@ class DailyReportsService:
             "recent_summary": recent_summary,
             "watch_outs": watch_outs,
             "checklist": readiness_checklist,
+            "trend_stats": trend_stats,
+
+            # BTST: 7-day summary (None if no BTST trades in the window)
+            "btst_weekly": btst_weekly,
 
             "commitment_prompt": "What is your ONE rule for today?",
             "suggested_commitments": self._get_suggested_commitments(watch_outs, yesterday_alerts)
+        }
+
+    def _generate_trend_stats(
+        self,
+        positions_7d: List[Position],
+        positions_30d: List[Position],
+    ) -> Dict:
+        """Compute 7-day and 30-day rolling P&L/win-rate for context."""
+        def _stats(positions: List[Position]) -> Dict:
+            if not positions:
+                return {"total_pnl": 0, "win_rate": 0, "trade_count": 0, "has_data": False}
+            pnls = [float(p.realized_pnl or p.pnl or 0) for p in positions]
+            winners = [x for x in pnls if x > 0]
+            return {
+                "total_pnl": round(sum(pnls), 2),
+                "win_rate": round(len(winners) / len(pnls) * 100, 1) if pnls else 0,
+                "trade_count": len(pnls),
+                "has_data": True,
+            }
+
+        s7 = _stats(positions_7d)
+        s30 = _stats(positions_30d)
+
+        # Trend direction: is 7-day win rate better or worse than 30-day?
+        trend = None
+        if s7["has_data"] and s30["has_data"]:
+            delta = s7["win_rate"] - s30["win_rate"]
+            if abs(delta) >= 5:
+                trend = "improving" if delta > 0 else "declining"
+            else:
+                trend = "stable"
+
+        return {
+            "seven_day": s7,
+            "thirty_day": s30,
+            "trend": trend,
         }
 
     def _generate_day_warning(self, day_name: str, profile: Optional[UserProfile]) -> Optional[Dict]:
@@ -688,7 +767,10 @@ class DailyReportsService:
                 "tilt_loss_spiral": "Tilt / loss spiral",
                 "consecutive_loss": "Consecutive losses",
                 "fomo": "FOMO entry",
-                "martingale": "Martingale sizing"
+                "martingale": "Martingale sizing",
+                "options_direction_confusion": "Direction confusion",
+                "options_premium_avg_down": "Premium averaging down",
+                "iv_crush_behavior": "IV crush",
             }
             patterns = list(dict.fromkeys(a.pattern_type for a in danger_alerts))
             names = [pattern_names.get(p, p.replace("_", " ").title()) for p in patterns[:2]]
@@ -827,6 +909,93 @@ class DailyReportsService:
             status, message = "warning", "High-risk session. Strongly consider reduced activity or sitting out."
 
         return {"score": score, "status": status, "message": message, "factors": factors}
+
+    # =========================================================================
+    # BTST ANALYTICS HELPERS
+    # =========================================================================
+
+    async def _get_btst_summary(
+        self,
+        broker_account_id: UUID,
+        db: AsyncSession,
+        days: int = 7,
+    ) -> Optional[Dict]:
+        """
+        Return a compact BTST summary for the given window, or None if no BTST trades.
+
+        Used by:
+          - EOD report: today's reversals (days=1)
+          - Morning briefing / weekly section: last 7 days (days=7)
+        """
+        cutoff = datetime.now(IST) - timedelta(days=days)
+        cutoff_utc = cutoff.astimezone(timezone.utc)
+
+        result = await db.execute(
+            select(CompletedTrade).where(
+                and_(
+                    CompletedTrade.broker_account_id == broker_account_id,
+                    CompletedTrade.product == "NRML",
+                    CompletedTrade.entry_time >= cutoff_utc,
+                    CompletedTrade.entry_time.is_not(None),
+                    CompletedTrade.exit_time.is_not(None),
+                )
+            ).order_by(CompletedTrade.entry_time.desc())
+        )
+        candidates = result.scalars().all()
+
+        btst = []
+        for ct in candidates:
+            entry_ist = ct.entry_time.astimezone(IST)
+            exit_ist = ct.exit_time.astimezone(IST)
+
+            if entry_ist.date() == exit_ist.date():
+                continue
+            # Entry after 15:00 IST
+            if not (entry_ist.hour > 15 or (entry_ist.hour == 15 and entry_ist.minute >= 0)):
+                continue
+            # Exit before 09:45 IST
+            if not (exit_ist.hour < 9 or (exit_ist.hour == 9 and exit_ist.minute < 45)):
+                continue
+
+            ocp = ct.overnight_close_price
+            avg_entry = float(ct.avg_entry_price or 0)
+            realized = float(ct.realized_pnl or 0)
+
+            was_profitable_at_eod = None
+            if ocp is not None:
+                if ct.direction == "LONG":
+                    was_profitable_at_eod = float(ocp) > avg_entry
+                elif ct.direction == "SHORT":
+                    was_profitable_at_eod = float(ocp) < avg_entry
+
+            is_reversal = (was_profitable_at_eod is True) and (realized < 0)
+
+            btst.append({
+                "tradingsymbol": ct.tradingsymbol,
+                "direction": ct.direction,
+                "realized_pnl": round(realized, 2),
+                "was_profitable_at_eod": was_profitable_at_eod,
+                "is_reversal": is_reversal,
+                "entry_time": ct.entry_time,
+                "exit_time": ct.exit_time,
+            })
+
+        if not btst:
+            return None
+
+        total = len(btst)
+        winners = sum(1 for t in btst if t["realized_pnl"] > 0)
+        total_pnl = sum(t["realized_pnl"] for t in btst)
+        reversals = [t for t in btst if t["is_reversal"]]
+
+        return {
+            "total_btst_trades": total,
+            "btst_win_rate": round(winners / total * 100, 1) if total else 0.0,
+            "btst_total_pnl": round(total_pnl, 2),
+            "overnight_reversals": len(reversals),
+            "reversal_pnl_lost": round(sum(abs(t["realized_pnl"]) for t in reversals), 2),
+            "trades": btst,
+        }
 
     def _get_suggested_commitments(self, watch_outs: List[Dict], yesterday_alerts: List[RiskAlert]) -> List[str]:
         """Generate suggested commitments based on watch-outs and yesterday's alerts."""

@@ -19,6 +19,9 @@ from app.models.alert_checkpoint import AlertCheckpoint
 from app.models.trading_session import TradingSession
 from app.models.position_ledger import PositionLedger
 from app.models.coach_session import CoachSession
+from app.models.strategy_group import StrategyGroup, StrategyGroupLeg
+from app.models.guardrail_rule import GuardrailRule
+from app.models.portfolio_chat_session import PortfolioChatSession
 
 __all__ = [
     "User",
@@ -41,4 +44,8 @@ __all__ = [
     "AlertCheckpoint",
     "TradingSession",
     "PositionLedger",
+    "StrategyGroup",
+    "StrategyGroupLeg",
+    "GuardrailRule",
+    "PortfolioChatSession",
 ]

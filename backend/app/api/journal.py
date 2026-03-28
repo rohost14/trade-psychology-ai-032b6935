@@ -25,6 +25,17 @@ router = APIRouter()
 logger = logging.getLogger(__name__)
 
 
+def _apply_fields(entry: "JournalEntry", data) -> None:
+    """Apply non-None fields from a create/update payload onto an entry row."""
+    for field in (
+        "emotion_tags", "followed_plan", "deviation_reason", "exit_reason",
+        "setup_quality", "would_repeat", "market_condition", "notes",
+    ):
+        val = getattr(data, field, None)
+        if val is not None:
+            setattr(entry, field, val)
+
+
 async def embed_journal_entry_async(db: AsyncSession, entry: JournalEntry):
     """Background task to embed a journal entry for RAG."""
     try:
@@ -64,10 +75,16 @@ async def embed_journal_entry_async(db: AsyncSession, entry: JournalEntry):
 # Request/Response Models
 class JournalEntryCreate(BaseModel):
     trade_id: Optional[str] = None
-    notes: Optional[str] = None
-    emotions: Optional[str] = None
-    lessons: Optional[str] = None
     emotion_tags: Optional[List[str]] = None
+    # Structured fields (migration 045)
+    followed_plan: Optional[str] = None       # 'yes' | 'partially' | 'no'
+    deviation_reason: Optional[str] = None    # 'fomo' | 'revenge' | 'overconfident' | 'bored' | 'impulse' | 'other'
+    exit_reason: Optional[str] = None         # 'sl_hit' | 'target_hit' | 'trailed_stop' | 'manual' | 'panic' | 'news'
+    setup_quality: Optional[int] = None       # 1–5
+    would_repeat: Optional[str] = None        # 'yes' | 'maybe' | 'no'
+    market_condition: Optional[str] = None    # 'trending' | 'ranging' | 'volatile' | 'choppy' | 'news_driven'
+    notes: Optional[str] = None               # optional free text
+    # Trade context
     trade_symbol: Optional[str] = None
     trade_type: Optional[str] = None
     trade_pnl: Optional[str] = None
@@ -75,20 +92,28 @@ class JournalEntryCreate(BaseModel):
 
 
 class JournalEntryUpdate(BaseModel):
-    notes: Optional[str] = None
-    emotions: Optional[str] = None
-    lessons: Optional[str] = None
     emotion_tags: Optional[List[str]] = None
+    followed_plan: Optional[str] = None
+    deviation_reason: Optional[str] = None
+    exit_reason: Optional[str] = None
+    setup_quality: Optional[int] = None
+    would_repeat: Optional[str] = None
+    market_condition: Optional[str] = None
+    notes: Optional[str] = None
 
 
 class JournalEntryResponse(BaseModel):
     id: str
     broker_account_id: str
     trade_id: Optional[str]
-    notes: Optional[str]
-    emotions: Optional[str]
-    lessons: Optional[str]
     emotion_tags: List[str]
+    followed_plan: Optional[str]
+    deviation_reason: Optional[str]
+    exit_reason: Optional[str]
+    setup_quality: Optional[int]
+    would_repeat: Optional[str]
+    market_condition: Optional[str]
+    notes: Optional[str]
     trade_symbol: Optional[str]
     trade_type: Optional[str]
     trade_pnl: Optional[str]
@@ -242,7 +267,7 @@ async def create_journal_entry(
                     detail="Trade does not belong to your account",
                 )
 
-        # Check if entry already exists for this trade
+        # Check if entry already exists for this trade — upsert
         if trade_uuid:
             result = await db.execute(
                 select(JournalEntry).where(
@@ -253,32 +278,23 @@ async def create_journal_entry(
             existing = result.scalar_one_or_none()
 
             if existing:
-                if data.notes is not None:
-                    existing.notes = data.notes
-                if data.emotions is not None:
-                    existing.emotions = data.emotions
-                if data.lessons is not None:
-                    existing.lessons = data.lessons
-                if data.emotion_tags is not None:
-                    existing.emotion_tags = data.emotion_tags
+                _apply_fields(existing, data)
                 existing.updated_at = datetime.now(timezone.utc)
-
                 await db.commit()
                 await db.refresh(existing)
-
-                return {
-                    "entry": existing.to_dict(),
-                    "created": False,
-                    "updated": True
-                }
+                return {"entry": existing.to_dict(), "created": False, "updated": True}
 
         entry = JournalEntry(
             broker_account_id=broker_account_id,
             trade_id=trade_uuid,
-            notes=data.notes,
-            emotions=data.emotions,
-            lessons=data.lessons,
             emotion_tags=data.emotion_tags or [],
+            followed_plan=data.followed_plan,
+            deviation_reason=data.deviation_reason,
+            exit_reason=data.exit_reason,
+            setup_quality=data.setup_quality,
+            would_repeat=data.would_repeat,
+            market_condition=data.market_condition,
+            notes=data.notes,
             trade_symbol=data.trade_symbol,
             trade_type=data.trade_type,
             trade_pnl=data.trade_pnl,
@@ -328,15 +344,7 @@ async def update_journal_entry(
         if not entry:
             raise HTTPException(status_code=404, detail="Journal entry not found")
 
-        if data.notes is not None:
-            entry.notes = data.notes
-        if data.emotions is not None:
-            entry.emotions = data.emotions
-        if data.lessons is not None:
-            entry.lessons = data.lessons
-        if data.emotion_tags is not None:
-            entry.emotion_tags = data.emotion_tags
-
+        _apply_fields(entry, data)
         entry.updated_at = datetime.now(timezone.utc)
 
         await db.commit()

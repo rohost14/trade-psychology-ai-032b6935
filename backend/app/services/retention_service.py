@@ -27,16 +27,38 @@ class RetentionService:
     def __init__(self):
         pass
     
+    async def _save_report(
+        self,
+        broker_account_id: UUID,
+        report_type: str,
+        report_date,
+        report_data: dict,
+        db: AsyncSession,
+        sent_via: str = "whatsapp",
+    ) -> None:
+        """Save a generated report to the DB for the Reports Hub."""
+        from app.models.generated_report import GeneratedReport
+        from datetime import date as date_type
+        rpt = GeneratedReport(
+            broker_account_id=broker_account_id,
+            report_type=report_type,
+            report_date=report_date if isinstance(report_date, date_type) else date_type.fromisoformat(report_date),
+            report_data=report_data,
+            sent_via=sent_via,
+        )
+        db.add(rpt)
+        await db.commit()
+
     async def send_eod_report(
         self,
         broker_account_id: UUID,
-        phone_number: str,
-        db: AsyncSession
+        phone_number: Optional[str],
+        db: AsyncSession,
     ) -> bool:
         """
-        Generate and send End-of-Day report via WhatsApp + Push Notification.
+        Generate and send End-of-Day report via WhatsApp + Email + Push Notification.
 
-        Called by cron at 3:30 PM IST daily.
+        Called by cron at 4:00 PM IST daily.
         Uses the comprehensive daily_reports_service for rich insights.
         """
         try:
@@ -50,15 +72,27 @@ class RetentionService:
                 logger.info(f"No trades today for {broker_account_id}, skipping EOD report")
                 return True
 
-            # Format for WhatsApp
-            message = self._format_eod_report_v2(report)
+            # Save to Reports Hub
+            try:
+                from datetime import date
+                await self._save_report(
+                    broker_account_id=broker_account_id,
+                    report_type="post_market",
+                    report_date=date.fromisoformat(report["report_date"]),
+                    report_data=report,
+                    db=db,
+                )
+            except Exception as e:
+                logger.error(f"Failed to save EOD report: {e}")
 
             # Send via WhatsApp
-            try:
-                await whatsapp_service.send_message(phone_number, message)
-                logger.info(f"EOD WhatsApp report sent for {broker_account_id}")
-            except Exception as e:
-                logger.error(f"WhatsApp EOD failed: {e}")
+            if phone_number:
+                try:
+                    message = self._format_eod_report_v2(report)
+                    await whatsapp_service.send_message(phone_number, message)
+                    logger.info(f"EOD WhatsApp report sent for {broker_account_id}")
+                except Exception as e:
+                    logger.error(f"WhatsApp EOD failed: {e}")
 
             # Also send push notification
             try:
@@ -201,11 +235,11 @@ class RetentionService:
     async def send_morning_brief(
         self,
         broker_account_id: UUID,
-        phone_number: str,
-        db: AsyncSession
+        phone_number: Optional[str],
+        db: AsyncSession,
     ) -> bool:
         """
-        Generate and send Morning Brief via WhatsApp + Push Notification.
+        Generate and send Morning Brief via WhatsApp + Email + Push Notification.
 
         Called by cron at 8:30 AM IST daily.
         Uses the comprehensive daily_reports_service for rich insights.
@@ -217,15 +251,27 @@ class RetentionService:
                 db=db
             )
 
-            # Format for WhatsApp
-            message = self._format_morning_brief_v2(briefing)
+            # Save to Reports Hub
+            try:
+                from datetime import date
+                await self._save_report(
+                    broker_account_id=broker_account_id,
+                    report_type="morning_briefing",
+                    report_date=date.fromisoformat(briefing["report_date"]),
+                    report_data=briefing,
+                    db=db,
+                )
+            except Exception as e:
+                logger.error(f"Failed to save morning brief: {e}")
 
             # Send via WhatsApp
-            try:
-                await whatsapp_service.send_message(phone_number, message)
-                logger.info(f"Morning brief WhatsApp sent for {broker_account_id}")
-            except Exception as e:
-                logger.error(f"WhatsApp morning brief failed: {e}")
+            if phone_number:
+                try:
+                    message = self._format_morning_brief_v2(briefing)
+                    await whatsapp_service.send_message(phone_number, message)
+                    logger.info(f"Morning brief WhatsApp sent for {broker_account_id}")
+                except Exception as e:
+                    logger.error(f"WhatsApp morning brief failed: {e}")
 
             # Also send push notification
             try:

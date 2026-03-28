@@ -11,7 +11,7 @@ class WhatsAppService:
         self.account_sid = settings.TWILIO_ACCOUNT_SID
         self.auth_token = settings.TWILIO_AUTH_TOKEN
         self.from_number = settings.TWILIO_WHATSAPP_FROM
-        
+
         self.client = None
         if self.account_sid and self.auth_token:
             try:
@@ -20,11 +20,24 @@ class WhatsAppService:
                 logger.error(f"Failed to initialize Twilio client: {e}")
         else:
             logger.info("Twilio credentials not set. WhatsApp service in SAFE MODE (Logging only).")
+            # Warn if Gupshup vars are set — they are not yet active (migration pending Meta approval).
+            # Setting only Gupshup vars without Twilio will leave WhatsApp silently disabled.
+            if settings.GUPSHUP_API_KEY:
+                logger.warning(
+                    "GUPSHUP_API_KEY is configured but Gupshup provider is not yet active. "
+                    "WhatsApp messages will NOT be sent. Set TWILIO_* credentials for now, "
+                    "or wait for the Gupshup migration to complete."
+                )
 
     @property
     def is_configured(self) -> bool:
         """Check if Twilio is configured and ready to send messages."""
         return self.client is not None and self.from_number is not None
+
+    @property
+    def provider(self) -> str:
+        """Return the active WhatsApp provider name."""
+        return "twilio" if self.is_configured else "not_configured"
 
     async def send_message(self, to_number: str, content: str) -> bool:
         """
@@ -45,7 +58,7 @@ class WhatsAppService:
             to_whatsapp = f"whatsapp:{to_number}" if not to_number.startswith("whatsapp:") else to_number
 
             # Run blocking Twilio call in executor to not block event loop
-            loop = asyncio.get_event_loop()
+            loop = asyncio.get_running_loop()
             message = await loop.run_in_executor(
                 None,
                 partial(

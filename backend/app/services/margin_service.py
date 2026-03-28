@@ -71,7 +71,15 @@ class MarginService:
             result["commodity"]["utilization_pct"]
         )
 
-        if max_utilization >= self.MARGIN_DANGER_THRESHOLD * 100:
+        # M3: check for debit balance (insolvency) first — distinct from high utilisation
+        is_insolvent = (
+            result["equity"].get("is_insolvent", False)
+            or result["commodity"].get("is_insolvent", False)
+        )
+        if is_insolvent:
+            risk_level = "insolvent"
+            risk_message = "Account is in debit balance (margin call territory). Immediate action required."
+        elif max_utilization >= self.MARGIN_DANGER_THRESHOLD * 100:
             risk_level = "danger"
             risk_message = "Critical margin utilization! Reduce positions immediately."
         elif max_utilization >= self.MARGIN_WARNING_THRESHOLD * 100:
@@ -84,7 +92,8 @@ class MarginService:
         result["overall"] = {
             "max_utilization_pct": round(max_utilization, 2),
             "risk_level": risk_level,
-            "risk_message": risk_message
+            "risk_message": risk_message,
+            "is_insolvent": is_insolvent,
         }
 
         return result
@@ -99,44 +108,47 @@ class MarginService:
                 "utilization_pct": 0
             }
 
-        available = segment_data.get("available", {})
+        available_data = segment_data.get("available", {})
         utilised = segment_data.get("utilised", {})
 
-        # Calculate totals
-        live_balance = float(available.get("live_balance", 0))
-        cash = float(available.get("cash", 0))
-        collateral = float(available.get("collateral", 0))
-        intraday_payin = float(available.get("intraday_payin", 0))
+        live_balance = float(available_data.get("live_balance", 0))
+        cash = float(available_data.get("cash", 0))
+        collateral = float(available_data.get("collateral", 0))
+        intraday_payin = float(available_data.get("intraday_payin", 0))
 
-        total_available = live_balance
-
-        # Calculate used margin
         exposure = float(utilised.get("exposure", 0))
         span = float(utilised.get("span", 0))
         option_premium = float(utilised.get("option_premium", 0))
-        holding_sales = float(utilised.get("holding_sales", 0))
-        turnover = float(utilised.get("turnover", 0))
 
-        total_used = exposure + span + option_premium
+        # option_premium from Zerodha is NEGATIVE when you received premium
+        # (sold/shorted options). A negative value means received credit — it
+        # reduces net margin obligation but is NOT negative "usage".
+        # net_blocked = what the exchange is actually holding as margin collateral.
+        # Clamped to 0: received premium can't make blocked margin negative.
+        net_blocked = max(0.0, exposure + span + option_premium)
 
-        # Total margin = available + used
-        total_margin = total_available + total_used
-
-        # Calculate utilization percentage
-        utilization_pct = (total_used / total_margin * 100) if total_margin > 0 else 0
+        # Utilization = what fraction of your available cash is blocked.
+        # Denominator: live_balance (actual liquid funds in the account).
+        # If live_balance ≤ 0 the account is in debit — treat as 100% utilised.
+        if live_balance > 0:
+            utilization_pct = round(net_blocked / live_balance * 100, 2)
+        else:
+            utilization_pct = 100.0 if net_blocked > 0 else 0.0
 
         return {
-            "available": round(total_available, 2),
-            "used": round(total_used, 2),
-            "total": round(total_margin, 2),
-            "utilization_pct": round(utilization_pct, 2),
+            "available": round(live_balance, 2),
+            "used": round(net_blocked, 2),
+            "total": round(live_balance, 2),   # total equity = live_balance
+            "utilization_pct": utilization_pct,
+            # M3: distinct flag so callers can distinguish "fully used" from "in debt"
+            "is_insolvent": live_balance < 0,
             "breakdown": {
                 "cash": cash,
                 "collateral": collateral,
                 "intraday_payin": intraday_payin,
                 "exposure": exposure,
                 "span": span,
-                "option_premium": option_premium
+                "option_premium": option_premium  # kept raw so UI can show credit received
             }
         }
 
@@ -258,18 +270,30 @@ class MarginService:
         commodity = margin_data.get("commodity", {})
         overall = margin_data.get("overall", {})
 
+        # Clamp utilization percentages to NUMERIC(5,2) column range (-999.99 to 999.99).
+        # Negative margin (option premium received / short positions) can produce extreme
+        # values (e.g., -2534%) when total margin is near zero. Clamp to ±999 for storage;
+        # the raw equity/used/total values are preserved for accurate display.
+        def _clamp_pct(v) -> float | None:
+            if v is None:
+                return None
+            try:
+                return max(-999.99, min(999.99, float(v)))
+            except (TypeError, ValueError):
+                return None
+
         snapshot = MarginSnapshot(
             broker_account_id=broker_account_id,
             snapshot_at=datetime.now(timezone.utc),
             equity_available=equity.get("available"),
             equity_used=equity.get("used"),
             equity_total=equity.get("total"),
-            equity_utilization_pct=equity.get("utilization_pct"),
+            equity_utilization_pct=_clamp_pct(equity.get("utilization_pct")),
             commodity_available=commodity.get("available"),
             commodity_used=commodity.get("used"),
             commodity_total=commodity.get("total"),
-            commodity_utilization_pct=commodity.get("utilization_pct"),
-            max_utilization_pct=overall.get("max_utilization_pct"),
+            commodity_utilization_pct=_clamp_pct(commodity.get("utilization_pct")),
+            max_utilization_pct=_clamp_pct(overall.get("max_utilization_pct")),
             risk_level=overall.get("risk_level"),
             equity_breakdown=equity.get("breakdown", {}),
             commodity_breakdown=commodity.get("breakdown", {}),
@@ -306,8 +330,9 @@ class MarginService:
 
         # Calculate statistics
         utilizations = [s.max_utilization_pct or 0 for s in snapshots]
-        danger_count = sum(1 for s in snapshots if s.risk_level == "danger")
-        warning_count = sum(1 for s in snapshots if s.risk_level == "warning")
+        danger_count    = sum(1 for s in snapshots if s.risk_level == "danger")
+        warning_count   = sum(1 for s in snapshots if s.risk_level == "warning")
+        insolvent_count = sum(1 for s in snapshots if s.risk_level == "insolvent")
 
         return {
             "has_data": True,
@@ -317,8 +342,9 @@ class MarginService:
                 "avg_utilization": float(round(sum(utilizations) / len(utilizations), 2)) if utilizations else 0.0,
                 "max_utilization": float(round(max(utilizations), 2)) if utilizations else 0.0,
                 "min_utilization": float(round(min(utilizations), 2)) if utilizations else 0.0,
-                "danger_occurrences": danger_count,
-                "warning_occurrences": warning_count,
+                "danger_occurrences":   danger_count,
+                "warning_occurrences":  warning_count,
+                "insolvent_occurrences": insolvent_count,
             },
             "snapshots": [
                 {

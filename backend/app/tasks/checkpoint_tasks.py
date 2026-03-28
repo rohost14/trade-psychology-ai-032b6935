@@ -5,9 +5,7 @@ Self-chaining tasks that track counterfactual P&L for danger/critical alerts.
 
 Flow:
   create_alert_checkpoint (immediate, ~10s delay)
-    → check_alert_t5 (T+5 min)
-      → check_alert_t30 (T+30 min)
-        → check_alert_t60 (T+60 min)
+    → check_alert_t30 (T+30 min)
 
 money_saved = user_actual_pnl - counterfactual_pnl_at_t30
   positive = alert helped user avoid a worse outcome
@@ -61,7 +59,7 @@ def _compute_counterfactual_pnl(positions_snapshot: list, prices: Dict[str, floa
 def create_alert_checkpoint(self, alert_id: str, broker_account_id: str):
     """
     Immediate snapshot: find trigger trade's open position + LTP at alert time.
-    Chains to check_alert_t5 on success.
+    Chains to check_alert_t30 at T+30 min on success.
     """
     async def _run():
         async with SessionLocal() as db:
@@ -179,89 +177,17 @@ def create_alert_checkpoint(self, alert_id: str, broker_account_id: str):
                     f"{tradingsymbol} qty={qty} ltp={ltp} entry={avg_entry}"
                 )
 
-                # 9. Chain to T+5 (300s)
-                check_alert_t5.apply_async(
+                # 9. Chain to T+30 (1800s)
+                check_alert_t30.apply_async(
                     args=[alert_id, broker_account_id],
-                    countdown=300,
+                    countdown=1800,
                 )
 
             except Exception as e:
                 logger.error(f"[checkpoint] create_alert_checkpoint failed: {e}", exc_info=True)
                 raise self.retry(exc=e)
 
-    asyncio.get_event_loop().run_until_complete(_run())
-
-
-@celery_app.task(
-    bind=True,
-    max_retries=2,
-    name="app.tasks.checkpoint_tasks.check_alert_t5",
-)
-def check_alert_t5(self, alert_id: str, broker_account_id: str):
-    """T+5 min: lightweight price check."""
-    async def _run():
-        async with SessionLocal() as db:
-            try:
-                from sqlalchemy import select
-                from app.models.broker_account import BrokerAccount
-                from app.services.alert_checkpoint_service import alert_checkpoint_service
-                from app.services.zerodha_service import zerodha_client, KiteTokenExpiredError, KiteAPIError
-                from app.core.config import settings
-                from cryptography.fernet import Fernet
-
-                aid = UUID(alert_id)
-                baid = UUID(broker_account_id)
-
-                checkpoint = await alert_checkpoint_service.get_by_alert_id(aid, db)
-                if not checkpoint or not checkpoint.positions_snapshot:
-                    logger.info(f"[checkpoint T+5] No checkpoint/positions for alert {alert_id}, skipping")
-                    check_alert_t30.apply_async(args=[alert_id, broker_account_id], countdown=1500)
-                    return
-
-                # Load + decrypt token
-                acct_res = await db.execute(
-                    select(BrokerAccount).where(BrokerAccount.id == baid)
-                )
-                account = acct_res.scalar_one_or_none()
-                if not account or not account.access_token:
-                    logger.warning(f"[checkpoint T+5] No token for {broker_account_id}")
-                    check_alert_t30.apply_async(args=[alert_id, broker_account_id], countdown=1500)
-                    return
-
-                fernet = Fernet(settings.ENCRYPTION_KEY.encode())
-                access_token = fernet.decrypt(account.access_token.encode()).decode()
-
-                # Fetch current prices
-                instruments = [
-                    f"{p['exchange']}:{p['tradingsymbol']}"
-                    for p in checkpoint.positions_snapshot
-                ]
-                try:
-                    prices = await zerodha_client.get_ltp(access_token, instruments)
-                except KiteTokenExpiredError as e:
-                    # Token expired — chain will never succeed, stop here
-                    logger.warning(f"[checkpoint T+5] Token expired for {broker_account_id}: {e}")
-                    await alert_checkpoint_service.mark_token_expiring(checkpoint.id, db)
-                    return  # Do NOT chain — token won't refresh in 25 minutes
-                except KiteAPIError as e:
-                    # Transient API error — chain continues, may succeed at T+30
-                    logger.warning(f"[checkpoint T+5] LTP fetch failed (API error): {e}")
-                    check_alert_t30.apply_async(args=[alert_id, broker_account_id], countdown=1500)
-                    return
-
-                pnl_t5 = _compute_counterfactual_pnl(checkpoint.positions_snapshot, prices)
-                await alert_checkpoint_service.update_t5(checkpoint.id, prices, pnl_t5, db)
-
-                logger.info(f"[checkpoint T+5] alert={alert_id} pnl_t5={pnl_t5:.2f}")
-
-                # Chain to T+30 (25 more minutes = 1500s)
-                check_alert_t30.apply_async(args=[alert_id, broker_account_id], countdown=1500)
-
-            except Exception as e:
-                logger.error(f"[checkpoint T+5] failed: {e}", exc_info=True)
-                raise self.retry(exc=e)
-
-    asyncio.get_event_loop().run_until_complete(_run())
+    asyncio.run(_run())
 
 
 @celery_app.task(
@@ -288,7 +214,6 @@ def check_alert_t30(self, alert_id: str, broker_account_id: str):
                 checkpoint = await alert_checkpoint_service.get_by_alert_id(aid, db)
                 if not checkpoint or not checkpoint.positions_snapshot:
                     logger.info(f"[checkpoint T+30] No checkpoint/positions for alert {alert_id}")
-                    check_alert_t60.apply_async(args=[alert_id, broker_account_id], countdown=1800)
                     return
 
                 # Load alert for alert_time
@@ -305,7 +230,6 @@ def check_alert_t30(self, alert_id: str, broker_account_id: str):
                 account = acct_res.scalar_one_or_none()
                 if not account or not account.access_token:
                     await alert_checkpoint_service.mark_error(checkpoint.id, db)
-                    check_alert_t60.apply_async(args=[alert_id, broker_account_id], countdown=1800)
                     return
 
                 fernet = Fernet(settings.ENCRYPTION_KEY.encode())
@@ -313,7 +237,6 @@ def check_alert_t30(self, alert_id: str, broker_account_id: str):
                     access_token = fernet.decrypt(account.access_token.encode()).decode()
                 except Exception:
                     await alert_checkpoint_service.mark_error(checkpoint.id, db)
-                    check_alert_t60.apply_async(args=[alert_id, broker_account_id], countdown=1800)
                     return
 
                 # Fetch current prices
@@ -330,7 +253,6 @@ def check_alert_t30(self, alert_id: str, broker_account_id: str):
                 except KiteAPIError as e:
                     logger.warning(f"[checkpoint T+30] LTP fetch failed (API error): {e}. Marking error.")
                     await alert_checkpoint_service.mark_error(checkpoint.id, db)
-                    check_alert_t60.apply_async(args=[alert_id, broker_account_id], countdown=1800)
                     return
 
                 # Compute counterfactual P&L at T+30
@@ -365,112 +287,10 @@ def check_alert_t30(self, alert_id: str, broker_account_id: str):
                     f"user_actual={user_actual_pnl:.2f} money_saved={money_saved:.2f}"
                 )
 
-                # Chain to T+60 (30 more minutes = 1800s)
-                check_alert_t60.apply_async(args=[alert_id, broker_account_id], countdown=1800)
-
             except Exception as e:
                 logger.error(f"[checkpoint T+30] failed: {e}", exc_info=True)
                 raise self.retry(exc=e)
 
-    asyncio.get_event_loop().run_until_complete(_run())
+    asyncio.run(_run())
 
 
-@celery_app.task(
-    bind=True,
-    max_retries=2,
-    name="app.tasks.checkpoint_tasks.check_alert_t60",
-)
-def check_alert_t60(self, alert_id: str, broker_account_id: str):
-    """T+60 min: final update with wider 60-min trade window."""
-    async def _run():
-        async with SessionLocal() as db:
-            try:
-                from sqlalchemy import select
-                from app.models.broker_account import BrokerAccount
-                from app.models.risk_alert import RiskAlert
-                from app.services.alert_checkpoint_service import alert_checkpoint_service
-                from app.services.zerodha_service import zerodha_client, KiteTokenExpiredError, KiteAPIError
-                from app.core.config import settings
-                from cryptography.fernet import Fernet
-
-                aid = UUID(alert_id)
-                baid = UUID(broker_account_id)
-
-                checkpoint = await alert_checkpoint_service.get_by_alert_id(aid, db)
-                if not checkpoint or not checkpoint.positions_snapshot:
-                    logger.info(f"[checkpoint T+60] No checkpoint/positions for alert {alert_id}")
-                    return
-
-                # Load alert time
-                alert_res = await db.execute(
-                    select(RiskAlert).where(RiskAlert.id == aid)
-                )
-                alert = alert_res.scalar_one_or_none()
-                alert_time = alert.detected_at if alert else checkpoint.created_at
-
-                # Decrypt token
-                acct_res = await db.execute(
-                    select(BrokerAccount).where(BrokerAccount.id == baid)
-                )
-                account = acct_res.scalar_one_or_none()
-                if not account or not account.access_token:
-                    await alert_checkpoint_service.mark_error(checkpoint.id, db)
-                    return
-
-                fernet = Fernet(settings.ENCRYPTION_KEY.encode())
-                try:
-                    access_token = fernet.decrypt(account.access_token.encode()).decode()
-                except Exception:
-                    await alert_checkpoint_service.mark_error(checkpoint.id, db)
-                    return
-
-                # Fetch current prices
-                instruments = [
-                    f"{p['exchange']}:{p['tradingsymbol']}"
-                    for p in checkpoint.positions_snapshot
-                ]
-                try:
-                    prices = await zerodha_client.get_ltp(access_token, instruments)
-                except KiteTokenExpiredError as e:
-                    logger.warning(f"[checkpoint T+60] Token expired for {broker_account_id}: {e}")
-                    await alert_checkpoint_service.mark_token_expiring(checkpoint.id, db)
-                    return  # T+60 is end of chain anyway, just mark and stop cleanly
-                except KiteAPIError as e:
-                    logger.warning(f"[checkpoint T+60] LTP fetch failed (API error): {e}")
-                    prices = {}  # Proceed with empty prices — partial result is better than nothing
-
-                pnl_t60 = _compute_counterfactual_pnl(checkpoint.positions_snapshot, prices)
-
-                # 60-min window for user actual P&L (final, wider look)
-                trigger_symbol = checkpoint.positions_snapshot[0]["tradingsymbol"] if checkpoint.positions_snapshot else None
-                user_actual_pnl = 0.0
-                if trigger_symbol and alert_time:
-                    user_actual_pnl = await alert_checkpoint_service.get_user_actual_pnl(
-                        broker_account_id=baid,
-                        trigger_symbol=trigger_symbol,
-                        alert_time=alert_time,
-                        window_minutes=60,
-                        db=db,
-                    )
-
-                money_saved = user_actual_pnl - pnl_t60
-
-                await alert_checkpoint_service.update_t60(
-                    checkpoint_id=checkpoint.id,
-                    prices=prices,
-                    pnl=pnl_t60,
-                    user_actual_pnl=user_actual_pnl,
-                    money_saved=money_saved,
-                    db=db,
-                )
-
-                logger.info(
-                    f"[checkpoint T+60] alert={alert_id} pnl_t60={pnl_t60:.2f} "
-                    f"user_actual={user_actual_pnl:.2f} money_saved={money_saved:.2f}"
-                )
-
-            except Exception as e:
-                logger.error(f"[checkpoint T+60] failed: {e}", exc_info=True)
-                raise self.retry(exc=e)
-
-    asyncio.get_event_loop().run_until_complete(_run())

@@ -1,16 +1,18 @@
-import { useState, useEffect, useCallback, useRef } from 'react';
+import { useState, useEffect, useCallback } from 'react';
+import { z } from 'zod';
 import {
   Link2,
   Link2Off,
   Shield,
   AlertTriangle,
-  RefreshCw,
   Loader2,
   User,
   Phone,
   Brain,
   Save,
   Bell,
+  Mail,
+  Key,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -29,6 +31,7 @@ import { useBroker } from '@/contexts/BrokerContext';
 import { toast } from 'sonner';
 import NotificationSettings from '@/components/settings/NotificationSettings';
 import { api } from '@/lib/api';
+import ApiKeySetup from '@/components/ApiKeySetup';
 
 interface UserProfile {
   display_name?: string;
@@ -53,6 +56,7 @@ interface UserProfile {
   alert_sensitivity?: string;
   guardian_enabled?: boolean;
   guardian_phone?: string;
+  guardian_name?: string;
   guardian_alert_threshold?: string;
   guardian_daily_summary?: boolean;
   eod_report_time?: string;       // HH:MM IST, default '16:00'
@@ -64,6 +68,7 @@ interface UserProfile {
 interface NotificationStatus {
   whatsapp: { twilio_configured: boolean };
   push: { vapid_configured: boolean };
+  email: { smtp_configured: boolean };
 }
 
 const EXPERIENCE_LEVELS = [
@@ -71,6 +76,14 @@ const EXPERIENCE_LEVELS = [
   { value: 'intermediate', label: 'Intermediate (1-3 years)' },
   { value: 'experienced', label: 'Experienced (3-5 years)' },
   { value: 'professional', label: 'Professional (5+ years)' },
+];
+
+const TRADING_STYLES = [
+  { value: 'scalper', label: 'Scalper', description: 'Multiple trades per day, quick exits' },
+  { value: 'intraday', label: 'Intraday', description: 'Day trader, no overnight positions' },
+  { value: 'swing', label: 'Swing', description: 'Hold for days/weeks' },
+  { value: 'positional', label: 'Positional', description: 'Hold for weeks/months' },
+  { value: 'mixed', label: 'Mixed', description: 'Combination of styles' },
 ];
 
 
@@ -93,11 +106,25 @@ const ALERT_SENSITIVITY = [
   { value: 'high', label: 'High', description: 'All detected patterns' },
 ];
 
+const profileSchema = z.object({
+  daily_loss_limit: z.number().positive('Daily loss limit must be positive').optional().or(z.undefined()),
+  daily_trade_limit: z.number().int('Must be a whole number').positive('Must be positive').optional().or(z.undefined()),
+  max_position_size: z.number().min(0.1, 'Min 0.1%').max(100, 'Max 100%').optional().or(z.undefined()),
+  cooldown_after_loss: z.number().int('Must be a whole number').min(0, 'Min 0 minutes').max(480, 'Max 8 hours').optional().or(z.undefined()),
+  trading_capital: z.number().positive('Capital must be positive').optional().or(z.undefined()),
+  sl_percent_futures: z.number().min(0.1, 'Min 0.1%').max(100, 'Max 100%').optional().or(z.undefined()),
+  sl_percent_options: z.number().min(1, 'Min 1%').max(100, 'Max 100%').optional().or(z.undefined()),
+  trading_hours_start: z.string().regex(/^\d{2}:\d{2}$/, 'Use HH:MM format').optional().or(z.undefined()),
+  trading_hours_end: z.string().regex(/^\d{2}:\d{2}$/, 'Use HH:MM format').optional().or(z.undefined()),
+  guardian_phone: z.string().regex(/^\+\d{10,15}$/, 'Use international format: +919876543210').optional().or(z.literal('')).or(z.undefined()),
+  eod_report_time: z.string().regex(/^\d{2}:\d{2}$/, 'Use HH:MM format').optional().or(z.undefined()),
+  morning_brief_time: z.string().regex(/^\d{2}:\d{2}$/, 'Use HH:MM format').optional().or(z.undefined()),
+}).passthrough();
+
 export default function Settings() {
-  const { isConnected, isLoading: brokerLoading, account, connect, disconnect, syncTrades } = useBroker();
+  const { isConnected, isLoading: brokerLoading, account, connect, disconnect } = useBroker();
   const [isConnecting, setIsConnecting] = useState(false);
   const [isDisconnecting, setIsDisconnecting] = useState(false);
-  const [isSyncing, setIsSyncing] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [isLoadingProfile, setIsLoadingProfile] = useState(false);
   const [notificationStatus, setNotificationStatus] = useState<NotificationStatus | null>(null);
@@ -163,6 +190,13 @@ export default function Settings() {
   const handleSaveProfile = async () => {
     if (!account?.id) return;
 
+    const validation = profileSchema.safeParse(profile);
+    if (!validation.success) {
+      const first = validation.error.errors[0];
+      toast.error(`${first.path.join('.')}: ${first.message}`);
+      return;
+    }
+
     setIsSaving(true);
     try {
       const payload = {
@@ -170,6 +204,7 @@ export default function Settings() {
         trading_since: profile.trading_since,
         experience_level: profile.experience_level,
         trading_style: profile.trading_style,
+        trading_since: profile.trading_since,
         risk_tolerance: profile.risk_tolerance,
         preferred_instruments: profile.preferred_instruments,
         trading_hours_start: profile.trading_hours_start,
@@ -184,9 +219,11 @@ export default function Settings() {
         known_weaknesses: profile.known_weaknesses,
         push_enabled: profile.push_enabled,
         whatsapp_enabled: profile.whatsapp_enabled,
+        email_enabled: profile.email_enabled,
         alert_sensitivity: profile.alert_sensitivity,
         guardian_enabled: profile.guardian_enabled,
         guardian_phone: profile.guardian_phone,
+        guardian_name: profile.guardian_name,
         guardian_alert_threshold: profile.guardian_alert_threshold,
         guardian_daily_summary: profile.guardian_daily_summary,
         eod_report_time: profile.eod_report_time || '16:00',
@@ -223,32 +260,6 @@ export default function Settings() {
       toast.error('Failed to disconnect');
     } finally {
       setIsDisconnecting(false);
-    }
-  };
-
-  // Rate limit: max 1 sync per 2 minutes. Prevents accidental spam-clicking.
-  const lastSyncAttemptRef = useRef<number>(0);
-  const SYNC_COOLDOWN_MS = 2 * 60 * 1000; // 2 minutes
-
-  const handleSync = async () => {
-    const now = Date.now();
-    const elapsed = now - lastSyncAttemptRef.current;
-    if (elapsed < SYNC_COOLDOWN_MS) {
-      const remaining = Math.ceil((SYNC_COOLDOWN_MS - elapsed) / 1000);
-      toast.info(`Please wait ${remaining}s before syncing again.`);
-      return;
-    }
-    lastSyncAttemptRef.current = now;
-    setIsSyncing(true);
-    try {
-      const result = await syncTrades();
-      if (result) {
-        toast.success(`Synced ${result.trades_synced} trades, ${result.positions_synced} positions`);
-      }
-    } catch (error) {
-      toast.error('Failed to sync trades');
-    } finally {
-      setIsSyncing(false);
     }
   };
 
@@ -355,10 +366,6 @@ export default function Settings() {
                   </div>
                 </div>
                 <div className="flex gap-2">
-                  <Button variant="outline" size="sm" onClick={handleSync} disabled={isSyncing}>
-                    <RefreshCw className={`h-4 w-4 mr-1.5 ${isSyncing ? 'animate-spin' : ''}`} />
-                    {isSyncing ? 'Syncing...' : 'Sync'}
-                  </Button>
                   <Button
                     variant="outline"
                     size="sm"
@@ -387,8 +394,8 @@ export default function Settings() {
             <div className="space-y-4">
               <div className="flex items-center justify-between p-4 bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-800 rounded-lg">
                 <div className="flex items-center gap-3">
-                  <div className="p-2 rounded-full bg-warning/10">
-                    <AlertTriangle className="h-5 w-5 text-warning" />
+                  <div className="p-2 rounded-full bg-amber-500/10">
+                    <AlertTriangle className="h-5 w-5 text-amber-500" />
                   </div>
                   <div>
                     <p className="text-sm font-medium text-amber-700 dark:text-amber-300">Not Connected</p>
@@ -405,6 +412,22 @@ export default function Settings() {
                 )}
                 Connect Zerodha Account
               </Button>
+
+              <div className="relative flex items-center gap-3">
+                <div className="flex-1 border-t border-border" />
+                <span className="text-xs text-muted-foreground shrink-0">or</span>
+                <div className="flex-1 border-t border-border" />
+              </div>
+
+              <ApiKeySetup
+                onRedirecting={() => setIsConnecting(true)}
+                trigger={
+                  <Button variant="outline" className="w-full gap-2">
+                    <Key className="h-4 w-4" />
+                    Use your own KiteConnect app
+                  </Button>
+                }
+              />
             </div>
           )}
         </CardContent>
@@ -464,10 +487,33 @@ export default function Settings() {
                     </Select>
                   </div>
 
+                  {/* Trading Style */}
+                  <div className="space-y-3">
+                    <Label>Trading Style</Label>
+                    <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 sm:gap-3">
+                      {TRADING_STYLES.map((style) => (
+                        <div
+                          key={style.value}
+                          className={`p-3 rounded-lg border-2 cursor-pointer transition-all ${profile.trading_style === style.value
+                            ? 'border-primary bg-primary/5'
+                            : 'border-border hover:border-primary/50'
+                            }`}
+                          onClick={() => setProfile({ ...profile, trading_style: style.value })}
+                        >
+                          <p className="font-medium text-sm">{style.label}</p>
+                          <p className="text-xs text-muted-foreground mt-0.5">{style.description}</p>
+                        </div>
+                      ))}
+                    </div>
+                    <p className="text-xs text-muted-foreground">
+                      Helps your AI coach understand your approach. Detection thresholds auto-calibrate from your actual trade history after 5 sessions.
+                    </p>
+                  </div>
+
                   {/* Risk Tolerance */}
                   <div className="space-y-3">
                     <Label>Risk Tolerance</Label>
-                    <div className="grid grid-cols-3 gap-3">
+                    <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 sm:gap-3">
                       {RISK_TOLERANCE.map((risk) => (
                         <div
                           key={risk.value}
@@ -697,6 +743,21 @@ export default function Settings() {
                 </div>
               )}
 
+              {/* Email not configured banner */}
+              {notificationStatus && !notificationStatus.email?.smtp_configured && (
+                <div className="flex items-start gap-3 p-4 bg-blue-50 dark:bg-blue-950/30 border border-blue-200 dark:border-blue-800 rounded-lg">
+                  <AlertTriangle className="h-5 w-5 text-blue-600 dark:text-blue-400 mt-0.5 shrink-0" />
+                  <div>
+                    <p className="text-sm font-medium text-blue-700 dark:text-blue-300">
+                      Email Delivery Not Configured
+                    </p>
+                    <p className="text-xs text-blue-600 dark:text-blue-400 mt-0.5">
+                      SMTP is not set up on the server. Email reports will be logged but not delivered. Set SMTP_HOST, SMTP_USER, SMTP_PASS, EMAIL_FROM in the backend .env file.
+                    </p>
+                  </div>
+                </div>
+              )}
+
               {/* Alert Sensitivity */}
               <Card>
                 <CardHeader>
@@ -704,7 +765,7 @@ export default function Settings() {
                   <CardDescription>Control how aggressively patterns are flagged</CardDescription>
                 </CardHeader>
                 <CardContent>
-                  <div className="grid grid-cols-3 gap-3">
+                  <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 sm:gap-3">
                     {ALERT_SENSITIVITY.map((level) => (
                       <div
                         key={level.value}
@@ -747,6 +808,49 @@ export default function Settings() {
                 </CardContent>
               </Card>
 
+              {/* Email Reports */}
+              <Card>
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2">
+                    <Mail className="h-5 w-5" />
+                    Email Reports
+                  </CardTitle>
+                  <CardDescription>
+                    Receive daily post-market reports and morning briefs by email
+                  </CardDescription>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  <div className="flex items-center justify-between p-4 border rounded-lg">
+                    <div>
+                      <p className="font-medium">Daily Email Reports</p>
+                      <p className="text-sm text-muted-foreground">
+                        Post-market summary at 4:00 PM IST + morning brief at 8:30 AM IST
+                      </p>
+                    </div>
+                    <Switch
+                      checked={profile.email_enabled || false}
+                      onCheckedChange={(checked) => setProfile({ ...profile, email_enabled: checked })}
+                    />
+                  </div>
+
+                  {profile.email_enabled && account && (
+                    <div className="p-3 bg-muted/40 rounded-lg flex items-center gap-3">
+                      <Mail className="h-4 w-4 text-muted-foreground shrink-0" />
+                      <div className="min-w-0">
+                        <p className="text-xs text-muted-foreground">Reports will be sent to your Zerodha-registered email</p>
+                        <p className="text-sm font-medium truncate">{account.broker_email || 'your account email'}</p>
+                      </div>
+                    </div>
+                  )}
+
+                  {profile.email_enabled && notificationStatus && !notificationStatus.email?.smtp_configured && (
+                    <p className="text-xs text-amber-600 dark:text-amber-400">
+                      Email toggle saved but SMTP is not configured on the server yet — emails won't send until an admin sets up SMTP credentials.
+                    </p>
+                  )}
+                </CardContent>
+              </Card>
+
               {/* Guardian Mode */}
               <Card>
                 <CardHeader>
@@ -775,16 +879,26 @@ export default function Settings() {
 
                   {profile.guardian_enabled && (
                     <>
+                      {/* Guardian Name */}
+                      <div className="space-y-2">
+                        <Label>Guardian's Name</Label>
+                        <Input
+                          placeholder="e.g. Spouse, Parent, Friend"
+                          value={profile.guardian_name || ''}
+                          onChange={(e) => setProfile({ ...profile, guardian_name: e.target.value })}
+                        />
+                      </div>
+
                       {/* Guardian Phone */}
                       <div className="space-y-2">
                         <Label>Guardian's WhatsApp Number</Label>
                         <Input
-                          placeholder="+91 9876543210"
+                          placeholder="+919876543210"
                           value={profile.guardian_phone || ''}
                           onChange={(e) => setProfile({ ...profile, guardian_phone: e.target.value })}
                         />
                         <p className="text-xs text-muted-foreground">
-                          Include country code (e.g., +91 for India)
+                          International format, no spaces — e.g. +919876543210
                         </p>
                       </div>
 
@@ -831,7 +945,7 @@ export default function Settings() {
                             <li>- Early warning signs</li>
                           )}
                           {profile.guardian_daily_summary && (
-                            <li>- Daily trading summary at 4:00 PM</li>
+                            <li>- Daily trading summary at your configured EOD time</li>
                           )}
                         </ul>
                       </div>

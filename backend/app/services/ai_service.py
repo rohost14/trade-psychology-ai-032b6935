@@ -660,6 +660,61 @@ Output the message string only."""
             
         return response.get('content', '').strip()
 
+    def _build_chat_system_prompt(
+        self,
+        trading_context: str,
+        rag_context: Optional[str],
+        ai_persona: str,
+    ) -> str:
+        """Build the system prompt used by both streaming and non-streaming chat."""
+        context_section = trading_context
+        if rag_context:
+            context_section += f"\n\n**Retrieved Context (from user's history and knowledge base):**\n{rag_context}"
+
+        persona_traits = {
+            "coach": "Supportive and encouraging, focused on building good habits. Empathetic but firm about discipline.",
+            "mentor": "Wise and experienced, shares trading wisdom from years of experience. Speaks with authority and depth.",
+            "friend": "Casual and relatable, empathetic listener who speaks like a fellow trader. Uses conversational tone.",
+            "strict": "No-nonsense and brutally honest, focused on accountability and discipline. Doesn't sugarcoat.",
+        }
+        persona_desc = persona_traits.get(ai_persona, persona_traits["coach"])
+
+        return f"""You are TradeMentor — a behavioral coach for F&O traders. You help traders understand their OWN patterns and psychology. You have access to their REAL trading data below.
+
+**Your personality:** {persona_desc}
+
+**ABSOLUTE RULES — follow these without exception:**
+
+1. ALWAYS USE THE DATA BELOW. The trading context contains their actual positions, P&L, journal entries, and behavioral patterns. When they ask about their trades, ANSWER FROM THIS DATA. Never say "I don't have access to your data" — the data IS right here.
+
+2. TALK LIKE A REAL PERSON. You're a coach sitting across the table. Use natural, flowing sentences. No bullet points. No numbered lists. No headers. Just talk.
+
+3. NEVER say these things:
+   - "I apologize" / "I'm sorry but" / "Unfortunately"
+   - "I suggest maintaining a trading journal" (THEY ALREADY HAVE ONE)
+   - "Consider setting up a tracking system" (THIS APP IS THEIR TRACKING SYSTEM)
+   - "Based on general best practices" (use THEIR specific data, not generic advice)
+
+4. BE SPECIFIC ABOUT BEHAVIOR. Instead of "your recent trades show some losses", say "your BANKNIFTY trade on Monday lost ₹2,400 in 12 minutes — that's your revenge pattern showing up again." Reference actual symbols, dates, amounts from the data.
+
+5. KEEP IT SHORT. 2–4 sentences for simple questions. Only go longer if they ask for detailed analysis.
+
+6. USE ₹ FOR CURRENCY (Indian Rupee).
+
+7. When data genuinely doesn't exist (zero trades), say it straight: "You haven't closed any positions in the last 7 days. Once you start trading, I'll give you real insights." Don't fill space with generic tips.
+
+8. SEBI COMPLIANCE — STRICT. You are a behavioral coach, NOT a financial advisor or analyst. You MUST NEVER:
+   - Suggest what to buy or sell
+   - Give entry/exit price levels, targets, or stop-loss levels as advice
+   - Recommend specific instruments, sectors, or strategies
+   - Give signals or calls of any kind
+   If asked for trading advice or signals, redirect clearly: "I can't give you trade recommendations — I'm a behavior coach, not an analyst. But looking at your data, what I can tell you is [behavioral observation about their past trades]."
+
+**THEIR ACTUAL TRADING DATA:**
+{context_section}
+
+Remember: Your job is to hold up a mirror to this trader's behavior — what they've done, what patterns are costing them, and how to build better habits. Not what to trade next."""
+
     async def generate_chat_response(
         self,
         user_message: str,
@@ -679,50 +734,7 @@ Output the message string only."""
             rag_context: Optional RAG-retrieved relevant content (journal entries, knowledge base)
             ai_persona: User's preferred AI personality (coach, mentor, friend, strict)
         """
-        # Build context section
-        context_section = trading_context
-
-        if rag_context:
-            context_section += f"\n\n**Retrieved Context (from user's history and knowledge base):**\n{rag_context}"
-
-        # Persona-aware personality
-        persona_traits = {
-            "coach": "Supportive and encouraging, focused on building good habits. Empathetic but firm about discipline.",
-            "mentor": "Wise and experienced, shares trading wisdom from years of experience. Speaks with authority and depth.",
-            "friend": "Casual and relatable, empathetic listener who speaks like a fellow trader. Uses conversational tone.",
-            "strict": "No-nonsense and brutally honest, focused on accountability and discipline. Doesn't sugarcoat.",
-        }
-        persona_desc = persona_traits.get(ai_persona, persona_traits["coach"])
-
-        system_prompt = f"""You are TradeMentor — a sharp, experienced F&O trading coach who knows this trader personally. You have access to their REAL trading data below. Use it.
-
-**Your personality:** {persona_desc}
-
-**ABSOLUTE RULES — follow these without exception:**
-
-1. ALWAYS USE THE DATA BELOW. The trading context contains their actual positions, P&L, journal entries, and patterns. When they ask about their trades, ANSWER FROM THIS DATA. Never say "I don't have access to your data" or "no data available" — the data IS right here.
-
-2. TALK LIKE A REAL PERSON. You're a coach sitting across the table, not a help desk. Use natural, flowing sentences. No bullet points. No numbered lists. No headers. No "Here are some suggestions:" format. Just talk.
-
-3. NEVER say these things:
-   - "I apologize" / "I'm sorry but" / "Unfortunately"
-   - "I suggest maintaining a trading journal" (THEY ALREADY HAVE ONE — you can see their journal entries below)
-   - "Consider setting up a tracking system" / "Record your entry/exit times" (THIS APP IS THEIR TRACKING SYSTEM)
-   - "Based on general best practices" (use THEIR specific data, not generic advice)
-   - "I don't have enough data to" (if the data section below shows trades, USE THEM)
-
-4. BE SPECIFIC. Instead of "your recent trades show some losses", say "your BANKNIFTY trade on Monday lost Rs.2,400 in 12 minutes — that's the revenge pattern showing up again." Use actual symbols, dates, amounts, and durations from the data.
-
-5. KEEP IT SHORT. 2-4 sentences for simple questions. Only go longer if they ask for detailed analysis. Don't pad with generic advice.
-
-6. USE Rs. FOR CURRENCY (Indian Rupee).
-
-7. When data genuinely doesn't exist (zero trades, empty sections), say it straight: "You haven't closed any positions in the last 7 days. Once you start trading, I'll be able to give you real insights." Don't offer generic tips instead.
-
-**THEIR ACTUAL TRADING DATA:**
-{context_section}
-
-Remember: You know this trader. You've seen their patterns. Talk to them like you've been coaching them for months."""
+        system_prompt = self._build_chat_system_prompt(trading_context, rag_context, ai_persona)
 
         # Build messages with history
         messages = [{"role": "system", "content": system_prompt}]
@@ -741,7 +753,7 @@ Remember: You know this trader. You've seen their patterns. Talk to them like yo
             messages=messages,
             model=self.primary_model,
             temperature=0.7,
-            max_tokens=500,
+            max_tokens=300,
             use_reasoning=False
         )
 
@@ -751,6 +763,73 @@ Remember: You know this trader. You've seen their patterns. Talk to them like yo
         content = response.get('content', '').strip()
         logger.info(f"✅ Chat response generated: {content[:50]}...")
         return content
+
+    async def generate_chat_response_stream(
+        self,
+        user_message: str,
+        trading_context: str,
+        chat_history: List[Dict],
+        rag_context: Optional[str] = None,
+        ai_persona: str = "coach",
+    ):
+        """
+        Streaming version of generate_chat_response.
+        Async generator that yields text chunks as they arrive from OpenRouter.
+        Falls back to a single-chunk response if streaming fails or API key is missing.
+        """
+        system_prompt = self._build_chat_system_prompt(trading_context, rag_context, ai_persona)
+
+        messages = [{"role": "system", "content": system_prompt}]
+        for msg in chat_history[-10:]:
+            messages.append({"role": msg.get("role", "user"), "content": msg.get("content", "")})
+        messages.append({"role": "user", "content": user_message})
+
+        if not self.api_key:
+            yield self._fallback_chat_response(user_message, trading_context)
+            return
+
+        headers = {
+            "Authorization": f"Bearer {self.api_key}",
+            "Content-Type": "application/json",
+            "HTTP-Referer": "https://trademental.ai",
+            "X-Title": "TradeMentor AI",
+        }
+        payload = {
+            "model": self.primary_model,
+            "messages": messages,
+            "temperature": 0.7,
+            "max_tokens": 300,
+            "stream": True,
+        }
+
+        try:
+            async with httpx.AsyncClient(timeout=60.0) as client:
+                async with client.stream("POST", self.base_url, headers=headers, json=payload) as response:
+                    if response.status_code != 200:
+                        logger.error(f"OpenRouter streaming error: {response.status_code}")
+                        yield self._fallback_chat_response(user_message, trading_context)
+                        return
+
+                    async for line in response.aiter_lines():
+                        if not line.startswith("data: "):
+                            continue
+                        data = line[6:].strip()
+                        if data == "[DONE]":
+                            break
+                        try:
+                            chunk = json.loads(data)
+                            text = chunk["choices"][0].get("delta", {}).get("content", "")
+                            if text:
+                                yield text
+                        except (json.JSONDecodeError, KeyError, IndexError):
+                            continue
+
+        except httpx.TimeoutException:
+            logger.error("OpenRouter streaming timeout")
+            yield self._fallback_chat_response(user_message, trading_context)
+        except Exception as e:
+            logger.error(f"OpenRouter streaming failed: {e}")
+            yield self._fallback_chat_response(user_message, trading_context)
 
     def _fallback_chat_response(self, user_message: str, trading_context: str) -> str:
         """Fallback when AI unavailable. Tries to extract real data from context."""

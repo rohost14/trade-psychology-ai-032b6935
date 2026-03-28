@@ -1,0 +1,3 @@
+web: uvicorn app.main:app --host 0.0.0.0 --port ${PORT:-8000} --timeout-keep-alive 120
+worker: celery -A app.core.celery_app worker --pool=gevent --concurrency=100 --queues=trades,alerts,reports --loglevel=INFO
+beat: celery -A app.core.celery_app beat --scheduler=redbeat.RedBeatScheduler --loglevel=INFO

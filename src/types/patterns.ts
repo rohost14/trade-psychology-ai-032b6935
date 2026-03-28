@@ -19,7 +19,10 @@ export type PatternType =
   | 'consecutive_losses'
   | 'capital_drawdown'
   | 'same_instrument_chasing'
-  | 'all_loss_session';
+  | 'all_loss_session'
+  | 'options_direction_confusion'
+  | 'options_premium_avg_down'
+  | 'iv_crush_behavior';
 
 export type PatternSeverity = 'low' | 'medium' | 'high' | 'critical';
 

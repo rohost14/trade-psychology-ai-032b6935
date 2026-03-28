@@ -240,7 +240,7 @@ export default function DangerZone() {
             </div>
 
             {/* Quick Stats */}
-            <div className="grid grid-cols-4 gap-4 mt-6">
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 sm:gap-4 mt-6">
               <div className="text-center p-3 bg-background rounded-lg">
                 <div className="text-2xl font-bold">{status.daily_loss_used_percent.toFixed(0)}%</div>
                 <div className="text-sm text-muted-foreground">Daily Loss Used</div>
@@ -288,7 +288,7 @@ export default function DangerZone() {
 
       {/* Tabs for different sections */}
       <Tabs defaultValue="settings">
-        <TabsList className="grid w-full grid-cols-4">
+        <TabsList className="grid w-full grid-cols-2 sm:grid-cols-4">
           <TabsTrigger value="settings">
             <Settings className="h-4 w-4 mr-2" />
             Thresholds

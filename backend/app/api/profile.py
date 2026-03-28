@@ -7,10 +7,11 @@ Handles user preferences, onboarding wizard, and adaptive settings.
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
-from pydantic import BaseModel
+from pydantic import BaseModel, field_validator
 from uuid import UUID
 from typing import Optional, List
 from datetime import datetime, timezone
+import re
 import logging
 
 from app.core.database import get_db
@@ -62,8 +63,19 @@ class OnboardingStep5(BaseModel):
     ai_persona: str = "coach"  # coach, mentor, friend, strict
 
 
+_PHONE_RE = re.compile(r"^\+[1-9]\d{9,14}$")  # E.164: + then country code (starts 1-9) then subscriber digits
+_TIME_RE = re.compile(r"^\d{2}:\d{2}$")
+
+VALID_EXPERIENCE_LEVELS = {"beginner", "intermediate", "experienced", "professional"}
+VALID_TRADING_STYLES = {"scalper", "intraday", "swing", "positional", "mixed"}
+VALID_RISK_TOLERANCES = {"conservative", "moderate", "aggressive"}
+VALID_PERSONAS = {"coach", "mentor", "friend", "strict"}
+VALID_SENSITIVITIES = {"low", "medium", "high"}
+VALID_GUARDIAN_THRESHOLDS = {"critical", "danger", "warning"}
+
+
 class ProfileUpdate(BaseModel):
-    """Full profile update"""
+    """Full profile update — all fields optional, validated server-side."""
     display_name: Optional[str] = None
     trading_since: Optional[int] = None
     experience_level: Optional[str] = None
@@ -77,6 +89,9 @@ class ProfileUpdate(BaseModel):
     daily_trade_limit: Optional[int] = None
     max_position_size: Optional[float] = None
     cooldown_after_loss: Optional[int] = None
+    trading_capital: Optional[float] = None
+    sl_percent_futures: Optional[float] = None
+    sl_percent_options: Optional[float] = None
     known_weaknesses: Optional[List[str]] = None
     push_enabled: Optional[bool] = None
     whatsapp_enabled: Optional[bool] = None
@@ -88,8 +103,102 @@ class ProfileUpdate(BaseModel):
     ai_persona: Optional[str] = None
     guardian_phone: Optional[str] = None
     guardian_name: Optional[str] = None
-    eod_report_time: Optional[str] = None    # HH:MM IST, e.g. "16:00"
-    morning_brief_time: Optional[str] = None # HH:MM IST, e.g. "08:30"
+    eod_report_time: Optional[str] = None
+    morning_brief_time: Optional[str] = None
+
+    @field_validator("guardian_phone")
+    @classmethod
+    def validate_guardian_phone(cls, v: Optional[str]) -> Optional[str]:
+        if v is None or v == "":
+            return v
+        v = v.replace(" ", "").replace("-", "")
+        if not _PHONE_RE.match(v):
+            raise ValueError("Phone must be in international format: +919876543210 (10–15 digits, no spaces)")
+        return v
+
+    @field_validator("experience_level")
+    @classmethod
+    def validate_experience_level(cls, v: Optional[str]) -> Optional[str]:
+        if v is not None and v not in VALID_EXPERIENCE_LEVELS:
+            raise ValueError(f"experience_level must be one of {VALID_EXPERIENCE_LEVELS}")
+        return v
+
+    @field_validator("trading_style")
+    @classmethod
+    def validate_trading_style(cls, v: Optional[str]) -> Optional[str]:
+        if v is not None and v not in VALID_TRADING_STYLES:
+            raise ValueError(f"trading_style must be one of {VALID_TRADING_STYLES}")
+        return v
+
+    @field_validator("risk_tolerance")
+    @classmethod
+    def validate_risk_tolerance(cls, v: Optional[str]) -> Optional[str]:
+        if v is not None and v not in VALID_RISK_TOLERANCES:
+            raise ValueError(f"risk_tolerance must be one of {VALID_RISK_TOLERANCES}")
+        return v
+
+    @field_validator("ai_persona")
+    @classmethod
+    def validate_ai_persona(cls, v: Optional[str]) -> Optional[str]:
+        if v is not None and v not in VALID_PERSONAS:
+            raise ValueError(f"ai_persona must be one of {VALID_PERSONAS}")
+        return v
+
+    @field_validator("alert_sensitivity")
+    @classmethod
+    def validate_alert_sensitivity(cls, v: Optional[str]) -> Optional[str]:
+        if v is not None and v not in VALID_SENSITIVITIES:
+            raise ValueError(f"alert_sensitivity must be one of {VALID_SENSITIVITIES}")
+        return v
+
+    @field_validator("guardian_alert_threshold")
+    @classmethod
+    def validate_guardian_threshold(cls, v: Optional[str]) -> Optional[str]:
+        if v is not None and v not in VALID_GUARDIAN_THRESHOLDS:
+            raise ValueError(f"guardian_alert_threshold must be one of {VALID_GUARDIAN_THRESHOLDS}")
+        return v
+
+    @field_validator("eod_report_time", "morning_brief_time")
+    @classmethod
+    def validate_time_format(cls, v: Optional[str]) -> Optional[str]:
+        if v is not None and not _TIME_RE.match(v):
+            raise ValueError("Time must be HH:MM format")
+        return v
+
+    @field_validator("daily_loss_limit", "trading_capital")
+    @classmethod
+    def validate_positive_float(cls, v: Optional[float]) -> Optional[float]:
+        if v is not None and v <= 0:
+            raise ValueError("Value must be positive")
+        return v
+
+    @field_validator("max_position_size", "sl_percent_futures", "sl_percent_options")
+    @classmethod
+    def validate_percent(cls, v: Optional[float]) -> Optional[float]:
+        if v is not None and not (0.1 <= v <= 100):
+            raise ValueError("Percentage must be between 0.1 and 100")
+        return v
+
+    @field_validator("cooldown_after_loss")
+    @classmethod
+    def validate_cooldown(cls, v: Optional[int]) -> Optional[int]:
+        if v is not None and not (0 <= v <= 480):
+            raise ValueError("Cooldown must be 0–480 minutes")
+        return v
+
+    @field_validator("daily_trade_limit")
+    @classmethod
+    def validate_daily_trade_limit(cls, v: Optional[int]) -> Optional[int]:
+        if v is not None and not (1 <= v <= 500):
+            raise ValueError("Daily trade limit must be 1–500")
+        return v
+
+    @field_validator("trading_since")
+    @classmethod
+    def validate_trading_since(cls, v: Optional[int]) -> Optional[int]:
+        if v is not None and not (1990 <= v <= 2100):
+            raise ValueError("trading_since must be a valid year (1990–2100)")
+        return v
 
 
 @router.get("/notification-status")

@@ -41,6 +41,13 @@ class Settings(BaseSettings):
     # Optional: Separate Celery broker URL (defaults to REDIS_URL)
     CELERY_BROKER_URL: Optional[str] = None
 
+    # SMTP — only used for admin panel OTP. Not used for user report delivery.
+    SMTP_HOST: Optional[str] = None
+    SMTP_PORT: int = 587
+    SMTP_USER: Optional[str] = None
+    SMTP_PASS: Optional[str] = None
+    EMAIL_FROM: Optional[str] = None
+
     # Sentry error tracking — create free account at sentry.io, set DSN in .env
     SENTRY_DSN: Optional[str] = None
 
@@ -53,7 +60,24 @@ class Settings(BaseSettings):
     SECRET_KEY: str  # Required - generate with: python -c "import secrets; print(secrets.token_urlsafe(32))"
     ALGORITHM: str = "HS256"
     ACCESS_TOKEN_EXPIRE_MINUTES: int = 30
+
+    # Admin panel — separate JWT secret, independent of user/broker auth
+    # Generate with: python -c "import secrets; print(secrets.token_urlsafe(32))"
+    ADMIN_JWT_SECRET: Optional[str] = None
+    ADMIN_JWT_EXPIRE_HOURS: int = 8
+
+    # Gupshup WhatsApp (replaces Twilio)
+    GUPSHUP_API_KEY: Optional[str] = None
+    GUPSHUP_APP_NAME: Optional[str] = None
+    GUPSHUP_WHATSAPP_FROM: Optional[str] = None  # E.164 without +, e.g. 917XXXXXXXXX
+    GUPSHUP_TMPL_REPORT: Optional[str] = None
+    GUPSHUP_TMPL_ALERT: Optional[str] = None
+    GUPSHUP_TMPL_GUARDIAN: Optional[str] = None
     
+    # Maintenance mode — returns 503 for all API requests when true
+    MAINTENANCE_MODE: bool = False
+    MAINTENANCE_MESSAGE: str = "We're performing scheduled maintenance. Back in a few minutes."
+
     # Cors - Frontend runs on port 8080
     BACKEND_CORS_ORIGINS: list[str] = ["http://localhost:8080", "http://localhost:3000"]
 

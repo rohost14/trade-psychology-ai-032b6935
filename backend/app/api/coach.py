@@ -12,6 +12,7 @@ Key improvements:
 """
 
 from fastapi import APIRouter, Depends
+from fastapi.responses import StreamingResponse
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, func
 from uuid import UUID
@@ -19,6 +20,8 @@ from datetime import datetime, timedelta, timezone
 from zoneinfo import ZoneInfo
 from pydantic import BaseModel
 from typing import List, Optional
+import json as _json
+import asyncio
 
 from app.core.database import get_db
 from app.api.deps import get_verified_broker_account_id
@@ -70,10 +73,14 @@ class ChatResponse(BaseModel):
     timestamp: str
 
 
+class SaveInsightRequest(BaseModel):
+    content: str
+
+
 async def _build_trading_context(
     broker_account_id: UUID,
     db: AsyncSession
-) -> str:
+) -> tuple[str, Optional["UserProfile"]]:
     """
     Build rich trading context for LLM from the last 7 days of CLOSED positions
     and journal entries. This is what the AI uses to answer questions like:
@@ -281,16 +288,25 @@ async def _build_trading_context(
             sym = entry.trade_symbol or "General"
             pnl_str = f" | P&L: ₹{entry.trade_pnl}" if entry.trade_pnl else ""
             emotions = ", ".join(entry.emotion_tags or []) if entry.emotion_tags else ""
-            notes_preview = (entry.notes or "")[:250]
-            lessons_preview = (entry.lessons or "")[:150]
-            lines.append(f"- [{date_str}] {sym}{pnl_str} | Emotions: {emotions or 'not tagged'}")
-            if notes_preview:
-                lines.append(f"  Notes: {notes_preview}")
-            if lessons_preview:
-                lines.append(f"  Lessons: {lessons_preview}")
+            parts = [f"- [{date_str}] {sym}{pnl_str} | Emotions: {emotions or 'not tagged'}"]
+            if entry.followed_plan:
+                parts.append(f"  Followed plan: {entry.followed_plan}")
+            if entry.deviation_reason:
+                parts.append(f"  Deviated because: {entry.deviation_reason}")
+            if entry.exit_reason:
+                parts.append(f"  Exit reason: {entry.exit_reason}")
+            if entry.setup_quality:
+                parts.append(f"  Setup quality: {entry.setup_quality}/5")
+            if entry.would_repeat:
+                parts.append(f"  Would repeat: {entry.would_repeat}")
+            if entry.market_condition:
+                parts.append(f"  Market condition: {entry.market_condition}")
+            if entry.notes:
+                parts.append(f"  Notes: {(entry.notes or '')[:250]}")
+            lines.extend(parts)
         lines.append("")
 
-    return "\n".join(lines)
+    return "\n".join(lines), profile
 
 
 # Cache TTL for coach insight: 15 minutes
@@ -434,6 +450,55 @@ def _coach_fallback(risk_state: str, total_pnl: float) -> str:
     return "Focus on process, not P&L. One good trade at a time."
 
 
+async def _build_chat_context(
+    broker_account_id: UUID,
+    db: AsyncSession,
+    message: str,
+) -> tuple[str, str, Optional[str]]:
+    """
+    Build full LLM context for a chat request.
+    Returns (full_context, ai_persona, rag_context).
+    Shared by both /chat and /chat/stream to avoid duplication.
+    """
+    from app.models.coach_session import CoachSession
+    from sqlalchemy import desc
+
+    trading_context, user_profile = await _build_trading_context(broker_account_id, db)
+    ai_persona = user_profile.ai_persona if user_profile and user_profile.ai_persona else "coach"
+
+    session_memory = ""
+    try:
+        mem_result = await db.execute(
+            select(CoachSession)
+            .where(
+                CoachSession.broker_account_id == broker_account_id,
+                CoachSession.summary != None,  # noqa: E711
+            )
+            .order_by(desc(CoachSession.started_at))
+            .limit(3)
+        )
+        past_sessions = mem_result.scalars().all()
+        if past_sessions:
+            session_memory = "\n\nPrevious conversation context:\n" + "\n".join(
+                f"- {s.summary}" for s in reversed(past_sessions)
+            )
+    except Exception:
+        pass
+
+    rag_context = None
+    try:
+        rag_context = await rag_service.get_chat_context(
+            db=db,
+            query=message,
+            broker_account_id=broker_account_id,
+            patterns_active=[],
+        )
+    except Exception:
+        pass
+
+    return trading_context + session_memory, ai_persona, rag_context
+
+
 @router.post("/chat", response_model=ChatResponse)
 async def chat_with_coach(
     request: ChatRequest,
@@ -450,51 +515,9 @@ async def chat_with_coach(
         from app.models.coach_session import CoachSession
         from sqlalchemy import desc
 
-        # Build rich trading context from positions + journal (7 days)
-        trading_context = await _build_trading_context(broker_account_id, db)
-
-        # Get user profile for persona
-        profile_result = await db.execute(
-            select(UserProfile).where(UserProfile.broker_account_id == broker_account_id)
+        full_context, ai_persona, rag_context = await _build_chat_context(
+            broker_account_id, db, request.message
         )
-        user_profile = profile_result.scalar_one_or_none()
-        ai_persona = user_profile.ai_persona if user_profile and user_profile.ai_persona else "coach"
-
-        # ── P-04: Coach conversation memory ───────────────────────────
-        # Fetch last 3 session summaries and inject as context
-        session_memory = ""
-        try:
-            mem_result = await db.execute(
-                select(CoachSession)
-                .where(
-                    CoachSession.broker_account_id == broker_account_id,
-                    CoachSession.summary != None,  # noqa: E711
-                )
-                .order_by(desc(CoachSession.started_at))
-                .limit(3)
-            )
-            past_sessions = mem_result.scalars().all()
-            if past_sessions:
-                session_memory = "\n\nPrevious conversation context:\n" + "\n".join(
-                    f"- {s.summary}" for s in reversed(past_sessions)
-                )
-        except Exception as mem_err:
-            logger.debug(f"Session memory load skipped: {mem_err}")
-
-        # Try RAG for semantic journal/KB search
-        rag_context = None
-        try:
-            rag_context = await rag_service.get_chat_context(
-                db=db,
-                query=request.message,
-                broker_account_id=broker_account_id,
-                patterns_active=[]
-            )
-        except Exception as e:
-            logger.debug(f"RAG context skipped (non-critical): {e}")
-
-        # Inject session memory into trading context
-        full_context = trading_context + session_memory
 
         # Generate AI response
         response = await ai_service.generate_chat_response(
@@ -568,3 +591,226 @@ async def chat_with_coach(
             response="I'm having trouble analyzing your data right now. Please try again in a moment.",
             timestamp=datetime.now(timezone.utc).isoformat()
         )
+
+
+async def _save_chat_session_bg(
+    broker_account_id_str: str,
+    user_message: str,
+    assistant_message: str,
+) -> None:
+    """Save a streaming chat exchange to CoachSession using a fresh DB session."""
+    from app.core.database import SessionLocal
+    from app.models.coach_session import CoachSession
+    from sqlalchemy import desc
+
+    try:
+        today_start = datetime.now(timezone.utc).replace(hour=0, minute=0, second=0, microsecond=0)
+        bid = UUID(broker_account_id_str)
+
+        async with SessionLocal() as db:
+            sess_result = await db.execute(
+                select(CoachSession)
+                .where(
+                    CoachSession.broker_account_id == bid,
+                    CoachSession.started_at >= today_start,
+                )
+                .order_by(desc(CoachSession.started_at))
+                .limit(1)
+            )
+            current_session = sess_result.scalar_one_or_none()
+
+            if not current_session:
+                current_session = CoachSession(broker_account_id=bid, messages=[])
+                db.add(current_session)
+
+            msgs = list(current_session.messages or [])
+            now_ts = datetime.now(timezone.utc).isoformat()
+            msgs.append({"role": "user", "content": user_message, "ts": now_ts})
+            msgs.append({"role": "assistant", "content": assistant_message, "ts": now_ts})
+            current_session.messages = msgs
+
+            if len(msgs) >= 8 and not current_session.summary:
+                topics: set[str] = set()
+                for msg in msgs:
+                    if msg["role"] == "user":
+                        text = msg["content"][:100].lower()
+                        if any(w in text for w in ["loss", "losing", "down"]):
+                            topics.add("losses")
+                        if any(w in text for w in ["trade", "position", "entry"]):
+                            topics.add("trades")
+                        if any(w in text for w in ["pattern", "behavior", "habit"]):
+                            topics.add("patterns")
+                current_session.summary = (
+                    f"Session discussed: {', '.join(topics) or 'general trading topics'}. "
+                    f"{len(msgs) // 2} exchanges."
+                )
+
+            await db.commit()
+    except Exception as e:
+        logger.debug(f"Background session save failed (non-critical): {e}")
+
+
+@router.get("/session/today")
+async def get_today_session(
+    broker_account_id: UUID = Depends(get_verified_broker_account_id),
+    db: AsyncSession = Depends(get_db),
+):
+    """Return today's coach session messages and a live trading snapshot."""
+    now_ist = datetime.now(IST)
+    today_start_utc = now_ist.replace(hour=0, minute=0, second=0, microsecond=0).astimezone(timezone.utc)
+
+    from app.models.coach_session import CoachSession
+    from sqlalchemy import desc
+
+    # Run all three queries in parallel — no data dependency between them
+    sess_result, pos_result, alerts_result = await asyncio.gather(
+        db.execute(
+            select(CoachSession)
+            .where(
+                CoachSession.broker_account_id == broker_account_id,
+                CoachSession.started_at >= today_start_utc,
+            )
+            .order_by(desc(CoachSession.started_at))
+            .limit(1)
+        ),
+        db.execute(
+            select(Position).where(
+                Position.broker_account_id == broker_account_id,
+                Position.last_exit_time >= today_start_utc,
+                Position.status == "closed",
+            )
+        ),
+        db.execute(
+            select(RiskAlert).where(
+                RiskAlert.broker_account_id == broker_account_id,
+                RiskAlert.detected_at >= today_start_utc,
+            )
+        ),
+    )
+
+    session = sess_result.scalar_one_or_none()
+    positions_today = list(pos_result.scalars().all())
+    total_pnl = sum(float(p.realized_pnl or p.pnl or 0) for p in positions_today)
+    alerts_today = list(alerts_result.scalars().all())
+    active_alerts = len([a for a in alerts_today if getattr(a, "status", None) in (None, "active", "new")])
+
+    recent_losses = [p for p in positions_today[-5:] if float(p.realized_pnl or p.pnl or 0) < 0]
+    if len(positions_today) > 10 or len(recent_losses) >= 3:
+        risk_state = "danger"
+    elif len(positions_today) > 5 or len(recent_losses) >= 2:
+        risk_state = "caution"
+    else:
+        risk_state = "safe"
+
+    return {
+        "messages": session.messages if session else [],
+        "snapshot": {
+            "trades_today": len(positions_today),
+            "pnl_today": total_pnl,
+            "active_alerts": active_alerts,
+            "risk_state": risk_state,
+        },
+    }
+
+
+@router.delete("/session/today", status_code=204)
+async def clear_today_session(
+    broker_account_id: UUID = Depends(get_verified_broker_account_id),
+    db: AsyncSession = Depends(get_db),
+):
+    """Clear today's coach session so the frontend starts fresh."""
+    from app.models.coach_session import CoachSession
+
+    now_ist = datetime.now(IST)
+    today_start_utc = now_ist.replace(hour=0, minute=0, second=0, microsecond=0).astimezone(timezone.utc)
+
+    result = await db.execute(
+        select(CoachSession).where(
+            CoachSession.broker_account_id == broker_account_id,
+            CoachSession.started_at >= today_start_utc,
+        )
+    )
+    session = result.scalar_one_or_none()
+    if session:
+        await db.delete(session)
+        await db.commit()
+
+
+@router.post("/chat/stream")
+async def chat_with_coach_stream(
+    request: ChatRequest,
+    broker_account_id: UUID = Depends(get_verified_broker_account_id),
+    db: AsyncSession = Depends(get_db),
+    _limiter: None = Depends(coach_limiter),
+):
+    """
+    SSE streaming version of /chat.
+    Yields text/event-stream chunks. Client reads with fetch + ReadableStream.
+    Session save runs as a background asyncio task after the stream completes.
+    """
+    try:
+        full_context, ai_persona, rag_context = await _build_chat_context(
+            broker_account_id, db, request.message
+        )
+        history = [m.dict() for m in (request.history or [])]
+        collected: list[str] = []
+
+        async def generate():
+            async for chunk in ai_service.generate_chat_response_stream(
+                user_message=request.message,
+                trading_context=full_context,
+                chat_history=history,
+                rag_context=rag_context,
+                ai_persona=ai_persona,
+            ):
+                collected.append(chunk)
+                yield f"data: {_json.dumps({'text': chunk})}\n\n"
+
+            yield "data: [DONE]\n\n"
+
+            asyncio.create_task(
+                _save_chat_session_bg(
+                    str(broker_account_id),
+                    request.message,
+                    "".join(collected),
+                )
+            )
+
+        return StreamingResponse(
+            generate(),
+            media_type="text/event-stream",
+            headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"},
+        )
+
+    except Exception as e:
+        logger.error(f"Streaming chat error: {e}", exc_info=True)
+
+        async def error_stream():
+            msg = "I'm having trouble right now. Please try again."
+            yield f"data: {_json.dumps({'text': msg})}\n\n"
+            yield "data: [DONE]\n\n"
+
+        return StreamingResponse(error_stream(), media_type="text/event-stream")
+
+
+@router.post("/save-insight")
+async def save_insight_to_journal(
+    request: SaveInsightRequest,
+    broker_account_id: UUID = Depends(get_verified_broker_account_id),
+    db: AsyncSession = Depends(get_db),
+):
+    """Save an AI coach message as a daily journal entry."""
+    try:
+        entry = JournalEntry(
+            broker_account_id=broker_account_id,
+            notes=request.content,
+            lessons=f"Saved from AI Coach — {datetime.now(IST).strftime('%d %b %H:%M IST')}",
+            entry_type="daily",
+            emotion_tags=[],
+        )
+        db.add(entry)
+        await db.commit()
+        return {"success": True, "id": str(entry.id)}
+    except Exception as e:
+        logger.error(f"Failed to save insight to journal: {e}")
+        return {"success": False}

@@ -1,15 +1,14 @@
 import { useState, useEffect } from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
 import {
   AlertTriangle,
   Clock,
   TrendingDown,
   Zap,
   X,
-  ChevronRight
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { api } from '@/lib/api';
+import { useWebSocket } from '@/contexts/WebSocketContext';
 
 interface PredictiveAlert {
   id: string;
@@ -53,8 +52,12 @@ const ALERT_CONFIG = {
 
 export default function PredictiveWarningsCard({ brokerAccountId }: PredictiveWarningsCardProps) {
   const [alerts, setAlerts] = useState<PredictiveAlert[]>([]);
+  // dismissed = fully removed; dismissing = exit animation in progress
   const [dismissed, setDismissed] = useState<Set<string>>(new Set());
+  const [dismissing, setDismissing] = useState<Set<string>>(new Set());
   const [isLoading, setIsLoading] = useState(true);
+
+  const { lastTradeEvent, lastAlertEvent } = useWebSocket();
 
   useEffect(() => {
     const fetchPredictiveData = async () => {
@@ -71,7 +74,6 @@ export default function PredictiveWarningsCard({ brokerAccountId }: PredictiveWa
         const check = checkRes.data;
         const newAlerts: PredictiveAlert[] = [];
 
-        // Check if current hour is a danger hour
         const currentHour = new Date().getHours();
         const currentHourStr = `${currentHour}:00`;
         if (insights.danger_hours?.includes(currentHourStr)) {
@@ -85,7 +87,6 @@ export default function PredictiveWarningsCard({ brokerAccountId }: PredictiveWa
           });
         }
 
-        // Check if today is a danger day
         const days = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
         const today = days[new Date().getDay()];
         if (insights.danger_days?.includes(today)) {
@@ -98,7 +99,6 @@ export default function PredictiveWarningsCard({ brokerAccountId }: PredictiveWa
           });
         }
 
-        // Check revenge window warning
         if (insights.revenge_window_minutes && check.has_warning) {
           newAlerts.push({
             id: 'revenge-window',
@@ -110,7 +110,6 @@ export default function PredictiveWarningsCard({ brokerAccountId }: PredictiveWa
           });
         }
 
-        // Add predictive alert from check endpoint
         if (check.alert) {
           newAlerts.push({
             id: 'predictive-' + Date.now(),
@@ -121,11 +120,10 @@ export default function PredictiveWarningsCard({ brokerAccountId }: PredictiveWa
           });
         }
 
-        // Show best hours as positive reinforcement if no danger
         if (newAlerts.length === 0 && insights.best_hours?.includes(currentHourStr)) {
           newAlerts.push({
             id: 'best-hour',
-            type: 'danger_hour', // reuse styling
+            type: 'danger_hour',
             severity: 'warning',
             title: 'Good Trading Hour',
             message: `${currentHourStr} is one of your best performing hours. Good time to trade!`,
@@ -141,13 +139,16 @@ export default function PredictiveWarningsCard({ brokerAccountId }: PredictiveWa
     };
 
     fetchPredictiveData();
-    // Refresh every 5 minutes
-    const interval = setInterval(fetchPredictiveData, 5 * 60 * 1000);
-    return () => clearInterval(interval);
-  }, [brokerAccountId]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [brokerAccountId, lastTradeEvent?.timestamp, lastAlertEvent?.timestamp]);
 
   const handleDismiss = (alertId: string) => {
-    setDismissed(prev => new Set([...prev, alertId]));
+    // Start exit animation, then fully remove after it completes
+    setDismissing(prev => new Set([...prev, alertId]));
+    setTimeout(() => {
+      setDismissed(prev => new Set([...prev, alertId]));
+      setDismissing(prev => { const s = new Set(prev); s.delete(alertId); return s; });
+    }, 180);
   };
 
   const visibleAlerts = alerts.filter(a => !dismissed.has(a.id));
@@ -163,33 +164,33 @@ export default function PredictiveWarningsCard({ brokerAccountId }: PredictiveWa
         <span>AI Predictive Warnings</span>
       </div>
 
-      <AnimatePresence mode="popLayout">
-        {visibleAlerts.map((alert) => {
+      <div className="space-y-3">
+        {visibleAlerts.map((alert, i) => {
           const config = ALERT_CONFIG[alert.type];
           const Icon = config.icon;
+          const isExiting = dismissing.has(alert.id);
 
           return (
-            <motion.div
+            <div
               key={alert.id}
-              initial={{ opacity: 0, y: -10, scale: 0.95 }}
-              animate={{ opacity: 1, y: 0, scale: 1 }}
-              exit={{ opacity: 0, scale: 0.95, y: -10 }}
-              transition={{ type: 'spring', stiffness: 200, damping: 20 }}
               className={cn(
                 'relative p-4 rounded-lg border',
                 config.bgColor,
-                config.borderColor
+                config.borderColor,
+                isExiting ? 'animate-card-exit' : 'animate-fade-in-scale'
               )}
+              style={{ animationDelay: isExiting ? '0ms' : `${i * 60}ms` }}
             >
               <button
                 onClick={() => handleDismiss(alert.id)}
                 className="absolute top-2 right-2 p-1 rounded-full hover:bg-background/50 transition-colors"
+                aria-label="Dismiss warning"
               >
                 <X className="h-4 w-4 text-muted-foreground" />
               </button>
 
               <div className="flex gap-3">
-                <div className={cn('p-2 rounded-lg', config.bgColor)}>
+                <div className={cn('p-2 rounded-lg flex-shrink-0', config.bgColor)}>
                   <Icon className={cn('h-5 w-5', config.color)} />
                 </div>
                 <div className="flex-1 min-w-0">
@@ -208,10 +209,10 @@ export default function PredictiveWarningsCard({ brokerAccountId }: PredictiveWa
                   </p>
                 </div>
               </div>
-            </motion.div>
+            </div>
           );
         })}
-      </AnimatePresence>
+      </div>
     </div>
   );
 }

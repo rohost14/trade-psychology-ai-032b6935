@@ -32,7 +32,9 @@ __pycache__/
 .venv
 venv/
 
-# Backend debug/one-off scripts
+# Backend debug/one-off scripts — these may contain hardcoded credentials
+backend/test_pooler.py
+backend/test_import.py
 backend/debug_*.py
 backend/check_database.py
 backend/get_tables.py

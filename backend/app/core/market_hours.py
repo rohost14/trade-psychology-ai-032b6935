@@ -9,11 +9,68 @@ Supports all segments:
 """
 
 from datetime import datetime, time, date, timezone, timedelta
-from typing import Dict, Optional, Tuple
+from typing import Dict, Optional, Tuple, Set
 from enum import Enum
 import pytz
 
 IST = pytz.timezone('Asia/Kolkata')
+
+# ---------------------------------------------------------------------------
+# NSE/BSE Trading Holidays
+# Source: NSE official holiday list. Update annually from:
+#   https://www.nseindia.com/resources/exchange-communication-holidays
+#
+# To override at runtime (e.g., unscheduled closures), set NSE_EXTRA_HOLIDAYS
+# in .env as a comma-separated list of YYYY-MM-DD dates.
+# ---------------------------------------------------------------------------
+NSE_HOLIDAYS_2025: Set[date] = {
+    date(2025, 2, 26),   # Mahashivratri
+    date(2025, 3, 14),   # Holi
+    date(2025, 3, 31),   # Id-Ul-Fitr (Ramadan Eid) — tentative, moon-sighting
+    date(2025, 4, 14),   # Dr. Baba Saheb Ambedkar Jayanti / Ram Navami
+    date(2025, 4, 18),   # Good Friday
+    date(2025, 5, 1),    # Maharashtra Day
+    date(2025, 8, 15),   # Independence Day
+    date(2025, 8, 27),   # Ganesh Chaturthi
+    date(2025, 10, 2),   # Mahatma Gandhi Jayanti
+    date(2025, 10, 21),  # Diwali Laxmi Pujan (Muhurat Trading session — NOT regular trading)
+    date(2025, 10, 22),  # Diwali Balipratipada
+    date(2025, 11, 5),   # Guru Nanak Jayanti
+    date(2025, 12, 25),  # Christmas
+}
+
+NSE_HOLIDAYS_2026: Set[date] = {
+    date(2026, 1, 26),   # Republic Day
+    date(2026, 3, 20),   # Holi (approx)
+    date(2026, 4, 3),    # Good Friday (approx)
+    date(2026, 8, 15),   # Independence Day
+    date(2026, 10, 2),   # Mahatma Gandhi Jayanti
+    date(2026, 12, 25),  # Christmas
+}
+
+# Combined holiday set — all years known
+NSE_HOLIDAYS: Set[date] = NSE_HOLIDAYS_2025 | NSE_HOLIDAYS_2026
+
+
+def _load_extra_holidays() -> Set[date]:
+    """Load any extra/unscheduled holidays from NSE_EXTRA_HOLIDAYS env var."""
+    try:
+        import os
+        extra = os.environ.get("NSE_EXTRA_HOLIDAYS", "")
+        result: Set[date] = set()
+        for s in extra.split(","):
+            s = s.strip()
+            if s:
+                result.add(date.fromisoformat(s))
+        return result
+    except Exception:
+        return set()
+
+
+def is_trading_holiday(check_date: date) -> bool:
+    """Return True if check_date is a NSE/BSE trading holiday."""
+    all_holidays = NSE_HOLIDAYS | _load_extra_holidays()
+    return check_date in all_holidays
 
 
 class MarketSegment(str, Enum):
@@ -115,6 +172,10 @@ def is_market_open(segment: MarketSegment, check_time: Optional[datetime] = None
 
     # Weekend check
     if check_time.weekday() >= 5:  # Saturday = 5, Sunday = 6
+        return False
+
+    # Holiday check (NSE/BSE scheduled + any extra holidays in env)
+    if is_trading_holiday(check_time.date()):
         return False
 
     current_time = check_time.time()

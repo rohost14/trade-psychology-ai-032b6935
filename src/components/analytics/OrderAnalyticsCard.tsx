@@ -1,6 +1,5 @@
 import { BarChart3, CheckCircle2, XCircle, AlertTriangle, Clock, TrendingUp, Info } from 'lucide-react';
 import { cn } from '@/lib/utils';
-import { motion } from 'framer-motion';
 import type { OrderAnalytics } from '@/types/api';
 
 interface OrderAnalyticsCardProps {
@@ -37,7 +36,7 @@ export default function OrderAnalyticsCard({
                     <div className="h-6 w-48 shimmer rounded-lg" />
                 </div>
                 <div className="p-6 space-y-4">
-                    <div className="grid grid-cols-4 gap-4">
+                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
                         {[1, 2, 3, 4].map((i) => (
                             <div key={i} className="h-20 shimmer rounded-xl" />
                         ))}
@@ -106,13 +105,9 @@ export default function OrderAnalyticsCard({
 
                 <div className="relative flex items-center justify-between">
                     <div className="flex items-center gap-4">
-                        <motion.div
-                            className="p-3 rounded-2xl bg-gradient-to-br from-primary/25 to-primary/10 border border-primary/20 shadow-lg"
-                            whileHover={{ scale: 1.08, rotate: 5 }}
-                            transition={{ type: 'spring', stiffness: 300 }}
-                        >
+                        <div className="p-3 rounded-2xl bg-gradient-to-br from-primary/25 to-primary/10 border border-primary/20 shadow-lg hover:scale-[1.008] transition-transform duration-200">
                             <BarChart3 className="h-5 w-5 text-primary" />
-                        </motion.div>
+                        </div>
                         <div>
                             <h3 className="text-lg font-semibold text-foreground">Order Analytics</h3>
                             <p className="text-sm text-muted-foreground">Last {analytics.period_days} days</p>
@@ -141,43 +136,23 @@ export default function OrderAnalyticsCard({
 
             {/* Summary Stats */}
             <div className="grid grid-cols-2 lg:grid-cols-4 divide-x divide-y lg:divide-y-0 divide-border/40">
-                <motion.div
-                    className="px-6 py-5"
-                    initial={{ opacity: 0, y: 10 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    transition={{ delay: 0.1 }}
-                >
+                <div className="px-6 py-5 animate-fade-in-up" style={{ animationDelay: '60ms' }}>
                     <p className="text-xs text-muted-foreground font-medium mb-1 uppercase tracking-wider">Total Orders</p>
                     <p className="text-2xl font-mono font-medium text-foreground">{summary.total_orders}</p>
-                </motion.div>
-                <motion.div
-                    className="px-6 py-5"
-                    initial={{ opacity: 0, y: 10 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    transition={{ delay: 0.15 }}
-                >
+                </div>
+                <div className="px-6 py-5 animate-fade-in-up" style={{ animationDelay: '120ms' }}>
                     <p className="text-xs text-muted-foreground font-medium mb-1 uppercase tracking-wider">Fill Rate</p>
                     <p className={cn('text-2xl font-mono font-medium', fillRateColor)}>
                         {summary.fill_rate_pct.toFixed(1)}%
                     </p>
-                </motion.div>
-                <motion.div
-                    className="px-6 py-5"
-                    initial={{ opacity: 0, y: 10 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    transition={{ delay: 0.2 }}
-                >
+                </div>
+                <div className="px-6 py-5 animate-fade-in-up" style={{ animationDelay: '180ms' }}>
                     <p className="text-xs text-muted-foreground font-medium mb-1 uppercase tracking-wider">Cancelled</p>
                     <p className={cn('text-2xl font-mono font-medium', cancelColor)}>
                         {metrics.cancel_ratio_pct.toFixed(1)}%
                     </p>
-                </motion.div>
-                <motion.div
-                    className="px-6 py-5"
-                    initial={{ opacity: 0, y: 10 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    transition={{ delay: 0.25 }}
-                >
+                </div>
+                <div className="px-6 py-5 animate-fade-in-up" style={{ animationDelay: '240ms' }}>
                     <p className="text-xs text-muted-foreground font-medium mb-1 uppercase tracking-wider">Rejected</p>
                     <p className={cn(
                         'text-2xl font-mono font-medium',
@@ -185,7 +160,7 @@ export default function OrderAnalyticsCard({
                     )}>
                         {summary.rejected}
                     </p>
-                </motion.div>
+                </div>
             </div>
 
             {/* Hourly Distribution */}
@@ -208,16 +183,13 @@ export default function OrderAnalyticsCard({
                             const isPeak = hour === timing.peak_trading_hour;
 
                             return (
-                                <motion.div
+                                <div
                                     key={hour}
                                     className={cn(
                                         'flex-1 rounded-t-sm transition-colors',
                                         isPeak ? 'bg-primary' : count > 0 ? 'bg-primary/40' : 'bg-muted/40'
                                     )}
                                     style={{ height: `${Math.max(height, 4)}%` }}
-                                    initial={{ height: 0 }}
-                                    animate={{ height: `${Math.max(height, 4)}%` }}
-                                    transition={{ delay: hour * 0.02, duration: 0.3 }}
                                     title={`${hour}:00 - ${count} orders`}
                                 />
                             );
@@ -243,15 +215,13 @@ export default function OrderAnalyticsCard({
                         const colorClass = insightColors[insight.type] || insightColors.info;
 
                         return (
-                            <motion.div
+                            <div
                                 key={index}
                                 className={cn(
-                                    'flex items-start gap-3 p-4 rounded-xl border',
+                                    'flex items-start gap-3 p-4 rounded-xl border animate-fade-in-up',
                                     colorClass
                                 )}
-                                initial={{ opacity: 0, x: -10 }}
-                                animate={{ opacity: 1, x: 0 }}
-                                transition={{ delay: 0.3 + index * 0.1 }}
+                                style={{ animationDelay: `${index * 60}ms` }}
                             >
                                 <IconComponent className="h-5 w-5 mt-0.5 flex-shrink-0" />
                                 <div className="flex-1 min-w-0">
@@ -261,7 +231,7 @@ export default function OrderAnalyticsCard({
                                         <p className="text-xs opacity-60 mt-2 italic">{insight.suggestion}</p>
                                     )}
                                 </div>
-                            </motion.div>
+                            </div>
                         );
                     })}
                 </div>

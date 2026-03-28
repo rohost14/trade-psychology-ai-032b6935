@@ -24,7 +24,9 @@ import logging
 from datetime import datetime, timezone
 
 from app.models.position import Position
+from app.models.broker_account import BrokerAccount
 from app.api.deps import get_current_user_ws
+from app.core.database import SessionLocal
 
 router = APIRouter()
 logger = logging.getLogger(__name__)
@@ -76,7 +78,8 @@ class ConnectionManager:
         websocket = self.active_connections.get(account_id)
         if websocket:
             try:
-                await websocket.send_json(message)
+                import asyncio
+                await asyncio.wait_for(websocket.send_json(message), timeout=2.0)
             except Exception as e:
                 logger.error(f"Send failed for {account_id[:8]}...: {e}")
                 await self.disconnect(account_id)
@@ -95,7 +98,8 @@ class ConnectionManager:
                 if instrument in subs or "*" in subs:  # * means all instruments
                     subscribers.append(account_id)
 
-        # Send to all subscribers
+        # Send to all subscribers concurrently — gather so one slow client
+        # doesn't delay price delivery to everyone else.
         message = {
             "type": "price",
             "instrument": instrument,
@@ -103,8 +107,12 @@ class ConnectionManager:
             "timestamp": datetime.now(timezone.utc).isoformat(),
         }
 
-        for account_id in subscribers:
-            await self.send_to_account(account_id, message)
+        if subscribers:
+            import asyncio
+            await asyncio.gather(
+                *[self.send_to_account(account_id, message) for account_id in subscribers],
+                return_exceptions=True,
+            )
 
     async def send_alert(self, account_id: str, alert_data: dict):
         """Send risk alert to specific account."""
@@ -148,37 +156,76 @@ manager = ConnectionManager()
 @router.websocket("/ws/prices")
 async def websocket_prices(
     websocket: WebSocket,
-    token: Optional[str] = Query(None),
     since: Optional[str] = Query(None),  # last_event_id for replay on reconnect
 ):
     """
     WebSocket endpoint for real-time price updates.
 
     Connection:
-        ws://host/api/ws/prices?token=JWT_TOKEN
+        ws://host/api/ws/prices?since=LAST_EVENT_ID
 
-    Messages from client:
+    Auth: first message from client MUST be:
+        {"action": "auth", "token": "JWT_TOKEN"}
+    Server closes with code 4001 if auth is missing, invalid, or times out (5s).
+    This prevents the JWT from appearing in proxy logs / browser DevTools history.
+
+    Messages from client (after auth):
         {"action": "subscribe", "instruments": ["RELIANCE", "NIFTY 50"]}
         {"action": "unsubscribe", "instruments": ["RELIANCE"]}
         {"action": "subscribe_positions"}  # Subscribe to all position instruments
 
     Messages from server:
+        {"type": "auth_ok"}  # Confirms authentication succeeded
         {"type": "price", "instrument": "RELIANCE", "data": {...}}
         {"type": "trade", "data": {...}}
         {"type": "alert", "data": {...}}
         {"type": "pong"}  # Response to ping
     """
-    # Authenticate via JWT token
+    # Accept the HTTP→WS upgrade before any auth (required by protocol)
+    await websocket.accept()
+
+    # First message must arrive within 5s and must be {"action":"auth","token":"..."}
     account_uuid = None
-    if token:
-        account_uuid = await get_current_user_ws(token)
+    try:
+        raw = await asyncio.wait_for(websocket.receive_text(), timeout=5.0)
+        first_msg = json.loads(raw)
+        if first_msg.get("action") == "auth":
+            token = first_msg.get("token", "")
+            if token:
+                account_uuid = await get_current_user_ws(token)
+    except (asyncio.TimeoutError, Exception):
+        pass
 
     if not account_uuid:
         await websocket.close(code=4001, reason="Authentication required")
         return
 
+    # Check token revocation — prevents use of old JWTs after disconnect.
+    # One lightweight DB query at connect time; not repeated during the session.
+    try:
+        async with SessionLocal() as db:
+            result = await db.execute(
+                select(BrokerAccount.token_revoked_at).where(BrokerAccount.id == account_uuid)
+            )
+            row = result.first()
+            if not row or row[0] is not None:
+                await websocket.close(code=4001, reason="Token revoked")
+                return
+    except Exception as e:
+        logger.warning(f"WebSocket revocation check failed: {e} — closing connection")
+        await websocket.close(code=4001, reason="Authentication error")
+        return
+
     account_id = str(account_uuid)
-    await manager.connect(websocket, account_id)
+
+    # Register in manager (already accepted above — skip the accept() in connect())
+    async with manager._lock:
+        manager.active_connections[account_id] = websocket
+        manager.subscriptions.setdefault(account_id, set())
+    logger.info(f"WebSocket connected: {account_id[:8]}...")
+
+    # Confirm auth to client so it can proceed with subscriptions
+    await asyncio.wait_for(websocket.send_json({"type": "auth_ok"}), timeout=2.0)
 
     # Event replay — send all events missed since last connection
     # Client sends ?since=last_event_id on reconnect.
@@ -202,12 +249,16 @@ async def websocket_prices(
                 except Exception:
                     break  # client disconnected during replay
 
-            # Signal replay complete so client knows it has full context
+            # Signal replay complete so client knows it has full context.
+            # truncated=True means the replay limit was hit — client should trigger
+            # a full data refresh (e.g. re-fetch trades/positions) rather than
+            # assuming it has a complete event log.
             last_replay_id = missed_events[-1][0] if missed_events else since
             await websocket.send_json({
                 "type": "replay_complete",
                 "last_event_id": last_replay_id,
                 "replayed": len(missed_events),
+                "truncated": len(missed_events) == 200,
             })
             logger.info(f"[ws] Replayed {len(missed_events)} events for {account_id[:8]}")
         except Exception as e:

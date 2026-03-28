@@ -155,6 +155,17 @@
   }
 }
 
+/* Global accessibility: visible focus rings for keyboard navigation */
+:focus-visible {
+  outline: 2px solid hsl(var(--ring));
+  outline-offset: 2px;
+}
+
+/* Remove outline for mouse users; keep for keyboard */
+:focus:not(:focus-visible) {
+  outline: none;
+}
+
 @layer components {
   /* Clean Card - No glassmorphism, no gradients */
   .card {
@@ -242,8 +253,112 @@
   }
 }
 
-/* Single loading animation - all we need */
+/* ── Animation keyframes (framer-motion replacement) ──────────────────────── */
+
 @keyframes pulse {
   0%, 100% { opacity: 1; }
   50% { opacity: 0.5; }
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+
+@keyframes fadeInUp {
+  from { opacity: 0; transform: translateY(8px); }
+  to   { opacity: 1; transform: translateY(0);   }
+}
+
+@keyframes fadeInScale {
+  from { opacity: 0; transform: translateY(-10px) scale(0.95); }
+  to   { opacity: 1; transform: translateY(0)     scale(1);    }
+}
+
+/* Spring-like: overshoot then settle — replaces type:'spring' on banner */
+@keyframes slideInDown {
+  0%   { opacity: 0; transform: translateY(-52px); }
+  60%  { opacity: 1; transform: translateY(4px);   }
+  80%  { transform: translateY(-2px); }
+  100% { transform: translateY(0); }
+}
+
+@keyframes slideOutUp {
+  from { opacity: 1; transform: translateY(0);    max-height: 200px; }
+  to   { opacity: 0; transform: translateY(-40px); max-height: 0;    }
+}
+
+@keyframes slideInUp {
+  0%   { opacity: 0; transform: translateY(100%); }
+  60%  { opacity: 1; transform: translateY(-6px);  }
+  80%  { transform: translateY(3px);               }
+  100% { transform: translateY(0);                 }
+}
+
+@keyframes cardExit {
+  from { opacity: 1; transform: translateY(0)     scale(1);    }
+  to   { opacity: 0; transform: translateY(-10px) scale(0.95); }
+}
+
+@keyframes float {
+  0%, 100% { transform: translateY(-5px) rotate(0deg);  }
+  50%       { transform: translateY(5px)  rotate(10deg); }
+}
+
+@keyframes zapPulse {
+  0%, 100% { transform: rotate(0deg)   scale(1);   }
+  33%       { transform: rotate(15deg)  scale(1.1); }
+  66%       { transform: rotate(-15deg) scale(1);   }
+}
+
+@keyframes pulseScale {
+  0%, 100% { transform: scale(1);   }
+  50%       { transform: scale(1.1); }
+}
+
+/* ── Animation utility classes ────────────────────────────────────────────── */
+
+@layer utilities {
+  .animate-fade-in {
+    animation: fadeIn 0.2s ease-out both;
+  }
+
+  .animate-fade-in-up {
+    animation: fadeInUp 0.2s ease-out both;
+  }
+
+  .animate-fade-in-scale {
+    animation: fadeInScale 0.2s cubic-bezier(0.16, 1, 0.3, 1) both;
+  }
+
+  .animate-slide-in-down {
+    animation: slideInDown 0.35s cubic-bezier(0.16, 1, 0.3, 1) both;
+  }
+
+  .animate-slide-in-up {
+    animation: slideInUp 0.35s cubic-bezier(0.16, 1, 0.3, 1) both;
+  }
+
+  .animate-slide-out-up {
+    animation: slideOutUp 0.25s ease-in forwards;
+    overflow: hidden;
+  }
+
+  .animate-card-exit {
+    animation: cardExit 0.18s ease-in forwards;
+    pointer-events: none;
+  }
+
+  .animate-float {
+    animation: float 4s ease-in-out infinite;
+  }
+
+  .animate-zap-pulse {
+    animation: zapPulse 3s ease-in-out infinite;
+    animation-delay: 2s;
+  }
+
+  .animate-pulse-scale {
+    animation: pulseScale 2s ease-in-out infinite;
+  }
 }

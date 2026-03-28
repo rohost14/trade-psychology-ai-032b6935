@@ -122,6 +122,7 @@ class ZerodhaTicker:
 
         self.kws = None
         self.subscribed_tokens: Set[int] = set()
+        self._token_to_symbol: Dict[int, str] = {}     # instrument_token → tradingsymbol
         self._connected = False
         self._loop: Optional[asyncio.AbstractEventLoop] = None
         self._last_tick_times: Dict[str, float] = {}   # symbol → monotonic timestamp
@@ -178,9 +179,18 @@ class ZerodhaTicker:
         import time
         now = time.monotonic()
 
+        ltp_updates: dict[int, str] = {}   # instrument_token → price string
+        ws_updates: list[tuple[str, dict]] = []  # (symbol, price_data)
+
         for tick in ticks:
             instrument_token = tick.get("instrument_token")
-            symbol = tick.get("tradingsymbol") or str(instrument_token)
+            # Kite MODE_LTP ticks do NOT include tradingsymbol — only instrument_token.
+            # Use the token→symbol map populated at subscription time.
+            symbol = (
+                self._token_to_symbol.get(instrument_token)
+                or tick.get("tradingsymbol")
+                or str(instrument_token)
+            )
             last_price = tick.get("last_price")
 
             # Throttle: skip if updated within the last second
@@ -196,24 +206,34 @@ class ZerodhaTicker:
                 "instrument_token": instrument_token,
             }
 
-            # 1. Write to Redis LTP cache (TTL=2s)
-            # Key: ltp:{instrument_token}  Value: price
-            # Position monitor reads from here — no REST API polling needed.
-            if last_price is not None:
-                try:
-                    from app.core.config import settings
-                    import redis as redis_lib
-                    r = redis_lib.from_url(settings.REDIS_URL, decode_responses=True)
-                    r.set(f"ltp:{instrument_token}", str(last_price), ex=2)
-                except Exception:
-                    pass  # Redis write failure never blocks the tick pipeline
+            if last_price is not None and instrument_token is not None:
+                ltp_updates[instrument_token] = str(last_price)
 
-            # 2. Broadcast to frontend via WebSocket (if callback set)
             if self.on_tick_callback:
-                asyncio.run_coroutine_threadsafe(
-                    self.on_tick_callback(symbol, price_data),
-                    self._loop,
-                )
+                ws_updates.append((symbol, price_data))
+
+        # 1. Batch-write all LTP prices in a single Redis pipeline.
+        # One TCP connection + one round-trip for N prices instead of N connections.
+        # Reduces Redis API calls by ~100x at 100 subscribed instruments.
+        if ltp_updates:
+            try:
+                from app.core.config import settings
+                import redis as redis_lib
+                r = redis_lib.from_url(settings.REDIS_URL, decode_responses=True)
+                pipe = r.pipeline(transaction=False)
+                for token, price in ltp_updates.items():
+                    pipe.set(f"ltp:{token}", price, ex=2)
+                pipe.execute()
+                r.close()
+            except Exception:
+                pass  # Redis write failure never blocks the tick pipeline
+
+        # 2. Broadcast to frontend via WebSocket (schedule on asyncio loop)
+        for symbol, price_data in ws_updates:
+            asyncio.run_coroutine_threadsafe(
+                self.on_tick_callback(symbol, price_data),
+                self._loop,
+            )
 
     def _on_close(self, ws, code, reason):
         self._connected = False
@@ -240,12 +260,22 @@ class ZerodhaTicker:
 
     # ── Subscription management ───────────────────────────────────────────────
 
-    def subscribe(self, tokens: list) -> None:
-        """Subscribe to instrument tokens (sync — called from event loop)."""
-        new_tokens = [t for t in tokens if t not in self.subscribed_tokens]
+    def subscribe(self, token_symbol_map: Dict[int, str]) -> None:
+        """
+        Subscribe to instrument tokens with their trading symbols.
+
+        Args:
+            token_symbol_map: Dict mapping instrument_token (int) → tradingsymbol (str).
+                              The tradingsymbol is used as the broadcast key so the
+                              frontend can look up prices by position.tradingsymbol.
+        """
+        new_tokens = [t for t in token_symbol_map if t not in self.subscribed_tokens]
         if not new_tokens:
             return
 
+        # Store token→symbol so _on_ticks can broadcast by tradingsymbol.
+        # Kite MODE_LTP ticks only contain instrument_token — no tradingsymbol field.
+        self._token_to_symbol.update(token_symbol_map)
         self.subscribed_tokens.update(new_tokens)
         if self.kws and self._connected:
             self.kws.subscribe(new_tokens)
@@ -351,9 +381,9 @@ class PerUserPriceStream(PriceStreamProvider):
         if not ticker:
             return
 
-        tokens = await self._get_open_position_tokens(broker_account_id, db)
-        if tokens:
-            ticker.subscribe(tokens)
+        token_symbol_map = await self._get_open_position_tokens(broker_account_id, db)
+        if token_symbol_map:
+            ticker.subscribe(token_symbol_map)
 
     async def stop_account(self, broker_account_id: UUID) -> None:
         """Stop and remove the KiteTicker for this account."""
@@ -406,11 +436,14 @@ class PerUserPriceStream(PriceStreamProvider):
 
     async def _get_open_position_tokens(
         self, broker_account_id: UUID, db
-    ) -> list:
+    ) -> Dict[int, str]:
         """
-        Return instrument_tokens for all open positions on this account.
-        Uses Position.instrument_token (integer) which KiteTicker requires.
-        Falls back to Instrument table lookup if Position lacks the token.
+        Return {instrument_token: tradingsymbol} for all open positions.
+
+        The tradingsymbol is the broadcast key: WebSocket manager subscriptions
+        store tradingsymbol strings, so price ticks must broadcast by symbol.
+        Kite MODE_LTP ticks only return the token — the caller stores this mapping
+        in ZerodhaTicker._token_to_symbol so _on_ticks can resolve the symbol.
         """
         from app.models.position import Position
         from app.models.instrument import Instrument
@@ -427,27 +460,27 @@ class PerUserPriceStream(PriceStreamProvider):
         )
         rows = pos_result.all()
 
-        tokens = []
+        token_symbol_map: Dict[int, str] = {}
         symbols_missing_token = []
 
         for tradingsymbol, instrument_token in rows:
             if instrument_token:
-                tokens.append(int(instrument_token))
+                token_symbol_map[int(instrument_token)] = tradingsymbol
             else:
                 symbols_missing_token.append(tradingsymbol)
 
         # Fallback: look up missing tokens from instruments table
         if symbols_missing_token:
             inst_result = await db.execute(
-                select(Instrument.instrument_token).where(
+                select(Instrument.tradingsymbol, Instrument.instrument_token).where(
                     Instrument.tradingsymbol.in_(symbols_missing_token)
                 )
             )
-            for (token,) in inst_result.all():
+            for sym, token in inst_result.all():
                 if token:
-                    tokens.append(int(token))
+                    token_symbol_map[int(token)] = sym
 
-        return tokens
+        return token_symbol_map
 
 
 # ─────────────────────────────────────────────────────────────────────────────

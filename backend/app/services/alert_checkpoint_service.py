@@ -59,26 +59,6 @@ class AlertCheckpointService:
         )
         return result.scalar_one_or_none()
 
-    async def update_t5(
-        self,
-        checkpoint_id: UUID,
-        prices: Dict[str, float],
-        pnl: float,
-        db: AsyncSession,
-    ) -> None:
-        result = await db.execute(
-            select(AlertCheckpoint).where(AlertCheckpoint.id == checkpoint_id)
-        )
-        cp = result.scalar_one_or_none()
-        if not cp:
-            logger.warning(f"Checkpoint {checkpoint_id} not found for T+5 update")
-            return
-        cp.prices_at_t5 = prices
-        cp.pnl_at_t5 = pnl
-        cp.checked_at_t5 = datetime.now(timezone.utc)
-        cp.calculation_status = "calculating"
-        await db.commit()
-
     async def update_t30(
         self,
         checkpoint_id: UUID,
@@ -101,30 +81,6 @@ class AlertCheckpointService:
         cp.user_actual_pnl = user_actual_pnl
         cp.money_saved = money_saved
         cp.calculation_status = "complete"
-        await db.commit()
-
-    async def update_t60(
-        self,
-        checkpoint_id: UUID,
-        prices: Dict[str, float],
-        pnl: float,
-        user_actual_pnl: float,
-        money_saved: float,
-        db: AsyncSession,
-    ) -> None:
-        result = await db.execute(
-            select(AlertCheckpoint).where(AlertCheckpoint.id == checkpoint_id)
-        )
-        cp = result.scalar_one_or_none()
-        if not cp:
-            logger.warning(f"Checkpoint {checkpoint_id} not found for T+60 update")
-            return
-        cp.prices_at_t60 = prices
-        cp.pnl_at_t60 = pnl
-        cp.checked_at_t60 = datetime.now(timezone.utc)
-        cp.user_actual_pnl = user_actual_pnl
-        cp.money_saved = money_saved
-        # status stays 'complete'
         await db.commit()
 
     async def mark_error(

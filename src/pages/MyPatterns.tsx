@@ -19,11 +19,9 @@ import { useAlerts } from '@/contexts/AlertContext';
 import { useWebSocket } from '@/contexts/WebSocketContext';
 import { EmotionalTaxCard } from '@/components/goals/EmotionalTaxCard';
 import { StreakTrackerCard } from '@/components/goals/StreakTrackerCard';
+import PatternCalendar from '@/components/patterns/PatternCalendar';
 import { calculateEmotionalTax, getTopRecommendations } from '@/lib/emotionalTaxCalculator';
-import { detectAllPatterns } from '@/lib/patternDetector';
-import { buildPatternConfig } from '@/lib/patternConfig';
 import type { DangerZoneStatus, CooldownRecord } from '@/types/api';
-import type { Trade } from '@/types/api';
 import type { StreakData, DailyAdherence, StreakMilestone } from '@/types/patterns';
 
 // ---------------------------------------------------------------------------
@@ -95,7 +93,7 @@ function DangerStatusBanner({
         </div>
 
         {/* Quick stats row */}
-        <div className="grid grid-cols-3 gap-3 mt-4">
+        <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 sm:gap-3 mt-4">
           <div className="text-center p-2.5 bg-background/60 rounded-lg">
             <div className={`text-xl font-bold ${status.daily_loss_used_percent >= 85 ? 'text-red-500' : status.daily_loss_used_percent >= 70 ? 'text-orange-500' : 'text-foreground'}`}>
               {status.daily_loss_used_percent.toFixed(0)}%
@@ -203,10 +201,9 @@ const MILESTONE_LABELS: Record<number, string> = {
 
 export default function MyPatterns() {
   const { isConnected, isLoading: brokerLoading, account } = useBroker();
-  const { traderProfile, capital } = useAlerts();
+  const { alerts } = useAlerts();
   const { lastTradeEvent, lastAlertEvent } = useWebSocket();
 
-  const [trades, setTrades] = useState<Trade[]>([]);
   const [status, setStatus] = useState<DangerZoneStatus | null>(null);
   const [alertHistory, setAlertHistory] = useState<CooldownRecord[]>([]);
   const [streakData, setStreakData] = useState<StreakData>(EMPTY_STREAK);
@@ -291,32 +288,9 @@ export default function MyPatterns() {
     if (lastTradeEvent || lastAlertEvent) fetchStatus();
   }, [lastTradeEvent, lastAlertEvent]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  // Fetch trades for pattern analysis
-  useEffect(() => {
-    if (!isConnected || !account) return;
-    api.get('/api/trades/', { params: { limit: 100, status: 'COMPLETE' } })
-      .then(res => {
-        const fetched: Trade[] = (res.data.trades || []).map((t: any) => ({
-          id: t.id,
-          tradingsymbol: t.tradingsymbol,
-          exchange: t.exchange,
-          trade_type: t.transaction_type === 'BUY' ? 'BUY' : 'SELL',
-          quantity: t.filled_quantity || t.quantity,
-          price: t.average_price || t.price,
-          pnl: t.pnl || 0,
-          traded_at: t.order_timestamp || t.created_at,
-          order_id: t.order_id,
-          instrument_type: t.instrument_type,
-        }));
-        setTrades(fetched);
-      })
-      .catch(() => { /* Non-fatal */ });
-  }, [isConnected, account]);
-
-  // Pattern analysis — uses profile-derived capital and config
-  const config   = useMemo(() => buildPatternConfig(traderProfile), [traderProfile]);
-  const patterns = useMemo(() => detectAllPatterns(trades, capital, config), [trades, capital, config]);
-  const emotionalTax    = useMemo(() => calculateEmotionalTax(patterns, trades), [patterns, trades]);
+  // Derive patterns from backend alerts (backend is the single detection engine)
+  const patterns = useMemo(() => alerts.map(a => a.pattern), [alerts]);
+  const emotionalTax    = useMemo(() => calculateEmotionalTax(patterns as any, []), [patterns]);
   const recommendations = useMemo(() => getTopRecommendations(emotionalTax), [emotionalTax]);
 
   const handleAlertGuardian = async () => {
@@ -409,14 +383,14 @@ export default function MyPatterns() {
 
       {/* Pattern-based Recommendations */}
       {recommendations.length > 0 && (
-        <div className="flex items-start gap-3 p-4 rounded-lg border border-warning/30 bg-warning/5">
-          <AlertTriangle className="h-4 w-4 text-warning flex-shrink-0 mt-0.5" />
+        <div className="flex items-start gap-3 p-4 rounded-lg border border-amber-500/30 bg-amber-500/5">
+          <AlertTriangle className="h-4 w-4 text-amber-500 flex-shrink-0 mt-0.5" />
           <div>
             <p className="text-sm font-medium">Based on your patterns:</p>
             <ul className="mt-1.5 space-y-1">
               {recommendations.map((rec, i) => (
                 <li key={i} className="text-sm text-muted-foreground flex items-center gap-2">
-                  <span className="w-1 h-1 rounded-full bg-warning flex-shrink-0" />
+                  <span className="w-1 h-1 rounded-full bg-amber-500 flex-shrink-0" />
                   {rec}
                 </li>
               ))}
@@ -424,6 +398,9 @@ export default function MyPatterns() {
           </div>
         </div>
       )}
+
+      {/* Pattern Calendar — full width */}
+      <PatternCalendar />
 
       {/* Main Grid */}
       <div className="grid gap-6 lg:grid-cols-2">

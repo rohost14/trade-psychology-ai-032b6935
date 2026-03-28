@@ -27,7 +27,7 @@ import { toast } from 'sonner';
 import { api } from '@/lib/api';
 
 import { calculateGoalAdherence, calculateEmotionalTax, getTopRecommendations } from '@/lib/emotionalTaxCalculator';
-import { detectAllPatterns } from '@/lib/patternDetector';
+// patternDetector removed — backend is the single detection engine
 import { TradingGoals } from '@/types/patterns';
 import { Trade } from '@/types/api';
 
@@ -87,8 +87,8 @@ export default function Goals() {
     fetchTrades();
   }, [isConnected, account]);
 
-  // Calculate patterns and adherence from real trades
-  const patterns = useMemo(() => detectAllPatterns(trades), [trades]);
+  // Patterns now come from backend — Goals page is deprecated (use My Patterns + Alerts)
+  const patterns = useMemo(() => [], []);
   const adherence = useMemo(
     () => calculateGoalAdherence(trades, patterns, goals),
     [trades, patterns, goals]

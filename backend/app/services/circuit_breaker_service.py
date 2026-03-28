@@ -175,6 +175,16 @@ class CircuitBreaker:
                     f"[circuit:{broker_account_id}] CLOSED → OPEN "
                     f"(failure rate {failures}/{total} = {failures/total:.0%})"
                 )
+                try:
+                    import sentry_sdk
+                    sentry_sdk.capture_message(
+                        f"Circuit breaker OPEN: account {str(broker_account_id)[:8]}... "
+                        f"({failures}/{total} Kite API failures = {failures/total:.0%}). "
+                        f"Live sync + real-time alerts disabled for this account.",
+                        level="error",
+                    )
+                except Exception:
+                    pass
 
         except Exception as e:
             logger.warning(f"[circuit] record_failure failed: {e}")

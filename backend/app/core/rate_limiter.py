@@ -45,7 +45,14 @@ class RateLimiter:
         self._lock = asyncio.Lock()
 
     def _default_key(self, request: Request) -> str:
-        """Extract rate-limit key from request. Uses client IP."""
+        """
+        Extract rate-limit key from request.
+        Prefers broker_account_id from request.state (set by auth middleware)
+        so limits are per-account, not per-IP. Falls back to IP if not authed.
+        """
+        account_id = getattr(request.state, "broker_account_id", None)
+        if account_id:
+            return str(account_id)
         forwarded = request.headers.get("X-Forwarded-For")
         if forwarded:
             return forwarded.split(",")[0].strip()
@@ -85,3 +92,7 @@ class RateLimiter:
 sync_limiter = RateLimiter(max_requests=3, window_seconds=60)       # 3 syncs/min
 coach_limiter = RateLimiter(max_requests=10, window_seconds=60)     # 10 chat msgs/min
 analytics_limiter = RateLimiter(max_requests=20, window_seconds=60) # 20 analytics/min
+
+# Admin auth — strict brute-force protection
+admin_login_limiter = RateLimiter(max_requests=5, window_seconds=900)  # 5 attempts/15 min per IP
+admin_otp_limiter   = RateLimiter(max_requests=5, window_seconds=300)  # 5 OTP guesses/5 min per IP

@@ -70,9 +70,24 @@ def send_whatsapp_alert(
 
             except Exception as e:
                 logger.error(f"WhatsApp send failed: {e}", exc_info=True)
-                raise self.retry(exc=e)
+                try:
+                    raise self.retry(exc=e)
+                except self.MaxRetriesExceededError:
+                    try:
+                        import sentry_sdk
+                        sentry_sdk.capture_message(
+                            f"WhatsApp alert permanently lost (all retries exhausted): "
+                            f"account={broker_account_id[:8]}..., error={e}",
+                            level="error",
+                        )
+                    except Exception:
+                        pass
+                    logger.error(
+                        f"[alert_tasks] WhatsApp alert permanently lost: "
+                        f"account={broker_account_id[:8]}..., error={e}"
+                    )
 
-    return asyncio.get_event_loop().run_until_complete(_send())
+    return asyncio.run(_send())
 
 
 @celery_app.task
@@ -137,7 +152,7 @@ _Stay disciplined. Follow your rules._
                 logger.error(f"Risk alert notification failed: {e}", exc_info=True)
                 return {"error": str(e)}
 
-    return asyncio.get_event_loop().run_until_complete(_send())
+    return asyncio.run(_send())
 
 
 @celery_app.task

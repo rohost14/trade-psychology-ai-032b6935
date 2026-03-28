@@ -49,6 +49,7 @@ class Position(Base):
     day_sell_value = Column(Numeric(15, 4))
 
     first_entry_time = Column(DateTime(timezone=True))
+    last_entry_time = Column(DateTime(timezone=True))   # most recent BUY — for averaged-up positions
     last_exit_time = Column(DateTime(timezone=True))
     holding_duration_minutes = Column(Integer)
     order_ids = Column(ARRAY(String))

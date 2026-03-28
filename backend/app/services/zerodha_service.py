@@ -82,9 +82,9 @@ class ZerodhaClient(BrokerInterface):
     TOKEN_URL = "https://api.kite.trade/session/token"
     BASE_URL = "https://api.kite.trade"
 
-    def __init__(self):
-        self.api_key = settings.ZERODHA_API_KEY
-        self.api_secret = settings.ZERODHA_API_SECRET
+    def __init__(self, api_key: Optional[str] = None, api_secret: Optional[str] = None):
+        self.api_key = api_key or settings.ZERODHA_API_KEY
+        self.api_secret = api_secret or settings.ZERODHA_API_SECRET
         self.rate_limiter = _rate_limiter
 
     @property
@@ -390,6 +390,21 @@ class ZerodhaClient(BrokerInterface):
         result = await self._request("GET", url, access_token)
         return result.get("data", [])
 
+    async def get_mf_holdings(self, access_token: str) -> List[Dict[str, Any]]:
+        """
+        Fetch mutual fund holdings.
+
+        Returns list of MF holdings with:
+        - tradingsymbol, folio, fund (scheme name)
+        - quantity, average_price, last_price, pnl
+        - day_change, day_change_percentage
+        """
+        url = f"{self.BASE_URL}/mf/holdings"
+        logger.info("Fetching MF holdings from Kite API")
+
+        result = await self._request("GET", url, access_token)
+        return result.get("data", [])
+
     async def get_margins(self, access_token: str, segment: str = None) -> Dict[str, Any]:
         """
         Fetch account margins.
@@ -498,6 +513,21 @@ class ZerodhaClient(BrokerInterface):
             prices[key] = float(data.get("last_price", 0))
         return prices
 
+    async def get_gtt_triggers(self, access_token: str) -> List[Dict[str, Any]]:
+        """
+        Fetch all active GTT (Good Till Triggered) orders.
+
+        Returns list of GTTs. Each entry has:
+        - id: GTT trigger ID (integer)
+        - status: 'active' | 'triggered' | 'disabled' | 'expired' | 'cancelled'
+        - condition: {exchange, tradingsymbol, trigger_values[], last_price}
+        - orders: [{exchange, tradingsymbol, transaction_type, quantity, order_type, product, price}]
+        - created_at, updated_at, expires_at
+        """
+        url = f"{self.BASE_URL}/gtt/triggers"
+        result = await self._request("GET", url, access_token)
+        return result.get("data", [])
+
     async def revoke_token(self, access_token: str) -> bool:
         """Revokes the access token (logout)."""
         url = f"{self.TOKEN_URL}?api_key={self.api_key}&access_token={access_token}"
@@ -551,3 +581,18 @@ zerodha_client = ZerodhaClient()
 
 # Register with factory so get_broker_service("zerodha") returns ZerodhaClient
 BrokerFactory.register(BrokerType.ZERODHA, ZerodhaClient)
+
+
+def get_service_for_account(account) -> "ZerodhaClient":
+    """
+    Return a ZerodhaClient scoped to the given BrokerAccount's own credentials.
+    Falls back to global credentials if the account has no personal api_secret stored.
+
+    Usage:
+        svc = get_service_for_account(account)
+        data = await svc.get_holdings(access_token)
+    """
+    api_secret = account.decrypt_api_secret() if hasattr(account, "decrypt_api_secret") else None
+    if account.api_key and api_secret:
+        return ZerodhaClient(api_key=account.api_key, api_secret=api_secret)
+    return zerodha_client

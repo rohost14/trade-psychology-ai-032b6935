@@ -372,14 +372,12 @@ class CooldownService:
         can_send, block_reason = notification_rate_limiter.can_send(
             account_id,
             NotificationType.COOLDOWN_STARTED,
-            None
         )
 
         if can_send:
             notification_rate_limiter.record_sent(
                 account_id,
                 NotificationType.COOLDOWN_STARTED,
-                None
             )
             logger.info(
                 f"Cooldown notification sent: {trigger_reason} ({duration_minutes}min) "

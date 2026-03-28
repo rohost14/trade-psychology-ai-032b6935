@@ -164,7 +164,7 @@ class DangerZoneService:
                 daily_loss_used_percent = (abs(today_pnl) / daily_loss_limit) * 100
 
         # 4. Get recent trades
-        trades_15min = await self._get_trade_count(db, broker_account_id, minutes=15)
+        trades_30min = await self._get_trade_count(db, broker_account_id, minutes=30)
         trades_1hr = await self._get_trade_count(db, broker_account_id, minutes=60)
         trades_today = await self._get_trade_count(db, broker_account_id, minutes=None)  # All today
 
@@ -224,18 +224,18 @@ class DangerZoneService:
             triggers.append("consecutive_loss_warning")
 
         # Profile-derived overtrading thresholds
-        burst_warn   = trader_thresholds['burst_trades_per_15min']       # e.g. 7
-        burst_danger = int(burst_warn * 1.6)                             # e.g. 11
+        burst_warn   = trader_thresholds['burst_trades_per_30min_caution']       # e.g. 5
+        burst_danger = trader_thresholds['burst_trades_per_30min_danger']        # e.g. 8
 
         # Check overtrading
-        if trades_15min >= burst_danger:
+        if trades_30min >= burst_danger:
             level = _upgrade_level(level, DangerLevel.DANGER)
             if level == DangerLevel.DANGER and intervention == InterventionType.NONE:
                 intervention = InterventionType.SOFT_COOLDOWN
             triggers.append("overtrading_danger")
             recommendations.append("Too many trades. Slow down.")
 
-        elif trades_15min >= burst_warn:
+        elif trades_30min >= burst_warn:
             level = _upgrade_level(level, DangerLevel.WARNING)
             triggers.append("overtrading_warning")
 

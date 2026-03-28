@@ -19,7 +19,7 @@ import secrets
 logger = logging.getLogger(__name__)
 
 from app.schemas.broker import BrokerAccountResponse, BrokerStatusResponse
-from app.services.zerodha_service import zerodha_client, KiteTokenExpiredError, KiteAPIError
+from app.services.zerodha_service import zerodha_client, ZerodhaClient, KiteTokenExpiredError, KiteAPIError
 from app.services.margin_service import margin_service
 from app.services.order_analytics_service import order_analytics_service
 from app.services.instrument_service import instrument_service
@@ -55,9 +55,10 @@ def _store_auth_code(jwt_token: str, broker_account_id: str) -> str:
             ex=30  # 30-second TTL
         )
     except Exception as e:
-        logger.warning(f"Redis unavailable for auth code storage: {e}. Falling back to token-in-URL.")
-        # Fallback: return a special prefix so the frontend knows to use token directly
-        return f"__token__{jwt_token}__bid__{broker_account_id}"
+        # Redis unavailable — do NOT fall back to token-in-URL (exposes JWT in logs/history).
+        # Let the exception propagate so the caller redirects to an error page instead.
+        logger.error(f"Redis unavailable for auth code storage: {e}. Cannot complete OAuth safely.")
+        raise RuntimeError("Auth session store temporarily unavailable. Please try again.") from e
     return code
 
 
@@ -93,14 +94,6 @@ async def exchange_auth_code(request: AuthExchangeRequest):
     """
     code = request.code
 
-    # Handle fallback case (Redis unavailable during OAuth)
-    if code.startswith("__token__"):
-        try:
-            parts = code.replace("__token__", "").split("__bid__")
-            return {"token": parts[0], "broker_account_id": parts[1]}
-        except Exception:
-            raise HTTPException(status_code=400, detail="Invalid fallback code")
-
     try:
         import redis as redis_lib
         r = redis_lib.from_url(settings.REDIS_URL, decode_responses=True)
@@ -120,16 +113,80 @@ async def exchange_auth_code(request: AuthExchangeRequest):
     return {"token": jwt_token, "broker_account_id": broker_account_id}
 
 
+class SetupCredentialsRequest(BaseModel):
+    api_key: str
+    api_secret: str
+
+
+@router.post("/setup-credentials")
+async def setup_credentials(request: SetupCredentialsRequest) -> Any:
+    """
+    Store a user's personal KiteConnect api_key + api_secret in Redis (30-min TTL).
+    Returns a setup_token to pass to /connect so the OAuth flow uses their credentials.
+
+    Use-case: testers before the developer obtains Zerodha multi-user partnership.
+    Each tester creates their own KiteConnect app at developers.zerodha.com and provides
+    their api_key + api_secret here. The JWT redirect URL will be set on their app.
+    """
+    if not request.api_key.strip() or not request.api_secret.strip():
+        raise HTTPException(status_code=422, detail="api_key and api_secret are required")
+
+    setup_token = secrets.token_urlsafe(32)
+    try:
+        import redis as redis_lib
+        r = redis_lib.from_url(settings.REDIS_URL, decode_responses=True)
+        import json as _json
+        r.set(
+            f"zerodha_creds:{setup_token}",
+            _json.dumps({"api_key": request.api_key.strip(), "api_secret": request.api_secret.strip()}),
+            ex=1800  # 30 minutes
+        )
+    except Exception as e:
+        logger.error(f"Redis unavailable for setup-credentials: {e}")
+        raise HTTPException(status_code=503, detail="Service temporarily unavailable")
+
+    return {"setup_token": setup_token}
+
+
 @router.get("/connect")
 async def connect_zerodha(
     redirect_uri: Optional[str] = None,
     user_id: Optional[str] = None,
+    setup_token: Optional[str] = None,
     db: AsyncSession = Depends(get_db)
 ) -> Any:
-    """Generate Zerodha login URL."""
+    """Generate Zerodha login URL.
+
+    If setup_token is provided, uses the user's personal KiteConnect credentials
+    stored in Redis (from POST /setup-credentials). The setup_token is passed as the
+    OAuth state so the callback can look up the same credentials.
+    """
     callback_uri = settings.ZERODHA_REDIRECT_URI or "http://localhost:8000/api/zerodha/callback"
-    state = user_id if user_id else "anonymous"
-    login_url = zerodha_client.generate_login_url(callback_uri, state=state)
+
+    if setup_token:
+        # Retrieve personal credentials from Redis
+        try:
+            import redis as redis_lib
+            import json as _json
+            r = redis_lib.from_url(settings.REDIS_URL, decode_responses=True)
+            raw = r.get(f"zerodha_creds:{setup_token}")
+            if not raw:
+                raise HTTPException(status_code=400, detail="setup_token expired or invalid — please re-enter credentials")
+            creds = _json.loads(raw)
+        except HTTPException:
+            raise
+        except Exception as e:
+            logger.error(f"Redis error reading setup credentials: {e}")
+            raise HTTPException(status_code=503, detail="Service temporarily unavailable")
+
+        client = ZerodhaClient(api_key=creds["api_key"], api_secret=creds["api_secret"])
+        # Encode the setup_token into state so callback can retrieve credentials
+        state = f"setup:{setup_token}"
+    else:
+        client = zerodha_client
+        state = user_id if user_id else "anonymous"
+
+    login_url = client.generate_login_url(callback_uri, state=state)
     return {"login_url": login_url}
 
 @router.get("/callback")
@@ -145,16 +202,39 @@ async def zerodha_callback(
     if status != "success":
         return RedirectResponse(url=f"{frontend_url}/settings?error=OAuth+failed+or+cancelled", status_code=302)
 
+    # Detect per-user credentials flow
+    _personal_api_key: Optional[str] = None
+    _personal_api_secret: Optional[str] = None
+    if state and state.startswith("setup:"):
+        _setup_token = state[len("setup:"):]
+        try:
+            import redis as redis_lib
+            import json as _json
+            _r = redis_lib.from_url(settings.REDIS_URL, decode_responses=True)
+            _raw = _r.get(f"zerodha_creds:{_setup_token}")
+            if _raw:
+                _creds = _json.loads(_raw)
+                _personal_api_key = _creds.get("api_key")
+                _personal_api_secret = _creds.get("api_secret")
+        except Exception as e:
+            logger.warning(f"Could not read setup credentials from Redis: {e}")
+
+    _active_client = (
+        ZerodhaClient(api_key=_personal_api_key, api_secret=_personal_api_secret)
+        if _personal_api_key and _personal_api_secret
+        else zerodha_client
+    )
+
     try:
         # 1. Exchange token
-        token_data = await zerodha_client.exchange_token(request_token)
+        token_data = await _active_client.exchange_token(request_token)
         access_token = token_data.get("access_token")
 
         if not access_token:
             return {"success": False, "error": "No access token received"}
 
         # 2. Get Zerodha profile
-        profile = await zerodha_client.get_profile(access_token)
+        profile = await _active_client.get_profile(access_token)
         zerodha_user_id = profile.get("user_id")
         zerodha_email = profile.get("email")
         zerodha_name = profile.get("user_name") or profile.get("user_shortname")
@@ -211,7 +291,9 @@ async def zerodha_callback(
             existing_account.order_types = profile.get("order_types", [])
             existing_account.avatar_url = zerodha_avatar
             existing_account.sync_status = "pending"
-            existing_account.api_key = zerodha_client.api_key
+            existing_account.api_key = _active_client.api_key
+            if _personal_api_secret:
+                existing_account.api_secret_enc = BrokerAccount.encrypt_api_secret(_personal_api_secret)
 
             await db.commit()
             await db.refresh(existing_account)
@@ -221,10 +303,11 @@ async def zerodha_callback(
                 broker_account_id=existing_account.id
             )
 
-            # Trigger background sync to refresh today's data on reconnect
+            # Trigger background sync + GTT seed on reconnect
             try:
-                from app.tasks.trade_tasks import sync_trades_for_account
+                from app.tasks.trade_tasks import sync_trades_for_account, seed_gtt_triggers_for_account
                 sync_trades_for_account.delay(str(existing_account.id))
+                seed_gtt_triggers_for_account.delay(str(existing_account.id))
             except Exception as sync_err:
                 logger.warning(f"Could not queue reconnect sync: {sync_err}")
 
@@ -244,7 +327,8 @@ async def zerodha_callback(
                 user_id=user.id,
                 broker_name="zerodha",
                 access_token=encrypted_token,
-                api_key=zerodha_client.api_key,
+                api_key=_active_client.api_key,
+                api_secret_enc=BrokerAccount.encrypt_api_secret(_personal_api_secret) if _personal_api_secret else None,
                 status="connected",
                 connected_at=datetime.now(timezone.utc),
                 broker_user_id=zerodha_user_id,
@@ -279,8 +363,9 @@ async def zerodha_callback(
             broker_account.sync_status = "syncing"
             await db.commit()
             try:
-                from app.tasks.trade_tasks import sync_trades_for_account
+                from app.tasks.trade_tasks import sync_trades_for_account, seed_gtt_triggers_for_account
                 sync_trades_for_account.delay(str(broker_account.id))
+                seed_gtt_triggers_for_account.delay(str(broker_account.id))
             except Exception as sync_err:
                 logger.warning(f"Could not queue initial sync: {sync_err}")
 
@@ -522,7 +607,8 @@ async def get_holdings(
     except KiteTokenExpiredError:
         raise HTTPException(status_code=401, detail="Token expired. Please reconnect.")
     except KiteAPIError as e:
-        raise HTTPException(status_code=400, detail=str(e))
+        logger.error(f"KiteAPIError fetching holdings: {e}")
+        raise HTTPException(status_code=400, detail="Broker API error. Please try again.")
     except HTTPException:
         raise
     except Exception as e:
@@ -623,7 +709,8 @@ async def get_order_history(
     except KiteTokenExpiredError:
         raise HTTPException(status_code=401, detail="Token expired. Please reconnect.")
     except KiteAPIError as e:
-        raise HTTPException(status_code=400, detail=str(e))
+        logger.error(f"KiteAPIError fetching order history: {e}")
+        raise HTTPException(status_code=400, detail="Broker API error. Please try again.")
     except HTTPException:
         raise
     except Exception as e:

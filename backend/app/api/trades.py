@@ -53,11 +53,13 @@ async def list_trades(
     result = await db.execute(query)
     trades = result.scalars().all()
 
+    total_count = total or 0
     return {
         "trades": trades,
-        "total": total or 0,
+        "total": total_count,
         "page": (offset // limit) + 1,
-        "limit": limit
+        "limit": limit,
+        "has_more": (offset + len(trades)) < total_count,
     }
 
 @router.get("/stats", response_model=TradeStatsResponse)

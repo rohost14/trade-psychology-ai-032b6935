@@ -1,0 +1,752 @@
+TRADEMENTOR AI — STITCH DESIGN PROMPTS
+Google Stitch: https://stitch.withgoogle.com/
+Generated: 2026-03-17
+
+HOW TO USE:
+- Open stitch.withgoogle.com
+- Paste one prompt at a time
+- Each prompt is self-contained — paste it exactly as written
+- After getting the design, you can refine with follow-up prompts like:
+  "Make the cards darker", "Add more breathing room", "The numbers should be bigger"
+
+GLOBAL DESIGN SYSTEM (reference for all screens):
+- Dark theme: background #04040e (near-black navy)
+- Primary accent: amber #f59e0b (used for CTAs, highlights, active states)
+- Surface cards: rgba(255,255,255,0.03) with 1px border rgba(255,255,255,0.07)
+- Text: #e2e8f0 (primary), rgba(226,232,240,0.45) (secondary)
+- Success: #10b981 (emerald), Danger: #ef4444 (red), Warning: #f97316 (orange)
+- Font: DM Sans (UI), JetBrains Mono (numbers/code/prices)
+- Severity system: critical=red, high=orange, medium=amber, low=green
+- Indian Rupee symbol ₹ for all monetary values
+- Instrument format: NIFTY 24000 CE, BANKNIFTY 52000 PE, RELIANCE, etc.
+
+================================================================================
+SCREEN 1: LANDING PAGE / WELCOME
+================================================================================
+
+Design a dark-theme fintech marketing landing page for TradeMentor AI, a trading psychology SaaS for Indian F&O (futures & options) traders.
+
+BACKGROUND: Deep near-black navy #04040e. Subtle radial amber glow behind the hero headline.
+
+NAVBAR (sticky, top):
+- Left: Shield icon + "TradeMentor" wordmark + small amber "BETA" badge
+- Center: Text links — About, Features, Pricing (smooth scroll)
+- Right: "Sign In" button — amber outline style
+
+HERO SECTION:
+- Large bold headline (Syne font, 3.5rem): "The market didn't take your money. Your emotions did."
+- Subheadline (smaller, muted): "Real-time behavioral analysis for Indian F&O traders. Know when you're revenge trading, overtrading, or chasing losses — before it's too late."
+- Live alert card preview floating to the right — looks like a real app notification:
+  Red-bordered card showing: "⚠ Revenge Trading Detected — 4th trade in NIFTY CE after 3 consecutive losses. Cooling down recommended."
+- Below hero: Two CTA buttons — "Connect Zerodha" (amber filled gradient) and "Try as Guest" (outline)
+- Small consent checkbox: "I agree to Terms of Service and Privacy Policy"
+- Social proof line: "Trusted by 200+ Indian traders in beta"
+
+PROBLEM SECTION (id="about"):
+- Heading: "Why do 90% of F&O traders lose money?"
+- 3 icon cards in a row:
+  1. Brain icon — "Emotional decisions after losses" — Revenge trading, panic exits
+  2. Eye icon — "No awareness of patterns" — Same mistakes every week
+  3. Clock icon — "Realizing too late" — Only sees the damage at end of day
+- Cards: dark surface, subtle amber icon tint
+
+HOW IT WORKS SECTION:
+- 3 numbered steps with connecting line:
+  1. "Connect Zerodha (read-only)" — padlock icon, "We never place trades. Read-only access only."
+  2. "Monitor trades live" — activity icon, "TradeMentor watches every fill in real-time"
+  3. "Alerts before damage is done" — bell icon, "Get warned while you can still act"
+
+FEATURES GRID (id="features"):
+- 6 cards in 2-row 3-column grid:
+  1. "Behavioral Analysis" — pattern detection across 15 behavioral patterns
+  2. "Real-time Alerts" — instant notifications when patterns detected
+  3. "Blowup Shield" — stops you before catastrophic loss days
+  4. "Analytics & Reports" — weekly email + WhatsApp summaries
+  5. "AI Coach" — chat with an AI that knows your trading history
+  6. "WhatsApp Reports" — daily EOD reports on WhatsApp
+
+PATTERNS SHOWCASE:
+- Heading: "Patterns we detect"
+- 5 pill/badge cards styled like real alert chips from the app:
+  - "Revenge Trading" — red "CRITICAL" badge
+  - "Overtrading" — amber "MEDIUM" badge
+  - "FOMO Entry" — amber "MEDIUM" badge
+  - "No Stop Loss" — red "CRITICAL" badge
+  - "Early Exit" — green "LOW" badge
+
+PRICING SECTION (id="pricing"):
+- Heading: "Simple pricing"
+- Toggle: Monthly / Yearly (yearly shows discount %)
+- 3 pricing cards in a row:
+  LEFT — Free: ₹0/forever. Features: 5 alerts/day, basic patterns, dashboard. Grey border.
+  CENTER — Pro: ₹499/mo or ₹4,499/yr. "Most Popular" amber badge. Amber glowing border. Features: unlimited alerts, all 15 patterns, AI coach, WhatsApp reports, email reports.
+  RIGHT — Elite: ₹999/mo or ₹8,999/yr. Features: everything in Pro + guardian alerts, priority support, early feature access.
+- Each card has a feature checklist with checkmark/X icons
+
+FAQ SECTION:
+- Accordion-style, 6 questions:
+  1. "Is my Zerodha data safe?" — Read-only API, we never store credentials
+  2. "Does TradeMentor place trades?" — Never. Read-only access only.
+  3. "What patterns does it detect?" — 15 behavioral patterns
+  4. "Is it free?" — Yes, free tier available. Pro for power users.
+  5. "Does it work for options?" — Yes, built specifically for F&O
+  6. "Is this SEBI registered?" — No. Behavioural analytics only, not investment advice.
+
+FOOTER:
+- 4 columns: Product | Legal | Company | Follow Us
+- Bottom bar: "© 2024 TradeMentor AI. Not SEBI registered. Behavioural analytics only. Not investment advice."
+
+================================================================================
+SCREEN 2: DASHBOARD
+================================================================================
+
+Design the main trading dashboard screen for TradeMentor AI. Dark theme, fintech aesthetic.
+
+LAYOUT: Sidebar on left (220px) + main content area.
+
+SIDEBAR:
+- Top: Shield icon + "TradeMentor" logo
+- Account selector (dropdown pill showing "ZERODHA • AB1234")
+- Nav items with icons: Dashboard (active/highlighted amber), Analytics, Alerts (with unread badge count), Blowup Shield, My Patterns, Portfolio Radar, Chat, Reports, Settings
+- Bottom: small amber pulsing dot + "Live" text (WebSocket connected indicator)
+
+HEADER BAR (top of main area):
+- Left: "Good morning, Arjun" greeting
+- Center: Risk state banner — show "CAUTION" state — amber background pill with warning icon: "3 alerts today. Consider reducing position size."
+- Right: Sync button (circular arrows icon) + small account avatar
+
+MAIN CONTENT (2-column grid):
+
+LEFT COLUMN:
+1. Open Positions card — table with columns: Instrument, Qty, LTP, P&L (live updating)
+   - Show 3 rows: NIFTY 24000 CE (+₹4,200 green), BANKNIFTY 52000 PE (-₹1,800 red), RELIANCE (-₹650 red)
+   - Live price indicator: small pulsing green dot next to each LTP
+
+2. Today's Alerts card — 3 behavioral alerts:
+   - Red chip: "Revenge Trading" — "4th trade after 3 losses. 14:32"
+   - Amber chip: "Overtrading" — "8 trades today vs your 5-trade average. 11:15"
+   - Green chip: "Cooling Off" — "No trades for 45 mins. Good discipline. 10:30"
+
+3. Predictive Warnings card — amber border — "Next 30 min risk":
+   - "Based on your pattern: 73% chance of revenge trade if NIFTY moves against you"
+
+RIGHT COLUMN:
+4. Today's P&L card — large number "-₹2,247" in red. Below: "vs your daily target ₹3,000"
+   Sparkline chart showing intraday P&L curve
+
+5. Trade Journal button — floating amber button to log the current trade's psychology
+
+6. Closed Trades today — compact table: 5 rows, showing instrument / P&L / pattern flag if any
+
+BOTTOM: "Behavioral Score" card — score meter from 0-100, current: 68/100, amber color.
+"Your top issue today: 3 revenge trades costing estimated ₹8,400"
+
+================================================================================
+SCREEN 3: ANALYTICS
+================================================================================
+
+Design an analytics screen for a trading psychology app. Dark fintech theme.
+
+LAYOUT: Sidebar (same as dashboard) + full-width content area with tab navigation.
+
+TOP TABS: Summary | Behavior | Trades | Timing
+
+SUMMARY TAB (default active):
+
+Row 1 — 4 stat cards:
+- "Win Rate" — 42% — small trend arrow down
+- "Avg Win" — ₹3,240 — green
+- "Avg Loss" — ₹4,180 — red
+- "Profit Factor" — 0.82 — red (below 1 = losing)
+
+Row 2 — 2 cards:
+- "P&L Over Time" — line chart, 30-day view, showing volatility with red days visible
+  X-axis: dates, Y-axis: cumulative P&L in ₹
+- "Win/Loss Distribution" — bar chart showing win rate by day of week (Tuesday worst, Monday best)
+
+Row 3 — "Money Saved by TradeMentor" — green card:
+- "Estimated ₹18,400 saved by heeding 7 alerts this month"
+- Small timeline of which alerts saved money
+
+AI NARRATIVE CARD — amber left border:
+"Your biggest weakness this month is revenge trading after morning losses. You trade 2.3x more after a losing first hour, and those trades have a 28% win rate vs your 42% average. Consider a rule: no new positions for 30 minutes after a ₹2,000 loss."
+
+BEHAVIOR TAB:
+- Radar/spider chart showing scores across 6 dimensions: Discipline, Risk Management, Consistency, Patience, Loss Recovery, Position Sizing
+- Current score vs last month comparison
+- 3 top pattern cards with frequency count and estimated cost
+
+================================================================================
+SCREEN 4: ALERTS CENTER
+================================================================================
+
+Design an alert management screen for a trading psychology app. Dark fintech theme.
+
+LAYOUT: Sidebar + content with 3 sub-tabs: Live | History | Patterns
+
+LIVE TAB (default):
+- Real-time feed header with amber pulsing dot: "3 unread alerts"
+- Alert cards in a vertical list, each card:
+  - Severity colored left border (red/orange/amber/green)
+  - Icon + Pattern name (bold) + timestamp
+  - Description: natural language explanation of what was detected
+  - Trade context: "NIFTY 24000 CE — 4th entry after 3 losses in same direction"
+  - Two action buttons: "Acknowledge" and "Log in Journal"
+
+Show 4 alerts:
+  1. RED — "Revenge Trading" — 14:32 — "You entered NIFTY 24000 CE for the 4th time after 3 consecutive losses. Historical success rate for this pattern: 18%."
+  2. ORANGE — "Meltdown Risk" — 14:15 — "Daily loss is 67% of your typical stop. Consider stopping for the day."
+  3. AMBER — "Overtrading" — 11:45 — "8 trades today vs your 7-day average of 4. Execution quality drops after trade #6."
+  4. GREEN — "Good Discipline" — 10:30 — "45-minute break taken after loss. This matches your best trading days pattern."
+
+HISTORY TAB:
+- Date range picker
+- Filterable list of all past alerts
+- Each row: date/time | pattern | severity chip | acknowledged status
+
+PATTERNS TAB:
+- 6 cards in 2x3 grid, one per major pattern:
+  Each card: Pattern name, detection count this month, trend (↑↓), estimated cost in ₹, mini sparkline of frequency over 30 days
+  Patterns: Revenge Trading (12 times, ₹24k cost), Overtrading (8 times), FOMO Entry (5 times), No Stop Loss (3 times, ₹8k cost), Early Exit (7 times), Winning Streak Overconfidence (2 times)
+
+================================================================================
+SCREEN 5: BLOWUP SHIELD
+================================================================================
+
+Design a "Blowup Shield" screen for a trading psychology app. This screen helps traders avoid catastrophic loss days. Dark fintech theme with a protective/guardian aesthetic.
+
+LAYOUT: Sidebar + content area
+
+TOP: Large status card spanning full width:
+- If safe: Green shield icon + "Shield Active" + "You're within safe limits today" — dark green background glow
+- If warning: Amber shield + "Approaching Limit" — amber glow
+- Show WARNING state: "₹14,200 lost today. Your historical blowup threshold is ₹18,000."
+
+PROGRESS BAR:
+- Large visual bar: "Today's Loss vs Blowup Threshold"
+- 79% filled (₹14,200 / ₹18,000), amber color, pulsing animation
+- Markers at 40% (First Warning) and 75% (Critical Warning)
+
+COUNTERFACTUAL P&L CARD (amber border):
+- "If you had stopped at the first alert today:"
+- Table showing: Actual P&L: -₹14,200 vs. Estimated P&L if stopped: -₹6,800
+- "TradeMentor could have saved you ₹7,400 today"
+
+ALERT TIMELINE:
+- Chronological list of today's shield checkpoints:
+  - 10:15 — First Warning triggered at 40% (₹7,200 loss). User continued.
+  - 12:45 — Critical Warning triggered at 75% (₹13,500 loss). User acknowledged.
+  - 14:20 — Current status: 79% of blowup threshold
+
+SETTINGS CARD:
+- "Your blowup thresholds" — editable values:
+  - Daily loss limit: ₹18,000 (based on your last 30 days avg)
+  - First warning at: 40%
+  - Critical warning at: 75%
+  - "Thresholds calculated from your trading history, not arbitrary rules"
+
+HISTORY TAB: Chart showing last 30 days, which days triggered blowup shield, bar chart of daily P&L with threshold line
+
+================================================================================
+SCREEN 6: MY PATTERNS
+================================================================================
+
+Design a "My Patterns" personal behavioral patterns screen. Dark fintech theme.
+
+LAYOUT: Sidebar + content
+
+HEADER: "Your Trading Psychology Profile"
+Subtitle: "Based on 847 trades over 6 months"
+
+TOP SECTION — Behavioral Scores:
+- Circular progress indicators in a row (5 metrics, score out of 10):
+  Discipline: 6.2 | Risk Mgmt: 4.8 | Patience: 7.1 | Consistency: 5.5 | Loss Recovery: 3.9
+  Each circle: amber filled arc, dark background, score in center, label below
+
+PATTERNS DETECTED card:
+- 5 pattern rows, each with:
+  - Severity badge (colored chip: critical/high/medium/low)
+  - Pattern name
+  - Frequency: "12 times in 30 days"
+  - Estimated impact: "-₹24,000 estimated cost"
+  - Trend arrow (getting worse/better)
+  - Small 14-day sparkline mini chart
+
+Show:
+1. CRITICAL — Revenge Trading — 12x — -₹24,000 — ↑ worse
+2. MEDIUM — Overtrading — 8x — -₹9,600 — → stable
+3. MEDIUM — FOMO Entry — 5x — -₹6,200 — ↓ improving
+4. LOW — Early Exit — 7x — -₹3,100 — ↓ improving
+5. LOW — Winning Streak Overconfidence — 2x — -₹1,800 — → stable
+
+GOALS SECTION:
+- "Active Commitments" — 2 goal cards:
+  1. "No trades for 30 minutes after a loss" — Streak: 4 days — progress bar
+  2. "Max 5 trades per day" — Streak: 1 day — broken yesterday, amber warning
+
+AI INSIGHT card (amber left border):
+"Your worst pattern is revenge trading, and it almost always happens between 2-3 PM after a morning loss. Your win rate in the 2-3 PM window after a losing morning: 14%. Consider stepping away from the terminal during this window."
+
+================================================================================
+SCREEN 7: AI COACH CHAT
+================================================================================
+
+Design an AI coach chat screen for a trading psychology app. The AI knows the user's trading history. Dark fintech theme.
+
+LAYOUT: Sidebar + chat interface taking full remaining width
+
+CHAT AREA:
+- Clean message bubbles
+- AI messages: dark surface card, left-aligned, amber "AI" avatar badge
+- User messages: right-aligned, darker surface
+- Streaming indicator: three pulsing dots when AI is typing
+
+Show a conversation sample:
+User: "Why did I lose so much today?"
+AI: (multi-line response) "Looking at today's 11 trades: you started well with 2 wins (NIFTY PE, +₹4,200). The turn came after your 10:45 BANKNIFTY loss (-₹6,800). After that loss, you made 4 more BANKNIFTY trades in the next 90 minutes — all losses totaling -₹14,200. This is your revenge trading pattern. It's triggered by losses above ₹5,000 on a single trade. You've had 12 similar episodes this month.
+→ What you can do: set a 30-minute hard stop after any single loss above ₹3,000."
+
+User: "How can I improve my win rate?"
+AI: "Your win rate is 42% overall, but it's 58% in the first 2 hours of the session and drops to 31% after 12:30 PM. Your best days all share one thing: no more than 4 trades. On your 5+ trade days, your win rate is 29%.
+The single highest-impact change: stop after 4 trades, regardless of P&L."
+
+BOTTOM INPUT:
+- Text input: "Ask about your trading..."
+- Send button (amber)
+- Context chip showing: "Analyzing: today's 11 trades + 30-day history"
+
+RIGHT SIDEBAR (collapsed by default, expandable):
+- "Today's Context" panel: quick stats AI is referencing (trades today, P&L, alerts triggered)
+
+================================================================================
+SCREEN 8: PORTFOLIO RADAR
+================================================================================
+
+Design a Portfolio Radar screen for a trading app. This shows concentration risk, correlation between positions, and single-stock overexposure. Dark fintech theme.
+
+LAYOUT: Sidebar + content
+
+HEADER: "Portfolio Radar" — subtitle: "Real-time concentration & correlation analysis"
+
+TOP ROW — 3 risk metric cards:
+1. "Concentration Risk" — Score: HIGH — red — "72% of capital in NIFTY derivatives"
+2. "Correlation Risk" — Score: MEDIUM — amber — "NIFTY + BANKNIFTY both long = correlated exposure"
+3. "Margin Utilization" — 84% — amber bar — "₹1,68,000 of ₹2,00,000 used"
+
+RADAR CHART (center, large):
+- Octagonal radar/spider chart with 6 axes:
+  Concentration | Correlation | Volatility | Leverage | Drawdown Risk | Liquidity
+- Current portfolio polygon in amber
+- "Safe zone" polygon in dark green
+- The amber polygon is clearly outside safe zone in Concentration and Leverage axes
+
+POSITION BREAKDOWN TABLE:
+- Columns: Instrument | Type | Qty | Value | % of Portfolio | Risk Level
+- Rows:
+  NIFTY 24000 CE | Option | 50 | ₹62,000 | 31% | HIGH (red)
+  BANKNIFTY 52000 PE | Option | 25 | ₹48,000 | 24% | HIGH (red)
+  NIFTY 23500 PE | Option | 50 | ₹17,000 | 8.5% | LOW (green)
+  RELIANCE | Future | 250 | ₹73,000 | 36.5% | MEDIUM (amber)
+
+ALERTS PANEL:
+- 2 active concentration alerts:
+  "⚠ 55% in NIFTY derivatives. Consider reducing if market turns."
+  "⚠ Long NIFTY + Long BANKNIFTY Future = 80% correlated. One event hits both."
+
+================================================================================
+SCREEN 9: SETTINGS
+================================================================================
+
+Design a settings screen for a trading psychology app. Dark fintech theme.
+
+LAYOUT: Sidebar + 2-column settings layout
+
+LEFT COLUMN (main settings):
+
+1. ACCOUNT card:
+   - Connected broker: Zerodha — green "Connected" badge — "AB1234 • Arjun Mehta"
+   - "Disconnect" button (red outline)
+   - Last sync: "2 minutes ago"
+
+2. NOTIFICATIONS card:
+   - WhatsApp Alerts toggle (ON) — phone number: +91 98765 43210 — "Test" button
+   - Push Notifications toggle (ON)
+   - Email Reports toggle (ON) — arjun@example.com
+   - Notification timing: EOD Report at 4:00 PM | Morning Brief at 8:30 AM
+
+3. TRADING PROFILE card:
+   - Capital: ₹2,00,000
+   - Risk tolerance: Conservative / Moderate / Aggressive (radio — Moderate selected)
+   - Trading style: Intraday / Swing / Both (radio — Intraday selected)
+   - Max trades per day: 5
+   - Daily loss limit: ₹4,000
+
+4. GUARDIAN settings card:
+   - "Guardian WhatsApp Number" — family member who gets blowup alerts
+   - Input field: +91 _______
+   - "A message is sent to your guardian when you hit 75% of your daily loss limit"
+
+RIGHT COLUMN:
+
+5. BEHAVIORAL THRESHOLDS card:
+   - Revenge trading sensitivity: Low / Medium / High (Medium selected)
+   - Overtrading threshold: 5 trades/day slider
+   - FOMO detection: ON/OFF toggle
+
+6. DATA & PRIVACY card:
+   - "Export my data" button
+   - "Delete all data" — red text button
+
+7. SUBSCRIPTION card:
+   - Current plan: "Pro" — amber badge
+   - Next billing: April 1, 2024 — ₹499
+   - "Manage subscription" button
+
+================================================================================
+SCREEN 10: REPORTS
+================================================================================
+
+Design a reports screen for a trading analytics app. Dark fintech theme.
+
+LAYOUT: Sidebar + content
+
+HEADER: "Reports" — subtitle: "Generated reports and summaries"
+
+TABS: All Reports | EOD Reports | Weekly | AI Insights
+
+REPORT CARDS (in a list):
+Each card shows:
+- Report type badge (amber chip: EOD / Weekly / AI Insight)
+- Date/time
+- Preview excerpt
+- "View" button
+
+Show 4 report cards:
+
+1. WEEKLY — "Week of Mar 10–14" — "Net P&L: -₹12,400. Win rate: 39%. Top pattern: Revenge Trading (5 triggers). Compared to last week: discipline score improved 12 points."
+
+2. EOD — "Friday, Mar 14" — "11 trades, net -₹3,200. 2 behavioral alerts triggered. Best trade: NIFTY PE +₹4,800. Worst: BANKNIFTY CE -₹6,200 (revenge trade after 3 losses)."
+
+3. AI INSIGHT — "Pattern Analysis: March" — "Your revenge trading costs you an estimated ₹24,000/month. It almost always happens between 2-4 PM after a morning loss > ₹4,000."
+
+4. EOD — "Thursday, Mar 13" — "8 trades, net +₹2,100. Good discipline day — stopped at 4 trades after reaching daily target."
+
+OPENED REPORT VIEW (right panel slides in):
+- Full report rendered: sections, charts, P&L breakdown, behavioral score
+- "Send to WhatsApp" and "Send to Email" buttons at top
+- Print button
+
+================================================================================
+SCREEN 11: ADMIN LOGIN
+================================================================================
+
+Design an admin login screen. Dark theme, minimal, security-focused aesthetic.
+
+Full-page centered layout on very dark background #04040e.
+
+CENTER CARD (max 380px wide):
+- Top: Large shield icon in amber on dark surface, "TradeMentor Admin" title, subtitle "Restricted access"
+
+STEP 1 — Login form:
+- Email input with mail icon
+- Password input with lock icon + show/hide toggle
+- "Continue" button — amber gradient
+
+STEP 2 — OTP verification (after email is submitted):
+- Large centered 6-digit OTP input, monospace font, big text
+- "Code sent to admin@tradementor.ai" subtitle
+- "Verify & Sign In" button — amber gradient
+- "Back" text link
+
+Bottom: Small text — "This area is restricted. Unauthorised access is prohibited."
+
+No registration link, no forgot password link. This is intentionally minimal and intimidating.
+
+================================================================================
+SCREEN 12: ADMIN OVERVIEW DASHBOARD
+================================================================================
+
+Design an admin dashboard overview screen. Dark fintech theme, professional internal tool aesthetic.
+
+LAYOUT: Left sidebar (220px, darker) + main content area
+
+SIDEBAR:
+- Logo: Shield + "TradeMentor ADMIN" (amber label)
+- Nav items with icons: Overview (active), Users, System Health, Insights, Broadcast, Audit Log, Config
+- Bottom: Admin name "Karan S." + email + "Sign out" button
+
+MAIN CONTENT:
+
+HEADER: "Overview" + "Updated 2 mins ago" + Refresh button
+
+STAT CARDS ROW (8 cards in responsive grid):
+- Total Users: 847 (amber icon)
+- Connected (Zerodha): 312 (green icon)
+- Online Now: 23 (green pulsing dot)
+- New Today: 14
+- Active (7d): 189
+- Total Trades: 142,840
+- Total Alerts: 28,930
+- Alerts Today: 847
+
+USER GROWTH CHART:
+- Line chart — "New signups — last 14 days"
+- Subtle sparkline style, amber line on dark background
+- Shows growth trend
+
+INFRASTRUCTURE STATUS:
+- Two status indicators: Database ● healthy | Redis ● healthy
+- Both with green pulsing dots
+
+================================================================================
+SCREEN 13: ADMIN USERS LIST
+================================================================================
+
+Design an admin users management screen. Dark theme, data-dense internal tool.
+
+LAYOUT: Admin sidebar + content
+
+HEADER: "Users" — "847 total"
+ACTIONS ROW: Search input + status filter dropdown ("All statuses") + "Export CSV" button
+
+DATA TABLE:
+- Columns: User / Zerodha ID | Status | Phone | Joined
+- 8 rows showing:
+  1. arjun@gmail.com / AB1234 — green "connected" badge — +91 98765 43210 — Jan 12
+  2. priya.sharma@gmail.com / PS5678 — green "connected" badge — +91 87654 32109 — Jan 15
+  3. rahul.t@gmail.com / RT9012 — amber "guest" badge — — — Jan 20
+  4. meera.p@hotmail.com / MP3456 — grey "disconnected" badge — — — Feb 3
+  5. vikram.singh@gmail.com / VS7890 — red "suspended" badge — +91 76543 21098 — Feb 8
+  (more rows...)
+
+- Hover state: row highlights slightly
+- Click on row → opens user detail page
+
+PAGINATION: Page 1 of 17 — prev/next arrows
+
+================================================================================
+SCREEN 14: ADMIN USER DETAIL
+================================================================================
+
+Design an admin user detail page. Dark theme internal tool.
+
+LAYOUT: Admin sidebar + content with back button
+
+HEADER:
+- "← Back to Users" link
+- User name/email as H1
+- "Zerodha ID: AB1234" subtitle
+- Phone number
+- Right: "Suspend" button (red outline)
+
+STATS ROW (4 cards):
+- Status: connected (green)
+- Total Trades: 847
+- Total Alerts: 23
+- Risk Tolerance: moderate
+
+PROFILE SECTION:
+- Trading Style: Intraday
+- Email Alerts: Enabled (green)
+
+SEND WHATSAPP MESSAGE section:
+- Sending to: +91 98765 43210
+- Large textarea: "Type a message (max 700 chars)..."
+- Character counter 0/700
+- "Send" button (amber outline)
+
+RECENT ALERTS list (last 10):
+Each row: severity badge | pattern type | timestamp
+- CRITICAL — Revenge Trading — Mar 14, 2:32 PM
+- MEDIUM — Overtrading — Mar 14, 11:45 AM
+- HIGH — Meltdown Risk — Mar 13, 3:15 PM
+- LOW — Early Exit — Mar 13, 10:20 AM
+
+================================================================================
+SCREEN 15: ADMIN SYSTEM HEALTH
+================================================================================
+
+Design an admin system health monitoring screen. Dark theme, technical/ops aesthetic.
+
+LAYOUT: Admin sidebar + content
+
+HEADER: "System Health" + Refresh button
+
+2-COLUMN GRID of metric cards:
+
+REDIS CARD:
+- Status: ● ok (green)
+- Version: 7.2.4
+- Uptime: 12.3 days
+- Connected clients: 4
+- Memory used: 84.2 MB / peak 91.0 MB
+- Total keys: 2,847
+- Hit rate: 94.2% (green — above 80% is good)
+- Evicted keys: 0
+- Ops/sec: 12
+
+CELERY QUEUES CARD:
+- Status: ● ok (green)
+- Default queue: 3 tasks
+- AI worker queue: 1 task
+
+DB CONNECTION POOL CARD:
+- Pool size: 5
+- Checked in: 4
+- Checked out: 1
+- Overflow: 0
+
+CONFIG CARD:
+- Environment: production
+- Maintenance mode: off (green)
+- Online users: 23
+
+INTEGRATIONS CARD (full width):
+- WhatsApp Gupshup: ● configured (green)
+- Email SMTP: ● configured (green)
+- Sentry: ● enabled (green)
+
+SCHEDULED TASKS (full width, 3-column card grid):
+Each task card shows:
+- Task name
+- Schedule (e.g., "Daily 23:45 IST")
+- Status dot (green/amber/grey)
+- Last run: timestamp
+- Next run: timestamp
+
+Tasks:
+1. Commodity EOD Report — Daily 23:45 IST — Last: Mar 16 11:45 PM — Next: Mar 17 11:45 PM
+2. Weekly Summary — Sun 20:00 IST — Last: Mar 10 8:00 PM — Next: Mar 17 8:00 PM
+3. EOD Reconciliation — Daily 04:00 IST — Last: Mar 17 4:00 AM — Next: Mar 18 4:00 AM
+
+================================================================================
+SCREEN 16: ADMIN BEHAVIORAL INSIGHTS
+================================================================================
+
+Design an admin behavioral insights analytics screen. Dark theme, data visualization heavy.
+
+LAYOUT: Admin sidebar + content
+
+HEADER: "Behavioral Insights" + period selector dropdown (Last 7d / 14d / 30d / 90d, currently 30d) + Refresh
+
+2-COLUMN GRID:
+
+TOP PATTERNS CARD (horizontal bar chart):
+- Heading: "Top Patterns — Last 30 Days"
+- Horizontal bars for:
+  Revenge Trading ||||||||||||| 2,847
+  Overtrading ||||||||| 1,923
+  FOMO Entry ||||||| 1,247
+  No Stop Loss ||||| 892
+  Early Exit |||| 651
+  Winning Streak Overconfidence || 287
+- Amber gradient bars on dark background
+
+SEVERITY BREAKDOWN CARD:
+- Heading: "By Severity"
+- Stacked progress bars:
+  Critical: 28% — red
+  High: 34% — orange
+  Medium: 26% — amber
+  Low: 12% — green
+- Each with count and percentage
+
+DAILY ALERT VOLUME (full width, sparkline chart):
+- Line chart over 14 days
+- Shows volume peaks (market volatile days = more alerts)
+- Amber line, dark background
+
+================================================================================
+SCREEN 17: ADMIN BROADCAST
+================================================================================
+
+Design an admin broadcast message screen for sending WhatsApp messages to user segments. Dark theme.
+
+LAYOUT: Admin sidebar + content, max-width centered card
+
+HEADER: "Broadcast Message"
+Subtitle: "Send a WhatsApp message to a segment of users. Always preview before sending."
+
+COMPOSE CARD:
+
+TARGET SEGMENT — 2 buttons side by side (radio card style):
+- LEFT: "Connected users" selected (amber border) — "Users with Zerodha linked + phone number"
+- RIGHT: "All with phone" — "Everyone who has provided a phone number"
+
+MESSAGE INPUT:
+- Large textarea, 5 rows, "Write your broadcast message here..."
+- Character counter 0/700 — turns amber when approaching limit
+
+"Preview recipients" button — amber outline, shows user count before committing to send
+
+AFTER DRY-RUN — preview state shows:
+- "This will send to 312 users" with users icon
+- Message preview box with amber left border showing the message text
+- Red warning: "⚠ This cannot be undone. Messages will be sent immediately via WhatsApp."
+- "Send to 312 users" button (amber gradient) + "Edit" button (grey outline)
+
+SUCCESS STATE (after sending):
+- Large checkmark icon (green)
+- "Broadcast complete"
+- Stats: Sent: 308 | Failed: 4 | Total: 312
+
+================================================================================
+SCREEN 18: ADMIN AUDIT LOG
+================================================================================
+
+Design an admin audit log screen showing a history of all admin actions. Dark theme.
+
+LAYOUT: Admin sidebar + content
+
+HEADER: "Audit Log" — "2,847 actions recorded"
+FILTER: Action type dropdown (All actions / Login / Suspend user / Send message / Broadcast / Maintenance toggle / Announcement set)
+
+TIMELINE LIST:
+Each entry shows:
+- Small icon in colored circle (color by action type)
+- Action name (bold, colored): "Suspend user" (red) / "Send message" (amber) / "Login" (green) / "Broadcast" (orange) / "Maintenance toggle" (red)
+- Admin email who did it
+- Truncated target ID (for user actions)
+- Detail chips: small grey pills showing key=value pairs from the action context
+  e.g., for suspend: "new_status: suspended"
+  e.g., for send_message: "preview: Hey Arjun, we noticed..." | "to: +91 9876..."
+  e.g., for broadcast: "segment: connected" | "sent: 308" | "failed: 4"
+- Timestamp (right-aligned)
+
+Show 8 entries:
+1. LOGIN (green) — karan@tradementor.ai — Mar 17 9:30 AM
+2. SUSPEND USER (red) — karan@tradementor.ai — account: VS789... — new_status: suspended — Mar 17 9:45 AM
+3. SEND MESSAGE (amber) — karan@tradementor.ai — account: AB123... — preview: "Please reduce..." — Mar 17 10:00 AM
+4. BROADCAST (orange) — karan@tradementor.ai — segment: connected | sent: 308 | failed: 4 — Mar 17 10:15 AM
+5. SET ANNOUNCEMENT (amber) — karan@tradementor.ai — announcement: "Scheduled maintenance..." — Mar 16 6:00 PM
+6. MAINTENANCE TOGGLE (red) — karan@tradementor.ai — enabled: true — Mar 15 2:00 AM
+7. UNSUSPEND USER (green) — karan@tradementor.ai — account: RT901... — new_status: connected — Mar 14 11:00 AM
+8. LOGIN (green) — karan@tradementor.ai — Mar 14 8:45 AM
+
+PAGINATION: Page 1 of 57
+
+================================================================================
+GENERAL REFINEMENT PROMPTS (use after any screen)
+================================================================================
+
+To tighten spacing:
+"Add more padding inside the cards. Increase line height. The layout feels cramped."
+
+To adjust colors:
+"The amber should be more golden and less yellow. The card backgrounds should be slightly lighter."
+
+To improve typography:
+"Make all number/price values use a monospace font. Increase the heading size. Labels should be smaller and more muted."
+
+To add depth:
+"Add subtle inner shadows to the cards. The active nav item should have a more prominent glow. Add a very subtle noise texture to the background."
+
+To make it more professional:
+"Remove any rounded corners that are too large. Make borders more subtle. Reduce the number of colors visible at once."
+
+To adjust the fintech feel:
+"This should feel like a Bloomberg terminal crossed with a modern fintech app. Serious, data-dense, but not overwhelming."
+
+================================================================================
+END OF STITCH DESIGN PROMPTS
+================================================================================

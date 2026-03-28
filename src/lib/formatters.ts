@@ -109,3 +109,29 @@ export function formatDateTime(dateString: string): string {
     minute: '2-digit',
   });
 }
+
+/**
+ * Format currency in compact Indian notation (L for lakh, Cr for crore).
+ * Used for large numbers where space is tight.
+ * Examples: ₹1,50,000 → ₹1.5L  |  ₹1,20,00,000 → ₹1.2Cr
+ */
+export function formatCompactCurrency(amount: number): string {
+  const abs = Math.abs(amount);
+  const sign = amount < 0 ? '-' : '';
+  if (abs >= 1_00_00_000) {
+    const cr = abs / 1_00_00_000;
+    return `${sign}₹${parseFloat(cr.toFixed(2))}Cr`;
+  }
+  if (abs >= 1_00_000) {
+    const l = abs / 1_00_000;
+    return `${sign}₹${parseFloat(l.toFixed(2))}L`;
+  }
+  // Below 1L — use standard formatting but without decimal
+  const formatted = new Intl.NumberFormat('en-IN', {
+    style: 'currency',
+    currency: 'INR',
+    minimumFractionDigits: 0,
+    maximumFractionDigits: 0,
+  }).format(abs);
+  return amount < 0 ? `-${formatted}` : formatted;
+}

@@ -1,7 +1,6 @@
-import { PieChart, RefreshCw, TrendingUp, TrendingDown, Minus } from 'lucide-react';
+import { PieChart, RefreshCw, TrendingUp, TrendingDown, Minus, AlertTriangle } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { formatCurrency } from '@/lib/formatters';
-import { motion } from 'framer-motion';
 import type { MarginStatus } from '@/types/api';
 
 interface MarginStatusCardProps {
@@ -20,11 +19,9 @@ function UtilizationBar({ percent, riskLevel }: { percent: number; riskLevel: st
 
   return (
     <div className="w-full h-2 rounded-full bg-muted/50 overflow-hidden">
-      <motion.div
+      <div
         className={cn('h-full rounded-full', barColor)}
-        initial={{ width: 0 }}
-        animate={{ width: `${Math.min(percent, 100)}%` }}
-        transition={{ duration: 0.8, ease: 'easeOut' }}
+        style={{ width: `${Math.min(percent, 100)}%` }}
       />
     </div>
   );
@@ -91,21 +88,25 @@ export default function MarginStatusCard({ margins, isLoading, onRefresh }: Marg
   const { equity, commodity, overall } = margins;
 
   const riskBorderColor =
-    overall.risk_level === 'danger'
-      ? 'border-destructive/30'
-      : overall.risk_level === 'warning'
-        ? 'border-warning/30'
-        : 'border-border';
+    overall.risk_level === 'insolvent'
+      ? 'border-destructive/60'
+      : overall.risk_level === 'danger'
+        ? 'border-destructive/30'
+        : overall.risk_level === 'warning'
+          ? 'border-warning/30'
+          : 'border-border';
 
   const RiskIcon =
-    overall.risk_level === 'danger'
-      ? TrendingDown
-      : overall.risk_level === 'warning'
-        ? Minus
-        : TrendingUp;
+    overall.risk_level === 'insolvent'
+      ? AlertTriangle
+      : overall.risk_level === 'danger'
+        ? TrendingDown
+        : overall.risk_level === 'warning'
+          ? Minus
+          : TrendingUp;
 
   const riskIconColor =
-    overall.risk_level === 'danger'
+    overall.risk_level === 'insolvent' || overall.risk_level === 'danger'
       ? 'text-destructive'
       : overall.risk_level === 'warning'
         ? 'text-warning'

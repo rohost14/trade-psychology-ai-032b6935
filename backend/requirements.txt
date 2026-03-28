@@ -20,6 +20,7 @@ python-dateutil
 pytz
 pywebpush
 sentry-sdk[fastapi]>=2.0.0
+prometheus_client>=0.20.0
 
 # Testing
 pytest>=8.0.0

@@ -61,7 +61,8 @@ async def recalculate_pnl(
     broker_account_id: UUID = Depends(get_verified_broker_account_id),
     symbol: str = None,
     days_back: int = 30,
-    db: AsyncSession = Depends(get_db)
+    db: AsyncSession = Depends(get_db),
+    _limiter: None = Depends(analytics_limiter),
 ):
     """
     Recalculate P&L for trades using FIFO matching.
@@ -70,6 +71,7 @@ async def recalculate_pnl(
     Call this endpoint to retroactively calculate P&L for all trades.
     """
     try:
+        days_back = min(max(days_back, 1), 90)  # clamp: 1–90 days
         result = await pnl_calculator.calculate_and_update_pnl(
             broker_account_id, db, symbol=symbol, days_back=days_back
         )
@@ -1244,3 +1246,686 @@ def _days_between(start_str: str | None, end_str: str | None) -> int:
         return (end - start).days
     except (ValueError, TypeError):
         return 0
+
+
+@router.get("/edge-confidence")
+async def get_edge_confidence(
+    days: int = 30,
+    broker_account_id: UUID = Depends(get_verified_broker_account_id),
+    db: AsyncSession = Depends(get_db),
+    _limiter: None = Depends(analytics_limiter),
+):
+    """Wilson confidence interval on win rate — tells you if your edge is real or noise."""
+    try:
+        cutoff = datetime.now(timezone.utc) - timedelta(days=days)
+        result = await db.execute(
+            select(CompletedTrade)
+            .where(and_(
+                CompletedTrade.broker_account_id == broker_account_id,
+                CompletedTrade.exit_time >= cutoff,
+            ))
+        )
+        trades = result.scalars().all()
+
+        n = len(trades)
+        if n == 0:
+            return {"has_data": False}
+
+        wins = sum(1 for t in trades if float(t.realized_pnl or 0) > 0)
+        p = wins / n
+        z = 1.96  # 95% CI
+
+        # Wilson interval
+        denominator = 1 + z * z / n
+        center = (p + z * z / (2 * n)) / denominator
+        half = (z * math.sqrt(p * (1 - p) / n + z * z / (4 * n * n))) / denominator
+
+        lower = max(0.0, center - half)
+        upper = min(1.0, center + half)
+
+        # Interpretation
+        if n < 20:
+            verdict = "too_few"
+            message = f"Only {n} trades — need at least 20 for a reliable reading."
+        elif lower > 0.50:
+            verdict = "real_edge"
+            message = f"Your win rate is statistically above 50%. This looks like a real edge."
+        elif upper < 0.50:
+            verdict = "losing_edge"
+            message = f"Your win rate is statistically below 50%. The losses are not random variance."
+        else:
+            verdict = "inconclusive"
+            message = f"Win rate could be 50/50 variance with {n} trades. Need more data to confirm edge."
+
+        return {
+            "has_data": True,
+            "n": n,
+            "wins": wins,
+            "observed_win_rate": round(p * 100, 1),
+            "ci_lower": round(lower * 100, 1),
+            "ci_upper": round(upper * 100, 1),
+            "ci_center": round(center * 100, 1),
+            "verdict": verdict,
+            "message": message,
+            "is_reliable": n >= 30,
+        }
+    except Exception as e:
+        logger.error(f"Failed to get edge confidence: {e}")
+        raise HTTPException(status_code=500, detail="Internal server error")
+
+
+@router.get("/conditional-performance")
+async def get_conditional_performance(
+    days: int = 30,
+    broker_account_id: UUID = Depends(get_verified_broker_account_id),
+    db: AsyncSession = Depends(get_db),
+    _limiter: None = Depends(analytics_limiter),
+):
+    """How win rate changes under specific conditions (narrative style)."""
+    try:
+        cutoff = datetime.now(timezone.utc) - timedelta(days=days)
+        result = await db.execute(
+            select(CompletedTrade, CompletedTradeFeature)
+            .outerjoin(CompletedTradeFeature, CompletedTrade.id == CompletedTradeFeature.completed_trade_id)
+            .where(and_(
+                CompletedTrade.broker_account_id == broker_account_id,
+                CompletedTrade.exit_time >= cutoff,
+            ))
+        )
+        rows = result.all()
+
+        if not rows:
+            return {"has_data": False}
+
+        def bucket_stats(condition_fn):
+            wins, total = 0, 0
+            for ct, feat in rows:
+                if condition_fn(ct, feat):
+                    total += 1
+                    if float(ct.realized_pnl or 0) > 0:
+                        wins += 1
+            wr = round(wins / total * 100, 1) if total else 0
+            avg_pnl = 0
+            if total:
+                pnls = [float(ct.realized_pnl or 0) for ct, feat in rows if condition_fn(ct, feat)]
+                avg_pnl = round(sum(pnls) / len(pnls), 2) if pnls else 0
+            return {"wins": wins, "total": total, "win_rate": wr, "avg_pnl": avg_pnl}
+
+        # Baseline
+        all_pnls = [float(ct.realized_pnl or 0) for ct, _ in rows]
+        baseline_wr = round(sum(1 for p in all_pnls if p > 0) / len(all_pnls) * 100, 1) if all_pnls else 0
+        baseline_avg = round(sum(all_pnls) / len(all_pnls), 2) if all_pnls else 0
+
+        conditions = []
+
+        # 1. After a loss
+        s = bucket_stats(lambda ct, feat: feat is not None and bool(feat.entry_after_loss))
+        if s["total"] >= 5:
+            delta = round(s["win_rate"] - baseline_wr, 1)
+            direction = "drops" if delta < 0 else "improves"
+            conditions.append({
+                "key": "after_loss",
+                "label": "After a loss",
+                "win_rate": s["win_rate"],
+                "avg_pnl": s["avg_pnl"],
+                "trade_count": s["total"],
+                "delta_vs_baseline": delta,
+                "narrative": f"Your win rate {direction} to {s['win_rate']}% after a loss (vs {baseline_wr}% baseline) across {s['total']} trades.",
+            })
+
+        # 2. First 30 minutes (9:15–9:45 IST = hour 9)
+        s = bucket_stats(lambda ct, feat: (feat.entry_hour_ist == 9 if feat and feat.entry_hour_ist is not None else False))
+        if s["total"] >= 5:
+            delta = round(s["win_rate"] - baseline_wr, 1)
+            direction = "drops" if delta < 0 else "improves"
+            conditions.append({
+                "key": "first_30min",
+                "label": "Opening 30 minutes",
+                "win_rate": s["win_rate"],
+                "avg_pnl": s["avg_pnl"],
+                "trade_count": s["total"],
+                "delta_vs_baseline": delta,
+                "narrative": f"In the opening 30 minutes your win rate {direction} to {s['win_rate']}% (vs {baseline_wr}% baseline) across {s['total']} trades.",
+            })
+
+        # 3. Expiry day
+        s = bucket_stats(lambda ct, feat: feat is not None and bool(feat.is_expiry_day))
+        if s["total"] >= 3:
+            delta = round(s["win_rate"] - baseline_wr, 1)
+            direction = "drops" if delta < 0 else "improves"
+            conditions.append({
+                "key": "expiry_day",
+                "label": "Expiry day",
+                "win_rate": s["win_rate"],
+                "avg_pnl": s["avg_pnl"],
+                "trade_count": s["total"],
+                "delta_vs_baseline": delta,
+                "narrative": f"On expiry days your win rate {direction} to {s['win_rate']}% (vs {baseline_wr}% baseline) across {s['total']} trades.",
+            })
+
+        # 4. Oversized positions (>1.5x avg)
+        s = bucket_stats(lambda ct, feat: float(feat.size_relative_to_avg) > 1.5 if feat and feat.size_relative_to_avg is not None else False)
+        if s["total"] >= 3:
+            delta = round(s["win_rate"] - baseline_wr, 1)
+            direction = "drops" if delta < 0 else "improves"
+            conditions.append({
+                "key": "large_position",
+                "label": "Oversized positions (>1.5×)",
+                "win_rate": s["win_rate"],
+                "avg_pnl": s["avg_pnl"],
+                "trade_count": s["total"],
+                "delta_vs_baseline": delta,
+                "narrative": f"When you size up (>1.5× avg) your win rate {direction} to {s['win_rate']}% (vs {baseline_wr}% baseline) across {s['total']} trades.",
+            })
+
+        # 5. Quick re-entry (<20 min since last round-trip)
+        s = bucket_stats(lambda ct, feat: float(feat.minutes_since_last_round) < 20 if feat and feat.minutes_since_last_round is not None else False)
+        if s["total"] >= 5:
+            delta = round(s["win_rate"] - baseline_wr, 1)
+            direction = "drops" if delta < 0 else "improves"
+            conditions.append({
+                "key": "quick_reentry",
+                "label": "Quick re-entry (<20 min)",
+                "win_rate": s["win_rate"],
+                "avg_pnl": s["avg_pnl"],
+                "trade_count": s["total"],
+                "delta_vs_baseline": delta,
+                "narrative": f"Quick re-entries (<20 min) show win rate {direction} to {s['win_rate']}% (vs {baseline_wr}% baseline) across {s['total']} trades.",
+            })
+
+        # Sort by absolute delta (most impactful first)
+        conditions.sort(key=lambda c: abs(c["delta_vs_baseline"]), reverse=True)
+
+        return {
+            "has_data": True,
+            "total_trades": len(rows),
+            "baseline_win_rate": baseline_wr,
+            "baseline_avg_pnl": baseline_avg,
+            "conditions": conditions,
+        }
+    except Exception as e:
+        logger.error(f"Failed to get conditional performance: {e}")
+        raise HTTPException(status_code=500, detail="Internal server error")
+
+
+@router.get("/critical-trades")
+async def get_critical_trades(
+    days: int = 30,
+    broker_account_id: UUID = Depends(get_verified_broker_account_id),
+    db: AsyncSession = Depends(get_db),
+    _limiter: None = Depends(analytics_limiter),
+):
+    """Critical trades: large losses, behavioral alerts, or oversized positions."""
+    try:
+        from app.models.behavioral_event import BehavioralEvent
+
+        cutoff = datetime.now(timezone.utc) - timedelta(days=days)
+
+        # Fetch completed trades + features
+        result = await db.execute(
+            select(CompletedTrade, CompletedTradeFeature)
+            .outerjoin(CompletedTradeFeature, CompletedTrade.id == CompletedTradeFeature.completed_trade_id)
+            .where(and_(
+                CompletedTrade.broker_account_id == broker_account_id,
+                CompletedTrade.exit_time >= cutoff,
+            ))
+            .order_by(CompletedTrade.exit_time.desc())
+        )
+        rows = result.all()
+
+        if not rows:
+            return {"has_data": False, "trades": []}
+
+        # Compute baseline avg loss to flag large losses
+        pnls = [float(ct.realized_pnl or 0) for ct, _ in rows]
+        losses = [p for p in pnls if p < 0]
+        avg_loss = sum(losses) / len(losses) if losses else 0  # negative number
+        loss_threshold = avg_loss * 2  # 2x avg loss = critical (more negative)
+
+        # Fetch all behavioral events in period
+        be_result = await db.execute(
+            select(BehavioralEvent)
+            .where(and_(
+                BehavioralEvent.broker_account_id == broker_account_id,
+                BehavioralEvent.detected_at >= cutoff,
+            ))
+            .order_by(BehavioralEvent.detected_at)
+        )
+        behavioral_events = be_result.scalars().all()
+
+        # Build critical trades list
+        critical = []
+        for ct, feat in rows:
+            pnl = float(ct.realized_pnl or 0)
+            reasons = []
+
+            # Reason 1: Large loss
+            if pnl < 0 and avg_loss != 0 and pnl <= loss_threshold:
+                reasons.append({"type": "large_loss", "label": "Large loss (>2× avg)"})
+
+            # Reason 2: Behavioral alert during this trade
+            if ct.entry_time and ct.exit_time:
+                trade_end = ct.exit_time + timedelta(minutes=10)
+                alerts_during = [
+                    be for be in behavioral_events
+                    if be.detected_at and ct.entry_time <= be.detected_at <= trade_end
+                ]
+                for be in alerts_during:
+                    reasons.append({
+                        "type": "behavioral_alert",
+                        "label": be.event_type.replace("_", " ").title() if be.event_type else "Alert",
+                        "event_type": be.event_type,
+                        "severity": be.severity,
+                    })
+
+            # Reason 3: Oversized position
+            if feat and feat.size_relative_to_avg is not None and float(feat.size_relative_to_avg) >= 1.5:
+                reasons.append({
+                    "type": "oversized",
+                    "label": f"Position {float(feat.size_relative_to_avg):.1f}× avg size",
+                })
+
+            # Reason 4: Quick re-entry after loss
+            if feat and feat.entry_after_loss and feat.minutes_since_last_round is not None and float(feat.minutes_since_last_round) < 20:
+                reasons.append({"type": "quick_reentry", "label": f"Re-entered {float(feat.minutes_since_last_round):.0f}m after loss"})
+
+            if reasons:
+                critical.append({
+                    "id": str(ct.id),
+                    "tradingsymbol": ct.tradingsymbol,
+                    "entry_time": ct.entry_time.isoformat() if ct.entry_time else None,
+                    "exit_time": ct.exit_time.isoformat() if ct.exit_time else None,
+                    "direction": ct.direction,
+                    "realized_pnl": round(pnl, 2),
+                    "duration_minutes": ct.duration_minutes,
+                    "reasons": reasons,
+                    "severity": "critical" if any(r["type"] == "large_loss" for r in reasons) or len(reasons) >= 3
+                                else "high" if len(reasons) >= 2
+                                else "medium",
+                })
+
+        # Sort by PnL ascending (worst first) then limit
+        critical.sort(key=lambda t: t["realized_pnl"])
+        critical = critical[:50]  # max 50
+
+        return {
+            "has_data": len(critical) > 0,
+            "total_critical": len(critical),
+            "avg_loss_threshold": round(loss_threshold, 2),
+            "trades": critical,
+        }
+    except Exception as e:
+        logger.error(f"Failed to get critical trades: {e}")
+        raise HTTPException(status_code=500, detail="Internal server error")
+
+
+@router.get("/timing-heatmap")
+async def get_timing_heatmap(
+    days: int = 30,
+    broker_account_id: UUID = Depends(get_verified_broker_account_id),
+    db: AsyncSession = Depends(get_db),
+    _limiter: None = Depends(analytics_limiter),
+):
+    """2D performance grid: entry hour (IST) × day of week."""
+    try:
+        cutoff = datetime.now(timezone.utc) - timedelta(days=days)
+        result = await db.execute(
+            select(CompletedTrade, CompletedTradeFeature)
+            .outerjoin(CompletedTradeFeature, CompletedTrade.id == CompletedTradeFeature.completed_trade_id)
+            .where(and_(
+                CompletedTrade.broker_account_id == broker_account_id,
+                CompletedTrade.exit_time >= cutoff,
+            ))
+        )
+        rows = result.all()
+
+        if not rows:
+            return {"has_data": False, "cells": [], "by_hour": [], "by_day": []}
+
+        day_names = ["Mon", "Tue", "Wed", "Thu", "Fri"]
+
+        # 2D grid: hour 9–15, day 0–4
+        grid: dict[tuple, dict] = {}
+        for ct, feat in rows:
+            h = feat.entry_hour_ist if feat and feat.entry_hour_ist is not None else None
+            if h is None and ct.entry_time:
+                # Convert UTC to IST (UTC+5:30)
+                ist_hour = (ct.entry_time.hour * 60 + ct.entry_time.minute + 330) // 60 % 24
+                h = ist_hour
+            d = feat.entry_day_of_week if feat and feat.entry_day_of_week is not None else None
+            if d is None and ct.entry_time:
+                d = ct.entry_time.weekday()
+            if h is None or d is None or h < 9 or h > 15 or d > 4:
+                continue
+            key = (h, d)
+            if key not in grid:
+                grid[key] = {"trades": 0, "pnl": 0.0, "wins": 0}
+            pnl_val = float(ct.realized_pnl or 0)
+            grid[key]["trades"] += 1
+            grid[key]["pnl"] += pnl_val
+            if pnl_val > 0:
+                grid[key]["wins"] += 1
+
+        cells = [
+            {
+                "hour": h,
+                "day": d,
+                "day_name": day_names[d] if d < 5 else f"D{d}",
+                "hour_label": f"{h}:00",
+                "trades": v["trades"],
+                "pnl": round(v["pnl"], 2),
+                "avg_pnl": round(v["pnl"] / v["trades"], 2) if v["trades"] else 0,
+                "win_rate": round(v["wins"] / v["trades"] * 100, 1) if v["trades"] else 0,
+            }
+            for (h, d), v in grid.items()
+        ]
+
+        # Also compute marginals
+        hour_map: dict[int, dict] = {}
+        day_map: dict[int, dict] = {}
+        for cell in cells:
+            h, d = cell["hour"], cell["day"]
+            hour_map.setdefault(h, {"trades": 0, "pnl": 0.0, "wins": 0})
+            hour_map[h]["trades"] += cell["trades"]
+            hour_map[h]["pnl"] += cell["pnl"]
+            hour_map[h]["wins"] += round(cell["win_rate"] / 100 * cell["trades"])
+            day_map.setdefault(d, {"trades": 0, "pnl": 0.0, "wins": 0})
+            day_map[d]["trades"] += cell["trades"]
+            day_map[d]["pnl"] += cell["pnl"]
+            day_map[d]["wins"] += round(cell["win_rate"] / 100 * cell["trades"])
+
+        by_hour = sorted([
+            {
+                "hour": h,
+                "label": f"{h}:00",
+                "trades": v["trades"],
+                "pnl": round(v["pnl"], 2),
+                "win_rate": round(v["wins"] / v["trades"] * 100, 1) if v["trades"] else 0,
+            }
+            for h, v in hour_map.items()
+        ], key=lambda x: x["hour"])
+
+        by_day = sorted([
+            {
+                "day": d,
+                "name": day_names[d] if d < 5 else f"D{d}",
+                "trades": v["trades"],
+                "pnl": round(v["pnl"], 2),
+                "win_rate": round(v["wins"] / v["trades"] * 100, 1) if v["trades"] else 0,
+            }
+            for d, v in day_map.items()
+        ], key=lambda x: x["day"])
+
+        return {
+            "has_data": True,
+            "cells": cells,
+            "by_hour": by_hour,
+            "by_day": by_day,
+        }
+    except Exception as e:
+        logger.error(f"Failed to get timing heatmap: {e}")
+        raise HTTPException(status_code=500, detail="Internal server error")
+
+
+@router.get("/options-behavior")
+async def get_options_behavior(
+    days: int = 30,
+    broker_account_id: UUID = Depends(get_verified_broker_account_id),
+    db: AsyncSession = Depends(get_db),
+    _limiter: None = Depends(analytics_limiter),
+):
+    """
+    Monthly summary of options-specific behavioral patterns.
+    Aggregates direction_confusion, premium_avg_down, iv_crush alerts
+    from risk_alerts table — gives "happened N times this month" insight.
+    """
+    OPTIONS_PATTERNS = (
+        "options_direction_confusion",
+        "options_premium_avg_down",
+        "iv_crush_behavior",
+    )
+    try:
+        cutoff = datetime.now(timezone.utc) - timedelta(days=days)
+        result = await db.execute(
+            select(RiskAlert).where(and_(
+                RiskAlert.broker_account_id == broker_account_id,
+                RiskAlert.pattern_type.in_(OPTIONS_PATTERNS),
+                RiskAlert.detected_at >= cutoff,
+            ))
+        )
+        alerts = result.scalars().all()
+
+        # Bucket by pattern
+        direction: list[RiskAlert] = []
+        avg_down: list[RiskAlert] = []
+        iv_crush: list[RiskAlert] = []
+        for a in alerts:
+            if a.pattern_type == "options_direction_confusion":
+                direction.append(a)
+            elif a.pattern_type == "options_premium_avg_down":
+                avg_down.append(a)
+            elif a.pattern_type == "iv_crush_behavior":
+                iv_crush.append(a)
+
+        # ── Direction confusion ──────────────────────────────────────────
+        underlying_counts: dict[str, int] = defaultdict(int)
+        flip_intervals: list[float] = []
+        for a in direction:
+            d = a.details or {}
+            if d.get("underlying"):
+                underlying_counts[d["underlying"]] += 1
+            if d.get("minutes_apart") is not None:
+                flip_intervals.append(float(d["minutes_apart"]))
+
+        direction_data = {
+            "count": len(direction),
+            "underlying_breakdown": dict(
+                sorted(underlying_counts.items(), key=lambda x: -x[1])
+            ),
+            "avg_flip_minutes": round(
+                sum(flip_intervals) / len(flip_intervals), 1
+            ) if flip_intervals else None,
+        }
+
+        # ── Premium averaging down ───────────────────────────────────────
+        total_re_entry_premium = 0.0
+        worst_loss_pcts: list[float] = []
+        for a in avg_down:
+            d = a.details or {}
+            total_re_entry_premium += float(d.get("current_premium_paid") or 0)
+            if d.get("worst_loss_pct") is not None:
+                worst_loss_pcts.append(float(d["worst_loss_pct"]))
+
+        avg_down_data = {
+            "count": len(avg_down),
+            "total_re_entry_premium": round(total_re_entry_premium),
+            "avg_worst_loss_pct": round(
+                sum(worst_loss_pcts) / len(worst_loss_pcts), 1
+            ) if worst_loss_pcts else None,
+        }
+
+        # ── IV crush ─────────────────────────────────────────────────────
+        total_iv_loss = 0.0
+        hold_mins: list[float] = []
+        loss_pcts: list[float] = []
+        for a in iv_crush:
+            d = a.details or {}
+            total_iv_loss += abs(float(d.get("realized_pnl") or 0))
+            if d.get("hold_minutes") is not None:
+                hold_mins.append(float(d["hold_minutes"]))
+            if d.get("loss_pct") is not None:
+                loss_pcts.append(float(d["loss_pct"]))
+
+        iv_crush_data = {
+            "count": len(iv_crush),
+            "total_loss": round(total_iv_loss),
+            "avg_hold_minutes": round(
+                sum(hold_mins) / len(hold_mins), 1
+            ) if hold_mins else None,
+            "avg_loss_pct": round(
+                sum(loss_pcts) / len(loss_pcts), 1
+            ) if loss_pcts else None,
+        }
+
+        has_data = any(
+            x["count"] > 0
+            for x in (direction_data, avg_down_data, iv_crush_data)
+        )
+
+        return {
+            "period_days": days,
+            "has_data": has_data,
+            "direction_confusion": direction_data,
+            "premium_avg_down": avg_down_data,
+            "iv_crush": iv_crush_data,
+        }
+
+    except Exception as e:
+        logger.error(f"Failed to get options behavior: {e}")
+        raise HTTPException(status_code=500, detail="Internal server error")
+
+
+@router.get("/btst")
+async def get_btst_analytics(
+    days: int = 90,
+    broker_account_id: UUID = Depends(get_verified_broker_account_id),
+    db: AsyncSession = Depends(get_db),
+    _limiter: None = Depends(analytics_limiter),
+):
+    """
+    BTST (Buy Today Sell Tomorrow) analytics.
+
+    Identifies NRML trades entered after 15:00 IST and exited before 09:45 IST
+    the next trading day — a behavioural signal of late-day emotional/distress
+    entries (planned swing trades enter before 14:45).
+
+    Computes:
+    - Total BTST trades and win rate
+    - Total realised P&L across all BTST trades
+    - Overnight reversals: was profitable at EOD but closed at a loss next day
+    """
+    try:
+        from zoneinfo import ZoneInfo
+        IST = ZoneInfo("Asia/Kolkata")
+
+        cutoff = datetime.now(timezone.utc) - timedelta(days=days)
+
+        # Fetch all NRML completed_trades in window; IST time-of-day filters applied
+        # in Python (simpler than AT TIME ZONE in SQLAlchemy for portability).
+        result = await db.execute(
+            select(CompletedTrade).where(and_(
+                CompletedTrade.broker_account_id == broker_account_id,
+                CompletedTrade.product == "NRML",
+                CompletedTrade.entry_time >= cutoff,
+                CompletedTrade.entry_time.is_not(None),
+                CompletedTrade.exit_time.is_not(None),
+            )).order_by(CompletedTrade.entry_time.desc())
+        )
+        candidates = result.scalars().all()
+
+        btst_trades = []
+        for ct in candidates:
+            entry_ist = ct.entry_time.astimezone(IST)
+            exit_ist = ct.exit_time.astimezone(IST)
+
+            # Must be different calendar dates in IST
+            if entry_ist.date() == exit_ist.date():
+                continue
+
+            # Entry must be after 15:00 IST (late-day emotional entry)
+            if not (entry_ist.hour > 15 or (entry_ist.hour == 15 and entry_ist.minute >= 0)):
+                continue
+
+            # Exit must be before 09:45 IST on the next session
+            if not (exit_ist.hour < 9 or (exit_ist.hour == 9 and exit_ist.minute < 45)):
+                continue
+
+            btst_trades.append(ct)
+
+        if not btst_trades:
+            return {
+                "has_data": False,
+                "period_days": days,
+                "total_btst_trades": 0,
+                "btst_win_rate": 0.0,
+                "btst_total_pnl": 0.0,
+                "overnight_reversals": 0,
+                "reversal_pnl_lost": 0.0,
+                "trades": [],
+            }
+
+        total = len(btst_trades)
+        winners = sum(1 for ct in btst_trades if float(ct.realized_pnl or 0) > 0)
+        total_pnl = sum(float(ct.realized_pnl or 0) for ct in btst_trades)
+        win_rate = round(winners / total * 100, 1) if total else 0.0
+
+        # Overnight reversal: position was profitable at EOD but closed at a loss
+        reversals = []
+        for ct in btst_trades:
+            ocp = ct.overnight_close_price
+            if ocp is None:
+                continue
+            avg_entry = float(ct.avg_entry_price or 0)
+            realized = float(ct.realized_pnl or 0)
+
+            was_profitable_at_eod = False
+            if ct.direction == "LONG":
+                was_profitable_at_eod = float(ocp) > avg_entry
+            elif ct.direction == "SHORT":
+                was_profitable_at_eod = float(ocp) < avg_entry
+
+            is_reversal = was_profitable_at_eod and realized < 0
+
+            if is_reversal:
+                reversals.append(ct)
+
+        reversal_pnl_lost = round(sum(abs(float(ct.realized_pnl or 0)) for ct in reversals), 2)
+
+        # Build trade list (all BTST trades with reversal flags)
+        reversal_ids = {ct.id for ct in reversals}
+        trade_list = []
+        for ct in btst_trades:
+            ocp = ct.overnight_close_price
+            avg_entry = float(ct.avg_entry_price or 0)
+            realized = float(ct.realized_pnl or 0)
+
+            was_profitable_at_eod = None
+            if ocp is not None:
+                if ct.direction == "LONG":
+                    was_profitable_at_eod = float(ocp) > avg_entry
+                elif ct.direction == "SHORT":
+                    was_profitable_at_eod = float(ocp) < avg_entry
+
+            entry_ist = ct.entry_time.astimezone(IST)
+            hold_type = "weekend_hold" if entry_ist.weekday() == 4 else "overnight"
+
+            trade_list.append({
+                "id": str(ct.id),
+                "tradingsymbol": ct.tradingsymbol,
+                "instrument_type": ct.instrument_type,
+                "entry_time": ct.entry_time.isoformat() if ct.entry_time else None,
+                "exit_time": ct.exit_time.isoformat() if ct.exit_time else None,
+                "direction": ct.direction,
+                "realized_pnl": round(realized, 2),
+                "avg_entry_price": round(avg_entry, 4) if avg_entry else None,
+                "overnight_close_price": round(float(ocp), 4) if ocp is not None else None,
+                "was_profitable_at_eod": was_profitable_at_eod,
+                "is_reversal": ct.id in reversal_ids,
+                "duration_minutes": ct.duration_minutes,
+                "hold_type": hold_type,
+            })
+
+        return {
+            "has_data": True,
+            "period_days": days,
+            "total_btst_trades": total,
+            "btst_win_rate": win_rate,
+            "btst_total_pnl": round(total_pnl, 2),
+            "overnight_reversals": len(reversals),
+            "reversal_pnl_lost": reversal_pnl_lost,
+            "trades": trade_list,
+        }
+
+    except Exception as e:
+        logger.error(f"Failed to get BTST analytics: {e}")
+        raise HTTPException(status_code=500, detail="Internal server error")

@@ -228,6 +228,18 @@ class PnLCalculator:
         # Round accumulator for flat-to-flat semantics
         round_acc = self._new_round_acc()
 
+        # MCX and CDS: Kite sends quantity as NUMBER OF LOTS, not units.
+        # NSE/BSE F&O (NFO/BFO): Kite sends quantity already in units (lots × lot_size).
+        # Apply lot_size multiplier only for MCX/CDS so P&L reflects ₹ per lot correctly.
+        first = sorted_trades[0] if sorted_trades else None
+        exchange = (getattr(first, "exchange", None) or "").upper()
+        lot_multiplier = Decimal("1")
+        if exchange in ("MCX", "CDS") and first and db:
+            raw_lot_size = await self.get_lot_size(
+                first.tradingsymbol or "", exchange, db
+            )
+            lot_multiplier = Decimal(str(raw_lot_size))
+
         for trade in sorted_trades:
             qty = trade.filled_quantity or trade.quantity or 0
             price = float(trade.average_price or trade.price or 0)
@@ -265,11 +277,13 @@ class PnLCalculator:
                 opening = opening_queue[0]
                 match_qty = min(opening["remaining_qty"], remaining_close_qty)
 
-                # P&L = price_diff * qty (Kite qty is already in units)
+                # P&L = price_diff * qty * lot_multiplier
+                # For NSE/BSE F&O: lot_multiplier = 1 (Kite sends units already)
+                # For MCX/CDS: lot_multiplier = lot_size (Kite sends lots, not units)
                 if opening["side"] == "BUY":
-                    match_pnl = Decimal(str((price - opening["price"]) * match_qty))
+                    match_pnl = Decimal(str((price - opening["price"]) * match_qty)) * lot_multiplier
                 else:
-                    match_pnl = Decimal(str((opening["price"] - price) * match_qty))
+                    match_pnl = Decimal(str((opening["price"] - price) * match_qty)) * lot_multiplier
 
                 trade_pnl += match_pnl
                 opening["remaining_qty"] -= match_qty

@@ -168,6 +168,7 @@ export interface ShieldSummary {
     unavailable: number; // no open position at alert time, or pre-checkpoint alerts
   };
   data_points: number;
+  is_partial?: boolean;  // true when some checkpoints are still calculating — capital_defended is a lower bound
 }
 
 export interface ShieldTimelineItem {
@@ -191,6 +192,15 @@ export interface ShieldTimelineItem {
   money_saved: number | null;             // user_actual_pnl − counterfactual_pnl_t30 (can be negative)
   counterfactual_pnl_t30: number | null;  // what P&L would have been if position held to T+30
   user_actual_pnl: number | null;         // what user actually realised in the 30-min window
+  position_details: {                     // snapshot of position at alert time
+    tradingsymbol: string | null;
+    quantity: number | null;
+    avg_entry_price: number | null;
+    ltp_at_alert: number | null;
+    unrealised_pnl: number | null;
+  } | null;
+  context_narrative: string | null;       // human-readable one-sentence story
+  capital_at_alert?: number | null;       // capital at risk when alert fired (no_positions case)
 }
 
 export interface PatternBreakdown {
@@ -379,8 +389,9 @@ export interface MarginStatus {
   };
   overall: {
     max_utilization_pct: number;
-    risk_level: 'safe' | 'warning' | 'danger';
+    risk_level: 'safe' | 'warning' | 'danger' | 'insolvent';
     risk_message: string;
+    is_insolvent?: boolean;
   };
 }
 
@@ -389,7 +400,7 @@ export interface MarginSnapshot {
   equity_utilization: number;
   commodity_utilization: number;
   max_utilization: number;
-  risk_level: 'safe' | 'warning' | 'danger';
+  risk_level: 'safe' | 'warning' | 'danger' | 'insolvent';
 }
 
 export interface MarginHistory {

@@ -1,5 +1,4 @@
 import { useState } from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
 import {
   User,
   TrendingUp,
@@ -266,14 +265,7 @@ export default function OnboardingWizard({ brokerAccountId, onComplete, onSkip }
         </CardHeader>
 
         <CardContent className="pb-6">
-          <AnimatePresence mode="wait">
-            <motion.div
-              key={currentStep}
-              initial={{ opacity: 0, x: 20 }}
-              animate={{ opacity: 1, x: 0 }}
-              exit={{ opacity: 0, x: -20 }}
-              transition={{ duration: 0.2 }}
-            >
+          <div key={currentStep} className="animate-fade-in-up">
               {/* Step 1: Welcome */}
               {currentStep === 1 && (
                 <div className="space-y-6">
@@ -362,7 +354,7 @@ export default function OnboardingWizard({ brokerAccountId, onComplete, onSkip }
 
                   <div className="space-y-3">
                     <Label>Risk Tolerance</Label>
-                    <div className="grid grid-cols-3 gap-3">
+                    <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 sm:gap-3">
                       {RISK_TOLERANCE.map((risk) => (
                         <div
                           key={risk.value}
@@ -553,8 +545,7 @@ export default function OnboardingWizard({ brokerAccountId, onComplete, onSkip }
                   </div>
                 </div>
               )}
-            </motion.div>
-          </AnimatePresence>
+            </div>
 
           {/* Navigation */}
           <div className="flex justify-between mt-8 pt-4 border-t">
