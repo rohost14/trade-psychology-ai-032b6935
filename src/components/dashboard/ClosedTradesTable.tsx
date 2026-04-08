@@ -170,7 +170,7 @@ export default function ClosedTradesTable({
       ) : (
         <table className="w-full">
           <thead>
-            <tr className="border-b border-slate-100 dark:border-neutral-700/60">
+            <tr className="border-b-2 border-b-slate-200 dark:border-b-neutral-700/80">
               {/* Symbol | Dir · Qty | Entry → Exit | P&L | Dur | Journal */}
               <th className="px-5 py-2 text-left table-header">Symbol</th>
               <th className="px-3 py-2 text-right table-header">Qty</th>

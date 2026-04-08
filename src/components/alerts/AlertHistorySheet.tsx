@@ -57,10 +57,10 @@ export function AlertHistorySheet({
           alert.acknowledged && 'opacity-50',
         )}
       >
-        {/* Dot */}
+        {/* Severity pip */}
         <span
-          className={cn('mt-1.5 shrink-0 rounded-full', severityDotClass(sev))}
-          style={{ width: 7, height: 7, minWidth: 7 }}
+          className={cn('shrink-0', severityDotClass(sev))}
+          style={{ width: 3, height: 20, minWidth: 3, borderRadius: 2, marginTop: 4 }}
         />
 
         {/* Content */}

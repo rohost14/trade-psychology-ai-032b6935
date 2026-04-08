@@ -69,13 +69,14 @@ function AlertRow({
     <button
       onClick={() => onOpen(alert)}
       className={cn(
-        'tm-card border-l-2 overflow-hidden w-full text-left transition-opacity hover:bg-muted/20 transition-colors',
-        SEV_LEFT_BORDER[sev],
+        'tm-card w-full text-left transition-colors hover:bg-muted/20',
         alert.acknowledged && 'opacity-60',
       )}
     >
-      <div className="flex items-start gap-3 px-4 py-3.5">
-        <span className={cn('w-2 h-2 rounded-full mt-[5px] flex-shrink-0', SEV_DOT[sev])} />
+      <div className="flex items-start gap-3 px-4 py-4">
+        <span className={cn('flex-shrink-0', SEV_DOT[sev])}
+          style={{ width: 3, height: 20, minWidth: 3, borderRadius: 2, marginTop: 2 }}
+        />
 
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-2 flex-wrap mb-1">
@@ -128,7 +129,7 @@ function LiveTab({ onOpen }: { onOpen: (a: AlertNotification) => void }) {
 
   if (live.length === 0) {
     return (
-      <div className="tm-card border-l-2 border-l-tm-brand px-5 py-6 flex items-start gap-4">
+      <div className="tm-card px-5 py-6 flex items-start gap-4">
         <div className="w-8 h-8 rounded-full bg-teal-50 dark:bg-teal-900/20 flex items-center justify-center flex-shrink-0 mt-0.5">
           <Shield className="h-4 w-4 text-tm-brand" />
         </div>

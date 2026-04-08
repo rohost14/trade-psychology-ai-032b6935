@@ -169,6 +169,12 @@
   }
 }
 
+/* Structural icons: refined 1.5 stroke feels crafted vs Lucide default 2 */
+/* Override specific action icons (X, Check) with style={{ strokeWidth: 2 }} if needed */
+svg.lucide {
+  stroke-width: 1.5;
+}
+
 /* Global accessibility: visible focus rings for keyboard navigation */
 :focus-visible {
   outline: 2px solid hsl(var(--ring));

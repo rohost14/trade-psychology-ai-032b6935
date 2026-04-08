@@ -603,7 +603,7 @@ export default function Dashboard() {
               </span>
             </div>
             <div className="flex items-baseline gap-2 mb-1">
-              <span className={cn('text-[36px] font-black font-mono tabular-nums leading-none', pnlPositive ? 'text-tm-profit' : 'text-tm-loss')}>
+              <span className={cn('text-[44px] font-black font-mono tabular-nums leading-none', pnlPositive ? 'text-tm-profit' : 'text-tm-loss')}>
                 {formatCurrencyWithSign(sessionPnlDisplay)}
               </span>
             </div>
@@ -626,7 +626,7 @@ export default function Dashboard() {
         </div>
 
         {/* Stat footer — pipe-separated */}
-        <div className="flex items-center flex-wrap gap-y-1 border-t border-slate-100 dark:border-neutral-700/60 px-5 py-2.5">
+        <div className="flex items-center flex-wrap gap-y-1 border-t border-slate-100 dark:border-neutral-700/60 px-5 py-3">
           <span className="text-[12px] text-muted-foreground pr-4">
             <span className="font-mono tabular-nums font-semibold text-foreground">{tradeStats?.trades_today ?? 0}</span>
             {' '}trades

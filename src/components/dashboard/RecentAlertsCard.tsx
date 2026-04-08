@@ -53,7 +53,7 @@ export default function RecentAlertsCard({ alerts, onAcknowledge, onOpen }: Rece
                 key={alert.id}
                 onClick={() => onOpen ? onOpen(alert.id) : onAcknowledge?.(alert.id)}
                 className={cn(
-                  'w-full flex items-start gap-4 px-5 py-3.5 text-left transition-colors',
+                  'w-full flex items-start gap-4 px-5 py-4 text-left transition-colors',
                   'hover:bg-slate-50 dark:hover:bg-slate-700/40',
                   i < Math.min(alerts.length, 5) - 1
                     ? 'border-b border-slate-50 dark:border-neutral-700/40'
@@ -61,10 +61,10 @@ export default function RecentAlertsCard({ alerts, onAcknowledge, onOpen }: Rece
                   isAcked && 'opacity-50',
                 )}
               >
-                {/* Severity dot */}
+                {/* Severity pip — vertical bar encodes urgency without decorating the row */}
                 <span
-                  className={cn('mt-[5px] shrink-0 rounded-full', severityDotClass(alert.severity))}
-                  style={{ width: 7, height: 7, minWidth: 7 }}
+                  className={cn('shrink-0', severityDotClass(alert.severity))}
+                  style={{ width: 3, height: 20, minWidth: 3, borderRadius: 2, marginTop: 2 }}
                 />
 
                 {/* Content */}
