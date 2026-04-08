@@ -29,10 +29,16 @@ export default function BlowupShieldCard() {
 
   if (loading) {
     return (
-      <div className="tm-card p-5 space-y-3">
-        <div className="h-4 bg-muted rounded animate-pulse w-24" />
-        <div className="h-10 bg-muted rounded animate-pulse w-16" />
-        <div className="h-2 bg-muted rounded animate-pulse" />
+      <div className="tm-card p-5 bg-gradient-to-br from-teal-50 to-white dark:from-teal-950/30 dark:to-[#1C1C1C]">
+        <div className="flex items-center justify-between mb-4">
+          <span className="tm-label">Blowup Shield</span>
+          <Shield className="w-4 h-4 text-teal-400 dark:text-teal-500" />
+        </div>
+        <div className="space-y-3">
+          <div className="h-10 bg-muted/60 rounded animate-pulse w-20" />
+          <div className="h-3 bg-muted/60 rounded animate-pulse w-32" />
+          <div className="h-1.5 bg-muted/60 rounded animate-pulse" />
+        </div>
       </div>
     );
   }
@@ -79,7 +85,7 @@ export default function BlowupShieldCard() {
           </p>
 
           {/* Heeded progress bar */}
-          <div className="h-1.5 rounded-full overflow-hidden mb-4 bg-muted">
+          <div className="h-1.5 rounded-full overflow-hidden bg-muted">
             <div
               className={cn(
                 'h-full rounded-full transition-all duration-500',
@@ -88,6 +94,10 @@ export default function BlowupShieldCard() {
               )}
               style={{ width: `${heedRate ?? 0}%` }}
             />
+          </div>
+          <div className="flex items-center justify-between mb-4 mt-1">
+            <span className="text-[10px] text-muted-foreground">0%</span>
+            <span className="text-[10px] text-muted-foreground">100% heeded</span>
           </div>
 
           {/* Additional loss callout when alerts were ignored */}

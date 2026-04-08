@@ -633,7 +633,7 @@ export default function Dashboard() {
           </span>
           {tradeStats && tradeStats.trades_today > 0 && (
             <>
-              <span className="w-px h-3.5 shrink-0 bg-slate-200 dark:bg-neutral-700" />
+              <span className="w-px h-3.5 shrink-0 bg-slate-200 dark:bg-neutral-600" />
               <span className="text-[12px] text-muted-foreground px-4">
                 <span className={cn('font-mono tabular-nums font-semibold', tradeStats.win_rate >= 50 ? 'text-tm-profit' : 'text-tm-loss')}>
                   {Math.round(tradeStats.win_rate)}%
@@ -642,7 +642,7 @@ export default function Dashboard() {
               </span>
             </>
           )}
-          <span className="w-px h-3.5 shrink-0 bg-slate-200 dark:bg-neutral-700" />
+          <span className="w-px h-3.5 shrink-0 bg-slate-200 dark:bg-neutral-600" />
           <span className="text-[12px] text-muted-foreground px-4">
             <span className={cn('font-mono tabular-nums font-semibold', realizedPnlDisplay >= 0 ? 'text-tm-profit' : 'text-tm-loss')}>
               {formatCurrencyWithSign(realizedPnlDisplay)}
@@ -651,13 +651,13 @@ export default function Dashboard() {
           </span>
           {unjournaled > 0 && (
             <>
-              <span className="w-px h-3.5 shrink-0 bg-slate-200 dark:bg-neutral-700" />
+              <span className="w-px h-3.5 shrink-0 bg-slate-200 dark:bg-neutral-600" />
               <span className="text-[12px] text-tm-obs font-medium px-4">{unjournaled} to journal</span>
             </>
           )}
           {unreadCount > 0 && (
             <>
-              <span className="w-px h-3.5 shrink-0 bg-slate-200 dark:bg-neutral-700" />
+              <span className="w-px h-3.5 shrink-0 bg-slate-200 dark:bg-neutral-600" />
               <Link to="/alerts" className="text-[12px] text-tm-obs font-medium hover:underline px-4">
                 {unreadCount} alert{unreadCount !== 1 ? 's' : ''} →
               </Link>
@@ -724,11 +724,7 @@ export default function Dashboard() {
           {/* AI Coach CTA */}
           <Link
             to="/chat"
-            className="flex items-center gap-3 rounded-xl p-4 hover:opacity-90 transition-opacity group"
-            style={{
-              background: 'linear-gradient(135deg, #0F8E7D 0%, #0A7A6B 100%)',
-              boxShadow: '0 4px 20px rgba(15,142,125,0.3), 0 0 0 1px rgba(15,142,125,0.2)',
-            }}
+            className="tm-coach-cta flex items-center gap-3 rounded-xl p-4 hover:opacity-90 transition-opacity group"
           >
             <div className="w-9 h-9 rounded-lg bg-white/15 flex items-center justify-center shrink-0">
               <Bot className="w-4 h-4 text-white" />

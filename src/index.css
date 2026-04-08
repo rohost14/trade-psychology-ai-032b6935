@@ -426,3 +426,14 @@
     0 8px 32px rgba(0,0,0,0.35),
     0 0 0 1px rgba(255,255,255,0.08);
 }
+
+/* AI Coach CTA — gradient button using brand token so it respects theme */
+.tm-coach-cta {
+  background: linear-gradient(135deg,
+    rgb(var(--tm-brand)) 0%,
+    color-mix(in srgb, rgb(var(--tm-brand)) 85%, black) 100%
+  );
+  box-shadow:
+    0 4px 20px rgba(var(--tm-brand) / 0.3),
+    0 0 0 1px rgba(var(--tm-brand) / 0.2);
+}

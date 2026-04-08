@@ -17,8 +17,6 @@ import Layout from "./components/Layout";
 // Eagerly load Dashboard — it's the first screen after login.
 // All other routes are lazy-loaded, splitting the bundle into per-route chunks.
 import Dashboard from "./pages/Dashboard";
-import DashboardV2 from "./pages/DashboardV2";
-import DashboardV1 from "./pages/DashboardV1";
 const Welcome       = lazy(() => import("./pages/Welcome"));
 const Analytics     = lazy(() => import("./pages/Analytics"));
 const Alerts        = lazy(() => import("./pages/Alerts"));
@@ -90,8 +88,6 @@ const App = () => (
                     <Route path="reports" element={<Reports />} />
                     <Route path="settings" element={<Settings />} />
                   </Route>
-                  <Route path="dashboard-v2" element={<DashboardV2 />} />
-                  <Route path="dashboard-v1" element={<DashboardV1 />} />
                   <Route path="welcome" element={<Welcome />} />
                   <Route path="terms" element={<TermsOfService />} />
                   <Route path="privacy" element={<PrivacyPolicy />} />

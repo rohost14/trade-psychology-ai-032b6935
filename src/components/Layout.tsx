@@ -228,7 +228,7 @@ export default function Layout() {
             {/* Logo + Nav */}
             <div className="flex items-center gap-6" ref={dropdownRef}>
               <div className="flex items-center gap-2">
-                <Shield className="h-5 w-5 text-primary" aria-hidden="true" />
+                <Shield className="h-5 w-5 text-tm-brand" aria-hidden="true" />
                 <span className="text-base font-semibold text-foreground">TradeMentor</span>
               </div>
 
@@ -245,7 +245,7 @@ export default function Layout() {
                         className={cn(
                           'px-3 py-1.5 rounded-md text-sm font-medium transition-colors',
                           isActive
-                            ? 'bg-primary/10 text-primary'
+                            ? 'bg-tm-brand/10 text-tm-brand'
                             : 'text-muted-foreground hover:text-foreground hover:bg-muted'
                         )}
                       >
@@ -268,7 +268,7 @@ export default function Layout() {
                         className={cn(
                           'flex items-center gap-1.5 px-3 py-1.5 rounded-md text-sm font-medium transition-colors relative',
                           isGroupActive || isOpen
-                            ? 'bg-primary/10 text-primary'
+                            ? 'bg-tm-brand/10 text-tm-brand'
                             : 'text-muted-foreground hover:text-foreground hover:bg-muted'
                         )}
                       >
@@ -298,7 +298,7 @@ export default function Layout() {
                                 className={cn(
                                   'flex items-center gap-2.5 px-3 py-2 text-sm transition-colors relative',
                                   isItemActive
-                                    ? 'text-primary bg-primary/5'
+                                    ? 'text-tm-brand bg-tm-brand/5'
                                     : 'text-foreground hover:bg-muted'
                                 )}
                               >
@@ -336,12 +336,12 @@ export default function Layout() {
                 isTokenExpired
                   ? 'bg-amber-50 text-amber-700 dark:bg-amber-900/20 dark:text-amber-400'
                   : isConnected
-                    ? 'bg-green-50 text-green-700 dark:bg-green-900/20 dark:text-green-400'
+                    ? 'bg-teal-50 text-teal-700 dark:bg-teal-900/20 dark:text-teal-400'
                     : 'bg-muted text-muted-foreground'
               )}>
                 <span className={cn(
                   'w-1.5 h-1.5 rounded-full',
-                  isTokenExpired ? 'bg-amber-500' : isConnected ? 'bg-green-500' : 'bg-gray-400'
+                  isTokenExpired ? 'bg-amber-500' : isConnected ? 'bg-teal-500' : 'bg-gray-400'
                 )} />
                 {isTokenExpired
                   ? 'Token expired'
@@ -368,7 +368,7 @@ export default function Layout() {
       <header className="md:hidden sticky top-0 z-50 bg-card border-b border-border">
         <div className="flex h-14 items-center justify-between px-4">
           <div className="flex items-center gap-2">
-            <Shield className="h-5 w-5 text-primary" />
+            <Shield className="h-5 w-5 text-tm-brand" />
             <span className="font-semibold text-foreground">TradeMentor</span>
           </div>
 
@@ -401,7 +401,7 @@ export default function Layout() {
           <div className="flex items-center gap-2">
             <button
               onClick={connect}
-              className="text-xs font-semibold text-primary underline underline-offset-2 hover:no-underline"
+              className="text-xs font-semibold text-tm-brand underline underline-offset-2 hover:no-underline"
             >
               Connect Zerodha
             </button>
@@ -450,11 +450,11 @@ export default function Layout() {
                 aria-label={showBadge ? `${item.name} (${unacknowledgedCount} unread)` : item.name}
                 className={cn(
                   'flex flex-col items-center justify-center flex-1 h-full py-2 transition-colors relative',
-                  isActive ? 'text-primary' : 'text-muted-foreground'
+                  isActive ? 'text-tm-brand' : 'text-muted-foreground'
                 )}
               >
                 {isActive && (
-                  <span aria-hidden="true" className="absolute top-0 left-1/2 -translate-x-1/2 w-8 h-0.5 rounded-full bg-primary" />
+                  <span aria-hidden="true" className="absolute top-0 left-1/2 -translate-x-1/2 w-8 h-0.5 rounded-full bg-tm-brand" />
                 )}
                 <div className="relative" aria-hidden="true">
                   <item.icon className="h-5 w-5" />
@@ -481,7 +481,7 @@ export default function Layout() {
                 )}
               >
                 {isOverflowActive && (
-                  <span className="absolute top-0 left-1/2 -translate-x-1/2 w-8 h-0.5 rounded-full bg-primary" />
+                  <span className="absolute top-0 left-1/2 -translate-x-1/2 w-8 h-0.5 rounded-full bg-tm-brand" />
                 )}
                 <MoreHorizontal className="h-5 w-5" />
                 <span className="text-[10px] mt-1 font-medium">More</span>
@@ -540,7 +540,7 @@ export default function Layout() {
                           className={cn(
                             'w-full flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring',
                             isActive
-                              ? 'bg-primary/10 text-primary'
+                              ? 'bg-tm-brand/10 text-tm-brand'
                               : 'text-foreground hover:bg-muted'
                           )}
                         >
