@@ -16,7 +16,7 @@
     --tm-profit:  15 142 125;   /* #0F8E7D  teal — profit on light bg         */
     --tm-loss:   177  61  68;   /* #B13D44  red                                */
     --tm-obs:    230 138   0;   /* #E68A00  amber — behavioral observations    */
-    --tm-brand:   15 142 125;   /* #0F8E7D  primary brand                      */
+    --tm-brand:   13 148 136;   /* #0D9488  teal-600 — more vivid on light     */
 
     /* Neutral Gray Scale (Zinc - warm, professional) */
     --gray-50:  250 250 250;
