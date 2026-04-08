@@ -31,7 +31,7 @@
     --gray-900: 24 24 27;
 
     /* Background & Foreground */
-    --background: var(--gray-50);
+    --background: 248 248 246;   /* warm stone-50 — not zinc-grey, not teal-tinted */
     --foreground: var(--gray-900);
 
     /* Card */
@@ -52,7 +52,7 @@
 
     /* Muted */
     --muted: var(--gray-100);
-    --muted-foreground: var(--gray-500);
+    --muted-foreground: 107 114 128;   /* slate-500 — warmer than zinc, better on white cards */
 
     /* Accent */
     --accent: var(--gray-100);
@@ -394,17 +394,15 @@
   .tm-chip    { @apply text-[10px] font-bold px-1.5 py-0.5 rounded leading-none; }
   .tm-chip-ce { @apply bg-teal-50  text-teal-700  dark:bg-teal-900/20  dark:text-teal-300; }
   .tm-chip-pe { @apply bg-red-50   text-red-600   dark:bg-red-900/20   dark:text-red-400;  }
-  .tm-chip-eq { @apply bg-slate-100 text-slate-500 dark:bg-neutral-700/60 dark:text-neutral-400; }
+  .tm-chip-eq { @apply bg-stone-100 text-slate-500 dark:bg-neutral-700/60 dark:text-neutral-400; }
 }
 
 /* ── Page backgrounds ───────────────────────────────────────────────────────── */
 /* Not in @layer so it beats utility specificity for the gradient override.     */
 
 .tm-page-bg {
-  background:
-    radial-gradient(ellipse 60% 45% at 92%   0%, rgba(15,142,125,0.13) 0%, transparent 100%),
-    radial-gradient(ellipse 55% 50% at  0% 100%, rgba(15,142,125,0.09) 0%, transparent 100%),
-    #F4F7F7;
+  /* Warm stone — no teal glow, no gradients bleeding into cards */
+  background: #F5F5F4;
 }
 .dark .tm-page-bg {
   background:
@@ -415,10 +413,11 @@
 
 /* ── Card shadow — separate rule so dark override applies ───────────────────── */
 .tm-card {
+  /* Slightly warmer + more depth: cards lift clearly off the stone background */
   box-shadow:
-    0 1px 2px rgba(0,0,0,0.04),
-    0 4px 12px rgba(0,0,0,0.06),
-    0 0 0 1px rgba(0,0,0,0.05);
+    0 1px 3px rgba(0,0,0,0.07),
+    0 4px 16px rgba(0,0,0,0.05),
+    0 0 0 1px rgba(0,0,0,0.04);
 }
 .dark .tm-card {
   box-shadow:

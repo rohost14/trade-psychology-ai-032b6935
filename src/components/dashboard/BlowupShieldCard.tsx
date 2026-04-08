@@ -29,7 +29,7 @@ export default function BlowupShieldCard() {
 
   if (loading) {
     return (
-      <div className="tm-card p-5 bg-gradient-to-br from-teal-50 to-white dark:from-teal-950/30 dark:to-[#1C1C1C]">
+      <div className="tm-card p-5">
         <div className="flex items-center justify-between mb-4">
           <span className="tm-label">Blowup Shield</span>
           <Shield className="w-4 h-4 text-teal-400 dark:text-teal-500" />
@@ -58,7 +58,7 @@ export default function BlowupShieldCard() {
     : null;
 
   return (
-    <div className="tm-card p-5 bg-gradient-to-br from-teal-50 to-white dark:from-teal-950/30 dark:to-[#1C1C1C]">
+    <div className="tm-card p-5">
       {/* Header */}
       <div className="flex items-center justify-between mb-4">
         <span className="tm-label">Blowup Shield</span>

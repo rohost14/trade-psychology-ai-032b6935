@@ -38,19 +38,19 @@ const STATE_CFG = {
     label:  'Stable',
     pill:   'bg-teal-100 dark:bg-teal-900/40 text-teal-700 dark:text-teal-300',
     dot:    'bg-teal-500',
-    cardBg: 'bg-gradient-to-br from-teal-50/60 to-white dark:from-teal-950/25 dark:to-[#1C1C1C]',
+    accent: 'border-l-[3px] border-l-teal-400 dark:border-l-teal-500',
   },
   caution: {
     label:  'Caution',
     pill:   'bg-amber-100 dark:bg-amber-900/40 text-amber-700 dark:text-amber-300',
     dot:    'bg-amber-500',
-    cardBg: 'bg-gradient-to-br from-amber-50/60 to-white dark:from-amber-950/25 dark:to-[#1C1C1C]',
+    accent: 'border-l-[3px] border-l-amber-400 dark:border-l-amber-500',
   },
   risk: {
     label:  'Risk',
     pill:   'bg-red-100 dark:bg-red-900/40 text-red-700 dark:text-red-300',
     dot:    'bg-red-500',
-    cardBg: 'bg-gradient-to-br from-red-50/60 to-white dark:from-red-950/25 dark:to-[#1C1C1C]',
+    accent: 'border-l-[3px] border-l-red-400 dark:border-l-red-500',
   },
 };
 
@@ -592,7 +592,7 @@ export default function Dashboard() {
       </div>
 
       {/* ── Session Hero ──────────────────────────────────────────────────── */}
-      <div className={cn('tm-card mb-5', stateCfg.cardBg)}>
+      <div className={cn('tm-card mb-5', stateCfg.accent)}>
         <div className="flex items-stretch">
           {/* Left: state + P&L */}
           <div className="flex-1 min-w-0 px-5 pt-4 pb-3">
