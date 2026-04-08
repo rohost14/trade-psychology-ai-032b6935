@@ -52,7 +52,7 @@ export default function BlowupShieldCard() {
     : null;
 
   return (
-    <div className="tm-card p-5">
+    <div className="tm-card p-5 bg-gradient-to-br from-teal-50 to-white dark:from-teal-950/30 dark:to-[#1C1C1C]">
       {/* Header */}
       <div className="flex items-center justify-between mb-4">
         <span className="tm-label">Blowup Shield</span>

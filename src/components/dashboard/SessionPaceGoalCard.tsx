@@ -93,7 +93,14 @@ export default function SessionPaceGoalCard({ brokerAccountId, tradesCount }: Se
       <div className="h-1.5 rounded-full bg-slate-100 dark:bg-neutral-700/50 overflow-hidden mb-4">
         <div
           className={cn('h-full rounded-full transition-all duration-500', pace.barCls)}
-          style={{ width: `${barPct}%` }}
+          style={{
+            width: `${barPct}%`,
+            boxShadow: pace.barCls === 'bg-tm-loss'
+              ? '0 0 6px rgba(220,38,38,0.55)'
+              : pace.barCls === 'bg-tm-obs'
+              ? '0 0 6px rgba(217,119,6,0.55)'
+              : '0 0 6px rgba(15,142,125,0.45)',
+          }}
         />
       </div>
 

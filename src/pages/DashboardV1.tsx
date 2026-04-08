@@ -35,22 +35,22 @@ interface RiskStateData {
 // ─── Session State ────────────────────────────────────────────────────────────
 const STATE_CFG = {
   stable: {
-    label:  'Stable',
-    pill:   'bg-teal-100 dark:bg-teal-900/40 text-teal-700 dark:text-teal-300',
-    dot:    'bg-teal-500',
-    cardBg: 'bg-gradient-to-br from-teal-50/60 to-white dark:from-teal-950/25 dark:to-[#1C1C1C]',
+    label: 'Stable',
+    pill: 'bg-teal-100 dark:bg-teal-900/40 text-teal-700 dark:text-teal-300',
+    dot: 'bg-teal-500',
+    desc: 'Session is on track — keep following your plan.',
   },
   caution: {
-    label:  'Caution',
-    pill:   'bg-amber-100 dark:bg-amber-900/40 text-amber-700 dark:text-amber-300',
-    dot:    'bg-amber-500',
-    cardBg: 'bg-gradient-to-br from-amber-50/60 to-white dark:from-amber-950/25 dark:to-[#1C1C1C]',
+    label: 'Caution',
+    pill: 'bg-amber-100 dark:bg-amber-900/40 text-amber-700 dark:text-amber-300',
+    dot: 'bg-amber-500',
+    desc: 'A few alerts active. Review before your next trade.',
   },
   risk: {
-    label:  'Risk',
-    pill:   'bg-red-100 dark:bg-red-900/40 text-red-700 dark:text-red-300',
-    dot:    'bg-red-500',
-    cardBg: 'bg-gradient-to-br from-red-50/60 to-white dark:from-red-950/25 dark:to-[#1C1C1C]',
+    label: 'Risk',
+    pill: 'bg-red-100 dark:bg-red-900/40 text-red-700 dark:text-red-300',
+    dot: 'bg-red-500',
+    desc: 'Multiple high-severity patterns detected. Trade with extra caution.',
   },
 };
 
@@ -61,28 +61,6 @@ function getSessionState(unreadCount: number, highSevCount: number): SessionStat
   if (highSevCount >= 1 || unreadCount >= 2) return 'caution';
   return 'stable';
 }
-
-function getSessionDesc(
-  state: SessionState,
-  unreadCount: number,
-  tradesCount: number,
-  winRate: number,
-): string {
-  if (state === 'risk') {
-    return highSevPattern(unreadCount)
-      ? `${unreadCount} high-severity pattern${unreadCount !== 1 ? 's' : ''} active — review before your next trade`
-      : 'Multiple patterns detected — trade with extra caution this session';
-  }
-  if (state === 'caution') {
-    if (unreadCount > 0)
-      return `${unreadCount} behavioral pattern${unreadCount !== 1 ? 's' : ''} noted — review before continuing`;
-    return 'Session elevated — stay within your plan';
-  }
-  if (tradesCount === 0) return 'No trades yet — session tracking is ready';
-  if (winRate > 0 && winRate < 40) return `Win rate at ${winRate}% — focus on setup quality, not frequency`;
-  return 'Session tracking normally — keep following your plan';
-}
-function highSevPattern(count: number) { return count >= 2; }
 
 // ─── P&L Sparkline ────────────────────────────────────────────────────────────
 function PnlSparkline({ closed, unrealized, positive }: {
@@ -592,7 +570,7 @@ export default function Dashboard() {
       </div>
 
       {/* ── Session Hero ──────────────────────────────────────────────────── */}
-      <div className={cn('tm-card mb-5', stateCfg.cardBg)}>
+      <div className="tm-card mb-5">
         <div className="flex items-stretch">
           {/* Left: state + P&L */}
           <div className="flex-1 min-w-0 px-5 pt-4 pb-3">
@@ -607,9 +585,7 @@ export default function Dashboard() {
                 {formatCurrencyWithSign(sessionPnlDisplay)}
               </span>
             </div>
-            <p className="text-[13px] text-muted-foreground leading-snug">
-              {getSessionDesc(sessionStateKey, unreadCount, tradeStats?.trades_today ?? 0, Math.round(tradeStats?.win_rate ?? 0))}
-            </p>
+            <p className="text-[13px] text-muted-foreground leading-snug">{stateCfg.desc}</p>
           </div>
 
           {/* Right: sparkline */}
@@ -625,43 +601,35 @@ export default function Dashboard() {
           </div>
         </div>
 
-        {/* Stat footer — pipe-separated */}
-        <div className="flex items-center flex-wrap gap-y-1 border-t border-slate-100 dark:border-neutral-700/60 px-5 py-2.5">
-          <span className="text-[12px] text-muted-foreground pr-4">
+        {/* Stat footer */}
+        <div className="flex items-center flex-wrap gap-x-5 gap-y-1 border-t border-slate-100 dark:border-neutral-700/60 px-5 py-2.5">
+          <span className="text-[12px] text-muted-foreground">
             <span className="font-mono tabular-nums font-semibold text-foreground">{tradeStats?.trades_today ?? 0}</span>
             {' '}trades
           </span>
           {tradeStats && tradeStats.trades_today > 0 && (
-            <>
-              <span className="w-px h-3.5 shrink-0 bg-slate-200 dark:bg-neutral-700" />
-              <span className="text-[12px] text-muted-foreground px-4">
-                <span className={cn('font-mono tabular-nums font-semibold', tradeStats.win_rate >= 50 ? 'text-tm-profit' : 'text-tm-loss')}>
-                  {Math.round(tradeStats.win_rate)}%
-                </span>
-                {' '}win rate
+            <span className="text-[12px] text-muted-foreground">
+              <span className={cn('font-mono tabular-nums font-semibold', tradeStats.win_rate >= 50 ? 'text-tm-profit' : 'text-tm-loss')}>
+                {Math.round(tradeStats.win_rate)}%
               </span>
-            </>
+              {' '}win rate
+            </span>
           )}
-          <span className="w-px h-3.5 shrink-0 bg-slate-200 dark:bg-neutral-700" />
-          <span className="text-[12px] text-muted-foreground px-4">
+          <span className="text-[12px] text-muted-foreground">
             <span className={cn('font-mono tabular-nums font-semibold', realizedPnlDisplay >= 0 ? 'text-tm-profit' : 'text-tm-loss')}>
               {formatCurrencyWithSign(realizedPnlDisplay)}
             </span>
             {' '}realized
           </span>
           {unjournaled > 0 && (
-            <>
-              <span className="w-px h-3.5 shrink-0 bg-slate-200 dark:bg-neutral-700" />
-              <span className="text-[12px] text-tm-obs font-medium px-4">{unjournaled} to journal</span>
-            </>
+            <span className="text-[12px] text-tm-obs font-medium">
+              {unjournaled} to journal
+            </span>
           )}
           {unreadCount > 0 && (
-            <>
-              <span className="w-px h-3.5 shrink-0 bg-slate-200 dark:bg-neutral-700" />
-              <Link to="/alerts" className="text-[12px] text-tm-obs font-medium hover:underline px-4">
-                {unreadCount} alert{unreadCount !== 1 ? 's' : ''} →
-              </Link>
-            </>
+            <Link to="/alerts" className="text-[12px] text-tm-obs font-medium hover:underline ml-auto">
+              {unreadCount} alert{unreadCount !== 1 ? 's' : ''} →
+            </Link>
           )}
         </div>
       </div>
@@ -724,20 +692,16 @@ export default function Dashboard() {
           {/* AI Coach CTA */}
           <Link
             to="/chat"
-            className="flex items-center gap-3 rounded-xl p-4 hover:opacity-90 transition-opacity group"
-            style={{
-              background: 'linear-gradient(135deg, #0F8E7D 0%, #0A7A6B 100%)',
-              boxShadow: '0 4px 20px rgba(15,142,125,0.3), 0 0 0 1px rgba(15,142,125,0.2)',
-            }}
+            className="tm-card p-4 flex items-center gap-3 hover:bg-slate-50 dark:hover:bg-slate-700/30 transition-colors group"
           >
-            <div className="w-9 h-9 rounded-lg bg-white/15 flex items-center justify-center shrink-0">
-              <Bot className="w-4 h-4 text-white" />
+            <div className="w-9 h-9 rounded-lg bg-tm-brand/10 flex items-center justify-center shrink-0">
+              <Bot className="w-4 h-4 text-tm-brand" />
             </div>
             <div className="flex-1 min-w-0">
-              <p className="text-sm font-semibold text-white">AI Trading Coach</p>
-              <p className="text-[12px] text-white/70">Ask about your patterns or get a debrief</p>
+              <p className="text-sm font-semibold text-foreground">AI Trading Coach</p>
+              <p className="text-[12px] text-muted-foreground">Ask about your patterns or get a debrief</p>
             </div>
-            <ArrowRight className="w-4 h-4 text-white/40 group-hover:text-white transition-colors shrink-0" />
+            <ArrowRight className="w-4 h-4 text-muted-foreground/50 group-hover:text-tm-brand transition-colors shrink-0" />
           </Link>
 
           {holdings.length > 0 && holdingsSummary && (

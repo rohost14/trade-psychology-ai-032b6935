@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { CheckCircle2, Check, ChevronDown, ChevronRight, Link as LinkIcon } from 'lucide-react';
+import { CheckCircle2, Check, ChevronRight, Link as LinkIcon } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { cn } from '@/lib/utils';
 import { formatRelativeTime } from '@/lib/formatters';
@@ -151,10 +151,7 @@ export default function RecentAlertsCard({ alerts, onAcknowledge, onOpen }: Rece
                     <span className="text-[12px] text-muted-foreground font-mono tabular-nums">
                       {formatRelativeTime(alert.timestamp)}
                     </span>
-                    <ChevronDown className={cn(
-                      'w-3.5 h-3.5 text-muted-foreground/50 transition-transform duration-150',
-                      isExpanded && 'rotate-180',
-                    )} />
+                    <ChevronRight className="w-3.5 h-3.5 text-muted-foreground/50" />
                   </div>
                 </button>
 
