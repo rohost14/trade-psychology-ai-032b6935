@@ -4,32 +4,7 @@ import { Sheet, SheetContent } from '@/components/ui/sheet';
 import { cn } from '@/lib/utils';
 import { AlertNotification } from '@/contexts/AlertContext';
 import { PatternSeverity } from '@/types/patterns';
-
-// ─── Severity config ──────────────────────────────────────────────────────────
-const SEV_DOT: Record<PatternSeverity, string> = {
-  critical: 'bg-tm-loss',
-  high:     'bg-tm-loss/70',
-  medium:   'bg-tm-obs',
-  low:      'bg-slate-400',
-};
-const SEV_LABEL: Record<PatternSeverity, string> = {
-  critical: 'Critical',
-  high:     'High',
-  medium:   'Caution',
-  low:      'Info',
-};
-const SEV_LABEL_COLOR: Record<PatternSeverity, string> = {
-  critical: 'text-tm-loss',
-  high:     'text-tm-loss',
-  medium:   'text-tm-obs',
-  low:      'text-muted-foreground',
-};
-const SEV_LEFT_BORDER: Record<PatternSeverity, string> = {
-  critical: 'border-l-tm-loss',
-  high:     'border-l-tm-loss',
-  medium:   'border-l-tm-obs',
-  low:      'border-l-slate-300 dark:border-l-slate-600',
-};
+import { SEV_DOT, SEV_LABEL, SEV_LABEL_COLOR, SEV_LEFT_BORDER } from '@/lib/alertSeverity';
 
 // ─── Pattern explanations (keyed by backend pattern_type) ────────────────────
 const PATTERN_EXPLANATIONS: Record<string, string> = {

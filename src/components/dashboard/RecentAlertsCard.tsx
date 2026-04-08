@@ -4,6 +4,7 @@ import { Link } from 'react-router-dom';
 import { cn } from '@/lib/utils';
 import { formatRelativeTime } from '@/lib/formatters';
 import type { Alert } from '@/types/api';
+import { severityDotClass } from '@/lib/alertSeverity';
 
 // ─── Detail renderer (shared logic with Alerts.tsx) ──────────────────────────
 const DETAIL_LABELS: Record<string, string> = {
@@ -55,14 +56,6 @@ interface RecentAlertsCardProps {
   alerts: (Alert & { pattern: string; description: string; why_it_matters?: string })[];
   onAcknowledge?: (alertId: string) => void;
   onOpen?: (alertId: string) => void;
-}
-
-function severityDot(sev: string): string {
-  if (sev === 'critical' || sev === 'danger') return 'bg-tm-loss';
-  if (sev === 'high') return 'bg-tm-loss';
-  if (sev === 'medium' || sev === 'caution') return 'bg-tm-obs';
-  if (sev === 'positive') return 'bg-tm-profit';
-  return 'bg-slate-400';
 }
 
 function patternWeight(sev: string): string {
@@ -136,7 +129,7 @@ export default function RecentAlertsCard({ alerts, onAcknowledge, onOpen }: Rece
                 >
                   {/* Severity dot */}
                   <span
-                    className={cn('mt-[5px] shrink-0 rounded-full', severityDot(alert.severity))}
+                    className={cn('mt-[5px] shrink-0 rounded-full', severityDotClass(alert.severity))}
                     style={{ width: 7, height: 7, minWidth: 7 }}
                   />
 

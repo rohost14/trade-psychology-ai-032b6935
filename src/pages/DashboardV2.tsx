@@ -22,6 +22,7 @@ import { Position, CompletedTrade, ShieldSummary } from '@/types/api';
 import { AlertNotification } from '@/contexts/AlertContext';
 import { TradeJournalSheet } from '@/components/dashboard/TradeJournalSheet';
 import TopNavbar from '@/components/dashboard-v2/TopNavbar';
+import { severityDotClass } from '@/lib/alertSeverity';
 import { format, parseISO, isToday, subMinutes } from 'date-fns';
 
 // ── Types ──────────────────────────────────────────────────────────────────────
@@ -88,11 +89,6 @@ function fmtTime(iso: string | undefined): string {
   try { return format(parseISO(iso), 'HH:mm'); } catch { return '—'; }
 }
 
-function severityDotClass(sev: string): string {
-  if (sev === 'critical' || sev === 'high') return 'bg-tm-loss';
-  if (sev === 'medium') return 'bg-tm-obs';
-  return 'bg-slate-400';
-}
 
 function fmtSymbol(sym: string, instrType?: string): { name: string; typeChip: string; sub: string } {
   const m5 = sym.match(/^([A-Z]+)\d{5}(\d{5})(CE|PE)$/);
