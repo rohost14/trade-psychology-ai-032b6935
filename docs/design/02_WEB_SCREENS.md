@@ -1,61 +1,97 @@
-# TradeMentor AI — Web Screens
+# TradeMentor AI — Web Screen Design Specification
 
-> Detailed spec for every web screen: layout, information hierarchy, components, empty states, and design decisions. Each screen is designed for a 1280px viewport with the 208px sidebar.
-
-**Content area width:** 1280 - 208 = 1072px, padded to `max-w-[1024px] mx-auto px-6`
+> **STRUCTURE NOTE (updated 2026-04-02):** Pixel-level per-screen specs now live in [`screens/`](./screens/). Each file covers both web and mobile for one screen. This file contains high-level screen descriptions and design rationale — read it for context, then go to `screens/XX_screenname.md` for implementation-ready specs.
+>
+> | Screen | Spec file | Status |
+> |--------|-----------|--------|
+> | Dashboard | [`screens/01_dashboard.md`](./screens/01_dashboard.md) | ✅ Specced |
+> | Behavioral Alerts | `screens/02_alerts.md` | ⬜ Pending |
+> | Analytics | `screens/03_analytics.md` | ⬜ Pending |
+> | AI Coach | `screens/04_coach.md` | ⬜ Pending |
+> | My Patterns | `screens/05_my_patterns.md` | ⬜ Pending |
+> | Blowup Shield | `screens/06_blowup_shield.md` | ⬜ Pending |
+> | Session Limits | `screens/07_session_limits.md` | ⬜ Pending |
+> | Goals | `screens/08_goals.md` | ⬜ Pending |
+> | Portfolio Radar | `screens/09_portfolio_radar.md` | ⬜ Pending |
+> | Reports | `screens/10_reports.md` | ⬜ Pending |
+> | Settings | `screens/11_settings.md` | ⬜ Pending |
+> | Welcome / Landing | `screens/12_welcome.md` | ⬜ Pending |
 
 ---
 
-## Screen Index
+> Original high-level descriptions and design rationale below.
 
-1. [Welcome / Landing](#1-welcome--landing)
-2. [Dashboard](#2-dashboard)
-3. [Analytics](#3-analytics)
-4. [Alerts](#4-alerts)
-5. [AI Coach](#5-ai-coach)
-6. [My Patterns](#6-my-patterns)
-7. [Blowup Shield](#7-blowup-shield)
-8. [Guardrails](#8-guardrails)
-9. [Danger Zone](#9-danger-zone)
-10. [Goals](#10-goals)
-11. [Portfolio Radar](#11-portfolio-radar)
-12. [Reports](#12-reports)
-13. [Settings](#13-settings)
-14. [Onboarding Wizard](#14-onboarding-wizard)
+---
+
+## Design Foundation
+
+### What TradeMentor Actually Does (And What the Design Must Reflect)
+
+TradeMentor does three distinct things that no other tool does:
+
+**1. Journal-enriched behavioral analysis.** The trader attaches emotional and process context to every trade — what they felt, whether they followed their plan, why they exited, how good the setup was. This journal data is the raw material for understanding the "why" behind behavioral patterns. Without it, pattern detection is purely algorithmic. With it, the system can say: "9 of 12 overtrading events happened when you said you were feeling anxious." That is a genuinely different level of insight.
+
+**2. Counterfactual protection tracking.** When a circuit break or cooldown activates, the system looks up the actual market price 30 minutes later and calculates what would have happened if the trader had continued. This is real data, not an estimate. The Blowup Shield shows this as capital defended — and crucially, if the market recovered and the trader would have made money by ignoring the alert, it shows that too. Honesty builds trust.
+
+**3. Behavioral pattern detection across 22 specific patterns.** Each pattern is defined with precise algorithmic triggers, not fuzzy heuristics. Revenge trading requires re-entry on the same symbol within 10 minutes of a loss above average loss size. Martingale behavior requires 3+ size escalations in a losing sequence. The patterns are specific, arguable, and explainable — which is why the design must show the evidence behind each one, not just the label.
+
+### The Dashboard Problem (And the Correct Solution)
+
+The original design instinct was: "Zerodha Kite shows positions, so we shouldn't." That was wrong. The reason we show positions and closed trades on the dashboard is not to replicate what Kite shows — it is to make the **journal entry action one tap away from the trade it relates to.** The journal is the single most valuable input in the entire system. If the trader has to navigate to Analytics → Trades tab → find the trade → click journal, they will not journal consistently. If they see the trade on the dashboard and tap a journal icon immediately after closing it, they will. The recency of the trade in their mind is the journal's value.
+
+So positions and today's closed trades appear on the dashboard. The P&L values are supporting context. The journal button is the primary action.
+
+### The Behavioral Score Problem (And the Correct Solution)
+
+The behavioral score (0–100) is a composite metric calculated from pattern frequency, severity, and cost over a rolling window. It is useful as a trend indicator — is this trader improving or regressing over 30 days? It is not useful as a moment-to-moment status display. A trader opening TradeMentor at 10:30 AM does not need to know their score is 74 — that number means nothing to them mid-session. What they need to know is: "I've been flagged for overtrading today" or "I've placed 8 trades in 2 hours."
+
+The score appears in Analytics → Behavior tab as a trend line chart showing improvement/regression over time. It appears in Reports as a period metric. It does not appear on the Dashboard as a hero element. Instead, the Dashboard surfaces specific behavioral signals that are immediately actionable: pattern observations from today, trade pace relative to the trader's normal, un-journaled trades needing attention.
+
+### The Journal is the Core Action
+
+The design must make journaling:
+- **Frictionless**: One tap from seeing a trade to the journal sheet
+- **Fast**: The sheet uses chip selects for emotions, plan adherence, exit reason — not text forms
+- **Contextually present**: The journal icon appears on every trade row, filled if journaled, empty if not
+- **Non-mandatory**: The sheet can be dismissed in one tap without saving anything
+
+The journal captures: emotion before entry (9 options, multi-select), plan adherence (Yes/Partially/No), deviation reason (conditional), exit reason (6 options), setup quality (5-star), would repeat (Yes/Maybe/No), market condition (5 options), and a free-text note.
+
+This data feeds: the Emotional Tax analysis in Analytics, the AI Coach's understanding of the trader's mental state, the personalized narrative in My Patterns, and the Emotional Journey section in EOD reports.
 
 ---
 
 ## Screen Descriptions
 
-A plain-language guide to what every screen is, what it contains, and how it should look and feel. Read this for orientation before diving into the detailed specs below.
+**Welcome / Landing** — The public entry point. Explains TradeMentor's purpose and value to an unknown visitor. The goal is honest explanation followed by a clear invitation to try. Two paths: connect Zerodha for real data, or explore with demo data as a guest. Compliance consent required before either CTA activates. No sidebar or app navigation — this page stands alone before the trader becomes a user.
 
-**Welcome / Landing** — The first thing a new visitor sees. It's a marketing and onboarding page, not part of the app shell — no sidebar, no nav. The layout is clean and editorial with a top navbar, a hero section explaining what TradeMentor does, and two clear calls to action: connect Zerodha or explore as a guest. Below the hero there are supporting sections — how it works, feature highlights, pricing, and an FAQ — all in a calm, structured layout. The tone is professional and serious, not promotional. The page communicates trust.
+**Dashboard** — The active session hub. Shows today's open positions and closed trades with a journal button on each row — because journaling is the primary action during the session, and recency matters. Behavioral observations from today sit below the trade list. A compact session summary (trade count, net P&L as a single line) provides context. No behavioral score hero. No replication of Kite's margin display. The screen answers: "What have I done today and what have I noticed about how I'm trading?"
 
-**Dashboard** — The screen a trader has open all day during market hours. It shows exactly one thing well: what is happening right now. Four metric tiles sit across the top showing session P&L, margin available, number of unread alerts, and current risk state. Below them is the open positions table — the main event — showing every live position with quantity, average price, last traded price, and P&L. At the bottom, a thin strip shows the last two behavioral alerts with a link to see all. During market hours there is a small pulsing live indicator in the header. After market close the tiles change to show final P&L and win rate. No charts, no history, no decoration.
+**Analytics** — The deep review screen for after-hours analysis. Five tabs. The Behavior tab is the default because behavioral insight is TradeMentor's primary value. The Behavior tab shows pattern frequency breakdown, emotional tax analysis (win rate by journal-reported emotion), BTST activity, and trading persona. The Trades tab shows every closed trade with pattern tags AND journal emotion tags inline. The Timing tab shows P&L and win rate by hour of day. The Progress tab shows goal streak history. The Summary tab shows overall P&L metrics last.
 
-**Analytics** — The place a trader goes after market close to understand their performance. It has five tabs. The Summary tab shows overall P&L trend, win rate, average hold time, and a cumulative P&L chart. The Behavior tab shows a behavior score out of 100, a breakdown of every pattern detected, and how often each occurred. The Trades tab is a full table of every completed trade with timing, size, and outcome. The Timing tab shows P&L broken down by hour of the day and day of the week. The Progress tab shows goal streak history. The layout is dense and table-heavy — this is where a trader spends time reviewing, not glancing.
+**Behavioral Observations** (route: /alerts) — The pattern observation feed. Three tabs: Recent, History, and By Pattern. Each observation card shows the evidence behind the detection, not just the label. The "Acknowledge" action marks an observation as reviewed — nothing else happens. No alarm aesthetics: severity is communicated only through the indicator dot, not through card size, color backgrounds, or visual weight.
 
-**Alerts** — A dedicated feed of behavioral alerts generated by the system. Three tabs: Live shows unacknowledged alerts; History shows all past alerts; Patterns shows a per-pattern breakdown. A filter panel on the right lets the user narrow by severity, pattern type, and date range. Each alert shows the pattern name, what triggered it, the evidence (e.g., "8 trades in 2 hours"), the severity level, and an acknowledge button. New alerts get a faint highlight. This screen is calm and informational — it never feels alarmist, regardless of severity.
+**AI Coach** — A psychology-focused conversation with an AI that has read the trader's full behavioral history and today's journal entries before the conversation starts. The left context panel shows "Today's Brief" — not raw stats but narrative-adjacent context including journal-reported emotions from today's trades. The coach asks questions, reflects behavior back, and never gives trading advice. The coach can save insights to the journal from within the conversation.
 
-**AI Coach** — A chat interface where the trader can have a psychology-focused conversation with an AI that has full context on their trading. The left panel shows live context — today's P&L, trade count, behavior score, and active alerts — so the coach always appears informed. The chat area takes up the rest of the screen. When there is no conversation history, starter prompt chips suggest things to ask. The AI response streams in word by word. The coach never gives trading advice — it reflects behavior back and asks questions. It feels like a private, knowledgeable sounding board.
+**My Patterns** — Longitudinal behavioral identity screen. Shows who the trader is across weeks and months — not just what patterns fired today, but which patterns are improving, worsening, or stable, and what journal data reveals about the emotional context for each pattern. The emotional correlation section is the unique value: "9 of 12 overtrading events you reported feeling Anxious." Includes the live behavioral status banner, streak tracker, and the pattern calendar heatmap.
 
-**My Patterns** — A behavioral identity screen. The left panel lists all detected patterns ranked by frequency and severity. The right panel shows the detail for whichever pattern is selected: a narrative describing the trader's tendency, a frequency sparkline over the last 90 days, estimated cost, and the three worst instances. Patterns that have never been detected appear at the bottom in a quieter "Not detected" group — they reassure rather than overwhelm. This screen is meant for reflective reading, not quick scanning.
+**Blowup Shield** — Counterfactual protection record. When a circuit break or cooldown activates, the system records the position state and then looks up actual market prices 30 minutes later to calculate what would have happened. The result is shown per event: capital defended (or, honestly, capital not lost if the market recovered). Shield Score shows what percentage of protection events the trader respected. This is a verification system, not just a log.
 
-**Blowup Shield** — A retrospective log of times the system's protection mechanisms activated and what they may have prevented. Four tiles at the top show: total capital saved, number of protection events, largest single save, and events this month. Below is a timeline of protection events with the type, date, and capital defended. This screen has no red anywhere — it is entirely about positive outcomes. The tone is reassuring: the system worked, here is the record.
+**Session Limits** (renamed from Danger Zone) — Risk status and configuration. Shows the current state of all trader-configured limits: whether they are within bounds, approaching, or active. When a limit triggers, the screen shows a calm informational card stating what happened and that the trader can still trade in Zerodha. Includes threshold configuration and recent event history. Renamed from "Danger Zone" because these are the trader's own self-set rules — a fuel gauge, not an emergency room.
 
-**Guardrails** — A read-only summary of the risk rules a trader has set for themselves. It shows daily loss limits, trade count limits, position size limits, cooldown rules after losses, and which high-risk time windows are flagged. Each rule shows its current value and a status dot. A compliance bar at the bottom shows how many rules were respected today. There is no editing here — a link at the bottom takes the user to Settings to change anything. The screen is short and reads like a checklist.
+**Goals** — Behavioral commitment tracker. The trader sets behavioral goals (max trades per day, no trading in first 15 minutes, always use stop-losses) and tracks their weekly compliance and streak history. Includes a 30-day consistency calendar heatmap. Goal changes are gated with a 24-hour cooldown to prevent impulsive modification during emotional sessions.
 
-**Danger Zone** — The active-state monitoring screen. It answers one question: "Am I in an active cooldown or circuit break right now?" When everything is normal it shows a calm green-bordered card saying "No active restrictions." When a cooldown or circuit break is active it shows a larger amber-bordered card with what triggered it, when it started, and when it ends. Below the status card is a brief explanation of what the restriction means — and a clear statement that the trader can still trade in Zerodha if they choose. A short history of recent events fills the bottom.
+**Portfolio Radar** — Position concentration and options risk analysis. Per-position cards show options-specific metrics where applicable: strike, breakeven price, gap to breakeven, premium decay percentage, and days to expiry. Concentration analysis shows exposure by expiry week and by underlying. Directional skew (long vs. short balance). GTT order summary. Used before adding a new position to check whether the existing book is already concentrated.
 
-**Goals** — The commitment-tracking screen. A trader sets personal behavioral goals here, like "no trades in the first 15 minutes" or "max 10 trades per day." Each goal shows a progress bar for the current week, current streak, and best streak. A calendar heatmap below shows the last 30 days of compliance as colored dots. Adding a new goal opens an inline form. There is no gamification — no badges or celebrations. Streaks are shown as simple numbers. The purpose is self-awareness and consistency, not reward.
+**Reports** — Generated periodic reports: Morning Brief, End of Day, and Weekly Summary. The EOD report includes an emotional journey timeline showing each trade with its journal-reported emotion as an emoji. The Morning Brief includes a readiness score and pre-trading checklist. The Weekly Summary shows behavioral trends. The AI narrative in each report synthesizes the behavioral story of the period. All reports downloadable as PDF.
 
-**Portfolio Radar** — A concentration risk analysis screen. It shows a score out of 100 representing how concentrated the current portfolio is. Below the score are two bar charts: exposure by sector and exposure by symbol. A table below lists every open position with its share of total exposure and a warning chip if the concentration exceeds a threshold. The screen is updated on demand (a sync button in the header). It answers the question: "Is my risk spread out or dangerously concentrated in one place?"
+**Settings** — Configuration hub with five tabs: Profile, Risk Limits, Notifications, Account, and Personalization. Saving happens per-tab, not globally.
 
-**Reports** — A library of generated reports. The left side is a list of reports sorted newest first, with type (EOD, Weekly, Monthly), date, and headline P&L visible on each row. Clicking a report opens it in the right panel. A report contains a P&L summary, behavior score, key patterns detected in the period, notable trades, a comparison to the previous period, and two to three paragraphs of AI-written behavioral narrative. There is a PDF download button. The list is paginated and can be filtered by report type.
+**Onboarding Wizard** — A five-step modal shown once after OAuth connection. Captures name, trading style, capital range, segment, and initial risk preferences. Each step saves immediately. Skip allowed on steps 2–5.
 
-**Settings** — A tabbed configuration screen with five tabs: Profile (name, trading style, capital range), Risk Limits (daily loss cap, max trades, cooldown rules), Notifications (push, WhatsApp, in-app toggles), Account (connected broker, token status, disconnect option), and Personalization (AI recommendation preferences). Fields are standard form inputs with labels above. Save happens per-section. There are no complex interactions — just fill in values and save.
+---
 
-**Onboarding Wizard** — A five-step full-screen modal that appears once after a new user connects Zerodha. Each step captures one piece of information: name, trading experience, capital range, primary segment, and initial risk preferences. A progress bar at the top shows 1 of 5 through 5 of 5. Every step except the first can be skipped. Each step saves immediately when the user clicks Next so nothing is lost if they close partway through. When complete the modal closes and the user lands on the Dashboard with a brief confirmation toast.
+## Individual Screen Specifications
 
 ---
 
@@ -63,63 +99,65 @@ A plain-language guide to what every screen is, what it contains, and how it sho
 
 **Route:** `/welcome`
 **Auth required:** No
-**Primary question:** "What is TradeMentor and why should I connect?"
 
-**What it is:** The public-facing entry point of the app, shown to anyone who hasn't connected a Zerodha account. Its job is to explain what TradeMentor does, make the value proposition clear, and get the user to click "Connect Zerodha." Users who don't want to commit can explore the full app with demo data as a guest. A compliance consent checkbox is required before either action.
+### Purpose
 
-**UI/UX:** Light-themed, editorial layout — clean and authoritative, not flashy. A fixed top navbar carries the logo on the left and two CTAs on the right. The hero is full-viewport-height with the headline left-aligned and three slowly cycling preview cards (alert card, P&L tile, pattern insight) on the right — showing the live product before the user does anything. Sections below alternate between constrained and full-width layouts creating visual rhythm. Pricing uses a 3-column card layout with the Pro tier subtly border-highlighted. No gradient overlays, no hero video, no decorative illustrations. The sidebar is NOT shown on this screen — it's outside the app shell.
+A potential trader arrives here. They are skeptical — there is no shortage of trading tools making behavioral improvement claims. The page must explain the mechanism clearly (not vaguely), show real product UI (not illustrations), and make it low-friction to try.
 
-### Layout
+Two types of visitors: those ready to connect their broker account immediately, and those who want to see the product before committing. The guest mode path must be equally prominent as the OAuth path.
+
+### Layout and Sections
 
 ```
-┌────────────────────────────────────────────────────────────────────┐
-│  [TM Logo]                         [Sign in]  [Connect Zerodha →]  │  ← Navbar, h-14, fixed
-├────────────────────────────────────────────────────────────────────┤
-│                                                                      │
-│         Your trading, reflected back.                                │  ← Hero headline
-│         Not judged. Not blocked. Just shown.                         │  ← Subhead
-│                                                                      │
-│         [Connect Zerodha — Primary CTA]                              │
-│         [Continue as Guest  — text link below]                       │
-│                                                                      │
-│         ┌─────────┐  ┌─────────┐  ┌─────────┐                       │  ← 3 animated
-│         │ Alert   │  │ P&L     │  │ Pattern │                       │    preview cards
-│         │ card    │  │ tile    │  │ insight │                       │    (cycling)
-│         └─────────┘  └─────────┘  └─────────┘                       │
-│                                                                      │
-├────────────────────────────────────────────────────────────────────┤
-│  THE PROBLEM                                                         │
-│  Most trading losses come from behavior, not analysis.               │
-│  [3 stats: 70% of retail losses from behavior patterns, etc.]        │
-├────────────────────────────────────────────────────────────────────┤
-│  HOW IT WORKS  (3-step horizontal)                                   │
-│  [1. Connect] → [2. We analyze] → [3. You see patterns]             │
-├────────────────────────────────────────────────────────────────────┤
-│  6 FEATURE TILES  (2×3 grid)                                         │
-│  Behavioral Alerts / AI Coach / Pattern History /                    │
-│  Blowup Shield / Portfolio Radar / Daily Reports                     │
-├────────────────────────────────────────────────────────────────────┤
-│  PATTERNS SHOWCASE  (carousel or static grid)                        │
-│  Sample alert cards with real-looking data                           │
-├────────────────────────────────────────────────────────────────────┤
-│  TESTIMONIALS  (3 cards)                                             │
-├────────────────────────────────────────────────────────────────────┤
-│  PRICING  (3 tiers: Free / Pro ₹499 / Elite ₹999)                   │
-│  Monthly / Yearly toggle                                             │
-├────────────────────────────────────────────────────────────────────┤
-│  FAQ  (8 questions, accordion)                                       │
-├────────────────────────────────────────────────────────────────────┤
-│  Footer: Legal links / Privacy / Terms / Contact                     │
-│  Consent checkbox required before CTA activates                      │
-└────────────────────────────────────────────────────────────────────┘
+Fixed Navbar:
+  [TM Logo]                              [Sign in]  [Connect Zerodha →]
+
+HERO (100vh)
+  Left:
+    "Your trading, reflected back."               ← headline
+    "Not judged. Not blocked. Just shown."         ← subhead
+    "TradeMentor connects to your Zerodha account
+     and builds a behavioral picture of how you
+     trade — so you can see yourself clearly."     ← body
+    [✓ I agree to Terms and Privacy Policy]        ← required checkbox
+    [Connect Zerodha — primary CTA]
+    [Continue as guest →]                          ← text link below
+
+  Right:
+    [3 rotating product cards — alert, score chart, journal sheet]
+    Cards cycle every 3 seconds with 400ms fade
+
+THE PROBLEM
+  "Most F&O losses come from behavior, not analysis."
+  [3 stats: 70% retail losses from behavioral patterns / etc.]
+
+HOW IT WORKS  (3 steps horizontal)
+  [1. Connect Zerodha] → [2. We track silently] → [3. You see patterns]
+
+6 FEATURES  (2×3 grid)
+  Behavioral Alerts       AI Coach
+  Journal + Patterns      Blowup Shield
+  Portfolio Radar         Daily Reports
+
+PATTERNS SHOWCASE
+  "The 22 patterns we track" — sample alert cards with real evidence
+
+TESTIMONIALS  (3 cards)
+
+PRICING  (3 tiers: Free / Pro ₹499 / Elite ₹999)
+  Monthly / Yearly toggle
+
+FAQ  (8 questions, accordion)
+
+FOOTER
+  Legal · Privacy · Terms · Compliance disclaimer
 ```
 
-**Design notes:**
-- Light theme. Clean, editorial. Dense enough to feel serious, not a marketing flyer.
-- Hero background: subtle geometric pattern (dot grid or fine rule grid), not a gradient photo
-- The 3 preview cards animate slowly on a 3s cycle — show what alerts look like
-- Consent checkbox: "I agree to Terms of Service and Privacy Policy" — CTA disabled until ticked
-- No autoplay video. No hero animation except the card cycle.
+### Design Notes
+
+- The three rotating product cards in the hero should show actual screenshots or very high-fidelity mockups. The product proves the point better than any copy.
+- The compliance checkbox is required. Both CTAs remain disabled until checked. This is genuinely required (DPDP Act), not dark pattern friction.
+- No autoplay video. No hero illustration. Clean, editorial, text-heavy. Credible, not excited.
 
 ---
 
@@ -127,95 +165,158 @@ A plain-language guide to what every screen is, what it contains, and how it sho
 
 **Route:** `/dashboard`
 **Auth required:** Yes
-**Primary question:** "How am I doing RIGHT NOW?"
 
-**What it is:** The home screen and most-used screen in the app. During market hours it answers one question: "How am I doing right now?" It shows live open positions, session P&L, available margin, and the current risk state. After market close it switches to a settled summary — final P&L, today's trades, win rate. A slim alerts strip at the bottom surfaces the last 2–3 behavioral flags. Everything else — charts, history, analysis — lives on other screens. The Dashboard is deliberately narrow in scope: if it doesn't answer "right now," it doesn't belong here.
+### Purpose and Primary Action
 
-**UI/UX:** High-density, workmanlike layout inspired by Zerodha Kite. No decorative elements. The page opens with a row of four equal-width metric tiles — each shows exactly one number and one label. Below the tiles, the Open Positions table takes up the bulk of the screen: compact 40px rows, monospaced numbers, with P&L as the only colored column. At the bottom, the Recent Alerts strip is two single-line entries with a "View all" right-aligned link — it does not expand inline. During market hours, a small amber pulsing dot sits beside "LIVE" in the page header — the only animation anywhere on this screen. No charts, no progress bars, no padded whitespace that would force scrolling to see positions.
+The dashboard is open during the trading session. The trader checks it between trades or immediately after closing a position. The primary **action** is journaling — the trader sees a trade they just closed and taps the journal icon before the details fade from memory. The primary **read** is today's behavioral observations — has the system flagged anything?
 
-### Layout (Market Hours — LIVE)
+The screen answers: "What have I done today and what has the system noticed?"
+
+### What is NOT on the Dashboard
+
+- Behavioral score (not useful mid-session; belongs in Analytics trends)
+- Margin display (already in Kite; only surfaced in Portfolio Radar)
+- RiskGuardian large widget (the risk state is shown as one quiet line when active, not a card)
+- Blowup Shield summary card (belongs on its own screen)
+- Progress tracking cards (belongs in Analytics → Progress tab)
+- Holdings (belongs in Portfolio Radar)
+- Separate closed trades card AND positions card — they are ONE unified today's activity feed
+
+### Information Hierarchy
+
+**During market hours:**
+1. **Today's Activity feed** — open positions + closed trades today, unified list, journal button on each
+2. **Today's Behavioral Observations** — what the system has flagged today, compact
+3. **Session Summary** — one line: trade count and net P&L, informational context
+4. **Session Limit status** — one line IF a limit is currently active, links to Session Limits
+5. **AI Coach quick access** — persistent input at bottom
+
+**After market close:**
+1. **Today's Activity feed** — all closed trades, with journal status prominently shown
+2. **Journaling prompt** — how many trades are un-journaled with direct link
+3. **Today's Behavioral Summary** — plain language summary of what the system observed
+4. **AI Coach debrief prompt** — suggested first message based on today
+
+### Layout — Market Hours
 
 ```
+Dashboard                                              ● LIVE  10:34 AM
+─────────────────────────────────────────────────────────────────────
+
+  8 trades today · Net: +₹1,240             ← one-line session summary, muted
+  [!]  Cooldown active — daily limit reached  [Details →]   ← only if active, quiet
+
+─────────────────────────────────────────────────────────────────────
+TODAY'S ACTIVITY
+─────────────────────────────────────────────────────────────────────
+
+Symbol            Type    Qty    P&L        Hold     Pattern    Journal
+NIFTY 24500CE     OPEN    50     +₹1,100    22m      —          ✎
+BANKNIFTY PE      OPEN    25     -₹550      14m      [Revenge]  ✎ (filled)
+RELIANCE EQ       CLOSED  100    +₹210      45m      —          ✎
+NIFTY 24400PE     CLOSED  75     -₹975      8m       [FOMO]     ✎
+
+3 trades not yet journaled.  [Journal them now →]     ← prompt, amber if >0
+─────────────────────────────────────────────────────────────────────
+
+TODAY'S OBSERVATIONS                                   [View all →]
+
+  ⬤  Overtrading · 8 trades in 2h · first observed at 10:34 AM
+  ⬤  Revenge trade risk · Re-entry on BANKNIFTY 4 min after loss · 09:58 AM
+─────────────────────────────────────────────────────────────────────
+
 ┌─────────────────────────────────────────────────────────────────┐
-│  Dashboard                                      ● LIVE  09:42   │  ← Page header
-├────────┬──────────┬──────────┬────────────────────────────────  │
-│Session │ Margin   │ Alerts   │ Risk State                        │  ← 4 metric tiles
-│P&L     │ Used     │ [3]      │ ● Safe / ◐ Caution / ⬤ Danger   │    h-28 each
-│+₹1,240 │ ₹42,500  │          │                                  │
-├────────┴──────────┴──────────┴────────────────────────────────  │
-│                                                                   │
-│  OPEN POSITIONS                              ⟳ synced 0s ago    │  ← Section header
-│  ┌──────────────────────────────────────────────────────────┐   │
-│  │ Symbol      Qty   Avg     LTP     P&L       Change       │   │
-│  │─────────────────────────────────────────────────────────-│   │
-│  │ NIFTY 24500CE  50  ₹140  ₹162   +₹1,100   +15.7%       │   │
-│  │ BANKNIFTY ...  25  ₹220  ₹198   -₹550     -10.0%       │   │
-│  │ RELIANCE       100  ₹2,840  ₹2,861  +₹210  +0.7%       │   │
-│  └──────────────────────────────────────────────────────────┘   │
-│                                                                   │
-│  RECENT ALERTS                               [View all →]        │
-│  ┌──────────────────────────────────────────────────────────┐   │
-│  │ ⚡ Overtrading · 8 trades in 2h · 10:34 AM              │   │
-│  │ ⚠ Revenge trade risk · After -₹800 loss · 09:58 AM      │   │
-│  └──────────────────────────────────────────────────────────┘   │
+│  Ask TradeMentor anything...                                  →  │
 └─────────────────────────────────────────────────────────────────┘
 ```
 
-### Layout (Market Closed)
+### Layout — Market Closed
 
 ```
+Dashboard                                              Market Closed
+─────────────────────────────────────────────────────────────────────
+
+  8 trades today · Final P&L: +₹3,450 · Win rate: 67%
+
+─────────────────────────────────────────────────────────────────────
+TODAY'S ACTIVITY
+─────────────────────────────────────────────────────────────────────
+
+Symbol            Type    Qty    P&L        Hold     Pattern    Journal
+NIFTY 24500CE     CLOSED  50     +₹1,100    22m      —          ✎ (filled)
+BANKNIFTY PE      CLOSED  25     -₹550      14m      [Revenge]  ✎ (filled)
+NIFTY 24400PE     CLOSED  75     -₹975      8m       [FOMO]     ✎
+RELIANCE EQ       CLOSED  100    +₹210      45m      —          ✎
+
+⚠  2 trades not yet journaled. Journal now while the session is fresh.
+   [Journal: NIFTY 24400PE]  [Journal: RELIANCE EQ]            ← direct links
+─────────────────────────────────────────────────────────────────────
+
+TODAY'S BEHAVIORAL SUMMARY
+
+  2 patterns observed: Overtrading (10:34 AM) and Revenge trade risk
+  (09:58 AM). You placed 8 trades — above your 6-trade daily average.
+  [View full observations →]
+─────────────────────────────────────────────────────────────────────
+
+DEBRIEF WITH YOUR COACH
+
+  "How was your trading behavior today?"    ← suggested prompt, clickable chip
+  "What patterns did I show today?"
+  "Help me process the BANKNIFTY revenge trade"
+
 ┌─────────────────────────────────────────────────────────────────┐
-│  Dashboard                                      Market Closed    │
-├────────┬──────────┬──────────┬────────────────────────────────  │
-│Today   │ This     │ Win Rate │ Behavior                          │
-│P&L     │ Week     │          │ Score                             │
-│+₹3,450 │ +₹12,800 │ 67%      │ 74/100                           │
-├────────┴──────────┴──────────┴────────────────────────────────  │
-│                                                                   │
-│  TODAY'S TRADES  (8 trades)              [View in Analytics →]   │
-│  ┌──────────────────────────────────────────────────────────┐   │
-│  │ Symbol      Type   Qty   Entry   Exit    P&L    Hold     │   │
-│  │ NIFTY CE    BUY    50    ₹140   ₹162   +₹1,100  22m     │   │
-│  └──────────────────────────────────────────────────────────┘   │
-│                                                                   │
-│  BEHAVIORAL FLAGS TODAY                                          │
-│  [same recent alerts section]                                    │
+│  Or ask anything...                                           →  │
 └─────────────────────────────────────────────────────────────────┘
 ```
 
-### Empty State (No trades yet)
+### Trade Activity Row Design
 
 ```
-Open Positions section:
-  ┌─────────────────────────────────────┐
-  │  No open positions                  │
-  │  Positions will appear here once    │
-  │  you trade in Zerodha Kite.         │
-  └─────────────────────────────────────┘
+Each row (compact, h-10):
+  Symbol (truncated if needed)   Type badge   Qty   P&L (colored)   Hold   [Pattern chip]   [✎ or ✎filled]
 
-GettingStartedCard (shows above everything until dismissed):
-  ┌─────────────────────────────────────────────────────────────────┐
-  │  Get started — 4 steps                              [×]         │
-  │  ✓ Connect Zerodha       ○ Complete profile                     │
-  │  ○ Set risk limits       ○ Enable alerts                        │
-  └─────────────────────────────────────────────────────────────────┘
+Pattern chip: small amber pill, pattern name abbreviated
+Journal icon: ✎ outline = not journaled. ✎ filled = journaled. Tap either → TradeJournalSheet
 ```
 
-### Metric Tile Specs
+Clicking anywhere on a trade row (not the journal icon) expands an inline detail row:
+- Entry price · Exit price · Entry time · Exit time · Strategy (if detected, e.g., "Bull Put Spread")
 
-| Tile | Primary value | Secondary | Color logic |
-|------|--------------|-----------|-------------|
-| Session P&L | ₹ amount (large, mono) | "Today" or "Session" label | `text-success` if >0, `text-danger` if <0 |
-| Margin | ₹ used / ₹ total | % bar (subtle) | `text-warning` if >80% used |
-| Alerts | Count (large, mono) | "unacknowledged" | `text-danger` if >0, `text-muted` if 0 |
-| Risk State | Safe / Caution / Danger / Insolvency | dot indicator | `text-success` / `text-warning` / `text-danger` / `text-destructive` |
+### Session Limit Status Line
 
-**Design notes:**
-- 4 tiles in a row on web. Each is `border border-border bg-card rounded-lg p-4`
-- No colored backgrounds on tiles. Color lives only in the value text.
-- Positions table: compact rows, `text-xs` for symbol/metadata, `text-sm font-mono` for prices
-- Prices update silently — no transition animation, no flash
-- "Synced X seconds ago" updates via WebSocket timestamp — shows if data is stale
+This line only appears when a limit is currently active. When all limits are within bounds it does not appear at all.
+
+```
+[⬤]  Cooldown active — daily loss limit reached.  Active until: market close.  [Details →]
+```
+
+The dot is amber. The text is regular weight, same size as the session summary line above it. This is not a card, not a banner — just an informational line. Clicking "Details →" opens the Session Limits page.
+
+### Empty State (No Trades Today)
+
+```
+TODAY'S ACTIVITY
+  No trades today yet. Your session activity will appear here as you trade.
+  [Sync trades →]
+```
+
+If user is new (fewer than 3 trades ever):
+
+```
+┌────────────────────────────────────────────────────────────────┐
+│  Getting Started                                           [×]  │
+│  ✓ Connect Zerodha    ○ Set trading capital                    │
+│  ○ Complete profile   ○ Enable notifications                   │
+└────────────────────────────────────────────────────────────────┘
+```
+
+### Design Notes
+
+- The journal icon (✎) is the most important interactive element on this screen. It should be visually distinct, consistently placed, and immediately recognizable.
+- Pattern chips on trade rows are amber pill labels. They identify trades that triggered an observation — they are context, not alarms.
+- The session summary line (trade count + P&L) is informational, not hero. It uses regular body text size, muted color for the label, regular for the number.
+- "3 trades not yet journaled" prompt uses amber text — the only amber on the screen — to draw attention without alarming.
 
 ---
 
@@ -223,190 +324,265 @@ GettingStartedCard (shows above everything until dismissed):
 
 **Route:** `/analytics`
 **Auth required:** Yes
-**Primary question:** "How have I been performing overall?"
 
-**What it is:** The primary performance analysis screen, designed for post-market review and periodic self-assessment. Organised into five tabs so the user can go deep on any dimension without other data cluttering the view. Summary shows overall shape. Behavior shows pattern frequency and the behavioral score. Trades shows every completed trade with filtering and journaling. Timing shows P&L by hour of day. Progress shows goal completion. A date range selector applies globally across all tabs.
+### Purpose
 
-**UI/UX:** Medium-to-high density — denser than Dashboard but not overwhelming. Five tab labels in an underline-style tab bar below the page header; active tab has a teal bottom border and `font-medium` label. Date range dropdown right-aligned in the header row. Summary tab opens with a 4-tile KPI row then a full-width line chart — crisp line, faint area fill below it, no fill grid. Trades tab is the densest screen in the app: 40px rows, sortable column headers, inline filter row, journal icon per row. Charts use a single teal accent — no rainbow palettes. Behavior tab's score card is the visual centrepiece: large monospace number, trend arrow, plain text descriptor.
+Post-market deep review. The trader uses this to understand their behavioral patterns and performance over time. The Behavior tab is the default — behavioral insight is TradeMentor's unique value. The screen is appropriately dense; the trader has time here.
+
+### Global Controls
+
+Date range selector (top right): Today / Last 7 days / Last 30 days / Last 90 days / Custom. Applies to all tabs simultaneously.
 
 ### Layout
 
 ```
-┌─────────────────────────────────────────────────────────────────┐
-│  Analytics                    [Date range: Last 30 days  ▼]     │
-├─────────────────────────────────────────────────────────────────┤
-│  [Summary] [Behavior] [Trades] [Timing] [Progress]              │  ← 5 tabs
-├─────────────────────────────────────────────────────────────────┤
-│  Tab content                                                     │
-└─────────────────────────────────────────────────────────────────┘
+Analytics                                         [Last 30 days  ▼]
+─────────────────────────────────────────────────────────────────
+ [Behavior]  [Trades]  [Timing]  [Progress]  [Summary]
+─────────────────────────────────────────────────────────────────
+[Tab content — all lazy loaded]
 ```
-
-### Tab: Summary
-
-```
-┌──────────┬──────────┬──────────┬──────────┐
-│ Total P&L│ Win Rate │ Avg Hold │ Trades   │  ← 4 KPI tiles
-│ +₹45,200 │ 64%      │ 38m      │ 142      │
-├──────────┴──────────┴──────────┴──────────┤
-│                                            │
-│  P&L Over Time  [Line chart, 30 days]      │  ← Full width chart
-│                                            │
-├────────────────────┬───────────────────────┤
-│ Performance by     │  Trade distribution   │  ← 2 half-width charts
-│ Segment/Product    │  by hour of day       │
-└────────────────────┴───────────────────────┘
-```
-
-### Tab: Behavior
-
-```
-┌──────────────────────────────────────────┐
-│ Behavior Score: 74/100  "Disciplined"    │  ← Score card
-│ Trend: ↑ +6 vs last month               │
-└──────────────────────────────────────────┘
-
-Pattern frequency table:
-┌────────────────────────────────────────────────────┐
-│ Pattern             Frequency  Severity  Est. Cost  │
-│─────────────────────────────────────────────────────│
-│ Overtrading         12×        Medium    -₹4,200    │
-│ Revenge trading     4×         High      -₹2,800    │
-│ No stop-loss        8×         Low       -₹1,100    │
-└────────────────────────────────────────────────────┘
-
-BTST card (if BTST trades exist):
-┌─────────────────────────────────────────────────────┐
-│ BTST Activity  [4 trades]                           │
-│ Overnight reversal: 2/4    Avg hold: 14h            │
-│ Avg P&L: -₹620             [View trades ↓]          │
-└─────────────────────────────────────────────────────┘
-```
-
-Behavior score null state: Shows "—" with "Need 5+ trades to calculate score" in `text-muted-foreground`
-
-### Tab: Trades
-
-```
-Filters: [Segment ▼] [Product ▼] [Result ▼] [Date ▼]   Search: [______________]
-
-┌─────────────────────────────────────────────────────────────────────┐
-│ Date     Symbol       Qty  Entry    Exit     P&L     Hold   Pattern │
-│──────────────────────────────────────────────────────────────────────│
-│ Mar 27   NIFTY 24500CE 50  ₹140    ₹162    +₹1,100  22m    —       │
-│ Mar 27   BANKNIFTY ... 25  ₹220    ₹198    -₹550    14m    Revenge │
-└─────────────────────────────────────────────────────────────────────┘
-
-Pagination: [← Prev]  Page 1 of 6  [Next →]
-```
-
-Each row has: journal icon (gray if empty, filled if journaled), click-to-expand inline detail.
-
-### Tab: Timing
-
-```
-P&L by hour of day (bar chart):
-  9:15  9:30  10:00  11:00  12:00  13:00  14:00  15:00  15:30
-
-Insight cards (below chart):
-  "Your best trading window is 10:00–11:30 AM"
-  "You lose money most often in the opening 15 minutes"
-```
-
-### Tab: Progress
-
-```
-Goal progress cards:
-  ┌────────────────────────────────┐
-  │ Daily loss limit              │
-  │ 14/30 days met  ████░░░░ 47%  │
-  └────────────────────────────────┘
-
-Streaks:
-  Current streak: 3 days (meeting all goals)
-  Best streak: 7 days
-```
-
-**Design notes:**
-- Date range selector: "Today / Last 7 days / Last 30 days / Last 90 days / Custom"
-- Charts use recharts. No 3D, no pie charts (except for segment distribution).
-- All tables are sortable by clicking column headers
-- Tabs are lazy-loaded — no performance hit on initial page load
 
 ---
 
-## 4. Alerts
+### Tab: Behavior (default)
+
+The behavioral intelligence center. This tab contains the unique analysis that only TradeMentor can provide because it combines trade data with journal entries.
+
+```
+DETECTED PATTERNS
+Pattern               Occurrences    Est. Cost      Trend
+─────────────────────────────────────────────────────────
+Overtrading           12×            -₹4,200        ↓ Improving
+Revenge trading        4×            -₹2,800        → Stable
+No stop-loss           8×            -₹1,100        ↑ Worsening
+FOMO entry             3×            -₹900          ↓ Improving
+Opening 5-min trap     2×            -₹380          → Stable
+─────────────────────────────────────────────────────────
+
+EMOTIONAL TAX  (powered by your journal entries)
+  ┌──────────────────────────────────────────────────────────────┐
+  │  Total estimated behavioral cost this month: -₹9,480         │
+  │                                                              │
+  │  Win rate by emotion you reported:                           │
+  │  Calm           68%  ████████████████  (41 trades)          │
+  │  Confident       71%  █████████████████ (18 trades)         │
+  │  Neutral         61%  ██████████████    (24 trades)         │
+  │  Anxious         28%  ██████             (12 trades)        │
+  │  FOMO            19%  ████               (8 trades)         │
+  │  Revenge         11%  ██                 (5 trades)         │
+  │                                                              │
+  │  Note: trades with no journal entry excluded from analysis.  │
+  └──────────────────────────────────────────────────────────────┘
+
+TRADING PERSONA
+  ┌──────────────────────────────────────────────────────────────┐
+  │  Your persona: "Reactive Scalper"                            │
+  │  You react quickly to price movement and trade in short      │
+  │  bursts. When sessions go well you execute cleanly. When     │
+  │  sessions turn against you, the trade frequency increases.   │
+  │                                                              │
+  │  Strengths:  · Fast execution  · Good win rate when calm    │
+  │  Watch out:  · Revenge risk    · Overtrading after losses   │
+  └──────────────────────────────────────────────────────────────┘
+
+BTST ACTIVITY  (if any BTST trades in period)
+  ┌──────────────────────────────────────────────────────────────┐
+  │  4 overnight trades this period                              │
+  │  Overnight reversal: 2/4   Avg hold: 14h   Win rate: 25%   │
+  │  Avg P&L: -₹620                                             │
+  │  [View BTST trades ↓]  ← expands a trade table              │
+  └──────────────────────────────────────────────────────────────┘
+
+BEHAVIOR SCORE TREND  (secondary, at the bottom of this tab)
+  Score over last 90 days: [line chart]
+  Note: This is a trend indicator for self-tracking, not a grade.
+```
+
+**Behavior score null state (< 5 trades):**
+"Behavioral analysis requires 5+ completed trades. — currently displayed."
+
+---
+
+### Tab: Trades
+
+The fullest trade-by-trade view in the app. The key differentiator from Kite's order history: pattern tags AND journal emotion tags appear inline on each row.
+
+```
+Filters: [Segment ▼] [Product ▼] [Result ▼] [Pattern ▼] [Emotion ▼]
+                                                             [Search symbol...]  [Export CSV]
+
+Date      Symbol           Qty   P&L       Hold   Pattern     Emotion    📝
+──────────────────────────────────────────────────────────────────────────────
+Mar 27    NIFTY 24500CE    50    +₹1,100   22m    —           Calm       ✎ filled
+Mar 27    BANKNIFTY PE     25    -₹550     14m    [Revenge]   Anxious    ✎ filled
+Mar 26    NIFTY 24400PE    75    -₹975     8m     [FOMO]      FOMO       ✎ filled
+Mar 26    RELIANCE EQ      100   +₹210     45m    —           —          ✎ (empty)
+──────────────────────────────────────────────────────────────────────────────
+
+Page 1 of 6   [← Prev]  [Next →]
+```
+
+Clicking the journal icon (✎) on any row opens the TradeJournalSheet. Clicking the pattern chip opens a tooltip explaining the detection evidence. Clicking anywhere else on the row expands inline detail (entry/exit times, prices, strategy if detected).
+
+---
+
+### Tab: Timing
+
+Reveals the trader's performance patterns across the trading day.
+
+```
+P&L BY HOUR OF DAY  (bar chart)
+  [Bar chart: 9:15 to 15:30, P&L on y-axis, hours on x-axis]
+  Bars colored green (positive avg P&L for that hour) or red (negative)
+
+  INSIGHT: Your 9:15–9:30 trades are net -₹2,400 this month.
+           Your best window is 10:00–11:30 (net +₹8,200).
+           You lose money on average in the last 30 minutes.
+
+WIN RATE BY HOUR  (bar chart)
+  [Same x-axis, win rate % on y-axis]
+
+P&L BY DAY OF WEEK  (bar chart)
+  Mon    Tue    Wed    Thu    Fri
+
+  INSIGHT: [Best/worst day with reasoning if detectable]
+```
+
+---
+
+### Tab: Progress
+
+Shows goal adherence and streak tracking over the selected period.
+
+```
+GOAL ADHERENCE
+┌──────────────────────────────────────────────────────────────────┐
+│  Max 10 trades per day                                           │
+│  14/30 days met this month    ████████████░░░░░░  47%           │
+│  Current streak: 3 days    Best streak: 7 days                  │
+└──────────────────────────────────────────────────────────────────┘
+
+┌──────────────────────────────────────────────────────────────────┐
+│  No trading 9:15–9:30 AM                                        │
+│  22/30 days met    █████████████████████░░░░░  73%             │
+│  Current streak: 5 days    Best streak: 12 days                 │
+└──────────────────────────────────────────────────────────────────┘
+
+CONSISTENCY CALENDAR (last 90 days)
+  [Heatmap: dark = all goals met, light = partial, empty = no trading]
+  [View / edit goals →]  ← links to Goals page
+```
+
+---
+
+### Tab: Summary
+
+Last tab because P&L overview is available in Kite. This tab satisfies traders who want it — it just doesn't lead with it.
+
+```
+┌──────────┬──────────┬──────────┬──────────┐
+│ Total P&L│ Win Rate │ Profit F │ Trades   │
+│ +₹45,200 │ 64%      │ 1.8      │ 142      │
+└──────────┴──────────┴──────────┴──────────┘
+
+P&L OVER TIME  (line chart, date range)
+  [Cumulative realized P&L line with daily P&L bars behind it]
+
+┌────────────────────────┬───────────────────────┐
+│  By Segment            │  By Product           │
+│  F&O: 78%  Equity: 22% │  MIS: 61%  NRML: 39%  │
+└────────────────────────┴───────────────────────┘
+```
+
+---
+
+## 4. Behavioral Observations
 
 **Route:** `/alerts`
 **Auth required:** Yes
-**Primary question:** "What behavioral patterns is the system flagging?"
 
-**What it is:** The behavioral alert center. Every pattern the system detects arrives here. Alerts are never pushed into the trader's workflow — they sit in this feed waiting to be reviewed. Three tabs: Live (recent and unread), History (all past alerts with date filtering), and Patterns (aggregate view showing frequency and cost per pattern type). The unread badge on the nav link reflects unacknowledged count. Acknowledging an alert marks it read — nothing else happens.
+### Purpose
 
-**UI/UX:** Two-column layout — the alert feed occupies ~70% on the left, a compact filter panel on the right. Unread alerts have a very faint `bg-primary/5` tinted background — subtle, never alarming. Each alert card has a left-side severity dot (the only color in the card), a bold pattern name, one line of evidence text, a row of symbol chips, a muted estimated cost, and a small "Acknowledge" button. The button is secondary — the card's visual focus is the evidence, not the action. Alert severity never increases the visual weight of a card — critical and low alerts look the same size and weight, only the dot color differs.
+Every behavioral pattern the system detects lands here. The feed is the trader's record of what the system noticed and when. Acknowledging an observation does not trigger anything — it simply marks it as reviewed.
+
+The design challenge: observations should feel like notes from a coach, not fire alarms. A "Critical" observation should not look dramatically different from a "Low" one in terms of card size, weight, or background color. The trader decides what matters. The dot color is the severity cue — nothing else.
 
 ### Layout
 
 ```
-┌─────────────────────────────────────────────────────────────────┐
-│  Alerts                           [Mark all read]  [3 unread]   │
-├─────────────────────────────────────────────────────────────────┤
-│  [Live]  [History]  [Patterns]                                  │  ← 3 tabs
-├───────────────────────────────────────┬─────────────────────────┤
-│  Feed (scrollable)                    │  Filter panel           │
-│                                       │  ─────────────────      │
-│  ┌─────────────────────────────────┐  │  Severity:              │
-│  │ ● NEW                           │  │  ☑ Critical             │
-│  │ Overtrading                     │  │  ☑ High                 │
-│  │ 8 trades in the last 2 hours    │  │  ☑ Medium               │
-│  │ Trades: NIFTY CE (×5), BANK...  │  │  ☑ Low                  │
-│  │ 10:34 AM today                  │  │                         │
-│  │ [Acknowledge]                   │  │  Pattern type:          │
-│  └─────────────────────────────────┘  │  ☑ Overtrading          │
-│                                       │  ☑ Revenge trading      │
-│  ┌─────────────────────────────────┐  │  ☑ No stop-loss         │
-│  │ ✓ ACK                           │  │  ... (all patterns)     │
-│  │ Revenge trade risk              │  │                         │
-│  │ Quick re-entry after -₹800 loss │  │  Date:                  │
-│  │ 09:58 AM today                  │  │  [Today ▼]              │
-│  └─────────────────────────────────┘  │                         │
-└───────────────────────────────────────┴─────────────────────────┘
+Behavioral Observations                   [Mark all read]  3 unread
+─────────────────────────────────────────────────────────────────
+ [Recent]  [History]  [By Pattern]
+──────────────────────────────────────────────────────┬──────────────
+  Feed (70%)                                          │ Filter (30%)
+                                                      │
+  ┌─────────────────────────────────────────────────┐ │  Pattern type:
+  │ ● NEW                                           │ │  ☑ All
+  │ Overtrading                                     │ │  ☐ Overtrading
+  │ 8 trades placed in a 2-hour window.             │ │  ☐ Revenge
+  │ 40% above your daily average of 6.              │ │  ☐ No stop-loss
+  │ Trades: NIFTY CE ×5, BANKNIFTY ×3             │ │  ☐ FOMO
+  │ 10:34 AM today  ·  Est. cost: -₹1,200          │ │  ☐ ...all 22
+  │ [Acknowledge]  [See trades →]                  │ │
+  └─────────────────────────────────────────────────┘ │  Severity:
+                                                      │  ☑ All
+  ┌─────────────────────────────────────────────────┐ │  ☑ Critical
+  │ ✓ Acknowledged                                  │ │  ☑ High
+  │ Revenge trade risk                              │ │  ☑ Medium
+  │ Re-entered BANKNIFTY CE 4 minutes after a       │ │  ☑ Low
+  │ ₹800 loss at 09:54 AM. Entry at 09:58 AM.       │ │
+  │ Typical revenge pattern: same underlying,       │ │  Date range:
+  │ opposite direction.                             │ │  [Today  ▼]
+  │ 09:58 AM today                                  │ │
+  └─────────────────────────────────────────────────┘ │
+──────────────────────────────────────────────────────┴──────────────
 ```
 
-### Alert Card Anatomy
+### Observation Card Anatomy
 
 ```
-┌────────────────────────────────────────────────────────┐
-│  [SeverityDot]  Pattern Name                 [Time]   │
-│  Evidence line (e.g., "8 trades in 2h")                │
-│  [Implicated trades — symbol chips, up to 5]           │
-│  Estimated cost: -₹1,200                               │
-│  [Acknowledge]  [View trades]                          │
-└────────────────────────────────────────────────────────┘
+┌──────────────────────────────────────────────────────────────────┐
+│  [●]  Pattern Name                                      [Time]   │
+│       Evidence line — specific, factual, numbers-based           │
+│       Context line — why this matters for this trader            │
+│       Affected instruments: [NIFTY CE ×5]  [BANKNIFTY ×3]       │
+│       Estimated cost: -₹1,200                                    │
+│       [Acknowledge]   [See trades →]                             │
+└──────────────────────────────────────────────────────────────────┘
 ```
 
-Severity dots:
-- Low: `bg-muted-foreground` (gray)
-- Medium: `bg-warning` (amber)
-- High: `bg-danger` (orange-red)
-- Critical: `bg-destructive` (red) — rare
+Evidence line must be specific. "Overtrading" is a label. "8 trades in a 2-hour window, 40% above your daily average of 6" is evidence. The design must accommodate this length — the card height adjusts to content.
 
-### Tab: Patterns
+Severity dot:
+- Low: muted gray
+- Medium: amber
+- High: orange
+- Critical: orange (same as high but slightly larger dot — not dramatically different)
+
+Critical and High look almost identical. This is intentional.
+
+### Tab: By Pattern
+
+Aggregated view. One card per pattern type that has ever triggered.
 
 ```
-Pattern summary cards (one per pattern type ever triggered):
-┌─────────────────────────────────────┐
-│ Overtrading                         │
-│ 12 occurrences  |  Avg cost: -₹350  │
-│ Last: 2 days ago                    │
-│ Frequency trend: ↓ improving        │
-└─────────────────────────────────────┘
+OVERTRADING
+  12 observations this month
+  Estimated total cost: -₹4,200
+  Trend: ↓ Improving (was 18 last month)
+  Last: 2 days ago    [See all →]
+
+REVENGE TRADING
+  4 observations this month
+  Estimated total cost: -₹2,800
+  Trend: → Stable
+  Last: today    [See all →]
 ```
 
-**Design notes:**
-- "Live" tab shows today's + last 7 days. "History" shows all time with date filter.
-- Unacknowledged alerts have a subtle `bg-primary/5` background — distinguishable but not alarming
-- Acknowledged alerts are muted in color but still visible
-- No bold red. Alert severity is conveyed by the dot only, not by the card's overall weight.
+### Empty State
+
+"No observations in this period. No behavioral patterns were detected in the selected date range."
 
 ---
 
@@ -414,60 +590,69 @@ Pattern summary cards (one per pattern type ever triggered):
 
 **Route:** `/coach`
 **Auth required:** Yes
-**Primary question:** "What should I think about this situation?"
 
-**What it is:** A psychology-focused conversational interface where traders discuss their behavior with an AI that has full context of their trade history, patterns, and current P&L. Unlike a generic chatbot, the coach has a live data panel showing what it knows — making responses feel grounded, not generic. The conversation persists across sessions. The coach never gives buy/sell advice; it only reflects behavioral observations.
+### Purpose
 
-**UI/UX:** Split layout — a 220px left context panel with `border-r border-border`, chat area fills the rest. The left panel shows live stats in stacked label-value format (not tiles) — it feels like a sidebar annotation, not a mini-dashboard. Chat area: user messages right-aligned in `bg-muted rounded-lg` bubble, AI responses left-aligned with an avatar initial circle and plain text (no bubble). Streaming renders smoothly with a blinking cursor at the last word. On first open, four starter prompt chips appear centered in the empty area. Input field autofocuses, is full-width, with a send button on the right. Page header shows "Market Open" or "Market Closed" badge right-aligned — the only time-aware element on this screen.
+The trader comes here to process — not to get information, but to think out loud with a knowledgeable observer who has full context. "Why did I trade like that today?" "What should I be watching tomorrow?" "I'm frustrated — help me understand what I'm seeing."
+
+The left context panel communicates that the coach is prepared. It shows not just stats but journal-reported emotions from today's trades — so the conversation starts with shared understanding, not from zero.
+
+The coach asks questions. It reflects observations. It never gives securities advice. It may say: "I see you reported feeling anxious on 4 of today's 6 trades. Your win rate on anxious-labeled trades over 30 days is 28%. Is that something you want to explore?" That is genuine coaching.
 
 ### Layout
 
 ```
-┌──────────────────────────────────────────────────────────────────┐
-│  AI Coach                                     ● Market Open      │  ← "Market Closed" when closed
-├────────────────────┬─────────────────────────────────────────────┤
-│  Context panel     │  Chat area                                  │
-│  ────────────────  │                                             │
-│  Today             │  ┌───────────────────────────────────────┐ │
-│  P&L: +₹1,240      │  │          AI COACH                     │ │
-│  Trades: 6         │  │                                        │ │
-│  Behavior: 74/100  │  │  "How was my trading today?"          │ │  ← starter prompts
-│                    │  │  "What patterns am I showing?"        │ │    (when no history)
-│  Active alerts:    │  │  "I'm feeling frustrated..."          │ │
-│  ⚡ Overtrading    │  │  "Help me prep for tomorrow"          │ │
-│  ⚠ Revenge risk   │  │                                        │ │
-│                    │  │  ─────────────────────────────────── │ │
-│  Risk: Safe        │  │                                        │ │
-│                    │  │  [Chat messages appear here]           │ │
-│                    │  │                                        │ │
-│                    │  └───────────────────────────────────────┘ │
-│                    │                                             │
-│                    │  ┌───────────────────────────────────────┐ │
-│                    │  │  [Message input                    ↑] │ │
-│                    │  └───────────────────────────────────────┘ │
-└────────────────────┴─────────────────────────────────────────────┘
+AI Coach                                            ● Market Open
+─────────────────────────────────────────────────────────────────
+┌──────────────────────────────┬──────────────────────────────────┐
+│  Today's Brief               │                                  │
+│  ──────────────────────────  │  [Starter prompts when no        │
+│  6 trades since 9:15 AM      │   conversation history:]         │
+│  Net unrealized: +₹1,240     │                                  │
+│                              │  "How was my behavior today?"   │
+│  Emotions today:             │  "What patterns am I showing?"  │
+│  Calm (3)  Anxious (2)       │  "I just made a bad trade —     │
+│  (from your journal entries) │   help me think it through"     │
+│                              │  "Help me prepare for tomorrow" │
+│  2 observations flagged:     │  "Why do I keep overtrading?"   │
+│  Overtrading  10:34 AM       │                                  │
+│  Revenge risk 09:58 AM       │  ───────────────────────────── │
+│                              │                                  │
+│  Context loaded:             │  [Conversation history]         │
+│  30-day behavioral data      │                                  │
+│  + journal entries           │                                  │
+│                              │  ┌────────────────────────────┐ │
+│  [New chat  +]               │  │  Ask anything...         ↑ │ │
+│                              │  └────────────────────────────┘ │
+└──────────────────────────────┴──────────────────────────────────┘
 ```
 
-### Chat Message Types
+### AI Message Feature: Save to Journal
+
+Each AI message has a bookmark icon on hover. Clicking it saves the insight to a coach session record. When saved, the icon changes to a checkmark with "Saved." This gives the trader a way to capture valuable coach observations.
+
+### Message Format
 
 ```
-User message (right-aligned):
-  ┌───────────────────────────────┐
-  │  What's my biggest weakness?  │
-  └───────────────────────────────┘
+User (right-aligned, bordered box):
+                        ┌────────────────────────────────┐
+                        │  Why do I keep overtrading?    │
+                        └────────────────────────────────┘
 
-AI response (left-aligned, with avatar):
-  [TM]  Based on your last 30 days, I can see that...
-        [streams in word by word]
+AI (left-aligned, [TM] avatar, plain text):
+[TM]  Looking at your data, I can see a pattern: 9 of 12
+      overtrading events this month occurred on days where
+      your first trade was a loss. Does that match your
+      experience? [📎 Save]
 ```
 
-**Design notes:**
-- Context panel is always visible on web. It's the coach's "memory" made visible.
-- The input field autofocuses on page load
-- Streaming: each word appears progressively. A subtle blinking cursor at end.
-- Session is restored on page revisit — no "start new chat" required
-- "New chat" button in top-right — clears session
-- The coach never shows a "loading" spinner between the user message and first word of response.
+Response text auto-formats bold, bullet lists, and numbered lists from markdown. Always includes a question or reflection at the end — the coach is a conversation partner, not a monologue.
+
+### Design Notes
+
+- The context panel line "from your journal entries" under the emotions section is an important trust signal — it shows the coach is working from the trader's own words, not just algorithmic data.
+- "New chat +" creates a new session. Previous session is preserved in history.
+- The coach page does not show a behavioral score anywhere.
 
 ---
 
@@ -475,44 +660,96 @@ AI response (left-aligned, with avatar):
 
 **Route:** `/patterns`
 **Auth required:** Yes
-**Primary question:** "Who am I as a trader? What are my tendencies?"
 
-**What it is:** A longitudinal view of the trader's behavioral identity — not what happened today, but who they are as a trader across weeks and months. Shows all pattern types being tracked, their frequency, severity, and last occurrence. Selecting a pattern loads a detail panel: a second-person narrative description, a weekly frequency sparkline over 90 days, and worst instances with P&L cost. A "Not Detected" section shows patterns tracked but never triggered — a source of reassurance.
+### Purpose
 
-**UI/UX:** Two-panel layout — list on the left (~30% width), detail on the right. Left list: each detected pattern as a single row with pattern name, severity badge pill (only color in the list), occurrence count, and days since last trigger. Clicking highlights with `border-l-2 border-primary` and loads the right panel without page navigation. Right panel opens with the pattern name in large type, then a narrative paragraph in `text-sm leading-relaxed`, a mini bar chart (weekly frequency, 90 days), and a compact worst-instances table. "Not Detected" section at list bottom uses `opacity-60` muted styling — quieter, not invisible.
+This is where the trader comes to understand who they are as a trader over time. Not what happened today — what tends to happen. The unique depth here: journal entries allow the system to connect emotional context to pattern occurrences. "You overtrade after losses" is algorithmic. "You overtrade after losses, and in those cases you most often reported feeling Anxious or Revenge" is a combination of algorithmic detection and journal data.
+
+The screen also serves as the behavioral status hub — it shows the live danger status, streak tracker, and pattern calendar.
 
 ### Layout
 
 ```
-┌─────────────────────────────────────────────────────────────────┐
-│  My Patterns                                                     │
-├───────────────────────────┬─────────────────────────────────────┤
-│  Pattern list (left)      │  Pattern detail (right)             │
-│  ─────────────────────    │  ──────────────────────────         │
-│  ● Overtrading      HIGH  │  Overtrading                        │
-│  ● Revenge Trading  HIGH  │  ─────────────────────────          │
-│  ● No Stop-Loss     MEDIUM│  "You tend to overtrade after       │
-│  ● FOMO Entry       MEDIUM│  a strong morning run"              │
-│  ● Early Exit       LOW   │                                     │
-│  ● Loss Aversion    LOW   │  Frequency (last 90 days):          │
-│  ─────────────────────    │  [Sparkline bar chart]              │
-│  Not detected:            │                                     │
-│  ○ Position Sizing        │  Worst instances:                   │
-│  ○ Winning Streak OC      │  Mar 15: 12 trades, -₹3,200        │
-│                           │  Mar 8:  9 trades, -₹1,800         │
-│                           │                                     │
-│                           │  What to watch for:                 │
-│                           │  "Most often triggers between       │
-│                           │   10:30–11:30 AM on losing days"   │
-└───────────────────────────┴─────────────────────────────────────┘
+My Patterns
+─────────────────────────────────────────────────────────────────
+
+[Live Status Banner — always visible]
+┌──────────────────────────────────────────────────────────────────┐
+│  ● Safe — No active limits triggered today                      │
+│  Daily loss: 18%   Trades today: 6   Consecutive losses: 0      │
+└──────────────────────────────────────────────────────────────────┘
+
+[Streak Card + Pattern Calendar — horizontal pair]
+┌──────────────────────────────┬───────────────────────────────────┐
+│  Streak: 4 clean days        │  PATTERN CALENDAR (30 days)       │
+│  Best: 12 days               │  [Calendar heatmap — dark = clean │
+│  Milestones: 3d ✓  7d ✓      │   light = observation day]        │
+│              14d ✗  21d ✗   │                                   │
+└──────────────────────────────┴───────────────────────────────────┘
+
+[Pattern Detail — 2 panel layout]
+┌───────────────────────────────┬─────────────────────────────────┐
+│  Pattern list (left)          │  Detail (right)                 │
+│  ─────────────────────────    │  ──────────────────────────     │
+│  ● Overtrading         12×   │  Overtrading                    │
+│    2 days ago          ←sel   │  ─────────────────────────      │
+│                               │  "You tend to overtrade on      │
+│  ● Revenge Trading      4×   │  days where your first trade    │
+│    today                      │  was a loss. In the last 30     │
+│                               │  days, 9 of 12 overtrading      │
+│  ● No Stop-Loss         8×   │  events followed an early       │
+│    3 days ago                 │  session loss."                 │
+│                               │                                 │
+│  ● FOMO Entry           3×   │  EMOTIONAL CORRELATION          │
+│    8 days ago                 │  (from your journal entries)    │
+│                               │  Anxious  · 9 of 12 events     │
+│  ● Early Exit           6×   │  Revenge  · 6 of 12 events     │
+│    5 days ago                 │  FOMO     · 3 of 12 events     │
+│                               │                                 │
+│  ─────────────────────────    │  Frequency last 90 days:        │
+│  Not Detected (3):            │  [Weekly bar sparkline]         │
+│  ○ Position Sizing            │                                 │
+│  ○ Winning Streak OC          │  Usually occurs:                │
+│  ○ Strategy Pivot             │  10:30 AM – 11:30 AM            │
+│                               │                                 │
+│                               │  Worst instances:               │
+│                               │  Mar 15: 12 trades  -₹3,200    │
+│                               │  Mar 8:  9 trades   -₹1,800    │
+│                               │                                 │
+│                               │  Estimated cost this month:     │
+│                               │  -₹4,200                        │
+│                               │  [See related trades →]         │
+└───────────────────────────────┴─────────────────────────────────┘
+
+EMOTIONAL TAX CARD
+  [Same as Analytics Behavior tab — monthly cost + emotion breakdown]
 ```
 
-**Design notes:**
-- Left panel: click a pattern to load its detail on the right (no page nav)
-- Severity badge is the ONLY color accent in the list. Not the row, not the text.
-- "Not Detected" section at bottom of list — shows patterns being tracked but never triggered
-- The narrative text in detail panel is written in second-person ("You tend to...") — personal but factual
-- Empty state (new user): "Your patterns will appear after 10+ trades."
+### Live Status Banner States
+
+```
+Safe (green left border):
+  ● Safe — No active limits triggered today
+  Daily loss: 18%   Trades: 6   Consecutive losses: 0
+
+Caution (amber left border):
+  ◐ Caution — Approaching daily loss limit
+  Daily loss: 72%   Trades: 9   Consecutive losses: 2
+  [Alert Guardian →]   ← WhatsApp notification option
+
+Danger/Critical (same amber border — no red siren):
+  ⬤ Limit Active — Daily loss limit reached
+  Circuit break triggered at 11:23 AM
+  [Alert Guardian →]   [Details →]
+```
+
+The "Alert Guardian" button connects WhatsApp notifications for the trader's own risk state — it lets them set up a check-in with someone who can hold them accountable.
+
+### Design Notes
+
+- The emotional correlation section in the pattern detail is the highest-value design element on this page. It requires journal data to populate. If fewer than 5 journal entries exist for a pattern, show: "Add journal entries to see emotional correlation data."
+- The Not Detected section at the bottom of the pattern list communicates what the trader is doing right. It is not empty data — it is positive signal. Design it as such: "3 patterns never detected" not "3 patterns: N/A."
+- Pattern narratives are written in second-person, specific to the trader's actual data, not generic. Generic text here breaks the screen's value entirely.
 
 ---
 
@@ -520,454 +757,488 @@ AI response (left-aligned, with avatar):
 
 **Route:** `/shield`
 **Auth required:** Yes
-**Primary question:** "What has the system protected me from?"
 
-**What it is:** A retrospective history of every time the system's protections prevented a bad situation from getting worse — circuit breakers triggered, cooldowns enforced, margin warnings issued. The headline number (total capital defended) is the app's single most emotionally impactful data point. The Shield is always described as "Active" when the system is monitoring — giving the trader a passive background confidence that something is watching.
+### Purpose
 
-**UI/UX:** Medium-density layout with a deliberate sense of calm and reassurance. The top 4-tile hero row gives "Total Capital Saved" slightly more visual weight — `text-3xl` vs `text-2xl` for the others. Color palette deliberately stays positive: saved amounts in `text-success`, status dot in soft green. No red anywhere — this is a review of what went right. History table is compact with subtle row separators. The timeline strip is a horizontal bar chart with date markers — clusters of protection events visible without reading every row. Tone is calm, factual, quietly affirming without being congratulatory.
+The Blowup Shield answers: "What has the system's protection actually done?" This screen is unique because it shows **counterfactual financial data** — not estimates, but actual market prices 30 minutes after an alert was triggered, compared to what the trader's position would have been.
 
-### Layout
+This builds trust in two ways: (1) it shows real verified numbers when the protection worked, and (2) it honestly shows when the market recovered after an alert — when following the alert would have cost opportunity. That honesty is the feature's credibility.
+
+### Key Metrics
 
 ```
-┌─────────────────────────────────────────────────────────────────┐
-│  Blowup Shield                                                   │
-├──────────┬──────────┬──────────┬──────────────────────────────  │
-│ Total    │ Saves    │ Worst    │ Current                         │  ← 4 tiles
-│ Saved    │ This Mo. │ Save     │ Status                          │
-│ ₹41,200  │ 3        │ ₹18,500  │ ● Active                       │
-├──────────┴──────────┴──────────┴──────────────────────────────  │
-│                                                                   │
-│  PROTECTION HISTORY                     [Last 90 days  ▼]       │
-│  ┌──────────────────────────────────────────────────────────┐   │
-│  │ Date    Event              Capital Defended  Type         │   │
-│  │────────────────────────────────────────────────────────--│   │
-│  │ Mar 27  Max loss reached   ₹18,500+         Circuit Break│   │
-│  │ Mar 22  Cooldown triggered ₹4,200           Cooldown     │   │
-│  │ Mar 18  Margin warning     ₹8,000+          Margin Alert │   │
-│  └──────────────────────────────────────────────────────────┘   │
-│                                                                   │
-│  TIMELINE                                                        │
-│  [Horizontal timeline visualization — events marked on date line]│
-└─────────────────────────────────────────────────────────────────┘
+Blowup Shield
+─────────────────────────────────────────────────────────────────
+
+┌──────────────────┬─────────────────────┬────────────────────────┐
+│ Capital Defended │  Shield Score        │  Heeded Streak         │
+│ ₹41,200          │  73%                 │  8 consecutive         │
+│ from 12 events   │  heeded/total        │  (without ignoring)    │
+└──────────────────┴─────────────────────┴────────────────────────┘
+
+DATA QUALITY
+  9 of 12 events verified with real market data  ████████████░░░  75%
+  3 still calculating (T+30 price not yet available)
+  [Verified ✨] [Calculating ⏱] [No position (auto-squared)]
+
+─────────────────────────────────────────────────────────────────
+PROTECTION TIMELINE
+─────────────────────────────────────────────────────────────────
 ```
 
-**Design notes:**
-- "Total saved" is the most emotionally resonant number in the app. Give it space.
-- `+` suffix on partial saves (e.g., ₹18,500+) — means the real number was likely higher
-- The timeline is a nice-to-have visual — compact bars on a date axis
-- Current Status: "● Active" means the shield is monitoring. "○ Not configured" means they need to set thresholds.
-- Tone: factual, positive, not boastful. "Here's what happened" not "Look how great we are"
+### Per-Event Display
+
+```
+Mar 27 · 11:23 AM                          CIRCUIT BREAK  [Heeded ✓]
+
+  Pattern: Session Meltdown                              [Verified ✨]
+  "You had realized losses of 42% of daily capital."
+
+  Long 10 NIFTY 24000 CE @ ₹180. LTP at alert: ₹162
+
+  You exited ✓                  [Expand counterfactual ↓]
+
+    ├── Your P&L (realized):             -₹18,000
+    ├── If held to T+30 (market data):   -₹36,500
+    └── Net difference:                  +₹18,500 defended  ✨
+
+─────────────────────────────────────────────────────────────────
+Mar 22 · 10:42 AM                          COOLDOWN  [Heeded ✓]
+
+  Pattern: Consecutive Loss Streak                       [Verified ✨]
+  "3rd consecutive loss. Cooldown triggered."
+
+  Net difference:                          +₹4,200 defended  ✨
+
+─────────────────────────────────────────────────────────────────
+Mar 15 · 14:05 PM                          COOLDOWN  [Ignored ✗]
+
+  Pattern: Revenge Trade                                 [Verified ✨]
+  "Re-entry BANKNIFTY 6 min after loss."
+
+  You continued trading ✗                 [Expand counterfactual ↓]
+
+    ├── Your P&L (continued trading):     -₹3,200
+    ├── If stopped at alert time (T+30):  -₹1,400
+    └── Additional loss from ignoring:    -₹1,800
+```
+
+**Honestly showing when the alert would have been wrong:**
+```
+Mar 10 · 09:45 AM                          COOLDOWN  [Heeded ✓]
+
+  Pattern: Opening 5-min Trap                            [Verified ✨]
+  "Entry at 09:17 on first 5-min trap."
+
+  You exited ✓                  [Expand counterfactual ↓]
+
+    ├── Your P&L (realized):             -₹2,100
+    ├── If held to T+30 (market data):   -₹800  (market recovered)
+    └── Note: Heeding this alert cost you ₹1,300 vs. holding.
+             This is shown honestly. Not all alerts will be correct.
+```
+
+### Pattern Breakdown Table
+
+```
+Pattern               Alerts   Heeded %   Avg Saved   Total Saved
+─────────────────────────────────────────────────────────────────
+Session Meltdown       2        100%        ₹18,500      ₹37,000
+Revenge Trading        4         75%         ₹4,200      ₹12,600
+Overtrading            5         60%         ₹1,800       ₹5,400
+Cooldown Violation     1        100%         ₹4,200       ₹4,200
+```
+
+### Design Notes
+
+- No red anywhere on this screen. Green for defended amounts. The "Additional loss from ignoring" row uses regular text weight, not red — it is information, not alarm.
+- The honesty note on events where heeding cost opportunity ("This is shown honestly") is a design requirement. Remove it and the screen becomes marketing. Keep it and it becomes a credible tool.
+- The shield score (73%) is displayed with a muted color indicator — green ≥70%, amber 40–69%, not specifically red for low scores.
 
 ---
 
-## 8. Guardrails
+## 8. Session Limits
 
-**Route:** `/guardrails`
+**Route:** `/danger-zone` (display name: Session Limits)
 **Auth required:** Yes
-**Primary question:** "What rules have I set for myself?"
 
-**What it is:** A read-only summary of all self-imposed risk rules the trader has configured — daily loss limits, max trade count, position size cap, cooldown triggers, high-risk time windows. Shows each rule's current status and a "Today's compliance" bar. Editing rules is done in Settings — this screen is visibility-only. The compliance metric is always framed as "X of Y rules met" — never a percentage grade, never color-coded shaming.
+### Purpose
 
-**UI/UX:** Simple, low-complexity layout — no charts, no complex components. Rules grouped into three bordered cards by category. Each rule row: description on left, configured value in center, status dot on right. Section headers use `text-xs uppercase tracking-wide text-muted-foreground`. At the bottom, the compliance bar is a plain progress element with a fraction label — no color coding based on percentage, no emoji. "Edit rules in Settings →" text link at the bottom signals this is a read-only view.
+This screen shows the trader the status of the risk rules they have set for themselves. It has three tabs: Status (current state), Thresholds (configuration), and History (recent events). The name "Session Limits" replaces "Danger Zone" because the design must communicate: these are your own rules, and reaching them is not a failure — it is the system working as designed.
 
-### Layout
+### Tab: Status
 
 ```
-┌─────────────────────────────────────────────────────────────────┐
-│  Guardrails                                       [Edit rules]  │
-├─────────────────────────────────────────────────────────────────┤
-│                                                                   │
-│  DAILY RULES                                                     │
-│  ┌──────────────────────────────────────────────────────────┐   │
-│  │  Max daily loss      ₹5,000        ● Active              │   │
-│  │  Max trades/day      15            ● Active              │   │
-│  │  Max position size   ₹50,000       ● Active              │   │
-│  └──────────────────────────────────────────────────────────┘   │
-│                                                                   │
-│  COOLDOWN RULES                                                  │
-│  ┌──────────────────────────────────────────────────────────┐   │
-│  │  After 3 losses      30-min cooldown  ● Active           │   │
-│  │  After max loss hit  Trading paused   ● Active           │   │
-│  └──────────────────────────────────────────────────────────┘   │
-│                                                                   │
-│  HIGH-RISK WINDOWS                                               │
-│  ┌──────────────────────────────────────────────────────────┐   │
-│  │  9:15–9:30 AM        Warning on trade  ● Active          │   │
-│  │  3:00–3:30 PM        Warning on trade  ● Active          │   │
-│  └──────────────────────────────────────────────────────────┘   │
-│                                                                   │
-│  TODAY'S COMPLIANCE                                              │
-│  3 of 5 rules met today  ██████░░░░  60%                        │
-└─────────────────────────────────────────────────────────────────┘
+Session Limits
+─────────────────────────────────────────────────────────────────
+ [Status]  [Thresholds]  [History]
+─────────────────────────────────────────────────────────────────
+
+CURRENT STATE
+
+┌──────────────────────────────────────────────────────────────────┐
+│  ● All session limits within bounds today.              Active   │
+└──────────────────────────────────────────────────────────────────┘
+
+    When a limit triggers, this card becomes:
+
+┌──────────────────────────────────────────────────────────────────┐
+│  Cooldown active                                                 │
+│  Triggered by: Daily loss limit reached (₹4,980 / ₹5,000)      │
+│  Triggered at: 11:23 AM today                                   │
+│  Active until: Market close (3:30 PM)                           │
+│                                                                  │
+│  This is informational. You can continue to trade in            │
+│  Zerodha Kite if you choose to.                                 │
+└──────────────────────────────────────────────────────────────────┘
+
+CURRENT VALUES
+  Daily loss            ₹4,980 / ₹5,000   ████████████████████░  99%
+  Trades today          9 / 15             ████████████░░░░░░░░░   60%
+  Consecutive losses    1 / 3              ██████░░░░░░░░░░░░░░░   33%
+  Open positions        2 / unlimited      —
 ```
 
-**Design notes:**
-- "Edit rules" button opens Settings → Risk tab (not a modal — full nav)
-- "Today's compliance" is informational only. Not a grade. Not a score that shames.
-- Rules show their current state: Active / Triggered Today / Paused
-- Empty state (no rules set): "No guardrails configured. Set your risk limits in Settings."
+### Tab: Thresholds
+
+```
+LOSS LIMITS
+  Warning level (amber):  [──────●────]  70% of daily loss limit
+  Danger level (trigger): [───────────●]  85% of daily loss limit
+
+CONSECUTIVE LOSS LIMITS
+  Warning:   [─●─────]  2 consecutive losses
+  Trigger:   [──●────]  3 consecutive losses
+
+[Save Thresholds]   [Reset to defaults]
+```
+
+### Tab: History
+
+```
+This week:
+Date        Event                    Trigger              Duration
+Mar 27      Cooldown triggered       Daily loss limit     Market close
+Mar 25      Circuit break triggered  3 consecutive losses  30 min
+Mar 22      Cooldown triggered       Daily loss limit     Market close
+
+[View all history]
+```
 
 ---
 
-## 9. Danger Zone
-
-**Route:** `/danger`
-**Auth required:** Yes
-**Primary question:** "Am I in an active cooldown or circuit break right now?"
-
-**What it is:** The real-time status screen for active cooldowns and circuit breakers. When a rule has been triggered — daily loss limit hit, consecutive losses exceeded — this screen shows exactly what happened, at what time, and for how long, stated plainly with no drama. When everything is clear it shows a simple "All clear." Must be visually distinct from Blowup Shield: Shield is history, Danger Zone is right now. A trader in crisis navigating here must land on the right information within one second.
-
-**UI/UX:** Low-density, high-clarity layout — this screen has less content than any other page, by design. Top half is a single large status card. In the active state: `border-l-4 border-warning` left accent (amber — never red, which means financial loss), four lines of plain text: what it is, why it triggered, when, how long. No icons with urgency, no pulsing animation. Safe state: very faint `border-l-4 border-success/40` left accent, two lines. Below the card a "What this means" block in `text-sm text-muted-foreground` — always present, explaining this is informational and Zerodha is fully accessible. This page must never look like an error screen.
-
-### Layout — Active State
-
-```
-┌─────────────────────────────────────────────────────────────────┐
-│  Danger Zone                                                     │
-├─────────────────────────────────────────────────────────────────┤
-│                                                                   │
-│  ┌──────────────────────────────────────────────────────────┐   │
-│  │  ⬤  CIRCUIT BREAKER ACTIVE                              │   │  ← amber border
-│  │                                                           │   │
-│  │  Reason: Daily loss limit reached (-₹5,240 of ₹5,000)   │   │
-│  │  Triggered: 11:23 AM                                     │   │
-│  │  Status: Trading paused until market close               │   │
-│  └──────────────────────────────────────────────────────────┘   │
-│                                                                   │
-│  WHAT THIS MEANS                                                 │
-│  The circuit breaker flags that your daily loss limit was        │
-│  reached. You can still use Zerodha — this is informational.     │
-│                                                                   │
-│  HISTORY (this week)                                             │
-│  [Same compact table as Blowup Shield]                          │
-└─────────────────────────────────────────────────────────────────┘
-```
-
-### Layout — Safe State
-
-```
-┌─────────────────────────────────────────────────────────────────┐
-│  Danger Zone                                                     │
-├─────────────────────────────────────────────────────────────────┤
-│                                                                   │
-│  ┌──────────────────────────────────────────────────────────┐   │
-│  │  ●  All clear                                            │   │  ← green border
-│  │  No active cooldowns or circuit breaks.                  │   │
-│  └──────────────────────────────────────────────────────────┘   │
-│                                                                   │
-│  Your rules: [compact summary of Guardrails]                     │
-│                                                                   │
-│  RECENT EVENTS (if any)                                          │
-│  [Last 3 events from history]                                    │
-└─────────────────────────────────────────────────────────────────┘
-```
-
-**Design notes:**
-- Active state: border `border-warning` (amber), NOT red. Red = financial loss. Amber = situation requires attention.
-- Safe state: border `border-success/30` — very subtle green. No "All clear" celebrations.
-- Text: factual. "Daily loss limit reached" not "You've lost too much today!"
-- The "What this means" section is critical — explains this is informational, not a block.
-
----
-
-## 10. Goals
+## 9. Goals
 
 **Route:** `/goals`
 **Auth required:** Yes
-**Primary question:** "Am I meeting the commitments I set for myself?"
 
-**What it is:** A commitment-tracking screen where traders set behavioral targets for themselves: trade count limits, time-of-day restrictions, consecutive loss caps, position size rules. Each goal shows weekly progress and a streak count. A calendar heatmap shows the last 30 days as green and gray circles. Streaks are shown as facts — never gamified with animations, trophies, or shaming. Adding a goal uses an inline form, not a modal. The screen is about sustained self-awareness, not winning a game.
+### Purpose
 
-**UI/UX:** Medium-density — more spacious than Analytics, less sparse than Settings. A 3-tile summary row at the top uses shorter tiles since the numbers are simpler. Each goal card below is a bordered box: goal description heading, a horizontal progress bar (green fill, gray track, no animation), streak counts in muted secondary text, and a "Missed: [day]" note when applicable. Calendar heatmap near the bottom is a compact grid of circles — 6 weeks × 7 days — green and gray fills only, dates on row edges. "+ Add goal" is a small secondary button in the page header. The inline form expands below the last goal card with a CSS height transition.
+The trader sets behavioral commitments here. The screen tracks whether those commitments are being kept. Goal changes are gated with a 24-hour cooldown — this prevents a trader from modifying their limits in the middle of an emotional session.
 
 ### Layout
 
 ```
-┌─────────────────────────────────────────────────────────────────┐
-│  Goals                                              [Add goal]  │
-├──────────┬──────────┬──────────────────────────────────────────  │
-│ Active   │ Met      │ Current streak                             │  ← 3 tiles
-│ Goals    │ This Mo. │ 4 days                                     │
-│ 3        │ 18/22    │                                            │
-├──────────┴──────────┴──────────────────────────────────────────  │
-│                                                                   │
-│  ACTIVE GOALS                                                    │
-│                                                                   │
-│  ┌──────────────────────────────────────────────────────────┐   │
-│  │  Max 10 trades per day                                   │   │
-│  │  Progress this week: ██████████ 5/5 days met            │   │
-│  │  Streak: 7 days  |  All-time best: 12 days              │   │
-│  └──────────────────────────────────────────────────────────┘   │
-│                                                                   │
-│  ┌──────────────────────────────────────────────────────────┐   │
-│  │  No trading in first 15 min (9:15–9:30 AM)              │   │
-│  │  Progress this week: ████████░░ 4/5 days met            │   │
-│  │  Streak: 4 days  |  Missed: Tuesday (2 trades at 9:21)  │   │
-│  └──────────────────────────────────────────────────────────┘   │
-│                                                                   │
-│  GOAL HISTORY                                    [Last 30 days]  │
-│  [Calendar heatmap — green = all goals met, gray = missed]       │
-└─────────────────────────────────────────────────────────────────┘
+Goals — My Commitments                               Streak: 4 days
+─────────────────────────────────────────────────────────────────
+
+┌──────────────────────────────────────────────────────────────────┐
+│  Max 10 trades per day                                  [⋯]     │
+│  This week:  Mon ✓  Tue ✓  Wed ✓  Thu ✓  Fri —                 │
+│  ██████████████████░░  14/30 days met this month   47%          │
+│  Current streak: 7 days    Best: 12 days                        │
+└──────────────────────────────────────────────────────────────────┘
+
+┌──────────────────────────────────────────────────────────────────┐
+│  No trading 9:15 AM – 9:30 AM                           [⋯]     │
+│  This week:  Mon ✓  Tue ✓  Wed ✗  Thu ✓  Fri —                 │
+│  ██████████████████████░░  22/30 days met   73%                 │
+│  Current streak: 4 days    Best: 9 days    (Missed: Wednesday)  │
+└──────────────────────────────────────────────────────────────────┘
+
+[+ Add commitment]
+
+COMMITMENT LOG
+  Mar 28 — Modified "Max trades" from 12 to 10 (Reason: too many impulse trades)
+  Mar 14 — Added "No trading 9:15–9:30 AM"
+
+CONSISTENCY CALENDAR (last 30 days)
+  [30-day heatmap — green = all met, gray = missed at least one]
 ```
 
-**Design notes:**
-- Streaks are shown but not celebrated. "7 days" is a fact, not a trophy.
-- No badge/achievement pop-ups when a streak is broken or set.
-- Calendar heatmap: purely factual — green/gray cells. No emojis, no fire icons.
-- Adding a goal: inline form below the list (not a modal), collapsible
-- Goal types: trade count, time window restriction, consecutive loss limit, max position size
+### Goal Change Cooldown
+
+The three-dot menu (⋯) on each goal card shows: View history, Request change, Pause, Delete. "Request change" opens a form asking for a reason. The change is applied after a 24-hour cooldown. A pending change shows as a notice on the card: "Change pending: Max 10 trades → Max 8 trades. Applies tomorrow."
 
 ---
 
-## 11. Portfolio Radar
+## 10. Portfolio Radar
 
-**Route:** `/radar`
+**Route:** `/portfolio-radar`
 **Auth required:** Yes
-**Primary question:** "Is my current exposure concentrated in risky ways?"
 
-**What it is:** A concentration risk analysis screen that examines the trader's current open positions and identifies whether exposure is dangerously skewed toward one sector, underlying, or instrument type. The primary output is a concentration score (0–100) and a risk level label. Two horizontal bar charts show breakdown by sector and by symbol. A positions table flags anything that represents an outsized share of total exposure. The screen never advises on what to do — it shows the distribution and trusts the trader to decide.
+### Purpose
 
-**UI/UX:** Medium-density analytical layout. Four metric tiles at the top — risk level tile uses `text-warning` for Moderate and `text-danger` for High, but never colored tile backgrounds. Below the tiles, two side-by-side horizontal bar charts use a single muted teal fill for all bars — no multi-color palettes. Each bar row has the category label on the left, percentage on the right, bar filling proportionally between them. The positions table is compact with a "Risk Flag" column showing a small `bg-warning/10 text-warning` chip for over-concentrated entries. The screen stays neutral — concentration is data, not an emergency.
+Position concentration and options risk analysis. The trader uses this before entering a new position to check whether the book is already too concentrated, and to monitor options-specific risks (premium decay, days to expiry, breakeven gaps).
 
 ### Layout
 
 ```
+Portfolio Radar                                        [Sync ⟳]
+─────────────────────────────────────────────────────────────────
+
+POSITION CARDS  (one per open position)
+
 ┌─────────────────────────────────────────────────────────────────┐
-│  Portfolio Radar                        ⟳ Last updated: 2m ago  │
-├──────────┬──────────┬──────────┬──────────────────────────────  │
-│ Conc.    │ Sectors  │ Exposure │ Risk                            │  ← 4 tiles
-│ Score    │          │          │ Level                           │
-│ 62/100   │ 3        │ ₹1.8L    │ ◐ Moderate                     │
-├──────────┴──────────┴──────────┴──────────────────────────────  │
-│                                                                   │
-│  CONCENTRATION BREAKDOWN                                         │
-│  ┌──────────────────────────┬────────────────────────────────┐  │
-│  │  By Sector               │  By Symbol                     │  │
-│  │  [Horizontal bar chart]  │  [Horizontal bar chart]        │  │
-│  │  BFSI      42%           │  BANKNIFTY  38%                │  │
-│  │  IT        28%           │  RELIANCE   22%                │  │
-│  │  Energy    18%           │  NIFTY      18%                │  │
-│  └──────────────────────────┴────────────────────────────────┘  │
-│                                                                   │
-│  OPEN POSITIONS WITH RISK FLAGS                                  │
-│  ┌──────────────────────────────────────────────────────────┐   │
-│  │ Symbol       P&L      % of Portfolio  Risk Flag           │   │
-│  │ BANKNIFTY CE +₹1,800  38%             ⚠ High conc.       │   │
-│  └──────────────────────────────────────────────────────────┘   │
+│  NIFTY 24500 CE  ·  Long  ·  50 qty                    MIS      │
+│  Entry: ₹140    LTP: ₹162    P&L: +₹1,100   +15.7%            │
+│                                                                  │
+│  Strike: 24500    Breakeven: ₹154    Gap to BE: -₹8 (ITM) ✓   │
+│  Premium decay: -₹12/day    Days to expiry: 3d  (amber)        │
 └─────────────────────────────────────────────────────────────────┘
+
+┌─────────────────────────────────────────────────────────────────┐
+│  BANKNIFTY 52000 PE  ·  Long  ·  25 qty                 MIS     │
+│  Entry: ₹220    LTP: ₹198    P&L: -₹550    -10.0%             │
+│                                                                  │
+│  Strike: 52000    Breakeven: ₹194    Gap to BE: +₹4 (OTM)     │
+│  Premium decay: -₹18/day    Days to expiry: 3d  (amber)        │
+└─────────────────────────────────────────────────────────────────┘
+
+─────────────────────────────────────────────────────────────────
+CONCENTRATION ANALYSIS
+─────────────────────────────────────────────────────────────────
+
+Total capital at risk: ₹1.8L across 8 positions
+
+BY EXPIRY WEEK                        BY UNDERLYING
+Week Mar 28:  ████████  45%  ⚠       BANKNIFTY   ████████  38%  ⚠
+Week Apr 4:   ██████    32%           NIFTY       █████     22%
+Week Apr 11:  ████      23%           RELIANCE    ████      18%
+                                       Others      ████      22%
+
+Warnings triggered:
+  [⚠ Expiry concentration: 45% in single expiry week — above 40% threshold]
+  [⚠ Underlying concentration: 38% in BANKNIFTY — above 30% threshold]
+
+DIRECTIONAL SKEW
+  Long: 65%   Short: 35%   — Mildly long-biased
+
+MARGIN UTILIZATION
+  Used: ₹94,000  /  Available: ₹1,60,000  =  59%  (within bounds)
+
+─────────────────────────────────────────────────────────────────
+GTT ORDERS
+─────────────────────────────────────────────────────────────────
+
+  Total active: 3    Honored: 12    Overridden: 2
+
+  Symbol            Trigger Price    Qty    Created
+  NIFTY 24500CE     ₹130             50     Mar 26
+  BANKNIFTY PE      ₹210             25     Mar 26
+  RELIANCE          ₹2,780           100    Mar 25
 ```
 
-**Design notes:**
-- Horizontal bars are better than pie charts for concentration (easier to compare)
-- Risk flags use `text-warning` (amber), not red — concentration is a warning, not a loss
-- Empty state (no positions): "No open positions to analyze."
+### Design Notes
+
+- Days to expiry on position cards: green if ≥5 days, amber if 3–4 days, red if ≤2 days. This is one of the few justified uses of red on position data.
+- Concentration warning chips appear inline in the concentration table — not as a banner above the entire page.
+- GTT override count (2) is displayed neutrally. It is not flagged as a behavioral pattern — it is operational data.
 
 ---
 
-## 12. Reports
+## 11. Reports
 
 **Route:** `/reports`
 **Auth required:** Yes
-**Primary question:** "What happened this week/month? What's the summary?"
 
-**What it is:** A library of generated performance summaries — end-of-day, weekly, and monthly. Each report contains a P&L summary, key behavioral patterns for the period, best and worst trades, a period-over-period comparison, and a 2–3 paragraph AI narrative offering behavioral insight. Reports are generated automatically at end of day and can also be triggered on demand. The AI narrative is the most valuable text in the entire app — designed to be read, not skimmed.
+### Purpose
 
-**UI/UX:** Two-panel layout — same structural pattern as My Patterns. Left list panel (~280px) shows report cards: type label (EOD/Weekly/Monthly), date, headline P&L, trade count. Selected report gets `border-l-2 border-primary` accent. The right panel renders the full report in a readable document style — not a dense data grid. AI narrative uses `text-sm leading-relaxed` — generous line height, body-copy feel. "Download PDF" is a small secondary button top-right in the content panel. Type filter tabs (EOD / Weekly / Monthly) at the top of the left panel. Overall feel should lean closer to a document than a dashboard — it is meant to be read.
+Generated periodic reports: Morning Brief (pre-session readiness), End-of-Day (behavioral narrative + emotional journey), and Weekly Summary (trend overview). The AI narrative and the Emotional Journey timeline are the most valuable content — design around them.
 
 ### Layout
 
 ```
-┌─────────────────────────────────────────────────────────────────┐
-│  Reports                                  [Generate new ▼]      │
-├─────────────────────────────────────────────────────────────────┤
-│  [EOD Reports]  [Weekly]  [Monthly]                             │  ← Filter tabs
-├───────────────────────────┬─────────────────────────────────────┤
-│  Report list (left)       │  Report content (right)             │
-│  ─────────────────────    │  ──────────────────────────         │
-│  Today · Mar 28           │  [Report title + date]              │
-│  Yesterday · Mar 27       │                                     │
-│  Mar 26                   │  Summary                            │
-│  Mar 25                   │  P&L: +₹3,450  Trades: 8           │
-│  ─────────────────────    │  Behavior score: 74                 │
-│  Week of Mar 24           │                                     │
-│  Week of Mar 17           │  Key patterns:                      │
-│                           │  · Overtrading (2 instances)        │
-│                           │  · No stop-loss (1 instance)        │
-│                           │                                     │
-│                           │  Notable trades:                    │
-│                           │  Best: NIFTY CE  +₹1,100           │
-│                           │  Worst: BANKNIFTY -₹550            │
-│                           │                                     │
-│                           │  [AI narrative — 2–3 paragraphs]   │
-│                           │                                     │
-│                           │  [Download PDF]                     │
-└───────────────────────────┴─────────────────────────────────────┘
+Reports
+─────────────────────────────────────────────────────────────────
+┌──────────────────────────────┬──────────────────────────────────┐
+│  [EOD] [Morning] [Weekly]    │  Mar 28 — End of Day    [PDF ↓] │
+│  ──────────────────────────  │  ──────────────────────────────  │
+│  EOD  Today, Mar 28          │                                  │
+│  +₹3,450 · 8 trades · B:74   │  +₹3,450  8 trades  67% WR     │
+│  ──────────────────────────  │                                  │
+│  Morning  Today, Mar 28      │  TODAY'S EMOTIONAL JOURNEY      │
+│  Readiness: 82/100           │  ───────────────────────────     │
+│  ──────────────────────────  │  09:23 AM  😤 FOMO entry        │
+│  EOD  Yesterday, Mar 27      │             NIFTY CE:  -₹975    │
+│  -₹1,200 · 12 trades · B:61  │  09:58 AM  😤 Revenge trade     │
+│  ──────────────────────────  │             BANKNIFTY: -₹550    │
+│  Weekly  Week of Mar 24      │  10:45 AM  😎 Calm entry        │
+│  +₹8,600 · 38 trades         │             RELIANCE:  +₹210    │
+│  ──────────────────────────  │  11:12 AM  😊 Confident         │
+│                              │             NIFTY CE:  +₹1,100  │
+│                              │                                  │
+│                              │  PATTERNS DETECTED TODAY        │
+│                              │  Overtrading  · 10:34 AM       │
+│                              │  Revenge risk · 09:58 AM       │
+│                              │                                  │
+│                              │  KEY LESSONS                    │
+│                              │  💡 Your calm trades won 3/4   │
+│                              │  ⚠  Opening FOMO cost -₹975    │
+│                              │  → Tomorrow: wait 15 min       │
+│                              │                                  │
+│                              │  BEHAVIORAL NARRATIVE           │
+│                              │  ───────────────────────────    │
+│                              │  Today showed a clear pattern:  │
+│                              │  your opening-session trades    │
+│                              │  were emotionally driven (FOMO  │
+│                              │  + Revenge entries), while      │
+│                              │  your mid-session trades were   │
+│                              │  controlled and profitable...   │
+└──────────────────────────────┴──────────────────────────────────┘
 ```
 
-**Design notes:**
-- Two-pane layout: list on left, content on right (same pattern as My Patterns)
-- AI narrative should be the most readable text on the page — larger line-height, not monospace
-- Reports are generated by backend; "Generate new" creates one on demand
-- Empty state: "Your first report will be ready after your first trading day."
+### Morning Brief Report (When Selected)
+
+```
+READINESS SCORE: 82/100   ● Good session predicted
+
+Day warning:  ✗  No historical pattern for today being a danger day
+
+PRE-TRADING CHECKLIST
+  ✓  Reviewed yesterday's journal entries
+  ○  Identified 2 patterns to watch (Overtrading, Revenge risk)
+  ○  Set today's maximum trade count: 10
+  ○  Checked expiry calendar (Mar 28 — weekly expiry day, CAUTION)
+
+WATCH OUT TODAY
+  · Expiry day — volatility will spike around 14:00–15:00
+  · You've overtraded on 3 of last 4 expiry days
+  · Your 9:15–9:30 win rate is 23% — wait for cleaner setups
+
+YESTERDAY RECAP
+  -₹1,200 · 12 trades · Score: 61 · Behavior was erratic in the afternoon
+```
+
+### Design Notes
+
+- The Emotional Journey timeline is the most visually distinctive element in the reports. The emoji + trade + P&L format tells the session story faster than any text. This is unique to TradeMentor.
+- The "Key Lessons" section uses three visual types: lightbulb (💡) for wins, warning (⚠) for patterns, arrow (→) for tomorrow's focus. Keep these consistent across all reports.
+- The behavioral narrative should be displayed at a comfortable reading size — 15px line height 1.6. It is meant to be read slowly, not scanned.
 
 ---
 
-## 13. Settings
+## 12. Settings
 
 **Route:** `/settings`
 **Auth required:** Yes
-**Primary question:** "Configure my profile, notifications, and risk limits."
 
-**What it is:** The configuration hub for everything personal — profile, risk rules, notifications, account management, and appearance. Divided into five tabs. The Risk Limits tab is where the guardrails seen elsewhere are actually set. Each tab has its own Save button — changes are never auto-saved, giving the trader deliberate control.
+### Tabs
 
-**UI/UX:** Low-density, form-focused layout. Tab bar uses the same underline style as Analytics. Form fields use top-aligned labels (`text-sm font-medium`) above the input — no floating labels. Inputs use standard shadcn `h-9` height. Form content constrained to `max-w-[560px]`. Risk Limits tab adds a faint `~X% of capital` hint below each amount input when capital is configured. Account tab puts destructive actions (Disconnect, Delete all data) in a separate section at the very bottom with a `text-destructive text-sm font-medium` section label. Each tab's Save button is a primary button, right-aligned at the bottom of the form content.
+**Profile**: Name, email, trading style (scalper/swing/positional), experience in years, primary segment (F&O/Equity/Both), trading capital (₹ range bracket), trading since (year).
+
+**Risk Limits**: Daily loss limit (₹ with % equivalent shown), max trades per day, max position size (₹), cooldown after N consecutive losses (slider: 15/30/45/60 min), circuit break at X% of capital.
+
+**Notifications**: Push notifications (toggle + permission request if not granted), WhatsApp notifications (toggle + guardian phone number input), in-app toast toggle, quiet hours setting.
+
+**Account**: Connected broker (account ID, status, last sync timestamp), Reconnect Zerodha button, API key configuration (for per-user Zerodha keys), Disconnect Zerodha (destructive), Delete all my data (destructive, requires typing confirmation phrase).
+
+**Personalization**: AI coach tone (analytical/empathetic/direct), default Analytics tab (Behavior/Trades/Timing/Progress/Summary), alert frequency (all alerts / daily summary only / critical only).
 
 ### Layout
 
 ```
-┌─────────────────────────────────────────────────────────────────┐
-│  Settings                                                        │
-├─────────────────────────────────────────────────────────────────┤
-│  [Profile] [Risk Limits] [Notifications] [Account] [Appearance] │  ← 5 tabs
-├─────────────────────────────────────────────────────────────────┤
-│  Tab content                                                     │
-└─────────────────────────────────────────────────────────────────┘
+Settings
+─────────────────────────────────────────────────────────────────
+ [Profile]  [Risk Limits]  [Notifications]  [Account]  [Personalization]
+─────────────────────────────────────────────────────────────────
+[Form fields — labels above inputs]
+
+[Save changes]  ← bottom of tab, only enabled when form is dirty
 ```
-
-### Tab: Profile
-
-```
-Name (required)
-Trading since (year)
-Experience level: Beginner / Intermediate / Advanced / Professional
-Primary segment: Equity / F&O / Both
-Capital size (range): Under ₹1L / ₹1–5L / ₹5–20L / ₹20L+
-Zerodha client ID: ZA1234 (read-only, from OAuth)
-
-[Save profile]
-```
-
-### Tab: Risk Limits
-
-```
-Max daily loss: [₹ input] (~ X% of capital)
-Max trades per day: [number input]
-Max position size: [₹ input]
-Cooldown after N losses: [number] losses → [minutes] cooldown
-High-risk window warnings: [toggle]
-
-[Save risk limits]
-```
-
-### Tab: Notifications
-
-```
-Behavioral alerts: [on/off toggle]
-  └── WhatsApp (if enabled): [on/off]
-  └── Browser push: [Enable push notifications button]
-
-Alert timing:
-  During market hours: ● Always
-  Outside market hours: ● Always / Only critical / Off
-
-EOD Reports:
-  Email: [toggle — disabled if SMTP not configured]
-
-[Save notification preferences]
-```
-
-### Tab: Account
-
-```
-Connected broker: Zerodha (ZA1234)  [Disconnect]
-Connected since: March 1, 2025
-Last sync: 2 minutes ago  [Sync now]
-
-Danger zone:
-[Delete all my data]
-[Export my data]
-```
-
-### Tab: Appearance
-
-```
-Theme:
-  ○ Light  ●  Dark  ○ System
-```
-
-**Design notes:**
-- Settings uses `text-sm` throughout — this is a form, not a reading page
-- Each tab saves independently with its own [Save] button
-- Success toast on save: "Settings saved"
-- Error: inline (below the field that failed), not modal
-- Disconnect Zerodha: confirmation required
-- Delete all data: "Type DELETE to confirm" — irreversible
 
 ---
 
-## 14. Onboarding Wizard
+## 13. Onboarding Wizard
 
-**Route:** Overlay on `/dashboard` (not a separate route)
-**Auth required:** Yes (appears immediately after first OAuth)
-**Purpose:** Collect essential profile data for personalized behavior analysis.
+**Route:** Modal on `/dashboard` post-OAuth
+**Auth required:** Yes (freshly authenticated)
 
-**What it is:** A focused, one-time setup experience that appears immediately after a new user's first Zerodha OAuth. Collects five things across five steps: name, trading experience, capital range, primary segment, initial risk preferences. Each step saves to the backend on Next — no data is lost if closed early. Step 1 (name) is the only required step — all others can be skipped. On completion, a brief "You're set up" toast appears and the GettingStartedCard checklist shows on Dashboard.
-
-**UI/UX:** Full-screen modal with the Dashboard blurred and visible behind it — the trader can see the product they're about to set up. The modal panel is centered, `max-w-[480px]`, with `p-8` internal padding. A horizontal progress bar (5 segments, teal fill) at the top shows current position — no step numbers in text, just the visual fill. Each step presents one or two questions using large `text-lg` labels and either a text input, radio buttons, or chip selects — no nested forms. Next is a primary button bottom-right; Skip is a plain `text-muted-foreground text-sm` link left of it. On step 1 the Skip link is not rendered at all. Overall aesthetic is slightly softer than the rest of the app: more padding, larger type, no dense tables — this is a welcoming one-time moment.
-
-### Layout
+### Steps
 
 ```
-┌──────────── FULL SCREEN MODAL ──────────────────┐
-│                                                  │
-│  ████░░░░░░ Step 2 of 5                         │  ← Progress bar
-│                                                  │
-│  Tell us about your trading                      │  ← Step headline
-│                                                  │
-│  How long have you been trading?                 │
-│  ○ Less than 1 year                              │
-│  ● 1–3 years                                     │
-│  ○ 3–5 years                                     │
-│  ○ 5+ years                                      │
-│                                                  │
-│  What do you mainly trade?                       │
-│  [F&O] [Equity] [Both] [Currency] [Commodity]    │  ← Pill selects
-│                                                  │
-│                          [Skip]    [Next →]      │
-└──────────────────────────────────────────────────┘
+Step 1 of 5  ████░░░░░░
+
+What should we call you?
+[First name    ]
+
+Required — used to personalize your experience.
+
+                                              [Next →]
+─────────────────────────────────────────────────────
+Step 2 of 5  ████████░░░░
+
+How long have you been trading?
+[0–1 year]  [1–3 years]  [3–5 years]  [5+ years]
+
+How would you describe your style?
+[Scalper]  [Day trader]  [Swing]  [Positional]
+
+                              [Skip for now]  [Next →]
+─────────────────────────────────────────────────────
+Step 3 of 5  ████████████░░
+
+Approximately how much capital do you trade with?
+[Under ₹1L]  [₹1–5L]  [₹5–25L]  [Over ₹25L]
+
+This helps calibrate your behavioral alerts.
+                              [Skip for now]  [Next →]
+─────────────────────────────────────────────────────
+Step 4 of 5  ████████████████░░
+
+What do you primarily trade?
+[F&O — Futures & Options]  [Equity]  [Both]
+
+                              [Skip for now]  [Next →]
+─────────────────────────────────────────────────────
+Step 5 of 5  ████████████████████
+
+Set your initial risk limits:
+  Max daily loss:  [₹ ________]
+  Max trades/day:  [________  ]
+
+These are your personal guardrails. You can change
+them anytime in Settings → Risk Limits.
+
+                                         [Finish →]
 ```
 
-Steps:
-1. Your name (text input — required, no skip)
-2. Trading background (years, style — radio + chip select)
-3. Capital range (slider or range select — private, no exact number)
-4. Primary segment (chip select)
-5. Initial risk preferences (3 sliders: loss limit, trade limit, position limit)
+### Design Notes
 
-**Design notes:**
-- Background is blurred Dashboard (visible but inaccessible during wizard)
-- Modal is centered, max-w-[480px] — focused, not sprawling
-- Each step saves immediately on clicking Next. Data is not lost if closed.
-- Wizard does not re-open on return visit if all steps completed
-- "Skip" is present on steps 2–5, right-aligned, `text-muted-foreground` — not prominent
+- Each step saves immediately on Next/Finish click.
+- Error saving: inline error below the field, retain user's input, retry on next click.
+- The skip link is small muted text, not a button. Not prominent, but present.
+- Step 1 cannot be skipped — name is required.
+- Completion: modal closes, "You're all set" toast, dashboard loads.
 
 ---
 
 ## Empty States Reference
 
-| Screen | Empty state text | CTA |
-|--------|-----------------|-----|
-| Dashboard (no trades) | "Positions will appear here once you trade in Zerodha Kite." | GettingStartedCard |
-| Analytics | "Trade at least once to see your performance analytics." | "Sync trades" |
-| Alerts | "No alerts yet. Alerts appear after 10+ trades." | None |
-| My Patterns | "Your patterns will appear after 10+ trades." | None |
-| Blowup Shield | "No protection events recorded yet." | None |
-| Goals | "You haven't set any goals. Add your first commitment." | "Add goal" |
-| Reports | "Your first report will be ready after your first trading day." | None |
-| Portfolio Radar | "No open positions to analyze." | None |
-
-**Design rule:** Empty states must never show error icons or red. Use a single centered line of `text-muted-foreground`. Only add a CTA if there's a clear next action for the user.
+| Screen | Condition | Message |
+|--------|-----------|---------|
+| Dashboard — Activity | No trades today | "No trades today yet. Your activity will appear here as you trade." |
+| Dashboard — Observations | No observations today | *(no empty state shown — absence of observations is normal, requires no message)* |
+| Observations | No observations in period | "No behavioral patterns were detected in this period." |
+| Analytics — Trades | No trades in range | "No completed trades in the selected date range." |
+| Analytics — Behavior | <5 trades | "Behavioral analysis requires 5+ completed trades." |
+| My Patterns | <10 trades | "Your behavioral patterns will appear after 10+ completed trades." |
+| My Patterns — Emotional Correlation | <5 journal entries for pattern | "Add journal entries to unlock emotional correlation data." |
+| Blowup Shield | No protection events | "Your shield is active and monitoring. Events will appear here after the system first activates." |
+| Reports | No reports generated | "Reports generate at the end of each trading day." |
+| Goals | No goals set | "Add your first behavioral commitment below." |
+| Portfolio Radar | No open positions | "No open positions to analyze." |
 
 ---
 
-*Next: [03_MOBILE_SCREENS.md](./03_MOBILE_SCREENS.md) | [04_COMPONENTS.md](./04_COMPONENTS.md)*
+*Previous: [01_USER_FLOWS.md](./01_USER_FLOWS.md) | Next: [03_MOBILE_SCREENS.md](./03_MOBILE_SCREENS.md)*

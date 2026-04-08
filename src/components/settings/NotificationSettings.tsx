@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Bell, BellOff, Smartphone, Monitor, Check, AlertTriangle, Loader2 } from 'lucide-react';
+import { Bell, BellOff, Monitor, Check, AlertTriangle } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Switch } from '@/components/ui/switch';
 import { pushNotifications } from '@/lib/pushNotifications';
@@ -102,7 +102,7 @@ export default function NotificationSettings({ className }: NotificationSettings
 
   if (!isSupported) {
     return (
-      <div className={cn('bg-card rounded-lg border border-border p-5', className)}>
+      <div className={cn('tm-card overflow-hidden p-5', className)}>
         <div className="flex items-start gap-3">
           <div className="p-2 rounded-lg bg-muted">
             <BellOff className="h-5 w-5 text-muted-foreground" />
@@ -120,16 +120,16 @@ export default function NotificationSettings({ className }: NotificationSettings
   }
 
   return (
-    <div className={cn('bg-card rounded-lg border border-border', className)}>
+    <div className={cn('tm-card overflow-hidden', className)}>
       <div className="p-5 border-b border-border">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-3">
             <div className={cn(
               'p-2 rounded-lg',
-              isSubscribed ? 'bg-success/10' : 'bg-muted'
+              isSubscribed ? 'bg-teal-50/60 dark:bg-teal-900/20' : 'bg-muted'
             )}>
               {isSubscribed ? (
-                <Bell className="h-5 w-5 text-success" />
+                <Bell className="h-5 w-5 text-tm-profit" />
               ) : (
                 <BellOff className="h-5 w-5 text-muted-foreground" />
               )}
@@ -158,10 +158,10 @@ export default function NotificationSettings({ className }: NotificationSettings
       <div className="p-5 space-y-4">
         {/* Status */}
         {permission === 'denied' && (
-          <div className="flex items-start gap-2 p-3 bg-destructive/10 rounded-lg">
-            <AlertTriangle className="h-4 w-4 text-destructive mt-0.5" />
+          <div className="flex items-start gap-2 p-3 bg-red-50/50 dark:bg-red-900/10 rounded-lg">
+            <AlertTriangle className="h-4 w-4 text-tm-loss mt-0.5" />
             <div>
-              <p className="text-sm font-medium text-destructive">Permission Denied</p>
+              <p className="text-sm font-medium text-tm-loss">Permission Denied</p>
               <p className="text-xs text-muted-foreground mt-0.5">
                 You've blocked notifications. To enable them, click the lock icon in your browser's
                 address bar and allow notifications for this site.
@@ -171,9 +171,9 @@ export default function NotificationSettings({ className }: NotificationSettings
         )}
 
         {error && (
-          <div className="flex items-start gap-2 p-3 bg-destructive/10 rounded-lg">
-            <AlertTriangle className="h-4 w-4 text-destructive mt-0.5" />
-            <p className="text-sm text-destructive">{error}</p>
+          <div className="flex items-start gap-2 p-3 bg-red-50/50 dark:bg-red-900/10 rounded-lg">
+            <AlertTriangle className="h-4 w-4 text-tm-loss mt-0.5" />
+            <p className="text-sm text-tm-loss">{error}</p>
           </div>
         )}
 
@@ -215,7 +215,7 @@ export default function NotificationSettings({ className }: NotificationSettings
               >
                 {testSent ? (
                   <>
-                    <Check className="h-4 w-4 text-success" />
+                    <Check className="h-4 w-4 text-tm-profit" />
                     Sent!
                   </>
                 ) : (
@@ -234,14 +234,10 @@ export default function NotificationSettings({ className }: NotificationSettings
             <Button
               onClick={handleEnableNotifications}
               disabled={isLoading || !account}
-              className="gap-2"
+              className="gap-2 bg-tm-brand hover:bg-tm-brand/90 text-white"
             >
-              {isLoading ? (
-                <Loader2 className="h-4 w-4 animate-spin" />
-              ) : (
-                <Bell className="h-4 w-4" />
-              )}
-              Enable Notifications
+              <Bell className="h-4 w-4" />
+              {isLoading ? "Enabling…" : "Enable Notifications"}
             </Button>
             <p className="text-xs text-muted-foreground mt-2">
               We'll ask for permission to send you notifications

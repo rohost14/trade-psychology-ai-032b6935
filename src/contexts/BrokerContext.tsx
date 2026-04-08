@@ -1,5 +1,5 @@
 import { createContext, useContext, useState, useEffect, useCallback, useRef, ReactNode } from 'react';
-import { api, AUTH_TOKEN_KEY } from '@/lib/api';
+import { api, AUTH_TOKEN_KEY, apiDetailString } from '@/lib/api';
 import { isGuestMode, enableGuestMode, disableGuestMode, GUEST_MODE_KEY } from '@/lib/guestMode';
 import { DEMO_ACCOUNT } from '@/lib/demoData';
 import { toast } from 'sonner';
@@ -50,7 +50,6 @@ interface SyncResult {
 }
 
 const BROKER_ACCOUNT_KEY = 'tradementor_broker_account_id';
-const LAST_SYNC_KEY = 'tradementor_last_sync_ts';
 
 const BrokerContext = createContext<BrokerContextValue | undefined>(undefined);
 
@@ -67,6 +66,7 @@ export function BrokerProvider({ children }: { children: ReactNode }) {
   // Refs to prevent duplicate operations
   const syncInProgressRef = useRef(false);
   const initialSyncDoneRef = useRef(false);
+  const lastTabSyncTsRef = useRef(0); // persists across effect re-runs
 
   // Check for OAuth callback params — now uses secure code exchange (M-08)
   // Backend sends ?code= instead of ?token= so JWT never appears in URL/history
@@ -183,7 +183,6 @@ export function BrokerProvider({ children }: { children: ReactNode }) {
 
       setLastSyncResult(syncResult);
       setSyncStatus('success');
-      localStorage.setItem(LAST_SYNC_KEY, Date.now().toString());
 
       // Refresh account to update last_sync_at without re-triggering sync
       const accResponse = await api.get('/api/zerodha/accounts');
@@ -195,7 +194,7 @@ export function BrokerProvider({ children }: { children: ReactNode }) {
 
       return syncResult;
     } catch (error: any) {
-      const errMsg = error.response?.data?.detail || error.message || 'Sync failed';
+      const errMsg = apiDetailString(error.response?.data?.detail, error.message || 'Sync failed');
       console.error('Sync failed:', errMsg);
       setSyncError(errMsg);
       setSyncStatus('error');
@@ -205,33 +204,28 @@ export function BrokerProvider({ children }: { children: ReactNode }) {
     }
   }, []);
 
-  // Single unified auto-sync effect - runs ONCE after account loads
+  // Auto-sync on every page load — no cooldown.
+  // The server already has a concurrent-sync lock (one sync at a time per account)
+  // and a rate limiter (3/min), so there is no risk of hammering Zerodha.
   useEffect(() => {
     if (!account || account.status !== 'connected' || initialSyncDoneRef.current) return;
-
-    const shouldSync = () => {
-      // Check localStorage timestamp for cross-tab deduplication
-      const lastSyncTs = localStorage.getItem(LAST_SYNC_KEY);
-      if (lastSyncTs) {
-        const elapsed = Date.now() - parseInt(lastSyncTs, 10);
-        if (elapsed < 5 * 60 * 1000) return false; // Synced less than 5 min ago
-      }
-      // Also check server-side last_sync_at
-      if (account.last_sync_at) {
-        const elapsed = Date.now() - new Date(account.last_sync_at).getTime();
-        if (elapsed < 5 * 60 * 1000) return false;
-      }
-      return true;
-    };
-
     initialSyncDoneRef.current = true;
+    doSync(account);
+  }, [account, doSync]);
 
-    if (shouldSync()) {
+  // Re-sync when user switches back to this tab — covers the "traded in Kite, came back here" flow.
+  // 30s minimum between tab-switch syncs (using a stable ref so effect re-runs don't reset the guard).
+  useEffect(() => {
+    if (!account || account.status !== 'connected') return;
+    const onVisible = () => {
+      if (document.visibilityState !== 'visible') return;
+      const now = Date.now();
+      if (now - lastTabSyncTsRef.current < 30_000) return;
+      lastTabSyncTsRef.current = now;
       doSync(account);
-    } else {
-      // Data is fresh enough, mark as success so Dashboard knows to fetch
-      setSyncStatus('success');
-    }
+    };
+    document.addEventListener('visibilitychange', onVisible);
+    return () => document.removeEventListener('visibilitychange', onVisible);
   }, [account, doSync]);
 
   const connect = useCallback(async () => {

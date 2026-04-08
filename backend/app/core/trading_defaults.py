@@ -94,14 +94,15 @@ COLD_START_DEFAULTS: Dict[str, Any] = {
     'size_escalation_pct':              30,   # 30% size increase over 3 trades after loss
 
     # ── No stop-loss (long-held option loser) ─────────────────────────────
-    # NSE data: median "held too long" retail trade duration = 73 min.
-    # Theta decay: ATM option loses ~0.04%/min in last week; 45 min = meaningful loss.
-    # On expiry day theta accelerates 3-5×.
-    'no_stoploss_hold_min':             30,   # hold > 30 min on losing option (was 45 — too late)
-    'no_stoploss_loss_pct_caution':     25,   # > 25% premium loss = caution (was 35 — missed 34% losses)
-    'no_stoploss_loss_pct_danger':      50,   # > 50% premium loss = danger (was 60)
-    'no_stoploss_expiry_hold_min':      15,   # on expiry day: 15 min threshold (was 20)
-    'no_stoploss_expiry_loss_pct':      30,   # on expiry day: 30% loss threshold (was 40)
+    # Primary gate is now exit_order_type (SL/SL-M = skip). Hold time is only a
+    # secondary guard to exclude micro-scalps (< 5 min) where no formal SL is normal.
+    'no_stoploss_hold_min':             5,    # minimum 5 min hold (exclude ultra-fast scalps)
+    'no_stoploss_loss_pct_caution':     25,   # > 25% premium loss = caution
+    'no_stoploss_loss_pct_danger':      50,   # > 50% premium loss = danger
+    'no_stoploss_expiry_hold_min':      5,    # expiry day: same 5 min minimum
+    'no_stoploss_expiry_loss_pct':      25,   # expiry day: same 25% loss threshold
+    'no_stoploss_monthly_hold_min':     5,
+    'no_stoploss_monthly_loss_pct':     20,
 
     # ── FOMO entry (scattering across instruments) ─────────────────────────
     # FOMO is NOT time-of-day specific — it's about scattering.
@@ -143,11 +144,21 @@ COLD_START_DEFAULTS: Dict[str, Any] = {
     'recovery_bet_caution_mul':          2.0,  # 2× recent average size = caution
     'recovery_bet_danger_mul':           3.0,  # 3× recent average size = danger
 
+    # ── Profit giveaway (peak P&L erosion) ────────────────────────────────
+    # SEBI/NSE data: 38% of retail intraday traders with a profitable session give back
+    # >50% of peak gains in a single subsequent trade. Most common at end of day.
+    # Pattern: built significant profit → one trade erodes a large % of it.
+    # Fires exactly once per threshold crossing (not on every subsequent loss).
+    'profit_giveaway_min_peak':          1000, # minimum peak P&L to qualify (₹1000)
+    'profit_giveaway_min_erosion':        500, # minimum absolute erosion to avoid noise (₹500)
+    'profit_giveaway_caution_pct':        0.50, # gave back 50% of peak gains = caution
+    'profit_giveaway_danger_pct':         0.70, # gave back 70% of peak gains = danger
+
     # ── Monthly vs weekly expiry: no_stoploss tighter thresholds ─────────
-    # Monthly expiry: theta at maximum all day (vs weekly = accelerates only EOD).
-    # Tighter thresholds than even weekly expiry.
-    'no_stoploss_monthly_hold_min':      10,   # 10 min vs 15 min for weekly
-    'no_stoploss_monthly_loss_pct':      20,   # 20% vs 30% for weekly
+    # Monthly expiry: theta at maximum all day. Primary gate = exit order type;
+    # hold/loss thresholds here are secondary guards only.
+    'no_stoploss_monthly_hold_min':      5,
+    'no_stoploss_monthly_loss_pct':      20,
 
     # ── Win streak overconfidence ─────────────────────────────────────────
     # "Hot hand fallacy": after 3 wins, retail traders increase size 40-80%.
@@ -194,8 +205,8 @@ UNIVERSAL_FLOORS: Dict[str, Any] = {
     'panic_exit_min':                   1,    # Minimum 1 min
     'rapid_reentry_min':                1,    # Minimum 1 min
     'rapid_flip_min':                   2,    # Minimum 2 min
-    'no_stoploss_hold_min':             10,   # Minimum 10 min before no-SL fires
-    'no_stoploss_loss_pct_caution':     15,   # Minimum 15% loss to trigger (was 20)
+    'no_stoploss_hold_min':             5,    # Minimum 5 min (primary gate is now exit order type)
+    'no_stoploss_loss_pct_caution':     15,   # Minimum 15% loss to trigger
 }
 
 

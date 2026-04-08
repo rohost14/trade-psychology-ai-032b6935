@@ -57,6 +57,29 @@ async def get_post_market_report(
             report_date=target_date
         )
 
+        # Persist to Reports Hub so it appears without waiting for Celery
+        if report.get("has_trades"):
+            try:
+                rpt_date = date.fromisoformat(report["report_date"]) if isinstance(report.get("report_date"), str) else (target_date or date.today())
+                existing = await db.execute(
+                    select(GeneratedReport).where(
+                        GeneratedReport.broker_account_id == broker_account_id,
+                        GeneratedReport.report_type == "post_market",
+                        GeneratedReport.report_date == rpt_date,
+                    )
+                )
+                if existing.scalar_one_or_none() is None:
+                    db.add(GeneratedReport(
+                        broker_account_id=broker_account_id,
+                        report_type="post_market",
+                        report_date=rpt_date,
+                        report_data=report,
+                        sent_via="direct",
+                    ))
+                    await db.commit()
+            except Exception as save_err:
+                logger.warning(f"Could not persist post-market report: {save_err}")
+
         return report
 
     except Exception as e:
@@ -91,6 +114,28 @@ async def get_morning_briefing(
             broker_account_id=broker_account_id,
             db=db
         )
+
+        # Persist to Reports Hub so it appears without waiting for Celery
+        try:
+            rpt_date = date.fromisoformat(briefing["report_date"]) if isinstance(briefing.get("report_date"), str) else date.today()
+            existing = await db.execute(
+                select(GeneratedReport).where(
+                    GeneratedReport.broker_account_id == broker_account_id,
+                    GeneratedReport.report_type == "morning_briefing",
+                    GeneratedReport.report_date == rpt_date,
+                )
+            )
+            if existing.scalar_one_or_none() is None:
+                db.add(GeneratedReport(
+                    broker_account_id=broker_account_id,
+                    report_type="morning_briefing",
+                    report_date=rpt_date,
+                    report_data=briefing,
+                    sent_via="direct",
+                ))
+                await db.commit()
+        except Exception as save_err:
+            logger.warning(f"Could not persist morning briefing: {save_err}")
 
         return briefing
 

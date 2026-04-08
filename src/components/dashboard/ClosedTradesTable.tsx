@@ -1,123 +1,114 @@
 import React, { useState } from 'react';
-import { ArrowUpRight, ArrowDownRight, Clock } from 'lucide-react';
+import { Search, X, Pencil, CheckCircle2 } from 'lucide-react';
 import { cn } from '@/lib/utils';
-import { formatCurrency, formatPrice } from '@/lib/formatters';
-import { formatSymbol } from '@/lib/exchangeConstants';
+import { formatPrice, formatCurrencyWithSign } from '@/lib/formatters';
 import type { CompletedTrade } from '@/types/api';
 
 interface ClosedTradesTableProps {
   trades: CompletedTrade[];
   isLoading?: boolean;
+  journaledIds?: Set<string>;
   onTradeClick?: (trade: CompletedTrade) => void;
+}
+
+// ── Symbol parser ─────────────────────────────────────────────────────────────
+// Handles: weekly options, monthly options, futures, equity
+function parseSymbol(sym: string): { name: string; chip: string; strike: string } {
+  // Weekly options: NAME + 5-digit expiry + 5-digit strike + CE/PE  e.g. NIFTY2541524600CE
+  const mw5 = sym.match(/^([A-Z]+)\d{5}(\d{5})(CE|PE)$/);
+  if (mw5) return { name: mw5[1], chip: mw5[3], strike: parseInt(mw5[2], 10).toLocaleString('en-IN') };
+  // Weekly options: 6-digit strike  e.g. NIFTY25415100000CE
+  const mw6 = sym.match(/^([A-Z]+)\d{5}(\d{6})(CE|PE)$/);
+  if (mw6) return { name: mw6[1], chip: mw6[3], strike: parseInt(mw6[2], 10).toLocaleString('en-IN') };
+  // Monthly options: NAME + 2YY + 3MON + strike + CE/PE  e.g. NIFTY25MAR23000CE
+  const mm = sym.match(/^([A-Z]+)\d{2}[A-Z]{3}(\d{4,6})(CE|PE)$/);
+  if (mm) return { name: mm[1], chip: mm[3], strike: parseInt(mm[2], 10).toLocaleString('en-IN') };
+  // Futures  e.g. NIFTY25MARFUT, BANKNIFTY25APR25FUT
+  const mf = sym.match(/^([A-Z]+)(?:\d{5}|\d{2}[A-Z]{3})FUT$/);
+  if (mf) return { name: mf[1], chip: 'FUT', strike: '' };
+  // Equity fallback
+  return { name: sym, chip: 'EQ', strike: '' };
+}
+
+function chipClass(chip: string) {
+  if (chip === 'CE') return 'tm-chip tm-chip-ce';
+  if (chip === 'PE') return 'tm-chip tm-chip-pe';
+  if (chip === 'FUT') return 'tm-chip bg-violet-100 text-violet-700 dark:bg-violet-900/30 dark:text-violet-300';
+  return 'tm-chip tm-chip-eq';
 }
 
 function formatDuration(minutes: number): string {
   if (minutes < 60) return `${minutes}m`;
-  const hours = Math.floor(minutes / 60);
-  const mins = minutes % 60;
-  if (hours < 24) return mins > 0 ? `${hours}h ${mins}m` : `${hours}h`;
-  const days = Math.floor(hours / 24);
-  const remainHours = hours % 24;
-  return remainHours > 0 ? `${days}d ${remainHours}h` : `${days}d`;
+  const h = Math.floor(minutes / 60);
+  const m = minutes % 60;
+  if (h < 24) return m > 0 ? `${h}h ${m}m` : `${h}h`;
+  const d = Math.floor(h / 24);
+  const rh = h % 24;
+  return rh > 0 ? `${d}d ${rh}h` : `${d}d`;
 }
 
 function formatTime(dateStr: string): string {
   if (!dateStr) return '—';
   return new Date(dateStr).toLocaleTimeString('en-IN', {
     hour: '2-digit', minute: '2-digit', hour12: false,
+    timeZone: 'Asia/Kolkata',
   });
 }
 
-function getDayLabel(dateStr: string): string {
-  if (!dateStr) return 'Unknown';
-  const d = new Date(dateStr);
-  const today = new Date();
-  const yesterday = new Date(today);
-  yesterday.setDate(today.getDate() - 1);
-  if (d.toDateString() === today.toDateString()) return 'Today';
-  if (d.toDateString() === yesterday.toDateString()) return 'Yesterday';
-  return d.toLocaleDateString('en-IN', { weekday: 'short', day: 'numeric', month: 'short' });
-}
-
-function getDayKey(dateStr: string): string {
-  if (!dateStr) return 'unknown';
-  const d = new Date(dateStr);
-  return `${d.getFullYear()}-${d.getMonth()}-${d.getDate()}`;
-}
-
-interface DayGroup {
-  label: string;
-  trades: CompletedTrade[];
-  dayPnl: number;
-}
-
-function groupByDay(trades: CompletedTrade[]): DayGroup[] {
-  const map = new Map<string, DayGroup>();
-  for (const t of trades) {
-    const key = getDayKey(t.exit_time);
-    if (!map.has(key)) {
-      map.set(key, { label: getDayLabel(t.exit_time), trades: [], dayPnl: 0 });
-    }
-    const group = map.get(key)!;
-    group.trades.push(t);
-    group.dayPnl += t.realized_pnl;
-  }
-  return Array.from(map.values());
-}
-
-export default function ClosedTradesTable({ trades, isLoading, onTradeClick }: ClosedTradesTableProps) {
+// ── Component ─────────────────────────────────────────────────────────────────
+export default function ClosedTradesTable({
+  trades, isLoading, journaledIds = new Set(), onTradeClick,
+}: ClosedTradesTableProps) {
   const [showAll, setShowAll] = useState(false);
+  const [filter, setFilter] = useState('');
+
+  // Sort unjournaled today-trades first, then by exit time descending
+  const sorted = [...trades].sort((a, b) => {
+    const aUnj = !journaledIds.has(a.id) ? 0 : 1;
+    const bUnj = !journaledIds.has(b.id) ? 0 : 1;
+    if (aUnj !== bUnj) return aUnj - bUnj;
+    return new Date(b.exit_time).getTime() - new Date(a.exit_time).getTime();
+  });
 
   const totalPnl = trades.reduce((sum, t) => sum + t.realized_pnl, 0);
-  const winners = trades.filter(t => t.realized_pnl > 0).length;
-  const losers = trades.filter(t => t.realized_pnl < 0).length;
-  const winRate = trades.length > 0 ? Math.round((winners / trades.length) * 100) : 0;
+  const winners  = trades.filter(t => t.realized_pnl > 0).length;
+  const losers   = trades.filter(t => t.realized_pnl < 0).length;
+  const winRate  = trades.length > 0 ? Math.round((winners / trades.length) * 100) : 0;
 
   if (isLoading) {
     return (
-      <div className="bg-card rounded-lg border border-border">
-        <div className="px-6 py-5 border-b border-border">
-          <div className="h-6 w-48 bg-muted animate-pulse rounded" />
+      <div className="tm-card">
+        <div className="px-5 py-3 border-b border-slate-100 dark:border-neutral-700/60">
+          <div className="h-4 w-32 bg-muted animate-pulse rounded" />
         </div>
-        <div className="p-6 space-y-3">
-          {[1, 2, 3].map((i) => (
-            <div key={i} className="h-14 bg-muted animate-pulse rounded" />
-          ))}
+        <div className="p-5 space-y-3">
+          {[1, 2, 3].map(i => <div key={i} className="h-10 bg-muted animate-pulse rounded" />)}
         </div>
       </div>
     );
   }
 
   if (!trades.length) {
-    const watchList = [
-      { stat: '94%', label: 'of traders who take >7 trades/day lose money', source: 'SEBI FY2023' },
-      { stat: '73%', label: 'of trades placed within 15 min of a loss are also losing trades', source: 'SEBI data' },
-      { stat: '2.7×', label: 'faster: retail closes winners vs holding losers (disposition effect)', source: 'SEBI FY2022' },
+    const stats = [
+      { stat: '94%',    label: 'of traders taking >7 trades/day lose money',          source: 'SEBI FY2023' },
+      { stat: '73%',    label: 'of trades placed within 15 min of a loss also lose',  source: 'SEBI data' },
+      { stat: '2.7×',   label: 'faster: retail closes winners vs holding losers',      source: 'SEBI FY2022' },
       { stat: '3 losses', label: 'in a row is when emotional impairment measurably starts', source: 'Behavioral research' },
     ];
-
     return (
-      <div className="bg-card rounded-lg border border-border">
-        <div className="px-6 py-5 border-b border-border">
-          <div className="flex items-center gap-3">
-            <div className="p-2.5 rounded-lg bg-muted">
-              <Clock className="h-5 w-5 text-muted-foreground" />
-            </div>
-            <div>
-              <h3 className="text-lg font-semibold text-foreground">Completed Trades</h3>
-              <p className="text-sm text-muted-foreground">Flat-to-flat trade rounds</p>
-            </div>
-          </div>
+      <div className="tm-card">
+        <div className="px-5 py-3 border-b border-slate-100 dark:border-neutral-700/60">
+          <span className="tm-label">Closed Trades</span>
         </div>
-        <div className="px-6 py-8">
+        <div className="px-5 py-8">
           <p className="text-sm font-medium text-foreground mb-1">Waiting for your first trade</p>
-          <p className="text-sm text-muted-foreground mb-6">
+          <p className="text-[13px] text-muted-foreground mb-5">
             Once you trade, we'll analyze every round — entry to exit — and watch for these patterns in real time.
           </p>
           <div className="grid grid-cols-2 gap-3">
-            {watchList.map((item, i) => (
-              <div key={i} className="p-3 rounded-lg bg-muted/50 border border-border/60">
-                <p className="text-lg font-bold text-primary">{item.stat}</p>
+            {stats.map((item, i) => (
+              <div key={i} className="p-3 rounded-lg bg-slate-50 dark:bg-neutral-700/30 border border-slate-100 dark:border-neutral-700/60">
+                <p className="text-base font-bold text-tm-brand">{item.stat}</p>
                 <p className="text-xs text-foreground mt-0.5 leading-snug">{item.label}</p>
                 <p className="text-[10px] text-muted-foreground mt-1">{item.source}</p>
               </div>
@@ -128,197 +119,176 @@ export default function ClosedTradesTable({ trades, isLoading, onTradeClick }: C
     );
   }
 
-  const pnlColor = totalPnl >= 0 ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400';
-  const winRateColor = winRate >= 50 ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400';
-
-  const displayTrades = showAll ? trades : trades.slice(0, 10);
-  const groups = groupByDay(displayTrades);
+  const filtered     = filter.trim()
+    ? sorted.filter(t => t.tradingsymbol.toLowerCase().includes(filter.toLowerCase()))
+    : sorted;
+  const displayLimit = showAll ? filtered.length : 6;
+  const visible      = filtered.slice(0, displayLimit);
 
   return (
-    <div className="bg-card rounded-lg border border-border">
-      {/* Header */}
-      <div className="px-4 py-3 border-b border-border">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            <Clock className="h-4 w-4 text-muted-foreground" />
-            <h3 className="text-sm font-semibold text-foreground">Completed Trades</h3>
-            <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
-              <span>{trades.length}</span>
-              <span className="text-muted-foreground/40">&bull;</span>
-              <span className="text-green-600 font-medium">{winners}W</span>
-              <span className="text-red-600 font-medium">{losers}L</span>
-              <span className="text-muted-foreground/40">&bull;</span>
-              <span className={cn('font-medium', winRateColor)}>{winRate}%</span>
-            </div>
+    <div className="tm-card">
+      {/* ── Header ── */}
+      <div className="flex items-center justify-between px-5 py-3 border-b border-slate-100 dark:border-neutral-700/60">
+        <div className="flex items-center gap-2 min-w-0">
+          <span className="tm-label">Closed Trades</span>
+          <span className="text-[11px] text-muted-foreground font-mono tabular-nums">{trades.length}</span>
+          <span className="text-[11px] text-muted-foreground/40">·</span>
+          <span className="text-[11px] font-mono tabular-nums text-tm-profit">{winners}W</span>
+          <span className="text-[11px] font-mono tabular-nums text-tm-loss ml-0.5">{losers}L</span>
+          <span className="text-[11px] text-muted-foreground/40">·</span>
+          <span className={cn('text-[11px] font-mono tabular-nums', winRate >= 50 ? 'text-tm-profit' : 'text-tm-loss')}>
+            {winRate}%
+          </span>
+        </div>
+        <div className="flex items-center gap-3 shrink-0">
+          {/* Filter */}
+          <div className="relative flex items-center">
+            <Search className="absolute left-2 w-3 h-3 text-muted-foreground/50 pointer-events-none" />
+            <input
+              value={filter}
+              onChange={e => setFilter(e.target.value)}
+              placeholder="Filter"
+              className="h-6 pl-6 pr-5 text-[12px] bg-slate-50 dark:bg-neutral-700/40 border border-slate-200 dark:border-neutral-600/50 rounded text-foreground placeholder:text-muted-foreground/50 focus:outline-none focus:ring-1 focus:ring-tm-brand/40 w-[80px]"
+            />
+            {filter && (
+              <button onClick={() => setFilter('')} className="absolute right-1.5 text-muted-foreground/50 hover:text-muted-foreground">
+                <X className="w-3 h-3" />
+              </button>
+            )}
           </div>
-          <div className={cn('text-sm font-semibold tabular-nums', pnlColor)}>
-            {totalPnl >= 0 ? '+' : ''}{formatCurrency(totalPnl)}
-          </div>
+          {/* Session P&L */}
+          <span className={cn('text-sm font-semibold font-mono tabular-nums', totalPnl >= 0 ? 'text-tm-profit' : 'text-tm-loss')}>
+            {formatCurrencyWithSign(totalPnl)}
+          </span>
         </div>
       </div>
 
-      {/* Desktop Table */}
-      <div className="hidden md:block overflow-x-auto">
+      {filtered.length === 0 ? (
+        <div className="py-8 text-center">
+          <p className="text-sm text-muted-foreground">No trades matching "{filter}"</p>
+        </div>
+      ) : (
         <table className="w-full">
           <thead>
-            <tr className="border-b border-border bg-muted/30">
-              <th className="px-4 py-2 text-left text-[11px] font-medium uppercase tracking-wide text-muted-foreground">Symbol</th>
-              <th className="px-3 py-2 text-right text-[11px] font-medium uppercase tracking-wide text-muted-foreground">Qty</th>
-              <th className="px-3 py-2 text-right text-[11px] font-medium uppercase tracking-wide text-muted-foreground">Entry</th>
-              <th className="px-3 py-2 text-right text-[11px] font-medium uppercase tracking-wide text-muted-foreground">Exit</th>
-              <th className="px-3 py-2 text-right text-[11px] font-medium uppercase tracking-wide text-muted-foreground">P&L</th>
-              <th className="px-3 py-2 text-right text-[11px] font-medium uppercase tracking-wide text-muted-foreground">Dur</th>
+            <tr className="border-b border-slate-100 dark:border-neutral-700/60">
+              {/* Symbol | Dir · Qty | Entry → Exit | P&L | Dur | Journal */}
+              <th className="px-5 py-2 text-left table-header">Symbol</th>
+              <th className="px-3 py-2 text-right table-header">Qty</th>
+              <th className="px-3 py-2 text-right table-header">Entry</th>
+              <th className="px-3 py-2 text-right table-header">Exit</th>
+              <th className="px-3 py-2 text-right table-header">P&L</th>
+              <th className="px-3 py-2 text-right table-header">Dur</th>
+              <th className="px-5 py-2 w-8 text-center table-header">
+                <Pencil className="w-3 h-3 text-muted-foreground/50 mx-auto" />
+              </th>
             </tr>
           </thead>
           <tbody>
-            {groups.map((group) => (
-              <React.Fragment key={group.label}>
-                {/* Date separator row */}
-                <tr className="bg-muted/20">
-                  <td colSpan={4} className="px-4 py-1.5">
-                    <span className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wide">
-                      {group.label}
-                    </span>
-                    <span className="text-[11px] text-muted-foreground ml-2">
-                      {group.trades.length} trade{group.trades.length !== 1 ? 's' : ''}
+            {visible.map((trade, i) => {
+              const isProfit   = trade.realized_pnl > 0;
+              const isJournaled = journaledIds.has(trade.id);
+              const { name, chip, strike } = parseSymbol(trade.tradingsymbol);
+              const isLast     = i === visible.length - 1;
+
+              return (
+                <tr
+                  key={trade.id}
+                  onClick={() => onTradeClick?.(trade)}
+                  className={cn(
+                    'transition-colors hover:bg-slate-50 dark:hover:bg-slate-700/30 cursor-pointer',
+                    !isLast && 'border-b border-slate-50 dark:border-neutral-700/30',
+                  )}
+                >
+                  {/* Symbol — always two lines for consistent row height */}
+                  <td className="px-5 py-2.5">
+                    <div className="flex items-center gap-1.5">
+                      <span className="text-[13px] font-semibold text-foreground leading-none">{name}</span>
+                      <span className={chipClass(chip)}>{chip}</span>
+                    </div>
+                    {/* Sub line: strike (if options) + exit time — always present */}
+                    <span className="text-[11px] text-muted-foreground font-mono tabular-nums mt-0.5 block">
+                      {strike ? `${strike} · ` : ''}{formatTime(trade.exit_time)}
                     </span>
                   </td>
-                  <td className="px-3 py-1.5 text-right" colSpan={2}>
+
+                  {/* Qty — direction color, quantity value */}
+                  <td className="px-3 py-2.5 text-right">
                     <span className={cn(
-                      'text-[11px] font-semibold tabular-nums',
-                      group.dayPnl >= 0 ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'
+                      'text-[11px] font-semibold uppercase',
+                      trade.direction === 'LONG' ? 'text-tm-profit' : 'text-tm-loss',
                     )}>
-                      {group.dayPnl >= 0 ? '+' : ''}{formatCurrency(group.dayPnl)}
+                      {trade.direction === 'LONG' ? 'B' : 'S'}
                     </span>
+                    <span className="ml-1 text-[13px] font-mono tabular-nums text-foreground">
+                      {trade.total_quantity}
+                    </span>
+                  </td>
+
+                  {/* Entry */}
+                  <td className="px-3 py-2.5 text-right text-[13px] font-mono tabular-nums text-muted-foreground">
+                    {formatPrice(trade.avg_entry_price)}
+                  </td>
+
+                  {/* Exit */}
+                  <td className="px-3 py-2.5 text-right text-[13px] font-mono tabular-nums text-muted-foreground">
+                    {formatPrice(trade.avg_exit_price)}
+                  </td>
+
+                  {/* P&L */}
+                  <td className="px-3 py-2.5 text-right">
+                    <span className={cn(
+                      'text-[13px] font-mono tabular-nums font-semibold',
+                      isProfit ? 'text-tm-profit' : trade.realized_pnl < 0 ? 'text-tm-loss' : 'text-muted-foreground',
+                    )}>
+                      {formatCurrencyWithSign(trade.realized_pnl)}
+                    </span>
+                  </td>
+
+                  {/* Duration */}
+                  <td className="px-3 py-2.5 text-right text-[12px] font-mono tabular-nums text-muted-foreground">
+                    {formatDuration(trade.duration_minutes)}
+                  </td>
+
+                  {/* Journal icon */}
+                  <td className="px-5 py-2.5 text-center">
+                    <button
+                      onClick={e => { e.stopPropagation(); onTradeClick?.(trade); }}
+                      className="w-7 h-7 inline-flex items-center justify-center rounded hover:bg-muted/60 transition-colors relative"
+                    >
+                      {isJournaled
+                        ? <CheckCircle2 className="w-[16px] h-[16px] text-tm-profit" />
+                        : <>
+                            <Pencil className="w-[13px] h-[13px] text-muted-foreground" />
+                            <span className="absolute top-0.5 right-0.5 w-[5px] h-[5px] rounded-full bg-tm-obs" />
+                          </>
+                      }
+                    </button>
                   </td>
                 </tr>
-                {/* Trade rows for this day */}
-                {group.trades.map((trade) => {
-                  const isProfit = trade.realized_pnl > 0;
-                  const rowPnlColor = isProfit
-                    ? 'text-green-600 dark:text-green-400'
-                    : 'text-red-600 dark:text-red-400';
-                  return (
-                    <tr
-                      key={trade.id}
-                      onClick={() => onTradeClick?.(trade)}
-                      className="border-t border-border/50 hover:bg-muted/50 transition-colors cursor-pointer"
-                    >
-                      <td className="px-4 py-2.5">
-                        {(() => {
-                          const { primary, secondary } = formatSymbol(trade.tradingsymbol);
-                          return (
-                            <>
-                              <div className="text-sm font-medium text-foreground">{primary}</div>
-                              <div className="text-[10px] text-muted-foreground tabular-nums">
-                                {secondary ? <span className="mr-1.5">{secondary}</span> : null}
-                                {formatTime(trade.exit_time)}
-                              </div>
-                            </>
-                          );
-                        })()}
-                      </td>
-                      <td className="px-3 py-2.5 text-right text-sm tabular-nums text-foreground">{trade.total_quantity}</td>
-                      <td className="px-3 py-2.5 text-right text-sm tabular-nums text-muted-foreground">{formatPrice(trade.avg_entry_price)}</td>
-                      <td className="px-3 py-2.5 text-right text-sm tabular-nums text-muted-foreground">{formatPrice(trade.avg_exit_price)}</td>
-                      <td className="px-3 py-2.5 text-right">
-                        <span className={cn('text-sm tabular-nums font-medium', rowPnlColor)}>
-                          {isProfit ? '+' : ''}{formatCurrency(trade.realized_pnl)}
-                        </span>
-                      </td>
-                      <td className="px-3 py-2.5 text-right text-xs text-muted-foreground tabular-nums">
-                        {formatDuration(trade.duration_minutes)}
-                      </td>
-                    </tr>
-                  );
-                })}
-              </React.Fragment>
-            ))}
+              );
+            })}
           </tbody>
         </table>
-      </div>
+      )}
 
-      {/* Mobile Cards */}
-      <div className="md:hidden">
-        {groups.map((group) => (
-          <div key={`mob-${group.label}`}>
-            {/* Date separator */}
-            <div className="px-4 py-1.5 bg-muted/20 flex items-center justify-between">
-              <span className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wide">
-                {group.label} · {group.trades.length} trade{group.trades.length !== 1 ? 's' : ''}
-              </span>
-              <span className={cn(
-                'text-[11px] font-semibold tabular-nums',
-                group.dayPnl >= 0 ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'
-              )}>
-                {group.dayPnl >= 0 ? '+' : ''}{formatCurrency(group.dayPnl)}
-              </span>
-            </div>
-            {/* Trade cards */}
-            <div className="divide-y divide-border">
-              {group.trades.map((trade) => {
-                const isProfit = trade.realized_pnl > 0;
-                const cardPnlColor = isProfit
-                  ? 'text-green-600 dark:text-green-400'
-                  : 'text-red-600 dark:text-red-400';
-                return (
-                  <div
-                    key={trade.id}
-                    onClick={() => onTradeClick?.(trade)}
-                    className="px-4 py-3 hover:bg-muted/50 transition-colors cursor-pointer"
-                  >
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center gap-2">
-                        <div>
-                          <span className="font-medium text-foreground text-sm">
-                            {formatSymbol(trade.tradingsymbol).primary}
-                          </span>
-                          {formatSymbol(trade.tradingsymbol).secondary && (
-                            <span className="ml-1 text-[10px] text-muted-foreground">
-                              {formatSymbol(trade.tradingsymbol).secondary}
-                            </span>
-                          )}
-                        </div>
-                        <span className={cn(
-                          'px-1.5 py-0.5 rounded text-[10px] font-medium',
-                          trade.direction === 'LONG'
-                            ? 'bg-green-50 text-green-700 dark:bg-green-900/20 dark:text-green-400'
-                            : 'bg-red-50 text-red-700 dark:bg-red-900/20 dark:text-red-400'
-                        )}>
-                          {trade.direction}
-                        </span>
-                      </div>
-                      <div className="flex items-center gap-1.5">
-                        {isProfit ? (
-                          <ArrowUpRight className="h-4 w-4 text-green-600" />
-                        ) : (
-                          <ArrowDownRight className="h-4 w-4 text-red-600" />
-                        )}
-                        <span className={cn('tabular-nums font-medium', cardPnlColor)}>
-                          {isProfit ? '+' : ''}{formatCurrency(trade.realized_pnl)}
-                        </span>
-                      </div>
-                    </div>
-                    <div className="flex items-center justify-between mt-1.5 text-xs text-muted-foreground">
-                      <span>{trade.total_quantity} qty · {formatPrice(trade.avg_entry_price)} → {formatPrice(trade.avg_exit_price)}</span>
-                      <span className="tabular-nums">{formatTime(trade.exit_time)} · {formatDuration(trade.duration_minutes)}</span>
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-          </div>
-        ))}
-      </div>
-
-      {/* View all toggle */}
-      {trades.length > 10 && (
-        <div className="px-6 py-3 border-t border-border text-center">
+      {/* Show more / less */}
+      {!filter && filtered.length > displayLimit && (
+        <div className="px-5 py-2.5 border-t border-slate-100 dark:border-neutral-700/60 text-center">
           <button
-            className="text-sm text-primary hover:underline"
-            onClick={() => setShowAll(!showAll)}
+            onClick={() => setShowAll(true)}
+            className="text-[13px] font-medium text-tm-brand hover:underline"
           >
-            {showAll ? 'Show less' : `View all ${trades.length} trades`}
+            View all {filtered.length} trades
+          </button>
+        </div>
+      )}
+      {!filter && showAll && filtered.length > 6 && (
+        <div className="px-5 py-2.5 border-t border-slate-100 dark:border-neutral-700/60 text-center">
+          <button
+            onClick={() => setShowAll(false)}
+            className="text-[13px] font-medium text-tm-brand hover:underline"
+          >
+            Show less
           </button>
         </div>
       )}

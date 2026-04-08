@@ -4,10 +4,12 @@ import {
   Bell, Settings, ChevronDown, User, RefreshCw,
   Shield, Target, Radar, FileText, AlertTriangle,
   TrendingUp, Brain, BookOpen, MessageSquare, ShieldAlert,
+  Sun, Moon,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useAlerts } from '@/contexts/AlertContext';
 import { useBroker } from '@/contexts/BrokerContext';
+import { useTheme } from '@/components/ThemeProvider';
 
 // ── Nav structure — mirrors original Layout grouped dropdowns ─────────────────
 
@@ -66,6 +68,7 @@ export default function TopNavbar({
 }: TopNavbarProps) {
   const { unacknowledgedCount } = useAlerts();
   const { account } = useBroker();
+  const { resolvedTheme, setTheme } = useTheme();
   const navigate = useNavigate();
   const location = useLocation();
 
@@ -94,12 +97,14 @@ export default function TopNavbar({
   }
 
   return (
-    <nav className="fixed top-0 left-0 right-0 z-50 h-[60px] bg-[#0F172A] border-b border-slate-800 flex items-center px-6">
+    <nav className="fixed top-0 left-0 right-0 z-50 h-[60px] border-b border-slate-700/40"
+      style={{ background: 'linear-gradient(180deg, #1E293B 0%, #1A2537 100%)' }}>
+      <div className="max-w-[1200px] mx-auto px-6 h-full flex items-center">
 
       {/* Logo */}
       <Link to="/dashboard-v2" className="flex items-center gap-2.5 mr-8 shrink-0">
-        <div className="w-7 h-7 rounded-md bg-[#0F8E7D] flex items-center justify-center">
-          <span className="text-white text-xs font-bold">TM</span>
+        <div className="w-7 h-7 rounded-md bg-[#0F8E7D] flex items-center justify-center shadow-sm">
+          <span className="text-white text-xs font-bold tracking-tight">TM</span>
         </div>
         <span className="text-white font-semibold text-sm tracking-tight">TradeMentor</span>
       </Link>
@@ -119,7 +124,7 @@ export default function TopNavbar({
                   'relative px-3 py-1.5 rounded-md text-sm font-medium transition-colors duration-100',
                   isActive
                     ? 'text-teal-300 bg-teal-900/20'
-                    : 'text-slate-300 hover:text-white hover:bg-slate-800'
+                    : 'text-slate-300 hover:text-white hover:bg-slate-700'
                 )}
               >
                 {item.label}
@@ -143,7 +148,7 @@ export default function TopNavbar({
                   'relative flex items-center gap-1.5 px-3 py-1.5 rounded-md text-sm font-medium transition-colors duration-100',
                   isActive || isOpen
                     ? 'text-teal-300 bg-teal-900/20'
-                    : 'text-slate-300 hover:text-white hover:bg-slate-800'
+                    : 'text-slate-300 hover:text-white hover:bg-slate-700'
                 )}
               >
                 {item.label}
@@ -216,13 +221,13 @@ export default function TopNavbar({
           onClick={onSync}
           disabled={isSyncing}
           title="Sync trades"
-          className="w-8 h-8 flex items-center justify-center rounded-md text-slate-400 hover:text-white hover:bg-slate-800 transition-colors disabled:opacity-40"
+          className="w-8 h-8 flex items-center justify-center rounded-md text-slate-400 hover:text-white hover:bg-slate-700 transition-colors disabled:opacity-40"
         >
           <RefreshCw className={cn('w-4 h-4', isSyncing && 'animate-spin')} />
         </button>
 
         {/* Bell */}
-        <button className="relative w-8 h-8 flex items-center justify-center rounded-md text-slate-400 hover:text-white hover:bg-slate-800 transition-colors">
+        <button className="relative w-8 h-8 flex items-center justify-center rounded-md text-slate-400 hover:text-white hover:bg-slate-700 transition-colors">
           <Bell className="w-4 h-4" />
           {unacknowledgedCount > 0 && (
             <span className="absolute top-1 right-1 w-2 h-2 bg-amber-500 rounded-full" />
@@ -232,10 +237,21 @@ export default function TopNavbar({
         {/* Settings */}
         <Link
           to="/settings"
-          className="w-8 h-8 flex items-center justify-center rounded-md text-slate-400 hover:text-white hover:bg-slate-800 transition-colors"
+          className="w-8 h-8 flex items-center justify-center rounded-md text-slate-400 hover:text-white hover:bg-slate-700 transition-colors"
         >
           <Settings className="w-4 h-4" />
         </Link>
+
+        {/* Theme toggle */}
+        <button
+          onClick={() => setTheme(resolvedTheme === 'dark' ? 'light' : 'dark')}
+          title={resolvedTheme === 'dark' ? 'Switch to light' : 'Switch to dark'}
+          className="w-8 h-8 flex items-center justify-center rounded-md text-slate-400 hover:text-white hover:bg-slate-700 transition-colors"
+        >
+          {resolvedTheme === 'dark'
+            ? <Sun className="w-4 h-4" />
+            : <Moon className="w-4 h-4" />}
+        </button>
 
         {/* Avatar */}
         <div ref={avatarRef} className="relative ml-1">
@@ -271,6 +287,7 @@ export default function TopNavbar({
             </div>
           )}
         </div>
+      </div>
       </div>
     </nav>
   );

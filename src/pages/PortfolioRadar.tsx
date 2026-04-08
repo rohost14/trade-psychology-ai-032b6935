@@ -1,8 +1,9 @@
 import { useState, useEffect, useCallback } from 'react';
 import {
-  Radar, AlertTriangle, CheckCircle2, Clock, TrendingDown,
-  TrendingUp, Minus, RefreshCw, Loader2, Info,
+  Radar, AlertTriangle, CheckCircle2, TrendingDown,
+  TrendingUp, Minus, RefreshCw, Info,
 } from 'lucide-react';
+import { Skeleton } from '@/components/ui/skeleton';
 import { cn } from '@/lib/utils';
 import { useBroker } from '@/contexts/BrokerContext';
 import { api } from '@/lib/api';
@@ -68,21 +69,21 @@ function fmtCurrency(n: number | null | undefined): string {
 
 function dteColor(dte: number | null): string {
   if (dte == null) return 'text-muted-foreground';
-  if (dte <= 1) return 'text-red-500';
-  if (dte <= 3) return 'text-amber-500';
+  if (dte <= 1) return 'text-tm-loss';
+  if (dte <= 3) return 'text-tm-obs';
   return 'text-foreground';
 }
 
 function decayColor(pct: number | null): string {
   if (pct == null) return 'text-muted-foreground';
-  if (pct >= 50) return 'text-red-500';
-  if (pct >= 25) return 'text-amber-500';
-  return 'text-green-500';
+  if (pct >= 50) return 'text-tm-loss';
+  if (pct >= 25) return 'text-tm-obs';
+  return 'text-tm-profit';
 }
 
 function concentrationColor(pct: number, threshold: number): string {
-  if (pct >= threshold) return 'text-red-500';
-  if (pct >= threshold * 0.8) return 'text-amber-500';
+  if (pct >= threshold) return 'text-tm-loss';
+  if (pct >= threshold * 0.8) return 'text-tm-obs';
   return 'text-foreground';
 }
 
@@ -94,11 +95,11 @@ function SectionCard({ title, children, className }: {
   className?: string;
 }) {
   return (
-    <div className={cn('rounded-xl border border-border bg-card p-5', className)}>
-      <h3 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide mb-4">
-        {title}
-      </h3>
-      {children}
+    <div className={cn('tm-card overflow-hidden', className)}>
+      <div className="px-5 py-4 border-b border-border">
+        <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">{title}</p>
+      </div>
+      <div className="p-5">{children}</div>
     </div>
   );
 }
@@ -123,10 +124,10 @@ function AlertBadge({ type }: { type: string }) {
 function PositionCard({ m }: { m: PositionMetric }) {
   const isOption = m.instrument_type === 'CE' || m.instrument_type === 'PE';
   const isLong = m.quantity > 0;
-  const pnlColor = m.unrealized_pnl >= 0 ? 'text-green-500' : 'text-red-500';
+  const pnlColor = m.unrealized_pnl >= 0 ? 'text-tm-profit' : 'text-tm-loss';
 
   return (
-    <div className="rounded-lg border border-border bg-card/60 p-4 space-y-3 animate-fade-in-up">
+    <div className="rounded-lg border border-border bg-card p-4 space-y-3 animate-fade-in-up">
       {/* Header */}
       <div className="flex items-start justify-between">
         <div>
@@ -166,7 +167,7 @@ function PositionCard({ m }: { m: PositionMetric }) {
             </div>
             <div>
               <p className="text-muted-foreground">Gap to BE</p>
-              <p className={cn('font-medium', m.breakeven_gap != null && m.breakeven_gap < 0 ? 'text-red-500' : 'text-green-500')}>
+              <p className={cn('font-medium', m.breakeven_gap != null && m.breakeven_gap < 0 ? 'text-tm-loss' : 'text-tm-profit')}>
                 {m.breakeven_gap != null ? `${m.breakeven_gap >= 0 ? '+' : ''}${fmt(m.breakeven_gap, 0)}` : '—'}
               </p>
             </div>
@@ -224,12 +225,12 @@ function ConcentrationPanel({ data }: { data: ConcentrationData }) {
         <div>
           <p className="text-muted-foreground mb-1">Direction</p>
           <div className="flex items-center gap-2">
-            <TrendingUp className="h-3.5 w-3.5 text-green-500" />
+            <TrendingUp className="h-3.5 w-3.5 text-tm-profit" />
             <span className={cn('font-medium', concentrationColor(data.long_pct, 100))}>
               {data.long_pct.toFixed(0)}%
             </span>
             <span className="text-muted-foreground">/</span>
-            <TrendingDown className="h-3.5 w-3.5 text-red-500" />
+            <TrendingDown className="h-3.5 w-3.5 text-tm-loss" />
             <span>{data.short_pct.toFixed(0)}%</span>
           </div>
         </div>
@@ -257,7 +258,7 @@ function ConcentrationPanel({ data }: { data: ConcentrationData }) {
                     <div
                       className={cn(
                         'h-full rounded-full',
-                        info.pct >= 60 ? 'bg-red-500' : info.pct >= 40 ? 'bg-amber-500' : 'bg-primary'
+                        info.pct >= 60 ? 'bg-tm-loss' : info.pct >= 40 ? 'bg-tm-obs' : 'bg-tm-brand'
                       )}
                       style={{ width: `${info.pct}%` }}
                     />
@@ -285,7 +286,7 @@ function ConcentrationPanel({ data }: { data: ConcentrationData }) {
                     <div
                       className={cn(
                         'h-full rounded-full',
-                        info.pct >= 70 ? 'bg-red-500' : info.pct >= 50 ? 'bg-amber-500' : 'bg-primary'
+                        info.pct >= 70 ? 'bg-tm-loss' : info.pct >= 50 ? 'bg-tm-obs' : 'bg-tm-brand'
                       )}
                       style={{ width: `${info.pct}%` }}
                     />
@@ -311,11 +312,11 @@ function GttPanel({ data }: { data: GttSummary }) {
     <div className="space-y-4">
       <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 sm:gap-3 text-center">
         <div className="rounded-lg bg-muted/50 p-3">
-          <p className="text-2xl font-bold text-green-500">{data.honored}</p>
+          <p className="text-2xl font-bold font-mono tabular-nums text-tm-profit">{data.honored}</p>
           <p className="text-xs text-muted-foreground mt-0.5">SL Honoured</p>
         </div>
         <div className="rounded-lg bg-muted/50 p-3">
-          <p className="text-2xl font-bold text-red-500">{data.overridden}</p>
+          <p className="text-2xl font-bold font-mono tabular-nums text-tm-loss">{data.overridden}</p>
           <p className="text-xs text-muted-foreground mt-0.5">Overridden</p>
         </div>
         <div className="rounded-lg bg-muted/50 p-3">
@@ -332,7 +333,7 @@ function GttPanel({ data }: { data: GttSummary }) {
           </div>
           <div className="h-2 bg-muted rounded-full overflow-hidden">
             <div
-              className="h-full rounded-full bg-green-500 transition-all"
+              className="h-full rounded-full bg-tm-profit transition-all"
               style={{ width: `${(data.honored / total) * 100}%` }}
             />
           </div>
@@ -346,7 +347,7 @@ function GttPanel({ data }: { data: GttSummary }) {
             {data.active_gtts.map((gtt) => (
               <div key={gtt.gtt_id} className="flex items-center justify-between text-xs">
                 <div className="flex items-center gap-2">
-                  <CheckCircle2 className="h-3.5 w-3.5 text-green-500 shrink-0" />
+                  <CheckCircle2 className="h-3.5 w-3.5 text-tm-profit shrink-0" />
                   <span className="font-medium">{gtt.tradingsymbol}</span>
                 </div>
                 <span className="text-muted-foreground">
@@ -431,31 +432,35 @@ export default function PortfolioRadar() {
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center h-64 gap-2 text-muted-foreground">
-        <Loader2 className="h-5 w-5 animate-spin" />
-        <span className="text-sm">Loading portfolio data…</span>
+      <div className="max-w-4xl mx-auto px-4 sm:px-6 py-6 space-y-5">
+        <div className="flex items-center justify-between">
+          <Skeleton className="h-6 w-40" />
+          <Skeleton className="h-8 w-20" />
+        </div>
+        <div className="grid md:grid-cols-2 gap-5">
+          <Skeleton className="h-64 rounded-xl" />
+          <Skeleton className="h-64 rounded-xl" />
+        </div>
       </div>
     );
   }
 
   if (error) {
     return (
-      <div className="flex items-center justify-center h-64 text-red-500 text-sm">{error}</div>
+      <div className="flex items-center justify-center h-64 text-tm-loss text-sm">{error}</div>
     );
   }
 
   const noPositions = metrics.length === 0;
 
   return (
-    <div className="max-w-4xl mx-auto p-4 md:p-6 space-y-6">
+    <div className="max-w-4xl mx-auto px-4 sm:px-6 py-6 space-y-5">
       {/* Header */}
       <div className="flex items-center justify-between">
-        <div className="flex items-center gap-3">
-          <div className="p-2 rounded-lg bg-primary/10">
-            <Radar className="h-5 w-5 text-primary" />
-          </div>
+        <div className="flex items-center gap-2.5">
+          <Radar className="h-5 w-5 text-tm-brand" />
           <div>
-            <h1 className="text-xl font-bold">Portfolio Radar</h1>
+            <h1 className="text-lg font-semibold tracking-tight">Portfolio Radar</h1>
             <p className="text-xs text-muted-foreground">
               {lastRefresh ? `Updated ${lastRefresh.toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' })}` : 'Live position intelligence'}
             </p>
@@ -471,15 +476,15 @@ export default function PortfolioRadar() {
       </div>
 
       {noPositions ? (
-        <div className="rounded-xl border border-border bg-card p-10 text-center">
-          <Minus className="h-8 w-8 text-muted-foreground mx-auto mb-3" />
+        <div className="tm-card overflow-hidden p-10 text-center">
+          <Minus className="h-8 w-8 text-muted-foreground/40 mx-auto mb-3" />
           <p className="text-sm font-medium">No open F&O positions</p>
           <p className="text-xs text-muted-foreground mt-1">Portfolio Radar activates when you have open positions.</p>
         </div>
       ) : (
-        <div className="grid md:grid-cols-2 gap-6">
+        <div className="grid md:grid-cols-2 gap-5">
           {/* Left column */}
-          <div className="space-y-6">
+          <div className="space-y-5">
             {/* Concentration */}
             {concentration && (
               <SectionCard title="Portfolio Concentration">

@@ -4,6 +4,124 @@
 
 ---
 
+## Session 31 (2026-04-02) — Design System + Dashboard Spec
+
+### What happened
+User said existing UI/UX is not coming out right. Decided to restart the design process properly: brainstorm page by page, write pixel-level specs, then build from Stitch/Figma mockups.
+
+### New Design Workflow (locked)
+1. Discuss + brainstorm a screen together
+2. Write pixel-level spec in `docs/design/screens/XX_screenname.md` (web + mobile in same file)
+3. User builds mockup in Stitch/Figma
+4. User shares mockup → I implement
+5. Update DESIGN_CHECKLIST.md as each stage completes
+
+### Files Created This Session
+- `docs/design/01_DESIGN_SYSTEM.md` — design tokens (colors confirmed, some TBDs remain)
+- `docs/design/DESIGN_CHECKLIST.md` — master checklist of all 21 screens, 4 stages each
+- `docs/design/screens/` — new subfolder for per-screen pixel specs
+- `docs/design/screens/01_dashboard.md` — complete dashboard spec (web + mobile)
+- `docs/design/02_WEB_SCREENS.md` — added navigation table at top pointing to screens/ files
+
+### Design Decisions Locked (don't revisit without reason)
+
+**Typography:** Inter. Tabular-nums for all financial data.
+
+**Theme:** Dark nav chrome + white/off-white content area. One theme. No toggle for now.
+- Dark: `#0F172A` nav/sidebar/header/footer
+- Light content: `#F1F5F9` page bg, `#FFFFFF` cards
+
+**Brand color:** Teal
+- `#0D9488` — on light backgrounds (buttons, active states)
+- `#2DD4BF` — on dark nav background (active nav text)
+- `#0D9488/12` — active nav item background
+
+**Full color palette confirmed:**
+- Profit: `#16A34A` (green-700)
+- Loss: `#DC2626` (red-600)
+- Observation/alert: `#D97706` (amber-600)
+- Observation bg tint: `#FEF3C7` (amber-50)
+- Text primary: `#0F172A`, secondary: `#64748B`, muted: `#94A3B8`
+- Border: `#E2E8F0`, card: `#FFFFFF`, page bg: `#F1F5F9`
+
+**Anti-vibe-code rules locked:**
+- No card-per-alert pattern — alerts are list rows
+- No left colored border on alert rows — small severity dot only (7px circle)
+- No metric card grid — stats in page header stat line
+- No gradient backgrounds, no glassmorphism, no heavy shadows
+- No rounded corners > 8px on data screens
+- Max shadow: 1px border only on cards (no drop shadow)
+- Monospace/tabular-nums for ALL financial numbers
+
+### Dashboard Spec Summary (full spec in screens/01_dashboard.md)
+
+**Web layout:**
+- Page header: "Dashboard" title + compact stat line (trades · P&L · ⚠alerts · ✎unjournaled · goal)
+- Full-width Behavioral Alerts section: list rows (dot + name + evidence + timestamp), max 3, view all link
+- Two-column below: Left 62% (Open Positions + Closed Today) | Right 38% sticky (Blowup Shield + Session Pace)
+- Right column: NO sparkline/graph. Blowup Shield (score + last event) + Session Pace (count vs avg).
+
+**Mobile layout:**
+- Header: Dashboard title + stat line (2 rows)
+- Behavioral Alerts: max 2 rows, then view all
+- Open Positions: simplified columns (Symbol + P&L + Journal icon)
+- Closed Today: same simplified columns
+- Blowup Shield + Session Pace: stacked cards below closed trades
+
+**Key decisions:**
+- Closed trades sort: unjournaled first. Show 5. Drop to 3 when all journaled.
+- Stat line: ⚠ and ✎ hidden when 0. Goal shown only if set.
+- No margin components. No behavioral score hero. No My Patterns/AI widget.
+- Alert rows: tap → alert detail bottom sheet (evidence paragraph + triggering trades + journal/coach links)
+- Trade rows: tap → journal bottom sheet (existing chip-select form)
+- No acknowledge button anywhere on dashboard.
+
+### Dashboard Checklist Status
+- Discussed: ✅ | Specced: ✅ | Designed: ⬜ | Built: ⬜
+
+### Next Screen to Design
+Behavioral Alerts page (`/alerts`) — 3 tabs (Recent / History / By Pattern), filter chips, full observation cards.
+
+---
+
+## Session 30 (2026-03-22) — 29-Issue QA Audit, Full Production Polish
+
+### QA Audit — All Issues Resolved
+
+**C1 — `.env.example` missing vars** (`backend/.env.example`)
+- Added: `OPENAI_API_KEY`, `SMTP_HOST`, `SMTP_PORT`, `SMTP_USER`, `SMTP_PASS`, `EMAIL_FROM`
+
+**D2 — `GET /api/trades/` missing `has_more`** (`backend/app/api/trades.py`)
+- Added `has_more: bool` to paginated response schema so frontend can correctly detect end-of-list
+
+**B4 — `behavior_score` crash on null** (`src/components/analytics/BehaviorTab.tsx`)
+- Updated `UserBehaviorProfile` interface: `behavior_score: number | null`
+- Score display: shows "—" instead of crashing; shows "Need 5+ trades" tooltip when null
+
+**F3 — Duplicate `trading_since` field** (`src/pages/Settings.tsx`)
+- Removed duplicate key in `UserProfile` interface (was defined twice → last one silently won)
+
+**F5 — Demo data field name mismatch** (`src/lib/demoData.ts`)
+- `DEMO_COMPLETED_TRADES` typed as `CompletedTrade[]`
+- Fixed field names: `quantity` → `total_quantity`, `entry_price` → `avg_entry_price`, `exit_price` → `avg_exit_price`
+- `DEMO_POSITIONS` typed as `Position[]`
+- Guest mode quantity/price columns now render correctly (were blank before)
+
+**M3 — Admin test-email endpoint** (`backend/app/api/admin/system.py`)
+- Added `POST /api/admin/test-email` — sends test email to admin's own address to verify SMTP config is working
+
+**E1 — Market hours missing holiday calendar** (`backend/app/utils/market_hours.py`)
+- Added `NSE_HOLIDAYS_2025` and `NSE_HOLIDAYS_2026` dicts with full NSE holiday lists
+- Added `is_trading_holiday(date)` function
+- `is_market_open()` now checks holidays before returning True
+- Added `NSE_EXTRA_HOLIDAYS` env var override for ad-hoc closures (budget day, etc.)
+
+**E2 — Webhook for deleted/suspended accounts** (`backend/app/api/webhooks.py`)
+- Previously: silently processed or returned confusing "Account not found"
+- Now: explicitly checks account state, logs `"Webhook discarded — account {id} is {state}"`, returns 200 with clear message to prevent Zerodha retry loop
+
+---
+
 ## Session 29 (2026-03-22) — Rate Limiting, BTST Frontend, Onboarding Card
 
 ### 1. Admin Login Rate Limiting
@@ -176,19 +294,19 @@ User confirmed applied: 047_generated_reports, 048_admin_users, 049_admin_audit_
 - **Cache**: Upstash free tier (already using)
 - **`.env`**: Never committed to git. On Vercel: set `VITE_API_URL` in project settings. On Render: paste all backend env vars in dashboard.
 
-### Pending Items (carried forward)
+### Pending Items (status as of session 30)
 
 | Item | Priority | Status |
 |------|----------|--------|
-| Wire WhatsApp alerts into `trade_tasks.py` | P1 | Code spec in migration doc §6.2 |
-| Rewrite `whatsapp_service.py` (Gupshup) | P1 | Full code in migration doc §6.1 |
-| BTST analytics (G1) | P2 | Analytics + reports. MTM snapshot needed. |
-| Admin panel activation | P0 | `ADMIN_JWT_SECRET` env var + INSERT first admin user |
-| Gupshup account setup (non-code) | P1 | Create Meta BM → Gupshup → submit templates |
+| Wire WhatsApp alerts into `trade_tasks.py` | P1 | Code spec in migration doc §6.2. Blocked: Meta template approval. |
+| Rewrite `whatsapp_service.py` (Gupshup) | P1 | Full code in migration doc §6.1. Blocked: Meta template approval. |
+| ~~BTST analytics (G1)~~ | P2 | **✅ DONE (S29)** — `BTSTCard` in `BehaviorTab.tsx`; backend `/api/analytics/btst` updated |
+| Admin panel activation | P0 | `ADMIN_JWT_SECRET` env var + INSERT first admin user (non-code setup) |
+| Gupshup account setup (non-code) | P1 | Create Meta BM → Gupshup → submit templates. Still pending. |
 | Razorpay payments | P1 | Not started |
 | Deep OTM lottery (G7) | Blocked | Needs spot price at trade time |
-| Rate limit admin login | P1 | Not started |
-| SMTP for admin OTP in prod | P1 | Falls back to log in dev |
+| ~~Rate limit admin login~~ | P1 | **✅ DONE (S29)** — IP sliding-window + per-email Redis lockout |
+| ~~SMTP for admin OTP in prod~~ | P1 | **✅ DONE (S30)** — `POST /api/admin/test-email` endpoint added; env vars documented in `.env.example` |
 
 ---
 

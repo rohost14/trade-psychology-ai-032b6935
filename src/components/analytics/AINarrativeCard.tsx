@@ -46,7 +46,7 @@ export default function AINarrativeCard({ tab, days }: AINarrativeCardProps) {
 
   if (isLoading) {
     return (
-      <div className="bg-gradient-to-r from-indigo-500/5 to-purple-500/5 border border-indigo-500/20 rounded-lg p-4 animate-pulse">
+      <div className="bg-teal-50/50 dark:bg-teal-900/10 border border-tm-brand/20 rounded-xl p-4 animate-pulse">
         <div className="flex items-center gap-2 text-sm text-muted-foreground">
           <Loader2 className="h-4 w-4 animate-spin" />
           Generating AI analysis...
@@ -60,11 +60,11 @@ export default function AINarrativeCard({ tab, days }: AINarrativeCardProps) {
   }
 
   return (
-    <div className="bg-gradient-to-r from-indigo-500/5 to-purple-500/5 border border-indigo-500/20 rounded-lg p-4">
+    <div className="bg-teal-50/50 dark:bg-teal-900/10 border border-tm-brand/20 rounded-xl p-4">
       <div className="flex items-start justify-between mb-2">
         <div className="flex items-center gap-2">
-          <Sparkles className="h-4 w-4 text-indigo-500" />
-          <span className="text-xs font-medium text-indigo-600 dark:text-indigo-400 uppercase tracking-wide">
+          <Sparkles className="h-4 w-4 text-tm-brand" />
+          <span className="text-xs font-medium text-tm-brand uppercase tracking-wide">
             AI Analysis
           </span>
           {data.cached && (
@@ -86,7 +86,7 @@ export default function AINarrativeCard({ tab, days }: AINarrativeCardProps) {
       <p className="text-sm text-foreground leading-relaxed">{data.narrative}</p>
 
       {data.key_insight && (
-        <p className="text-sm text-indigo-600 dark:text-indigo-400 font-medium mt-2">
+        <p className="text-sm text-tm-brand font-medium mt-2">
           {data.key_insight}
         </p>
       )}

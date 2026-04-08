@@ -6,7 +6,7 @@ import {
 import { Skeleton } from '@/components/ui/skeleton';
 import { Loader2, BarChart3, Clock } from 'lucide-react';
 import { cn } from '@/lib/utils';
-import { formatCurrency } from '@/lib/formatters';
+import { formatCurrencyWithSign } from '@/lib/formatters';
 import { api } from '@/lib/api';
 import { useOrderAnalytics } from '@/hooks/useOrderAnalytics';
 import { useBroker } from '@/contexts/BrokerContext';
@@ -107,11 +107,11 @@ function HeatmapGrid({ days }: { days: number }) {
   };
 
   return (
-    <div className="bg-card rounded-lg border border-border overflow-hidden">
+    <div className="tm-card overflow-hidden">
       <div className="px-5 py-4 border-b border-border flex items-center gap-2">
         <Clock className="h-4 w-4 text-muted-foreground" />
         <div>
-          <p className="text-xs font-medium uppercase tracking-widest text-muted-foreground">Hour × Day Performance</p>
+          <p className="tm-label">Hour × Day Performance</p>
           <p className="text-xs text-muted-foreground mt-0.5">Average P&L by entry time (IST)</p>
         </div>
       </div>
@@ -245,13 +245,13 @@ export default function TimingTab({ days }: TimingTabProps) {
       {/* By Hour + By Day — horizontal bar charts side by side */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         {data.by_hour.length > 0 && (
-          <div className="bg-card rounded-lg border border-border overflow-hidden">
+          <div className="tm-card overflow-hidden">
             <div className="px-5 py-4 border-b border-border flex items-center justify-between">
-              <p className="text-xs font-medium uppercase tracking-widest text-muted-foreground">By Hour (IST)</p>
+              <p className="tm-label">By Hour (IST)</p>
               {bestHour && worstHour && (
                 <div className="text-right">
-                  <p className="text-[10px] text-green-600">Best: {bestHour.label}</p>
-                  <p className="text-[10px] text-red-600">Worst: {worstHour.label}</p>
+                  <p className="text-[10px] text-tm-profit">Best: {bestHour.label}</p>
+                  <p className="text-[10px] text-tm-loss">Worst: {worstHour.label}</p>
                 </div>
               )}
             </div>
@@ -279,7 +279,7 @@ export default function TimingTab({ days }: TimingTabProps) {
                     <ReferenceLine x={0} stroke="hsl(var(--border))" strokeWidth={1.5} />
                     <Bar dataKey="pnl" radius={[0, 3, 3, 0]}>
                       {data.by_hour.map((entry, i) => (
-                        <Cell key={i} fill={entry.pnl >= 0 ? 'hsl(142, 71%, 45%)' : 'hsl(0, 84%, 60%)'} />
+                        <Cell key={i} fill={entry.pnl >= 0 ? '#16A34A' : '#DC2626'} />
                       ))}
                     </Bar>
                   </BarChart>
@@ -290,13 +290,13 @@ export default function TimingTab({ days }: TimingTabProps) {
         )}
 
         {data.by_day_of_week.length > 0 && (
-          <div className="bg-card rounded-lg border border-border overflow-hidden">
+          <div className="tm-card overflow-hidden">
             <div className="px-5 py-4 border-b border-border flex items-center justify-between">
-              <p className="text-xs font-medium uppercase tracking-widest text-muted-foreground">By Day of Week</p>
+              <p className="tm-label">By Day of Week</p>
               {bestDay && worstDay && (
                 <div className="text-right">
-                  <p className="text-[10px] text-green-600">Best: {bestDay.name.slice(0, 3)}</p>
-                  <p className="text-[10px] text-red-600">Worst: {worstDay.name.slice(0, 3)}</p>
+                  <p className="text-[10px] text-tm-profit">Best: {bestDay.name.slice(0, 3)}</p>
+                  <p className="text-[10px] text-tm-loss">Worst: {worstDay.name.slice(0, 3)}</p>
                 </div>
               )}
             </div>
@@ -325,7 +325,7 @@ export default function TimingTab({ days }: TimingTabProps) {
                     <ReferenceLine x={0} stroke="hsl(var(--border))" strokeWidth={1.5} />
                     <Bar dataKey="pnl" radius={[0, 3, 3, 0]}>
                       {data.by_day_of_week.map((entry, i) => (
-                        <Cell key={i} fill={entry.pnl >= 0 ? 'hsl(142, 71%, 45%)' : 'hsl(0, 84%, 60%)'} />
+                        <Cell key={i} fill={entry.pnl >= 0 ? '#16A34A' : '#DC2626'} />
                       ))}
                     </Bar>
                   </BarChart>
@@ -338,9 +338,9 @@ export default function TimingTab({ days }: TimingTabProps) {
 
       {/* Instrument Leaderboard — Zerodha holdings style */}
       {data.by_instrument.length > 0 && (
-        <div className="bg-card rounded-lg border border-border overflow-hidden">
+        <div className="tm-card overflow-hidden">
           <div className="px-5 py-4 border-b border-border flex items-center justify-between">
-            <p className="text-xs font-medium uppercase tracking-widest text-muted-foreground">Instruments</p>
+            <p className="tm-label">Instruments</p>
             <p className="text-xs text-muted-foreground">{data.by_instrument.length} symbols</p>
           </div>
           <div className="overflow-x-auto">
@@ -362,22 +362,22 @@ export default function TimingTab({ days }: TimingTabProps) {
                     <td className="px-3 py-3 text-sm font-medium text-foreground">{instr.symbol}</td>
                     <td className={cn(
                       'px-3 py-3 text-right text-sm font-mono tabular-nums font-medium',
-                      instr.pnl >= 0 ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'
+                      instr.pnl >= 0 ? 'text-tm-profit' : 'text-tm-loss'
                     )}>
-                      {instr.pnl >= 0 ? '+' : ''}{formatCurrency(instr.pnl)}
+                      {formatCurrencyWithSign(instr.pnl)}
                     </td>
                     <td className={cn(
                       'px-3 py-3 text-right text-sm tabular-nums',
-                      instr.win_rate >= 50 ? 'text-green-600' : 'text-red-600'
+                      instr.win_rate >= 50 ? 'text-tm-profit' : 'text-tm-loss'
                     )}>
                       {instr.win_rate}%
                     </td>
                     <td className="px-3 py-3 text-right text-sm tabular-nums text-muted-foreground">{instr.trades}</td>
                     <td className={cn(
                       'px-5 py-3 text-right text-sm font-mono tabular-nums',
-                      instr.avg_pnl >= 0 ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'
+                      instr.avg_pnl >= 0 ? 'text-tm-profit' : 'text-tm-loss'
                     )}>
-                      {instr.avg_pnl >= 0 ? '+' : ''}{formatCurrency(instr.avg_pnl)}
+                      {formatCurrencyWithSign(instr.avg_pnl)}
                     </td>
                   </tr>
                 ))}
@@ -409,8 +409,8 @@ function HourTooltip({ active, payload }: any) {
   return (
     <div className="bg-popover border border-border rounded-lg p-3 shadow-lg text-sm">
       <p className="font-medium text-foreground">{d.label} IST</p>
-      <p className={cn('tabular-nums font-mono', d.pnl >= 0 ? 'text-green-600' : 'text-red-600')}>
-        {d.pnl >= 0 ? '+' : ''}{formatCurrency(d.pnl)}
+      <p className={cn('tabular-nums font-mono', d.pnl >= 0 ? 'text-tm-profit' : 'text-tm-loss')}>
+        {formatCurrencyWithSign(d.pnl)}
       </p>
       <p className="text-xs text-muted-foreground">{d.trades} trades &middot; {d.win_rate}% WR</p>
     </div>
@@ -423,8 +423,8 @@ function DayTooltip({ active, payload }: any) {
   return (
     <div className="bg-popover border border-border rounded-lg p-3 shadow-lg text-sm">
       <p className="font-medium text-foreground">{d.name}</p>
-      <p className={cn('tabular-nums font-mono', d.pnl >= 0 ? 'text-green-600' : 'text-red-600')}>
-        {d.pnl >= 0 ? '+' : ''}{formatCurrency(d.pnl)}
+      <p className={cn('tabular-nums font-mono', d.pnl >= 0 ? 'text-tm-profit' : 'text-tm-loss')}>
+        {formatCurrencyWithSign(d.pnl)}
       </p>
       <p className="text-xs text-muted-foreground">{d.trades} trades &middot; {d.win_rate}% WR</p>
     </div>

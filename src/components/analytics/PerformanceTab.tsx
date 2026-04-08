@@ -3,7 +3,8 @@ import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip,
   ResponsiveContainer, Cell, ReferenceLine,
 } from 'recharts';
-import { Loader2, BarChart3, ArrowUpDown, TrendingUp, TrendingDown } from 'lucide-react';
+import { BarChart3, ArrowUpDown, TrendingUp, TrendingDown } from 'lucide-react';
+import { Skeleton } from '@/components/ui/skeleton';
 import { cn } from '@/lib/utils';
 import { formatCurrency } from '@/lib/formatters';
 import { api } from '@/lib/api';
@@ -107,15 +108,20 @@ export default function PerformanceTab({ days }: PerformanceTabProps) {
 
   if (isLoading) {
     return (
-      <div className="flex items-center justify-center min-h-[40vh]">
-        <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+      <div className="space-y-3">
+        <Skeleton className="h-48 rounded-xl" />
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+          <Skeleton className="h-32 rounded-xl" />
+          <Skeleton className="h-32 rounded-xl" />
+        </div>
+        <Skeleton className="h-56 rounded-xl" />
       </div>
     );
   }
 
   if (!data?.has_data) {
     return (
-      <div className="flex flex-col items-center justify-center min-h-[40vh] bg-card rounded-lg border border-border">
+      <div className="flex flex-col items-center justify-center min-h-[40vh] tm-card overflow-hidden">
         <BarChart3 className="h-10 w-10 text-muted-foreground/40 mb-3" />
         <p className="font-medium text-foreground">No performance data for this period</p>
         <p className="text-sm text-muted-foreground mt-1">Complete some trades to see analysis</p>
@@ -147,7 +153,7 @@ export default function PerformanceTab({ days }: PerformanceTabProps) {
       <AINarrativeCard tab="performance" days={days} />
 
       {/* By Instrument */}
-      <div className="bg-card rounded-lg border border-border overflow-hidden">
+      <div className="tm-card overflow-hidden">
         <div className="px-4 py-3 border-b border-border flex items-center justify-between">
           <div>
             <h3 className="text-sm font-semibold text-foreground">By Instrument</h3>
@@ -190,19 +196,19 @@ export default function PerformanceTab({ days }: PerformanceTabProps) {
                   <td className="px-4 py-2.5 text-right text-sm tabular-nums">{inst.trades}</td>
                   <td className={cn(
                     'px-4 py-2.5 text-right text-sm tabular-nums font-mono font-medium',
-                    inst.pnl >= 0 ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'
+                    inst.pnl >= 0 ? 'text-tm-profit' : 'text-tm-loss'
                   )}>
                     {inst.pnl >= 0 ? '+' : ''}{formatCurrency(inst.pnl)}
                   </td>
                   <td className={cn(
                     'px-4 py-2.5 text-right text-sm tabular-nums',
-                    inst.win_rate >= 50 ? 'text-green-600' : 'text-red-600'
+                    inst.win_rate >= 50 ? 'text-tm-profit' : 'text-tm-loss'
                   )}>
                     {inst.win_rate}%
                   </td>
                   <td className={cn(
                     'px-4 py-2.5 text-right text-sm tabular-nums font-mono',
-                    inst.avg_pnl >= 0 ? 'text-green-600' : 'text-red-600'
+                    inst.avg_pnl >= 0 ? 'text-tm-profit' : 'text-tm-loss'
                   )}>
                     {inst.avg_pnl >= 0 ? '+' : ''}{formatCurrency(inst.avg_pnl)}
                   </td>
@@ -220,12 +226,12 @@ export default function PerformanceTab({ days }: PerformanceTabProps) {
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         {/* Direction */}
         {Object.entries(data.by_direction).map(([dir, stats]) => (
-          <div key={dir} className="bg-card rounded-lg border border-border overflow-hidden">
+          <div key={dir} className="tm-card overflow-hidden">
             <div className={cn(
               'px-4 py-3 border-b border-border flex items-center gap-2',
-              dir === 'LONG' ? 'bg-green-50/50 dark:bg-green-900/10' : 'bg-red-50/50 dark:bg-red-900/10'
+              dir === 'LONG' ? 'bg-teal-50/50 dark:bg-teal-900/10' : 'bg-red-50/50 dark:bg-red-900/10'
             )}>
-              {dir === 'LONG' ? <TrendingUp className="h-4 w-4 text-green-600" /> : <TrendingDown className="h-4 w-4 text-red-600" />}
+              {dir === 'LONG' ? <TrendingUp className="h-4 w-4 text-tm-profit" /> : <TrendingDown className="h-4 w-4 text-tm-loss" />}
               <h3 className="text-sm font-semibold text-foreground">{dir}</h3>
             </div>
             <div className="grid grid-cols-3 divide-x divide-border">
@@ -237,7 +243,7 @@ export default function PerformanceTab({ days }: PerformanceTabProps) {
                 <p className="text-xs text-muted-foreground">P&L</p>
                 <p className={cn(
                   'text-lg font-bold tabular-nums font-mono',
-                  stats.pnl >= 0 ? 'text-green-600' : 'text-red-600'
+                  stats.pnl >= 0 ? 'text-tm-profit' : 'text-tm-loss'
                 )}>
                   {formatCurrency(stats.pnl)}
                 </p>
@@ -246,7 +252,7 @@ export default function PerformanceTab({ days }: PerformanceTabProps) {
                 <p className="text-xs text-muted-foreground">Win Rate</p>
                 <p className={cn(
                   'text-lg font-bold tabular-nums',
-                  stats.win_rate >= 50 ? 'text-green-600' : 'text-red-600'
+                  stats.win_rate >= 50 ? 'text-tm-profit' : 'text-tm-loss'
                 )}>
                   {stats.win_rate}%
                 </p>
@@ -258,7 +264,7 @@ export default function PerformanceTab({ days }: PerformanceTabProps) {
 
       {/* By Product Type (MIS vs NRML vs MTF) */}
       {Object.keys(data.by_product).length > 0 && (
-        <div className="bg-card rounded-lg border border-border overflow-hidden">
+        <div className="tm-card overflow-hidden">
           <div className="px-4 py-3 border-b border-border">
             <h3 className="text-sm font-semibold text-foreground">By Product Type</h3>
             <p className="text-xs text-muted-foreground">Intraday (MIS) vs Positional (NRML) performance</p>
@@ -292,19 +298,19 @@ export default function PerformanceTab({ days }: PerformanceTabProps) {
                     </td>
                     <td className={cn(
                       'px-3 py-2.5 text-right text-sm tabular-nums font-mono font-medium',
-                      stats.pnl >= 0 ? 'text-green-600' : 'text-red-600'
+                      stats.pnl >= 0 ? 'text-tm-profit' : 'text-tm-loss'
                     )}>
                       {stats.pnl >= 0 ? '+' : ''}{formatCurrency(stats.pnl)}
                     </td>
                     <td className={cn(
                       'px-3 py-2.5 text-right text-sm tabular-nums',
-                      stats.win_rate >= 50 ? 'text-green-600' : 'text-red-600'
+                      stats.win_rate >= 50 ? 'text-tm-profit' : 'text-tm-loss'
                     )}>
                       {stats.win_rate}%
                     </td>
                     <td className={cn(
                       'px-3 py-2.5 text-right text-sm tabular-nums font-mono',
-                      stats.avg_pnl >= 0 ? 'text-green-600' : 'text-red-600'
+                      stats.avg_pnl >= 0 ? 'text-tm-profit' : 'text-tm-loss'
                     )}>
                       {stats.avg_pnl >= 0 ? '+' : ''}{formatCurrency(stats.avg_pnl)}
                     </td>
@@ -320,7 +326,7 @@ export default function PerformanceTab({ days }: PerformanceTabProps) {
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
         {/* By Hour */}
         {data.by_hour.length > 0 && (
-          <div className="bg-card rounded-lg border border-border overflow-hidden">
+          <div className="tm-card overflow-hidden">
             <div className="px-4 py-3 border-b border-border flex items-center justify-between">
               <div>
                 <h3 className="text-sm font-semibold text-foreground">P&L by Hour</h3>
@@ -354,7 +360,7 @@ export default function PerformanceTab({ days }: PerformanceTabProps) {
                     <ReferenceLine y={0} stroke="hsl(var(--border))" strokeWidth={1.5} />
                     <Bar dataKey="pnl" radius={[2, 2, 0, 0]}>
                       {data.by_hour.map((entry, i) => (
-                        <Cell key={i} fill={entry.pnl >= 0 ? 'hsl(142, 71%, 45%)' : 'hsl(0, 84%, 60%)'} />
+                        <Cell key={i} fill={entry.pnl >= 0 ? '#16A34A' : '#DC2626'} />
                       ))}
                     </Bar>
                   </BarChart>
@@ -379,13 +385,13 @@ export default function PerformanceTab({ days }: PerformanceTabProps) {
                       <td className="px-3 py-1.5 text-right text-xs tabular-nums">{h.trades}</td>
                       <td className={cn(
                         'px-3 py-1.5 text-right text-xs tabular-nums font-mono',
-                        h.pnl >= 0 ? 'text-green-600' : 'text-red-600'
+                        h.pnl >= 0 ? 'text-tm-profit' : 'text-tm-loss'
                       )}>
                         {formatCurrency(h.pnl)}
                       </td>
                       <td className={cn(
                         'px-3 py-1.5 text-right text-xs tabular-nums',
-                        h.win_rate >= 50 ? 'text-green-600' : 'text-red-600'
+                        h.win_rate >= 50 ? 'text-tm-profit' : 'text-tm-loss'
                       )}>
                         {h.win_rate}%
                       </td>
@@ -399,7 +405,7 @@ export default function PerformanceTab({ days }: PerformanceTabProps) {
 
         {/* By Day of Week */}
         {data.by_day_of_week.length > 0 && (
-          <div className="bg-card rounded-lg border border-border overflow-hidden">
+          <div className="tm-card overflow-hidden">
             <div className="px-4 py-3 border-b border-border flex items-center justify-between">
               <div>
                 <h3 className="text-sm font-semibold text-foreground">P&L by Day</h3>
@@ -434,7 +440,7 @@ export default function PerformanceTab({ days }: PerformanceTabProps) {
                     <ReferenceLine y={0} stroke="hsl(var(--border))" strokeWidth={1.5} />
                     <Bar dataKey="pnl" radius={[2, 2, 0, 0]}>
                       {data.by_day_of_week.map((entry, i) => (
-                        <Cell key={i} fill={entry.pnl >= 0 ? 'hsl(142, 71%, 45%)' : 'hsl(0, 84%, 60%)'} />
+                        <Cell key={i} fill={entry.pnl >= 0 ? '#16A34A' : '#DC2626'} />
                       ))}
                     </Bar>
                   </BarChart>
@@ -459,13 +465,13 @@ export default function PerformanceTab({ days }: PerformanceTabProps) {
                       <td className="px-3 py-1.5 text-right text-xs tabular-nums">{d.trades}</td>
                       <td className={cn(
                         'px-3 py-1.5 text-right text-xs tabular-nums font-mono',
-                        d.pnl >= 0 ? 'text-green-600' : 'text-red-600'
+                        d.pnl >= 0 ? 'text-tm-profit' : 'text-tm-loss'
                       )}>
                         {formatCurrency(d.pnl)}
                       </td>
                       <td className={cn(
                         'px-3 py-1.5 text-right text-xs tabular-nums',
-                        d.win_rate >= 50 ? 'text-green-600' : 'text-red-600'
+                        d.win_rate >= 50 ? 'text-tm-profit' : 'text-tm-loss'
                       )}>
                         {d.win_rate}%
                       </td>
@@ -480,7 +486,7 @@ export default function PerformanceTab({ days }: PerformanceTabProps) {
 
       {/* Position Size Analysis */}
       {data.size_analysis.length > 0 && (
-        <div className="bg-card rounded-lg border border-border overflow-hidden">
+        <div className="tm-card overflow-hidden">
           <div className="px-4 py-3 border-b border-border">
             <h3 className="text-sm font-semibold text-foreground">Position Size Analysis</h3>
             <p className="text-xs text-muted-foreground">How position sizing affects your outcomes</p>
@@ -503,19 +509,19 @@ export default function PerformanceTab({ days }: PerformanceTabProps) {
                     <td className="px-3 py-2.5 text-right text-sm tabular-nums">{bucket.trades}</td>
                     <td className={cn(
                       'px-3 py-2.5 text-right text-sm tabular-nums font-mono font-medium',
-                      bucket.pnl >= 0 ? 'text-green-600' : 'text-red-600'
+                      bucket.pnl >= 0 ? 'text-tm-profit' : 'text-tm-loss'
                     )}>
                       {bucket.pnl >= 0 ? '+' : ''}{formatCurrency(bucket.pnl)}
                     </td>
                     <td className={cn(
                       'px-3 py-2.5 text-right text-sm tabular-nums',
-                      bucket.win_rate >= 50 ? 'text-green-600' : 'text-red-600'
+                      bucket.win_rate >= 50 ? 'text-tm-profit' : 'text-tm-loss'
                     )}>
                       {bucket.win_rate}%
                     </td>
                     <td className={cn(
                       'px-3 py-2.5 text-right text-sm tabular-nums font-mono',
-                      bucket.avg_pnl >= 0 ? 'text-green-600' : 'text-red-600'
+                      bucket.avg_pnl >= 0 ? 'text-tm-profit' : 'text-tm-loss'
                     )}>
                       {bucket.avg_pnl >= 0 ? '+' : ''}{formatCurrency(bucket.avg_pnl)}
                     </td>
@@ -528,8 +534,8 @@ export default function PerformanceTab({ days }: PerformanceTabProps) {
           {data.size_analysis.length > 1 && (() => {
             const best = data.size_analysis.reduce((a, b) => a.avg_pnl > b.avg_pnl ? a : b);
             return best.avg_pnl > 0 ? (
-              <div className="border-t border-border px-4 py-2.5 bg-green-50/30 dark:bg-green-900/5">
-                <p className="text-xs text-green-700 dark:text-green-400">
+              <div className="border-t border-border px-4 py-2.5 bg-teal-50/40 dark:bg-teal-900/10">
+                <p className="text-xs text-tm-brand">
                   You perform best with <span className="font-medium">{best.bucket}</span> positions
                   ({best.win_rate}% win rate, avg {formatCurrency(best.avg_pnl)}/trade)
                 </p>
@@ -571,7 +577,7 @@ function HourTooltip({ active, payload }: any) {
   return (
     <div className="bg-popover border border-border rounded-lg p-3 shadow-lg text-sm">
       <p className="font-medium text-foreground">{d.label} IST</p>
-      <p className={cn('tabular-nums font-mono', d.pnl >= 0 ? 'text-green-600' : 'text-red-600')}>
+      <p className={cn('tabular-nums font-mono', d.pnl >= 0 ? 'text-tm-profit' : 'text-tm-loss')}>
         {d.pnl >= 0 ? '+' : ''}{formatCurrency(d.pnl)}
       </p>
       <p className="text-xs text-muted-foreground">{d.trades} trades &middot; {d.win_rate}% WR</p>
@@ -585,7 +591,7 @@ function DayTooltip({ active, payload }: any) {
   return (
     <div className="bg-popover border border-border rounded-lg p-3 shadow-lg text-sm">
       <p className="font-medium text-foreground">{d.name}</p>
-      <p className={cn('tabular-nums font-mono', d.pnl >= 0 ? 'text-green-600' : 'text-red-600')}>
+      <p className={cn('tabular-nums font-mono', d.pnl >= 0 ? 'text-tm-profit' : 'text-tm-loss')}>
         {d.pnl >= 0 ? '+' : ''}{formatCurrency(d.pnl)}
       </p>
       <p className="text-xs text-muted-foreground">{d.trades} trades &middot; {d.win_rate}% WR</p>

@@ -867,6 +867,19 @@ async def sync_all_data(
                 logger.error(f"Legacy risk detection failed (non-fatal): {e}")
                 results["risk_detection_error"] = str(e)
 
+            # 1b. BehaviorEngine — full session replay for bulk-synced trades.
+            # Replays engine on EACH of today's CompletedTrades in order so patterns
+            # like consecutive_loss_streak and options_premium_avg_down fire correctly
+            # even when the user was not in the app during trading (trades arrived via REST
+            # sync rather than webhooks). Dedup (24h window) prevents duplicate alerts.
+            try:
+                from app.tasks.trade_tasks import run_behavior_engine_full_session
+                n = await run_behavior_engine_full_session(broker_account_id, db)
+                results["behavior_engine"] = f"{n} new alerts"
+            except Exception as e:
+                logger.error(f"BehaviorEngine sync failed (non-fatal): {e}")
+                results["behavior_engine_error"] = str(e)
+
             # 2. BehavioralEvaluator — new signal pipeline with confidence scoring
             try:
                 from app.services.behavioral_evaluator import BehavioralEvaluator
@@ -959,6 +972,20 @@ async def sync_all_data(
                 account.sync_status = "complete"
                 account.last_sync_at = datetime.now(timezone.utc)
                 await db.commit()
+
+            # Refresh KiteTicker subscriptions so any newly opened positions
+            # get live price ticks immediately — no page refresh needed.
+            try:
+                from app.services.price_stream_service import price_stream
+                from app.api.websocket import manager as ws_manager, get_position_instruments
+                await price_stream.refresh_subscriptions(broker_account_id, db)
+                # Also update the WebSocket routing table so ticks for new positions
+                # are forwarded to the connected browser tab.
+                new_instruments = await get_position_instruments(str(broker_account_id))
+                if new_instruments:
+                    await ws_manager.subscribe(str(broker_account_id), new_instruments)
+            except Exception as e:
+                logger.warning(f"Subscription refresh failed (non-fatal): {e}")
 
             return {
                 "success": True,

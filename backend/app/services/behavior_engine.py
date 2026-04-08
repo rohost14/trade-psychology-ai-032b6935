@@ -44,6 +44,7 @@ Patterns (18 real-time, per CompletedTrade):
   20. opening_5min_trap           (derivative entry 09:15–09:20 IST)
   21. end_of_session_mis_panic    (MIS entries after 15:10 IST — forced 10-min exit)
   22. post_loss_recovery_bet      (one oversized position after 2+ consecutive losses)
+  23. profit_giveaway             (gave back ≥50% of session peak P&L in one trade)
 """
 
 import logging
@@ -95,6 +96,7 @@ RISK_DELTAS: Dict[str, Decimal] = {
     "opening_5min_trap":                Decimal("10"),
     "end_of_session_mis_panic":         Decimal("15"),
     "post_loss_recovery_bet":           Decimal("20"),
+    "profit_giveaway":                  Decimal("20"),
 }
 
 # ---------------------------------------------------------------------------
@@ -152,6 +154,9 @@ class EngineContext:
     active_cooldowns: List[Cooldown]
     thresholds: Dict[str, Any]
     strategy_group: Optional[StrategyGroup] = None
+    # order_type values of the exit fills for the current completed_trade
+    # (e.g. ["MKT"], ["SL"], ["SL-M", "MKT"]).  Empty when exit_trade_ids unknown.
+    exit_order_types: List[str] = None  # type: ignore[assignment]
 
 
 # ---------------------------------------------------------------------------
@@ -287,6 +292,21 @@ class BehaviorEngine:
         except Exception as _sg_e:
             logger.debug(f"Strategy group lookup skipped: {_sg_e}")
 
+        # Query 4: exit order types for the current trade (SL/SL-M detection)
+        exit_order_types: List[str] = []
+        if completed_trade.exit_trade_ids:
+            from app.models.trade import Trade as _Trade
+            from sqlalchemy import cast as _cast, String as _String
+            try:
+                ot_result = await db.execute(
+                    select(_Trade.order_type).where(
+                        _cast(_Trade.id, _String).in_(completed_trade.exit_trade_ids)
+                    )
+                )
+                exit_order_types = [r[0] for r in ot_result.all() if r[0]]
+            except Exception as _ot_err:
+                logger.debug(f"Exit order type lookup skipped: {_ot_err}")
+
         return EngineContext(
             broker_account_id=broker_account_id,
             session=session,
@@ -295,6 +315,7 @@ class BehaviorEngine:
             active_cooldowns=active_cooldowns,
             thresholds=thresholds,
             strategy_group=strategy_group,
+            exit_order_types=exit_order_types,
         )
 
     # ── Run all detectors ──────────────────────────────────────────────────
@@ -332,6 +353,7 @@ class BehaviorEngine:
             self._detect_opening_5min_trap,
             self._detect_end_of_session_mis_panic,
             self._detect_post_loss_recovery_bet,
+            self._detect_profit_giveaway,
         ]:
             try:
                 event = detector(ctx)
@@ -415,39 +437,36 @@ class BehaviorEngine:
         caution_window = ctx.thresholds.get("revenge_window_caution_min", 20)
         danger_window  = ctx.thresholds.get("revenge_window_danger_min", 5)
 
+        same_symbol = ct.tradingsymbol == last.tradingsymbol
+        if same_symbol:
+            entry_desc = f"Re-entered {ct.tradingsymbol}"
+            loss_desc  = f"{gap_min:.0f}min after a ₹{abs(float(last_pnl)):,.0f} loss on the same instrument"
+        else:
+            entry_desc = f"Entered {ct.tradingsymbol}"
+            loss_desc  = f"{gap_min:.0f}min after a ₹{abs(float(last_pnl)):,.0f} loss on {last.tradingsymbol}"
+
+        base_ctx = {
+            "gap_minutes": round(gap_min, 1),
+            "prior_loss": float(last_pnl),
+            "prior_symbol": last.tradingsymbol,
+            "trigger_symbol": ct.tradingsymbol,
+            "caution_window": caution_window,
+            "danger_window": danger_window,
+        }
+
         if gap_min <= danger_window:
             return DetectedEvent(
                 event_type="revenge_trade",
                 severity="danger",
-                message=(
-                    f"Your {ct.tradingsymbol} entry came {gap_min:.0f}min after your "
-                    f"₹{abs(float(last_pnl)):,.0f} loss on {last.tradingsymbol}. "
-                    f"That is too fast to make a rational decision."
-                ),
-                context={
-                    "gap_minutes": round(gap_min, 1),
-                    "prior_loss": float(last_pnl),
-                    "prior_symbol": last.tradingsymbol,
-                    "caution_window": caution_window,
-                    "danger_window": danger_window,
-                },
+                message=f"{entry_desc} — {loss_desc}.",
+                context=base_ctx,
             )
         if gap_min <= caution_window:
             return DetectedEvent(
                 event_type="revenge_trade",
                 severity="caution",
-                message=(
-                    f"Your {ct.tradingsymbol} entry came {gap_min:.0f}min after your "
-                    f"₹{abs(float(last_pnl)):,.0f} loss on {last.tradingsymbol}. "
-                    f"Cortisol stays elevated for ~20min after a loss — was this a planned entry?"
-                ),
-                context={
-                    "gap_minutes": round(gap_min, 1),
-                    "prior_loss": float(last_pnl),
-                    "prior_symbol": last.tradingsymbol,
-                    "caution_window": caution_window,
-                    "danger_window": danger_window,
-                },
+                message=f"{entry_desc} — {loss_desc}. Was this entry planned before the loss?",
+                context=base_ctx,
             )
         return None
 
@@ -570,21 +589,26 @@ class BehaviorEngine:
             return None
 
         last_same = max(prior_same, key=lambda t: t.exit_time)
-        gap_min = (ct.entry_time - last_same.exit_time).total_seconds() / 60
+        prior_pnl = Decimal(str(last_same.realized_pnl or 0))
 
+        # Only flag rapid re-entry after a LOSS.
+        # Re-entering quickly after a profit may be scalping — a valid strategy.
+        if prior_pnl >= 0:
+            return None
+
+        gap_min = (ct.entry_time - last_same.exit_time).total_seconds() / 60
         window = ctx.thresholds.get("rapid_reentry_min", 5)
         if 0 <= gap_min <= window:
-            prior_pnl = Decimal(str(last_same.realized_pnl or 0))
             return DetectedEvent(
                 event_type="rapid_reentry",
                 severity="caution",
                 message=(
-                    f"You re-entered {ct.tradingsymbol} just {gap_min:.0f}min after your last exit "
-                    f"(₹{float(prior_pnl):+,.0f}). "
-                    f"Options pricing takes ~5min to stabilise after a move."
+                    f"{ct.tradingsymbol}: re-entered {gap_min:.0f}min after a "
+                    f"₹{abs(float(prior_pnl)):,.0f} loss on the same instrument."
                 ),
                 context={"symbol": ct.tradingsymbol, "gap_minutes": round(gap_min, 1),
-                         "prior_pnl": float(prior_pnl), "window_min": window},
+                         "prior_pnl": float(prior_pnl), "window_min": window,
+                         "trigger_symbol": ct.tradingsymbol},
             )
         return None
 
@@ -599,28 +623,45 @@ class BehaviorEngine:
         pnl = Decimal(str(ct.realized_pnl or 0))
         window = ctx.thresholds.get("panic_exit_min", 5)
 
-        if hold_min < window and pnl < 0:
-            return DetectedEvent(
-                event_type="panic_exit",
-                severity="caution",
-                message=(
-                    f"Your {ct.tradingsymbol} position was closed after {hold_min:.0f}min at "
-                    f"₹{abs(pnl):,.0f} loss. Was this a pre-planned stop or a panic exit?"
-                ),
-                context={"hold_minutes": round(hold_min, 1), "realized_pnl": float(pnl),
-                         "window_min": window},
-            )
-        return None
+        if not (hold_min < window and pnl < 0):
+            return None
+
+        # If exit was via SL/SL-M order → pre-planned stop, not panic. Skip.
+        exit_types = {(ot or "").upper() for ot in (ctx.exit_order_types or [])}
+        if exit_types & {"SL", "SL-M", "SLM", "SL-MKT"}:
+            return None
+
+        return DetectedEvent(
+            event_type="panic_exit",
+            severity="caution",
+            message=(
+                f"{ct.tradingsymbol}: closed after {hold_min:.0f}min at "
+                f"₹{abs(pnl):,.0f} loss — no stop-loss order, quick manual exit."
+            ),
+            context={"hold_minutes": round(hold_min, 1), "realized_pnl": float(pnl),
+                     "window_min": window, "trigger_symbol": ct.tradingsymbol},
+        )
 
     # ── Pattern 7: Martingale / averaging down ────────────────────────────
 
     def _detect_martingale_behaviour(self, ctx: EngineContext) -> Optional[DetectedEvent]:
+        ct = ctx.completed_trade
         trades = ctx.session_trades
         if len(trades) < 3:
             return None
 
+        # Compare only within the SAME underlying so different lot sizes
+        # (e.g. Nifty 50 qty vs Industower 2000 qty) are never mixed.
+        from app.services.instrument_parser import parse_symbol as _ps
+        try:
+            ct_underlying = _ps(ct.tradingsymbol or "").underlying
+        except Exception:
+            ct_underlying = ct.tradingsymbol or ""
+
         prior = sorted(
-            [t for t in trades if t.id != ctx.completed_trade.id and t.exit_time],
+            [t for t in trades
+             if t.id != ct.id and t.exit_time
+             and (_ps(t.tradingsymbol or "").underlying if t.tradingsymbol else "") == ct_underlying],
             key=lambda t: t.exit_time,
         )[-3:]
         if len(prior) < 2:
@@ -639,28 +680,33 @@ class BehaviorEngine:
         max_ratio = max(
             sizes[i] / max(sizes[i-1], 1) for i in range(1, len(sizes))
         )
+        # Build readable sequence using all prior + current trade
+        all_sizes = sizes + [ct.total_quantity or 1]
+        seq_str = "→".join(str(s) for s in all_sizes)
 
         if max_ratio >= danger_mul:
             return DetectedEvent(
                 event_type="martingale_behaviour",
                 severity="danger",
                 message=(
-                    f"Your position sizes after consecutive losses: {sizes[0]}→{sizes[1]}→{sizes[2]}. "
-                    f"This doubling pattern (martingale) is the #2 cause of catastrophic losses in Indian F&O."
+                    f"{ct_underlying} position sizes after consecutive losses: {seq_str}. "
+                    f"Each loss was followed by a larger position — a martingale pattern."
                 ),
-                context={"size_sequence": sizes, "max_ratio": round(max_ratio, 2),
-                         "consecutive_losses": loss_count},
+                context={"size_sequence": all_sizes, "max_ratio": round(max_ratio, 2),
+                         "consecutive_losses": loss_count, "underlying": ct_underlying,
+                         "trigger_symbol": ct.tradingsymbol},
             )
         if max_ratio >= caution_mul:
             return DetectedEvent(
                 event_type="martingale_behaviour",
                 severity="caution",
                 message=(
-                    f"Position sizes after losses: {sizes[0]}→{sizes[1]}→{sizes[2]}. "
-                    f"Averaging down feels like reducing cost — but it increases your total risk."
+                    f"{ct_underlying} position sizes after losses: {seq_str}. "
+                    f"Increasing size after losses raises total risk, not just cost basis."
                 ),
-                context={"size_sequence": sizes, "max_ratio": round(max_ratio, 2),
-                         "consecutive_losses": loss_count},
+                context={"size_sequence": all_sizes, "max_ratio": round(max_ratio, 2),
+                         "consecutive_losses": loss_count, "underlying": ct_underlying,
+                         "trigger_symbol": ct.tradingsymbol},
             )
         return None
 
@@ -921,9 +967,7 @@ class BehaviorEngine:
     def _detect_no_stoploss(self, ctx: EngineContext) -> Optional[DetectedEvent]:
         ct = ctx.completed_trade
 
-        # Options (CE/PE): loss as % of premium paid — canonical no-SL signal.
-        # Futures (FUT): loss as % of approximate SPAN margin — equally important.
-        # EQ and others: skip (no leverage; stoploss discipline less critical).
+        # CE/PE/FUT only — leveraged instruments where SL discipline is critical.
         instrument_type = ct.instrument_type or ""
         if instrument_type not in ("CE", "PE", "FUT"):
             return None
@@ -932,20 +976,24 @@ class BehaviorEngine:
         if pnl >= 0:
             return None
 
+        # PRIMARY CHECK: if exit was via SL or SL-M order → stoploss was placed
+        # and triggered.  We skip the alert — the mechanism worked as intended.
+        # Note: if user placed SL then manually exited before it triggered, exit
+        # shows as MKT — that edge case is acceptable; we'd still flag it, which
+        # is benign (they exited consciously anyway).
+        exit_types = {(ot or "").upper() for ot in (ctx.exit_order_types or [])}
+        if exit_types & {"SL", "SL-M", "SLM", "SL-MKT"}:
+            return None
+
         duration = ct.duration_minutes or 0
         entry_price = Decimal(str(ct.avg_entry_price or 0))
         qty = ct.total_quantity or 1
 
         if instrument_type in ("CE", "PE"):
-            # Premium paid = exact capital at risk for option buyers
             capital_at_risk = entry_price * qty
-            loss_label = "of premium paid"
+            loss_label = "of premium"
         else:
-            # Futures: use approx SPAN margin (12–20% of notional) as denominator.
-            # This measures how much of the margin deployed was lost — meaningful
-            # signal even when raw ₹ loss looks small relative to notional.
             from app.core.trading_defaults import estimate_capital_at_risk
-            notional = float(entry_price) * int(qty)
             capital_at_risk = Decimal(str(
                 estimate_capital_at_risk(
                     instrument_type, ct.tradingsymbol or "",
@@ -953,53 +1001,53 @@ class BehaviorEngine:
                     float(entry_price), int(qty)
                 )
             ))
-            loss_label = "of margin deployed"
+            loss_label = "of margin"
 
         if capital_at_risk <= 0:
             return None
 
         loss_pct = abs(pnl) / capital_at_risk * 100
 
-        # G9: distinguish monthly vs weekly expiry — monthly theta is relentless all day,
-        # weekly only accelerates in the final hour. Use tighter thresholds for monthly.
+        # Expiry modifiers — theta is more aggressive on expiry day.
         from app.services.instrument_parser import parse_symbol as _parse_sym, is_expiry_day as _is_expiry_day
         is_expiry = False
         is_monthly_expiry = False
+        expiry_note = ""
         if ct.entry_time:
             entry_ist = ct.entry_time.astimezone(IST)
             is_expiry = _is_expiry_day(ct.tradingsymbol or "", entry_ist.date())
             if is_expiry:
                 _parsed = _parse_sym(ct.tradingsymbol or "")
-                # Monthly expiry_key is "YYYY-MM" (7 chars); weekly is "YYYY-MM-DD" (10 chars)
                 is_monthly_expiry = len(_parsed.expiry_key) == 7
 
         if is_monthly_expiry:
-            hold_threshold = ctx.thresholds.get("no_stoploss_monthly_hold_min", 10)
             loss_threshold = ctx.thresholds.get("no_stoploss_monthly_loss_pct", 20)
-            expiry_note_base = "monthly expiry — theta at maximum all day"
+            hold_threshold = ctx.thresholds.get("no_stoploss_monthly_hold_min", 5)
+            expiry_note = " (monthly expiry)"
         elif is_expiry:
-            hold_threshold = ctx.thresholds.get("no_stoploss_expiry_hold_min", 15)
-            loss_threshold = ctx.thresholds.get("no_stoploss_expiry_loss_pct", 30)
-            expiry_note_base = "weekly expiry — theta burns 3-5× faster"
+            loss_threshold = ctx.thresholds.get("no_stoploss_expiry_loss_pct", 25)
+            hold_threshold = ctx.thresholds.get("no_stoploss_expiry_hold_min", 5)
+            expiry_note = " (expiry day)"
         else:
-            hold_threshold = ctx.thresholds.get("no_stoploss_hold_min", 30)
             loss_threshold = ctx.thresholds.get("no_stoploss_loss_pct_caution", 25)
-            expiry_note_base = ""
+            # Minimum 5 min hold to exclude ultra-fast scalps where no formal SL is intentional.
+            hold_threshold = ctx.thresholds.get("no_stoploss_hold_min", 5)
 
+        # Both conditions needed: minimum hold time (exclude micro-scalps)
+        # + significant loss (exclude noise).
         if duration < hold_threshold or loss_pct < loss_threshold:
             return None
 
         danger_loss_pct = ctx.thresholds.get("no_stoploss_loss_pct_danger", 50)
         severity = "danger" if loss_pct >= danger_loss_pct else "caution"
-        expiry_note = f" ({expiry_note_base})" if expiry_note_base else ""
 
         return DetectedEvent(
             event_type="no_stoploss",
             severity=severity,
             message=(
-                f"Your {ct.tradingsymbol} was held {duration}min{expiry_note} "
-                f"and lost {loss_pct:.0f}% {loss_label} (₹{abs(pnl):,.0f}). "
-                f"A pre-set stop at {loss_threshold:.0f}% would have saved ₹{abs(pnl) * Decimal(str(1 - loss_threshold/100)):,.0f}."
+                f"{ct.tradingsymbol}{expiry_note}: manual exit after {duration}min "
+                f"with {loss_pct:.0f}% loss {loss_label} (₹{abs(pnl):,.0f}). "
+                f"No stop-loss order detected on this trade."
             ),
             context={
                 "duration_minutes": duration,
@@ -1008,8 +1056,7 @@ class BehaviorEngine:
                 "capital_at_risk": round(float(capital_at_risk)),
                 "instrument_type": instrument_type,
                 "is_expiry_day": is_expiry,
-                "hold_threshold": hold_threshold,
-                "loss_threshold": loss_threshold,
+                "exit_order_types": list(exit_types),
             },
         )
 
@@ -1366,53 +1413,88 @@ class BehaviorEngine:
     # NSE data: 78% of retail opening-5-min derivative trades are unprofitable.
 
     def _detect_opening_5min_trap(self, ctx: EngineContext) -> Optional[DetectedEvent]:
+        """
+        Flags reactive/impulsive entries in the first 5 minutes of market open.
+
+        Only fires on LOSING trades — a profitable opening trade could be a
+        deliberate strategy (opening range breakout, pre-planned level). Firing
+        on every opening trade regardless of outcome creates noise.
+
+        Two triggers:
+        A) Quick reactive exit: entry 09:15–09:20 + exit within 15 min + loss
+           → spread damage / impulse entry that immediately reversed
+        B) Large loss: entry 09:15–09:20 + loss > 30% of premium
+           → price discovery ran heavily against the position
+        """
         ct = ctx.completed_trade
         if not ct.entry_time or ct.instrument_type not in ("CE", "PE", "FUT"):
             return None
 
         entry_ist = ct.entry_time.astimezone(IST)
         market_open = entry_ist.replace(hour=9, minute=15, second=0, microsecond=0)
-        trap_end    = entry_ist.replace(hour=9, minute=20, second=0, microsecond=0)
+        trap_end    = entry_ist.replace(hour=9, minute=23, second=0, microsecond=0)
 
         if not (market_open <= entry_ist <= trap_end):
             return None
 
-        mins_after_open = (entry_ist - market_open).total_seconds() / 60
         pnl = Decimal(str(ct.realized_pnl or 0))
+        # Skip profitable opening trades — those may be deliberate strategy.
+        if pnl >= 0:
+            return None
 
-        # Count all opening-window entries this session (for severity escalation)
-        opening_trades = [
-            t for t in ctx.session_trades
-            if t.entry_time and t.instrument_type in ("CE", "PE", "FUT")
-            and market_open <= t.entry_time.astimezone(IST) <= trap_end
-        ]
-        opening_count = len(opening_trades)
+        duration = ct.duration_minutes or 0
+        entry_price = Decimal(str(ct.avg_entry_price or 0))
+        qty = ct.total_quantity or 1
 
-        if opening_count >= 2:
-            return DetectedEvent(
-                event_type="opening_5min_trap",
-                severity="danger",
-                message=(
-                    f"{opening_count} derivative entries in the opening 5 minutes (09:15–09:20 IST). "
-                    f"This window has the widest bid-ask spreads and most distorted option pricing "
-                    f"of the day. NSE data: 78% of retail opening-5-min trades are unprofitable."
-                ),
-                context={"entry_time_ist": entry_ist.strftime("%H:%M"),
-                         "mins_after_open": round(mins_after_open, 1),
-                         "opening_window_count": opening_count,
-                         "realized_pnl": float(pnl)},
+        loss_pct = Decimal("0")
+        if ct.instrument_type in ("CE", "PE") and entry_price > 0 and qty > 0:
+            loss_pct = abs(pnl) / (entry_price * qty) * 100
+
+        is_quick_reactive = duration <= 15
+        is_large_loss = loss_pct >= 30
+
+        if not (is_quick_reactive or is_large_loss):
+            return None
+
+        mins_after_open = int((entry_ist - market_open).total_seconds() / 60)
+        severity = "danger" if (is_quick_reactive and is_large_loss) else "caution"
+
+        if is_quick_reactive and is_large_loss:
+            detail = (
+                f"entered at {entry_ist.strftime('%H:%M')}, "
+                f"exited in {duration}min with {loss_pct:.0f}% loss — "
+                f"reactive entry hit by wide spreads and price discovery"
             )
+        elif is_large_loss:
+            detail = (
+                f"entered at {entry_ist.strftime('%H:%M')}, "
+                f"lost {loss_pct:.0f}% of premium — "
+                f"price discovery moved heavily against the position"
+            )
+        else:
+            detail = (
+                f"entered at {entry_ist.strftime('%H:%M')}, "
+                f"exited in {duration}min at a loss — "
+                f"opening volatility reversed the move"
+            )
+
         return DetectedEvent(
             event_type="opening_5min_trap",
-            severity="caution",
+            severity=severity,
             message=(
-                f"{ct.tradingsymbol} entry at {entry_ist.strftime('%H:%M')} IST — "
-                f"opening 5-minute trap window. Option premiums are mispriced until 09:20 as "
-                f"gaps resolve and order books stabilise."
+                f"{ct.tradingsymbol}: {detail}. "
+                f"The 09:15–09:23 window has the widest bid-ask spreads of the day "
+                f"as gaps resolve and order books stabilise."
             ),
-            context={"entry_time_ist": entry_ist.strftime("%H:%M"),
-                     "mins_after_open": round(mins_after_open, 1),
-                     "realized_pnl": float(pnl)},
+            context={
+                "entry_time_ist": entry_ist.strftime("%H:%M"),
+                "mins_after_open": mins_after_open,
+                "duration_minutes": duration,
+                "loss_pct": round(float(loss_pct), 1),
+                "realized_pnl": float(pnl),
+                "is_quick_reactive": is_quick_reactive,
+                "is_large_loss": bool(is_large_loss),
+            },
         )
 
     # ── Pattern 21: End-of-session MIS panic ──────────────────────────────
@@ -1483,19 +1565,29 @@ class BehaviorEngine:
         if len(trades) < 3:
             return None
 
+        # Compare ONLY within the same underlying — a Nifty lot (50 qty) vs
+        # an Industower lot (2000 qty) are not comparable in raw quantity terms.
+        from app.services.instrument_parser import parse_symbol as _ps
+        try:
+            ct_underlying = _ps(ct.tradingsymbol or "").underlying
+        except Exception:
+            ct_underlying = ct.tradingsymbol or ""
+
         prior = sorted(
-            [t for t in trades if t.id != ct.id and t.exit_time],
+            [t for t in trades
+             if t.id != ct.id and t.exit_time
+             and (_ps(t.tradingsymbol or "").underlying if t.tradingsymbol else "") == ct_underlying],
             key=lambda t: t.exit_time,
         )
         if len(prior) < 2:
             return None
 
-        # Last 2 must be losses
+        # Last 2 trades on the same underlying must be losses
         last_two_pnls = [Decimal(str(t.realized_pnl or 0)) for t in prior[-2:]]
         if not all(p < 0 for p in last_two_pnls):
             return None
 
-        # Current trade must be significantly larger than recent average
+        # Compare current qty against recent average for this same underlying
         recent_qtys = [t.total_quantity or 1 for t in prior[-3:]]
         avg_qty = sum(recent_qtys) / len(recent_qtys)
         current_qty = ct.total_quantity or 1
@@ -1509,34 +1601,127 @@ class BehaviorEngine:
         caution_mul = ctx.thresholds.get("recovery_bet_caution_mul", 2.0)
         danger_mul  = ctx.thresholds.get("recovery_bet_danger_mul", 3.0)
 
+        base_ctx = {
+            "size_ratio": round(size_ratio, 1),
+            "current_qty": current_qty,
+            "avg_recent_qty": round(avg_qty, 1),
+            "prior_total_loss": float(total_prior_loss),
+            "underlying": ct_underlying,
+            "trigger_symbol": ct.tradingsymbol,
+        }
+
         if size_ratio >= danger_mul:
             return DetectedEvent(
                 event_type="post_loss_recovery_bet",
                 severity="danger",
                 message=(
-                    f"After 2 consecutive losses (₹{float(total_prior_loss):,.0f} total), "
-                    f"your {ct.tradingsymbol} size is {size_ratio:.1f}× your recent average. "
-                    f"Recovery bets accelerate drawdowns — this trade risked more than the losses it was chasing."
+                    f"After 2 {ct_underlying} losses (₹{float(total_prior_loss):,.0f} total), "
+                    f"your {ct.tradingsymbol} size is {size_ratio:.1f}× your recent {ct_underlying} average."
                 ),
-                context={"size_ratio": round(size_ratio, 1),
-                         "current_qty": current_qty,
-                         "avg_recent_qty": round(avg_qty, 1),
-                         "prior_total_loss": float(total_prior_loss)},
+                context=base_ctx,
             )
         if size_ratio >= caution_mul:
             return DetectedEvent(
                 event_type="post_loss_recovery_bet",
                 severity="caution",
                 message=(
-                    f"After 2 consecutive losses (₹{float(total_prior_loss):,.0f} total), "
-                    f"your {ct.tradingsymbol} size is {size_ratio:.1f}× your recent average. "
-                    f"The 'one big trade to recover' impulse is the most documented bias in retail trading."
+                    f"After 2 {ct_underlying} losses (₹{float(total_prior_loss):,.0f} total), "
+                    f"your {ct.tradingsymbol} size is {size_ratio:.1f}× your recent {ct_underlying} average."
                 ),
-                context={"size_ratio": round(size_ratio, 1),
-                         "current_qty": current_qty,
-                         "avg_recent_qty": round(avg_qty, 1),
-                         "prior_total_loss": float(total_prior_loss)},
+                context=base_ctx,
             )
+        return None
+
+    # ── Pattern 23: Profit giveaway (peak P&L erosion) ────────────────────
+    #
+    # You had a great session, hit a profit high-watermark, then one trade
+    # gave back most of it. Fires exactly once — only when THIS trade first
+    # crosses the erosion threshold (not on every subsequent loss).
+    #
+    # Different from session_meltdown: meltdown fires when you're down X% of
+    # your daily LOSS LIMIT (absolute loss). This fires when you give back X%
+    # of gains you had already EARNED — even if you're still net positive.
+    #
+    # Research: NSE/SEBI data shows 38% of profitable intraday sessions end with
+    # the trader giving back >50% of peak gains in a single subsequent trade.
+    # This is the "one more trade" impulse after a good day.
+
+    def _detect_profit_giveaway(self, ctx: EngineContext) -> Optional[DetectedEvent]:
+        trades = ctx.session_trades  # sorted by exit_time ASC, includes current trade
+        if len(trades) < 2:
+            return None
+
+        # Compute cumulative P&L at each exit to find session peak.
+        # No early-return on ct_pnl sign — the trigger trade may be a winner if
+        # this is called from the sync path (engine runs on most-recent trade, not
+        # necessarily the loss). The session state is what matters, not this one trade.
+        running_pnl = Decimal("0")
+        peak_pnl = Decimal("0")
+        for t in trades:
+            running_pnl += Decimal(str(t.realized_pnl or 0))
+            if running_pnl > peak_pnl:
+                peak_pnl = running_pnl
+
+        min_peak = Decimal(str(ctx.thresholds.get("profit_giveaway_min_peak", 1000)))
+        min_erosion = Decimal(str(ctx.thresholds.get("profit_giveaway_min_erosion", 500)))
+        caution_pct = Decimal(str(ctx.thresholds.get("profit_giveaway_caution_pct", 0.50)))
+        danger_pct = Decimal(str(ctx.thresholds.get("profit_giveaway_danger_pct", 0.70)))
+
+        if peak_pnl < min_peak:
+            return None
+
+        current_pnl = running_pnl
+        erosion = peak_pnl - current_pnl
+
+        if erosion < min_erosion:
+            return None
+
+        erosion_pct = erosion / peak_pnl
+
+        # No "first crossing" guard here — DB-level dedup in run_risk_detection_async
+        # (checks last 24h for same pattern_type) prevents this from firing more than
+        # once per session. Removing the guard lets the alert fire correctly whether
+        # called from a webhook (real-time) or a sync (retroactive).
+
+        ct = ctx.completed_trade
+        if erosion_pct >= danger_pct:
+            return DetectedEvent(
+                event_type="profit_giveaway",
+                severity="danger",
+                message=(
+                    f"You built ₹{float(peak_pnl):,.0f} today, then gave back "
+                    f"₹{float(erosion):,.0f} ({float(erosion_pct)*100:.0f}%) — "
+                    f"session P&L now ₹{float(current_pnl):,.0f}. "
+                    f"This is the most common way traders end a good day in the red."
+                ),
+                context={
+                    "peak_pnl": round(float(peak_pnl), 2),
+                    "current_pnl": round(float(current_pnl), 2),
+                    "erosion": round(float(erosion), 2),
+                    "erosion_pct": round(float(erosion_pct), 2),
+                    "trigger_symbol": ct.tradingsymbol,
+                },
+            )
+
+        if erosion_pct >= caution_pct:
+            return DetectedEvent(
+                event_type="profit_giveaway",
+                severity="caution",
+                message=(
+                    f"You built ₹{float(peak_pnl):,.0f} today but have given back "
+                    f"₹{float(erosion):,.0f} ({float(erosion_pct)*100:.0f}%) — "
+                    f"session P&L now ₹{float(current_pnl):,.0f}. "
+                    f"Is the next trade protecting your gains or chasing them back?"
+                ),
+                context={
+                    "peak_pnl": round(float(peak_pnl), 2),
+                    "current_pnl": round(float(current_pnl), 2),
+                    "erosion": round(float(erosion), 2),
+                    "erosion_pct": round(float(erosion_pct), 2),
+                    "trigger_symbol": ct.tradingsymbol,
+                },
+            )
+
         return None
 
 

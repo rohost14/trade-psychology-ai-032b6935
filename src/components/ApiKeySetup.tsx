@@ -9,7 +9,7 @@ import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
 import { ExternalLink, Key, ChevronRight, CheckCircle2, AlertCircle } from "lucide-react";
-import api from "@/lib/api";
+import api, { apiDetailString } from "@/lib/api";
 
 // Steps shown to guide the user through creating a KiteConnect app
 const STEPS = [
@@ -100,7 +100,7 @@ export default function ApiKeySetup({ onRedirecting, trigger }: Props) {
     onError: (e: any) => {
       toast({
         title: "Invalid credentials",
-        description: e.response?.data?.detail || "Check your API key and secret.",
+        description: apiDetailString(e.response?.data?.detail, "Check your API key and secret."),
         variant: "destructive",
       });
     },

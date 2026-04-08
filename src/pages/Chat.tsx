@@ -98,7 +98,7 @@ function formatMessage(content: string): JSX.Element {
         if (line.trim().startsWith('- ') || line.trim().startsWith('• ')) {
           return (
             <div key={idx} className="flex gap-2 ml-2">
-              <span className="text-primary mt-0.5 flex-shrink-0">•</span>
+              <span className="text-tm-brand mt-0.5 flex-shrink-0">•</span>
               <span
                 dangerouslySetInnerHTML={{
                   __html: DOMPurify.sanitize(formattedLine.replace(/^[-•]\s*/, '')),
@@ -116,7 +116,7 @@ function formatMessage(content: string): JSX.Element {
           );
           return (
             <div key={idx} className="flex gap-2 ml-2">
-              <span className="text-primary font-medium flex-shrink-0">{numberedMatch[1]}.</span>
+              <span className="text-tm-brand font-medium flex-shrink-0">{numberedMatch[1]}.</span>
               <span dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(lineContent) }} />
             </div>
           );
@@ -352,23 +352,20 @@ export default function Chat() {
   if (!isConnected || !account) {
     return (
       <div className="max-w-3xl mx-auto h-[calc(100vh-8rem)]">
-        <div className="mb-6">
-          <h1 className="text-2xl font-bold text-foreground">AI Coach</h1>
-          <p className="text-sm text-muted-foreground">
-            Get personalized trading advice based on your behavior
-          </p>
+        <div className="mb-5">
+          <h1 className="text-lg font-semibold text-foreground tracking-tight">AI Coach</h1>
         </div>
-        <div className="flex flex-col items-center justify-center h-[60%] bg-card rounded-xl border border-border shadow-sm">
-          <div className="p-5 rounded-full bg-primary/10 mb-6 shadow-inner">
-            <Link2 className="h-12 w-12 text-primary" />
+        <div className="tm-card flex flex-col items-center justify-center min-h-[50vh] text-center py-16">
+          <div className="p-4 rounded-full bg-teal-50 dark:bg-teal-900/20 mb-5">
+            <Link2 className="h-10 w-10 text-tm-brand" />
           </div>
-          <h2 className="text-xl font-semibold text-foreground mb-2">Connect Your Broker</h2>
-          <p className="text-muted-foreground text-center max-w-md mb-6">
+          <h2 className="text-base font-semibold text-foreground mb-1">Connect Your Broker</h2>
+          <p className="text-sm text-muted-foreground max-w-sm mb-5">
             Connect your Zerodha account to chat with your AI trading coach.
           </p>
           <Link to="/settings">
-            <Button size="lg" className="gap-2">
-              <Link2 className="h-5 w-5" />
+            <Button size="sm" className="gap-2 bg-tm-brand hover:bg-tm-brand/90 text-white">
+              <Link2 className="h-4 w-4" />
               Connect Zerodha
             </Button>
           </Link>
@@ -382,10 +379,7 @@ export default function Chat() {
       {/* Header */}
       <div className="mb-4 flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-bold text-foreground flex items-center gap-2">
-            <Bot className="h-6 w-6 text-primary" />
-            AI Coach
-          </h1>
+          <h1 className="text-lg font-semibold text-foreground tracking-tight">AI Coach</h1>
           <p className="text-sm text-muted-foreground">
             Personalized guidance from your real trading data
           </p>
@@ -404,7 +398,7 @@ export default function Chat() {
       </div>
 
       {/* Chat Container */}
-      <div className="bg-card rounded-xl shadow-sm border border-border flex flex-col h-[calc(100%-4rem)] overflow-hidden">
+      <div className="tm-card flex flex-col h-[calc(100%-4rem)] overflow-hidden">
 
         {/* Session Snapshot Bar */}
         {snapshot && (
@@ -413,7 +407,7 @@ export default function Chat() {
             <span
               className={cn(
                 'font-semibold flex items-center gap-0.5',
-                snapshot.pnl_today >= 0 ? 'text-green-500' : 'text-red-500'
+                snapshot.pnl_today >= 0 ? 'text-tm-profit' : 'text-tm-loss'
               )}
             >
               {snapshot.pnl_today >= 0 ? (
@@ -427,7 +421,7 @@ export default function Chat() {
               {snapshot.trades_today} trade{snapshot.trades_today !== 1 ? 's' : ''}
             </span>
             {snapshot.active_alerts > 0 && (
-              <span className="text-amber-500 flex items-center gap-1">
+              <span className="text-tm-obs flex items-center gap-1">
                 <AlertTriangle className="h-3 w-3" />
                 {snapshot.active_alerts} alert{snapshot.active_alerts !== 1 ? 's' : ''}
               </span>
@@ -436,10 +430,10 @@ export default function Chat() {
               className={cn(
                 'ml-auto px-2 py-0.5 rounded-full font-medium flex items-center gap-1',
                 snapshot.risk_state === 'safe'
-                  ? 'bg-green-500/10 text-green-600 dark:text-green-400'
+                  ? 'bg-teal-50 dark:bg-teal-900/20 text-tm-brand'
                   : snapshot.risk_state === 'caution'
-                    ? 'bg-amber-500/10 text-amber-600 dark:text-amber-400'
-                    : 'bg-red-500/10 text-red-600 dark:text-red-400'
+                    ? 'bg-amber-50 dark:bg-amber-900/20 text-tm-obs'
+                    : 'bg-red-50 dark:bg-red-900/20 text-tm-loss'
               )}
             >
               <Shield className="h-3 w-3" />
@@ -452,8 +446,8 @@ export default function Chat() {
         <div className="flex-1 overflow-y-auto p-4 space-y-4">
           {messages.length === 0 ? (
             <div className="flex flex-col items-center justify-center h-full text-center px-4">
-              <div className="p-5 rounded-full bg-gradient-to-br from-primary/20 to-primary/5 shadow-inner mb-5">
-                <Sparkles className="h-10 w-10 text-primary" />
+              <div className="p-4 rounded-full bg-teal-50 dark:bg-teal-900/20 mb-5">
+                <Sparkles className="h-10 w-10 text-tm-brand" />
               </div>
               <h3 className="text-lg font-semibold text-foreground mb-2">
                 Ask your AI Trading Coach
@@ -466,7 +460,7 @@ export default function Chat() {
                   <button
                     key={index}
                     onClick={() => handleSend(question)}
-                    className="px-3 py-2 text-sm bg-muted hover:bg-primary/10 text-foreground hover:text-primary rounded-lg transition-all border border-border hover:border-primary/40 hover:shadow-sm"
+                    className="px-3 py-2 text-sm bg-muted hover:bg-teal-50 dark:hover:bg-teal-900/10 text-foreground hover:text-tm-brand rounded-lg transition-all border border-border hover:border-tm-brand/30 hover:shadow-sm"
                   >
                     {question}
                   </button>
@@ -486,8 +480,8 @@ export default function Chat() {
                   >
                     {/* AI avatar */}
                     {message.role === 'assistant' && (
-                      <div className="w-8 h-8 rounded-xl bg-primary/10 border border-primary/20 flex-shrink-0 flex items-center justify-center mt-0.5">
-                        <Bot className="h-4 w-4 text-primary" />
+                      <div className="w-8 h-8 rounded-xl bg-teal-50 dark:bg-teal-900/20 border border-tm-brand/20 flex-shrink-0 flex items-center justify-center mt-0.5">
+                        <Bot className="h-4 w-4 text-tm-brand" />
                       </div>
                     )}
 
@@ -504,7 +498,7 @@ export default function Chat() {
                         className={cn(
                           'px-4 py-3 rounded-2xl text-sm leading-relaxed shadow-sm',
                           message.role === 'user'
-                            ? 'bg-primary text-primary-foreground rounded-tr-sm'
+                            ? 'bg-tm-brand text-white rounded-tr-sm'
                             : 'bg-card border border-zinc-200 dark:border-zinc-700 text-foreground rounded-tl-sm'
                         )}
                       >
@@ -513,9 +507,9 @@ export default function Chat() {
                             {formatMessage(message.content)}
                             {message.isStreaming && (
                               <span className="inline-flex gap-0.5 ml-1 align-middle">
-                                <span className="w-1 h-1 bg-primary/50 rounded-full animate-bounce" />
-                                <span className="w-1 h-1 bg-primary/50 rounded-full animate-bounce [animation-delay:0.1s]" />
-                                <span className="w-1 h-1 bg-primary/50 rounded-full animate-bounce [animation-delay:0.2s]" />
+                                <span className="w-1 h-1 bg-tm-brand/50 rounded-full animate-bounce" />
+                                <span className="w-1 h-1 bg-tm-brand/50 rounded-full animate-bounce [animation-delay:0.1s]" />
+                                <span className="w-1 h-1 bg-tm-brand/50 rounded-full animate-bounce [animation-delay:0.2s]" />
                               </span>
                             )}
                           </>
@@ -545,8 +539,8 @@ export default function Chat() {
                               className={cn(
                                 'flex items-center gap-1 text-[10px] transition-colors',
                                 message.saved
-                                  ? 'text-green-500 cursor-default'
-                                  : 'text-muted-foreground hover:text-primary cursor-pointer'
+                                  ? 'text-tm-profit cursor-default'
+                                  : 'text-muted-foreground hover:text-tm-brand cursor-pointer'
                               )}
                             >
                               {message.saved ? (
@@ -604,7 +598,7 @@ export default function Chat() {
                   key={`${lastAIMessage.id}-${idx}`}
                   onClick={() => handleSend(chip)}
                   disabled={isLoading}
-                  className="px-3 py-1.5 text-xs bg-muted hover:bg-primary/10 text-muted-foreground hover:text-primary rounded-full transition-all border border-border hover:border-primary/40 whitespace-nowrap disabled:opacity-40 disabled:cursor-not-allowed flex-shrink-0"
+                  className="px-3 py-1.5 text-xs bg-muted hover:bg-teal-50 dark:hover:bg-teal-900/10 text-muted-foreground hover:text-tm-brand rounded-full transition-all border border-border hover:border-tm-brand/30 whitespace-nowrap disabled:opacity-40 disabled:cursor-not-allowed flex-shrink-0"
                 >
                   {chip}
                 </button>

@@ -1,13 +1,14 @@
 import { useState, useEffect, useCallback } from 'react';
 import {
   Sunrise, BarChart2, CalendarDays, ChevronDown, ChevronUp,
-  Loader2, FileText, Printer, TrendingUp, TrendingDown,
+  FileText, Printer, TrendingUp, TrendingDown,
   AlertTriangle, CheckCircle2, Target, Lightbulb, Shield, Link2,
 } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
-import { formatCurrency } from '@/lib/formatters';
+import { formatCurrency, formatCurrencyWithSign } from '@/lib/formatters';
+import { Skeleton } from '@/components/ui/skeleton';
 import { api } from '@/lib/api';
 import { useBroker } from '@/contexts/BrokerContext';
 
@@ -39,7 +40,7 @@ const TYPE_META: Record<string, { label: string; icon: React.ComponentType<any>;
   morning_briefing: {
     label: 'Morning Brief',
     icon: Sunrise,
-    color: 'text-amber-600 dark:text-amber-400',
+    color: 'text-tm-obs',
     bg: 'bg-amber-50 dark:bg-amber-900/20 border-amber-200 dark:border-amber-800',
   },
   post_market: {
@@ -82,7 +83,7 @@ function PostMarketDetail({ data }: { data: Record<string, any> }) {
       {/* Stats row */}
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
         {[
-          { label: 'P&L', value: formatCurrency(s.total_pnl ?? 0), color: s.total_pnl >= 0 ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400' },
+          { label: 'P&L', value: formatCurrency(s.total_pnl ?? 0), color: s.total_pnl >= 0 ? 'text-tm-profit' : 'text-tm-loss' },
           { label: 'Trades', value: s.total_trades ?? 0, color: 'text-foreground' },
           { label: 'Win Rate', value: `${s.win_rate ?? 0}%`, color: 'text-foreground' },
           { label: 'Profit Factor', value: s.profit_factor ?? '—', color: 'text-foreground' },
@@ -103,7 +104,7 @@ function PostMarketDetail({ data }: { data: Record<string, any> }) {
               <div key={i} className="flex items-center gap-1.5 bg-muted/40 rounded-lg px-2.5 py-1.5 text-xs">
                 <span className="text-base">{entry.emoji}</span>
                 <span className="font-medium text-foreground">{entry.symbol}</span>
-                <span className={cn('font-mono tabular-nums', entry.pnl >= 0 ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400')}>
+                <span className={cn('font-mono tabular-nums', entry.pnl >= 0 ? 'text-tm-profit' : 'text-tm-loss')}>
                   {entry.pnl >= 0 ? '+' : ''}{formatCurrency(entry.pnl)}
                 </span>
               </div>
@@ -153,10 +154,10 @@ function PostMarketDetail({ data }: { data: Record<string, any> }) {
 
       {/* Tomorrow focus */}
       {tomorrow.primary && (
-        <div className="rounded-lg border border-primary/30 bg-primary/5 p-4">
+        <div className="rounded-lg border border-tm-brand/20 bg-teal-50/50 dark:bg-teal-900/10 p-4">
           <div className="flex items-center gap-2 mb-2">
-            <Target className="h-4 w-4 text-primary" />
-            <p className="text-xs font-semibold text-primary uppercase tracking-widest">Tomorrow's Focus</p>
+            <Target className="h-4 w-4 text-tm-brand" />
+            <p className="text-xs font-semibold text-tm-brand uppercase tracking-widest">Tomorrow's Focus</p>
           </div>
           <p className="text-sm font-semibold text-foreground">{tomorrow.primary}</p>
           {tomorrow.rule && <p className="text-xs text-muted-foreground mt-1">Rule: {tomorrow.rule}</p>}
@@ -175,8 +176,8 @@ function MorningBriefDetail({ data }: { data: Record<string, any> }) {
   const dayWarning = data.day_warning;
   const trend = data.trend_stats;
 
-  const scoreColor = readiness.status === 'warning' ? 'text-red-600 dark:text-red-400' :
-    readiness.status === 'caution' ? 'text-amber-600 dark:text-amber-400' : 'text-green-600 dark:text-green-400';
+  const scoreColor = readiness.status === 'warning' ? 'text-tm-loss' :
+    readiness.status === 'caution' ? 'text-tm-obs' : 'text-tm-profit';
 
   return (
     <div className="space-y-5 pt-4 border-t border-border">
@@ -217,7 +218,7 @@ function MorningBriefDetail({ data }: { data: Record<string, any> }) {
             ].map(({ label, data: d }) => d?.has_data ? (
               <div key={label} className="bg-muted/40 rounded-lg p-3">
                 <p className="text-[10px] uppercase tracking-widest text-muted-foreground mb-1">{label}</p>
-                <p className={cn('text-xl font-bold font-mono tabular-nums', (d.total_pnl ?? 0) >= 0 ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400')}>
+                <p className={cn('text-xl font-bold font-mono tabular-nums', (d.total_pnl ?? 0) >= 0 ? 'text-tm-profit' : 'text-tm-loss')}>
                   {formatCurrency(d.total_pnl ?? 0)}
                 </p>
                 <p className="text-xs text-muted-foreground mt-0.5">{d.win_rate}% win rate · {d.trade_count} trades</p>
@@ -225,7 +226,7 @@ function MorningBriefDetail({ data }: { data: Record<string, any> }) {
             ) : null)}
           </div>
           {trend.trend && (
-            <p className={cn('text-xs mt-2', trend.trend === 'improving' ? 'text-green-600 dark:text-green-400' : trend.trend === 'declining' ? 'text-amber-600 dark:text-amber-400' : 'text-muted-foreground')}>
+            <p className={cn('text-xs mt-2', trend.trend === 'improving' ? 'text-tm-profit' : trend.trend === 'declining' ? 'text-tm-obs' : 'text-muted-foreground')}>
               {trend.trend === 'improving' ? '↑ Win rate improving vs 30-day average' : trend.trend === 'declining' ? '↓ Win rate declining vs 30-day average' : '→ Win rate stable vs 30-day average'}
             </p>
           )}
@@ -284,7 +285,7 @@ function WeeklySummaryDetail({ data }: { data: Record<string, any> }) {
         ].map(({ label, stats }) => (
           <div key={label} className="bg-muted/40 rounded-lg p-4 space-y-2">
             <p className="text-xs font-semibold uppercase tracking-widest text-muted-foreground">{label}</p>
-            <p className={cn('text-2xl font-bold font-mono tabular-nums', (stats.total_pnl ?? 0) >= 0 ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400')}>
+            <p className={cn('text-2xl font-bold font-mono tabular-nums', (stats.total_pnl ?? 0) >= 0 ? 'text-tm-profit' : 'text-tm-loss')}>
               {formatCurrency(stats.total_pnl ?? 0)}
             </p>
             <div className="flex gap-4 text-xs text-muted-foreground">
@@ -302,19 +303,19 @@ function WeeklySummaryDetail({ data }: { data: Record<string, any> }) {
           <div className="space-y-1.5">
             {imp.pnl && (
               <div className="flex items-center gap-2 text-sm">
-                {imp.pnl.improved ? <TrendingUp className="h-4 w-4 text-green-500" /> : <TrendingDown className="h-4 w-4 text-red-500" />}
+                {imp.pnl.improved ? <TrendingUp className="h-4 w-4 text-tm-profit" /> : <TrendingDown className="h-4 w-4 text-tm-loss" />}
                 <span className="text-foreground">P&L {imp.pnl.improved ? 'up' : 'down'} {formatCurrency(Math.abs(imp.pnl.change))} vs last week</span>
               </div>
             )}
             {imp.win_rate && (
               <div className="flex items-center gap-2 text-sm">
-                {imp.win_rate.improved ? <TrendingUp className="h-4 w-4 text-green-500" /> : <TrendingDown className="h-4 w-4 text-red-500" />}
+                {imp.win_rate.improved ? <TrendingUp className="h-4 w-4 text-tm-profit" /> : <TrendingDown className="h-4 w-4 text-tm-loss" />}
                 <span className="text-foreground">Win rate {imp.win_rate.improved ? '+' : ''}{imp.win_rate.change}pp vs last week</span>
               </div>
             )}
             {imp.danger_alerts && (
               <div className="flex items-center gap-2 text-sm">
-                {imp.danger_alerts.improved ? <Shield className="h-4 w-4 text-green-500" /> : <AlertTriangle className="h-4 w-4 text-amber-500" />}
+                {imp.danger_alerts.improved ? <Shield className="h-4 w-4 text-tm-profit" /> : <AlertTriangle className="h-4 w-4 text-tm-obs" />}
                 <span className="text-foreground">{imp.danger_alerts.message}</span>
               </div>
             )}
@@ -351,7 +352,7 @@ function ReportCard({ report }: { report: ReportSummary }) {
   }, [expanded, detail, report.id]);
 
   return (
-    <div className="bg-card rounded-xl border border-border overflow-hidden animate-fade-in-up">
+    <div className="tm-card overflow-hidden animate-fade-in-up">
       {/* Header row */}
       <button
         onClick={handleExpand}
@@ -375,7 +376,7 @@ function ReportCard({ report }: { report: ReportSummary }) {
             <>
               <div className="text-right">
                 <p className="text-[10px] text-muted-foreground">P&L</p>
-                <p className={cn('text-base font-bold font-mono tabular-nums', report.total_pnl >= 0 ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400')}>
+                <p className={cn('text-base font-bold font-mono tabular-nums', report.total_pnl >= 0 ? 'text-tm-profit' : 'text-tm-loss')}>
                   {formatCurrency(report.total_pnl)}
                 </p>
               </div>
@@ -390,8 +391,8 @@ function ReportCard({ report }: { report: ReportSummary }) {
               <p className="text-[10px] text-muted-foreground">Readiness</p>
               <p className={cn(
                 'text-base font-bold font-mono tabular-nums',
-                report.readiness_score >= 80 ? 'text-green-600 dark:text-green-400' :
-                  report.readiness_score >= 60 ? 'text-amber-600 dark:text-amber-400' : 'text-red-600 dark:text-red-400'
+                report.readiness_score >= 80 ? 'text-tm-profit' :
+                  report.readiness_score >= 60 ? 'text-tm-obs' : 'text-tm-loss'
               )}>
                 {report.readiness_score}/100
               </p>
@@ -400,7 +401,7 @@ function ReportCard({ report }: { report: ReportSummary }) {
           {report.report_type === 'weekly_summary' && report.total_pnl !== undefined && (
             <div className="text-right">
               <p className="text-[10px] text-muted-foreground">Week P&L</p>
-              <p className={cn('text-base font-bold font-mono tabular-nums', report.total_pnl >= 0 ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400')}>
+              <p className={cn('text-base font-bold font-mono tabular-nums', report.total_pnl >= 0 ? 'text-tm-profit' : 'text-tm-loss')}>
                 {formatCurrency(report.total_pnl)}
               </p>
             </div>
@@ -496,19 +497,19 @@ export default function Reports() {
 
   if (!isConnected) {
     return (
-      <div className="max-w-3xl mx-auto px-4 py-6">
-        <h1 className="text-2xl font-bold text-foreground mb-2">Reports Hub</h1>
-        <div className="flex flex-col items-center justify-center min-h-[50vh] bg-card rounded-xl border border-border">
-          <div className="p-4 rounded-full bg-primary/10 mb-6">
-            <Link2 className="h-12 w-12 text-primary" />
+      <div className="max-w-3xl mx-auto pb-12">
+        <div className="mb-5"><h1 className="text-lg font-semibold text-foreground tracking-tight">Reports</h1></div>
+        <div className="tm-card flex flex-col items-center justify-center min-h-[50vh] text-center py-16">
+          <div className="p-4 rounded-full bg-teal-50 dark:bg-teal-900/20 mb-5">
+            <Link2 className="h-10 w-10 text-tm-brand" />
           </div>
-          <h2 className="text-xl font-semibold text-foreground mb-2">Connect Your Broker</h2>
-          <p className="text-muted-foreground text-center max-w-md mb-6">
+          <h2 className="text-base font-semibold text-foreground mb-1">Connect Your Broker</h2>
+          <p className="text-sm text-muted-foreground text-center max-w-sm mb-5">
             Connect your Zerodha account to view your saved reports.
           </p>
           <Link to="/settings">
-            <Button size="lg" className="gap-2">
-              <Link2 className="h-5 w-5" />
+            <Button size="sm" className="gap-2 bg-tm-brand hover:bg-tm-brand/90 text-white">
+              <Link2 className="h-4 w-4" />
               Connect Zerodha
             </Button>
           </Link>
@@ -522,9 +523,9 @@ export default function Reports() {
       {/* Header */}
       <div className="flex items-start justify-between">
         <div>
-          <h1 className="text-2xl font-bold text-foreground">Reports Hub</h1>
-          <p className="text-sm text-muted-foreground mt-1">
-            Your morning briefs, EOD reports, and weekly summaries — all in one place
+          <h1 className="text-lg font-semibold text-foreground tracking-tight">Reports</h1>
+          <p className="text-sm text-muted-foreground mt-0.5">
+            Morning briefs, EOD reports, and weekly summaries
           </p>
         </div>
         <button
@@ -559,8 +560,8 @@ export default function Reports() {
 
       {/* Content */}
       {isLoading ? (
-        <div className="flex items-center justify-center min-h-[30vh]">
-          <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+        <div className="space-y-3">
+          {[1,2,3].map(i => <Skeleton key={i} className="h-16 rounded-xl" />)}
         </div>
       ) : reports.length === 0 ? (
         <div className="flex flex-col items-center justify-center min-h-[30vh] rounded-xl border border-border bg-card">
@@ -597,7 +598,7 @@ export default function Reports() {
                 disabled={loadingMore}
                 className="flex items-center gap-2 px-5 py-2 rounded-full border border-border text-sm text-muted-foreground hover:text-foreground hover:border-foreground transition-colors disabled:opacity-50"
               >
-                {loadingMore ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
+                {loadingMore ? <span className="h-4 w-4 animate-spin inline-block border-2 border-current border-t-transparent rounded-full" /> : null}
                 Load more ({total - reports.length} remaining)
               </button>
             </div>

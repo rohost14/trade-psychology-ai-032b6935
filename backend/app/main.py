@@ -170,6 +170,12 @@ async def security_headers_middleware(request: Request, call_next):
         "frame-ancestors 'none'; "
         "base-uri 'self'"
     )
+    # Prevent browsers from caching dynamic API responses.
+    # Without this, browsers apply heuristic caching to GET responses —
+    # re-fetches after a sync serve stale data until a hard refresh.
+    if request.url.path.startswith("/api/"):
+        response.headers["Cache-Control"] = "no-store, no-cache, must-revalidate, max-age=0"
+        response.headers["Pragma"] = "no-cache"
     return response
 
 

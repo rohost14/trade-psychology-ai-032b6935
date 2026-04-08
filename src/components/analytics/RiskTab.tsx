@@ -3,7 +3,8 @@ import {
   AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip,
   ResponsiveContainer, ReferenceLine,
 } from 'recharts';
-import { Loader2, ShieldAlert, AlertTriangle, TrendingDown, Activity, Shield } from 'lucide-react';
+import { ShieldAlert, AlertTriangle, TrendingDown, Activity, Shield } from 'lucide-react';
+import { Skeleton } from '@/components/ui/skeleton';
 import { cn } from '@/lib/utils';
 import { formatCurrency } from '@/lib/formatters';
 import { api } from '@/lib/api';
@@ -78,8 +79,8 @@ function formatDateShort(dateStr: string): string {
 
 const severityColors: Record<string, string> = {
   critical: 'text-red-700 bg-red-100 dark:text-red-400 dark:bg-red-900/30',
-  high: 'text-red-600 bg-red-50 dark:text-red-400 dark:bg-red-900/20',
-  danger: 'text-red-600 bg-red-50 dark:text-red-400 dark:bg-red-900/20',
+  high: 'text-tm-loss bg-red-50 dark:text-red-400 dark:bg-red-900/20',
+  danger: 'text-tm-loss bg-red-50 dark:text-red-400 dark:bg-red-900/20',
   medium: 'text-amber-600 bg-amber-50 dark:text-amber-400 dark:bg-amber-900/20',
   warning: 'text-amber-600 bg-amber-50 dark:text-amber-400 dark:bg-amber-900/20',
   low: 'text-blue-600 bg-blue-50 dark:text-blue-400 dark:bg-blue-900/20',
@@ -136,15 +137,19 @@ export default function RiskTab({ days }: RiskTabProps) {
 
   if (isLoading) {
     return (
-      <div className="flex items-center justify-center min-h-[40vh]">
-        <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+      <div className="space-y-3">
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-px bg-border rounded-lg overflow-hidden">
+          {[1,2,3,4].map(i => <Skeleton key={i} className="h-16 rounded-none" />)}
+        </div>
+        <Skeleton className="h-[280px] rounded-xl" />
+        <Skeleton className="h-48 rounded-xl" />
       </div>
     );
   }
 
   if (!data?.has_data) {
     return (
-      <div className="flex flex-col items-center justify-center min-h-[40vh] bg-card rounded-lg border border-border">
+      <div className="flex flex-col items-center justify-center min-h-[40vh] tm-card overflow-hidden">
         <ShieldAlert className="h-10 w-10 text-muted-foreground/40 mb-3" />
         <p className="font-medium text-foreground">No risk data for this period</p>
         <p className="text-sm text-muted-foreground mt-1">Complete some trades to see risk metrics</p>
@@ -161,7 +166,7 @@ export default function RiskTab({ days }: RiskTabProps) {
       <div className="grid grid-cols-2 md:grid-cols-4 gap-px bg-border rounded-lg overflow-hidden">
         <div className="bg-card px-4 py-3">
           <p className="text-xs text-muted-foreground">Max Drawdown</p>
-          <p className="text-xl font-bold tabular-nums font-mono text-red-600 dark:text-red-400">
+          <p className="text-xl font-bold tabular-nums font-mono text-tm-loss">
             {formatCurrency(data.max_drawdown.amount)}
           </p>
           {data.max_drawdown.start_date && (
@@ -173,7 +178,7 @@ export default function RiskTab({ days }: RiskTabProps) {
         </div>
         <div className="bg-card px-4 py-3">
           <p className="text-xs text-muted-foreground">VaR (95%)</p>
-          <p className="text-xl font-bold tabular-nums font-mono text-red-600 dark:text-red-400">
+          <p className="text-xl font-bold tabular-nums font-mono text-tm-loss">
             {formatCurrency(data.var_95)}
           </p>
           <p className="text-xs text-muted-foreground mt-0.5">Worst daily expected (5th pctile)</p>
@@ -189,9 +194,9 @@ export default function RiskTab({ days }: RiskTabProps) {
           <p className="text-xs text-muted-foreground">Risk-Reward Ratio</p>
           <p className={cn(
             'text-xl font-bold tabular-nums font-mono',
-            data.risk_reward_ratio >= 1.5 ? 'text-green-600 dark:text-green-400' :
+            data.risk_reward_ratio >= 1.5 ? 'text-tm-profit' :
             data.risk_reward_ratio >= 1 ? 'text-foreground' :
-            'text-red-600 dark:text-red-400'
+            'text-tm-loss'
           )}>
             {data.risk_reward_ratio > 0 ? data.risk_reward_ratio.toFixed(2) : '—'}
           </p>
@@ -212,8 +217,8 @@ export default function RiskTab({ days }: RiskTabProps) {
             </div>
             <p className={cn(
               'text-3xl font-bold tabular-nums font-mono',
-              (riskScore.score ?? 0) >= 70 ? 'text-green-600' :
-              (riskScore.score ?? 0) >= 40 ? 'text-amber-600' : 'text-red-600'
+              (riskScore.score ?? 0) >= 70 ? 'text-tm-profit' :
+              (riskScore.score ?? 0) >= 40 ? 'text-amber-600' : 'text-tm-loss'
             )}>
               {riskScore.score ?? '—'}
               <span className="text-base text-muted-foreground font-normal">/100</span>
@@ -233,14 +238,14 @@ export default function RiskTab({ days }: RiskTabProps) {
         )}
         <div className="bg-card px-5 py-4">
           <p className="text-xs text-muted-foreground mb-1">Max Win Streak</p>
-          <p className="text-3xl font-bold tabular-nums font-mono text-green-600 dark:text-green-400">
+          <p className="text-3xl font-bold tabular-nums font-mono text-tm-profit">
             {data.consecutive_max.wins}
           </p>
           <p className="text-xs text-muted-foreground mt-1">Consecutive winning trades</p>
         </div>
         <div className="bg-card px-5 py-4">
           <p className="text-xs text-muted-foreground mb-1">Max Loss Streak</p>
-          <p className="text-3xl font-bold tabular-nums font-mono text-red-600 dark:text-red-400">
+          <p className="text-3xl font-bold tabular-nums font-mono text-tm-loss">
             {data.consecutive_max.losses}
           </p>
           <p className="text-xs text-muted-foreground mt-1">Consecutive losing trades</p>
@@ -249,10 +254,10 @@ export default function RiskTab({ days }: RiskTabProps) {
 
       {/* Drawdown Chart */}
       {drawdownData.length > 1 && (
-        <div className="bg-card rounded-lg border border-border overflow-hidden">
+        <div className="tm-card overflow-hidden overflow-hidden">
           <div className="px-4 py-3 border-b border-border">
             <div className="flex items-center gap-2">
-              <TrendingDown className="h-4 w-4 text-red-600" />
+              <TrendingDown className="h-4 w-4 text-tm-loss" />
               <div>
                 <h3 className="text-sm font-semibold text-foreground">Drawdown Chart</h3>
                 <p className="text-xs text-muted-foreground">Distance from equity peak over time</p>
@@ -302,10 +307,10 @@ export default function RiskTab({ days }: RiskTabProps) {
 
       {/* Drawdown Periods */}
       {data.drawdown_periods.length > 0 && (
-        <div className="bg-card rounded-lg border border-border overflow-hidden">
+        <div className="tm-card overflow-hidden overflow-hidden">
           <div className="px-4 py-3 border-b border-border">
             <div className="flex items-center gap-2">
-              <TrendingDown className="h-4 w-4 text-red-600" />
+              <TrendingDown className="h-4 w-4 text-tm-loss" />
               <h3 className="text-sm font-semibold text-foreground">Drawdown Periods</h3>
             </div>
           </div>
@@ -326,7 +331,7 @@ export default function RiskTab({ days }: RiskTabProps) {
                       {' \u2192 '}
                       {dd.end ? formatDateShort(dd.end) : 'ongoing'}
                     </td>
-                    <td className="px-3 py-2.5 text-right text-sm tabular-nums font-mono text-red-600 dark:text-red-400 font-medium">
+                    <td className="px-3 py-2.5 text-right text-sm tabular-nums font-mono text-tm-loss font-medium">
                       {formatCurrency(dd.depth)}
                     </td>
                     <td className="px-3 py-2.5 text-right text-sm text-muted-foreground">
@@ -342,7 +347,7 @@ export default function RiskTab({ days }: RiskTabProps) {
 
       {/* Risk Alert Summary */}
       {data.alerts_summary.length > 0 && (
-        <div className="bg-card rounded-lg border border-border overflow-hidden">
+        <div className="tm-card overflow-hidden overflow-hidden">
           <div className="px-4 py-3 border-b border-border">
             <div className="flex items-center gap-2">
               <Activity className="h-4 w-4 text-muted-foreground" />
@@ -379,7 +384,7 @@ export default function RiskTab({ days }: RiskTabProps) {
 
       {/* Recent Alerts */}
       {data.recent_alerts.length > 0 && (
-        <div className="bg-card rounded-lg border border-border overflow-hidden">
+        <div className="tm-card overflow-hidden overflow-hidden">
           <div className="px-4 py-3 border-b border-border">
             <div className="flex items-center gap-2">
               <AlertTriangle className="h-4 w-4 text-amber-600" />
@@ -410,7 +415,7 @@ export default function RiskTab({ days }: RiskTabProps) {
                       {alert.detected_at ? formatDateShort(alert.detected_at) : '—'}
                     </p>
                     {alert.acknowledged && (
-                      <span className="text-[10px] text-green-600">Ack'd</span>
+                      <span className="text-[10px] text-tm-profit">Ack'd</span>
                     )}
                   </div>
                 </div>
@@ -431,10 +436,10 @@ function DrawdownTooltip({ active, payload }: any) {
       <p className="font-medium text-foreground mb-1">{formatDateShort(d.date)}</p>
       <div className="space-y-0.5">
         <p className="text-xs text-muted-foreground">
-          Drawdown: <span className="tabular-nums font-mono text-red-600">{formatCurrency(d.drawdown)}</span>
+          Drawdown: <span className="tabular-nums font-mono text-tm-loss">{formatCurrency(d.drawdown)}</span>
         </p>
         <p className="text-xs text-muted-foreground">
-          Equity: <span className={cn('tabular-nums font-mono', d.cumulative_pnl >= 0 ? 'text-green-600' : 'text-red-600')}>
+          Equity: <span className={cn('tabular-nums font-mono', d.cumulative_pnl >= 0 ? 'text-tm-profit' : 'text-tm-loss')}>
             {formatCurrency(d.cumulative_pnl)}
           </span>
         </p>

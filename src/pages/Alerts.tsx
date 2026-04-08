@@ -1,54 +1,36 @@
-// Alerts Page — Dedicated behavioral alert center
-// Replaces the small RecentAlertsCard widget on Dashboard with a full-page view.
-// Three tabs: Live (unacknowledged) | History (all 48h) | Patterns (aggregate)
-
 import { useState, useMemo } from 'react';
-import { Bell, BellOff, CheckCheck, Clock, TrendingUp, AlertTriangle, Shield, Zap } from 'lucide-react';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Badge } from '@/components/ui/badge';
-import { Button } from '@/components/ui/button';
+import { Bell, BellOff, CheckCheck, Clock, TrendingUp, Shield } from 'lucide-react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { cn } from '@/lib/utils';
 import { useAlerts, AlertNotification } from '@/contexts/AlertContext';
 import { PatternSeverity } from '@/types/patterns';
+import AlertDetailSheet from '@/components/alerts/AlertDetailSheet';
 
-// ---------------------------------------------------------------------------
-// Severity helpers
-// ---------------------------------------------------------------------------
-const SEVERITY_CONFIG: Record<PatternSeverity, {
-  border: string;
-  bg: string;
-  badge: string;
-  icon: typeof AlertTriangle;
-  label: string;
-}> = {
-  critical: {
-    border: 'border-red-700',
-    bg: 'bg-red-50/50 dark:bg-red-950/40',
-    badge: 'bg-red-200 text-red-900 dark:bg-red-800 dark:text-red-200',
-    icon: AlertTriangle,
-    label: 'CRITICAL',
-  },
-  high: {
-    border: 'border-red-500/60',
-    bg: 'bg-red-50/30 dark:bg-red-950/20',
-    badge: 'bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-400',
-    icon: AlertTriangle,
-    label: 'High',
-  },
-  medium: {
-    border: 'border-yellow-500/40',
-    bg: 'bg-yellow-50/20 dark:bg-yellow-950/10',
-    badge: 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-400',
-    icon: Zap,
-    label: 'Caution',
-  },
-  low: {
-    border: 'border-blue-400/30',
-    bg: '',
-    badge: 'bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-400',
-    icon: Shield,
-    label: 'Info',
-  },
+// ─── Severity config ──────────────────────────────────────────────────────────
+
+const SEV_DOT: Record<PatternSeverity, string> = {
+  critical: 'bg-tm-loss',
+  high:     'bg-tm-loss/60',
+  medium:   'bg-tm-obs',
+  low:      'bg-slate-400',
+};
+const SEV_LABEL: Record<PatternSeverity, string> = {
+  critical: 'Critical',
+  high:     'High',
+  medium:   'Caution',
+  low:      'Info',
+};
+const SEV_LABEL_COLOR: Record<PatternSeverity, string> = {
+  critical: 'text-tm-loss',
+  high:     'text-tm-loss',
+  medium:   'text-tm-obs',
+  low:      'text-muted-foreground',
+};
+const SEV_LEFT_BORDER: Record<PatternSeverity, string> = {
+  critical: 'border-l-tm-loss',
+  high:     'border-l-tm-loss',
+  medium:   'border-l-tm-obs',
+  low:      'border-l-slate-300 dark:border-l-slate-600',
 };
 
 function timeAgo(dateStr: string | undefined): string {
@@ -57,9 +39,9 @@ function timeAgo(dateStr: string | undefined): string {
   const mins = Math.floor(diff / 60000);
   const hrs = Math.floor(mins / 60);
   const days = Math.floor(hrs / 24);
-  if (mins < 1) return 'just now';
+  if (mins < 1)  return 'just now';
   if (mins < 60) return `${mins}m ago`;
-  if (hrs < 24) return `${hrs}h ago`;
+  if (hrs < 24)  return `${hrs}h ago`;
   return `${days}d ago`;
 }
 
@@ -72,78 +54,71 @@ function formatIST(dateStr: string | undefined): string {
   });
 }
 
-// ---------------------------------------------------------------------------
-// Alert Card
-// ---------------------------------------------------------------------------
-function AlertCard({
+// ─── Alert row ────────────────────────────────────────────────────────────────
+
+function AlertRow({
   alert,
-  onAcknowledge,
-  showAck = true,
+  onOpen,
 }: {
   alert: AlertNotification;
-  onAcknowledge: (id: string) => void;
-  showAck?: boolean;
+  onOpen: (alert: AlertNotification) => void;
 }) {
-  const cfg = SEVERITY_CONFIG[alert.pattern.severity] ?? SEVERITY_CONFIG.medium;
-  const Icon = cfg.icon;
+  const sev = alert.pattern.severity;
 
   return (
-    <div className={`rounded-lg border-2 ${cfg.border} ${cfg.bg} p-4 transition-opacity ${alert.acknowledged ? 'opacity-60' : ''}`}>
-      <div className="flex items-start justify-between gap-3">
-        <div className="flex items-start gap-3 min-w-0">
-          <Icon className={`h-4 w-4 mt-0.5 flex-shrink-0 ${alert.pattern.severity === 'low' ? 'text-blue-500' : alert.pattern.severity === 'medium' ? 'text-yellow-500' : 'text-red-500'}`} />
-          <div className="min-w-0">
-            <div className="flex items-center gap-2 flex-wrap">
-              <span className="font-semibold text-sm text-foreground">{alert.pattern.name}</span>
-              <Badge className={`text-xs ${cfg.badge}`}>{cfg.label}</Badge>
-              {alert.acknowledged && (
-                <Badge variant="outline" className="text-xs text-muted-foreground">Acknowledged</Badge>
-              )}
-            </div>
-            <p className="text-sm text-muted-foreground mt-1 leading-relaxed">
-              {alert.pattern.description}
-            </p>
-            {alert.pattern.insight && typeof alert.pattern.insight === 'string' && alert.pattern.insight.length > 0 && (
-              <p className="text-xs text-muted-foreground/80 mt-1.5 italic">
-                {alert.pattern.insight}
-              </p>
+    <button
+      onClick={() => onOpen(alert)}
+      className={cn(
+        'tm-card border-l-2 overflow-hidden w-full text-left transition-opacity hover:bg-muted/20 transition-colors',
+        SEV_LEFT_BORDER[sev],
+        alert.acknowledged && 'opacity-60',
+      )}
+    >
+      <div className="flex items-start gap-3 px-4 py-3.5">
+        <span className={cn('w-2 h-2 rounded-full mt-[5px] flex-shrink-0', SEV_DOT[sev])} />
+
+        <div className="flex-1 min-w-0">
+          <div className="flex items-center gap-2 flex-wrap mb-1">
+            <span className="text-[13px] font-semibold text-foreground">{alert.pattern.name}</span>
+            <span className={cn('text-[10px] font-semibold uppercase tracking-wide', SEV_LABEL_COLOR[sev])}>
+              {SEV_LABEL[sev]}
+            </span>
+            {alert.acknowledged && (
+              <span className="text-[10px] text-muted-foreground border border-border rounded px-1.5 py-0.5">
+                Reviewed
+              </span>
             )}
-            <div className="flex items-center gap-2 mt-2 text-xs text-muted-foreground">
-              <Clock className="h-3 w-3" />
-              <span title={formatIST(alert.shown_at)}>{timeAgo(alert.shown_at)}</span>
-              {(alert.pattern.estimated_cost ?? 0) > 0 && (
-                <>
-                  <span>·</span>
-                  <span className="text-red-500">
-                    ₹{(alert.pattern.estimated_cost as number).toLocaleString('en-IN')} estimated cost
-                  </span>
-                </>
-              )}
-            </div>
+          </div>
+
+          {/* Evidence line — dynamic, generated by behavior_engine with real trade numbers */}
+          <p className="text-[12px] text-muted-foreground leading-relaxed line-clamp-2">
+            {alert.pattern.description}
+          </p>
+
+          <div className="flex items-center gap-2 mt-1.5 text-[11px] text-muted-foreground">
+            <Clock className="h-3 w-3 flex-shrink-0" />
+            <span>{timeAgo(alert.shown_at)}</span>
+            {(alert.pattern.estimated_cost ?? 0) > 0 && (
+              <>
+                <span className="text-muted-foreground/40">·</span>
+                <span className="text-tm-loss font-mono tabular-nums">
+                  ₹{(alert.pattern.estimated_cost as number).toLocaleString('en-IN')} est.
+                </span>
+              </>
+            )}
           </div>
         </div>
 
-        {showAck && !alert.acknowledged && (
-          <Button
-            variant="ghost"
-            size="sm"
-            className="flex-shrink-0 h-7 px-2 text-xs text-muted-foreground hover:text-foreground"
-            onClick={() => onAcknowledge(alert.id)}
-            title="Mark as acknowledged"
-          >
-            <CheckCheck className="h-3.5 w-3.5" />
-          </Button>
-        )}
+        <span className="text-muted-foreground/40 text-[11px] flex-shrink-0 mt-0.5">›</span>
       </div>
-    </div>
+    </button>
   );
 }
 
-// ---------------------------------------------------------------------------
-// Live Tab — unacknowledged alerts only
-// ---------------------------------------------------------------------------
-function LiveTab() {
-  const { alerts, acknowledgeAlert, acknowledgeAll } = useAlerts();
+// ─── Live Tab ─────────────────────────────────────────────────────────────────
+
+function LiveTab({ onOpen }: { onOpen: (a: AlertNotification) => void }) {
+  const { alerts, acknowledgeAll } = useAlerts();
   const live = useMemo(
     () => alerts
       .filter(a => !a.acknowledged)
@@ -153,79 +128,78 @@ function LiveTab() {
 
   if (live.length === 0) {
     return (
-      <div className="rounded-lg border border-emerald-200 dark:border-emerald-800/50 bg-emerald-50/50 dark:bg-emerald-950/20 px-6 py-8">
-        <div className="flex items-start gap-4">
-          <div className="mt-0.5 flex-shrink-0 w-9 h-9 rounded-full bg-emerald-100 dark:bg-emerald-900/40 flex items-center justify-center">
-            <Shield className="h-5 w-5 text-emerald-600 dark:text-emerald-400" />
-          </div>
-          <div>
-            <p className="text-sm font-semibold text-emerald-800 dark:text-emerald-300">Clean session</p>
-            <p className="text-sm text-emerald-700/80 dark:text-emerald-400/80 mt-0.5 leading-relaxed">
-              No active behavioral alerts. You're trading with discipline — keep it up.
-            </p>
-            <p className="text-xs text-emerald-600/60 dark:text-emerald-500/60 mt-3">
-              Alerts are saved here as they fire. Check the History tab to review past patterns.
-            </p>
-          </div>
+      <div className="tm-card border-l-2 border-l-tm-brand px-5 py-6 flex items-start gap-4">
+        <div className="w-8 h-8 rounded-full bg-teal-50 dark:bg-teal-900/20 flex items-center justify-center flex-shrink-0 mt-0.5">
+          <Shield className="h-4 w-4 text-tm-brand" />
+        </div>
+        <div>
+          <p className="text-[13px] font-semibold text-foreground">Clean session</p>
+          <p className="text-[12px] text-muted-foreground mt-0.5 leading-relaxed">
+            No active behavioral alerts. You're trading with discipline — keep it up.
+          </p>
+          <p className="text-[11px] text-muted-foreground/60 mt-2">
+            Alerts appear here as they fire. Check History to review past patterns.
+          </p>
         </div>
       </div>
     );
   }
 
   return (
-    <div className="space-y-3">
+    <div className="space-y-2.5">
       <div className="flex items-center justify-between">
-        <p className="text-sm text-muted-foreground">
-          {live.length} unacknowledged alert{live.length !== 1 ? 's' : ''}
+        <p className="text-[12px] text-muted-foreground">
+          {live.length} unreviewed alert{live.length !== 1 ? 's' : ''} · tap to open
         </p>
-        <Button variant="ghost" size="sm" className="text-xs gap-1.5" onClick={acknowledgeAll}>
+        <button
+          onClick={acknowledgeAll}
+          className="flex items-center gap-1.5 text-[11px] text-muted-foreground hover:text-foreground transition-colors"
+        >
           <CheckCheck className="h-3.5 w-3.5" />
-          Acknowledge all
-        </Button>
+          Mark all reviewed
+        </button>
       </div>
       {live.map(alert => (
-        <AlertCard key={alert.id} alert={alert} onAcknowledge={acknowledgeAlert} />
+        <AlertRow key={alert.id} alert={alert} onOpen={onOpen} />
       ))}
     </div>
   );
 }
 
-// ---------------------------------------------------------------------------
-// History Tab — all 48h alerts with severity filter
-// ---------------------------------------------------------------------------
-const SEVERITY_OPTIONS: Array<{ value: string; label: string }> = [
-  { value: 'all',      label: 'All Severities' },
+// ─── History Tab ──────────────────────────────────────────────────────────────
+
+const SEVERITY_OPTIONS = [
+  { value: 'all',      label: 'All' },
   { value: 'critical', label: 'Critical' },
   { value: 'high',     label: 'High' },
   { value: 'medium',   label: 'Caution' },
   { value: 'low',      label: 'Info' },
 ];
 
-function HistoryTab() {
-  const { alerts, acknowledgeAlert } = useAlerts();
-  const [severityFilter, setSeverityFilter] = useState('all');
+function HistoryTab({ onOpen }: { onOpen: (a: AlertNotification) => void }) {
+  const { alerts } = useAlerts();
+  const [sevFilter, setSevFilter] = useState('all');
 
   const filtered = useMemo(() => {
     const sorted = [...alerts].sort(
       (a, b) => new Date(b.shown_at ?? 0).getTime() - new Date(a.shown_at ?? 0).getTime()
     );
-    if (severityFilter === 'all') return sorted;
-    return sorted.filter(a => a.pattern.severity === severityFilter);
-  }, [alerts, severityFilter]);
+    return sevFilter === 'all' ? sorted : sorted.filter(a => a.pattern.severity === sevFilter);
+  }, [alerts, sevFilter]);
 
   return (
     <div className="space-y-4">
-      {/* Severity filter */}
-      <div className="flex items-center gap-2 flex-wrap">
+      <div className="flex items-center gap-1 p-1 bg-slate-100 dark:bg-neutral-700/50 rounded-lg w-fit">
         {SEVERITY_OPTIONS.map(opt => (
           <button
             key={opt.value}
-            onClick={() => setSeverityFilter(opt.value)}
-            className={`text-xs px-3 py-1 rounded-full border transition-colors ${
-              severityFilter === opt.value
-                ? 'bg-primary text-primary-foreground border-primary'
-                : 'border-border text-muted-foreground hover:border-foreground hover:text-foreground'
-            }`}
+            onClick={() => setSevFilter(opt.value)}
+            className={cn(
+              'px-3 py-1 text-[11px] font-medium rounded-md transition-all',
+              sevFilter === opt.value
+                ? 'bg-white dark:bg-neutral-800 text-foreground shadow-sm'
+                : 'text-muted-foreground hover:text-foreground'
+            )}
           >
             {opt.label}
           </button>
@@ -233,14 +207,14 @@ function HistoryTab() {
       </div>
 
       {filtered.length === 0 ? (
-        <div className="flex flex-col items-center justify-center py-12 text-center">
-          <BellOff className="h-8 w-8 text-muted-foreground/40 mb-3" />
-          <p className="text-sm text-muted-foreground">No alerts match this filter.</p>
+        <div className="tm-card flex flex-col items-center justify-center py-12 text-center">
+          <BellOff className="h-8 w-8 text-muted-foreground/30 mb-3" />
+          <p className="text-sm text-muted-foreground">No alerts match this filter</p>
         </div>
       ) : (
         <div className="space-y-2">
           {filtered.map(alert => (
-            <AlertCard key={alert.id} alert={alert} onAcknowledge={acknowledgeAlert} />
+            <AlertRow key={alert.id} alert={alert} onOpen={onOpen} />
           ))}
         </div>
       )}
@@ -248,9 +222,8 @@ function HistoryTab() {
   );
 }
 
-// ---------------------------------------------------------------------------
-// Patterns Tab — aggregate by pattern type
-// ---------------------------------------------------------------------------
+// ─── Patterns Tab ─────────────────────────────────────────────────────────────
+
 interface PatternSummary {
   type: string;
   name: string;
@@ -268,7 +241,6 @@ function PatternsTab() {
 
   const summaries = useMemo<PatternSummary[]>(() => {
     const map = new Map<string, PatternSummary>();
-
     for (const alert of alerts) {
       const key = alert.pattern.type;
       const existing = map.get(key) ?? {
@@ -280,186 +252,154 @@ function PatternsTab() {
         severities: { critical: 0, high: 0, medium: 0, low: 0 },
         worstSeverity: 'low' as PatternSeverity,
       };
-
       existing.count++;
       existing.totalCost += alert.pattern.estimated_cost ?? 0;
       existing.severities[alert.pattern.severity]++;
-
       const dt = alert.shown_at;
-      if (!existing.latestAt || (dt && dt > existing.latestAt)) {
-        existing.latestAt = dt;
-      }
-
-      // Track worst severity
+      if (!existing.latestAt || (dt && dt > existing.latestAt)) existing.latestAt = dt;
       const idx = SEVERITY_ORDER.indexOf(alert.pattern.severity);
-      if (idx < SEVERITY_ORDER.indexOf(existing.worstSeverity)) {
-        existing.worstSeverity = alert.pattern.severity;
-      }
-
+      if (idx < SEVERITY_ORDER.indexOf(existing.worstSeverity)) existing.worstSeverity = alert.pattern.severity;
       map.set(key, existing);
     }
-
     return Array.from(map.values()).sort((a, b) => b.count - a.count);
   }, [alerts]);
 
   if (summaries.length === 0) {
     return (
-      <div className="flex flex-col items-center justify-center py-16 text-center">
-        <div className="p-4 rounded-full bg-muted mb-4">
-          <TrendingUp className="h-8 w-8 text-muted-foreground" />
-        </div>
-        <p className="text-base font-medium text-foreground">No pattern data yet</p>
-        <p className="text-sm text-muted-foreground mt-1">
-          Patterns will appear here as your backend engine detects behaviors.
-        </p>
+      <div className="tm-card flex flex-col items-center justify-center py-16 text-center">
+        <TrendingUp className="h-8 w-8 text-muted-foreground/30 mb-3" />
+        <p className="text-sm font-medium text-foreground">No pattern data yet</p>
+        <p className="text-sm text-muted-foreground mt-1">Patterns appear here as the engine detects behaviors</p>
       </div>
     );
   }
 
+  const maxCount = Math.max(...summaries.map(x => x.count));
+
   return (
-    <div className="space-y-3">
-      <p className="text-sm text-muted-foreground">
+    <div className="space-y-2.5">
+      <p className="text-[12px] text-muted-foreground">
         {summaries.length} distinct pattern{summaries.length !== 1 ? 's' : ''} detected in the last 48 hours
       </p>
-      {summaries.map(s => {
-        const cfg = SEVERITY_CONFIG[s.worstSeverity] ?? SEVERITY_CONFIG.medium;
-        const Icon = cfg.icon;
-        const maxCount = Math.max(...summaries.map(x => x.count));
+      {summaries.map(s => (
+        <div key={s.type} className={cn('tm-card border-l-2 px-4 py-3.5', SEV_LEFT_BORDER[s.worstSeverity])}>
+          <div className="flex items-start justify-between gap-3 mb-2.5">
+            <div className="flex items-center gap-2 min-w-0">
+              <span className={cn('w-2 h-2 rounded-full flex-shrink-0', SEV_DOT[s.worstSeverity])} />
+              <span className="text-[13px] font-semibold text-foreground">{s.name}</span>
+              <span className={cn('text-[10px] font-semibold uppercase', SEV_LABEL_COLOR[s.worstSeverity])}>
+                {SEV_LABEL[s.worstSeverity]}
+              </span>
+            </div>
+            <div className="text-right flex-shrink-0">
+              <span className="text-[18px] font-bold font-mono tabular-nums text-foreground">{s.count}</span>
+              <span className="text-[11px] text-muted-foreground ml-1">×</span>
+            </div>
+          </div>
 
-        return (
-          <Card key={s.type} className={`border ${cfg.border}`}>
-            <CardContent className="pt-4 pb-4">
-              <div className="flex items-start justify-between gap-3 mb-3">
-                <div className="flex items-center gap-2">
-                  <Icon className={`h-4 w-4 ${s.worstSeverity === 'low' ? 'text-blue-500' : s.worstSeverity === 'medium' ? 'text-yellow-500' : 'text-red-500'}`} />
-                  <span className="font-semibold text-sm">{s.name}</span>
-                  <Badge className={`text-xs ${cfg.badge}`}>{cfg.label}</Badge>
-                </div>
-                <div className="text-right flex-shrink-0">
-                  <div className="text-lg font-bold text-foreground">{s.count}×</div>
-                  <div className="text-xs text-muted-foreground">occurrences</div>
-                </div>
-              </div>
+          {/* Frequency bar */}
+          <div className="w-full bg-slate-100 dark:bg-neutral-700/40 rounded-full h-1 mb-2.5">
+            <div
+              className={cn('h-1 rounded-full transition-all', SEV_DOT[s.worstSeverity])}
+              style={{ width: `${Math.min((s.count / maxCount) * 100, 100)}%` }}
+            />
+          </div>
 
-              {/* Frequency bar */}
-              <div className="w-full bg-muted rounded-full h-1.5 mb-3">
-                <div
-                  className={`h-1.5 rounded-full transition-all ${
-                    s.worstSeverity === 'critical' || s.worstSeverity === 'high'
-                      ? 'bg-red-500'
-                      : s.worstSeverity === 'medium'
-                        ? 'bg-yellow-500'
-                        : 'bg-blue-400'
-                  }`}
-                  style={{ width: `${Math.min((s.count / maxCount) * 100, 100)}%` }}
-                />
-              </div>
-
-              <div className="flex items-center justify-between text-xs text-muted-foreground">
-                <div className="flex items-center gap-3">
-                  {/* Severity breakdown dots */}
-                  {(SEVERITY_ORDER as PatternSeverity[]).map(sev => s.severities[sev] > 0 && (
-                    <span key={sev} className="flex items-center gap-1">
-                      <span className={`w-2 h-2 rounded-full ${sev === 'critical' || sev === 'high' ? 'bg-red-500' : sev === 'medium' ? 'bg-yellow-500' : 'bg-blue-400'}`} />
-                      {s.severities[sev]} {sev}
-                    </span>
-                  ))}
-                </div>
-                <div className="flex items-center gap-3">
-                  {s.totalCost > 0 && (
-                    <span className="text-red-500">₹{s.totalCost.toLocaleString('en-IN')}</span>
-                  )}
-                  {s.latestAt && (
-                    <span title={formatIST(s.latestAt)}>Last: {timeAgo(s.latestAt)}</span>
-                  )}
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-        );
-      })}
+          <div className="flex items-center justify-between text-[11px] text-muted-foreground">
+            <div className="flex items-center gap-2">
+              {(SEVERITY_ORDER as PatternSeverity[]).map(sev => s.severities[sev] > 0 && (
+                <span key={sev} className="flex items-center gap-1">
+                  <span className={cn('w-1.5 h-1.5 rounded-full', SEV_DOT[sev])} />
+                  {s.severities[sev]} {sev}
+                </span>
+              ))}
+            </div>
+            <div className="flex items-center gap-3">
+              {s.totalCost > 0 && (
+                <span className="text-tm-loss font-mono tabular-nums">₹{s.totalCost.toLocaleString('en-IN')} est.</span>
+              )}
+              {s.latestAt && (
+                <span title={formatIST(s.latestAt)}>Last: {timeAgo(s.latestAt)}</span>
+              )}
+            </div>
+          </div>
+        </div>
+      ))}
     </div>
   );
 }
 
-// ---------------------------------------------------------------------------
-// Main Page
-// ---------------------------------------------------------------------------
+// ─── Main Page ────────────────────────────────────────────────────────────────
+
 export default function AlertsPage() {
-  const { alerts, unacknowledgedCount } = useAlerts();
+  const { alerts, unacknowledgedCount, acknowledgeAlert } = useAlerts();
+  const [selectedAlert, setSelectedAlert] = useState<AlertNotification | null>(null);
 
   const stats = useMemo(() => ({
-    total: alerts.length,
+    total:    alerts.length,
     critical: alerts.filter(a => a.pattern.severity === 'critical').length,
-    high: alerts.filter(a => a.pattern.severity === 'high').length,
-    medium: alerts.filter(a => a.pattern.severity === 'medium').length,
-    unacked: unacknowledgedCount,
+    high:     alerts.filter(a => a.pattern.severity === 'high').length,
+    unacked:  unacknowledgedCount,
   }), [alerts, unacknowledgedCount]);
 
   return (
-    <div className="space-y-6">
-      {/* Page Header */}
-      <div className="flex items-start justify-between gap-4">
-        <div>
-          <h1 className="text-xl font-semibold text-foreground flex items-center gap-2">
-            <Bell className="h-5 w-5 text-primary" />
-            Behavioral Alerts
-            {unacknowledgedCount > 0 && (
-              <Badge className="bg-red-500 text-white text-xs px-2 py-0.5 rounded-full">
-                {unacknowledgedCount}
-              </Badge>
-            )}
-          </h1>
-          <p className="text-sm text-muted-foreground mt-0.5">
-            Real-time behavioral pattern detection by the backend engine
-          </p>
+    <div className="max-w-3xl mx-auto pb-12">
+      {/* Page header */}
+      <div className="mb-5 flex items-center justify-between">
+        <div className="flex items-center gap-2">
+          <h1 className="text-lg font-semibold text-foreground tracking-tight">Behavioral Alerts</h1>
+          {unacknowledgedCount > 0 && (
+            <span className="bg-tm-loss text-white text-[10px] font-bold px-1.5 py-0.5 rounded-full leading-none">
+              {unacknowledgedCount}
+            </span>
+          )}
         </div>
+        {/* Inline stat strip */}
+        {stats.total > 0 && (
+          <div className="flex items-center gap-3 text-[12px] text-muted-foreground">
+            <span>{stats.total} total</span>
+            {stats.critical > 0 && <><span className="text-muted-foreground/40">·</span><span className="text-tm-loss">{stats.critical} critical</span></>}
+            {stats.high > 0 && <><span className="text-muted-foreground/40">·</span><span className="text-tm-loss/70">{stats.high} high</span></>}
+            {stats.unacked > 0 && <><span className="text-muted-foreground/40">·</span><span className="text-tm-obs">{stats.unacked} unread</span></>}
+          </div>
+        )}
       </div>
 
-      {/* Stats row */}
-      {stats.total > 0 && (
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-          <StatPill label="Total (48h)" value={stats.total} color="text-foreground" />
-          <StatPill label="Critical" value={stats.critical} color="text-red-700 dark:text-red-400" />
-          <StatPill label="High" value={stats.high} color="text-red-500" />
-          <StatPill label="Unread" value={stats.unacked} color="text-yellow-600 dark:text-yellow-400" />
-        </div>
-      )}
-
       {/* Tabs */}
-      <Tabs defaultValue="live" className="w-full">
-        <TabsList className="w-full sm:w-auto grid grid-cols-3 sm:inline-flex">
-          <TabsTrigger value="live" className="gap-1.5">
-            Live
-            {unacknowledgedCount > 0 && (
-              <span className="bg-red-500 text-white text-[10px] font-bold px-1.5 py-0.5 rounded-full leading-none">
-                {unacknowledgedCount}
-              </span>
-            )}
-          </TabsTrigger>
-          <TabsTrigger value="history">History</TabsTrigger>
-          <TabsTrigger value="patterns">Patterns</TabsTrigger>
+      <Tabs defaultValue="live">
+        <TabsList className="w-full justify-start rounded-none bg-transparent border-b border-border p-0 h-auto gap-0 mb-6">
+          {([
+            { value: 'live',     label: 'Live',     badge: unacknowledgedCount },
+            { value: 'history',  label: 'History',  badge: 0 },
+            { value: 'patterns', label: 'Patterns', badge: 0 },
+          ] as const).map(({ value, label, badge }) => (
+            <TabsTrigger
+              key={value}
+              value={value}
+              className="relative rounded-none bg-transparent border-b-2 border-transparent px-4 py-2.5 text-sm text-muted-foreground hover:text-foreground transition-colors data-[state=active]:border-tm-brand data-[state=active]:bg-transparent data-[state=active]:text-foreground data-[state=active]:shadow-none"
+            >
+              {label}
+              {badge > 0 && (
+                <span className="ml-1.5 bg-tm-loss text-white text-[9px] font-bold px-1.5 py-0.5 rounded-full leading-none">
+                  {badge}
+                </span>
+              )}
+            </TabsTrigger>
+          ))}
         </TabsList>
 
-        <TabsContent value="live" className="mt-4">
-          <LiveTab />
-        </TabsContent>
-        <TabsContent value="history" className="mt-4">
-          <HistoryTab />
-        </TabsContent>
-        <TabsContent value="patterns" className="mt-4">
-          <PatternsTab />
-        </TabsContent>
+        <TabsContent value="live"><LiveTab onOpen={setSelectedAlert} /></TabsContent>
+        <TabsContent value="history"><HistoryTab onOpen={setSelectedAlert} /></TabsContent>
+        <TabsContent value="patterns"><PatternsTab /></TabsContent>
       </Tabs>
-    </div>
-  );
-}
 
-function StatPill({ label, value, color }: { label: string; value: number; color: string }) {
-  return (
-    <div className="bg-card border rounded-lg p-3 text-center">
-      <div className={`text-xl font-bold ${color}`}>{value}</div>
-      <div className="text-xs text-muted-foreground mt-0.5">{label}</div>
+      {/* Alert detail sheet */}
+      <AlertDetailSheet
+        alert={selectedAlert}
+        open={selectedAlert !== null}
+        onClose={() => setSelectedAlert(null)}
+        onAcknowledge={acknowledgeAlert}
+      />
     </div>
   );
 }

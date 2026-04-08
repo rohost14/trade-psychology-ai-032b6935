@@ -89,7 +89,7 @@ class RateLimiter:
 
 
 # Pre-configured limiters for expensive endpoints
-sync_limiter = RateLimiter(max_requests=3, window_seconds=60)       # 3 syncs/min
+sync_limiter = RateLimiter(max_requests=10, window_seconds=60)      # 10 syncs/min (tab-switch + page loads)
 coach_limiter = RateLimiter(max_requests=10, window_seconds=60)     # 10 chat msgs/min
 analytics_limiter = RateLimiter(max_requests=20, window_seconds=60) # 20 analytics/min
 

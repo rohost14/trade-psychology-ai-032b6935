@@ -237,22 +237,40 @@ export const DEMO_RISK_STATE = {
 // ---------------------------------------------------------------------------
 export const DEMO_RISK_ALERTS = [
   {
-    id: 'ra-001', pattern_type: 'revenge_trading', severity: 'high',
-    message: 'You entered NIFTY23000CE just 25 minutes after a ₹13,000 loss on SOLARINDS. Revenge trading pattern detected.',
+    id: 'ra-001', pattern_type: 'revenge_trade', severity: 'high',
+    message: 'NIFTY23000CE entry came 25 min after ₹13,000 loss on SOLARINDS. Re-entering under active loss stress.',
     created_at: daysAgo(1, 14, 36), acknowledged: false,
-    estimated_cost: 2700,
+    details: {
+      gap_minutes: 25,
+      prior_loss: 13000,
+      prior_symbol: 'SOLARINDS',
+      danger_window: 20,
+      estimated_cost: 2700,
+    },
   },
   {
     id: 'ra-002', pattern_type: 'overtrading', severity: 'medium',
-    message: '5 trades placed in the last 3 hours. Your typical pace is 2-3. Slow down and be selective.',
+    message: '5 trades in the last 3 hours. Typical pace is 2–3. Each additional trade this session has been a loss.',
     created_at: daysAgo(1, 13, 0), acknowledged: false,
-    estimated_cost: 0,
+    details: {
+      daily_count: 5,
+      daily_caution: 4,
+      daily_danger: 7,
+      trades_in_window: 5,
+      estimated_cost: 0,
+    },
   },
   {
-    id: 'ra-003', pattern_type: 'loss_aversion', severity: 'medium',
-    message: 'SOLARINDS held for 3h 17m while in loss. Consider setting a max hold time on losers.',
+    id: 'ra-003', pattern_type: 'martingale_behaviour', severity: 'medium',
+    message: 'BANKNIFTY lot size went 1 → 1 → 3 across three consecutive losses. Total session exposure has tripled.',
     created_at: daysAgo(1, 14, 22), acknowledged: true,
-    estimated_cost: 4500,
+    details: {
+      underlying: 'BANKNIFTY',
+      size_sequence: [1, 1, 3],
+      max_ratio: 3,
+      consecutive_losses: 3,
+      estimated_cost: 4500,
+    },
   },
 ];
 

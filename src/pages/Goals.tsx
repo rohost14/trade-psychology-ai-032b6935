@@ -2,7 +2,8 @@
 // Philosophy: Mirror, not blocker - show facts and let traders self-reflect
 
 import { useState, useMemo, useEffect } from 'react';
-import { Target, AlertTriangle, Link2, Loader2 } from 'lucide-react';
+import { Target, AlertTriangle, Link2 } from 'lucide-react';
+import { Skeleton } from '@/components/ui/skeleton';
 import { Link } from 'react-router-dom';
 import { useGoals } from '@/hooks/useGoals';
 import { useBroker } from '@/contexts/BrokerContext';
@@ -12,7 +13,6 @@ import { StreakTrackerCard } from '@/components/goals/StreakTrackerCard';
 import { CommitmentLogCard } from '@/components/goals/CommitmentLogCard';
 import { GoalEditModal } from '@/components/goals/GoalEditModal';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent } from '@/components/ui/card';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -124,39 +124,34 @@ export default function Goals() {
     toast.success('Goals updated successfully. Your commitment has been logged.');
   };
 
-  // Loading state
   if (brokerLoading || goalsLoading || tradesLoading) {
     return (
-      <div className="flex items-center justify-center min-h-[60vh]">
-        <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+      <div className="max-w-4xl mx-auto space-y-4 pb-12">
+        <Skeleton className="h-8 w-56" />
+        <div className="grid grid-cols-2 gap-4">
+          {[1,2,3,4].map(i => <Skeleton key={i} className="h-48 rounded-xl" />)}
+        </div>
       </div>
     );
   }
 
-  // Not connected state
   if (!isConnected) {
     return (
-      <div className="space-y-6">
-        <div>
-          <h1 className="text-2xl font-bold flex items-center gap-2">
-            <Target className="h-6 w-6 text-primary" />
-            My Trading Commitments
-          </h1>
-          <p className="text-muted-foreground text-sm mt-1">
-            Self-awareness through data, not restrictions
-          </p>
+      <div className="max-w-4xl mx-auto pb-12">
+        <div className="mb-5">
+          <h1 className="text-lg font-semibold text-foreground tracking-tight">My Goals</h1>
         </div>
-        <div className="flex flex-col items-center justify-center min-h-[50vh] bg-card rounded-lg border border-border">
-          <div className="p-4 rounded-full bg-primary/10 mb-6">
-            <Link2 className="h-12 w-12 text-primary" />
+        <div className="tm-card flex flex-col items-center justify-center min-h-[50vh] text-center py-16">
+          <div className="p-4 rounded-full bg-teal-50 dark:bg-teal-900/20 mb-5">
+            <Link2 className="h-10 w-10 text-tm-brand" />
           </div>
-          <h2 className="text-xl font-semibold text-foreground mb-2">Connect Your Broker</h2>
-          <p className="text-muted-foreground text-center max-w-md mb-6">
-            Connect your Zerodha account to track your trading commitments and see your discipline score.
+          <h2 className="text-base font-semibold text-foreground mb-1">Connect Your Broker</h2>
+          <p className="text-sm text-muted-foreground max-w-sm mb-5">
+            Connect your Zerodha account to track trading commitments and discipline streaks.
           </p>
           <Link to="/settings">
-            <Button size="lg" className="gap-2">
-              <Link2 className="h-5 w-5" />
+            <Button size="sm" className="gap-2 bg-tm-brand hover:bg-tm-brand/90 text-white">
+              <Link2 className="h-4 w-4" />
               Connect Zerodha
             </Button>
           </Link>
@@ -166,47 +161,34 @@ export default function Goals() {
   }
 
   return (
-    <div className="space-y-6">
-      {/* Page Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-        <div>
-          <h1 className="text-2xl font-bold flex items-center gap-2">
-            <Target className="h-6 w-6 text-primary" />
-            My Trading Commitments
-          </h1>
-          <p className="text-muted-foreground text-sm mt-1">
-            Self-awareness through data, not restrictions
-          </p>
-        </div>
+    <div className="max-w-4xl mx-auto pb-12">
+      {/* Page header */}
+      <div className="mb-5">
+        <h1 className="text-lg font-semibold text-foreground tracking-tight">My Goals</h1>
       </div>
-      
-      {/* Recommendations Banner (if any) */}
+
+      {/* Recommendations */}
       {recommendations.length > 0 && (
-        <Card className="border-warning/30 bg-warning/5">
-          <CardContent className="py-4">
-            <div className="flex items-start gap-3">
-              <AlertTriangle className="h-5 w-5 text-warning flex-shrink-0 mt-0.5" />
-              <div>
-                <p className="font-medium text-sm">Recommendations based on your patterns:</p>
-                <ul className="mt-2 space-y-1">
-                  {recommendations.map((rec, i) => (
-                    <li key={i} className="text-sm text-muted-foreground flex items-center gap-2">
-                      <span className="w-1 h-1 rounded-full bg-warning" />
-                      {rec}
-                    </li>
-                  ))}
-                </ul>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
+        <div className="tm-card border-l-2 border-l-tm-obs px-5 py-4 flex items-start gap-3 mb-5">
+          <AlertTriangle className="h-4 w-4 text-tm-obs flex-shrink-0 mt-0.5" />
+          <div>
+            <p className="text-[12px] font-semibold text-foreground mb-1.5">Recommendations based on your patterns:</p>
+            <ul className="space-y-1">
+              {recommendations.map((rec, i) => (
+                <li key={i} className="text-[12px] text-muted-foreground flex items-center gap-2">
+                  <span className="w-1 h-1 rounded-full bg-tm-obs flex-shrink-0" />
+                  {rec}
+                </li>
+              ))}
+            </ul>
+          </div>
+        </div>
       )}
-      
+
       {/* Main Grid */}
-      <div className="grid gap-6 lg:grid-cols-2">
+      <div className="grid gap-5 lg:grid-cols-2">
         {/* Left Column */}
-        <div className="space-y-6">
-          {/* Goal Commitments */}
+        <div className="space-y-5">
           <GoalCommitmentsCard
             goals={goals}
             adherence={adherence}
@@ -215,17 +197,11 @@ export default function Goals() {
             cooldown={cooldown}
             onRequestChange={handleRequestChange}
           />
-          
-          {/* Emotional Tax */}
           <EmotionalTaxCard tax={emotionalTax} period="month" />
         </div>
-        
         {/* Right Column */}
-        <div className="space-y-6">
-          {/* Streak Tracker */}
+        <div className="space-y-5">
           <StreakTrackerCard streak={streakData} goalDays={30} />
-          
-          {/* Commitment Log */}
           <CommitmentLogCard log={commitmentLog} />
         </div>
       </div>

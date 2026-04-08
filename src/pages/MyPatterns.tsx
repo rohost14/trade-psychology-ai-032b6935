@@ -5,13 +5,11 @@
 import { useState, useEffect, useCallback, useMemo } from 'react';
 import { Link } from 'react-router-dom';
 import {
-  Brain, Link2, Loader2, AlertTriangle, Shield,
+  Brain, Link2, AlertTriangle, Shield,
   Clock, RefreshCw, Phone
 } from 'lucide-react';
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
-import { Badge } from '@/components/ui/badge';
+import { Skeleton } from '@/components/ui/skeleton';
 import { Button } from '@/components/ui/button';
-import { Progress } from '@/components/ui/progress';
 import { toast } from 'sonner';
 import { api } from '@/lib/api';
 import { useBroker } from '@/contexts/BrokerContext';
@@ -28,18 +26,17 @@ import type { StreakData, DailyAdherence, StreakMilestone } from '@/types/patter
 // Danger level display config
 // ---------------------------------------------------------------------------
 const LEVEL_CONFIG: Record<string, {
-  border: string;
-  bg: string;
-  badgeClass: string;
-  iconColor: string;
+  leftBorder: string;
+  dotColor: string;
+  labelColor: string;
   label: string;
   Icon: typeof Shield;
 }> = {
-  safe:     { border: 'border-green-500/30',  bg: '',                                      badgeClass: 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400',  iconColor: 'text-green-500',  label: 'Safe',     Icon: Shield },
-  caution:  { border: 'border-yellow-500/40', bg: 'bg-yellow-50/30 dark:bg-yellow-950/20', badgeClass: 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-400', iconColor: 'text-yellow-500', label: 'Caution',  Icon: AlertTriangle },
-  warning:  { border: 'border-orange-500/50', bg: 'bg-orange-50/30 dark:bg-orange-950/20', badgeClass: 'bg-orange-100 text-orange-800 dark:bg-orange-900/30 dark:text-orange-400', iconColor: 'text-orange-500', label: 'Warning',  Icon: AlertTriangle },
-  danger:   { border: 'border-red-500/60',    bg: 'bg-red-50/40 dark:bg-red-950/30',       badgeClass: 'bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-400',           iconColor: 'text-red-500',    label: 'Danger',   Icon: AlertTriangle },
-  critical: { border: 'border-red-700',       bg: 'bg-red-100/50 dark:bg-red-950/50',      badgeClass: 'bg-red-200 text-red-900 dark:bg-red-800 dark:text-red-200',              iconColor: 'text-red-700',    label: 'CRITICAL', Icon: AlertTriangle },
+  safe:     { leftBorder: 'border-l-tm-brand',    dotColor: 'bg-tm-brand',   labelColor: 'text-tm-brand',  label: 'Safe',     Icon: Shield },
+  caution:  { leftBorder: 'border-l-tm-obs',      dotColor: 'bg-tm-obs',     labelColor: 'text-tm-obs',    label: 'Caution',  Icon: AlertTriangle },
+  warning:  { leftBorder: 'border-l-tm-obs',      dotColor: 'bg-tm-obs',     labelColor: 'text-tm-obs',    label: 'Warning',  Icon: AlertTriangle },
+  danger:   { leftBorder: 'border-l-tm-loss',     dotColor: 'bg-tm-loss',    labelColor: 'text-tm-loss',   label: 'Danger',   Icon: AlertTriangle },
+  critical: { leftBorder: 'border-l-tm-loss',     dotColor: 'bg-tm-loss',    labelColor: 'text-tm-loss',   label: 'CRITICAL', Icon: AlertTriangle },
 };
 
 // ---------------------------------------------------------------------------
@@ -55,85 +52,84 @@ function DangerStatusBanner({
   isAlerting: boolean;
 }) {
   const cfg = LEVEL_CONFIG[status.level] ?? LEVEL_CONFIG.safe;
-  const LevelIcon = cfg.Icon;
   const isSafe = status.level === 'safe';
+  const lossColor = status.daily_loss_used_percent >= 85
+    ? 'text-tm-loss' : status.daily_loss_used_percent >= 70
+      ? 'text-tm-obs' : 'text-foreground';
+  const lossBarColor = status.daily_loss_used_percent >= 85
+    ? 'bg-tm-loss' : status.daily_loss_used_percent >= 70
+      ? 'bg-tm-obs' : 'bg-tm-brand';
 
   return (
-    <Card className={`border-2 ${cfg.border} ${cfg.bg}`}>
-      <CardContent className="pt-5 pb-4">
-        <div className="flex items-center justify-between gap-4 flex-wrap">
-          <div className="flex items-center gap-3">
-            <LevelIcon className={`h-6 w-6 ${cfg.iconColor} flex-shrink-0`} />
-            <div>
-              <div className="flex items-center gap-2">
-                <span className={`text-xl font-bold ${cfg.iconColor}`}>{cfg.label}</span>
-                {status.cooldown_active && (
-                  <Badge variant="outline" className="text-xs gap-1">
-                    <Clock className="h-3 w-3" />
-                    Cooldown: {status.cooldown_remaining_minutes}m left
-                  </Badge>
-                )}
-              </div>
-              <p className="text-sm text-muted-foreground">{status.message}</p>
-            </div>
-          </div>
-
-          {!isSafe && (
-            <Button
-              variant="destructive"
-              size="sm"
-              onClick={onAlertGuardian}
-              disabled={isAlerting}
-              className="gap-2 flex-shrink-0"
-            >
-              <Phone className="h-3.5 w-3.5" />
-              Alert Guardian
-            </Button>
+    <div className={`tm-card border-l-2 ${cfg.leftBorder} px-5 py-4`}>
+      <div className="flex items-center justify-between gap-4 flex-wrap mb-4">
+        <div className="flex items-center gap-2.5">
+          <span className={`w-2.5 h-2.5 rounded-full flex-shrink-0 ${cfg.dotColor}`} />
+          <span className={`text-[15px] font-bold ${cfg.labelColor}`}>{cfg.label}</span>
+          {status.cooldown_active && (
+            <span className="flex items-center gap-1 text-[11px] text-muted-foreground border border-border rounded px-2 py-0.5">
+              <Clock className="h-3 w-3" />
+              Cooldown: {status.cooldown_remaining_minutes}m left
+            </span>
           )}
+          <p className="text-[12px] text-muted-foreground hidden sm:block">{status.message}</p>
         </div>
+        {!isSafe && (
+          <button
+            onClick={onAlertGuardian}
+            disabled={isAlerting}
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-tm-loss text-white text-[12px] font-medium hover:bg-tm-loss/90 transition-colors disabled:opacity-50"
+          >
+            <Phone className="h-3.5 w-3.5" />
+            Alert Guardian
+          </button>
+        )}
+      </div>
+      <p className="text-[12px] text-muted-foreground sm:hidden mb-3">{status.message}</p>
 
-        {/* Quick stats row */}
-        <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 sm:gap-3 mt-4">
-          <div className="text-center p-2.5 bg-background/60 rounded-lg">
-            <div className={`text-xl font-bold ${status.daily_loss_used_percent >= 85 ? 'text-red-500' : status.daily_loss_used_percent >= 70 ? 'text-orange-500' : 'text-foreground'}`}>
-              {status.daily_loss_used_percent.toFixed(0)}%
-            </div>
-            <div className="text-xs text-muted-foreground">Daily Loss Used</div>
-            <Progress value={Math.min(status.daily_loss_used_percent, 100)} className="mt-1.5 h-1" />
+      {/* Quick stats */}
+      <div className="grid grid-cols-3 gap-3">
+        <div className="tm-card px-3 py-2.5 text-center">
+          <div className={`text-[18px] font-bold font-mono tabular-nums ${lossColor}`}>
+            {status.daily_loss_used_percent.toFixed(0)}%
           </div>
-          <div className="text-center p-2.5 bg-background/60 rounded-lg">
-            <div className="text-xl font-bold">{status.trade_count_today}</div>
-            <div className="text-xs text-muted-foreground">Trades Today</div>
-          </div>
-          <div className="text-center p-2.5 bg-background/60 rounded-lg">
-            <div className={`text-xl font-bold ${status.consecutive_losses >= 3 ? 'text-red-500' : status.consecutive_losses >= 2 ? 'text-orange-500' : 'text-foreground'}`}>
-              {status.consecutive_losses}
-            </div>
-            <div className="text-xs text-muted-foreground">Consecutive Losses</div>
+          <div className="text-[10px] text-muted-foreground">Daily Loss Used</div>
+          <div className="mt-1.5 w-full bg-slate-100 dark:bg-neutral-700/40 rounded-full h-1">
+            <div className={`h-1 rounded-full ${lossBarColor}`} style={{ width: `${Math.min(status.daily_loss_used_percent, 100)}%` }} />
           </div>
         </div>
-
-        {/* Active triggers */}
-        {status.triggers.length > 0 && (
-          <div className="flex flex-wrap gap-1.5 mt-3">
-            {status.triggers.map((t, i) => (
-              <Badge key={i} variant="outline" className="text-xs capitalize">
-                {t.replace(/_/g, ' ')}
-              </Badge>
-            ))}
+        <div className="tm-card px-3 py-2.5 text-center">
+          <div className="text-[18px] font-bold font-mono tabular-nums text-foreground">{status.trade_count_today}</div>
+          <div className="text-[10px] text-muted-foreground">Trades Today</div>
+        </div>
+        <div className="tm-card px-3 py-2.5 text-center">
+          <div className={`text-[18px] font-bold font-mono tabular-nums ${status.consecutive_losses >= 3 ? 'text-tm-loss' : status.consecutive_losses >= 2 ? 'text-tm-obs' : 'text-foreground'}`}>
+            {status.consecutive_losses}
           </div>
-        )}
+          <div className="text-[10px] text-muted-foreground">Consec. Losses</div>
+        </div>
+      </div>
 
-        {/* Recommendations */}
-        {status.recommendations.length > 0 && (
-          <div className="mt-3 p-3 bg-background/60 rounded-lg space-y-1">
-            {status.recommendations.map((rec, i) => (
-              <p key={i} className="text-sm text-muted-foreground">• {rec}</p>
-            ))}
-          </div>
-        )}
-      </CardContent>
-    </Card>
+      {/* Active triggers */}
+      {status.triggers.length > 0 && (
+        <div className="flex flex-wrap gap-1.5 mt-3">
+          {status.triggers.map((t, i) => (
+            <span key={i} className="text-[11px] text-muted-foreground border border-border rounded-full px-2 py-0.5 capitalize">
+              {t.replace(/_/g, ' ')}
+            </span>
+          ))}
+        </div>
+      )}
+
+      {/* Recommendations */}
+      {status.recommendations.length > 0 && (
+        <div className="mt-3 border-t border-border pt-3 space-y-1">
+          {status.recommendations.map((rec, i) => (
+            <p key={i} className="text-[12px] text-muted-foreground">· {rec}</p>
+          ))}
+        </div>
+      )}
+    </div>
   );
 }
 
@@ -142,22 +138,19 @@ function DangerStatusBanner({
 // ---------------------------------------------------------------------------
 function AlertHistoryCard({ history }: { history: CooldownRecord[] }) {
   return (
-    <Card>
-      <CardHeader className="pb-3">
-        <CardTitle className="text-base flex items-center gap-2">
-          <Clock className="h-4 w-4 text-muted-foreground" />
-          Alert History (7 days)
-        </CardTitle>
-        <CardDescription>Cooldowns and interventions triggered</CardDescription>
-      </CardHeader>
-      <CardContent>
+    <div className="tm-card overflow-hidden">
+      <div className="px-5 py-4 border-b border-border flex items-center gap-2">
+        <Clock className="h-4 w-4 text-muted-foreground" />
+        <span className="tm-label">Alert History (7 days)</span>
+      </div>
+      <div className="px-5 py-4">
         {history.length > 0 ? (
           <div className="space-y-2">
             {history.map((record, i) => (
-              <div key={i} className="flex items-center justify-between p-2.5 border rounded-lg text-sm">
+              <div key={i} className="flex items-center justify-between py-2 border-b border-border/50 last:border-0">
                 <div>
-                  <p className="font-medium capitalize">{record.reason.replace(/_/g, ' ')}</p>
-                  <p className="text-xs text-muted-foreground">
+                  <p className="text-[12px] font-medium text-foreground capitalize">{record.reason.replace(/_/g, ' ')}</p>
+                  <p className="text-[11px] text-muted-foreground mt-0.5">
                     {new Date(record.started_at).toLocaleString('en-IN', {
                       month: 'short', day: 'numeric',
                       hour: '2-digit', minute: '2-digit',
@@ -166,21 +159,20 @@ function AlertHistoryCard({ history }: { history: CooldownRecord[] }) {
                     {' · '}{record.duration_minutes}m cooldown
                   </p>
                 </div>
-                <Badge variant="outline" className="text-xs">
+                <span className={`text-[10px] font-semibold px-2 py-0.5 rounded-full border ${record.is_active ? 'text-tm-obs border-amber-300 dark:border-amber-700/50 bg-amber-50 dark:bg-amber-900/15' : 'text-muted-foreground border-border'}`}>
                   {record.is_active ? 'Active' : 'Ended'}
-                </Badge>
+                </span>
               </div>
             ))}
           </div>
         ) : (
-          <div className="flex flex-col items-center py-6 text-center text-muted-foreground">
-            <Shield className="h-8 w-8 mb-2 opacity-30" />
-            <p className="text-sm">No alerts in the last 7 days</p>
-            <p className="text-xs mt-1">Keep trading disciplined!</p>
+          <div className="flex flex-col items-center py-6 text-center">
+            <Shield className="h-7 w-7 text-muted-foreground/30 mb-2" />
+            <p className="text-[12px] text-muted-foreground">No alerts in the last 7 days</p>
           </div>
         )}
-      </CardContent>
-    </Card>
+      </div>
+    </div>
   );
 }
 
@@ -310,35 +302,34 @@ export default function MyPatterns() {
 
   if (brokerLoading) {
     return (
-      <div className="flex items-center justify-center min-h-[60vh]">
-        <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+      <div className="max-w-4xl mx-auto space-y-4 pb-12">
+        <Skeleton className="h-8 w-48" />
+        <Skeleton className="h-40 rounded-xl" />
+        <div className="grid grid-cols-2 gap-4">
+          <Skeleton className="h-56 rounded-xl" />
+          <Skeleton className="h-56 rounded-xl" />
+        </div>
       </div>
     );
   }
 
   if (!isConnected) {
     return (
-      <div className="space-y-6">
-        <div>
-          <h1 className="text-2xl font-bold flex items-center gap-2">
-            <Brain className="h-6 w-6 text-primary" />
-            My Patterns
-          </h1>
-          <p className="text-muted-foreground text-sm mt-1">
-            Live risk monitoring and behavioral patterns
-          </p>
+      <div className="max-w-4xl mx-auto pb-12">
+        <div className="mb-5">
+          <h1 className="text-lg font-semibold text-foreground tracking-tight">Risk Monitor</h1>
         </div>
-        <div className="flex flex-col items-center justify-center min-h-[50vh] bg-card rounded-lg border border-border">
-          <div className="p-4 rounded-full bg-primary/10 mb-6">
-            <Link2 className="h-12 w-12 text-primary" />
+        <div className="tm-card flex flex-col items-center justify-center min-h-[50vh] text-center py-16">
+          <div className="p-4 rounded-full bg-teal-50 dark:bg-teal-900/20 mb-5">
+            <Link2 className="h-10 w-10 text-tm-brand" />
           </div>
-          <h2 className="text-xl font-semibold text-foreground mb-2">Connect Your Broker</h2>
-          <p className="text-muted-foreground text-center max-w-md mb-6">
-            Connect your Zerodha account to monitor your trading patterns.
+          <h2 className="text-base font-semibold text-foreground mb-1">Connect Your Broker</h2>
+          <p className="text-sm text-muted-foreground max-w-sm mb-5">
+            Connect your Zerodha account to monitor live risk and behavioral patterns.
           </p>
           <Link to="/settings">
-            <Button size="lg" className="gap-2">
-              <Link2 className="h-5 w-5" />
+            <Button size="sm" className="gap-2 bg-tm-brand hover:bg-tm-brand/90 text-white">
+              <Link2 className="h-4 w-4" />
               Connect Zerodha
             </Button>
           </Link>
@@ -348,71 +339,60 @@ export default function MyPatterns() {
   }
 
   return (
-    <div className="space-y-6">
-      {/* Page Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
-        <div>
-          <h1 className="text-2xl font-bold flex items-center gap-2">
-            <Brain className="h-6 w-6 text-primary" />
-            My Patterns
-          </h1>
-          <p className="text-muted-foreground text-sm mt-1">
-            Live risk monitoring and behavioral patterns
-          </p>
-        </div>
-        <Button
-          variant="ghost"
-          size="sm"
+    <div className="max-w-4xl mx-auto pb-12">
+      {/* Page header */}
+      <div className="mb-5 flex items-center justify-between">
+        <h1 className="text-lg font-semibold text-foreground tracking-tight">Risk Monitor</h1>
+        <button
           onClick={fetchStatus}
           disabled={statusLoading}
-          className="gap-2 self-start sm:self-auto"
+          className="flex items-center gap-1.5 text-[12px] text-muted-foreground hover:text-foreground transition-colors disabled:opacity-50"
         >
           <RefreshCw className={`h-3.5 w-3.5 ${statusLoading ? 'animate-spin' : ''}`} />
           Refresh
-        </Button>
+        </button>
       </div>
 
-      {/* Live Danger Status Banner */}
-      {status && (
-        <DangerStatusBanner
-          status={status}
-          onAlertGuardian={handleAlertGuardian}
-          isAlerting={isAlerting}
-        />
-      )}
+      <div className="space-y-5">
+        {/* Live danger status */}
+        {status && (
+          <DangerStatusBanner
+            status={status}
+            onAlertGuardian={handleAlertGuardian}
+            isAlerting={isAlerting}
+          />
+        )}
 
-      {/* Pattern-based Recommendations */}
-      {recommendations.length > 0 && (
-        <div className="flex items-start gap-3 p-4 rounded-lg border border-amber-500/30 bg-amber-500/5">
-          <AlertTriangle className="h-4 w-4 text-amber-500 flex-shrink-0 mt-0.5" />
-          <div>
-            <p className="text-sm font-medium">Based on your patterns:</p>
-            <ul className="mt-1.5 space-y-1">
-              {recommendations.map((rec, i) => (
-                <li key={i} className="text-sm text-muted-foreground flex items-center gap-2">
-                  <span className="w-1 h-1 rounded-full bg-amber-500 flex-shrink-0" />
-                  {rec}
-                </li>
-              ))}
-            </ul>
+        {/* Recommendations */}
+        {recommendations.length > 0 && (
+          <div className="tm-card border-l-2 border-l-tm-obs px-5 py-4 flex items-start gap-3">
+            <AlertTriangle className="h-4 w-4 text-tm-obs flex-shrink-0 mt-0.5" />
+            <div>
+              <p className="text-[12px] font-semibold text-foreground mb-1.5">Based on your patterns:</p>
+              <ul className="space-y-1">
+                {recommendations.map((rec, i) => (
+                  <li key={i} className="text-[12px] text-muted-foreground flex items-center gap-2">
+                    <span className="w-1 h-1 rounded-full bg-tm-obs flex-shrink-0" />
+                    {rec}
+                  </li>
+                ))}
+              </ul>
+            </div>
           </div>
-        </div>
-      )}
+        )}
 
-      {/* Pattern Calendar — full width */}
-      <PatternCalendar />
+        {/* Pattern Calendar */}
+        <PatternCalendar />
 
-      {/* Main Grid */}
-      <div className="grid gap-6 lg:grid-cols-2">
-        {/* Left Column */}
-        <div className="space-y-6">
-          <EmotionalTaxCard tax={emotionalTax} period="month" />
-        </div>
-
-        {/* Right Column */}
-        <div className="space-y-6">
-          <StreakTrackerCard streak={streakData} goalDays={30} />
-          <AlertHistoryCard history={alertHistory} />
+        {/* Grid */}
+        <div className="grid gap-5 lg:grid-cols-2">
+          <div className="space-y-5">
+            <EmotionalTaxCard tax={emotionalTax} period="month" />
+          </div>
+          <div className="space-y-5">
+            <StreakTrackerCard streak={streakData} goalDays={30} />
+            <AlertHistoryCard history={alertHistory} />
+          </div>
         </div>
       </div>
     </div>

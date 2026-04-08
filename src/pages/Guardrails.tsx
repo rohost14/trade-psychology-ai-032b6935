@@ -5,8 +5,6 @@ import {
   AlertTriangle, CheckCircle2, Clock, TrendingDown, TrendingUp, Info
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger
 } from "@/components/ui/dialog";
@@ -18,7 +16,7 @@ import {
 } from "@/components/ui/select";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useToast } from "@/hooks/use-toast";
-import api from "@/lib/api";
+import api, { apiDetailString } from "@/lib/api";
 
 // ── Types ────────────────────────────────────────────────────────────────────
 
@@ -90,12 +88,12 @@ function conditionLabel(rule: GuardrailRule): string {
 
 function statusBadge(rule: GuardrailRule) {
   if (rule.is_expired)
-    return <Badge variant="outline" className="text-muted-foreground">Expired</Badge>;
+    return <span className="text-[10px] font-medium px-1.5 py-0.5 rounded border border-border text-muted-foreground">Expired</span>;
   if (rule.status === "triggered")
-    return <Badge className="bg-blue-500/10 text-blue-600 border-blue-500/20">Triggered</Badge>;
+    return <span className="text-[10px] font-medium px-1.5 py-0.5 rounded border border-tm-brand/20 bg-teal-50/50 dark:bg-teal-900/10 text-tm-brand">Triggered</span>;
   if (rule.status === "paused")
-    return <Badge variant="outline" className="text-yellow-600">Paused</Badge>;
-  return <Badge className="bg-green-500/10 text-green-600 border-green-500/20">Active</Badge>;
+    return <span className="text-[10px] font-medium px-1.5 py-0.5 rounded border border-tm-obs/20 bg-amber-50/50 dark:bg-amber-900/10 text-tm-obs">Paused</span>;
+  return <span className="text-[10px] font-medium px-1.5 py-0.5 rounded border border-tm-profit/20 bg-teal-50/50 dark:bg-teal-900/10 text-tm-profit">Active</span>;
 }
 
 // ── Add Rule Dialog ──────────────────────────────────────────────────────────
@@ -137,7 +135,7 @@ function AddRuleDialog({ onCreated }: { onCreated: () => void }) {
     onError: (e: any) => {
       toast({
         title: "Failed to create rule",
-        description: e.response?.data?.detail || "Please check your inputs.",
+        description: apiDetailString(e.response?.data?.detail, "Please check your inputs."),
         variant: "destructive",
       });
     },
@@ -146,7 +144,7 @@ function AddRuleDialog({ onCreated }: { onCreated: () => void }) {
   return (
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger asChild>
-        <Button size="sm" className="gap-2">
+        <Button size="sm" className="gap-2 bg-tm-brand hover:bg-tm-brand/90 text-white">
           <Plus className="h-4 w-4" /> Add Rule
         </Button>
       </DialogTrigger>
@@ -227,12 +225,13 @@ function AddRuleDialog({ onCreated }: { onCreated: () => void }) {
           </div>
 
           <Button
-            className="w-full"
+            className="w-full bg-tm-brand hover:bg-tm-brand/90 text-white"
             disabled={!name.trim() || !conditionValue || mutation.isPending}
             onClick={() => mutation.mutate()}
           >
             {mutation.isPending ? "Creating..." : "Create Rule"}
           </Button>
+
         </div>
       </DialogContent>
     </Dialog>
@@ -261,77 +260,73 @@ function RuleCard({ rule, onRefresh }: { rule: GuardrailRule; onRefresh: () => v
   const isInactive = rule.status === "triggered" || rule.is_expired;
 
   return (
-    <Card className={isInactive ? "opacity-60" : ""}>
-      <CardContent className="p-4">
-        <div className="flex items-start justify-between gap-3">
-          <div className="flex items-start gap-3 min-w-0">
-            <div className="mt-0.5 rounded-lg bg-muted p-2 shrink-0">
-              <Icon className="h-4 w-4 text-muted-foreground" />
-            </div>
-            <div className="min-w-0">
-              <div className="flex items-center gap-2 flex-wrap">
-                <span className="font-medium text-sm">{rule.name}</span>
-                {statusBadge(rule)}
-              </div>
-              <p className="text-xs text-muted-foreground mt-0.5">
-                {conditionLabel(rule)}
-              </p>
-              {rule.target_symbols?.length ? (
-                <p className="text-xs text-muted-foreground">
-                  Watching: {rule.target_symbols.join(", ")}
-                </p>
-              ) : (
-                <p className="text-xs text-muted-foreground">Watching all open positions</p>
-              )}
-              {/* Notification channels */}
-              <div className="flex gap-2 mt-1">
-                {rule.notify_whatsapp ? (
-                  <span className="text-[10px] text-green-600 flex items-center gap-0.5">
-                    <Bell className="h-2.5 w-2.5" /> WhatsApp
-                  </span>
-                ) : null}
-                {rule.notify_push ? (
-                  <span className="text-[10px] text-blue-600 flex items-center gap-0.5">
-                    <Bell className="h-2.5 w-2.5" /> Push
-                  </span>
-                ) : null}
-              </div>
-              {rule.triggered_at && (
-                <p className="text-[10px] text-muted-foreground mt-1">
-                  Triggered at {new Date(rule.triggered_at).toLocaleTimeString("en-IN", { hour: "2-digit", minute: "2-digit" })} IST
-                </p>
-              )}
-            </div>
+    <div className={`tm-card overflow-hidden p-4 ${isInactive ? "opacity-60" : ""}`}>
+      <div className="flex items-start justify-between gap-3">
+        <div className="flex items-start gap-3 min-w-0">
+          <div className="mt-0.5 rounded-lg bg-muted p-2 shrink-0">
+            <Icon className="h-4 w-4 text-muted-foreground" />
           </div>
-
-          {/* Actions */}
-          {!isInactive && (
-            <div className="flex gap-1 shrink-0">
-              <Button
-                variant="ghost"
-                size="icon"
-                className="h-8 w-8"
-                title={rule.status === "paused" ? "Resume" : "Pause"}
-                disabled={pauseMutation.isPending}
-                onClick={() => pauseMutation.mutate()}
-              >
-                {rule.status === "paused" ? <Play className="h-3.5 w-3.5" /> : <Pause className="h-3.5 w-3.5" />}
-              </Button>
-              <Button
-                variant="ghost"
-                size="icon"
-                className="h-8 w-8 text-destructive hover:text-destructive"
-                title="Delete"
-                disabled={deleteMutation.isPending}
-                onClick={() => deleteMutation.mutate()}
-              >
-                <Trash2 className="h-3.5 w-3.5" />
-              </Button>
+          <div className="min-w-0">
+            <div className="flex items-center gap-2 flex-wrap">
+              <span className="font-medium text-sm">{rule.name}</span>
+              {statusBadge(rule)}
             </div>
-          )}
+            <p className="text-xs text-muted-foreground mt-0.5">
+              {conditionLabel(rule)}
+            </p>
+            {rule.target_symbols?.length ? (
+              <p className="text-xs text-muted-foreground">
+                Watching: {rule.target_symbols.join(", ")}
+              </p>
+            ) : (
+              <p className="text-xs text-muted-foreground">Watching all open positions</p>
+            )}
+            <div className="flex gap-2 mt-1">
+              {rule.notify_whatsapp ? (
+                <span className="text-[10px] text-tm-profit flex items-center gap-0.5">
+                  <Bell className="h-2.5 w-2.5" /> WhatsApp
+                </span>
+              ) : null}
+              {rule.notify_push ? (
+                <span className="text-[10px] text-tm-brand flex items-center gap-0.5">
+                  <Bell className="h-2.5 w-2.5" /> Push
+                </span>
+              ) : null}
+            </div>
+            {rule.triggered_at && (
+              <p className="text-[10px] text-muted-foreground mt-1">
+                Triggered at {new Date(rule.triggered_at).toLocaleTimeString("en-IN", { hour: "2-digit", minute: "2-digit" })} IST
+              </p>
+            )}
+          </div>
         </div>
-      </CardContent>
-    </Card>
+
+        {!isInactive && (
+          <div className="flex gap-1 shrink-0">
+            <Button
+              variant="ghost"
+              size="icon"
+              className="h-8 w-8"
+              title={rule.status === "paused" ? "Resume" : "Pause"}
+              disabled={pauseMutation.isPending}
+              onClick={() => pauseMutation.mutate()}
+            >
+              {rule.status === "paused" ? <Play className="h-3.5 w-3.5" /> : <Pause className="h-3.5 w-3.5" />}
+            </Button>
+            <Button
+              variant="ghost"
+              size="icon"
+              className="h-8 w-8 text-tm-loss hover:text-tm-loss"
+              title="Delete"
+              disabled={deleteMutation.isPending}
+              onClick={() => deleteMutation.mutate()}
+            >
+              <Trash2 className="h-3.5 w-3.5" />
+            </Button>
+          </div>
+        )}
+      </div>
+    </div>
   );
 }
 
@@ -356,14 +351,12 @@ export default function Guardrails() {
   const done = rules.filter(r => r.status === "triggered" || r.is_expired);
 
   return (
-    <div className="container max-w-2xl py-6 space-y-6">
+    <div className="px-4 sm:px-6 py-6 max-w-2xl mx-auto space-y-5">
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-semibold flex items-center gap-2">
-            <Shield className="h-6 w-6 text-primary" /> Position Guardrails
-          </h1>
-          <p className="text-sm text-muted-foreground mt-1">
+          <h1 className="text-lg font-semibold tracking-tight">Position Guardrails</h1>
+          <p className="text-sm text-muted-foreground mt-0.5">
             Alert rules on your open positions. Fire once, never repeat.
           </p>
         </div>
@@ -371,10 +364,10 @@ export default function Guardrails() {
       </div>
 
       {/* Info banner */}
-      <div className="rounded-lg border bg-muted/40 px-4 py-3 text-sm text-muted-foreground flex gap-2">
-        <Info className="h-4 w-4 mt-0.5 shrink-0 text-primary" />
+      <div className="rounded-lg border border-tm-brand/20 bg-teal-50/40 dark:bg-teal-900/10 px-4 py-3 text-sm text-muted-foreground flex gap-2">
+        <Info className="h-4 w-4 mt-0.5 shrink-0 text-tm-brand" />
         <span>
-          Rules expire at <strong>15:30 IST</strong> daily. Each rule fires once — create a new one
+          Rules expire at <strong className="text-foreground">15:30 IST</strong> daily. Each rule fires once — create a new one
           the next day. No automatic order execution — you act manually.
         </span>
       </div>
@@ -384,15 +377,15 @@ export default function Guardrails() {
           {[1, 2, 3].map(i => <Skeleton key={i} className="h-24 w-full rounded-lg" />)}
         </div>
       ) : rules.length === 0 ? (
-        <Card>
-          <CardContent className="py-12 text-center">
-            <Shield className="h-10 w-10 mx-auto text-muted-foreground mb-3" />
-            <p className="font-medium">No guardrail rules yet</p>
+        <div className="tm-card overflow-hidden">
+          <div className="py-12 text-center px-5">
+            <Shield className="h-10 w-10 mx-auto text-muted-foreground/40 mb-3" />
+            <p className="text-sm font-medium">No guardrail rules yet</p>
             <p className="text-sm text-muted-foreground mt-1">
               Add rules before market opens to protect your positions.
             </p>
-          </CardContent>
-        </Card>
+          </div>
+        </div>
       ) : (
         <div className="space-y-6">
           {/* Active */}

@@ -160,9 +160,28 @@ export function getGuestResponse(url: string, method = 'GET'): unknown | undefin
     return { alerts: DEMO_RISK_ALERTS, total: DEMO_RISK_ALERTS.length };
   }
 
-  // Blowup Shield
-  if (path.includes('/api/shield') || path.includes('/api/blowup')) {
-    return { shield_active: false, daily_pnl: -15700, limit: 25000, can_trade: true };
+  // Notification status
+  if (path.includes('/api/profile/notification-status')) {
+    return {
+      whatsapp: { twilio_configured: false, phone_set: false },
+      push: { enabled: false },
+      email: { smtp_configured: false },
+    };
+  }
+
+  // Blowup Shield — must match ShieldSummary interface
+  if (path.includes('/api/shield/summary')) {
+    return {
+      total_alerts: 22, danger_count: 8, caution_count: 14,
+      heeded_count: 15, continued_count: 7, post_alert_pnl_continued: -4120,
+      heeded_streak: 4, spiral_sessions: 1,
+    };
+  }
+  if (path.includes('/api/shield/timeline')) {
+    return { timeline: [], total: 0 };
+  }
+  if (path.includes('/api/shield/patterns')) {
+    return { patterns: [] };
   }
 
   // GTT / orders

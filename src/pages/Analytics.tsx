@@ -64,24 +64,19 @@ export default function Analytics() {
   return (
     <div className="max-w-6xl mx-auto pb-12">
       {/* Page Header */}
-      <div className="mb-6 flex items-start justify-between">
-        <div>
-          <h1 className="text-2xl font-bold text-foreground">Analytics</h1>
-          <p className="text-sm text-muted-foreground mt-1">
-            Performance insights and behavioral patterns
-          </p>
-        </div>
+      <div className="mb-5 flex items-center justify-between">
+        <h1 className="text-lg font-semibold text-foreground tracking-tight">Analytics</h1>
         <div className="flex items-center gap-3">
           {/* Period Selector */}
-          <div className="flex items-center gap-1 p-1 bg-muted rounded-lg">
+          <div className="flex items-center gap-1 p-1 bg-slate-100 dark:bg-neutral-700/50 rounded-lg">
             {PERIOD_OPTIONS.map((opt) => (
               <button
                 key={opt.days}
                 onClick={() => setDays(opt.days)}
                 className={cn(
-                  'px-3 py-1.5 text-xs font-medium rounded-md transition-all',
+                  'px-3 py-1 text-[12px] font-medium rounded-md transition-all',
                   days === opt.days
-                    ? 'bg-background text-foreground shadow-sm'
+                    ? 'bg-white dark:bg-neutral-800 text-foreground shadow-sm'
                     : 'text-muted-foreground hover:text-foreground'
                 )}
               >
@@ -96,13 +91,19 @@ export default function Analytics() {
       {/* Tabs */}
       <Tabs defaultValue="summary">
         <TabsList className="w-full justify-start rounded-none bg-transparent border-b border-border p-0 h-auto gap-0 mb-6">
-          {(['summary','behavior','timing','progress','trades'] as const).map((tab) => (
+          {([
+            { value: 'summary',  label: 'Overview'  },
+            { value: 'behavior', label: 'Behavior'  },
+            { value: 'timing',   label: 'Timing'    },
+            { value: 'progress', label: 'Progress'  },
+            { value: 'trades',   label: 'Trade Log' },
+          ] as const).map(({ value, label }) => (
             <TabsTrigger
-              key={tab}
-              value={tab}
-              className="relative rounded-none bg-transparent border-b-2 border-transparent px-4 py-2.5 text-sm capitalize text-muted-foreground hover:text-foreground transition-colors data-[state=active]:border-primary data-[state=active]:bg-transparent data-[state=active]:text-foreground data-[state=active]:shadow-none"
+              key={value}
+              value={value}
+              className="relative rounded-none bg-transparent border-b-2 border-transparent px-4 py-2.5 text-sm text-muted-foreground hover:text-foreground transition-colors data-[state=active]:border-tm-brand data-[state=active]:bg-transparent data-[state=active]:text-foreground data-[state=active]:shadow-none"
             >
-              {tab.charAt(0).toUpperCase() + tab.slice(1)}
+              {label}
             </TabsTrigger>
           ))}
         </TabsList>

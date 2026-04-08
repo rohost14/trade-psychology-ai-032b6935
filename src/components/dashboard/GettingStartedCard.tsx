@@ -77,7 +77,7 @@ export default function GettingStartedCard({
       action: !onboardingCompleted ? (
         <button
           onClick={onOpenWizard}
-          className="text-xs font-medium text-primary hover:underline"
+          className="text-xs font-medium text-tm-brand hover:underline"
         >
           Set up now →
         </button>
@@ -110,7 +110,7 @@ export default function GettingStartedCard({
       description: 'See patterns, timing insights, and your behavioral score.',
       done: tradeCount >= 5,
       action: tradeCount > 0 && tradeCount < 5 ? (
-        <Link to="/analytics" className="text-xs font-medium text-primary hover:underline">
+        <Link to="/analytics" className="text-xs font-medium text-tm-brand hover:underline">
           View Analytics →
         </Link>
       ) : tradeCount >= 5 ? null : null,
@@ -121,7 +121,7 @@ export default function GettingStartedCard({
   const progressPct = Math.round((completedCount / steps.length) * 100);
 
   return (
-    <div className="mb-5 rounded-xl border border-primary/20 bg-primary/5 p-5 relative animate-fade-in-up">
+    <div className="mb-5 rounded-xl border border-tm-brand/20 bg-teal-50/50 dark:bg-teal-900/10 p-5 relative animate-fade-in-up">
       {/* Dismiss */}
       <button
         onClick={handleDismiss}
@@ -144,7 +144,7 @@ export default function GettingStartedCard({
           <span className="text-xs font-mono text-muted-foreground">{progressPct}%</span>
           <div className="w-24 h-1.5 bg-border rounded-full overflow-hidden">
             <div
-              className="h-full bg-primary rounded-full transition-all duration-500"
+              className="h-full bg-tm-brand rounded-full transition-all duration-500"
               style={{ width: `${progressPct}%` }}
             />
           </div>
@@ -157,7 +157,7 @@ export default function GettingStartedCard({
           <div key={step.id} className="flex items-start gap-3">
             <div className="mt-0.5 flex-shrink-0">
               {step.done ? (
-                <CheckCircle2 className="h-4 w-4 text-green-600 dark:text-green-400" />
+                <CheckCircle2 className="h-4 w-4 text-tm-profit" />
               ) : (
                 <Circle className="h-4 w-4 text-muted-foreground/50" />
               )}

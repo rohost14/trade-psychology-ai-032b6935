@@ -149,7 +149,7 @@ export default function Personalization() {
     return (
       <div className="container mx-auto p-6 flex items-center justify-center min-h-[400px]">
         <div className="text-center">
-          <Brain className="h-12 w-12 animate-pulse mx-auto text-primary mb-4" />
+          <Brain className="h-12 w-12 animate-pulse mx-auto text-tm-brand mb-4" />
           <p className="text-muted-foreground">Analyzing your trading patterns...</p>
         </div>
       </div>
@@ -161,10 +161,10 @@ export default function Personalization() {
 
       {/* P-06: What the system has learned — shown ABOVE the settings form */}
       {behavioralStatus === 'active' && behavioralInsights.length > 0 && (
-        <Card className="border-primary/30 bg-primary/5">
+        <Card className="border-tm-brand/30 bg-teal-50/50 dark:bg-teal-900/10">
           <CardHeader className="pb-3">
             <CardTitle className="flex items-center gap-2 text-base">
-              <Brain className="h-5 w-5 text-primary" />
+              <Brain className="h-5 w-5 text-tm-brand" />
               What we've learned about you
             </CardTitle>
             <CardDescription>
@@ -174,7 +174,7 @@ export default function Personalization() {
           <CardContent className="space-y-3">
             {behavioralInsights.map((insight: any, i: number) => (
               <div key={i} className="flex items-start gap-3 p-3 rounded-lg bg-background border border-border">
-                <Sparkles className="h-4 w-4 text-primary mt-0.5 flex-shrink-0" />
+                <Sparkles className="h-4 w-4 text-tm-brand mt-0.5 flex-shrink-0" />
                 <div>
                   <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-0.5">
                     {insight.category}
@@ -203,7 +203,7 @@ export default function Personalization() {
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-3xl font-bold flex items-center gap-2">
-            <Sparkles className="h-8 w-8 text-primary" />
+            <Sparkles className="h-8 w-8 text-tm-brand" />
             Personalized Insights
           </h1>
           <p className="text-muted-foreground">
@@ -224,8 +224,8 @@ export default function Personalization() {
 
       {/* Last Learned Banner */}
       {lastLearned && (
-        <Alert className="bg-primary/5 border-primary/20">
-          <Zap className="h-4 w-4 text-primary" />
+        <Alert className="bg-teal-50/50 dark:bg-teal-900/10 border-tm-brand/20">
+          <Zap className="h-4 w-4 text-tm-brand" />
           <AlertTitle>AI Model Updated</AlertTitle>
           <AlertDescription>
             Last pattern learning: {new Date(lastLearned).toLocaleString()}
@@ -238,16 +238,16 @@ export default function Personalization() {
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
           {insights.map((insight, i) => (
             <Card key={i} className={`
-              ${insight.type === 'strength' ? 'border-green-200 bg-green-50/50 dark:bg-green-950/20' : ''}
-              ${insight.type === 'weakness' ? 'border-red-200 bg-red-50/50 dark:bg-red-950/20' : ''}
+              ${insight.type === 'strength' ? 'border-green-200 bg-teal-50/50/50 dark:bg-green-950/20' : ''}
+              ${insight.type === 'weakness' ? 'border-red-200 bg-red-50/50/50 dark:bg-red-950/20' : ''}
               ${insight.type === 'pattern' ? 'border-blue-200 bg-blue-50/50 dark:bg-blue-950/20' : ''}
               ${insight.type === 'recommendation' ? 'border-yellow-200 bg-yellow-50/50 dark:bg-yellow-950/20' : ''}
             `}>
               <CardContent className="pt-4">
                 <div className="flex items-start gap-3">
                   <div className={`p-2 rounded-lg
-                    ${insight.type === 'strength' ? 'bg-green-100 text-green-600' : ''}
-                    ${insight.type === 'weakness' ? 'bg-red-100 text-red-600' : ''}
+                    ${insight.type === 'strength' ? 'bg-teal-50/60 dark:bg-teal-900/15 text-tm-profit' : ''}
+                    ${insight.type === 'weakness' ? 'bg-red-50/50/60 dark:bg-red-900/15 text-tm-loss' : ''}
                     ${insight.type === 'pattern' ? 'bg-blue-100 text-blue-600' : ''}
                     ${insight.type === 'recommendation' ? 'bg-yellow-100 text-yellow-600' : ''}
                   `}>
@@ -265,7 +265,7 @@ export default function Personalization() {
                     </div>
                     <p className="text-sm text-muted-foreground">{insight.description}</p>
                     {insight.action && (
-                      <p className="text-sm font-medium mt-2 text-primary">{insight.action}</p>
+                      <p className="text-sm font-medium mt-2 text-tm-brand">{insight.action}</p>
                     )}
                   </div>
                 </div>
@@ -299,7 +299,7 @@ export default function Personalization() {
               {/* Best Hours */}
               <Card>
                 <CardHeader>
-                  <CardTitle className="flex items-center gap-2 text-green-600">
+                  <CardTitle className="flex items-center gap-2 text-tm-profit">
                     <TrendingUp className="h-5 w-5" />
                     Your Best Trading Hours
                   </CardTitle>
@@ -313,7 +313,7 @@ export default function Personalization() {
                       {timeAnalysis.best_hours.slice(0, 5).map((item, i) => (
                         <div key={i} className="flex items-center justify-between">
                           <div className="flex items-center gap-2">
-                            <Badge variant="outline" className="bg-green-50">
+                            <Badge variant="outline" className="bg-teal-50/50">
                               {formatHour(item.hour)}
                             </Badge>
                             <span className="text-sm text-muted-foreground">
@@ -321,7 +321,7 @@ export default function Personalization() {
                             </span>
                           </div>
                           <div className="text-right">
-                            <div className="font-semibold text-green-600">
+                            <div className="font-semibold text-tm-profit">
                               {item.win_rate.toFixed(0)}% win
                             </div>
                             <div className="text-xs text-muted-foreground">
@@ -342,7 +342,7 @@ export default function Personalization() {
               {/* Worst Hours */}
               <Card>
                 <CardHeader>
-                  <CardTitle className="flex items-center gap-2 text-red-600">
+                  <CardTitle className="flex items-center gap-2 text-tm-loss">
                     <TrendingDown className="h-5 w-5" />
                     Hours to Avoid
                   </CardTitle>
@@ -356,7 +356,7 @@ export default function Personalization() {
                       {timeAnalysis.worst_hours.slice(0, 5).map((item, i) => (
                         <div key={i} className="flex items-center justify-between">
                           <div className="flex items-center gap-2">
-                            <Badge variant="outline" className="bg-red-50">
+                            <Badge variant="outline" className="bg-red-50/50">
                               {formatHour(item.hour)}
                             </Badge>
                             <span className="text-sm text-muted-foreground">
@@ -364,7 +364,7 @@ export default function Personalization() {
                             </span>
                           </div>
                           <div className="text-right">
-                            <div className="font-semibold text-red-600">
+                            <div className="font-semibold text-tm-loss">
                               {item.win_rate.toFixed(0)}% win
                             </div>
                             <div className="text-xs text-muted-foreground">
@@ -386,7 +386,7 @@ export default function Personalization() {
               <Card>
                 <CardHeader>
                   <CardTitle className="flex items-center gap-2">
-                    <Calendar className="h-5 w-5 text-green-600" />
+                    <Calendar className="h-5 w-5 text-tm-profit" />
                     Best Days of Week
                   </CardTitle>
                 </CardHeader>
@@ -394,10 +394,10 @@ export default function Personalization() {
                   {timeAnalysis.best_days.length > 0 ? (
                     <div className="space-y-2">
                       {timeAnalysis.best_days.map((item, i) => (
-                        <div key={i} className="flex items-center justify-between p-2 rounded-lg bg-green-50/50">
+                        <div key={i} className="flex items-center justify-between p-2 rounded-lg bg-teal-50/50/50">
                           <span className="font-medium">{item.day}</span>
                           <div className="flex items-center gap-4">
-                            <span className="text-green-600">{item.win_rate.toFixed(0)}% win</span>
+                            <span className="text-tm-profit">{item.win_rate.toFixed(0)}% win</span>
                             <span className="text-muted-foreground text-sm">
                               ₹{item.avg_pnl.toFixed(0)} avg
                             </span>
@@ -463,7 +463,7 @@ export default function Personalization() {
               {/* Best Symbols */}
               <Card>
                 <CardHeader>
-                  <CardTitle className="flex items-center gap-2 text-green-600">
+                  <CardTitle className="flex items-center gap-2 text-tm-profit">
                     <TrendingUp className="h-5 w-5" />
                     Your Best Symbols
                   </CardTitle>
@@ -483,10 +483,10 @@ export default function Personalization() {
                             </div>
                           </div>
                           <div className="text-right">
-                            <div className="font-semibold text-green-600">
+                            <div className="font-semibold text-tm-profit">
                               {item.win_rate.toFixed(0)}% win
                             </div>
-                            <div className="text-xs text-green-600">
+                            <div className="text-xs text-tm-profit">
                               +₹{item.avg_pnl.toFixed(0)}/trade
                             </div>
                           </div>
@@ -504,7 +504,7 @@ export default function Personalization() {
               {/* Worst Symbols */}
               <Card>
                 <CardHeader>
-                  <CardTitle className="flex items-center gap-2 text-red-600">
+                  <CardTitle className="flex items-center gap-2 text-tm-loss">
                     <TrendingDown className="h-5 w-5" />
                     Symbols to Avoid
                   </CardTitle>
@@ -524,10 +524,10 @@ export default function Personalization() {
                             </div>
                           </div>
                           <div className="text-right">
-                            <div className="font-semibold text-red-600">
+                            <div className="font-semibold text-tm-loss">
                               {item.win_rate.toFixed(0)}% win
                             </div>
-                            <div className="text-xs text-red-600">
+                            <div className="text-xs text-tm-loss">
                               ₹{item.avg_pnl.toFixed(0)}/trade
                             </div>
                           </div>
@@ -546,7 +546,7 @@ export default function Personalization() {
               {symbolAnalysis.overtraded_symbols.length > 0 && (
                 <Card className="md:col-span-2">
                   <CardHeader>
-                    <CardTitle className="flex items-center gap-2 text-orange-600">
+                    <CardTitle className="flex items-center gap-2 text-tm-obs">
                       <BarChart3 className="h-5 w-5" />
                       Overtraded Symbols
                     </CardTitle>
@@ -557,9 +557,9 @@ export default function Personalization() {
                   <CardContent>
                     <div className="flex flex-wrap gap-2">
                       {symbolAnalysis.overtraded_symbols.map((item, i) => (
-                        <Badge key={i} variant="outline" className="bg-orange-50">
+                        <Badge key={i} variant="outline" className="bg-amber-50/50">
                           {item.symbol}
-                          <span className="ml-2 text-orange-600">
+                          <span className="ml-2 text-tm-obs">
                             {item.trade_count} trades, {(item.loss_rate * 100).toFixed(0)}% loss
                           </span>
                         </Badge>
@@ -633,7 +633,7 @@ export default function Personalization() {
                   </div>
 
                   <div className="text-center p-4 bg-muted rounded-lg">
-                    <div className="text-3xl font-bold text-green-600">
+                    <div className="text-3xl font-bold text-tm-profit">
                       {(interventionTiming.escalation_effectiveness * 100).toFixed(0)}%
                     </div>
                     <div className="text-sm text-muted-foreground">
@@ -646,7 +646,7 @@ export default function Personalization() {
                   </div>
 
                   <div className="text-center p-4 bg-muted rounded-lg">
-                    <div className="text-3xl font-bold text-orange-600">
+                    <div className="text-3xl font-bold text-tm-obs">
                       {(interventionTiming.skip_rate * 100).toFixed(0)}%
                     </div>
                     <div className="text-sm text-muted-foreground">
@@ -663,8 +663,8 @@ export default function Personalization() {
                     <h4 className="font-semibold mb-3">Personalized Intervention Strategy</h4>
                     <div className="space-y-2">
                       {interventionTiming.recommendations.map((rec, i) => (
-                        <div key={i} className="flex items-start gap-2 p-3 bg-primary/5 rounded-lg">
-                          <Zap className="h-4 w-4 text-primary mt-0.5" />
+                        <div key={i} className="flex items-start gap-2 p-3 bg-teal-50/40 dark:bg-teal-900/10 rounded-lg">
+                          <Zap className="h-4 w-4 text-tm-brand mt-0.5" />
                           <span className="text-sm">{rec}</span>
                         </div>
                       ))}

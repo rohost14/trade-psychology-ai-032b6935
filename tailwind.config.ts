@@ -59,6 +59,11 @@ export default {
           DEFAULT: "rgb(var(--danger) / <alpha-value>)",
           foreground: "rgb(var(--danger-foreground) / <alpha-value>)",
         },
+        // TradeMentor semantic tokens — flip between light/dark via CSS variables
+        'tm-profit': "rgb(var(--tm-profit) / <alpha-value>)",
+        'tm-loss':   "rgb(var(--tm-loss)   / <alpha-value>)",
+        'tm-obs':    "rgb(var(--tm-obs)    / <alpha-value>)",
+        'tm-brand':  "rgb(var(--tm-brand)  / <alpha-value>)",
       },
       borderRadius: {
         lg: "var(--radius)",

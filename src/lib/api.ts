@@ -5,6 +5,19 @@ const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000';
 
 export const AUTH_TOKEN_KEY = 'tradementor_auth_token';
 
+/** Safely extract a human-readable string from a FastAPI error detail.
+ *  FastAPI 422s return detail as an array of Pydantic objects {type,loc,msg,input,ctx}.
+ *  Passing that array as a React child crashes with "Objects are not valid as a React child". */
+export function apiDetailString(detail: unknown, fallback: string): string {
+  if (!detail) return fallback;
+  if (typeof detail === 'string') return detail;
+  if (Array.isArray(detail)) {
+    const msg = detail.map((d: any) => d?.msg || d?.message || JSON.stringify(d)).join(', ');
+    return msg || fallback;
+  }
+  return fallback;
+}
+
 export const api = axios.create({
   baseURL: API_URL,
   headers: {
@@ -58,7 +71,7 @@ api.interceptors.response.use(
 
       if (status === 503) {
         // Backend maintenance mode — redirect to maintenance page
-        const msg = encodeURIComponent(data?.detail || 'Service temporarily unavailable');
+        const msg = encodeURIComponent(apiDetailString(data?.detail, 'Service temporarily unavailable'));
         window.location.href = `/maintenance?message=${msg}`;
       }
 

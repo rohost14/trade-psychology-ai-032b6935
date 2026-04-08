@@ -12,6 +12,7 @@ DATA PIPELINE ONLY — this service NEVER emits behavioral signals.
 from datetime import datetime, timedelta, timezone
 from typing import List, Dict, Tuple, Optional
 from uuid import UUID
+import uuid as uuid_module
 from decimal import Decimal
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, and_, update, delete
@@ -43,11 +44,13 @@ class PnLCalculator:
     - A round closes ONLY when the position goes to zero
     - Direction flips close the current round and start a new one
 
-    Kite returns qty in units (lot_size already factored in), so no
-    lot_size multiplication is needed for P&L.
+    FIFO determines structure only (rounds, direction, timing, entry/exit fills).
+    P&L values are overwritten post-sync by _reconcile_pnl_with_zerodha() which
+    uses Zerodha's authoritative 'realised' field — the only correct source for
+    all exchanges including MCX where the instruments CSV lot_size ≠ contract multiplier.
     """
 
-    # Cache for lot sizes (kept for position sizing alerts, NOT used in P&L)
+    # Cache for lot sizes (used for position sizing alerts only, NOT for P&L)
     _lot_size_cache: Dict[str, int] = {}
 
     async def get_lot_size(
@@ -228,17 +231,15 @@ class PnLCalculator:
         # Round accumulator for flat-to-flat semantics
         round_acc = self._new_round_acc()
 
-        # MCX and CDS: Kite sends quantity as NUMBER OF LOTS, not units.
-        # NSE/BSE F&O (NFO/BFO): Kite sends quantity already in units (lots × lot_size).
-        # Apply lot_size multiplier only for MCX/CDS so P&L reflects ₹ per lot correctly.
-        first = sorted_trades[0] if sorted_trades else None
-        exchange = (getattr(first, "exchange", None) or "").upper()
+        # FIFO P&L is structural only — it records rounds, timing, and direction.
+        # The actual P&L value is overwritten by _reconcile_pnl_with_zerodha() after sync,
+        # which uses Zerodha's authoritative 'realised' field.
+        #
+        # We do NOT apply MCX/CDS lot_size here because Zerodha's instruments CSV stores
+        # lot_size = minimum order quantity (= 1 lot), NOT the contract multiplier.
+        # For GOLDM: CSV lot_size=1, but correct multiplier=10 (10g per lot).
+        # Applying CSV lot_size here would give wrong P&L — reconciliation corrects it.
         lot_multiplier = Decimal("1")
-        if exchange in ("MCX", "CDS") and first and db:
-            raw_lot_size = await self.get_lot_size(
-                first.tradingsymbol or "", exchange, db
-            )
-            lot_multiplier = Decimal(str(raw_lot_size))
 
         for trade in sorted_trades:
             qty = trade.filled_quantity or trade.quantity or 0
@@ -374,6 +375,26 @@ class PnLCalculator:
             "total_pnl": Decimal("0"),
         }
 
+    @staticmethod
+    def _stable_ct_id(
+        broker_account_id: UUID,
+        tradingsymbol: str,
+        entry_time,
+        direction: str,
+        exit_time,
+    ) -> uuid_module.UUID:
+        """
+        Generate a deterministic UUID for a CompletedTrade round.
+
+        Same round (same broker, symbol, entry time, direction, exit time) always
+        produces the same UUID — so journal trade_id FK links survive re-syncs
+        that delete and recreate CompletedTrade rows.
+        """
+        entry_str = entry_time.isoformat() if entry_time else "none"
+        exit_str = exit_time.isoformat() if exit_time else "none"
+        key = f"{broker_account_id}|{tradingsymbol}|{entry_str}|{direction}|{exit_str}"
+        return uuid_module.uuid5(uuid_module.NAMESPACE_URL, key)
+
     def _build_completed_trade(
         self,
         round_acc: Dict,
@@ -412,7 +433,17 @@ class PnLCalculator:
         if entry_time and exit_time:
             duration = max(0, int((exit_time - entry_time).total_seconds() / 60))
 
+        # Stable UUID: same round always gets same ID so journal FKs survive re-syncs
+        ct_id = self._stable_ct_id(
+            broker_account_id,
+            ref_trade.tradingsymbol,
+            entry_time,
+            round_acc["direction"],
+            exit_time,
+        )
+
         return CompletedTrade(
+            id=ct_id,
             broker_account_id=broker_account_id,
             tradingsymbol=ref_trade.tradingsymbol,
             exchange=ref_trade.exchange,

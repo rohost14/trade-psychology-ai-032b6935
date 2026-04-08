@@ -64,18 +64,17 @@ Every screen answers one primary question. This drives what information is most 
 
 | Screen | Primary question it answers |
 |---|---|
-| Dashboard | "How am I doing RIGHT NOW?" |
-| Analytics | "How have I been performing overall?" |
-| Alerts | "What behavioral patterns is the system flagging?" |
-| My Patterns | "Who am I as a trader? What are my tendencies?" |
-| AI Coach | "What should I think about this situation?" |
-| Blowup Shield | "What has the system protected me from?" |
-| Guardrails | "What rules have I set for myself?" |
-| Danger Zone | "Am I in an active cooldown or circuit break right now?" |
-| Goals | "Am I meeting the commitments I set for myself?" |
-| Portfolio Radar | "Is my current exposure concentrated in risky ways?" |
-| Portfolio Advisor | "What does AI think about my holdings position?" |
-| Reports | "What happened this week/month? What's the summary?" |
+| Dashboard | "How is my behavior holding up today?" |
+| Analytics | "What does my behavioral and performance data show?" |
+| Behavioral Observations (Alerts) | "What patterns has the system observed in my trading?" |
+| My Patterns | "Who am I as a trader? What are my recurring tendencies?" |
+| AI Coach | "What does a knowledgeable observer see in my recent trading?" |
+| Blowup Shield | "What has the system defended me from over time?" |
+| Guardrails | "What rules have I configured for myself?" |
+| Session Limits (Danger Zone) | "Are any of my self-set limits currently active?" |
+| Goals | "Am I keeping the commitments I made to myself?" |
+| Portfolio Radar | "Is my current exposure dangerously concentrated?" |
+| Reports | "What is the behavioral story of this week/month?" |
 | Settings | "Configure my profile, notifications, and risk limits" |
 
 **Design rule:** If a piece of information does not answer the primary question of a screen, it belongs somewhere else. The current Dashboard violates this by containing 10+ distinct information types. The redesign fixes this.
@@ -86,17 +85,17 @@ Every screen answers one primary question. This drives what information is most 
 TradeMentor AI
 │
 ├── DAILY USE (in nav, always accessible)
-│   ├── Dashboard ─────── "Right now" status
-│   ├── Alerts ─────────── Behavioral flag feed
-│   ├── Analytics ──────── Performance deep-dive (5 tabs)
-│   └── AI Coach ───────── Psychology conversation
+│   ├── Dashboard ─────────── Behavioral pulse — score, pace, today's observations
+│   ├── Observations ──────── Behavioral pattern feed (nav label: "Patterns" on mobile)
+│   ├── Analytics ──────────── Deep review — 5 tabs, Behavior tab is default
+│   └── AI Coach ───────────── Psychology conversation with full data context
 │
 ├── PROTECTION & GROWTH (in nav, secondary)
-│   ├── My Patterns ────── Behavioral identity & trends
-│   ├── Blowup Shield ──── Historical protection log
-│   ├── Guardrails ─────── Self-imposed rules
-│   ├── Danger Zone ────── Active cooldown status
-│   └── Goals ──────────── Commitments & streaks
+│   ├── My Patterns ────────── Behavioral identity — who you are as a trader
+│   ├── Blowup Shield ──────── Historical protection log
+│   ├── Guardrails ─────────── Self-imposed rule list (read-only)
+│   ├── Session Limits ─────── Active limits status (renamed from Danger Zone)
+│   └── Goals ──────────────── Commitments & consistency calendar
 │
 ├── DATA & TOOLS (in nav, below fold / More sheet on mobile)
 │   ├── Portfolio Radar ── Concentration analysis
@@ -139,51 +138,30 @@ They should look similar in UI (both are chat) but be clearly labeled.
 
 ## 4. Navigation Architecture
 
-### Web — Sidebar
+### Web — Top Navbar
+
+**Decision (Session 31, 2026-04-02):** Switched from sidebar to top navbar.
+Rationale: 17% more content width, matches Indian F&O trader familiarity (Zerodha Kite, Sensibull, Tickertape all use top nav), better for data-heavy tables.
 
 ```
-Width: 208px (w-52) — consistent with Zerodha's compact sidebar
-Background: bg-card
-Border: border-r border-border
+Height: 60px fixed top
+Background: #0F172A (nav-bg, dark slate)
+Full viewport width
 ```
 
 **Structure:**
 ```
-┌──────────────────┐
-│  [TM Logo + name] │  — clickable, goes to /dashboard
-├──────────────────┤
-│                   │
-│  ● Dashboard      │  ← primary, bold when active
-│                   │
-│  DAILY            │  ← section label: text-xs uppercase muted
-│    Analytics      │
-│    Alerts    [3]  │  ← badge for unacknowledged
-│    AI Coach       │
-│                   │
-│  PROTECTION       │
-│    My Patterns    │
-│    Shield         │
-│    Guardrails     │
-│    Danger Zone    │
-│    Goals          │
-│                   │
-│  TOOLS            │
-│    Portfolio Radar│
-│    Advisor        │
-│    Reports        │
-│                   │
-├──────────────────┤
-│  Settings         │  ← at bottom always
-│                   │
-│  [ZA1234]  ●      │  ← user/connection status
-│  Connected        │
-└──────────────────┘
+[TM Logo · TradeMentor]  Dashboard  Alerts[●]  Analytics  Coach  My Patterns  More▾     12 trades · Goal 8/10     [🔔] [⚙] [avatar]
 ```
 
-**Active state:** `bg-primary/10 text-primary` on the item, left border `border-l-2 border-primary`
-**Inactive state:** `text-muted-foreground hover:bg-muted hover:text-foreground`
-**Section labels:** `text-xs font-medium uppercase tracking-wide text-muted-foreground px-3 py-2`
-**Badge:** Small `bg-danger text-white` pill, `text-xs font-bold`, only on Alerts
+**Primary nav items (left-center):** Dashboard · Alerts · Analytics · Coach · My Patterns · More ▾
+- `More ▾` dropdown: Blowup Shield · Session Limits · Goals · Portfolio Radar · Reports · Settings
+
+**Active state:** `text-teal-300` + `border-b-2 border-teal-400` underline
+**Inactive state:** `text-slate-300` hover → `text-white`
+**Alerts badge:** Small `bg-amber-500` filled circle top-right of "Alerts" text, count inside
+**Compact stat (center-right):** `12 trades · Goal 8/10` in `text-sm text-slate-400`
+**Right actions:** Bell · Gear · Avatar (32px circle)
 
 ### Mobile — Bottom Navigation
 

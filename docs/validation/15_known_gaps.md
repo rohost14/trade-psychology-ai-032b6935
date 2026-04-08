@@ -38,13 +38,13 @@
 
 | # | Gap | Impact | Fix | Effort |
 |---|-----|--------|-----|--------|
-| P2-1 | No skeleton/shimmer loading states | Cards flash empty on load (bad first impression) | Add shadcn `<Skeleton>` to all cards | 4 hours |
-| P2-2 | No empty state illustrations | New users see blank tables with no guidance | Design + add illustrated empty states | 4 hours |
+| ~~P2-1~~ | ~~No skeleton/shimmer loading states~~ | — | **✅ DONE (S22)** — Skeleton in all 4 analytics tabs + empty state SEBI stats | — |
+| P2-2 | No empty state illustrations | New users see blank tables with no guidance | Design + add illustrated empty states (onboarding card is a partial fix) | 4 hours |
 | P2-3 | No formal a11y audit | Screen reader users blocked | Screen reader + keyboard navigation test | 1 day |
-| P2-4 | `.env.example` outdated | Developers/deployers miss required vars | Add `VITE_SENTRY_DSN`, `VAPID_*`, document all vars | 30 min |
-| P2-5 | No Dockerfile | Manual deploy steps, no containerization | Write Dockerfile + docker-compose | 2 hours |
-| P2-6 | No maintenance mode | Can't take backend offline for migrations without user-facing errors | Add `MAINTENANCE_MODE` env flag → 503 with message | 1 hour |
-| P2-7 | WebSocket reconnect: no user-visible indicator | User doesn't know they're offline/reconnecting | Add connection dot animation in Layout header | 30 min |
+| ~~P2-4~~ | ~~`.env.example` outdated~~ | — | **✅ DONE (S22+S30)** — All vars documented incl. SMTP, VAPID, Gupshup, ENCRYPTION_KEY, ADMIN_JWT_SECRET | — |
+| ~~P2-5~~ | ~~No Dockerfile~~ | — | **✅ DONE (S22)** — Dockerfile + docker-compose.yml added | — |
+| ~~P2-6~~ | ~~No maintenance mode~~ | — | **✅ DONE (S22)** — `MAINTENANCE_MODE` env → 503 middleware + FE `/maintenance` page + api.ts 503 handler | — |
+| ~~P2-7~~ | ~~WebSocket reconnect: no user-visible indicator~~ | — | **✅ DONE (S22)** — Amber pulsing dot in Layout header | — |
 
 ---
 

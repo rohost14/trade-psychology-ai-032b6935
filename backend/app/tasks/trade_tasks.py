@@ -572,14 +572,6 @@ async def run_risk_detection_async(broker_account_id: UUID, db, trigger_trade: T
         for alert in danger_alerts:
             send_danger_alert.delay(str(broker_account_id), str(alert.id))
 
-        # ── Create BlowupShield checkpoints for danger alerts ─────────
-        for alert in danger_alerts:
-            from app.tasks.checkpoint_tasks import create_alert_checkpoint
-            create_alert_checkpoint.apply_async(
-                args=[str(alert.id), str(broker_account_id)],
-                countdown=10,
-            )
-
         logger.info(
             f"[BehaviorEngine] {broker_account_id}: {len(new_alerts)} new alerts "
             f"({len(danger_alerts)} danger) | "
@@ -602,6 +594,96 @@ async def run_risk_detection_async(broker_account_id: UUID, db, trigger_trade: T
 
     except Exception as e:
         logger.error(f"Risk detection error: {e}", exc_info=True)
+
+
+async def run_behavior_engine_full_session(broker_account_id: UUID, db) -> int:
+    """
+    Replay the behavior engine across ALL of today's CompletedTrades in
+    chronological order.
+
+    Used by the REST sync path when trades arrive in bulk (user was not in the
+    app while trading).  Running the engine only on the *most recent* trade
+    misses patterns like consecutive_loss_streak and options_premium_avg_down
+    that fire on the 2nd/3rd loss in a sequence — not on a later winner.
+
+    Returns the number of new alerts saved.
+    """
+    from app.models.risk_alert import RiskAlert
+    from app.models.completed_trade import CompletedTrade
+    from app.services.behavior_engine import behavior_engine
+    from datetime import date as _date
+    from zoneinfo import ZoneInfo as _ZI
+
+    today_ist = datetime.now(_ZI("Asia/Kolkata")).date()
+    today_start_utc = datetime.combine(
+        today_ist, datetime.min.time()
+    ).replace(tzinfo=timezone.utc) - timedelta(hours=5, minutes=30)
+
+    ct_result = await db.execute(
+        select(CompletedTrade)
+        .where(
+            CompletedTrade.broker_account_id == broker_account_id,
+            CompletedTrade.exit_time >= today_start_utc,
+        )
+        .order_by(CompletedTrade.exit_time.asc())
+    )
+    trades_today = ct_result.scalars().all()
+
+    if not trades_today:
+        return 0
+
+    # Build dedup set once — shared across all iterations so the same pattern
+    # cannot fire more than once even if it triggers on multiple trades.
+    cutoff = datetime.now(timezone.utc) - timedelta(hours=24)
+    existing_result = await db.execute(
+        select(RiskAlert).where(
+            and_(
+                RiskAlert.broker_account_id == broker_account_id,
+                RiskAlert.detected_at >= cutoff,
+            )
+        )
+    )
+    existing_keys: set = {
+        ("_account_", a.pattern_type) for a in existing_result.scalars().all()
+    }
+
+    all_new_alerts: list[RiskAlert] = []
+
+    for ct in trades_today:
+        result = await behavior_engine.analyze(
+            broker_account_id=broker_account_id,
+            completed_trade=ct,
+            db=db,
+        )
+        for alert in result.alerts:
+            key = ("_account_", alert.pattern_type)
+            if key not in existing_keys:
+                db.add(alert)
+                all_new_alerts.append(alert)
+                existing_keys.add(key)
+
+    if all_new_alerts:
+        await db.commit()
+        all_new_alerts = await _apply_alert_consolidation(broker_account_id, all_new_alerts, db)
+
+        danger_alerts = [a for a in all_new_alerts if a.severity == "danger"]
+        for alert in danger_alerts:
+            send_danger_alert.delay(str(broker_account_id), str(alert.id))
+
+        if all_new_alerts:
+            from app.core.event_bus import publish_event
+            publish_event(str(broker_account_id), "alert_update", {
+                "count": len(all_new_alerts),
+                "has_danger": len(danger_alerts) > 0,
+            })
+            publish_event(str(broker_account_id), "trade_update", {})
+
+        logger.info(
+            f"[BehaviorEngine/FullSession] {broker_account_id}: "
+            f"{len(all_new_alerts)} alerts from {len(trades_today)} trades"
+        )
+
+    return len(all_new_alerts)
 
 
 async def _apply_alert_consolidation(

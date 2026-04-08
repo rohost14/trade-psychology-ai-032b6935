@@ -268,41 +268,83 @@ async def _build_trading_context(
         lines.append("(Either no trades have been made, or positions haven't been synced yet.)")
         lines.append("")
 
-    # Section E: Behavioral alerts (7 days)
-    if alerts:
-        danger_alerts = [a for a in alerts if a.severity == "danger"]
-        pattern_counts: dict[str, int] = {}
-        for a in alerts:
-            pattern_counts[a.pattern_type] = pattern_counts.get(a.pattern_type, 0) + 1
+    # Section E: Today's session summary — gives AI the numbers to do erosion math
+    today_start_ist = now_ist.replace(hour=0, minute=0, second=0, microsecond=0)
+    today_start_utc = today_start_ist.astimezone(timezone.utc)
+    today_closed = [p for p in positions if p.last_exit_time and p.last_exit_time >= today_start_utc]
+    if today_closed:
+        # Sort by exit time ascending to compute running P&L and find peak
+        today_sorted = sorted(today_closed, key=lambda p: p.last_exit_time)
+        running = 0.0
+        peak = 0.0
+        running_series = []
+        for p in today_sorted:
+            pnl = float(p.realized_pnl or p.pnl or 0)
+            running += pnl
+            if running > peak:
+                peak = running
+            running_series.append((p.tradingsymbol, pnl, running))
 
-        lines.append(f"**Behavioral Alerts (7 days): {len(alerts)} total, {len(danger_alerts)} danger**")
-        for pattern, count in sorted(pattern_counts.items(), key=lambda x: -x[1]):
-            lines.append(f"- {pattern.replace('_', ' ').title()}: {count} occurrences")
+        final = running
+        erosion = peak - final
+        erosion_pct = (erosion / peak * 100) if peak > 0 else 0
+
+        lines.append("**Today's Session (closed trades only, chronological):**")
+        lines.append(f"- Peak P&L reached: ₹{peak:+,.2f}")
+        lines.append(f"- Final P&L: ₹{final:+,.2f}")
+        if erosion > 0:
+            lines.append(f"- Gave back: ₹{erosion:,.2f} ({erosion_pct:.0f}% of peak gains)")
+        lines.append("- Trade sequence:")
+        for sym, pnl, cum in running_series:
+            sign = "+" if pnl >= 0 else ""
+            cum_sign = "+" if cum >= 0 else ""
+            lines.append(f"  • {sym}: ₹{sign}{pnl:,.2f} → running total ₹{cum_sign}{cum:,.2f}")
         lines.append("")
 
-    # Section F: Journal entries (direct from DB — no embedding needed)
+    # Section F: Behavioral alerts — linked to trade symbols where available
+    if alerts:
+        danger_alerts = [a for a in alerts if a.severity == "danger"]
+        lines.append(f"**Behavioral Alerts (7 days): {len(alerts)} total, {len(danger_alerts)} danger**")
+        # Show each alert with its trigger symbol so AI can link alert → trade
+        for a in sorted(alerts, key=lambda x: x.detected_at, reverse=True)[:15]:
+            date_str = _fmt_date(a.detected_at)
+            sym = (a.details or {}).get("trigger_symbol", "") if a.details else ""
+            sym_str = f" on {sym}" if sym else ""
+            lines.append(
+                f"- [{date_str}] {a.pattern_type.replace('_', ' ').title()} [{a.severity.upper()}]{sym_str}: {a.message}"
+            )
+        lines.append("")
+
+    # Section G: Journal entries — structured fields for synthesis (not for quoting back)
     if journal_entries:
         lines.append(f"**Journal Entries (last 7 days, {len(journal_entries)} entries):**")
+        lines.append("(Use these fields to UNDERSTAND the trader's mindset and decisions — do NOT quote them back verbatim)")
         for entry in journal_entries:
             date_str = _fmt_date(entry.created_at)
             sym = entry.trade_symbol or "General"
-            pnl_str = f" | P&L: ₹{entry.trade_pnl}" if entry.trade_pnl else ""
-            emotions = ", ".join(entry.emotion_tags or []) if entry.emotion_tags else ""
-            parts = [f"- [{date_str}] {sym}{pnl_str} | Emotions: {emotions or 'not tagged'}"]
-            if entry.followed_plan:
-                parts.append(f"  Followed plan: {entry.followed_plan}")
+            pnl_str = f" | P&L: ₹{entry.trade_pnl:+,.2f}" if entry.trade_pnl else ""
+            emotions = ", ".join(entry.emotion_tags or []) if entry.emotion_tags else "none tagged"
+
+            # Build a structured signal summary — what this entry SIGNALS about the trader's state
+            signals = []
+            if entry.followed_plan is not None:
+                signals.append(f"followed plan: {'YES' if entry.followed_plan else 'NO'}")
             if entry.deviation_reason:
-                parts.append(f"  Deviated because: {entry.deviation_reason}")
+                signals.append(f"deviated because: {entry.deviation_reason}")
             if entry.exit_reason:
-                parts.append(f"  Exit reason: {entry.exit_reason}")
+                signals.append(f"exit reason: {entry.exit_reason}")
             if entry.setup_quality:
-                parts.append(f"  Setup quality: {entry.setup_quality}/5")
-            if entry.would_repeat:
-                parts.append(f"  Would repeat: {entry.would_repeat}")
+                signals.append(f"setup quality: {entry.setup_quality}/5")
+            if entry.would_repeat is not None:
+                signals.append(f"would repeat: {'YES' if entry.would_repeat else 'NO'}")
             if entry.market_condition:
-                parts.append(f"  Market condition: {entry.market_condition}")
+                signals.append(f"market: {entry.market_condition}")
+
+            parts = [f"- [{date_str}] {sym}{pnl_str} | Emotions: {emotions}"]
+            if signals:
+                parts.append(f"  Signals: {' | '.join(signals)}")
             if entry.notes:
-                parts.append(f"  Notes: {(entry.notes or '')[:250]}")
+                parts.append(f"  Raw note: \"{(entry.notes or '').strip()[:200]}\"")
             lines.extend(parts)
         lines.append("")
 

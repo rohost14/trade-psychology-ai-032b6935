@@ -4,10 +4,11 @@ import {
   ResponsiveContainer, ReferenceLine,
 } from 'recharts';
 import {
-  Loader2, ShieldAlert, TrendingDown, Shield, ArrowUp, ArrowDown,
+  ShieldAlert, TrendingDown, Shield, ArrowUp, ArrowDown,
 } from 'lucide-react';
+import { Skeleton } from '@/components/ui/skeleton';
 import { cn } from '@/lib/utils';
-import { formatCurrency } from '@/lib/formatters';
+import { formatCurrency, formatCurrencyWithSign } from '@/lib/formatters';
 import { api } from '@/lib/api';
 import AINarrativeCard from './AINarrativeCard';
 
@@ -164,21 +165,21 @@ function PeriodComparisonCards() {
   return (
     <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
       {metrics.map((m) => (
-        <div key={m.label} className="bg-card rounded-xl border border-border p-5">
-          <p className="text-xs font-medium uppercase tracking-widest text-muted-foreground mb-2">{m.label}</p>
+        <div key={m.label} className="tm-card p-5">
+          <p className="tm-label mb-2">{m.label}</p>
           <p className={cn(
             'text-3xl font-bold font-mono tabular-nums',
             m.colorize
-              ? (m.current >= 0 ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400')
+              ? (m.current >= 0 ? 'text-tm-profit' : 'text-tm-loss')
               : 'text-foreground'
           )}>
             {m.format(m.current)}
           </p>
           <div className="flex items-center gap-1 mt-1.5">
             {m.improved ? (
-              <ArrowUp className="h-3 w-3 text-green-500" />
+              <ArrowUp className="h-3 w-3 text-tm-profit" />
             ) : (
-              <ArrowDown className="h-3 w-3 text-red-500" />
+              <ArrowDown className="h-3 w-3 text-tm-loss" />
             )}
             <p className="text-xs text-muted-foreground">vs {m.format(m.prev)} last week</p>
           </div>
@@ -240,15 +241,19 @@ export default function ProgressTab({ days }: ProgressTabProps) {
 
   if (isLoading) {
     return (
-      <div className="flex items-center justify-center min-h-[40vh]">
-        <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+      <div className="space-y-4">
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+          {[1,2,3,4].map(i => <Skeleton key={i} className="h-24 rounded-xl" />)}
+        </div>
+        <Skeleton className="h-48 rounded-xl" />
+        <Skeleton className="h-32 rounded-xl" />
       </div>
     );
   }
 
   if (!data?.has_data) {
     return (
-      <div className="flex flex-col items-center justify-center min-h-[40vh] bg-card rounded-xl border border-border">
+      <div className="tm-card flex flex-col items-center justify-center min-h-[40vh]">
         <ShieldAlert className="h-10 w-10 text-muted-foreground/40 mb-3" />
         <p className="font-medium text-foreground">No risk data for this period</p>
         <p className="text-sm text-muted-foreground mt-1">Complete some trades to see risk metrics</p>
@@ -262,35 +267,35 @@ export default function ProgressTab({ days }: ProgressTabProps) {
       <PeriodComparisonCards />
 
       {/* AI Narrative — left border accent */}
-      <div className="border-l-4 border-primary rounded-r-xl overflow-hidden">
+      <div className="border-l-4 border-tm-brand rounded-r-xl overflow-hidden">
         <AINarrativeCard tab="risk" days={days} />
       </div>
 
       {/* Risk KPI — 3 individual cards */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-        <div className="bg-card rounded-xl border border-border p-5">
-          <p className="text-xs font-medium uppercase tracking-widest text-muted-foreground mb-2">VaR (95%)</p>
-          <p className="text-3xl font-bold font-mono tabular-nums text-red-600 dark:text-red-400">
+        <div className="tm-card p-5">
+          <p className="tm-label mb-2">VaR (95%)</p>
+          <p className="text-3xl font-bold font-mono tabular-nums text-tm-loss">
             {formatCurrency(data.var_95)}
           </p>
           <p className="text-xs text-muted-foreground mt-1">Worst daily expected (5th pctile)</p>
         </div>
 
-        <div className="bg-card rounded-xl border border-border p-5">
-          <p className="text-xs font-medium uppercase tracking-widest text-muted-foreground mb-2">Daily Volatility</p>
+        <div className="tm-card p-5">
+          <p className="tm-label mb-2">Daily Volatility</p>
           <p className="text-3xl font-bold font-mono tabular-nums text-foreground">
             {formatCurrency(data.daily_volatility)}
           </p>
           <p className="text-xs text-muted-foreground mt-1">Std dev of daily P&L</p>
         </div>
 
-        <div className="bg-card rounded-xl border border-border p-5">
-          <p className="text-xs font-medium uppercase tracking-widest text-muted-foreground mb-2">Risk-Reward Ratio</p>
+        <div className="tm-card p-5">
+          <p className="tm-label mb-2">Risk-Reward Ratio</p>
           <p className={cn(
             'text-3xl font-bold font-mono tabular-nums',
-            data.risk_reward_ratio >= 1.5 ? 'text-green-600 dark:text-green-400' :
+            data.risk_reward_ratio >= 1.5 ? 'text-tm-profit' :
               data.risk_reward_ratio >= 1 ? 'text-foreground' :
-                'text-red-600 dark:text-red-400'
+                'text-tm-loss'
           )}>
             {data.risk_reward_ratio > 0 ? data.risk_reward_ratio.toFixed(2) : '—'}
           </p>
@@ -303,9 +308,9 @@ export default function ProgressTab({ days }: ProgressTabProps) {
 
       {/* Max Drawdown card + Discipline Score */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-        <div className="bg-card rounded-xl border border-border p-5">
-          <p className="text-xs font-medium uppercase tracking-widest text-muted-foreground mb-2">Max Drawdown</p>
-          <p className="text-3xl font-bold font-mono tabular-nums text-red-600 dark:text-red-400">
+        <div className="tm-card p-5">
+          <p className="tm-label mb-2">Max Drawdown</p>
+          <p className="text-3xl font-bold font-mono tabular-nums text-tm-loss">
             {formatCurrency(data.max_drawdown.amount)}
           </p>
           {data.max_drawdown.start_date && (
@@ -317,7 +322,7 @@ export default function ProgressTab({ days }: ProgressTabProps) {
         </div>
 
         {riskScore && (
-          <div className="bg-card rounded-xl border border-border p-5">
+          <div className="tm-card p-5">
             <div className="flex items-center gap-1.5 mb-2">
               <Shield className="h-3.5 w-3.5 text-muted-foreground" />
               <p className="text-xs font-medium uppercase tracking-widest text-muted-foreground">Discipline Score</p>
@@ -325,8 +330,8 @@ export default function ProgressTab({ days }: ProgressTabProps) {
             <div className="flex items-end gap-2">
               <p className={cn(
                 'text-3xl font-bold font-mono tabular-nums',
-                (riskScore.score ?? 0) >= 70 ? 'text-green-600' :
-                  (riskScore.score ?? 0) >= 40 ? 'text-amber-600' : 'text-red-600'
+                (riskScore.score ?? 0) >= 70 ? 'text-tm-profit' :
+                  (riskScore.score ?? 0) >= 40 ? 'text-tm-obs' : 'text-tm-loss'
               )}>
                 {riskScore.score ?? '—'}
               </p>
@@ -351,16 +356,16 @@ export default function ProgressTab({ days }: ProgressTabProps) {
 
       {/* Consecutive Streaks — 2 small cards */}
       <div className="grid grid-cols-2 gap-4">
-        <div className="bg-card rounded-xl border border-border p-5">
-          <p className="text-xs font-medium uppercase tracking-widest text-muted-foreground mb-2">Max Win Streak</p>
-          <p className="text-3xl font-bold font-mono tabular-nums text-green-600 dark:text-green-400">
+        <div className="tm-card p-5">
+          <p className="tm-label mb-2">Max Win Streak</p>
+          <p className="text-3xl font-bold font-mono tabular-nums text-tm-profit">
             {data.consecutive_max.wins}
           </p>
           <p className="text-xs text-muted-foreground mt-1">Consecutive winning trades</p>
         </div>
-        <div className="bg-card rounded-xl border border-border p-5">
-          <p className="text-xs font-medium uppercase tracking-widest text-muted-foreground mb-2">Max Loss Streak</p>
-          <p className="text-3xl font-bold font-mono tabular-nums text-red-600 dark:text-red-400">
+        <div className="tm-card p-5">
+          <p className="tm-label mb-2">Max Loss Streak</p>
+          <p className="text-3xl font-bold font-mono tabular-nums text-tm-loss">
             {data.consecutive_max.losses}
           </p>
           <p className="text-xs text-muted-foreground mt-1">Consecutive losing trades</p>
@@ -369,10 +374,10 @@ export default function ProgressTab({ days }: ProgressTabProps) {
 
       {/* Drawdown Chart */}
       {drawdownData.length > 1 && (
-        <div className="bg-card rounded-xl border border-border overflow-hidden">
+        <div className="tm-card overflow-hidden">
           <div className="px-5 py-4 border-b border-border">
             <div className="flex items-center gap-2">
-              <TrendingDown className="h-4 w-4 text-red-600" />
+              <TrendingDown className="h-4 w-4 text-tm-loss" />
               <div>
                 <p className="text-xs font-medium uppercase tracking-widest text-muted-foreground">Drawdown Chart</p>
                 <p className="text-xs text-muted-foreground mt-0.5">Distance from equity peak over time</p>
@@ -422,10 +427,10 @@ export default function ProgressTab({ days }: ProgressTabProps) {
 
       {/* Drawdown Periods */}
       {data.drawdown_periods.length > 0 && (
-        <div className="bg-card rounded-xl border border-border overflow-hidden">
+        <div className="tm-card overflow-hidden">
           <div className="px-5 py-4 border-b border-border">
             <div className="flex items-center gap-2">
-              <TrendingDown className="h-4 w-4 text-red-600" />
+              <TrendingDown className="h-4 w-4 text-tm-loss" />
               <p className="text-xs font-medium uppercase tracking-widest text-muted-foreground">Drawdown Periods</p>
             </div>
           </div>
@@ -446,7 +451,7 @@ export default function ProgressTab({ days }: ProgressTabProps) {
                       {' \u2192 '}
                       {dd.end ? formatDateShort(dd.end) : 'ongoing'}
                     </td>
-                    <td className="px-3 py-2.5 text-right text-sm tabular-nums font-mono text-red-600 dark:text-red-400 font-medium">
+                    <td className="px-3 py-2.5 text-right text-sm tabular-nums font-mono text-tm-loss font-medium">
                       {formatCurrency(dd.depth)}
                     </td>
                     <td className="px-3 py-2.5 text-right text-sm text-muted-foreground">
@@ -462,7 +467,7 @@ export default function ProgressTab({ days }: ProgressTabProps) {
 
       {/* Risk Alert Summary */}
       {data.alerts_summary.length > 0 && (
-        <div className="bg-card rounded-xl border border-border overflow-hidden">
+        <div className="tm-card overflow-hidden">
           <div className="px-5 py-4 border-b border-border flex items-center gap-2">
             <p className="text-xs font-medium uppercase tracking-widest text-muted-foreground">Risk Alert Summary</p>
             <span className="text-xs text-muted-foreground">
@@ -507,10 +512,10 @@ function DrawdownTooltip({ active, payload }: any) {
       <p className="font-medium text-foreground mb-1">{formatDateShort(d.date)}</p>
       <div className="space-y-0.5">
         <p className="text-xs text-muted-foreground">
-          Drawdown: <span className="tabular-nums font-mono text-red-600">{formatCurrency(d.drawdown)}</span>
+          Drawdown: <span className="tabular-nums font-mono text-tm-loss">{formatCurrency(d.drawdown)}</span>
         </p>
         <p className="text-xs text-muted-foreground">
-          Equity: <span className={cn('tabular-nums font-mono', d.cumulative_pnl >= 0 ? 'text-green-600' : 'text-red-600')}>
+          Equity: <span className={cn('tabular-nums font-mono', d.cumulative_pnl >= 0 ? 'text-tm-profit' : 'text-tm-loss')}>
             {formatCurrency(d.cumulative_pnl)}
           </span>
         </p>

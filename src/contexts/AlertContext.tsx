@@ -42,6 +42,8 @@ export interface AlertNotification {
   pattern: {
     id: string;
     type: PatternType;
+    /** Original backend pattern_type string — use this for buildFacts / PATTERN_EXPLANATIONS lookups */
+    backend_type: string;
     name: string;
     severity: PatternSeverity;
     description: string;
@@ -52,6 +54,8 @@ export interface AlertNotification {
     trades_involved: string[];
     frequency_this_week: number;
     frequency_this_month: number;
+    /** Raw context dict from behavior_engine — e.g. gap_minutes, prior_loss, streak */
+    details: Record<string, unknown>;
   };
   shown_at: string | undefined;
   acknowledged: boolean;
@@ -102,6 +106,11 @@ const BACKEND_TO_FRONTEND_TYPE: Record<string, string> = {
   'options_direction_confusion': 'options_direction_confusion',
   'options_premium_avg_down':    'options_premium_avg_down',
   'iv_crush_behavior':           'iv_crush_behavior',
+  'expiry_day_overtrading':      'overtrading',
+  'opening_5min_trap':           'opening_5min_trap',
+  'end_of_session_mis_panic':    'end_of_session_mis_panic',
+  'post_loss_recovery_bet':      'post_loss_recovery_bet',
+  'profit_giveaway':             'profit_giveaway',
 };
 
 function formatPatternName(patternType: string): string {
@@ -134,6 +143,10 @@ function formatPatternName(patternType: string): string {
     'options_direction_confusion':   'Direction Confusion',
     'options_premium_avg_down':      'Premium Averaging Down',
     'iv_crush_behavior':             'IV Crush',
+    'opening_5min_trap':             'Opening 5-Min Trap',
+    'end_of_session_mis_panic':      'End-of-Session Panic',
+    'post_loss_recovery_bet':        'Recovery Bet',
+    'profit_giveaway':               'Profit Giveaway',
   };
   return names[patternType]
     || patternType.split('_').map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' ');
@@ -149,6 +162,7 @@ interface BackendAlert {
   detected_at?: string;
   created_at?: string;
   acknowledged_at?: string | null;
+  acknowledged?: boolean; // present in demo data and some API responses
 }
 
 // Map backend severity strings to frontend PatternSeverity
@@ -172,6 +186,7 @@ function mapBackendAlert(a: BackendAlert): AlertNotification {
     pattern: {
       id:                  String(a.id),
       type:                frontendType,
+      backend_type:        a.pattern_type,
       name:                formatPatternName(a.pattern_type),
       severity:            normalizeSeverity(a.severity),
       description:         a.message,
@@ -182,9 +197,10 @@ function mapBackendAlert(a: BackendAlert): AlertNotification {
       trades_involved:     [],
       frequency_this_week:  0,
       frequency_this_month: 0,
+      details:             (a.details as Record<string, unknown>) ?? {},
     },
     shown_at:     detected_at,
-    acknowledged: a.acknowledged_at != null,
+    acknowledged: a.acknowledged ?? (a.acknowledged_at != null),
   };
 }
 

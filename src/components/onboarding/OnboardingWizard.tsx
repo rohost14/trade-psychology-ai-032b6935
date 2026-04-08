@@ -8,19 +8,16 @@ import {
   ChevronRight,
   ChevronLeft,
   Check,
-  Loader2,
   Brain,
   Target,
   Clock,
   Wallet
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
 import { Slider } from '@/components/ui/slider';
-import { Progress } from '@/components/ui/progress';
 import {
   Select,
   SelectContent,
@@ -82,9 +79,9 @@ const TRADING_STYLES = [
 ];
 
 const RISK_TOLERANCE = [
-  { value: 'conservative', label: 'Conservative', color: 'bg-green-500' },
-  { value: 'moderate', label: 'Moderate', color: 'bg-yellow-500' },
-  { value: 'aggressive', label: 'Aggressive', color: 'bg-red-500' },
+  { value: 'conservative', label: 'Conservative', color: 'bg-tm-profit' },
+  { value: 'moderate', label: 'Moderate', color: 'bg-tm-obs' },
+  { value: 'aggressive', label: 'Aggressive', color: 'bg-tm-loss' },
 ];
 
 const INSTRUMENTS = [
@@ -231,11 +228,17 @@ export default function OnboardingWizard({ brokerAccountId, onComplete, onSkip }
 
   return (
     <div className="fixed inset-0 bg-background/95 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-      <Card className="w-full max-w-2xl max-h-[90vh] overflow-auto">
-        <CardHeader className="pb-4">
-          <div className="mb-4">
-            <Progress value={progress} className="h-2" />
-            <div className="flex justify-between mt-2">
+      <div className="tm-card overflow-hidden w-full max-w-2xl max-h-[90vh] overflow-auto">
+        <div className="px-6 py-5 border-b border-border">
+          <div className="mb-5">
+            {/* Progress bar */}
+            <div className="h-1.5 bg-muted rounded-full overflow-hidden mb-3">
+              <div
+                className="h-full bg-tm-brand rounded-full transition-all duration-500"
+                style={{ width: `${progress}%` }}
+              />
+            </div>
+            <div className="flex justify-between">
               {STEPS.map((step) => {
                 const StepIcon = step.icon;
                 const isComplete = currentStep > step.id;
@@ -243,13 +246,13 @@ export default function OnboardingWizard({ brokerAccountId, onComplete, onSkip }
                 return (
                   <div
                     key={step.id}
-                    className={`flex flex-col items-center ${isCurrent ? 'text-primary' : isComplete ? 'text-green-500' : 'text-muted-foreground'
-                      }`}
+                    className={`flex flex-col items-center ${isCurrent ? 'text-tm-brand' : isComplete ? 'text-tm-profit' : 'text-muted-foreground'}`}
                   >
                     <div
-                      className={`w-8 h-8 rounded-full flex items-center justify-center ${isCurrent ? 'bg-primary text-primary-foreground' :
-                          isComplete ? 'bg-green-500 text-white' : 'bg-muted'
-                        }`}
+                      className={`w-8 h-8 rounded-full flex items-center justify-center ${
+                        isCurrent ? 'bg-tm-brand text-white' :
+                        isComplete ? 'bg-tm-profit text-white' : 'bg-muted'
+                      }`}
                     >
                       {isComplete ? <Check className="h-4 w-4" /> : <StepIcon className="h-4 w-4" />}
                     </div>
@@ -260,18 +263,18 @@ export default function OnboardingWizard({ brokerAccountId, onComplete, onSkip }
             </div>
           </div>
 
-          <CardTitle>{STEPS[currentStep - 1].title}</CardTitle>
-          <CardDescription>{STEPS[currentStep - 1].description}</CardDescription>
-        </CardHeader>
+          <p className="text-base font-semibold text-foreground">{STEPS[currentStep - 1].title}</p>
+          <p className="text-sm text-muted-foreground mt-0.5">{STEPS[currentStep - 1].description}</p>
+        </div>
 
-        <CardContent className="pb-6">
+        <div className="px-6 pb-6">
           <div key={currentStep} className="animate-fade-in-up">
               {/* Step 1: Welcome */}
               {currentStep === 1 && (
                 <div className="space-y-6">
                   <div className="text-center py-4">
-                    <div className="w-20 h-20 bg-primary/10 rounded-full flex items-center justify-center mx-auto mb-4">
-                      <Brain className="h-10 w-10 text-primary" />
+                    <div className="w-20 h-20 bg-teal-50 dark:bg-teal-900/20 rounded-full flex items-center justify-center mx-auto mb-4">
+                      <Brain className="h-10 w-10 text-tm-brand" />
                     </div>
                     <h3 className="text-lg font-semibold">Welcome to TradeMentor</h3>
                     <p className="text-muted-foreground text-sm mt-2">
@@ -321,8 +324,8 @@ export default function OnboardingWizard({ brokerAccountId, onComplete, onSkip }
                         <div
                           key={level.value}
                           className={`p-4 rounded-lg border-2 cursor-pointer transition-all ${data.experience_level === level.value
-                              ? 'border-primary bg-primary/5'
-                              : 'border-border hover:border-primary/50'
+                              ? 'border-tm-brand bg-teal-50/50 dark:bg-teal-900/10'
+                              : 'border-border hover:border-tm-brand/50'
                             }`}
                           onClick={() => setData({ ...data, experience_level: level.value })}
                         >
@@ -340,8 +343,8 @@ export default function OnboardingWizard({ brokerAccountId, onComplete, onSkip }
                         <div
                           key={style.value}
                           className={`p-4 rounded-lg border-2 cursor-pointer transition-all ${data.trading_style === style.value
-                              ? 'border-primary bg-primary/5'
-                              : 'border-border hover:border-primary/50'
+                              ? 'border-tm-brand bg-teal-50/50 dark:bg-teal-900/10'
+                              : 'border-border hover:border-tm-brand/50'
                             }`}
                           onClick={() => setData({ ...data, trading_style: style.value })}
                         >
@@ -359,8 +362,8 @@ export default function OnboardingWizard({ brokerAccountId, onComplete, onSkip }
                         <div
                           key={risk.value}
                           className={`p-4 rounded-lg border-2 cursor-pointer transition-all text-center ${data.risk_tolerance === risk.value
-                              ? 'border-primary bg-primary/5'
-                              : 'border-border hover:border-primary/50'
+                              ? 'border-tm-brand bg-teal-50/50 dark:bg-teal-900/10'
+                              : 'border-border hover:border-tm-brand/50'
                             }`}
                           onClick={() => setData({ ...data, risk_tolerance: risk.value })}
                         >
@@ -382,8 +385,11 @@ export default function OnboardingWizard({ brokerAccountId, onComplete, onSkip }
                       {INSTRUMENTS.map((instrument) => (
                         <Button
                           key={instrument.value}
-                          variant={data.preferred_instruments.includes(instrument.value) ? 'default' : 'outline'}
+                          variant="outline"
                           size="sm"
+                          className={data.preferred_instruments.includes(instrument.value)
+                            ? 'bg-tm-brand text-white border-tm-brand hover:bg-tm-brand/90'
+                            : ''}
                           onClick={() => toggleInstrument(instrument.value)}
                         >
                           {instrument.label}
@@ -482,8 +488,11 @@ export default function OnboardingWizard({ brokerAccountId, onComplete, onSkip }
                       {WEAKNESSES.map((weakness) => (
                         <Button
                           key={weakness.value}
-                          variant={data.known_weaknesses.includes(weakness.value) ? 'default' : 'outline'}
+                          variant="outline"
                           size="sm"
+                          className={data.known_weaknesses.includes(weakness.value)
+                            ? 'bg-tm-brand text-white border-tm-brand hover:bg-tm-brand/90'
+                            : ''}
                           onClick={() => toggleWeakness(weakness.value)}
                         >
                           {weakness.label}
@@ -507,8 +516,8 @@ export default function OnboardingWizard({ brokerAccountId, onComplete, onSkip }
                         <div
                           key={persona.value}
                           className={`p-4 rounded-lg border-2 cursor-pointer transition-all ${data.ai_persona === persona.value
-                              ? 'border-primary bg-primary/5'
-                              : 'border-border hover:border-primary/50'
+                              ? 'border-tm-brand bg-teal-50/50 dark:bg-teal-900/10'
+                              : 'border-border hover:border-tm-brand/50'
                             }`}
                           onClick={() => setData({ ...data, ai_persona: persona.value })}
                         >
@@ -548,7 +557,7 @@ export default function OnboardingWizard({ brokerAccountId, onComplete, onSkip }
             </div>
 
           {/* Navigation */}
-          <div className="flex justify-between mt-8 pt-4 border-t">
+          <div className="flex justify-between mt-8 pt-4 border-t border-border">
             <div>
               {currentStep === 1 ? (
                 <Button variant="ghost" onClick={handleSkip}>
@@ -562,24 +571,20 @@ export default function OnboardingWizard({ brokerAccountId, onComplete, onSkip }
               )}
             </div>
 
-            <Button onClick={handleNext} disabled={isLoading}>
-              {isLoading ? (
-                <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-              ) : currentStep === STEPS.length ? (
-                <>
-                  Complete Setup
-                  <Check className="h-4 w-4 ml-2" />
-                </>
+            <Button
+              className="bg-tm-brand hover:bg-tm-brand/90 text-white"
+              onClick={handleNext}
+              disabled={isLoading}
+            >
+              {isLoading ? "Saving…" : currentStep === STEPS.length ? (
+                <>Complete Setup <Check className="h-4 w-4 ml-2" /></>
               ) : (
-                <>
-                  Next
-                  <ChevronRight className="h-4 w-4 ml-1" />
-                </>
+                <>Next <ChevronRight className="h-4 w-4 ml-1" /></>
               )}
             </Button>
           </div>
-        </CardContent>
-      </Card>
+        </div>
+      </div>
     </div>
   );
 }

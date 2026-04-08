@@ -15,7 +15,7 @@ import {
   Key,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Skeleton } from '@/components/ui/skeleton';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
@@ -306,8 +306,12 @@ export default function Settings() {
 
   if (brokerLoading) {
     return (
-      <div className="max-w-4xl mx-auto flex items-center justify-center h-64">
-        <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+      <div className="max-w-4xl mx-auto space-y-4 pb-12">
+        <Skeleton className="h-8 w-48" />
+        <Skeleton className="h-40 rounded-xl" />
+        <div className="grid grid-cols-2 gap-4">
+          {[1,2,3,4].map(i => <Skeleton key={i} className="h-32 rounded-xl" />)}
+        </div>
       </div>
     );
   }
@@ -317,7 +321,7 @@ export default function Settings() {
       {/* Page Header */}
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-bold text-foreground">Settings</h1>
+          <h1 className="text-lg font-semibold text-foreground tracking-tight">Settings</h1>
           <p className="text-sm text-muted-foreground">
             Manage your broker, profile, and preferences
           </p>
@@ -335,31 +339,31 @@ export default function Settings() {
       </div>
 
       {/* Broker Connection Card */}
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <Link2 className="h-5 w-5" />
+      <div className="tm-card overflow-hidden">
+        <div className="px-5 py-4 border-b border-border">
+          <p className="text-sm font-semibold text-foreground flex items-center gap-2">
+            <Link2 className="h-4 w-4" />
             Broker Connection
-          </CardTitle>
-          <CardDescription>Connect your Zerodha account</CardDescription>
-        </CardHeader>
-        <CardContent>
+          </p>
+          <p className="text-xs text-muted-foreground mt-0.5">Connect your Zerodha account</p>
+        </div>
+        <div className="p-5">
           {isConnected && account ? (
             <div className="space-y-4">
-              <div className="flex items-center justify-between p-4 bg-emerald-50 dark:bg-emerald-950/30 border border-emerald-200 dark:border-emerald-800 rounded-lg">
+              <div className="flex items-center justify-between p-4 bg-teal-50 dark:bg-teal-900/10 border border-tm-brand/20 rounded-lg">
                 <div className="flex items-center gap-3">
-                  <div className="p-2 rounded-full bg-success/10">
-                    <Shield className="h-5 w-5 text-success" />
+                  <div className="p-2 rounded-full bg-teal-50 dark:bg-teal-900/20">
+                    <Shield className="h-5 w-5 text-tm-brand" />
                   </div>
                   <div>
-                    <p className="text-sm font-medium text-emerald-700 dark:text-emerald-300">Connected to Zerodha</p>
+                    <p className="text-sm font-medium text-tm-brand">Connected to Zerodha</p>
                     {account.sync_status === 'syncing' ? (
-                      <p className="text-xs text-amber-600 dark:text-amber-400 flex items-center gap-1">
+                      <p className="text-xs text-tm-obs flex items-center gap-1">
                         <span className="inline-block h-2 w-2 rounded-full bg-amber-400 animate-pulse" />
                         Loading your trading data…
                       </p>
                     ) : (
-                      <p className="text-xs text-emerald-600 dark:text-emerald-400">
+                      <p className="text-xs text-tm-brand/70">
                         Last synced: {formatLastSync(account.last_sync_at)}
                       </p>
                     )}
@@ -371,7 +375,7 @@ export default function Settings() {
                     size="sm"
                     onClick={handleDisconnect}
                     disabled={isDisconnecting}
-                    className="text-destructive hover:text-destructive"
+                    className="text-tm-loss hover:text-tm-loss"
                   >
                     <Link2Off className="h-4 w-4 mr-1.5" />
                     Disconnect
@@ -430,19 +434,19 @@ export default function Settings() {
               />
             </div>
           )}
-        </CardContent>
-      </Card>
+        </div>
+      </div>
 
       {/* Only show other settings if connected */}
       {isConnected && (
-        <Tabs defaultValue="profile" className="space-y-4">
-          <TabsList className="grid w-full grid-cols-2">
-            <TabsTrigger value="profile">
-              <User className="h-4 w-4 mr-2" />
+        <Tabs defaultValue="profile" className="space-y-5">
+          <TabsList className="inline-flex h-auto bg-transparent p-0 gap-1 border-b border-border w-full rounded-none">
+            <TabsTrigger value="profile" className="rounded-none px-3 pb-3 text-sm font-medium text-muted-foreground data-[state=active]:bg-transparent data-[state=active]:text-foreground data-[state=active]:border-b-2 data-[state=active]:border-tm-brand transition-colors flex items-center gap-1.5">
+              <User className="h-4 w-4" />
               Profile
             </TabsTrigger>
-            <TabsTrigger value="notifications">
-              <Bell className="h-4 w-4 mr-2" />
+            <TabsTrigger value="notifications" className="rounded-none px-3 pb-3 text-sm font-medium text-muted-foreground data-[state=active]:bg-transparent data-[state=active]:text-foreground data-[state=active]:border-b-2 data-[state=active]:border-tm-brand transition-colors flex items-center gap-1.5">
+              <Bell className="h-4 w-4" />
               Notifications
             </TabsTrigger>
           </TabsList>
@@ -451,12 +455,12 @@ export default function Settings() {
           <TabsContent value="profile">
             <div className="space-y-6">
               {/* Basic Info */}
-              <Card>
-                <CardHeader>
-                  <CardTitle>Trading Profile</CardTitle>
-                  <CardDescription>Tell us about your trading style and experience</CardDescription>
-                </CardHeader>
-                <CardContent className="space-y-6">
+              <div className="tm-card overflow-hidden">
+                <div className="px-5 py-4 border-b border-border">
+                  <p className="text-sm font-semibold text-foreground">Trading Profile</p>
+                  <p className="text-xs text-muted-foreground mt-0.5">Tell us about your trading style and experience</p>
+                </div>
+                <div className="p-5 space-y-6">
                   {/* Display Name */}
                   <div className="space-y-2">
                     <Label>Display Name</Label>
@@ -495,8 +499,8 @@ export default function Settings() {
                         <div
                           key={style.value}
                           className={`p-3 rounded-lg border-2 cursor-pointer transition-all ${profile.trading_style === style.value
-                            ? 'border-primary bg-primary/5'
-                            : 'border-border hover:border-primary/50'
+                            ? 'border-tm-brand bg-teal-50/50 dark:bg-teal-900/10'
+                            : 'border-border hover:border-tm-brand/50'
                             }`}
                           onClick={() => setProfile({ ...profile, trading_style: style.value })}
                         >
@@ -518,8 +522,8 @@ export default function Settings() {
                         <div
                           key={risk.value}
                           className={`p-4 rounded-lg border-2 cursor-pointer transition-all ${profile.risk_tolerance === risk.value
-                            ? 'border-primary bg-primary/5'
-                            : 'border-border hover:border-primary/50'
+                            ? 'border-tm-brand bg-teal-50/50 dark:bg-teal-900/10'
+                            : 'border-border hover:border-tm-brand/50'
                             }`}
                           onClick={() => setProfile({ ...profile, risk_tolerance: risk.value })}
                         >
@@ -552,21 +556,21 @@ export default function Settings() {
                       </div>
                     </div>
                   </div>
-                </CardContent>
-              </Card>
+                </div>
+              </div>
 
               {/* Trading Limits */}
-              <Card>
-                <CardHeader>
-                  <CardTitle className="flex items-center gap-2">
-                    <Shield className="h-5 w-5" />
+              <div className="tm-card overflow-hidden">
+                <div className="px-5 py-4 border-b border-border">
+                  <p className="text-sm font-semibold text-foreground flex items-center gap-2">
+                    <Shield className="h-4 w-4" />
                     Trading Limits
-                  </CardTitle>
-                  <CardDescription>
+                  </p>
+                  <p className="text-xs text-muted-foreground mt-0.5">
                     These calibrate pattern detection to your actual trading style — alerts become more accurate.
-                  </CardDescription>
-                </CardHeader>
-                <CardContent className="space-y-6">
+                  </p>
+                </div>
+                <div className="p-5 space-y-6">
                   {/* Capital */}
                   <div className="space-y-2">
                     <Label htmlFor="trading-capital">My trading capital (₹)</Label>
@@ -593,7 +597,7 @@ export default function Settings() {
                         step={1}
                         value={profile.max_position_size ?? 10}
                         onChange={(e) => setProfile({ ...profile, max_position_size: Number(e.target.value) })}
-                        className="w-full accent-primary"
+                        className="w-full accent-[#0D9488]"
                       />
                       <span className="text-sm font-medium w-12 text-right">{profile.max_position_size ?? 10}%</span>
                     </div>
@@ -612,8 +616,8 @@ export default function Settings() {
                           type="button"
                           className={`px-3 py-1.5 rounded-md border text-sm font-medium transition-all ${
                             (profile.sl_percent_futures ?? 1.0) === pct
-                              ? 'border-primary bg-primary text-primary-foreground'
-                              : 'border-border hover:border-primary/50'
+                              ? 'border-tm-brand bg-tm-brand text-white'
+                              : 'border-border hover:border-tm-brand/50'
                           }`}
                           onClick={() => setProfile({ ...profile, sl_percent_futures: pct })}
                         >
@@ -636,8 +640,8 @@ export default function Settings() {
                           type="button"
                           className={`px-3 py-1.5 rounded-md border text-sm font-medium transition-all ${
                             (profile.sl_percent_options ?? 50) === pct
-                              ? 'border-primary bg-primary text-primary-foreground'
-                              : 'border-border hover:border-primary/50'
+                              ? 'border-tm-brand bg-tm-brand text-white'
+                              : 'border-border hover:border-tm-brand/50'
                           }`}
                           onClick={() => setProfile({ ...profile, sl_percent_options: pct })}
                         >
@@ -677,8 +681,8 @@ export default function Settings() {
                           type="button"
                           className={`px-3 py-1.5 rounded-md border text-sm font-medium transition-all ${
                             (profile.cooldown_after_loss ?? 15) === mins
-                              ? 'border-primary bg-primary text-primary-foreground'
-                              : 'border-border hover:border-primary/50'
+                              ? 'border-tm-brand bg-tm-brand text-white'
+                              : 'border-border hover:border-tm-brand/50'
                           }`}
                           onClick={() => setProfile({ ...profile, cooldown_after_loss: mins })}
                         >
@@ -690,28 +694,28 @@ export default function Settings() {
                       Revenge trading alert window. If you say 15 min, re-entries at 12 min will fire.
                     </p>
                   </div>
-                </CardContent>
-              </Card>
+                </div>
+              </div>
 
               {/* AI Persona */}
-              <Card>
-                <CardHeader>
-                  <CardTitle className="flex items-center gap-2">
-                    <Brain className="h-5 w-5" />
+              <div className="tm-card overflow-hidden">
+                <div className="px-5 py-4 border-b border-border">
+                  <p className="text-sm font-semibold text-foreground flex items-center gap-2">
+                    <Brain className="h-4 w-4" />
                     AI Coach Personality
-                  </CardTitle>
-                  <CardDescription>
+                  </p>
+                  <p className="text-xs text-muted-foreground mt-0.5">
                     Choose how your AI trading coach communicates with you
-                  </CardDescription>
-                </CardHeader>
-                <CardContent>
+                  </p>
+                </div>
+                <div className="p-5">
                   <div className="grid grid-cols-2 gap-4">
                     {AI_PERSONAS.map((persona) => (
                       <div
                         key={persona.value}
                         className={`p-4 rounded-lg border-2 cursor-pointer transition-all ${profile.ai_persona === persona.value
-                          ? 'border-primary bg-primary/5'
-                          : 'border-border hover:border-primary/50'
+                          ? 'border-tm-brand bg-teal-50/50 dark:bg-teal-900/10'
+                          : 'border-border hover:border-tm-brand/50'
                           }`}
                         onClick={() => setProfile({ ...profile, ai_persona: persona.value })}
                       >
@@ -720,8 +724,8 @@ export default function Settings() {
                       </div>
                     ))}
                   </div>
-                </CardContent>
-              </Card>
+                </div>
+              </div>
             </div>
           </TabsContent>
 
@@ -729,7 +733,7 @@ export default function Settings() {
           <TabsContent value="notifications">
             <div className="space-y-6">
               {/* WhatsApp not configured banner */}
-              {notificationStatus && !notificationStatus.whatsapp.twilio_configured && (
+              {notificationStatus && !notificationStatus.whatsapp?.twilio_configured && (
                 <div className="flex items-start gap-3 p-4 bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-800 rounded-lg">
                   <AlertTriangle className="h-5 w-5 text-amber-600 dark:text-amber-400 mt-0.5 shrink-0" />
                   <div>
@@ -759,19 +763,19 @@ export default function Settings() {
               )}
 
               {/* Alert Sensitivity */}
-              <Card>
-                <CardHeader>
-                  <CardTitle>Alert Sensitivity</CardTitle>
-                  <CardDescription>Control how aggressively patterns are flagged</CardDescription>
-                </CardHeader>
-                <CardContent>
+              <div className="tm-card overflow-hidden">
+                <div className="px-5 py-4 border-b border-border">
+                  <p className="text-sm font-semibold text-foreground">Alert Sensitivity</p>
+                  <p className="text-xs text-muted-foreground mt-0.5">Control how aggressively patterns are flagged</p>
+                </div>
+                <div className="p-5">
                   <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 sm:gap-3">
                     {ALERT_SENSITIVITY.map((level) => (
                       <div
                         key={level.value}
                         className={`p-3 rounded-lg border-2 cursor-pointer transition-all text-center ${profile.alert_sensitivity === level.value
-                          ? 'border-primary bg-primary/5'
-                          : 'border-border hover:border-primary/50'
+                          ? 'border-tm-brand bg-teal-50/50 dark:bg-teal-900/10'
+                          : 'border-border hover:border-tm-brand/50'
                           }`}
                         onClick={() => setProfile({ ...profile, alert_sensitivity: level.value })}
                       >
@@ -780,19 +784,19 @@ export default function Settings() {
                       </div>
                     ))}
                   </div>
-                </CardContent>
-              </Card>
+                </div>
+              </div>
 
               {/* Push Notifications */}
               <NotificationSettings />
 
               {/* WhatsApp Reports */}
-              <Card>
-                <CardHeader>
-                  <CardTitle>WhatsApp Reports</CardTitle>
-                  <CardDescription>Daily trading summaries via WhatsApp</CardDescription>
-                </CardHeader>
-                <CardContent>
+              <div className="tm-card overflow-hidden">
+                <div className="px-5 py-4 border-b border-border">
+                  <p className="text-sm font-semibold text-foreground">WhatsApp Reports</p>
+                  <p className="text-xs text-muted-foreground mt-0.5">Daily trading summaries via WhatsApp</p>
+                </div>
+                <div className="p-5">
                   <div className="flex items-center justify-between p-4 border rounded-lg">
                     <div>
                       <p className="font-medium">Daily WhatsApp Reports</p>
@@ -805,21 +809,21 @@ export default function Settings() {
                       onCheckedChange={(checked) => setProfile({ ...profile, whatsapp_enabled: checked })}
                     />
                   </div>
-                </CardContent>
-              </Card>
+                </div>
+              </div>
 
               {/* Email Reports */}
-              <Card>
-                <CardHeader>
-                  <CardTitle className="flex items-center gap-2">
-                    <Mail className="h-5 w-5" />
+              <div className="tm-card overflow-hidden">
+                <div className="px-5 py-4 border-b border-border">
+                  <p className="text-sm font-semibold text-foreground flex items-center gap-2">
+                    <Mail className="h-4 w-4" />
                     Email Reports
-                  </CardTitle>
-                  <CardDescription>
+                  </p>
+                  <p className="text-xs text-muted-foreground mt-0.5">
                     Receive daily post-market reports and morning briefs by email
-                  </CardDescription>
-                </CardHeader>
-                <CardContent className="space-y-4">
+                  </p>
+                </div>
+                <div className="p-5 space-y-4">
                   <div className="flex items-center justify-between p-4 border rounded-lg">
                     <div>
                       <p className="font-medium">Daily Email Reports</p>
@@ -848,21 +852,21 @@ export default function Settings() {
                       Email toggle saved but SMTP is not configured on the server yet — emails won't send until an admin sets up SMTP credentials.
                     </p>
                   )}
-                </CardContent>
-              </Card>
+                </div>
+              </div>
 
               {/* Guardian Mode */}
-              <Card>
-                <CardHeader>
-                  <CardTitle className="flex items-center gap-2">
-                    <Phone className="h-5 w-5" />
+              <div className="tm-card overflow-hidden">
+                <div className="px-5 py-4 border-b border-border">
+                  <p className="text-sm font-semibold text-foreground flex items-center gap-2">
+                    <Phone className="h-4 w-4" />
                     Guardian Mode
-                  </CardTitle>
-                  <CardDescription>
+                  </p>
+                  <p className="text-xs text-muted-foreground mt-0.5">
                     Set up a trusted contact to receive alerts when you're in danger zone
-                  </CardDescription>
-                </CardHeader>
-                <CardContent className="space-y-6">
+                  </p>
+                </div>
+                <div className="p-5 space-y-6">
                   {/* Enable Guardian */}
                   <div className="flex items-center justify-between p-4 border rounded-lg">
                     <div>
@@ -961,21 +965,21 @@ export default function Settings() {
                       </Button>
                     </>
                   )}
-                </CardContent>
-              </Card>
+                </div>
+              </div>
 
               {/* Report Delivery Timing */}
-              <Card>
-                <CardHeader>
-                  <CardTitle className="flex items-center gap-2">
-                    <Bell className="h-5 w-5" />
+              <div className="tm-card overflow-hidden">
+                <div className="px-5 py-4 border-b border-border">
+                  <p className="text-sm font-semibold text-foreground flex items-center gap-2">
+                    <Bell className="h-4 w-4" />
                     Report Delivery Timing (IST)
-                  </CardTitle>
-                  <CardDescription>
+                  </p>
+                  <p className="text-xs text-muted-foreground mt-0.5">
                     Choose when you receive automated daily reports. Defaults are after market close and before open.
-                  </CardDescription>
-                </CardHeader>
-                <CardContent className="space-y-6">
+                  </p>
+                </div>
+                <div className="p-5 space-y-6">
                   {/* EOD Report Time */}
                   <div className="space-y-2">
                     <Label htmlFor="eod-time">Post-Market Report (EOD)</Label>
@@ -1020,8 +1024,8 @@ export default function Settings() {
                     ℹ️ Reports are sent to your WhatsApp (guardian number) and as push notifications.
                     If no custom time is set, the default times above are used.
                   </div>
-                </CardContent>
-              </Card>
+                </div>
+              </div>
             </div>
           </TabsContent>
         </Tabs>

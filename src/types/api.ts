@@ -153,22 +153,16 @@ export interface MoneySaved {
 }
 
 export interface ShieldSummary {
-  capital_defended: number;
-  this_week: number;
-  this_month: number;
-  shield_score: number;
   total_alerts: number;
-  heeded: number;
-  ignored: number;
+  danger_count: number;
+  caution_count: number;
+  heeded_count: number;
+  continued_count: number;
+  /** Net P&L of all trades taken AFTER alerts were not heeded. Negative = additional losses. */
+  post_alert_pnl_continued: number;
   heeded_streak: number;
-  blowups_prevented: number;
-  checkpoint_coverage: {
-    complete: number;    // alerts with real verified data
-    calculating: number; // alerts where T+30 check is pending
-    unavailable: number; // no open position at alert time, or pre-checkpoint alerts
-  };
-  data_points: number;
-  is_partial?: boolean;  // true when some checkpoints are still calculating — capital_defended is a lower bound
+  /** Days with ≥3 danger alerts — high-spiral sessions */
+  spiral_sessions: number;
 }
 
 export interface ShieldTimelineItem {
@@ -177,30 +171,17 @@ export interface ShieldTimelineItem {
   pattern_type: string;
   severity: string;
   message: string;
-  outcome: 'heeded' | 'ignored' | 'partially_heeded';
   trigger_symbol: string;
-  trigger_trade: {
+  outcome: 'heeded' | 'continued';
+  post_alert_trade_count: number;
+  post_alert_pnl: number;
+  post_alert_trades: {
     tradingsymbol: string;
-    quantity: number;
-    average_price: number;
-    transaction_type: string;
-  } | null;
-  capital_defended: number | null;
+    realized_pnl: number;
+    exit_time: string | null;
+  }[];
+  narrative: string;
   details: Record<string, unknown> | null;
-  // Real counterfactual data from AlertCheckpoint
-  calculation_status: 'pending' | 'calculating' | 'complete' | 'no_positions' | 'error' | null;
-  money_saved: number | null;             // user_actual_pnl − counterfactual_pnl_t30 (can be negative)
-  counterfactual_pnl_t30: number | null;  // what P&L would have been if position held to T+30
-  user_actual_pnl: number | null;         // what user actually realised in the 30-min window
-  position_details: {                     // snapshot of position at alert time
-    tradingsymbol: string | null;
-    quantity: number | null;
-    avg_entry_price: number | null;
-    ltp_at_alert: number | null;
-    unrealised_pnl: number | null;
-  } | null;
-  context_narrative: string | null;       // human-readable one-sentence story
-  capital_at_alert?: number | null;       // capital at risk when alert fired (no_positions case)
 }
 
 export interface PatternBreakdown {
@@ -208,10 +189,9 @@ export interface PatternBreakdown {
   display_name: string;
   alerts: number;
   heeded: number;
-  ignored: number;
+  continued: number;
   heeded_pct: number;
-  avg_defended: number;
-  total_defended: number;
+  post_alert_pnl: number;
 }
 
 export interface TradingPersona {

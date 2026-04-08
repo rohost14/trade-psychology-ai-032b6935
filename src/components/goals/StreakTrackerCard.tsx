@@ -1,9 +1,4 @@
-// Streak Tracker Card - Visual display of discipline streak
-// Positive reinforcement through achievement tracking
-
 import { Flame, Trophy, Calendar } from 'lucide-react';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Badge } from '@/components/ui/badge';
 import { StreakData } from '@/types/patterns';
 import { cn } from '@/lib/utils';
 
@@ -14,11 +9,7 @@ interface StreakTrackerCardProps {
 
 export function StreakTrackerCard({ streak, goalDays = 30 }: StreakTrackerCardProps) {
   const progressPercent = Math.min((streak.current_streak_days / goalDays) * 100, 100);
-  
-  // Get last 30 days for visual display
   const last30Days = streak.daily_status.slice(0, 30);
-  
-  // Fill in missing days with empty status
   const displayDays = Array.from({ length: 30 }, (_, i) => {
     const day = last30Days[i];
     if (day) {
@@ -30,51 +21,48 @@ export function StreakTrackerCard({ streak, goalDays = 30 }: StreakTrackerCardPr
     return { status: 'empty' };
   });
 
+  const isOnFire = streak.current_streak_days >= 7;
+
   return (
-    <Card>
-      <CardHeader className="pb-3">
-        <div className="flex items-center justify-between">
-          <CardTitle className="text-lg flex items-center gap-2">
-            <Flame className={cn(
-              "h-5 w-5",
-              streak.current_streak_days >= 7 ? "text-warning" : "text-muted-foreground"
-            )} />
-            Discipline Streak
-          </CardTitle>
-          {streak.current_streak_days >= 7 && (
-            <Badge variant="default" className="bg-warning text-warning-foreground">
-              🔥 On Fire!
-            </Badge>
-          )}
-        </div>
-      </CardHeader>
-      <CardContent className="space-y-4">
-        {/* Main Streak Display */}
-        <div className="text-center py-4">
-          <p className="text-5xl font-bold font-mono text-primary">
+    <div className="tm-card overflow-hidden">
+      <div className="px-5 py-4 border-b border-border flex items-center justify-between">
+        <p className="text-sm font-semibold text-foreground flex items-center gap-1.5">
+          <Flame className={cn('h-4 w-4', isOnFire ? 'text-tm-obs' : 'text-muted-foreground')} />
+          Discipline Streak
+        </p>
+        {isOnFire && (
+          <span className="text-[11px] font-medium px-2 py-0.5 rounded-full bg-amber-50 dark:bg-amber-900/20 text-tm-obs">
+            On Fire!
+          </span>
+        )}
+      </div>
+      <div className="p-5 space-y-4">
+        {/* Main streak number */}
+        <div className="text-center py-3">
+          <p className="text-5xl font-bold font-mono tabular-nums text-tm-brand">
             {streak.current_streak_days}
           </p>
-          <p className="text-sm text-muted-foreground mt-1">days without a high/critical alert</p>
+          <p className="text-xs text-muted-foreground mt-1">days without a high/critical alert</p>
         </div>
-        
-        {/* Progress to Goal */}
-        <div className="space-y-2">
-          <div className="flex items-center justify-between text-sm">
+
+        {/* Progress to goal */}
+        <div className="space-y-1.5">
+          <div className="flex items-center justify-between text-xs">
             <span className="text-muted-foreground">Progress to {goalDays}-day goal</span>
-            <span className="font-mono">{streak.current_streak_days}/{goalDays}</span>
+            <span className="font-mono tabular-nums text-foreground">{streak.current_streak_days}/{goalDays}</span>
           </div>
-          <div className="h-3 bg-muted rounded-full overflow-hidden">
-            <div 
-              className="h-full bg-primary transition-all duration-500"
+          <div className="h-2 bg-muted rounded-full overflow-hidden">
+            <div
+              className="h-full bg-tm-brand rounded-full transition-all duration-500"
               style={{ width: `${progressPercent}%` }}
             />
           </div>
         </div>
-        
-        {/* Visual Day Grid */}
+
+        {/* Day grid */}
         <div className="space-y-2">
-          <p className="text-sm font-medium text-muted-foreground flex items-center gap-2">
-            <Calendar className="h-4 w-4" />
+          <p className="tm-label flex items-center gap-1.5">
+            <Calendar className="h-3 w-3" />
             Last 30 Days
           </p>
           <div className="flex flex-wrap gap-1">
@@ -82,66 +70,56 @@ export function StreakTrackerCard({ streak, goalDays = 30 }: StreakTrackerCardPr
               <div
                 key={i}
                 className={cn(
-                  "w-4 h-4 rounded-sm transition-colors",
-                  day.status === 'success' && "bg-success",
-                  day.status === 'broken' && "bg-destructive",
-                  day.status === 'non-trading' && "bg-muted-foreground/30",
-                  day.status === 'empty' && "bg-muted"
+                  'w-4 h-4 rounded-sm transition-colors',
+                  day.status === 'success' && 'bg-tm-profit',
+                  day.status === 'broken' && 'bg-tm-loss',
+                  day.status === 'non-trading' && 'bg-muted-foreground/25',
+                  day.status === 'empty' && 'bg-muted'
                 )}
                 title={
                   day.status === 'success' ? 'Clean — no high/critical alert' :
                   day.status === 'broken' ? 'High or critical alert triggered' :
-                  day.status === 'non-trading' ? 'No alerts recorded' :
-                  'No data'
+                  day.status === 'non-trading' ? 'No alerts recorded' : 'No data'
                 }
               />
             ))}
           </div>
-          <div className="flex items-center gap-4 text-xs text-muted-foreground">
-            <div className="flex items-center gap-1">
-              <div className="w-3 h-3 rounded-sm bg-success" />
-              <span>Clean</span>
-            </div>
-            <div className="flex items-center gap-1">
-              <div className="w-3 h-3 rounded-sm bg-destructive" />
-              <span>Alert triggered</span>
-            </div>
-            <div className="flex items-center gap-1">
-              <div className="w-3 h-3 rounded-sm bg-muted-foreground/30" />
-              <span>No data</span>
-            </div>
+          <div className="flex items-center gap-4 text-[10px] text-muted-foreground">
+            <span className="flex items-center gap-1"><span className="w-2.5 h-2.5 rounded-sm bg-tm-profit inline-block" />Clean</span>
+            <span className="flex items-center gap-1"><span className="w-2.5 h-2.5 rounded-sm bg-tm-loss inline-block" />Alert</span>
+            <span className="flex items-center gap-1"><span className="w-2.5 h-2.5 rounded-sm bg-muted inline-block" />No data</span>
           </div>
         </div>
-        
+
         {/* Stats */}
         <div className="grid grid-cols-2 gap-3 pt-3 border-t border-border">
-          <div className="text-center p-3 rounded-lg bg-muted/50">
-            <p className="text-2xl font-bold font-mono">{streak.longest_streak_days}</p>
-            <p className="text-xs text-muted-foreground">Longest Streak</p>
+          <div className="text-center p-3 rounded-lg bg-muted/40">
+            <p className="text-xl font-bold font-mono tabular-nums text-foreground">{streak.longest_streak_days}</p>
+            <p className="text-[10px] text-muted-foreground mt-0.5">Longest Streak</p>
           </div>
-          <div className="text-center p-3 rounded-lg bg-muted/50">
-            <p className="text-2xl font-bold font-mono">{streak.milestones_achieved.length}</p>
-            <p className="text-xs text-muted-foreground">Milestones</p>
+          <div className="text-center p-3 rounded-lg bg-muted/40">
+            <p className="text-xl font-bold font-mono tabular-nums text-foreground">{streak.milestones_achieved.length}</p>
+            <p className="text-[10px] text-muted-foreground mt-0.5">Milestones</p>
           </div>
         </div>
-        
-        {/* Recent Milestones */}
+
+        {/* Milestones */}
         {streak.milestones_achieved.length > 0 && (
           <div className="space-y-2">
-            <p className="text-sm font-medium text-muted-foreground flex items-center gap-2">
-              <Trophy className="h-4 w-4" />
+            <p className="tm-label flex items-center gap-1.5">
+              <Trophy className="h-3 w-3" />
               Achievements
             </p>
-            <div className="flex flex-wrap gap-2">
+            <div className="flex flex-wrap gap-1.5">
               {streak.milestones_achieved.map((milestone) => (
-                <Badge key={milestone.days} variant="secondary">
+                <span key={milestone.days} className="text-[11px] font-medium px-2 py-0.5 rounded-full bg-teal-50 dark:bg-teal-900/20 text-tm-brand">
                   🏆 {milestone.label}
-                </Badge>
+                </span>
               ))}
             </div>
           </div>
         )}
-      </CardContent>
-    </Card>
+      </div>
+    </div>
   );
 }

@@ -4,9 +4,10 @@ import {
   Tooltip, ResponsiveContainer, ReferenceLine, Cell,
 } from 'recharts';
 import {
-  Loader2, TrendingUp, TrendingDown, Target, BarChart3,
-  Calendar, Flame, Trophy, Clock, Zap, ArrowUp, ArrowDown,
+  TrendingUp, TrendingDown, BarChart3,
+  Flame, Trophy, Clock, Zap,
 } from 'lucide-react';
+import { Skeleton } from '@/components/ui/skeleton';
 import { cn } from '@/lib/utils';
 import { formatCurrency } from '@/lib/formatters';
 import { api } from '@/lib/api';
@@ -100,15 +101,19 @@ export default function OverviewTab({ days }: OverviewTabProps) {
 
   if (isLoading) {
     return (
-      <div className="flex items-center justify-center min-h-[40vh]">
-        <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+      <div className="space-y-3">
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-px bg-border rounded-lg overflow-hidden">
+          {[1,2,3,4].map(i => <Skeleton key={i} className="h-16 rounded-none" />)}
+        </div>
+        <Skeleton className="h-[300px] rounded-xl" />
+        <Skeleton className="h-[240px] rounded-xl" />
       </div>
     );
   }
 
   if (!data?.has_data || !data.kpis) {
     return (
-      <div className="flex flex-col items-center justify-center min-h-[40vh] bg-card rounded-lg border border-border">
+      <div className="flex flex-col items-center justify-center min-h-[40vh] tm-card overflow-hidden">
         <BarChart3 className="h-10 w-10 text-muted-foreground/40 mb-3" />
         <p className="font-medium text-foreground">No trading data for this period</p>
         <p className="text-sm text-muted-foreground mt-1">Complete some trades to see analytics</p>
@@ -129,26 +134,26 @@ export default function OverviewTab({ days }: OverviewTabProps) {
         <KPICell
           label="Total P&L"
           value={formatCurrency(kpis.total_pnl)}
-          color={isProfit ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'}
+          color={isProfit ? 'text-tm-profit' : 'text-tm-loss'}
           icon={isProfit ? TrendingUp : TrendingDown}
           highlight
         />
         <KPICell
           label="Win Rate"
           value={`${kpis.win_rate}%`}
-          color={kpis.win_rate >= 50 ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'}
+          color={kpis.win_rate >= 50 ? 'text-tm-profit' : 'text-tm-loss'}
           sub={`${kpis.winners}W / ${kpis.losers}L of ${kpis.total_trades}`}
         />
         <KPICell
           label="Profit Factor"
           value={kpis.profit_factor > 0 ? kpis.profit_factor.toFixed(2) : '—'}
-          color={kpis.profit_factor >= 1.5 ? 'text-green-600 dark:text-green-400' : kpis.profit_factor >= 1 ? 'text-foreground' : 'text-red-600 dark:text-red-400'}
+          color={kpis.profit_factor >= 1.5 ? 'text-tm-profit' : kpis.profit_factor >= 1 ? 'text-foreground' : 'text-tm-loss'}
           sub={kpis.profit_factor >= 1.5 ? 'Good edge' : kpis.profit_factor >= 1 ? 'Breakeven zone' : 'Losing edge'}
         />
         <KPICell
           label="Expectancy"
           value={formatCurrency(kpis.expectancy)}
-          color={kpis.expectancy >= 0 ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'}
+          color={kpis.expectancy >= 0 ? 'text-tm-profit' : 'text-tm-loss'}
           sub="Avg P&L per trade"
           icon={Zap}
         />
@@ -159,26 +164,26 @@ export default function OverviewTab({ days }: OverviewTabProps) {
         <KPICell
           label="Avg Win"
           value={formatCurrency(kpis.avg_win)}
-          color="text-green-600 dark:text-green-400"
+          color="text-tm-profit"
           sub={`Largest: ${formatCurrency(kpis.largest_win)}`}
         />
         <KPICell
           label="Avg Loss"
           value={formatCurrency(kpis.avg_loss)}
-          color="text-red-600 dark:text-red-400"
+          color="text-tm-loss"
           sub={`Largest: ${formatCurrency(kpis.largest_loss)}`}
         />
         <KPICell
           label="Best Day"
           value={kpis.best_day ? formatCurrency(kpis.best_day.pnl) : '—'}
-          color="text-green-600 dark:text-green-400"
+          color="text-tm-profit"
           sub={kpis.best_day ? `${formatDateShort(kpis.best_day.date)} (${kpis.best_day.trades} trades)` : ''}
           icon={Trophy}
         />
         <KPICell
           label="Worst Day"
           value={kpis.worst_day ? formatCurrency(kpis.worst_day.pnl) : '—'}
-          color="text-red-600 dark:text-red-400"
+          color="text-tm-loss"
           sub={kpis.worst_day ? `${formatDateShort(kpis.worst_day.date)} (${kpis.worst_day.trades} trades)` : ''}
           icon={Flame}
         />
@@ -212,17 +217,17 @@ export default function OverviewTab({ days }: OverviewTabProps) {
         </div>
         <div className="bg-card px-4 py-3">
           <p className="text-xs text-muted-foreground">Win Streak</p>
-          <p className="text-lg font-bold tabular-nums text-green-600 dark:text-green-400">{kpis.max_win_streak}</p>
+          <p className="text-lg font-bold tabular-nums text-tm-profit">{kpis.max_win_streak}</p>
         </div>
         <div className="bg-card px-4 py-3">
           <p className="text-xs text-muted-foreground">Loss Streak</p>
-          <p className="text-lg font-bold tabular-nums text-red-600 dark:text-red-400">{kpis.max_loss_streak}</p>
+          <p className="text-lg font-bold tabular-nums text-tm-loss">{kpis.max_loss_streak}</p>
         </div>
         <div className="bg-card px-4 py-3">
           <p className="text-xs text-muted-foreground">Current Streak</p>
           <p className={cn(
             'text-lg font-bold tabular-nums',
-            kpis.current_streak_type === 'win' ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'
+            kpis.current_streak_type === 'win' ? 'text-tm-profit' : 'text-tm-loss'
           )}>
             {kpis.current_streak} {kpis.current_streak_type === 'win' ? 'W' : kpis.current_streak_type === 'loss' ? 'L' : '—'}
           </p>
@@ -231,7 +236,7 @@ export default function OverviewTab({ days }: OverviewTabProps) {
 
       {/* Equity Curve */}
       {equity_curve.length > 1 && (
-        <div className="bg-card rounded-lg border border-border">
+        <div className="tm-card overflow-hidden">
           <div className="px-4 py-3 border-b border-border flex items-center justify-between">
             <div>
               <h3 className="text-sm font-semibold text-foreground">Equity Curve</h3>
@@ -239,7 +244,7 @@ export default function OverviewTab({ days }: OverviewTabProps) {
             </div>
             <div className={cn(
               'text-sm font-bold tabular-nums font-mono',
-              isProfit ? 'text-green-600' : 'text-red-600'
+              isProfit ? 'text-tm-profit' : 'text-tm-loss'
             )}>
               {isProfit ? '+' : ''}{formatCurrency(kpis.total_pnl)}
             </div>
@@ -250,8 +255,8 @@ export default function OverviewTab({ days }: OverviewTabProps) {
                 <AreaChart data={equity_curve}>
                   <defs>
                     <linearGradient id="equityGradient" x1="0" y1="0" x2="0" y2="1">
-                      <stop offset="0%" stopColor={isProfit ? 'hsl(142, 71%, 45%)' : 'hsl(0, 84%, 60%)'} stopOpacity={0.2} />
-                      <stop offset="100%" stopColor={isProfit ? 'hsl(142, 71%, 45%)' : 'hsl(0, 84%, 60%)'} stopOpacity={0} />
+                      <stop offset="0%" stopColor={isProfit ? '#16A34A' : '#DC2626'} stopOpacity={0.2} />
+                      <stop offset="100%" stopColor={isProfit ? '#16A34A' : '#DC2626'} stopOpacity={0} />
                     </linearGradient>
                   </defs>
                   <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" strokeOpacity={0.5} vertical={false} />
@@ -274,7 +279,7 @@ export default function OverviewTab({ days }: OverviewTabProps) {
                   <Area
                     type="monotone"
                     dataKey="cumulative_pnl"
-                    stroke={isProfit ? 'hsl(142, 71%, 45%)' : 'hsl(0, 84%, 60%)'}
+                    stroke={isProfit ? '#16A34A' : '#DC2626'}
                     strokeWidth={2}
                     fill="url(#equityGradient)"
                   />
@@ -287,7 +292,7 @@ export default function OverviewTab({ days }: OverviewTabProps) {
 
       {/* Daily P&L Bar Chart */}
       {daily_pnl.length > 0 && (
-        <div className="bg-card rounded-lg border border-border">
+        <div className="tm-card overflow-hidden">
           <div className="px-4 py-3 border-b border-border flex items-center justify-between">
             <div>
               <h3 className="text-sm font-semibold text-foreground">Daily P&L</h3>
@@ -295,11 +300,11 @@ export default function OverviewTab({ days }: OverviewTabProps) {
             </div>
             <div className="flex items-center gap-3 text-xs text-muted-foreground">
               <span className="flex items-center gap-1">
-                <span className="w-2 h-2 rounded-full bg-green-500" />
+                <span className="w-2 h-2 rounded-full bg-tm-profit" />
                 {kpis.win_days} green
               </span>
               <span className="flex items-center gap-1">
-                <span className="w-2 h-2 rounded-full bg-red-500" />
+                <span className="w-2 h-2 rounded-full bg-tm-loss" />
                 {kpis.loss_days} red
               </span>
             </div>
@@ -329,7 +334,7 @@ export default function OverviewTab({ days }: OverviewTabProps) {
                     {daily_pnl.map((entry, index) => (
                       <Cell
                         key={index}
-                        fill={entry.pnl >= 0 ? 'hsl(142, 71%, 45%)' : 'hsl(0, 84%, 60%)'}
+                        fill={entry.pnl >= 0 ? '#16A34A' : '#DC2626'}
                       />
                     ))}
                   </Bar>
@@ -356,14 +361,14 @@ export default function OverviewTab({ days }: OverviewTabProps) {
                       <td className="px-4 py-1.5 text-xs text-foreground">{formatDateShort(day.date)}</td>
                       <td className={cn(
                         'px-3 py-1.5 text-right text-xs tabular-nums font-mono font-medium',
-                        day.pnl >= 0 ? 'text-green-600' : 'text-red-600'
+                        day.pnl >= 0 ? 'text-tm-profit' : 'text-tm-loss'
                       )}>
                         {day.pnl >= 0 ? '+' : ''}{formatCurrency(day.pnl)}
                       </td>
                       <td className="px-3 py-1.5 text-right text-xs tabular-nums text-muted-foreground">{day.trades}</td>
                       <td className={cn(
                         'px-3 py-1.5 text-right text-xs tabular-nums',
-                        day.win_rate >= 50 ? 'text-green-600' : 'text-red-600'
+                        day.win_rate >= 50 ? 'text-tm-profit' : 'text-tm-loss'
                       )}>
                         {day.win_rate}%
                       </td>
@@ -414,7 +419,7 @@ function EquityTooltip({ active, payload }: any) {
   return (
     <div className="bg-popover border border-border rounded-lg p-3 shadow-lg text-sm">
       <p className="font-medium text-foreground mb-1">{formatDateShort(d.date)}</p>
-      <p className={cn('tabular-nums font-mono', d.cumulative_pnl >= 0 ? 'text-green-600' : 'text-red-600')}>
+      <p className={cn('tabular-nums font-mono', d.cumulative_pnl >= 0 ? 'text-tm-profit' : 'text-tm-loss')}>
         {d.cumulative_pnl >= 0 ? '+' : ''}{formatCurrency(d.cumulative_pnl)}
       </p>
       <p className="text-xs text-muted-foreground">{d.trade_count} trades</p>
@@ -428,7 +433,7 @@ function DailyTooltip({ active, payload }: any) {
   return (
     <div className="bg-popover border border-border rounded-lg p-3 shadow-lg text-sm">
       <p className="font-medium text-foreground mb-1">{formatDateShort(d.date)}</p>
-      <p className={cn('tabular-nums font-mono', d.pnl >= 0 ? 'text-green-600' : 'text-red-600')}>
+      <p className={cn('tabular-nums font-mono', d.pnl >= 0 ? 'text-tm-profit' : 'text-tm-loss')}>
         {d.pnl >= 0 ? '+' : ''}{formatCurrency(d.pnl)}
       </p>
       <p className="text-xs text-muted-foreground">{d.trades} trades &middot; {d.win_rate}% WR</p>

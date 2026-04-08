@@ -1,28 +1,25 @@
 import { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Link2, Loader2, AlertTriangle, RefreshCw, X } from 'lucide-react';
-import RiskGuardianCard from '@/components/dashboard/RiskGuardianCard';
+import { Link } from 'react-router-dom';
+import { Link2, Loader2, AlertTriangle, RefreshCw, X, Bot, ArrowRight } from 'lucide-react';
 import BlowupShieldCard from '@/components/dashboard/BlowupShieldCard';
 import RecentAlertsCard from '@/components/dashboard/RecentAlertsCard';
+import AlertDetailSheet from '@/components/alerts/AlertDetailSheet';
 import OpenPositionsTable from '@/components/dashboard/OpenPositionsTable';
 import ClosedTradesTable from '@/components/dashboard/ClosedTradesTable';
 import HoldingsCard from '@/components/dashboard/HoldingsCard';
-import MarginStatusCard from '@/components/dashboard/MarginStatusCard';
-import MarginInsightsCard from '@/components/dashboard/MarginInsightsCard';
 import PredictiveWarningsCard from '@/components/dashboard/PredictiveWarningsCard';
-import ProgressTrackingCard from '@/components/dashboard/ProgressTrackingCard';
+import SessionPaceGoalCard from '@/components/dashboard/SessionPaceGoalCard';
 import { useHoldings } from '@/hooks/useHoldings';
 import { TradeJournalSheet } from '@/components/dashboard/TradeJournalSheet';
-import OnboardingWizard from '@/components/onboarding/OnboardingWizard';
-import GettingStartedCard from '@/components/dashboard/GettingStartedCard';
 import { Button } from '@/components/ui/button';
-import { api } from '@/lib/api';
+import { cn } from '@/lib/utils';
+import { formatCurrencyWithSign } from '@/lib/formatters';
+import { api, apiDetailString } from '@/lib/api';
 import { Position, CompletedTrade } from '@/types/api';
-import { useAlerts } from '@/contexts/AlertContext';
+import { useAlerts, AlertNotification } from '@/contexts/AlertContext';
 import { useBroker } from '@/contexts/BrokerContext';
 import { useWebSocket } from '@/contexts/WebSocketContext';
-import { useOnboarding } from '@/hooks/useOnboarding';
-import { useMargins } from '@/hooks/useMargins';
 
 type PositionWithExtras = Position & { instrument_type: string; unrealized_pnl: number; current_value: number };
 
@@ -35,22 +32,92 @@ interface RiskStateData {
   last_synced: string;
 }
 
+// ─── Session State ────────────────────────────────────────────────────────────
+const STATE_CFG = {
+  stable: {
+    label: 'Stable',
+    pill: 'bg-teal-100 dark:bg-teal-900/40 text-teal-700 dark:text-teal-300',
+    dot: 'bg-teal-500',
+    desc: 'Session is on track — keep following your plan.',
+  },
+  caution: {
+    label: 'Caution',
+    pill: 'bg-amber-100 dark:bg-amber-900/40 text-amber-700 dark:text-amber-300',
+    dot: 'bg-amber-500',
+    desc: 'A few alerts active. Review before your next trade.',
+  },
+  risk: {
+    label: 'Risk',
+    pill: 'bg-red-100 dark:bg-red-900/40 text-red-700 dark:text-red-300',
+    dot: 'bg-red-500',
+    desc: 'Multiple high-severity patterns detected. Trade with extra caution.',
+  },
+};
 
+type SessionState = keyof typeof STATE_CFG;
+
+function getSessionState(unreadCount: number, highSevCount: number): SessionState {
+  if (highSevCount >= 2 || unreadCount >= 5) return 'risk';
+  if (highSevCount >= 1 || unreadCount >= 2) return 'caution';
+  return 'stable';
+}
+
+// ─── P&L Sparkline ────────────────────────────────────────────────────────────
+function PnlSparkline({ closed, unrealized, positive }: {
+  closed: CompletedTrade[]; unrealized: number; positive: boolean;
+}) {
+  const today = new Date(); today.setHours(0, 0, 0, 0);
+  const todayTrades = closed.filter(t => new Date(t.exit_time) >= today);
+
+  const points: number[] = [0];
+  let cum = 0;
+  for (const t of todayTrades) { cum += t.realized_pnl; points.push(cum); }
+  points.push(cum + unrealized);
+
+  if (points.length < 2) {
+    return <div className="flex-1 flex items-center justify-center text-[11px] text-muted-foreground/50">No data yet</div>;
+  }
+
+  const min = Math.min(...points);
+  const max = Math.max(...points);
+  const range = max - min || 1;
+  const W = 200; const H = 72;
+  const toX = (i: number) => (i / (points.length - 1)) * W;
+  const toY = (v: number) => H - ((v - min) / range) * (H * 0.85) - H * 0.075;
+  const zeroY = toY(0);
+
+  const linePath = points.map((v, i) => `${i === 0 ? 'M' : 'L'}${toX(i).toFixed(1)},${toY(v).toFixed(1)}`).join(' ');
+  const areaPath = `${linePath} L${W},${zeroY.toFixed(1)} L0,${zeroY.toFixed(1)} Z`;
+
+  const lineColor = positive ? 'var(--tm-profit, #16A34A)' : 'var(--tm-loss, #DC2626)';
+  const gradId = `spk-${positive ? 'p' : 'l'}`;
+
+  return (
+    <svg viewBox={`0 0 ${W} ${H}`} preserveAspectRatio="none" className="flex-1 w-full">
+      <defs>
+        <linearGradient id={gradId} x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0%" stopColor={lineColor} stopOpacity="0.18" />
+          <stop offset="100%" stopColor={lineColor} stopOpacity="0.02" />
+        </linearGradient>
+      </defs>
+      <line x1="0" y1={zeroY} x2={W} y2={zeroY} stroke="currentColor" strokeOpacity="0.12" strokeWidth="1" strokeDasharray="3 3" className="text-muted-foreground" />
+      <path d={areaPath} fill={`url(#${gradId})`} />
+      <path d={linePath} fill="none" stroke={lineColor} strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" />
+      <circle cx={toX(points.length - 1)} cy={toY(points[points.length - 1])} r="3" fill={lineColor} />
+    </svg>
+  );
+}
+
+// ─── Dashboard ────────────────────────────────────────────────────────────────
 export default function Dashboard() {
   const navigate = useNavigate();
   const { isConnected, isLoading: brokerLoading, account, connect, syncTrades, syncStatus, syncError, isTokenExpired } = useBroker();
   const { lastTradeEvent } = useWebSocket();
   const { alerts, acknowledgeAlert } = useAlerts();
-  const { showOnboarding, completeOnboarding, skipOnboarding, reopenOnboarding, status: onboardingStatus } = useOnboarding();
 
-  // Stabilize account id to prevent callback churn
   const accountId = account?.id;
   const lastSyncAt = account?.last_sync_at;
 
-  // Fetch real margin data from Kite API
-  const { margins, insights: marginInsights, isLoading: marginsLoading, refetch: refetchMargins } = useMargins(accountId);
-
-  // Fetch holdings
   const { holdings, summary: holdingsSummary, isLoading: holdingsLoading } = useHoldings(accountId);
 
   const [isSyncing, setIsSyncing] = useState(false);
@@ -62,77 +129,66 @@ export default function Dashboard() {
   const [tradesError, setTradesError] = useState<string | null>(null);
   const [riskState, setRiskState] = useState<RiskStateData | null>(null);
   const [dataLoaded, setDataLoaded] = useState(false);
-  // Session P&L in its own state — never wiped during riskState refetches
   const [sessionPnlDisplay, setSessionPnlDisplay] = useState<number>(0);
+  const [realizedPnlDisplay, setRealizedPnlDisplay] = useState<number>(0);
 
   const [tradeStats, setTradeStats] = useState<{
     trades_today: number;
     win_rate: number;
     max_drawdown: number;
     risk_used: number;
-    margin_utilization?: number;
-    margin_available?: number;
   } | null>(null);
 
+  const [selectedAlert, setSelectedAlert] = useState<AlertNotification | null>(null);
+
+  const [journaledIds, setJournaledIds] = useState<Set<string>>(new Set());
   const [journalOpen, setJournalOpen] = useState(false);
   const [selectedTrade, setSelectedTrade] = useState<PositionWithExtras | CompletedTrade | null>(null);
   const [selectedType, setSelectedType] = useState<'position' | 'closed'>('position');
 
-  // Capital prompt — shown when trading_capital is not set
   const [showCapitalPrompt, setShowCapitalPrompt] = useState(false);
   const [capitalInput, setCapitalInput] = useState('');
   const [capitalSaving, setCapitalSaving] = useState(false);
 
-  // Use ref for account id in fetch callbacks to avoid recreating them
   const accountIdRef = useRef(accountId);
   accountIdRef.current = accountId;
-
-  // Track whether we've already fetched for this sync cycle
   const fetchedForSyncRef = useRef<string | null>(null);
+  const seenTradeIdsRef = useRef<Set<string>>(new Set());
+  const journalPromptTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  // Fetch positions - stable callback (no account in deps)
+  // ── Fetch callbacks ──────────────────────────────────────────────────────
   const fetchPositions = useCallback(async () => {
     const id = accountIdRef.current;
     if (!id) return;
-
     try {
       setPositionsLoading(true);
       setPositionsError(null);
       const response = await api.get('/api/positions/');
-
       const transformedPositions = (response.data.positions || []).map((pos: any) => ({
         ...pos,
         instrument_type: pos.instrument_type || 'OPTION',
         unrealized_pnl: parseFloat(pos.unrealized_pnl) || parseFloat(pos.pnl) || 0,
         current_value: pos.last_price
-          ? parseFloat(pos.last_price) * Math.abs(pos.total_quantity || 0)
-          : (parseFloat(pos.average_entry_price) || 0) * Math.abs(pos.total_quantity || 0),
+          ? parseFloat(pos.last_price) * Math.abs(pos.total_quantity || 0) * (parseFloat(pos.multiplier) || 1)
+          : (parseFloat(pos.average_entry_price) || 0) * Math.abs(pos.total_quantity || 0) * (parseFloat(pos.multiplier) || 1),
         last_price: parseFloat(pos.last_price) || 0,
-        day_pnl: parseFloat(pos.day_pnl) || 0
+        day_pnl: parseFloat(pos.day_pnl) || 0,
       }));
-
       setPositions(transformedPositions);
     } catch (err: any) {
-      const msg = err.response?.data?.detail || err.message || 'Failed to fetch positions';
-      console.error('Error fetching positions:', msg);
-      setPositionsError(msg);
+      setPositionsError(apiDetailString(err.response?.data?.detail, err.message || 'Failed to fetch positions'));
     } finally {
       setPositionsLoading(false);
     }
   }, []);
 
-  // Fetch completed trades (flat-to-flat rounds) - stable callback
   const fetchTrades = useCallback(async () => {
     const id = accountIdRef.current;
     if (!id) return;
-
     try {
       setTradesLoading(true);
       setTradesError(null);
-      const response = await api.get('/api/trades/completed', {
-        params: { limit: 50 }
-      });
-
+      const response = await api.get('/api/trades/completed', { params: { limit: 50 } });
       const trades: CompletedTrade[] = (response.data.trades || []).map((t: any) => ({
         id: t.id,
         broker_account_id: t.broker_account_id,
@@ -156,25 +212,19 @@ export default function Dashboard() {
         status: t.status || 'closed',
         created_at: t.created_at,
       }));
-
       setClosedTrades(trades);
     } catch (err: any) {
-      const msg = err.response?.data?.detail || err.message || 'Failed to fetch trades';
-      console.error('Error fetching trades:', msg);
-      setTradesError(msg);
+      setTradesError(apiDetailString(err.response?.data?.detail, err.message || 'Failed to fetch trades'));
     } finally {
       setTradesLoading(false);
     }
   }, []);
 
-  // Fetch risk state - stable callback
   const fetchRiskState = useCallback(async () => {
     const id = accountIdRef.current;
     if (!id) return;
-
     try {
       const response = await api.get('/api/risk/state');
-
       const data = response.data;
       setRiskState({
         risk_state: data.risk_state || 'safe',
@@ -183,33 +233,33 @@ export default function Dashboard() {
         active_patterns: data.active_patterns || [],
         unrealized_pnl: 0,
         ai_recommendations: data.recommendations || [],
-        last_synced: lastSyncAt ? `Synced ${formatTimeAgo(lastSyncAt)}` : 'Not synced yet'
+        last_synced: lastSyncAt ? `Synced ${formatTimeAgo(lastSyncAt)}` : 'Not synced yet',
       });
-    } catch (err: any) {
-      console.error('Error fetching risk state:', err);
+    } catch {
       setRiskState({
-        risk_state: 'safe',
-        status_message: 'Unable to fetch risk state',
-        active_patterns: [],
-        unrealized_pnl: 0,
-        ai_recommendations: [],
-        last_synced: 'Unknown'
+        risk_state: 'safe', status_message: 'Unable to fetch risk state',
+        active_patterns: [], unrealized_pnl: 0, ai_recommendations: [], last_synced: 'Unknown',
       });
     }
   }, [lastSyncAt]);
 
-  // Fetch all dashboard data - stable callback (no account dependency)
   const fetchAllData = useCallback(async () => {
     if (!accountIdRef.current) return;
-    await Promise.all([
-      fetchPositions(),
-      fetchTrades(),
-      fetchRiskState(),
-    ]);
+    await Promise.all([fetchPositions(), fetchTrades(), fetchRiskState()]);
     setDataLoaded(true);
   }, [fetchPositions, fetchTrades, fetchRiskState]);
 
-  // Load data immediately on connect — don't wait for sync
+  // Fetch journal entries
+  useEffect(() => {
+    if (!accountId) return;
+    api.get('/api/journal').then(res => {
+      const entries = res.data?.entries || [];
+      const ids = new Set<string>(entries.map((e: any) => e.trade_id).filter(Boolean));
+      setJournaledIds(ids);
+    }).catch(() => {});
+  }, [accountId]);
+
+  // Load on connect
   useEffect(() => {
     if (!isConnected || !accountId) return;
     const fetchKey = `connect-${accountId}`;
@@ -217,57 +267,64 @@ export default function Dashboard() {
     fetchedForSyncRef.current = fetchKey;
     fetchAllData();
 
-    // Check if trading_capital is set — needed for position sizing alerts
     const dismissed = localStorage.getItem(`capital_prompt_dismissed_${accountId}`);
     if (!dismissed) {
       api.get('/api/profile/').then((res) => {
-        const capital = res.data?.profile?.trading_capital;
-        if (!capital) setShowCapitalPrompt(true);
-      }).catch(() => {/* non-critical */});
+        if (!res.data?.profile?.trading_capital) setShowCapitalPrompt(true);
+      }).catch(() => {});
     }
   }, [isConnected, accountId, fetchAllData]);
 
-  // Re-fetch silently when sync completes (gets latest fills)
+  // Re-fetch when sync transitions to success
+  const prevSyncStatusRef = useRef<string>('idle');
   useEffect(() => {
-    if (syncStatus === 'success' && isConnected && accountId) {
+    const prev = prevSyncStatusRef.current;
+    prevSyncStatusRef.current = syncStatus;
+    if (syncStatus === 'success' && prev === 'syncing' && isConnected && accountId) {
       fetchAllData();
     }
-  }, [syncStatus]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [syncStatus, isConnected, accountId, fetchAllData]);
 
-  // React to WebSocket trade events — no polling needed.
-  // When Celery processes a trade (webhook → FIFO → BehaviorEngine),
-  // it publishes to Redis → FastAPI forwards via WebSocket → lastTradeEvent changes.
-  // This replaces ALL time-based polling for trade and position data.
+  // Re-fetch on WebSocket trade event
   useEffect(() => {
     if (!lastTradeEvent || !isConnected || isTokenExpired) return;
-    // Silent background refresh — no loading spinner
     fetchTrades();
     fetchPositions();
   }, [lastTradeEvent]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  // Calculate trade stats + session P&L (D1: realized+unrealized, D2: IST date, D4: real margin)
+  // Journal auto-prompt: open journal 45s after new trade closes
   useEffect(() => {
-    // Today boundary in browser local time (IST for Indian users)
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
+    if (!dataLoaded || closedTrades.length === 0) return;
+    if (seenTradeIdsRef.current.size === 0) {
+      closedTrades.forEach(t => seenTradeIdsRef.current.add(t.id));
+      return;
+    }
+    const newTrade = closedTrades.find(t => !seenTradeIdsRef.current.has(t.id) && !journaledIds.has(t.id));
+    closedTrades.forEach(t => seenTradeIdsRef.current.add(t.id));
+    if (!newTrade) return;
+    if (journalPromptTimerRef.current) clearTimeout(journalPromptTimerRef.current);
+    journalPromptTimerRef.current = setTimeout(() => {
+      if (!journalOpen) {
+        setSelectedTrade(newTrade);
+        setSelectedType('closed');
+        setJournalOpen(true);
+      }
+    }, 45_000);
+    return () => {
+      if (journalPromptTimerRef.current) clearTimeout(journalPromptTimerRef.current);
+    };
+  }, [closedTrades]); // eslint-disable-line react-hooks/exhaustive-deps
 
-    // Today's completed trades
+  // Compute session stats
+  useEffect(() => {
+    const today = new Date(); today.setHours(0, 0, 0, 0);
     const todayTrades = closedTrades.filter(t => new Date(t.exit_time) >= today);
     const winners = todayTrades.filter(t => t.realized_pnl > 0);
-
-    // Realized P&L from today's closed trades
     const realizedPnl = todayTrades.reduce((sum, t) => sum + t.realized_pnl, 0);
-
-    // Unrealized P&L from open positions
     const unrealizedPnl = positions.reduce((sum, p) => sum + (p.unrealized_pnl || 0), 0);
-
-    // Session P&L = realized + unrealized (broker standard: Zerodha, Sensibull)
     const sessionPnl = realizedPnl + unrealizedPnl;
 
-    // Max drawdown from completed trades sequence
-    let cumPnl = 0;
-    let peak = 0;
-    let maxDrawdown = 0;
+    let cumPnl = 0, peak = 0, maxDrawdown = 0;
     for (const trade of todayTrades) {
       cumPnl += trade.realized_pnl;
       if (cumPnl > peak) peak = cumPnl;
@@ -275,24 +332,18 @@ export default function Dashboard() {
       if (drawdown > maxDrawdown) maxDrawdown = drawdown;
     }
 
-    // Real margin utilization from Kite API (replaces hardcoded trades/10 formula)
-    const marginUtilization = margins?.overall?.max_utilization_pct ?? 0;
-
     setTradeStats({
       trades_today: todayTrades.length,
       win_rate: todayTrades.length > 0 ? (winners.length / todayTrades.length) * 100 : 0,
       max_drawdown: -maxDrawdown,
-      risk_used: marginUtilization,
-      margin_utilization: marginUtilization || undefined,
-      margin_available: margins?.equity?.available ?? undefined,
+      risk_used: 0,
     });
-
-    // Store session P&L in dedicated state (never wiped during riskState refetches)
     setSessionPnlDisplay(sessionPnl);
-    // Also keep riskState in sync when it exists
+    setRealizedPnlDisplay(realizedPnl);
     setRiskState(prev => prev ? { ...prev, unrealized_pnl: sessionPnl } : prev);
-  }, [closedTrades, positions, margins]);
+  }, [closedTrades, positions]);
 
+  // ── Handlers ─────────────────────────────────────────────────────────────
   const handleSaveCapital = async () => {
     const val = parseFloat(capitalInput.replace(/,/g, ''));
     if (!val || val <= 0) return;
@@ -300,9 +351,8 @@ export default function Dashboard() {
     try {
       await api.put('/api/profile/', { trading_capital: val });
       setShowCapitalPrompt(false);
-      localStorage.setItem(`capital_prompt_dismissed_${accountId}`, '1');
+      if (accountId) localStorage.setItem(`capital_prompt_dismissed_${accountId}`, '1');
     } catch {
-      // Non-critical — just dismiss
       setShowCapitalPrompt(false);
     } finally {
       setCapitalSaving(false);
@@ -317,18 +367,14 @@ export default function Dashboard() {
   const handleSync = async () => {
     setIsSyncing(true);
     try {
-      // Reset dedup key BEFORE sync so the effect can trigger a fresh fetch
       fetchedForSyncRef.current = null;
       await syncTrades();
-      // syncTrades sets syncStatus='success', which triggers fetchAllData via the useEffect above.
-      // No manual fetchAllData call needed — the effect handles it.
     } catch (err) {
       console.error('Sync failed:', err);
     } finally {
       setIsSyncing(false);
     }
   };
-
 
   const handlePositionClick = (position: PositionWithExtras) => {
     setSelectedTrade(position);
@@ -342,7 +388,14 @@ export default function Dashboard() {
     setJournalOpen(true);
   };
 
-  // Alert list for RecentAlertsCard — backend risk_alerts is the single source of truth
+  const handleJournalClose = (open: boolean) => {
+    if (!open && selectedTrade) {
+      setJournaledIds(prev => new Set([...prev, selectedTrade.id]));
+    }
+    setJournalOpen(open);
+  };
+
+  // ── Computed values ───────────────────────────────────────────────────────
   const mergedAlerts = useMemo(() => {
     const twoDaysAgo = Date.now() - 48 * 60 * 60 * 1000;
     return alerts
@@ -356,6 +409,7 @@ export default function Dashboard() {
         description: a.pattern.description,
         message: a.pattern.description,
         why_it_matters: a.pattern.insight,
+        details: a.pattern.details,
         timestamp: a.shown_at,
         acknowledged: a.acknowledged,
       }))
@@ -368,7 +422,19 @@ export default function Dashboard() {
     return closedTrades.filter(t => new Date(t.exit_time).getTime() > threeDaysAgo);
   }, [closedTrades]);
 
-  // Show loading state
+  const unreadCount = mergedAlerts.filter(a => !a.acknowledged).length;
+  const highSevCount = mergedAlerts.filter(a => !a.acknowledged && (a.severity === 'critical' || a.severity === 'high')).length;
+  const sessionStateKey = getSessionState(unreadCount, highSevCount);
+  const stateCfg = STATE_CFG[sessionStateKey];
+
+  const unjournaled = recentTrades.filter(t => {
+    const today = new Date(); today.setHours(0, 0, 0, 0);
+    return new Date(t.exit_time) >= today && !journaledIds.has(t.id);
+  }).length;
+
+  const pnlPositive = sessionPnlDisplay >= 0;
+
+  // ── Render guards ─────────────────────────────────────────────────────────
   if (brokerLoading) {
     return (
       <div className="w-full min-h-[60vh] flex items-center justify-center">
@@ -377,7 +443,6 @@ export default function Dashboard() {
     );
   }
 
-  // Show connect prompt if not connected
   if (!isConnected) {
     return (
       <div className="w-full min-h-[60vh] flex flex-col items-center justify-center animate-fade-in-up">
@@ -396,7 +461,6 @@ export default function Dashboard() {
     );
   }
 
-  // Show sync error with retry (only if we have no data at all and not currently loading)
   if (syncStatus === 'error' && !dataLoaded && !positionsLoading && !tradesLoading) {
     return (
       <div className="w-full min-h-[60vh] flex flex-col items-center justify-center gap-4">
@@ -417,42 +481,27 @@ export default function Dashboard() {
     );
   }
 
-  // Default risk state while loading
-  const displayRiskState = {
-    ...(riskState || {
-      risk_state: 'safe' as const,
-      status_message: 'Loading...',
-      active_patterns: [],
-      ai_recommendations: [],
-      last_synced: 'Loading...'
-    }),
-    // Use stable sessionPnlDisplay — never flickers to 0 during riskState refetches
-    unrealized_pnl: sessionPnlDisplay,
-  };
-
   return (
-    <div className="w-full min-h-screen">
-      {/* Degraded mode banner — token expired but historical data still works */}
+    <div className="w-full min-h-screen tm-page-bg">
+
+      {/* ── Banners ───────────────────────────────────────────────────────── */}
       {isTokenExpired && dataLoaded && (
-        <div className="mb-4 p-3 rounded-lg bg-amber-500/10 border border-amber-500/20 flex items-center justify-between animate-fade-in-up">
+        <div className="mb-4 px-3 py-2.5 rounded-lg bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800/30 flex items-center justify-between">
           <div className="flex items-center gap-2">
-            <AlertTriangle className="h-4 w-4 text-amber-600 dark:text-amber-400" />
-            <span className="text-sm text-amber-700 dark:text-amber-300">
+            <AlertTriangle className="h-3.5 w-3.5 text-amber-600 dark:text-amber-400 shrink-0" />
+            <span className="text-[13px] text-amber-700 dark:text-amber-300">
               Live sync paused — showing last known data. Analytics, chat and history still work.
             </span>
           </div>
         </div>
       )}
 
-      {/* Capital prompt — one-time, dismissible, enables position sizing alerts */}
       {showCapitalPrompt && dataLoaded && (
-        <div className="mb-4 p-3 rounded-lg bg-primary/5 border border-primary/20 flex flex-wrap items-center gap-3 animate-fade-in-up">
+        <div className="mb-4 px-3 py-2.5 rounded-lg bg-tm-brand/5 border border-tm-brand/20 flex flex-wrap items-center gap-3">
           <div className="flex-1 min-w-0">
-            <p className="text-sm font-medium text-foreground">
-              Enable position sizing alerts
-            </p>
-            <p className="text-xs text-muted-foreground mt-0.5">
-              Without your trading capital, we can't detect when a single trade is oversized. Takes 5 seconds.
+            <p className="text-[13px] font-medium text-foreground">Enable position sizing alerts</p>
+            <p className="text-[12px] text-muted-foreground mt-0.5">
+              Without your trading capital, we can't detect oversized positions.
             </p>
           </div>
           <div className="flex items-center gap-2 flex-shrink-0">
@@ -461,14 +510,14 @@ export default function Dashboard() {
               type="number"
               placeholder="e.g. 500000"
               value={capitalInput}
-              onChange={(e) => setCapitalInput(e.target.value)}
-              onKeyDown={(e) => e.key === 'Enter' && handleSaveCapital()}
-              className="w-32 px-2 py-1.5 text-sm bg-background border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-ring"
+              onChange={e => setCapitalInput(e.target.value)}
+              onKeyDown={e => e.key === 'Enter' && handleSaveCapital()}
+              className="w-32 px-2 py-1.5 text-sm bg-background border border-border rounded-lg focus:outline-none focus:ring-1 focus:ring-ring"
             />
             <button
               onClick={handleSaveCapital}
               disabled={!capitalInput || capitalSaving}
-              className="px-3 py-1.5 text-sm bg-primary text-primary-foreground rounded-lg hover:bg-primary/90 disabled:opacity-50"
+              className="px-3 py-1.5 text-sm bg-tm-brand text-white rounded-lg hover:bg-tm-brand/90 disabled:opacity-50"
             >
               {capitalSaving ? <Loader2 className="h-3 w-3 animate-spin" /> : 'Save'}
             </button>
@@ -479,178 +528,214 @@ export default function Dashboard() {
         </div>
       )}
 
-      {/* Sync error banner (when data is loaded but sync had errors) */}
       {syncStatus === 'error' && dataLoaded && !isTokenExpired && (
-        <div className="mb-4 p-3 rounded-lg bg-destructive/10 border border-destructive/20 flex items-center justify-between animate-fade-in-up">
+        <div className="mb-4 px-3 py-2.5 rounded-lg bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800/30 flex items-center justify-between">
           <div className="flex items-center gap-2">
-            <AlertTriangle className="h-4 w-4 text-destructive" />
-            <span className="text-sm text-destructive">
+            <AlertTriangle className="h-3.5 w-3.5 text-tm-loss shrink-0" />
+            <span className="text-[13px] text-tm-loss">
               Sync failed: {syncError || 'Could not refresh data'}. Showing cached data.
             </span>
           </div>
-          <Button onClick={handleSync} variant="ghost" size="sm" className="gap-1 text-destructive">
+          <Button onClick={handleSync} variant="ghost" size="sm" className="gap-1 text-tm-loss h-7 text-[13px]">
             <RefreshCw className="h-3 w-3" />
             Retry
           </Button>
         </div>
       )}
 
-      {/* Getting Started — shown to new users until they have data */}
-      <GettingStartedCard
-        tradeCount={closedTrades.length}
-        onboardingCompleted={onboardingStatus?.completed ?? false}
-        onOpenWizard={reopenOnboarding}
+      {/* ── Page Header ───────────────────────────────────────────────────── */}
+      <div className="flex items-center justify-between mb-4">
+        <h1 className="text-lg font-semibold text-foreground tracking-tight">Dashboard</h1>
+        <div className="flex items-center gap-3 text-[13px] text-muted-foreground font-mono tabular-nums">
+          <span>{tradeStats?.trades_today ?? 0} trades</span>
+          <span className="text-muted-foreground/30">·</span>
+          <span className={cn('font-semibold', pnlPositive ? 'text-tm-profit' : 'text-tm-loss')}>
+            {formatCurrencyWithSign(sessionPnlDisplay)}
+          </span>
+          {unreadCount > 0 && (
+            <>
+              <span className="text-muted-foreground/30">·</span>
+              <Link to="/alerts" className="text-tm-obs hover:underline font-medium">
+                {unreadCount} alert{unreadCount !== 1 ? 's' : ''}
+              </Link>
+            </>
+          )}
+          {unjournaled > 0 && (
+            <>
+              <span className="text-muted-foreground/30">·</span>
+              <span className="text-tm-obs">{unjournaled} to journal</span>
+            </>
+          )}
+        </div>
+      </div>
+
+      {/* ── Session Hero ──────────────────────────────────────────────────── */}
+      <div className="tm-card mb-5">
+        <div className="flex items-stretch">
+          {/* Left: state + P&L */}
+          <div className="flex-1 min-w-0 px-5 pt-4 pb-3">
+            <div className="flex items-center gap-2 mb-2">
+              <span className={cn('flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-semibold uppercase tracking-wide', stateCfg.pill)}>
+                <span className={cn('w-1.5 h-1.5 rounded-full', stateCfg.dot)} />
+                {stateCfg.label}
+              </span>
+            </div>
+            <div className="flex items-baseline gap-2 mb-1">
+              <span className={cn('text-[36px] font-black font-mono tabular-nums leading-none', pnlPositive ? 'text-tm-profit' : 'text-tm-loss')}>
+                {formatCurrencyWithSign(sessionPnlDisplay)}
+              </span>
+            </div>
+            <p className="text-[13px] text-muted-foreground leading-snug">{stateCfg.desc}</p>
+          </div>
+
+          {/* Right: sparkline */}
+          <div className="w-[176px] shrink-0 border-l border-slate-100 dark:border-neutral-700/60 px-4 pt-4 pb-3 flex flex-col">
+            <span className="tm-label mb-2">Cumulative P&L</span>
+            <PnlSparkline closed={closedTrades} unrealized={positions.reduce((s, p) => s + (p.unrealized_pnl || 0), 0)} positive={pnlPositive} />
+            <div className="flex items-center justify-between mt-1.5">
+              <span className="text-[10px] text-muted-foreground">open → now</span>
+              <span className={cn('text-[11px] font-mono tabular-nums font-semibold', pnlPositive ? 'text-tm-profit' : 'text-tm-loss')}>
+                {formatCurrencyWithSign(sessionPnlDisplay)}
+              </span>
+            </div>
+          </div>
+        </div>
+
+        {/* Stat footer */}
+        <div className="flex items-center flex-wrap gap-x-5 gap-y-1 border-t border-slate-100 dark:border-neutral-700/60 px-5 py-2.5">
+          <span className="text-[12px] text-muted-foreground">
+            <span className="font-mono tabular-nums font-semibold text-foreground">{tradeStats?.trades_today ?? 0}</span>
+            {' '}trades
+          </span>
+          {tradeStats && tradeStats.trades_today > 0 && (
+            <span className="text-[12px] text-muted-foreground">
+              <span className={cn('font-mono tabular-nums font-semibold', tradeStats.win_rate >= 50 ? 'text-tm-profit' : 'text-tm-loss')}>
+                {Math.round(tradeStats.win_rate)}%
+              </span>
+              {' '}win rate
+            </span>
+          )}
+          <span className="text-[12px] text-muted-foreground">
+            <span className={cn('font-mono tabular-nums font-semibold', realizedPnlDisplay >= 0 ? 'text-tm-profit' : 'text-tm-loss')}>
+              {formatCurrencyWithSign(realizedPnlDisplay)}
+            </span>
+            {' '}realized
+          </span>
+          {unjournaled > 0 && (
+            <span className="text-[12px] text-tm-obs font-medium">
+              {unjournaled} to journal
+            </span>
+          )}
+          {unreadCount > 0 && (
+            <Link to="/alerts" className="text-[12px] text-tm-obs font-medium hover:underline ml-auto">
+              {unreadCount} alert{unreadCount !== 1 ? 's' : ''} →
+            </Link>
+          )}
+        </div>
+      </div>
+
+      {/* ── Alerts (full-width) ───────────────────────────────────────────── */}
+      <div className="mb-5">
+        <RecentAlertsCard
+          alerts={mergedAlerts}
+          onAcknowledge={acknowledgeAlert}
+          onOpen={id => setSelectedAlert(alerts.find(a => a.id === id) ?? null)}
+        />
+      </div>
+
+      {/* ── Two-column layout ─────────────────────────────────────────────── */}
+      <div className="flex gap-5 items-start">
+
+        {/* Left 62% */}
+        <div className="flex-[62] min-w-0 space-y-5">
+          {positionsError && !positionsLoading && positions.length === 0 ? (
+            <div className="tm-card p-5 text-center">
+              <AlertTriangle className="h-5 w-5 text-tm-loss mx-auto mb-2" />
+              <p className="text-[13px] text-muted-foreground">{positionsError}</p>
+              <Button onClick={fetchPositions} variant="ghost" size="sm" className="mt-2">Retry</Button>
+            </div>
+          ) : (
+            <OpenPositionsTable
+              positions={positions}
+              isLoading={positionsLoading}
+              journaledIds={journaledIds}
+              onPositionClick={handlePositionClick}
+            />
+          )}
+
+          {tradesError && !tradesLoading && closedTrades.length === 0 ? (
+            <div className="tm-card p-5 text-center">
+              <AlertTriangle className="h-5 w-5 text-tm-loss mx-auto mb-2" />
+              <p className="text-[13px] text-muted-foreground">{tradesError}</p>
+              <Button onClick={fetchTrades} variant="ghost" size="sm" className="mt-2">Retry</Button>
+            </div>
+          ) : (
+            <ClosedTradesTable
+              trades={recentTrades}
+              isLoading={tradesLoading}
+              journaledIds={journaledIds}
+              onTradeClick={handleTradeClick}
+            />
+          )}
+        </div>
+
+        {/* Right 38% sticky */}
+        <div className="flex-[38] min-w-0 space-y-5 sticky top-4">
+          <BlowupShieldCard />
+          {accountId && (
+            <SessionPaceGoalCard
+              brokerAccountId={accountId}
+              tradesCount={tradeStats?.trades_today ?? 0}
+            />
+          )}
+
+          {/* AI Coach CTA */}
+          <Link
+            to="/chat"
+            className="tm-card p-4 flex items-center gap-3 hover:bg-slate-50 dark:hover:bg-slate-700/30 transition-colors group"
+          >
+            <div className="w-9 h-9 rounded-lg bg-tm-brand/10 flex items-center justify-center shrink-0">
+              <Bot className="w-4 h-4 text-tm-brand" />
+            </div>
+            <div className="flex-1 min-w-0">
+              <p className="text-sm font-semibold text-foreground">AI Trading Coach</p>
+              <p className="text-[12px] text-muted-foreground">Ask about your patterns or get a debrief</p>
+            </div>
+            <ArrowRight className="w-4 h-4 text-muted-foreground/50 group-hover:text-tm-brand transition-colors shrink-0" />
+          </Link>
+
+          {holdings.length > 0 && holdingsSummary && (
+            <HoldingsCard
+              holdings={holdings}
+              summary={holdingsSummary}
+              isLoading={holdingsLoading}
+            />
+          )}
+        </div>
+      </div>
+
+      {/* ── Predictive Warnings (full-width below) ─────────────────────────── */}
+      {accountId && (
+        <div className="mt-5">
+          <PredictiveWarningsCard brokerAccountId={accountId} />
+        </div>
+      )}
+
+      {/* ── Alert Detail Sheet ───────────────────────────────────────────── */}
+      <AlertDetailSheet
+        alert={selectedAlert}
+        open={selectedAlert !== null}
+        onClose={() => setSelectedAlert(null)}
+        onAcknowledge={id => { acknowledgeAlert(id); setSelectedAlert(null); }}
       />
 
-      {/* Page Header */}
-      <div className="mb-6 animate-fade-in-up flex items-start justify-between gap-4">
-        <div>
-          <h1 className="text-xl font-semibold text-foreground tracking-tight">Dashboard</h1>
-          <p className="text-sm text-muted-foreground mt-0.5">Real-time trading behavior monitoring</p>
-        </div>
-        <div className="shrink-0 text-right">
-          {(() => {
-            const now = new Date();
-            // Convert to IST: UTC + 5h30m. Use UTC getters on the shifted timestamp.
-            // Do NOT subtract browser timezone offset — getTime() is always UTC.
-            const ist = new Date(now.getTime() + 5.5 * 60 * 60 * 1000);
-            const h = ist.getUTCHours(), m = ist.getUTCMinutes(), day = ist.getUTCDay();
-            const isOpen = day >= 1 && day <= 5 &&
-              (h > 9 || (h === 9 && m >= 15)) && (h < 15 || (h === 15 && m <= 30));
-            const dateStr = now.toLocaleDateString('en-IN', { weekday: 'short', day: 'numeric', month: 'short' });
-            return (
-              <>
-                <p className="text-sm text-muted-foreground">{dateStr}</p>
-                <div className="flex items-center justify-end gap-1.5 mt-0.5">
-                  <span className={`w-1.5 h-1.5 rounded-full ${isOpen ? 'bg-emerald-500' : 'bg-muted-foreground/40'}`} />
-                  <span className="text-xs text-muted-foreground">
-                    {isOpen ? 'Market Open · 09:15–15:30' : 'Market Closed'}
-                  </span>
-                </div>
-              </>
-            );
-          })()}
-        </div>
-      </div>
-
-      {/* Main Grid */}
-      <div className="grid grid-cols-12 gap-6 lg:gap-8">
-        {/* Hero Card - Full width */}
-        <div className="col-span-12 animate-fade-in-up" style={{ animationDelay: '40ms' }}>
-          <RiskGuardianCard
-            data={displayRiskState}
-            stats={tradeStats || undefined}
-            onSync={handleSync}
-            isLoading={isSyncing}
-          />
-        </div>
-
-        {/* Left Column - Positions & Trades (priority content) */}
-        <div className="col-span-12 lg:col-span-8 space-y-6 lg:space-y-8">
-          <div className="animate-fade-in-up" style={{ animationDelay: '80ms' }}>
-            {positionsError && !positionsLoading && positions.length === 0 ? (
-              <div className="rounded-xl border border-destructive/20 bg-card p-6 text-center">
-                <AlertTriangle className="h-6 w-6 text-destructive mx-auto mb-2" />
-                <p className="text-sm text-muted-foreground">{positionsError}</p>
-                <Button onClick={fetchPositions} variant="ghost" size="sm" className="mt-2">
-                  Retry
-                </Button>
-              </div>
-            ) : (
-              <OpenPositionsTable
-                positions={positions}
-                isLoading={positionsLoading}
-                onPositionClick={handlePositionClick}
-              />
-            )}
-          </div>
-          <div className="animate-fade-in-up" style={{ animationDelay: '120ms' }}>
-            {tradesError && !tradesLoading && closedTrades.length === 0 ? (
-              <div className="rounded-xl border border-destructive/20 bg-card p-6 text-center">
-                <AlertTriangle className="h-6 w-6 text-destructive mx-auto mb-2" />
-                <p className="text-sm text-muted-foreground">{tradesError}</p>
-                <Button onClick={fetchTrades} variant="ghost" size="sm" className="mt-2">
-                  Retry
-                </Button>
-              </div>
-            ) : (
-              <ClosedTradesTable
-                trades={recentTrades}
-                isLoading={tradesLoading}
-                onTradeClick={handleTradeClick}
-              />
-            )}
-          </div>
-        </div>
-
-        {/* Right Sidebar - Alerts & Monitoring */}
-        <div className="col-span-12 lg:col-span-4 space-y-6 lg:space-y-8">
-          <div className="animate-fade-in-up" style={{ animationDelay: '80ms' }}>
-            <RecentAlertsCard
-              alerts={mergedAlerts}
-              onAcknowledge={acknowledgeAlert}
-            />
-          </div>
-          {accountId && (
-            <div className="animate-fade-in-up" style={{ animationDelay: '120ms' }}>
-              <PredictiveWarningsCard brokerAccountId={accountId} />
-            </div>
-          )}
-          <div className="animate-fade-in-up" style={{ animationDelay: '160ms' }}>
-            <BlowupShieldCard />
-          </div>
-          {accountId && (
-            <div className="animate-fade-in-up" style={{ animationDelay: '200ms' }}>
-              <ProgressTrackingCard brokerAccountId={accountId} />
-            </div>
-          )}
-          {holdings.length > 0 && holdingsSummary && (
-            <div className="animate-fade-in-up" style={{ animationDelay: '240ms' }}>
-              <HoldingsCard
-                holdings={holdings}
-                summary={holdingsSummary}
-                isLoading={holdingsLoading}
-              />
-            </div>
-          )}
-        </div>
-
-        {/* Margin Cards - Lower priority, full width at bottom */}
-        {margins && (
-          <>
-            <div className="col-span-12 lg:col-span-6 animate-fade-in-up" style={{ animationDelay: '160ms' }}>
-              <MarginStatusCard
-                margins={margins}
-                isLoading={marginsLoading}
-                onRefresh={refetchMargins}
-              />
-            </div>
-            <div className="col-span-12 lg:col-span-6 animate-fade-in-up" style={{ animationDelay: '200ms' }}>
-              <MarginInsightsCard
-                insights={marginInsights}
-                isLoading={marginsLoading}
-              />
-            </div>
-          </>
-        )}
-      </div>
-
-      {/* Trade Journal Sheet */}
+      {/* ── Trade Journal Sheet ───────────────────────────────────────────── */}
       <TradeJournalSheet
         open={journalOpen}
-        onOpenChange={setJournalOpen}
+        onOpenChange={handleJournalClose}
         trade={selectedTrade}
         type={selectedType}
       />
-
-      {/* Onboarding Wizard */}
-      {showOnboarding && account?.id && (
-        <OnboardingWizard
-          brokerAccountId={account.id}
-          onComplete={completeOnboarding}
-          onSkip={skipOnboarding}
-        />
-      )}
     </div>
   );
 }
@@ -659,11 +744,9 @@ function formatTimeAgo(dateStr: string): string {
   const date = new Date(dateStr);
   const now = new Date();
   const diffMs = now.getTime() - date.getTime();
-  const diffSecs = Math.floor(diffMs / 1000);
-  const diffMins = Math.floor(diffSecs / 60);
+  const diffMins = Math.floor(diffMs / 60000);
   const diffHours = Math.floor(diffMins / 60);
-
-  if (diffSecs < 60) return 'just now';
+  if (diffMins < 1) return 'just now';
   if (diffMins < 60) return `${diffMins} min ago`;
   if (diffHours < 24) return `${diffHours} hours ago`;
   return date.toLocaleDateString();

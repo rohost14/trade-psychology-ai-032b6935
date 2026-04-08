@@ -1,34 +1,54 @@
 """
-Shield Service — Real counterfactual P&L from AlertCheckpoints.
+Shield Service — Factual post-alert behaviour tracking.
 
-For each danger/critical alert:
-  - AlertCheckpoint snapshots the trigger position + LTP at alert time
-  - check_alert_t30 computes: money_saved = user_actual_pnl - counterfactual_pnl_at_t30
-    (positive = alert helped user avoid a worse outcome)
-    (negative = market recovered / user exited at a bad time — honest)
+For each behavioural alert we answer one simple question:
+  Did the trader stop, or keep going?
 
-No bootstrap. No hardcoded ₹ defaults. Numbers are either real or not shown.
+  • "heeded"    → no CompletedTrades for the rest of that trading session.
+                  Narrative: "You stopped trading after this alert."
+
+  • "continued" → trader kept taking positions after the alert fired.
+                  Narrative: "You took 3 more trades → net P&L: −₹1,583"
+
+No T+30 counterfactuals.  No "capital defended" performance claims.
+No AlertCheckpoints.  Only facts from CompletedTrade records.
 
 Performance:
-  All three public methods batch-load their data upfront.
-  No N+1 queries — regardless of alert count, always 3-5 DB queries total.
+  All public methods batch-load data upfront.
+  Always ≤ 4 DB queries regardless of alert count.
 """
 
 from datetime import datetime, timedelta, timezone
-from typing import Dict, List, Optional, Tuple
+from typing import Dict, List, Optional
 from uuid import UUID
+from zoneinfo import ZoneInfo
 
-from sqlalchemy import select, and_
+from sqlalchemy import select, and_, func
 from sqlalchemy.ext.asyncio import AsyncSession
 import logging
 
 from app.models.risk_alert import RiskAlert
-from app.models.trade import Trade
-from app.models.alert_checkpoint import AlertCheckpoint
+from app.models.completed_trade import CompletedTrade
 
 logger = logging.getLogger(__name__)
 
-SEVERITY_WEIGHT = {"danger": 2.0, "critical": 2.0, "caution": 1.0}
+_IST = ZoneInfo("Asia/Kolkata")
+
+# Market closes at 15:30 IST. Treat the session as over after this time.
+_SESSION_END_HOUR = 15
+_SESSION_END_MINUTE = 30
+
+
+def _session_end_utc(alert_time_utc: datetime) -> datetime:
+    """Return the UTC timestamp for 15:30 IST on the same calendar day as alert_time_utc."""
+    ist_dt = alert_time_utc.astimezone(_IST)
+    session_end_ist = ist_dt.replace(
+        hour=_SESSION_END_HOUR,
+        minute=_SESSION_END_MINUTE,
+        second=0,
+        microsecond=0,
+    )
+    return session_end_ist.astimezone(timezone.utc)
 
 
 class ShieldService:
@@ -47,99 +67,55 @@ class ShieldService:
             if not alerts:
                 return self._empty_summary()
 
-            # ── Batch-load all supporting data (3 queries total) ──────
-            checkpoints = await self._batch_load_checkpoints(alerts, db)
-            post_trades = await self._batch_load_post_alert_trades(
+            post_cts = await self._batch_load_post_alert_cts(
                 broker_account_id, alerts, db
             )
 
-            now = datetime.now(timezone.utc)
-            week_start = now - timedelta(days=7)
-            month_start = now - timedelta(days=30)
-
-            total_defended = 0.0
-            week_defended = 0.0
-            month_defended = 0.0
+            total_alerts = len(alerts)
+            danger_count = sum(1 for a in alerts if a.severity in ("danger", "critical"))
+            caution_count = sum(1 for a in alerts if a.severity == "caution")
             heeded_count = 0
-            ignored_count = 0
-            weighted_heeded = 0.0
-            weighted_total = 0.0
+            continued_count = 0
+            post_alert_pnl_continued = 0.0   # net P&L from trades taken AFTER alerts (factual)
             current_streak = 0
             counting_streak = True
-            cp_complete = 0
-            cp_calculating = 0
-            cp_unavailable = 0
 
-            sorted_alerts = sorted(
-                alerts, key=lambda a: a.detected_at or now, reverse=True
-            )
+            # spiral_sessions: calendar days with ≥3 danger/critical alerts
+            danger_days: Dict[str, int] = {}
+            for a in alerts:
+                if a.severity in ("danger", "critical") and a.detected_at:
+                    day = a.detected_at.astimezone(_IST).strftime("%Y-%m-%d")
+                    danger_days[day] = danger_days.get(day, 0) + 1
+            spiral_sessions = sum(1 for c in danger_days.values() if c >= 3)
 
-            for alert in sorted_alerts:
-                outcome = self._classify_alert_outcome(
-                    alert, post_trades.get(alert.id, [])
-                )
-
-                checkpoint = checkpoints.get(alert.id)
-                defended = 0.0
-
-                if checkpoint:
-                    status = checkpoint.calculation_status
-                    if status == "complete" and checkpoint.money_saved is not None:
-                        defended = max(0.0, float(checkpoint.money_saved))
-                        cp_complete += 1
-                    elif status in ("pending", "calculating"):
-                        cp_calculating += 1
-                    else:
-                        cp_unavailable += 1
-                else:
-                    cp_unavailable += 1
-
-                total_defended += defended
-                if alert.detected_at and alert.detected_at >= week_start:
-                    week_defended += defended
-                if alert.detected_at and alert.detected_at >= month_start:
-                    month_defended += defended
-
-                w = SEVERITY_WEIGHT.get(alert.severity, 1.0)
-                weighted_total += w
+            # Iterate newest-first for streak calculation
+            for alert in sorted(alerts, key=lambda a: a.detected_at or datetime.min.replace(tzinfo=timezone.utc), reverse=True):
+                cts_after = post_cts.get(alert.id, [])
+                outcome = "heeded" if not cts_after else "continued"
 
                 if outcome == "heeded":
                     heeded_count += 1
-                    weighted_heeded += w
                     if counting_streak:
                         current_streak += 1
-                elif outcome == "partially_heeded":
-                    weighted_heeded += w * 0.5
-                    counting_streak = False
                 else:
-                    ignored_count += 1
+                    continued_count += 1
                     counting_streak = False
-
-            blowups = await self._count_blowups_prevented(broker_account_id, db, days)
-            shield_score = (
-                round(weighted_heeded / weighted_total * 100)
-                if weighted_total > 0 else 0
-            )
+                    post_alert_pnl_continued += sum(
+                        float(ct.realized_pnl or 0) for ct in cts_after
+                    )
 
             return {
-                "capital_defended": round(total_defended),
-                "this_week": round(week_defended),
-                "this_month": round(month_defended),
-                "shield_score": shield_score,
-                "total_alerts": len(alerts),
-                "heeded": heeded_count,
-                "ignored": ignored_count,
+                "total_alerts": total_alerts,
+                "danger_count": danger_count,
+                "caution_count": caution_count,
+                "heeded_count": heeded_count,
+                "continued_count": continued_count,
+                # Sum of actual P&L from trades taken AFTER alerts were ignored.
+                # Negative = additional losses incurred by continuing. Positive = they worked out.
+                # Named "post_alert_pnl" to be neutral — frontend decides how to present.
+                "post_alert_pnl_continued": round(post_alert_pnl_continued, 2),
                 "heeded_streak": current_streak,
-                "blowups_prevented": blowups,
-                "checkpoint_coverage": {
-                    "complete": cp_complete,
-                    "calculating": cp_calculating,
-                    "unavailable": cp_unavailable,
-                },
-                "data_points": cp_complete,
-                # True when some checkpoints are still being calculated — capital_defended
-                # is a lower bound. The UI should show "₹X+" or a "calculating" indicator.
-                "is_partial": cp_calculating > 0,
+                "spiral_sessions": spiral_sessions,
             }
         except Exception as e:
             logger.error(f"Shield summary failed: {e}", exc_info=True)
@@ -151,7 +127,7 @@ class ShieldService:
         db: AsyncSession,
         limit: int = 50,
     ) -> List[Dict]:
-        """Per-alert detail with real checkpoint data."""
+        """Per-alert detail — factual post-alert behaviour."""
         try:
             alerts = await self._get_alerts(broker_account_id, db, days=None)
             alerts = sorted(
@@ -163,91 +139,33 @@ class ShieldService:
             if not alerts:
                 return []
 
-            # ── Batch-load all supporting data (3 queries total) ──────
-            checkpoints = await self._batch_load_checkpoints(alerts, db)
-            post_trades = await self._batch_load_post_alert_trades(
+            post_cts = await self._batch_load_post_alert_cts(
                 broker_account_id, alerts, db
             )
-            trigger_trades = await self._batch_load_trigger_trades(alerts, db)
 
             timeline = []
             for alert in alerts:
-                outcome = self._classify_alert_outcome(
-                    alert, post_trades.get(alert.id, [])
-                )
+                cts_after = post_cts.get(alert.id, [])
+                outcome = "heeded" if not cts_after else "continued"
 
-                trigger_symbol = "Multiple Positions"
-                trigger_info = None
-                trigger_trade = trigger_trades.get(alert.trigger_trade_id)
-                if trigger_trade:
-                    trigger_symbol = trigger_trade.tradingsymbol or trigger_symbol
-                    trigger_info = {
-                        "tradingsymbol": trigger_trade.tradingsymbol,
-                        "quantity": trigger_trade.quantity,
-                        "average_price": float(trigger_trade.average_price or 0),
-                        "transaction_type": trigger_trade.transaction_type,
+                post_alert_pnl = sum(float(ct.realized_pnl or 0) for ct in cts_after)
+
+                # Build per-trade summary list (newest first inside the group)
+                post_trades_detail = [
+                    {
+                        "tradingsymbol": ct.tradingsymbol,
+                        "realized_pnl": round(float(ct.realized_pnl or 0), 2),
+                        "exit_time": ct.exit_time.isoformat() if ct.exit_time else None,
                     }
+                    for ct in cts_after
+                ]
 
-                checkpoint = checkpoints.get(alert.id)
-                calc_status = checkpoint.calculation_status if checkpoint else None
-                money_saved = None
-                counterfactual_pnl_t30 = None
-                user_actual_pnl = None
-                capital_defended = None
+                trigger_symbol = (alert.details or {}).get("trigger_symbol", "") if alert.details else ""
 
-                if checkpoint and checkpoint.calculation_status == "complete":
-                    money_saved = (
-                        float(checkpoint.money_saved)
-                        if checkpoint.money_saved is not None else None
-                    )
-                    counterfactual_pnl_t30 = (
-                        float(checkpoint.pnl_at_t30)
-                        if checkpoint.pnl_at_t30 is not None else None
-                    )
-                    user_actual_pnl = (
-                        float(checkpoint.user_actual_pnl)
-                        if checkpoint.user_actual_pnl is not None else None
-                    )
-                    capital_defended = (
-                        round(max(0.0, money_saved))
-                        if money_saved is not None else 0
-                    )
-
-                # P-05: Compute capital_at_alert for no-position cases
-                # (MIS auto-squared after 3:20PM, or alert after position closed)
-                capital_at_alert = None
-                if calc_status == "no_positions" and trigger_info:
-                    try:
-                        from app.core.trading_defaults import estimate_capital_at_risk
-                        capital_at_alert = round(estimate_capital_at_risk(
-                            instrument_type=None,
-                            tradingsymbol=trigger_info.get("tradingsymbol", ""),
-                            direction="LONG",
-                            avg_entry_price=trigger_info.get("average_price", 0),
-                            total_quantity=trigger_info.get("quantity", 0),
-                        ))
-                    except Exception:
-                        pass
-
-                # Position details from checkpoint snapshot
-                position_details = None
-                if checkpoint and checkpoint.positions_snapshot:
-                    pos = checkpoint.positions_snapshot[0]
-                    position_details = {
-                        "tradingsymbol": pos.get("tradingsymbol"),
-                        "quantity": pos.get("quantity"),
-                        "avg_entry_price": pos.get("avg_entry_price"),
-                        "ltp_at_alert": pos.get("ltp_at_alert"),
-                        "unrealised_pnl": pos.get("unrealised_pnl"),
-                    }
-
-                # Human-readable narrative
-                context_narrative = self._build_narrative(
-                    money_saved=money_saved,
-                    user_actual_pnl=user_actual_pnl,
-                    counterfactual_pnl_t30=counterfactual_pnl_t30,
+                narrative = self._build_narrative(
                     outcome=outcome,
-                    symbol=trigger_symbol,
+                    post_alert_trades=cts_after,
+                    post_alert_pnl=post_alert_pnl,
                 )
 
                 timeline.append({
@@ -256,24 +174,13 @@ class ShieldService:
                     "pattern_type": alert.pattern_type,
                     "severity": alert.severity,
                     "message": alert.message,
-                    "outcome": outcome,
                     "trigger_symbol": trigger_symbol,
-                    "trigger_trade": trigger_info,
-                    "capital_defended": capital_defended,
-                    "capital_at_alert": capital_at_alert,  # P-05: shown when no position
+                    "outcome": outcome,
+                    "post_alert_trade_count": len(cts_after),
+                    "post_alert_pnl": round(post_alert_pnl, 2),
+                    "post_alert_trades": post_trades_detail,
+                    "narrative": narrative,
                     "details": alert.details,
-                    "calculation_status": calc_status,
-                    "money_saved": round(money_saved) if money_saved is not None else None,
-                    "counterfactual_pnl_t30": (
-                        round(counterfactual_pnl_t30)
-                        if counterfactual_pnl_t30 is not None else None
-                    ),
-                    "user_actual_pnl": (
-                        round(user_actual_pnl)
-                        if user_actual_pnl is not None else None
-                    ),
-                    "position_details": position_details,
-                    "context_narrative": context_narrative,
                 })
 
             return timeline
@@ -286,70 +193,52 @@ class ShieldService:
         broker_account_id: UUID,
         db: AsyncSession,
     ) -> List[Dict]:
-        """Grouped stats per pattern type — real checkpoint data only."""
+        """Per-pattern summary — heeded rate + post-alert P&L."""
         try:
             alerts = await self._get_alerts(broker_account_id, db, days=None)
             if not alerts:
                 return []
 
-            # ── Batch-load all supporting data (2 queries total) ──────
-            checkpoints = await self._batch_load_checkpoints(alerts, db)
-            post_trades = await self._batch_load_post_alert_trades(
+            post_cts = await self._batch_load_post_alert_cts(
                 broker_account_id, alerts, db
             )
 
-            pattern_groups: Dict[str, Dict] = {}
-
+            groups: Dict[str, Dict] = {}
             for alert in alerts:
                 key = alert.pattern_type or "unknown"
-                if key not in pattern_groups:
-                    pattern_groups[key] = {
+                if key not in groups:
+                    groups[key] = {
                         "alerts": 0,
                         "heeded": 0,
-                        "ignored": 0,
-                        "total_saved": 0.0,
-                        "total_defended": 0.0,
-                        "real_data_count": 0,
+                        "continued": 0,
+                        "post_alert_pnl": 0.0,
                     }
-                grp = pattern_groups[key]
-                grp["alerts"] += 1
+                g = groups[key]
+                g["alerts"] += 1
 
-                outcome = self._classify_alert_outcome(
-                    alert, post_trades.get(alert.id, [])
-                )
-                if outcome == "heeded":
-                    grp["heeded"] += 1
-                elif outcome == "ignored":
-                    grp["ignored"] += 1
-
-                checkpoint = checkpoints.get(alert.id)
-                if checkpoint and checkpoint.calculation_status == "complete" \
-                        and checkpoint.money_saved is not None:
-                    saved = float(checkpoint.money_saved)
-                    grp["total_saved"] += saved
-                    grp["total_defended"] += max(0.0, saved)
-                    grp["real_data_count"] += 1
+                cts_after = post_cts.get(alert.id, [])
+                if cts_after:
+                    g["continued"] += 1
+                    g["post_alert_pnl"] += sum(float(ct.realized_pnl or 0) for ct in cts_after)
+                else:
+                    g["heeded"] += 1
 
             result = []
             for pattern, stats in sorted(
-                pattern_groups.items(),
-                key=lambda x: x[1]["total_defended"],
+                groups.items(),
+                key=lambda x: x[1]["alerts"],
                 reverse=True,
             ):
                 n = stats["alerts"]
-                real = stats["real_data_count"]
                 heeded_pct = round(stats["heeded"] / n * 100) if n else 0
-                avg_defended = round(stats["total_defended"] / real) if real else 0
                 result.append({
                     "pattern_type": pattern,
                     "display_name": pattern.replace("_", " ").title(),
                     "alerts": n,
                     "heeded": stats["heeded"],
-                    "ignored": stats["ignored"],
+                    "continued": stats["continued"],
                     "heeded_pct": heeded_pct,
-                    "avg_defended": avg_defended,
-                    "total_defended": round(stats["total_defended"]),
-                    "real_data_count": real,
+                    "post_alert_pnl": round(stats["post_alert_pnl"], 2),
                 })
 
             return result
@@ -357,118 +246,13 @@ class ShieldService:
             logger.error(f"Shield pattern breakdown failed: {e}", exc_info=True)
             return []
 
-    # ── Batch loaders (eliminate N+1) ───────────────────────────────────
-
-    async def _batch_load_checkpoints(
-        self,
-        alerts: List[RiskAlert],
-        db: AsyncSession,
-    ) -> Dict:
-        """
-        Load all checkpoints for the given alerts in ONE query.
-        Returns {alert_id: AlertCheckpoint}.
-        """
-        if not alerts:
-            return {}
-        alert_ids = [a.id for a in alerts]
-        try:
-            result = await db.execute(
-                select(AlertCheckpoint).where(
-                    AlertCheckpoint.alert_id.in_(alert_ids)
-                )
-            )
-            return {c.alert_id: c for c in result.scalars().all()}
-        except Exception as e:
-            logger.error(f"Batch checkpoint load failed: {e}")
-            return {}
-
-    async def _batch_load_post_alert_trades(
-        self,
-        broker_account_id: UUID,
-        alerts: List[RiskAlert],
-        db: AsyncSession,
-    ) -> Dict:
-        """
-        Load all post-alert trades for ALL alerts in ONE query.
-        Returns {alert_id: [Trade, ...]}.
-
-        Strategy: fetch all COMPLETE trades in the range
-        [earliest_alert_time, latest_alert_time + 60min],
-        then filter per alert in Python (no extra queries).
-        """
-        if not alerts:
-            return {}
-
-        alert_times = [a.detected_at for a in alerts if a.detected_at]
-        if not alert_times:
-            return {a.id: [] for a in alerts}
-
-        range_start = min(alert_times)
-        range_end = max(alert_times) + timedelta(minutes=60)
-
-        try:
-            result = await db.execute(
-                select(Trade).where(
-                    and_(
-                        Trade.broker_account_id == broker_account_id,
-                        Trade.order_timestamp > range_start,
-                        Trade.order_timestamp <= range_end,
-                        Trade.status == "COMPLETE",
-                    )
-                ).order_by(Trade.order_timestamp)
-            )
-            all_trades = list(result.scalars().all())
-        except Exception as e:
-            logger.error(f"Batch post-alert trades load failed: {e}")
-            return {a.id: [] for a in alerts}
-
-        # Assign trades to each alert's window in Python
-        trades_by_alert: Dict = {}
-        for alert in alerts:
-            if not alert.detected_at:
-                trades_by_alert[alert.id] = []
-                continue
-
-            window_end = alert.detected_at + timedelta(minutes=60)
-            day_end = (
-                alert.detected_at.replace(hour=0, minute=0, second=0, microsecond=0)
-                + timedelta(days=1)
-            )
-            cutoff = min(window_end, day_end)
-
-            trades_by_alert[alert.id] = [
-                t for t in all_trades
-                if t.order_timestamp
-                and alert.detected_at < t.order_timestamp <= cutoff
-            ]
-
-        return trades_by_alert
-
-    async def _batch_load_trigger_trades(
-        self,
-        alerts: List[RiskAlert],
-        db: AsyncSession,
-    ) -> Dict:
-        """
-        Load all trigger trades for the given alerts in ONE query.
-        Returns {trade_id: Trade}.
-        """
-        trigger_ids = [a.trigger_trade_id for a in alerts if a.trigger_trade_id]
-        if not trigger_ids:
-            return {}
-        try:
-            result = await db.execute(
-                select(Trade).where(Trade.id.in_(trigger_ids))
-            )
-            return {t.id: t for t in result.scalars().all()}
-        except Exception as e:
-            logger.error(f"Batch trigger trades load failed: {e}")
-            return {}
-
-    # ── Internal helpers ─────────────────────────────────────────────────
+    # ── Batch loaders ────────────────────────────────────────────────────
 
     async def _get_alerts(
-        self, broker_account_id: UUID, db: AsyncSession, days: Optional[int]
+        self,
+        broker_account_id: UUID,
+        db: AsyncSession,
+        days: Optional[int],
     ) -> List[RiskAlert]:
         query = select(RiskAlert).where(
             RiskAlert.broker_account_id == broker_account_id
@@ -480,114 +264,96 @@ class ShieldService:
         result = await db.execute(query)
         return list(result.scalars().all())
 
-    def _classify_alert_outcome(
-        self, alert: RiskAlert, post_trades: List[Trade]
-    ) -> str:
-        """Classify: heeded | partially_heeded | ignored — based on trading behaviour."""
-        if not alert.detected_at:
-            return "ignored"
+    async def _batch_load_post_alert_cts(
+        self,
+        broker_account_id: UUID,
+        alerts: List[RiskAlert],
+        db: AsyncSession,
+    ) -> Dict:
+        """
+        For each alert, load CompletedTrades that exited AFTER the alert fired
+        and before the end of that trading session (15:30 IST same day).
 
-        has_ack = alert.acknowledged_at is not None
+        Returns {alert_id: [CompletedTrade, ...]} ordered by exit_time asc.
 
-        if not post_trades:
-            return "heeded"
+        Uses a single DB query: fetch all CTs from earliest_alert to latest_session_end,
+        then partition in Python.
+        """
+        if not alerts:
+            return {}
 
-        first_trade_time = min(
-            (t.order_timestamp for t in post_trades if t.order_timestamp),
-            default=None,
-        )
-        if not first_trade_time:
-            return "heeded"
+        alert_times = [a.detected_at for a in alerts if a.detected_at]
+        if not alert_times:
+            return {a.id: [] for a in alerts}
 
-        gap_minutes = (first_trade_time - alert.detected_at).total_seconds() / 60
+        range_start = min(alert_times)
+        # Ceiling: latest session end (could span multiple days if days=30)
+        range_end = max(_session_end_utc(t) for t in alert_times)
 
-        if has_ack and gap_minutes > 30:
-            return "heeded"
-        elif has_ack and gap_minutes <= 30:
-            return "partially_heeded"
-        elif gap_minutes > 30:
-            return "partially_heeded"
-        else:
-            return "ignored"
-
-    async def _count_blowups_prevented(
-        self, broker_account_id: UUID, db: AsyncSession, days: Optional[int]
-    ) -> int:
-        query = select(RiskAlert).where(
-            and_(
-                RiskAlert.broker_account_id == broker_account_id,
-                RiskAlert.severity.in_(["danger", "critical"]),
+        try:
+            result = await db.execute(
+                select(CompletedTrade).where(
+                    and_(
+                        CompletedTrade.broker_account_id == broker_account_id,
+                        CompletedTrade.exit_time > range_start,
+                        CompletedTrade.exit_time <= range_end,
+                    )
+                ).order_by(CompletedTrade.exit_time.asc())
             )
-        )
-        if days is not None:
-            cutoff = datetime.now(timezone.utc) - timedelta(days=days)
-            query = query.where(RiskAlert.detected_at >= cutoff)
+            all_cts = list(result.scalars().all())
+        except Exception as e:
+            logger.error(f"Batch post-alert CTs load failed: {e}")
+            return {a.id: [] for a in alerts}
 
-        result = await db.execute(query)
-        danger_alerts = list(result.scalars().all())
+        cts_by_alert: Dict = {}
+        for alert in alerts:
+            if not alert.detected_at:
+                cts_by_alert[alert.id] = []
+                continue
+            session_end = _session_end_utc(alert.detected_at)
+            cts_by_alert[alert.id] = [
+                ct for ct in all_cts
+                if ct.exit_time
+                and ct.exit_time > alert.detected_at
+                and ct.exit_time <= session_end
+            ]
 
-        daily_counts: Dict[str, int] = {}
-        for a in danger_alerts:
-            if a.detected_at:
-                day_key = a.detected_at.strftime("%Y-%m-%d")
-                daily_counts[day_key] = daily_counts.get(day_key, 0) + 1
+        return cts_by_alert
 
-        return sum(1 for c in daily_counts.values() if c >= 5)
+    # ── Narrative builder ────────────────────────────────────────────────
 
     def _build_narrative(
         self,
-        money_saved: Optional[float],
-        user_actual_pnl: Optional[float],
-        counterfactual_pnl_t30: Optional[float],
         outcome: str,
-        symbol: str,
-    ) -> Optional[str]:
-        """One-sentence story explaining what the alert actually achieved."""
-        if money_saved is None or user_actual_pnl is None or counterfactual_pnl_t30 is None:
-            return None
+        post_alert_trades: List[CompletedTrade],
+        post_alert_pnl: float,
+    ) -> str:
+        if outcome == "heeded":
+            return "You stopped trading after this alert."
 
-        verb = "exited" if outcome == "heeded" else "reduced exposure to"
-
-        if money_saved >= 0:
-            if counterfactual_pnl_t30 < 0:
-                return (
-                    f"You {verb} {symbol} for ₹{user_actual_pnl:+,.0f}. "
-                    f"Had you held 30 min longer, the loss would have been "
-                    f"₹{abs(counterfactual_pnl_t30):,.0f}. "
-                    f"Alert saved you ₹{money_saved:,.0f}."
-                )
-            else:
-                return (
-                    f"You {verb} {symbol}. "
-                    f"Your P&L: ₹{user_actual_pnl:+,.0f} vs "
-                    f"₹{counterfactual_pnl_t30:+,.0f} if held to T+30. "
-                    f"Net benefit: ₹{money_saved:,.0f}."
-                )
+        n = len(post_alert_trades)
+        trade_word = "trade" if n == 1 else "trades"
+        sign = "+" if post_alert_pnl >= 0 else ""
+        pnl_str = f"{sign}₹{abs(post_alert_pnl):,.0f}"
+        direction = "" if post_alert_pnl >= 0 else "additional loss "
+        if post_alert_pnl >= 0:
+            return f"You took {n} more {trade_word} after this alert → net P&L: {sign}₹{post_alert_pnl:,.0f}"
         else:
             return (
-                f"The market recovered after the alert. "
-                f"You got ₹{user_actual_pnl:+,.0f}, but {symbol} was worth "
-                f"₹{counterfactual_pnl_t30:+,.0f} at T+30 — "
-                f"₹{abs(money_saved):,.0f} left on the table (reported honestly)."
+                f"You took {n} more {trade_word} after this alert "
+                f"→ additional loss ₹{abs(post_alert_pnl):,.0f}"
             )
 
     def _empty_summary(self) -> Dict:
         return {
-            "capital_defended": 0,
-            "this_week": 0,
-            "this_month": 0,
-            "shield_score": 0,
             "total_alerts": 0,
-            "heeded": 0,
-            "ignored": 0,
+            "danger_count": 0,
+            "caution_count": 0,
+            "heeded_count": 0,
+            "continued_count": 0,
+            "post_alert_pnl_continued": 0.0,
             "heeded_streak": 0,
-            "blowups_prevented": 0,
-            "checkpoint_coverage": {
-                "complete": 0,
-                "calculating": 0,
-                "unavailable": 0,
-            },
-            "data_points": 0,
+            "spiral_sessions": 0,
         }
 
 

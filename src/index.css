@@ -11,6 +11,13 @@
 
 @layer base {
   :root {
+    /* ── TradeMentor financial & brand tokens ─────────────────────────────── */
+    /* These flip in .dark below. Use text-tm-profit, bg-tm-loss/5, etc.     */
+    --tm-profit:  15 142 125;   /* #0F8E7D  teal — profit on light bg         */
+    --tm-loss:   177  61  68;   /* #B13D44  red                                */
+    --tm-obs:    230 138   0;   /* #E68A00  amber — behavioral observations    */
+    --tm-brand:   15 142 125;   /* #0F8E7D  primary brand                      */
+
     /* Neutral Gray Scale (Zinc - warm, professional) */
     --gray-50:  250 250 250;
     --gray-100: 244 244 245;
@@ -77,36 +84,43 @@
   }
 
   .dark {
-    --background: 9 9 11;
-    --foreground: 250 250 250;
+    /* TradeMentor tokens — dark overrides */
+    --tm-profit:  52 211 153;   /* #34D399 — emerald green */
+    --tm-loss:   248 113 113;   /* #F87171 — soft red      */
+    --tm-obs:    251 191  36;   /* #FBBF24 — amber         */
+    --tm-brand:   45 212 191;   /* #2DD4BF — teal          */
 
-    --card: 24 24 27;
-    --card-foreground: 250 250 250;
+    /* Pure neutral dark — no slate/blue cast */
+    --background: 11 11 11;      /* #0B0B0B — near-black     */
+    --foreground: 242 242 242;   /* #F2F2F2 — soft white     */
 
-    --popover: 24 24 27;
-    --popover-foreground: 250 250 250;
+    --card: 20 20 20;            /* #141414 — dark card      */
+    --card-foreground: 242 242 242;
 
-    --primary: 20 184 166;
+    --popover: 24 24 24;         /* #181818 */
+    --popover-foreground: 242 242 242;
+
+    --primary: 20 184 166;       /* teal-500 */
     --primary-foreground: 255 255 255;
 
-    --secondary: 39 39 42;
-    --secondary-foreground: 250 250 250;
+    --secondary: 30 30 30;       /* #1E1E1E */
+    --secondary-foreground: 220 220 220;
 
-    --muted: 39 39 42;
-    --muted-foreground: 161 161 170;
+    --muted: 26 26 26;           /* #1A1A1A */
+    --muted-foreground: 142 142 142;  /* #8E8E8E */
 
-    --accent: 39 39 42;
-    --accent-foreground: 250 250 250;
+    --accent: 30 30 30;
+    --accent-foreground: 220 220 220;
 
     --destructive: 239 68 68;
     --destructive-foreground: 255 255 255;
 
-    --border: 39 39 42;
-    --input: 39 39 42;
+    --border: 40 40 40;          /* #282828 — subtle separator */
+    --input:  36 36 36;          /* #242424 */
     --ring: 20 184 166;
 
-    --shadow-sm: 0 1px 2px 0 rgb(0 0 0 / 0.3);
-    --shadow-md: 0 4px 6px -1px rgb(0 0 0 / 0.4);
+    --shadow-sm: 0 1px 3px 0 rgb(0 0 0 / 0.5);
+    --shadow-md: 0 4px 12px -2px rgb(0 0 0 / 0.6);
   }
 }
 
@@ -361,4 +375,54 @@
   .animate-pulse-scale {
     animation: pulseScale 2s ease-in-out infinite;
   }
+}
+
+/* ── TradeMentor design components ─────────────────────────────────────────── */
+
+@layer components {
+  /* Section label — every section header across all screens */
+  .tm-label {
+    @apply text-[11px] font-medium uppercase tracking-widest text-muted-foreground;
+  }
+
+  /* Data card — standard surface with theme-aware shadow */
+  .tm-card {
+    @apply bg-white dark:bg-[#1C1C1C] rounded-xl overflow-hidden;
+  }
+
+  /* Instrument type chips */
+  .tm-chip    { @apply text-[10px] font-bold px-1.5 py-0.5 rounded leading-none; }
+  .tm-chip-ce { @apply bg-teal-50  text-teal-700  dark:bg-teal-900/20  dark:text-teal-300; }
+  .tm-chip-pe { @apply bg-red-50   text-red-600   dark:bg-red-900/20   dark:text-red-400;  }
+  .tm-chip-eq { @apply bg-slate-100 text-slate-500 dark:bg-neutral-700/60 dark:text-neutral-400; }
+}
+
+/* ── Page backgrounds ───────────────────────────────────────────────────────── */
+/* Not in @layer so it beats utility specificity for the gradient override.     */
+
+.tm-page-bg {
+  background:
+    radial-gradient(ellipse 60% 45% at 92%   0%, rgba(15,142,125,0.13) 0%, transparent 100%),
+    radial-gradient(ellipse 55% 50% at  0% 100%, rgba(15,142,125,0.09) 0%, transparent 100%),
+    #F4F7F7;
+}
+.dark .tm-page-bg {
+  background:
+    radial-gradient(ellipse 60% 45% at 92%   0%, rgba(15,142,125,0.10) 0%, transparent 100%),
+    radial-gradient(ellipse 55% 50% at  0% 100%, rgba(15,142,125,0.07) 0%, transparent 100%),
+    #0B0B0B;
+}
+
+/* ── Card shadow — separate rule so dark override applies ───────────────────── */
+.tm-card {
+  box-shadow:
+    0 1px 2px rgba(0,0,0,0.04),
+    0 4px 12px rgba(0,0,0,0.06),
+    0 0 0 1px rgba(0,0,0,0.05);
+}
+.dark .tm-card {
+  box-shadow:
+    0 2px 8px rgba(0,0,0,0.4),
+    0 8px 32px rgba(0,0,0,0.35),
+    0 0 0 1px rgba(255,255,255,0.08);
 }

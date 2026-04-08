@@ -10,10 +10,10 @@ export function formatCurrency(amount: number): string {
   const formatted = new Intl.NumberFormat('en-IN', {
     style: 'currency',
     currency: 'INR',
-    minimumFractionDigits: 0,
-    maximumFractionDigits: 0,
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
   }).format(absAmount);
-  
+
   return amount >= 0 ? formatted : `-${formatted.replace('₹', '₹')}`;
 }
 
@@ -23,14 +23,14 @@ export function formatCurrency(amount: number): string {
 export function formatCurrencyWithSign(amount: number): string {
   const absAmount = Math.abs(amount);
   const sign = amount >= 0 ? '+' : '-';
-  
+  // Show 2 decimal places so ₹918.75 doesn't round to ₹919
   const formatted = new Intl.NumberFormat('en-IN', {
     style: 'currency',
     currency: 'INR',
-    minimumFractionDigits: 0,
-    maximumFractionDigits: 0,
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
   }).format(absAmount);
-  
+
   return `${sign}${formatted}`;
 }
 
@@ -126,12 +126,12 @@ export function formatCompactCurrency(amount: number): string {
     const l = abs / 1_00_000;
     return `${sign}₹${parseFloat(l.toFixed(2))}L`;
   }
-  // Below 1L — use standard formatting but without decimal
+  // Below 1L — show 2 decimal places to preserve paise accuracy
   const formatted = new Intl.NumberFormat('en-IN', {
     style: 'currency',
     currency: 'INR',
-    minimumFractionDigits: 0,
-    maximumFractionDigits: 0,
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
   }).format(abs);
   return amount < 0 ? `-${formatted}` : formatted;
 }

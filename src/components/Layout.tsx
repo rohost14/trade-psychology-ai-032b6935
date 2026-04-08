@@ -44,7 +44,7 @@ const desktopNavGroups = [
     icon: BarChart2,
     items: [
       { name: 'Analytics',   href: '/analytics',    icon: TrendingUp },
-      { name: 'My Patterns', href: '/my-patterns',  icon: Brain },
+      { name: 'Risk Monitor', href: '/my-patterns',  icon: Brain },
       { name: 'Reports',     href: '/reports',      icon: BookOpen },
     ],
   },
@@ -92,7 +92,7 @@ const mobileMoreGroups = [
   {
     label: 'Insights',
     items: [
-      { name: 'My Patterns', href: '/my-patterns',  icon: Brain },
+      { name: 'Risk Monitor', href: '/my-patterns',  icon: Brain },
       { name: 'Reports',     href: '/reports',      icon: BookOpen },
     ],
   },
@@ -346,9 +346,7 @@ export default function Layout() {
                 {isTokenExpired
                   ? 'Token expired'
                   : isConnected
-                    ? tokenExpiresIn
-                      ? <span>Connected <span className="opacity-50">· {tokenExpiresIn}</span></span>
-                      : 'Connected'
+                    ? 'Connected'
                     : 'Offline'
                 }
               </div>

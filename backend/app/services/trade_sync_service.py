@@ -286,9 +286,9 @@ class TradeSyncService:
             # Pushing /orders into trades table caused duplicates (every COMPLETE order
             # appeared twice: once from /trades with trade_id, once from /orders with order_id)
 
-            account.last_sync_at = datetime.now(timezone.utc)
-
             # 4. Calculate P&L for trades (FIFO matching)
+            # NOTE: last_sync_at is set AFTER this block so the frontend's 5-min dedup
+            # doesn't skip retries when FIFO fails mid-sync.
             try:
                 pnl_result = await pnl_calculator.calculate_and_update_pnl(
                     broker_account_id, db, days_back=30
@@ -314,10 +314,28 @@ class TradeSyncService:
                     logger.error(f"Overnight CompletedTrade backfill failed (non-fatal): {e}")
                     stats["errors"].append(f"Overnight Backfill: {str(e)}")
 
+            # 4c. Reconcile same-day FIFO P&L against Zerodha's authoritative 'realised' value.
+            # Flush first — FIFO uses db.add() inside savepoints; without flush the freshly
+            # created CompletedTrade rows may not be visible to the reconciliation SELECT.
+            try:
+                await db.flush()
+                reconciled = await cls._reconcile_pnl_with_zerodha(
+                    broker_account_id, db
+                )
+                if reconciled:
+                    stats["pnl_reconciled"] = reconciled
+                    logger.info(f"P&L reconciled: {reconciled} CompletedTrade(s) updated from Zerodha")
+            except Exception as e:
+                logger.error(f"P&L reconciliation failed (non-fatal): {e}")
+                stats["errors"].append(f"P&L Reconciliation: {str(e)}")
+
             # 5. Risk detection decoupled from sync pipeline
             # Moved to post-sync step in zerodha.py sync_all_data().
             # FIFO/sync must remain deterministic and replayable.
             # Behavioral detection runs AFTER data pipeline completes.
+
+            # Stamp last_sync_at only after data pipeline fully completes.
+            account.last_sync_at = datetime.now(timezone.utc)
 
             await db.commit()
             
@@ -870,3 +888,105 @@ class TradeSyncService:
                 logger.error(f"[overnight] Failed to backfill {symbol}: {e}")
 
         return created
+
+    @classmethod
+    async def _reconcile_pnl_with_zerodha(
+        cls,
+        broker_account_id: uuid.UUID,
+        db: AsyncSession,
+    ) -> int:
+        """
+        Replace FIFO-calculated P&L with Zerodha's authoritative 'realised' value.
+
+        Zerodha is the ground truth for P&L — it handles lot sizes, contract multipliers,
+        exchange-specific rules, and corporate actions correctly for every instrument type:
+          - NFO/BFO (NSE/BSE F&O): qty already in units, no multiplier needed
+          - MCX (commodities): Zerodha qty = lots; instruments CSV lot_size = 1 (minimum
+            order quantity), NOT the contract multiplier. FIFO gives wrong values here.
+            e.g. GOLDM: CSV lot_size=1 but multiplier=10 → FIFO off by 10×.
+          - CDS (currency): same issue as MCX.
+
+        For single-round positions: direct assignment.
+        For multi-round positions (traded same symbol twice today): proportional scaling
+        so each CompletedTrade gets the correct share of Zerodha's total realised P&L.
+        The proportions are correct even when FIFO absolute values are wrong, because
+        all rounds of the same symbol have the same lot-size error factor.
+        """
+        # Use a 2-day window so post-midnight reconciliation still catches
+        # trades that closed on the previous calendar day (IST).
+        # e.g. MCX options trade until 23:30 IST; at 00:01 IST next day,
+        # "today" flips but yesterday's closed positions are still in
+        # Zerodha's /portfolio/positions response until market opens.
+        two_days_ago = datetime.now(timezone.utc) - timedelta(hours=48)
+
+        # Load ALL closed positions (Zerodha still returns them until next session)
+        pos_result = await db.execute(
+            select(Position).where(
+                Position.broker_account_id == broker_account_id,
+                Position.total_quantity == 0,
+            )
+        )
+        closed_positions = pos_result.scalars().all()
+
+        reconciled = 0
+        for pos in closed_positions:
+            # Use Position.pnl as the authoritative value — it equals realised + unrealised.
+            # For MCX options/futures, Zerodha puts the P&L in 'unrealised' even when
+            # the position is closed (qty=0), leaving 'realised' as 0. Using pnl is
+            # always correct: NSE F&O (realised=-680, unrealised=0) => pnl=-680 ✓
+            #                  MCX options (realised=0, unrealised=-680) => pnl=-680 ✓
+            zerodha_pnl = float(pos.pnl or 0)
+            if abs(zerodha_pnl) < 0.01:
+                continue
+
+            # Find all CompletedTrades for this symbol within the 2-day window
+            ct_result = await db.execute(
+                select(CompletedTrade).where(
+                    CompletedTrade.broker_account_id == broker_account_id,
+                    CompletedTrade.tradingsymbol == pos.tradingsymbol,
+                    CompletedTrade.exit_time >= two_days_ago,
+                    CompletedTrade.status == "closed",
+                )
+            )
+            cts = ct_result.scalars().all()
+            if not cts:
+                continue
+
+            fifo_total = sum(float(ct.realized_pnl or 0) for ct in cts)
+
+            if len(cts) == 1:
+                # Single round — direct assignment
+                ct = cts[0]
+                diff = abs(zerodha_pnl - float(ct.realized_pnl or 0))
+                if diff > 0.5:
+                    logger.info(
+                        f"[reconcile] {pos.tradingsymbol}: FIFO={float(ct.realized_pnl or 0):.2f} "
+                        f"Zerodha={zerodha_pnl:.2f} — correcting"
+                    )
+                    ct.realized_pnl = zerodha_pnl
+                    reconciled += 1
+            else:
+                # Multiple rounds — proportional distribution.
+                # FIFO proportions are ratio-correct even when absolute values are wrong
+                # (all rounds of the same symbol share the same error factor).
+                if abs(fifo_total) > 0.5:
+                    scale = zerodha_pnl / fifo_total
+                    # Only scale if there's a real discrepancy (>5% difference)
+                    if abs(scale - 1.0) > 0.05:
+                        logger.info(
+                            f"[reconcile] {pos.tradingsymbol}: {len(cts)} rounds, "
+                            f"FIFO_total={fifo_total:.2f} Zerodha={zerodha_pnl:.2f} "
+                            f"scale={scale:.3f}"
+                        )
+                        for ct in cts:
+                            ct.realized_pnl = float(ct.realized_pnl or 0) * scale
+                        reconciled += len(cts)
+                else:
+                    # FIFO total ≈ 0 (washout): distribute Zerodha P&L equally
+                    per_round = zerodha_pnl / len(cts)
+                    if abs(per_round) > 0.5:
+                        for ct in cts:
+                            ct.realized_pnl = per_round
+                        reconciled += len(cts)
+
+        return reconciled
