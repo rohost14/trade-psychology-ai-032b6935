@@ -81,3 +81,8 @@ class PositionLedger(Base):
     # Relationships
     broker_account = relationship("BrokerAccount")
     session = relationship("TradingSession")
+
+    @property
+    def net_qty(self) -> int:
+        """Alias for position_qty_after — net position quantity after this fill."""
+        return self.position_qty_after

@@ -1,4 +1,4 @@
-from sqlalchemy import String, TIMESTAMP, text, UUID, ARRAY, Boolean, ForeignKey
+from sqlalchemy import String, TIMESTAMP, text, UUID, ARRAY, Boolean, ForeignKey, Index
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -17,13 +17,16 @@ if TYPE_CHECKING:
 class BrokerAccount(Base):
     __tablename__ = "broker_accounts"
 
+    __table_args__ = (
+        Index('idx_broker_accounts_user_id', 'user_id'),
+    )
+
     id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     # FK to users.id — NOT NULL after migration 032
     user_id: Mapped[uuid.UUID] = mapped_column(
         UUID(as_uuid=True),
         ForeignKey("users.id", ondelete="CASCADE"),
         nullable=False,
-        index=True
     )
     broker_name: Mapped[str] = mapped_column(String, default="zerodha")
     access_token: Mapped[str] = mapped_column(String, nullable=True)

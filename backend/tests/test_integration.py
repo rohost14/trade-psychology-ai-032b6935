@@ -15,7 +15,7 @@ In CI without DB access, skip with:
 
 import pytest
 import asyncio
-from datetime import datetime, timezone, timedelta
+from datetime import datetime, date, timezone, timedelta
 from decimal import Decimal
 from uuid import uuid4
 from unittest.mock import AsyncMock, MagicMock, patch

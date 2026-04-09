@@ -38,6 +38,10 @@ COLD_START_DEFAULTS: Dict[str, Any] = {
     'burst_trades_per_30min_caution':   5,
     'burst_trades_per_30min_danger':    8,
 
+    # SEBI FY2023: traders with >6 trades/15 min window showed panic patterns.
+    # Used by RiskDetector (15-min window). BehaviorEngine uses 30-min window above.
+    'burst_trades_per_15min':           6,
+
     # ── Consecutive losses ────────────────────────────────────────────────
     # Tilt state begins after 3 losses (confirmed in poker+trading research).
     # After 5, near-universal emotional impairment.
@@ -50,6 +54,9 @@ COLD_START_DEFAULTS: Dict[str, Any] = {
     # The "loss recovery" impulse peaks at 3-8 min (immediate = danger).
     'revenge_window_caution_min':       20,   # entry within 20 min of loss = caution
     'revenge_window_danger_min':        5,    # entry within 5 min of loss = danger
+    # Unified revenge window used by RiskDetector + BehavioralEvaluator.
+    # Overridden by profile.cooldown_after_loss in get_thresholds().
+    'revenge_window_min':               10,   # default: 10-min window
     'revenge_min_loss_inr':             500,  # only trigger if prior loss > ₹500 (ignore scratch trades)
 
     # ── Position sizing / excess exposure ────────────────────────────────
@@ -201,6 +208,7 @@ UNIVERSAL_FLOORS: Dict[str, Any] = {
     'burst_trades_per_30min_caution':   3,    # Never alert for < 3 trades in 30 min
     'revenge_window_caution_min':       2,    # Minimum 2-min caution window
     'revenge_window_danger_min':        1,    # Minimum 1-min danger window
+    'revenge_window_min':               1,    # Unified window floor: minimum 1 min
     'consecutive_loss_caution':         3,    # At least 3 losses before any alert
     'panic_exit_min':                   1,    # Minimum 1 min
     'rapid_reentry_min':                1,    # Minimum 1 min
@@ -258,6 +266,8 @@ def get_thresholds(profile=None) -> Dict[str, Any]:
             result['revenge_window_caution_min'] = max(
                 user_cooldown, result['revenge_window_caution_min']
             )
+            # Unified key used by RiskDetector + BehavioralEvaluator: honour user's declared cooldown directly
+            result['revenge_window_min'] = user_cooldown
 
         # Capital-derived thresholds (always from profile, no style default)
         result['trading_capital']   = getattr(profile, 'trading_capital', None)

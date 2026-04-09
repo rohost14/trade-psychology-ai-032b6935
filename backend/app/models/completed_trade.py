@@ -1,6 +1,6 @@
 import uuid
 from datetime import datetime, timezone
-from sqlalchemy import Column, String, Integer, Boolean, Numeric, TIMESTAMP, text, ForeignKey, ARRAY
+from sqlalchemy import Column, String, Integer, Boolean, Numeric, TIMESTAMP, text, ForeignKey, ARRAY, Index
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import relationship
 from app.core.database import Base
@@ -16,9 +16,12 @@ class CompletedTrade(Base):
     Immutable once created — historical facts are never rewritten.
     """
     __tablename__ = "completed_trades"
+    __table_args__ = (
+        Index('idx_completed_trades_broker_exit', 'broker_account_id', 'exit_time'),
+    )
 
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
-    broker_account_id = Column(UUID(as_uuid=True), ForeignKey("broker_accounts.id", ondelete="CASCADE"), nullable=False, index=True)
+    broker_account_id = Column(UUID(as_uuid=True), ForeignKey("broker_accounts.id", ondelete="CASCADE"), nullable=False)
 
     # Instrument
     tradingsymbol = Column(String(100), nullable=False)

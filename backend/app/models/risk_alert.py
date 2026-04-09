@@ -1,4 +1,4 @@
-from sqlalchemy import Column, String, DateTime, ForeignKey, ARRAY
+from sqlalchemy import Column, String, DateTime, ForeignKey, ARRAY, Index
 from sqlalchemy.dialects.postgresql import UUID, JSONB
 from sqlalchemy.orm import relationship
 from datetime import datetime, timezone
@@ -8,9 +8,12 @@ from app.core.database import Base
 
 class RiskAlert(Base):
     __tablename__ = "risk_alerts"
-    
+    __table_args__ = (
+        Index('idx_risk_alerts_broker_detected', 'broker_account_id', 'detected_at'),
+    )
+
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
-    broker_account_id = Column(UUID(as_uuid=True), ForeignKey("broker_accounts.id", ondelete="CASCADE"), nullable=False, index=True)
+    broker_account_id = Column(UUID(as_uuid=True), ForeignKey("broker_accounts.id", ondelete="CASCADE"), nullable=False)
     
     pattern_type = Column(String, nullable=False)
     severity = Column(String, nullable=False)

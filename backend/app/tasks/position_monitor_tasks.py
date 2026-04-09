@@ -28,6 +28,7 @@ from app.core.celery_app import celery_app
 from app.core.config import settings
 from app.core.database import SessionLocal
 from app.core.market_hours import is_market_open, MarketSegment
+from app.services.price_stream_service import get_cached_ltp
 
 logger = logging.getLogger(__name__)
 IST = ZoneInfo("Asia/Kolkata")
@@ -150,8 +151,6 @@ async def _monitor_account(broker_account_id: UUID, db) -> int:
 
 async def _check_position(position, thresholds: dict, db) -> List[dict]:
     """Check a single open position for behavioral patterns."""
-    from app.services.price_stream_service import get_cached_ltp
-
     events = []
     symbol = position.tradingsymbol
     qty = position.total_quantity or 0
@@ -253,7 +252,6 @@ async def _holding_loser_task(broker_account_id: str, check_number: int) -> dict
     from app.models.position import Position
     from app.models.user_profile import UserProfile
     from app.core.trading_defaults import get_thresholds
-    from app.services.price_stream_service import get_cached_ltp
     from sqlalchemy import select, and_
 
     async with SessionLocal() as db:
@@ -356,7 +354,6 @@ async def _overexposure_task(broker_account_id: str, tradingsymbol: str) -> dict
     from app.models.position import Position
     from app.models.user_profile import UserProfile
     from app.core.trading_defaults import get_thresholds
-    from app.services.price_stream_service import get_cached_ltp
     from sqlalchemy import select, and_
 
     async with SessionLocal() as db:

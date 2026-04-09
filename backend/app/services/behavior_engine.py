@@ -498,7 +498,7 @@ class BehaviorEngine:
         daily_danger  = ctx.thresholds.get("daily_trade_danger", 12)
 
         # Session P&L context — used to gate/downgrade alerts when in profit
-        session_pnl = float(ctx.session.realized_pnl or 0) if ctx.session else 0
+        session_pnl = float(ctx.session.session_pnl or 0) if ctx.session else 0
 
         # Check 1: burst (30-min rolling window)
         cutoff = ct.entry_time - timedelta(minutes=30)

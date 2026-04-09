@@ -1,7 +1,7 @@
 import uuid
 from datetime import datetime
 from typing import Optional
-from sqlalchemy import String, Numeric, Integer, BigInteger, JSON, TIMESTAMP, text, ForeignKey, UUID
+from sqlalchemy import String, Numeric, Integer, BigInteger, JSON, TIMESTAMP, text, ForeignKey, UUID, UniqueConstraint
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from app.core.database import Base
 from app.models.broker_account import BrokerAccount
@@ -72,6 +72,10 @@ class Trade(Base):
 
     created_at: Mapped[datetime] = mapped_column(TIMESTAMP(timezone=True), server_default=text("now()"))
     updated_at: Mapped[datetime] = mapped_column(TIMESTAMP(timezone=True), server_default=text("now()"))
+
+    __table_args__ = (
+        UniqueConstraint('broker_account_id', 'order_id', name='uq_trades_broker_order'),
+    )
 
     # Relationship
     broker_account = relationship("BrokerAccount")

@@ -29,8 +29,9 @@ Redis keys:
 
 import logging
 import time
+from datetime import datetime, timezone
 from enum import Enum
-from typing import Optional
+from typing import Any, Dict, Optional
 from uuid import UUID
 
 logger = logging.getLogger(__name__)
@@ -63,7 +64,71 @@ class CircuitBreaker:
         except KiteAPIError:
             await cb.record_failure(broker_account_id)
             raise
+
+    Constructor params are optional — production code uses module-level constants.
+    Params exist so tests can inject specific thresholds and mock _get_state/_save_state.
     """
+
+    def __init__(
+        self,
+        name: Optional[str] = None,
+        failure_threshold: Optional[float] = None,
+        recovery_timeout: Optional[int] = None,
+        min_calls: Optional[int] = None,
+    ):
+        self._name = name or "default"
+        self._failure_threshold = failure_threshold if failure_threshold is not None else FAILURE_RATE_THRESHOLD
+        self._recovery_timeout = recovery_timeout if recovery_timeout is not None else OPEN_COOLDOWN_SECONDS
+        self._min_calls = min_calls if min_calls is not None else MIN_CALLS_TO_TRIP
+
+    # ── Testable helper methods ────────────────────────────────────────────
+
+    def _should_open(self, failure_count: int, total_count: int) -> bool:
+        """Return True if the circuit should trip based on failure rate."""
+        if total_count < self._min_calls:
+            return False
+        return (failure_count / total_count) > self._failure_threshold
+
+    def _get_state(self) -> Dict[str, Any]:
+        """Return current circuit state dict. Override or mock in tests."""
+        raise NotImplementedError("_get_state must be mocked in tests or overridden in subclass")
+
+    def _save_state(self, state_dict: Dict[str, Any]) -> None:
+        """Persist circuit state dict. Override or mock in tests."""
+        raise NotImplementedError("_save_state must be mocked in tests or overridden in subclass")
+
+    def _compute_next_state(self) -> CircuitState:
+        """
+        Compute the next circuit state based on current state and elapsed time.
+        Reads via _get_state() — mock that in tests to control input.
+        """
+        state_dict = self._get_state()
+        state = state_dict.get("state", CircuitState.CLOSED)
+
+        if state == CircuitState.OPEN:
+            last_failure_time = state_dict.get("last_failure_time")
+            if last_failure_time:
+                last_dt = datetime.fromisoformat(last_failure_time)
+                if last_dt.tzinfo is None:
+                    last_dt = last_dt.replace(tzinfo=timezone.utc)
+                elapsed = (datetime.now(timezone.utc) - last_dt).total_seconds()
+                if elapsed >= self._recovery_timeout:
+                    return CircuitState.HALF_OPEN
+            return CircuitState.OPEN
+
+        return state
+
+    def _record_success(self) -> None:
+        """
+        Record a successful probe call. If HALF_OPEN, transitions to CLOSED.
+        Writes via _save_state() — mock that in tests to capture the result.
+        """
+        state_dict = self._get_state()
+        state = state_dict.get("state", CircuitState.CLOSED)
+        if state == CircuitState.HALF_OPEN:
+            self._save_state({"state": CircuitState.CLOSED})
+
+    # ── Redis-backed production methods ───────────────────────────────────
 
     def _get_redis(self):
         import redis as redis_lib

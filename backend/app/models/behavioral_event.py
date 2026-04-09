@@ -1,5 +1,5 @@
 import uuid
-from sqlalchemy import Column, String, Numeric, Text, TIMESTAMP, text, ForeignKey
+from sqlalchemy import Column, String, Numeric, Text, TIMESTAMP, text, ForeignKey, CheckConstraint
 from sqlalchemy.dialects.postgresql import UUID, JSONB
 from sqlalchemy.orm import relationship
 from app.core.database import Base
@@ -19,6 +19,9 @@ class BehavioralEvent(Base):
     daily summaries, alert fatigue tuning.
     """
     __tablename__ = "behavioral_events"
+    __table_args__ = (
+        CheckConstraint('confidence >= 0.70', name='chk_behavioral_events_confidence'),
+    )
 
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     broker_account_id = Column(UUID(as_uuid=True), ForeignKey("broker_accounts.id", ondelete="CASCADE"), nullable=False, index=True)

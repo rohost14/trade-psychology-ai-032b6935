@@ -9,7 +9,7 @@ At T+5, T+30, and T+60 minutes we fetch live prices to compute:
 
 from datetime import datetime, timezone
 from uuid import uuid4
-from sqlalchemy import Column, String, DateTime, ForeignKey, Numeric
+from sqlalchemy import Column, String, DateTime, ForeignKey, Numeric, Index
 from sqlalchemy.dialects.postgresql import UUID, JSONB
 
 from app.core.database import Base
@@ -17,19 +17,21 @@ from app.core.database import Base
 
 class AlertCheckpoint(Base):
     __tablename__ = "alert_checkpoints"
+    __table_args__ = (
+        Index('idx_ac_alert_id', 'alert_id'),
+        Index('idx_ac_broker_created', 'broker_account_id', 'created_at'),
+    )
 
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid4)
     alert_id = Column(
         UUID(as_uuid=True),
         ForeignKey("risk_alerts.id", ondelete="CASCADE"),
         nullable=False,
-        index=True
     )
     broker_account_id = Column(
         UUID(as_uuid=True),
         ForeignKey("broker_accounts.id", ondelete="CASCADE"),
         nullable=False,
-        index=True
     )
 
     # Snapshot at alert time (single trigger instrument position)
