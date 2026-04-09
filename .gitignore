@@ -72,3 +72,19 @@ nul
 
 # Binary documents (track in Google Drive/Notion instead)
 *.docx
+
+# IDE / AI tool scaffolding (Lovable, Windsurf, Zencoder, agent runners)
+.lovable/
+.windsurf/
+.zencoder/
+.agent/
+.agents/
+
+# Claude Code artifacts
+skills-lock.json
+
+# Redundant package manager lockfiles
+bun.lockb
+
+# Vite temp files
+*.timestamp-*.mjs

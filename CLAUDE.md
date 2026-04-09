@@ -50,9 +50,8 @@ Key directories:
 - `src/components/dashboard/` - Dashboard-specific components (positions tables, alerts, risk guardian)
 - `src/components/analytics/` - Analytics charts and cards
 - `src/components/goals/` - Goal commitment and streak tracking
-- `src/contexts/AlertContext.tsx` - Global behavioral alert state with pattern detection
+- `src/contexts/AlertContext.tsx` - Global behavioral alert state (backend-driven, WebSocket-triggered)
 - `src/contexts/BrokerContext.tsx` - Broker connection state (Zerodha OAuth, sync, account management)
-- `src/lib/patternDetector.ts` - Client-side behavioral pattern detection engine
 - `src/types/` - TypeScript interfaces (`api.ts` for API types, `patterns.ts` for behavioral types)
 
 ### Backend (`backend/app/`)
