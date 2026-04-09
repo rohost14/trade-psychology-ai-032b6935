@@ -1,10 +1,16 @@
 """
 Admin task status — query RedBeat Redis keys to show Celery beat schedule health.
 Returns last run time, next run time, and status for each scheduled task.
+Also exposes one-time maintenance operations (backfills, recalculations).
 """
 from fastapi import APIRouter, Depends
+from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy import select, update
 from app.api.admin.deps import get_current_admin
+from app.core.database import get_db
 from app.core.config import settings
+from app.core.market_hours import market_minutes
+from app.models.completed_trade import CompletedTrade
 import logging
 
 router = APIRouter()
@@ -101,4 +107,61 @@ async def get_task_status(_: dict = Depends(get_current_admin)):
         "queue_depths":    queues,
         "failed_tasks":    failed_tasks,
         "failed_count":    len(failed_tasks),
+    }
+
+
+@router.post("/backfill-duration")
+async def backfill_duration_minutes(
+    db: AsyncSession = Depends(get_db),
+    _: dict = Depends(get_current_admin),
+):
+    """
+    One-time maintenance: recalculate duration_minutes for all CompletedTrades
+    using market hours (strips overnight gaps, weekends, holidays).
+
+    Safe to run multiple times — only updates rows where the value changes.
+    Returns counts of updated / already-correct / skipped (missing timestamps).
+    """
+    result = await db.execute(
+        select(CompletedTrade).where(
+            CompletedTrade.entry_time.is_not(None),
+            CompletedTrade.exit_time.is_not(None),
+        )
+    )
+    trades = result.scalars().all()
+
+    updated = 0
+    already_correct = 0
+    skipped = 0
+
+    for trade in trades:
+        try:
+            new_duration = market_minutes(
+                trade.entry_time,
+                trade.exit_time,
+                exchange=trade.exchange or "NFO",
+            )
+        except Exception as e:
+            logger.warning(f"[backfill-duration] skipping {trade.id}: {e}")
+            skipped += 1
+            continue
+
+        if new_duration != trade.duration_minutes:
+            trade.duration_minutes = new_duration
+            updated += 1
+        else:
+            already_correct += 1
+
+    await db.commit()
+
+    logger.info(
+        f"[backfill-duration] done — updated={updated} "
+        f"already_correct={already_correct} skipped={skipped}"
+    )
+    return {
+        "status":          "done",
+        "total":           len(trades),
+        "updated":         updated,
+        "already_correct": already_correct,
+        "skipped":         skipped,
     }
