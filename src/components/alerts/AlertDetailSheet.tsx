@@ -11,6 +11,7 @@ const PATTERN_EXPLANATIONS: Record<string, string> = {
   revenge_trade:            'Entering immediately after a loss while the emotional response is still active. The next trade placed under stress tends to be larger, faster, and less disciplined than planned.',
   rapid_reentry:            'Re-entering the same instrument shortly after a losing exit. The setup has not changed — the same conditions that caused the first loss are still in play.',
   panic_exit:               'A fast manual exit at a loss with no stop-loss order on record. May be a rational decision or an impulsive reaction — worth reviewing against your pre-trade plan.',
+  size_escalation:          'Your quantity on the same underlying has been rising across consecutive trades while you were losing. A larger size on an already-losing instrument compounds the total drawdown.',
   martingale_behaviour:     'Increasing position size after consecutive losses on the same instrument. Each escalation increases the total risk in the session, not just the cost of this trade.',
   post_loss_recovery_bet:   'Taking a significantly larger position on the same underlying after losing. If this trade also loses, the combined loss will exceed all prior losses combined.',
   consecutive_loss_streak:  'Multiple consecutive losses in the same session. After the third loss, the probability of the next trade being a loss is statistically higher due to emotional state, not randomness.',
@@ -52,6 +53,12 @@ function buildFacts(patternType: string, d: Record<string, unknown>): { label: s
       if (d.hold_minutes != null) add('Hold time', `${fmtN(d.hold_minutes)} min`);
       if (d.realized_pnl)        add('Loss', fmtRs(d.realized_pnl));
       break;
+    case 'size_escalation':
+      if (d.underlying)          add('Underlying', String(d.underlying));
+      if (d.size_sequence && Array.isArray(d.size_sequence))
+                                 add('Qty sequence', (d.size_sequence as number[]).join(' → '));
+      if (d.escalation_pct != null) add('Total increase', `${fmtN(d.escalation_pct)}%`);
+      break;
     case 'martingale_behaviour':
       if (d.underlying)          add('Underlying', String(d.underlying));
       if (d.size_sequence && Array.isArray(d.size_sequence))
@@ -68,7 +75,7 @@ function buildFacts(patternType: string, d: Record<string, unknown>): { label: s
       break;
     case 'consecutive_loss_streak':
       if (d.streak != null)  add('Loss streak', `${d.streak} in a row`);
-      if (d.total_loss)      add('Total session loss', fmtRs(d.total_loss));
+      if (d.total_loss)      add('Total loss', fmtRs(d.total_loss));
       break;
     case 'overtrading':
       if (d.daily_count != null)      add('Trades today', String(d.daily_count));
@@ -205,6 +212,39 @@ export default function AlertDetailSheet({ alert, open, onClose, onAcknowledge }
               ))}
             </div>
           )}
+
+          {/* Trades involved — shown for consecutive_loss and size_escalation */}
+          {(() => {
+            const d = alert.pattern.details ?? {};
+            const rows: { symbol: string; qty: number; pnl: number }[] =
+              Array.isArray(d.losing_trades) ? (d.losing_trades as { symbol: string; qty: number; pnl: number }[]) :
+              Array.isArray(d.trade_list)    ? (d.trade_list    as { symbol: string; qty: number; pnl: number }[]) :
+              [];
+            if (rows.length === 0) return null;
+            return (
+              <div>
+                <p className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wide mb-2">
+                  Trades involved
+                </p>
+                <div className="rounded-lg border border-border divide-y divide-border">
+                  {rows.map((r, i) => (
+                    <div key={i} className="flex items-center justify-between px-3 py-2">
+                      <span className="text-[12px] font-mono text-foreground">{r.symbol}</span>
+                      <div className="flex items-center gap-4">
+                        <span className="text-[11px] text-muted-foreground">{r.qty} qty</span>
+                        <span className={cn(
+                          'text-[12px] font-mono tabular-nums font-medium',
+                          r.pnl < 0 ? 'text-tm-loss' : 'text-tm-profit'
+                        )}>
+                          {r.pnl < 0 ? '−' : '+'}₹{Math.abs(r.pnl).toLocaleString('en-IN', { maximumFractionDigits: 0 })}
+                        </span>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            );
+          })()}
 
           {/* Pattern explanation */}
           {PATTERN_EXPLANATIONS[backendType] && (

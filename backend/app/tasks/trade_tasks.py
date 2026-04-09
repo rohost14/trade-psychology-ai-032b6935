@@ -540,8 +540,17 @@ async def run_risk_detection_async(broker_account_id: UUID, db, trigger_trade: T
         )
         alerts = result.alerts  # List[RiskAlert], ready to save
 
-        # ── Deduplicate against last 24 hours ─────────────────────────
-        cutoff = datetime.now(timezone.utc) - timedelta(hours=24)
+        # ── Deduplicate with pattern-specific windows ─────────────────
+        # Most patterns: 24h (once per session is enough).
+        # Streak/meltdown patterns: 2h so a second episode in the same day
+        # still fires, and repeated consecutive_loss_streak escalates to danger.
+        _DEDUP_HOURS = {
+            "consecutive_loss_streak": 2,
+            "session_meltdown":        2,
+            "profit_giveaway":         2,
+        }
+        now_utc = datetime.now(timezone.utc)
+        cutoff = now_utc - timedelta(hours=24)
         existing_result = await db.execute(
             select(RiskAlert).where(
                 and_(
@@ -550,17 +559,34 @@ async def run_risk_detection_async(broker_account_id: UUID, db, trigger_trade: T
                 )
             )
         )
-        existing_keys = {
-            ("_account_", a.pattern_type) for a in existing_result.scalars().all()
-        }
+        all_existing = existing_result.scalars().all()
+        # last fired time per pattern_type
+        last_fired: dict = {}
+        today_patterns: set = set()
+        for a in all_existing:
+            today_patterns.add(a.pattern_type)
+            if a.pattern_type not in last_fired or a.detected_at > last_fired[a.pattern_type]:
+                last_fired[a.pattern_type] = a.detected_at
+
+        def _is_deduped(pattern_type: str) -> bool:
+            if pattern_type not in last_fired:
+                return False
+            hours = _DEDUP_HOURS.get(pattern_type, 24)
+            return (now_utc - last_fired[pattern_type]) < timedelta(hours=hours)
 
         new_alerts = []
         for alert in alerts:
-            key = ("_account_", alert.pattern_type)
-            if key not in existing_keys:
-                db.add(alert)
-                new_alerts.append(alert)
-                existing_keys.add(key)
+            if _is_deduped(alert.pattern_type):
+                continue
+            # consecutive_loss_streak fired again today → escalate to danger
+            # so the guardian (WhatsApp/push) notification triggers.
+            if alert.pattern_type == "consecutive_loss_streak" \
+                    and alert.pattern_type in today_patterns:
+                alert.severity = "danger"
+            db.add(alert)
+            new_alerts.append(alert)
+            last_fired[alert.pattern_type] = now_utc
+            today_patterns.add(alert.pattern_type)
 
         await db.commit()
 
@@ -632,9 +658,16 @@ async def run_behavior_engine_full_session(broker_account_id: UUID, db) -> int:
     if not trades_today:
         return 0
 
-    # Build dedup set once — shared across all iterations so the same pattern
-    # cannot fire more than once even if it triggers on multiple trades.
-    cutoff = datetime.now(timezone.utc) - timedelta(hours=24)
+    # Build dedup state once — shared across all iterations.
+    # Pattern-specific windows: streak/meltdown patterns use 2h so a second
+    # episode in the same day can still fire.
+    _DEDUP_HOURS = {
+        "consecutive_loss_streak": 2,
+        "session_meltdown":        2,
+        "profit_giveaway":         2,
+    }
+    now_utc = datetime.now(timezone.utc)
+    cutoff = now_utc - timedelta(hours=24)
     existing_result = await db.execute(
         select(RiskAlert).where(
             and_(
@@ -643,9 +676,19 @@ async def run_behavior_engine_full_session(broker_account_id: UUID, db) -> int:
             )
         )
     )
-    existing_keys: set = {
-        ("_account_", a.pattern_type) for a in existing_result.scalars().all()
-    }
+    all_existing = existing_result.scalars().all()
+    last_fired: dict = {}
+    today_patterns: set = set()
+    for a in all_existing:
+        today_patterns.add(a.pattern_type)
+        if a.pattern_type not in last_fired or a.detected_at > last_fired[a.pattern_type]:
+            last_fired[a.pattern_type] = a.detected_at
+
+    def _is_deduped_full(pattern_type: str) -> bool:
+        if pattern_type not in last_fired:
+            return False
+        hours = _DEDUP_HOURS.get(pattern_type, 24)
+        return (now_utc - last_fired[pattern_type]) < timedelta(hours=hours)
 
     all_new_alerts: list[RiskAlert] = []
 
@@ -656,11 +699,15 @@ async def run_behavior_engine_full_session(broker_account_id: UUID, db) -> int:
             db=db,
         )
         for alert in result.alerts:
-            key = ("_account_", alert.pattern_type)
-            if key not in existing_keys:
-                db.add(alert)
-                all_new_alerts.append(alert)
-                existing_keys.add(key)
+            if _is_deduped_full(alert.pattern_type):
+                continue
+            if alert.pattern_type == "consecutive_loss_streak" \
+                    and alert.pattern_type in today_patterns:
+                alert.severity = "danger"
+            db.add(alert)
+            all_new_alerts.append(alert)
+            last_fired[alert.pattern_type] = now_utc
+            today_patterns.add(alert.pattern_type)
 
     if all_new_alerts:
         await db.commit()

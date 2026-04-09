@@ -338,7 +338,6 @@ class BehaviorEngine:
             self._detect_rapid_reentry,
             self._detect_panic_exit,
             self._detect_martingale_behaviour,
-            self._detect_cooldown_violation,
             self._detect_rapid_flip,
             self._detect_excess_exposure,
             self._detect_session_meltdown,
@@ -389,24 +388,39 @@ class BehaviorEngine:
         caution = ctx.thresholds.get("consecutive_loss_caution", 3)
         danger  = ctx.thresholds.get("consecutive_loss_danger", 5)
 
+        # Build per-trade list for detail sheet (oldest first)
+        losing_trades = []
+        for ct in reversed(trades):
+            pnl = Decimal(str(ct.realized_pnl or 0))
+            if pnl < 0:
+                losing_trades.append({
+                    "symbol": ct.tradingsymbol or "—",
+                    "pnl": float(pnl),
+                    "qty": ct.total_quantity or 0,
+                })
+            else:
+                break
+        losing_trades.reverse()  # oldest → newest for display
+
         if streak >= danger:
             return DetectedEvent(
                 event_type="consecutive_loss_streak",
                 severity="danger",
                 message=(
-                    f"Your last {streak} trades were all losses — ₹{total_loss:,.0f} total. "
-                    f"Stop, review your analysis before the next trade."
+                    f"{streak} consecutive losing trades — ₹{total_loss:,.0f} total loss."
                 ),
-                context={"streak": streak, "total_loss": float(total_loss), "threshold": danger},
+                context={"streak": streak, "total_loss": float(total_loss),
+                         "threshold": danger, "losing_trades": losing_trades},
             )
         if streak >= caution:
             return DetectedEvent(
                 event_type="consecutive_loss_streak",
                 severity="caution",
                 message=(
-                    f"Your last {streak} trades were all losses — ₹{total_loss:,.0f} total."
+                    f"{streak} consecutive losing trades — ₹{total_loss:,.0f} total loss."
                 ),
-                context={"streak": streak, "total_loss": float(total_loss), "threshold": caution},
+                context={"streak": streak, "total_loss": float(total_loss),
+                         "threshold": caution, "losing_trades": losing_trades},
             )
         return None
 
@@ -433,6 +447,8 @@ class BehaviorEngine:
             return None
 
         gap_min = (ct.entry_time - last.exit_time).total_seconds() / 60
+        if gap_min < 0:
+            return None  # data issue: timestamps out of order
         caution_window = ctx.thresholds.get("revenge_window_caution_min", 20)
         danger_window  = ctx.thresholds.get("revenge_window_danger_min", 5)
 
@@ -570,15 +586,26 @@ class BehaviorEngine:
     # ── Pattern 4: Size escalation after losses ───────────────────────────
 
     def _detect_size_escalation(self, ctx: EngineContext) -> Optional[DetectedEvent]:
+        ct = ctx.completed_trade
         trades = ctx.session_trades
         if len(trades) < 3:
             return None
 
+        # Only compare trades on the SAME underlying — mixing NIFTY and SENSEX
+        # lot sizes (50 vs 20) would produce meaningless comparisons.
+        from app.services.instrument_parser import parse_symbol as _ps
+        try:
+            ct_underlying = _ps(ct.tradingsymbol or "").underlying
+        except Exception:
+            ct_underlying = ct.tradingsymbol or ""
+
         prior = sorted(
-            [t for t in trades if t.id != ctx.completed_trade.id and t.exit_time],
+            [t for t in trades
+             if t.id != ct.id and t.exit_time
+             and (_ps(t.tradingsymbol or "").underlying if t.tradingsymbol else "") == ct_underlying],
             key=lambda t: t.exit_time,
         )[-3:]
-        if len(prior) < 2:
+        if len(prior) < 3:
             return None
 
         sizes = [t.total_quantity or 1 for t in prior]
@@ -592,15 +619,23 @@ class BehaviorEngine:
             threshold = ctx.thresholds.get("size_escalation_pct", 30)
             escalation_pct = (sizes[2] - sizes[0]) / max(sizes[0], 1) * 100
             if escalation_pct >= threshold:
+                symbols = [t.tradingsymbol or "—" for t in prior]
+                trade_list = [
+                    {"symbol": t.tradingsymbol or "—", "qty": t.total_quantity or 0,
+                     "pnl": float(Decimal(str(t.realized_pnl or 0)))}
+                    for t in prior
+                ]
                 return DetectedEvent(
                     event_type="size_escalation",
                     severity="caution",
                     message=(
-                        f"Your position size has been increasing after losses: "
-                        f"{sizes[0]}→{sizes[1]}→{sizes[2]} units ({escalation_pct:.0f}% increase)."
+                        f"{ct_underlying}: position size increased across 3 consecutive trades "
+                        f"while losing — {sizes[0]}→{sizes[1]}→{sizes[2]} qty "
+                        f"({symbols[0]} / {symbols[1]} / {symbols[2]})."
                     ),
-                    context={"size_sequence": sizes, "escalation_pct": round(escalation_pct, 1),
-                             "threshold_pct": threshold},
+                    context={"underlying": ct_underlying, "size_sequence": sizes,
+                             "escalation_pct": round(escalation_pct, 1),
+                             "threshold_pct": threshold, "trade_list": trade_list},
                 )
         return None
 
@@ -781,6 +816,8 @@ class BehaviorEngine:
             return None
 
         gap_min = (ct.entry_time - last.exit_time).total_seconds() / 60
+        if gap_min < 0:
+            return None  # data issue: timestamps out of order
         window = ctx.thresholds.get("rapid_flip_min", 10)
 
         if gap_min < window:
@@ -788,9 +825,8 @@ class BehaviorEngine:
                 event_type="rapid_flip",
                 severity="caution",
                 message=(
-                    f"You reversed direction on {ct.tradingsymbol} "
-                    f"({last.direction}→{ct.direction}) within {gap_min:.0f}min. "
-                    f"Rapid direction changes usually reflect uncertainty, not a new signal."
+                    f"{ct.tradingsymbol}: direction reversed "
+                    f"{last.direction}→{ct.direction} within {gap_min:.0f}min."
                 ),
                 context={
                     "symbol": ct.tradingsymbol,
@@ -826,9 +862,8 @@ class BehaviorEngine:
                 event_type="excess_exposure",
                 severity="danger",
                 message=(
-                    f"Your {ct.tradingsymbol} trade put ₹{capital_at_risk:,.0f} at risk "
-                    f"({risk_pct:.1f}% of your capital). "
-                    f"Profitable F&O traders risk ≤5% per trade. This is {risk_pct/5:.1f}× that."
+                    f"{ct.tradingsymbol}: ₹{capital_at_risk:,.0f} at risk "
+                    f"— {risk_pct:.1f}% of capital on a single trade."
                 ),
                 context={"capital_at_risk": round(capital_at_risk),
                          "risk_pct": round(risk_pct, 1),
@@ -881,10 +916,8 @@ class BehaviorEngine:
                 event_type="session_meltdown",
                 severity="danger",
                 message=(
-                    f"Today's P&L: ₹{session_pnl:,.0f} ({pct_used:.0f}% of your "
-                    f"₹{limit:,.0f} daily limit). "
-                    f"Research shows decision quality collapses at this level of loss. "
-                    f"Stop trading today."
+                    f"Today's P&L: ₹{session_pnl:,.0f} — {pct_used:.0f}% of your "
+                    f"₹{limit:,.0f} daily limit used."
                 ),
                 context={"session_pnl": float(session_pnl),
                          "daily_loss_limit": float(limit),
@@ -896,9 +929,8 @@ class BehaviorEngine:
                 event_type="session_meltdown",
                 severity="caution",
                 message=(
-                    f"Today's P&L: ₹{session_pnl:,.0f} ({pct_used:.0f}% of your "
-                    f"₹{limit:,.0f} daily limit used). "
-                    f"At 40%+ loss, the urge to recover distorts decision-making."
+                    f"Today's P&L: ₹{session_pnl:,.0f} — {pct_used:.0f}% of your "
+                    f"₹{limit:,.0f} daily limit used."
                 ),
                 context={"session_pnl": float(session_pnl),
                          "daily_loss_limit": float(limit),
@@ -1122,10 +1154,9 @@ class BehaviorEngine:
                 event_type="early_exit",
                 severity="caution",
                 message=(
-                    f"Today's pattern: winners held {avg_winner_hold:.0f}min avg vs "
-                    f"losers {avg_loser_hold:.0f}min avg ({ratio:.1f}× longer). "
-                    f"You are cutting winners too early and holding losers too long — "
-                    f"this is the single biggest driver of underperformance for retail traders."
+                    f"Today's pattern: winners held {avg_winner_hold:.0f}min avg, "
+                    f"losers held {avg_loser_hold:.0f}min avg ({ratio:.1f}× longer). "
+                    f"Winners are being closed faster than losers."
                 ),
                 context={
                     "avg_winner_hold_min": round(avg_winner_hold, 1),
@@ -1169,9 +1200,7 @@ class BehaviorEngine:
                 event_type="winning_streak_overconfidence",
                 severity="danger",
                 message=(
-                    f"{danger_streak} consecutive wins (₹{float(total_profit):,.0f} total). "
-                    f"This level of streak creates extreme overconfidence. "
-                    f"Your next trade is statistically a regression to the mean — size accordingly."
+                    f"{danger_streak} consecutive wins — ₹{float(total_profit):,.0f} total profit."
                 ),
                 context={
                     "win_streak": danger_streak,
@@ -1191,9 +1220,8 @@ class BehaviorEngine:
                     event_type="winning_streak_overconfidence",
                     severity="caution",
                     message=(
-                        f"{caution_streak} consecutive wins, then your position size jumped "
-                        f"{escalation_pct:.0f}% ({avg_streak_qty:.0f}→{current_qty} units). "
-                        f"Streaks end — don't let confidence become a liability."
+                        f"{caution_streak} consecutive wins, then position size jumped "
+                        f"{escalation_pct:.0f}% ({avg_streak_qty:.0f}→{current_qty} units)."
                     ),
                     context={
                         "win_streak": caution_streak,
@@ -1355,11 +1383,9 @@ class BehaviorEngine:
             event_type="iv_crush_behavior",
             severity="caution",
             message=(
-                f"Your {ct.tradingsymbol} lost {float(loss_pct):.0f}% of premium "
-                f"(₹{abs(float(pnl)):,.0f}) in just {hold_min}min. "
-                f"This pattern matches IV crush — buying options when implied volatility is "
-                f"elevated, then watching premium collapse after the event passes. "
-                f"Check IV rank before buying: >60% means you're paying peak premium."
+                f"{ct.tradingsymbol}: {float(loss_pct):.0f}% of premium lost "
+                f"(₹{abs(float(pnl)):,.0f}) in {hold_min}min — "
+                f"fast premium collapse consistent with IV crush."
             ),
             context={
                 "tradingsymbol": ct.tradingsymbol,
@@ -1459,7 +1485,7 @@ class BehaviorEngine:
 
         entry_ist = ct.entry_time.astimezone(IST)
         market_open = entry_ist.replace(hour=9, minute=15, second=0, microsecond=0)
-        trap_end    = entry_ist.replace(hour=9, minute=23, second=0, microsecond=0)
+        trap_end    = entry_ist.replace(hour=9, minute=25, second=0, microsecond=0)
 
         if not (market_open <= entry_ist <= trap_end):
             return None
@@ -1510,7 +1536,7 @@ class BehaviorEngine:
             severity=severity,
             message=(
                 f"{ct.tradingsymbol}: {detail}. "
-                f"The 09:15–09:23 window has the widest bid-ask spreads of the day "
+                f"The 09:15–09:25 window has the widest bid-ask spreads of the day "
                 f"as gaps resolve and order books stabilise."
             ),
             context={
@@ -1537,12 +1563,12 @@ class BehaviorEngine:
             return None
 
         entry_ist = ct.entry_time.astimezone(IST)
-        panic_start = entry_ist.replace(hour=15, minute=10, second=0, microsecond=0)
+        panic_start = entry_ist.replace(hour=15, minute=0, second=0, microsecond=0)
 
         if entry_ist < panic_start:
             return None
 
-        # Count all MIS trades entered after 15:10 IST today
+        # Count all MIS trades entered after 15:00 IST today
         panic_trades = [
             t for t in ctx.session_trades
             if t.product in ("MIS", "INTRADAY")
@@ -1559,24 +1585,24 @@ class BehaviorEngine:
                 event_type="end_of_session_mis_panic",
                 severity="danger",
                 message=(
-                    f"{panic_count} MIS trades after 15:10 IST today. "
-                    f"Zerodha auto-squares MIS at 15:20 — you are voluntarily entering positions "
-                    f"with a 10-minute forced exit. This is not trading, it is gambling."
+                    f"{panic_count} MIS trades after 15:00 IST today. "
+                    f"Zerodha auto-squares MIS at 15:20."
                 ),
                 context={"entry_time_ist": entry_ist.strftime("%H:%M"),
                          "panic_count": panic_count},
             )
         if panic_count >= caution_count:
+            mins_remaining = max(0, (15 * 60 + 20) - (entry_ist.hour * 60 + entry_ist.minute))
             return DetectedEvent(
                 event_type="end_of_session_mis_panic",
                 severity="caution",
                 message=(
-                    f"MIS entry at {entry_ist.strftime('%H:%M')} IST. "
-                    f"Zerodha squares off MIS at 15:20 — a {20 - (entry_ist.hour * 60 + entry_ist.minute - 15 * 60 - 10)}-minute "
-                    f"forced exit window is too tight for rational decision-making."
+                    f"MIS entry at {entry_ist.strftime('%H:%M')} IST — "
+                    f"{mins_remaining}min until Zerodha auto-square-off at 15:20."
                 ),
                 context={"entry_time_ist": entry_ist.strftime("%H:%M"),
-                         "panic_count": panic_count},
+                         "panic_count": panic_count,
+                         "mins_to_squareoff": mins_remaining},
             )
         return None
 

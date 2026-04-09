@@ -127,13 +127,13 @@ COLD_START_DEFAULTS: Dict[str, Any] = {
     'expiry_overtrading_caution_mul':    1.5,  # 1.5× personal baseline = caution
     'expiry_overtrading_danger_mul':     2.0,  # 2.0× personal baseline = danger
 
-    # ── Opening 5-minute trap ─────────────────────────────────────────────
-    # 09:15-09:20 IST: widest spreads, most distorted option pricing of the day.
-    # NSE data: 78% of retail opening-5-min derivative trades are unprofitable.
+    # ── Opening 10-minute trap ────────────────────────────────────────────
+    # 09:15-09:25 IST: widest spreads, most distorted option pricing of the day.
+    # NSE data: 78% of retail opening-10-min derivative trades are unprofitable.
     # (This pattern fires once per entry — no separate threshold needed)
 
     # ── End-of-session MIS panic ──────────────────────────────────────────
-    # MIS trades entered after 15:10 IST face auto-square-off at ~15:20.
+    # MIS trades entered after 15:00 IST face auto-square-off at ~15:20.
     # 2 such trades = caution (pattern emerging), 3+ = danger (clear panic spiral).
     'end_session_mis_caution_count':     2,
     'end_session_mis_danger_count':      3,

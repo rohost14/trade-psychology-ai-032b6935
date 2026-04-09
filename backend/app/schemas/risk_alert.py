@@ -1,6 +1,7 @@
-from pydantic import BaseModel, UUID4, ConfigDict, computed_field
+from pydantic import BaseModel, ConfigDict, computed_field
 from datetime import datetime
 from typing import Optional, List, Dict, Any
+from uuid import UUID
 
 class RiskAlertBase(BaseModel):
     pattern_type: str
@@ -9,10 +10,10 @@ class RiskAlertBase(BaseModel):
     details: Optional[Dict[str, Any]] = None
 
 class RiskAlertResponse(RiskAlertBase):
-    id: UUID4
-    broker_account_id: UUID4
-    trigger_trade_id: Optional[UUID4] = None
-    related_trade_ids: Optional[List[UUID4]] = None
+    id: UUID
+    broker_account_id: UUID
+    trigger_trade_id: Optional[UUID] = None
+    related_trade_ids: Optional[List[UUID]] = None
     detected_at: datetime
     acknowledged_at: Optional[datetime] = None
 
