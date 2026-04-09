@@ -24,6 +24,7 @@ from app.models.instrument import Instrument
 from app.models.completed_trade import CompletedTrade
 from app.models.completed_trade_feature import CompletedTradeFeature
 from app.models.incomplete_position import IncompletePosition
+from app.core.market_hours import market_minutes
 
 logger = logging.getLogger(__name__)
 
@@ -431,7 +432,9 @@ class PnLCalculator:
 
         duration = 0
         if entry_time and exit_time:
-            duration = max(0, int((exit_time - entry_time).total_seconds() / 60))
+            # Market-hours duration: strips overnight gaps, weekends, holidays
+            # so a 4-day NRML hold reports actual exposure (~1,500 min), not wall-clock (~5,760 min)
+            duration = market_minutes(entry_time, exit_time, exchange=ref_trade.exchange or "NFO")
 
         # Stable UUID: same round always gets same ID so journal FKs survive re-syncs
         ct_id = self._stable_ct_id(

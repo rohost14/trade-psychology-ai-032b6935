@@ -189,6 +189,51 @@ def is_market_open(segment: MarketSegment, check_time: Optional[datetime] = None
     return open_time <= current_time <= close_time
 
 
+def market_minutes(
+    entry_dt: datetime,
+    exit_dt: datetime,
+    exchange: str = "NFO",
+) -> int:
+    """
+    Return actual trading minutes between two datetimes.
+
+    Strips overnight gaps, weekends, and NSE/BSE holidays — so a 4-day NRML
+    hold reports ~1,500 minutes (actual exposure) not ~5,760 minutes (wall-clock).
+
+    Uses the exchange's trading window from MARKET_HOURS.
+    Falls back to NSE/NFO hours (9:15–15:30) for unknown exchanges.
+    Returns at least 1 (zero-duration trades are still 1 minute).
+    """
+    if not entry_dt or not exit_dt or exit_dt <= entry_dt:
+        return 1
+
+    segment = get_segment_from_exchange(exchange)
+    market_open, market_close = get_market_hours(segment)
+
+    entry_ist = entry_dt.astimezone(IST)
+    exit_ist  = exit_dt.astimezone(IST)
+
+    total = 0
+    current_date = entry_ist.date()
+
+    while current_date <= exit_ist.date():
+        # Skip weekends and holidays
+        if current_date.weekday() < 5 and not is_trading_holiday(current_date):
+            day_open  = IST.localize(datetime.combine(current_date, market_open))
+            day_close = IST.localize(datetime.combine(current_date, market_close))
+
+            # Clamp to the actual entry/exit on their respective days
+            period_start = max(entry_ist, day_open)  if current_date == entry_ist.date() else day_open
+            period_end   = min(exit_ist,  day_close) if current_date == exit_ist.date()  else day_close
+
+            if period_end > period_start:
+                total += int((period_end - period_start).total_seconds() / 60)
+
+        current_date += timedelta(days=1)
+
+    return max(1, total)
+
+
 def is_high_risk_window(segment: MarketSegment, check_time: Optional[datetime] = None) -> Tuple[bool, Optional[str]]:
     """Check if current time is in a high-risk trading window."""
     if check_time is None:

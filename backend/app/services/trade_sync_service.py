@@ -18,6 +18,7 @@ from app.utils.trade_classifier import classify_trade
 from app.services.zerodha_service import zerodha_client
 from app.services.pnl_calculator import pnl_calculator
 from app.services.instrument_service import instrument_service
+from app.core.market_hours import market_minutes
 from app.models.instrument import Instrument
 from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy import func as sa_func
@@ -834,8 +835,22 @@ class TradeSyncService:
                     tzinfo=IST,
                 ).astimezone(timezone.utc)
 
-                entry_time = prev_trading_day_close(today_ist)
-                duration_minutes = max(1, int((exit_time - entry_time).total_seconds() / 60))
+                # Try to find the actual entry timestamp from saved Trade records.
+                # The user's entry fill WAS saved when they placed the trade — we just
+                # need to look across all history, not only today.
+                # Fall back to prev-day-close approximation only if no record exists
+                # (e.g. position was opened before the user connected the app).
+                entry_buy_type = "BUY" if direction == "LONG" else "SELL"
+                actual_entry_time = await db.scalar(
+                    select(sa_func.min(Trade.exchange_timestamp)).where(
+                        Trade.broker_account_id == broker_account_id,
+                        Trade.tradingsymbol == symbol,
+                        Trade.transaction_type == entry_buy_type,
+                        Trade.exchange_timestamp < today_start_utc,
+                    )
+                )
+                entry_time = actual_entry_time or prev_trading_day_close(today_ist)
+                duration_minutes = market_minutes(entry_time, exit_time, exchange=exchange)
 
                 # Derive instrument_type from symbol suffix
                 sym_upper = symbol.upper()
