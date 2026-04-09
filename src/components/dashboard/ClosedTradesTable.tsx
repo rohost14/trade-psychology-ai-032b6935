@@ -172,13 +172,13 @@ export default function ClosedTradesTable({
           <thead>
             <tr className="border-b-2 border-b-slate-200 dark:border-b-neutral-700/80">
               {/* Symbol | Dir · Qty | Entry → Exit | P&L | Dur | Journal */}
-              <th className="px-5 py-2 text-left table-header">Symbol</th>
-              <th className="px-3 py-2 text-right table-header">Qty</th>
-              <th className="px-3 py-2 text-right table-header">Entry</th>
-              <th className="px-3 py-2 text-right table-header">Exit</th>
-              <th className="px-3 py-2 text-right table-header">P&L</th>
-              <th className="px-3 py-2 text-right table-header">Dur</th>
-              <th className="px-5 py-2 w-8 text-center table-header">
+              <th className="px-5 py-3 text-left table-header">Symbol</th>
+              <th className="px-3 py-3 text-right table-header">Qty</th>
+              <th className="px-3 py-3 text-right table-header">Entry</th>
+              <th className="px-3 py-3 text-right table-header">Exit</th>
+              <th className="px-3 py-3 text-right table-header">P&L</th>
+              <th className="px-3 py-3 text-right table-header">Dur</th>
+              <th className="px-5 py-3 w-8 text-center table-header">
                 <Pencil className="w-3 h-3 text-muted-foreground/50 mx-auto" />
               </th>
             </tr>
@@ -200,44 +200,44 @@ export default function ClosedTradesTable({
                   )}
                 >
                   {/* Symbol — always two lines for consistent row height */}
-                  <td className="px-5 py-2.5">
+                  <td className="px-5 py-3">
                     <div className="flex items-center gap-1.5">
-                      <span className="text-[13px] font-semibold text-foreground leading-none">{name}</span>
+                      <span className="text-sm font-semibold text-foreground leading-none">{name}</span>
                       <span className={chipClass(chip)}>{chip}</span>
                     </div>
-                    {/* Sub line: strike (if options) + exit time — always present */}
-                    <span className="text-[11px] text-muted-foreground font-mono tabular-nums mt-0.5 block">
+                    {/* Sub line: strike (if options) + exit time */}
+                    <span className="text-[12px] text-muted-foreground font-mono tabular-nums mt-1 block">
                       {strike ? `${strike} · ` : ''}{formatTime(trade.exit_time)}
                     </span>
                   </td>
 
                   {/* Qty — direction color, quantity value */}
-                  <td className="px-3 py-2.5 text-right">
+                  <td className="px-3 py-3 text-right">
                     <span className={cn(
-                      'text-[11px] font-semibold uppercase',
+                      'text-[12px] font-semibold uppercase',
                       trade.direction === 'LONG' ? 'text-tm-profit' : 'text-tm-loss',
                     )}>
                       {trade.direction === 'LONG' ? 'B' : 'S'}
                     </span>
-                    <span className="ml-1 text-[13px] font-mono tabular-nums text-foreground">
+                    <span className="ml-1 text-sm font-mono tabular-nums text-foreground">
                       {trade.total_quantity}
                     </span>
                   </td>
 
                   {/* Entry */}
-                  <td className="px-3 py-2.5 text-right text-[13px] font-mono tabular-nums text-muted-foreground">
+                  <td className="px-3 py-3 text-right text-sm font-mono tabular-nums font-medium text-muted-foreground">
                     {formatPrice(trade.avg_entry_price)}
                   </td>
 
                   {/* Exit */}
-                  <td className="px-3 py-2.5 text-right text-[13px] font-mono tabular-nums text-muted-foreground">
+                  <td className="px-3 py-3 text-right text-sm font-mono tabular-nums font-medium text-muted-foreground">
                     {formatPrice(trade.avg_exit_price)}
                   </td>
 
                   {/* P&L */}
-                  <td className="px-3 py-2.5 text-right">
+                  <td className="px-3 py-3 text-right">
                     <span className={cn(
-                      'text-[13px] font-mono tabular-nums font-semibold',
+                      'text-sm font-mono tabular-nums font-semibold',
                       isProfit ? 'text-tm-profit' : trade.realized_pnl < 0 ? 'text-tm-loss' : 'text-muted-foreground',
                     )}>
                       {formatCurrencyWithSign(trade.realized_pnl)}
@@ -245,12 +245,12 @@ export default function ClosedTradesTable({
                   </td>
 
                   {/* Duration */}
-                  <td className="px-3 py-2.5 text-right text-[12px] font-mono tabular-nums text-muted-foreground">
+                  <td className="px-3 py-3 text-right text-[13px] font-mono tabular-nums text-muted-foreground">
                     {formatDuration(trade.duration_minutes)}
                   </td>
 
                   {/* Journal icon */}
-                  <td className="px-5 py-2.5 text-center">
+                  <td className="px-5 py-3 text-center">
                     <button
                       onClick={e => { e.stopPropagation(); onTradeClick?.(trade); }}
                       className="w-7 h-7 inline-flex items-center justify-center rounded hover:bg-muted/60 transition-colors relative"

@@ -150,7 +150,7 @@ export default function OpenPositionsTable({
             <tr className="border-b-2 border-b-slate-200 dark:border-b-neutral-700/80">
               {['Symbol', 'Qty', 'Avg', 'LTP', 'P&L', ''].map((h, idx) => (
                 <th key={idx} className={cn(
-                  'py-2.5 table-header',
+                  'py-3 table-header',
                   idx === 0 ? 'px-5 text-left' :
                   idx === 5 ? 'px-5 w-10 text-left' :
                   'px-3 text-right',
@@ -174,18 +174,18 @@ export default function OpenPositionsTable({
                   livePnl > 0 && 'bg-tm-profit/[0.03]',
                   livePnl < 0 && 'bg-tm-loss/[0.03]',
                 )}>
-                  <td className="px-5 py-2.5">
+                  <td className="px-5 py-3">
                     <div className="flex items-center gap-1.5">
                       <span className="text-sm font-semibold text-foreground leading-none">{name}</span>
                       <span className={chipClass(chip)}>{chip}</span>
                     </div>
                     {sub && (
-                      <span className="text-[11px] text-muted-foreground font-mono tabular-nums mt-0.5 block">
+                      <span className="text-[12px] text-muted-foreground font-mono tabular-nums mt-1 block">
                         {sub} · {pos.product}
                       </span>
                     )}
                   </td>
-                  <td className="px-3 text-right">
+                  <td className="px-3 py-3 text-right">
                     <span className={cn('text-sm font-semibold', qty > 0 ? 'text-tm-profit' : 'text-tm-loss')}>
                       {qty > 0 ? 'BUY' : 'SELL'}
                     </span>
@@ -193,17 +193,17 @@ export default function OpenPositionsTable({
                       {formatNumber(Math.abs(qty))}
                     </span>
                   </td>
-                  <td className="px-3 text-right text-sm font-mono tabular-nums text-muted-foreground">
+                  <td className="px-3 py-3 text-right text-sm font-mono tabular-nums font-medium text-muted-foreground">
                     {formatPrice(pos.average_entry_price)}
                   </td>
-                  <td className="px-3 text-right text-sm">
+                  <td className="px-3 py-3 text-right text-sm font-medium">
                     <PriceCell
                       symbol={pos.tradingsymbol}
                       staticPrice={pos.last_price || pos.average_entry_price}
                       livePrice={liveData?.last_price}
                     />
                   </td>
-                  <td className="px-3 text-right">
+                  <td className="px-3 py-3 text-right">
                     <span className={cn(
                       'text-sm font-mono tabular-nums font-semibold',
                       livePnl > 0 ? 'text-tm-profit' : livePnl < 0 ? 'text-tm-loss' : 'text-muted-foreground',
@@ -211,7 +211,7 @@ export default function OpenPositionsTable({
                       {formatCurrencyWithSign(livePnl)}
                     </span>
                   </td>
-                  <td className="px-5">
+                  <td className="px-5 py-3">
                     <button
                       onClick={() => onPositionClick?.(pos)}
                       className="w-7 h-7 flex items-center justify-center rounded hover:bg-muted/60 transition-colors relative"
