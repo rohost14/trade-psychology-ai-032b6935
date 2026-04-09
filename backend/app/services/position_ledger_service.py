@@ -289,6 +289,31 @@ class PositionLedgerService:
 
         return last_entry.position_qty_after, last_entry.avg_entry_price_after
 
+    @staticmethod
+    async def get_net_qty(
+        broker_account_id: UUID,
+        tradingsymbol: str,
+        db: AsyncSession,
+    ) -> int:
+        """
+        Return current net position quantity for a symbol (any exchange).
+        Convenience method when exchange is not known at call site.
+        Returns 0 if no position exists.
+        """
+        result = await db.execute(
+            select(PositionLedger)
+            .where(
+                and_(
+                    PositionLedger.broker_account_id == broker_account_id,
+                    PositionLedger.tradingsymbol == tradingsymbol,
+                )
+            )
+            .order_by(PositionLedger.occurred_at.desc(), PositionLedger.created_at.desc())
+            .limit(1)
+        )
+        last_entry = result.scalar_one_or_none()
+        return last_entry.position_qty_after if last_entry else 0
+
     # ------------------------------------------------------------------
     # Read: realized P&L for a time range
     # ------------------------------------------------------------------

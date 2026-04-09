@@ -36,6 +36,7 @@ from app.core.database import SessionLocal
 from app.core.market_hours import is_market_open, MarketSegment
 from app.models.broker_account import BrokerAccount
 from app.services.zerodha_service import zerodha_client, KiteTokenExpiredError, KiteAPIError
+from app.services.instrument_parser import parse_symbol
 from sqlalchemy import select, and_
 
 logger = logging.getLogger(__name__)
@@ -239,7 +240,6 @@ async def _expire_stale_positions(account_id: UUID, today_ist: date) -> int:
     Returns count of positions expired.
     """
     from app.models.position import Position
-    from app.services.instrument_parser import parse_symbol
 
     async with SessionLocal() as db:
         result = await db.execute(
