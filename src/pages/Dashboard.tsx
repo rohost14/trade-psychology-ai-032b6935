@@ -35,19 +35,19 @@ interface RiskStateData {
 // ─── Session State ────────────────────────────────────────────────────────────
 const STATE_CFG = {
   stable: {
-    label:  'Stable',
+    label:  'On Track',
     pill:   'bg-teal-100 dark:bg-teal-900/40 text-teal-700 dark:text-teal-300',
     dot:    'bg-teal-500',
     accent: 'border-l-[3px] border-l-teal-400 dark:border-l-teal-500',
   },
   caution: {
-    label:  'Caution',
+    label:  'Patterns',          // behavioral patterns noted — NOT financial caution
     pill:   'bg-amber-100 dark:bg-amber-900/40 text-amber-700 dark:text-amber-300',
     dot:    'bg-amber-500',
     accent: 'border-l-[3px] border-l-amber-400 dark:border-l-amber-500',
   },
   risk: {
-    label:  'Risk',
+    label:  'High Alert',        // multiple/critical patterns — review immediately
     pill:   'bg-red-100 dark:bg-red-900/40 text-red-700 dark:text-red-300',
     dot:    'bg-red-500',
     accent: 'border-l-[3px] border-l-red-400 dark:border-l-red-500',
@@ -419,9 +419,9 @@ export default function Dashboard() {
 
   // ── Computed values ───────────────────────────────────────────────────────
   const mergedAlerts = useMemo(() => {
-    const twoDaysAgo = Date.now() - 48 * 60 * 60 * 1000;
+    const startOfToday = new Date(); startOfToday.setHours(0, 0, 0, 0);
     return alerts
-      .filter(a => new Date(a.shown_at).getTime() > twoDaysAgo)
+      .filter(a => new Date(a.shown_at).getTime() >= startOfToday.getTime())
       .map(a => ({
         id: a.id,
         pattern_name: a.pattern.name,
