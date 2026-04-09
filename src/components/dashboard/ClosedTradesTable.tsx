@@ -171,13 +171,11 @@ export default function ClosedTradesTable({
         <table className="w-full">
           <thead>
             <tr className="border-b-2 border-b-slate-200 dark:border-b-neutral-700/80">
-              {/* Symbol | Dir · Qty | Entry → Exit | P&L | Dur | Journal */}
               <th className="px-5 py-3 text-left table-header">Symbol</th>
               <th className="px-3 py-3 text-right table-header">Qty</th>
               <th className="px-3 py-3 text-right table-header">Entry</th>
               <th className="px-3 py-3 text-right table-header">Exit</th>
               <th className="px-3 py-3 text-right table-header">P&L</th>
-              <th className="px-3 py-3 text-right table-header">Dur</th>
               <th className="px-5 py-3 w-8 text-center table-header">
                 <Pencil className="w-3 h-3 text-muted-foreground/50 mx-auto" />
               </th>
@@ -242,11 +240,6 @@ export default function ClosedTradesTable({
                     )}>
                       {formatCurrencyWithSign(trade.realized_pnl)}
                     </span>
-                  </td>
-
-                  {/* Duration */}
-                  <td className="px-3 py-3 text-right text-[13px] font-mono tabular-nums text-muted-foreground">
-                    {formatDuration(trade.duration_minutes)}
                   </td>
 
                   {/* Journal icon */}
