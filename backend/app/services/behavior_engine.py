@@ -482,34 +482,64 @@ class BehaviorEngine:
         daily_caution = ctx.thresholds.get("daily_trade_limit", 7)
         daily_danger  = ctx.thresholds.get("daily_trade_danger", 12)
 
+        # Session P&L context — used to gate/downgrade alerts when in profit
+        session_pnl = float(ctx.session.realized_pnl or 0) if ctx.session else 0
+
         # Check 1: burst (30-min rolling window)
         cutoff = ct.entry_time - timedelta(minutes=30)
         recent = [t for t in ctx.session_trades
                   if t.entry_time and t.entry_time >= cutoff and t.id != ct.id]
         burst_count = len(recent) + 1
 
-        if burst_count >= burst_danger:
-            return DetectedEvent(
-                event_type="overtrading_burst",
-                severity="danger",
-                message=(
-                    f"{burst_count} trades in the last 30 minutes. "
-                    f"This pace is unsustainable — decision quality degrades sharply above {burst_danger} trades/30min."
-                ),
-                context={"trades_in_window": burst_count, "window_minutes": 30,
-                         "caution_limit": burst_caution, "danger_limit": burst_danger},
-            )
+        # Suppress burst alert entirely if session is profitable AND all burst trades won
+        # (high-frequency profitable trading is not a behavioral problem)
         if burst_count >= burst_caution:
-            return DetectedEvent(
-                event_type="overtrading_burst",
-                severity="caution",
-                message=(
-                    f"{burst_count} trades in the last 30 minutes. "
-                    f"Profitable F&O traders average 2-4 trades per day — are these all planned?"
-                ),
-                context={"trades_in_window": burst_count, "window_minutes": 30,
-                         "caution_limit": burst_caution, "danger_limit": burst_danger},
-            )
+            recent_pnls = [float(t.realized_pnl or 0) for t in recent]
+            recent_pnls.append(float(ct.realized_pnl or 0))
+            all_burst_profitable = all(p > 0 for p in recent_pnls)
+            if session_pnl > 0 and all_burst_profitable:
+                pass  # genuinely profitable burst — skip
+            elif burst_count >= burst_danger:
+                return DetectedEvent(
+                    event_type="overtrading_burst",
+                    severity="danger",
+                    message=(
+                        f"{burst_count} trades in 30 minutes"
+                        + (f" while down ₹{abs(session_pnl):,.0f} on the session." if session_pnl < 0 else ".")
+                    ),
+                    context={"trades_in_window": burst_count, "window_minutes": 30,
+                             "session_pnl": round(session_pnl, 2),
+                             "caution_limit": burst_caution, "danger_limit": burst_danger},
+                )
+            else:
+                # caution: fire only when session is in loss or mixed
+                if session_pnl < 0:
+                    return DetectedEvent(
+                        event_type="overtrading_burst",
+                        severity="caution",
+                        message=(
+                            f"{burst_count} trades in 30 minutes while the session is down "
+                            f"₹{abs(session_pnl):,.0f}."
+                        ),
+                        context={"trades_in_window": burst_count, "window_minutes": 30,
+                                 "session_pnl": round(session_pnl, 2),
+                                 "caution_limit": burst_caution, "danger_limit": burst_danger},
+                    )
+                # session positive but some burst trades losing — neutral observation
+                losing_in_burst = sum(1 for p in recent_pnls if p < 0)
+                if losing_in_burst > 0:
+                    return DetectedEvent(
+                        event_type="overtrading_burst",
+                        severity="caution",
+                        message=(
+                            f"{burst_count} trades in 30 minutes — "
+                            f"{losing_in_burst} of them closed at a loss."
+                        ),
+                        context={"trades_in_window": burst_count, "window_minutes": 30,
+                                 "losing_in_burst": losing_in_burst,
+                                 "session_pnl": round(session_pnl, 2),
+                                 "caution_limit": burst_caution, "danger_limit": burst_danger},
+                    )
 
         # Check 2: daily session count
         daily_count = len(ctx.session_trades)
@@ -518,23 +548,24 @@ class BehaviorEngine:
                 event_type="overtrading_burst",
                 severity="danger",
                 message=(
-                    f"{daily_count} trades today. SEBI data shows >12 trades/day correlates "
-                    f"with a 99% loss probability for retail F&O traders."
+                    f"{daily_count} trades today"
+                    + (f", session P&L: ₹{session_pnl:+,.0f}." if session_pnl != 0 else ".")
                 ),
                 context={"daily_count": daily_count, "daily_caution": daily_caution,
-                         "daily_danger": daily_danger},
+                         "daily_danger": daily_danger, "session_pnl": round(session_pnl, 2)},
             )
         if daily_count >= daily_caution:
-            return DetectedEvent(
-                event_type="overtrading_burst",
-                severity="caution",
-                message=(
-                    f"{daily_count} trades today. Profitable F&O traders average 2-4/day. "
-                    f"Each additional trade increases emotional noise in your decisions."
-                ),
-                context={"daily_count": daily_count, "daily_caution": daily_caution,
-                         "daily_danger": daily_danger},
-            )
+            # Only fire daily count alert if session is in loss
+            if session_pnl < 0:
+                return DetectedEvent(
+                    event_type="overtrading_burst",
+                    severity="caution",
+                    message=(
+                        f"{daily_count} trades today, session P&L: ₹{session_pnl:+,.0f}."
+                    ),
+                    context={"daily_count": daily_count, "daily_caution": daily_caution,
+                             "daily_danger": daily_danger, "session_pnl": round(session_pnl, 2)},
+                )
         return None
 
     # ── Pattern 4: Size escalation after losses ───────────────────────────
