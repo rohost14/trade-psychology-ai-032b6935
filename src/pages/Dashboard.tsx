@@ -421,7 +421,7 @@ export default function Dashboard() {
   const mergedAlerts = useMemo(() => {
     const startOfToday = new Date(); startOfToday.setHours(0, 0, 0, 0);
     return alerts
-      .filter(a => new Date(a.shown_at).getTime() >= startOfToday.getTime())
+      .filter(a => a.shown_at && new Date(a.shown_at).getTime() >= startOfToday.getTime())
       .map(a => ({
         id: a.id,
         pattern_name: a.pattern.name,

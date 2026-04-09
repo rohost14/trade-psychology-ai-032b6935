@@ -315,6 +315,21 @@ export function AlertProvider({ children }: { children: ReactNode }) {
     if (lastAlertEvent) fetchAlerts(true);
   }, [lastAlertEvent]); // eslint-disable-line react-hooks/exhaustive-deps
 
+  // Poll every 60 s — catches alerts that arrive when WS was disconnected or tab was in background
+  useEffect(() => {
+    const id = setInterval(() => fetchAlerts(true), 60_000);
+    return () => clearInterval(id);
+  }, [fetchAlerts]);
+
+  // Refetch immediately when user switches back to this tab
+  useEffect(() => {
+    const onVisible = () => {
+      if (document.visibilityState === 'visible') fetchAlerts(true);
+    };
+    document.addEventListener('visibilitychange', onVisible);
+    return () => document.removeEventListener('visibilitychange', onVisible);
+  }, [fetchAlerts]);
+
   // ---------------------------------------------------------------------------
   // Alert actions
   // ---------------------------------------------------------------------------

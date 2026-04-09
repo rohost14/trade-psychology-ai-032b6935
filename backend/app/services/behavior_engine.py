@@ -404,8 +404,7 @@ class BehaviorEngine:
                 event_type="consecutive_loss_streak",
                 severity="caution",
                 message=(
-                    f"Your last {streak} trades were all losses — ₹{total_loss:,.0f} total. "
-                    f"Take a short break before continuing."
+                    f"Your last {streak} trades were all losses — ₹{total_loss:,.0f} total."
                 ),
                 context={"streak": streak, "total_loss": float(total_loss), "threshold": caution},
             )
@@ -598,8 +597,7 @@ class BehaviorEngine:
                     severity="caution",
                     message=(
                         f"Your position size has been increasing after losses: "
-                        f"{sizes[0]}→{sizes[1]}→{sizes[2]} units ({escalation_pct:.0f}% increase). "
-                        f"Scaling up while losing accelerates drawdowns."
+                        f"{sizes[0]}→{sizes[1]}→{sizes[2]} units ({escalation_pct:.0f}% increase)."
                     ),
                     context={"size_sequence": sizes, "escalation_pct": round(escalation_pct, 1),
                              "threshold_pct": threshold},
@@ -756,8 +754,7 @@ class BehaviorEngine:
             message=(
                 f"You traded during an active cooldown period "
                 f"({remaining_min:.0f}min remaining). "
-                f"Reason: {cooldown.reason or 'loss streak'}. "
-                f"Cooldowns exist because you asked for them."
+                f"Reason: {cooldown.reason or 'loss streak'}."
             ),
             context={"remaining_minutes": round(remaining_min, 1),
                      "cooldown_reason": cooldown.reason},
@@ -1313,8 +1310,7 @@ class BehaviorEngine:
                 f"You entered {ct.tradingsymbol} after "
                 f"{len(prior_losers)} losing options position"
                 f"{'s' if len(prior_losers) > 1 else ''} on {ct_parsed.underlying} today "
-                f"(worst loss: {worst_pct:.0f}% of premium). "
-                f"Averaging down on options accelerates losses — theta works against you with each re-entry."
+                f"(worst loss: {worst_pct:.0f}% of premium)."
             ),
             context={
                 "underlying": ct_parsed.underlying,
@@ -1722,8 +1718,7 @@ class BehaviorEngine:
                 message=(
                     f"You built ₹{float(peak_pnl):,.0f} today, then gave back "
                     f"₹{float(erosion):,.0f} ({float(erosion_pct)*100:.0f}%) — "
-                    f"session P&L now ₹{float(current_pnl):,.0f}. "
-                    f"This is the most common way traders end a good day in the red."
+                    f"session P&L now ₹{float(current_pnl):,.0f}."
                 ),
                 context={
                     "peak_pnl": round(float(peak_pnl), 2),
