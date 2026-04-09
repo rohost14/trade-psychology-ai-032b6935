@@ -22,6 +22,10 @@ from app.models.coach_session import CoachSession
 from app.models.strategy_group import StrategyGroup, StrategyGroupLeg
 from app.models.guardrail_rule import GuardrailRule
 from app.models.portfolio_chat_session import PortfolioChatSession
+from app.models.admin_user import AdminUser
+from app.models.admin_audit_log import AdminAuditLog
+from app.models.generated_report import GeneratedReport
+from app.models.margin_snapshot import MarginSnapshot
 
 __all__ = [
     "User",
@@ -48,4 +52,8 @@ __all__ = [
     "StrategyGroupLeg",
     "GuardrailRule",
     "PortfolioChatSession",
+    "AdminUser",
+    "AdminAuditLog",
+    "GeneratedReport",
+    "MarginSnapshot",
 ]

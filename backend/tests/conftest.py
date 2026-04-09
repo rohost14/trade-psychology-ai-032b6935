@@ -15,11 +15,14 @@ from datetime import timedelta
 from uuid import uuid4
 
 from app.core.config import settings
+from app.core.database import Base
 from app.models.user import User
 from app.models.broker_account import BrokerAccount
 from app.models.trade import Trade
 from app.models.completed_trade import CompletedTrade
 from app.models.risk_alert import RiskAlert
+# Import all models so Base.metadata is fully populated before create_all
+import app.models  # noqa: F401
 from tests.helpers import now_utc, make_email
 
 
@@ -31,6 +34,24 @@ def make_engine():
         connect_args={"statement_cache_size": 0},
         echo=False,
     )
+
+
+@pytest_asyncio.fixture(scope="session", autouse=True)
+async def create_tables():
+    """Create all tables once per test session from SQLAlchemy models.
+
+    CI starts with a blank database — migrations are Supabase-only.
+    This replaces the migration step for the test environment.
+    """
+    engine = create_async_engine(
+        settings.DATABASE_URL,
+        poolclass=NullPool,
+        connect_args={"statement_cache_size": 0},
+        echo=False,
+    )
+    async with engine.begin() as conn:
+        await conn.run_sync(Base.metadata.create_all)
+    await engine.dispose()
 
 
 @pytest_asyncio.fixture
