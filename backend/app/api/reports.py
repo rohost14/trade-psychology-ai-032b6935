@@ -7,12 +7,12 @@ from pydantic import BaseModel
 import logging
 
 from app.models.generated_report import GeneratedReport
+from app.models.risk_alert import RiskAlert
 
 from app.core.database import get_db
 from app.api.deps import get_verified_broker_account_id
 from app.services.ai_service import ai_service
 from app.services.whatsapp_service import whatsapp_service
-from app.services.behavioral_analysis_service import BehavioralAnalysisService
 from app.services.daily_reports_service import daily_reports_service
 from app.services.pattern_prediction_service import pattern_prediction_service
 from app.models.trade import Trade
@@ -21,7 +21,6 @@ from uuid import UUID
 
 router = APIRouter()
 logger = logging.getLogger(__name__)
-behavioral_service = BehavioralAnalysisService()
 
 
 # =============================================================================
@@ -372,7 +371,7 @@ def _calculate_improvements(this_week: dict, last_week: dict) -> dict:
 async def send_whatsapp_report(
     broker_account_id: UUID = Depends(get_verified_broker_account_id),
     period_days: int = 2,
-    to_number: str = None,
+    to_number: Optional[str] = None,
     db: AsyncSession = Depends(get_db)
 ):
     """
@@ -380,7 +379,7 @@ async def send_whatsapp_report(
     """
     try:
         # 1. Fetch trades
-        cutoff = datetime.now() - timedelta(days=period_days)
+        cutoff = datetime.now(timezone.utc) - timedelta(days=period_days)
         result = await db.execute(
             select(Trade).where(
                 Trade.broker_account_id == broker_account_id,
@@ -396,7 +395,6 @@ async def send_whatsapp_report(
         # 2. Analyze Stats
         total_pnl = sum((t.pnl or 0) for t in trades)
         wins = [t for t in trades if (t.pnl or 0) > 0]
-        losses = [t for t in trades if (t.pnl or 0) <= 0]
 
         trade_count = len(trades)
         win_rate = (len(wins) / trade_count * 100) if trade_count > 0 else 0
@@ -404,21 +402,18 @@ async def send_whatsapp_report(
         best_trade = max((t.pnl or 0) for t in trades) if trades else 0
         worst_trade = min((t.pnl or 0) for t in trades) if trades else 0
 
-        # 3. Analyze Behavior (Reuse existing service)
-        # We reuse the full analysis logic but scoped to these trades if possible,
-        # or just quick-detect. For accurate persona, we generally need more history,
-        # but for "Active Patterns" in a 2-day report, we can run detection on just these trades
-        # OR fetch the comprehensive analysis and filter.
-        # Let's run detection on the specific set for immediate feedback.
-
-        detected_patterns = []
-        for pattern in behavioral_service.patterns:
-            res = pattern.detect(trades)
-            if res["detected"]:
-                detected_patterns.append(pattern.name)
+        # 3. Fetch behavioral alerts from DB (source of truth since Session 21)
+        alerts_result = await db.execute(
+            select(RiskAlert).where(
+                RiskAlert.broker_account_id == broker_account_id,
+                RiskAlert.detected_at >= cutoff,
+            )
+        )
+        recent_alerts = alerts_result.scalars().all()
+        detected_patterns = list({a.alert_type for a in recent_alerts})
 
         # Quick strength/weakness heuristic for the report
-        key_strength = "Discipline" if not any(p for p in detected_patterns if "Revenge" in p or "Overtrading" in p) else "Resilience"
+        key_strength = "Discipline" if not any(p for p in detected_patterns if "revenge" in p.lower() or "overtrading" in p.lower()) else "Resilience"
         key_weakness = detected_patterns[0] if detected_patterns else "None"
 
         # 4. Generate AI Report

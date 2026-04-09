@@ -226,7 +226,7 @@ class RetentionService:
         
         footer = (
             f"\n"
-            f"Time: {datetime.now().strftime('%I:%M %p')}\n"
+            f"Time: {datetime.now(timezone.utc).strftime('%I:%M %p')} UTC\n"
             f"TradeMentor AI"
         )
         

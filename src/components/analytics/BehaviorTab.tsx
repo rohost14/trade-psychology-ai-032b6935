@@ -572,7 +572,7 @@ function ConditionalPerformanceCard({ days }: { days: number }) {
     let c = false;
     api.get('/api/analytics/conditional-performance', { params: { days } })
       .then(r => { if (!c) setData(r.data); })
-      .catch(() => {});
+      .catch((err) => { console.warn("[BehaviorTab] fetch failed:", err); });
     return () => { c = true; };
   }, [days]);
 
@@ -643,7 +643,7 @@ function BTSTCard({ days }: { days: number }) {
     let c = false;
     api.get('/api/analytics/btst', { params: { days } })
       .then(r => { if (!c) setData(r.data); })
-      .catch(() => {});
+      .catch((err) => { console.warn("[BehaviorTab] fetch failed:", err); });
     return () => { c = true; };
   }, [days]);
 
@@ -763,7 +763,7 @@ function OptionsPatternCard({ days }: { days: number }) {
     let c = false;
     api.get('/api/analytics/options-behavior', { params: { days } })
       .then(r => { if (!c) setData(r.data); })
-      .catch(() => {});
+      .catch((err) => { console.warn("[BehaviorTab] fetch failed:", err); });
     return () => { c = true; };
   }, [days]);
 

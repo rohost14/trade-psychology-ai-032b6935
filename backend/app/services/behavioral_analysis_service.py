@@ -1,4 +1,4 @@
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from typing import Dict, List, Optional
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
@@ -1621,7 +1621,7 @@ class BehavioralAnalysisService:
         """Enhanced comprehensive behavioral analysis WITH AI."""
         
         # Fetch completed trades (real P&L lives here, not in Trade table)
-        cutoff = datetime.now() - timedelta(days=time_window_days)
+        cutoff = datetime.now(timezone.utc) - timedelta(days=time_window_days)
 
         ct_result = await db.execute(
             select(CompletedTrade).where(

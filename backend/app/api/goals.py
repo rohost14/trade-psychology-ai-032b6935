@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, desc
@@ -215,7 +215,7 @@ async def update_goals(
 @router.get("/commitment-log", response_model=CommitmentLogResponse)
 async def get_commitment_log(
     broker_account_id: UUID = Depends(get_verified_broker_account_id),
-    limit: int = 50,
+    limit: int = Query(default=50, ge=1, le=200),
     db: AsyncSession = Depends(get_db)
 ):
     """Get commitment log entries."""

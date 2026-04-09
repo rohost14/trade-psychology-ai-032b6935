@@ -59,7 +59,6 @@ class Settings(BaseSettings):
     ENCRYPTION_KEY: str  # Required - generate with: python -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())"
     SECRET_KEY: str  # Required - generate with: python -c "import secrets; print(secrets.token_urlsafe(32))"
     ALGORITHM: str = "HS256"
-    ACCESS_TOKEN_EXPIRE_MINUTES: int = 30
 
     # Admin panel — separate JWT secret, independent of user/broker auth
     # Generate with: python -c "import secrets; print(secrets.token_urlsafe(32))"

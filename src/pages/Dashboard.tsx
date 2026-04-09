@@ -278,7 +278,7 @@ export default function Dashboard() {
       const entries = res.data?.entries || [];
       const ids = new Set<string>(entries.map((e: any) => e.trade_id).filter(Boolean));
       setJournaledIds(ids);
-    }).catch(() => {});
+    }).catch((err) => { console.warn('[Dashboard] journal fetch failed:', err); });
   }, [accountId]);
 
   // Load on connect
@@ -293,7 +293,7 @@ export default function Dashboard() {
     if (!dismissed) {
       api.get('/api/profile/').then((res) => {
         if (!res.data?.profile?.trading_capital) setShowCapitalPrompt(true);
-      }).catch(() => {});
+      }).catch((err) => { console.warn('[Dashboard] profile fetch failed:', err); });
     }
   }, [isConnected, accountId, fetchAllData]);
 

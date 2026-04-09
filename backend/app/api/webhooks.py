@@ -88,23 +88,7 @@ async def zerodha_postback(
 
     logger.info(f"Postback received: {form_dict.get('order_id')} - {form_dict.get('status')}")
 
-    # 2. Verify checksum — forged/tampered = 200 (no retry, nothing to recover)
-    header_checksum = request.headers.get("X-Kite-Checksum")
-    if header_checksum:
-        is_valid = verify_zerodha_checksum_header(
-            form_dict.get("order_id", ""),
-            form_dict.get("order_timestamp", ""),
-            header_checksum,
-            settings.ZERODHA_API_SECRET
-        )
-    else:
-        is_valid = verify_zerodha_checksum(form_dict, settings.ZERODHA_API_SECRET)
-
-    if not is_valid:
-        logger.warning("Invalid checksum in postback")
-        return {"status": "ok", "message": "Invalid checksum"}
-
-    # 3. Extract broker account ID from tag — untagged order = 200 (not our user)
+    # 2. Extract broker account ID from tag early — needed to resolve per-user API secret
     tag = form_dict.get("tag", "")
     broker_account_id = extract_broker_account_id(tag)
 
@@ -112,18 +96,34 @@ async def zerodha_postback(
         logger.warning(f"No valid user tag in postback: {tag}")
         return {"status": "ok", "message": "No user tag"}
 
-    # 4. Verify account exists and is active — return 200 for all non-active states
+    # 3. Verify account exists and is active — return 200 for all non-active states
     #    so Zerodha does NOT retry (these are permanent states, retrying won't help).
     result = await db.execute(
-        select(BrokerAccount.id, BrokerAccount.status).where(
-            BrokerAccount.id == broker_account_id
-        )
+        select(BrokerAccount).where(BrokerAccount.id == broker_account_id)
     )
-    row = result.first()
-    if not row:
+    account = result.scalar_one_or_none()
+    if not account:
         logger.warning(f"Postback for unknown account {broker_account_id} — discarding")
         return {"status": "ok", "message": "Account not found"}
-    acct_status = row[1]
+    acct_status = account.status
+
+    # 4. Verify checksum using per-user API secret (fallback to global if not stored)
+    #    Must happen AFTER account lookup so we can use the right secret.
+    api_secret = account.decrypt_api_secret() or settings.ZERODHA_API_SECRET or ""
+    header_checksum = request.headers.get("X-Kite-Checksum")
+    if header_checksum:
+        is_valid = verify_zerodha_checksum_header(
+            form_dict.get("order_id", ""),
+            form_dict.get("order_timestamp", ""),
+            header_checksum,
+            api_secret,
+        )
+    else:
+        is_valid = verify_zerodha_checksum(form_dict, api_secret)
+
+    if not is_valid:
+        logger.warning(f"Invalid checksum in postback for account {broker_account_id}")
+        return {"status": "ok", "message": "Invalid checksum"}
     if acct_status == "deleted":
         logger.info(
             f"Postback for deleted account {broker_account_id} "
@@ -158,6 +158,22 @@ async def zerodha_postback(
         )
         return {"status": "ok", "message": "No timestamps"}
 
+    def _si(key, default=0):
+        """Safe int conversion — handles None, empty string, 'None' strings."""
+        v = form_dict.get(key)
+        try:
+            return int(v) if v not in (None, "", "None") else default
+        except (ValueError, TypeError):
+            return default
+
+    def _sf(key, default=0.0):
+        """Safe float conversion — handles None, empty string, 'None' strings."""
+        v = form_dict.get(key)
+        try:
+            return float(v) if v not in (None, "", "None") else default
+        except (ValueError, TypeError):
+            return default
+
     trade_data = {
         "order_id": form_dict.get("order_id"),
         "exchange_order_id": form_dict.get("exchange_order_id"),
@@ -167,23 +183,23 @@ async def zerodha_postback(
         "transaction_type": form_dict.get("transaction_type"),
         "order_type": form_dict.get("order_type"),
         "product": form_dict.get("product"),
-        "quantity": int(form_dict.get("quantity", 0)),
-        "filled_quantity": int(form_dict.get("filled_quantity", 0)),
-        "pending_quantity": int(form_dict.get("pending_quantity", 0)),
-        "cancelled_quantity": int(form_dict.get("cancelled_quantity", 0)),
-        "price": float(form_dict.get("price", 0)),
-        "average_price": float(form_dict.get("average_price", 0)),
-        "trigger_price": float(form_dict.get("trigger_price", 0)),
+        "quantity": _si("quantity"),
+        "filled_quantity": _si("filled_quantity"),
+        "pending_quantity": _si("pending_quantity"),
+        "cancelled_quantity": _si("cancelled_quantity"),
+        "price": _sf("price"),
+        "average_price": _sf("average_price"),
+        "trigger_price": _sf("trigger_price"),
         "status_message": form_dict.get("status_message"),
         "order_timestamp": form_dict.get("order_timestamp"),
         "exchange_timestamp": form_dict.get("exchange_timestamp"),
         "validity": form_dict.get("validity", "DAY"),
         "variety": form_dict.get("variety", "regular"),
-        "disclosed_quantity": int(form_dict.get("disclosed_quantity", 0)),
+        "disclosed_quantity": _si("disclosed_quantity"),
         "parent_order_id": form_dict.get("parent_order_id"),
         "tag": form_dict.get("tag"),
         "guid": form_dict.get("guid"),
-        "instrument_token": int(form_dict.get("instrument_token", 0)) if form_dict.get("instrument_token") else None,
+        "instrument_token": _si("instrument_token") if form_dict.get("instrument_token") else None,
         "raw_payload": form_dict,
     }
 

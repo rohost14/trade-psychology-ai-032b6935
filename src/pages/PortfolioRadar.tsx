@@ -421,7 +421,7 @@ export default function PortfolioRadar() {
     fetchAll();
     // Also sync GTTs on mount so the list is fresh
     if (account?.id) {
-      api.post('/api/portfolio-radar/sync-gtts', null, { params: { broker_account_id: account.id } }).catch(() => {});
+      api.post('/api/portfolio-radar/sync-gtts').catch((err) => { console.warn('[PortfolioRadar] GTT sync failed:', err); });
     }
   }, [account?.id]); // eslint-disable-line react-hooks/exhaustive-deps
 

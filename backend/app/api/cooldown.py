@@ -4,7 +4,7 @@ Cooldown & Pre-Trade Intervention API
 Manages cooling-off periods and pre-trade checks.
 """
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, and_, or_
 from pydantic import BaseModel
@@ -86,7 +86,7 @@ async def get_active_cooldown(
 @router.get("/history")
 async def get_cooldown_history(
     broker_account_id: UUID = Depends(get_verified_broker_account_id),
-    limit: int = 20,
+    limit: int = Query(default=20, ge=1, le=100),
     db: AsyncSession = Depends(get_db)
 ):
     """Get cooldown history."""

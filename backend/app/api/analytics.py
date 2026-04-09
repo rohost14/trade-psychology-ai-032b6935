@@ -1,9 +1,10 @@
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, and_, func, cast, Date
 from uuid import UUID
 from datetime import datetime, timedelta, timezone
 from collections import defaultdict
+from typing import Optional
 import logging
 import math
 
@@ -59,8 +60,8 @@ async def get_dashboard_stats(
 @router.post("/recalculate-pnl")
 async def recalculate_pnl(
     broker_account_id: UUID = Depends(get_verified_broker_account_id),
-    symbol: str = None,
-    days_back: int = 30,
+    symbol: Optional[str] = None,
+    days_back: int = Query(default=30, ge=1, le=90),
     db: AsyncSession = Depends(get_db),
     _limiter: None = Depends(analytics_limiter),
 ):
@@ -259,7 +260,7 @@ async def _get_discipline_streaks(account_id: UUID, db: AsyncSession):
 
 @router.get("/overview")
 async def get_analytics_overview(
-    days: int = 30,
+    days: int = Query(default=30, ge=1, le=365),
     broker_account_id: UUID = Depends(get_verified_broker_account_id),
     db: AsyncSession = Depends(get_db),
     _limiter: None = Depends(analytics_limiter),
@@ -419,7 +420,7 @@ async def get_analytics_overview(
 
 @router.get("/performance")
 async def get_analytics_performance(
-    days: int = 30,
+    days: int = Query(default=30, ge=1, le=365),
     broker_account_id: UUID = Depends(get_verified_broker_account_id),
     db: AsyncSession = Depends(get_db),
     _limiter: None = Depends(analytics_limiter),
@@ -632,7 +633,7 @@ async def get_analytics_performance(
 
 @router.get("/risk-metrics")
 async def get_analytics_risk_metrics(
-    days: int = 30,
+    days: int = Query(default=30, ge=1, le=365),
     broker_account_id: UUID = Depends(get_verified_broker_account_id),
     db: AsyncSession = Depends(get_db),
     _limiter: None = Depends(analytics_limiter),
@@ -924,7 +925,7 @@ async def get_journal_correlation(
 
 @router.get("/ai-insights")
 async def get_ai_insights(
-    days: int = 30,
+    days: int = Query(default=30, ge=1, le=365),
     broker_account_id: UUID = Depends(get_verified_broker_account_id),
     db: AsyncSession = Depends(get_db),
     _limiter: None = Depends(analytics_limiter),
@@ -1030,7 +1031,7 @@ async def get_ai_insights(
 @router.get("/ai-summary")
 async def get_ai_summary(
     tab: str = "overview",
-    days: int = 30,
+    days: int = Query(default=30, ge=1, le=365),
     force: bool = False,
     broker_account_id: UUID = Depends(get_verified_broker_account_id),
     db: AsyncSession = Depends(get_db),
@@ -1250,7 +1251,7 @@ def _days_between(start_str: str | None, end_str: str | None) -> int:
 
 @router.get("/edge-confidence")
 async def get_edge_confidence(
-    days: int = 30,
+    days: int = Query(default=30, ge=1, le=365),
     broker_account_id: UUID = Depends(get_verified_broker_account_id),
     db: AsyncSession = Depends(get_db),
     _limiter: None = Depends(analytics_limiter),
@@ -1316,7 +1317,7 @@ async def get_edge_confidence(
 
 @router.get("/conditional-performance")
 async def get_conditional_performance(
-    days: int = 30,
+    days: int = Query(default=30, ge=1, le=365),
     broker_account_id: UUID = Depends(get_verified_broker_account_id),
     db: AsyncSession = Depends(get_db),
     _limiter: None = Depends(analytics_limiter),
@@ -1450,7 +1451,7 @@ async def get_conditional_performance(
 
 @router.get("/critical-trades")
 async def get_critical_trades(
-    days: int = 30,
+    days: int = Query(default=30, ge=1, le=365),
     broker_account_id: UUID = Depends(get_verified_broker_account_id),
     db: AsyncSession = Depends(get_db),
     _limiter: None = Depends(analytics_limiter),
@@ -1561,7 +1562,7 @@ async def get_critical_trades(
 
 @router.get("/timing-heatmap")
 async def get_timing_heatmap(
-    days: int = 30,
+    days: int = Query(default=30, ge=1, le=365),
     broker_account_id: UUID = Depends(get_verified_broker_account_id),
     db: AsyncSession = Depends(get_db),
     _limiter: None = Depends(analytics_limiter),
@@ -1669,7 +1670,7 @@ async def get_timing_heatmap(
 
 @router.get("/options-behavior")
 async def get_options_behavior(
-    days: int = 30,
+    days: int = Query(default=30, ge=1, le=365),
     broker_account_id: UUID = Depends(get_verified_broker_account_id),
     db: AsyncSession = Depends(get_db),
     _limiter: None = Depends(analytics_limiter),
@@ -1934,7 +1935,7 @@ async def get_btst_analytics(
 @router.get("/instrument")
 async def get_instrument_analytics(
     underlying: str,
-    days: int = 30,
+    days: int = Query(default=30, ge=1, le=365),
     broker_account_id: UUID = Depends(get_verified_broker_account_id),
     db: AsyncSession = Depends(get_db),
     _limiter: None = Depends(analytics_limiter),

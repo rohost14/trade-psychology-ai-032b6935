@@ -304,9 +304,7 @@ export default function DashboardV2() {
     if (!accountIdRef.current) return;
     try {
       setPosLoading(true);
-      const { data } = await api.get('/api/positions/', {
-        params: { broker_account_id: accountIdRef.current },
-      });
+      const { data } = await api.get('/api/positions/');
       const raw: Position[] = Array.isArray(data) ? data : (data.positions ?? []);
       setPositions(raw.filter(p => p.status === 'open').map(p => ({
         ...p,
@@ -314,7 +312,7 @@ export default function DashboardV2() {
         unrealized_pnl:  p.unrealized_pnl ?? p.pnl ?? p.m2m ?? 0,
         current_value:   p.current_value  ?? (p.last_price ?? 0) * Math.abs(p.total_quantity ?? 0),
       })));
-    } catch { setPositions([]); } finally { setPosLoading(false); }
+    } catch (err) { console.warn('[DashboardV2] fetchPositions failed:', err); setPositions([]); } finally { setPosLoading(false); }
   }, []);
 
   const fetchClosedTrades = useCallback(async () => {
@@ -322,23 +320,23 @@ export default function DashboardV2() {
     try {
       setTradesLoading(true);
       const { data } = await api.get('/api/trades/completed', {
-        params: { broker_account_id: accountIdRef.current, limit: 50 },
+        params: { limit: 50 },
       });
       const raw: CompletedTrade[] = Array.isArray(data) ? data : (data.trades ?? []);
       setClosedTrades(raw.filter(t => {
         try { return isToday(parseISO(t.exit_time)); } catch { return false; }
       }));
-    } catch { setClosedTrades([]); } finally { setTradesLoading(false); }
+    } catch (err) { console.warn('[DashboardV2] fetchClosedTrades failed:', err); setClosedTrades([]); } finally { setTradesLoading(false); }
   }, []);
 
   const fetchShield = useCallback(async () => {
     if (!accountIdRef.current) return;
     try {
       const { data } = await api.get('/api/shield/summary', {
-        params: { days: 30, broker_account_id: accountIdRef.current },
+        params: { days: 30 },
       });
       setShield(data);
-    } catch { setShield(null); }
+    } catch (err) { console.warn('[DashboardV2] fetchShield failed:', err); setShield(null); }
   }, []);
 
   useEffect(() => {

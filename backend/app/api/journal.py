@@ -4,7 +4,7 @@ Trade Journal API Endpoints
 CRUD operations for journal entries - traders' notes, emotions, and lessons.
 """
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, delete
 from pydantic import BaseModel
@@ -124,8 +124,8 @@ class JournalEntryResponse(BaseModel):
 
 @router.get("/")
 async def list_journal_entries(
-    limit: int = 50,
-    offset: int = 0,
+    limit: int = Query(default=50, ge=1, le=200),
+    offset: int = Query(default=0, ge=0),
     entry_type: Optional[str] = None,
     broker_account_id: UUID = Depends(get_verified_broker_account_id),
     db: AsyncSession = Depends(get_db)
@@ -434,7 +434,7 @@ async def delete_journal_by_trade(
 
 @router.get("/stats/emotions")
 async def get_emotion_stats(
-    days: int = 30,
+    days: int = Query(default=30, ge=1, le=365),
     broker_account_id: UUID = Depends(get_verified_broker_account_id),
     db: AsyncSession = Depends(get_db)
 ):
@@ -495,7 +495,7 @@ async def get_emotion_stats(
 @router.get("/search/semantic")
 async def semantic_search_journal(
     query: str,
-    limit: int = 5,
+    limit: int = Query(default=5, ge=1, le=50),
     broker_account_id: UUID = Depends(get_verified_broker_account_id),
     db: AsyncSession = Depends(get_db)
 ):

@@ -262,12 +262,14 @@ export function AlertProvider({ children }: { children: ReactNode }) {
             setCapital(equityTotal);
             return;
           }
-        } catch {
+        } catch (err) {
+          console.warn('[AlertContext] margins fetch failed (not connected or market closed):', err);
           // Not connected or market closed — fall through
         }
 
         setCapital(CAPITAL_FLOOR);
-      } catch {
+      } catch (err) {
+        console.warn('[AlertContext] capital/profile resolve failed:', err);
         // Not authenticated yet — keep floor
       }
     }

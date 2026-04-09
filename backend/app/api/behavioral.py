@@ -15,7 +15,7 @@ logger = logging.getLogger(__name__)
 @router.get("/analysis")
 async def get_behavioral_analysis(
     broker_account_id: UUID = Depends(get_verified_broker_account_id),
-    time_window_days: int = 30,
+    time_window_days: int = Query(default=30, ge=1, le=365),
     db: AsyncSession = Depends(get_db)
 ):
     """Get comprehensive behavioral analysis."""
