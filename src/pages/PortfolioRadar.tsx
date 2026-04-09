@@ -199,7 +199,10 @@ function PositionCard({ m }: { m: PositionMetric }) {
 // ── Concentration Panel ───────────────────────────────────────────────────
 
 function ConcentrationPanel({ data }: { data: ConcentrationData }) {
-  const hasAlerts = data.triggered.length > 0;
+  const triggered = data.triggered || [];
+  const expiryWeeks = data.expiry_weeks || {};
+  const underlyings = data.underlyings || {};
+  const hasAlerts = triggered.length > 0;
 
   return (
     <div className="space-y-4">
@@ -208,10 +211,10 @@ function ConcentrationPanel({ data }: { data: ConcentrationData }) {
           <p className="text-xs font-semibold text-amber-700 dark:text-amber-400 mb-2 flex items-center gap-1">
             <AlertTriangle className="h-3.5 w-3.5" /> Active Alerts
           </p>
-          {data.triggered.map((t, i) => (
+          {triggered.map((t, i) => (
             <div key={i} className="flex items-center justify-between">
               <AlertBadge type={t.type} />
-              <span className="text-xs font-medium text-amber-700 dark:text-amber-400">{t.value.toFixed(0)}%</span>
+              <span className="text-xs font-medium text-amber-700 dark:text-amber-400">{t.value?.toFixed(0) ?? 0}%</span>
             </div>
           ))}
         </div>
@@ -227,29 +230,29 @@ function ConcentrationPanel({ data }: { data: ConcentrationData }) {
           <div className="flex items-center gap-2">
             <TrendingUp className="h-3.5 w-3.5 text-tm-profit" />
             <span className={cn('font-medium', concentrationColor(data.long_pct, 100))}>
-              {data.long_pct.toFixed(0)}%
+              {data.long_pct?.toFixed(0) ?? 0}%
             </span>
             <span className="text-muted-foreground">/</span>
             <TrendingDown className="h-3.5 w-3.5 text-tm-loss" />
-            <span>{data.short_pct.toFixed(0)}%</span>
+            <span>{data.short_pct?.toFixed(0) ?? 0}%</span>
           </div>
         </div>
         {data.margin_utilization != null && (
           <div>
             <p className="text-muted-foreground mb-1">Margin used</p>
             <p className={cn('font-semibold', concentrationColor(data.margin_utilization, 80))}>
-              {data.margin_utilization.toFixed(0)}%
+              {data.margin_utilization?.toFixed(0) ?? 0}%
             </p>
           </div>
         )}
       </div>
 
       {/* Expiry breakdown */}
-      {Object.keys(data.expiry_weeks).length > 0 && (
+      {Object.keys(expiryWeeks).length > 0 && (
         <div>
           <p className="text-xs text-muted-foreground mb-2">Expiry week distribution</p>
           <div className="space-y-1.5">
-            {Object.entries(data.expiry_weeks)
+            {Object.entries(expiryWeeks)
               .sort((a, b) => b[1].pct - a[1].pct)
               .map(([week, info]) => (
                 <div key={week} className="flex items-center gap-2">
@@ -264,7 +267,7 @@ function ConcentrationPanel({ data }: { data: ConcentrationData }) {
                     />
                   </div>
                   <span className={cn('text-xs font-medium w-10 text-right', concentrationColor(info.pct, 60))}>
-                    {info.pct.toFixed(0)}%
+                    {info.pct?.toFixed(0) ?? 0}%
                   </span>
                 </div>
               ))}
@@ -273,11 +276,11 @@ function ConcentrationPanel({ data }: { data: ConcentrationData }) {
       )}
 
       {/* Underlying breakdown */}
-      {Object.keys(data.underlyings).length > 0 && (
+      {Object.keys(underlyings).length > 0 && (
         <div>
           <p className="text-xs text-muted-foreground mb-2">Underlying concentration</p>
           <div className="space-y-1.5">
-            {Object.entries(data.underlyings)
+            {Object.entries(underlyings)
               .sort((a, b) => b[1].pct - a[1].pct)
               .map(([sym, info]) => (
                 <div key={sym} className="flex items-center gap-2">
@@ -292,7 +295,7 @@ function ConcentrationPanel({ data }: { data: ConcentrationData }) {
                     />
                   </div>
                   <span className={cn('text-xs font-medium w-10 text-right', concentrationColor(info.pct, 70))}>
-                    {info.pct.toFixed(0)}%
+                    {info.pct?.toFixed(0) ?? 0}%
                   </span>
                 </div>
               ))}

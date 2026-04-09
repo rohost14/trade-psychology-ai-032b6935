@@ -1929,3 +1929,159 @@ async def get_btst_analytics(
     except Exception as e:
         logger.error(f"Failed to get BTST analytics: {e}")
         raise HTTPException(status_code=500, detail="Internal server error")
+
+
+@router.get("/instrument")
+async def get_instrument_analytics(
+    underlying: str,
+    days: int = 30,
+    broker_account_id: UUID = Depends(get_verified_broker_account_id),
+    db: AsyncSession = Depends(get_db),
+    _limiter: None = Depends(analytics_limiter),
+):
+    """
+    Drill-down analytics for a single underlying (e.g. NIFTY, SENSEX, BANKNIFTY).
+    Matches all CompletedTrades whose tradingsymbol starts with the underlying name.
+    Returns per-instrument KPIs, CE/PE/FUT split, by-hour, equity curve, recent trades.
+    """
+    import re
+    try:
+        cutoff = datetime.now(timezone.utc) - timedelta(days=days)
+
+        result = await db.execute(
+            select(CompletedTrade)
+            .where(
+                and_(
+                    CompletedTrade.broker_account_id == broker_account_id,
+                    CompletedTrade.exit_time >= cutoff,
+                    CompletedTrade.tradingsymbol.ilike(f"{underlying}%"),
+                )
+            )
+            .order_by(CompletedTrade.exit_time)
+        )
+        trades = result.scalars().all()
+
+        if not trades:
+            return {"has_data": False, "underlying": underlying}
+
+        # ── KPIs ───────────────────────────────────────────────────────────
+        total_pnl = sum(float(t.realized_pnl or 0) for t in trades)
+        wins = [t for t in trades if float(t.realized_pnl or 0) > 0]
+        losses = [t for t in trades if float(t.realized_pnl or 0) < 0]
+        win_rate = round(len(wins) / len(trades) * 100, 1) if trades else 0
+        avg_win = round(sum(float(t.realized_pnl) for t in wins) / len(wins), 2) if wins else 0
+        avg_loss = round(sum(float(t.realized_pnl) for t in losses) / len(losses), 2) if losses else 0
+        gross_profit = sum(float(t.realized_pnl) for t in wins)
+        gross_loss = abs(sum(float(t.realized_pnl) for t in losses))
+        profit_factor = round(gross_profit / gross_loss, 2) if gross_loss > 0 else 0
+        avg_hold = round(sum(t.duration_minutes or 0 for t in trades) / len(trades))
+
+        # ── Option type split (CE / PE / FUT / EQ) ────────────────────────
+        def option_type(sym: str) -> str:
+            s = sym.upper()
+            if s.endswith("CE"):  return "CE"
+            if s.endswith("PE"):  return "PE"
+            if "FUT" in s:        return "FUT"
+            return "EQ"
+
+        otype_map: dict[str, dict] = {}
+        for t in trades:
+            ot = option_type(t.tradingsymbol)
+            otype_map.setdefault(ot, {"trades": 0, "pnl": 0.0, "wins": 0})
+            pnl_v = float(t.realized_pnl or 0)
+            otype_map[ot]["trades"] += 1
+            otype_map[ot]["pnl"] += pnl_v
+            if pnl_v > 0:
+                otype_map[ot]["wins"] += 1
+
+        by_option_type = {
+            k: {
+                "trades": v["trades"],
+                "pnl": round(v["pnl"], 2),
+                "win_rate": round(v["wins"] / v["trades"] * 100, 1) if v["trades"] else 0,
+                "avg_pnl": round(v["pnl"] / v["trades"], 2) if v["trades"] else 0,
+            }
+            for k, v in otype_map.items()
+        }
+
+        # ── By hour ────────────────────────────────────────────────────────
+        import pytz
+        IST = pytz.timezone("Asia/Kolkata")
+        hour_map: dict[int, dict] = {}
+        for t in trades:
+            if not t.entry_time:
+                continue
+            hr = t.entry_time.astimezone(IST).hour
+            hour_map.setdefault(hr, {"trades": 0, "pnl": 0.0, "wins": 0})
+            pnl_v = float(t.realized_pnl or 0)
+            hour_map[hr]["trades"] += 1
+            hour_map[hr]["pnl"] += pnl_v
+            if pnl_v > 0:
+                hour_map[hr]["wins"] += 1
+
+        by_hour = sorted(
+            [
+                {
+                    "hour": h,
+                    "label": f"{h:02d}:00",
+                    "trades": v["trades"],
+                    "pnl": round(v["pnl"], 2),
+                    "win_rate": round(v["wins"] / v["trades"] * 100, 1) if v["trades"] else 0,
+                }
+                for h, v in hour_map.items()
+            ],
+            key=lambda x: x["hour"],
+        )
+
+        # ── Equity curve ───────────────────────────────────────────────────
+        from collections import defaultdict
+        from datetime import date as dt_date
+        daily: dict[str, float] = defaultdict(float)
+        for t in trades:
+            d = t.exit_time.astimezone(IST).date().isoformat()
+            daily[d] += float(t.realized_pnl or 0)
+
+        cumulative = 0.0
+        equity_curve = []
+        for d in sorted(daily):
+            cumulative += daily[d]
+            equity_curve.append({"date": d, "cumulative_pnl": round(cumulative, 2)})
+
+        # ── Recent trades (latest 15) ──────────────────────────────────────
+        recent = sorted(trades, key=lambda t: t.exit_time, reverse=True)[:15]
+        trade_list = [
+            {
+                "id": str(t.id),
+                "tradingsymbol": t.tradingsymbol,
+                "direction": t.direction,
+                "total_quantity": t.total_quantity,
+                "avg_entry_price": float(t.avg_entry_price or 0),
+                "avg_exit_price": float(t.avg_exit_price or 0),
+                "realized_pnl": float(t.realized_pnl or 0),
+                "duration_minutes": t.duration_minutes,
+                "exit_time": t.exit_time.isoformat(),
+                "option_type": option_type(t.tradingsymbol),
+            }
+            for t in recent
+        ]
+
+        return {
+            "has_data": True,
+            "underlying": underlying,
+            "period_days": days,
+            "total_trades": len(trades),
+            "total_pnl": round(total_pnl, 2),
+            "win_rate": win_rate,
+            "profit_factor": profit_factor,
+            "avg_hold_min": avg_hold,
+            "avg_win": avg_win,
+            "avg_loss": avg_loss,
+            "by_option_type": by_option_type,
+            "by_hour": by_hour,
+            "equity_curve": equity_curve,
+            "trades": trade_list,
+        }
+
+    except Exception as e:
+        logger.error(f"Failed to get instrument analytics: {e}")
+        raise HTTPException(status_code=500, detail="Internal server error")

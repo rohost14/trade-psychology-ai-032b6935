@@ -115,7 +115,7 @@ export default function TradesTab({ days }: { days: number }) {
   const [isLoading, setIsLoading]   = useState(true);
   const [expanded, setExpanded]     = useState<Set<string>>(new Set());
   const [dirFilter, setDirFilter]   = useState<DirFilter>('all');
-  const [tradeFilter, setTradeFilter] = useState<'all' | 'clean' | 'flagged'>('all');
+  const [flaggedOnly, setFlaggedOnly] = useState(false);
   const [search, setSearch]         = useState('');
   const [sortKey, setSortKey]       = useState<SortKey>('date');
   const [sortDir, setSortDir]       = useState<SortDir>('desc');
@@ -192,8 +192,7 @@ export default function TradesTab({ days }: { days: number }) {
   const filtered = useMemo(() => {
     let list = trades;
     if (dirFilter !== 'all') list = list.filter((t) => t.direction === dirFilter);
-    if (tradeFilter === 'flagged') list = list.filter((t) => (flagMap.get(t.id) ?? []).length > 0);
-    if (tradeFilter === 'clean')   list = list.filter((t) => (flagMap.get(t.id) ?? []).length === 0);
+    if (flaggedOnly) list = list.filter((t) => flagMap.has(t.id));
     if (search.trim()) {
       const q = search.trim().toUpperCase();
       list = list.filter((t) => t.tradingsymbol.includes(q));
@@ -207,7 +206,7 @@ export default function TradesTab({ days }: { days: number }) {
       return sortDir === 'desc' ? -diff : diff;
     });
     return list;
-  }, [trades, dirFilter, tradeFilter, flagMap, search, sortKey, sortDir]);
+  }, [trades, dirFilter, flaggedOnly, flagMap, search, sortKey, sortDir]);
 
   // Stats (always from full `trades` list, not filtered)
   const winners  = trades.filter((t) => t.realized_pnl > 0).length;
@@ -298,25 +297,21 @@ export default function TradesTab({ days }: { days: number }) {
           ))}
         </div>
 
-        {/* All / Clean / Flagged toggle */}
-        <div className="flex items-center gap-1 p-1 bg-slate-100 dark:bg-neutral-700/50 rounded-lg">
-          {(['all', 'clean', 'flagged'] as const).map((f) => (
-            <button
-              key={f}
-              onClick={() => setTradeFilter(f)}
-              className={cn(
-                'px-2.5 py-1 text-[11px] font-medium rounded-md transition-all capitalize',
-                tradeFilter === f
-                  ? f === 'flagged'
-                    ? 'bg-amber-50 dark:bg-amber-900/30 text-tm-obs shadow-sm'
-                    : 'bg-white dark:bg-neutral-800 text-foreground shadow-sm'
-                  : 'text-muted-foreground hover:text-foreground'
-              )}
-            >
-              {f === 'flagged' ? `Flagged${flagCount > 0 ? ` (${flagCount})` : ''}` : f === 'clean' ? 'Clean' : 'All'}
-            </button>
-          ))}
-        </div>
+        {/* Flagged toggle */}
+        {flagCount > 0 && (
+          <button
+            onClick={() => setFlaggedOnly((v) => !v)}
+            className={cn(
+              'flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[11px] font-medium transition-all border',
+              flaggedOnly
+                ? 'bg-amber-50 dark:bg-amber-900/20 text-tm-obs border-amber-300 dark:border-amber-700/50'
+                : 'bg-transparent text-muted-foreground border-border hover:border-foreground hover:text-foreground'
+            )}
+          >
+            <AlertTriangle className="h-3 w-3" />
+            Flagged ({flagCount})
+          </button>
+        )}
 
         {/* Sort — pushed to right */}
         <div className="ml-auto flex items-center gap-3 px-3 py-1.5 bg-slate-100 dark:bg-neutral-700/50 rounded-lg">

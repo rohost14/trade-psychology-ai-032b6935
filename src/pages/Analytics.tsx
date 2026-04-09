@@ -1,58 +1,64 @@
 import { useState, Suspense, lazy } from 'react';
 import { Link } from 'react-router-dom';
-import { BarChart3, Link2 } from 'lucide-react';
-import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
+import { Link2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import { cn } from '@/lib/utils';
 import { useBroker } from '@/contexts/BrokerContext';
 import ExportReportButton from '@/components/analytics/ExportReportButton';
 import ComplianceDisclaimer from '@/components/ComplianceDisclaimer';
+import InstrumentPanel from '@/components/analytics/InstrumentPanel';
 
-// Lazy-load each tab — only downloaded when user opens that tab
 const SummaryTab  = lazy(() => import('@/components/analytics/SummaryTab'));
-const BehaviorTab = lazy(() => import('@/components/analytics/BehaviorTab'));
-const TimingTab   = lazy(() => import('@/components/analytics/TimingTab'));
-const ProgressTab = lazy(() => import('@/components/analytics/ProgressTab'));
+const PatternsTab = lazy(() => import('@/components/analytics/PatternsTab'));
 const TradesTab   = lazy(() => import('@/components/analytics/TradesTab'));
 
 function TabSkeleton() {
   return (
     <div className="space-y-4 pt-2">
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-        {[1,2,3,4].map(i => <Skeleton key={i} className="h-24 rounded-xl" />)}
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+        {[1,2,3,4].map(i => <Skeleton key={i} className="h-20 rounded-xl" />)}
       </div>
-      <Skeleton className="h-56 rounded-xl" />
+      <Skeleton className="h-64 rounded-xl" />
+      <Skeleton className="h-48 rounded-xl" />
     </div>
   );
 }
 
 const PERIOD_OPTIONS = [
-  { label: '7D', days: 7 },
-  { label: '14D', days: 14 },
+  { label: '7D',  days: 7  },
   { label: '30D', days: 30 },
   { label: '90D', days: 90 },
 ] as const;
 
+const TABS = [
+  { value: 'summary',  label: 'Summary'  },
+  { value: 'patterns', label: 'Patterns' },
+  { value: 'trades',   label: 'Trades'   },
+] as const;
+
+type TabValue = typeof TABS[number]['value'];
+
 export default function Analytics() {
   const { isConnected, isLoading: brokerLoading, account } = useBroker();
   const [days, setDays] = useState(30);
+  const [tab, setTab]   = useState<TabValue>('summary');
+  const [instrumentPanel, setInstrumentPanel] = useState<string | null>(null);
 
-  // Not connected state
   if (!brokerLoading && !isConnected) {
     return (
-      <div className="max-w-6xl mx-auto pb-12">
+      <div className="max-w-5xl mx-auto pb-12">
         <div className="flex flex-col items-center justify-center min-h-[60vh]">
-          <div className="p-4 rounded-full bg-primary/10 mb-6">
-            <Link2 className="h-12 w-12 text-primary" />
+          <div className="p-4 rounded-full bg-tm-brand/10 mb-6">
+            <Link2 className="h-12 w-12 text-tm-brand" />
           </div>
-          <h2 className="text-2xl font-semibold text-foreground mb-2">Connect Your Broker</h2>
-          <p className="text-muted-foreground text-center max-w-md mb-6">
-            Connect your Zerodha account to see your trading analytics and behavioral insights.
+          <h2 className="text-xl font-semibold text-foreground mb-2">Connect Your Broker</h2>
+          <p className="text-sm text-muted-foreground text-center max-w-md mb-6">
+            Connect your Zerodha account to see your trading analytics.
           </p>
           <Link to="/settings">
-            <Button size="lg" className="gap-2">
-              <Link2 className="h-5 w-5" />
+            <Button size="lg" className="bg-tm-brand hover:bg-tm-brand/90 text-white gap-2">
+              <Link2 className="h-4 w-4" />
               Connect Zerodha
             </Button>
           </Link>
@@ -62,21 +68,20 @@ export default function Analytics() {
   }
 
   return (
-    <div className="max-w-6xl mx-auto pb-12">
-      {/* Page Header */}
+    <div className="max-w-5xl mx-auto pb-12">
+      {/* ── Page Header ── */}
       <div className="mb-5 flex items-center justify-between">
         <h1 className="text-lg font-semibold text-foreground tracking-tight">Analytics</h1>
         <div className="flex items-center gap-3">
-          {/* Period Selector */}
-          <div className="flex items-center gap-1 p-1 bg-slate-100 dark:bg-neutral-700/50 rounded-lg">
+          <div className="flex items-center gap-0.5 p-0.5 bg-slate-100 dark:bg-neutral-800 rounded-lg">
             {PERIOD_OPTIONS.map((opt) => (
               <button
                 key={opt.days}
                 onClick={() => setDays(opt.days)}
                 className={cn(
-                  'px-3 py-1 text-[12px] font-medium rounded-md transition-all',
+                  'px-3 py-1.5 text-[12px] font-medium rounded-md transition-all',
                   days === opt.days
-                    ? 'bg-white dark:bg-neutral-800 text-foreground shadow-sm'
+                    ? 'bg-white dark:bg-neutral-700 text-foreground shadow-sm'
                     : 'text-muted-foreground hover:text-foreground'
                 )}
               >
@@ -88,44 +93,46 @@ export default function Analytics() {
         </div>
       </div>
 
-      {/* Tabs */}
-      <Tabs defaultValue="summary">
-        <TabsList className="w-full justify-start rounded-none bg-transparent border-b border-border p-0 h-auto gap-0 mb-6">
-          {([
-            { value: 'summary',  label: 'Overview'  },
-            { value: 'behavior', label: 'Behavior'  },
-            { value: 'timing',   label: 'Timing'    },
-            { value: 'progress', label: 'Progress'  },
-            { value: 'trades',   label: 'Trade Log' },
-          ] as const).map(({ value, label }) => (
-            <TabsTrigger
-              key={value}
-              value={value}
-              className="relative rounded-none bg-transparent border-b-2 border-transparent px-4 py-2.5 text-sm text-muted-foreground hover:text-foreground transition-colors data-[state=active]:border-tm-brand data-[state=active]:bg-transparent data-[state=active]:text-foreground data-[state=active]:shadow-none"
-            >
-              {label}
-            </TabsTrigger>
-          ))}
-        </TabsList>
+      {/* ── Tab Bar ── */}
+      <div className="flex gap-0 border-b border-border mb-6">
+        {TABS.map(({ value, label }) => (
+          <button
+            key={value}
+            onClick={() => setTab(value)}
+            className={cn(
+              'px-4 py-2.5 text-sm font-medium border-b-2 transition-colors -mb-px',
+              tab === value
+                ? 'border-tm-brand text-foreground'
+                : 'border-transparent text-muted-foreground hover:text-foreground'
+            )}
+          >
+            {label}
+          </button>
+        ))}
+      </div>
 
-        <TabsContent value="summary">
-          <Suspense fallback={<TabSkeleton />}><SummaryTab days={days} /></Suspense>
-        </TabsContent>
-        <TabsContent value="behavior">
-          <Suspense fallback={<TabSkeleton />}><BehaviorTab days={days} /></Suspense>
-        </TabsContent>
-        <TabsContent value="timing">
-          <Suspense fallback={<TabSkeleton />}><TimingTab days={days} /></Suspense>
-        </TabsContent>
-        <TabsContent value="progress">
-          <Suspense fallback={<TabSkeleton />}><ProgressTab days={days} /></Suspense>
-        </TabsContent>
-        <TabsContent value="trades">
-          <Suspense fallback={<TabSkeleton />}><TradesTab days={days} /></Suspense>
-        </TabsContent>
-      </Tabs>
+      {/* ── Tab Content ── */}
+      <Suspense fallback={<TabSkeleton />}>
+        {tab === 'summary'  && (
+          <SummaryTab
+            days={days}
+            onInstrumentClick={(underlying) => setInstrumentPanel(underlying)}
+          />
+        )}
+        {tab === 'patterns' && <PatternsTab days={days} />}
+        {tab === 'trades'   && <TradesTab days={days} />}
+      </Suspense>
 
-      <ComplianceDisclaimer variant="footer" className="mt-6" />
+      <ComplianceDisclaimer variant="footer" className="mt-8" />
+
+      {/* ── Instrument Drill-down Panel ── */}
+      {instrumentPanel && (
+        <InstrumentPanel
+          underlying={instrumentPanel}
+          days={days}
+          onClose={() => setInstrumentPanel(null)}
+        />
+      )}
     </div>
   );
 }

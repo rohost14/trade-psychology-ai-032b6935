@@ -39,7 +39,7 @@ function SeverityDot({ severity }: { severity: string }) {
 function TimelineRow({ item }: { item: ShieldTimelineItem }) {
   const [expanded, setExpanded] = useState(false);
   const heeded = item.outcome === 'heeded';
-  const hasTrades = item.post_alert_trades.length > 0;
+  const hasTrades = (item.post_alert_trades?.length ?? 0) > 0;
 
   return (
     <div className="px-5 py-4 border-b border-border last:border-0">
@@ -83,13 +83,13 @@ function TimelineRow({ item }: { item: ShieldTimelineItem }) {
               className="mt-2 flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground transition-colors"
             >
               {expanded ? <ChevronUp className="h-3 w-3" /> : <ChevronDown className="h-3 w-3" />}
-              {expanded ? 'Hide trades' : `Show ${item.post_alert_trades.length} trade${item.post_alert_trades.length !== 1 ? 's' : ''}`}
+              {expanded ? 'Hide trades' : `Show ${item.post_alert_trades?.length ?? 0} trade${(item.post_alert_trades?.length ?? 0) !== 1 ? 's' : ''}`}
             </button>
           )}
 
           {expanded && (
             <div className="mt-2 rounded-md bg-muted/30 divide-y divide-border text-xs">
-              {item.post_alert_trades.map((t, i) => (
+              {item.post_alert_trades?.map((t, i) => (
                 <div key={i} className="flex items-center justify-between px-3 py-2">
                   <span className="font-medium text-foreground">{t.tradingsymbol}</span>
                   <span className={cn(
