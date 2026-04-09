@@ -419,9 +419,14 @@ export default function Dashboard() {
 
   // ── Computed values ───────────────────────────────────────────────────────
   const mergedAlerts = useMemo(() => {
-    const startOfToday = new Date(); startOfToday.setHours(0, 0, 0, 0);
+    // Use a 36-hour window instead of calendar-day midnight.
+    // Calendar-day comparison breaks when the browser timezone differs from IST
+    // (e.g. trading alerts at 9:15 IST = 3:45 UTC; midnight UTC = 5:30 IST).
+    // 36h catches everything from today's and yesterday's session without needing
+    // timezone conversion, and old acked alerts fall off naturally.
+    const cutoff = Date.now() - 36 * 60 * 60 * 1000;
     return alerts
-      .filter(a => a.shown_at && new Date(a.shown_at).getTime() >= startOfToday.getTime())
+      .filter(a => a.shown_at && new Date(a.shown_at).getTime() >= cutoff)
       .map(a => ({
         id: a.id,
         pattern_name: a.pattern.name,

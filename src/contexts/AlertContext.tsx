@@ -27,6 +27,25 @@ function useWebSocketAlerts() {
 
 const CAPITAL_FLOOR = 100_000; // Rs 1L floor — used only when nothing else is available
 
+// ── Persistent "seen" set — survives page reloads ──────────────────────────
+// We track alert IDs that have already been toasted across sessions so we
+// never re-toast an alert the user has already seen.  Capped at 500 entries.
+const SEEN_KEY = 'tradementor_seen_alerts';
+function loadSeenIds(): Set<string> {
+  try {
+    const raw = localStorage.getItem(SEEN_KEY);
+    return new Set(raw ? (JSON.parse(raw) as string[]) : []);
+  } catch { return new Set(); }
+}
+function persistSeenIds(newIds: string[]) {
+  try {
+    const set = loadSeenIds();
+    newIds.forEach(id => set.add(id));
+    const trimmed = [...set].slice(-500);
+    localStorage.setItem(SEEN_KEY, JSON.stringify(trimmed));
+  } catch {}
+}
+
 // Profile shape (6 user-declared fields; all others are backend-derived)
 export interface UserProfileThresholds {
   daily_trade_limit?: number;
@@ -267,16 +286,17 @@ export function AlertProvider({ children }: { children: ReactNode }) {
       setAlerts(mapped);
 
       if (showToasts) {
+        // Real-time path (triggered by WebSocket event).
+        // Toast each alert the user hasn't seen yet this session.
+        const newlySeen: string[] = [];
         for (let i = 0; i < mapped.length; i++) {
           const alert = mapped[i];
           const rawAlert = raw[i];
           if (!alert.acknowledged && !toastedIdsRef.current.has(alert.id)) {
-            // Always mark as seen so we don't revisit on the next WebSocket event
             toastedIdsRef.current.add(alert.id);
+            newlySeen.push(alert.id);
 
-            // Gate: only show real-time toast during market hours for this exchange.
-            // Alert is always saved to DB and visible in Alerts history.
-            // NSE/NFO/BSE/BFO close at 15:30; MCX runs until 23:30; CDS until 17:00.
+            // Gate: only toast during market hours — alert still saved to DB.
             const exchange = (rawAlert.details?.exchange as string | undefined) ?? 'NSE';
             if (!isMarketOpen(exchange)) continue;
 
@@ -295,16 +315,57 @@ export function AlertProvider({ children }: { children: ReactNode }) {
             }
           }
         }
+        if (newlySeen.length) persistSeenIds(newlySeen);
       } else {
-        // Seed toasted set from existing alerts (prevent re-toast on next WS event)
-        mapped.forEach(a => toastedIdsRef.current.add(a.id));
+        // Initial load path.
+        // Seed toastedIdsRef from localStorage + acknowledged alerts so WS replay
+        // doesn't re-toast things the user has already seen.
+        // Unacknowledged alerts the user has NEVER seen → show a single summary toast.
+        const persisted = loadSeenIds();
+        mapped.forEach(a => {
+          if (a.acknowledged || persisted.has(a.id)) {
+            toastedIdsRef.current.add(a.id);
+          }
+        });
+
+        const twentyFourHoursAgo = Date.now() - 24 * 60 * 60 * 1000;
+        const unseen = mapped.filter(a =>
+          !a.acknowledged &&
+          !persisted.has(a.id) &&
+          new Date(a.shown_at ?? 0).getTime() > twentyFourHoursAgo
+        );
+
+        if (unseen.length > 0) {
+          // Mark them as seen immediately so they don't repeat on next load
+          const unseenIds = unseen.map(a => a.id);
+          unseenIds.forEach(id => toastedIdsRef.current.add(id));
+          persistSeenIds(unseenIds);
+
+          // One summary toast — don't spam N individual toasts at startup
+          const dangers = unseen.filter(a => a.pattern.severity === 'high' || a.pattern.severity === 'critical');
+          const hasDanger = dangers.length > 0;
+          const names = unseen.map(a => a.pattern.name).slice(0, 3).join(', ');
+          const extra = unseen.length > 3 ? ` +${unseen.length - 3} more` : '';
+
+          if (hasDanger) {
+            toast.error(`${dangers.length} danger alert${dangers.length > 1 ? 's' : ''} from today`, {
+              description: `${names}${extra} — open Alerts to review`,
+              duration: 12000,
+            });
+          } else {
+            toast.warning(`${unseen.length} alert${unseen.length > 1 ? 's' : ''} from today`, {
+              description: `${names}${extra} — open Alerts to review`,
+              duration: 8000,
+            });
+          }
+        }
       }
     } catch {
       // Non-fatal — user may not be authenticated yet
     }
   }, []);
 
-  // Initial fetch — seed toasted IDs, no toasts
+  // Initial fetch — on mount, show summary for any missed alerts
   useEffect(() => {
     fetchAlerts(false);
   }, [fetchAlerts]);
@@ -315,20 +376,6 @@ export function AlertProvider({ children }: { children: ReactNode }) {
     if (lastAlertEvent) fetchAlerts(true);
   }, [lastAlertEvent]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  // Poll every 60 s — catches alerts that arrive when WS was disconnected or tab was in background
-  useEffect(() => {
-    const id = setInterval(() => fetchAlerts(true), 60_000);
-    return () => clearInterval(id);
-  }, [fetchAlerts]);
-
-  // Refetch immediately when user switches back to this tab
-  useEffect(() => {
-    const onVisible = () => {
-      if (document.visibilityState === 'visible') fetchAlerts(true);
-    };
-    document.addEventListener('visibilitychange', onVisible);
-    return () => document.removeEventListener('visibilitychange', onVisible);
-  }, [fetchAlerts]);
 
   // ---------------------------------------------------------------------------
   // Alert actions
