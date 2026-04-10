@@ -117,6 +117,51 @@ async def lifespan(app: FastAPI):
     except Exception as e:
         logger.error(f"Event subscriber failed to start: {e}")
 
+    # One-time repair: fix CompletedTrades whose realized_pnl was overwritten by the
+    # reconciliation bug introduced in session 33 (49ba0b8).  For NSE/NFO instruments
+    # the FIFO engine is authoritative; Zerodha's pos.pnl diverges because it spans
+    # all rounds of the symbol while FIFO creates per-round records.
+    # This runs silently in the background — no user action required.
+    async def _repair_nse_pnl():
+        try:
+            from app.core.database import SessionLocal
+            from app.models.completed_trade import CompletedTrade
+            from sqlalchemy import select
+            from datetime import datetime, timezone, timedelta
+
+            FIFO_ACCURATE = {"NSE", "BSE", "NFO", "BFO"}
+            cutoff = datetime.now(timezone.utc) - timedelta(days=7)
+            repaired = 0
+
+            async with SessionLocal() as db:
+                result = await db.execute(
+                    select(CompletedTrade).where(
+                        CompletedTrade.exchange.in_(list(FIFO_ACCURATE)),
+                        CompletedTrade.exit_time >= cutoff,
+                        CompletedTrade.avg_entry_price.isnot(None),
+                        CompletedTrade.avg_exit_price.isnot(None),
+                    )
+                )
+                cts = result.scalars().all()
+                for ct in cts:
+                    entry = float(ct.avg_entry_price or 0)
+                    exit_ = float(ct.avg_exit_price or 0)
+                    qty = int(ct.total_quantity or 0)
+                    if qty == 0:
+                        continue
+                    expected = (exit_ - entry) * qty if ct.direction == "LONG" else (entry - exit_) * qty
+                    actual = float(ct.realized_pnl or 0)
+                    if abs(expected - actual) > 0.5:
+                        ct.realized_pnl = round(expected, 4)
+                        repaired += 1
+                if repaired:
+                    await db.commit()
+                    logger.info(f"[startup repair] Fixed {repaired} NSE/NFO CompletedTrade P&L records.")
+        except Exception as e:
+            logger.warning(f"[startup repair] P&L repair skipped: {e}")
+
+    _asyncio.create_task(_repair_nse_pnl())
+
     yield
 
     # Shutdown logic
