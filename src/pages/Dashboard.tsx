@@ -324,7 +324,13 @@ export default function Dashboard() {
 
   // ── Computed values ───────────────────────────────────────────────────────
   const mergedAlerts = useMemo(() => {
-    const cutoff = Date.now() - 36 * 60 * 60 * 1000;
+    // IST midnight cutoff — alerts from today's session only.
+    // Market alerts only fire 9:15–15:30 IST, so IST-day boundary is correct.
+    // IST = UTC+5:30; compute UTC timestamp of today's 00:00 IST.
+    const IST_OFFSET_MS = 5.5 * 60 * 60 * 1000;
+    const nowIST = new Date(Date.now() + IST_OFFSET_MS);
+    nowIST.setUTCHours(0, 0, 0, 0);
+    const cutoff = nowIST.getTime() - IST_OFFSET_MS;
     return alerts
       .filter(a => a.shown_at && new Date(a.shown_at).getTime() >= cutoff)
       .map(a => ({
