@@ -943,8 +943,19 @@ class TradeSyncService:
         )
         closed_positions = pos_result.scalars().all()
 
+        # NSE/BSE F&O: FIFO is already correct (lot_multiplier=1, units from Kite).
+        # Only reconcile MCX and CDS where Kite sends lots but CSV lot_size=1
+        # (contract multiplier not exposed in instruments CSV).
+        FIFO_ACCURATE_EXCHANGES = {"NSE", "BSE", "NFO", "BFO"}
+
         reconciled = 0
         for pos in closed_positions:
+            # Skip NSE/BSE F&O — FIFO P&L is correct for these. Reconciling them
+            # causes avg_entry/exit to diverge from displayed prices because Zerodha's
+            # pos.pnl covers ALL rounds of the symbol while FIFO creates per-round records.
+            if (pos.exchange or "").upper() in FIFO_ACCURATE_EXCHANGES:
+                continue
+
             # Use Position.pnl as the authoritative value — it equals realised + unrealised.
             # For MCX options/futures, Zerodha puts the P&L in 'unrealised' even when
             # the position is closed (qty=0), leaving 'realised' as 0. Using pnl is
@@ -1003,5 +1014,37 @@ class TradeSyncService:
                         for ct in cts:
                             ct.realized_pnl = per_round
                         reconciled += len(cts)
+
+        # ── Repair pass: fix NSE/BSE CompletedTrades that were incorrectly
+        # overwritten by a previous reconciliation run.
+        # P&L should equal (avg_exit - avg_entry) * total_quantity for LONG,
+        # (avg_entry - avg_exit) * total_quantity for SHORT.
+        two_days_ago_repair = datetime.now(timezone.utc) - timedelta(hours=48)
+        nse_ct_result = await db.execute(
+            select(CompletedTrade).where(
+                CompletedTrade.broker_account_id == broker_account_id,
+                CompletedTrade.exchange.in_(list(FIFO_ACCURATE_EXCHANGES)),
+                CompletedTrade.exit_time >= two_days_ago_repair,
+                CompletedTrade.avg_entry_price.isnot(None),
+                CompletedTrade.avg_exit_price.isnot(None),
+            )
+        )
+        nse_cts = nse_ct_result.scalars().all()
+        for ct in nse_cts:
+            entry = float(ct.avg_entry_price or 0)
+            exit_ = float(ct.avg_exit_price or 0)
+            qty = int(ct.total_quantity or 0)
+            if qty == 0:
+                continue
+            expected_pnl = (exit_ - entry) * qty if ct.direction == "LONG" else (entry - exit_) * qty
+            actual_pnl = float(ct.realized_pnl or 0)
+            if abs(expected_pnl - actual_pnl) > 0.5:
+                logger.info(
+                    f"[repair] {ct.tradingsymbol} {ct.direction}: "
+                    f"pnl was {actual_pnl:.2f}, correcting to {expected_pnl:.2f} "
+                    f"(entry={entry} exit={exit_} qty={qty})"
+                )
+                ct.realized_pnl = round(expected_pnl, 4)
+                reconciled += 1
 
         return reconciled
