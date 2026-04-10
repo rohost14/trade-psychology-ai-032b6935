@@ -1,125 +1,15 @@
 import { useState, useEffect, useCallback } from 'react';
-import { z } from 'zod';
-import {
-  Link2,
-  Link2Off,
-  Shield,
-  AlertTriangle,
-  Loader2,
-  User,
-  Phone,
-  Brain,
-  Save,
-  Bell,
-  Mail,
-  Key,
-} from 'lucide-react';
+import { Save, Loader2, User, Bell } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
-import { Switch } from '@/components/ui/switch';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select';
 import { useBroker } from '@/contexts/BrokerContext';
 import { toast } from 'sonner';
-import NotificationSettings from '@/components/settings/NotificationSettings';
 import { api } from '@/lib/api';
-import ApiKeySetup from '@/components/ApiKeySetup';
-
-interface UserProfile {
-  display_name?: string;
-  trading_since?: number;
-  experience_level?: string;
-  trading_style?: string;
-  risk_tolerance?: string;
-  preferred_instruments?: string[];
-  trading_hours_start?: string;
-  trading_hours_end?: string;
-  daily_loss_limit?: number;
-  daily_trade_limit?: number;
-  max_position_size?: number;     // % of capital per trade (e.g., 10 = 10%)
-  cooldown_after_loss?: number;   // minutes
-  trading_capital?: number;       // Rs capital deployed for trading
-  sl_percent_futures?: number;    // typical SL % of notional for futures
-  sl_percent_options?: number;    // % of premium to exit losing options
-  known_weaknesses?: string[];
-  push_enabled?: boolean;
-  whatsapp_enabled?: boolean;
-  email_enabled?: boolean;
-  alert_sensitivity?: string;
-  guardian_enabled?: boolean;
-  guardian_phone?: string;
-  guardian_name?: string;
-  guardian_alert_threshold?: string;
-  guardian_daily_summary?: boolean;
-  eod_report_time?: string;       // HH:MM IST, default '16:00'
-  morning_brief_time?: string;    // HH:MM IST, default '08:30'
-  ai_persona?: string;
-  onboarding_completed?: boolean;
-}
-
-interface NotificationStatus {
-  whatsapp: { twilio_configured: boolean };
-  push: { vapid_configured: boolean };
-  email: { smtp_configured: boolean };
-}
-
-const EXPERIENCE_LEVELS = [
-  { value: 'beginner', label: 'Beginner (< 1 year)' },
-  { value: 'intermediate', label: 'Intermediate (1-3 years)' },
-  { value: 'experienced', label: 'Experienced (3-5 years)' },
-  { value: 'professional', label: 'Professional (5+ years)' },
-];
-
-const TRADING_STYLES = [
-  { value: 'scalper', label: 'Scalper', description: 'Multiple trades per day, quick exits' },
-  { value: 'intraday', label: 'Intraday', description: 'Day trader, no overnight positions' },
-  { value: 'swing', label: 'Swing', description: 'Hold for days/weeks' },
-  { value: 'positional', label: 'Positional', description: 'Hold for weeks/months' },
-  { value: 'mixed', label: 'Mixed', description: 'Combination of styles' },
-];
-
-
-const RISK_TOLERANCE = [
-  { value: 'conservative', label: 'Conservative', description: 'Preserve capital, small positions' },
-  { value: 'moderate', label: 'Moderate', description: 'Balanced risk/reward' },
-  { value: 'aggressive', label: 'Aggressive', description: 'Higher risk for higher returns' },
-];
-
-const AI_PERSONAS = [
-  { value: 'coach', label: 'Coach', description: 'Supportive, encouraging, process-focused' },
-  { value: 'mentor', label: 'Mentor', description: 'Experienced guide, shares wisdom' },
-  { value: 'friend', label: 'Friend', description: 'Casual, relatable, empathetic' },
-  { value: 'strict', label: 'Strict', description: 'No-nonsense, direct, disciplined' },
-];
-
-const ALERT_SENSITIVITY = [
-  { value: 'low', label: 'Low', description: 'Only critical alerts' },
-  { value: 'medium', label: 'Medium', description: 'Important patterns' },
-  { value: 'high', label: 'High', description: 'All detected patterns' },
-];
-
-const profileSchema = z.object({
-  daily_loss_limit: z.number().positive('Daily loss limit must be positive').optional().or(z.undefined()),
-  daily_trade_limit: z.number().int('Must be a whole number').positive('Must be positive').optional().or(z.undefined()),
-  max_position_size: z.number().min(0.1, 'Min 0.1%').max(100, 'Max 100%').optional().or(z.undefined()),
-  cooldown_after_loss: z.number().int('Must be a whole number').min(0, 'Min 0 minutes').max(480, 'Max 8 hours').optional().or(z.undefined()),
-  trading_capital: z.number().positive('Capital must be positive').optional().or(z.undefined()),
-  sl_percent_futures: z.number().min(0.1, 'Min 0.1%').max(100, 'Max 100%').optional().or(z.undefined()),
-  sl_percent_options: z.number().min(1, 'Min 1%').max(100, 'Max 100%').optional().or(z.undefined()),
-  trading_hours_start: z.string().regex(/^\d{2}:\d{2}$/, 'Use HH:MM format').optional().or(z.undefined()),
-  trading_hours_end: z.string().regex(/^\d{2}:\d{2}$/, 'Use HH:MM format').optional().or(z.undefined()),
-  guardian_phone: z.string().regex(/^\+\d{10,15}$/, 'Use international format: +919876543210').optional().or(z.literal('')).or(z.undefined()),
-  eod_report_time: z.string().regex(/^\d{2}:\d{2}$/, 'Use HH:MM format').optional().or(z.undefined()),
-  morning_brief_time: z.string().regex(/^\d{2}:\d{2}$/, 'Use HH:MM format').optional().or(z.undefined()),
-}).passthrough();
+import { UserProfile, NotificationStatus, profileSchema } from '@/lib/settingsConstants';
+import { BrokerConnectionCard } from '@/components/settings/BrokerConnectionCard';
+import { ProfileTab } from '@/components/settings/ProfileTab';
+import { NotificationsTab } from '@/components/settings/NotificationsTab';
 
 export default function Settings() {
   const { isConnected, isLoading: brokerLoading, account, connect, disconnect } = useBroker();
@@ -129,7 +19,6 @@ export default function Settings() {
   const [isLoadingProfile, setIsLoadingProfile] = useState(false);
   const [notificationStatus, setNotificationStatus] = useState<NotificationStatus | null>(null);
 
-  // Profile state
   const [profile, setProfile] = useState<UserProfile>({
     experience_level: 'intermediate',
     trading_style: 'intraday',
@@ -152,10 +41,8 @@ export default function Settings() {
     morning_brief_time: '08:30',
   });
 
-  // Fetch profile from backend
   const fetchProfile = useCallback(async () => {
     if (!account?.id) return;
-
     setIsLoadingProfile(true);
     try {
       const response = await api.get('/api/profile/');
@@ -169,7 +56,6 @@ export default function Settings() {
     }
   }, [account?.id]);
 
-  // Fetch notification channel status
   const fetchNotificationStatus = useCallback(async () => {
     if (!account?.id) return;
     try {
@@ -204,7 +90,6 @@ export default function Settings() {
         trading_since: profile.trading_since,
         experience_level: profile.experience_level,
         trading_style: profile.trading_style,
-        trading_since: profile.trading_since,
         risk_tolerance: profile.risk_tolerance,
         preferred_instruments: profile.preferred_instruments,
         trading_hours_start: profile.trading_hours_start,
@@ -245,7 +130,7 @@ export default function Settings() {
     setIsConnecting(true);
     try {
       await connect();
-    } catch (error) {
+    } catch {
       toast.error('Failed to connect to Zerodha');
       setIsConnecting(false);
     }
@@ -256,7 +141,7 @@ export default function Settings() {
     try {
       await disconnect();
       toast.success('Disconnected from Zerodha');
-    } catch (error) {
+    } catch {
       toast.error('Failed to disconnect');
     } finally {
       setIsDisconnecting(false);
@@ -297,7 +182,6 @@ export default function Settings() {
     const now = new Date();
     const diffMs = now.getTime() - date.getTime();
     const diffMins = Math.floor(diffMs / 60000);
-
     if (diffMins < 1) return 'Just now';
     if (diffMins < 60) return `${diffMins} min ago`;
     if (diffMins < 1440) return `${Math.floor(diffMins / 60)} hours ago`;
@@ -339,103 +223,16 @@ export default function Settings() {
       </div>
 
       {/* Broker Connection Card */}
-      <div className="tm-card overflow-hidden">
-        <div className="px-5 py-4 border-b border-border">
-          <p className="text-sm font-semibold text-foreground flex items-center gap-2">
-            <Link2 className="h-4 w-4" />
-            Broker Connection
-          </p>
-          <p className="text-xs text-muted-foreground mt-0.5">Connect your Zerodha account</p>
-        </div>
-        <div className="p-5">
-          {isConnected && account ? (
-            <div className="space-y-4">
-              <div className="flex items-center justify-between p-4 bg-teal-50 dark:bg-teal-900/10 border border-tm-brand/20 rounded-lg">
-                <div className="flex items-center gap-3">
-                  <div className="p-2 rounded-full bg-teal-50 dark:bg-teal-900/20">
-                    <Shield className="h-5 w-5 text-tm-brand" />
-                  </div>
-                  <div>
-                    <p className="text-sm font-medium text-tm-brand">Connected to Zerodha</p>
-                    {account.sync_status === 'syncing' ? (
-                      <p className="text-xs text-tm-obs flex items-center gap-1">
-                        <span className="inline-block h-2 w-2 rounded-full bg-amber-400 animate-pulse" />
-                        Loading your trading data…
-                      </p>
-                    ) : (
-                      <p className="text-xs text-tm-brand/70">
-                        Last synced: {formatLastSync(account.last_sync_at)}
-                      </p>
-                    )}
-                  </div>
-                </div>
-                <div className="flex gap-2">
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={handleDisconnect}
-                    disabled={isDisconnecting}
-                    className="text-tm-loss hover:text-tm-loss"
-                  >
-                    <Link2Off className="h-4 w-4 mr-1.5" />
-                    Disconnect
-                  </Button>
-                </div>
-              </div>
-
-              <div className="grid grid-cols-2 gap-4">
-                <div className="p-4 bg-muted/50 rounded-lg">
-                  <p className="text-xs text-muted-foreground mb-1">Broker</p>
-                  <p className="text-sm font-medium">Zerodha (Kite)</p>
-                </div>
-                <div className="p-4 bg-muted/50 rounded-lg">
-                  <p className="text-xs text-muted-foreground mb-1">Account ID</p>
-                  <p className="text-sm font-mono">{account.broker_user_id || 'Unknown'}</p>
-                </div>
-              </div>
-            </div>
-          ) : (
-            <div className="space-y-4">
-              <div className="flex items-center justify-between p-4 bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-800 rounded-lg">
-                <div className="flex items-center gap-3">
-                  <div className="p-2 rounded-full bg-amber-500/10">
-                    <AlertTriangle className="h-5 w-5 text-amber-500" />
-                  </div>
-                  <div>
-                    <p className="text-sm font-medium text-amber-700 dark:text-amber-300">Not Connected</p>
-                    <p className="text-xs text-amber-600 dark:text-amber-400">Connect your broker to start monitoring</p>
-                  </div>
-                </div>
-              </div>
-
-              <Button onClick={handleConnect} disabled={isConnecting} className="w-full">
-                {isConnecting ? (
-                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                ) : (
-                  <Link2 className="h-4 w-4 mr-2" />
-                )}
-                Connect Zerodha Account
-              </Button>
-
-              <div className="relative flex items-center gap-3">
-                <div className="flex-1 border-t border-border" />
-                <span className="text-xs text-muted-foreground shrink-0">or</span>
-                <div className="flex-1 border-t border-border" />
-              </div>
-
-              <ApiKeySetup
-                onRedirecting={() => setIsConnecting(true)}
-                trigger={
-                  <Button variant="outline" className="w-full gap-2">
-                    <Key className="h-4 w-4" />
-                    Use your own KiteConnect app
-                  </Button>
-                }
-              />
-            </div>
-          )}
-        </div>
-      </div>
+      <BrokerConnectionCard
+        isConnected={isConnected}
+        account={account}
+        isConnecting={isConnecting}
+        isDisconnecting={isDisconnecting}
+        onConnect={handleConnect}
+        onDisconnect={handleDisconnect}
+        formatLastSync={formatLastSync}
+        onRedirecting={() => setIsConnecting(true)}
+      />
 
       {/* Only show other settings if connected */}
       {isConnected && (
@@ -451,582 +248,18 @@ export default function Settings() {
             </TabsTrigger>
           </TabsList>
 
-          {/* ===== Profile Tab ===== */}
           <TabsContent value="profile">
-            <div className="space-y-6">
-              {/* Basic Info */}
-              <div className="tm-card overflow-hidden">
-                <div className="px-5 py-4 border-b border-border">
-                  <p className="text-sm font-semibold text-foreground">Trading Profile</p>
-                  <p className="text-xs text-muted-foreground mt-0.5">Tell us about your trading style and experience</p>
-                </div>
-                <div className="p-5 space-y-6">
-                  {/* Display Name */}
-                  <div className="space-y-2">
-                    <Label>Display Name</Label>
-                    <Input
-                      placeholder="Your name"
-                      value={profile.display_name || ''}
-                      onChange={(e) => setProfile({ ...profile, display_name: e.target.value })}
-                    />
-                  </div>
-
-                  {/* Experience Level */}
-                  <div className="space-y-2">
-                    <Label>Experience Level</Label>
-                    <Select
-                      value={profile.experience_level}
-                      onValueChange={(value) => setProfile({ ...profile, experience_level: value })}
-                    >
-                      <SelectTrigger>
-                        <SelectValue placeholder="Select experience level" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {EXPERIENCE_LEVELS.map((level) => (
-                          <SelectItem key={level.value} value={level.value}>
-                            {level.label}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
-
-                  {/* Trading Style */}
-                  <div className="space-y-3">
-                    <Label>Trading Style</Label>
-                    <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 sm:gap-3">
-                      {TRADING_STYLES.map((style) => (
-                        <div
-                          key={style.value}
-                          className={`p-3 rounded-lg border-2 cursor-pointer transition-all ${profile.trading_style === style.value
-                            ? 'border-tm-brand bg-teal-50/50 dark:bg-teal-900/10'
-                            : 'border-border hover:border-tm-brand/50'
-                            }`}
-                          onClick={() => setProfile({ ...profile, trading_style: style.value })}
-                        >
-                          <p className="font-medium text-sm">{style.label}</p>
-                          <p className="text-xs text-muted-foreground mt-0.5">{style.description}</p>
-                        </div>
-                      ))}
-                    </div>
-                    <p className="text-xs text-muted-foreground">
-                      Helps your AI coach understand your approach. Detection thresholds auto-calibrate from your actual trade history after 5 sessions.
-                    </p>
-                  </div>
-
-                  {/* Risk Tolerance */}
-                  <div className="space-y-3">
-                    <Label>Risk Tolerance</Label>
-                    <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 sm:gap-3">
-                      {RISK_TOLERANCE.map((risk) => (
-                        <div
-                          key={risk.value}
-                          className={`p-4 rounded-lg border-2 cursor-pointer transition-all ${profile.risk_tolerance === risk.value
-                            ? 'border-tm-brand bg-teal-50/50 dark:bg-teal-900/10'
-                            : 'border-border hover:border-tm-brand/50'
-                            }`}
-                          onClick={() => setProfile({ ...profile, risk_tolerance: risk.value })}
-                        >
-                          <p className="font-medium text-sm">{risk.label}</p>
-                          <p className="text-xs text-muted-foreground mt-1">{risk.description}</p>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-
-                  {/* Trading Hours */}
-                  <div className="space-y-2">
-                    <Label>Trading Hours</Label>
-                    <div className="grid grid-cols-2 gap-4">
-                      <div>
-                        <Label className="text-xs text-muted-foreground">Start Time</Label>
-                        <Input
-                          type="time"
-                          value={profile.trading_hours_start || '09:15'}
-                          onChange={(e) => setProfile({ ...profile, trading_hours_start: e.target.value })}
-                        />
-                      </div>
-                      <div>
-                        <Label className="text-xs text-muted-foreground">End Time</Label>
-                        <Input
-                          type="time"
-                          value={profile.trading_hours_end || '15:30'}
-                          onChange={(e) => setProfile({ ...profile, trading_hours_end: e.target.value })}
-                        />
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              </div>
-
-              {/* Trading Limits */}
-              <div className="tm-card overflow-hidden">
-                <div className="px-5 py-4 border-b border-border">
-                  <p className="text-sm font-semibold text-foreground flex items-center gap-2">
-                    <Shield className="h-4 w-4" />
-                    Trading Limits
-                  </p>
-                  <p className="text-xs text-muted-foreground mt-0.5">
-                    These calibrate pattern detection to your actual trading style — alerts become more accurate.
-                  </p>
-                </div>
-                <div className="p-5 space-y-6">
-                  {/* Capital */}
-                  <div className="space-y-2">
-                    <Label htmlFor="trading-capital">My trading capital (₹)</Label>
-                    <Input
-                      id="trading-capital"
-                      type="number"
-                      placeholder="e.g. 500000"
-                      value={profile.trading_capital ?? ''}
-                      onChange={(e) => setProfile({ ...profile, trading_capital: e.target.value ? Number(e.target.value) : undefined })}
-                    />
-                    <p className="text-xs text-muted-foreground">
-                      Used to calculate position sizing alerts as % of your actual capital.
-                    </p>
-                  </div>
-
-                  {/* Max position size (% of capital) */}
-                  <div className="space-y-2">
-                    <Label>Max per options trade — % of capital as premium</Label>
-                    <div className="flex items-center gap-3">
-                      <input
-                        type="range"
-                        min={1}
-                        max={30}
-                        step={1}
-                        value={profile.max_position_size ?? 10}
-                        onChange={(e) => setProfile({ ...profile, max_position_size: Number(e.target.value) })}
-                        className="w-full accent-[#0D9488]"
-                      />
-                      <span className="text-sm font-medium w-12 text-right">{profile.max_position_size ?? 10}%</span>
-                    </div>
-                    <p className="text-xs text-muted-foreground">
-                      Alert fires when a single trade exceeds this % of your capital. Default: 10%.
-                    </p>
-                  </div>
-
-                  {/* SL % futures */}
-                  <div className="space-y-2">
-                    <Label>My typical stop-loss on futures (% of notional)</Label>
-                    <div className="flex flex-wrap gap-2">
-                      {[0.5, 1, 1.5, 2, 3].map((pct) => (
-                        <button
-                          key={pct}
-                          type="button"
-                          className={`px-3 py-1.5 rounded-md border text-sm font-medium transition-all ${
-                            (profile.sl_percent_futures ?? 1.0) === pct
-                              ? 'border-tm-brand bg-tm-brand text-white'
-                              : 'border-border hover:border-tm-brand/50'
-                          }`}
-                          onClick={() => setProfile({ ...profile, sl_percent_futures: pct })}
-                        >
-                          {pct}%
-                        </button>
-                      ))}
-                    </div>
-                    <p className="text-xs text-muted-foreground">
-                      Used to detect no-stop-loss behavior on futures trades.
-                    </p>
-                  </div>
-
-                  {/* SL % options */}
-                  <div className="space-y-2">
-                    <Label>I exit options when premium drops by</Label>
-                    <div className="flex flex-wrap gap-2">
-                      {[30, 50, 70, 100].map((pct) => (
-                        <button
-                          key={pct}
-                          type="button"
-                          className={`px-3 py-1.5 rounded-md border text-sm font-medium transition-all ${
-                            (profile.sl_percent_options ?? 50) === pct
-                              ? 'border-tm-brand bg-tm-brand text-white'
-                              : 'border-border hover:border-tm-brand/50'
-                          }`}
-                          onClick={() => setProfile({ ...profile, sl_percent_options: pct })}
-                        >
-                          {pct}%
-                        </button>
-                      ))}
-                    </div>
-                    <p className="text-xs text-muted-foreground">
-                      Used to detect holding losers too long on options buys.
-                    </p>
-                  </div>
-
-                  {/* Daily trade limit */}
-                  <div className="space-y-2">
-                    <Label htmlFor="daily-trade-limit">My max trades per day</Label>
-                    <Input
-                      id="daily-trade-limit"
-                      type="number"
-                      min={1}
-                      max={50}
-                      placeholder="e.g. 10"
-                      value={profile.daily_trade_limit ?? ''}
-                      onChange={(e) => setProfile({ ...profile, daily_trade_limit: e.target.value ? Number(e.target.value) : undefined })}
-                    />
-                    <p className="text-xs text-muted-foreground">
-                      Overtrading alert fires when you exceed this. Scales with your style.
-                    </p>
-                  </div>
-
-                  {/* Cooldown after loss */}
-                  <div className="space-y-2">
-                    <Label>I wait after a loss before re-entering</Label>
-                    <div className="flex flex-wrap gap-2">
-                      {[0, 5, 10, 15, 30, 60].map((mins) => (
-                        <button
-                          key={mins}
-                          type="button"
-                          className={`px-3 py-1.5 rounded-md border text-sm font-medium transition-all ${
-                            (profile.cooldown_after_loss ?? 15) === mins
-                              ? 'border-tm-brand bg-tm-brand text-white'
-                              : 'border-border hover:border-tm-brand/50'
-                          }`}
-                          onClick={() => setProfile({ ...profile, cooldown_after_loss: mins })}
-                        >
-                          {mins === 0 ? 'None' : `${mins} min`}
-                        </button>
-                      ))}
-                    </div>
-                    <p className="text-xs text-muted-foreground">
-                      Revenge trading alert window. If you say 15 min, re-entries at 12 min will fire.
-                    </p>
-                  </div>
-                </div>
-              </div>
-
-              {/* AI Persona */}
-              <div className="tm-card overflow-hidden">
-                <div className="px-5 py-4 border-b border-border">
-                  <p className="text-sm font-semibold text-foreground flex items-center gap-2">
-                    <Brain className="h-4 w-4" />
-                    AI Coach Personality
-                  </p>
-                  <p className="text-xs text-muted-foreground mt-0.5">
-                    Choose how your AI trading coach communicates with you
-                  </p>
-                </div>
-                <div className="p-5">
-                  <div className="grid grid-cols-2 gap-4">
-                    {AI_PERSONAS.map((persona) => (
-                      <div
-                        key={persona.value}
-                        className={`p-4 rounded-lg border-2 cursor-pointer transition-all ${profile.ai_persona === persona.value
-                          ? 'border-tm-brand bg-teal-50/50 dark:bg-teal-900/10'
-                          : 'border-border hover:border-tm-brand/50'
-                          }`}
-                        onClick={() => setProfile({ ...profile, ai_persona: persona.value })}
-                      >
-                        <p className="font-medium">{persona.label}</p>
-                        <p className="text-sm text-muted-foreground mt-1">{persona.description}</p>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              </div>
-            </div>
+            <ProfileTab profile={profile} setProfile={setProfile} />
           </TabsContent>
 
-          {/* ===== Notifications Tab ===== */}
           <TabsContent value="notifications">
-            <div className="space-y-6">
-              {/* WhatsApp not configured banner */}
-              {notificationStatus && !notificationStatus.whatsapp?.twilio_configured && (
-                <div className="flex items-start gap-3 p-4 bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-800 rounded-lg">
-                  <AlertTriangle className="h-5 w-5 text-amber-600 dark:text-amber-400 mt-0.5 shrink-0" />
-                  <div>
-                    <p className="text-sm font-medium text-amber-700 dark:text-amber-300">
-                      WhatsApp Not Available
-                    </p>
-                    <p className="text-xs text-amber-600 dark:text-amber-400 mt-0.5">
-                      Twilio is not configured on the server. WhatsApp reports and guardian alerts will be logged but not delivered. Contact admin to set up Twilio credentials.
-                    </p>
-                  </div>
-                </div>
-              )}
-
-              {/* Email not configured banner */}
-              {notificationStatus && !notificationStatus.email?.smtp_configured && (
-                <div className="flex items-start gap-3 p-4 bg-blue-50 dark:bg-blue-950/30 border border-blue-200 dark:border-blue-800 rounded-lg">
-                  <AlertTriangle className="h-5 w-5 text-blue-600 dark:text-blue-400 mt-0.5 shrink-0" />
-                  <div>
-                    <p className="text-sm font-medium text-blue-700 dark:text-blue-300">
-                      Email Delivery Not Configured
-                    </p>
-                    <p className="text-xs text-blue-600 dark:text-blue-400 mt-0.5">
-                      SMTP is not set up on the server. Email reports will be logged but not delivered. Set SMTP_HOST, SMTP_USER, SMTP_PASS, EMAIL_FROM in the backend .env file.
-                    </p>
-                  </div>
-                </div>
-              )}
-
-              {/* Alert Sensitivity */}
-              <div className="tm-card overflow-hidden">
-                <div className="px-5 py-4 border-b border-border">
-                  <p className="text-sm font-semibold text-foreground">Alert Sensitivity</p>
-                  <p className="text-xs text-muted-foreground mt-0.5">Control how aggressively patterns are flagged</p>
-                </div>
-                <div className="p-5">
-                  <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 sm:gap-3">
-                    {ALERT_SENSITIVITY.map((level) => (
-                      <div
-                        key={level.value}
-                        className={`p-3 rounded-lg border-2 cursor-pointer transition-all text-center ${profile.alert_sensitivity === level.value
-                          ? 'border-tm-brand bg-teal-50/50 dark:bg-teal-900/10'
-                          : 'border-border hover:border-tm-brand/50'
-                          }`}
-                        onClick={() => setProfile({ ...profile, alert_sensitivity: level.value })}
-                      >
-                        <p className="font-medium text-sm">{level.label}</p>
-                        <p className="text-xs text-muted-foreground">{level.description}</p>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              </div>
-
-              {/* Push Notifications */}
-              <NotificationSettings />
-
-              {/* WhatsApp Reports */}
-              <div className="tm-card overflow-hidden">
-                <div className="px-5 py-4 border-b border-border">
-                  <p className="text-sm font-semibold text-foreground">WhatsApp Reports</p>
-                  <p className="text-xs text-muted-foreground mt-0.5">Daily trading summaries via WhatsApp</p>
-                </div>
-                <div className="p-5">
-                  <div className="flex items-center justify-between p-4 border rounded-lg">
-                    <div>
-                      <p className="font-medium">Daily WhatsApp Reports</p>
-                      <p className="text-sm text-muted-foreground">
-                        Receive end-of-day trading summary via WhatsApp
-                      </p>
-                    </div>
-                    <Switch
-                      checked={profile.whatsapp_enabled || false}
-                      onCheckedChange={(checked) => setProfile({ ...profile, whatsapp_enabled: checked })}
-                    />
-                  </div>
-                </div>
-              </div>
-
-              {/* Email Reports */}
-              <div className="tm-card overflow-hidden">
-                <div className="px-5 py-4 border-b border-border">
-                  <p className="text-sm font-semibold text-foreground flex items-center gap-2">
-                    <Mail className="h-4 w-4" />
-                    Email Reports
-                  </p>
-                  <p className="text-xs text-muted-foreground mt-0.5">
-                    Receive daily post-market reports and morning briefs by email
-                  </p>
-                </div>
-                <div className="p-5 space-y-4">
-                  <div className="flex items-center justify-between p-4 border rounded-lg">
-                    <div>
-                      <p className="font-medium">Daily Email Reports</p>
-                      <p className="text-sm text-muted-foreground">
-                        Post-market summary at 4:00 PM IST + morning brief at 8:30 AM IST
-                      </p>
-                    </div>
-                    <Switch
-                      checked={profile.email_enabled || false}
-                      onCheckedChange={(checked) => setProfile({ ...profile, email_enabled: checked })}
-                    />
-                  </div>
-
-                  {profile.email_enabled && account && (
-                    <div className="p-3 bg-muted/40 rounded-lg flex items-center gap-3">
-                      <Mail className="h-4 w-4 text-muted-foreground shrink-0" />
-                      <div className="min-w-0">
-                        <p className="text-xs text-muted-foreground">Reports will be sent to your Zerodha-registered email</p>
-                        <p className="text-sm font-medium truncate">{account.broker_email || 'your account email'}</p>
-                      </div>
-                    </div>
-                  )}
-
-                  {profile.email_enabled && notificationStatus && !notificationStatus.email?.smtp_configured && (
-                    <p className="text-xs text-amber-600 dark:text-amber-400">
-                      Email toggle saved but SMTP is not configured on the server yet — emails won't send until an admin sets up SMTP credentials.
-                    </p>
-                  )}
-                </div>
-              </div>
-
-              {/* Guardian Mode */}
-              <div className="tm-card overflow-hidden">
-                <div className="px-5 py-4 border-b border-border">
-                  <p className="text-sm font-semibold text-foreground flex items-center gap-2">
-                    <Phone className="h-4 w-4" />
-                    Guardian Mode
-                  </p>
-                  <p className="text-xs text-muted-foreground mt-0.5">
-                    Set up a trusted contact to receive alerts when you're in danger zone
-                  </p>
-                </div>
-                <div className="p-5 space-y-6">
-                  {/* Enable Guardian */}
-                  <div className="flex items-center justify-between p-4 border rounded-lg">
-                    <div>
-                      <p className="font-medium">Enable Guardian Mode</p>
-                      <p className="text-sm text-muted-foreground">
-                        Send critical alerts to your guardian via WhatsApp
-                      </p>
-                    </div>
-                    <Switch
-                      checked={profile.guardian_enabled || false}
-                      onCheckedChange={(checked) => setProfile({ ...profile, guardian_enabled: checked })}
-                    />
-                  </div>
-
-                  {profile.guardian_enabled && (
-                    <>
-                      {/* Guardian Name */}
-                      <div className="space-y-2">
-                        <Label>Guardian's Name</Label>
-                        <Input
-                          placeholder="e.g. Spouse, Parent, Friend"
-                          value={profile.guardian_name || ''}
-                          onChange={(e) => setProfile({ ...profile, guardian_name: e.target.value })}
-                        />
-                      </div>
-
-                      {/* Guardian Phone */}
-                      <div className="space-y-2">
-                        <Label>Guardian's WhatsApp Number</Label>
-                        <Input
-                          placeholder="+919876543210"
-                          value={profile.guardian_phone || ''}
-                          onChange={(e) => setProfile({ ...profile, guardian_phone: e.target.value })}
-                        />
-                        <p className="text-xs text-muted-foreground">
-                          International format, no spaces — e.g. +919876543210
-                        </p>
-                      </div>
-
-                      {/* Alert Threshold */}
-                      <div className="space-y-2">
-                        <Label>Alert Threshold</Label>
-                        <Select
-                          value={profile.guardian_alert_threshold || 'critical'}
-                          onValueChange={(value) => setProfile({ ...profile, guardian_alert_threshold: value })}
-                        >
-                          <SelectTrigger>
-                            <SelectValue />
-                          </SelectTrigger>
-                          <SelectContent>
-                            <SelectItem value="critical">Critical Only (Loss limit breached)</SelectItem>
-                            <SelectItem value="danger">Danger & Critical</SelectItem>
-                            <SelectItem value="warning">Warning, Danger & Critical</SelectItem>
-                          </SelectContent>
-                        </Select>
-                      </div>
-
-                      {/* Daily Summary Toggle */}
-                      <div className="flex items-center justify-between p-4 border rounded-lg">
-                        <div>
-                          <p className="font-medium">Daily Summary Reports</p>
-                          <p className="text-sm text-muted-foreground">
-                            Send end-of-day trading summary to your guardian
-                          </p>
-                        </div>
-                        <Switch
-                          checked={profile.guardian_daily_summary || false}
-                          onCheckedChange={(checked) => setProfile({ ...profile, guardian_daily_summary: checked })}
-                        />
-                      </div>
-
-                      {/* What Guardian Receives */}
-                      <div className="p-4 bg-muted/50 rounded-lg space-y-2">
-                        <p className="font-medium text-sm">Your guardian will receive:</p>
-                        <ul className="text-sm text-muted-foreground space-y-1">
-                          <li>- Daily loss limit breached alerts</li>
-                          <li>- Critical patterns (tilt, revenge trading)</li>
-                          <li>- Consecutive loss threshold exceeded</li>
-                          {profile.guardian_alert_threshold === 'warning' && (
-                            <li>- Early warning signs</li>
-                          )}
-                          {profile.guardian_daily_summary && (
-                            <li>- Daily trading summary at your configured EOD time</li>
-                          )}
-                        </ul>
-                      </div>
-
-                      {/* Test Message */}
-                      <Button
-                        variant="outline"
-                        className="w-full"
-                        onClick={handleTestGuardian}
-                      >
-                        <Phone className="h-4 w-4 mr-2" />
-                        Send Test Message
-                      </Button>
-                    </>
-                  )}
-                </div>
-              </div>
-
-              {/* Report Delivery Timing */}
-              <div className="tm-card overflow-hidden">
-                <div className="px-5 py-4 border-b border-border">
-                  <p className="text-sm font-semibold text-foreground flex items-center gap-2">
-                    <Bell className="h-4 w-4" />
-                    Report Delivery Timing (IST)
-                  </p>
-                  <p className="text-xs text-muted-foreground mt-0.5">
-                    Choose when you receive automated daily reports. Defaults are after market close and before open.
-                  </p>
-                </div>
-                <div className="p-5 space-y-6">
-                  {/* EOD Report Time */}
-                  <div className="space-y-2">
-                    <Label htmlFor="eod-time">Post-Market Report (EOD)</Label>
-                    <div className="flex items-center gap-3">
-                      <Input
-                        id="eod-time"
-                        type="time"
-                        value={profile.eod_report_time || '16:00'}
-                        onChange={(e) => setProfile({ ...profile, eod_report_time: e.target.value })}
-                        className="w-36"
-                      />
-                      <span className="text-sm text-muted-foreground">
-                        IST — Default 4:00 PM (after equity market close)
-                      </span>
-                    </div>
-                    <p className="text-xs text-muted-foreground">
-                      Includes: trade count, P&amp;L, win rate, emotional journey, patterns detected, lessons &amp; tomorrow's focus.
-                    </p>
-                  </div>
-
-                  {/* Morning Brief Time */}
-                  <div className="space-y-2">
-                    <Label htmlFor="morning-time">Morning Readiness Brief</Label>
-                    <div className="flex items-center gap-3">
-                      <Input
-                        id="morning-time"
-                        type="time"
-                        value={profile.morning_brief_time || '08:30'}
-                        onChange={(e) => setProfile({ ...profile, morning_brief_time: e.target.value })}
-                        className="w-36"
-                      />
-                      <span className="text-sm text-muted-foreground">
-                        IST — Default 8:30 AM (before market open at 9:15)
-                      </span>
-                    </div>
-                    <p className="text-xs text-muted-foreground">
-                      Includes: readiness score, yesterday's recap, watch-outs, personalised checklist &amp; commitment prompt.
-                    </p>
-                  </div>
-
-                  <div className="p-3 bg-muted/40 rounded-lg text-xs text-muted-foreground">
-                    ℹ️ Reports are sent to your WhatsApp (guardian number) and as push notifications.
-                    If no custom time is set, the default times above are used.
-                  </div>
-                </div>
-              </div>
-            </div>
+            <NotificationsTab
+              profile={profile}
+              setProfile={setProfile}
+              notificationStatus={notificationStatus}
+              account={account}
+              onTestGuardian={handleTestGuardian}
+            />
           </TabsContent>
         </Tabs>
       )}

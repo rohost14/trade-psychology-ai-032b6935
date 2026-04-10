@@ -1,7 +1,7 @@
 import { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Link } from 'react-router-dom';
-import { Link2, Loader2, AlertTriangle, RefreshCw, X, Bot, ArrowRight } from 'lucide-react';
+import { Link2, Loader2, AlertTriangle, RefreshCw, X } from 'lucide-react';
 import BlowupShieldCard from '@/components/dashboard/BlowupShieldCard';
 import RecentAlertsCard from '@/components/dashboard/RecentAlertsCard';
 import AlertDetailSheet from '@/components/alerts/AlertDetailSheet';
@@ -10,6 +10,8 @@ import ClosedTradesTable from '@/components/dashboard/ClosedTradesTable';
 import HoldingsCard from '@/components/dashboard/HoldingsCard';
 import PredictiveWarningsCard from '@/components/dashboard/PredictiveWarningsCard';
 import SessionPaceGoalCard from '@/components/dashboard/SessionPaceGoalCard';
+import { SessionHeroCard } from '@/components/dashboard/SessionHeroCard';
+import { AiCoachCta } from '@/components/dashboard/AiCoachCta';
 import { useHoldings } from '@/hooks/useHoldings';
 import { TradeJournalSheet } from '@/components/dashboard/TradeJournalSheet';
 import { Button } from '@/components/ui/button';
@@ -20,6 +22,7 @@ import { Position, CompletedTrade } from '@/types/api';
 import { useAlerts, AlertNotification } from '@/contexts/AlertContext';
 import { useBroker } from '@/contexts/BrokerContext';
 import { useWebSocket } from '@/contexts/WebSocketContext';
+import { STATE_CFG, SessionState, getSessionState, formatTimeAgo } from '@/lib/dashboardUtils';
 
 type PositionWithExtras = Position & { instrument_type: string; unrealized_pnl: number; current_value: number };
 
@@ -30,104 +33,6 @@ interface RiskStateData {
   unrealized_pnl: number;
   ai_recommendations: string[];
   last_synced: string;
-}
-
-// ─── Session State ────────────────────────────────────────────────────────────
-const STATE_CFG = {
-  stable: {
-    label:  'On Track',
-    pill:   'bg-teal-100 dark:bg-teal-900/40 text-teal-700 dark:text-teal-300',
-    dot:    'bg-teal-500',
-    accent: 'border-l-[3px] border-l-teal-400 dark:border-l-teal-500',
-  },
-  caution: {
-    label:  'Patterns',          // behavioral patterns noted — NOT financial caution
-    pill:   'bg-amber-100 dark:bg-amber-900/40 text-amber-700 dark:text-amber-300',
-    dot:    'bg-amber-500',
-    accent: 'border-l-[3px] border-l-amber-400 dark:border-l-amber-500',
-  },
-  risk: {
-    label:  'High Alert',        // multiple/critical patterns — review immediately
-    pill:   'bg-red-100 dark:bg-red-900/40 text-red-700 dark:text-red-300',
-    dot:    'bg-red-500',
-    accent: 'border-l-[3px] border-l-red-400 dark:border-l-red-500',
-  },
-};
-
-type SessionState = keyof typeof STATE_CFG;
-
-function getSessionState(unreadCount: number, highSevCount: number): SessionState {
-  if (highSevCount >= 2 || unreadCount >= 5) return 'risk';
-  if (highSevCount >= 1 || unreadCount >= 2) return 'caution';
-  return 'stable';
-}
-
-function getSessionDesc(
-  state: SessionState,
-  unreadCount: number,
-  tradesCount: number,
-  winRate: number,
-): string {
-  if (state === 'risk') {
-    return highSevPattern(unreadCount)
-      ? `${unreadCount} high-severity pattern${unreadCount !== 1 ? 's' : ''} active — review before your next trade`
-      : 'Multiple patterns detected — trade with extra caution this session';
-  }
-  if (state === 'caution') {
-    if (unreadCount > 0)
-      return `${unreadCount} behavioral pattern${unreadCount !== 1 ? 's' : ''} noted — review before continuing`;
-    return 'Session elevated — stay within your plan';
-  }
-  if (tradesCount === 0) return 'No trades yet — session tracking is ready';
-  if (winRate > 0 && winRate < 40) return `Win rate at ${winRate}% — focus on setup quality, not frequency`;
-  return 'Session tracking normally — keep following your plan';
-}
-function highSevPattern(count: number) { return count >= 2; }
-
-// ─── P&L Sparkline ────────────────────────────────────────────────────────────
-function PnlSparkline({ closed, unrealized, positive }: {
-  closed: CompletedTrade[]; unrealized: number; positive: boolean;
-}) {
-  const today = new Date(); today.setHours(0, 0, 0, 0);
-  const todayTrades = closed.filter(t => new Date(t.exit_time) >= today);
-
-  const points: number[] = [0];
-  let cum = 0;
-  for (const t of todayTrades) { cum += t.realized_pnl; points.push(cum); }
-  points.push(cum + unrealized);
-
-  if (points.length < 2) {
-    return <div className="flex-1 flex items-center justify-center text-[11px] text-muted-foreground/50">No data yet</div>;
-  }
-
-  const min = Math.min(...points);
-  const max = Math.max(...points);
-  const range = max - min || 1;
-  const W = 200; const H = 72;
-  const toX = (i: number) => (i / (points.length - 1)) * W;
-  const toY = (v: number) => H - ((v - min) / range) * (H * 0.85) - H * 0.075;
-  const zeroY = toY(0);
-
-  const linePath = points.map((v, i) => `${i === 0 ? 'M' : 'L'}${toX(i).toFixed(1)},${toY(v).toFixed(1)}`).join(' ');
-  const areaPath = `${linePath} L${W},${zeroY.toFixed(1)} L0,${zeroY.toFixed(1)} Z`;
-
-  const lineColor = positive ? 'var(--tm-profit, #16A34A)' : 'var(--tm-loss, #DC2626)';
-  const gradId = `spk-${positive ? 'p' : 'l'}`;
-
-  return (
-    <svg viewBox={`0 0 ${W} ${H}`} preserveAspectRatio="none" className="flex-1 w-full">
-      <defs>
-        <linearGradient id={gradId} x1="0" y1="0" x2="0" y2="1">
-          <stop offset="0%" stopColor={lineColor} stopOpacity="0.18" />
-          <stop offset="100%" stopColor={lineColor} stopOpacity="0.02" />
-        </linearGradient>
-      </defs>
-      <line x1="0" y1={zeroY} x2={W} y2={zeroY} stroke="currentColor" strokeOpacity="0.12" strokeWidth="1" strokeDasharray="3 3" className="text-muted-foreground" />
-      <path d={areaPath} fill={`url(#${gradId})`} />
-      <path d={linePath} fill="none" stroke={lineColor} strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" />
-      <circle cx={toX(points.length - 1)} cy={toY(points[points.length - 1])} r="3" fill={lineColor} />
-    </svg>
-  );
 }
 
 // ─── Dashboard ────────────────────────────────────────────────────────────────
@@ -419,11 +324,6 @@ export default function Dashboard() {
 
   // ── Computed values ───────────────────────────────────────────────────────
   const mergedAlerts = useMemo(() => {
-    // Use a 36-hour window instead of calendar-day midnight.
-    // Calendar-day comparison breaks when the browser timezone differs from IST
-    // (e.g. trading alerts at 9:15 IST = 3:45 UTC; midnight UTC = 5:30 IST).
-    // 36h catches everything from today's and yesterday's session without needing
-    // timezone conversion, and old acked alerts fall off naturally.
     const cutoff = Date.now() - 36 * 60 * 60 * 1000;
     return alerts
       .filter(a => a.shown_at && new Date(a.shown_at).getTime() >= cutoff)
@@ -451,7 +351,7 @@ export default function Dashboard() {
 
   const unreadCount = mergedAlerts.filter(a => !a.acknowledged).length;
   const highSevCount = mergedAlerts.filter(a => !a.acknowledged && (a.severity === 'critical' || a.severity === 'high')).length;
-  const sessionStateKey = getSessionState(unreadCount, highSevCount);
+  const sessionStateKey: SessionState = getSessionState(unreadCount, highSevCount);
   const stateCfg = STATE_CFG[sessionStateKey];
 
   const unjournaled = recentTrades.filter(t => {
@@ -460,6 +360,7 @@ export default function Dashboard() {
   }).length;
 
   const pnlPositive = sessionPnlDisplay >= 0;
+  const unrealizedTotal = positions.reduce((s, p) => s + (p.unrealized_pnl || 0), 0);
 
   // ── Render guards ─────────────────────────────────────────────────────────
   if (brokerLoading) {
@@ -597,79 +498,18 @@ export default function Dashboard() {
       </div>
 
       {/* ── Session Hero ──────────────────────────────────────────────────── */}
-      <div className={cn('tm-card mb-5', stateCfg.accent)}>
-        <div className="flex items-stretch">
-          {/* Left: state + P&L */}
-          <div className="flex-1 min-w-0 px-5 pt-4 pb-3">
-            <div className="flex items-center gap-2 mb-2">
-              <span className={cn('flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-semibold uppercase tracking-wide', stateCfg.pill)}>
-                <span className={cn('w-1.5 h-1.5 rounded-full', stateCfg.dot)} />
-                {stateCfg.label}
-              </span>
-            </div>
-            <div className="flex items-baseline gap-2 mb-1">
-              <span className={cn('text-[44px] font-black font-mono tabular-nums leading-none', pnlPositive ? 'text-tm-profit' : 'text-tm-loss')}>
-                {formatCurrencyWithSign(sessionPnlDisplay)}
-              </span>
-            </div>
-            <p className="text-[13px] text-muted-foreground leading-snug">
-              {getSessionDesc(sessionStateKey, unreadCount, tradeStats?.trades_today ?? 0, Math.round(tradeStats?.win_rate ?? 0))}
-            </p>
-          </div>
-
-          {/* Right: sparkline */}
-          <div className="w-[176px] shrink-0 border-l border-slate-100 dark:border-neutral-700/60 px-4 pt-4 pb-3 flex flex-col">
-            <span className="tm-label mb-2">Cumulative P&L</span>
-            <PnlSparkline closed={closedTrades} unrealized={positions.reduce((s, p) => s + (p.unrealized_pnl || 0), 0)} positive={pnlPositive} />
-            <div className="flex items-center justify-between mt-1.5">
-              <span className="text-[10px] text-muted-foreground">open → now</span>
-              <span className={cn('text-[11px] font-mono tabular-nums font-semibold', pnlPositive ? 'text-tm-profit' : 'text-tm-loss')}>
-                {formatCurrencyWithSign(sessionPnlDisplay)}
-              </span>
-            </div>
-          </div>
-        </div>
-
-        {/* Stat footer — pipe-separated */}
-        <div className="flex items-center flex-wrap gap-y-1 border-t border-slate-100 dark:border-neutral-700/60 px-5 py-3">
-          <span className="text-[12px] text-muted-foreground pr-4">
-            <span className="font-mono tabular-nums font-semibold text-foreground">{tradeStats?.trades_today ?? 0}</span>
-            {' '}trades
-          </span>
-          {tradeStats && tradeStats.trades_today > 0 && (
-            <>
-              <span className="w-px h-3.5 shrink-0 bg-slate-200 dark:bg-neutral-600" />
-              <span className="text-[12px] text-muted-foreground px-4">
-                <span className={cn('font-mono tabular-nums font-semibold', tradeStats.win_rate >= 50 ? 'text-tm-profit' : 'text-tm-loss')}>
-                  {Math.round(tradeStats.win_rate)}%
-                </span>
-                {' '}win rate
-              </span>
-            </>
-          )}
-          <span className="w-px h-3.5 shrink-0 bg-slate-200 dark:bg-neutral-600" />
-          <span className="text-[12px] text-muted-foreground px-4">
-            <span className={cn('font-mono tabular-nums font-semibold', realizedPnlDisplay >= 0 ? 'text-tm-profit' : 'text-tm-loss')}>
-              {formatCurrencyWithSign(realizedPnlDisplay)}
-            </span>
-            {' '}realized
-          </span>
-          {unjournaled > 0 && (
-            <>
-              <span className="w-px h-3.5 shrink-0 bg-slate-200 dark:bg-neutral-600" />
-              <span className="text-[12px] text-tm-obs font-medium px-4">{unjournaled} to journal</span>
-            </>
-          )}
-          {unreadCount > 0 && (
-            <>
-              <span className="w-px h-3.5 shrink-0 bg-slate-200 dark:bg-neutral-600" />
-              <Link to="/alerts" className="text-[12px] text-tm-obs font-medium hover:underline px-4">
-                {unreadCount} alert{unreadCount !== 1 ? 's' : ''} →
-              </Link>
-            </>
-          )}
-        </div>
-      </div>
+      <SessionHeroCard
+        stateCfg={stateCfg}
+        sessionStateKey={sessionStateKey}
+        sessionPnlDisplay={sessionPnlDisplay}
+        realizedPnlDisplay={realizedPnlDisplay}
+        tradeStats={tradeStats}
+        pnlPositive={pnlPositive}
+        unreadCount={unreadCount}
+        unjournaled={unjournaled}
+        closedTrades={closedTrades}
+        unrealizedTotal={unrealizedTotal}
+      />
 
       {/* ── Alerts (full-width) ───────────────────────────────────────────── */}
       <div className="mb-5">
@@ -726,20 +566,7 @@ export default function Dashboard() {
             />
           )}
 
-          {/* AI Coach CTA */}
-          <Link
-            to="/chat"
-            className="tm-coach-cta flex items-center gap-3 rounded-xl p-4 hover:opacity-90 transition-opacity group"
-          >
-            <div className="w-9 h-9 rounded-lg bg-white/15 flex items-center justify-center shrink-0">
-              <Bot className="w-4 h-4 text-white" />
-            </div>
-            <div className="flex-1 min-w-0">
-              <p className="text-sm font-semibold text-white">AI Trading Coach</p>
-              <p className="text-[12px] text-white/70">Ask about your patterns or get a debrief</p>
-            </div>
-            <ArrowRight className="w-4 h-4 text-white/40 group-hover:text-white transition-colors shrink-0" />
-          </Link>
+          <AiCoachCta />
 
           {holdings.length > 0 && holdingsSummary && (
             <HoldingsCard
@@ -775,16 +602,4 @@ export default function Dashboard() {
       />
     </div>
   );
-}
-
-function formatTimeAgo(dateStr: string): string {
-  const date = new Date(dateStr);
-  const now = new Date();
-  const diffMs = now.getTime() - date.getTime();
-  const diffMins = Math.floor(diffMs / 60000);
-  const diffHours = Math.floor(diffMins / 60);
-  if (diffMins < 1) return 'just now';
-  if (diffMins < 60) return `${diffMins} min ago`;
-  if (diffHours < 24) return `${diffHours} hours ago`;
-  return date.toLocaleDateString();
 }
