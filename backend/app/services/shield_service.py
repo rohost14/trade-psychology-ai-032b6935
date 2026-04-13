@@ -271,13 +271,17 @@ class ShieldService:
         db: AsyncSession,
     ) -> Dict:
         """
-        For each alert, load CompletedTrades that exited AFTER the alert fired
-        and before the end of that trading session (15:30 IST same day).
+        For each alert, load CompletedTrades that were ENTERED *and* exited after
+        the alert fired, within the same trading session (before 15:30 IST).
+
+        The entry_time filter is critical: a position that was opened before the alert
+        but closed after it (e.g. trader holds a NIFTY position through an overtrading
+        alert) must NOT count as "continued trading" — the trader obeyed the alert,
+        they just let the existing trade run to completion.  Only NEW positions
+        (entry_time > alert.detected_at) represent a deliberate choice to keep trading.
 
         Returns {alert_id: [CompletedTrade, ...]} ordered by exit_time asc.
-
-        Uses a single DB query: fetch all CTs from earliest_alert to latest_session_end,
-        then partition in Python.
+        Uses a single DB query then partitions in Python.
         """
         if not alerts:
             return {}
@@ -287,7 +291,6 @@ class ShieldService:
             return {a.id: [] for a in alerts}
 
         range_start = min(alert_times)
-        # Ceiling: latest session end (could span multiple days if days=30)
         range_end = max(_session_end_utc(t) for t in alert_times)
 
         try:
@@ -295,7 +298,8 @@ class ShieldService:
                 select(CompletedTrade).where(
                     and_(
                         CompletedTrade.broker_account_id == broker_account_id,
-                        CompletedTrade.exit_time > range_start,
+                        # entry_time >= range_start catches all possible post-alert entries
+                        CompletedTrade.entry_time >= range_start,
                         CompletedTrade.exit_time <= range_end,
                     )
                 ).order_by(CompletedTrade.exit_time.asc())
@@ -313,8 +317,10 @@ class ShieldService:
             session_end = _session_end_utc(alert.detected_at)
             cts_by_alert[alert.id] = [
                 ct for ct in all_cts
-                if ct.exit_time
-                and ct.exit_time > alert.detected_at
+                # Position must have been ENTERED after the alert — not merely exited after
+                if ct.entry_time
+                and ct.exit_time
+                and ct.entry_time > alert.detected_at
                 and ct.exit_time <= session_end
             ]
 

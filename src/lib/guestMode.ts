@@ -106,11 +106,6 @@ export function getGuestResponse(url: string, method = 'GET'): unknown | undefin
     return { patterns: DEMO_BEHAVIORAL_ANALYSIS.patterns_detected };
   }
 
-  // Money saved
-  if (path.includes('/api/analytics/money-saved')) {
-    return { total_saved: 21260, alerts_count: 3, period_days: 30 };
-  }
-
   // Dashboard predictive warnings
   if (path.includes('/api/dashboard/warnings') || path.includes('/api/risk/warnings')) {
     return {

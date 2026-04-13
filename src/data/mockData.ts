@@ -1,4 +1,4 @@
-import { Position, Trade, Alert, MoneySaved } from '@/types/api';
+import { Position, Trade, Alert } from '@/types/api';
 
 export interface MockRiskState {
   risk_state: 'safe' | 'caution' | 'danger';
@@ -20,13 +20,6 @@ export const mockRiskState: MockRiskState = {
     'Position sizes are 2x your usual - slow down.',
   ],
   last_synced: 'Synced 30 seconds ago',
-};
-
-export const mockMoneySaved: MoneySaved = {
-  all_time: 27000,
-  this_week: 4500,
-  this_month: 12800,
-  blowups_prevented: 3,
 };
 
 export const mockPositions: (Position & { instrument_type: string; unrealized_pnl: number; current_value: number })[] = [

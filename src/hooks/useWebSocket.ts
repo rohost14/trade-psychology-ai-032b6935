@@ -49,11 +49,9 @@ export function useWebSocket(options: UseWebSocketOptions = {}) {
 
             const wsUrl = urlObj.toString();
 
-            console.log('Connecting to WebSocket:', wsUrl);
             const ws = new WebSocket(wsUrl);
 
             ws.onopen = () => {
-                console.log('WebSocket Connected');
                 setIsWsConnected(true);
                 if (reconnectTimeoutRef.current) {
                     clearTimeout(reconnectTimeoutRef.current);
@@ -76,7 +74,6 @@ export function useWebSocket(options: UseWebSocketOptions = {}) {
             };
 
             ws.onclose = () => {
-                console.log('WebSocket Disconnected');
                 setIsWsConnected(false);
                 wsRef.current = null;
 

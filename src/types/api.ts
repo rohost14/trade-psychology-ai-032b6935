@@ -145,13 +145,6 @@ export interface CoachInsight {
   timestamp: string;
 }
 
-export interface MoneySaved {
-  all_time: number;
-  this_week: number;
-  this_month: number;
-  blowups_prevented: number;
-}
-
 export interface ShieldSummary {
   total_alerts: number;
   danger_count: number;

@@ -24,7 +24,6 @@ const BlowupShield  = lazy(() => import("./pages/BlowupShield"));
 const MyPatterns    = lazy(() => import("./pages/MyPatterns"));
 const Chat          = lazy(() => import("./pages/Chat"));
 const Settings      = lazy(() => import("./pages/Settings"));
-const MoneySaved    = lazy(() => import("./pages/MoneySaved"));
 const PortfolioRadar  = lazy(() => import("./pages/PortfolioRadar"));
 const Guardrails      = lazy(() => import("./pages/Guardrails"));
 const PortfolioChat   = lazy(() => import("./pages/PortfolioChat"));
@@ -81,7 +80,6 @@ const App = () => (
                     <Route path="blowup-shield" element={<BlowupShield />} />
                     <Route path="my-patterns" element={<MyPatterns />} />
                     <Route path="chat" element={<Chat />} />
-                    <Route path="money-saved" element={<MoneySaved />} />
                     <Route path="portfolio-radar" element={<PortfolioRadar />} />
                     <Route path="guardrails" element={<Guardrails />} />
                     <Route path="portfolio-chat" element={<PortfolioChat />} />

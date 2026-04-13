@@ -113,8 +113,6 @@ export function usePriceStream(brokerAccountId?: string): UsePriceStreamReturn {
       urlObj.searchParams.set('token', authToken);
 
       const wsUrl = urlObj.toString();
-      console.log('PriceStream connecting to:', wsUrl);
-
       const ws = new WebSocket(wsUrl);
       wsRef.current = ws;
 
