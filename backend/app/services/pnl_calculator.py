@@ -25,6 +25,7 @@ from app.models.completed_trade import CompletedTrade
 from app.models.completed_trade_feature import CompletedTradeFeature
 from app.models.incomplete_position import IncompletePosition
 from app.core.market_hours import market_minutes
+from app.services.mcx_contract_specs import get_lot_multiplier
 
 logger = logging.getLogger(__name__)
 
@@ -232,15 +233,19 @@ class PnLCalculator:
         # Round accumulator for flat-to-flat semantics
         round_acc = self._new_round_acc()
 
-        # FIFO P&L is structural only — it records rounds, timing, and direction.
-        # The actual P&L value is overwritten by _reconcile_pnl_with_zerodha() after sync,
-        # which uses Zerodha's authoritative 'realised' field.
+        # Lot multiplier: how many price-quotation units are in 1 filled lot.
         #
-        # We do NOT apply MCX/CDS lot_size here because Zerodha's instruments CSV stores
-        # lot_size = minimum order quantity (= 1 lot), NOT the contract multiplier.
-        # For GOLDM: CSV lot_size=1, but correct multiplier=10 (10g per lot).
-        # Applying CSV lot_size here would give wrong P&L — reconciliation corrects it.
-        lot_multiplier = Decimal("1")
+        # NSE/BSE/NFO/BFO: Kite already expands quantity to total units
+        #   (e.g. 1 NIFTY lot → qty=50 in the fill).  Multiplier = 1.
+        #
+        # MCX/CDS: Kite sends quantity in LOTS (qty=1 for 1 CRUDEOIL lot = 100 bbl).
+        #   Zerodha instruments CSV has lot_size=1 for ALL MCX instruments — it is
+        #   the minimum order quantity, not the contract size.
+        #   We use our own authoritative table in mcx_contract_specs.py.
+        #   Ref: https://kite.trade/forum/discussion/14531/
+        ref_exchange = (sorted_trades[0].exchange or "") if sorted_trades else ""
+        ref_symbol   = (sorted_trades[0].tradingsymbol or "") if sorted_trades else ""
+        lot_multiplier = Decimal(str(get_lot_multiplier(ref_exchange, ref_symbol)))
 
         for trade in sorted_trades:
             qty = trade.filled_quantity or trade.quantity or 0

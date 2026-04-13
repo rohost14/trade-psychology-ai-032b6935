@@ -911,30 +911,23 @@ class TradeSyncService:
         db: AsyncSession,
     ) -> int:
         """
-        Replace FIFO-calculated P&L with Zerodha's authoritative 'realised' value.
+        Sanity-check FIFO P&L against Zerodha's stored position data.
 
-        Zerodha is the ground truth for P&L — it handles lot sizes, contract multipliers,
-        exchange-specific rules, and corporate actions correctly for every instrument type:
-          - NFO/BFO (NSE/BSE F&O): qty already in units, no multiplier needed
-          - MCX (commodities): Zerodha qty = lots; instruments CSV lot_size = 1 (minimum
-            order quantity), NOT the contract multiplier. FIFO gives wrong values here.
-            e.g. GOLDM: CSV lot_size=1 but multiplier=10 → FIFO off by 10×.
-          - CDS (currency): same issue as MCX.
+        Since mcx_contract_specs.py now provides correct lot multipliers for all
+        known MCX/CDS contracts, FIFO P&L should be accurate everywhere.
 
-        For single-round positions: direct assignment.
-        For multi-round positions (traded same symbol twice today): proportional scaling
-        so each CompletedTrade gets the correct share of Zerodha's total realised P&L.
-        The proportions are correct even when FIFO absolute values are wrong, because
-        all rounds of the same symbol have the same lot-size error factor.
+        This function:
+          - NSE/BSE/NFO/BFO: runs the repair pass (fixes old records corrupted before
+            the multiplier fix was deployed).  No overwrite of current records.
+          - MCX/CDS: LOG-ONLY sanity check.  If FIFO differs from Zerodha's pos.pnl
+            by >10% it means a contract multiplier is missing from mcx_contract_specs.py
+            — log it so we can add the entry.  Never overwrite.
+
+        NOTE: This function queries the local `positions` table only — no Zerodha
+        API calls are made here.  Position data was fetched during sync_positions().
         """
-        # Use a 2-day window so post-midnight reconciliation still catches
-        # trades that closed on the previous calendar day (IST).
-        # e.g. MCX options trade until 23:30 IST; at 00:01 IST next day,
-        # "today" flips but yesterday's closed positions are still in
-        # Zerodha's /portfolio/positions response until market opens.
         two_days_ago = datetime.now(timezone.utc) - timedelta(hours=48)
 
-        # Load ALL closed positions (Zerodha still returns them until next session)
         pos_result = await db.execute(
             select(Position).where(
                 Position.broker_account_id == broker_account_id,
@@ -943,29 +936,26 @@ class TradeSyncService:
         )
         closed_positions = pos_result.scalars().all()
 
-        # NSE/BSE F&O: FIFO is already correct (lot_multiplier=1, units from Kite).
-        # Only reconcile MCX and CDS where Kite sends lots but CSV lot_size=1
-        # (contract multiplier not exposed in instruments CSV).
+        # All exchanges: FIFO is now correct.
+        # NSE/BSE repair pass is below; MCX/CDS is log-only.
         FIFO_ACCURATE_EXCHANGES = {"NSE", "BSE", "NFO", "BFO"}
 
         reconciled = 0
         for pos in closed_positions:
-            # Skip NSE/BSE F&O — FIFO P&L is correct for these. Reconciling them
-            # causes avg_entry/exit to diverge from displayed prices because Zerodha's
-            # pos.pnl covers ALL rounds of the symbol while FIFO creates per-round records.
-            if (pos.exchange or "").upper() in FIFO_ACCURATE_EXCHANGES:
+            exch = (pos.exchange or "").upper()
+
+            # NSE/BSE F&O: FIFO is correct (Kite sends expanded units).
+            # Skip overwrite; repair pass below handles any pre-existing corruption.
+            if exch in FIFO_ACCURATE_EXCHANGES:
                 continue
 
-            # Use Position.pnl as the authoritative value — it equals realised + unrealised.
-            # For MCX options/futures, Zerodha puts the P&L in 'unrealised' even when
-            # the position is closed (qty=0), leaving 'realised' as 0. Using pnl is
-            # always correct: NSE F&O (realised=-680, unrealised=0) => pnl=-680 ✓
-            #                  MCX options (realised=0, unrealised=-680) => pnl=-680 ✓
+            # MCX/CDS: FIFO now uses correct multipliers from mcx_contract_specs.py.
+            # This loop is LOG-ONLY — it detects contracts missing from the spec table
+            # so we can add them, but never overwrites the FIFO value.
             zerodha_pnl = float(pos.pnl or 0)
             if abs(zerodha_pnl) < 0.01:
                 continue
 
-            # Find all CompletedTrades for this symbol within the 2-day window
             ct_result = await db.execute(
                 select(CompletedTrade).where(
                     CompletedTrade.broker_account_id == broker_account_id,
@@ -979,41 +969,15 @@ class TradeSyncService:
                 continue
 
             fifo_total = sum(float(ct.realized_pnl or 0) for ct in cts)
-
-            if len(cts) == 1:
-                # Single round — direct assignment
-                ct = cts[0]
-                diff = abs(zerodha_pnl - float(ct.realized_pnl or 0))
-                if diff > 0.5:
-                    logger.info(
-                        f"[reconcile] {pos.tradingsymbol}: FIFO={float(ct.realized_pnl or 0):.2f} "
-                        f"Zerodha={zerodha_pnl:.2f} — correcting"
+            if abs(zerodha_pnl) > 0.01 and abs(fifo_total) > 0.01:
+                ratio = fifo_total / zerodha_pnl
+                if abs(ratio - 1.0) > 0.10:
+                    # >10% divergence → multiplier likely missing from mcx_contract_specs.py
+                    logger.warning(
+                        "[reconcile] %s (%s): FIFO_total=%.2f Zerodha=%.2f ratio=%.3f "
+                        "— possible missing multiplier in mcx_contract_specs.py",
+                        pos.tradingsymbol, exch, fifo_total, zerodha_pnl, ratio,
                     )
-                    ct.realized_pnl = zerodha_pnl
-                    reconciled += 1
-            else:
-                # Multiple rounds — proportional distribution.
-                # FIFO proportions are ratio-correct even when absolute values are wrong
-                # (all rounds of the same symbol share the same error factor).
-                if abs(fifo_total) > 0.5:
-                    scale = zerodha_pnl / fifo_total
-                    # Only scale if there's a real discrepancy (>5% difference)
-                    if abs(scale - 1.0) > 0.05:
-                        logger.info(
-                            f"[reconcile] {pos.tradingsymbol}: {len(cts)} rounds, "
-                            f"FIFO_total={fifo_total:.2f} Zerodha={zerodha_pnl:.2f} "
-                            f"scale={scale:.3f}"
-                        )
-                        for ct in cts:
-                            ct.realized_pnl = float(ct.realized_pnl or 0) * scale
-                        reconciled += len(cts)
-                else:
-                    # FIFO total ≈ 0 (washout): distribute Zerodha P&L equally
-                    per_round = zerodha_pnl / len(cts)
-                    if abs(per_round) > 0.5:
-                        for ct in cts:
-                            ct.realized_pnl = per_round
-                        reconciled += len(cts)
 
         # ── Repair pass: fix NSE/BSE CompletedTrades that were incorrectly
         # overwritten by a previous reconciliation run.
