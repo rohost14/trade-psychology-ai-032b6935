@@ -112,10 +112,17 @@ celery_app.conf.update(
     # FastAPI app process, which fires every minute and respects each user's
     # configured delivery time. Duplicating them here would cause double-sends.
     beat_schedule={
-        # Commodity market close report - 11:45 PM IST (not in APScheduler)
+        # Commodity daily EOD report - 11:45 PM IST (after MCX close at 11:30 PM)
         "commodity-eod": {
             "task": "app.tasks.report_tasks.generate_commodity_eod",
             "schedule": crontab(hour=23, minute=45),
+        },
+        # Commodity weekly summary - every Friday at 12:00 PM IST
+        # Gives commodity traders a midday Friday snapshot of the week.
+        # Stored as GeneratedReport(report_type='commodity_weekly') — in-app only.
+        "commodity-weekly": {
+            "task": "app.tasks.report_tasks.generate_commodity_weekly_report",
+            "schedule": crontab(hour=12, minute=0, day_of_week=5),
         },
         # Weekly performance summary - every Sunday at 8:00 PM IST
         "weekly-summary": {

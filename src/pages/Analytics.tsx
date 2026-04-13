@@ -12,6 +12,7 @@ import InstrumentPanel from '@/components/analytics/InstrumentPanel';
 const SummaryTab  = lazy(() => import('@/components/analytics/SummaryTab'));
 const PatternsTab = lazy(() => import('@/components/analytics/PatternsTab'));
 const TradesTab   = lazy(() => import('@/components/analytics/TradesTab'));
+const BtstTab     = lazy(() => import('@/components/analytics/BtstTab'));
 
 function TabSkeleton() {
   return (
@@ -35,6 +36,7 @@ const TABS = [
   { value: 'summary',  label: 'Summary'  },
   { value: 'patterns', label: 'Patterns' },
   { value: 'trades',   label: 'Trades'   },
+  { value: 'btst',     label: 'BTST'     },
 ] as const;
 
 type TabValue = typeof TABS[number]['value'];
@@ -121,6 +123,7 @@ export default function Analytics() {
         )}
         {tab === 'patterns' && <PatternsTab days={days} />}
         {tab === 'trades'   && <TradesTab days={days} />}
+        {tab === 'btst'     && <BtstTab days={days} />}
       </Suspense>
 
       <ComplianceDisclaimer variant="footer" className="mt-8" />

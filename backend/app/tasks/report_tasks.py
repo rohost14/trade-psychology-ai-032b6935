@@ -321,6 +321,145 @@ def send_weekly_summaries_batch():
     return asyncio.run(_batch())
 
 
+@celery_app.task
+def generate_commodity_weekly_report():
+    """
+    Generate a weekly MCX commodity performance summary for all commodity traders.
+
+    Runs every Friday at 12:00 PM IST — midday, while MCX is still open,
+    giving traders a snapshot of their week before Friday's afternoon session.
+
+    Stores a GeneratedReport (report_type='commodity_weekly') per account so
+    the result is visible in the Reports Hub without any delivery dependency.
+    No email/WhatsApp — purely in-app.
+
+    Covers the 5 most recent trading days (Mon–Fri week).
+    """
+    async def _generate():
+        from datetime import timedelta, date
+        from sqlalchemy import and_
+        from app.models.completed_trade import CompletedTrade
+        from app.models.generated_report import GeneratedReport
+
+        async with SessionLocal() as db:
+            # Find all accounts that have MCX CompletedTrades in the last 7 days
+            week_start = datetime.now(timezone.utc) - timedelta(days=7)
+            result = await db.execute(
+                select(BrokerAccount.id)
+                .join(
+                    CompletedTrade,
+                    CompletedTrade.broker_account_id == BrokerAccount.id,
+                )
+                .where(
+                    BrokerAccount.status == "connected",
+                    CompletedTrade.exchange == "MCX",
+                    CompletedTrade.exit_time >= week_start,
+                )
+                .distinct()
+            )
+            account_ids = result.scalars().all()
+
+        if not account_ids:
+            logger.info("[commodity_weekly] No MCX accounts with trades this week")
+            return {"generated": 0}
+
+        generated = 0
+        today = date.today()
+
+        for account_id in account_ids:
+            try:
+                async with SessionLocal() as db:
+                    week_start_dt = datetime.now(timezone.utc) - timedelta(days=7)
+
+                    ct_result = await db.execute(
+                        select(CompletedTrade).where(
+                            and_(
+                                CompletedTrade.broker_account_id == account_id,
+                                CompletedTrade.exchange == "MCX",
+                                CompletedTrade.exit_time >= week_start_dt,
+                            )
+                        ).order_by(CompletedTrade.exit_time.asc())
+                    )
+                    trades = ct_result.scalars().all()
+
+                    if not trades:
+                        continue
+
+                    total = len(trades)
+                    winners = [t for t in trades if float(t.realized_pnl or 0) > 0]
+                    total_pnl = sum(float(t.realized_pnl or 0) for t in trades)
+                    win_rate = round(len(winners) / total * 100, 1) if total else 0.0
+                    best = max((float(t.realized_pnl or 0) for t in trades), default=0.0)
+                    worst = min((float(t.realized_pnl or 0) for t in trades), default=0.0)
+
+                    # Breakdown by symbol
+                    symbol_pnl: dict = {}
+                    for t in trades:
+                        sym = t.tradingsymbol or "UNKNOWN"
+                        # Strip expiry suffix to get underlying (e.g. CRUDEOIL24AUGFUT → CRUDEOIL)
+                        import re as _re
+                        underlying = _re.match(r'^([A-Z]+)', sym.upper())
+                        key = underlying.group(1) if underlying else sym
+                        symbol_pnl.setdefault(key, {"pnl": 0.0, "trades": 0})
+                        symbol_pnl[key]["pnl"] += float(t.realized_pnl or 0)
+                        symbol_pnl[key]["trades"] += 1
+
+                    top_symbols = sorted(
+                        [{"symbol": k, **v} for k, v in symbol_pnl.items()],
+                        key=lambda x: abs(x["pnl"]),
+                        reverse=True,
+                    )[:5]
+
+                    report_data = {
+                        "report_type": "commodity_weekly",
+                        "period_days": 7,
+                        "week_ending": today.isoformat(),
+                        "total_trades": total,
+                        "win_rate": win_rate,
+                        "total_pnl": round(total_pnl, 2),
+                        "best_trade": round(best, 2),
+                        "worst_trade": round(worst, 2),
+                        "top_symbols": top_symbols,
+                        "exchange": "MCX",
+                    }
+
+                    # Upsert — one report per account per week-ending date
+                    existing = await db.execute(
+                        select(GeneratedReport).where(
+                            GeneratedReport.broker_account_id == account_id,
+                            GeneratedReport.report_type == "commodity_weekly",
+                            GeneratedReport.report_date == today,
+                        )
+                    )
+                    rec = existing.scalar_one_or_none()
+                    if rec:
+                        rec.report_data = report_data
+                        rec.generated_at = datetime.now(timezone.utc)
+                    else:
+                        db.add(GeneratedReport(
+                            broker_account_id=account_id,
+                            report_type="commodity_weekly",
+                            report_date=today,
+                            report_data=report_data,
+                            sent_via="scheduled",
+                        ))
+
+                    await db.commit()
+                    generated += 1
+                    logger.info(
+                        f"[commodity_weekly] {account_id}: {total} MCX trades, "
+                        f"pnl={total_pnl:+.0f}, win_rate={win_rate:.0f}%"
+                    )
+
+            except Exception as e:
+                logger.error(f"[commodity_weekly] Failed for {account_id}: {e}", exc_info=True)
+
+        logger.info(f"[commodity_weekly] Done: {generated}/{len(account_ids)} reports generated")
+        return {"generated": generated, "accounts": len(account_ids)}
+
+    return asyncio.run(_generate())
+
+
 @celery_app.task(name="app.tasks.report_tasks.generate_coach_insight_task")
 def generate_coach_insight_task(broker_account_id: str, context: dict):
     """
