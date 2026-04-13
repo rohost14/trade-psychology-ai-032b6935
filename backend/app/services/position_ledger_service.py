@@ -34,6 +34,7 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.position_ledger import PositionLedger, ENTRY_TYPES
+from app.services.mcx_contract_specs import get_lot_multiplier
 
 logger = logging.getLogger(__name__)
 
@@ -127,6 +128,13 @@ class PositionLedgerService:
             fill_qty=fill.fill_qty,
             fill_price=fill.fill_price,
         )
+
+        # Apply lot multiplier for MCX/CDS — Kite sends fill qty in LOTS for these
+        # exchanges (e.g. 1 CRUDEOIL lot = 100 barrels).  _compute_fill_effect is
+        # exchange-agnostic so we apply the multiplier here.
+        _lot_mult = Decimal(str(get_lot_multiplier(fill.exchange, fill.tradingsymbol)))
+        if _lot_mult != 1 and realized_pnl:
+            realized_pnl = realized_pnl * _lot_mult
 
         entry = PositionLedger(
             broker_account_id=fill.broker_account_id,
@@ -223,6 +231,9 @@ class PositionLedgerService:
         running_qty = 0
         running_avg: Optional[Decimal] = None
 
+        # Lot multiplier — same for all entries in this symbol (exchange is fixed)
+        _replay_lot_mult = Decimal(str(get_lot_multiplier(fill.exchange, fill.tradingsymbol)))
+
         # Find the index where the new entry sits — only entries at or after
         # that index need updating (entries before are unchanged)
         new_idx = next(i for i, e in enumerate(all_entries) if e.id == new_entry.id)
@@ -234,6 +245,8 @@ class PositionLedgerService:
                 fill_qty=entry.fill_qty,
                 fill_price=entry.fill_price,
             )
+            if _replay_lot_mult != 1 and pnl:
+                pnl = pnl * _replay_lot_mult
             running_qty = new_qty
             running_avg = new_avg
 

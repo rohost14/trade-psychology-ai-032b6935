@@ -287,22 +287,34 @@ class TradeSyncService:
             # Pushing /orders into trades table caused duplicates (every COMPLETE order
             # appeared twice: once from /trades with trade_id, once from /orders with order_id)
 
-            # 4. Calculate P&L for trades (FIFO matching)
-            # NOTE: last_sync_at is set AFTER this block so the frontend's 5-min dedup
-            # doesn't skip retries when FIFO fails mid-sync.
+            # 4. Idempotent replay of any fills not yet in PositionLedger.
+            #
+            # Architecture: PositionLedger is the single writer for CompletedTrades.
+            #   - Real-time: webhook → apply_fill() → build_completed_trade_on_close()
+            #   - Sync path: catches any fills PositionLedger missed (webhook failures)
+            #     by replaying them through apply_fill() in timestamp order.
+            #     apply_fill() is idempotent (same idempotency_key = no-op), so fills
+            #     that already arrived via webhook are safely skipped.
+            #
+            # Why not pnl_calculator here: pnl_calculator deletes then recreates
+            # CompletedTrades, destroying real-time records built by PositionLedger.
+            # pnl_calculator is kept as a historical-backfill-only tool (admin endpoint).
             try:
-                pnl_result = await pnl_calculator.calculate_and_update_pnl(
+                replayed = await cls.replay_missed_fills_into_ledger(
                     broker_account_id, db, days_back=30
                 )
-                stats["pnl_trades_updated"] = pnl_result.get("updated", 0)
-                stats["total_pnl_calculated"] = pnl_result.get("total_pnl", 0)
-                logger.info(f"P&L calculation: {pnl_result['updated']} trades updated, total: {pnl_result['total_pnl']}")
+                stats["fills_replayed"] = replayed
+                if replayed:
+                    logger.info(f"[ledger replay] {replayed} fill(s) processed from missed webhooks")
             except Exception as e:
-                logger.error(f"P&L calculation failed: {e}")
-                stats["errors"].append(f"P&L Calculation: {str(e)}")
+                logger.error(f"Ledger replay failed: {e}", exc_info=True)
+                stats["errors"].append(f"Ledger Replay: {str(e)}")
 
-            # 4b. Backfill CompletedTrades for cross-day positions FIFO couldn't match
-            # Runs AFTER pnl_calculator so we only create records FIFO missed.
+            # 4b. Backfill CompletedTrades for cross-day positions PositionLedger missed.
+            # Overnight holds have entry fills from yesterday — those entries are in the
+            # ledger already; only the exit fills from today may be missing.
+            # replay_missed_fills_into_ledger covers this, but _backfill_overnight_completed_trades
+            # handles the case where YESTERDAY's entry fills were never recorded in the ledger.
             if overnight_closed_positions:
                 try:
                     backfilled = await cls._backfill_overnight_completed_trades(
@@ -315,9 +327,10 @@ class TradeSyncService:
                     logger.error(f"Overnight CompletedTrade backfill failed (non-fatal): {e}")
                     stats["errors"].append(f"Overnight Backfill: {str(e)}")
 
-            # 4c. Reconcile same-day FIFO P&L against Zerodha's authoritative 'realised' value.
-            # Flush first — FIFO uses db.add() inside savepoints; without flush the freshly
-            # created CompletedTrade rows may not be visible to the reconciliation SELECT.
+            # 4c. Reconciliation (log-only — no overwrites).
+            # PositionLedger P&L is authoritative for NSE/NFO/BSE/BFO and MCX.
+            # This block only logs WARNING when FIFO vs Zerodha aggregate diverges >10%
+            # (which indicates a missing MCX multiplier entry that needs to be added).
             try:
                 await db.flush()
                 reconciled = await cls._reconcile_pnl_with_zerodha(
@@ -325,7 +338,7 @@ class TradeSyncService:
                 )
                 if reconciled:
                     stats["pnl_reconciled"] = reconciled
-                    logger.info(f"P&L reconciled: {reconciled} CompletedTrade(s) updated from Zerodha")
+                    logger.info(f"P&L reconciliation check: {reconciled} record(s) verified")
             except Exception as e:
                 logger.error(f"P&L reconciliation failed (non-fatal): {e}")
                 stats["errors"].append(f"P&L Reconciliation: {str(e)}")
@@ -345,6 +358,112 @@ class TradeSyncService:
         except Exception as e:
             logger.error(f"Sync error for account {broker_account_id}: {e}")
             return {"success": False, "error": str(e)}
+
+    @classmethod
+    async def replay_missed_fills_into_ledger(
+        cls,
+        broker_account_id: uuid.UUID,
+        db: AsyncSession,
+        days_back: int = 30,
+    ) -> int:
+        """
+        Replay any COMPLETE Trade fills not yet recorded in PositionLedger.
+
+        This is the EOD catch-up path: webhooks fire for each fill in real-time,
+        but if a webhook was missed (network blip, Celery restart, etc.) the fill
+        never reached apply_fill().  This method finds those gaps and replays them.
+
+        Design:
+        - apply_fill() is idempotent (same idempotency_key → return existing, is_new=False).
+          Fills that already arrived via webhook are safely skipped — no double-counting.
+        - Processes fills in ascending timestamp order so position state accumulates
+          correctly (same invariant as the webhook path).
+        - On CLOSE/FLIP: calls build_completed_trade_on_close() to create the
+          CompletedTrade.  Existing CompletedTrades (from successful webhooks) are
+          never deleted or overwritten.
+
+        Returns: number of fills that were newly processed (missed_webhook count).
+        """
+        from decimal import Decimal as _Decimal
+        from app.services.position_ledger_service import PositionLedgerService, FillData
+        from app.models.position_ledger import PositionLedger
+
+        cutoff = datetime.now(timezone.utc) - timedelta(days=days_back)
+
+        # All COMPLETE fills in window, ordered by timestamp
+        result = await db.execute(
+            select(Trade).where(
+                Trade.broker_account_id == broker_account_id,
+                Trade.status == "COMPLETE",
+                Trade.order_timestamp >= cutoff,
+            ).order_by(Trade.order_timestamp.asc())
+        )
+        all_trades = list(result.scalars().all())
+
+        if not all_trades:
+            return 0
+
+        # Fetch all existing ledger idempotency keys for this account — O(1) lookup
+        key_result = await db.execute(
+            select(PositionLedger.idempotency_key).where(
+                PositionLedger.broker_account_id == broker_account_id
+            )
+        )
+        seen_keys = {row[0] for row in key_result}
+
+        missed = 0
+        for trade in all_trades:
+            idem_key = f"{trade.order_id}:ledger"
+            if idem_key in seen_keys:
+                continue  # Already in ledger — skip (idempotent)
+
+            qty = trade.filled_quantity or trade.quantity or 0
+            signed_qty = qty if trade.transaction_type == "BUY" else -qty
+            if signed_qty == 0:
+                continue
+
+            fill = FillData(
+                broker_account_id=broker_account_id,
+                tradingsymbol=trade.tradingsymbol or "",
+                exchange=trade.exchange or "",
+                fill_order_id=trade.order_id or str(trade.id),
+                fill_qty=signed_qty,
+                fill_price=_Decimal(str(trade.average_price or trade.price or 0)),
+                occurred_at=trade.order_timestamp or datetime.now(timezone.utc),
+                idempotency_key=idem_key,
+            )
+
+            try:
+                ledger_entry, is_new = await PositionLedgerService.apply_fill(fill, db)
+                if not is_new:
+                    seen_keys.add(idem_key)
+                    continue  # Race: another worker got there first
+
+                seen_keys.add(idem_key)
+                missed += 1
+
+                # If position closed: create CompletedTrade (if one doesn't exist)
+                if ledger_entry.entry_type in ("CLOSE", "FLIP"):
+                    ct = await PositionLedgerService.build_completed_trade_on_close(
+                        ledger_entry, db
+                    )
+                    if ct:
+                        db.add(ct)
+                        await db.flush()
+                        logger.info(
+                            f"[ledger replay] CompletedTrade: {ct.tradingsymbol} "
+                            f"{ct.direction} pnl={ct.realized_pnl:.2f}"
+                        )
+
+            except Exception as e:
+                logger.error(
+                    f"[ledger replay] apply_fill failed for {trade.tradingsymbol} "
+                    f"order={trade.order_id}: {e}",
+                    exc_info=True,
+                )
+                # Non-fatal: continue with remaining fills
+
+        return missed
 
     @classmethod
     async def sync_orders_to_db(
