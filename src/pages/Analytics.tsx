@@ -80,6 +80,8 @@ export default function Analytics() {
               <button
                 key={opt.days}
                 onClick={() => setDays(opt.days)}
+                aria-pressed={days === opt.days}
+                aria-label={`Show last ${opt.label}`}
                 className={cn(
                   'px-3 py-1.5 text-[12px] font-medium rounded-md transition-all',
                   days === opt.days
@@ -96,10 +98,12 @@ export default function Analytics() {
       </div>
 
       {/* ── Tab Bar ── */}
-      <div className="flex gap-0 border-b border-border mb-6">
+      <div role="tablist" aria-label="Analytics sections" className="flex gap-0 border-b border-border mb-6">
         {TABS.map(({ value, label }) => (
           <button
             key={value}
+            role="tab"
+            aria-selected={tab === value}
             onClick={() => setTab(value)}
             className={cn(
               'px-4 py-2.5 text-sm font-medium border-b-2 transition-colors -mb-px',

@@ -246,6 +246,7 @@ export default function ClosedTradesTable({
                   <td className="px-5 py-3 text-center">
                     <button
                       onClick={e => { e.stopPropagation(); onTradeClick?.(trade); }}
+                      aria-label={isJournaled ? `View journal for ${trade.tradingsymbol}` : `Add journal entry for ${trade.tradingsymbol}`}
                       className="w-7 h-7 inline-flex items-center justify-center rounded hover:bg-muted/60 transition-colors relative"
                     >
                       {isJournaled

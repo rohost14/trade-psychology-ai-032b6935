@@ -1,5 +1,6 @@
 import { CheckCircle2, Check, ChevronRight, Link as LinkIcon } from 'lucide-react';
 import { Link } from 'react-router-dom';
+import { Skeleton } from '@/components/ui/skeleton';
 import { cn } from '@/lib/utils';
 import { formatRelativeTime } from '@/lib/formatters';
 import type { Alert } from '@/types/api';
@@ -9,6 +10,7 @@ interface RecentAlertsCardProps {
   alerts: (Alert & { pattern: string; description: string; why_it_matters?: string })[];
   onAcknowledge?: (alertId: string) => void;
   onOpen?: (alertId: string) => void;
+  loading?: boolean;
 }
 
 function patternWeight(sev: string): string {
@@ -20,7 +22,7 @@ function patternWeight(sev: string): string {
 const unreadCount = (alerts: RecentAlertsCardProps['alerts']) =>
   alerts.filter(a => !a.acknowledged).length;
 
-export default function RecentAlertsCard({ alerts, onAcknowledge, onOpen }: RecentAlertsCardProps) {
+export default function RecentAlertsCard({ alerts, onAcknowledge, onOpen, loading }: RecentAlertsCardProps) {
   const unread = unreadCount(alerts);
 
   return (
@@ -30,21 +32,34 @@ export default function RecentAlertsCard({ alerts, onAcknowledge, onOpen }: Rece
       <div className="flex items-center justify-between px-5 py-3 border-b border-slate-100 dark:border-neutral-700/60">
         <div className="flex items-center gap-3">
           <span className="tm-label">Behavioral Alerts</span>
-          {unread > 0 && (
+          {!loading && unread > 0 && (
             <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-semibold bg-amber-100 text-amber-700 dark:bg-amber-800/40 dark:text-amber-300">
               {unread} unread
             </span>
           )}
         </div>
-        {alerts.length > 4 && (
+        {!loading && alerts.length > 4 && (
           <Link to="/alerts" className="text-[13px] font-medium text-tm-brand hover:underline">
             View all →
           </Link>
         )}
       </div>
 
-      {/* Alert list */}
-      {alerts.length > 0 ? (
+      {/* Skeleton */}
+      {loading ? (
+        <div className="divide-y divide-slate-50 dark:divide-neutral-700/40">
+          {[1, 2, 3].map(i => (
+            <div key={i} className="flex items-start gap-4 px-5 py-4">
+              <Skeleton className="w-0.5 h-5 rounded flex-shrink-0 mt-0.5" />
+              <div className="flex-1 space-y-2">
+                <Skeleton className="h-3.5 w-32 rounded" />
+                <Skeleton className="h-3 w-full rounded" />
+              </div>
+              <Skeleton className="h-3 w-12 rounded flex-shrink-0" />
+            </div>
+          ))}
+        </div>
+      ) : alerts.length > 0 ? (
         <div>
           {alerts.slice(0, 5).map((alert, i) => {
             const isAcked = alert.acknowledged;
@@ -52,6 +67,7 @@ export default function RecentAlertsCard({ alerts, onAcknowledge, onOpen }: Rece
               <button
                 key={alert.id}
                 onClick={() => onOpen ? onOpen(alert.id) : onAcknowledge?.(alert.id)}
+                aria-label={`${alert.pattern}${isAcked ? ', reviewed' : ', tap to review'}`}
                 className={cn(
                   'w-full flex items-start gap-4 px-5 py-4 text-left transition-colors',
                   'hover:bg-slate-50 dark:hover:bg-slate-700/40',

@@ -1,6 +1,7 @@
 import { useState, useMemo } from 'react';
 import { Bell, BellOff, CheckCheck, Clock, TrendingUp, Shield } from 'lucide-react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Skeleton } from '@/components/ui/skeleton';
 import { cn } from '@/lib/utils';
 import { useAlerts, AlertNotification } from '@/contexts/AlertContext';
 import { PatternSeverity } from '@/types/patterns';
@@ -68,6 +69,7 @@ function AlertRow({
   return (
     <button
       onClick={() => onOpen(alert)}
+      aria-label={`${alert.pattern.name} — ${SEV_LABEL[sev]}${alert.acknowledged ? ', reviewed' : ', unreviewed'}`}
       className={cn(
         'tm-card w-full text-left transition-colors hover:bg-muted/20',
         alert.acknowledged && 'opacity-60',
@@ -118,14 +120,33 @@ function AlertRow({
 
 // ─── Live Tab ─────────────────────────────────────────────────────────────────
 
+function AlertSkeleton() {
+  return (
+    <div className="space-y-2.5">
+      {[1, 2, 3].map(i => (
+        <div key={i} className="tm-card px-4 py-4 flex items-start gap-3">
+          <Skeleton className="w-0.5 h-5 rounded flex-shrink-0 mt-0.5" />
+          <div className="flex-1 space-y-2">
+            <Skeleton className="h-3.5 w-36 rounded" />
+            <Skeleton className="h-3 w-full rounded" />
+            <Skeleton className="h-3 w-48 rounded" />
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+}
+
 function LiveTab({ onOpen }: { onOpen: (a: AlertNotification) => void }) {
-  const { alerts, acknowledgeAll } = useAlerts();
+  const { alerts, isLoading, acknowledgeAll } = useAlerts();
   const live = useMemo(
     () => alerts
       .filter(a => !a.acknowledged)
       .sort((a, b) => new Date(b.shown_at ?? 0).getTime() - new Date(a.shown_at ?? 0).getTime()),
     [alerts]
   );
+
+  if (isLoading) return <AlertSkeleton />;
 
   if (live.length === 0) {
     return (
@@ -178,7 +199,7 @@ const SEVERITY_OPTIONS = [
 ];
 
 function HistoryTab({ onOpen }: { onOpen: (a: AlertNotification) => void }) {
-  const { alerts } = useAlerts();
+  const { alerts, isLoading } = useAlerts();
   const [sevFilter, setSevFilter] = useState('all');
 
   const filtered = useMemo(() => {
@@ -188,6 +209,8 @@ function HistoryTab({ onOpen }: { onOpen: (a: AlertNotification) => void }) {
     return sevFilter === 'all' ? sorted : sorted.filter(a => a.pattern.severity === sevFilter);
   }, [alerts, sevFilter]);
 
+  if (isLoading) return <AlertSkeleton />;
+
   return (
     <div className="space-y-4">
       <div className="flex items-center gap-1 p-1 bg-slate-100 dark:bg-neutral-700/50 rounded-lg w-fit">
@@ -195,6 +218,7 @@ function HistoryTab({ onOpen }: { onOpen: (a: AlertNotification) => void }) {
           <button
             key={opt.value}
             onClick={() => setSevFilter(opt.value)}
+            aria-pressed={sevFilter === opt.value}
             className={cn(
               'px-3 py-1 text-[11px] font-medium rounded-md transition-all',
               sevFilter === opt.value
@@ -238,7 +262,7 @@ interface PatternSummary {
 const SEVERITY_ORDER: PatternSeverity[] = ['critical', 'high', 'medium', 'low'];
 
 function PatternsTab() {
-  const { alerts } = useAlerts();
+  const { alerts, isLoading } = useAlerts();
 
   const summaries = useMemo<PatternSummary[]>(() => {
     const map = new Map<string, PatternSummary>();
@@ -264,6 +288,8 @@ function PatternsTab() {
     }
     return Array.from(map.values()).sort((a, b) => b.count - a.count);
   }, [alerts]);
+
+  if (isLoading) return <AlertSkeleton />;
 
   if (summaries.length === 0) {
     return (

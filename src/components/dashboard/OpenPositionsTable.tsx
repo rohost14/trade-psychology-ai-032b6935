@@ -214,6 +214,7 @@ export default function OpenPositionsTable({
                   <td className="px-5 py-3">
                     <button
                       onClick={() => onPositionClick?.(pos)}
+                      aria-label={isJournaled ? `View journal for ${pos.tradingsymbol}` : `Add journal entry for ${pos.tradingsymbol}`}
                       className="w-7 h-7 flex items-center justify-center rounded hover:bg-muted/60 transition-colors relative"
                     >
                       {isJournaled

@@ -40,7 +40,7 @@ export default function Dashboard() {
   const navigate = useNavigate();
   const { isConnected, isLoading: brokerLoading, account, connect, syncTrades, syncStatus, syncError, isTokenExpired } = useBroker();
   const { lastTradeEvent } = useWebSocket();
-  const { alerts, acknowledgeAlert } = useAlerts();
+  const { alerts, isLoading: alertsLoading, acknowledgeAlert } = useAlerts();
 
   const accountId = account?.id;
   const lastSyncAt = account?.last_sync_at;
@@ -518,9 +518,10 @@ export default function Dashboard() {
       />
 
       {/* ── Alerts (full-width) ───────────────────────────────────────────── */}
-      <div className="mb-5">
+      <div className="mb-5" aria-live="polite" aria-label="Behavioral alerts">
         <RecentAlertsCard
           alerts={mergedAlerts}
+          loading={alertsLoading}
           onAcknowledge={acknowledgeAlert}
           onOpen={id => setSelectedAlert(alerts.find(a => a.id === id) ?? null)}
         />

@@ -84,6 +84,7 @@ interface AlertContextValue {
   // Persistent alerts from backend risk_alerts table
   alerts: AlertNotification[];
   unacknowledgedCount: number;
+  isLoading: boolean;
 
   // User profile (6 fields) — still useful for Settings display
   traderProfile: UserProfileThresholds | null;
@@ -234,6 +235,7 @@ const SEVERITY_LABEL: Record<string, string> = {
 
 export function AlertProvider({ children }: { children: ReactNode }) {
   const [alerts,        setAlerts]        = useState<AlertNotification[]>([]);
+  const [isLoading,     setIsLoading]     = useState(true);
   const [traderProfile, setTraderProfile] = useState<UserProfileThresholds | null>(null);
   const [capital,       setCapital]       = useState<number>(CAPITAL_FLOOR);
 
@@ -281,6 +283,7 @@ export function AlertProvider({ children }: { children: ReactNode }) {
   // Fetch alerts from backend — single source of truth
   // ---------------------------------------------------------------------------
   const fetchAlerts = useCallback(async (showToasts = false) => {
+    if (!showToasts) setIsLoading(true);
     try {
       const res = await api.get('/api/risk/alerts', { params: { hours: 48 } });
       const raw: BackendAlert[] = res.data.alerts || [];
@@ -364,6 +367,8 @@ export function AlertProvider({ children }: { children: ReactNode }) {
       }
     } catch {
       // Non-fatal — user may not be authenticated yet
+    } finally {
+      setIsLoading(false);
     }
   }, []);
 
@@ -405,6 +410,7 @@ export function AlertProvider({ children }: { children: ReactNode }) {
     <AlertContext.Provider value={{
       alerts,
       unacknowledgedCount,
+      isLoading,
       traderProfile,
       capital,
       acknowledgeAlert,
