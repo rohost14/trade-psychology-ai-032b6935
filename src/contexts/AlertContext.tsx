@@ -285,7 +285,9 @@ export function AlertProvider({ children }: { children: ReactNode }) {
   const fetchAlerts = useCallback(async (showToasts = false) => {
     if (!showToasts) setIsLoading(true);
     try {
-      const res = await api.get('/api/risk/alerts', { params: { hours: 48 } });
+      // 7 days — covers a full trading week in the Live + History tabs.
+      // Previously 48h, which silently discarded all alerts older than 2 days.
+      const res = await api.get('/api/risk/alerts', { params: { hours: 168 } });
       const raw: BackendAlert[] = res.data.alerts || [];
       const mapped = raw.map(mapBackendAlert);
       setAlerts(mapped);

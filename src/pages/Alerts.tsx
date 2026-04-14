@@ -1,8 +1,9 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect, useCallback } from 'react';
 import { Bell, BellOff, CheckCheck, Clock, TrendingUp, Shield } from 'lucide-react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Skeleton } from '@/components/ui/skeleton';
 import { cn } from '@/lib/utils';
+import { api } from '@/lib/api';
 import { useAlerts, AlertNotification } from '@/contexts/AlertContext';
 import { PatternSeverity } from '@/types/patterns';
 import AlertDetailSheet from '@/components/alerts/AlertDetailSheet';
@@ -198,43 +199,119 @@ const SEVERITY_OPTIONS = [
   { value: 'low',      label: 'Info' },
 ];
 
+const PERIOD_OPTIONS = [
+  { label: '7d',  hours: 168  },
+  { label: '30d', hours: 720  },
+  { label: '90d', hours: 2160 },
+] as const;
+
 function HistoryTab({ onOpen }: { onOpen: (a: AlertNotification) => void }) {
-  const { alerts, isLoading } = useAlerts();
+  // History has its own data source — loads independently of AlertContext
+  // so users can see alerts beyond the 7-day live window.
+  const [hours, setHours] = useState(168);
   const [sevFilter, setSevFilter] = useState('all');
+  const [allAlerts, setAllAlerts] = useState<AlertNotification[]>([]);
+  const [loading, setLoading] = useState(true);
 
-  const filtered = useMemo(() => {
-    const sorted = [...alerts].sort(
-      (a, b) => new Date(b.shown_at ?? 0).getTime() - new Date(a.shown_at ?? 0).getTime()
-    );
-    return sevFilter === 'all' ? sorted : sorted.filter(a => a.pattern.severity === sevFilter);
-  }, [alerts, sevFilter]);
+  const loadHistory = useCallback(async (h: number) => {
+    setLoading(true);
+    try {
+      const res = await api.get('/api/risk/alerts', { params: { hours: h } });
+      const raw = res.data.alerts ?? [];
+      // Use the same shape AlertContext uses — map raw to AlertNotification
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const mapped: AlertNotification[] = raw.map((a: any) => ({
+        id: String(a.id),
+        pattern: {
+          id:                  String(a.id),
+          type:                a.pattern_type,
+          backend_type:        a.pattern_type,
+          name:                a.pattern_type.split('_').map((w: string) => w.charAt(0).toUpperCase() + w.slice(1)).join(' '),
+          severity:            ({'danger':'high','critical':'critical','high':'high','caution':'medium','medium':'medium','low':'low'} as Record<string,PatternSeverity>)[a.severity] ?? 'medium',
+          description:         a.message,
+          detected_at:         a.detected_at || a.created_at,
+          insight:             a.details?.insight || '',
+          historical_insight:  a.details?.historical_insight || '',
+          estimated_cost:      (a.details?.estimated_cost as number) ?? 0,
+          trades_involved:     [],
+          frequency_this_week:  0,
+          frequency_this_month: 0,
+          details:             a.details ?? {},
+        },
+        shown_at:     a.detected_at || a.created_at,
+        acknowledged: a.acknowledged ?? (a.acknowledged_at != null),
+      }));
+      mapped.sort((a, b) => new Date(b.shown_at ?? 0).getTime() - new Date(a.shown_at ?? 0).getTime());
+      setAllAlerts(mapped);
+    } catch {
+      setAllAlerts([]);
+    } finally {
+      setLoading(false);
+    }
+  }, []);
 
-  if (isLoading) return <AlertSkeleton />;
+  useEffect(() => { loadHistory(hours); }, [hours, loadHistory]);
+
+  const filtered = useMemo(
+    () => sevFilter === 'all' ? allAlerts : allAlerts.filter(a => a.pattern.severity === sevFilter),
+    [allAlerts, sevFilter]
+  );
 
   return (
     <div className="space-y-4">
-      <div className="flex items-center gap-1 p-1 bg-slate-100 dark:bg-neutral-700/50 rounded-lg w-fit">
-        {SEVERITY_OPTIONS.map(opt => (
-          <button
-            key={opt.value}
-            onClick={() => setSevFilter(opt.value)}
-            aria-pressed={sevFilter === opt.value}
-            className={cn(
-              'px-3 py-1 text-[11px] font-medium rounded-md transition-all',
-              sevFilter === opt.value
-                ? 'bg-white dark:bg-neutral-800 text-foreground shadow-sm'
-                : 'text-muted-foreground hover:text-foreground'
-            )}
-          >
-            {opt.label}
-          </button>
-        ))}
+      {/* Controls row */}
+      <div className="flex items-center gap-3 flex-wrap">
+        {/* Period selector */}
+        <div className="flex items-center gap-0.5 p-0.5 bg-slate-100 dark:bg-neutral-700/50 rounded-lg">
+          {PERIOD_OPTIONS.map(opt => (
+            <button
+              key={opt.hours}
+              onClick={() => setHours(opt.hours)}
+              aria-pressed={hours === opt.hours}
+              className={cn(
+                'px-3 py-1 text-[11px] font-medium rounded-md transition-all',
+                hours === opt.hours
+                  ? 'bg-white dark:bg-neutral-800 text-foreground shadow-sm'
+                  : 'text-muted-foreground hover:text-foreground'
+              )}
+            >
+              {opt.label}
+            </button>
+          ))}
+        </div>
+
+        {/* Severity filter */}
+        <div className="flex items-center gap-0.5 p-0.5 bg-slate-100 dark:bg-neutral-700/50 rounded-lg">
+          {SEVERITY_OPTIONS.map(opt => (
+            <button
+              key={opt.value}
+              onClick={() => setSevFilter(opt.value)}
+              aria-pressed={sevFilter === opt.value}
+              className={cn(
+                'px-3 py-1 text-[11px] font-medium rounded-md transition-all',
+                sevFilter === opt.value
+                  ? 'bg-white dark:bg-neutral-800 text-foreground shadow-sm'
+                  : 'text-muted-foreground hover:text-foreground'
+              )}
+            >
+              {opt.label}
+            </button>
+          ))}
+        </div>
+
+        {!loading && (
+          <p className="text-[11px] text-muted-foreground ml-auto">
+            {filtered.length} alert{filtered.length !== 1 ? 's' : ''}
+          </p>
+        )}
       </div>
 
-      {filtered.length === 0 ? (
+      {loading ? <AlertSkeleton /> : filtered.length === 0 ? (
         <div className="tm-card flex flex-col items-center justify-center py-12 text-center">
           <BellOff className="h-8 w-8 text-muted-foreground/30 mb-3" />
-          <p className="text-sm text-muted-foreground">No alerts match this filter</p>
+          <p className="text-sm text-muted-foreground">
+            {allAlerts.length === 0 ? 'No alerts in this period' : 'No alerts match this filter'}
+          </p>
         </div>
       ) : (
         <div className="space-y-2">
