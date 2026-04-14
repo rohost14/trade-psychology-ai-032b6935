@@ -23,8 +23,9 @@ class AIService:
         else:
             logger.info(f"AI Service initialized with OpenRouter key (configured={bool(self.api_key)})")
 
-        # Model selection (cost-efficient)
-        self.primary_model = "anthropic/claude-3.5-haiku"
+        # Model selection
+        self.primary_model = "anthropic/claude-3.5-haiku"   # fast, cheap — default for chat
+        self.deep_model    = "anthropic/claude-sonnet-4-5"   # deep analysis — user-triggered
         self.reasoning_model = "openai/gpt-4o-mini"
         self.free_model = "google/gemini-flash-1.5-8b"
 
@@ -733,20 +734,28 @@ Remember: Your job is to hold up a mirror to this trader's behavior — what the
         trading_context: str,
         chat_history: List[Dict],
         rag_context: Optional[str] = None,
-        ai_persona: str = "coach"
+        ai_persona: str = "coach",
+        deep_mode: bool = False,
     ) -> str:
         """
         Generate conversational response for trading coach chat.
-        Uses trading context and RAG context to provide personalized advice.
 
         Args:
             user_message: User's chat message
             trading_context: Current trading stats and patterns
             chat_history: Previous messages in conversation
-            rag_context: Optional RAG-retrieved relevant content (journal entries, knowledge base)
+            rag_context: Optional RAG-retrieved relevant content
             ai_persona: User's preferred AI personality (coach, mentor, friend, strict)
+            deep_mode: Use deep model (Sonnet) with longer output for comprehensive analysis
         """
         system_prompt = self._build_chat_system_prompt(trading_context, rag_context, ai_persona)
+        if deep_mode:
+            system_prompt += (
+                "\n\nThe user has requested a DEEP ANALYSIS. "
+                "Provide a thorough, structured response covering multiple angles: "
+                "behavioral patterns, statistical edge, risk management, and specific actionable steps. "
+                "Be comprehensive — up to 600 words is appropriate here."
+            )
 
         # Build messages with history
         messages = [{"role": "system", "content": system_prompt}]
@@ -761,11 +770,14 @@ Remember: Your job is to hold up a mirror to this trader's behavior — what the
         # Add current user message
         messages.append({"role": "user", "content": user_message})
 
+        model = self.deep_model if deep_mode else self.primary_model
+        max_tokens = 800 if deep_mode else 300
+
         response = await self._make_request(
             messages=messages,
-            model=self.primary_model,
-            temperature=0.7,
-            max_tokens=300,
+            model=model,
+            temperature=0.5 if deep_mode else 0.7,
+            max_tokens=max_tokens,
             use_reasoning=False
         )
 
@@ -783,6 +795,7 @@ Remember: Your job is to hold up a mirror to this trader's behavior — what the
         chat_history: List[Dict],
         rag_context: Optional[str] = None,
         ai_persona: str = "coach",
+        deep_mode: bool = False,
     ):
         """
         Streaming version of generate_chat_response.
@@ -790,6 +803,13 @@ Remember: Your job is to hold up a mirror to this trader's behavior — what the
         Falls back to a single-chunk response if streaming fails or API key is missing.
         """
         system_prompt = self._build_chat_system_prompt(trading_context, rag_context, ai_persona)
+        if deep_mode:
+            system_prompt += (
+                "\n\nThe user has requested a DEEP ANALYSIS. "
+                "Provide a thorough, structured response covering multiple angles: "
+                "behavioral patterns, statistical edge, risk management, and specific actionable steps. "
+                "Be comprehensive — up to 600 words is appropriate here."
+            )
 
         messages = [{"role": "system", "content": system_prompt}]
         for msg in chat_history[-10:]:
@@ -807,10 +827,10 @@ Remember: Your job is to hold up a mirror to this trader's behavior — what the
             "X-Title": "TradeMentor AI",
         }
         payload = {
-            "model": self.primary_model,
+            "model": self.deep_model if deep_mode else self.primary_model,
             "messages": messages,
-            "temperature": 0.7,
-            "max_tokens": 300,
+            "temperature": 0.5 if deep_mode else 0.7,
+            "max_tokens": 800 if deep_mode else 300,
             "stream": True,
         }
 

@@ -66,6 +66,7 @@ class ChatMessage(BaseModel):
 class ChatRequest(BaseModel):
     message: str
     history: Optional[List[ChatMessage]] = []
+    analysis_type: Optional[str] = "fast"  # "fast" (Haiku) or "deep" (Sonnet)
 
 
 class ChatResponse(BaseModel):
@@ -567,7 +568,8 @@ async def chat_with_coach(
             trading_context=full_context,
             chat_history=[m.dict() for m in (request.history or [])],
             rag_context=rag_context or None,
-            ai_persona=ai_persona
+            ai_persona=ai_persona,
+            deep_mode=(request.analysis_type == "deep"),
         )
 
         # ── Save this exchange to the current session ──────────────────
@@ -804,6 +806,7 @@ async def chat_with_coach_stream(
                 chat_history=history,
                 rag_context=rag_context,
                 ai_persona=ai_persona,
+                deep_mode=(request.analysis_type == "deep"),
             ):
                 collected.append(chunk)
                 yield f"data: {_json.dumps({'text': chunk})}\n\n"

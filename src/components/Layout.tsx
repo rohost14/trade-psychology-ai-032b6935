@@ -43,9 +43,10 @@ const desktopNavGroups = [
     name: 'Insights',
     icon: BarChart2,
     items: [
-      { name: 'Analytics',   href: '/analytics',    icon: TrendingUp },
-      { name: 'Risk Monitor', href: '/my-patterns',  icon: Brain },
-      { name: 'Reports',     href: '/reports',      icon: BookOpen },
+      { name: 'Analytics',       href: '/analytics',        icon: TrendingUp },
+      { name: 'My Patterns',     href: '/personalization',  icon: Brain },
+      { name: 'Risk Monitor',    href: '/my-patterns',      icon: BarChart2 },
+      { name: 'Reports',         href: '/reports',          icon: BookOpen },
     ],
   },
   {
@@ -92,8 +93,9 @@ const mobileMoreGroups = [
   {
     label: 'Insights',
     items: [
-      { name: 'Risk Monitor', href: '/my-patterns',  icon: Brain },
-      { name: 'Reports',     href: '/reports',      icon: BookOpen },
+      { name: 'My Patterns',  href: '/personalization', icon: Brain },
+      { name: 'Risk Monitor', href: '/my-patterns',     icon: BarChart2 },
+      { name: 'Reports',      href: '/reports',         icon: BookOpen },
     ],
   },
   {

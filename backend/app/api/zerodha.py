@@ -32,7 +32,7 @@ from app.models.trade import Trade
 from app.core.database import get_db
 from app.core.logging_config import metrics
 from app.api.deps import get_verified_broker_account_id, create_access_token
-from app.core.rate_limiter import sync_limiter
+from app.core.rate_limiter import sync_limiter, general_limiter
 
 router = APIRouter()
 
@@ -380,7 +380,9 @@ async def zerodha_callback(
         return RedirectResponse(url=f"{frontend_url}/settings?error={error_msg}", status_code=302)
 
 @router.get("/test")
-async def test_zerodha_config() -> Any:
+async def test_zerodha_config(
+    _limiter: None = Depends(general_limiter),
+) -> Any:
     """Test endpoint to verify config."""
     key = settings.ZERODHA_API_KEY
     if not key:
@@ -389,7 +391,9 @@ async def test_zerodha_config() -> Any:
     return {"api_key": masked, "configured": True}
 
 @router.get("/metrics")
-async def get_metrics() -> Any:
+async def get_metrics(
+    _limiter: None = Depends(general_limiter),
+) -> Any:
     """Get API metrics for monitoring."""
     return metrics.get_metrics()
 
@@ -403,7 +407,8 @@ async def reset_metrics(
 
 @router.get("/health")
 async def health_check(
-    db: AsyncSession = Depends(get_db)
+    db: AsyncSession = Depends(get_db),
+    _limiter: None = Depends(general_limiter),
 ) -> Any:
     """Health check endpoint."""
     health = {

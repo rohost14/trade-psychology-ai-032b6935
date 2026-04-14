@@ -18,9 +18,11 @@ from enum import Enum
 from dataclasses import dataclass
 import logging
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select, and_
+from sqlalchemy import select, and_, desc
 
 from app.models.cooldown import Cooldown, create_cooldown
+from app.models.risk_alert import RiskAlert
+from app.models.user_profile import UserProfile
 from app.services.notification_rate_limiter import (
     notification_rate_limiter,
     NotificationType
@@ -168,10 +170,15 @@ class CooldownService:
             trigger_reason, CooldownType.SOFT
         )
 
-        # Calculate duration based on strategy (graduated escalation)
-        duration_minutes = custom_duration_minutes or self._calculate_duration(
-            account_id_str, trigger_reason
-        )
+        # Calculate duration based on strategy
+        if custom_duration_minutes:
+            duration_minutes = custom_duration_minutes
+        elif self.config.strategy == CooldownStrategy.SMART:
+            duration_minutes = await self._calculate_smart_duration(
+                db, broker_account_id, trigger_reason
+            )
+        else:
+            duration_minutes = self._calculate_duration(account_id_str, trigger_reason)
 
         # Determine if can skip (hard cooldowns can't be skipped)
         can_skip = cooldown_type != CooldownType.HARD
@@ -308,14 +315,83 @@ class CooldownService:
             return self.ESCALATION_LADDER[-1]  # Max duration
 
         elif self.config.strategy == CooldownStrategy.SMART:
-            # TODO: Integrate with emotional state scoring
-            # For now, use graduated as fallback
+            # Handled by _calculate_smart_duration (async) in start_cooldown.
+            # This sync path is only reached if called directly outside start_cooldown.
             level = self._get_escalation_level(user_id, trigger_reason)
             if level < len(self.ESCALATION_LADDER):
                 return self.ESCALATION_LADDER[level]
             return self.ESCALATION_LADDER[-1]
 
         return self.config.base_duration_minutes
+
+    async def _calculate_smart_duration(
+        self,
+        db: AsyncSession,
+        broker_account_id: UUID,
+        trigger_reason: str,
+    ) -> int:
+        """
+        SMART cooldown: adapts duration to the trader's current emotional state.
+
+        Logic (in priority order):
+        1. Session meltdown or danger-level consecutive-loss streak in last 30 min
+           → 2× the graduated ladder value (maximum distress).
+        2. 3 or more patterns fired in the last 30 min (tilt storm)
+           → 1.5× the graduated ladder value.
+        3. PersonalizationService has a learned personal_revenge_window_minutes
+           → use max(graduated, revenge_window × 1.5) so the cooldown always
+              outlasts the trader's own revenge window.
+        4. Fall through to plain graduated (explicit, never silent).
+        """
+        account_id_str = str(broker_account_id)
+        graduated = self._calculate_duration(account_id_str, trigger_reason)
+
+        window_start = datetime.now(timezone.utc) - timedelta(minutes=30)
+
+        # ── 1 & 2: Query recent alerts ─────────────────────────────────────
+        try:
+            result = await db.execute(
+                select(RiskAlert)
+                .where(
+                    RiskAlert.broker_account_id == broker_account_id,
+                    RiskAlert.detected_at >= window_start,
+                )
+                .order_by(desc(RiskAlert.detected_at))
+                .limit(20)
+            )
+            recent_alerts = result.scalars().all()
+        except Exception:
+            recent_alerts = []
+
+        HIGH_DISTRESS_TYPES = {"session_meltdown", "consecutive_loss_streak", "tilt_loss_spiral"}
+        has_high_distress = any(
+            a.pattern_type in HIGH_DISTRESS_TYPES and a.severity == "danger"
+            for a in recent_alerts
+        )
+
+        if has_high_distress:
+            return min(graduated * 2, self.ESCALATION_LADDER[-1])
+
+        if len(recent_alerts) >= 3:
+            return min(int(graduated * 1.5), self.ESCALATION_LADDER[-1])
+
+        # ── 3: Personalized revenge window ─────────────────────────────────
+        try:
+            prof_result = await db.execute(
+                select(UserProfile).where(UserProfile.broker_account_id == broker_account_id)
+            )
+            profile = prof_result.scalar_one_or_none()
+            if profile and profile.detected_patterns:
+                intervention = profile.detected_patterns.get("intervention_timing", {})
+                revenge_window = intervention.get("personal_revenge_window_minutes")
+                if revenge_window and revenge_window > 0:
+                    personal_min = int(revenge_window * 1.5)
+                    return max(graduated, personal_min)
+        except Exception:
+            pass
+
+        # ── 4: Plain graduated ─────────────────────────────────────────────
+        return graduated
 
     def _get_escalation_level(self, user_id: int, trigger_reason: str) -> int:
         """Get current escalation level based on recent violations."""

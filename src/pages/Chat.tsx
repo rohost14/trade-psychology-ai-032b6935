@@ -13,6 +13,7 @@ import {
   TrendingDown,
   AlertTriangle,
   Shield,
+  Zap,
 } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
@@ -137,6 +138,7 @@ export default function Chat() {
   const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState('');
   const [isLoading, setIsLoading] = useState(false);
+  const [deepMode, setDeepMode] = useState(false);
   const [snapshot, setSnapshot] = useState<Snapshot | null>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
@@ -258,7 +260,11 @@ export default function Chat() {
         const response = await fetchWithAuth(`${API_URL}/api/coach/chat/stream`, {
           method: 'POST',
           signal: abortControllerRef.current.signal,
-          body: JSON.stringify({ message: content.trim(), history }),
+          body: JSON.stringify({
+            message: content.trim(),
+            history,
+            analysis_type: deepMode ? 'deep' : 'fast',
+          }),
         });
 
         if (!response.ok || !response.body) {
@@ -621,6 +627,21 @@ export default function Chat() {
               className="flex-1 px-4 py-2.5 bg-muted rounded-xl text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring resize-none overflow-y-auto min-h-[42px] max-h-[160px] leading-relaxed disabled:opacity-60"
               disabled={isLoading}
             />
+            <button
+              onClick={() => setDeepMode(v => !v)}
+              disabled={isLoading}
+              aria-pressed={deepMode}
+              aria-label={deepMode ? 'Deep analysis on — click to switch to fast mode' : 'Fast mode — click for deep analysis'}
+              title={deepMode ? 'Deep Analysis (Sonnet) — slower, more thorough' : 'Fast Mode (Haiku) — quick responses'}
+              className={cn(
+                'h-[42px] w-[42px] rounded-xl flex-shrink-0 flex items-center justify-center transition-colors border',
+                deepMode
+                  ? 'bg-tm-brand/10 border-tm-brand/40 text-tm-brand'
+                  : 'bg-muted border-transparent text-muted-foreground hover:text-foreground'
+              )}
+            >
+              <Zap className="h-4 w-4" aria-hidden="true" />
+            </button>
             <Button
               onClick={() => handleSend(input)}
               disabled={!input.trim() || isLoading}
@@ -636,7 +657,10 @@ export default function Chat() {
             </Button>
           </div>
           <p className="text-[10px] text-muted-foreground mt-1.5 text-right select-none">
-            Enter to send · Shift+Enter for new line
+            {deepMode
+              ? <span className="text-tm-brand">Deep Analysis on · Sonnet model · slower, more thorough</span>
+              : 'Enter to send · Shift+Enter for new line'
+            }
           </p>
         </div>
       </div>
