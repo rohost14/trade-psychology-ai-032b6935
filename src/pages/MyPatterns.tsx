@@ -113,8 +113,8 @@ function DangerStatusBanner({
       {/* Active triggers */}
       {status.triggers.length > 0 && (
         <div className="flex flex-wrap gap-1.5 mt-3">
-          {status.triggers.map((t, i) => (
-            <span key={i} className="text-[11px] text-muted-foreground border border-border rounded-full px-2 py-0.5 capitalize">
+          {status.triggers.map((t) => (
+            <span key={t} className="text-[11px] text-muted-foreground border border-border rounded-full px-2 py-0.5 capitalize">
               {t.replace(/_/g, ' ')}
             </span>
           ))}
@@ -125,7 +125,7 @@ function DangerStatusBanner({
       {status.recommendations.length > 0 && (
         <div className="mt-3 border-t border-border pt-3 space-y-1">
           {status.recommendations.map((rec, i) => (
-            <p key={i} className="text-[12px] text-muted-foreground">· {rec}</p>
+            <p key={`rec-${i}`} className="text-[12px] text-muted-foreground">· {rec}</p>
           ))}
         </div>
       )}
@@ -146,8 +146,8 @@ function AlertHistoryCard({ history }: { history: CooldownRecord[] }) {
       <div className="px-5 py-4">
         {history.length > 0 ? (
           <div className="space-y-2">
-            {history.map((record, i) => (
-              <div key={i} className="flex items-center justify-between py-2 border-b border-border/50 last:border-0">
+            {history.map((record) => (
+              <div key={record.id} className="flex items-center justify-between py-2 border-b border-border/50 last:border-0">
                 <div>
                   <p className="text-[12px] font-medium text-foreground capitalize">{record.reason.replace(/_/g, ' ')}</p>
                   <p className="text-[11px] text-muted-foreground mt-0.5">
@@ -371,7 +371,7 @@ export default function MyPatterns() {
               <p className="text-[12px] font-semibold text-foreground mb-1.5">Based on your patterns:</p>
               <ul className="space-y-1">
                 {recommendations.map((rec, i) => (
-                  <li key={i} className="text-[12px] text-muted-foreground flex items-center gap-2">
+                  <li key={`main-rec-${i}`} className="text-[12px] text-muted-foreground flex items-center gap-2">
                     <span className="w-1 h-1 rounded-full bg-tm-obs flex-shrink-0" />
                     {rec}
                   </li>

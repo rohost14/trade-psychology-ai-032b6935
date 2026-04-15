@@ -22,7 +22,7 @@ from sqlalchemy import select
 logger = logging.getLogger(__name__)
 
 
-@celery_app.task(bind=True, max_retries=3, default_retry_delay=30)
+@celery_app.task(bind=True, max_retries=3, default_retry_delay=30, time_limit=300, soft_time_limit=290)
 def send_whatsapp_alert(
     self,
     broker_account_id: str,
@@ -90,8 +90,8 @@ def send_whatsapp_alert(
     return asyncio.run(_send())
 
 
-@celery_app.task
-def send_risk_alert_notification(alert_id: str):
+@celery_app.task(bind=True, max_retries=3, default_retry_delay=30, time_limit=300, soft_time_limit=290)
+def send_risk_alert_notification(self, alert_id: str):
     """
     Send notification for a specific risk alert.
 
@@ -155,7 +155,7 @@ _Stay disciplined. Follow your rules._
     return asyncio.run(_send())
 
 
-@celery_app.task
+@celery_app.task(time_limit=60, soft_time_limit=55)
 def send_bulk_alerts(broker_account_ids: list, message: str):
     """
     Send same message to multiple users.

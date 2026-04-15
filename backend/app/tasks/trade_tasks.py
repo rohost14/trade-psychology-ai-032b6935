@@ -56,7 +56,7 @@ def _release_lock(redis_client, key: str):
     redis_client.delete(key)
 
 
-@celery_app.task(bind=True, max_retries=3, default_retry_delay=60)
+@celery_app.task(bind=True, max_retries=3, default_retry_delay=60, time_limit=120, soft_time_limit=110)
 def process_webhook_trade(self, trade_data: Dict[str, Any], broker_account_id: str, request_id: str = "-"):
     """
     Process a single trade from Zerodha webhook.

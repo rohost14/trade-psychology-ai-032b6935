@@ -100,12 +100,28 @@ async def _dispatch_reports(report_type: str):
 
 async def dispatch_eod_reports():
     """Called every minute to send EOD reports to users whose time matches now."""
-    await _dispatch_reports("eod")
+    try:
+        await _dispatch_reports("eod")
+    except Exception as e:
+        logger.error(f"EOD report scheduler tick crashed: {e}", exc_info=True)
+        try:
+            import sentry_sdk
+            sentry_sdk.capture_exception(e)
+        except Exception:
+            pass
 
 
 async def dispatch_morning_briefs():
     """Called every minute to send morning briefs to users whose time matches now."""
-    await _dispatch_reports("morning")
+    try:
+        await _dispatch_reports("morning")
+    except Exception as e:
+        logger.error(f"Morning brief scheduler tick crashed: {e}", exc_info=True)
+        try:
+            import sentry_sdk
+            sentry_sdk.capture_exception(e)
+        except Exception:
+            pass
 
 
 def start_scheduler():

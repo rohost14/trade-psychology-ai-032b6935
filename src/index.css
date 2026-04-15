@@ -13,13 +13,17 @@
   :root {
     /* ── TradeMentor financial & brand tokens ─────────────────────────────── */
     /* These flip in .dark below. Use text-tm-profit, bg-tm-loss/5, etc.     */
-    --tm-profit:  15 142 125;   /* #0F8E7D  teal — profit on light bg         */
-    --tm-loss:   177  61  68;   /* #B13D44  red                                */
-    --tm-obs:    230 138   0;   /* #E68A00  amber — behavioral observations    */
-    --tm-brand:   13 148 136;   /* #0D9488  teal-600 — more vivid on light     */
+    --tm-profit: 15 142 125;
+    /* #0F8E7D  teal — profit on light bg         */
+    --tm-loss: 177 61 68;
+    /* #B13D44  red                                */
+    --tm-obs: 230 138 0;
+    /* #E68A00  amber — behavioral observations    */
+    --tm-brand: 13 148 136;
+    /* #0D9488  teal-600 — more vivid on light     */
 
     /* Neutral Gray Scale (Zinc - warm, professional) */
-    --gray-50:  250 250 250;
+    --gray-50: 250 250 250;
     --gray-100: 244 244 245;
     --gray-200: 228 228 231;
     --gray-300: 212 212 216;
@@ -31,7 +35,8 @@
     --gray-900: 24 24 27;
 
     /* Background & Foreground */
-    --background: 248 248 246;   /* warm stone-50 — not zinc-grey, not teal-tinted */
+    --background: 248 248 246;
+    /* warm stone-50 — not zinc-grey, not teal-tinted */
     --foreground: var(--gray-900);
 
     /* Card */
@@ -52,7 +57,8 @@
 
     /* Muted */
     --muted: var(--gray-100);
-    --muted-foreground: 107 114 128;   /* slate-500 — warmer than zinc, better on white cards */
+    --muted-foreground: 107 114 128;
+    /* slate-500 — warmer than zinc, better on white cards */
 
     /* Accent */
     --accent: var(--gray-100);
@@ -85,29 +91,41 @@
 
   .dark {
     /* TradeMentor tokens — dark overrides */
-    --tm-profit:  52 211 153;   /* #34D399 — emerald green */
-    --tm-loss:   248 113 113;   /* #F87171 — soft red      */
-    --tm-obs:    251 191  36;   /* #FBBF24 — amber         */
-    --tm-brand:   45 212 191;   /* #2DD4BF — teal          */
+    --tm-profit: 52 211 153;
+    /* #34D399 — emerald green */
+    --tm-loss: 248 113 113;
+    /* #F87171 — soft red      */
+    --tm-obs: 251 191 36;
+    /* #FBBF24 — amber         */
+    --tm-brand: 45 212 191;
+    /* #2DD4BF — teal          */
 
     /* Pure neutral dark — no slate/blue cast */
-    --background: 11 11 11;      /* #0B0B0B — near-black     */
-    --foreground: 242 242 242;   /* #F2F2F2 — soft white     */
+    --background: 11 11 11;
+    /* #0B0B0B — near-black     */
+    --foreground: 242 242 242;
+    /* #F2F2F2 — soft white     */
 
-    --card: 20 20 20;            /* #141414 — dark card      */
+    --card: 20 20 20;
+    /* #141414 — dark card      */
     --card-foreground: 242 242 242;
 
-    --popover: 24 24 24;         /* #181818 */
+    --popover: 24 24 24;
+    /* #181818 */
     --popover-foreground: 242 242 242;
 
-    --primary: 20 184 166;       /* teal-500 */
+    --primary: 20 184 166;
+    /* teal-500 */
     --primary-foreground: 255 255 255;
 
-    --secondary: 30 30 30;       /* #1E1E1E */
+    --secondary: 30 30 30;
+    /* #1E1E1E */
     --secondary-foreground: 220 220 220;
 
-    --muted: 26 26 26;           /* #1A1A1A */
-    --muted-foreground: 142 142 142;  /* #8E8E8E */
+    --muted: 26 26 26;
+    /* #1A1A1A */
+    --muted-foreground: 142 142 142;
+    /* #8E8E8E */
 
     --accent: 30 30 30;
     --accent-foreground: 220 220 220;
@@ -115,8 +133,10 @@
     --destructive: 239 68 68;
     --destructive-foreground: 255 255 255;
 
-    --border: 40 40 40;          /* #282828 — subtle separator */
-    --input:  36 36 36;          /* #242424 */
+    --border: 40 40 40;
+    /* #282828 — subtle separator */
+    --input: 36 36 36;
+    /* #242424 */
     --ring: 20 184 166;
 
     --shadow-sm: 0 1px 3px 0 rgb(0 0 0 / 0.5);
@@ -187,6 +207,7 @@ svg.lucide {
 }
 
 @layer components {
+
   /* Clean Card - No glassmorphism, no gradients */
   .card {
     @apply bg-card rounded-lg border border-border;
@@ -257,6 +278,7 @@ svg.lucide {
 }
 
 @layer utilities {
+
   /* Focus ring */
   .focus-ring {
     @apply focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 focus-visible:ring-offset-background;
@@ -276,69 +298,168 @@ svg.lucide {
 /* ── Animation keyframes (framer-motion replacement) ──────────────────────── */
 
 @keyframes pulse {
-  0%, 100% { opacity: 1; }
-  50% { opacity: 0.5; }
+
+  0%,
+  100% {
+    opacity: 1;
+  }
+
+  50% {
+    opacity: 0.5;
+  }
 }
 
 @keyframes fadeIn {
-  from { opacity: 0; }
-  to   { opacity: 1; }
+  from {
+    opacity: 0;
+  }
+
+  to {
+    opacity: 1;
+  }
 }
 
 @keyframes fadeInUp {
-  from { opacity: 0; transform: translateY(8px); }
-  to   { opacity: 1; transform: translateY(0);   }
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
 }
 
 @keyframes fadeInScale {
-  from { opacity: 0; transform: translateY(-10px) scale(0.95); }
-  to   { opacity: 1; transform: translateY(0)     scale(1);    }
+  from {
+    opacity: 0;
+    transform: translateY(-10px) scale(0.95);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
 }
 
 /* Spring-like: overshoot then settle — replaces type:'spring' on banner */
 @keyframes slideInRight {
-  0%   { opacity: 0; transform: translateX(100%); }
-  100% { opacity: 1; transform: translateX(0); }
+  0% {
+    opacity: 0;
+    transform: translateX(100%);
+  }
+
+  100% {
+    opacity: 1;
+    transform: translateX(0);
+  }
 }
 
 @keyframes slideInDown {
-  0%   { opacity: 0; transform: translateY(-52px); }
-  60%  { opacity: 1; transform: translateY(4px);   }
-  80%  { transform: translateY(-2px); }
-  100% { transform: translateY(0); }
+  0% {
+    opacity: 0;
+    transform: translateY(-52px);
+  }
+
+  60% {
+    opacity: 1;
+    transform: translateY(4px);
+  }
+
+  80% {
+    transform: translateY(-2px);
+  }
+
+  100% {
+    transform: translateY(0);
+  }
 }
 
 @keyframes slideOutUp {
-  from { opacity: 1; transform: translateY(0);    max-height: 200px; }
-  to   { opacity: 0; transform: translateY(-40px); max-height: 0;    }
+  from {
+    opacity: 1;
+    transform: translateY(0);
+    max-height: 200px;
+  }
+
+  to {
+    opacity: 0;
+    transform: translateY(-40px);
+    max-height: 0;
+  }
 }
 
 @keyframes slideInUp {
-  0%   { opacity: 0; transform: translateY(100%); }
-  60%  { opacity: 1; transform: translateY(-6px);  }
-  80%  { transform: translateY(3px);               }
-  100% { transform: translateY(0);                 }
+  0% {
+    opacity: 0;
+    transform: translateY(100%);
+  }
+
+  60% {
+    opacity: 1;
+    transform: translateY(-6px);
+  }
+
+  80% {
+    transform: translateY(3px);
+  }
+
+  100% {
+    transform: translateY(0);
+  }
 }
 
 @keyframes cardExit {
-  from { opacity: 1; transform: translateY(0)     scale(1);    }
-  to   { opacity: 0; transform: translateY(-10px) scale(0.95); }
+  from {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+
+  to {
+    opacity: 0;
+    transform: translateY(-10px) scale(0.95);
+  }
 }
 
 @keyframes float {
-  0%, 100% { transform: translateY(-5px) rotate(0deg);  }
-  50%       { transform: translateY(5px)  rotate(10deg); }
+
+  0%,
+  100% {
+    transform: translateY(-5px) rotate(0deg);
+  }
+
+  50% {
+    transform: translateY(5px) rotate(10deg);
+  }
 }
 
 @keyframes zapPulse {
-  0%, 100% { transform: rotate(0deg)   scale(1);   }
-  33%       { transform: rotate(15deg)  scale(1.1); }
-  66%       { transform: rotate(-15deg) scale(1);   }
+
+  0%,
+  100% {
+    transform: rotate(0deg) scale(1);
+  }
+
+  33% {
+    transform: rotate(15deg) scale(1.1);
+  }
+
+  66% {
+    transform: rotate(-15deg) scale(1);
+  }
 }
 
 @keyframes pulseScale {
-  0%, 100% { transform: scale(1);   }
-  50%       { transform: scale(1.1); }
+
+  0%,
+  100% {
+    transform: scale(1);
+  }
+
+  50% {
+    transform: scale(1.1);
+  }
 }
 
 /* ── Animation utility classes ────────────────────────────────────────────── */
@@ -395,6 +516,7 @@ svg.lucide {
 /* ── TradeMentor design components ─────────────────────────────────────────── */
 
 @layer components {
+
   /* Section label — every section header across all screens */
   .tm-label {
     @apply text-[11px] font-medium uppercase tracking-widest text-muted-foreground;
@@ -406,10 +528,21 @@ svg.lucide {
   }
 
   /* Instrument type chips */
-  .tm-chip    { @apply text-[10px] font-bold px-1.5 py-0.5 rounded leading-none; }
-  .tm-chip-ce { @apply bg-teal-50  text-teal-700  dark:bg-teal-900/20  dark:text-teal-300; }
-  .tm-chip-pe { @apply bg-red-50   text-red-600   dark:bg-red-900/20   dark:text-red-400;  }
-  .tm-chip-eq { @apply bg-stone-100 text-slate-500 dark:bg-neutral-700/60 dark:text-neutral-400; }
+  .tm-chip {
+    @apply text-[10px] font-bold px-1.5 py-0.5 rounded leading-none;
+  }
+
+  .tm-chip-ce {
+    @apply bg-teal-50 text-teal-700 dark:bg-teal-900/20 dark:text-teal-300;
+  }
+
+  .tm-chip-pe {
+    @apply bg-red-50 text-red-600 dark:bg-red-900/20 dark:text-red-400;
+  }
+
+  .tm-chip-eq {
+    @apply bg-stone-100 text-slate-500 dark:bg-neutral-700/60 dark:text-neutral-400;
+  }
 }
 
 /* ── Page backgrounds ───────────────────────────────────────────────────────── */
@@ -419,10 +552,11 @@ svg.lucide {
   /* Warm stone — no teal glow, no gradients bleeding into cards */
   background: #F5F5F4;
 }
+
 .dark .tm-page-bg {
   background:
-    radial-gradient(ellipse 60% 45% at 92%   0%, rgba(15,142,125,0.10) 0%, transparent 100%),
-    radial-gradient(ellipse 55% 50% at  0% 100%, rgba(15,142,125,0.07) 0%, transparent 100%),
+    radial-gradient(ellipse 60% 45% at 92% 0%, rgba(15, 142, 125, 0.10) 0%, transparent 100%),
+    radial-gradient(ellipse 55% 50% at 0% 100%, rgba(15, 142, 125, 0.07) 0%, transparent 100%),
     #0B0B0B;
 }
 
@@ -430,23 +564,23 @@ svg.lucide {
 .tm-card {
   /* Slightly warmer + more depth: cards lift clearly off the stone background */
   box-shadow:
-    0 1px 3px rgba(0,0,0,0.07),
-    0 4px 16px rgba(0,0,0,0.05),
-    0 0 0 1px rgba(0,0,0,0.04);
+    0 1px 3px rgba(0, 0, 0, 0.07),
+    0 4px 16px rgba(0, 0, 0, 0.05),
+    0 0 0 1px rgba(0, 0, 0, 0.04);
 }
+
 .dark .tm-card {
   box-shadow:
-    0 2px 8px rgba(0,0,0,0.4),
-    0 8px 32px rgba(0,0,0,0.35),
-    0 0 0 1px rgba(255,255,255,0.08);
+    0 2px 8px rgba(0, 0, 0, 0.4),
+    0 8px 32px rgba(0, 0, 0, 0.35),
+    0 0 0 1px rgba(255, 255, 255, 0.08);
 }
 
 /* AI Coach CTA — gradient button using brand token so it respects theme */
 .tm-coach-cta {
   background: linear-gradient(135deg,
-    rgb(var(--tm-brand)) 0%,
-    color-mix(in srgb, rgb(var(--tm-brand)) 85%, black) 100%
-  );
+      rgb(var(--tm-brand)) 0%,
+      color-mix(in srgb, rgb(var(--tm-brand)) 85%, black) 100%);
   box-shadow:
     0 4px 20px rgba(var(--tm-brand) / 0.3),
     0 0 0 1px rgba(var(--tm-brand) / 0.2);

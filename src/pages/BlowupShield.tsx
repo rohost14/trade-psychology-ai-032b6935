@@ -90,7 +90,7 @@ function TimelineRow({ item }: { item: ShieldTimelineItem }) {
           {expanded && (
             <div className="mt-2 rounded-md bg-muted/30 divide-y divide-border text-xs">
               {item.post_alert_trades?.map((t, i) => (
-                <div key={i} className="flex items-center justify-between px-3 py-2">
+                <div key={`${t.tradingsymbol}-${t.exit_time ?? i}`} className="flex items-center justify-between px-3 py-2">
                   <span className="font-medium text-foreground">{t.tradingsymbol}</span>
                   <span className={cn(
                     'font-mono tabular-nums',

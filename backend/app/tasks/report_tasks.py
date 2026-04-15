@@ -460,7 +460,7 @@ def generate_commodity_weekly_report():
     return asyncio.run(_generate())
 
 
-@celery_app.task(name="app.tasks.report_tasks.generate_coach_insight_task")
+@celery_app.task(name="app.tasks.report_tasks.generate_coach_insight_task", time_limit=120, soft_time_limit=110)
 def generate_coach_insight_task(broker_account_id: str, context: dict):
     """
     Async Celery task to generate a coach insight via LLM and cache it.
@@ -523,7 +523,7 @@ def generate_coach_insight_task(broker_account_id: str, context: dict):
     return asyncio.run(_generate())
 
 
-@celery_app.task(name="app.tasks.report_tasks.generate_analytics_narrative_task")
+@celery_app.task(name="app.tasks.report_tasks.generate_analytics_narrative_task", time_limit=120, soft_time_limit=110)
 def generate_analytics_narrative_task(
     broker_account_id: str,
     tab: str,
