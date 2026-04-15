@@ -18,6 +18,7 @@ from app.utils.trade_classifier import classify_trade
 from app.services.zerodha_service import zerodha_client
 from app.services.pnl_calculator import pnl_calculator
 from app.services.instrument_service import instrument_service
+from app.services.mcx_contract_specs import get_lot_multiplier
 from app.core.market_hours import market_minutes
 from app.models.instrument import Instrument
 from sqlalchemy.dialects.postgresql import insert
@@ -757,7 +758,13 @@ class TradeSyncService:
                         "average_entry_price": safe_float(pos.get("average_price")),
                         "instrument_token": safe_int(pos.get("instrument_token")) or None,
                         "overnight_quantity": safe_int(pos.get("overnight_quantity")),
-                        "multiplier": safe_float(pos.get("multiplier"), 1.0),
+                        # Use our authoritative multiplier table for MCX/CDS — Zerodha's
+                        # instruments CSV sets lot_size=1 for all MCX instruments, so
+                        # pos.get("multiplier") is unreliable (returns 1 for CRUDEOIL etc.).
+                        # get_lot_multiplier returns 1 for NSE/BSE/NFO/BFO (no change there).
+                        "multiplier": float(get_lot_multiplier(
+                            pos.get("exchange", ""), pos.get("tradingsymbol", "")
+                        )),
                         "pnl": safe_float(pos.get("pnl")),
                         "unrealized_pnl": safe_float(pos.get("unrealised")),
                         "realized_pnl": safe_float(pos.get("realised")),
