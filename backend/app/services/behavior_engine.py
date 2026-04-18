@@ -97,6 +97,7 @@ RISK_DELTAS: Dict[str, Decimal] = {
     "end_of_session_mis_panic":         Decimal("15"),
     "post_loss_recovery_bet":           Decimal("20"),
     "profit_giveaway":                  Decimal("20"),
+    "premium_destruction":              Decimal("25"),
 }
 
 # ---------------------------------------------------------------------------
@@ -348,6 +349,7 @@ class BehaviorEngine:
             self._detect_options_direction_confusion,
             self._detect_options_premium_avg_down,
             self._detect_iv_crush_behavior,
+            self._detect_premium_destruction,
             self._detect_expiry_day_overtrading,
             self._detect_opening_5min_trap,
             self._detect_end_of_session_mis_panic,
@@ -1397,7 +1399,73 @@ class BehaviorEngine:
         )
 
 
-    # ── Pattern 19: Expiry day overtrading ────────────────────────────────
+    # ── Pattern 19 (new): Premium destruction ─────────────────────────────
+    #
+    # Options trade exits with > 60% of premium lost.
+    # Distinct from iv_crush_behavior (which fires on fast < 30 min collapse).
+    # premium_destruction fires regardless of hold time — it measures the
+    # severity of the exit, not the speed of the move.
+    #
+    # Severity escalation:
+    #   caution  — first occurrence in session, or single trade > 60%
+    #   danger   — 2+ trades in session each losing > 60% of premium
+
+    def _detect_premium_destruction(self, ctx: EngineContext) -> Optional[DetectedEvent]:
+        ct = ctx.completed_trade
+        if ct.instrument_type not in ("CE", "PE") or ct.direction != "LONG":
+            return None
+
+        # Use stored pnl_pct if available; fall back to computing it
+        if ct.pnl_pct is not None:
+            loss_pct = float(ct.pnl_pct)
+        else:
+            entry_price = float(ct.avg_entry_price or 0)
+            exit_price  = float(ct.avg_exit_price  or 0)
+            if entry_price <= 0:
+                return None
+            loss_pct = (exit_price - entry_price) / entry_price * 100
+
+        threshold = float(ctx.thresholds.get("premium_destruction_pct", -60))
+        if loss_pct >= threshold:   # threshold is negative (e.g. -60)
+            return None
+
+        # Count how many options trades today also crossed the threshold
+        prior_destruction = [
+            t for t in ctx.session_trades
+            if t.id != ct.id
+            and t.instrument_type in ("CE", "PE")
+            and t.direction == "LONG"
+            and (
+                (float(t.pnl_pct) if t.pnl_pct is not None
+                 else (float(t.avg_exit_price or 0) - float(t.avg_entry_price or 1))
+                      / float(t.avg_entry_price or 1) * 100)
+                < threshold
+            )
+        ]
+
+        severity = "danger" if prior_destruction else "caution"
+        count_msg = (
+            f" ({len(prior_destruction) + 1} trades today with >60% premium loss)"
+            if prior_destruction else ""
+        )
+
+        return DetectedEvent(
+            event_type="premium_destruction",
+            severity=severity,
+            message=(
+                f"{ct.tradingsymbol}: {abs(loss_pct):.0f}% of premium lost "
+                f"(₹{abs(float(ct.realized_pnl or 0)):,.0f}){count_msg}."
+            ),
+            context={
+                "tradingsymbol":        ct.tradingsymbol,
+                "pnl_pct":              round(loss_pct, 1),
+                "realized_pnl":         float(ct.realized_pnl or 0),
+                "prior_destruction_count": len(prior_destruction),
+                "hold_minutes":         ct.duration_minutes or 0,
+            },
+        )
+
+    # ── Pattern 20: Expiry day overtrading ────────────────────────────────
     #
     # Excessive trades on the instrument's own expiry date.
     # 0DTE herding: NSE data shows retail activity spikes 3-5× near expiry EOD.

@@ -162,6 +162,41 @@ async def lifespan(app: FastAPI):
 
     _asyncio.create_task(_repair_nse_pnl())
 
+    # Backfill pnl_pct for CompletedTrades created before migration 055.
+    async def _backfill_pnl_pct():
+        try:
+            from app.core.database import SessionLocal
+            from app.models.completed_trade import CompletedTrade
+            from app.services.position_ledger_service import _compute_pnl_pct
+            from sqlalchemy import select
+
+            async with SessionLocal() as db:
+                result = await db.execute(
+                    select(CompletedTrade).where(
+                        CompletedTrade.pnl_pct.is_(None),
+                        CompletedTrade.avg_entry_price.isnot(None),
+                        CompletedTrade.avg_exit_price.isnot(None),
+                    )
+                )
+                cts = result.scalars().all()
+                filled = 0
+                for ct in cts:
+                    pct = _compute_pnl_pct(
+                        float(ct.avg_entry_price),
+                        float(ct.avg_exit_price),
+                        ct.direction or "LONG",
+                    )
+                    if pct is not None:
+                        ct.pnl_pct = pct
+                        filled += 1
+                if filled:
+                    await db.commit()
+                    logger.info(f"[startup backfill] Filled pnl_pct for {filled} CompletedTrade records.")
+        except Exception as e:
+            logger.warning(f"[startup backfill] pnl_pct backfill skipped: {e}")
+
+    _asyncio.create_task(_backfill_pnl_pct())
+
     yield
 
     # Shutdown logic

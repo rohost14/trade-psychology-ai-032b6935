@@ -19,6 +19,7 @@ from app.services.zerodha_service import zerodha_client
 from app.services.pnl_calculator import pnl_calculator
 from app.services.instrument_service import instrument_service
 from app.services.mcx_contract_specs import get_lot_multiplier
+from app.services.position_ledger_service import _compute_pnl_pct
 from app.core.market_hours import market_minutes
 from app.models.instrument import Instrument
 from sqlalchemy.dialects.postgresql import insert
@@ -1007,6 +1008,7 @@ class TradeSyncService:
                     avg_entry_price=avg_entry,
                     avg_exit_price=avg_exit,
                     realized_pnl=realized_pnl,
+                    pnl_pct=_compute_pnl_pct(avg_entry, avg_exit, direction),
                     entry_time=entry_time,
                     exit_time=exit_time,
                     duration_minutes=duration_minutes,

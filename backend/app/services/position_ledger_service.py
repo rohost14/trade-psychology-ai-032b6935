@@ -455,6 +455,7 @@ class PositionLedgerService:
             avg_entry_price=float(avg_entry),
             avg_exit_price=float(avg_exit),
             realized_pnl=float(total_pnl),
+            pnl_pct=_compute_pnl_pct(float(avg_entry), float(avg_exit), direction),
             entry_time=entry_time,
             exit_time=exit_time,
             duration_minutes=duration,
@@ -498,6 +499,31 @@ class PositionLedgerService:
             .limit(1)
         )
         return result.scalar_one_or_none()
+
+
+# ------------------------------------------------------------------
+# Pure helper: pnl_pct
+# ------------------------------------------------------------------
+
+def _compute_pnl_pct(
+    avg_entry: Optional[float],
+    avg_exit: Optional[float],
+    direction: str,
+) -> Optional[float]:
+    """
+    Return the percentage return relative to the entry price.
+
+    LONG:  (exit - entry) / entry * 100
+    SHORT: (entry - exit) / entry * 100
+
+    Returns None if entry price is zero / unknown.
+    """
+    if not avg_entry or avg_entry == 0:
+        return None
+    if direction == "LONG":
+        return round((avg_exit - avg_entry) / avg_entry * 100, 2)
+    else:  # SHORT
+        return round((avg_entry - avg_exit) / avg_entry * 100, 2)
 
 
 # ------------------------------------------------------------------

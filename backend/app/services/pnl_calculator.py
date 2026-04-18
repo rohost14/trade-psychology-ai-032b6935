@@ -26,6 +26,7 @@ from app.models.completed_trade_feature import CompletedTradeFeature
 from app.models.incomplete_position import IncompletePosition
 from app.core.market_hours import market_minutes
 from app.services.mcx_contract_specs import get_lot_multiplier
+from app.services.position_ledger_service import _compute_pnl_pct
 
 logger = logging.getLogger(__name__)
 
@@ -464,6 +465,7 @@ class PnLCalculator:
             avg_entry_price=round(avg_entry, 4),
             avg_exit_price=round(avg_exit, 4),
             realized_pnl=float(round_acc["total_pnl"]),
+            pnl_pct=_compute_pnl_pct(round(avg_entry, 4), round(avg_exit, 4), round_acc["direction"] or "LONG"),
             entry_time=entry_time,
             exit_time=exit_time,
             duration_minutes=duration,

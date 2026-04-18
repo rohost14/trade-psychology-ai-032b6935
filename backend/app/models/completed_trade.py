@@ -41,6 +41,9 @@ class CompletedTrade(Base):
 
     # P&L
     realized_pnl = Column(Numeric(15, 4))
+    # Percentage return on entry price: (exit-entry)/entry*100 for LONG, (entry-exit)/entry*100 for SHORT.
+    # NULL for records created before migration 055; backfilled on server startup.
+    pnl_pct = Column(Numeric(8, 2), nullable=True)
 
     # Timing
     entry_time = Column(TIMESTAMP(timezone=True))

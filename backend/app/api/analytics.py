@@ -2086,3 +2086,112 @@ async def get_instrument_analytics(
     except Exception as e:
         logger.error(f"Failed to get instrument analytics: {e}")
         raise HTTPException(status_code=500, detail="Internal server error")
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# % P&L analysis — Return on Premium / price
+# ─────────────────────────────────────────────────────────────────────────────
+
+@router.get("/pnl-percent")
+async def get_pnl_percent(
+    broker_account_id: UUID = Depends(get_verified_broker_account_id),
+    days_back: int = Query(default=30, ge=1, le=365),
+    db: AsyncSession = Depends(get_db),
+):
+    """
+    Percentage P&L analysis across closed trades.
+
+    Returns:
+    - avg_win_pct / avg_loss_pct / rr_ratio
+    - by_hold_time: avg % P&L bucketed by hold duration
+    - trades: per-trade pnl_pct for scatter chart
+    """
+    try:
+        from statistics import mean
+        cutoff = datetime.now(timezone.utc) - timedelta(days=days_back)
+
+        result = await db.execute(
+            select(CompletedTrade).where(
+                CompletedTrade.broker_account_id == broker_account_id,
+                CompletedTrade.exit_time >= cutoff,
+                CompletedTrade.pnl_pct.isnot(None),
+                CompletedTrade.status == "closed",
+            ).order_by(CompletedTrade.exit_time.asc())
+        )
+        trades = result.scalars().all()
+
+        if not trades:
+            return {
+                "has_data": False,
+                "avg_win_pct": 0.0,
+                "avg_loss_pct": 0.0,
+                "rr_ratio": None,
+                "win_count": 0,
+                "loss_count": 0,
+                "by_hold_time": [],
+                "trades": [],
+            }
+
+        winners = [float(t.pnl_pct) for t in trades if float(t.pnl_pct or 0) > 0]
+        losers  = [float(t.pnl_pct) for t in trades if float(t.pnl_pct or 0) < 0]
+
+        avg_win_pct  = round(mean(winners), 2) if winners else 0.0
+        avg_loss_pct = round(mean(losers),  2) if losers  else 0.0
+        rr_ratio = round(avg_win_pct / abs(avg_loss_pct), 2) if avg_loss_pct != 0 else None
+
+        # Hold-time buckets
+        BUCKETS = [
+            ("< 15 min",   0,    15),
+            ("15–60 min",  15,   60),
+            ("1–4 hrs",    60,  240),
+            ("> 4 hrs",   240, 99999),
+        ]
+        by_hold_time = []
+        for label, lo, hi in BUCKETS:
+            bucket_trades = [
+                float(t.pnl_pct)
+                for t in trades
+                if lo <= (t.duration_minutes or 0) < hi
+            ]
+            if not bucket_trades:
+                by_hold_time.append({"bucket": label, "avg_pct": 0.0, "count": 0,
+                                     "avg_win_pct": 0.0, "avg_loss_pct": 0.0})
+                continue
+            bw = [p for p in bucket_trades if p > 0]
+            bl = [p for p in bucket_trades if p < 0]
+            by_hold_time.append({
+                "bucket":       label,
+                "avg_pct":      round(mean(bucket_trades), 2),
+                "count":        len(bucket_trades),
+                "avg_win_pct":  round(mean(bw), 2) if bw else 0.0,
+                "avg_loss_pct": round(mean(bl), 2) if bl else 0.0,
+            })
+
+        # Per-trade list for scatter chart
+        trade_list = [
+            {
+                "tradingsymbol":    t.tradingsymbol,
+                "instrument_type":  t.instrument_type,
+                "direction":        t.direction,
+                "pnl_pct":          round(float(t.pnl_pct), 2),
+                "realized_pnl":     round(float(t.realized_pnl or 0), 2),
+                "duration_minutes": t.duration_minutes or 0,
+                "exit_time":        t.exit_time.isoformat() if t.exit_time else None,
+            }
+            for t in trades
+        ]
+
+        return {
+            "has_data":     True,
+            "avg_win_pct":  avg_win_pct,
+            "avg_loss_pct": avg_loss_pct,
+            "rr_ratio":     rr_ratio,
+            "win_count":    len(winners),
+            "loss_count":   len(losers),
+            "by_hold_time": by_hold_time,
+            "trades":       trade_list,
+        }
+
+    except Exception as e:
+        logger.error(f"Failed to get pnl-percent analytics: {e}")
+        raise HTTPException(status_code=500, detail="Internal server error")

@@ -103,6 +103,7 @@ class CompletedTradeResponse(BaseModel):
     avg_entry_price: Optional[float] = None
     avg_exit_price: Optional[float] = None
     realized_pnl: Optional[float] = None
+    pnl_pct: Optional[float] = None
     entry_time: Optional[datetime] = None
     exit_time: Optional[datetime] = None
     duration_minutes: Optional[int] = None

@@ -196,6 +196,13 @@ COLD_START_DEFAULTS: Dict[str, Any] = {
     # Proxy: losing >40% premium in <30 min without directional move = IV collapse.
     'iv_crush_proxy_hold_min':          30,   # hold < 30 min for this to be IV (not theta)
     'iv_crush_proxy_loss_pct':          40,   # lost > 40% of premium paid
+
+    # Premium destruction: options trade exits losing > X% of entry premium.
+    # Fires regardless of hold time — measures exit severity, not speed.
+    # -60 means the threshold is "worse than -60%" (e.g. -65%, -80%, -99%).
+    # Derived from: options losing >60% have almost no recovery probability
+    # in the same session. Source: NSE options data, Zerodha SPAN margin docs.
+    'premium_destruction_pct':         -60,  # pnl_pct < -60% triggers alert
 }
 
 
