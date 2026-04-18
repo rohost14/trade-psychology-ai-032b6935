@@ -1,4 +1,6 @@
-import { AlertTriangle, Mail, Phone, Bell } from 'lucide-react';
+import { AlertTriangle, Mail, Phone, Bell, CheckCircle2, Clock } from 'lucide-react';
+import { api } from '@/lib/api';
+import { toast } from 'sonner';
 import { Switch } from '@/components/ui/switch';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -10,6 +12,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
+import React from 'react';
 import NotificationSettings from '@/components/settings/NotificationSettings';
 import { UserProfile, NotificationStatus, ALERT_SENSITIVITY } from '@/lib/settingsConstants';
 
@@ -32,6 +35,24 @@ export function NotificationsTab({
   account,
   onTestGuardian,
 }: NotificationsTabProps) {
+  const [sendingConsent, setSendingConsent] = React.useState(false);
+
+  async function sendGuardianConsent() {
+    setSendingConsent(true);
+    try {
+      const r = await api.post('/api/profile/guardian/send-consent');
+      if (r.data.sent) {
+        toast.success(`Consent request sent to ${profile.guardian_phone}`);
+      } else {
+        toast.error('Failed to send consent — check WhatsApp configuration');
+      }
+    } catch (e: any) {
+      toast.error(e?.response?.data?.detail || 'Failed to send consent');
+    } finally {
+      setSendingConsent(false);
+    }
+  }
+
   return (
     <div className="space-y-6">
       {/* WhatsApp not configured banner */}
@@ -255,6 +276,54 @@ export function NotificationsTab({
                   )}
                 </ul>
               </div>
+
+              {/* Daily Loss Limit */}
+              <div className="space-y-2">
+                <Label>Daily Loss Limit (₹)</Label>
+                <Input
+                  type="number"
+                  placeholder="e.g. 5000"
+                  value={profile.guardian_loss_limit ?? ''}
+                  onChange={(e) => setProfile({
+                    ...profile,
+                    guardian_loss_limit: e.target.value ? parseFloat(e.target.value) : undefined,
+                  })}
+                />
+                <p className="text-xs text-muted-foreground">
+                  Guardian is notified when you cross this loss in a day.
+                </p>
+              </div>
+
+              {/* Confirmation status */}
+              <div className={`flex items-center gap-2 p-3 rounded-lg ${
+                profile.guardian_confirmed
+                  ? 'bg-green-50 dark:bg-green-900/10 border border-green-200 dark:border-green-800/30'
+                  : 'bg-amber-50 dark:bg-amber-900/10 border border-amber-200 dark:border-amber-800/30'
+              }`}>
+                {profile.guardian_confirmed
+                  ? <CheckCircle2 className="h-4 w-4 text-tm-profit shrink-0" />
+                  : <Clock className="h-4 w-4 text-tm-obs shrink-0" />
+                }
+                <p className="text-[12px]">
+                  {profile.guardian_confirmed
+                    ? `${profile.guardian_name || 'Guardian'} has confirmed.`
+                    : `Waiting for ${profile.guardian_name || 'guardian'} to confirm via WhatsApp.`
+                  }
+                </p>
+              </div>
+
+              {/* Send consent */}
+              {!profile.guardian_confirmed && profile.guardian_phone && (
+                <Button
+                  variant="outline"
+                  className="w-full"
+                  onClick={sendGuardianConsent}
+                  disabled={sendingConsent}
+                >
+                  <Phone className="h-4 w-4 mr-2" />
+                  {sendingConsent ? 'Sending…' : 'Send Consent Request to Guardian'}
+                </Button>
+              )}
 
               {/* Test Message */}
               <Button

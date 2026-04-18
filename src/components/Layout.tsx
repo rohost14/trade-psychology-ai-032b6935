@@ -18,6 +18,7 @@ import {
   AlertTriangle,
   ShieldAlert,
   Briefcase,
+  Zap,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { ThemeToggle } from './ThemeToggle';
@@ -44,6 +45,7 @@ const desktopNavGroups = [
     icon: BarChart2,
     items: [
       { name: 'Analytics',       href: '/analytics',        icon: TrendingUp },
+      { name: 'Discipline',      href: '/discipline',       icon: Zap },
       { name: 'My Patterns',     href: '/personalization',  icon: Brain },
       { name: 'Risk Monitor',    href: '/my-patterns',      icon: BarChart2 },
       { name: 'Reports',         href: '/reports',          icon: BookOpen },
@@ -94,6 +96,7 @@ const mobileMoreGroups = [
     label: 'Insights',
     items: [
       { name: 'My Patterns',  href: '/personalization', icon: Brain },
+      { name: 'Discipline',   href: '/discipline',      icon: Zap },
       { name: 'Risk Monitor', href: '/my-patterns',     icon: BarChart2 },
       { name: 'Reports',      href: '/reports',         icon: BookOpen },
     ],

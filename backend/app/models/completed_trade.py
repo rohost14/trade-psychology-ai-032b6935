@@ -44,6 +44,9 @@ class CompletedTrade(Base):
     # Percentage return on entry price: (exit-entry)/entry*100 for LONG, (entry-exit)/entry*100 for SHORT.
     # NULL for records created before migration 055; backfilled on server startup.
     pnl_pct = Column(Numeric(8, 2), nullable=True)
+    # Behavioral quality score (0–8): computed by quality-breakdown endpoint or nightly task.
+    # NULL until first computation after migration 056.
+    quality_score = Column(Integer, nullable=True)
 
     # Timing
     entry_time = Column(TIMESTAMP(timezone=True))

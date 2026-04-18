@@ -103,6 +103,7 @@ class ProfileUpdate(BaseModel):
     ai_persona: Optional[str] = None
     guardian_phone: Optional[str] = None
     guardian_name: Optional[str] = None
+    guardian_loss_limit: Optional[float] = None
     eod_report_time: Optional[str] = None
     morning_brief_time: Optional[str] = None
 
@@ -238,8 +239,10 @@ async def get_profile(
         profile_dict = profile.to_dict()
         user = await db.get(User, user_id)
         if user:
-            profile_dict["guardian_phone"] = user.guardian_phone
-            profile_dict["guardian_name"] = user.guardian_name
+            profile_dict["guardian_phone"]        = user.guardian_phone
+            profile_dict["guardian_name"]         = user.guardian_name
+            profile_dict["guardian_confirmed"]    = user.guardian_confirmed or False
+            profile_dict["guardian_loss_limit"]   = float(user.guardian_loss_limit) if user.guardian_loss_limit else None
 
         return {
             "profile": profile_dict,
@@ -452,16 +455,23 @@ async def update_profile(
         update_data = data.dict(exclude_unset=True)
 
         # Guardian fields live on User, not UserProfile
-        guardian_phone = update_data.pop('guardian_phone', None)
-        guardian_name = update_data.pop('guardian_name', None)
+        guardian_phone      = update_data.pop('guardian_phone', None)
+        guardian_name       = update_data.pop('guardian_name', None)
+        guardian_loss_limit = update_data.pop('guardian_loss_limit', None)
 
-        if guardian_phone is not None or guardian_name is not None:
+        if guardian_phone is not None or guardian_name is not None or guardian_loss_limit is not None:
             user = await db.get(User, user_id)
             if user:
                 if guardian_phone is not None:
+                    # Reset confirmation when phone changes
+                    if user.guardian_phone != guardian_phone:
+                        user.guardian_confirmed    = False
+                        user.guardian_confirmed_at = None
                     user.guardian_phone = guardian_phone
                 if guardian_name is not None:
                     user.guardian_name = guardian_name
+                if guardian_loss_limit is not None:
+                    user.guardian_loss_limit = guardian_loss_limit
 
         for field, value in update_data.items():
             if hasattr(profile, field) and value is not None:
@@ -475,8 +485,10 @@ async def update_profile(
         profile_dict = profile.to_dict()
         user = await db.get(User, user_id)
         if user:
-            profile_dict["guardian_phone"] = user.guardian_phone
-            profile_dict["guardian_name"] = user.guardian_name
+            profile_dict["guardian_phone"]      = user.guardian_phone
+            profile_dict["guardian_name"]       = user.guardian_name
+            profile_dict["guardian_confirmed"]  = user.guardian_confirmed or False
+            profile_dict["guardian_loss_limit"] = float(user.guardian_loss_limit) if user.guardian_loss_limit else None
 
         return {"success": True, "profile": profile_dict}
 
@@ -798,4 +810,87 @@ async def get_behavioral_insights(
 
     except Exception as e:
         logger.error(f"Behavioral insights failed: {e}")
+        raise HTTPException(status_code=500, detail="Internal server error")
+
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Guardian: send consent request + handle confirmation
+# ─────────────────────────────────────────────────────────────────────────────
+
+@router.post("/guardian/send-consent")
+async def guardian_send_consent(
+    broker_account_id: UUID = Depends(get_verified_broker_account_id),
+    db: AsyncSession = Depends(get_db),
+):
+    """
+    Send a WhatsApp consent request to the configured guardian phone.
+    Resets confirmed=False so re-confirmation is needed after phone change.
+    """
+    try:
+        from app.services.whatsapp_service import whatsapp_service
+        from app.api.zerodha import _get_user_id_from_broker_account
+
+        user_id = await _get_user_id_from_broker_account(broker_account_id, db)
+        user = await db.get(User, user_id)
+
+        if not user or not user.guardian_phone:
+            raise HTTPException(status_code=400, detail="No guardian phone number configured")
+
+        if not whatsapp_service.is_configured:
+            raise HTTPException(status_code=503, detail="WhatsApp not configured")
+
+        # Reset confirmation
+        user.guardian_confirmed    = False
+        user.guardian_confirmed_at = None
+        await db.commit()
+
+        trader_name = user.display_name or user.email.split("@")[0]
+        msg = (
+            f"Hi! {trader_name} has added you as their Trading Guardian on TradeMentor. "
+            f"You will receive a message ONLY when they cross a personal loss limit they set themselves. "
+            f"Reply YES to confirm, NO to decline. No other messages without your consent."
+        )
+        sent = await whatsapp_service.send_message(user.guardian_phone, msg)
+
+        return {
+            "sent":   sent,
+            "phone":  user.guardian_phone,
+            "status": "consent_sent" if sent else "send_failed",
+        }
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"guardian send-consent failed: {e}")
+        raise HTTPException(status_code=500, detail="Internal server error")
+
+
+@router.post("/guardian/confirm")
+async def guardian_confirm(
+    broker_account_id: UUID = Depends(get_verified_broker_account_id),
+    db: AsyncSession = Depends(get_db),
+):
+    """
+    Manually mark guardian as confirmed (used when WhatsApp webhook reply is received
+    or for testing/admin override).
+    """
+    try:
+        from datetime import timezone as _tz
+        from app.api.zerodha import _get_user_id_from_broker_account
+
+        user_id = await _get_user_id_from_broker_account(broker_account_id, db)
+        user = await db.get(User, user_id)
+
+        if not user:
+            raise HTTPException(status_code=404, detail="User not found")
+
+        user.guardian_confirmed    = True
+        user.guardian_confirmed_at = datetime.now(timezone.utc)
+        await db.commit()
+
+        return {"confirmed": True, "confirmed_at": user.guardian_confirmed_at.isoformat()}
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"guardian confirm failed: {e}")
         raise HTTPException(status_code=500, detail="Internal server error")

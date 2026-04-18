@@ -12,6 +12,7 @@ import PredictiveWarningsCard from '@/components/dashboard/PredictiveWarningsCar
 import SessionPaceGoalCard from '@/components/dashboard/SessionPaceGoalCard';
 import { SessionHeroCard } from '@/components/dashboard/SessionHeroCard';
 import { AiCoachCta } from '@/components/dashboard/AiCoachCta';
+import VixStrip from '@/components/dashboard/VixStrip';
 import { useHoldings } from '@/hooks/useHoldings';
 import { TradeJournalSheet } from '@/components/dashboard/TradeJournalSheet';
 import { Button } from '@/components/ui/button';
@@ -478,7 +479,7 @@ export default function Dashboard() {
       )}
 
       {/* ── Page Header ───────────────────────────────────────────────────── */}
-      <div className="flex items-center justify-between mb-4">
+      <div className="flex items-center justify-between mb-1">
         <h1 className="text-lg font-semibold text-foreground tracking-tight">Dashboard</h1>
         <div className="flex items-center gap-3 text-[13px] text-muted-foreground font-mono tabular-nums">
           <span>{tradeStats?.trades_today ?? 0} trades</span>
@@ -501,6 +502,11 @@ export default function Dashboard() {
             </>
           )}
         </div>
+      </div>
+
+      {/* ── VIX Context Strip ────────────────────────────────────────────── */}
+      <div className="mb-4">
+        <VixStrip />
       </div>
 
       {/* ── Session Hero ──────────────────────────────────────────────────── */}

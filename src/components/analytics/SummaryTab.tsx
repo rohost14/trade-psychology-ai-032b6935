@@ -6,6 +6,8 @@ import {
 } from 'recharts';
 import { Trophy, Flame, ChevronRight } from 'lucide-react';
 import { Skeleton } from '@/components/ui/skeleton';
+import AttributionCard from '@/components/analytics/AttributionCard';
+import DnaCard from '@/components/analytics/DnaCard';
 import { cn } from '@/lib/utils';
 import { formatCurrency, formatCurrencyWithSign } from '@/lib/formatters';
 import { api } from '@/lib/api';
@@ -456,6 +458,10 @@ export default function SummaryTab({ days, onInstrumentClick }: SummaryTabProps)
               </div>
             </div>
           )}
+
+          {/* Attribution + DNA */}
+          <AttributionCard days={days} />
+          <DnaCard days={days} />
 
           {/* Streaks */}
           <div className="tm-card overflow-hidden">

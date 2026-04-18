@@ -112,6 +112,7 @@ export default function TradesTab({ days }: { days: number }) {
   const [offset, setOffset]         = useState(0);
   const [loadingMore, setLoadingMore] = useState(false);
   const [flagMap, setFlagMap]       = useState<Map<string, FlagReason[]>>(new Map());
+  const [qualityMap, setQualityMap] = useState<Map<string, { score: number; tier: string }>>(new Map());
   const [isLoading, setIsLoading]   = useState(true);
   const [expanded, setExpanded]     = useState<Set<string>>(new Set());
   const [dirFilter, setDirFilter]   = useState<DirFilter>('all');
@@ -134,9 +135,10 @@ export default function TradesTab({ days }: { days: number }) {
 
     const load = async () => {
       setIsLoading(true);
-      const [tradesRes, criticalRes] = await Promise.allSettled([
+      const [tradesRes, criticalRes, qualityRes] = await Promise.allSettled([
         api.get('/api/trades/completed', { params: { limit: PAGE_SIZE, offset: 0 } }),
         api.get('/api/analytics/critical-trades', { params: { days } }),
+        api.get('/api/analytics/quality-breakdown', { params: { days } }),
       ]);
       if (cancelled) return;
 
@@ -144,6 +146,13 @@ export default function TradesTab({ days }: { days: number }) {
       if (criticalRes.status === 'fulfilled') {
         for (const ct of (criticalRes.value.data.trades ?? [])) {
           map.set(ct.id, ct.reasons ?? []);
+        }
+      }
+
+      const qmap = new Map<string, { score: number; tier: string }>();
+      if (qualityRes.status === 'fulfilled') {
+        for (const qt of (qualityRes.value.data.per_trade ?? [])) {
+          qmap.set(qt.trade_id, { score: qt.score, tier: qt.tier });
         }
       }
 
@@ -155,6 +164,7 @@ export default function TradesTab({ days }: { days: number }) {
         setOffset(PAGE_SIZE);
       }
       setFlagMap(map);
+      setQualityMap(qmap);
       setIsLoading(false);
     };
     load();
@@ -342,6 +352,7 @@ export default function TradesTab({ days }: { days: number }) {
           filtered.map((trade) => {
             const flags = flagMap.get(trade.id) ?? [];
             const isFlagged = flags.length > 0;
+            const quality = qualityMap.get(trade.id);
             const isOpen = expanded.has(trade.id);
             const { name, chip, sub } = parseSymbol(trade.tradingsymbol);
             const { date, time } = formatExitTime(trade.exit_time);
@@ -368,6 +379,16 @@ export default function TradesTab({ days }: { days: number }) {
                     </span>
                     {isFlagged && (
                       <AlertTriangle className="h-3 w-3 text-tm-obs shrink-0 hidden sm:block" />
+                    )}
+                    {quality && (
+                      <span className={cn(
+                        'text-[10px] font-bold font-mono px-1.5 py-0.5 rounded shrink-0 hidden sm:inline',
+                        quality.tier === 'high'   && 'bg-green-50 dark:bg-green-900/20 text-tm-profit',
+                        quality.tier === 'medium' && 'bg-amber-50 dark:bg-amber-900/20 text-tm-obs',
+                        quality.tier === 'low'    && 'bg-red-50 dark:bg-red-900/20 text-tm-loss',
+                      )}>
+                        Q{quality.score}
+                      </span>
                     )}
                   </div>
 

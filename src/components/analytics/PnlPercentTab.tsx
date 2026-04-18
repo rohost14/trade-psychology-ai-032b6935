@@ -39,6 +39,9 @@ interface PnlPercentData {
   loss_count: number;
   by_hold_time: HoldBucket[];
   trades: TradePoint[];
+  avg_win_hold_minutes: number;
+  avg_loss_hold_minutes: number;
+  disposition_ratio: number | null;
 }
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
@@ -120,7 +123,10 @@ export default function PnlPercentTab({ days }: { days: number }) {
     </div>
   );
 
-  const { avg_win_pct, avg_loss_pct, rr_ratio, win_count, loss_count, by_hold_time, trades } = data;
+  const {
+    avg_win_pct, avg_loss_pct, rr_ratio, win_count, loss_count, by_hold_time, trades,
+    avg_win_hold_minutes, avg_loss_hold_minutes, disposition_ratio,
+  } = data;
 
   // Scatter: x = duration_minutes, y = pnl_pct
   const scatterData = trades.map(t => ({ ...t, x: t.duration_minutes, y: t.pnl_pct }));
@@ -161,6 +167,29 @@ export default function PnlPercentTab({ days }: { days: number }) {
           color="text-foreground"
         />
       </div>
+
+      {/* ── Disposition Effect (11.3) ── */}
+      {disposition_ratio !== null && (
+        <div className={cn(
+          'tm-card p-4 flex items-start gap-3 border-l-4',
+          disposition_ratio > 2 ? 'border-l-tm-loss' : 'border-l-muted'
+        )}>
+          <Scale className="h-4 w-4 mt-0.5 shrink-0 text-muted-foreground" />
+          <div>
+            <p className="text-sm font-medium text-foreground">Holding Pattern</p>
+            <p className="text-[12px] text-muted-foreground mt-0.5 leading-relaxed">
+              Winners held <span className="font-mono text-foreground">{avg_win_hold_minutes < 60 ? `${avg_win_hold_minutes}m` : `${(avg_win_hold_minutes/60).toFixed(1)}h`}</span>
+              {' '}· Losers held <span className="font-mono text-foreground">{avg_loss_hold_minutes < 60 ? `${avg_loss_hold_minutes}m` : `${(avg_loss_hold_minutes/60).toFixed(1)}h`}</span>
+              {disposition_ratio > 1 && (
+                <span className={cn('ml-1', disposition_ratio > 2 ? 'text-tm-loss' : 'text-tm-obs')}>
+                  · You hold losers <strong>{disposition_ratio}×</strong> longer than winners.
+                  {disposition_ratio > 2 && ' Classic disposition effect.'}
+                </span>
+              )}
+            </p>
+          </div>
+        </div>
+      )}
 
       {/* ── Hold time vs % P&L ── */}
       <div className="tm-card overflow-hidden">

@@ -29,6 +29,7 @@ const Guardrails      = lazy(() => import("./pages/Guardrails"));
 const PortfolioChat   = lazy(() => import("./pages/PortfolioChat"));
 const Reports           = lazy(() => import("./pages/Reports"));
 const Personalization   = lazy(() => import("./pages/Personalization"));
+const Discipline        = lazy(() => import("./pages/Discipline"));
 const TermsOfService = lazy(() => import("./pages/TermsOfService"));
 const PrivacyPolicy  = lazy(() => import("./pages/PrivacyPolicy"));
 const Maintenance   = lazy(() => import("./pages/Maintenance"));
@@ -86,6 +87,7 @@ const App = () => (
                     <Route path="portfolio-chat" element={<PortfolioChat />} />
                     <Route path="reports" element={<Reports />} />
                     <Route path="personalization" element={<Personalization />} />
+                    <Route path="discipline" element={<Discipline />} />
                     <Route path="settings" element={<Settings />} />
                   </Route>
                   <Route path="welcome" element={<Welcome />} />

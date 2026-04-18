@@ -26,6 +26,8 @@ export interface UserProfile {
   guardian_name?: string;
   guardian_alert_threshold?: string;
   guardian_daily_summary?: boolean;
+  guardian_confirmed?: boolean;
+  guardian_loss_limit?: number;
   eod_report_time?: string;       // HH:MM IST, default '16:00'
   morning_brief_time?: string;    // HH:MM IST, default '08:30'
   ai_persona?: string;

@@ -10,7 +10,7 @@ from datetime import datetime
 from typing import Optional, List, TYPE_CHECKING
 from uuid import uuid4
 
-from sqlalchemy import String, TIMESTAMP, text
+from sqlalchemy import String, TIMESTAMP, Boolean, Numeric, text
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
@@ -34,7 +34,11 @@ class User(Base):
 
     # Guardian contact — belongs to the human, survives broker reconnects
     guardian_phone: Mapped[Optional[str]] = mapped_column(String, nullable=True)
-    guardian_name: Mapped[Optional[str]] = mapped_column(String, nullable=True)
+    guardian_name:  Mapped[Optional[str]] = mapped_column(String, nullable=True)
+    # Guardian confirmed (migration 056): True after guardian replies YES to consent WhatsApp
+    guardian_confirmed:    Mapped[Optional[bool]]     = mapped_column(Boolean, nullable=True, default=False)
+    guardian_confirmed_at: Mapped[Optional[datetime]] = mapped_column(TIMESTAMP(timezone=True), nullable=True)
+    guardian_loss_limit:   Mapped[Optional[float]]    = mapped_column(Numeric(15, 4), nullable=True)
 
     created_at: Mapped[datetime] = mapped_column(
         TIMESTAMP(timezone=True), server_default=text("now()"), nullable=False
