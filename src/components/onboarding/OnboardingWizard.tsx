@@ -52,7 +52,6 @@ interface OnboardingData {
   whatsapp_enabled: boolean;
   alert_sensitivity: string;
   guardian_enabled: boolean;
-  ai_persona: string;
 }
 
 const STEPS = [
@@ -101,12 +100,6 @@ const WEAKNESSES = [
   { value: 'late_entry', label: 'Chasing Entries' },
 ];
 
-const AI_PERSONAS = [
-  { value: 'coach', label: 'Coach', icon: '🏋️', description: 'Encouraging & supportive' },
-  { value: 'mentor', label: 'Mentor', icon: '🎓', description: 'Wise & experienced' },
-  { value: 'friend', label: 'Friend', icon: '🤝', description: 'Casual & relatable' },
-  { value: 'strict', label: 'Drill Sergeant', icon: '🎖️', description: 'No-nonsense discipline' },
-];
 
 export default function OnboardingWizard({ brokerAccountId, onComplete, onSkip }: OnboardingWizardProps) {
   const [currentStep, setCurrentStep] = useState(1);
@@ -129,7 +122,6 @@ export default function OnboardingWizard({ brokerAccountId, onComplete, onSkip }
     whatsapp_enabled: false,
     alert_sensitivity: 'medium',
     guardian_enabled: false,
-    ai_persona: 'coach',
   });
 
   const progress = (currentStep / STEPS.length) * 100;
@@ -201,7 +193,6 @@ export default function OnboardingWizard({ brokerAccountId, onComplete, onSkip }
           whatsapp_enabled: data.whatsapp_enabled,
           alert_sensitivity: data.alert_sensitivity,
           guardian_enabled: data.guardian_enabled,
-          ai_persona: data.ai_persona,
         };
       default:
         return {};
@@ -509,26 +500,6 @@ export default function OnboardingWizard({ brokerAccountId, onComplete, onSkip }
               {/* Step 5: Notifications */}
               {currentStep === 5 && (
                 <div className="space-y-6">
-                  <div className="space-y-3">
-                    <Label>Choose Your AI Coach Personality</Label>
-                    <div className="grid grid-cols-2 gap-3">
-                      {AI_PERSONAS.map((persona) => (
-                        <div
-                          key={persona.value}
-                          className={`p-4 rounded-lg border-2 cursor-pointer transition-all ${data.ai_persona === persona.value
-                              ? 'border-tm-brand bg-teal-50/50 dark:bg-teal-900/10'
-                              : 'border-border hover:border-tm-brand/50'
-                            }`}
-                          onClick={() => setData({ ...data, ai_persona: persona.value })}
-                        >
-                          <span className="text-2xl">{persona.icon}</span>
-                          <p className="font-medium mt-2">{persona.label}</p>
-                          <p className="text-xs text-muted-foreground">{persona.description}</p>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-
                   <div className="space-y-4">
                     <div className="flex items-center justify-between p-4 border rounded-lg">
                       <div>

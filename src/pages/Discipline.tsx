@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Zap, Flame, Trophy, TrendingUp } from 'lucide-react';
+import { Zap, Flame, TrendingUp } from 'lucide-react';
 import { Skeleton } from '@/components/ui/skeleton';
 import { cn } from '@/lib/utils';
 import { api } from '@/lib/api';
@@ -25,13 +25,6 @@ interface DisciplineData {
   };
 }
 
-const STREAK_BADGES = [
-  { id: 'revenge_free',     icon: '🧘', label: 'Revenge-Free',      desc: 'No revenge trades for 5+ days',    threshold: 5 },
-  { id: 'size_discipline',  icon: '📐', label: 'Size Disciplined',   desc: 'No size escalation for 7+ days',   threshold: 7 },
-  { id: 'early_bird',       icon: '🌅', label: 'Morning Trader',     desc: 'Trade only 9:15–11:30 for 5 days', threshold: 5 },
-  { id: 'quality_trader',   icon: '⭐', label: 'Quality Trader',     desc: '5 sessions avg quality ≥7',        threshold: 5 },
-  { id: 'iron_discipline',  icon: '🔩', label: 'Iron Discipline',    desc: '10 sessions no hard alerts',       threshold: 10 },
-];
 
 function ScoreGauge({ score, max }: { score: number; max: number }) {
   const pct = Math.min(100, (score / max) * 100);
@@ -241,34 +234,6 @@ export default function Discipline() {
         </div>
       </div>
 
-      {/* Badge wall */}
-      <div className="tm-card overflow-hidden">
-        <div className="px-5 py-4 border-b border-border flex items-center gap-2">
-          <Trophy className="h-4 w-4 text-tm-obs" />
-          <p className="text-sm font-medium text-foreground">Badges</p>
-          <p className="text-[11px] text-muted-foreground">(coming as you hit streaks)</p>
-        </div>
-        <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 p-4">
-          {STREAK_BADGES.map(badge => {
-            const unlocked = badge.id === 'revenge_free' && data.revenge_free_days >= badge.threshold;
-            return (
-              <div key={badge.id} className={cn(
-                'rounded-xl border p-3 text-center transition-all',
-                unlocked
-                  ? 'border-tm-brand/40 bg-tm-brand/5'
-                  : 'border-border bg-muted/20 opacity-50'
-              )}>
-                <p className="text-2xl mb-1">{badge.icon}</p>
-                <p className={cn('text-[12px] font-medium', unlocked ? 'text-foreground' : 'text-muted-foreground')}>
-                  {badge.label}
-                </p>
-                <p className="text-[10px] text-muted-foreground mt-0.5">{badge.desc}</p>
-                {unlocked && <p className="text-[10px] text-tm-profit mt-1 font-medium">Unlocked</p>}
-              </div>
-            );
-          })}
-        </div>
-      </div>
     </div>
   );
 }

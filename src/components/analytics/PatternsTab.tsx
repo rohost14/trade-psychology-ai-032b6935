@@ -4,7 +4,6 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { cn } from '@/lib/utils';
 import { formatCurrencyWithSign, formatCurrency } from '@/lib/formatters';
 import { api } from '@/lib/api';
-import RecoveryCard from '@/components/analytics/RecoveryCard';
 
 interface PatternsTabProps { days: number; }
 
@@ -217,9 +216,6 @@ export default function PatternsTab({ days }: PatternsTabProps) {
 
   return (
     <div className="space-y-4">
-
-      {/* Recovery Pattern (11.15) */}
-      <RecoveryCard days={days} />
 
       {/* Clean vs Flagged comparison */}
       {(clean.length > 0 || dirty.length > 0) && (

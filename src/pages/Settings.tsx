@@ -36,9 +36,6 @@ export default function Settings() {
     whatsapp_enabled: false,
     alert_sensitivity: 'medium',
     guardian_enabled: false,
-    ai_persona: 'coach',
-    eod_report_time: '16:00',
-    morning_brief_time: '08:30',
   });
 
   const fetchProfile = useCallback(async () => {
@@ -111,9 +108,6 @@ export default function Settings() {
         guardian_name: profile.guardian_name,
         guardian_alert_threshold: profile.guardian_alert_threshold,
         guardian_daily_summary: profile.guardian_daily_summary,
-        eod_report_time: profile.eod_report_time || '16:00',
-        morning_brief_time: profile.morning_brief_time || '08:30',
-        ai_persona: profile.ai_persona,
       };
 
       await api.put('/api/profile/', payload);

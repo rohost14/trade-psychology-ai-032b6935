@@ -14,7 +14,6 @@ const PatternsTab   = lazy(() => import('@/components/analytics/PatternsTab'));
 const TradesTab     = lazy(() => import('@/components/analytics/TradesTab'));
 const BtstTab       = lazy(() => import('@/components/analytics/BtstTab'));
 const PnlPercentTab = lazy(() => import('@/components/analytics/PnlPercentTab'));
-const EdgeMapTab    = lazy(() => import('@/components/analytics/EdgeMapTab'));
 
 function TabSkeleton() {
   return (
@@ -40,7 +39,6 @@ const TABS = [
   { value: 'trades',   label: 'Trades'   },
   { value: 'btst',     label: 'BTST'     },
   { value: 'pnlpct',   label: '% Return' },
-  { value: 'edge',     label: 'Edge Map'  },
 ] as const;
 
 type TabValue = typeof TABS[number]['value'];
@@ -133,7 +131,6 @@ export default function Analytics() {
         {tab === 'trades'   && <TradesTab days={days} />}
         {tab === 'btst'     && <BtstTab days={days} />}
         {tab === 'pnlpct'   && <PnlPercentTab days={days} />}
-        {tab === 'edge'     && <EdgeMapTab days={days} />}
       </Suspense>
 
       <ComplianceDisclaimer variant="footer" className="mt-8" />

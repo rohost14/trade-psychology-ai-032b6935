@@ -1,4 +1,4 @@
-import { AlertTriangle, Mail, Phone, Bell, CheckCircle2, Clock } from 'lucide-react';
+import { AlertTriangle, Mail, Phone, CheckCircle2, Clock } from 'lucide-react';
 import { api } from '@/lib/api';
 import { toast } from 'sonner';
 import { Switch } from '@/components/ui/switch';
@@ -247,20 +247,6 @@ export function NotificationsTab({
                 </Select>
               </div>
 
-              {/* Daily Summary Toggle */}
-              <div className="flex items-center justify-between p-4 border rounded-lg">
-                <div>
-                  <p className="font-medium">Daily Summary Reports</p>
-                  <p className="text-sm text-muted-foreground">
-                    Send end-of-day trading summary to your guardian
-                  </p>
-                </div>
-                <Switch
-                  checked={profile.guardian_daily_summary || false}
-                  onCheckedChange={(checked) => setProfile({ ...profile, guardian_daily_summary: checked })}
-                />
-              </div>
-
               {/* What Guardian Receives */}
               <div className="p-4 bg-muted/50 rounded-lg space-y-2">
                 <p className="font-medium text-sm">Your guardian will receive:</p>
@@ -270,9 +256,6 @@ export function NotificationsTab({
                   <li>- Consecutive loss threshold exceeded</li>
                   {profile.guardian_alert_threshold === 'warning' && (
                     <li>- Early warning signs</li>
-                  )}
-                  {profile.guardian_daily_summary && (
-                    <li>- Daily trading summary at your configured EOD time</li>
                   )}
                 </ul>
               </div>
@@ -339,64 +322,6 @@ export function NotificationsTab({
         </div>
       </div>
 
-      {/* Report Delivery Timing */}
-      <div className="tm-card overflow-hidden">
-        <div className="px-5 py-4 border-b border-border">
-          <p className="text-sm font-semibold text-foreground flex items-center gap-2">
-            <Bell className="h-4 w-4" />
-            Report Delivery Timing (IST)
-          </p>
-          <p className="text-xs text-muted-foreground mt-0.5">
-            Choose when you receive automated daily reports. Defaults are after market close and before open.
-          </p>
-        </div>
-        <div className="p-5 space-y-6">
-          {/* EOD Report Time */}
-          <div className="space-y-2">
-            <Label htmlFor="eod-time">Post-Market Report (EOD)</Label>
-            <div className="flex items-center gap-3">
-              <Input
-                id="eod-time"
-                type="time"
-                value={profile.eod_report_time || '16:00'}
-                onChange={(e) => setProfile({ ...profile, eod_report_time: e.target.value })}
-                className="w-36"
-              />
-              <span className="text-sm text-muted-foreground">
-                IST — Default 4:00 PM (after equity market close)
-              </span>
-            </div>
-            <p className="text-xs text-muted-foreground">
-              Includes: trade count, P&amp;L, win rate, emotional journey, patterns detected, lessons &amp; tomorrow's focus.
-            </p>
-          </div>
-
-          {/* Morning Brief Time */}
-          <div className="space-y-2">
-            <Label htmlFor="morning-time">Morning Readiness Brief</Label>
-            <div className="flex items-center gap-3">
-              <Input
-                id="morning-time"
-                type="time"
-                value={profile.morning_brief_time || '08:30'}
-                onChange={(e) => setProfile({ ...profile, morning_brief_time: e.target.value })}
-                className="w-36"
-              />
-              <span className="text-sm text-muted-foreground">
-                IST — Default 8:30 AM (before market open at 9:15)
-              </span>
-            </div>
-            <p className="text-xs text-muted-foreground">
-              Includes: readiness score, yesterday's recap, watch-outs, personalised checklist &amp; commitment prompt.
-            </p>
-          </div>
-
-          <div className="p-3 bg-muted/40 rounded-lg text-xs text-muted-foreground">
-            ℹ️ Reports are sent to your WhatsApp (guardian number) and as push notifications.
-            If no custom time is set, the default times above are used.
-          </div>
-        </div>
-      </div>
     </div>
   );
 }

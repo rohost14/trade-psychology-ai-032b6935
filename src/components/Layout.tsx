@@ -8,7 +8,6 @@ import {
   Shield,
   X,
   Brain,
-  Radar,
   Bell,
   BookOpen,
   MoreHorizontal,
@@ -17,7 +16,6 @@ import {
   BarChart2,
   AlertTriangle,
   ShieldAlert,
-  Briefcase,
   Zap,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
@@ -59,14 +57,7 @@ const desktopNavGroups = [
       { name: 'Alerts',          href: '/alerts',          icon: Bell },
       { name: 'Blowup Shield',   href: '/blowup-shield',   icon: Shield },
       { name: 'Guardrails',      href: '/guardrails',      icon: ShieldAlert },
-      { name: 'Portfolio Radar', href: '/portfolio-radar', icon: Radar },
     ],
-  },
-  {
-    type: 'link' as const,
-    name: 'Portfolio Chat',
-    href: '/portfolio-chat',
-    icon: Briefcase,
   },
   {
     type: 'link' as const,
@@ -106,13 +97,6 @@ const mobileMoreGroups = [
     items: [
       { name: 'Blowup Shield',   href: '/blowup-shield',   icon: Shield },
       { name: 'Guardrails',      href: '/guardrails',      icon: ShieldAlert },
-      { name: 'Portfolio Radar', href: '/portfolio-radar', icon: Radar },
-    ],
-  },
-  {
-    label: 'Investor',
-    items: [
-      { name: 'Portfolio Chat', href: '/portfolio-chat', icon: Briefcase },
     ],
   },
   {

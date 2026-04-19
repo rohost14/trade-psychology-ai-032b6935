@@ -1,4 +1,4 @@
-import { Shield, Brain } from 'lucide-react';
+import { Shield } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import {
@@ -13,7 +13,6 @@ import {
   EXPERIENCE_LEVELS,
   TRADING_STYLES,
   RISK_TOLERANCE,
-  AI_PERSONAS,
 } from '@/lib/settingsConstants';
 
 interface ProfileTabProps {
@@ -267,35 +266,6 @@ export function ProfileTab({ profile, setProfile }: ProfileTabProps) {
         </div>
       </div>
 
-      {/* AI Persona */}
-      <div className="tm-card overflow-hidden">
-        <div className="px-5 py-4 border-b border-border">
-          <p className="text-sm font-semibold text-foreground flex items-center gap-2">
-            <Brain className="h-4 w-4" />
-            AI Coach Personality
-          </p>
-          <p className="text-xs text-muted-foreground mt-0.5">
-            Choose how your AI trading coach communicates with you
-          </p>
-        </div>
-        <div className="p-5">
-          <div className="grid grid-cols-2 gap-4">
-            {AI_PERSONAS.map((persona) => (
-              <div
-                key={persona.value}
-                className={`p-4 rounded-lg border-2 cursor-pointer transition-all ${profile.ai_persona === persona.value
-                  ? 'border-tm-brand bg-teal-50/50 dark:bg-teal-900/10'
-                  : 'border-border hover:border-tm-brand/50'
-                  }`}
-                onClick={() => setProfile({ ...profile, ai_persona: persona.value })}
-              >
-                <p className="font-medium">{persona.label}</p>
-                <p className="text-sm text-muted-foreground mt-1">{persona.description}</p>
-              </div>
-            ))}
-          </div>
-        </div>
-      </div>
     </div>
   );
 }
