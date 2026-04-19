@@ -136,7 +136,7 @@ export default function Personalization() {
       {/* Header */}
       <div className="mb-5 flex items-center justify-between">
         <div>
-          <h1 className="text-lg font-semibold text-foreground tracking-tight">My Patterns</h1>
+          <h1 className="t-heading-lg text-foreground">My Patterns</h1>
           {data?.last_updated && (
             <p className="text-[11px] text-muted-foreground mt-0.5">
               Last analysed {fmtUpdated(data.last_updated)}

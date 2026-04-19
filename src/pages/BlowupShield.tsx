@@ -216,7 +216,7 @@ export default function BlowupShieldPage() {
 
       {/* Header */}
       <div className="mb-6 animate-fade-in-up">
-        <h1 className="text-xl font-semibold text-foreground tracking-tight">Blowup Shield</h1>
+        <h1 className="t-heading-lg text-foreground">Blowup Shield</h1>
         <p className="text-sm text-muted-foreground mt-0.5">
           What you did after each alert — facts only.
         </p>
@@ -226,7 +226,7 @@ export default function BlowupShieldPage() {
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-6 animate-fade-in-up">
         <div className="tm-card px-4 py-3">
           <p className="text-xs text-muted-foreground mb-1">Total Alerts</p>
-          <p className="text-2xl font-semibold font-mono text-foreground">{s.total_alerts}</p>
+          <p className="t-mono-display text-foreground">{s.total_alerts}</p>
           <p className="text-xs text-muted-foreground mt-0.5">
             {s.danger_count} danger · {s.caution_count} caution
           </p>
@@ -235,7 +235,7 @@ export default function BlowupShieldPage() {
         <div className="tm-card px-4 py-3">
           <p className="text-xs text-muted-foreground mb-1">Heeded Rate</p>
           <p className={cn(
-            'text-2xl font-semibold font-mono',
+            't-mono-display',
             heedRate === null ? 'text-foreground' :
               heedRate >= 70 ? 'text-tm-profit' :
               heedRate >= 40 ? 'text-tm-obs' : 'text-tm-loss',
@@ -249,7 +249,7 @@ export default function BlowupShieldPage() {
 
         <div className="tm-card px-4 py-3">
           <p className="text-xs text-muted-foreground mb-1">Current Streak</p>
-          <p className="text-2xl font-semibold font-mono text-foreground">{s.heeded_streak}</p>
+          <p className="t-mono-display text-foreground">{s.heeded_streak}</p>
           <p className="text-xs text-muted-foreground mt-0.5">consecutive heeded</p>
         </div>
 
@@ -258,11 +258,11 @@ export default function BlowupShieldPage() {
             {additionalLoss !== null ? 'Added Loss (ignored)' : 'Spiral Sessions'}
           </p>
           {additionalLoss !== null ? (
-            <p className="text-2xl font-semibold font-mono text-tm-loss">
+            <p className="t-mono-display text-tm-loss">
               {formatCurrencyWithSign(additionalLoss)}
             </p>
           ) : (
-            <p className="text-2xl font-semibold font-mono text-foreground">{s.spiral_sessions}</p>
+            <p className="t-mono-display text-foreground">{s.spiral_sessions}</p>
           )}
           <p className="text-xs text-muted-foreground mt-0.5">
             {additionalLoss !== null

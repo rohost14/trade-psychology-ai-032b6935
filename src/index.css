@@ -1,146 +1,164 @@
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=DM+Mono:wght@400;500&display=swap');
 
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
 
-/* TradeMentor AI - Clean Professional Design System
-   Inspired by: Stripe, Zerodha Kite, Linear, Mercury
-   Philosophy: Content over chrome, clarity over complexity
+/* TradeMentor AI — "Precision Dark/Light" Design System
+   Both themes are equal priority. Dark is default; light is first-class.
+   Layer system creates visual depth via blue-purple undertone at all levels.
 */
 
 @layer base {
   :root {
-    /* ── TradeMentor financial & brand tokens ─────────────────────────────── */
-    /* These flip in .dark below. Use text-tm-profit, bg-tm-loss/5, etc.     */
-    --tm-profit: 15 142 125;
-    /* #0F8E7D  teal — profit on light bg         */
-    --tm-loss: 177 61 68;
-    /* #B13D44  red                                */
-    --tm-obs: 230 138 0;
-    /* #E68A00  amber — behavioral observations    */
-    --tm-brand: 13 148 136;
-    /* #0D9488  teal-600 — more vivid on light     */
+    /* ── Layer System (Light) ──────────────────────────────────────────────── */
+    /* Each layer is progressively lighter; cards visually lift off the page.  */
+    --layer-page:          242 242 247;   /* #F2F2F7  hsl(240,13%,96%)  body  */
+    --layer-surface:       255 255 255;   /* #FFFFFF                    cards */
+    --layer-elevated:      248 248 252;   /* #F8F8FC  hsl(240,20%,98%)  sidebar, modals */
+    --layer-overlay:       238 239 246;   /* #EEEFF6  hsl(235,18%,95%)  hover rows */
+    --layer-border:        226 226 238;   /* #E2E2EE  hsl(240,18%,91%)  card edges */
+    --layer-border-subtle: 235 235 245;   /* #EBEBF5  hsl(240,20%,94%)  row dividers */
 
-    /* Neutral Gray Scale (Zinc - warm, professional) */
-    --gray-50: 250 250 250;
-    --gray-100: 244 244 245;
-    --gray-200: 228 228 231;
-    --gray-300: 212 212 216;
-    --gray-400: 161 161 170;
-    --gray-500: 113 113 122;
-    --gray-600: 82 82 91;
-    --gray-700: 63 63 70;
-    --gray-800: 39 39 42;
-    --gray-900: 24 24 27;
+    /* ── shadcn / Tailwind mapping ──────────────────────────────────────────── */
+    --background:          var(--layer-page);
+    --foreground:          12 12 20;       /* #0C0C14 — primary text */
 
-    /* Background & Foreground */
-    --background: 248 248 246;
-    /* warm stone-50 — not zinc-grey, not teal-tinted */
-    --foreground: var(--gray-900);
+    --card:                var(--layer-surface);
+    --card-foreground:     12 12 20;
 
-    /* Card */
-    --card: 255 255 255;
-    --card-foreground: var(--gray-900);
+    --popover:             var(--layer-surface);
+    --popover-foreground:  12 12 20;
 
-    /* Popover */
-    --popover: 255 255 255;
-    --popover-foreground: var(--gray-900);
+    --primary:             15 118 110;     /* #0F766E  teal-700 */
+    --primary-foreground:  255 255 255;
 
-    /* Primary - Teal (calming, professional) */
-    --primary: 13 148 136;
-    --primary-foreground: 255 255 255;
+    --secondary:           var(--layer-elevated);
+    --secondary-foreground: 12 12 20;
 
-    /* Secondary */
-    --secondary: var(--gray-100);
-    --secondary-foreground: var(--gray-900);
+    --muted:               var(--layer-elevated);
+    --muted-foreground:    96 96 122;      /* #60607A — secondary text */
 
-    /* Muted */
-    --muted: var(--gray-100);
-    --muted-foreground: 107 114 128;
-    /* slate-500 — warmer than zinc, better on white cards */
+    --accent:              var(--layer-overlay);
+    --accent-foreground:   12 12 20;
 
-    /* Accent */
-    --accent: var(--gray-100);
-    --accent-foreground: var(--gray-900);
-
-    /* Destructive */
-    --destructive: 220 38 38;
+    --destructive:         185 28 28;      /* #B91C1C */
     --destructive-foreground: 255 255 255;
 
-    /* Border & Input */
-    --border: var(--gray-200);
-    --input: var(--gray-200);
-    --ring: 13 148 136;
+    --border:              var(--layer-border);
+    --input:               var(--layer-border);
+    --ring:                15 118 110;     /* #0F766E */
 
-    /* Radius - Modest, not too rounded */
     --radius: 0.5rem;
 
-    /* Semantic Colors */
-    --success: 22 163 74;
+    /* ── Text hierarchy (3 tiers) ───────────────────────────────────────────── */
+    --text-primary:   12 12 20;    /* #0C0C14 — headings, key data */
+    --text-secondary: 96 96 122;   /* #60607A — descriptions, labels */
+    --text-tertiary:  152 152 174; /* #9898AE — timestamps, metadata */
+
+    /* ── TradeMentor financial & brand tokens ───────────────────────────────── */
+    /* WCAG AA corrected for light backgrounds (all ≥ 4.5:1 on white)          */
+    --tm-profit: 21 128 61;    /* #15803D  green-700  — 4.6:1 ✓ */
+    --tm-loss:   185 28 28;    /* #B91C1C  red-700    — 6.4:1 ✓ */
+    --tm-obs:    146 64 14;    /* #92400E  amber-800  — 7.4:1 ✓ */
+    --tm-brand:  15 118 110;   /* #0F766E  teal-700   — 4.6:1 ✓ */
+
+    /* ── Status system tokens ───────────────────────────────────────────────── */
+    /* Use with opacity modifier: bg-tm-status-danger/7 border-tm-status-danger/20 */
+    --status-danger:  185 28 28;   /* #B91C1C */
+    --status-caution: 146 64 14;   /* #92400E */
+    --status-success: 21 128 61;   /* #15803D */
+    --status-info:    29 78 216;   /* #1D4ED8 */
+
+    /* ── Sidebar colors ─────────────────────────────────────────────────────── */
+    --sidebar-bg: 240 240 248;   /* #F0F0F8 — slightly deeper than page */
+
+    /* ── Semantic aliases (kept for backwards compatibility) ────────────────── */
+    --success: var(--tm-profit);
     --success-foreground: 255 255 255;
-    --warning: 217 119 6;
+    --warning: var(--tm-obs);
     --warning-foreground: 255 255 255;
-    --danger: 220 38 38;
+    --danger: var(--tm-loss);
     --danger-foreground: 255 255 255;
 
-    /* Shadows - Minimal, subtle */
-    --shadow-sm: 0 1px 2px 0 rgb(0 0 0 / 0.05);
-    --shadow-md: 0 4px 6px -1px rgb(0 0 0 / 0.07);
+    /* ── Shadow tokens (raw CSS values — light mode uses drop shadows) ───────── */
+    --shadow-card:     0 1px 2px rgba(0,0,0,0.06), 0 1px 4px rgba(0,0,0,0.04);
+    --shadow-elevated: 0 2px 8px rgba(0,0,0,0.08), 0 4px 20px rgba(0,0,0,0.06);
+    --shadow-sheet:    0 8px 32px rgba(0,0,0,0.12), 0 24px 80px rgba(0,0,0,0.08);
   }
 
   .dark {
-    /* TradeMentor tokens — dark overrides */
-    --tm-profit: 52 211 153;
-    /* #34D399 — emerald green */
-    --tm-loss: 248 113 113;
-    /* #F87171 — soft red      */
-    --tm-obs: 251 191 36;
-    /* #FBBF24 — amber         */
-    --tm-brand: 45 212 191;
-    /* #2DD4BF — teal          */
+    /* ── Layer System (Dark) ──────────────────────────────────────────────────
+       Blue-purple undertone: hsl(240, ~12-15%, L%). Not blue — just tinted.
+       Delta between page (#09090C) and surface (#111116) is now clearly visible. */
+    --layer-page:          9 9 12;      /* #09090C  hsl(240,15%,4.5%) */
+    --layer-surface:       17 17 22;    /* #111116  hsl(240,12%,8%)   */
+    --layer-elevated:      26 26 34;    /* #1A1A22  hsl(240,13%,12%)  */
+    --layer-overlay:       35 35 48;    /* #232330  hsl(240,15%,17%)  */
+    --layer-border:        42 42 56;    /* #2A2A38  hsl(240,15%,20%)  */
+    --layer-border-subtle: 30 30 42;    /* #1E1E2A  hsl(240,15%,15%)  */
 
-    /* Pure neutral dark — no slate/blue cast */
-    --background: 11 11 11;
-    /* #0B0B0B — near-black     */
-    --foreground: 242 242 242;
-    /* #F2F2F2 — soft white     */
+    /* ── shadcn / Tailwind mapping ──────────────────────────────────────────── */
+    --background:         var(--layer-page);
+    --foreground:         240 240 248;  /* #F0F0F8 — slightly blue-tinted white */
 
-    --card: 20 20 20;
-    /* #141414 — dark card      */
-    --card-foreground: 242 242 242;
+    --card:               var(--layer-surface);
+    --card-foreground:    240 240 248;
 
-    --popover: 24 24 24;
-    /* #181818 */
-    --popover-foreground: 242 242 242;
+    --popover:            var(--layer-elevated);
+    --popover-foreground: 240 240 248;
 
-    --primary: 20 184 166;
-    /* teal-500 */
-    --primary-foreground: 255 255 255;
+    --primary:            45 212 191;   /* #2DD4BF  teal-400 */
+    --primary-foreground: 9 9 12;
 
-    --secondary: 30 30 30;
-    /* #1E1E1E */
-    --secondary-foreground: 220 220 220;
+    --secondary:          var(--layer-elevated);
+    --secondary-foreground: 220 220 230;
 
-    --muted: 26 26 26;
-    /* #1A1A1A */
-    --muted-foreground: 142 142 142;
-    /* #8E8E8E */
+    --muted:              var(--layer-elevated);
+    --muted-foreground:   152 152 176;  /* #9898B0 — secondary text */
 
-    --accent: 30 30 30;
-    --accent-foreground: 220 220 220;
+    --accent:             var(--layer-overlay);
+    --accent-foreground:  220 220 230;
 
-    --destructive: 239 68 68;
+    --destructive:        248 113 113;  /* #F87171 */
     --destructive-foreground: 255 255 255;
 
-    --border: 40 40 40;
-    /* #282828 — subtle separator */
-    --input: 36 36 36;
-    /* #242424 */
-    --ring: 20 184 166;
+    --border:             var(--layer-border);
+    --input:              var(--layer-border);
+    --ring:               45 212 191;   /* #2DD4BF */
 
-    --shadow-sm: 0 1px 3px 0 rgb(0 0 0 / 0.5);
-    --shadow-md: 0 4px 12px -2px rgb(0 0 0 / 0.6);
+    /* ── Text hierarchy ────────────────────────────────────────────────────── */
+    --text-primary:   240 240 248;  /* #F0F0F8 — not pure white, reduces strain */
+    --text-secondary: 152 152 176;  /* #9898B0 */
+    --text-tertiary:  90 90 114;    /* #5A5A72 */
+
+    /* ── Financial tokens ──────────────────────────────────────────────────── */
+    --tm-profit: 74 222 128;    /* #4ADE80  green-400  — bright on dark */
+    --tm-loss:   248 113 113;   /* #F87171  red-400    */
+    --tm-obs:    251 191 36;    /* #FBBF24  amber-400  */
+    --tm-brand:  45 212 191;    /* #2DD4BF  teal-400   */
+
+    /* ── Status system tokens ───────────────────────────────────────────────── */
+    --status-danger:  248 113 113;  /* #F87171 */
+    --status-caution: 251 191 36;   /* #FBBF24 */
+    --status-success: 74 222 128;   /* #4ADE80 */
+    --status-info:    96 165 250;   /* #60A5FA */
+
+    /* ── Sidebar ────────────────────────────────────────────────────────────── */
+    --sidebar-bg: 26 26 34;   /* #1A1A22 — Layer 2 */
+
+    /* ── Semantic aliases ───────────────────────────────────────────────────── */
+    --success: var(--tm-profit);
+    --success-foreground: 9 9 12;
+    --warning: var(--tm-obs);
+    --warning-foreground: 9 9 12;
+    --danger: var(--tm-loss);
+    --danger-foreground: 9 9 12;
+
+    /* ── Shadow tokens (dark mode uses edge highlights, not drop shadows) ────── */
+    --shadow-card:     inset 0 1px 0 rgba(255,255,255,0.06);
+    --shadow-elevated: 0 0 0 1px rgba(255,255,255,0.08), 0 8px 32px rgba(0,0,0,0.5);
+    --shadow-sheet:    0 0 0 1px rgba(255,255,255,0.10), 0 24px 80px rgba(0,0,0,0.7);
   }
 }
 
@@ -158,30 +176,16 @@
 
   body {
     @apply bg-background text-foreground;
-    font-family: 'Inter', system-ui, -apple-system, sans-serif;
+    font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
     line-height: 1.5;
   }
 
-  /* Simple Typography */
-  h1 {
-    @apply text-2xl font-semibold text-foreground tracking-tight;
-  }
-
-  h2 {
-    @apply text-xl font-semibold text-foreground tracking-tight;
-  }
-
-  h3 {
-    @apply text-lg font-semibold text-foreground;
-  }
-
-  h4 {
-    @apply text-base font-medium text-foreground;
-  }
-
-  p {
-    @apply text-base text-muted-foreground;
-  }
+  /* Typography — headings use design system sizes */
+  h1 { font-size: 20px; font-weight: 600; line-height: 1.25; letter-spacing: -0.02em; @apply text-foreground; }
+  h2 { font-size: 16px; font-weight: 600; line-height: 1.35; letter-spacing: -0.015em; @apply text-foreground; }
+  h3 { font-size: 14px; font-weight: 600; line-height: 1.4; letter-spacing: -0.01em; @apply text-foreground; }
+  h4 { @apply text-base font-medium text-foreground; }
+  p  { @apply text-sm text-muted-foreground; }
 
   /* Tabular numbers for financial data */
   .tabular-nums {
@@ -190,38 +194,32 @@
 }
 
 /* Structural icons: refined 1.5 stroke feels crafted vs Lucide default 2 */
-/* Override specific action icons (X, Check) with style={{ strokeWidth: 2 }} if needed */
 svg.lucide {
   stroke-width: 1.5;
 }
 
 /* Global accessibility: visible focus rings for keyboard navigation */
 :focus-visible {
-  outline: 2px solid hsl(var(--ring));
+  outline: 2px solid rgb(var(--ring));
   outline-offset: 2px;
 }
 
-/* Remove outline for mouse users; keep for keyboard */
 :focus:not(:focus-visible) {
   outline: none;
 }
 
 @layer components {
 
-  /* Clean Card - No glassmorphism, no gradients */
-  .card {
-    @apply bg-card rounded-lg border border-border;
-    box-shadow: var(--shadow-sm);
-  }
-
-  .card-elevated {
-    @apply bg-card rounded-lg border border-border;
-    box-shadow: var(--shadow-md);
+  /* tm-card — standard data surface, both themes */
+  .tm-card {
+    @apply bg-card rounded-xl overflow-hidden;
+    box-shadow: var(--shadow-card);
   }
 
   /* Simple stat display */
   .stat-value {
     @apply text-2xl font-semibold tabular-nums tracking-tight;
+    font-family: 'DM Mono', monospace;
   }
 
   .stat-label {
@@ -230,358 +228,239 @@ svg.lucide {
 
   /* Clean table header */
   .table-header {
-    @apply text-xs font-medium uppercase tracking-wide text-muted-foreground;
+    font-size: 11px;
+    font-weight: 500;
+    line-height: 1;
+    letter-spacing: 0.07em;
+    text-transform: uppercase;
+    @apply text-muted-foreground;
   }
 
-  /* P&L Colors */
-  .text-profit {
-    color: rgb(var(--success));
-  }
-
-  .text-loss {
-    color: rgb(var(--danger));
-  }
-
-  /* Simple badge */
-  .badge {
-    @apply inline-flex items-center px-2.5 py-0.5 rounded-md text-xs font-medium;
-  }
-
-  .badge-success {
-    @apply bg-green-50 text-green-700 dark:bg-green-900/30 dark:text-green-400;
-  }
-
-  .badge-warning {
-    @apply bg-amber-50 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400;
-  }
-
-  .badge-danger {
-    @apply bg-red-50 text-red-700 dark:bg-red-900/30 dark:text-red-400;
-  }
-
-  /* Status dot - simple, no animation */
-  .status-dot {
-    @apply w-2 h-2 rounded-full;
-  }
-
-  .status-dot-success {
-    @apply bg-green-500;
-  }
-
-  .status-dot-warning {
-    @apply bg-amber-500;
-  }
-
-  .status-dot-danger {
-    @apply bg-red-500;
-  }
-}
-
-@layer utilities {
-
-  /* Focus ring */
-  .focus-ring {
-    @apply focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 focus-visible:ring-offset-background;
-  }
-
-  /* Simple hover for interactive elements */
-  .hover-bg {
-    @apply transition-colors hover:bg-muted;
-  }
-
-  /* Loading skeleton */
-  .skeleton {
-    @apply bg-muted animate-pulse rounded;
-  }
-}
-
-/* ── Animation keyframes (framer-motion replacement) ──────────────────────── */
-
-@keyframes pulse {
-
-  0%,
-  100% {
-    opacity: 1;
-  }
-
-  50% {
-    opacity: 0.5;
-  }
-}
-
-@keyframes fadeIn {
-  from {
-    opacity: 0;
-  }
-
-  to {
-    opacity: 1;
-  }
-}
-
-@keyframes fadeInUp {
-  from {
-    opacity: 0;
-    transform: translateY(8px);
-  }
-
-  to {
-    opacity: 1;
-    transform: translateY(0);
-  }
-}
-
-@keyframes fadeInScale {
-  from {
-    opacity: 0;
-    transform: translateY(-10px) scale(0.95);
-  }
-
-  to {
-    opacity: 1;
-    transform: translateY(0) scale(1);
-  }
-}
-
-/* Spring-like: overshoot then settle — replaces type:'spring' on banner */
-@keyframes slideInRight {
-  0% {
-    opacity: 0;
-    transform: translateX(100%);
-  }
-
-  100% {
-    opacity: 1;
-    transform: translateX(0);
-  }
-}
-
-@keyframes slideInDown {
-  0% {
-    opacity: 0;
-    transform: translateY(-52px);
-  }
-
-  60% {
-    opacity: 1;
-    transform: translateY(4px);
-  }
-
-  80% {
-    transform: translateY(-2px);
-  }
-
-  100% {
-    transform: translateY(0);
-  }
-}
-
-@keyframes slideOutUp {
-  from {
-    opacity: 1;
-    transform: translateY(0);
-    max-height: 200px;
-  }
-
-  to {
-    opacity: 0;
-    transform: translateY(-40px);
-    max-height: 0;
-  }
-}
-
-@keyframes slideInUp {
-  0% {
-    opacity: 0;
-    transform: translateY(100%);
-  }
-
-  60% {
-    opacity: 1;
-    transform: translateY(-6px);
-  }
-
-  80% {
-    transform: translateY(3px);
-  }
-
-  100% {
-    transform: translateY(0);
-  }
-}
-
-@keyframes cardExit {
-  from {
-    opacity: 1;
-    transform: translateY(0) scale(1);
-  }
-
-  to {
-    opacity: 0;
-    transform: translateY(-10px) scale(0.95);
-  }
-}
-
-@keyframes float {
-
-  0%,
-  100% {
-    transform: translateY(-5px) rotate(0deg);
-  }
-
-  50% {
-    transform: translateY(5px) rotate(10deg);
-  }
-}
-
-@keyframes zapPulse {
-
-  0%,
-  100% {
-    transform: rotate(0deg) scale(1);
-  }
-
-  33% {
-    transform: rotate(15deg) scale(1.1);
-  }
-
-  66% {
-    transform: rotate(-15deg) scale(1);
-  }
-}
-
-@keyframes pulseScale {
-
-  0%,
-  100% {
-    transform: scale(1);
-  }
-
-  50% {
-    transform: scale(1.1);
-  }
-}
-
-/* ── Animation utility classes ────────────────────────────────────────────── */
-
-@layer utilities {
-  .animate-fade-in {
-    animation: fadeIn 0.2s ease-out both;
-  }
-
-  .animate-fade-in-up {
-    animation: fadeInUp 0.2s ease-out both;
-  }
-
-  .animate-fade-in-scale {
-    animation: fadeInScale 0.2s cubic-bezier(0.16, 1, 0.3, 1) both;
-  }
-
-  .animate-slide-in-right {
-    animation: slideInRight 0.28s cubic-bezier(0.16, 1, 0.3, 1) both;
-  }
-
-  .animate-slide-in-down {
-    animation: slideInDown 0.35s cubic-bezier(0.16, 1, 0.3, 1) both;
-  }
-
-  .animate-slide-in-up {
-    animation: slideInUp 0.35s cubic-bezier(0.16, 1, 0.3, 1) both;
-  }
-
-  .animate-slide-out-up {
-    animation: slideOutUp 0.25s ease-in forwards;
-    overflow: hidden;
-  }
-
-  .animate-card-exit {
-    animation: cardExit 0.18s ease-in forwards;
-    pointer-events: none;
-  }
-
-  .animate-float {
-    animation: float 4s ease-in-out infinite;
-  }
-
-  .animate-zap-pulse {
-    animation: zapPulse 3s ease-in-out infinite;
-    animation-delay: 2s;
-  }
-
-  .animate-pulse-scale {
-    animation: pulseScale 2s ease-in-out infinite;
-  }
-}
-
-/* ── TradeMentor design components ─────────────────────────────────────────── */
-
-@layer components {
-
-  /* Section label — every section header across all screens */
+  /* TM section label — category headings */
   .tm-label {
-    @apply text-[11px] font-medium uppercase tracking-widest text-muted-foreground;
+    font-size: 11px;
+    font-weight: 500;
+    line-height: 1;
+    letter-spacing: 0.07em;
+    text-transform: uppercase;
+    @apply text-muted-foreground;
   }
 
-  /* Data card — standard surface with theme-aware shadow */
-  .tm-card {
-    @apply bg-white dark:bg-[#1C1C1C] rounded-xl overflow-hidden;
-  }
+  /* Status dots */
+  .status-dot         { @apply w-2 h-2 rounded-full; }
+  .status-dot-success { background-color: rgb(var(--tm-profit)); }
+  .status-dot-warning { background-color: rgb(var(--tm-obs)); }
+  .status-dot-danger  { background-color: rgb(var(--tm-loss)); }
 
   /* Instrument type chips */
   .tm-chip {
     @apply text-[10px] font-bold px-1.5 py-0.5 rounded leading-none;
   }
+  .tm-chip-ce { @apply bg-teal-50 text-teal-700 dark:bg-teal-900/20 dark:text-teal-300; }
+  .tm-chip-pe { @apply bg-red-50 text-red-600 dark:bg-red-900/20 dark:text-red-400; }
+  .tm-chip-eq { @apply bg-stone-100 text-slate-500 dark:bg-neutral-700/60 dark:text-neutral-400; }
 
-  .tm-chip-ce {
-    @apply bg-teal-50 text-teal-700 dark:bg-teal-900/20 dark:text-teal-300;
+  /* P&L convenience aliases */
+  .text-profit { color: rgb(var(--tm-profit)); }
+  .text-loss   { color: rgb(var(--tm-loss)); }
+
+  /* Simple badge */
+  .badge         { @apply inline-flex items-center px-2.5 py-0.5 rounded text-xs font-medium; }
+  .badge-success { @apply bg-green-50 text-green-700 dark:bg-green-900/30 dark:text-green-400; }
+  .badge-warning { @apply bg-amber-50 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400; }
+  .badge-danger  { @apply bg-red-50 text-red-700 dark:bg-red-900/30 dark:text-red-400; }
+}
+
+@layer utilities {
+  /* Focus ring */
+  .focus-ring {
+    @apply focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 focus-visible:ring-offset-background;
   }
 
-  .tm-chip-pe {
-    @apply bg-red-50 text-red-600 dark:bg-red-900/20 dark:text-red-400;
+  /* Hover for interactive elements */
+  .hover-bg { @apply transition-colors hover:bg-muted; }
+
+  /* Loading skeleton */
+  .skeleton { @apply bg-muted animate-pulse rounded; }
+}
+
+/* ── Type scale utilities ──────────────────────────────────────────────────── */
+/* Apply these instead of ad-hoc text-* classes for consistency.               */
+
+@layer utilities {
+  /* Display — hero P&L, score numbers */
+  .t-display {
+    font-size: 28px; font-weight: 700; line-height: 1.15; letter-spacing: -0.03em;
+  }
+  /* Heading LG — page titles */
+  .t-heading-lg {
+    font-size: 20px; font-weight: 600; line-height: 1.25; letter-spacing: -0.02em;
+  }
+  /* Heading MD — card titles */
+  .t-heading-md {
+    font-size: 16px; font-weight: 600; line-height: 1.35; letter-spacing: -0.015em;
+  }
+  /* Heading SM — section headers within cards */
+  .t-heading-sm {
+    font-size: 14px; font-weight: 600; line-height: 1.4; letter-spacing: -0.01em;
+  }
+  /* Body — primary reading text */
+  .t-body {
+    font-size: 14px; font-weight: 400; line-height: 1.5;
+  }
+  /* Body SM — descriptions, secondary copy */
+  .t-body-sm {
+    font-size: 13px; font-weight: 400; line-height: 1.5;
+  }
+  /* Caption — timestamps, metadata */
+  .t-caption {
+    font-size: 12px; font-weight: 400; line-height: 1.4; letter-spacing: 0.01em;
+  }
+  /* Overline — section category labels (UPPERCASE) */
+  .t-overline {
+    font-size: 11px; font-weight: 500; line-height: 1; letter-spacing: 0.07em; text-transform: uppercase;
   }
 
-  .tm-chip-eq {
-    @apply bg-stone-100 text-slate-500 dark:bg-neutral-700/60 dark:text-neutral-400;
+  /* Mono variants — ALL financial numbers use DM Mono */
+  .t-mono {
+    font-family: 'DM Mono', 'Fira Code', monospace;
+    font-size: 14px; font-weight: 500; line-height: 1;
+    font-variant-numeric: tabular-nums;
+  }
+  .t-mono-sm {
+    font-family: 'DM Mono', 'Fira Code', monospace;
+    font-size: 12px; font-weight: 500; line-height: 1;
+    font-variant-numeric: tabular-nums;
+  }
+  .t-mono-lg {
+    font-family: 'DM Mono', 'Fira Code', monospace;
+    font-size: 20px; font-weight: 600; line-height: 1; letter-spacing: -0.01em;
+    font-variant-numeric: tabular-nums;
+  }
+  .t-mono-display {
+    font-family: 'DM Mono', 'Fira Code', monospace;
+    font-size: 28px; font-weight: 700; line-height: 1.1; letter-spacing: -0.02em;
+    font-variant-numeric: tabular-nums;
   }
 }
 
 /* ── Page backgrounds ───────────────────────────────────────────────────────── */
-/* Not in @layer so it beats utility specificity for the gradient override.     */
 
 .tm-page-bg {
-  /* Warm stone — no teal glow, no gradients bleeding into cards */
-  background: #F5F5F4;
+  background: rgb(var(--layer-page));
 }
 
 .dark .tm-page-bg {
   background:
-    radial-gradient(ellipse 60% 45% at 92% 0%, rgba(15, 142, 125, 0.10) 0%, transparent 100%),
-    radial-gradient(ellipse 55% 50% at 0% 100%, rgba(15, 142, 125, 0.07) 0%, transparent 100%),
-    #0B0B0B;
+    radial-gradient(ellipse 60% 45% at 92% 0%,  rgba(45,212,191,0.07) 0%, transparent 100%),
+    radial-gradient(ellipse 55% 50% at 0% 100%, rgba(45,212,191,0.05) 0%, transparent 100%),
+    #09090C;
 }
 
-/* ── Card shadow — separate rule so dark override applies ───────────────────── */
-.tm-card {
-  /* Slightly warmer + more depth: cards lift clearly off the stone background */
-  box-shadow:
-    0 1px 3px rgba(0, 0, 0, 0.07),
-    0 4px 16px rgba(0, 0, 0, 0.05),
-    0 0 0 1px rgba(0, 0, 0, 0.04);
+/* ── Elevated surface (sidebar, modals) ─────────────────────────────────────── */
+
+.tm-elevated {
+  background-color: rgb(var(--layer-elevated));
+  box-shadow: var(--shadow-elevated);
 }
 
-.dark .tm-card {
-  box-shadow:
-    0 2px 8px rgba(0, 0, 0, 0.4),
-    0 8px 32px rgba(0, 0, 0, 0.35),
-    0 0 0 1px rgba(255, 255, 255, 0.08);
-}
+/* ── AI Coach CTA gradient ──────────────────────────────────────────────────── */
 
-/* AI Coach CTA — gradient button using brand token so it respects theme */
 .tm-coach-cta {
   background: linear-gradient(135deg,
       rgb(var(--tm-brand)) 0%,
-      color-mix(in srgb, rgb(var(--tm-brand)) 85%, black) 100%);
+      color-mix(in srgb, rgb(var(--tm-brand)) 80%, black) 100%);
   box-shadow:
     0 4px 20px rgba(var(--tm-brand) / 0.3),
     0 0 0 1px rgba(var(--tm-brand) / 0.2);
+}
+
+/* ── Animation keyframes ────────────────────────────────────────────────────── */
+
+@keyframes pulse {
+  0%, 100% { opacity: 1; }
+  50%       { opacity: 0.5; }
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+
+@keyframes fadeInUp {
+  from { opacity: 0; transform: translateY(8px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes fadeInScale {
+  from { opacity: 0; transform: translateY(-10px) scale(0.95); }
+  to   { opacity: 1; transform: translateY(0) scale(1); }
+}
+
+@keyframes slideInRight {
+  0%   { opacity: 0; transform: translateX(100%); }
+  100% { opacity: 1; transform: translateX(0); }
+}
+
+@keyframes slideInDown {
+  0%   { opacity: 0; transform: translateY(-52px); }
+  60%  { opacity: 1; transform: translateY(4px); }
+  80%  { transform: translateY(-2px); }
+  100% { transform: translateY(0); }
+}
+
+@keyframes slideOutUp {
+  from { opacity: 1; transform: translateY(0);   max-height: 200px; }
+  to   { opacity: 0; transform: translateY(-40px); max-height: 0; }
+}
+
+@keyframes slideInUp {
+  0%   { opacity: 0; transform: translateY(100%); }
+  60%  { opacity: 1; transform: translateY(-6px); }
+  80%  { transform: translateY(3px); }
+  100% { transform: translateY(0); }
+}
+
+@keyframes cardExit {
+  from { opacity: 1; transform: translateY(0) scale(1); }
+  to   { opacity: 0; transform: translateY(-10px) scale(0.95); }
+}
+
+@keyframes float {
+  0%, 100% { transform: translateY(-5px) rotate(0deg); }
+  50%       { transform: translateY(5px) rotate(10deg); }
+}
+
+@keyframes zapPulse {
+  0%, 100% { transform: rotate(0deg) scale(1); }
+  33%       { transform: rotate(15deg) scale(1.1); }
+  66%       { transform: rotate(-15deg) scale(1); }
+}
+
+@keyframes pulseScale {
+  0%, 100% { transform: scale(1); }
+  50%       { transform: scale(1.1); }
+}
+
+/* Alert badge pulse — fires every 4s when unread alerts > 0 */
+@keyframes badgePulse {
+  0%, 70%, 100% { transform: scale(1); }
+  85%            { transform: scale(1.15); }
+}
+
+/* ── Animation utility classes ──────────────────────────────────────────────── */
+
+@layer utilities {
+  .animate-fade-in        { animation: fadeIn      0.2s ease-out both; }
+  .animate-fade-in-up     { animation: fadeInUp    0.2s ease-out both; }
+  .animate-fade-in-scale  { animation: fadeInScale 0.2s cubic-bezier(0.16, 1, 0.3, 1) both; }
+  .animate-slide-in-right { animation: slideInRight 0.28s cubic-bezier(0.16, 1, 0.3, 1) both; }
+  .animate-slide-in-down  { animation: slideInDown  0.35s cubic-bezier(0.16, 1, 0.3, 1) both; }
+  .animate-slide-in-up    { animation: slideInUp    0.35s cubic-bezier(0.16, 1, 0.3, 1) both; }
+  .animate-slide-out-up   { animation: slideOutUp   0.25s ease-in forwards; overflow: hidden; }
+  .animate-card-exit      { animation: cardExit     0.18s ease-in forwards; pointer-events: none; }
+  .animate-float          { animation: float  4s ease-in-out infinite; }
+  .animate-zap-pulse      { animation: zapPulse 3s ease-in-out infinite; animation-delay: 2s; }
+  .animate-pulse-scale    { animation: pulseScale 2s ease-in-out infinite; }
+  .animate-badge-pulse    { animation: badgePulse 4s ease-in-out infinite; }
 }

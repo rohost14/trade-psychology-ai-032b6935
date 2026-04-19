@@ -359,7 +359,7 @@ export default function Chat() {
     return (
       <div className="max-w-3xl mx-auto h-[calc(100vh-8rem)]">
         <div className="mb-5">
-          <h1 className="text-lg font-semibold text-foreground tracking-tight">AI Coach</h1>
+          <h1 className="t-heading-lg text-foreground">AI Coach</h1>
         </div>
         <div className="tm-card flex flex-col items-center justify-center min-h-[50vh] text-center py-16">
           <div className="p-4 rounded-full bg-teal-50 dark:bg-teal-900/20 mb-5">
@@ -385,7 +385,7 @@ export default function Chat() {
       {/* Header */}
       <div className="mb-4 flex items-center justify-between">
         <div>
-          <h1 className="text-lg font-semibold text-foreground tracking-tight">AI Coach</h1>
+          <h1 className="t-heading-lg text-foreground">AI Coach</h1>
           <p className="text-sm text-muted-foreground">
             Personalized guidance from your real trading data
           </p>

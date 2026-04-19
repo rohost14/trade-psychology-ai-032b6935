@@ -480,8 +480,8 @@ export default function Dashboard() {
 
       {/* ── Page Header ───────────────────────────────────────────────────── */}
       <div className="flex items-center justify-between mb-1">
-        <h1 className="text-lg font-semibold text-foreground tracking-tight">Dashboard</h1>
-        <div className="flex items-center gap-3 text-[13px] text-muted-foreground font-mono tabular-nums">
+        <h1 className="t-heading-lg text-foreground">Dashboard</h1>
+        <div className="flex items-center gap-3 t-mono-sm text-muted-foreground">
           <span>{tradeStats?.trades_today ?? 0} trades</span>
           <span className="text-muted-foreground/30">·</span>
           <span className={cn('font-semibold', pnlPositive ? 'text-tm-profit' : 'text-tm-loss')}>

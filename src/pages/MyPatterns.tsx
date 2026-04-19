@@ -317,7 +317,7 @@ export default function MyPatterns() {
     return (
       <div className="max-w-4xl mx-auto pb-12">
         <div className="mb-5">
-          <h1 className="text-lg font-semibold text-foreground tracking-tight">Risk Monitor</h1>
+          <h1 className="t-heading-lg text-foreground">Risk Monitor</h1>
         </div>
         <div className="tm-card flex flex-col items-center justify-center min-h-[50vh] text-center py-16">
           <div className="p-4 rounded-full bg-teal-50 dark:bg-teal-900/20 mb-5">
@@ -342,7 +342,7 @@ export default function MyPatterns() {
     <div className="max-w-4xl mx-auto pb-12">
       {/* Page header */}
       <div className="mb-5 flex items-center justify-between">
-        <h1 className="text-lg font-semibold text-foreground tracking-tight">Risk Monitor</h1>
+        <h1 className="t-heading-lg text-foreground">Risk Monitor</h1>
         <button
           onClick={fetchStatus}
           disabled={statusLoading}

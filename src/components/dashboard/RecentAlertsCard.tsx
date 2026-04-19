@@ -4,7 +4,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { cn } from '@/lib/utils';
 import { formatRelativeTime } from '@/lib/formatters';
 import type { Alert } from '@/types/api';
-import { severityDotClass } from '@/lib/alertSeverity';
+import { severityDotClass, severityRowBg, severityBorderClass } from '@/lib/alertSeverity';
 
 interface RecentAlertsCardProps {
   alerts: (Alert & { pattern: string; description: string; why_it_matters?: string })[];
@@ -29,7 +29,7 @@ export default function RecentAlertsCard({ alerts, onAcknowledge, onOpen, loadin
     <div className="tm-card">
 
       {/* Header */}
-      <div className="flex items-center justify-between px-5 py-3 border-b border-slate-100 dark:border-neutral-700/60">
+      <div className="flex items-center justify-between px-5 py-3.5 border-b border-border">
         <div className="flex items-center gap-3">
           <span className="tm-label">Behavioral Alerts</span>
           {!loading && unread > 0 && (
@@ -47,7 +47,7 @@ export default function RecentAlertsCard({ alerts, onAcknowledge, onOpen, loadin
 
       {/* Skeleton */}
       {loading ? (
-        <div className="divide-y divide-slate-50 dark:divide-neutral-700/40">
+        <div className="divide-y divide-border">
           {[1, 2, 3].map(i => (
             <div key={i} className="flex items-start gap-4 px-5 py-4">
               <Skeleton className="w-0.5 h-5 rounded flex-shrink-0 mt-0.5" />
@@ -69,36 +69,36 @@ export default function RecentAlertsCard({ alerts, onAcknowledge, onOpen, loadin
                 onClick={() => onOpen ? onOpen(alert.id) : onAcknowledge?.(alert.id)}
                 aria-label={`${alert.pattern}${isAcked ? ', reviewed' : ', tap to review'}`}
                 className={cn(
-                  'w-full flex items-start gap-4 px-5 py-4 text-left transition-colors',
-                  'hover:bg-slate-50 dark:hover:bg-slate-700/40',
-                  i < Math.min(alerts.length, 5) - 1
-                    ? 'border-b border-slate-50 dark:border-neutral-700/40'
-                    : '',
+                  'w-full flex items-start gap-4 pl-0 pr-5 py-3.5 text-left',
+                  'border-l-[3px] transition-colors duration-100',
+                  severityBorderClass(alert.severity),
+                  severityRowBg(alert.severity),
+                  'hover:brightness-[0.97] dark:hover:brightness-110',
+                  i < Math.min(alerts.length, 5) - 1 ? 'border-b border-border' : '',
                   isAcked && 'opacity-50',
                 )}
               >
-                {/* Severity pip — vertical bar encodes urgency without decorating the row */}
-                <span
-                  className={cn('shrink-0', severityDotClass(alert.severity))}
-                  style={{ width: 3, height: 20, minWidth: 3, borderRadius: 2, marginTop: 2 }}
-                />
+                {/* Severity dot — 8px filled circle per spec */}
+                <span className="shrink-0 flex items-center justify-center w-10 pt-[3px]">
+                  <span className={cn('w-2 h-2 rounded-full shrink-0', severityDotClass(alert.severity))} />
+                </span>
 
                 {/* Content */}
                 <div className="flex-1 min-w-0">
-                  <p className={cn('text-sm leading-snug', patternWeight(alert.severity))}>
+                  <p className={cn('t-body-sm leading-snug', patternWeight(alert.severity))}>
                     {alert.pattern}
                     {isAcked && (
                       <Check className="inline ml-1.5 h-3 w-3 text-tm-profit align-middle" />
                     )}
                   </p>
-                  <p className="text-[13px] text-muted-foreground mt-0.5 leading-snug">
+                  <p className="t-caption text-muted-foreground mt-0.5 leading-snug">
                     {alert.description}
                   </p>
                 </div>
 
                 {/* Time + chevron */}
                 <div className="shrink-0 flex items-center gap-1.5 pt-0.5">
-                  <span className="text-[12px] text-muted-foreground font-mono tabular-nums">
+                  <span className="t-mono-sm text-muted-foreground">
                     {formatRelativeTime(alert.timestamp)}
                   </span>
                   <ChevronRight className="w-3.5 h-3.5 text-muted-foreground/50" />
@@ -108,7 +108,7 @@ export default function RecentAlertsCard({ alerts, onAcknowledge, onOpen, loadin
           })}
 
           {/* Footer link */}
-          <div className="px-5 py-2.5 border-t border-slate-100 dark:border-neutral-700/60">
+          <div className="px-5 py-2.5 border-t border-border">
             <Link
               to="/alerts"
               className="flex items-center gap-1 text-[13px] font-medium text-tm-brand hover:underline"

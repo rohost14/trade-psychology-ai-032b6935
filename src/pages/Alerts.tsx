@@ -451,7 +451,7 @@ export default function AlertsPage() {
       {/* Page header */}
       <div className="mb-5 flex items-center justify-between">
         <div className="flex items-center gap-2">
-          <h1 className="text-lg font-semibold text-foreground tracking-tight">Behavioral Alerts</h1>
+          <h1 className="t-heading-lg text-foreground">Behavioral Alerts</h1>
           {unacknowledgedCount > 0 && (
             <span className="bg-tm-loss text-white text-[10px] font-bold px-1.5 py-0.5 rounded-full leading-none">
               {unacknowledgedCount}

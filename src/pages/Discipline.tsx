@@ -113,7 +113,7 @@ export default function Discipline() {
   return (
     <div className="max-w-2xl mx-auto pb-12">
       <div className="mb-6">
-        <h1 className="text-lg font-semibold text-foreground tracking-tight">Discipline</h1>
+        <h1 className="t-heading-lg text-foreground">Discipline</h1>
         <p className="text-sm text-muted-foreground mt-0.5">Week of {data.week_start}</p>
       </div>
 

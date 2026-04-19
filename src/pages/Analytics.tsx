@@ -75,7 +75,7 @@ export default function Analytics() {
     <div className="max-w-5xl mx-auto pb-12">
       {/* ── Page Header ── */}
       <div className="mb-5 flex items-center justify-between">
-        <h1 className="text-lg font-semibold text-foreground tracking-tight">Analytics</h1>
+        <h1 className="t-heading-lg text-foreground">Analytics</h1>
         <div className="flex items-center gap-3">
           <div className="flex items-center gap-0.5 p-0.5 bg-slate-100 dark:bg-neutral-800 rounded-lg">
             {PERIOD_OPTIONS.map((opt) => (
