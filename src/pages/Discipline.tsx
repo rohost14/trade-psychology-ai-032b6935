@@ -80,7 +80,8 @@ function TrendTooltip({ active, payload, label }: any) {
 }
 
 export default function Discipline() {
-  const { accountId } = useBroker();
+  const { account } = useBroker();
+  const accountId = account?.id;
   const [data, setData]       = useState<DisciplineData | null>(null);
   const [loading, setLoading] = useState(true);
 

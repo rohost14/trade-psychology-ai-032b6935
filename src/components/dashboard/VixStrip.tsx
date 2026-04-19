@@ -25,7 +25,8 @@ const REGIME_TEXT: Record<string, string> = {
 };
 
 export default function VixStrip() {
-  const { accountId } = useBroker();
+  const { account } = useBroker();
+  const accountId = account?.id;
   const [data, setData] = useState<VixData | null>(null);
 
   useEffect(() => {

@@ -2599,12 +2599,12 @@ async def get_trading_dna(
             refreshes = int(await r.get(refresh_key) or 0)
             if refreshes >= REFRESH_LIMIT:
                 cached = await r.get(cache_key)
-                await r.aclose()
                 if cached:
+                    await r.aclose()
                     d = json.loads(cached)
                     d["refresh_limit_hit"] = True
                     return d
-                # No cache + limit hit → still compute once
+                # No cache + limit hit → still compute (rare first-run edge case)
             else:
                 await r.incr(refresh_key)
                 await r.expire(refresh_key, 86400)
@@ -2699,7 +2699,7 @@ async def get_trading_dna(
                 {"role": "system", "content": system_prompt},
                 {"role": "user",   "content": user_msg},
             ],
-            model="google/gemini-flash-1.5",
+            model=ai_service.primary_model,
             temperature=0.6,
             max_tokens=400,
         )
@@ -3000,7 +3000,8 @@ async def get_discipline_summary(
         week_trades = trades_res.scalars().all()
 
         # ── Quality component (avg quality score this week) ───────────────────
-        quality_avg = 5.0  # default if no quality data
+        scored = [t.quality_score for t in week_trades if t.quality_score is not None]
+        quality_avg = (sum(scored) / len(scored)) if scored else 4.0  # 4/8 = neutral 20pts default
 
         # ── Discipline score formula ──────────────────────────────────────────
         # Alerts component (60 points): penalise hard violations more

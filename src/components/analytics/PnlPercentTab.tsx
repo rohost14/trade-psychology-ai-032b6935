@@ -100,7 +100,8 @@ function ScatterTooltip({ active, payload }: any) {
 // ─── Main component ───────────────────────────────────────────────────────────
 
 export default function PnlPercentTab({ days }: { days: number }) {
-  const { accountId } = useBroker();
+  const { account } = useBroker();
+  const accountId = account?.id;
   const [data, setData]       = useState<PnlPercentData | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError]     = useState<string | null>(null);

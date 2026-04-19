@@ -383,9 +383,9 @@ export default function TradesTab({ days }: { days: number }) {
                     {quality && (
                       <span className={cn(
                         'text-[10px] font-bold font-mono px-1.5 py-0.5 rounded shrink-0 hidden sm:inline',
-                        quality.tier === 'high'   && 'bg-green-50 dark:bg-green-900/20 text-tm-profit',
-                        quality.tier === 'medium' && 'bg-amber-50 dark:bg-amber-900/20 text-tm-obs',
-                        quality.tier === 'low'    && 'bg-red-50 dark:bg-red-900/20 text-tm-loss',
+                        quality.tier === 'high' && 'bg-green-50 dark:bg-green-900/20 text-tm-profit',
+                        quality.tier === 'mid'  && 'bg-amber-50 dark:bg-amber-900/20 text-tm-obs',
+                        quality.tier === 'low'  && 'bg-red-50 dark:bg-red-900/20 text-tm-loss',
                       )}>
                         Q{quality.score}
                       </span>
