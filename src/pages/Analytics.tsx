@@ -51,7 +51,7 @@ export default function Analytics() {
 
   if (!brokerLoading && !isConnected) {
     return (
-      <div className="max-w-5xl mx-auto pb-12">
+      <div className="w-full pb-12">
         <div className="flex flex-col items-center justify-center min-h-[60vh]">
           <div className="p-4 rounded-full bg-tm-brand/10 mb-6">
             <Link2 className="h-12 w-12 text-tm-brand" />
@@ -72,7 +72,7 @@ export default function Analytics() {
   }
 
   return (
-    <div className="max-w-5xl mx-auto pb-12">
+    <div className="w-full pb-12">
       {/* ── Page Header ── */}
       <div className="mb-5 flex items-center justify-between">
         <h1 className="t-heading-lg text-foreground">Analytics</h1>

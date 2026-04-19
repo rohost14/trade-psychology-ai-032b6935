@@ -180,10 +180,10 @@ export default function BlowupShieldPage() {
 
   if (loading) {
     return (
-      <div className="max-w-3xl mx-auto pb-12 space-y-4">
+      <div className="pb-12 space-y-4">
         <Skeleton className="h-5 w-32" />
         <Skeleton className="h-8 w-48" />
-        <div className="grid grid-cols-4 gap-3">
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
           {[...Array(4)].map((_, i) => <Skeleton key={i} className="h-20 rounded-xl" />)}
         </div>
         <Skeleton className="h-64 rounded-xl" />
@@ -205,7 +205,7 @@ export default function BlowupShieldPage() {
   const additionalLoss = s.post_alert_pnl_continued < 0 ? s.post_alert_pnl_continued : null;
 
   return (
-    <div className="max-w-3xl mx-auto pb-12">
+    <div className="pb-12">
       <Link
         to="/dashboard"
         className="inline-flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground mb-6"

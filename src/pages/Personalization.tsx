@@ -132,7 +132,7 @@ export default function Personalization() {
   };
 
   return (
-    <div className="max-w-4xl mx-auto pb-12">
+    <div className="w-full pb-12">
       {/* Header */}
       <div className="mb-5 flex items-center justify-between">
         <div>

@@ -302,7 +302,7 @@ export default function MyPatterns() {
 
   if (brokerLoading) {
     return (
-      <div className="max-w-4xl mx-auto space-y-4 pb-12">
+      <div className="w-full space-y-4 pb-12">
         <Skeleton className="h-8 w-48" />
         <Skeleton className="h-40 rounded-xl" />
         <div className="grid grid-cols-2 gap-4">
@@ -315,7 +315,7 @@ export default function MyPatterns() {
 
   if (!isConnected) {
     return (
-      <div className="max-w-4xl mx-auto pb-12">
+      <div className="w-full pb-12">
         <div className="mb-5">
           <h1 className="t-heading-lg text-foreground">Risk Monitor</h1>
         </div>
@@ -339,7 +339,7 @@ export default function MyPatterns() {
   }
 
   return (
-    <div className="max-w-4xl mx-auto pb-12">
+    <div className="w-full pb-12">
       {/* Page header */}
       <div className="mb-5 flex items-center justify-between">
         <h1 className="t-heading-lg text-foreground">Risk Monitor</h1>

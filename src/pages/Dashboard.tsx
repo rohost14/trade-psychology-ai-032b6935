@@ -534,10 +534,10 @@ export default function Dashboard() {
       </div>
 
       {/* ── Two-column layout ─────────────────────────────────────────────── */}
-      <div className="flex gap-5 items-start">
+      <div className="flex flex-col lg:flex-row gap-5 items-start">
 
-        {/* Left 62% */}
-        <div className="flex-[62] min-w-0 space-y-5">
+        {/* Left — full width on mobile, 62% on desktop */}
+        <div className="w-full lg:flex-[62] min-w-0 space-y-5">
           {positionsError && !positionsLoading && positions.length === 0 ? (
             <div className="tm-card p-5 text-center">
               <AlertTriangle className="h-5 w-5 text-tm-loss mx-auto mb-2" />
@@ -569,8 +569,8 @@ export default function Dashboard() {
           )}
         </div>
 
-        {/* Right 38% sticky */}
-        <div className="flex-[38] min-w-0 space-y-5 sticky top-4">
+        {/* Right — full width on mobile, 38% sticky on desktop */}
+        <div className="w-full lg:flex-[38] min-w-0 space-y-5 lg:sticky lg:top-4">
           <BlowupShieldCard />
           {accountId && (
             <SessionPaceGoalCard

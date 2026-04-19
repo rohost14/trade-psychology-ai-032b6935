@@ -184,7 +184,7 @@ export default function Settings() {
 
   if (brokerLoading) {
     return (
-      <div className="max-w-4xl mx-auto space-y-4 pb-12">
+      <div className="max-w-3xl mx-auto space-y-4 pb-12">
         <Skeleton className="h-8 w-48" />
         <Skeleton className="h-40 rounded-xl" />
         <div className="grid grid-cols-2 gap-4">
@@ -195,7 +195,7 @@ export default function Settings() {
   }
 
   return (
-    <div className="max-w-4xl mx-auto space-y-6">
+    <div className="max-w-3xl mx-auto space-y-6">
       {/* Page Header */}
       <div className="flex items-center justify-between">
         <div>

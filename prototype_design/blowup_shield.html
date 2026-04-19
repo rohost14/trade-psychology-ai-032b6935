@@ -1,0 +1,376 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description" content="Blowup Shield protection log. Review heeded and ignored alerts and their outcomes.">
+  <link rel="icon" type="image/svg+xml" href="favicon.svg">
+  <title>Blowup Shield — TradeMentor AI</title>
+
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:ital,wght@0,400;0,500;0,600;0,700;0,800;1,400&display=swap" rel="stylesheet">
+
+    <link rel="stylesheet" href="shared.css">
+
+    <!-- Tailwind v4 Engine -->
+  <script src="https://unpkg.com/@tailwindcss/browser@4"></script>
+  <style type="text/tailwindcss">
+    @theme {
+      --font-sans: 'Inter', sans-serif;
+      --color-brand: #4F46E5;
+      --color-brandBg: #EEF2FF;
+      --color-profit: #059669;
+      --color-profitBg: #ecfdf5;
+      --color-loss: #dc2626;
+      --color-lossBg: #fef2f2;
+      --color-obs: #d97706;
+      --color-obsBg: #fffbeb;
+      --color-surface: #ffffff;
+      --color-background: #F8FAFC;
+    }
+  </style>
+  <style>
+    body {
+      background-color: #F8FAFC;
+      color: #0F172A;
+      -webkit-font-smoothing: antialiased;
+    }
+
+    .hidden {
+      position: absolute;
+      top: 0;
+      left: 0;
+      right: 0;
+      height: 350px;
+      background: linear-gradient(175deg, rgba(238, 242, 255, 1) 0%, rgba(246, 248, 253, 1) 40%, rgba(248, 250, 252, 1) 100%);
+      z-index: -1;
+    }
+
+    .tm-card {
+      background: white;
+      border-radius: 12px;
+      border: 1px solid #E2E8F0;
+      box-shadow: 0 1px 2px rgba(0, 0, 0, 0.04), 0 4px 12px rgba(0, 0, 0, 0.02);
+      transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    }
+
+    .tm-card:hover {
+      border-color: #CBD5E1;
+      box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.05), 0 8px 10px -6px rgba(0, 0, 0, 0.01);
+      transform: translateY(-2px);
+    }
+
+    @keyframes fadeInUp {
+      from {
+        opacity: 0;
+        transform: translateY(16px);
+      }
+
+      to {
+        opacity: 1;
+        transform: translateY(0);
+      }
+    }
+
+    .transition-opacity duration-300 {
+      animation: fadeInUp 0.5s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+      opacity: 0;
+    }
+
+    . {
+      animation-delay: 100ms;
+    }
+
+    . {
+      animation-delay: 200ms;
+    }
+  </style>
+</head>
+
+<body class="flex min-h-screen">
+
+  <!-- Mobile Backdrop -->
+  <div id="sidebar-backdrop" class="fixed inset-0 bg-gray-900/40 backdrop-blur-sm z-[60] hidden lg:hidden"
+    onclick="toggleSidebar()"></div>
+
+  <aside id="app-sidebar" role="navigation" aria-label="Main navigation">
+    <!-- Branding -->
+    <div class="sidebar-logo">
+      <div class="logo-mark" aria-hidden="true">
+        <svg aria-hidden="true" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2.5">
+          <path stroke-linecap="round" stroke-linejoin="round" d="M13 10V3L4 14h7v7l9-11h-7z"/>
+        </svg>
+      </div>
+      <span class="sidebar-logo-text">TradeMentor AI</span>
+      <span class="sidebar-logo-badge">Beta</span>
+      <button class="ml-2 p-1.5 text-slate-500 hover:text-slate-600 hover:bg-slate-100 rounded-md lg:hidden" onclick="toggleSidebar()" aria-label="Close sidebar">
+        <svg aria-hidden="true" class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
+      </button>
+    </div>
+
+    <!-- Navigation Area -->
+    <nav class="sidebar-nav" aria-label="App pages">
+      <p class="sidebar-section-label">Main Menu</p>
+
+      <a href="dashboard.html" class="sidebar-link">
+        <svg aria-hidden="true" width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M4 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2V6zM14 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2V6zM4 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2v-2zM14 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2v-2z"/></svg>
+        Overview
+      </a>
+
+      <a href="analytics.html" class="sidebar-link">
+        <svg aria-hidden="true" width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M16 8v8m-4-5v5m-4-2v2m-2 4h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"/></svg>
+        Performance Metrics
+      </a>
+
+      <a href="alerts.html" class="sidebar-link">
+        <svg aria-hidden="true" width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"/></svg>
+        Shield Alerts
+        <span class="sidebar-badge">2</span>
+      </a>
+
+      <a href="blowup_shield.html" class="sidebar-link active" aria-current="page">
+        <svg aria-hidden="true" width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M20.618 5.984A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"/></svg>
+        Blowup Shield
+      </a>
+
+      <a href="chat.html" class="sidebar-link">
+        <svg aria-hidden="true" width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M5 3v4M3 5h4M6 17v4m-2-2h4m5-16l2.286 6.857L21 12l-5.714 2.143L13 21l-2.286-6.857L5 12l5.714-2.143L13 3z"/></svg>
+        AI Coach
+      </a>
+    </nav>
+
+    <!-- User Profile -->
+    <div class="sidebar-profile">
+      <div class="sidebar-profile-inner">
+        <div class="sidebar-avatar" role="img" aria-label="Profile Avatar" aria-hidden="true">JD</div>
+        <div class="min-w-0">
+          <p class="sidebar-profile-name">John Doe</p>
+          <p class="sidebar-profile-sub">ID: 45X9B · Zerodha</p>
+        </div>
+      </div>
+    </div>
+  </aside>
+
+  <script>
+    function toggleSidebar() {
+      const sidebar = document.getElementById('app-sidebar');
+      const backdrop = document.getElementById('sidebar-backdrop');
+      const isOpen = sidebar.style.transform === 'translateX(0px)' || !sidebar.style.transform;
+      // Use data attribute to track state cleanly
+      const isHidden = sidebar.getAttribute('data-open') !== 'true';
+      if (isHidden) {
+        sidebar.style.transform = 'translateX(0)';
+        sidebar.setAttribute('data-open', 'true');
+        backdrop.classList.add('show');
+        document.body.style.overflow = 'hidden';
+      } else {
+        sidebar.style.transform = '';
+        sidebar.setAttribute('data-open', 'false');
+        backdrop.classList.remove('show');
+        document.body.style.overflow = '';
+      }
+    }
+  </script>
+
+  <!-- ── Main Canvas ── -->
+  <!-- Margin pushing content right ONLY on large screens lg:ml-[260px] -->
+  <main class="flex-1 w-full lg:ml-[260px] relative min-h-screen">
+    <div class="hidden"></div>
+
+        <!-- Inner Padding Wrapper -->
+    <div class="w-full px-4 sm:px-6 lg:px-10 py-6 lg:py-10 pb-20 max-w-6xl mx-auto">
+
+      <!-- Header -->
+      <header class="flex flex-col sm:flex-row sm:items-end justify-between gap-4 mb-8">
+        <div>
+          <h1 class="text-[20px] sm:text-[24px] font-medium  text-slate-900 mb-1 flex items-center gap-3">
+            <div class="w-10 h-10 rounded-full bg-indigo-100 flex items-center justify-center shrink-0">
+              <svg aria-hidden="true" class="w-5 h-5 text-brand" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                  d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z">
+                </path>
+              </svg>
+            </div>
+            Blowup Shield Log
+          </h1>
+          <p class="text-xs sm:text-sm text-slate-500 font-medium ml-13">A historical timeline of defensive actions and
+            behavioral traps.</p>
+        </div>
+      </header>
+
+      <!-- Hero Metrics -->
+      <div class="grid grid-cols-1 sm:grid-cols-3 gap-6 mb-8">
+        <div class="tm-card p-6 border border-slate-200 shadow-sm ring-1 ring-slate-900/5 relative overflow-hidden transition-opacity duration-300">
+          <h3 class="text-sm font-semibold text-slate-500 mb-1">Shield Response Rate</h3>
+          <p class="text-[24px] font-medium  text-slate-900 tabular er">42<span class="text-xl">%</span></p>
+          <div class="mt-4 flex items-center gap-2">
+            <span
+              class="text-[13px] font-bold px-2 py-1 bg-green-50 text-profit rounded-md uppercase tracking-wider">&uarr;
+              5%</span>
+            <span class="text-[13px] text-slate-500 font-medium">vs Last Month</span>
+          </div>
+        </div>
+
+        <div class="tm-card p-6 border border-slate-200 shadow-sm ring-1 ring-slate-900/5 relative overflow-hidden transition-opacity duration-300 ">
+          <h3 class="text-sm font-semibold text-slate-500 mb-1">Estimated Capital Saved</h3>
+          <p class="text-[24px] font-medium  text-profit tabular er"
+            style="font-variant-numeric: tabular-nums;">₹12,450</p>
+          <div class="mt-4 text-[13px] text-slate-500 font-medium">
+            From heeded critical alerts
+          </div>
+        </div>
+
+        <div class="tm-card p-6 border border-slate-200 shadow-sm ring-1 ring-slate-900/5 relative overflow-hidden transition-opacity duration-300 ">
+          <h3 class="text-sm font-semibold text-slate-500 mb-1">Follow-on Loss</h3>
+          <p class="text-[24px] font-medium  text-loss tabular er"
+            style="font-variant-numeric: tabular-nums;">-₹8,200</p>
+          <div class="mt-4 text-[13px] text-slate-500 font-medium">
+            Cost of ignored alerts
+          </div>
+        </div>
+      </div>
+
+      <!-- Shield Timeline -->
+      <div class="tm-card overflow-hidden transition-opacity duration-300 ">
+        <div class="px-6 py-4 border-b border-slate-100 bg-slate-50 flex items-center justify-between">
+          <h3 class="text-[14px] font-bold text-slate-700">Timeline</h3>
+          <button class="text-[13px] font-medium text-brand hover:underline">Filter by outcome</button>
+        </div>
+
+        <!-- Timeline Log List -->
+        <div class="divide-y divide-gray-100">
+
+          <!-- Heeded Item -->
+          <div class="timeline-item px-6 py-5 hover:bg-slate-50/50 transition-colors">
+            <div class="flex items-start gap-4">
+              <div class="mt-1 shrink-0">
+                <svg aria-hidden="true" class="w-5 h-5 text-profit" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5"
+                    d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                </svg>
+              </div>
+              <div class="flex-1 min-w-0">
+                <div class="flex items-center gap-2 mb-2 flex-wrap">
+                  <span class="w-1.5 h-1.5 rounded-full bg-loss"></span>
+                  <span class="text-[12px] font-bold uppercase tracking-wide text-slate-500">Loss Spiral</span>
+                  <span class="text-[13px] font-bold text-slate-900 bg-slate-100 px-2 py-0.5 rounded-md">NIFTY</span>
+                  <span class="text-[13px] font-medium text-slate-500 ml-auto">Yesterday, 2:45 PM</span>
+                </div>
+                <p class="text-[14px] text-slate-800 font-semibold mb-2">3 consecutive losses in the last 40 minutes. You
+                  historically spiral in the afternoon.</p>
+                <p class="text-[13px] font-medium text-emerald-600">You heeded this alert. No further trades were placed,
+                  saving an estimated ₹2,500.</p>
+              </div>
+            </div>
+          </div>
+
+          <!-- Ignored item -->
+          <div class="timeline-item px-6 py-5 hover:bg-slate-50/50 transition-colors">
+            <div class="flex items-start gap-4">
+              <div class="mt-1 shrink-0">
+                <svg aria-hidden="true" class="w-5 h-5 text-loss" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5"
+                    d="M10 14l2-2m0 0l2-2m-2 2l-2-2m2 2l2 2m7-2a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                </svg>
+              </div>
+              <div class="flex-1 min-w-0">
+                <div class="flex items-center gap-2 mb-2 flex-wrap">
+                  <span class="w-1.5 h-1.5 rounded-full bg-obs"></span>
+                  <span class="text-[12px] font-bold uppercase tracking-wide text-slate-500">Overtrading</span>
+                  <span class="text-[13px] font-bold text-slate-900 bg-slate-100 px-2 py-0.5 rounded-md">BANKNIFTY</span>
+                  <span class="text-[13px] font-medium text-slate-500 ml-auto">Apr 08, 10:15 AM</span>
+                </div>
+                <p class="text-[14px] text-slate-800 font-semibold mb-2">Pace of trading is very high. 6 orders in 30
+                  minutes.</p>
+                <p class="text-[13px] font-medium text-rose-600">You ignored this alert and continued trading. Resulting in a
+                  -₹3,200 loss.</p>
+
+                <button onclick="toggleTradesBlock(this)"
+                  class="mt-3 flex items-center gap-1.5 text-[13px] text-slate-500 hover:text-slate-900 font-medium transition-colors cursor-pointer">
+                  <svg aria-hidden="true" class="w-3.5 h-3.5 chevron transition-transform" fill="none" stroke="currentColor"
+                    viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M19 9l-7 7-7-7"></path>
+                  </svg>
+                  <span class="btn-text">Show 2 trades</span>
+                </button>
+
+                <div
+                  class="trades-block hidden mt-3 bg-slate-50 rounded-lg border border-slate-100 divide-y divide-gray-100">
+                  <div class="flex items-center justify-between px-4 py-2.5">
+                    <span class="text-[13px] font-bold text-slate-700">BANKNIFTY 47500 CE</span>
+                    <span class="text-[13px] font-medium text-rose-600 tabular">-₹2,100</span>
+                  </div>
+                  <div class="flex items-center justify-between px-4 py-2.5">
+                    <span class="text-[13px] font-bold text-slate-700">BANKNIFTY 47600 PE</span>
+                    <span class="text-[13px] font-medium text-rose-600 tabular">-₹1,100</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Heeded item 2 -->
+          <div class="timeline-item px-6 py-5 hover:bg-slate-50/50 transition-colors">
+            <div class="flex items-start gap-4">
+              <div class="mt-1 shrink-0">
+                <svg aria-hidden="true" class="w-5 h-5 text-profit" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5"
+                    d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                </svg>
+              </div>
+              <div class="flex-1 min-w-0">
+                <div class="flex items-center gap-2 mb-2 flex-wrap">
+                  <span class="w-1.5 h-1.5 rounded-full bg-loss"></span>
+                  <span class="text-[12px] font-bold uppercase tracking-wide text-slate-500">Revenge Risk</span>
+                  <span class="text-[13px] font-medium text-slate-500 ml-auto">Apr 06, 09:30 AM</span>
+                </div>
+                <p class="text-[14px] text-slate-800 font-semibold mb-2">Large immediate loss on opening candle. Risk of
+                  revenge trading is critical.</p>
+                <p class="text-[13px] font-medium text-emerald-600">You heeded this alert. Session paced correctly.</p>
+              </div>
+            </div>
+          </div>
+
+        </div>
+
+        <div class="px-6 py-4 border-t border-slate-100 bg-slate-50 text-center">
+          <button class="text-[13px] font-medium text-brand hover:underline">Load older alerts</button>
+        </div>
+      </div>
+
+    </div>
+  </main>
+
+
+  <!-- Mobile Bottom Navigation -->
+  <nav id="bottom-nav" aria-label="Mobile navigation">
+    <div class="bottom-nav-items">
+      <a href="dashboard.html" class="bottom-nav-item" id="bnav-overview">
+        <svg fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M4 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2V6zM14 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2V6zM4 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2v-2zM14 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2v-2z"/></svg>
+        Overview
+      </a>
+      <a href="analytics.html" class="bottom-nav-item" id="bnav-analytics">
+        <svg fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M16 8v8m-4-5v5m-4-2v2m-2 4h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"/></svg>
+        Analytics
+      </a>
+      <a href="alerts.html" class="bottom-nav-item" id="bnav-alerts">
+        <span class="bottom-nav-badge">2</span>
+        <svg fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"/></svg>
+        Alerts
+      </a>
+      <a href="blowup_shield.html" class="bottom-nav-item" id="bnav-shield">
+        <svg fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M20.618 5.984A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"/></svg>
+        Shield
+      </a>
+      <a href="chat.html" class="bottom-nav-item" id="bnav-chat">
+        <svg fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M5 3v4M3 5h4M6 17v4m-2-2h4m5-16l2.286 6.857L21 12l-5.714 2.143L13 21l-2.286-6.857L5 12l5.714-2.143L13 3z"/></svg>
+        AI Coach
+      </a>
+    </div>
+  </nav>
+  <script>document.getElementById('bnav-shield').classList.add('active');</script>
+</body>
+
+</html>

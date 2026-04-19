@@ -111,129 +111,137 @@ export default function Discipline() {
   })).reverse();
 
   return (
-    <div className="max-w-2xl mx-auto pb-12">
+    <div className="pb-12">
       <div className="mb-6">
         <h1 className="t-heading-lg text-foreground">Discipline</h1>
         <p className="text-sm text-muted-foreground mt-0.5">Week of {data.week_start}</p>
       </div>
 
-      {/* Score + breakdown */}
-      <div className="tm-card overflow-hidden mb-4">
-        <div className="p-6 flex flex-col sm:flex-row items-center gap-6">
-          <ScoreGauge score={data.score} max={data.max_score} />
-          <div className="flex-1 w-full space-y-3">
-            <p className="text-sm font-medium text-foreground">This Week's Score</p>
+      {/* Two-column on lg+: score/breakdown left, trend + streaks right */}
+      <div className="flex flex-col lg:flex-row gap-4 items-start">
 
-            {/* Breakdown bars */}
-            <div className="space-y-2">
-              <div>
-                <div className="flex justify-between text-[11px] text-muted-foreground mb-1">
-                  <span>Alert control</span>
-                  <span className="font-mono">{data.breakdown.alerts_score} / 60</span>
-                </div>
-                <div className="h-1.5 rounded-full bg-muted overflow-hidden">
-                  <div
-                    className="h-full bg-tm-brand transition-all"
-                    style={{ width: `${(data.breakdown.alerts_score / 60) * 100}%` }}
-                  />
-                </div>
-              </div>
-              <div>
-                <div className="flex justify-between text-[11px] text-muted-foreground mb-1">
-                  <span>Trade quality</span>
-                  <span className="font-mono">{data.breakdown.quality_score} / 40</span>
-                </div>
-                <div className="h-1.5 rounded-full bg-muted overflow-hidden">
-                  <div
-                    className="h-full bg-tm-brand transition-all"
-                    style={{ width: `${(data.breakdown.quality_score / 40) * 100}%` }}
-                  />
-                </div>
-              </div>
-            </div>
+        {/* Left — score gauge + breakdown bars */}
+        <div className="w-full lg:flex-[55] min-w-0">
+          <div className="tm-card overflow-hidden">
+            <div className="p-6 flex flex-col sm:flex-row items-center gap-6">
+              <ScoreGauge score={data.score} max={data.max_score} />
+              <div className="flex-1 w-full space-y-3">
+                <p className="text-sm font-medium text-foreground">This Week's Score</p>
 
-            {/* Quick stats */}
-            <div className="flex gap-4 pt-1">
-              <div>
-                <p className="text-[10px] text-muted-foreground uppercase">Trades</p>
-                <p className="text-sm font-mono font-semibold text-foreground">{data.trades_this_week}</p>
-              </div>
-              <div>
-                <p className="text-[10px] text-muted-foreground uppercase">Danger alerts</p>
-                <p className={cn('text-sm font-mono font-semibold', data.danger_alerts > 0 ? 'text-tm-loss' : 'text-tm-profit')}>
-                  {data.danger_alerts}
-                </p>
-              </div>
-              <div>
-                <p className="text-[10px] text-muted-foreground uppercase">Caution alerts</p>
-                <p className={cn('text-sm font-mono font-semibold', data.caution_alerts > 2 ? 'text-tm-obs' : 'text-foreground')}>
-                  {data.caution_alerts}
-                </p>
+                {/* Breakdown bars */}
+                <div className="space-y-2">
+                  <div>
+                    <div className="flex justify-between text-[11px] text-muted-foreground mb-1">
+                      <span>Alert control</span>
+                      <span className="font-mono">{data.breakdown.alerts_score} / 60</span>
+                    </div>
+                    <div className="h-1.5 rounded-full bg-muted overflow-hidden">
+                      <div
+                        className="h-full bg-tm-brand transition-all"
+                        style={{ width: `${(data.breakdown.alerts_score / 60) * 100}%` }}
+                      />
+                    </div>
+                  </div>
+                  <div>
+                    <div className="flex justify-between text-[11px] text-muted-foreground mb-1">
+                      <span>Trade quality</span>
+                      <span className="font-mono">{data.breakdown.quality_score} / 40</span>
+                    </div>
+                    <div className="h-1.5 rounded-full bg-muted overflow-hidden">
+                      <div
+                        className="h-full bg-tm-brand transition-all"
+                        style={{ width: `${(data.breakdown.quality_score / 40) * 100}%` }}
+                      />
+                    </div>
+                  </div>
+                </div>
+
+                {/* Quick stats */}
+                <div className="flex gap-4 pt-1">
+                  <div>
+                    <p className="text-[10px] text-muted-foreground uppercase">Trades</p>
+                    <p className="text-sm font-mono font-semibold text-foreground">{data.trades_this_week}</p>
+                  </div>
+                  <div>
+                    <p className="text-[10px] text-muted-foreground uppercase">Danger alerts</p>
+                    <p className={cn('text-sm font-mono font-semibold', data.danger_alerts > 0 ? 'text-tm-loss' : 'text-tm-profit')}>
+                      {data.danger_alerts}
+                    </p>
+                  </div>
+                  <div>
+                    <p className="text-[10px] text-muted-foreground uppercase">Caution alerts</p>
+                    <p className={cn('text-sm font-mono font-semibold', data.caution_alerts > 2 ? 'text-tm-obs' : 'text-foreground')}>
+                      {data.caution_alerts}
+                    </p>
+                  </div>
+                </div>
               </div>
             </div>
           </div>
         </div>
+
+        {/* Right — trend chart + streaks */}
+        <div className="w-full lg:flex-[45] min-w-0 space-y-4">
+          {/* 4-week trend */}
+          {trendData.length > 1 && (
+            <div className="tm-card overflow-hidden">
+              <div className="px-5 py-3.5 border-b border-border flex items-center gap-2">
+                <TrendingUp className="h-4 w-4 text-muted-foreground" />
+                <p className="text-sm font-medium text-foreground">4-Week Trend</p>
+              </div>
+              <div className="p-5">
+                <ResponsiveContainer width="100%" height={120}>
+                  <LineChart data={trendData}>
+                    <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" vertical={false} />
+                    <XAxis dataKey="week" tick={{ fontSize: 11, fill: 'var(--muted-foreground)' }}
+                      axisLine={false} tickLine={false} />
+                    <YAxis domain={[0, 100]} tick={{ fontSize: 11, fill: 'var(--muted-foreground)' }}
+                      axisLine={false} tickLine={false} tickFormatter={v => `${v}`} />
+                    <Tooltip content={<TrendTooltip />} />
+                    <Line
+                      type="monotone" dataKey="score"
+                      stroke="#0D9488" strokeWidth={2}
+                      dot={{ fill: '#0D9488', r: 3 }}
+                      activeDot={{ r: 5 }}
+                    />
+                  </LineChart>
+                </ResponsiveContainer>
+              </div>
+            </div>
+          )}
+
+          {/* Streaks */}
+          <div className="tm-card overflow-hidden">
+            <div className="px-5 py-3.5 border-b border-border flex items-center gap-2">
+              <Flame className="h-4 w-4 text-tm-obs" />
+              <p className="text-sm font-medium text-foreground">Streaks</p>
+            </div>
+            <div className="divide-y divide-border">
+              <div className="px-5 py-3 flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                  <span className="text-xl">🧘</span>
+                  <div>
+                    <p className="text-[13px] font-medium text-foreground">Revenge-Free</p>
+                    <p className="text-[11px] text-muted-foreground">No revenge trades</p>
+                  </div>
+                </div>
+                <div className="text-right">
+                  <p className={cn(
+                    'text-lg font-bold font-mono tabular-nums',
+                    data.revenge_free_days >= 5 ? 'text-tm-profit' : data.revenge_free_days >= 2 ? 'text-tm-obs' : 'text-tm-loss'
+                  )}>
+                    {data.revenge_free_days}d
+                  </p>
+                  {data.revenge_free_days >= 5 && (
+                    <p className="text-[10px] text-tm-profit">On track ✓</p>
+                  )}
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
       </div>
-
-      {/* 4-week trend */}
-      {trendData.length > 1 && (
-        <div className="tm-card overflow-hidden mb-4">
-          <div className="px-5 py-4 border-b border-border flex items-center gap-2">
-            <TrendingUp className="h-4 w-4 text-muted-foreground" />
-            <p className="text-sm font-medium text-foreground">4-Week Trend</p>
-          </div>
-          <div className="p-5">
-            <ResponsiveContainer width="100%" height={120}>
-              <LineChart data={trendData}>
-                <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" vertical={false} />
-                <XAxis dataKey="week" tick={{ fontSize: 11, fill: 'var(--muted-foreground)' }}
-                  axisLine={false} tickLine={false} />
-                <YAxis domain={[0, 100]} tick={{ fontSize: 11, fill: 'var(--muted-foreground)' }}
-                  axisLine={false} tickLine={false} tickFormatter={v => `${v}`} />
-                <Tooltip content={<TrendTooltip />} />
-                <Line
-                  type="monotone" dataKey="score"
-                  stroke="#0D9488" strokeWidth={2}
-                  dot={{ fill: '#0D9488', r: 3 }}
-                  activeDot={{ r: 5 }}
-                />
-              </LineChart>
-            </ResponsiveContainer>
-          </div>
-        </div>
-      )}
-
-      {/* Streaks */}
-      <div className="tm-card overflow-hidden mb-4">
-        <div className="px-5 py-4 border-b border-border flex items-center gap-2">
-          <Flame className="h-4 w-4 text-tm-obs" />
-          <p className="text-sm font-medium text-foreground">Streaks</p>
-        </div>
-        <div className="divide-y divide-border">
-          {/* Revenge-free streak — always shown, computed from data */}
-          <div className="px-5 py-3 flex items-center justify-between">
-            <div className="flex items-center gap-3">
-              <span className="text-xl">🧘</span>
-              <div>
-                <p className="text-[13px] font-medium text-foreground">Revenge-Free</p>
-                <p className="text-[11px] text-muted-foreground">No revenge trades</p>
-              </div>
-            </div>
-            <div className="text-right">
-              <p className={cn(
-                'text-lg font-bold font-mono tabular-nums',
-                data.revenge_free_days >= 5 ? 'text-tm-profit' : data.revenge_free_days >= 2 ? 'text-tm-obs' : 'text-tm-loss'
-              )}>
-                {data.revenge_free_days}d
-              </p>
-              {data.revenge_free_days >= 5 && (
-                <p className="text-[10px] text-tm-profit">On track ✓</p>
-              )}
-            </div>
-          </div>
-        </div>
-      </div>
-
     </div>
   );
 }

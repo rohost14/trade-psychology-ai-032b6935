@@ -351,7 +351,7 @@ export default function Guardrails() {
   const done = rules.filter(r => r.status === "triggered" || r.is_expired);
 
   return (
-    <div className="px-4 sm:px-6 py-6 max-w-2xl mx-auto space-y-5">
+    <div className="space-y-5 pb-12">
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>

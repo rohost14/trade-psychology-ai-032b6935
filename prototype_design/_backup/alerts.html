@@ -1,0 +1,442 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description" content="Behavioral pattern alerts and observations feed for disciplined trading.">
+  <link rel="icon" type="image/svg+xml" href="favicon.svg">
+  <title>Shield Alerts — TradeMentor AI</title>
+
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:ital,wght@0,400;0,500;0,600;0,700;0,800;1,400&display=swap" rel="stylesheet">
+
+    <link rel="stylesheet" href="shared.css">
+
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          fontFamily: {
+            sans: ['Inter', 'sans-serif'],
+          },
+          colors: {
+            brand: '#4F46E5',
+            brandBg: '#EEF2FF',
+            profit: '#059669',
+            profitBg: '#ecfdf5',
+            loss: '#dc2626',
+            lossBg: '#fef2f2',
+            obs: '#d97706', obsBg: '#fffbeb',
+            surface: '#ffffff',
+            background: '#F9FAFB',
+          },
+          boxShadow: {
+            'card': '0 1px 2px rgba(0,0,0,0.04), 0 4px 12px rgba(0,0,0,0.02)',
+            'stripe': '0 2px 5px rgba(0,0,0,0.04), 0 1px 1px rgba(0,0,0,0.02)'
+          }
+        }
+      }
+    }
+  </script>
+  <style>
+    body {
+      background-color: #F8FAFC;
+      color: #0F172A;
+      -webkit-font-smoothing: antialiased;
+    }
+
+    .hidden {
+      position: absolute;
+      top: 0;
+      left: 0;
+      right: 0;
+      height: 350px;
+      background: linear-gradient(175deg, rgba(238, 242, 255, 1) 0%, rgba(246, 248, 253, 1) 40%, rgba(248, 250, 252, 1) 100%);
+      z-index: -1;
+    }
+
+    .tm-card {
+      background: white;
+      border-radius: 12px;
+      border: 1px solid #E2E8F0;
+      box-shadow: 0 1px 2px rgba(0, 0, 0, 0.04), 0 4px 12px rgba(0, 0, 0, 0.02);
+      transition: box-shadow 0.2s ease, transform 0.2s ease;
+    }
+
+    .tm-card:hover {
+      border-color: #CBD5E1;
+    }
+  </style>
+</head>
+
+<body class="flex min-h-screen">
+
+  <!-- Mobile Backdrop -->
+  <div id="sidebar-backdrop"
+    onclick="closeSidebar()"></div>
+
+  <aside id="app-sidebar"
+    class="fixed inset-y-0 left-0 bg-white border-r border-slate-200 w-[260px] flex flex-col z-[70] transform -translate-x-full lg:translate-x-0 transition-transform duration-300 ease-in-out">
+
+    <!-- Branding -->
+    <div class="h-[72px] px-6 flex items-center gap-3 border-b border-slate-100 shrink-0">
+      <div class="w-7 h-7 bg-brand rounded-md flex items-center justify-center">
+        <svg class="w-4 h-4 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+          <path stroke-linecap="round" stroke-linejoin="round" d="M13 10V3L4 14h7v7l9-11h-7z" />
+        </svg>
+      </div>
+      <span class="font-bold text-slate-900 text-[15px] ">TradeMentor AI</span>
+      <!-- Close button for mobile -->
+      <button class="ml-auto p-1 text-slate-500 hover:text-slate-600 lg:hidden" onclick="closeSidebar()">
+        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+        </svg>
+      </button>
+    </div>
+
+    <!-- Navigation Area -->
+    <div class="flex-1 overflow-y-auto pt-6 px-4 pb-6 space-y-1">
+      <p class="px-2 text-[12px] font-bold uppercase tracking-wider text-slate-500 mb-2">Main Menu</p>
+
+      <a href="dashboard.html"
+        class="sidebar-link">
+        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2">
+          <path stroke-linecap="round" stroke-linejoin="round"
+            d="M4 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2V6zM14 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2V6zM4 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2v-2zM14 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2v-2z">
+          </path>
+        </svg>
+        Overview
+      </a>
+
+      <a href="analytics.html"
+        class="sidebar-link">
+        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2">
+          <path stroke-linecap="round" stroke-linejoin="round"
+            d="M16 8v8m-4-5v5m-4-2v2m-2 4h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"></path>
+        </svg>
+        Performance Metrics
+      </a>
+
+      <!-- Active Link -->
+      <a href="alerts.html"
+        class="sidebar-link active">
+        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2">
+          <path stroke-linecap="round" stroke-linejoin="round"
+            d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z">
+          </path>
+        </svg>
+        Shield Alerts
+        <span class="ml-auto bg-brand text-white shadow-sm text-[12px] font-bold px-2 py-0.5 rounded-full">2</span>
+      </a>
+
+      <a href="blowup_shield.html"
+        class="sidebar-link">
+        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2">
+          <path stroke-linecap="round" stroke-linejoin="round"
+            d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z">
+          </path>
+        </svg>
+        Blowup Shield
+      </a>
+
+      <a href="chat.html"
+        class="sidebar-link">
+        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2">
+          <path stroke-linecap="round" stroke-linejoin="round"
+            d="M5 3v4M3 5h4M6 17v4m-2-2h4m5-16l2.286 6.857L21 12l-5.714 2.143L13 21l-2.286-6.857L5 12l5.714-2.143L13 3z">
+          </path>
+        </svg>
+        AI Coach
+      </a>
+    </div>
+
+    <!-- User Profile Area -->
+    <div class="p-4 border-t border-slate-100 shrink-0">
+      <div class="hover:bg-slate-50 rounded-lg p-3 transition cursor-pointer flex items-center gap-3">
+        <div
+          class="w-10 h-10 rounded-full bg-indigo-50 border border-indigo-100 text-brand font-bold text-sm flex items-center justify-center shrink-0">
+          JD</div>
+        <div class="min-w-0">
+          <p class="text-[13px] font-bold text-slate-900 truncate">John Doe</p>
+          <p class="text-[13px] text-slate-500 font-mono truncate">ID: 45X9B (Zerodha)</p>
+        </div>
+      </div>
+    </div>
+  </aside>
+
+  <script>
+        function toggleSidebar() {
+      const sidebar = document.getElementById('app-sidebar');
+      const backdrop = document.getElementById('sidebar-backdrop');
+      const isHidden = sidebar.getAttribute('data-open') !== 'true';
+      if (isHidden) {
+        sidebar.style.transform = 'translateX(0)';
+        sidebar.setAttribute('data-open', 'true');
+        backdrop.classList.add('show');
+        document.body.style.overflow = 'hidden';
+      } else {
+        closeSidebar();
+      }
+    }
+    function closeSidebar() {
+      const sidebar = document.getElementById('app-sidebar');
+      const backdrop = document.getElementById('sidebar-backdrop');
+      sidebar.style.transform = '';
+      sidebar.setAttribute('data-open', 'false');
+      backdrop.classList.remove('show');
+      document.body.style.overflow = '';
+    }
+  </script>
+
+  <main class="main-content">
+    <div class="hidden"></div>
+
+        <!-- Inner Padding Wrapper -->
+    <div class="w-full px-4 sm:px-6 lg:px-10 py-6 lg:py-10 pb-20 relative z-10">
+
+      <!-- Header & Quick Actions -->
+      <header class="flex flex-col sm:flex-row sm:items-end justify-between gap-4 mb-6 lg:mb-8">
+        <div>
+          <h1 class="text-[20px] sm:text-[24px] font-medium  text-slate-900 mb-1">Behavioral Observations</h1>
+          <p class="text-xs sm:text-sm text-slate-500 font-medium">Every behavioral pattern detected by the system.</p>
+        </div>
+        <div class="flex items-center gap-4">
+          <span class="text-[13px] font-semibold text-slate-700">2 unread</span>
+          <button class="text-brand font-semibold text-[13px] hover:underline">Mark all read</button>
+        </div>
+      </header>
+
+      <!-- Tabs -->
+      <div class="flex items-center gap-2 border-b border-slate-200 mb-6 lg:mb-8 overflow-x-auto pb-px">
+        <button class="px-5 py-3 border-b-2 border-brand text-brand font-semibold text-[14px]">Recent</button>
+        <button
+          class="px-5 py-3 border-b-2 border-transparent text-slate-500 hover:text-slate-900 font-medium text-[14px] transition">History</button>
+        <button
+          class="px-5 py-3 border-b-2 border-transparent text-slate-500 hover:text-slate-900 font-medium text-[14px] transition">By
+          Pattern</button>
+      </div>
+
+      <!-- Layout Grid -->
+      <div class="flex flex-col lg:flex-row gap-8 items-start">
+
+        <!-- Main Feed (70%) -->
+        <div class="w-full lg:w-[65%] 2xl:w-[70%] space-y-5">
+
+          <!-- Card 1: NEW Observation -->
+          <div class="tm-card p-8 border-indigo-200 bg-white border border-slate-200 shadow-sm ring-1 ring-slate-900/5">
+            <div class="flex items-start justify-between mb-3">
+              <h3 class="text-[15px] sm:text-[16px] font-bold text-slate-900 flex items-center gap-2">
+                <span class="w-3 h-3 rounded-full bg-obs shadow-sm"></span>
+                Overtrading
+                <span
+                  class="ml-2 bg-brand text-white text-[11px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full shadow-sm">New</span>
+              </h3>
+              <span class="text-[13px] sm:text-[13px] font-medium text-slate-500">10:34 AM today</span>
+            </div>
+
+            <div class="pl-5 border-l-2 border-slate-100 ml-[5px] mb-5">
+              <p class="text-[13px] sm:text-[14px] text-slate-900 font-semibold mb-1">
+                8 trades placed in a 2-hour window. This is 40% above your daily average of 6.
+              </p>
+              <p class="text-[13px] sm:text-[14px] text-slate-600 font-medium leading-relaxed mb-4">
+                You typically only exceed this pace on days marked by high frustration in your journal. Please review
+                your session pace.
+              </p>
+
+              <div class="flex flex-wrap gap-2 mb-4">
+                <span
+                  class="text-[13px] font-semibold text-slate-600 bg-slate-50 border border-slate-200 px-2 py-1 rounded-md">NIFTY
+                  CE &times; 5</span>
+                <span
+                  class="text-[13px] font-semibold text-slate-600 bg-slate-50 border border-slate-200 px-2 py-1 rounded-md">BANKNIFTY
+                  &times; 3</span>
+              </div>
+
+              <p class="text-[13px] sm:text-[13px] font-medium text-slate-500">Estimated cost: <span
+                  class="font-medium text-rose-600 tabular">-₹1,200</span></p>
+            </div>
+
+            <div class="flex items-center gap-3 pl-5 ml-[5px]">
+              <button
+                class="bg-white border border-slate-200 hover:bg-slate-50 text-slate-800 font-semibold text-[13px] px-5 py-2 rounded-lg transition shadow-sm">Acknowledge</button>
+              <button
+                class="bg-white border border-slate-200 text-slate-700 hover:text-slate-900 hover:bg-slate-50 font-semibold text-[13px] px-5 py-2 rounded-lg transition">See
+                trades &rarr;</button>
+            </div>
+          </div>
+
+          <!-- Card 2: NEW Observation (High Severity) -->
+          <div class="tm-card p-8 border-red-200 bg-white border border-slate-200 shadow-sm ring-1 ring-slate-900/5">
+            <div class="flex items-start justify-between mb-3">
+              <h3 class="text-[15px] sm:text-[16px] font-bold text-slate-900 flex items-center gap-2">
+                <span class="w-3 h-3 rounded-full bg-red-500 shadow-sm"></span>
+                Revenge Trade Risk
+                <span
+                  class="ml-2 bg-brand text-white text-[11px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full shadow-sm">New</span>
+              </h3>
+              <span class="text-[13px] sm:text-[13px] font-medium text-slate-500">09:58 AM today</span>
+            </div>
+
+            <div class="pl-5 border-l-2 border-slate-100 ml-[5px] mb-5">
+              <p class="text-[13px] sm:text-[14px] text-slate-900 font-semibold mb-1">
+                Re-entered BANKNIFTY CE 4 minutes after a ₹800 loss at 09:54 AM.
+              </p>
+              <p class="text-[13px] sm:text-[14px] text-slate-600 font-medium leading-relaxed mb-4">
+                Typical revenge pattern: entering the same underlying directly after a stop-out without an intentional
+                pause.
+              </p>
+            </div>
+
+            <div class="flex items-center gap-3 pl-5 ml-[5px]">
+              <button
+                class="bg-red-600 hover:bg-red-700 text-white font-semibold text-[13px] px-5 py-2 rounded-lg transition shadow-sm">Acknowledge</button>
+              <button
+                class="bg-white border border-slate-200 text-slate-700 hover:text-slate-900 hover:bg-slate-50 font-semibold text-[13px] px-5 py-2 rounded-lg transition">See
+                trades &rarr;</button>
+            </div>
+          </div>
+
+          <!-- Card 3: Acknowledged Observation -->
+          <div class="tm-card p-8 opacity-70">
+            <div class="flex items-start justify-between mb-3">
+              <h3 class="text-[15px] sm:text-[16px] font-bold text-slate-900 flex items-center gap-2">
+                <span class="w-2.5 h-2.5 rounded-full bg-gray-300"></span>
+                Opening 5-Min Trap
+                <span
+                  class="ml-2 text-slate-500 text-[12px] font-bold uppercase tracking-wider flex items-center gap-1 bg-slate-100 px-2 py-0.5 rounded-full">
+                  <svg class="w-3 h-3 text-slate-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="3" d="M5 13l4 4L19 7"></path>
+                  </svg>
+                  Acknowledged
+                </span>
+              </h3>
+              <span class="text-[13px] sm:text-[13px] font-medium text-slate-500">Mar 26 &middot; 09:18 AM</span>
+            </div>
+
+            <div class="pl-5 border-l-2 border-slate-100 ml-[5px]">
+              <p class="text-[13px] text-slate-600 font-medium leading-relaxed">
+                Entered position within the first 5 minutes of market open. Historically, this has resulted in a 32% win
+                rate.
+              </p>
+            </div>
+          </div>
+
+        </div>
+
+        <!-- Right Side Filter Container (35%) -->
+        <div class="w-full lg:w-[35%] 2xl:w-[30%]">
+          <div class="tm-card p-8 sticky top-24">
+            <h3 class="text-[13px] font-medium text-slate-500 uppercase tracking-wider mb-4 border-b border-slate-100 pb-2">
+              Filter Feed</h3>
+
+            <!-- Pattern Type -->
+            <div class="mb-6">
+              <p class="text-[13px] font-semibold text-slate-900 mb-3">Pattern Type</p>
+              <div class="space-y-3">
+                <label class="flex items-center gap-3 cursor-pointer group">
+                  <input type="checkbox" checked
+                    class="w-4 h-4 rounded text-brand border-gray-300 focus:ring-brand focus:ring-2 cursor-pointer">
+                  <span class="text-[14px] font-medium text-slate-600 group-hover:text-slate-900 transition">All
+                    Patterns</span>
+                </label>
+                <label class="flex items-center gap-3 cursor-pointer group">
+                  <input type="checkbox" checked
+                    class="w-4 h-4 rounded text-brand border-gray-300 focus:ring-brand focus:ring-2 cursor-pointer">
+                  <span
+                    class="text-[14px] font-medium text-slate-600 group-hover:text-slate-900 transition">Overtrading</span>
+                </label>
+                <label class="flex items-center gap-3 cursor-pointer group">
+                  <input type="checkbox" checked
+                    class="w-4 h-4 rounded text-brand border-gray-300 focus:ring-brand focus:ring-2 cursor-pointer">
+                  <span class="text-[14px] font-medium text-slate-600 group-hover:text-slate-900 transition">Revenge
+                    Risk</span>
+                </label>
+                <label class="flex items-center gap-3 cursor-pointer group">
+                  <input type="checkbox" checked
+                    class="w-4 h-4 rounded text-brand border-gray-300 focus:ring-brand focus:ring-2 cursor-pointer">
+                  <span class="text-[14px] font-medium text-slate-600 group-hover:text-slate-900 transition">FOMO
+                    Entry</span>
+                </label>
+              </div>
+            </div>
+
+            <!-- Severity -->
+            <div class="mb-6">
+              <p class="text-[13px] font-semibold text-slate-900 mb-3">Severity</p>
+              <div class="space-y-3">
+                <label class="flex items-center gap-3 cursor-pointer group">
+                  <input type="checkbox" checked
+                    class="w-4 h-4 rounded text-brand border-gray-300 focus:ring-brand focus:ring-2 cursor-pointer">
+                  <span class="w-2.5 h-2.5 rounded-full bg-red-500"></span>
+                  <span class="text-[14px] font-medium text-slate-600 group-hover:text-slate-900 transition">High /
+                    Critical</span>
+                </label>
+                <label class="flex items-center gap-3 cursor-pointer group">
+                  <input type="checkbox" checked
+                    class="w-4 h-4 rounded text-brand border-gray-300 focus:ring-brand focus:ring-2 cursor-pointer">
+                  <span class="w-2.5 h-2.5 rounded-full bg-obs"></span>
+                  <span class="text-[14px] font-medium text-slate-600 group-hover:text-slate-900 transition">Medium</span>
+                </label>
+                <label class="flex items-center gap-3 cursor-pointer group">
+                  <input type="checkbox" checked
+                    class="w-4 h-4 rounded text-brand border-gray-300 focus:ring-brand focus:ring-2 cursor-pointer">
+                  <span class="w-2.5 h-2.5 rounded-full bg-gray-300"></span>
+                  <span class="text-[14px] font-medium text-slate-600 group-hover:text-slate-900 transition">Low</span>
+                </label>
+              </div>
+            </div>
+
+            <!-- Date Range -->
+            <div>
+              <p class="text-[13px] font-semibold text-slate-900 mb-3">Date Range</p>
+              <button
+                class="w-full bg-white border border-slate-200 text-slate-700 hover:bg-slate-50 font-medium text-[13px] px-4 py-2.5 rounded-lg shadow-sm flex items-center justify-between transition-colors">
+                Today
+                <svg class="w-4 h-4 text-slate-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path>
+                </svg>
+              </button>
+            </div>
+
+          </div>
+        </div>
+
+      </div>
+
+    </div>
+  </main>
+
+
+  <!-- Mobile Bottom Navigation -->
+  <nav id="bottom-nav" aria-label="Mobile navigation">
+    <div class="bottom-nav-items">
+      <a href="dashboard.html" class="bottom-nav-item" id="bnav-overview">
+        <svg fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M4 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2V6zM14 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2V6zM4 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2v-2zM14 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2v-2z"/></svg>
+        Overview
+      </a>
+      <a href="analytics.html" class="bottom-nav-item" id="bnav-analytics">
+        <svg fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M16 8v8m-4-5v5m-4-2v2m-2 4h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"/></svg>
+        Analytics
+      </a>
+      <a href="alerts.html" class="bottom-nav-item" id="bnav-alerts">
+        <span class="bottom-nav-badge">2</span>
+        <svg fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"/></svg>
+        Alerts
+      </a>
+      <a href="blowup_shield.html" class="bottom-nav-item" id="bnav-shield">
+        <svg fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M20.618 5.984A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"/></svg>
+        Shield
+      </a>
+      <a href="chat.html" class="bottom-nav-item" id="bnav-chat">
+        <svg fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M5 3v4M3 5h4M6 17v4m-2-2h4m5-16l2.286 6.857L21 12l-5.714 2.143L13 21l-2.286-6.857L5 12l5.714-2.143L13 3z"/></svg>
+        AI Coach
+      </a>
+    </div>
+  </nav>
+  <script>document.getElementById('bnav-alerts').classList.add('active');</script>
+</body>
+
+</html>

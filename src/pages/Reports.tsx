@@ -497,7 +497,7 @@ export default function Reports() {
 
   if (!isConnected) {
     return (
-      <div className="max-w-3xl mx-auto pb-12">
+      <div className="pb-12">
         <div className="mb-5"><h1 className="t-heading-lg text-foreground">Reports</h1></div>
         <div className="tm-card flex flex-col items-center justify-center min-h-[50vh] text-center py-16">
           <div className="p-4 rounded-full bg-teal-50 dark:bg-teal-900/20 mb-5">
@@ -519,7 +519,7 @@ export default function Reports() {
   }
 
   return (
-    <div className="max-w-3xl mx-auto px-4 py-6 space-y-6">
+    <div className="space-y-6 pb-12">
       {/* Header */}
       <div className="flex items-start justify-between">
         <div>

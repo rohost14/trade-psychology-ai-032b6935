@@ -447,7 +447,7 @@ export default function AlertsPage() {
   }), [alerts, unacknowledgedCount]);
 
   return (
-    <div className="max-w-3xl mx-auto pb-12">
+    <div className="pb-12">
       {/* Page header */}
       <div className="mb-5 flex items-center justify-between">
         <div className="flex items-center gap-2">

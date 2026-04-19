@@ -1,0 +1,569 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Overview Dashboard — TradeMentor AI</title>
+  <meta name="description" content="Real-time behavioral psychology dashboard for disciplined trading. Monitor your P&L, behavioral patterns, and risk state.">
+  <link rel="icon" type="image/svg+xml" href="favicon.svg">
+
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:ital,wght@0,400;0,500;0,600;0,700;0,800;1,400&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="shared.css">
+
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          fontFamily: { sans: ['Inter', 'sans-serif'] },
+          colors: {
+            brand: '#4F46E5', brandBg: '#EEF2FF',
+            profit: '#059669', profitBg: '#ecfdf5',
+            loss: '#dc2626', lossBg: '#fef2f2',
+            obs: '#d97706', obsBg: '#fffbeb',
+            surface: '#ffffff', background: '#F8FAFC',
+          }
+        }
+      }
+    }
+  </script>
+  <style>
+    .table-scroll-wrap { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+    .table-scroll-wrap table { min-width: 500px; }
+  </style>
+</head>
+
+<body class="flex min-h-screen relative overflow-hidden lg:overflow-auto">
+
+  <!-- ── Application Sidebar ── -->
+  <!-- 
+    Desktop: Fixed on left (lg:flex), width 64 (256px), bordered on right.
+    Mobile: Fixed, hidden by default (`-translate-x-full`), toggled via JS, with a backdrop overlay.
+  -->
+
+  <!-- Mobile Backdrop -->
+  <div id="sidebar-backdrop" class="fixed inset-0 bg-gray-900/40 backdrop-blur-sm z-[60] hidden lg:hidden"
+    onclick="toggleSidebar()"></div>
+
+  <aside id="app-sidebar" role="navigation" aria-label="Main navigation">
+    <!-- Branding -->
+    <div class="sidebar-logo">
+      <div class="logo-mark" aria-hidden="true">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2.5">
+          <path stroke-linecap="round" stroke-linejoin="round" d="M13 10V3L4 14h7v7l9-11h-7z"/>
+        </svg>
+      </div>
+      <span class="sidebar-logo-text">TradeMentor AI</span>
+      <span class="sidebar-logo-badge">Beta</span>
+      <button class="ml-2 p-1.5 text-slate-500 hover:text-slate-600 hover:bg-slate-100 rounded-md lg:hidden" onclick="toggleSidebar()" aria-label="Close sidebar">
+        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
+      </button>
+    </div>
+
+    <!-- Navigation Area -->
+    <nav class="sidebar-nav" aria-label="App pages">
+      <p class="sidebar-section-label">Main Menu</p>
+
+      <a href="dashboard.html" class="sidebar-link active" aria-current="page">
+        <svg width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M4 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2V6zM14 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2V6zM4 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2v-2zM14 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2v-2z"/></svg>
+        Overview
+      </a>
+
+      <a href="analytics.html" class="sidebar-link">
+        <svg width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M16 8v8m-4-5v5m-4-2v2m-2 4h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"/></svg>
+        Performance Metrics
+      </a>
+
+      <a href="alerts.html" class="sidebar-link">
+        <svg width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"/></svg>
+        Shield Alerts
+        <span class="sidebar-badge">2</span>
+      </a>
+
+      <a href="blowup_shield.html" class="sidebar-link">
+        <svg width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M20.618 5.984A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"/></svg>
+        Blowup Shield
+      </a>
+
+      <a href="chat.html" class="sidebar-link">
+        <svg width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M5 3v4M3 5h4M6 17v4m-2-2h4m5-16l2.286 6.857L21 12l-5.714 2.143L13 21l-2.286-6.857L5 12l5.714-2.143L13 3z"/></svg>
+        AI Coach
+      </a>
+    </nav>
+
+    <!-- User Profile -->
+    <div class="sidebar-profile">
+      <div class="sidebar-profile-inner">
+        <div class="sidebar-avatar" aria-hidden="true">JD</div>
+        <div class="min-w-0">
+          <p class="sidebar-profile-name">John Doe</p>
+          <p class="sidebar-profile-sub">ID: 45X9B · Zerodha</p>
+        </div>
+      </div>
+    </div>
+  </aside>
+
+  <script>
+    function toggleSidebar() {
+      const sidebar = document.getElementById('app-sidebar');
+      const backdrop = document.getElementById('sidebar-backdrop');
+      const isOpen = sidebar.style.transform === 'translateX(0px)' || !sidebar.style.transform;
+      // Use data attribute to track state cleanly
+      const isHidden = sidebar.getAttribute('data-open') !== 'true';
+      if (isHidden) {
+        sidebar.style.transform = 'translateX(0)';
+        sidebar.setAttribute('data-open', 'true');
+        backdrop.classList.add('show');
+        document.body.style.overflow = 'hidden';
+      } else {
+        sidebar.style.transform = '';
+        sidebar.setAttribute('data-open', 'false');
+        backdrop.classList.remove('show');
+        document.body.style.overflow = '';
+      }
+    }
+  </script>
+
+  <!-- ── Main Canvas ── -->
+  <!-- Margin pushing content right ONLY on large screens lg:ml-[260px] -->
+  <main class="flex-1 w-full lg:ml-[260px] relative min-h-screen">
+    <div class="hidden"></div>
+
+    <!-- Inner Padding Wrapper -->
+    <div class="w-full px-4 sm:px-6 lg:px-10 py-6 lg:py-10 pb-20">
+
+      <!-- Page Header -->
+      <header class="flex flex-col xl:flex-row xl:items-center justify-between gap-4 xl:gap-8 mb-6 lg:mb-8">
+        <div>
+          <h1 class="text-[20px] sm:text-[24px] font-medium  text-slate-900 mb-1">Overview Dashboard</h1>
+          <p class="text-xs sm:text-sm text-slate-500 font-medium">Tuesday, Oct 24 &middot; Active Live Session</p>
+        </div>
+
+        <!-- Top Action Pills -->
+        <div class="flex items-center gap-2 sm:gap-3 overflow-x-auto pb-1 sm:pb-0 shrink-0">
+          <div
+            class="px-3 sm:px-5 py-2.5 sm:py-3 bg-white border border-slate-200 rounded-lg shadow-stripe flex flex-col justify-center shrink-0">
+            <span
+              class="text-[11px] sm:text-[12px] text-slate-500 font-bold uppercase tracking-wide leading-none mb-1 sm:mb-1.5">Margin
+              Available</span>
+            <span class="tabular font-bold text-[13px] sm:text-[15px] leading-none text-slate-900">₹4,25,000</span>
+          </div>
+
+          <div
+            class="px-4 sm:px-5 py-2.5 sm:py-3 bg-white border border-slate-200 rounded-lg shadow-stripe flex items-center justify-center gap-2 h-full shrink-0">
+            <span class="w-2 h-2 sm:w-2.5 sm:h-2.5 rounded-full bg-profit animate-pulse shrink-0"></span>
+            <span class="tabular font-bold text-[16px] sm:text-[18px] text-profit leading-none">+₹24,500</span>
+          </div>
+        </div>
+      </header>
+
+      <!-- Primary Metrics Row -->
+      <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
+
+        <!-- Metric Box 1 -->
+        <div class="tm-card p-6 relative overflow-hidden transition-opacity duration-300 flex flex-col justify-between">
+          <div>
+            <div class="flex items-center justify-between mb-2">
+              <h3 class="text-[13px] font-semibold text-slate-500">Today's P&L</h3>
+              <div class="w-8 h-8 rounded-full bg-emerald-50 flex items-center justify-center">
+                <svg class="w-4 h-4 text-profit" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                    d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6"></path>
+                </svg>
+              </div>
+            </div>
+            <p class="text-[22px] font-medium  text-slate-900  tabular">₹1,450</p>
+          </div>
+          <!-- Sparkline SVG -->
+          <svg class="absolute bottom-0 left-0 w-full h-12 text-emerald-100 opacity-60" preserveAspectRatio="none"
+            viewBox="0 0 100 30" fill="none" stroke="currentColor">
+            <path stroke-width="2" d="M0,30 L10,25 L20,30 L35,15 L50,20 L65,5 L80,10 L100,2" />
+            <path fill="currentColor" opacity="0.3" stroke="none"
+              d="M0,30 L10,25 L20,30 L35,15 L50,20 L65,5 L80,10 L100,2 L100,30 L0,30 Z" />
+          </svg>
+          <div class="mt-4 flex items-center gap-2 relative z-10">
+            <span
+              class="text-[13px] font-bold px-1.5 py-0.5 bg-emerald-100 text-profit rounded flex items-center gap-0.5"><svg
+                class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M5 10l7-7m0 0l7 7m-7-7v18">
+                </path>
+              </svg> 2.1%</span>
+            <span class="text-[13px] text-slate-500 font-medium ">vs capital</span>
+          </div>
+        </div>
+
+        <!-- Metric Box 2 -->
+        <div class="tm-card p-6 relative min-h-[140px] transition-opacity duration-300  flex flex-col justify-between">
+          <div class="flex items-center justify-between mb-2">
+            <h3 class="text-[13px] font-semibold text-slate-500">Trades Executed</h3>
+            <div class="w-8 h-8 rounded-full bg-indigo-50 flex items-center justify-center">
+              <svg class="w-4 h-4 text-brand" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                  d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z">
+                </path>
+              </svg>
+            </div>
+          </div>
+          <p class="text-[22px] font-medium  text-slate-900  tabular">6 <span class="text-lg text-slate-500">/
+              10</span></p>
+          <div class="mt-4 flex flex-col gap-1.5">
+            <div class="w-full h-1.5 bg-slate-100 rounded-full overflow-hidden">
+              <div class="h-full bg-brand rounded-full" style="width: 60%;"></div>
+            </div>
+            <span class="text-[13px] text-slate-500 font-medium">Daily limit pacing</span>
+          </div>
+        </div>
+
+        <!-- Metric Box 3 -->
+        <div class="tm-card p-6 relative min-h-[140px] transition-opacity duration-300  flex flex-col justify-between">
+          <div class="flex items-center justify-between mb-2">
+            <h3 class="text-[13px] font-semibold text-slate-500">Emotional Tax</h3>
+            <div class="w-8 h-8 rounded-full bg-red-50 flex items-center justify-center">
+              <svg class="w-4 h-4 text-loss" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                  d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+              </svg>
+            </div>
+          </div>
+          <p class="text-[22px] font-medium  text-slate-900  tabular">-₹380</p>
+          <!-- SVG sparkline downward -->
+          <svg class="absolute bottom-0 left-0 w-full h-12 text-red-100 opacity-60" preserveAspectRatio="none"
+            viewBox="0 0 100 30" fill="none" stroke="currentColor">
+            <path stroke-width="2" d="M0,5 L20,10 L35,8 L50,20 L65,15 L80,25 L100,30" />
+            <path fill="currentColor" opacity="0.3" stroke="none"
+              d="M0,5 L20,10 L35,8 L50,20 L65,15 L80,25 L100,30 L100,30 L0,30 Z" />
+          </svg>
+          <div class="mt-4 flex items-center gap-2 relative z-10">
+            <span
+              class="text-[13px] font-bold px-1.5 py-0.5 bg-red-100 text-loss rounded flex items-center gap-0.5"><svg
+                class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M19 14l-7 7m0 0l-7-7m7 7V3">
+                </path>
+              </svg> 18%</span>
+            <span class="text-[13px] text-slate-500 font-medium ">of gross P&L</span>
+          </div>
+        </div>
+
+        <!-- Metric Box 4 (Risk State) -->
+        <div
+          class="tm-card p-6 border-t-4 border-t-emerald-500 bg-gradient-to-b from-emerald-50/50 to-white transition-opacity duration-300  flex flex-col justify-between">
+          <h3 class="text-[13px] font-semibold text-slate-500 mb-2">System Risk State</h3>
+          <div class="flex items-center gap-3">
+            <span class="relative flex h-3 w-3">
+              <span
+                class="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+              <span class="relative inline-flex rounded-full h-3 w-3 bg-emerald-500"></span>
+            </span>
+            <span class="text-xl font-medium text-emerald-600 ">SAFE</span>
+          </div>
+          <div class="mt-4 flex items-center gap-2 text-[13px] text-slate-500 font-medium">
+            <svg class="w-4 h-4 text-slate-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+            </svg>
+            No active behavioral flags
+          </div>
+        </div>
+      </div>
+
+      <!-- Main Grid: 70/30 split on huge screens -->
+      <div class="flex flex-col md:flex-col lg:flex-col 2xl:flex-row gap-8 items-start">
+
+        <!-- ── Left Column (Main Content - 75% on Ultrawide) ── -->
+        <div class="w-full 2xl:w-[72%] space-y-6 lg:space-y-8 min-w-0">
+
+          <!-- P&L Hero Summary -->
+          <div class="tm-card relative overflow-hidden group">
+            <div
+              class="absolute top-0 right-0 w-80 h-80 hidden z-0">
+            </div>
+
+            <div
+              class="relative z-10 p-8 flex flex-wrap md:flex-nowrap items-end justify-between border-b border-slate-100 gap-4">
+              <div class="w-full md:w-auto">
+                <p class="text-[13px] sm:text-[13px] font-medium text-slate-500 uppercase tracking-wider mb-2">Net Realized
+                  P&L</p>
+                <div class="flex items-baseline gap-2 sm:gap-3 flex-wrap">
+                  <span
+                    class="text-3xl sm:text-3xl font-semibold  text-slate-900 tabular er">₹24,500.00</span>
+                  <span
+                    class="text-[13px] sm:text-[13px] font-medium text-emerald-600 bg-profitBg px-2 py-1 rounded-md mt-1 sm:mt-0">+5.76%</span>
+                </div>
+              </div>
+
+              <div class="text-left md:text-right w-full md:w-auto">
+                <p class="text-[13px] sm:text-[13px] font-medium text-slate-500 uppercase tracking-wider mb-1 md:mb-2">
+                  Trades Today</p>
+                <span class="text-2xl sm:text-3xl font-bold text-slate-900 tabular">8</span>
+              </div>
+            </div>
+
+            <div class="relative z-10 grid grid-cols-2 md:grid-cols-4 gap-4 p-8 bg-white">
+              <div class="border-b md:border-0 border-slate-100 pb-3 md:pb-0">
+                <p class="text-[13px] sm:text-[13px] text-slate-500 mb-0.5 font-medium">Win Rate</p>
+                <p class="font-bold text-slate-900 text-[14px] sm:text-[15px]">62.5%</p>
+              </div>
+              <div class="border-b md:border-0 border-slate-100 pb-3 md:pb-0">
+                <p class="text-[13px] sm:text-[13px] text-slate-500 mb-0.5 font-medium">Avg Winning Trade</p>
+                <p class="font-medium text-emerald-600 tabular text-[14px] sm:text-[15px]">+₹6,400</p>
+              </div>
+              <div>
+                <p class="text-[13px] sm:text-[13px] text-slate-500 mb-0.5 font-medium">Avg Losing Trade</p>
+                <p class="font-medium text-rose-600 tabular text-[14px] sm:text-[15px]">-₹2,500</p>
+              </div>
+              <div>
+                <p class="text-[13px] sm:text-[13px] text-slate-500 mb-0.5 font-medium">Risk/Reward</p>
+                <p class="font-bold text-slate-900 tabular text-[14px] sm:text-[15px]">2.56</p>
+              </div>
+            </div>
+          </div>
+
+          <!-- Centered Alerts Component -->
+          <div class="tm-card border border-amber-200/60 shadow-sm bg-white border-y border-slate-200">
+            <div class="p-6 sm:p-6 flex items-center justify-between border-b border-slate-100">
+              <h2 class="text-[14px] sm:text-[15px] font-semibold  text-slate-900 flex items-center gap-2">
+                <svg class="w-4 h-4 text-obs" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2">
+                  <path stroke-linecap="round" stroke-linejoin="round"
+                    d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z">
+                  </path>
+                </svg>
+                Behavioral Alerts
+              </h2>
+              <span
+                class="bg-amber-100 text-amber-700 text-[12px] sm:text-[13px] font-bold px-2 py-0.5 rounded-full uppercase tracking-wider shrink-0">2
+                Action Req</span>
+            </div>
+
+            <div class="divide-y divide-gray-100">
+              <div class="p-6 sm:p-6 hover:bg-slate-50 flex flex-col sm:flex-row items-start gap-4 transition-colors">
+                <div class="hidden sm:block w-1 sm:w-1.5 h-[50px] bg-red-500 rounded-full mt-1 shrink-0"></div>
+                <div class="flex-1 w-full min-w-0">
+                  <div class="flex justify-between items-center mb-2 gap-1 block sm:hidden">
+                    <span class="w-1.5 h-4 bg-red-500 rounded-full shrink-0 block"></span>
+                    <h4 class="font-bold text-[14px] sm:text-[15px] text-slate-900 w-full truncate ml-1">Revenge Matrix
+                      Triggered</h4>
+                    <span
+                      class="text-[13px] sm:text-[13px] tabular text-slate-500 font-medium shrink-0 ml-auto">14m</span>
+                  </div>
+                  <div class="hidden sm:flex justify-between items-center mb-2">
+                    <h4 class="font-bold text-[14px] sm:text-[15px] text-slate-900 truncate">Revenge Matrix Triggered
+                    </h4>
+                    <span class="text-[13px] sm:text-[13px] tabular text-slate-500 font-medium">14 mins ago</span>
+                  </div>
+                  <p class="text-[13px] sm:text-[14px] text-slate-600 leading-relaxed mb-4">Re-entered BANKNIFTY 48000 PE
+                    immediately after a stop-out loss. Acknowledge this pattern before taking the next trade.</p>
+                  <div class="flex flex-wrap sm:flex-nowrap gap-2 sm:gap-3">
+                    <button
+                      class="px-3 sm:px-4 py-1.5 sm:py-2 bg-red-50 text-red-700 font-semibold text-[13px] sm:text-[13px] rounded-lg border border-red-100 hover:bg-red-100 w-full sm:w-auto text-center">Review
+                      & Halt</button>
+                    <button
+                      class="px-3 sm:px-4 py-1.5 sm:py-2 bg-white border border-slate-200 text-slate-600 font-semibold text-[13px] sm:text-[13px] rounded-lg hover:bg-slate-50 w-full sm:w-auto text-center">Dismiss</button>
+                  </div>
+                </div>
+              </div>
+
+              <div class="p-6 sm:p-6 hover:bg-slate-50 flex items-start gap-3 sm:gap-4 transition-colors bg-amber-50/10">
+                <div class="w-1 sm:w-1.5 h-[30px] sm:h-[40px] bg-amber-400 rounded-full mt-1 shrink-0 hidden sm:block">
+                </div>
+                <div class="flex-1 w-full min-w-0">
+                  <div
+                    class="flex flex-wrap sm:flex-nowrap justify-between items-center sm:items-start mb-1 sm:mb-2 gap-1">
+                    <h4 class="font-bold text-[14px] sm:text-[15px] text-slate-800 truncate flex items-center gap-2">
+                      <div class="sm:hidden w-1.5 h-4 bg-amber-400 rounded-full"></div>Volume Surge Warning
+                    </h4>
+                    <span class="text-[13px] sm:text-[13px] tabular text-slate-500 font-medium shrink-0">42 mins
+                      ago</span>
+                  </div>
+                  <p class="text-[13px] sm:text-[14px] text-slate-500 leading-relaxed">Position sizing on your last 2
+                    trades exceeds daily psychological boundary by 15.4%.</p>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Open Positions Table -->
+          <div class="tm-card">
+            <div
+              class="flex justify-between items-center px-4 sm:px-6 pt-4 sm:pt-6 pb-3 sm:pb-4 border-b border-slate-100">
+              <h2 class="text-[14px] sm:text-[15px] font-semibold  text-slate-900">Active Positions</h2>
+              <button class="text-[13px] sm:text-sm font-semibold text-brand hover:underline">Exit All</button>
+            </div>
+
+            <div class="px-4 sm:px-6 pb-4 overflow-x-auto table-scroll-wrap">
+              <table class="w-full text-left whitespace-nowrap min-w-[500px]">
+                <thead>
+                  <tr>
+                    <th class="w-2/5">Instrument</th>
+                    <th class="text-right">Qty</th>
+                    <th class="text-right">Avg Entry</th>
+                    <th class="text-right">LTP</th>
+                    <th class="text-right">Floating P&L</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr class="hover:bg-slate-50 cursor-pointer">
+                    <td>
+                      <div class="flex items-center gap-2 sm:gap-3">
+                        <span
+                          class="px-1.5 py-0.5 bg-blue-50 text-blue-700 font-bold text-[11px] sm:text-[12px] rounded uppercase shrink-0">CE</span>
+                        <div class="flex flex-col">
+                          <span class="font-bold text-slate-900 text-[13px] sm:text-[13px]">NIFTY 24000 CE</span>
+                          <span class="text-[12px] sm:text-[13px] text-slate-500 font-medium">24 Oct</span>
+                        </div>
+                      </div>
+                    </td>
+                    <td class="text-right tabular font-bold text-slate-700">1,200</td>
+                    <td class="text-right tabular text-slate-500">145.20</td>
+                    <td class="text-right tabular text-slate-500">165.40</td>
+                    <td class="text-right tabular font-medium text-emerald-600">+₹24,240.00</td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+        </div>
+
+        <!-- ── Right Column (Sidebar metrics - 28% on Ultrawide) ── -->
+        <!-- Stack strictly below main on phones/tablets/smaller desktop. Only sit to the side nicely on 2XL screen sizes (1536px+) -->
+        <div class="w-full 2xl:w-[28%] space-y-6 lg:space-y-8 2xl:sticky 2xl:top-[40px] min-w-0">
+
+          <!-- BLOWUP SHIELD Card -->
+          <div class="tm-card p-8 border-slate-200">
+            <div class="flex items-center justify-between mb-6 sm:mb-8">
+              <h3 class="font-bold text-slate-900 text-[14px] sm:text-[15px] flex items-center gap-1.5 sm:gap-2">
+                <svg class="w-4 h-4 text-brand" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2">
+                  <path stroke-linecap="round" stroke-linejoin="round"
+                    d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z">
+                  </path>
+                </svg>
+                Blowup Shield
+              </h3>
+              <span class="text-[12px] sm:text-xs font-semibold text-slate-500">Active</span>
+            </div>
+
+            <div class="flex items-end gap-2 mb-1.5">
+              <span
+                class="text-[36px] sm:text-[44px] font-black font-mono tabular-nums leading-none text-obs">40%</span>
+            </div>
+            <p class="text-[13px] sm:text-[13px] text-slate-500 mb-5 font-medium">Alerts heeded &middot; 2/5 total
+              response rate</p>
+
+            <div class="h-2 rounded-full overflow-hidden bg-slate-100 mb-2">
+              <div class="h-full rounded-full bg-obs w-[40%] transition-all"></div>
+            </div>
+            <div class="flex items-center justify-between mb-5 sm:mb-6">
+              <span class="text-[11px] sm:text-[12px] text-slate-500 font-bold uppercase tracking-wider">0%</span>
+              <span class="text-[11px] sm:text-[12px] text-slate-500 font-bold uppercase tracking-wider">100% Guard</span>
+            </div>
+
+            <div
+              class="flex items-center justify-between rounded-lg px-3 sm:px-4 py-3 sm:py-3.5 mb-5 sm:mb-6 bg-red-50 border border-red-100 shadow-sm">
+              <span class="text-[13px] sm:text-[13px] font-bold text-red-900 leading-tight pr-2">Follow-on Loss</span>
+              <span
+                class="text-[13px] sm:text-[15px] font-semibold  text-loss font-mono tabular-nums bg-white px-2 py-0.5 rounded shadow-sm shrink-0">-₹4,500</span>
+            </div>
+
+            <button
+              class="w-full py-2 sm:py-2.5 bg-slate-50 border border-slate-200 text-slate-600 text-[13px] sm:text-[13px] font-semibold rounded-lg hover:bg-slate-100 transition">View
+              Shield Log &rarr;</button>
+          </div>
+
+          <!-- Session Pacing Goal Card -->
+          <div class="tm-card p-8">
+            <div class="flex flex-wrap sm:flex-nowrap justify-between items-center mb-4 gap-2">
+              <h3 class="font-bold text-slate-900 text-[14px] sm:text-[15px]">Session Pacing</h3>
+              <span
+                class="text-[11px] sm:text-[12px] font-bold uppercase text-profit tracking-wide px-2 py-0.5 bg-profitBg rounded border border-profit/20">Optimal</span>
+            </div>
+            <div class="w-full bg-slate-100 h-2 sm:h-3 rounded-full overflow-hidden mb-3">
+              <div class="bg-gradient-to-r from-profit/70 to-profit w-[80%] h-full rounded-full relative">
+                <div class="absolute top-0 bottom-0 right-[20%] w-[2px] bg-white border-l border-profit/20"></div>
+              </div>
+            </div>
+            <div class="flex justify-between items-center text-sm">
+              <span class="text-slate-500 font-medium text-[13px] sm:text-sm"><strong
+                  class="text-slate-900 tabular font-bold text-[14px] sm:text-base">8</strong> of 10 limit</span>
+              <span class="text-slate-500 text-[13px] sm:text-xs font-medium">2 trades left</span>
+            </div>
+          </div>
+
+        </div>
+
+      </div>
+
+    </div>
+  </main>
+
+  <!-- Mock Toast Notification -->
+  <div id="toast-notification"
+    class="fixed bottom-4 right-4 sm:bottom-6 sm:right-6 max-w-sm w-full bg-white border border-red-200 rounded-xl shadow-2xl z-[100] transform translate-y-20 opacity-0 transition-all duration-500 flex flex-col pointer-events-none">
+    <div class="p-4 flex items-start gap-4">
+      <div class="w-10 h-10 rounded-full bg-red-100 flex items-center justify-center shrink-0">
+        <svg class="w-5 h-5 text-loss" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5"
+            d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z">
+          </path>
+        </svg>
+      </div>
+      <div class="flex-1">
+        <h4 class="text-[14px] font-bold text-slate-900 mb-1">Revenge Overtrading Detected</h4>
+        <p class="text-[13px] text-slate-600 leading-snug">You just placed 4 trades in 10 minutes following a loss on
+          NIFTY.</p>
+        <div class="mt-3 flex gap-2 pointer-events-auto">
+          <button onclick="dismissToast()"
+            class="px-3 py-1.5 bg-slate-100 hover:bg-gray-200 text-slate-700 text-[13px] font-semibold rounded-md transition-colors">Dismiss</button>
+          <a href="blowup_shield.html"
+            class="px-3 py-1.5 bg-red-50 hover:bg-red-100 text-loss border border-red-200 text-[13px] font-bold rounded-md transition-colors">View
+            Log</a>
+        </div>
+      </div>
+      <button onclick="dismissToast()" class="text-slate-500 hover:text-slate-600 pointer-events-auto"><svg
+          class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+        </svg></button>
+    </div>
+    <!-- Progress bar -->
+    <div class="h-1 w-full bg-red-50 rounded-b-xl overflow-hidden">
+      <div id="toast-progress" class="h-full bg-loss transition-all duration-1000 ease-linear" style="width: 100%;">
+      </div>
+    </div>
+  </div>
+
+  <script>
+    // Mock the Toast popping up
+    setTimeout(() => {
+      const toast = document.getElementById('toast-notification');
+      if(toast) {
+        toast.classList.remove('translate-y-20', 'opacity-0');
+        toast.classList.add('translate-y-0', 'opacity-100');
+        
+        // Progress bar simulation
+        const progress = document.getElementById('toast-progress');
+        let width = 100;
+        const interval = setInterval(() => {
+          width -= 1;
+          progress.style.width = width + '%';
+          if(width <= 0) {
+            clearInterval(interval);
+            dismissToast();
+          }
+        }, 80); // ~8s timeout
+      }
+    }, 2500);
+
+    function dismissToast() {
+      const toast = document.getElementById('toast-notification');
+      if(toast) {
+        toast.classList.remove('translate-y-0', 'opacity-100');
+        toast.classList.add('translate-y-20', 'opacity-0');
+        setTimeout(() => toast.remove(), 500);
+      }
+    }
+  </script>
+</body>
+
+</html>

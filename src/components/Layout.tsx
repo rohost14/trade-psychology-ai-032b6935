@@ -199,7 +199,7 @@ export default function Layout() {
 
         {/* ── Main content ────────────────────────────────────────────────── */}
         <main className="flex-1 pb-20 md:pb-8">
-          <div className="max-w-7xl mx-auto px-4 md:px-6 py-6">
+          <div className="w-full px-4 md:px-6 py-6">
             <ErrorBoundary key={location.pathname}>
               <Outlet />
             </ErrorBoundary>

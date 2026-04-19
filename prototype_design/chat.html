@@ -1,0 +1,393 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description" content="AI trading coach powered by behavioral psychology. Get personalized insights and coaching.">
+  <link rel="icon" type="image/svg+xml" href="favicon.svg">
+  <title>AI Coach — TradeMentor AI</title>
+
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:ital,wght@0,400;0,500;0,600;0,700;0,800;1,400&display=swap" rel="stylesheet">
+
+    <link rel="stylesheet" href="shared.css">
+
+    <!-- Tailwind v4 Engine -->
+  <script src="https://unpkg.com/@tailwindcss/browser@4"></script>
+  <style type="text/tailwindcss">
+    @theme {
+      --font-sans: 'Inter', sans-serif;
+      --color-brand: #4F46E5;
+      --color-brandBg: #EEF2FF;
+      --color-profit: #059669;
+      --color-profitBg: #ecfdf5;
+      --color-loss: #dc2626;
+      --color-lossBg: #fef2f2;
+      --color-obs: #d97706;
+      --color-obsBg: #fffbeb;
+      --color-surface: #ffffff;
+      --color-background: #F8FAFC;
+    }
+  </style>
+  <style>
+    body {
+      background-color: #F8FAFC;
+      color: #0F172A;
+      -webkit-font-smoothing: antialiased;
+    }
+
+    .hidden {
+      position: absolute;
+      top: 0;
+      left: 0;
+      right: 0;
+      height: 350px;
+      background: linear-gradient(175deg, rgba(238, 242, 255, 1) 0%, rgba(246, 248, 253, 1) 40%, rgba(248, 250, 252, 1) 100%);
+      z-index: -1;
+    }
+
+    .tm-card {
+      background: white;
+      border-radius: 12px;
+      border: 1px solid #E2E8F0;
+      box-shadow: 0 1px 2px rgba(0, 0, 0, 0.04), 0 4px 12px rgba(0, 0, 0, 0.02);
+      transition: box-shadow 0.2s ease, transform 0.2s ease;
+    }
+
+    .chat-scroll::-webkit-scrollbar {
+      width: 6px;
+    }
+
+    .chat-scroll::-webkit-scrollbar-thumb {
+      background: #CBD5E1;
+      border-radius: 4px;
+    }
+
+    .bg-slate-800 text-white rounded-2xl rounded-tr-sm {
+      border-radius: 16px;
+      border-top-right-radius: 4px;
+      background-color: #4F46E5;
+      color: white;
+    }
+
+    .bg-slate-50 border border-slate-200 text-slate-900 rounded-2xl rounded-tl-sm {
+      border-radius: 16px;
+      border-top-left-radius: 4px;
+      background-color: white;
+      border: 1px solid #E2E8F0;
+      color: #0F172A;
+    }
+  </style>
+</head>
+
+<body class="flex min-h-screen relative overflow-hidden lg:overflow-auto">
+
+  <!-- Mobile Backdrop -->
+  <div id="sidebar-backdrop" class="fixed inset-0 bg-gray-900/40 backdrop-blur-sm z-[60] hidden lg:hidden"
+    onclick="toggleSidebar()"></div>
+
+  <aside id="app-sidebar" role="navigation" aria-label="Main navigation">
+    <!-- Branding -->
+    <div class="sidebar-logo">
+      <div class="logo-mark" aria-hidden="true">
+        <svg aria-hidden="true" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2.5">
+          <path stroke-linecap="round" stroke-linejoin="round" d="M13 10V3L4 14h7v7l9-11h-7z"/>
+        </svg>
+      </div>
+      <span class="sidebar-logo-text">TradeMentor AI</span>
+      <span class="sidebar-logo-badge">Beta</span>
+      <button class="ml-2 p-1.5 text-slate-500 hover:text-slate-600 hover:bg-slate-100 rounded-md lg:hidden" onclick="toggleSidebar()" aria-label="Close sidebar">
+        <svg aria-hidden="true" class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
+      </button>
+    </div>
+
+    <!-- Navigation Area -->
+    <nav class="sidebar-nav" aria-label="App pages">
+      <p class="sidebar-section-label">Main Menu</p>
+
+      <a href="dashboard.html" class="sidebar-link">
+        <svg aria-hidden="true" width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M4 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2V6zM14 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2V6zM4 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2v-2zM14 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2v-2z"/></svg>
+        Overview
+      </a>
+
+      <a href="analytics.html" class="sidebar-link">
+        <svg aria-hidden="true" width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M16 8v8m-4-5v5m-4-2v2m-2 4h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"/></svg>
+        Performance Metrics
+      </a>
+
+      <a href="alerts.html" class="sidebar-link">
+        <svg aria-hidden="true" width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"/></svg>
+        Shield Alerts
+        <span class="sidebar-badge">2</span>
+      </a>
+
+      <a href="blowup_shield.html" class="sidebar-link">
+        <svg aria-hidden="true" width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M20.618 5.984A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"/></svg>
+        Blowup Shield
+      </a>
+
+      <a href="chat.html" class="sidebar-link active" aria-current="page">
+        <svg aria-hidden="true" width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M5 3v4M3 5h4M6 17v4m-2-2h4m5-16l2.286 6.857L21 12l-5.714 2.143L13 21l-2.286-6.857L5 12l5.714-2.143L13 3z"/></svg>
+        AI Coach
+      </a>
+    </nav>
+
+    <!-- User Profile -->
+    <div class="sidebar-profile">
+      <div class="sidebar-profile-inner">
+        <div class="sidebar-avatar" role="img" aria-label="Profile Avatar" aria-hidden="true">JD</div>
+        <div class="min-w-0">
+          <p class="sidebar-profile-name">John Doe</p>
+          <p class="sidebar-profile-sub">ID: 45X9B · Zerodha</p>
+        </div>
+      </div>
+    </div>
+  </aside>
+
+  <script>
+    function toggleSidebar() {
+      const sidebar = document.getElementById('app-sidebar');
+      const backdrop = document.getElementById('sidebar-backdrop');
+      const isOpen = sidebar.style.transform === 'translateX(0px)' || !sidebar.style.transform;
+      // Use data attribute to track state cleanly
+      const isHidden = sidebar.getAttribute('data-open') !== 'true';
+      if (isHidden) {
+        sidebar.style.transform = 'translateX(0)';
+        sidebar.setAttribute('data-open', 'true');
+        backdrop.classList.add('show');
+        document.body.style.overflow = 'hidden';
+      } else {
+        sidebar.style.transform = '';
+        sidebar.setAttribute('data-open', 'false');
+        backdrop.classList.remove('show');
+        document.body.style.overflow = '';
+      }
+    }
+  </script>
+
+  <!-- ── Main Canvas ── -->
+  <!-- Margin pushing content right ONLY on large screens lg:ml-[260px] -->
+  <main class="main-content flex flex-col h-screen">
+    <div class="hidden"></div>
+
+        <!-- Main Chat Workspace -->
+    <div class="w-full max-w-4xl mx-auto px-4 sm:px-6 py-6 flex-1 flex flex-col h-[calc(100vh-72px)] lg:h-screen">
+
+      <!-- Page Header -->
+      <header class="flex items-end justify-between gap-4 mb-4 shrink-0">
+        <div>
+          <h1 class="text-[22px] font-medium  text-slate-900 mb-1">AI Coach</h1>
+          <p class="text-sm text-slate-500 font-medium">Personalized guidance from your real trading data</p>
+        </div>
+        <button class="text-[13px] text-slate-500 hover:text-slate-900 font-medium flex items-center gap-2">
+          <svg aria-hidden="true" class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+              d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16">
+            </path>
+          </svg>
+          Clear
+        </button>
+      </header>
+
+      <!-- Chat Container -->
+      <div class="tm-card flex flex-col flex-1 overflow-hidden">
+
+        <!-- Snapshot Bar -->
+        <div class="px-4 py-2 border-b border-slate-100 bg-slate-50 flex items-center gap-3 text-xs flex-wrap">
+          <span class="font-bold text-slate-500">Today</span>
+
+          <span class="font-medium text-rose-600 flex items-center gap-1 tabular">
+            <svg aria-hidden="true" class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="3" d="M13 17h8m0 0V9m0 8l-8-8-4 4-6-6">
+              </path>
+            </svg>
+            -₹4,200
+          </span>
+
+          <span class="text-slate-500 font-medium">
+            12 trades
+          </span>
+
+          <span class="text-obs flex items-center gap-1 font-bold">
+            <svg aria-hidden="true" class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="3"
+                d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z">
+              </path>
+            </svg>
+            1 alert
+          </span>
+
+          <span
+            class="ml-auto px-2 py-0.5 rounded-full font-bold flex items-center gap-1 bg-red-50 text-loss border border-red-100 uppercase tracking-wider text-[11px]">
+            <svg aria-hidden="true" class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z">
+              </path>
+            </svg>
+            Danger
+          </span>
+        </div>
+
+        <!-- Chat Feed -->
+        <div class="flex-1 overflow-y-auto chat-scroll p-4 sm:p-6 space-y-6 bg-white">
+
+          <!-- AI intro -->
+          <div class="flex gap-3 max-w-[85%]">
+            <div
+              class="w-8 h-8 rounded-xl bg-indigo-50 border border-indigo-100 flex-shrink-0 flex items-center justify-center mt-1">
+              <svg aria-hidden="true" class="w-4 h-4 text-brand" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                  d="M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z">
+                </path>
+              </svg>
+            </div>
+            <div>
+              <div class="bg-slate-50 border border-slate-200 text-slate-900 rounded-2xl rounded-tl-sm px-4 py-3 shadow-sm text-[14px]">
+                Welcome back, John. I notice you've taken 12 trades today and are currently down ₹4,200. The risk engine
+                has flagged you as being in a <strong>tilt state</strong> due to revenge trading on BANKNIFTY.
+                <br><br>
+                How are you feeling right now? Do you want me to analyze those recent losses?
+              </div>
+              <p class="text-[12px] text-slate-500 mt-1.5 px-1 font-medium select-none">10:45 AM</p>
+            </div>
+          </div>
+
+          <!-- User Message -->
+          <div class="flex gap-3 max-w-[80%] ml-auto justify-end">
+            <div class="flex flex-col items-end">
+              <div class="bg-slate-800 text-white rounded-2xl rounded-tr-sm px-4 py-3 shadow-sm text-[14px]">
+                I got stopped out early on a fake breakdown and jumped back in to recover. Why do I keep doing this?
+              </div>
+              <p class="text-[12px] text-slate-500 mt-1.5 px-1 font-medium select-none">10:47 AM</p>
+            </div>
+            <div
+              class="w-8 h-8 rounded-xl bg-slate-100 border border-slate-200 flex-shrink-0 flex items-center justify-center mt-1">
+              <span class="text-[13px] font-bold text-slate-500">JD</span>
+            </div>
+          </div>
+
+          <!-- AI Response -->
+          <div class="flex gap-3 max-w-[85%]">
+            <div
+              class="w-8 h-8 rounded-xl bg-indigo-50 border border-indigo-100 flex-shrink-0 flex items-center justify-center mt-1">
+              <svg aria-hidden="true" class="w-4 h-4 text-brand" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                  d="M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z">
+                </path>
+              </svg>
+            </div>
+            <div>
+              <div class="bg-slate-50 border border-slate-200 text-slate-900 rounded-2xl rounded-tl-sm px-4 py-3 shadow-sm text-[14px]">
+                This is a classic immediate re-entry pattern. Looking at your history over the last 30 days:
+                <br><br>
+                <div class="flex gap-2 ml-1">
+                  <span class="text-brand font-bold">•</span>
+                  <span>When you re-enter the same instrument within 5 minutes of a stop-out, your win rate is only
+                    <strong>18%</strong>.</span>
+                </div>
+                <div class="flex gap-2 ml-1 mt-1">
+                  <span class="text-brand font-bold">•</span>
+                  <span>This specific habit has cost you <strong>₹12,400</strong> this month.</span>
+                </div>
+                <br>
+                Your "Adaptive Scalper" persona works well when you are calm, but you abandon your criteria after a
+                loss. I recommend a hard 15-minute cooldown rule after any stop-out before trading the same ticker
+                again.
+              </div>
+              <div class="flex items-center gap-2 mt-1.5 px-1">
+                <p class="text-[12px] text-slate-500 font-medium select-none">10:48 AM</p>
+                <button
+                  class="flex items-center gap-1 text-[12px] text-slate-500 hover:text-brand transition-colors font-medium cursor-pointer ml-2">
+                  <svg aria-hidden="true" class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                      d="M5 5a2 2 0 012-2h10a2 2 0 012 2v16l-7-3.5L5 21V5z"></path>
+                  </svg>
+                  Save to Journal
+                </button>
+              </div>
+            </div>
+          </div>
+
+        </div>
+
+        <!-- Follow-up Prompt Chips -->
+        <div class="px-4 pb-3 pt-1 border-t border-slate-100 bg-white">
+          <p class="text-[12px] font-medium text-slate-500 uppercase tracking-wider mb-2">Suggested Actions</p>
+          <div class="flex gap-2 overflow-x-auto pb-1 chat-scroll">
+            <button
+              class="px-3 py-1.5 text-[13px] bg-slate-50 hover:bg-brandBg text-slate-600 hover:text-brand font-medium rounded-full transition-all border border-slate-200 hover:border-brand/30 whitespace-nowrap flex-shrink-0 cursor-pointer">
+              How do I enforce a cooldown?
+            </button>
+            <button
+              class="px-3 py-1.5 text-[13px] bg-slate-50 hover:bg-brandBg text-slate-600 hover:text-brand font-medium rounded-full transition-all border border-slate-200 hover:border-brand/30 whitespace-nowrap flex-shrink-0 cursor-pointer">
+              Analyze my win rate by time of day
+            </button>
+            <button
+              class="px-3 py-1.5 text-[13px] bg-slate-50 hover:bg-brandBg text-slate-600 hover:text-brand font-medium rounded-full transition-all border border-slate-200 hover:border-brand/30 whitespace-nowrap flex-shrink-0 cursor-pointer">
+              Show me my best setups
+            </button>
+          </div>
+        </div>
+
+        <!-- Input Area -->
+        <div class="p-4 bg-slate-50 border-t border-slate-200">
+          <div class="flex gap-3 items-end">
+            <div
+              class="flex-1 bg-white border border-gray-300 rounded-xl shadow-sm focus-within:ring-2 focus-within:ring-brand/20 focus-within:border-brand transition-all flex items-center">
+              <textarea placeholder="Ask your AI coach..." rows="1"
+                class="w-full px-4 py-3 bg-transparent text-[14px] text-slate-900 placeholder:text-slate-500 focus:outline-none resize-none overflow-y-hidden max-h-[120px] leading-relaxed"></textarea>
+            </div>
+            <button
+              class="h-[46px] w-[46px] bg-white border border-slate-200 hover:bg-slate-50 text-slate-800 rounded-xl shadow-sm flex items-center justify-center transition-colors flex-shrink-0">
+              <svg aria-hidden="true" class="w-4 h-4 ml-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                  d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8"></path>
+              </svg>
+            </button>
+          </div>
+          <p class="text-[12px] text-slate-500 font-medium text-right mt-2 select-none">
+            Enter to send &middot; Shift+Enter for new line
+          </p>
+        </div>
+
+      </div>
+
+      <!-- Footer disclaimer -->
+      <p class="text-[13px] text-slate-500 text-center mt-4">TradeMentor AI is a coaching tool and does not provide
+        financial advice.</p>
+    </div>
+  </main>
+
+
+  <!-- Mobile Bottom Navigation -->
+  <nav id="bottom-nav" aria-label="Mobile navigation">
+    <div class="bottom-nav-items">
+      <a href="dashboard.html" class="bottom-nav-item" id="bnav-overview">
+        <svg fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M4 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2V6zM14 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2V6zM4 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2v-2zM14 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2v-2z"/></svg>
+        Overview
+      </a>
+      <a href="analytics.html" class="bottom-nav-item" id="bnav-analytics">
+        <svg fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M16 8v8m-4-5v5m-4-2v2m-2 4h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"/></svg>
+        Analytics
+      </a>
+      <a href="alerts.html" class="bottom-nav-item" id="bnav-alerts">
+        <span class="bottom-nav-badge">2</span>
+        <svg fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"/></svg>
+        Alerts
+      </a>
+      <a href="blowup_shield.html" class="bottom-nav-item" id="bnav-shield">
+        <svg fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M20.618 5.984A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"/></svg>
+        Shield
+      </a>
+      <a href="chat.html" class="bottom-nav-item" id="bnav-chat">
+        <svg fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M5 3v4M3 5h4M6 17v4m-2-2h4m5-16l2.286 6.857L21 12l-5.714 2.143L13 21l-2.286-6.857L5 12l5.714-2.143L13 3z"/></svg>
+        AI Coach
+      </a>
+    </div>
+  </nav>
+  <script>document.getElementById('bnav-chat').classList.add('active');</script>
+</body>
+
+</html>
