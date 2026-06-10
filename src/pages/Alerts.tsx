@@ -7,33 +7,10 @@ import { api } from '@/lib/api';
 import { useAlerts, AlertNotification } from '@/contexts/AlertContext';
 import { PatternSeverity } from '@/types/patterns';
 import AlertDetailSheet from '@/components/alerts/AlertDetailSheet';
-
-// ─── Severity config ──────────────────────────────────────────────────────────
-
-const SEV_DOT: Record<PatternSeverity, string> = {
-  critical: 'bg-tm-loss',
-  high:     'bg-tm-loss/60',
-  medium:   'bg-tm-obs',
-  low:      'bg-slate-400',
-};
-const SEV_LABEL: Record<PatternSeverity, string> = {
-  critical: 'Critical',
-  high:     'High',
-  medium:   'Caution',
-  low:      'Info',
-};
-const SEV_LABEL_COLOR: Record<PatternSeverity, string> = {
-  critical: 'text-tm-loss',
-  high:     'text-tm-loss',
-  medium:   'text-tm-obs',
-  low:      'text-muted-foreground',
-};
-const SEV_LEFT_BORDER: Record<PatternSeverity, string> = {
-  critical: 'border-l-tm-loss',
-  high:     'border-l-tm-loss',
-  medium:   'border-l-tm-obs',
-  low:      'border-l-slate-300 dark:border-l-slate-600',
-};
+import {
+  SEV_DOT, SEV_LABEL, SEV_LABEL_COLOR,
+  severityBorderClass, severityRowBg,
+} from '@/lib/alertSeverity';
 
 function timeAgo(dateStr: string | undefined): string {
   if (!dateStr) return '—';
@@ -72,14 +49,15 @@ function AlertRow({
       onClick={() => onOpen(alert)}
       aria-label={`${alert.pattern.name} — ${SEV_LABEL[sev]}${alert.acknowledged ? ', reviewed' : ', unreviewed'}`}
       className={cn(
-        'tm-card w-full text-left transition-colors hover:bg-muted/20',
+        'tm-card w-full text-left border-l-[3px] transition-colors',
+        severityBorderClass(sev),
+        severityRowBg(sev),
+        'hover:brightness-[0.97] dark:hover:brightness-105',
         alert.acknowledged && 'opacity-60',
       )}
     >
       <div className="flex items-start gap-3 px-4 py-4">
-        <span className={cn('flex-shrink-0', SEV_DOT[sev])}
-          style={{ width: 3, height: 20, minWidth: 3, borderRadius: 2, marginTop: 2 }}
-        />
+        <span className={cn('w-2 h-2 rounded-full flex-shrink-0 mt-1.5', SEV_DOT[sev])} />
 
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-2 flex-wrap mb-1">
@@ -386,7 +364,11 @@ function PatternsTab() {
         {summaries.length} distinct pattern{summaries.length !== 1 ? 's' : ''} detected in the last 48 hours
       </p>
       {summaries.map(s => (
-        <div key={s.type} className={cn('tm-card border-l-2 px-4 py-3.5', SEV_LEFT_BORDER[s.worstSeverity])}>
+        <div key={s.type} className={cn(
+          'tm-card border-l-[3px] px-4 py-3.5',
+          severityBorderClass(s.worstSeverity),
+          severityRowBg(s.worstSeverity),
+        )}>
           <div className="flex items-start justify-between gap-3 mb-2.5">
             <div className="flex items-center gap-2 min-w-0">
               <span className={cn('w-2 h-2 rounded-full flex-shrink-0', SEV_DOT[s.worstSeverity])} />
@@ -396,7 +378,7 @@ function PatternsTab() {
               </span>
             </div>
             <div className="text-right flex-shrink-0">
-              <span className="text-[18px] font-bold font-mono tabular-nums text-foreground">{s.count}</span>
+              <span className="t-mono-lg text-foreground">{s.count}</span>
               <span className="text-[11px] text-muted-foreground ml-1">×</span>
             </div>
           </div>
