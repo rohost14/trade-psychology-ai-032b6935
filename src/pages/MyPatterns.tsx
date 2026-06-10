@@ -139,7 +139,7 @@ function DangerStatusBanner({
 function AlertHistoryCard({ history }: { history: CooldownRecord[] }) {
   return (
     <div className="tm-card overflow-hidden">
-      <div className="px-5 py-4 border-b border-border flex items-center gap-2">
+      <div className="px-5 py-3.5 border-b border-border flex items-center gap-2">
         <Clock className="h-4 w-4 text-muted-foreground" />
         <span className="tm-label">Alert History (7 days)</span>
       </div>

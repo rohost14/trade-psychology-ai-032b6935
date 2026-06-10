@@ -25,7 +25,7 @@ export function ProfileTab({ profile, setProfile }: ProfileTabProps) {
     <div className="space-y-6">
       {/* Basic Info */}
       <div className="tm-card overflow-hidden">
-        <div className="px-5 py-4 border-b border-border">
+        <div className="px-5 py-3.5 border-b border-border">
           <p className="text-sm font-semibold text-foreground">Trading Profile</p>
           <p className="text-xs text-muted-foreground mt-0.5">Tell us about your trading style and experience</p>
         </div>
@@ -130,7 +130,7 @@ export function ProfileTab({ profile, setProfile }: ProfileTabProps) {
 
       {/* Trading Limits */}
       <div className="tm-card overflow-hidden">
-        <div className="px-5 py-4 border-b border-border">
+        <div className="px-5 py-3.5 border-b border-border">
           <p className="text-sm font-semibold text-foreground flex items-center gap-2">
             <Shield className="h-4 w-4" />
             Trading Limits

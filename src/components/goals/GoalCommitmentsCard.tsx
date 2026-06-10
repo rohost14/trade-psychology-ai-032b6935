@@ -34,7 +34,7 @@ export function GoalCommitmentsCard({
 
   return (
     <div className="tm-card overflow-hidden">
-      <div className="px-5 py-4 border-b border-border flex items-center justify-between">
+      <div className="px-5 py-3.5 border-b border-border flex items-center justify-between">
         <p className="text-sm font-semibold text-foreground">My Trading Commitments</p>
         <span className={`inline-flex items-center gap-1 text-[11px] font-medium px-2 py-0.5 rounded-full ${
           isLocked

@@ -113,7 +113,7 @@ export default function EdgeMapTab({ days }: { days: number }) {
 
       {/* Scatter chart */}
       <div className="tm-card overflow-hidden">
-        <div className="px-5 py-4 border-b border-border">
+        <div className="px-5 py-3.5 border-b border-border">
           <p className="text-sm font-medium text-foreground">Capital Allocation vs Edge</p>
           <p className="text-[11px] text-muted-foreground mt-0.5">
             Each bubble = one instrument. Size = trade count. Top-left = underallocated edge.
@@ -208,7 +208,7 @@ export default function EdgeMapTab({ days }: { days: number }) {
 
       {/* Ranked table */}
       <div className="tm-card overflow-hidden">
-        <div className="px-5 py-3 border-b border-border">
+        <div className="px-5 py-3.5 border-b border-border">
           <p className="text-sm font-medium text-foreground">All Instruments</p>
         </div>
         <div className="divide-y divide-border">

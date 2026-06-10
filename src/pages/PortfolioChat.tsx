@@ -148,7 +148,7 @@ function PortfolioPanel({ snapshot, isLoading, onRefresh }: {
       {/* Sector exposure */}
       {sectorEntries.length > 0 && (
         <div className="tm-card overflow-hidden">
-          <div className="px-4 py-3 border-b border-border">
+          <div className="px-5 py-3.5 border-b border-border">
             <p className="text-sm font-medium flex items-center gap-2">
               <PieChart className="h-4 w-4 text-muted-foreground" /> Sector Exposure
             </p>
@@ -164,7 +164,7 @@ function PortfolioPanel({ snapshot, isLoading, onRefresh }: {
       {/* Top holdings */}
       {holdings.length > 0 && (
         <div className="tm-card overflow-hidden">
-          <div className="px-4 py-3 border-b border-border">
+          <div className="px-5 py-3.5 border-b border-border">
             <p className="text-sm font-medium">Top Holdings</p>
           </div>
           <div className="px-4 pb-4 pt-3 space-y-2">

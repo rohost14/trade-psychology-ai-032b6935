@@ -245,7 +245,7 @@ export default function SummaryTab({ days, onInstrumentClick }: SummaryTabProps)
       {/* Equity Curve */}
       {(overview.equity_curve?.length ?? 0) > 1 && (
         <div className="tm-card overflow-hidden">
-          <div className="px-5 py-3 border-b border-border flex items-center justify-between">
+          <div className="px-5 py-3.5 border-b border-border flex items-center justify-between">
             <div>
               <p className="tm-label">Equity Curve</p>
               <p className="text-xs text-muted-foreground">Cumulative P&L over time</p>
@@ -286,7 +286,7 @@ export default function SummaryTab({ days, onInstrumentClick }: SummaryTabProps)
       {/* Daily P&L */}
       {(overview.daily_pnl?.length ?? 0) > 0 && (
         <div className="tm-card overflow-hidden">
-          <div className="px-5 py-3 border-b border-border flex items-center justify-between">
+          <div className="px-5 py-3.5 border-b border-border flex items-center justify-between">
             <div>
               <p className="tm-label">Daily P&L</p>
               <p className="text-xs text-muted-foreground">Profit and loss per trading day</p>
@@ -330,7 +330,7 @@ export default function SummaryTab({ days, onInstrumentClick }: SummaryTabProps)
         {/* Instrument Leaderboard */}
         {instruments.length > 0 && (
           <div className="md:col-span-3 tm-card overflow-hidden">
-            <div className="px-5 py-3 border-b border-border">
+            <div className="px-5 py-3.5 border-b border-border">
               <p className="tm-label">Instruments</p>
               <p className="text-xs text-muted-foreground">Click any row to see full breakdown</p>
             </div>
@@ -388,7 +388,7 @@ export default function SummaryTab({ days, onInstrumentClick }: SummaryTabProps)
           {/* MIS / NRML / MTF */}
           {Object.keys(products).length > 0 && (
             <div className="tm-card overflow-hidden">
-              <div className="px-5 py-3 border-b border-border">
+              <div className="px-5 py-3.5 border-b border-border">
                 <p className="tm-label">Product Type</p>
                 <p className="text-xs text-muted-foreground">Intraday vs overnight</p>
               </div>
@@ -421,7 +421,7 @@ export default function SummaryTab({ days, onInstrumentClick }: SummaryTabProps)
           {/* Best & Worst Hours */}
           {(bestHour || worstHour) && (
             <div className="tm-card overflow-hidden">
-              <div className="px-5 py-3 border-b border-border">
+              <div className="px-5 py-3.5 border-b border-border">
                 <p className="tm-label">Best & Worst Hours</p>
                 <p className="text-xs text-muted-foreground">Entry time performance (IST)</p>
               </div>
@@ -462,7 +462,7 @@ export default function SummaryTab({ days, onInstrumentClick }: SummaryTabProps)
 
           {/* Streaks */}
           <div className="tm-card overflow-hidden">
-            <div className="px-5 py-3 border-b border-border">
+            <div className="px-5 py-3.5 border-b border-border">
               <p className="tm-label">Streaks</p>
             </div>
             <div className="grid grid-cols-2 divide-x divide-border">

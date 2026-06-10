@@ -42,7 +42,7 @@ function TimelineRow({ item }: { item: ShieldTimelineItem }) {
   const hasTrades = (item.post_alert_trades?.length ?? 0) > 0;
 
   return (
-    <div className="px-5 py-4 border-b border-border last:border-0">
+    <div className="px-5 py-3.5 border-b border-border last:border-0">
       <div className="flex items-start gap-3">
         {/* Outcome icon */}
         <div className="mt-0.5 flex-shrink-0">
@@ -275,7 +275,7 @@ export default function BlowupShieldPage() {
       {/* Pattern breakdown */}
       {patterns.length > 0 && (
         <div className="tm-card overflow-hidden mb-6 animate-fade-in-up">
-          <div className="px-5 py-4 border-b border-border">
+          <div className="px-5 py-3.5 border-b border-border">
             <p className="text-sm font-medium text-foreground">By Pattern</p>
           </div>
           <div className="overflow-x-auto">
@@ -321,7 +321,7 @@ export default function BlowupShieldPage() {
 
       {/* Timeline */}
       <div className="tm-card overflow-hidden animate-fade-in-up">
-        <div className="px-5 py-4 border-b border-border">
+        <div className="px-5 py-3.5 border-b border-border">
           <p className="text-sm font-medium text-foreground">Alert History</p>
           <p className="text-xs text-muted-foreground mt-0.5">What happened after each alert</p>
         </div>

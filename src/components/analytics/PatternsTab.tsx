@@ -222,7 +222,7 @@ export default function PatternsTab({ days }: PatternsTabProps) {
         <div className="grid grid-cols-2 gap-3">
           {/* Clean trades */}
           <div className="tm-card overflow-hidden">
-            <div className="px-5 py-3 border-b border-border flex items-center gap-2">
+            <div className="px-5 py-3.5 border-b border-border flex items-center gap-2">
               <CheckCircle2 className="h-4 w-4 text-tm-profit shrink-0" />
               <p className="tm-label">Clean Trades</p>
             </div>
@@ -243,7 +243,7 @@ export default function PatternsTab({ days }: PatternsTabProps) {
 
           {/* Flagged trades */}
           <div className="tm-card overflow-hidden">
-            <div className="px-5 py-3 border-b border-border flex items-center gap-2">
+            <div className="px-5 py-3.5 border-b border-border flex items-center gap-2">
               <AlertTriangle className="h-4 w-4 text-tm-obs shrink-0" />
               <p className="tm-label">Flagged Trades</p>
             </div>
@@ -269,7 +269,7 @@ export default function PatternsTab({ days }: PatternsTabProps) {
       {/* Flagged trades grouped by reason — expandable */}
       {Object.keys(byReason).length > 0 && (
         <div className="tm-card overflow-hidden">
-          <div className="px-5 py-3 border-b border-border">
+          <div className="px-5 py-3.5 border-b border-border">
             <p className="tm-label">Flagged Trade Breakdown</p>
             <p className="text-xs text-muted-foreground">Click any row to see the trades</p>
           </div>
@@ -289,7 +289,7 @@ export default function PatternsTab({ days }: PatternsTabProps) {
       {/* Conditional performance */}
       {conditions.length > 0 && (
         <div className="tm-card overflow-hidden">
-          <div className="px-5 py-3 border-b border-border">
+          <div className="px-5 py-3.5 border-b border-border">
             <p className="tm-label">Performance Under Conditions</p>
             <p className="text-xs text-muted-foreground">
               Baseline: {cond?.baseline_win_rate}% WR · {formatCurrencyWithSign(cond?.baseline_avg_pnl ?? 0)}/trade avg

@@ -194,7 +194,7 @@ export default function PnlPercentTab({ days }: { days: number }) {
 
       {/* ── Hold time vs % P&L ── */}
       <div className="tm-card overflow-hidden">
-        <div className="px-5 py-4 border-b border-border flex items-center gap-2">
+        <div className="px-5 py-3.5 border-b border-border flex items-center gap-2">
           <Clock className="h-4 w-4 text-muted-foreground" />
           <p className="text-sm font-medium text-foreground">Hold Time vs % Return</p>
         </div>
@@ -233,7 +233,7 @@ export default function PnlPercentTab({ days }: { days: number }) {
 
       {/* ── Trade scatter: hold time × % P&L ── */}
       <div className="tm-card overflow-hidden">
-        <div className="px-5 py-4 border-b border-border">
+        <div className="px-5 py-3.5 border-b border-border">
           <p className="text-sm font-medium text-foreground">Every Trade — Hold Time × % Return</p>
           <p className="text-[11px] text-muted-foreground mt-0.5">
             Each dot is one closed trade. Green = profit, red = loss.
@@ -284,7 +284,7 @@ export default function PnlPercentTab({ days }: { days: number }) {
 
       {/* ── Trade list ── */}
       <div className="tm-card overflow-hidden">
-        <div className="px-5 py-4 border-b border-border">
+        <div className="px-5 py-3.5 border-b border-border">
           <p className="text-sm font-medium text-foreground">All Trades ({trades.length})</p>
         </div>
         <div className="divide-y divide-border">

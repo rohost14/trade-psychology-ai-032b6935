@@ -28,7 +28,7 @@ export function CommitmentLogCard({ log, maxItems = 20 }: CommitmentLogCardProps
 
   return (
     <div className="tm-card overflow-hidden">
-      <div className="px-5 py-4 border-b border-border">
+      <div className="px-5 py-3.5 border-b border-border">
         <p className="text-sm font-semibold text-foreground flex items-center gap-1.5">
           <History className="h-4 w-4 text-muted-foreground" />
           Commitment Log

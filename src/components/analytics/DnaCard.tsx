@@ -67,7 +67,7 @@ export default function DnaCard({ days }: { days: number }) {
 
   return (
     <div className="tm-card overflow-hidden">
-      <div className="px-5 py-4 border-b border-border flex items-center justify-between">
+      <div className="px-5 py-3.5 border-b border-border flex items-center justify-between">
         <div>
           <p className="text-sm font-medium text-foreground">Your Trading Profile</p>
           {data.cached_at && (

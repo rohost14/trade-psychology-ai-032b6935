@@ -113,7 +113,7 @@ export function AlertHistorySheet({
       {/* History sheet */}
       <Sheet open={open} onOpenChange={setOpen}>
         <SheetContent className="w-full sm:max-w-md p-0 flex flex-col overflow-hidden">
-          <SheetHeader className="px-5 py-4 border-b border-border">
+          <SheetHeader className="px-5 py-3.5 border-b border-border">
             <SheetTitle className="flex items-center gap-2 text-[15px]">
               <Bell className="h-4 w-4" />
               Behavioral Alerts

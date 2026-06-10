@@ -375,7 +375,7 @@ export default function ProgressTab({ days }: ProgressTabProps) {
       {/* Drawdown Chart */}
       {drawdownData.length > 1 && (
         <div className="tm-card overflow-hidden">
-          <div className="px-5 py-4 border-b border-border">
+          <div className="px-5 py-3.5 border-b border-border">
             <div className="flex items-center gap-2">
               <TrendingDown className="h-4 w-4 text-tm-loss" />
               <div>
@@ -428,7 +428,7 @@ export default function ProgressTab({ days }: ProgressTabProps) {
       {/* Drawdown Periods */}
       {data.drawdown_periods.length > 0 && (
         <div className="tm-card overflow-hidden">
-          <div className="px-5 py-4 border-b border-border">
+          <div className="px-5 py-3.5 border-b border-border">
             <div className="flex items-center gap-2">
               <TrendingDown className="h-4 w-4 text-tm-loss" />
               <p className="text-xs font-medium uppercase tracking-widest text-muted-foreground">Drawdown Periods</p>
@@ -468,7 +468,7 @@ export default function ProgressTab({ days }: ProgressTabProps) {
       {/* Risk Alert Summary */}
       {data.alerts_summary.length > 0 && (
         <div className="tm-card overflow-hidden">
-          <div className="px-5 py-4 border-b border-border flex items-center gap-2">
+          <div className="px-5 py-3.5 border-b border-border flex items-center gap-2">
             <p className="text-xs font-medium uppercase tracking-widest text-muted-foreground">Risk Alert Summary</p>
             <span className="text-xs text-muted-foreground">
               ({data.alerts_summary.reduce((s, a) => s + a.count, 0)} total)

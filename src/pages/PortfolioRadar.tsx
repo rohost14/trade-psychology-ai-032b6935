@@ -96,7 +96,7 @@ function SectionCard({ title, children, className }: {
 }) {
   return (
     <div className={cn('tm-card overflow-hidden', className)}>
-      <div className="px-5 py-4 border-b border-border">
+      <div className="px-5 py-3.5 border-b border-border">
         <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">{title}</p>
       </div>
       <div className="p-5">{children}</div>

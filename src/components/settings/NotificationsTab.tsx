@@ -87,7 +87,7 @@ export function NotificationsTab({
 
       {/* Alert Sensitivity */}
       <div className="tm-card overflow-hidden">
-        <div className="px-5 py-4 border-b border-border">
+        <div className="px-5 py-3.5 border-b border-border">
           <p className="text-sm font-semibold text-foreground">Alert Sensitivity</p>
           <p className="text-xs text-muted-foreground mt-0.5">Control how aggressively patterns are flagged</p>
         </div>
@@ -115,7 +115,7 @@ export function NotificationsTab({
 
       {/* WhatsApp Reports */}
       <div className="tm-card overflow-hidden">
-        <div className="px-5 py-4 border-b border-border">
+        <div className="px-5 py-3.5 border-b border-border">
           <p className="text-sm font-semibold text-foreground">WhatsApp Reports</p>
           <p className="text-xs text-muted-foreground mt-0.5">Daily trading summaries via WhatsApp</p>
         </div>
@@ -137,7 +137,7 @@ export function NotificationsTab({
 
       {/* Email Reports */}
       <div className="tm-card overflow-hidden">
-        <div className="px-5 py-4 border-b border-border">
+        <div className="px-5 py-3.5 border-b border-border">
           <p className="text-sm font-semibold text-foreground flex items-center gap-2">
             <Mail className="h-4 w-4" />
             Email Reports
@@ -180,7 +180,7 @@ export function NotificationsTab({
 
       {/* Guardian Mode */}
       <div className="tm-card overflow-hidden">
-        <div className="px-5 py-4 border-b border-border">
+        <div className="px-5 py-3.5 border-b border-border">
           <p className="text-sm font-semibold text-foreground flex items-center gap-2">
             <Phone className="h-4 w-4" />
             Guardian Mode

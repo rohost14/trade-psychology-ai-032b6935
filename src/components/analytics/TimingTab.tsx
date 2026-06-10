@@ -108,7 +108,7 @@ function HeatmapGrid({ days }: { days: number }) {
 
   return (
     <div className="tm-card overflow-hidden">
-      <div className="px-5 py-4 border-b border-border flex items-center gap-2">
+      <div className="px-5 py-3.5 border-b border-border flex items-center gap-2">
         <Clock className="h-4 w-4 text-muted-foreground" />
         <div>
           <p className="tm-label">Hour × Day Performance</p>
@@ -246,7 +246,7 @@ export default function TimingTab({ days }: TimingTabProps) {
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         {data.by_hour.length > 0 && (
           <div className="tm-card overflow-hidden">
-            <div className="px-5 py-4 border-b border-border flex items-center justify-between">
+            <div className="px-5 py-3.5 border-b border-border flex items-center justify-between">
               <p className="tm-label">By Hour (IST)</p>
               {bestHour && worstHour && (
                 <div className="text-right">
@@ -291,7 +291,7 @@ export default function TimingTab({ days }: TimingTabProps) {
 
         {data.by_day_of_week.length > 0 && (
           <div className="tm-card overflow-hidden">
-            <div className="px-5 py-4 border-b border-border flex items-center justify-between">
+            <div className="px-5 py-3.5 border-b border-border flex items-center justify-between">
               <p className="tm-label">By Day of Week</p>
               {bestDay && worstDay && (
                 <div className="text-right">
@@ -339,7 +339,7 @@ export default function TimingTab({ days }: TimingTabProps) {
       {/* Instrument Leaderboard — Zerodha holdings style */}
       {data.by_instrument.length > 0 && (
         <div className="tm-card overflow-hidden">
-          <div className="px-5 py-4 border-b border-border flex items-center justify-between">
+          <div className="px-5 py-3.5 border-b border-border flex items-center justify-between">
             <p className="tm-label">Instruments</p>
             <p className="text-xs text-muted-foreground">{data.by_instrument.length} symbols</p>
           </div>

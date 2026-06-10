@@ -226,7 +226,7 @@ export default function Personalization() {
           {/* ── Predictive alerts ── */}
           {data.predictive_alerts.length > 0 && (
             <div className="tm-card overflow-hidden">
-              <div className="px-5 py-3 border-b border-border">
+              <div className="px-5 py-3.5 border-b border-border">
                 <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">
                   Predictive Warnings
                 </p>

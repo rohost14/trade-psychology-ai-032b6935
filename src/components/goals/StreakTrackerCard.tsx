@@ -25,7 +25,7 @@ export function StreakTrackerCard({ streak, goalDays = 30 }: StreakTrackerCardPr
 
   return (
     <div className="tm-card overflow-hidden">
-      <div className="px-5 py-4 border-b border-border flex items-center justify-between">
+      <div className="px-5 py-3.5 border-b border-border flex items-center justify-between">
         <p className="text-sm font-semibold text-foreground flex items-center gap-1.5">
           <Flame className={cn('h-4 w-4', isOnFire ? 'text-tm-obs' : 'text-muted-foreground')} />
           Discipline Streak

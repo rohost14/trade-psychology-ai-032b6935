@@ -104,7 +104,7 @@ export default function RiskGuardianCard({ data, stats: propStats, onSync, isLoa
     <div className="bg-card rounded-lg border border-border">
 
       {/* ── Header ── */}
-      <div className="flex items-center justify-between px-4 py-3 border-b border-border">
+      <div className="flex items-center justify-between px-5 py-3.5 border-b border-border">
         <div className="flex items-center gap-2.5 min-w-0">
           {/* Colored status dot */}
           <span className={cn('w-2 h-2 rounded-full shrink-0', config.dotClass)} />

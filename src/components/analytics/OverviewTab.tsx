@@ -237,7 +237,7 @@ export default function OverviewTab({ days }: OverviewTabProps) {
       {/* Equity Curve */}
       {equity_curve.length > 1 && (
         <div className="tm-card overflow-hidden">
-          <div className="px-4 py-3 border-b border-border flex items-center justify-between">
+          <div className="px-5 py-3.5 border-b border-border flex items-center justify-between">
             <div>
               <h3 className="text-sm font-semibold text-foreground">Equity Curve</h3>
               <p className="text-xs text-muted-foreground">Cumulative P&L over time</p>
@@ -293,7 +293,7 @@ export default function OverviewTab({ days }: OverviewTabProps) {
       {/* Daily P&L Bar Chart */}
       {daily_pnl.length > 0 && (
         <div className="tm-card overflow-hidden">
-          <div className="px-4 py-3 border-b border-border flex items-center justify-between">
+          <div className="px-5 py-3.5 border-b border-border flex items-center justify-between">
             <div>
               <h3 className="text-sm font-semibold text-foreground">Daily P&L</h3>
               <p className="text-xs text-muted-foreground">Profit and loss by trading day</p>

@@ -207,7 +207,7 @@ export function TradeJournalSheet({ open, onOpenChange, trade, type }: TradeJour
         aria-describedby="journal-desc"
       >
         {/* ── Header ── */}
-        <div className="flex items-center justify-between px-5 py-4 border-b border-border">
+        <div className="flex items-center justify-between px-5 py-3.5 border-b border-border">
           <div>
             <p className="text-[15px] font-semibold text-foreground">Trade Journal</p>
             <p id="journal-desc" className="text-[12px] text-muted-foreground mt-0.5">

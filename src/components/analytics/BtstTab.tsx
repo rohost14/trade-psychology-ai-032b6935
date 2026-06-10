@@ -135,7 +135,7 @@ export default function BtstTab({ days }: { days: number }) {
       {/* Trade table */}
       {trades.length > 0 && (
         <div className="tm-card overflow-hidden">
-          <div className="px-5 py-3 border-b border-border">
+          <div className="px-5 py-3.5 border-b border-border">
             <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">
               BTST Trade History
             </p>

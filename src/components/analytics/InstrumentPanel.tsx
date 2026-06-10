@@ -91,7 +91,7 @@ export default function InstrumentPanel({ underlying, days, onClose }: Instrumen
       <div className="fixed top-0 right-0 h-full w-full max-w-[480px] bg-background border-l border-border shadow-2xl z-50 flex flex-col overflow-hidden animate-slide-in-right" style={{ animation: 'slideInRight 0.28s cubic-bezier(0.16,1,0.3,1) both' }}>
 
         {/* Header */}
-        <div className="flex items-center justify-between px-5 py-4 border-b border-border shrink-0">
+        <div className="flex items-center justify-between px-5 py-3.5 border-b border-border shrink-0">
           <div>
             <h2 className="text-base font-bold text-foreground tracking-tight">{underlying}</h2>
             <p className="text-xs text-muted-foreground">Last {days} days</p>
@@ -166,7 +166,7 @@ export default function InstrumentPanel({ underlying, days, onClose }: Instrumen
               {/* CE / PE / FUT split */}
               {Object.keys(data.by_option_type).length > 1 && (
                 <div className="tm-card overflow-hidden">
-                  <div className="px-4 py-3 border-b border-border">
+                  <div className="px-5 py-3.5 border-b border-border">
                     <p className="tm-label">By Option Type</p>
                   </div>
                   <div className="divide-y divide-border">
@@ -202,7 +202,7 @@ export default function InstrumentPanel({ underlying, days, onClose }: Instrumen
               {/* Equity curve */}
               {data.equity_curve.length > 1 && (
                 <div className="tm-card overflow-hidden">
-                  <div className="px-4 py-3 border-b border-border">
+                  <div className="px-5 py-3.5 border-b border-border">
                     <p className="tm-label">Cumulative P&L</p>
                   </div>
                   <div className="px-3 py-3">
@@ -250,7 +250,7 @@ export default function InstrumentPanel({ underlying, days, onClose }: Instrumen
               {/* By hour */}
               {data.by_hour.length > 1 && (
                 <div className="tm-card overflow-hidden">
-                  <div className="px-4 py-3 border-b border-border">
+                  <div className="px-5 py-3.5 border-b border-border">
                     <p className="tm-label">P&L by Entry Hour (IST)</p>
                   </div>
                   <div className="px-3 py-3">
@@ -295,7 +295,7 @@ export default function InstrumentPanel({ underlying, days, onClose }: Instrumen
               {/* Recent trades */}
               {data.trades.length > 0 && (
                 <div className="tm-card overflow-hidden">
-                  <div className="px-4 py-3 border-b border-border">
+                  <div className="px-5 py-3.5 border-b border-border">
                     <p className="tm-label">Recent Trades</p>
                   </div>
                   <table className="w-full">

@@ -33,7 +33,7 @@ export default function OrderAnalyticsCard({
     if (isLoading) {
         return (
             <div className="tm-card overflow-hidden">
-                <div className="px-5 py-4 border-b border-border">
+                <div className="px-5 py-3.5 border-b border-border">
                     <Skeleton className="h-5 w-40" />
                 </div>
                 <div className="p-5 space-y-4">
@@ -51,7 +51,7 @@ export default function OrderAnalyticsCard({
     if (!analytics?.has_data) {
         return (
             <div className="tm-card overflow-hidden">
-                <div className="px-5 py-4 border-b border-border flex items-center gap-2">
+                <div className="px-5 py-3.5 border-b border-border flex items-center gap-2">
                     <BarChart3 className="h-4 w-4 text-muted-foreground" />
                     <span className="tm-label">Order Analytics</span>
                 </div>
@@ -87,7 +87,7 @@ export default function OrderAnalyticsCard({
     return (
         <div className="tm-card overflow-hidden">
             {/* Header */}
-            <div className="px-5 py-4 border-b border-border flex items-center justify-between">
+            <div className="px-5 py-3.5 border-b border-border flex items-center justify-between">
                 <div className="flex items-center gap-2">
                     <BarChart3 className="h-4 w-4 text-muted-foreground" />
                     <span className="tm-label">Order Analytics</span>

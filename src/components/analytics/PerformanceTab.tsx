@@ -154,7 +154,7 @@ export default function PerformanceTab({ days }: PerformanceTabProps) {
 
       {/* By Instrument */}
       <div className="tm-card overflow-hidden">
-        <div className="px-4 py-3 border-b border-border flex items-center justify-between">
+        <div className="px-5 py-3.5 border-b border-border flex items-center justify-between">
           <div>
             <h3 className="text-sm font-semibold text-foreground">By Instrument</h3>
             <p className="text-xs text-muted-foreground">{data.by_instrument.length} instruments traded</p>
@@ -228,7 +228,7 @@ export default function PerformanceTab({ days }: PerformanceTabProps) {
         {Object.entries(data.by_direction).map(([dir, stats]) => (
           <div key={dir} className="tm-card overflow-hidden">
             <div className={cn(
-              'px-4 py-3 border-b border-border flex items-center gap-2',
+              'px-5 py-3.5 border-b border-border flex items-center gap-2',
               dir === 'LONG' ? 'bg-teal-50/50 dark:bg-teal-900/10' : 'bg-red-50/50 dark:bg-red-900/10'
             )}>
               {dir === 'LONG' ? <TrendingUp className="h-4 w-4 text-tm-profit" /> : <TrendingDown className="h-4 w-4 text-tm-loss" />}
@@ -265,7 +265,7 @@ export default function PerformanceTab({ days }: PerformanceTabProps) {
       {/* By Product Type (MIS vs NRML vs MTF) */}
       {Object.keys(data.by_product).length > 0 && (
         <div className="tm-card overflow-hidden">
-          <div className="px-4 py-3 border-b border-border">
+          <div className="px-5 py-3.5 border-b border-border">
             <h3 className="text-sm font-semibold text-foreground">By Product Type</h3>
             <p className="text-xs text-muted-foreground">Intraday (MIS) vs Positional (NRML) performance</p>
           </div>
@@ -327,7 +327,7 @@ export default function PerformanceTab({ days }: PerformanceTabProps) {
         {/* By Hour */}
         {data.by_hour.length > 0 && (
           <div className="tm-card overflow-hidden">
-            <div className="px-4 py-3 border-b border-border flex items-center justify-between">
+            <div className="px-5 py-3.5 border-b border-border flex items-center justify-between">
               <div>
                 <h3 className="text-sm font-semibold text-foreground">P&L by Hour</h3>
                 <p className="text-xs text-muted-foreground">Entry time analysis (IST)</p>
@@ -406,7 +406,7 @@ export default function PerformanceTab({ days }: PerformanceTabProps) {
         {/* By Day of Week */}
         {data.by_day_of_week.length > 0 && (
           <div className="tm-card overflow-hidden">
-            <div className="px-4 py-3 border-b border-border flex items-center justify-between">
+            <div className="px-5 py-3.5 border-b border-border flex items-center justify-between">
               <div>
                 <h3 className="text-sm font-semibold text-foreground">P&L by Day</h3>
                 <p className="text-xs text-muted-foreground">Day of week analysis</p>
@@ -487,7 +487,7 @@ export default function PerformanceTab({ days }: PerformanceTabProps) {
       {/* Position Size Analysis */}
       {data.size_analysis.length > 0 && (
         <div className="tm-card overflow-hidden">
-          <div className="px-4 py-3 border-b border-border">
+          <div className="px-5 py-3.5 border-b border-border">
             <h3 className="text-sm font-semibold text-foreground">Position Size Analysis</h3>
             <p className="text-xs text-muted-foreground">How position sizing affects your outcomes</p>
           </div>

@@ -255,7 +255,7 @@ export default function RiskTab({ days }: RiskTabProps) {
       {/* Drawdown Chart */}
       {drawdownData.length > 1 && (
         <div className="tm-card overflow-hidden overflow-hidden">
-          <div className="px-4 py-3 border-b border-border">
+          <div className="px-5 py-3.5 border-b border-border">
             <div className="flex items-center gap-2">
               <TrendingDown className="h-4 w-4 text-tm-loss" />
               <div>
@@ -308,7 +308,7 @@ export default function RiskTab({ days }: RiskTabProps) {
       {/* Drawdown Periods */}
       {data.drawdown_periods.length > 0 && (
         <div className="tm-card overflow-hidden overflow-hidden">
-          <div className="px-4 py-3 border-b border-border">
+          <div className="px-5 py-3.5 border-b border-border">
             <div className="flex items-center gap-2">
               <TrendingDown className="h-4 w-4 text-tm-loss" />
               <h3 className="text-sm font-semibold text-foreground">Drawdown Periods</h3>
@@ -348,7 +348,7 @@ export default function RiskTab({ days }: RiskTabProps) {
       {/* Risk Alert Summary */}
       {data.alerts_summary.length > 0 && (
         <div className="tm-card overflow-hidden overflow-hidden">
-          <div className="px-4 py-3 border-b border-border">
+          <div className="px-5 py-3.5 border-b border-border">
             <div className="flex items-center gap-2">
               <Activity className="h-4 w-4 text-muted-foreground" />
               <h3 className="text-sm font-semibold text-foreground">Risk Alert Summary</h3>
@@ -385,7 +385,7 @@ export default function RiskTab({ days }: RiskTabProps) {
       {/* Recent Alerts */}
       {data.recent_alerts.length > 0 && (
         <div className="tm-card overflow-hidden overflow-hidden">
-          <div className="px-4 py-3 border-b border-border">
+          <div className="px-5 py-3.5 border-b border-border">
             <div className="flex items-center gap-2">
               <AlertTriangle className="h-4 w-4 text-amber-600" />
               <h3 className="text-sm font-semibold text-foreground">Recent Alerts</h3>

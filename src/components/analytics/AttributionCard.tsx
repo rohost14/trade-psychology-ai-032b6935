@@ -54,7 +54,7 @@ export default function AttributionCard({ days }: { days: number }) {
 
   return (
     <div className="tm-card overflow-hidden">
-      <div className="px-5 py-4 border-b border-border">
+      <div className="px-5 py-3.5 border-b border-border">
         <p className="text-sm font-medium text-foreground">P&L Attribution</p>
         <p className="text-[11px] text-muted-foreground mt-0.5">
           Clean trades (no alert) vs flagged trades (alert ≤30 min before entry)

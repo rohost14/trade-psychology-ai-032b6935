@@ -48,7 +48,7 @@ export default function RecoveryCard({ days }: { days: number }) {
 
   return (
     <div className="tm-card overflow-hidden">
-      <div className="px-5 py-4 border-b border-border flex items-center gap-2">
+      <div className="px-5 py-3.5 border-b border-border flex items-center gap-2">
         <TrendingDown className="h-4 w-4 text-tm-loss" />
         <div>
           <p className="text-sm font-medium text-foreground">Post-Bad-Day Pattern</p>

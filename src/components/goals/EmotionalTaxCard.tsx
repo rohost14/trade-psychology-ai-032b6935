@@ -25,7 +25,7 @@ export function EmotionalTaxCard({ tax, period = 'month' }: EmotionalTaxCardProp
 
   return (
     <div className="tm-card overflow-hidden">
-      <div className="px-5 py-4 border-b border-border flex items-center justify-between">
+      <div className="px-5 py-3.5 border-b border-border flex items-center justify-between">
         <div className="flex items-center gap-2">
           <p className="text-sm font-semibold text-foreground flex items-center gap-1.5">
             <DollarSign className="h-4 w-4 text-tm-obs" />
