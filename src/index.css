@@ -1,4 +1,4 @@
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=DM+Mono:wght@400;500&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=DM+Mono:ital,wght@0,300;0,400;0,500&display=swap');
 
 @tailwind base;
 @tailwind components;
@@ -334,12 +334,12 @@ svg.lucide {
   }
   .t-mono-lg {
     font-family: 'DM Mono', 'Fira Code', monospace;
-    font-size: 20px; font-weight: 600; line-height: 1; letter-spacing: -0.01em;
+    font-size: 20px; font-weight: 500; line-height: 1; letter-spacing: -0.01em;
     font-variant-numeric: tabular-nums;
   }
   .t-mono-display {
     font-family: 'DM Mono', 'Fira Code', monospace;
-    font-size: 28px; font-weight: 700; line-height: 1.1; letter-spacing: -0.02em;
+    font-size: 28px; font-weight: 500; line-height: 1.1; letter-spacing: -0.02em;
     font-variant-numeric: tabular-nums;
   }
 }

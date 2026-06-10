@@ -319,11 +319,11 @@ function GttPanel({ data }: { data: GttSummary }) {
           <p className="text-xs text-muted-foreground mt-0.5">SL Honoured</p>
         </div>
         <div className="rounded-lg bg-muted/50 p-3">
-          <p className="text-2xl font-bold font-mono tabular-nums text-tm-loss">{data.overridden}</p>
+          <p className="t-mono-lg text-tm-loss">{data.overridden}</p>
           <p className="text-xs text-muted-foreground mt-0.5">Overridden</p>
         </div>
         <div className="rounded-lg bg-muted/50 p-3">
-          <p className="text-2xl font-bold">{data.active}</p>
+          <p className="t-mono-lg text-foreground">{data.active}</p>
           <p className="text-xs text-muted-foreground mt-0.5">Active GTTs</p>
         </div>
       </div>

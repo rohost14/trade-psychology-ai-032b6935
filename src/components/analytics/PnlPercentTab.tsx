@@ -55,7 +55,7 @@ function StatCard({
   return (
     <div className="tm-card p-4 flex flex-col gap-1">
       <p className="text-[11px] text-muted-foreground uppercase tracking-wide">{label}</p>
-      <p className={cn('text-2xl font-mono font-semibold tabular-nums', color)}>{value}</p>
+      <p className={cn('t-mono-lg', color)}>{value}</p>
       {sub && <p className="text-[11px] text-muted-foreground">{sub}</p>}
     </div>
   );

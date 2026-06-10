@@ -115,24 +115,24 @@ export default function OrderAnalyticsCard({
             <div className="grid grid-cols-2 lg:grid-cols-4 divide-x divide-y lg:divide-y-0 divide-border">
                 <div className="px-5 py-4">
                     <p className="tm-label mb-1">Total Orders</p>
-                    <p className="text-2xl font-mono font-semibold tabular-nums text-foreground">{summary.total_orders}</p>
+                    <p className="t-mono-lg text-foreground">{summary.total_orders}</p>
                 </div>
                 <div className="px-5 py-4">
                     <p className="tm-label mb-1">Fill Rate</p>
-                    <p className={cn('text-2xl font-mono font-semibold tabular-nums', fillRateColor)}>
+                    <p className={cn('t-mono-lg', fillRateColor)}>
                         {summary.fill_rate_pct.toFixed(1)}%
                     </p>
                 </div>
                 <div className="px-5 py-4">
                     <p className="tm-label mb-1">Cancelled</p>
-                    <p className={cn('text-2xl font-mono font-semibold tabular-nums', cancelColor)}>
+                    <p className={cn('t-mono-lg', cancelColor)}>
                         {metrics.cancel_ratio_pct.toFixed(1)}%
                     </p>
                 </div>
                 <div className="px-5 py-4">
                     <p className="tm-label mb-1">Rejected</p>
                     <p className={cn(
-                        'text-2xl font-mono font-semibold tabular-nums',
+                        't-mono-lg',
                         summary.rejected === 0 ? 'text-tm-profit' : 'text-tm-loss'
                     )}>
                         {summary.rejected}

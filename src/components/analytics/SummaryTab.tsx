@@ -94,7 +94,7 @@ function StatCell({ label, value, color, sub }: {
   return (
     <div className="bg-card px-4 py-3">
       <p className="text-xs text-muted-foreground mb-1">{label}</p>
-      <p className={cn('text-xl font-bold font-mono tabular-nums', color ?? 'text-foreground')}>{value}</p>
+      <p className={cn('t-mono-lg', color ?? 'text-foreground')}>{value}</p>
       {sub && <p className="text-[11px] text-muted-foreground mt-0.5">{sub}</p>}
     </div>
   );
@@ -468,12 +468,12 @@ export default function SummaryTab({ days, onInstrumentClick }: SummaryTabProps)
             <div className="grid grid-cols-2 divide-x divide-border">
               <div className="px-5 py-4">
                 <p className="text-xs text-muted-foreground mb-1">Best win streak</p>
-                <p className="text-2xl font-bold tabular-nums text-tm-profit">{kpis.max_win_streak}</p>
+                <p className="t-mono-lg text-tm-profit">{kpis.max_win_streak}</p>
                 <p className="text-[11px] text-muted-foreground mt-0.5">in a row</p>
               </div>
               <div className="px-5 py-4">
                 <p className="text-xs text-muted-foreground mb-1">Worst loss streak</p>
-                <p className="text-2xl font-bold tabular-nums text-tm-loss">{kpis.max_loss_streak}</p>
+                <p className="t-mono-lg text-tm-loss">{kpis.max_loss_streak}</p>
                 <p className="text-[11px] text-muted-foreground mt-0.5">in a row</p>
               </div>
             </div>

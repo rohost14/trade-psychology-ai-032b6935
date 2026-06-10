@@ -89,13 +89,13 @@ export default function EdgeMapTab({ days }: { days: number }) {
       <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
         <div className="tm-card p-4">
           <p className="text-[11px] text-muted-foreground uppercase tracking-wide">Instruments tracked</p>
-          <p className="text-2xl font-mono font-semibold text-foreground tabular-nums mt-1">
+          <p className="t-mono-lg text-foreground mt-1">
             {instruments.length}
           </p>
         </div>
         <div className="tm-card p-4">
           <p className="text-[11px] text-muted-foreground uppercase tracking-wide">Overall win rate</p>
-          <p className={cn('text-2xl font-mono font-semibold tabular-nums mt-1',
+          <p className={cn('t-mono-lg mt-1',
             overall_win_rate >= 50 ? 'text-tm-profit' : 'text-tm-loss')}>
             {overall_win_rate}%
           </p>

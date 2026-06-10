@@ -80,7 +80,7 @@ export default function AttributionCard({ days }: { days: number }) {
               <span className="w-2 h-2 rounded-full bg-[#16A34A]" />
               <p className="text-[11px] text-muted-foreground uppercase tracking-wide">Clean</p>
             </div>
-            <p className={cn('text-xl font-mono font-semibold tabular-nums',
+            <p className={cn('t-mono-lg',
               clean_pnl >= 0 ? 'text-tm-profit' : 'text-tm-loss')}>
               {formatCurrencyWithSign(clean_pnl)}
             </p>
@@ -93,7 +93,7 @@ export default function AttributionCard({ days }: { days: number }) {
               <span className="w-2 h-2 rounded-full bg-[#DC2626]" />
               <p className="text-[11px] text-muted-foreground uppercase tracking-wide">Flagged</p>
             </div>
-            <p className={cn('text-xl font-mono font-semibold tabular-nums',
+            <p className={cn('t-mono-lg',
               flagged_pnl >= 0 ? 'text-tm-profit' : 'text-tm-loss')}>
               {formatCurrencyWithSign(flagged_pnl)}
             </p>

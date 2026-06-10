@@ -114,7 +114,7 @@ export default function BtstTab({ days }: { days: number }) {
         ].map(({ label, value, sub, cls }) => (
           <div key={label} className="tm-card overflow-hidden p-4">
             <p className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wide mb-1">{label}</p>
-            <p className={cn('text-2xl font-semibold font-mono tabular-nums', cls)}>{value}</p>
+            <p className={cn('t-mono-lg', cls)}>{value}</p>
             <p className="text-[11px] text-muted-foreground mt-0.5">{sub}</p>
           </div>
         ))}

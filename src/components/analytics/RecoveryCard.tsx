@@ -65,7 +65,7 @@ export default function RecoveryCard({ days }: { days: number }) {
           <div className="bg-muted/30 rounded-lg p-3 space-y-1">
             <p className="text-[10px] text-muted-foreground uppercase tracking-wide">Normal day</p>
             <div className="flex items-baseline gap-1">
-              <p className="text-lg font-mono font-semibold text-foreground tabular-nums">
+              <p className="t-mono text-foreground">
                 {avg_normal_count}
               </p>
               <p className="text-[11px] text-muted-foreground">trades</p>
@@ -83,7 +83,7 @@ export default function RecoveryCard({ days }: { days: number }) {
             <p className="text-[10px] text-muted-foreground uppercase tracking-wide">Day after bad day</p>
             <div className="flex items-baseline gap-1">
               <p className={cn(
-                'text-lg font-mono font-semibold tabular-nums',
+                't-mono',
                 overtrade ? 'text-tm-loss' : 'text-foreground'
               )}>
                 {next_day.avg_count}
