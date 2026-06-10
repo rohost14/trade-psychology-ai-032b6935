@@ -604,6 +604,168 @@ export const DEMO_OPTIONS_BEHAVIOR = {
 };
 
 // ---------------------------------------------------------------------------
+// Analytics: pnl-percent (% Return tab)
+// ---------------------------------------------------------------------------
+export const DEMO_PNL_PERCENT = {
+  has_data: true,
+  avg_win_pct: 42.9,
+  avg_loss_pct: -30.2,
+  rr_ratio: 1.42,
+  win_count: 9,
+  loss_count: 6,
+  avg_win_hold_minutes: 97,
+  avg_loss_hold_minutes: 185,
+  disposition_ratio: 1.9,
+  by_hold_time: [
+    { bucket: '<30m',   avg_pct: -45.5, count: 1, avg_win_pct: 0,    avg_loss_pct: -45.5 },
+    { bucket: '30–60m', avg_pct: -12.7, count: 4, avg_win_pct: 44.1, avg_loss_pct: -31.6 },
+    { bucket: '1–2h',   avg_pct: 27.1,  count: 4, avg_win_pct: 48.9, avg_loss_pct: -38.7 },
+    { bucket: '2–4h',   avg_pct: 9.9,   count: 5, avg_win_pct: 32.5, avg_loss_pct: -16.0 },
+    { bucket: '4h+',    avg_pct: 70.6,  count: 1, avg_win_pct: 70.6, avg_loss_pct: 0     },
+  ],
+  trades: [
+    { tradingsymbol: 'NIFTY2531723200PE',   instrument_type: 'PE', direction: 'LONG', pnl_pct: 57.8,   realized_pnl: 3625,   duration_minutes: 85,  exit_time: daysAgo(1, 10, 47) },
+    { tradingsymbol: 'SOLARINDS',           instrument_type: 'EQ', direction: 'LONG', pnl_pct: -1.5,   realized_pnl: -13000, duration_minutes: 197, exit_time: daysAgo(1, 14, 22) },
+    { tradingsymbol: 'NIFTY25MAR23000CE',   instrument_type: 'CE', direction: 'LONG', pnl_pct: -30.7,  realized_pnl: -2700,  duration_minutes: 35,  exit_time: daysAgo(1, 15, 10) },
+    { tradingsymbol: 'BANKNIFTY2531748500PE',instrument_type: 'PE', direction: 'LONG', pnl_pct: 44.1,  realized_pnl: 2250,   duration_minutes: 47,  exit_time: daysAgo(2, 10, 5)  },
+    { tradingsymbol: 'FORTIS25MAR960CE',    instrument_type: 'CE', direction: 'LONG', pnl_pct: 32.4,   realized_pnl: 5170,   duration_minutes: 165, exit_time: daysAgo(3, 13, 15) },
+    { tradingsymbol: 'SENSEX25MAR75000PE',  instrument_type: 'PE', direction: 'LONG', pnl_pct: -30.4,  realized_pnl: -1700,  duration_minutes: 165, exit_time: daysAgo(3, 14, 30) },
+    { tradingsymbol: 'NIFTY25MAR23000CE',   instrument_type: 'CE', direction: 'LONG', pnl_pct: 45.1,   realized_pnl: 2300,   duration_minutes: 105, exit_time: daysAgo(5, 11, 10) },
+    { tradingsymbol: 'NIFTY2531723200PE',   instrument_type: 'PE', direction: 'LONG', pnl_pct: -45.5,  realized_pnl: -3750,  duration_minutes: 28,  exit_time: daysAgo(6, 9, 48)  },
+    { tradingsymbol: 'NIFTY2531723200CE',   instrument_type: 'CE', direction: 'LONG', pnl_pct: -37.5,  realized_pnl: -2700,  duration_minutes: 30,  exit_time: daysAgo(6, 10, 35) },
+    { tradingsymbol: 'BANKNIFTY2531749000CE',instrument_type: 'CE', direction: 'LONG', pnl_pct: -26.7, realized_pnl: -960,   duration_minutes: 35,  exit_time: daysAgo(6, 11, 50) },
+    { tradingsymbol: 'NIFTY25MAR23000CE',   instrument_type: 'CE', direction: 'LONG', pnl_pct: 47.4,   realized_pnl: 1850,   duration_minutes: 135, exit_time: daysAgo(9, 11, 45) },
+    { tradingsymbol: 'BANKNIFTY2531748500PE',instrument_type: 'PE', direction: 'LONG', pnl_pct: 43.9,  realized_pnl: 2700,   duration_minutes: 80,  exit_time: daysAgo(10, 10, 40)},
+    { tradingsymbol: 'FORTIS25MAR960CE',    instrument_type: 'CE', direction: 'LONG', pnl_pct: 70.6,   realized_pnl: 6600,   duration_minutes: 270, exit_time: daysAgo(12, 14, 30)},
+    { tradingsymbol: 'SOLARINDS',           instrument_type: 'EQ', direction: 'LONG', pnl_pct: 1.6,    realized_pnl: 6500,   duration_minutes: 155, exit_time: daysAgo(14, 12, 20)},
+    { tradingsymbol: 'NIFTY25MAR23000PE',   instrument_type: 'PE', direction: 'LONG', pnl_pct: -38.7,  realized_pnl: -3000,  duration_minutes: 105, exit_time: daysAgo(15, 14, 55)},
+  ],
+};
+
+// ---------------------------------------------------------------------------
+// Analytics: btst (BTST tab)
+// ---------------------------------------------------------------------------
+export const DEMO_BTST = {
+  has_data: true,
+  period_days: 30,
+  total_btst_trades: 3,
+  btst_win_rate: 67,
+  btst_total_pnl: 4850,
+  overnight_reversals: 1,
+  reversal_pnl_lost: -2200,
+  trades: [
+    {
+      id: 'btst-001', tradingsymbol: 'NIFTY25MAR23000CE',
+      instrument_type: 'CE', direction: 'LONG',
+      entry_time: daysAgo(4, 15, 15), exit_time: daysAgo(3, 9, 32),
+      realized_pnl: 4200, avg_entry_price: 95, overnight_close_price: 142,
+      was_profitable_at_eod: true, is_reversal: false,
+      duration_minutes: 1097, hold_type: 'overnight' as const,
+    },
+    {
+      id: 'btst-002', tradingsymbol: 'BANKNIFTY2531748500PE',
+      instrument_type: 'PE', direction: 'LONG',
+      entry_time: daysAgo(11, 15, 5), exit_time: daysAgo(10, 9, 41),
+      realized_pnl: 2850, avg_entry_price: 290, overnight_close_price: 385,
+      was_profitable_at_eod: true, is_reversal: false,
+      duration_minutes: 1116, hold_type: 'overnight' as const,
+    },
+    {
+      id: 'btst-003', tradingsymbol: 'NIFTY25MAR23000PE',
+      instrument_type: 'PE', direction: 'LONG',
+      entry_time: daysAgo(18, 15, 20), exit_time: daysAgo(17, 9, 38),
+      realized_pnl: -2200, avg_entry_price: 180, overnight_close_price: 210,
+      was_profitable_at_eod: true, is_reversal: true,
+      duration_minutes: 1098, hold_type: 'overnight' as const,
+    },
+  ],
+};
+
+// ---------------------------------------------------------------------------
+// Analytics: pnl-attribution (AttributionCard in SummaryTab)
+// ---------------------------------------------------------------------------
+export const DEMO_PNL_ATTRIBUTION = {
+  has_data: true,
+  total_pnl: 7990,
+  clean_pnl: 30155,
+  clean_count: 11,
+  clean_wr: 73,
+  clean_avg_pnl: 2741,
+  flagged_pnl: -22165,
+  flagged_count: 4,
+  flagged_wr: 25,
+  flagged_avg_pnl: -5541,
+};
+
+// ---------------------------------------------------------------------------
+// Analytics: quality-breakdown (TradesTab quality scores)
+// ---------------------------------------------------------------------------
+export const DEMO_QUALITY_BREAKDOWN = {
+  per_trade: [
+    { trade_id: 'ct-001', score: 82, tier: 'A' },
+    { trade_id: 'ct-002', score: 38, tier: 'C' },
+    { trade_id: 'ct-003', score: 12, tier: 'F' },
+    { trade_id: 'ct-004', score: 77, tier: 'B' },
+    { trade_id: 'ct-005', score: 85, tier: 'A' },
+    { trade_id: 'ct-006', score: 44, tier: 'C' },
+    { trade_id: 'ct-007', score: 79, tier: 'B' },
+    { trade_id: 'ct-008', score: 18, tier: 'F' },
+    { trade_id: 'ct-009', score: 22, tier: 'F' },
+    { trade_id: 'ct-010', score: 35, tier: 'D' },
+    { trade_id: 'ct-011', score: 76, tier: 'B' },
+    { trade_id: 'ct-012', score: 80, tier: 'A' },
+    { trade_id: 'ct-013', score: 91, tier: 'A' },
+    { trade_id: 'ct-014', score: 72, tier: 'B' },
+    { trade_id: 'ct-015', score: 41, tier: 'D' },
+  ],
+};
+
+// ---------------------------------------------------------------------------
+// Analytics: instrument drill-down (InstrumentPanel)
+// ---------------------------------------------------------------------------
+export const DEMO_INSTRUMENT_NIFTY = {
+  has_data: true,
+  underlying: 'NIFTY',
+  total_trades: 8,
+  total_pnl: 5275,
+  win_rate: 62,
+  profit_factor: 1.84,
+  avg_hold_min: 94,
+  avg_win: 2886,
+  avg_loss: -2788,
+  by_option_type: {
+    CE: { trades: 5, pnl: 3050, win_rate: 60, avg_pnl: 610 },
+    PE: { trades: 3, pnl: 2225, win_rate: 67, avg_pnl: 742 },
+  },
+  by_hour: [
+    { hour: 9, label: '09:00', trades: 3, pnl: 6325, win_rate: 100 },
+    { hour: 10, label: '10:00', trades: 1, pnl: -2700, win_rate: 0 },
+    { hour: 11, label: '11:00', trades: 2, pnl: 4150, win_rate: 50 },
+    { hour: 14, label: '14:00', trades: 1, pnl: -3000, win_rate: 0 },
+    { hour: 15, label: '15:00', trades: 1, pnl: 2700, win_rate: 100 },
+  ],
+  equity_curve: (() => {
+    const points = [3625, -2700, 2300, -3750, -2700, 1850, 2700, -3000];
+    let cum = 0;
+    return points.map((p, i) => {
+      cum += p;
+      const d = new Date();
+      d.setDate(d.getDate() - (15 - i * 2));
+      return { date: d.toISOString().split('T')[0], cumulative_pnl: cum };
+    });
+  })(),
+  trades: [
+    { id: 'ct-001', tradingsymbol: 'NIFTY2531723200PE',  direction: 'LONG', total_quantity: 50,  avg_entry_price: 125.5, avg_exit_price: 198.0, realized_pnl: 3625,  duration_minutes: 85,  exit_time: daysAgo(1, 10, 47),  option_type: 'PE' },
+    { id: 'ct-003', tradingsymbol: 'NIFTY25MAR23000CE',  direction: 'LONG', total_quantity: 100, avg_entry_price: 88,    avg_exit_price: 61,    realized_pnl: -2700, duration_minutes: 35,  exit_time: daysAgo(1, 15, 10),  option_type: 'CE' },
+    { id: 'ct-007', tradingsymbol: 'NIFTY25MAR23000CE',  direction: 'LONG', total_quantity: 50,  avg_entry_price: 102,   avg_exit_price: 148,   realized_pnl: 2300,  duration_minutes: 105, exit_time: daysAgo(5, 11, 10),  option_type: 'CE' },
+    { id: 'ct-008', tradingsymbol: 'NIFTY2531723200PE',  direction: 'LONG', total_quantity: 150, avg_entry_price: 55,    avg_exit_price: 30,    realized_pnl: -3750, duration_minutes: 28,  exit_time: daysAgo(6, 9, 48),   option_type: 'PE' },
+    { id: 'ct-009', tradingsymbol: 'NIFTY2531723200CE',  direction: 'LONG', total_quantity: 100, avg_entry_price: 72,    avg_exit_price: 45,    realized_pnl: -2700, duration_minutes: 30,  exit_time: daysAgo(6, 10, 35),  option_type: 'CE' },
+    { id: 'ct-011', tradingsymbol: 'NIFTY25MAR23000CE',  direction: 'LONG', total_quantity: 50,  avg_entry_price: 78,    avg_exit_price: 115,   realized_pnl: 1850,  duration_minutes: 135, exit_time: daysAgo(9, 11, 45),  option_type: 'CE' },
+    { id: 'ct-015', tradingsymbol: 'NIFTY25MAR23000PE',  direction: 'LONG', total_quantity: 50,  avg_entry_price: 155,   avg_exit_price: 95,    realized_pnl: -3000, duration_minutes: 105, exit_time: daysAgo(15, 14, 55), option_type: 'PE' },
+  ],
+};
+
+// ---------------------------------------------------------------------------
 // Behavioral patterns (MyPatterns page)
 // ---------------------------------------------------------------------------
 export const DEMO_BEHAVIORAL_ANALYSIS = {

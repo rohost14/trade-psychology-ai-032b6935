@@ -10,6 +10,8 @@ import {
   DEMO_AI_INSIGHTS, DEMO_AI_SUMMARY, DEMO_PROGRESS, DEMO_RISK_METRICS,
   DEMO_RISK_SCORE, DEMO_CRITICAL_TRADES, DEMO_EDGE_CONFIDENCE,
   DEMO_CONDITIONAL_PERFORMANCE, DEMO_OPTIONS_BEHAVIOR, DEMO_BEHAVIORAL_ANALYSIS,
+  DEMO_PNL_PERCENT, DEMO_BTST, DEMO_PNL_ATTRIBUTION, DEMO_QUALITY_BREAKDOWN,
+  DEMO_INSTRUMENT_NIFTY,
 } from './demoData';
 
 export const GUEST_MODE_KEY = 'tradementor_guest_mode';
@@ -98,6 +100,28 @@ export function getGuestResponse(url: string, method = 'GET'): unknown | undefin
   }
   if (path === '/api/analytics/unrealized-pnl') {
     return { unrealized_pnl: 440, positions_count: 2 };
+  }
+  if (path === '/api/analytics/pnl-percent') return DEMO_PNL_PERCENT;
+  if (path === '/api/analytics/btst') return DEMO_BTST;
+  if (path === '/api/analytics/pnl-attribution') return DEMO_PNL_ATTRIBUTION;
+  if (path === '/api/analytics/quality-breakdown') return DEMO_QUALITY_BREAKDOWN;
+  if (path === '/api/analytics/instrument') {
+    // Return NIFTY data for any underlying in demo
+    return DEMO_INSTRUMENT_NIFTY;
+  }
+  if (path === '/api/analytics/discipline-summary') {
+    return {
+      has_data: true,
+      score: 68,
+      max_score: 100,
+      week_start: new Date(Date.now() - 6 * 86_400_000).toLocaleDateString('en-IN', { day: 'numeric', month: 'short' }),
+      danger_alerts: 2,
+      caution_alerts: 4,
+      trades_this_week: 5,
+      revenge_free_days: 3,
+      weekly_trend: [72, 81, 55, 68],
+      breakdown: { alerts_score: 38, quality_score: 30 },
+    };
   }
 
   // Behavioral
