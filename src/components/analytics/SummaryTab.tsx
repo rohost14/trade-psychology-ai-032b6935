@@ -184,7 +184,7 @@ export default function SummaryTab({ days, onInstrumentClick }: SummaryTabProps)
   const worstHour   = byHour.length ? byHour.reduce((a, b) => a.pnl < b.pnl ? a : b) : null;
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-4 animate-fade-in-up">
 
       {/* Row 1: Core KPIs */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-px bg-border rounded-lg overflow-hidden">

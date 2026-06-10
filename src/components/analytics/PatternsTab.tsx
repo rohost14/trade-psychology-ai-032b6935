@@ -215,7 +215,7 @@ export default function PatternsTab({ days }: PatternsTabProps) {
   }
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-4 animate-fade-in-up">
 
       {/* Clean vs Flagged comparison */}
       {(clean.length > 0 || dirty.length > 0) && (

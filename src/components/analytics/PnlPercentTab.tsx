@@ -133,7 +133,7 @@ export default function PnlPercentTab({ days }: { days: number }) {
   const scatterData = trades.map(t => ({ ...t, x: t.duration_minutes, y: t.pnl_pct }));
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 animate-fade-in-up">
 
       {/* ── Stat cards ── */}
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">

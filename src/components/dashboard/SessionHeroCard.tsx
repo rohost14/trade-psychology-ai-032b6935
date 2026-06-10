@@ -4,6 +4,7 @@ import { formatCurrencyWithSign } from '@/lib/formatters';
 import { CompletedTrade } from '@/types/api';
 import { PnlSparkline } from './PnlSparkline';
 import { STATE_CFG, SessionState, getSessionDesc } from '@/lib/dashboardUtils';
+import { useCountUp } from '@/hooks/useCountUp';
 
 interface SessionHeroCardProps {
   stateCfg: typeof STATE_CFG[SessionState];
@@ -30,6 +31,7 @@ export function SessionHeroCard({
   closedTrades,
   unrealizedTotal,
 }: SessionHeroCardProps) {
+  const animatedPnl = useCountUp(sessionPnlDisplay, 500);
   return (
     <div className={cn('tm-card mb-5', stateCfg.accent)}>
       <div className="flex items-stretch">
@@ -43,7 +45,7 @@ export function SessionHeroCard({
           </div>
           <div className="flex items-baseline gap-2 mb-1">
             <span className={cn('text-[44px] font-black font-mono tabular-nums leading-none', pnlPositive ? 'text-tm-profit' : 'text-tm-loss')}>
-              {formatCurrencyWithSign(sessionPnlDisplay)}
+              {formatCurrencyWithSign(Math.round(animatedPnl))}
             </span>
           </div>
           <p className="text-[13px] text-muted-foreground leading-snug">

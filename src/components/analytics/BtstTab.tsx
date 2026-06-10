@@ -88,7 +88,7 @@ export default function BtstTab({ days }: { days: number }) {
   const visible = showAll ? trades : trades.slice(0, 10);
 
   return (
-    <div className="space-y-5">
+    <div className="space-y-5 animate-fade-in-up">
       {/* Summary grid */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
         {[
