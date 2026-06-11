@@ -1,4 +1,5 @@
 import { useState, Suspense, lazy } from 'react';
+import { ErrorBoundary } from '@/components/ErrorBoundary';
 import { Link } from 'react-router-dom';
 import { Link2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -120,18 +121,24 @@ export default function Analytics() {
       </div>
 
       {/* ── Tab Content ── */}
-      <Suspense fallback={<TabSkeleton />}>
-        {tab === 'summary'  && (
-          <SummaryTab
-            days={days}
-            onInstrumentClick={(underlying) => setInstrumentPanel(underlying)}
-          />
-        )}
-        {tab === 'patterns' && <PatternsTab days={days} />}
-        {tab === 'trades'   && <TradesTab days={days} />}
-        {tab === 'btst'     && <BtstTab days={days} />}
-        {tab === 'pnlpct'   && <PnlPercentTab days={days} />}
-      </Suspense>
+      <ErrorBoundary fallback={
+        <div className="py-12 text-center text-sm text-muted-foreground">
+          This tab failed to load. Try refreshing the page.
+        </div>
+      }>
+        <Suspense fallback={<TabSkeleton />}>
+          {tab === 'summary'  && (
+            <SummaryTab
+              days={days}
+              onInstrumentClick={(underlying) => setInstrumentPanel(underlying)}
+            />
+          )}
+          {tab === 'patterns' && <PatternsTab days={days} />}
+          {tab === 'trades'   && <TradesTab days={days} />}
+          {tab === 'btst'     && <BtstTab days={days} />}
+          {tab === 'pnlpct'   && <PnlPercentTab days={days} />}
+        </Suspense>
+      </ErrorBoundary>
 
       <ComplianceDisclaimer variant="footer" className="mt-8" />
 

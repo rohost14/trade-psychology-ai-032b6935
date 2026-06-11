@@ -2,7 +2,7 @@ import uuid
 from datetime import datetime, date
 from decimal import Decimal
 from typing import Optional
-from sqlalchemy import String, Numeric, Integer, Date, TIMESTAMP, text, ForeignKey, CheckConstraint
+from sqlalchemy import String, Numeric, Integer, Date, TIMESTAMP, text, ForeignKey, CheckConstraint, UniqueConstraint
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from app.core.database import Base
@@ -26,6 +26,10 @@ class TradingSession(Base):
         CheckConstraint(
             "session_state IN ('normal', 'caution', 'danger', 'blowup')",
             name="chk_session_state"
+        ),
+        UniqueConstraint(
+            'broker_account_id', 'session_date',
+            name='uq_trading_session_account_date'
         ),
     )
 

@@ -9,11 +9,13 @@ Scheduling approach:
 - Users can override times in their profile settings
 """
 
+import asyncio
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from apscheduler.triggers.cron import CronTrigger
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
 from app.core.database import get_db
+from app.core.celery_app import celery_app
 from app.services.retention_service import RetentionService
 from app.models.user import User
 from app.models.broker_account import BrokerAccount
@@ -28,7 +30,8 @@ IST = ZoneInfo("Asia/Kolkata")
 scheduler = AsyncIOScheduler()
 
 # Default report times (IST) — used when user hasn't set a custom time
-DEFAULT_EOD_TIME = "16:00"
+DEFAULT_EOD_TIME = "16:00"       # Equity session close
+DEFAULT_MCX_EOD_TIME = "23:45"   # After MCX commodity session close (23:30)
 DEFAULT_MORNING_TIME = "08:30"
 
 
@@ -58,9 +61,16 @@ async def _dispatch_reports(report_type: str):
             sent_count = 0
 
             for account, profile in rows:
-                # Determine this user's configured time (or default)
+                # Determine this user's configured time (or default).
+                # MCX/commodity traders (trading_hours_end ≥ "23:00") default to 23:45
+                # so they receive their EOD report after MCX session close, not mid-session.
                 if report_type == "eod":
-                    user_time = (profile.eod_report_time if profile and profile.eod_report_time else DEFAULT_EOD_TIME)
+                    is_commodity = (
+                        profile and profile.trading_hours_end
+                        and profile.trading_hours_end >= "23:00"
+                    )
+                    default_eod = DEFAULT_MCX_EOD_TIME if is_commodity else DEFAULT_EOD_TIME
+                    user_time = profile.eod_report_time if (profile and profile.eod_report_time) else default_eod
                 else:
                     user_time = (profile.morning_brief_time if profile and profile.morning_brief_time else DEFAULT_MORNING_TIME)
 
@@ -145,3 +155,16 @@ def start_scheduler():
 
     scheduler.start()
     logger.info(f"Retention scheduler started. EOD default: {DEFAULT_EOD_TIME} IST, Morning default: {DEFAULT_MORNING_TIME} IST")
+
+
+@celery_app.task(name="app.tasks.retention_tasks.dispatch_reports_tick")
+def dispatch_reports_tick():
+    """
+    Fires every 60s via Celery beat (single beat process — no N× duplication).
+    Checks each user's configured delivery time and sends EOD / morning reports
+    to those whose window matches the current IST minute.
+    """
+    async def _run():
+        await _dispatch_reports("eod")
+        await _dispatch_reports("morning")
+    asyncio.run(_run())

@@ -22,7 +22,7 @@ export function formatCurrency(amount: number): string {
  */
 export function formatCurrencyWithSign(amount: number): string {
   const absAmount = Math.abs(amount);
-  const sign = amount >= 0 ? '+' : '-';
+  const sign = amount > 0 ? '+' : amount < 0 ? '-' : '';
   // Show 2 decimal places so ₹918.75 doesn't round to ₹919
   const formatted = new Intl.NumberFormat('en-IN', {
     style: 'currency',

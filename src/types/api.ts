@@ -1,16 +1,9 @@
 export interface RiskState {
   risk_state: 'safe' | 'caution' | 'danger';
-  status_message: string;
   active_patterns: string[];
-  last_updated: string;
+  recommendations: string[];
 }
 
-export interface DashboardStats {
-  total_pnl: number;
-  win_rate: number;
-  total_trades: number;
-  max_drawdown: number;
-}
 
 export interface Position {
   id: string;
@@ -110,8 +103,9 @@ export interface CompletedTrade {
   avg_entry_price: number;
   avg_exit_price: number;
   realized_pnl: number;
-  entry_time: string;
-  exit_time: string;
+  pnl_pct?: number | null;
+  entry_time?: string;
+  exit_time?: string;
   duration_minutes: number;
   closed_by_flip: boolean;
   entry_trade_ids: string[];
@@ -125,7 +119,7 @@ export interface Alert {
   // Frontend uses pattern_name; backend sends pattern_type (RiskAlertResponse includes both)
   pattern_name: string;
   pattern_type?: string;
-  severity: 'critical' | 'high' | 'medium' | 'positive';
+  severity: 'danger' | 'caution' | 'positive';
   // Frontend uses timestamp; backend sends detected_at (RiskAlertResponse includes both)
   timestamp: string;
   detected_at?: string;

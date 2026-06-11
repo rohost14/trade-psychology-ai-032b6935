@@ -78,12 +78,13 @@ function formatDateShort(dateStr: string): string {
 }
 
 const severityColors: Record<string, string> = {
-  critical: 'text-red-700 bg-red-100 dark:text-red-400 dark:bg-red-900/30',
-  high: 'text-tm-loss bg-red-50 dark:text-red-400 dark:bg-red-900/20',
-  danger: 'text-tm-loss bg-red-50 dark:text-red-400 dark:bg-red-900/20',
-  medium: 'text-amber-600 bg-amber-50 dark:text-amber-400 dark:bg-amber-900/20',
-  warning: 'text-amber-600 bg-amber-50 dark:text-amber-400 dark:bg-amber-900/20',
-  low: 'text-blue-600 bg-blue-50 dark:text-blue-400 dark:bg-blue-900/20',
+  danger:   'text-tm-loss bg-red-50 dark:text-red-400 dark:bg-red-900/20',
+  caution:  'text-amber-600 bg-amber-50 dark:text-amber-400 dark:bg-amber-900/20',
+  positive: 'text-tm-profit bg-green-50 dark:text-green-400 dark:bg-green-900/20',
+  // legacy aliases — normalised by components before lookup
+  critical: 'text-tm-loss bg-red-50 dark:text-red-400 dark:bg-red-900/20',
+  high:     'text-tm-loss bg-red-50 dark:text-red-400 dark:bg-red-900/20',
+  medium:   'text-amber-600 bg-amber-50 dark:text-amber-400 dark:bg-amber-900/20',
 };
 
 export default function RiskTab({ days }: RiskTabProps) {

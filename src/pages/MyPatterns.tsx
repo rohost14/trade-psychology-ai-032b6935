@@ -6,8 +6,12 @@ import { useState, useEffect, useCallback, useMemo } from 'react';
 import { Link } from 'react-router-dom';
 import {
   Brain, Link2, AlertTriangle, Shield,
-  Clock, RefreshCw, Phone
+  Clock, RefreshCw, Phone, TrendingUp, Zap, Flame,
 } from 'lucide-react';
+import {
+  LineChart, Line, XAxis, YAxis, CartesianGrid,
+  Tooltip, ResponsiveContainer,
+} from 'recharts';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Button } from '@/components/ui/button';
 import { toast } from 'sonner';
@@ -21,6 +25,72 @@ import PatternCalendar from '@/components/patterns/PatternCalendar';
 import { calculateEmotionalTax, getTopRecommendations } from '@/lib/emotionalTaxCalculator';
 import type { DangerZoneStatus, CooldownRecord } from '@/types/api';
 import type { StreakData, DailyAdherence, StreakMilestone } from '@/types/patterns';
+
+// ---------------------------------------------------------------------------
+// Discipline types + components
+// ---------------------------------------------------------------------------
+
+interface DisciplineData {
+  has_data: boolean;
+  score: number;
+  max_score: number;
+  week_start: string;
+  danger_alerts: number;
+  caution_alerts: number;
+  trades_this_week: number;
+  revenge_free_days: number;
+  weekly_trend: number[];
+  breakdown: {
+    alerts_score: number;
+    quality_score: number;
+  };
+}
+
+function ScoreGauge({ score, max }: { score: number; max: number }) {
+  const pct = Math.min(100, (score / max) * 100);
+  const color = pct >= 70 ? '#16A34A' : pct >= 45 ? '#D97706' : '#DC2626';
+  const circumference = 2 * Math.PI * 45;
+  const dashOffset = circumference * (1 - pct / 100);
+
+  return (
+    <div className="flex flex-col items-center">
+      <div className="relative w-28 h-28">
+        <svg viewBox="0 0 100 100" className="transform -rotate-90 w-full h-full">
+          <circle cx="50" cy="50" r="45" stroke="var(--border)" strokeWidth="8" fill="none" />
+          <circle
+            cx="50" cy="50" r="45"
+            stroke={color}
+            strokeWidth="8"
+            fill="none"
+            strokeDasharray={circumference}
+            strokeDashoffset={dashOffset}
+            strokeLinecap="round"
+            className="transition-all duration-700"
+          />
+        </svg>
+        <div className="absolute inset-0 flex flex-col items-center justify-center">
+          <p className="text-2xl font-bold font-mono tabular-nums text-foreground">{score}</p>
+          <p className="text-[10px] text-muted-foreground">/ {max}</p>
+        </div>
+      </div>
+      <p className={cn(
+        'text-xs font-semibold mt-1.5',
+        pct >= 70 ? 'text-tm-profit' : pct >= 45 ? 'text-tm-obs' : 'text-tm-loss'
+      )}>
+        {pct >= 80 ? 'Excellent' : pct >= 60 ? 'Good' : pct >= 40 ? 'Needs work' : 'Struggling'}
+      </p>
+    </div>
+  );
+}
+
+function DisciplineTrendTooltip({ active, payload }: any) {
+  if (!active || !payload?.length) return null;
+  return (
+    <div className="bg-card border border-border rounded-md px-2 py-1.5 text-xs">
+      <p className="font-mono tabular-nums">{payload[0].value} / 100</p>
+    </div>
+  );
+}
 
 // ---------------------------------------------------------------------------
 // Danger level display config
@@ -201,15 +271,16 @@ export default function MyPatterns() {
   const [streakData, setStreakData] = useState<StreakData>(EMPTY_STREAK);
   const [statusLoading, setStatusLoading] = useState(true);
   const [isAlerting, setIsAlerting] = useState(false);
+  const [disciplineData, setDisciplineData] = useState<DisciplineData | null>(null);
 
   // Fetch live danger zone status + alert history + streak data
-  const fetchStatus = useCallback(async () => {
+  const fetchStatus = useCallback(async (signal?: AbortSignal) => {
     if (!account?.id) return;
     try {
       const [statusRes, summaryRes, alertsRes] = await Promise.all([
-        api.get('/api/danger-zone/status'),
-        api.get('/api/danger-zone/summary'),
-        api.get('/api/risk/alerts', { params: { hours: 720 } }), // 30 days for streak
+        api.get('/api/danger-zone/status', { signal }),
+        api.get('/api/danger-zone/summary', { signal }),
+        api.get('/api/risk/alerts', { params: { hours: 720 }, signal }), // 30 days for streak
       ]);
       setStatus(statusRes.data);
       setAlertHistory(summaryRes.data.cooldown_history_7d || []);
@@ -231,6 +302,10 @@ export default function MyPatterns() {
         const d = new Date();
         d.setDate(d.getDate() - i);
         const dateStr = d.toLocaleDateString('en-CA', { timeZone: 'Asia/Kolkata' });
+        // Parse IST date to get IST day-of-week (avoids UTC-vs-IST offset issues)
+        const [y, mo, dy] = dateStr.split('-').map(Number);
+        const dow = new Date(y, mo - 1, dy).getDay(); // 0 = Sun, 6 = Sat
+        if (dow === 0 || dow === 6) continue; // NSE doesn't trade on weekends
         const day = alertsByDate[dateStr];
         daily_status.push({
           date: dateStr,
@@ -254,7 +329,14 @@ export default function MyPatterns() {
 
       const milestones_achieved: StreakMilestone[] = [3, 7, 14, 21, 30]
         .filter(d => longest >= d)
-        .map(d => ({ days: d, achieved_at: daily_status[0]?.date ?? '', label: MILESTONE_LABELS[d] }));
+        // achieved_at = the date the streak first hit d days (d-1 index back in the
+        // sorted-newest-first array). Falls back to the streak-start date if index
+        // is out of range (milestone is from a longer past streak).
+        .map(d => ({
+          days: d,
+          achieved_at: daily_status[d - 1]?.date ?? daily_status[daily_status.length - 1]?.date ?? '',
+          label: MILESTONE_LABELS[d],
+        }));
 
       setStreakData({
         current_streak_days,
@@ -263,16 +345,19 @@ export default function MyPatterns() {
         daily_status,
         milestones_achieved,
       });
-    } catch {
+    } catch (err: any) {
+      if (err?.code === 'ERR_CANCELED') return; // aborted on unmount — not an error
       // Non-fatal — page still works without status
     } finally {
-      setStatusLoading(false);
+      if (!signal?.aborted) setStatusLoading(false);
     }
   }, [account?.id]);
 
-  // Initial load
+  // Initial load — cancel in-flight requests if the component unmounts
   useEffect(() => {
-    fetchStatus();
+    const controller = new AbortController();
+    fetchStatus(controller.signal);
+    return () => controller.abort();
   }, [fetchStatus]);
 
   // Refetch when a trade fills or a risk alert fires — streak and danger level change at these moments
@@ -280,9 +365,32 @@ export default function MyPatterns() {
     if (lastTradeEvent || lastAlertEvent) fetchStatus();
   }, [lastTradeEvent, lastAlertEvent]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  // Derive patterns from backend alerts (backend is the single detection engine)
-  const patterns = useMemo(() => alerts.map(a => a.pattern), [alerts]);
-  const emotionalTax    = useMemo(() => calculateEmotionalTax(patterns as any, []), [patterns]);
+  // Discipline score — fetched once on mount, independent of status polling
+  useEffect(() => {
+    if (!account?.id) return;
+    api.get('/api/analytics/discipline-summary')
+      .then(r => setDisciplineData(r.data))
+      .catch(() => setDisciplineData(null));
+  }, [account?.id]);
+
+  // Derive BehaviorPattern objects from backend alerts for EmotionalTax.
+  // Alert has no .pattern sub-object; map the fields we do have.
+  // estimated_cost is not returned by the backend yet — defaults to 0.
+  const patterns = useMemo(() => alerts.map(a => ({
+    id: a.id,
+    type: (a.pattern_type ?? a.pattern_name ?? 'overtrading') as import('@/types/patterns').PatternType,
+    name: a.pattern_name,
+    severity: a.severity as import('@/types/patterns').PatternSeverity,
+    detected_at: a.timestamp || a.detected_at || new Date().toISOString(),
+    description: a.message,
+    evidence: { trades_involved: a.related_trade_ids ?? [], time_range: '', market_context: '' },
+    historical_insight: '',
+    frequency_this_week: 0,
+    frequency_this_month: 0,
+    estimated_cost: 0,
+    insight: '',
+  })), [alerts]);
+  const emotionalTax    = useMemo(() => calculateEmotionalTax(patterns, []), [patterns]);
   const recommendations = useMemo(() => getTopRecommendations(emotionalTax), [emotionalTax]);
 
   const handleAlertGuardian = async () => {
@@ -394,6 +502,128 @@ export default function MyPatterns() {
             <AlertHistoryCard history={alertHistory} />
           </div>
         </div>
+
+        {/* Weekly Discipline Score */}
+        {disciplineData?.has_data && (
+          <div className="tm-card overflow-hidden">
+            <div className="px-5 py-3.5 border-b border-border flex items-center gap-2">
+              <Zap className="h-4 w-4 text-tm-brand" />
+              <p className="text-sm font-medium text-foreground">Weekly Score</p>
+              <span className="text-[11px] text-muted-foreground ml-auto">
+                Week of {disciplineData.week_start}
+              </span>
+            </div>
+            <div className="p-5">
+              <div className="flex flex-col sm:flex-row items-center gap-6">
+                <ScoreGauge score={disciplineData.score} max={disciplineData.max_score} />
+
+                <div className="flex-1 w-full space-y-3">
+                  {/* Breakdown bars */}
+                  <div className="space-y-2">
+                    <div>
+                      <div className="flex justify-between text-[11px] text-muted-foreground mb-1">
+                        <span>Alert control</span>
+                        <span className="font-mono">{disciplineData.breakdown.alerts_score} / 60</span>
+                      </div>
+                      <div className="h-1.5 rounded-full bg-muted overflow-hidden">
+                        <div
+                          className="h-full bg-tm-brand transition-all"
+                          style={{ width: `${(disciplineData.breakdown.alerts_score / 60) * 100}%` }}
+                        />
+                      </div>
+                    </div>
+                    <div>
+                      <div className="flex justify-between text-[11px] text-muted-foreground mb-1">
+                        <span>Trade quality</span>
+                        <span className="font-mono">{disciplineData.breakdown.quality_score} / 40</span>
+                      </div>
+                      <div className="h-1.5 rounded-full bg-muted overflow-hidden">
+                        <div
+                          className="h-full bg-tm-brand transition-all"
+                          style={{ width: `${(disciplineData.breakdown.quality_score / 40) * 100}%` }}
+                        />
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Quick stats */}
+                  <div className="flex gap-4 pt-1">
+                    <div>
+                      <p className="text-[10px] text-muted-foreground uppercase">Trades</p>
+                      <p className="text-sm font-mono font-semibold text-foreground">
+                        {disciplineData.trades_this_week}
+                      </p>
+                    </div>
+                    <div>
+                      <p className="text-[10px] text-muted-foreground uppercase">Danger alerts</p>
+                      <p className={cn(
+                        'text-sm font-mono font-semibold',
+                        disciplineData.danger_alerts > 0 ? 'text-tm-loss' : 'text-tm-profit',
+                      )}>
+                        {disciplineData.danger_alerts}
+                      </p>
+                    </div>
+                    <div>
+                      <p className="text-[10px] text-muted-foreground uppercase">Caution alerts</p>
+                      <p className={cn(
+                        'text-sm font-mono font-semibold',
+                        disciplineData.caution_alerts > 2 ? 'text-tm-obs' : 'text-foreground',
+                      )}>
+                        {disciplineData.caution_alerts}
+                      </p>
+                    </div>
+                    <div>
+                      <p className="text-[10px] text-muted-foreground uppercase flex items-center gap-1">
+                        <Flame className="h-2.5 w-2.5 text-tm-obs" /> Revenge-free
+                      </p>
+                      <p className={cn(
+                        'text-sm font-mono font-semibold',
+                        disciplineData.revenge_free_days >= 5 ? 'text-tm-profit'
+                          : disciplineData.revenge_free_days >= 2 ? 'text-tm-obs'
+                            : 'text-tm-loss',
+                      )}>
+                        {disciplineData.revenge_free_days}d
+                      </p>
+                    </div>
+                  </div>
+                </div>
+
+                {/* 4-week trend (only when enough data) */}
+                {disciplineData.weekly_trend.length > 1 && (
+                  <div className="w-full sm:w-48 shrink-0">
+                    <div className="flex items-center gap-1.5 mb-2">
+                      <TrendingUp className="h-3.5 w-3.5 text-muted-foreground" />
+                      <p className="text-[11px] text-muted-foreground font-medium">4-Week Trend</p>
+                    </div>
+                    <ResponsiveContainer width="100%" height={80}>
+                      <LineChart
+                        data={disciplineData.weekly_trend.map((s, i) => ({
+                          week: `W-${disciplineData.weekly_trend.length - i}`,
+                          score: s,
+                        }))}
+                      >
+                        <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" vertical={false} />
+                        <XAxis
+                          dataKey="week"
+                          tick={{ fontSize: 10, fill: 'var(--muted-foreground)' }}
+                          axisLine={false} tickLine={false}
+                        />
+                        <YAxis domain={[0, 100]} hide />
+                        <Tooltip content={<DisciplineTrendTooltip />} />
+                        <Line
+                          type="monotone" dataKey="score"
+                          stroke="#0D9488" strokeWidth={2}
+                          dot={{ fill: '#0D9488', r: 2 }}
+                          activeDot={{ r: 4 }}
+                        />
+                      </LineChart>
+                    </ResponsiveContainer>
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );

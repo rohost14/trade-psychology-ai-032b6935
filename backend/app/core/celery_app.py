@@ -42,6 +42,7 @@ celery_app = Celery(
         "app.tasks.trade_tasks",
         "app.tasks.alert_tasks",
         "app.tasks.report_tasks",
+        "app.tasks.retention_tasks",
         "app.tasks.checkpoint_tasks",
         "app.tasks.reconciliation_tasks",
         "app.tasks.position_monitor_tasks",
@@ -66,7 +67,7 @@ celery_app.conf.update(
 
     # Worker settings
     worker_prefetch_multiplier=1,  # One task at a time per worker
-    worker_concurrency=100,  # 100 concurrent workers — handles peak load; use --pool=gevent
+    worker_concurrency=4,  # 4 prefork workers — safe for 512MB Render free tier (~100MB each)
 
     # Task routing
     task_routes={
@@ -107,11 +108,14 @@ celery_app.conf.update(
 
     # Beat schedule for periodic tasks (uses crontab)
     #
-    # NOTE: EOD reports and morning briefs are NOT here.
-    # They are dispatched by APScheduler (retention_tasks.py) running inside the
-    # FastAPI app process, which fires every minute and respects each user's
-    # configured delivery time. Duplicating them here would cause double-sends.
     beat_schedule={
+        # Fires every 60s. Each user's configured delivery time is checked inside
+        # the task — reports only send to users whose time matches the current IST minute.
+        # Single Celery beat process means no N× duplication (replaces APScheduler).
+        "retention-reports-tick": {
+            "task": "app.tasks.retention_tasks.dispatch_reports_tick",
+            "schedule": 60.0,
+        },
         # Commodity daily EOD report - 11:45 PM IST (after MCX close at 11:30 PM)
         "commodity-eod": {
             "task": "app.tasks.report_tasks.generate_commodity_eod",

@@ -231,7 +231,12 @@ export function getGuestResponse(url: string, method = 'GET'): unknown | undefin
     return { orders: [], gtt: [] };
   }
 
-  // Catch-all: any unmocked route in guest mode returns empty success
-  // Prevents 401s from hitting the real backend (which would fire token-expired events)
+  // Catch-all: any unmocked GET route returns {} to prevent 401s from the real
+  // backend (guest mode has no auth token). Add a specific stub above for any
+  // endpoint that should render demo data instead of a blank state.
+  if (import.meta.env.DEV) {
+    // eslint-disable-next-line no-console
+    console.warn(`[GuestMode] No stub for ${m} ${path} — add one in getGuestResponse() to show demo data`);
+  }
   return {};
 }

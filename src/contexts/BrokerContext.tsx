@@ -249,9 +249,10 @@ export function BrokerProvider({ children }: { children: ReactNode }) {
       setAccount(null);
       setSyncStatus('idle');
       setLastSyncResult(null);
-      // Clear all tradementor_* keys (alerts, goals, last_event_*, etc.)
+      // Clear all tradementor_* keys except seen_alerts — we want to preserve the
+      // dedup set so alerts don't re-toast after reconnecting to the same account.
       Object.keys(localStorage)
-        .filter(k => k.startsWith('tradementor'))
+        .filter(k => k.startsWith('tradementor') && k !== 'tradementor_seen_alerts')
         .forEach(k => localStorage.removeItem(k));
     } catch (error) {
       console.error('Failed to disconnect:', error);

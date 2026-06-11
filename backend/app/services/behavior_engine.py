@@ -327,10 +327,18 @@ class BehaviorEngine:
         "martingale_behaviour",
         "size_escalation",
         "consecutive_loss_streak",
+        # Suppress for multi-leg hedges: buying a CE + PE simultaneously is
+        # not rapid re-entry, missing stop-loss, or a recovery bet — it is a
+        # defined strategy (straddle/strangle/spread). strategy_group is set by
+        # get_group_for_trade() when the trade is part of a detected structure.
+        "rapid_reentry",
+        "no_stoploss",
+        "post_loss_recovery_bet",
     })
 
     def _run_all_detectors(self, ctx: EngineContext) -> List[DetectedEvent]:
         events = []
+        _SEV_RANK = {"danger": 1, "caution": 2, "positive": 3}
         for detector in [
             self._detect_consecutive_loss_streak,
             self._detect_revenge_trade,
@@ -368,6 +376,19 @@ class BehaviorEngine:
                     events.append(event)
             except Exception as e:
                 logger.warning(f"[BehaviorEngine] {detector.__name__} failed: {e}")
+
+        # iv_crush_behavior and premium_destruction both analyse the same fast premium
+        # collapse — if both fire for this trade keep only the higher-severity one.
+        _OPTIONS_OVERLAP = {"iv_crush_behavior", "premium_destruction"}
+        options_events = [e for e in events if e.event_type in _OPTIONS_OVERLAP]
+        if len(options_events) >= 2:
+            best = min(options_events, key=lambda e: _SEV_RANK.get(e.severity, 99))
+            events = [e for e in events if e.event_type not in _OPTIONS_OVERLAP] + [best]
+            logger.debug(
+                f"[BehaviorEngine] options dedup: kept {best.event_type} ({best.severity}), "
+                f"dropped {[e.event_type for e in options_events if e is not best]}"
+            )
+
         return events
 
     # ── Pattern 1: Consecutive loss streak ────────────────────────────────
@@ -583,6 +604,66 @@ class BehaviorEngine:
                     context={"daily_count": daily_count, "daily_caution": daily_caution,
                              "daily_danger": daily_danger, "session_pnl": round(session_pnl, 2)},
                 )
+
+        # Check 3: gains erosion through continued trading (fires even below daily_caution)
+        # Catches the "6 good-start trades then 3-4 losses" pattern before it crosses
+        # the raw trade-count threshold. Different from profit_giveaway (session-wide
+        # peak erosion) — this specifically requires 3+ trades AFTER the peak, indicating
+        # overtrading behaviour drove the drawdown.
+        if len(ctx.session_trades) >= 4:
+            trade_pnls = [Decimal(str(t.realized_pnl or 0)) for t in ctx.session_trades]
+            running_pg = Decimal("0")
+            peak_pg = Decimal("0")
+            peak_pg_idx = 0
+            for _i, _p in enumerate(trade_pnls):
+                running_pg += _p
+                if running_pg > peak_pg:
+                    peak_pg = running_pg
+                    peak_pg_idx = _i
+            trades_after_peak = len(trade_pnls) - 1 - peak_pg_idx
+            min_peak = Decimal(str(ctx.thresholds.get("profit_giveaway_min_peak", 1000)))
+            if trades_after_peak >= 3 and peak_pg >= min_peak:
+                erosion_pg = peak_pg - running_pg
+                erosion_pct_pg = erosion_pg / peak_pg
+                if erosion_pct_pg >= Decimal("0.70"):
+                    return DetectedEvent(
+                        event_type="overtrading_burst",
+                        severity="danger",
+                        message=(
+                            f"Last {trades_after_peak} trades gave back "
+                            f"₹{float(erosion_pg):,.0f} ({float(erosion_pct_pg)*100:.0f}%) "
+                            f"of your ₹{float(peak_pg):,.0f} session peak — "
+                            f"session P&L now ₹{float(running_pg):,.0f}."
+                        ),
+                        context={
+                            "peak_pnl": round(float(peak_pg), 2),
+                            "current_pnl": round(float(running_pg), 2),
+                            "erosion": round(float(erosion_pg), 2),
+                            "erosion_pct": round(float(erosion_pct_pg), 2),
+                            "trades_after_peak": trades_after_peak,
+                            "daily_count": daily_count,
+                        },
+                    )
+                if erosion_pct_pg >= Decimal("0.50"):
+                    return DetectedEvent(
+                        event_type="overtrading_burst",
+                        severity="caution",
+                        message=(
+                            f"Last {trades_after_peak} trades gave back "
+                            f"₹{float(erosion_pg):,.0f} ({float(erosion_pct_pg)*100:.0f}%) "
+                            f"of your ₹{float(peak_pg):,.0f} session peak — "
+                            f"session P&L now ₹{float(running_pg):,.0f}."
+                        ),
+                        context={
+                            "peak_pnl": round(float(peak_pg), 2),
+                            "current_pnl": round(float(running_pg), 2),
+                            "erosion": round(float(erosion_pg), 2),
+                            "erosion_pct": round(float(erosion_pct_pg), 2),
+                            "trades_after_peak": trades_after_peak,
+                            "daily_count": daily_count,
+                        },
+                    )
+
         return None
 
     # ── Pattern 4: Size escalation after losses ───────────────────────────
@@ -845,7 +926,9 @@ class BehaviorEngine:
     def _detect_excess_exposure(self, ctx: EngineContext) -> Optional[DetectedEvent]:
         ct = ctx.completed_trade
         capital = ctx.thresholds.get("trading_capital")
-        if not capital or float(capital) < 10000:
+        # Require a known (non-zero) capital figure but drop the ₹10 000 floor —
+        # under-capitalised accounts are the ones most at risk of over-exposure.
+        if not capital or float(capital) <= 0:
             return None
 
         capital_at_risk = estimate_capital_at_risk(
@@ -1148,7 +1231,9 @@ class BehaviorEngine:
         avg_loser_hold  = sum(t.duration_minutes for t in losers)  / len(losers)
 
         ratio_threshold    = ctx.thresholds.get("early_exit_ratio", 0.40)
-        max_winner_min     = ctx.thresholds.get("early_exit_winner_max_min", 20)
+        # 60-min ceiling covers the classic 25-40 min winner / 2-4 hr loser
+        # disposition-effect pattern. 20 min was too tight and missed it entirely.
+        max_winner_min     = ctx.thresholds.get("early_exit_winner_max_min", 60)
 
         if avg_winner_hold < avg_loser_hold * ratio_threshold and avg_winner_hold < max_winner_min:
             ratio = avg_loser_hold / max(avg_winner_hold, 1)
@@ -1365,7 +1450,12 @@ class BehaviorEngine:
         if pnl >= 0:
             return None
 
-        hold_min = ct.duration_minutes or 0
+        # duration_minutes is None when entry/exit timestamps are missing — treat
+        # as "unknown hold time" and skip rather than defaulting to 0, which would
+        # pass the < 30 min threshold and produce a false positive.
+        if ct.duration_minutes is None:
+            return None
+        hold_min = ct.duration_minutes
         hold_threshold = ctx.thresholds.get("iv_crush_proxy_hold_min", 30)
         if hold_min >= hold_threshold:
             return None  # Held too long — theta decay, not IV crush

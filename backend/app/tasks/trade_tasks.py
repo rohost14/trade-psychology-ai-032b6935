@@ -123,23 +123,27 @@ def process_webhook_trade(self, trade_data: Dict[str, Any], broker_account_id: s
                     "status": trade_data.get("status"),
                 })
 
-                # Fetch fresh margin from Kite and push to frontend.
-                # Replaces useMargins.ts 30s polling — margin is pushed on every
-                # trade webhook so frontend always has up-to-date margin data.
+                # Push margin data to frontend.
+                # Cache TTL = 60s — serves all fills within same trading minute
+                # from cache, avoiding a REST call per fill during active sessions.
                 try:
                     from app.models.broker_account import BrokerAccount
                     from app.services.zerodha_service import zerodha_client, KiteTokenExpiredError
                     import json as _json
 
-                    account_record = await db.get(BrokerAccount, account_id)
-                    if account_record and account_record.access_token and not account_record.token_revoked_at:
-                        access_token = account_record.decrypt_token(account_record.access_token)
-                        margins = await zerodha_client.get_margins(access_token)
-                        # Cache in Redis for fast reads (5 min TTL)
-                        _r = _get_redis_client()
-                        _r.set(f"margin:{account_id}", _json.dumps(margins), ex=300)
-                        # Push to frontend via stream
-                        publish_event(str(account_id), "margin_update", margins)
+                    _r = _get_redis_client()
+                    _margin_key = f"margin:{account_id}"
+                    _cached = _r.get(_margin_key)
+                    if _cached:
+                        # Serve from cache — no REST call
+                        publish_event(str(account_id), "margin_update", _json.loads(_cached))
+                    else:
+                        account_record = await db.get(BrokerAccount, account_id)
+                        if account_record and account_record.access_token and not account_record.token_revoked_at:
+                            access_token = account_record.decrypt_token(account_record.access_token)
+                            margins = await zerodha_client.get_margins(access_token)
+                            _r.set(_margin_key, _json.dumps(margins), ex=60)
+                            publish_event(str(account_id), "margin_update", margins)
                 except KiteTokenExpiredError:
                     pass  # Token expired — margin update skipped, not an error
                 except Exception as _me:
@@ -327,7 +331,7 @@ def process_webhook_trade(self, trade_data: Dict[str, Any], broker_account_id: s
                         redis_client = _get_redis_client()
 
                     for attempt in range(3):
-                        behavior_lock_acquired = _acquire_lock(redis_client, behavior_lock_key, ttl_seconds=15)
+                        behavior_lock_acquired = _acquire_lock(redis_client, behavior_lock_key, ttl_seconds=60)
                         if behavior_lock_acquired:
                             break
                         import asyncio as _asyncio
@@ -585,7 +589,7 @@ async def run_risk_detection_async(broker_account_id: UUID, db, trigger_trade: T
                 alert.severity = "danger"
             db.add(alert)
             new_alerts.append(alert)
-            last_fired[alert.pattern_type] = now_utc
+            last_fired[alert.pattern_type] = latest_ct.exit_time or now_utc
             today_patterns.add(alert.pattern_type)
 
         await db.commit()
@@ -706,7 +710,7 @@ async def run_behavior_engine_full_session(broker_account_id: UUID, db) -> int:
                 alert.severity = "danger"
             db.add(alert)
             all_new_alerts.append(alert)
-            last_fired[alert.pattern_type] = now_utc
+            last_fired[alert.pattern_type] = ct.exit_time or now_utc
             today_patterns.add(alert.pattern_type)
 
     if all_new_alerts:

@@ -60,21 +60,17 @@ interface AIInsightsData {
   } | null;
 }
 
-const SEV_ORDER: Record<string, number> = { critical: 0, high: 1, medium: 2, low: 3, positive: 4 };
+const SEV_ORDER: Record<string, number> = { danger: 0, caution: 1, positive: 2 };
 
 const SEV_DOT: Record<string, string> = {
-  critical: 'bg-tm-loss',
-  high: 'bg-tm-loss',
-  medium: 'bg-tm-obs',
-  low: 'bg-slate-400',
+  danger:   'bg-tm-loss',
+  caution:  'bg-tm-obs',
   positive: 'bg-tm-profit',
 };
 
 const SEV_LABEL: Record<string, string> = {
-  critical: 'text-tm-loss',
-  high: 'text-tm-loss',
-  medium: 'text-tm-obs',
-  low: 'text-muted-foreground',
+  danger:   'text-tm-loss',
+  caution:  'text-tm-obs',
   positive: 'text-tm-profit',
 };
 

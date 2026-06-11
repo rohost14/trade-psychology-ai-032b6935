@@ -19,7 +19,7 @@ Equity:           {underlying}  (e.g. RELIANCE, INFY)
 """
 import re
 from dataclasses import dataclass
-from datetime import date
+from datetime import date, timedelta
 from typing import Optional
 
 
@@ -162,19 +162,21 @@ def same_expiry(a: ParsedSymbol, b: ParsedSymbol) -> bool:
 
 def _last_thursday_of_month(year: int, month: int) -> date:
     """
-    Return the last Thursday of the given month.
+    Return the NSE monthly F&O expiry date for the given month.
 
-    This is the default NSE monthly F&O expiry date when there is no holiday.
-    A full trading-calendar integration would adjust for holidays, but this is
-    dramatically more accurate than hardcoding weekday() == 3.
+    Normally this is the last Thursday. When the last Thursday is a trading
+    holiday, NSE moves expiry one calendar day earlier (usually to Wednesday).
+    Walks back until it lands on a trading day.
     """
     import calendar as _cal
-    # Find the last day of the month
+    from app.core.market_hours import is_trading_holiday
     last_day = _cal.monthrange(year, month)[1]
     d = date(year, month, last_day)
-    # Walk backwards until we hit Thursday (weekday 3)
     while d.weekday() != 3:
         d = date(year, month, d.day - 1)
+    # If last Thursday is a holiday, move expiry to prior trading day
+    while is_trading_holiday(d):
+        d -= timedelta(days=1)
     return d
 
 

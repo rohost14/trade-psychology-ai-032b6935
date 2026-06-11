@@ -225,7 +225,6 @@ async def process_trade_sync(trade_data: dict, broker_account_id: UUID, db: Asyn
     """
     from app.services.trade_sync_service import TradeSyncService
     from app.utils.trade_classifier import classify_trade
-    from app.services.risk_detector import RiskDetector
     from app.models.trade import Trade
 
     # Classify and transform
@@ -245,22 +244,5 @@ async def process_trade_sync(trade_data: dict, broker_account_id: UUID, db: Asyn
     except Exception as e:
         logger.error(f"Failed to sync positions in webhook fallback: {e}")
 
-    # Risk detection for COMPLETE trades
-
-    if trade_data.get("status") == "COMPLETE":
-        result = await db.execute(
-            select(Trade).where(Trade.order_id == trade_data["order_id"])
-        )
-        saved_trade = result.scalar_one_or_none()
-
-        risk_detector = RiskDetector()
-        alerts = await risk_detector.detect_patterns(
-            broker_account_id, db, trigger_trade=saved_trade
-        )
-
-        for alert in alerts:
-            db.add(alert)
-        await db.commit()
-
-        if alerts:
-            logger.warning(f"Risk alerts created: {len(alerts)}")
+    # BehaviorEngine runs via Celery on COMPLETE trades (process_webhook_trade task).
+    # Dev fallback: no inline detection — alerts fire on next manual sync.

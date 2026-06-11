@@ -2,12 +2,13 @@
 Admin authentication — email + password → OTP → JWT.
 Completely independent of Zerodha OAuth.
 """
-import random
+import secrets
 import string
 import logging
 from datetime import datetime, timezone, timedelta
 
 from fastapi import APIRouter, HTTPException, Depends, Request
+from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from pydantic import BaseModel, EmailStr
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, update
@@ -19,6 +20,8 @@ from app.core.config import settings
 from app.models.admin_user import AdminUser
 from app.api.admin.deps import get_current_admin
 from app.core.rate_limiter import admin_login_limiter, admin_otp_limiter
+
+_bearer_logout = HTTPBearer(auto_error=False)
 
 router = APIRouter()
 logger = logging.getLogger(__name__)
@@ -39,7 +42,10 @@ def _redis():
 
 
 def _make_otp() -> str:
-    return "".join(random.choices(string.digits, k=6))
+    return "".join(secrets.choice(string.digits) for _ in range(6))
+
+
+BLOCKLIST_PREFIX = "admin_jti_block:"
 
 
 def _make_admin_jwt(admin: AdminUser) -> str:
@@ -48,7 +54,13 @@ def _make_admin_jwt(admin: AdminUser) -> str:
         raise RuntimeError("ADMIN_JWT_SECRET not configured")
     expire = datetime.now(timezone.utc) + timedelta(hours=settings.ADMIN_JWT_EXPIRE_HOURS)
     return jwt.encode(
-        {"sub": str(admin.id), "email": admin.email, "name": admin.name, "exp": expire},
+        {
+            "sub": str(admin.id),
+            "email": admin.email,
+            "name": admin.name,
+            "exp": expire,
+            "jti": secrets.token_hex(16),   # unique token ID for blocklist on logout
+        },
         secret,
         algorithm="HS256",
     )
@@ -205,6 +217,23 @@ async def admin_me(payload: dict = Depends(get_current_admin)):
 
 
 @router.post("/logout")
-async def admin_logout():
-    """Client-side logout — just acknowledge. Token is stateless (JWT)."""
+async def admin_logout(
+    credentials: HTTPAuthorizationCredentials = Depends(_bearer_logout),
+    payload: dict = Depends(get_current_admin),
+):
+    """
+    Invalidate the current admin JWT server-side.
+    Stores the token's jti in Redis with TTL = remaining expiry so the
+    blocklist self-cleans — no manual pruning needed.
+    """
+    jti = payload.get("jti")
+    exp = payload.get("exp")
+    if jti and exp:
+        try:
+            ttl = int(exp - datetime.now(timezone.utc).timestamp())
+            if ttl > 0:
+                r = _redis()
+                r.setex(f"{BLOCKLIST_PREFIX}{jti}", ttl, "1")
+        except Exception as _e:
+            logger.warning(f"Logout blocklist write failed (non-fatal): {_e}")
     return {"status": "ok"}

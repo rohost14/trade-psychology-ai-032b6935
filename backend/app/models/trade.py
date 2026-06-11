@@ -50,9 +50,11 @@ class Trade(Base):
     status_message: Mapped[str] = mapped_column(String, nullable=True)
 
     # Classification (Computed)
-    asset_class: Mapped[str] = mapped_column(String)
-    instrument_type: Mapped[str] = mapped_column(String)
-    product_type: Mapped[str] = mapped_column(String)
+    # Python defaults guard against NOT NULL violations if classify_trade() raises —
+    # the trade is saved with a safe placeholder rather than being silently dropped.
+    asset_class: Mapped[str] = mapped_column(String, default="UNKNOWN")
+    instrument_type: Mapped[str] = mapped_column(String, default="UNKNOWN")
+    product_type: Mapped[str] = mapped_column(String, default="NRML")
     segment: Mapped[Optional[str]] = mapped_column(String(20), nullable=True)
 
     # Financials

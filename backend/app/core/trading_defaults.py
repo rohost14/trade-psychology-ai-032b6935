@@ -108,8 +108,6 @@ COLD_START_DEFAULTS: Dict[str, Any] = {
     'no_stoploss_loss_pct_danger':      50,   # > 50% premium loss = danger
     'no_stoploss_expiry_hold_min':      5,    # expiry day: same 5 min minimum
     'no_stoploss_expiry_loss_pct':      25,   # expiry day: same 25% loss threshold
-    'no_stoploss_monthly_hold_min':     5,
-    'no_stoploss_monthly_loss_pct':     20,
 
     # ── FOMO entry (scattering across instruments) ─────────────────────────
     # FOMO is NOT time-of-day specific — it's about scattering.

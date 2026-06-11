@@ -8,65 +8,53 @@
 import type { PatternSeverity } from '@/types/patterns';
 
 export const SEV_DOT: Record<PatternSeverity, string> = {
-  critical: 'bg-tm-loss',
-  high:     'bg-tm-loss/70',
-  medium:   'bg-tm-obs',
-  low:      'bg-muted-foreground/40',
+  danger:   'bg-tm-loss',
+  caution:  'bg-tm-obs',
+  positive: 'bg-tm-profit',
 };
 
 export const SEV_LABEL: Record<PatternSeverity, string> = {
-  critical: 'Critical',
-  high:     'High',
-  medium:   'Caution',
-  low:      'Info',
+  danger:   'Danger',
+  caution:  'Caution',
+  positive: 'Positive',
 };
 
 export const SEV_LABEL_COLOR: Record<PatternSeverity, string> = {
-  critical: 'text-tm-loss',
-  high:     'text-tm-loss',
-  medium:   'text-tm-obs',
-  low:      'text-muted-foreground',
+  danger:   'text-tm-loss',
+  caution:  'text-tm-obs',
+  positive: 'text-tm-profit',
 };
 
 /** 3px left border — wider than 2px for clear visual anchor */
 export const SEV_LEFT_BORDER: Record<PatternSeverity, string> = {
-  critical: 'border-l-tm-loss',
-  high:     'border-l-tm-loss',
-  medium:   'border-l-tm-obs',
-  low:      'border-l-border',
+  danger:   'border-l-tm-loss',
+  caution:  'border-l-tm-obs',
+  positive: 'border-l-tm-profit',
 };
 
 /** Background tint for rows — paired with SEV_LEFT_BORDER */
 export const SEV_ROW_BG: Record<PatternSeverity, string> = {
-  critical: 'bg-tm-status-danger/[0.05]',
-  high:     'bg-tm-status-danger/[0.04]',
-  medium:   'bg-tm-status-caution/[0.05]',
-  low:      '',
+  danger:   'bg-tm-status-danger/[0.05]',
+  caution:  'bg-tm-status-caution/[0.05]',
+  positive: '',
 };
 
-/**
- * Returns dot class for an alert severity.
- * Accepts both PatternSeverity values and raw backend strings ('danger', 'caution', 'positive').
- */
+/** Normalise any raw backend or legacy severity string to a PatternSeverity. */
+export function normalizeSeverityStr(sev: string): PatternSeverity {
+  const s = sev.toLowerCase();
+  if (s === 'danger' || s === 'critical' || s === 'high') return 'danger';
+  if (s === 'positive') return 'positive';
+  return 'caution'; // caution / medium / low / unknown
+}
+
 export function severityDotClass(sev: string): string {
-  if (sev === 'critical' || sev === 'danger') return 'bg-tm-loss';
-  if (sev === 'high') return 'bg-tm-loss/70';
-  if (sev === 'medium' || sev === 'caution') return 'bg-tm-obs';
-  if (sev === 'positive') return 'bg-tm-profit';
-  return 'bg-muted-foreground/40';
+  return SEV_DOT[normalizeSeverityStr(sev)] ?? 'bg-muted-foreground/40';
 }
 
-/** Row background tint based on string severity */
 export function severityRowBg(sev: string): string {
-  if (sev === 'critical' || sev === 'danger') return 'bg-tm-status-danger/[0.05]';
-  if (sev === 'high') return 'bg-tm-status-danger/[0.04]';
-  if (sev === 'medium' || sev === 'caution') return 'bg-tm-status-caution/[0.05]';
-  return '';
+  return SEV_ROW_BG[normalizeSeverityStr(sev)] ?? '';
 }
 
-/** 3px left border color class based on string severity */
 export function severityBorderClass(sev: string): string {
-  if (sev === 'critical' || sev === 'danger' || sev === 'high') return 'border-l-tm-loss';
-  if (sev === 'medium' || sev === 'caution') return 'border-l-tm-obs';
-  return 'border-l-transparent';
+  return SEV_LEFT_BORDER[normalizeSeverityStr(sev)] ?? 'border-l-transparent';
 }

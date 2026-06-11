@@ -1,6 +1,6 @@
 from pydantic_settings import BaseSettings, SettingsConfigDict
 from typing import Optional
-from pydantic import Field
+from pydantic import Field, model_validator
 
 class Settings(BaseSettings):
     PROJECT_NAME: str = "TradeMentor AI"
@@ -50,6 +50,17 @@ class Settings(BaseSettings):
 
     # Sentry error tracking — create free account at sentry.io, set DSN in .env
     SENTRY_DSN: Optional[str] = None
+
+    @model_validator(mode="after")
+    def _validate_production_settings(self) -> "Settings":
+        if self.ENVIRONMENT != "development" and "localhost" in self.REDIS_URL:
+            raise ValueError(
+                "REDIS_URL is pointing to localhost in a non-development environment. "
+                "Set REDIS_URL to your Redis provider URL (e.g. Upstash "
+                "rediss://default:PASSWORD@HOST:PORT). "
+                "Failing fast to prevent silent connection failures on startup."
+            )
+        return self
 
     @property
     def celery_broker(self) -> str:

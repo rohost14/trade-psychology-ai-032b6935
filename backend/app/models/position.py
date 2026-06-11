@@ -1,4 +1,4 @@
-from sqlalchemy import Column, String, Integer, BigInteger, Numeric, DateTime, ARRAY, ForeignKey
+from sqlalchemy import Column, String, Integer, BigInteger, Numeric, DateTime, ARRAY, ForeignKey, UniqueConstraint
 from sqlalchemy.dialects.postgresql import UUID
 import uuid
 from datetime import datetime, timezone
@@ -7,6 +7,12 @@ from app.core.database import Base
 
 class Position(Base):
     __tablename__ = "positions"
+    __table_args__ = (
+        UniqueConstraint(
+            'broker_account_id', 'tradingsymbol', 'exchange', 'product',
+            name='uq_position_account_symbol_exchange_product'
+        ),
+    )
 
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     broker_account_id = Column(UUID(as_uuid=True), ForeignKey("broker_accounts.id", ondelete="CASCADE"), nullable=False, index=True)

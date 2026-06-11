@@ -128,6 +128,8 @@ export default function BlowupShieldPage() {
   useEffect(() => {
     if (!account?.id) { setLoading(false); return; }
 
+    const controller = new AbortController();
+
     async function fetchShieldData(force = false) {
       const now = Date.now();
       if (
@@ -145,10 +147,11 @@ export default function BlowupShieldPage() {
       try {
         setLoading(true);
         const [summaryRes, timelineRes, patternsRes] = await Promise.all([
-          api.get<ShieldSummary>('/api/shield/summary'),
-          api.get<{ timeline: ShieldTimelineItem[] }>('/api/shield/timeline?limit=50'),
-          api.get<{ patterns: PatternBreakdown[] }>('/api/shield/patterns'),
+          api.get<ShieldSummary>('/api/shield/summary', { signal: controller.signal }),
+          api.get<{ timeline: ShieldTimelineItem[] }>('/api/shield/timeline?limit=50', { signal: controller.signal }),
+          api.get<{ patterns: PatternBreakdown[] }>('/api/shield/patterns', { signal: controller.signal }),
         ]);
+        if (controller.signal.aborted) return;
         const fresh = {
           summary: summaryRes.data,
           timeline: timelineRes.data.timeline,
@@ -161,11 +164,11 @@ export default function BlowupShieldPage() {
         setTimeline(fresh.timeline);
         setPatterns(fresh.patterns);
         setError(null);
-      } catch (err) {
-        console.error('Failed to fetch shield data:', err);
+      } catch (err: any) {
+        if (err?.code === 'ERR_CANCELED') return;
         setError('Failed to load protection data');
       } finally {
-        setLoading(false);
+        if (!controller.signal.aborted) setLoading(false);
       }
     }
 
@@ -175,7 +178,10 @@ export default function BlowupShieldPage() {
       if (document.visibilityState === 'visible') fetchShieldData();
     };
     document.addEventListener('visibilitychange', onVisible);
-    return () => document.removeEventListener('visibilitychange', onVisible);
+    return () => {
+      controller.abort();
+      document.removeEventListener('visibilitychange', onVisible);
+    };
   }, [account?.id]);
 
   if (loading) {

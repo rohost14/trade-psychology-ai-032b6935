@@ -7,6 +7,7 @@ import base64
 import urllib.parse
 from typing import Any, Optional
 from uuid import UUID
+from weakref import WeakValueDictionary
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from fastapi import APIRouter, Depends, HTTPException
@@ -62,16 +63,20 @@ def _store_auth_code(jwt_token: str, broker_account_id: str) -> str:
     return code
 
 
-# Sync lock to prevent concurrent sync calls per account
-_sync_locks: dict[str, asyncio.Lock] = {}
+# Sync lock to prevent concurrent sync calls per account.
+# WeakValueDictionary: entries are GC'd automatically when no coroutine holds
+# or awaits the lock — dict never grows beyond the number of active syncs.
+_sync_locks: WeakValueDictionary = WeakValueDictionary()
 _sync_locks_lock = asyncio.Lock()
 
 async def _get_sync_lock(account_id: str) -> asyncio.Lock:
     """Get or create a per-account sync lock."""
     async with _sync_locks_lock:
-        if account_id not in _sync_locks:
-            _sync_locks[account_id] = asyncio.Lock()
-        return _sync_locks[account_id]
+        lock = _sync_locks.get(account_id)
+        if lock is None:
+            lock = asyncio.Lock()
+            _sync_locks[account_id] = lock
+        return lock
 
 
 # =============================================================================
@@ -119,7 +124,10 @@ class SetupCredentialsRequest(BaseModel):
 
 
 @router.post("/setup-credentials")
-async def setup_credentials(request: SetupCredentialsRequest) -> Any:
+async def setup_credentials(
+    request: SetupCredentialsRequest,
+    _: None = Depends(general_limiter),
+) -> Any:
     """
     Store a user's personal KiteConnect api_key + api_secret in Redis (30-min TTL).
     Returns a setup_token to pass to /connect so the OAuth flow uses their credentials.
@@ -180,11 +188,26 @@ async def connect_zerodha(
             raise HTTPException(status_code=503, detail="Service temporarily unavailable")
 
         client = ZerodhaClient(api_key=creds["api_key"], api_secret=creds["api_secret"])
-        # Encode the setup_token into state so callback can retrieve credentials
-        state = f"setup:{setup_token}"
+        # CSRF nonce — stored value is the setup_token so callback can retrieve creds
+        csrf_nonce = secrets.token_urlsafe(16)
+        state = f"setup:{csrf_nonce}"
+        _state_value = setup_token
     else:
         client = zerodha_client
-        state = user_id if user_id else "anonymous"
+        csrf_nonce = secrets.token_urlsafe(16)
+        state = csrf_nonce
+        _state_value = "regular"
+
+    # Persist nonce in Redis (120 s TTL — covers the Zerodha login page round-trip).
+    # Callback validates and deletes it atomically; unmatched state = CSRF rejection.
+    try:
+        import redis as redis_lib
+        _sr = redis_lib.from_url(settings.REDIS_URL, decode_responses=True)
+        _sr.setex(f"oauth_state:{csrf_nonce}", 120, _state_value)
+        _sr.close()
+    except Exception as e:
+        logger.error(f"Redis error storing OAuth state nonce: {e}")
+        raise HTTPException(status_code=503, detail="Service temporarily unavailable")
 
     login_url = client.generate_login_url(callback_uri, state=state)
     return {"login_url": login_url}
@@ -202,16 +225,52 @@ async def zerodha_callback(
     if status != "success":
         return RedirectResponse(url=f"{frontend_url}/settings?error=OAuth+failed+or+cancelled", status_code=302)
 
-    # Detect per-user credentials flow
+    # ── CSRF validation ───────────────────────────────────────────────────────
+    # state is a random nonce generated in /connect and stored in Redis (120 s TTL).
+    # We validate and atomically delete it so it can only be used once.
+    if not state:
+        return RedirectResponse(
+            url=f"{frontend_url}/settings?error=OAuth+session+missing+%E2%80%94+please+try+again",
+            status_code=302,
+        )
+
+    _is_setup_flow = state.startswith("setup:")
+    _csrf_nonce = state[len("setup:"):] if _is_setup_flow else state
+
+    try:
+        import redis as redis_lib
+        import json as _json
+        _r = redis_lib.from_url(settings.REDIS_URL, decode_responses=True)
+        _pipe = _r.pipeline()
+        _pipe.get(f"oauth_state:{_csrf_nonce}")
+        _pipe.delete(f"oauth_state:{_csrf_nonce}")
+        _stored_value, _ = _pipe.execute()
+        _r.close()
+    except Exception as e:
+        logger.error(f"Redis error validating OAuth state nonce: {e}")
+        return RedirectResponse(
+            url=f"{frontend_url}/settings?error=Authentication+service+unavailable+%E2%80%94+please+try+again",
+            status_code=302,
+        )
+
+    if _stored_value is None:
+        # Nonce not found — expired (>120 s), already used, or forged state parameter.
+        logger.warning(f"OAuth callback rejected: state nonce '{_csrf_nonce[:8]}…' not found in Redis")
+        return RedirectResponse(
+            url=f"{frontend_url}/settings?error=OAuth+session+expired+%E2%80%94+please+try+connecting+again",
+            status_code=302,
+        )
+
+    # ── Resolve per-user credentials (setup flow) ─────────────────────────────
     _personal_api_key: Optional[str] = None
     _personal_api_secret: Optional[str] = None
-    if state and state.startswith("setup:"):
-        _setup_token = state[len("setup:"):]
+    if _is_setup_flow:
+        # stored_value IS the original setup_token; use it to fetch credentials
+        _setup_token = _stored_value
         try:
-            import redis as redis_lib
-            import json as _json
-            _r = redis_lib.from_url(settings.REDIS_URL, decode_responses=True)
-            _raw = _r.get(f"zerodha_creds:{_setup_token}")
+            _r2 = redis_lib.from_url(settings.REDIS_URL, decode_responses=True)
+            _raw = _r2.get(f"zerodha_creds:{_setup_token}")
+            _r2.close()
             if _raw:
                 _creds = _json.loads(_raw)
                 _personal_api_key = _creds.get("api_key")
@@ -376,8 +435,23 @@ async def zerodha_callback(
 
     except Exception as e:
         logger.error(f"OAuth callback error: {e}", exc_info=True)
-        error_msg = urllib.parse.quote(str(e))
-        return RedirectResponse(url=f"{frontend_url}/settings?error={error_msg}", status_code=302)
+        # Map exception types to safe messages — never expose internal details in a redirect URL
+        from app.services.zerodha_service import (
+            KiteTokenExpiredError, KiteAuthError, KiteNetworkError, KiteAPIError
+        )
+        if isinstance(e, KiteTokenExpiredError):
+            safe_msg = "Token+exchange+failed+%E2%80%94+please+try+connecting+again"
+        elif isinstance(e, KiteAuthError):
+            safe_msg = "Zerodha+authentication+failed+%E2%80%94+check+your+API+credentials"
+        elif isinstance(e, KiteNetworkError):
+            safe_msg = "Could+not+reach+Zerodha+%E2%80%94+please+try+again"
+        elif isinstance(e, KiteAPIError):
+            safe_msg = "Zerodha+API+error+%E2%80%94+please+try+again"
+        elif isinstance(e, ValueError):
+            safe_msg = "Invalid+response+from+Zerodha+%E2%80%94+please+try+again"
+        else:
+            safe_msg = "Connection+failed+%E2%80%94+please+try+again"
+        return RedirectResponse(url=f"{frontend_url}/settings?error={safe_msg}", status_code=302)
 
 @router.get("/test")
 async def test_zerodha_config(
@@ -816,63 +890,7 @@ async def sync_all_data(
             )
             _trader_profile = _profile_result.scalar_one_or_none()
 
-            # 1. Legacy risk detection (feeds risk_alerts for existing frontend)
-            try:
-                from app.services.risk_detector import RiskDetector
-                from app.models.risk_alert import RiskAlert
-                from sqlalchemy import and_
-
-                risk_detector = RiskDetector()
-                alerts = await risk_detector.detect_patterns(broker_account_id, db, profile=_trader_profile)
-
-                cutoff_24h = datetime.now(timezone.utc) - timedelta(hours=24)
-                existing_result = await db.execute(
-                    select(RiskAlert).where(
-                        and_(
-                            RiskAlert.broker_account_id == broker_account_id,
-                            RiskAlert.detected_at >= cutoff_24h
-                        )
-                    )
-                )
-                existing_keys = set()
-                for ea in existing_result.scalars().all():
-                    if ea.trigger_trade_id:
-                        existing_keys.add((str(ea.trigger_trade_id), ea.pattern_type))
-                    else:
-                        # Account-level alerts (no trigger trade) — dedup by type
-                        existing_keys.add(("_account_", ea.pattern_type))
-
-                added_count = 0
-                new_sync_alerts = []
-                for alert in alerts:
-                    if alert.trigger_trade_id:
-                        key = (str(alert.trigger_trade_id), alert.pattern_type)
-                    else:
-                        key = ("_account_", alert.pattern_type)
-                    if key in existing_keys:
-                        continue
-                    db.add(alert)
-                    new_sync_alerts.append(alert)
-                    existing_keys.add(key)
-                    added_count += 1
-
-                if added_count > 0:
-                    await db.commit()
-                results["risk_alerts"] = added_count
-
-                # Trigger AlertCheckpoint for newly-added danger/critical alerts
-                from app.tasks.checkpoint_tasks import create_alert_checkpoint
-                for alert in new_sync_alerts:
-                    if alert.severity in ("danger", "critical"):
-                        create_alert_checkpoint.apply_async(
-                            args=[str(alert.id), str(broker_account_id)],
-                            countdown=10,
-                        )
-            except Exception as e:
-                logger.error(f"Legacy risk detection failed (non-fatal): {e}")
-                results["risk_detection_error"] = str(e)
-
-            # 1b. BehaviorEngine — full session replay for bulk-synced trades.
+            # BehaviorEngine — full session replay for bulk-synced trades.
             # Replays engine on EACH of today's CompletedTrades in order so patterns
             # like consecutive_loss_streak and options_premium_avg_down fire correctly
             # even when the user was not in the app during trading (trades arrived via REST

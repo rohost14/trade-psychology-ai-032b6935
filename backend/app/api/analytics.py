@@ -122,11 +122,13 @@ async def get_progress_tracking(
     from app.models.trade import Trade
     from app.models.risk_alert import RiskAlert
 
-    try:
-        now = datetime.now(timezone.utc)
+    IST = timezone(timedelta(hours=5, minutes=30))
 
-        # Calculate week boundaries
-        today = now.date()
+    try:
+        now_ist = datetime.now(IST)
+
+        # Week boundaries in IST — Indian market weeks are Mon–Fri IST
+        today = now_ist.date()
         this_week_start = today - timedelta(days=today.weekday())
         last_week_start = this_week_start - timedelta(days=7)
         last_week_end = this_week_start
@@ -134,12 +136,11 @@ async def get_progress_tracking(
         # Helper to get stats for a period
         async def get_period_stats(start_date, end_date):
             trades_result = await db.execute(
-                select(Trade).where(
+                select(CompletedTrade).where(
                     and_(
-                        Trade.broker_account_id == broker_account_id,
-                        Trade.order_timestamp >= datetime.combine(start_date, datetime.min.time()),
-                        Trade.order_timestamp < datetime.combine(end_date, datetime.min.time()),
-                        Trade.status == 'COMPLETE'
+                        CompletedTrade.broker_account_id == broker_account_id,
+                        CompletedTrade.exit_time >= datetime.combine(start_date, datetime.min.time()).replace(tzinfo=IST),
+                        CompletedTrade.exit_time < datetime.combine(end_date, datetime.min.time()).replace(tzinfo=IST),
                     )
                 )
             )
@@ -156,7 +157,7 @@ async def get_progress_tracking(
                     "avg_loss": 0,
                 }
 
-            pnls = [float(t.pnl or 0) for t in trades]
+            pnls = [float(t.realized_pnl or 0) for t in trades]
             winners = [p for p in pnls if p > 0]
             losers = [p for p in pnls if p < 0]
 
@@ -180,8 +181,8 @@ async def get_progress_tracking(
                 select(func.count(RiskAlert.id)).where(
                     and_(
                         RiskAlert.broker_account_id == broker_account_id,
-                        RiskAlert.detected_at >= datetime.combine(start_date, datetime.min.time()),
-                        RiskAlert.detected_at < datetime.combine(end_date, datetime.min.time()),
+                        RiskAlert.detected_at >= datetime.combine(start_date, datetime.min.time()).replace(tzinfo=IST),
+                        RiskAlert.detected_at < datetime.combine(end_date, datetime.min.time()).replace(tzinfo=IST),
                         RiskAlert.severity.in_(['danger', 'critical'])
                     )
                 )
@@ -221,35 +222,45 @@ async def get_progress_tracking(
 
 
 async def _get_discipline_streaks(account_id: UUID, db: AsyncSession):
-    """Calculate discipline streaks."""
+    """Calculate discipline streaks from alert history."""
     from datetime import datetime, timedelta, timezone
     from sqlalchemy import select, and_
     from app.models.risk_alert import RiskAlert
 
     try:
-        # Get all danger alerts in last 30 days
-        thirty_days_ago = datetime.now(timezone.utc) - timedelta(days=30)
+        # Look back 180 days to compute a meaningful best_streak
+        cutoff = datetime.now(timezone.utc) - timedelta(days=180)
         result = await db.execute(
             select(RiskAlert.detected_at).where(
                 and_(
                     RiskAlert.broker_account_id == account_id,
-                    RiskAlert.detected_at >= thirty_days_ago,
+                    RiskAlert.detected_at >= cutoff,
                     RiskAlert.pattern_type.in_(['revenge_trading', 'tilt', 'overtrading', 'martingale'])
                 )
-            ).order_by(RiskAlert.detected_at.desc())
+            ).order_by(RiskAlert.detected_at.asc())
         )
-        alert_dates = [r[0].date() for r in result.fetchall()]
+        # Deduplicate to one entry per calendar day (multiple alerts same day = one bad day)
+        alert_dates = sorted({r[0].date() for r in result.fetchall()})
 
-        # Calculate days since last bad pattern
+        today = datetime.now(timezone.utc).date()
+
         if not alert_dates:
-            days_clean = 30
+            current_streak = 180
+            best_streak = 180
         else:
-            days_clean = (datetime.now(timezone.utc).date() - alert_dates[0]).days
+            current_streak = (today - alert_dates[-1]).days
+
+            # Best streak = longest gap between consecutive bad days (or from start of window)
+            # Gaps to evaluate: [cutoff.date() → first alert] + [alert[i] → alert[i+1]] + [last alert → today]
+            window_start = cutoff.date()
+            boundaries = [window_start] + alert_dates + [today]
+            gaps = [(boundaries[i + 1] - boundaries[i]).days for i in range(len(boundaries) - 1)]
+            best_streak = max(gaps) if gaps else current_streak
 
         return {
-            "days_without_revenge": days_clean,
-            "current_streak": days_clean,
-            "best_streak": max(days_clean, 7),  # Simplified - would need history
+            "days_without_revenge": current_streak,
+            "current_streak": current_streak,
+            "best_streak": best_streak,
         }
     except Exception:
         return {"days_without_revenge": 0, "current_streak": 0, "best_streak": 0}
@@ -301,7 +312,7 @@ async def get_analytics_overview(
 
         avg_win = sum(winners) / len(winners) if winners else 0
         avg_loss = sum(losers) / len(losers) if losers else 0
-        profit_factor = (sum(winners) / abs(sum(losers))) if losers else 0
+        profit_factor = round(sum(winners) / abs(sum(losers)), 2) if losers else None
         expectancy = total_pnl / len(trades) if trades else 0
 
         # Win/loss streaks
@@ -395,7 +406,7 @@ async def get_analytics_overview(
                 "win_rate": round((len(winners) / len(trades)) * 100, 1) if trades else 0,
                 "avg_win": round(avg_win, 2),
                 "avg_loss": round(avg_loss, 2),
-                "profit_factor": round(profit_factor, 2),
+                "profit_factor": profit_factor,
                 "expectancy": round(expectancy, 2),
                 "best_day": best_day,
                 "worst_day": worst_day,
@@ -678,8 +689,11 @@ async def get_analytics_risk_metrics(
             mean_daily = sum(daily_pnls) / len(daily_pnls)
             variance = sum((x - mean_daily) ** 2 for x in daily_pnls) / (len(daily_pnls) - 1)
             daily_volatility = round(math.sqrt(variance), 2)
-            # VaR at 95%: 5th percentile of daily P&L
-            idx_5 = max(0, int(len(daily_pnls) * 0.05))
+            # VaR at 95%: 5th percentile of daily P&L (lower-bound convention).
+            # int(N * 0.05) overshoots by 1 for small N (e.g. N=20 gives idx=1,
+            # but only 1 day belongs in the 5% tail). int((N-1) * 0.05) matches
+            # numpy percentile(interpolation='lower') for all N.
+            idx_5 = max(0, int((len(daily_pnls) - 1) * 0.05))
             var_95 = round(daily_pnls[idx_5], 2)
 
         # --- Drawdown calculation ---
@@ -688,11 +702,13 @@ async def get_analytics_risk_metrics(
         max_drawdown = 0
         max_dd_start = None
         max_dd_end = None
-        current_dd_start = None
         drawdown_periods = []
         current_dd_depth = 0
 
         sorted_daily = sorted(daily_pnl_map.items())
+        # If the first day is a loss, current_dd_start must be initialised to
+        # that day — otherwise it stays None and drawdown_periods gets a null start.
+        current_dd_start = sorted_daily[0][0] if sorted_daily else None
         for date_str, day_pnl in sorted_daily:
             cumulative += day_pnl
             if cumulative > peak:
@@ -1094,7 +1110,7 @@ async def get_ai_summary(
                     "total_pnl": sum(pnls),
                     "total_trades": len(trades),
                     "win_rate": round((len(winners) / len(trades)) * 100, 1) if trades else 0,
-                    "profit_factor": round(sum(winners) / abs(sum(losers)), 2) if losers else 0,
+                    "profit_factor": round(sum(winners) / abs(sum(losers)), 2) if losers else None,
                     "expectancy": round(sum(pnls) / len(trades), 2) if trades else 0,
                     "largest_win": max(pnls) if pnls else 0,
                     "largest_loss": min(pnls) if pnls else 0,
@@ -1974,7 +1990,7 @@ async def get_instrument_analytics(
         avg_loss = round(sum(float(t.realized_pnl) for t in losses) / len(losses), 2) if losses else 0
         gross_profit = sum(float(t.realized_pnl) for t in wins)
         gross_loss = abs(sum(float(t.realized_pnl) for t in losses))
-        profit_factor = round(gross_profit / gross_loss, 2) if gross_loss > 0 else 0
+        profit_factor = round(gross_profit / gross_loss, 2) if gross_loss > 0 else None
         avg_hold = round(sum(t.duration_minutes or 0 for t in trades) / len(trades))
 
         # ── Option type split (CE / PE / FUT / EQ) ────────────────────────

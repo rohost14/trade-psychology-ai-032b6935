@@ -24,7 +24,7 @@ export type PatternType =
   | 'options_premium_avg_down'
   | 'iv_crush_behavior';
 
-export type PatternSeverity = 'low' | 'medium' | 'high' | 'critical';
+export type PatternSeverity = 'danger' | 'caution' | 'positive';
 
 export interface BehaviorPattern {
   id: string;

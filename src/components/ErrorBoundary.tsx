@@ -3,6 +3,7 @@ import * as Sentry from '@sentry/react';
 
 interface Props {
   children: ReactNode;
+  fallback?: ReactNode;
 }
 
 interface State {
@@ -30,6 +31,7 @@ export class ErrorBoundary extends Component<Props, State> {
 
   render() {
     if (this.state.hasError) {
+      if (this.props.fallback) return this.props.fallback;
       const isDev = import.meta.env.DEV;
       return (
         <div className="min-h-screen flex items-center justify-center bg-background p-8">

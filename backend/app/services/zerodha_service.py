@@ -53,27 +53,56 @@ class KiteNetworkError(KiteAPIError):
 
 class RateLimiter:
     """
-    Simple rate limiter for Kite API.
-    Kite allows 3 requests/second.
+    Redis-backed global rate limiter for Kite API (3 req/sec per API key).
+    Shared across all Celery/uvicorn workers — prevents multi-worker bursts
+    from exceeding Zerodha's limit and getting the API key banned.
+    Falls back to in-process throttle if Redis is unavailable.
     """
+
     def __init__(self, calls_per_second: float = 3.0):
-        self.calls_per_second = calls_per_second
-        self.min_interval = 1.0 / calls_per_second
-        self.last_call_time = 0.0
-        self._lock = asyncio.Lock()
+        self.max_calls = int(calls_per_second)
+        self._fallback_interval = 1.0 / calls_per_second
+        self._fallback_last = 0.0
+        self._fallback_lock = asyncio.Lock()
 
     async def acquire(self):
-        """Wait if necessary to respect rate limit"""
-        async with self._lock:
-            now = time.time()
-            elapsed = now - self.last_call_time
-            if elapsed < self.min_interval:
-                wait_time = self.min_interval - elapsed
-                await asyncio.sleep(wait_time)
-            self.last_call_time = time.time()
+        """Block until a Kite API slot is available (global across all workers)."""
+        try:
+            import redis as redis_lib
+            from app.core.config import settings as _settings
+
+            while True:
+                now = time.time()
+                window_start = now - 1.0
+                member = f"{now:.9f}"
+
+                r = redis_lib.from_url(_settings.REDIS_URL, socket_connect_timeout=1)
+                pipe = r.pipeline()
+                pipe.zremrangebyscore("kite_api_rate", "-inf", window_start)
+                pipe.zcard("kite_api_rate")
+                results = pipe.execute()
+                call_count = results[1]
+
+                if call_count < self.max_calls:
+                    r.zadd("kite_api_rate", {member: now})
+                    r.expire("kite_api_rate", 2)
+                    r.close()
+                    return
+
+                r.close()
+                await asyncio.sleep(0.1)
+
+        except Exception:
+            # Redis unavailable — fall back to in-process throttle (single-worker safe)
+            async with self._fallback_lock:
+                now = time.time()
+                elapsed = now - self._fallback_last
+                if elapsed < self._fallback_interval:
+                    await asyncio.sleep(self._fallback_interval - elapsed)
+                self._fallback_last = time.time()
 
 
-# Global rate limiter instance
+# Global rate limiter instance — shared by all ZerodhaClient instances in this process
 _rate_limiter = RateLimiter(calls_per_second=3.0)
 
 

@@ -75,11 +75,6 @@ async def lifespan(app: FastAPI):
             "WARNING: changing this key will make all stored access tokens undecryptable — users must reconnect."
         ) from e
 
-    # Start retention scheduler
-    from app.tasks.retention_tasks import start_scheduler
-    start_scheduler()
-    logger.info("Retention scheduler started")
-
     # Reconnect KiteTicker for all accounts that had open positions
     # before the server restarted (prevents stale prices after deploys).
     try:
@@ -239,11 +234,11 @@ async def security_headers_middleware(request: Request, call_next):
     response.headers["X-Content-Type-Options"] = "nosniff"
     response.headers["X-Frame-Options"] = "DENY"
     response.headers["Referrer-Policy"] = "strict-origin-when-cross-origin"
-    # CSP: allow same-origin scripts/styles + Sentry DSN reporting endpoint.
-    # Tighten further in production by replacing 'unsafe-inline' with nonces.
+    # CSP: 'unsafe-inline' removed from script-src — Vite production builds
+    # have no inline scripts. style-src keeps 'unsafe-inline' for Tailwind/shadcn.
     response.headers["Content-Security-Policy"] = (
         "default-src 'self'; "
-        "script-src 'self' 'unsafe-inline'; "
+        "script-src 'self'; "
         "style-src 'self' 'unsafe-inline'; "
         "img-src 'self' data:; "
         "connect-src 'self' https://*.sentry.io wss:; "

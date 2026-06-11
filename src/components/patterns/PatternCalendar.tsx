@@ -14,7 +14,7 @@ interface AlertRecord {
   acknowledged_at: string | null;
 }
 
-type DaySeverity = 'no_data' | 'clean' | 'low' | 'medium' | 'high' | 'critical';
+type DaySeverity = 'no_data' | 'clean' | 'caution' | 'danger';
 
 interface DayData {
   date: string; // YYYY-MM-DD IST
@@ -26,20 +26,12 @@ interface DayData {
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
-const SEVERITY_ORDER: Record<string, number> = {
-  low: 1, medium: 2, caution: 2, high: 3, danger: 3, critical: 4,
-};
-
 function worstSeverity(alerts: AlertRecord[]): DaySeverity {
   if (alerts.length === 0) return 'clean';
-  let max = 0;
-  for (const a of alerts) {
-    max = Math.max(max, SEVERITY_ORDER[a.severity] ?? 0);
-  }
-  if (max >= 4) return 'critical';
-  if (max >= 3) return 'high';
-  if (max >= 2) return 'medium';
-  return 'low';
+  const hasDanger = alerts.some(
+    a => a.severity === 'danger' || a.severity === 'critical' || a.severity === 'high'
+  );
+  return hasDanger ? 'danger' : 'caution';
 }
 
 // Returns YYYY-MM-DD in IST for a given UTC Date object
@@ -48,12 +40,10 @@ function toISTDateStr(d: Date): string {
 }
 
 const SEVERITY_CELL: Record<DaySeverity, string> = {
-  no_data:  'bg-muted/20 border border-muted/30',
-  clean:    'bg-green-500/80 dark:bg-green-500/70 border-0',
-  low:      'bg-amber-300/80 dark:bg-amber-400/60 border-0',
-  medium:   'bg-amber-500/80 dark:bg-amber-500/70 border-0',
-  high:     'bg-orange-500/80 dark:bg-orange-500/70 border-0',
-  critical: 'bg-red-600/85 dark:bg-red-600/75 border-0',
+  no_data: 'bg-muted/20 border border-muted/30',
+  clean:   'bg-green-500/80 dark:bg-green-500/70 border-0',
+  caution: 'bg-amber-500/80 dark:bg-amber-500/70 border-0',
+  danger:  'bg-red-600/85 dark:bg-red-600/75 border-0',
 };
 
 const WEEKDAY_LABELS = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
@@ -142,11 +132,9 @@ function DayDetail({ day, onClose }: { day: DayData; onClose: () => void }) {
           {day.alerts.map((alert, i) => (
             <div key={i} className={cn(
               'flex items-start gap-2.5 p-2.5 rounded-lg border text-sm',
-              alert.severity === 'critical' || alert.severity === 'danger'
+              alert.severity === 'danger'
                 ? 'bg-red-50 dark:bg-red-900/10 border-red-200 dark:border-red-800'
-                : alert.severity === 'high'
-                  ? 'bg-orange-50 dark:bg-orange-900/10 border-orange-200 dark:border-orange-800'
-                  : 'bg-amber-50 dark:bg-amber-900/10 border-amber-200 dark:border-amber-800'
+                : 'bg-amber-50 dark:bg-amber-900/10 border-amber-200 dark:border-amber-800'
             )}>
               <AlertTriangle className="h-3.5 w-3.5 mt-0.5 shrink-0 text-muted-foreground" />
               <div className="min-w-0">

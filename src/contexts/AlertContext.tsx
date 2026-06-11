@@ -133,7 +133,7 @@ const BACKEND_TO_FRONTEND_TYPE: Record<string, string> = {
   'profit_giveaway':             'profit_giveaway',
 };
 
-function formatPatternName(patternType: string): string {
+export function formatPatternName(patternType: string): string {
   const names: Record<string, string> = {
     'consecutive_loss':              'Consecutive Loss Spiral',
     'consecutive_losses':            'Consecutive Losses',
@@ -185,17 +185,12 @@ interface BackendAlert {
   acknowledged?: boolean; // present in demo data and some API responses
 }
 
-// Map backend severity strings to frontend PatternSeverity
+// Map backend severity strings to frontend PatternSeverity (3-level system)
 function normalizeSeverity(s: string): PatternSeverity {
-  const map: Record<string, PatternSeverity> = {
-    danger:   'high',
-    critical: 'critical',
-    high:     'high',
-    caution:  'medium',
-    medium:   'medium',
-    low:      'low',
-  };
-  return map[s.toLowerCase()] ?? 'medium';
+  const lc = s.toLowerCase();
+  if (lc === 'danger' || lc === 'critical' || lc === 'high') return 'danger';
+  if (lc === 'positive') return 'positive';
+  return 'caution'; // caution / medium / low / unknown
 }
 
 function mapBackendAlert(a: BackendAlert): AlertNotification {
@@ -398,15 +393,31 @@ export function AlertProvider({ children }: { children: ReactNode }) {
     }
   }, []);
 
-  const acknowledgeAll = useCallback(() => {
+  const acknowledgeAll = useCallback(async () => {
+    const unacked = alerts.filter(a => !a.acknowledged);
     setAlerts(prev => prev.map(a => ({ ...a, acknowledged: true })));
-  }, []);
+    try {
+      await Promise.all(
+        unacked.map(a => api.post(`/api/risk/alerts/${a.id}/acknowledge`))
+      );
+    } catch {
+      setAlerts(prev => prev.map(a =>
+        unacked.some(u => u.id === a.id) ? { ...a, acknowledged: false } : a
+      ));
+    }
+  }, [alerts]);
 
   const clearAllAlerts = useCallback(() => {
     setAlerts([]);
   }, []);
 
-  const unacknowledgedCount = alerts.filter(a => !a.acknowledged).length;
+  // Badge counts only today's unacknowledged alerts (IST calendar day).
+  // The alerts array covers the last 7 days — counting all would inflate the badge.
+  const _todayIST = new Date().toLocaleDateString('en-CA', { timeZone: 'Asia/Kolkata' });
+  const unacknowledgedCount = alerts.filter(a =>
+    !a.acknowledged &&
+    new Date(a.shown_at || '').toLocaleDateString('en-CA', { timeZone: 'Asia/Kolkata' }) === _todayIST
+  ).length;
 
   return (
     <AlertContext.Provider value={{

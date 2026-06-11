@@ -85,9 +85,11 @@ class AnalyticsService:
             danger_count = len([a for a in current_alerts if a.severity and str(a.severity).lower() == "danger"])
             caution_count = len([a for a in current_alerts if a.severity and str(a.severity).lower() == "caution"])
             
-            # Clean days = days without any alerts
-            alert_dates = set(a.detected_at.date() for a in current_alerts)
-            clean_days = 7 - len(alert_dates)
+            # Clean days = days without any alerts (IST calendar day — Indian traders)
+            from zoneinfo import ZoneInfo as _ZI
+            _IST = _ZI("Asia/Kolkata")
+            alert_dates = set(a.detected_at.astimezone(_IST).date() for a in current_alerts)
+            clean_days = max(0, 7 - len(alert_dates))
             
             return {
                 "current_score": round(current_score, 1),

@@ -4,7 +4,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Skeleton } from '@/components/ui/skeleton';
 import { cn } from '@/lib/utils';
 import { api } from '@/lib/api';
-import { useAlerts, AlertNotification } from '@/contexts/AlertContext';
+import { useAlerts, AlertNotification, formatPatternName } from '@/contexts/AlertContext';
 import { PatternSeverity } from '@/types/patterns';
 import AlertDetailSheet from '@/components/alerts/AlertDetailSheet';
 import {
@@ -204,7 +204,7 @@ function HistoryTab({ onOpen }: { onOpen: (a: AlertNotification) => void }) {
           id:                  String(a.id),
           type:                a.pattern_type,
           backend_type:        a.pattern_type,
-          name:                a.pattern_type.split('_').map((w: string) => w.charAt(0).toUpperCase() + w.slice(1)).join(' '),
+          name:                formatPatternName(a.pattern_type),
           severity:            ({'danger':'high','critical':'critical','high':'high','caution':'medium','medium':'medium','low':'low'} as Record<string,PatternSeverity>)[a.severity] ?? 'medium',
           description:         a.message,
           detected_at:         a.detected_at || a.created_at,

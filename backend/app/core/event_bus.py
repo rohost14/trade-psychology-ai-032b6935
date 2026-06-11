@@ -223,7 +223,11 @@ async def start_event_subscriber() -> None:
             logger.error(f"[event_bus] Subscriber error (reconnecting in 5s): {e}")
             import asyncio
             await asyncio.sleep(5)
-            last_id = "$"  # after reconnect, only read new events
+            # Do NOT reset last_id to "$" here — keep the cursor at the last
+            # successfully-processed entry so events that arrived during the
+            # disconnect window are replayed. If Redis trimmed that ID from the
+            # stream, XREAD will start from the oldest available entry (safe).
+            # Only the initial startup uses "$" (line above the outer while loop).
 
 
 async def _dispatch_to_websocket(

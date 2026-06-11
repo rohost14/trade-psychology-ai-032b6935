@@ -28,63 +28,11 @@
       --color-obs: #d97706;
       --color-obsBg: #fffbeb;
       --color-surface: #ffffff;
-      --color-background: #F8FAFC;
-    }
-  </style>
-  <style>
-    body {
-      background-color: #F8FAFC;
-      color: #0F172A;
-      -webkit-font-smoothing: antialiased;
-    }
-
-    .hidden {
-      position: absolute;
-      top: 0;
-      left: 0;
-      right: 0;
-      height: 350px;
-      background: linear-gradient(175deg, rgba(238, 242, 255, 1) 0%, rgba(246, 248, 253, 1) 40%, rgba(248, 250, 252, 1) 100%);
-      z-index: -1;
-    }
-
-    .tm-card {
-      background: white;
-      border-radius: 12px;
-      border: 1px solid #E2E8F0;
-      box-shadow: 0 1px 2px rgba(0, 0, 0, 0.04), 0 4px 12px rgba(0, 0, 0, 0.02);
-      transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-    }
-
-    .tm-card:hover {
-      border-color: #CBD5E1;
-      box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.05), 0 8px 10px -6px rgba(0, 0, 0, 0.01);
-      transform: translateY(-2px);
-    }
-
-    @keyframes fadeInUp {
-      from {
-        opacity: 0;
-        transform: translateY(16px);
-      }
-
-      to {
-        opacity: 1;
-        transform: translateY(0);
-      }
-    }
-
-    .transition-opacity duration-300 {
-      animation: fadeInUp 0.5s cubic-bezier(0.16, 1, 0.3, 1) forwards;
-      opacity: 0;
-    }
-
-    . {
-      animation-delay: 100ms;
-    }
-
-    . {
-      animation-delay: 200ms;
+      --color-background: #F5F3FF;
+      
+      --shadow-clay-card: 0 10px 24px -4px rgba(15, 23, 42, 0.04), 0 4px 12px -2px rgba(15, 23, 42, 0.02), inset -6px -6px 12px -1px rgba(15, 23, 42, 0.03), inset 6px 6px 12px rgba(255, 255, 255, 0.95);
+      --shadow-clay-card-hover: 0 20px 36px -6px rgba(99, 102, 241, 0.08), 0 8px 18px -2px rgba(15, 23, 42, 0.03), inset -8px -8px 16px -1px rgba(15, 23, 42, 0.04), inset 8px 8px 16px rgba(255, 255, 255, 0.95);
+      --shadow-clay-inset: inset 4px 4px 8px rgba(15, 23, 42, 0.05), inset -4px -4px 8px rgba(255, 255, 255, 0.85);
     }
   </style>
 </head>
@@ -177,7 +125,7 @@
   <!-- ── Main Canvas ── -->
   <!-- Margin pushing content right ONLY on large screens lg:ml-[260px] -->
   <main class="flex-1 w-full lg:ml-[260px] relative min-h-screen">
-    <div class="hidden"></div>
+    <div class="bg-stripe-header"></div>
 
         <!-- Inner Padding Wrapper -->
     <div class="w-full px-4 sm:px-6 lg:px-10 py-6 lg:py-10 pb-20 max-w-6xl mx-auto">
@@ -186,7 +134,7 @@
       <header class="flex flex-col sm:flex-row sm:items-end justify-between gap-4 mb-8">
         <div>
           <h1 class="text-[20px] sm:text-[24px] font-medium  text-slate-900 mb-1 flex items-center gap-3">
-            <div class="w-10 h-10 rounded-full bg-indigo-100 flex items-center justify-center shrink-0">
+            <div class="w-10 h-10 rounded-2xl bg-indigo-50 shadow-clay-inset flex items-center justify-center shrink-0">
               <svg aria-hidden="true" class="w-5 h-5 text-brand" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
                   d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z">
@@ -202,18 +150,16 @@
 
       <!-- Hero Metrics -->
       <div class="grid grid-cols-1 sm:grid-cols-3 gap-6 mb-8">
-        <div class="tm-card p-6 border border-slate-200 shadow-sm ring-1 ring-slate-900/5 relative overflow-hidden transition-opacity duration-300">
+        <div class="tm-card p-6 bg-white relative overflow-hidden transition-opacity duration-300">
           <h3 class="text-sm font-semibold text-slate-500 mb-1">Shield Response Rate</h3>
           <p class="text-[24px] font-medium  text-slate-900 tabular er">42<span class="text-xl">%</span></p>
           <div class="mt-4 flex items-center gap-2">
-            <span
-              class="text-[13px] font-bold px-2 py-1 bg-green-50 text-profit rounded-md uppercase tracking-wider">&uarr;
-              5%</span>
+            <span class="badge badge-green">&uarr; 5%</span>
             <span class="text-[13px] text-slate-500 font-medium">vs Last Month</span>
           </div>
         </div>
 
-        <div class="tm-card p-6 border border-slate-200 shadow-sm ring-1 ring-slate-900/5 relative overflow-hidden transition-opacity duration-300 ">
+        <div class="tm-card p-6 bg-white relative overflow-hidden transition-opacity duration-300 ">
           <h3 class="text-sm font-semibold text-slate-500 mb-1">Estimated Capital Saved</h3>
           <p class="text-[24px] font-medium  text-profit tabular er"
             style="font-variant-numeric: tabular-nums;">₹12,450</p>
@@ -222,7 +168,7 @@
           </div>
         </div>
 
-        <div class="tm-card p-6 border border-slate-200 shadow-sm ring-1 ring-slate-900/5 relative overflow-hidden transition-opacity duration-300 ">
+        <div class="tm-card p-6 bg-white relative overflow-hidden transition-opacity duration-300 ">
           <h3 class="text-sm font-semibold text-slate-500 mb-1">Follow-on Loss</h3>
           <p class="text-[24px] font-medium  text-loss tabular er"
             style="font-variant-numeric: tabular-nums;">-₹8,200</p>
@@ -233,10 +179,10 @@
       </div>
 
       <!-- Shield Timeline -->
-      <div class="tm-card overflow-hidden transition-opacity duration-300 ">
+      <div class="tm-card overflow-hidden bg-white">
         <div class="px-6 py-4 border-b border-slate-100 bg-slate-50 flex items-center justify-between">
           <h3 class="text-[14px] font-bold text-slate-700">Timeline</h3>
-          <button class="text-[13px] font-medium text-brand hover:underline">Filter by outcome</button>
+          <button class="btn btn-sm btn-secondary text-[13px]">Filter by outcome</button>
         </div>
 
         <!-- Timeline Log List -->
@@ -245,7 +191,7 @@
           <!-- Heeded Item -->
           <div class="timeline-item px-6 py-5 hover:bg-slate-50/50 transition-colors">
             <div class="flex items-start gap-4">
-              <div class="mt-1 shrink-0">
+              <div class="mt-1.5 shrink-0">
                 <svg aria-hidden="true" class="w-5 h-5 text-profit" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5"
                     d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path>
@@ -253,9 +199,9 @@
               </div>
               <div class="flex-1 min-w-0">
                 <div class="flex items-center gap-2 mb-2 flex-wrap">
-                  <span class="w-1.5 h-1.5 rounded-full bg-loss"></span>
+                  <span class="status-dot danger"></span>
                   <span class="text-[12px] font-bold uppercase tracking-wide text-slate-500">Loss Spiral</span>
-                  <span class="text-[13px] font-bold text-slate-900 bg-slate-100 px-2 py-0.5 rounded-md">NIFTY</span>
+                  <span class="badge badge-gray">NIFTY</span>
                   <span class="text-[13px] font-medium text-slate-500 ml-auto">Yesterday, 2:45 PM</span>
                 </div>
                 <p class="text-[14px] text-slate-800 font-semibold mb-2">3 consecutive losses in the last 40 minutes. You
@@ -269,7 +215,7 @@
           <!-- Ignored item -->
           <div class="timeline-item px-6 py-5 hover:bg-slate-50/50 transition-colors">
             <div class="flex items-start gap-4">
-              <div class="mt-1 shrink-0">
+              <div class="mt-1.5 shrink-0">
                 <svg aria-hidden="true" class="w-5 h-5 text-loss" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5"
                     d="M10 14l2-2m0 0l2-2m-2 2l-2-2m2 2l2 2m7-2a9 9 0 11-18 0 9 9 0 0118 0z"></path>
@@ -277,9 +223,9 @@
               </div>
               <div class="flex-1 min-w-0">
                 <div class="flex items-center gap-2 mb-2 flex-wrap">
-                  <span class="w-1.5 h-1.5 rounded-full bg-obs"></span>
+                  <span class="status-dot warn"></span>
                   <span class="text-[12px] font-bold uppercase tracking-wide text-slate-500">Overtrading</span>
-                  <span class="text-[13px] font-bold text-slate-900 bg-slate-100 px-2 py-0.5 rounded-md">BANKNIFTY</span>
+                  <span class="badge badge-gray">BANKNIFTY</span>
                   <span class="text-[13px] font-medium text-slate-500 ml-auto">Apr 08, 10:15 AM</span>
                 </div>
                 <p class="text-[14px] text-slate-800 font-semibold mb-2">Pace of trading is very high. 6 orders in 30
@@ -297,13 +243,13 @@
                 </button>
 
                 <div
-                  class="trades-block hidden mt-3 bg-slate-50 rounded-lg border border-slate-100 divide-y divide-gray-100">
+                  class="trades-block hidden mt-3 bg-slate-50 rounded-2xl border border-slate-100 divide-y divide-gray-100 shadow-clay-inset">
                   <div class="flex items-center justify-between px-4 py-2.5">
-                    <span class="text-[13px] font-bold text-slate-700">BANKNIFTY 47500 CE</span>
+                    <span class="text-[13px] font-bold text-slate-700 flex items-center gap-2"><span class="badge badge-brand">CE</span> BANKNIFTY 47500</span>
                     <span class="text-[13px] font-medium text-rose-600 tabular">-₹2,100</span>
                   </div>
                   <div class="flex items-center justify-between px-4 py-2.5">
-                    <span class="text-[13px] font-bold text-slate-700">BANKNIFTY 47600 PE</span>
+                    <span class="text-[13px] font-bold text-slate-700 flex items-center gap-2"><span class="badge badge-red">PE</span> BANKNIFTY 47600</span>
                     <span class="text-[13px] font-medium text-rose-600 tabular">-₹1,100</span>
                   </div>
                 </div>
@@ -314,7 +260,7 @@
           <!-- Heeded item 2 -->
           <div class="timeline-item px-6 py-5 hover:bg-slate-50/50 transition-colors">
             <div class="flex items-start gap-4">
-              <div class="mt-1 shrink-0">
+              <div class="mt-1.5 shrink-0">
                 <svg aria-hidden="true" class="w-5 h-5 text-profit" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5"
                     d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path>
@@ -322,7 +268,7 @@
               </div>
               <div class="flex-1 min-w-0">
                 <div class="flex items-center gap-2 mb-2 flex-wrap">
-                  <span class="w-1.5 h-1.5 rounded-full bg-loss"></span>
+                  <span class="status-dot danger"></span>
                   <span class="text-[12px] font-bold uppercase tracking-wide text-slate-500">Revenge Risk</span>
                   <span class="text-[13px] font-medium text-slate-500 ml-auto">Apr 06, 09:30 AM</span>
                 </div>
@@ -336,7 +282,7 @@
         </div>
 
         <div class="px-6 py-4 border-t border-slate-100 bg-slate-50 text-center">
-          <button class="text-[13px] font-medium text-brand hover:underline">Load older alerts</button>
+          <button class="btn btn-secondary text-[13px]">Load older alerts</button>
         </div>
       </div>
 

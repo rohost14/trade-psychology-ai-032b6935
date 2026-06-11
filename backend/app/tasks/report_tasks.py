@@ -230,8 +230,10 @@ def send_weekly_summary(broker_account_id: str):
                 from app.services.ai_service import ai_service
                 from app.services.whatsapp_service import whatsapp_service as _wa
                 from app.models.completed_trade import CompletedTrade
+                from app.models.risk_alert import RiskAlert
                 from sqlalchemy import and_
                 from datetime import timedelta
+                from collections import Counter
 
                 account_id = UUID(broker_account_id)
 
@@ -255,6 +257,64 @@ def send_weekly_summary(broker_account_id: str):
                 best = max((float(t.realized_pnl or 0) for t in trades), default=0)
                 worst = min((float(t.realized_pnl or 0) for t in trades), default=0)
 
+                # Fetch this week's behavioral alerts for real strength/weakness data
+                alert_result = await db.execute(
+                    select(RiskAlert).where(
+                        and_(
+                            RiskAlert.broker_account_id == account_id,
+                            RiskAlert.detected_at >= week_start,
+                        )
+                    )
+                )
+                week_alerts = alert_result.scalars().all()
+
+                _PATTERN_LABELS = {
+                    "overtrading": "Overtrading",
+                    "burst_trading": "Overtrading",
+                    "revenge_trade": "Revenge Trading",
+                    "consecutive_loss_streak": "Consecutive Loss Streak",
+                    "session_meltdown": "Session Meltdown",
+                    "size_escalation": "Size Escalation",
+                    "excess_exposure": "Excess Exposure",
+                    "fomo_entry": "FOMO Entry",
+                    "no_stoploss": "No Stop-Loss",
+                    "early_exit": "Early Exit",
+                    "winning_streak_overconfidence": "Overconfidence",
+                    "rapid_flip": "Rapid Direction Flip",
+                    "expiry_day_overtrading": "Expiry Day Overtrading",
+                    "opening_5min_trap": "Opening 5-Min Trap",
+                    "end_of_session_mis_panic": "End-of-Session Panic",
+                    "post_loss_recovery_bet": "Recovery Bet",
+                    "profit_giveaway": "Profit Giveaway",
+                    "martingale_behaviour": "Martingale Behaviour",
+                }
+                _COMMON_PATTERNS = [
+                    "overtrading", "revenge_trade", "no_stoploss",
+                    "size_escalation", "session_meltdown",
+                ]
+
+                if not week_alerts:
+                    key_strength = "Disciplined execution"
+                    key_weakness = "None detected this week"
+                    patterns_detected = []
+                else:
+                    counts = Counter(a.pattern_type for a in week_alerts)
+                    worst_type = counts.most_common(1)[0][0]
+                    key_weakness = _PATTERN_LABELS.get(
+                        worst_type, worst_type.replace("_", " ").title()
+                    )
+                    # Strength = first common pattern area that never fired this week
+                    clean = [p for p in _COMMON_PATTERNS if p not in counts]
+                    if clean:
+                        clean_label = _PATTERN_LABELS.get(clean[0], clean[0].replace("_", " ").title())
+                        key_strength = f"No {clean_label}"
+                    else:
+                        key_strength = "Managed all risk areas"
+                    patterns_detected = [
+                        _PATTERN_LABELS.get(pt, pt.replace("_", " ").title())
+                        for pt in counts
+                    ]
+
                 report = await ai_service.generate_whatsapp_report(
                     period_days=7,
                     total_pnl=total_pnl,
@@ -262,9 +322,9 @@ def send_weekly_summary(broker_account_id: str):
                     win_rate=win_rate,
                     best_trade=best,
                     worst_trade=worst,
-                    patterns_detected=[],
-                    key_strength="Consistent execution",
-                    key_weakness="Position sizing"
+                    patterns_detected=patterns_detected,
+                    key_strength=key_strength,
+                    key_weakness=key_weakness,
                 )
 
                 account_result = await db.execute(

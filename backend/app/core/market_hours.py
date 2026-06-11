@@ -41,15 +41,26 @@ NSE_HOLIDAYS_2025: Set[date] = {
 
 NSE_HOLIDAYS_2026: Set[date] = {
     date(2026, 1, 26),   # Republic Day
-    date(2026, 3, 20),   # Holi (approx)
-    date(2026, 4, 3),    # Good Friday (approx)
-    date(2026, 8, 15),   # Independence Day
+    date(2026, 2, 18),   # Maha Shivaratri
+    date(2026, 3, 20),   # Holi
+    date(2026, 3, 30),   # Ram Navami
+    date(2026, 4, 3),    # Good Friday
+    date(2026, 4, 14),   # Dr. Baba Saheb Ambedkar Jayanti
+    date(2026, 5, 1),    # Maharashtra Day
+    date(2026, 6, 17),   # Bakri Id / Eid al-Adha — tentative (moon-sighting)
+    date(2026, 9, 2),    # Ganesh Chaturthi
     date(2026, 10, 2),   # Mahatma Gandhi Jayanti
+    date(2026, 10, 20),  # Diwali Laxmi Puja (Muhurat Trading session)
+    date(2026, 10, 21),  # Diwali Balipratipada
+    date(2026, 11, 25),  # Guru Nanak Jayanti
     date(2026, 12, 25),  # Christmas
 }
 
 # Combined holiday set — all years known
 NSE_HOLIDAYS: Set[date] = NSE_HOLIDAYS_2025 | NSE_HOLIDAYS_2026
+
+# Warn once per process when today is past the last known holiday year
+_stale_holiday_warned = False
 
 
 def _load_extra_holidays() -> Set[date]:
@@ -69,7 +80,18 @@ def _load_extra_holidays() -> Set[date]:
 
 def is_trading_holiday(check_date: date) -> bool:
     """Return True if check_date is a NSE/BSE trading holiday."""
+    global _stale_holiday_warned
     all_holidays = NSE_HOLIDAYS | _load_extra_holidays()
+    if not _stale_holiday_warned:
+        max_known = max(all_holidays) if all_holidays else date(2026, 12, 31)
+        if check_date > max_known:
+            import logging
+            logging.getLogger(__name__).warning(
+                f"NSE holiday calendar may be stale: checking {check_date} but last known "
+                f"holiday is {max_known}. Update NSE_HOLIDAYS in market_hours.py or set "
+                "NSE_EXTRA_HOLIDAYS env var."
+            )
+            _stale_holiday_warned = True
     return check_date in all_holidays
 
 

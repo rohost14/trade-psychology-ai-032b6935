@@ -26,6 +26,7 @@ from app.models.completed_trade_feature import CompletedTradeFeature
 from app.models.incomplete_position import IncompletePosition
 from app.core.market_hours import market_minutes
 from app.services.mcx_contract_specs import get_lot_multiplier
+from app.services.instrument_parser import is_expiry_day as _instrument_is_expiry_day
 from app.services.position_ledger_service import _compute_pnl_pct
 
 logger = logging.getLogger(__name__)
@@ -620,8 +621,7 @@ class PnLCalculator:
         entry_hour = entry_ist.hour if entry_ist else None
         exit_hour = exit_ist.hour if exit_ist else None
         entry_dow = entry_ist.weekday() if entry_ist else None  # 0=Mon
-        # Thursday = weekly F&O expiry day in India
-        is_expiry = exit_ist.weekday() == 3 if exit_ist else False
+        is_expiry = _instrument_is_expiry_day(ct.tradingsymbol or "", exit_ist.date()) if exit_ist else False
 
         # --- Sizing features ---
         recent_20 = prev_rounds[-20:]
@@ -708,6 +708,9 @@ class PnLCalculator:
         """
         trade_qty = trade.filled_quantity or trade.quantity or 0
         trade_price = float(trade.average_price or trade.price or 0)
+        lot_multiplier = Decimal(str(get_lot_multiplier(
+            trade.exchange or "", trade.tradingsymbol or ""
+        )))
 
         if trade.transaction_type == "SELL":
             opposite_side = "BUY"
@@ -771,9 +774,9 @@ class PnLCalculator:
             match_qty = min(opening["remaining_qty"], remaining_close_qty)
 
             if opening["side"] == "BUY":
-                match_pnl = Decimal(str((trade_price - opening["price"]) * match_qty))
+                match_pnl = Decimal(str((trade_price - opening["price"]) * match_qty)) * lot_multiplier
             else:
-                match_pnl = Decimal(str((opening["price"] - trade_price) * match_qty))
+                match_pnl = Decimal(str((opening["price"] - trade_price) * match_qty)) * lot_multiplier
 
             total_pnl += match_pnl
             opening["remaining_qty"] -= match_qty

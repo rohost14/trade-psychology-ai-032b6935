@@ -76,6 +76,7 @@ class TradeListResponse(BaseModel):
     total: int
     page: int
     limit: int
+    has_more: bool = False
 
 class TradeStatsResponse(BaseModel):
     total_trades: int

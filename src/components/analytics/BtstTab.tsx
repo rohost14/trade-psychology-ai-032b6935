@@ -51,7 +51,7 @@ export default function BtstTab({ days }: { days: number }) {
     setLoading(true);
     setData(null);
     let cancelled = false;
-    api.get('/api/analytics/btst', { params: { days, broker_account_id: account.id } })
+    api.get('/api/analytics/btst', { params: { days } })
       .then(r => { if (!cancelled) { setData(r.data); setLoading(false); } })
       .catch(() => { if (!cancelled) setLoading(false); });
     return () => { cancelled = true; };

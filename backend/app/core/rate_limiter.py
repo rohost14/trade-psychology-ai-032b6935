@@ -1,8 +1,9 @@
 """
-In-memory rate limiter for expensive endpoints.
+Redis-backed sliding-window rate limiter for expensive and unauthenticated endpoints.
 
-Uses a sliding window counter per (client_key, endpoint) pair.
-No external dependencies — backed by a simple dict with TTL cleanup.
+Replaces the previous in-memory defaultdict implementation that was not shared across
+gunicorn/uvicorn workers (effective limit was N× the configured value with N workers).
+Fails open on Redis unavailability — never blocks users due to infrastructure issues.
 
 Usage:
     from app.core.rate_limiter import RateLimiter
@@ -17,32 +18,28 @@ Usage:
 """
 
 import time
-import asyncio
-from collections import defaultdict
-from fastapi import HTTPException, Request, Depends
 import logging
+
+from fastapi import HTTPException, Request, Depends
 
 logger = logging.getLogger(__name__)
 
 
 class RateLimiter:
     """
-    Sliding-window rate limiter implemented as a FastAPI dependency.
+    Redis sliding-window rate limiter implemented as a FastAPI dependency.
 
     Args:
         max_requests: Maximum requests allowed within the window.
         window_seconds: Time window in seconds.
         key_func: Optional callable to extract the rate-limit key from request.
-                  Defaults to client IP.
+                  Defaults to broker_account_id (if authed) or client IP.
     """
 
     def __init__(self, max_requests: int, window_seconds: int, key_func=None):
         self.max_requests = max_requests
         self.window_seconds = window_seconds
         self.key_func = key_func
-        # key -> list of timestamps
-        self._hits: dict[str, list[float]] = defaultdict(list)
-        self._lock = asyncio.Lock()
 
     def _default_key(self, request: Request) -> str:
         """
@@ -59,40 +56,48 @@ class RateLimiter:
         return request.client.host if request.client else "unknown"
 
     async def __call__(self, request: Request):
-        if self.key_func:
-            key = self.key_func(request)
-        else:
-            key = self._default_key(request)
-
-        now = time.monotonic()
+        key = self.key_func(request) if self.key_func else self._default_key(request)
+        redis_key = f"rl:{key}:{request.url.path}"
+        now = time.time()
         window_start = now - self.window_seconds
 
-        async with self._lock:
-            # Prune expired entries
-            hits = self._hits[key]
-            self._hits[key] = [t for t in hits if t > window_start]
-            hits = self._hits[key]
+        try:
+            import redis as redis_lib
+            from app.core.config import settings
+            r = redis_lib.from_url(settings.REDIS_URL, socket_connect_timeout=1)
+            pipe = r.pipeline()
+            pipe.zremrangebyscore(redis_key, "-inf", window_start)
+            pipe.zcard(redis_key)
+            # Use high-precision timestamp as member to avoid collisions under burst traffic
+            pipe.zadd(redis_key, {f"{now:.9f}": now})
+            pipe.expire(redis_key, self.window_seconds + 1)
+            results = pipe.execute()
+            r.close()
 
-            if len(hits) >= self.max_requests:
-                retry_after = int(hits[0] - window_start) + 1
+            call_count = results[1]
+            if call_count >= self.max_requests:
+                retry_after = self.window_seconds
                 logger.warning(
                     f"Rate limit exceeded for {key} on {request.url.path} "
-                    f"({len(hits)}/{self.max_requests} in {self.window_seconds}s)"
+                    f"({call_count}/{self.max_requests} in {self.window_seconds}s)"
                 )
                 raise HTTPException(
                     status_code=429,
                     detail=f"Too many requests. Try again in {retry_after}s.",
                     headers={"Retry-After": str(retry_after)},
                 )
-
-            hits.append(now)
+        except HTTPException:
+            raise
+        except Exception as exc:
+            # Redis unavailable — fail open (don't block users for infra issues)
+            logger.warning(f"Rate limit check skipped (Redis error): {exc}")
 
 
 # Pre-configured limiters for expensive endpoints
-sync_limiter      = RateLimiter(max_requests=10, window_seconds=60)  # 10 syncs/min (tab-switch + page loads)
-coach_limiter     = RateLimiter(max_requests=10, window_seconds=60)  # 10 chat msgs/min
-analytics_limiter = RateLimiter(max_requests=20, window_seconds=60)  # 20 analytics/min
-general_limiter   = RateLimiter(max_requests=20, window_seconds=60)  # unauthenticated public endpoints
+sync_limiter      = RateLimiter(max_requests=10, window_seconds=60)   # 10 syncs/min (tab-switch + page loads)
+coach_limiter     = RateLimiter(max_requests=10, window_seconds=60)   # 10 chat msgs/min
+analytics_limiter = RateLimiter(max_requests=20, window_seconds=60)   # 20 analytics/min
+general_limiter   = RateLimiter(max_requests=20, window_seconds=60)   # unauthenticated public endpoints
 
 # Admin auth — strict brute-force protection
 admin_login_limiter = RateLimiter(max_requests=5, window_seconds=900)  # 5 attempts/15 min per IP
