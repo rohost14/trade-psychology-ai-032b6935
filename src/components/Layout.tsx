@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { Outlet, NavLink, useLocation, useNavigate } from 'react-router-dom';
 import {
   LayoutDashboard, TrendingUp, MessageSquare, Settings,
-  Shield, Brain, Bell, BookOpen, X, Zap, ShieldAlert,
+  Shield, Brain, Bell, BookOpen, X,
   MoreHorizontal, ChevronRight,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
@@ -30,16 +30,14 @@ const mobileMoreGroups = [
   {
     label: 'Insights',
     items: [
-      { name: 'My Patterns', href: '/personalization', icon: Brain },
-      { name: 'Discipline',  href: '/discipline',      icon: Zap },
-      { name: 'Reports',     href: '/reports',          icon: BookOpen },
+      { name: 'My Patterns', href: '/my-patterns', icon: Brain },
+      { name: 'Reports',     href: '/reports',     icon: BookOpen },
     ],
   },
   {
     label: 'Risk',
     items: [
       { name: 'Blowup Shield', href: '/blowup-shield', icon: Shield },
-      { name: 'Guardrails',    href: '/guardrails',    icon: ShieldAlert },
     ],
   },
   {

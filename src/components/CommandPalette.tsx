@@ -13,7 +13,7 @@ import {
 } from '@/components/ui/command';
 import {
   LayoutDashboard, TrendingUp, Bell, Shield, Brain,
-  Radar, BookOpen, MessageSquare, Settings, CheckCheck,
+  BookOpen, MessageSquare, Settings, CheckCheck,
 } from 'lucide-react';
 import { useAlerts } from '@/contexts/AlertContext';
 
@@ -23,7 +23,6 @@ const NAV_COMMANDS = [
   { name: 'Alerts',           href: '/alerts',          icon: Bell },
   { name: 'Blowup Shield',    href: '/blowup-shield',   icon: Shield },
   { name: 'My Patterns',      href: '/my-patterns',     icon: Brain },
-  { name: 'Portfolio Radar',  href: '/portfolio-radar', icon: Radar },
   { name: 'Reports',          href: '/reports',         icon: BookOpen },
   { name: 'Chat',             href: '/chat',            icon: MessageSquare },
   { name: 'Settings',         href: '/settings',        icon: Settings },

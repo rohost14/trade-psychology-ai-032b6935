@@ -24,10 +24,7 @@ const BlowupShield  = lazy(() => import("./pages/BlowupShield"));
 const MyPatterns    = lazy(() => import("./pages/MyPatterns"));
 const Chat          = lazy(() => import("./pages/Chat"));
 const Settings      = lazy(() => import("./pages/Settings"));
-const Guardrails      = lazy(() => import("./pages/Guardrails"));
 const Reports           = lazy(() => import("./pages/Reports"));
-const Personalization   = lazy(() => import("./pages/Personalization"));
-const Discipline        = lazy(() => import("./pages/Discipline"));
 const TermsOfService = lazy(() => import("./pages/TermsOfService"));
 const PrivacyPolicy  = lazy(() => import("./pages/PrivacyPolicy"));
 const Maintenance   = lazy(() => import("./pages/Maintenance"));
@@ -80,10 +77,7 @@ const App = () => (
                     <Route path="blowup-shield" element={<BlowupShield />} />
                     <Route path="my-patterns" element={<MyPatterns />} />
                     <Route path="chat" element={<Chat />} />
-                    <Route path="guardrails" element={<Guardrails />} />
                     <Route path="reports" element={<Reports />} />
-                    <Route path="personalization" element={<Personalization />} />
-                    <Route path="discipline" element={<Discipline />} />
                     <Route path="settings" element={<Settings />} />
                   </Route>
                   <Route path="welcome" element={<Welcome />} />

@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
-import { Save, Loader2, User, Bell } from 'lucide-react';
+import { Save, Loader2, User, Bell, Brain } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
@@ -10,6 +10,7 @@ import { UserProfile, NotificationStatus, profileSchema } from '@/lib/settingsCo
 import { BrokerConnectionCard } from '@/components/settings/BrokerConnectionCard';
 import { ProfileTab } from '@/components/settings/ProfileTab';
 import { NotificationsTab } from '@/components/settings/NotificationsTab';
+import { InsightsTab } from '@/components/settings/InsightsTab';
 
 export default function Settings() {
   const { isConnected, isLoading: brokerLoading, account, connect, disconnect } = useBroker();
@@ -240,6 +241,10 @@ export default function Settings() {
               <Bell className="h-4 w-4" />
               Notifications
             </TabsTrigger>
+            <TabsTrigger value="insights" className="rounded-none px-3 pb-3 text-sm font-medium text-muted-foreground data-[state=active]:bg-transparent data-[state=active]:text-foreground data-[state=active]:border-b-2 data-[state=active]:border-tm-brand transition-colors flex items-center gap-1.5">
+              <Brain className="h-4 w-4" />
+              Insights
+            </TabsTrigger>
           </TabsList>
 
           <TabsContent value="profile">
@@ -254,6 +259,10 @@ export default function Settings() {
               account={account}
               onTestGuardian={handleTestGuardian}
             />
+          </TabsContent>
+
+          <TabsContent value="insights">
+            <InsightsTab />
           </TabsContent>
         </Tabs>
       )}
