@@ -89,4 +89,6 @@ export const adminApi = {
   // ── Broadcast ─────────────────────────────────────────────────────────────
   broadcast: (segment: 'all_with_phone' | 'connected', message: string, dry_run = false) =>
     req('/broadcast', { method: 'POST', body: JSON.stringify({ segment, message, dry_run }) }),
+  broadcastLogs:     (limit = 20) => req(`/broadcast/logs?limit=${limit}`),
+  broadcastReceipts: (id: string)  => req(`/broadcast/logs/${id}/receipts`),
 };
