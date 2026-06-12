@@ -1707,8 +1707,10 @@ class BehaviorEngine:
 
     # ── Pattern 21: End-of-session MIS panic ──────────────────────────────
     #
-    # MIS trades entered after 15:10 IST — auto-square-off at ~15:20.
-    # Voluntarily entering a position with a 10-minute forced exit is panic, not trading.
+    # MIS trades entered after 15:00 IST — Zerodha auto-square-off varies by segment:
+    #   Equity (NSE/BSE)  → 15:15 IST
+    #   F&O    (NFO/BFO)  → 15:25 IST
+    # Voluntarily entering a position with minutes until forced exit is panic, not trading.
 
     def _detect_end_of_session_mis_panic(self, ctx: EngineContext) -> Optional[DetectedEvent]:
         ct = ctx.completed_trade
@@ -1722,6 +1724,16 @@ class BehaviorEngine:
 
         if entry_ist < panic_start:
             return None
+
+        # Zerodha squareoff time depends on exchange segment
+        exchange = (ct.exchange or "").upper()
+        if exchange in ("NFO", "BFO"):
+            squareoff_total_min = 15 * 60 + 25
+            squareoff_str = "15:25"
+        else:
+            # NSE/BSE equity MIS
+            squareoff_total_min = 15 * 60 + 15
+            squareoff_str = "15:15"
 
         # Count all MIS trades entered after 15:00 IST today
         panic_trades = [
@@ -1741,23 +1753,25 @@ class BehaviorEngine:
                 severity="danger",
                 message=(
                     f"{panic_count} MIS trades after 15:00 IST today. "
-                    f"Zerodha auto-squares MIS at 15:20."
+                    f"Zerodha auto-squares {exchange or 'MIS'} at {squareoff_str}."
                 ),
                 context={"entry_time_ist": entry_ist.strftime("%H:%M"),
-                         "panic_count": panic_count},
+                         "panic_count": panic_count,
+                         "squareoff_time": squareoff_str},
             )
         if panic_count >= caution_count:
-            mins_remaining = max(0, (15 * 60 + 20) - (entry_ist.hour * 60 + entry_ist.minute))
+            mins_remaining = max(0, squareoff_total_min - (entry_ist.hour * 60 + entry_ist.minute))
             return DetectedEvent(
                 event_type="end_of_session_mis_panic",
                 severity="caution",
                 message=(
                     f"MIS entry at {entry_ist.strftime('%H:%M')} IST — "
-                    f"{mins_remaining}min until Zerodha auto-square-off at 15:20."
+                    f"{mins_remaining}min until Zerodha auto-square-off at {squareoff_str}."
                 ),
                 context={"entry_time_ist": entry_ist.strftime("%H:%M"),
                          "panic_count": panic_count,
-                         "mins_to_squareoff": mins_remaining},
+                         "mins_to_squareoff": mins_remaining,
+                         "squareoff_time": squareoff_str},
             )
         return None
 

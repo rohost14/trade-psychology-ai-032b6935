@@ -559,7 +559,9 @@ def generate_coach_insight_task(broker_account_id: str, context: dict):
                     return {"error": "LLM returned empty response"}
 
                 profile_result = await db.execute(
-                    select(UserProfile).where(UserProfile.broker_account_id == account_id)
+                    select(UserProfile)
+                    .where(UserProfile.broker_account_id == account_id)
+                    .with_for_update()
                 )
                 profile = profile_result.scalar_one_or_none()
 
@@ -630,7 +632,9 @@ def generate_analytics_narrative_task(
                 cache_entry = {**narrative_result, "generated_at": generated_at}
 
                 profile_result = await db.execute(
-                    select(UserProfile).where(UserProfile.broker_account_id == account_id)
+                    select(UserProfile)
+                    .where(UserProfile.broker_account_id == account_id)
+                    .with_for_update()
                 )
                 profile = profile_result.scalar_one_or_none()
 

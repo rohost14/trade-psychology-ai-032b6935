@@ -1697,9 +1697,16 @@ class BehavioralAnalysisService:
                     emotional_tax=emotional_tax,
                     time_performance=time_performance
                 )
-                # Cache the result
+                # Cache the result — re-fetch with row lock to prevent lost-update
+                # if two workers (persona + coach) write different keys concurrently.
                 if profile and persona:
                     from datetime import timezone as tz
+                    locked = await db.execute(
+                        sa_select(UserProfile)
+                        .where(UserProfile.broker_account_id == broker_account_id)
+                        .with_for_update()
+                    )
+                    profile = locked.scalar_one_or_none() or profile
                     current_cache = dict(profile.ai_cache or {})
                     current_cache["persona"] = {
                         "data": persona,
