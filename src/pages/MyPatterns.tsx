@@ -311,7 +311,7 @@ export default function MyPatterns() {
           date: dateStr,
           all_goals_followed: !day?.hasHighCritical,
           goals_broken: day?.hasHighCritical ? ['high_critical_alert'] : [],
-          trading_day: !!alertsByDate[dateStr],
+          trading_day: true, // all non-weekend days are trading days; alert presence is not a reliable proxy
         });
       }
 

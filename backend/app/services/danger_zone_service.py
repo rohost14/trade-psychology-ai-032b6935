@@ -15,10 +15,11 @@ Danger Zone Triggers:
 5. Overtrading (SOFT) - Warning + suggestion
 """
 
-from datetime import datetime, timedelta, timezone
+from datetime import datetime, timedelta, timezone, time as _time
 from typing import Dict, List, Optional, Tuple
 from uuid import UUID
 from dataclasses import dataclass
+from zoneinfo import ZoneInfo
 from enum import Enum
 import logging
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -40,6 +41,7 @@ from app.services.whatsapp_service import whatsapp_service
 from app.core.trading_defaults import get_thresholds as get_trader_thresholds
 
 logger = logging.getLogger(__name__)
+IST = ZoneInfo("Asia/Kolkata")
 
 
 class DangerLevel(Enum):
@@ -240,7 +242,17 @@ class DangerZoneService:
             triggers.append("overtrading_warning")
 
         # Check pattern-based triggers
-        danger_patterns = {"revenge_trading", "tilt", "fomo", "loss_chasing"}
+        # Names must match BehaviorEngine event_type / risk_detector pattern_type values exactly.
+        danger_patterns = {
+            "revenge_trade",           # BehaviorEngine
+            "revenge_sizing",          # risk_detector
+            "tilt_loss_spiral",        # risk_detector
+            "fomo",                    # risk_detector
+            "fomo_entry",              # BehaviorEngine
+            "session_meltdown",        # BehaviorEngine
+            "post_loss_recovery_bet",  # BehaviorEngine
+            "martingale_behaviour",    # BehaviorEngine
+        }
         if any(p in danger_patterns for p in patterns_active):
             level = _upgrade_level(level, DangerLevel.DANGER)
             if level == DangerLevel.DANGER and intervention == InterventionType.NONE:
@@ -249,7 +261,10 @@ class DangerZoneService:
                 if pattern in danger_patterns:
                     triggers.append(f"pattern_{pattern}")
 
-        caution_patterns = {"overconfidence", "anchoring", "round_number_bias"}
+        caution_patterns = {
+            "winning_streak_overconfidence",  # BehaviorEngine
+            "rapid_reentry",                  # BehaviorEngine
+        }
         if any(p in caution_patterns for p in patterns_active):
             level = _upgrade_level(level, DangerLevel.CAUTION)
             for pattern in patterns_active:
@@ -504,14 +519,15 @@ class DangerZoneService:
         broker_account_id: UUID
     ) -> float:
         """Get total P&L for today using CompletedTrade.realized_pnl (real P&L)."""
-        now = datetime.now(timezone.utc)
-        today_start = now.replace(hour=0, minute=0, second=0, microsecond=0)
+        today_start_utc = datetime.combine(
+            datetime.now(IST).date(), _time.min, tzinfo=IST
+        ).astimezone(timezone.utc)
 
         result = await db.execute(
             select(func.sum(CompletedTrade.realized_pnl)).where(
                 and_(
                     CompletedTrade.broker_account_id == broker_account_id,
-                    CompletedTrade.exit_time >= today_start
+                    CompletedTrade.exit_time >= today_start_utc
                 )
             )
         )
@@ -524,25 +540,37 @@ class DangerZoneService:
         broker_account_id: UUID,
         minutes: Optional[int] = None
     ) -> int:
-        """Get trade count in time window."""
+        """Get trade count in time window.
+
+        Windowed (minutes set): raw Trade order events — burst detection cares
+        about order velocity, not completed round-trips.
+        Daily (minutes=None): CompletedTrade — matches user's 'trades per day' goal
+        which counts round-trips, not individual order legs.
+        """
         now = datetime.now(timezone.utc)
         if minutes:
             cutoff = now - timedelta(minutes=minutes)
-        else:
-            cutoff = now.replace(hour=0, minute=0, second=0, microsecond=0)
-
-        # Ensure cutoff is timezone-aware if Trade.order_timestamp is aware
-        # In this project, all timestamps should be UTC aware.
-
-        result = await db.execute(
-            select(func.count(Trade.id)).where(
-                and_(
-                    Trade.broker_account_id == broker_account_id,
-                    Trade.status == "COMPLETE",
-                    Trade.order_timestamp >= cutoff
+            result = await db.execute(
+                select(func.count(Trade.id)).where(
+                    and_(
+                        Trade.broker_account_id == broker_account_id,
+                        Trade.status == "COMPLETE",
+                        Trade.order_timestamp >= cutoff
+                    )
                 )
             )
-        )
+        else:
+            today_start_utc = datetime.combine(
+                datetime.now(IST).date(), _time.min, tzinfo=IST
+            ).astimezone(timezone.utc)
+            result = await db.execute(
+                select(func.count(CompletedTrade.id)).where(
+                    and_(
+                        CompletedTrade.broker_account_id == broker_account_id,
+                        CompletedTrade.exit_time >= today_start_utc,
+                    )
+                )
+            )
         return result.scalar() or 0
 
     async def _count_consecutive_losses(

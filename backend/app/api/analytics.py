@@ -2975,10 +2975,10 @@ async def get_discipline_summary(
     """
     try:
         from statistics import mean as _mean
-        import pytz
+        from zoneinfo import ZoneInfo as _ZoneInfo
 
         now_utc = datetime.now(timezone.utc)
-        IST = pytz.timezone("Asia/Kolkata")
+        IST = _ZoneInfo("Asia/Kolkata")
         now_ist = now_utc.astimezone(IST)
 
         # Current week: Monday 00:00 IST → now
@@ -3041,7 +3041,10 @@ async def get_discipline_summary(
             revenge_free_days = 30
         else:
             last_revenge = revenge_times[0]
-            revenge_free_days = (now_utc - last_revenge).days
+            # Compare IST dates to avoid ±1 day error in 18:30–23:59 UTC window
+            now_ist_date = now_utc.astimezone(IST).date()
+            last_revenge_ist_date = last_revenge.astimezone(IST).date()
+            revenge_free_days = (now_ist_date - last_revenge_ist_date).days
 
         # ── 4-week trend ──────────────────────────────────────────────────────
         weeks_res = await db.execute(
@@ -3052,6 +3055,11 @@ async def get_discipline_summary(
         )
         all_past_alerts = weeks_res.fetchall()
 
+        # Neutral quality component for past weeks — quality_score field is not yet
+        # populated by any service, so using 4.0/8 neutral default rather than
+        # leaking current week's quality into all historical weeks.
+        neutral_quality = min(40, round((4.0 / 8) * 40))  # 20 pts
+
         # Build weekly scores for sparkline (last 4 weeks)
         weekly_trend = []
         for w in range(3, -1, -1):
@@ -3059,7 +3067,7 @@ async def get_discipline_summary(
             we = now_utc - timedelta(weeks=w)
             wk_danger  = sum(1 for at, sev in all_past_alerts if ws <= at < we and sev == "danger")
             wk_caution = sum(1 for at, sev in all_past_alerts if ws <= at < we and sev == "caution")
-            wk_score   = max(0, 60 - (wk_danger * 10) - (wk_caution * 3)) + quality_score_component
+            wk_score   = max(0, 60 - (wk_danger * 10) - (wk_caution * 3)) + neutral_quality
             weekly_trend.append(min(100, wk_score))
 
         return {
