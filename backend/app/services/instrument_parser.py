@@ -192,11 +192,9 @@ def is_expiry_day(symbol: str, trade_date: date) -> bool:
       last Thursday of the contract month (NSE standard monthly expiry).
     - EQ / unknown: returns False.
 
-    NOTE: Does not account for NSE holiday adjustments. When the last Thursday
-    is a market holiday, NSE moves expiry to Wednesday. To handle this correctly
-    a trading calendar API or a maintained holiday list is needed. This is still
-    far more accurate than hardcoded Thursday (weekday==3) which fires on EVERY
-    Thursday regardless of whether it is an expiry.
+    Monthly expiry uses _last_thursday_of_month() which already walks back
+    past NSE holidays, so holiday-adjusted expiries (e.g. Wednesday when
+    last Thursday is a holiday) are handled correctly.
     """
     parsed = parse_symbol(symbol)
     if not parsed.expiry_date:

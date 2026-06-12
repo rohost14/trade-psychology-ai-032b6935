@@ -721,22 +721,26 @@ async def run_behavior_engine_full_session(broker_account_id: UUID, db) -> int:
         if a.pattern_type not in last_fired or a.detected_at > last_fired[a.pattern_type]:
             last_fired[a.pattern_type] = a.detected_at
 
-    def _is_deduped_full(pattern_type: str) -> bool:
+    def _is_deduped_full(pattern_type: str, trade_time: datetime) -> bool:
         if pattern_type not in last_fired:
             return False
         hours = _DEDUP_HOURS.get(pattern_type, 24)
-        return (now_utc - last_fired[pattern_type]) < timedelta(hours=hours)
+        # Use the trade's own exit_time as reference, not now_utc.
+        # During bulk historical replay (e.g. 6 PM) trades from 10 AM would
+        # compute now_utc - last_fired = 8h >> 2h window → dedup never fires.
+        return (trade_time - last_fired[pattern_type]) < timedelta(hours=hours)
 
     all_new_alerts: list[RiskAlert] = []
 
     for ct in trades_today:
+        trade_time = ct.exit_time or now_utc
         result = await behavior_engine.analyze(
             broker_account_id=broker_account_id,
             completed_trade=ct,
             db=db,
         )
         for alert in result.alerts:
-            if _is_deduped_full(alert.pattern_type):
+            if _is_deduped_full(alert.pattern_type, trade_time):
                 continue
             if alert.pattern_type == "consecutive_loss_streak" \
                     and alert.pattern_type in today_patterns:

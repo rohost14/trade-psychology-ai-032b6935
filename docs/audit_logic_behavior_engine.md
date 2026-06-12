@@ -404,17 +404,9 @@ At line 693+, the loop does commit per-alert but the dedup state in-memory is up
 
 ### EXPIRY-1: Monthly expiry holiday adjustment not implemented
 **File**: instrument_parser.py:181–209  
-**Status**: BUG  
-**Finding**: `is_expiry_day` for monthly contracts uses `_last_thursday_of_month()` without checking NSE holidays. The docstring explicitly acknowledges this gap. NSE holiday list is available in `market_hours.py` via `is_trading_holiday()`. When last Thursday is a holiday, NSE moves expiry to Wednesday.  
-**Impact**: Several times per year (Diwali, Holi, etc. sometimes fall on Thursday), the actual expiry day is Wednesday but `is_expiry_day` returns True for Thursday (a regular trading day) and False for Wednesday (actual expiry). All expiry-aware patterns (`no_stoploss` expiry modifier, `fomo_entry` expiry threshold, `expiry_day_overtrading`) will misfire on these dates.  
-**Fix**:
-```python
-from app.core.market_hours import is_trading_holiday
-expected = _last_thursday_of_month(year, month)
-while is_trading_holiday(expected):
-    expected -= timedelta(days=1)  # step back to Wednesday, Tuesday, etc.
-return expected == trade_date
-```
+**Status**: ~~BUG~~ **RESOLVED (already fixed)**  
+**Finding**: ~~`_last_thursday_of_month()` does not check NSE holidays.~~  
+**Resolution**: `_last_thursday_of_month()` already calls `is_trading_holiday(d)` and walks back until it lands on a trading day (lines 178–179). The docstring on `is_expiry_day` was stale and incorrectly described this as an open gap. Docstring corrected 2026-06-12.
 
 ---
 

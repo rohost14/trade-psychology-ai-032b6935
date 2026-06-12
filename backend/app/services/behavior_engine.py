@@ -401,22 +401,12 @@ class BehaviorEngine:
 
         streak = 0
         total_loss = Decimal("0")
+        losing_trades = []
         for ct in reversed(trades):
             pnl = Decimal(str(ct.realized_pnl or 0))
             if pnl < 0:
                 streak += 1
                 total_loss += abs(pnl)
-            else:
-                break
-
-        caution = ctx.thresholds.get("consecutive_loss_caution", 3)
-        danger  = ctx.thresholds.get("consecutive_loss_danger", 5)
-
-        # Build per-trade list for detail sheet (oldest first)
-        losing_trades = []
-        for ct in reversed(trades):
-            pnl = Decimal(str(ct.realized_pnl or 0))
-            if pnl < 0:
                 losing_trades.append({
                     "symbol": ct.tradingsymbol or "—",
                     "pnl": float(pnl),
@@ -425,6 +415,9 @@ class BehaviorEngine:
             else:
                 break
         losing_trades.reverse()  # oldest → newest for display
+
+        caution = ctx.thresholds.get("consecutive_loss_caution", 3)
+        danger  = ctx.thresholds.get("consecutive_loss_danger", 5)
 
         if streak >= danger:
             return DetectedEvent(
