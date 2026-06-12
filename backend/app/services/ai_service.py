@@ -1,10 +1,33 @@
 import os
+import re
 import httpx
 import json
 from typing import List, Dict, Optional
 import logging
 from datetime import datetime
 from app.core.config import settings
+
+# ── SEBI pre-LLM classifier ──────────────────────────────────────────────────
+# Catch obvious trading-advice requests BEFORE context building and LLM call.
+# Saves DB queries + token cost. System prompt handles edge cases.
+_SEBI_PATTERNS = [
+    re.compile(r'\bshould\s+i\s+(buy|sell|short|exit|enter)\b.{0,40}\b(nifty|banknifty|sensex|ce|pe|call|put|fut|future)', re.I),
+    re.compile(r'\b(give me|share|send me|tell me).{0,20}\b(signal|call|tip|pick|trading recommendation)\b', re.I),
+    re.compile(r'\btrading\s+(call|tip|signal)\b', re.I),
+    re.compile(r'\b(entry|exit)\s+(level|price|point)\s+(?:for|of|on)\b', re.I),
+    re.compile(r'\b(will|going to|gonna)\b.{0,30}\b(go up|go down|rally|crash|dump|pump|reach|touch)\b', re.I),
+    re.compile(r'\bwhat\s+(should|can|do)\s+i\s+trade\b', re.I),
+    re.compile(r'\bwhich\s+(stock|instrument|option|strike|expiry)\s+(?:to|should|can)\s+(?:buy|trade|sell)\b', re.I),
+    re.compile(r'\bwhat.{0,20}(?:target|stop.?loss|stoploss)\s+(?:should|to|for)\b', re.I),
+]
+
+SEBI_REDIRECT = (
+    "That's a trading recommendation — I can't give buy/sell calls, price targets, or entry/exit levels. "
+    "SEBI requires a registered research analyst for that, which I'm not.\n\n"
+    "What I *can* do: reflect your own behavior back at you. "
+    "If something's pulling you toward this trade right now — FOMO, revenge, a genuine setup — "
+    "tell me what it feels like and I'll give you an honest read from your pattern data."
+)
 
 logger = logging.getLogger(__name__)
 
@@ -661,6 +684,11 @@ Output the message string only."""
             
         return response.get('content', '').strip()
 
+    @staticmethod
+    def check_sebi_violation(message: str) -> bool:
+        """True if message is asking for a trading recommendation/signal."""
+        return any(p.search(message) for p in _SEBI_PATTERNS)
+
     def _build_chat_system_prompt(
         self,
         trading_context: str,
@@ -716,12 +744,20 @@ Output the message string only."""
 
 10. JOURNAL ENTRIES ARE YOUR RAW MATERIAL, NOT YOUR ANSWER. When journal entries are in the data, use them to identify patterns, extract insights, or notice emotional states — do NOT quote them back word for word. The trader wrote those entries themselves; reading them back adds zero value. If they asked "what did I do right?", synthesize the behavioural pattern you observe across entries (e.g., "You enter well when you wait for structure — that's a consistent edge in your winning trades"), not a transcript.
 
-11. SEBI COMPLIANCE — STRICT. You are a behavioral coach, NOT a financial advisor or analyst. You MUST NEVER:
+11. SEBI COMPLIANCE — STRICT. You are a behavioral coach, NOT a financial advisor or research analyst. You MUST NEVER:
    - Suggest what to buy or sell
    - Give entry/exit price levels, targets, or stop-loss levels as advice
    - Recommend specific instruments, sectors, or strategies
    - Give signals or calls of any kind
-   If asked for trading advice or signals, redirect clearly: "I can't give you trade recommendations — I'm a behavior coach, not an analyst. But looking at your data, what I can tell you is [behavioral observation about their past trades]."
+   - Comment on whether a live open position should be held or exited
+   If asked, redirect clearly: "I can't give trade recommendations — I'm a behavior coach. But looking at your data: [behavioral observation]."
+
+12. RESPONSE LENGTH — HARD LIMITS. You are being called via API on mobile. Tokens cost money. Every extra sentence is a cost.
+   - Simple factual questions (last trade, today's P&L, win rate): 1–2 sentences, max 40 words
+   - Behavioral questions (what pattern, why bad day): 3–5 sentences, max 100 words
+   - Deep analysis (user explicitly asked "analyze", "breakdown", "in detail"): max 180 words
+   NEVER write bullet points, headers, numbered lists, or multi-paragraph responses in normal mode.
+   If you're tempted to write more, cut it in half.
 
 **THEIR ACTUAL TRADING DATA:**
 {context_section}
@@ -760,8 +796,8 @@ Remember: Your job is to hold up a mirror to this trader's behavior — what the
         # Build messages with history
         messages = [{"role": "system", "content": system_prompt}]
 
-        # Add chat history (last 10 messages for context)
-        for msg in chat_history[-10:]:
+        # Last 3 exchanges (6 messages) — older context is stale, wastes tokens
+        for msg in chat_history[-6:]:
             messages.append({
                 "role": msg.get("role", "user"),
                 "content": msg.get("content", "")
@@ -812,7 +848,7 @@ Remember: Your job is to hold up a mirror to this trader's behavior — what the
             )
 
         messages = [{"role": "system", "content": system_prompt}]
-        for msg in chat_history[-10:]:
+        for msg in chat_history[-6:]:
             messages.append({"role": msg.get("role", "user"), "content": msg.get("content", "")})
         messages.append({"role": "user", "content": user_message})
 

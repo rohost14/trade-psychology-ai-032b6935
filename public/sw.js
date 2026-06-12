@@ -45,7 +45,11 @@ self.addEventListener('push', (event) => {
         // Additional notification options
         requireInteraction: payload.severity === 'danger',
         actions: payload.actions || getDefaultActions(payload.pattern_type),
-        vibrate: payload.severity === 'danger' ? [200, 100, 200, 100, 200] : [200, 100, 200]
+        vibrate: payload.severity === 'danger'
+          ? [200, 100, 200, 100, 200]
+          : payload.data?.type === 'early_warning'
+          ? [150, 80, 150]
+          : [200, 100, 200]
       };
     } catch (e) {
       console.error('[SW] Error parsing push data:', e);

@@ -5,6 +5,7 @@ import { Link2, Loader2, AlertTriangle, RefreshCw, X } from 'lucide-react';
 import BlowupShieldCard from '@/components/dashboard/BlowupShieldCard';
 import { MorningIntentCard } from '@/components/dashboard/MorningIntentCard';
 import { EodComparisonCard } from '@/components/dashboard/EodComparisonCard';
+import { SetupNudgeCard } from '@/components/dashboard/SetupNudgeCard';
 import RecentAlertsCard from '@/components/dashboard/RecentAlertsCard';
 import AlertDetailSheet from '@/components/alerts/AlertDetailSheet';
 import OpenPositionsTable from '@/components/dashboard/OpenPositionsTable';
@@ -505,6 +506,9 @@ export default function Dashboard() {
           )}
         </div>
       </div>
+
+      {/* ── Setup nudge (new users only, dismissable) ────────────────────── */}
+      <SetupNudgeCard />
 
       {/* ── Morning Intent / EOD Comparison ──────────────────────────────── */}
       <div className="mb-4 space-y-4">

@@ -622,6 +622,25 @@ async def run_risk_detection_async(broker_account_id: UUID, db, trigger_trade: T
         from app.core.event_bus import publish_event
         publish_event(str(broker_account_id), "trade_update", {})
 
+        # Early warnings (soft nudges before danger threshold)
+        try:
+            from app.services.early_warning_service import check_early_warnings
+            from app.services.push_notification_service import push_service
+            ew_redis = _get_redis_client()
+            ew_warnings = await check_early_warnings(broker_account_id, db, ew_redis)
+            for w in ew_warnings:
+                await push_service.send_notification(
+                    broker_account_id=broker_account_id,
+                    title=w["title"],
+                    body=w["body"],
+                    db=db,
+                    data=w["data"],
+                    severity=w.get("severity", "info"),
+                    tag=w.get("tag", "early-warning"),
+                )
+        except Exception as ew_e:
+            logger.warning(f"[EarlyWarning] non-critical failure: {ew_e}")
+
     except Exception as e:
         logger.error(f"Risk detection error: {e}", exc_info=True)
 

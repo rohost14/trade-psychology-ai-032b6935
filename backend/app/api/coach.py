@@ -25,7 +25,7 @@ import asyncio
 
 from app.core.database import get_db
 from app.api.deps import get_verified_broker_account_id
-from app.services.ai_service import ai_service
+from app.services.ai_service import ai_service, SEBI_REDIRECT
 from app.services.rag_service import rag_service
 from app.models.position import Position
 from app.models.risk_alert import RiskAlert
@@ -80,20 +80,19 @@ class SaveInsightRequest(BaseModel):
 
 async def _build_trading_context(
     broker_account_id: UUID,
-    db: AsyncSession
+    db: AsyncSession,
+    fast_mode: bool = True,
 ) -> tuple[str, Optional["UserProfile"]]:
     """
     Build rich trading context for LLM from the last 7 days of CLOSED positions
-    and journal entries. This is what the AI uses to answer questions like:
-    - "What was my last trade?"
-    - "How much did I lose on BDL?"
-    - "What's my worst time of day?"
-    - "Give me analysis of last 7 days"
+    and journal entries. fast_mode=True (default) trims context for token efficiency.
     """
     now_ist = datetime.now(IST)
     seven_days_ago_utc = (now_ist - timedelta(days=7)).astimezone(timezone.utc)
+    thirty_days_ago_utc = (now_ist - timedelta(days=30)).astimezone(timezone.utc)
 
-    # ── 1. Fetch last 7 days of CLOSED positions (not raw orders) ──
+    # ── 1. Fetch last 7 days of CLOSED positions ──
+    pos_limit = 25 if fast_mode else 50
     pos_result = await db.execute(
         select(Position)
         .where(
@@ -102,7 +101,7 @@ async def _build_trading_context(
             Position.last_exit_time >= seven_days_ago_utc
         )
         .order_by(Position.last_exit_time.desc())
-        .limit(50)
+        .limit(pos_limit)
     )
     positions: List[Position] = list(pos_result.scalars().all())
 
@@ -349,6 +348,24 @@ async def _build_trading_context(
             lines.extend(parts)
         lines.append("")
 
+    # Section H: 30-day pattern frequency — lets coach say "revenge trading is your #1 issue"
+    pattern_freq_result = await db.execute(
+        select(RiskAlert.pattern_type, func.count(RiskAlert.id).label("n"))
+        .where(
+            RiskAlert.broker_account_id == broker_account_id,
+            RiskAlert.detected_at >= thirty_days_ago_utc,
+        )
+        .group_by(RiskAlert.pattern_type)
+        .order_by(func.count(RiskAlert.id).desc())
+        .limit(5)
+    )
+    pattern_freq = pattern_freq_result.all()
+    if pattern_freq:
+        lines.append("**Your Recurring Patterns (30 days):**")
+        for pt, n in pattern_freq:
+            lines.append(f"- {pt.replace('_', ' ').title()}: {n}x")
+        lines.append("")
+
     return "\n".join(lines), profile
 
 
@@ -497,6 +514,7 @@ async def _build_chat_context(
     broker_account_id: UUID,
     db: AsyncSession,
     message: str,
+    deep_mode: bool = False,
 ) -> tuple[str, str, Optional[str]]:
     """
     Build full LLM context for a chat request.
@@ -506,7 +524,9 @@ async def _build_chat_context(
     from app.models.coach_session import CoachSession
     from sqlalchemy import desc
 
-    trading_context, user_profile = await _build_trading_context(broker_account_id, db)
+    trading_context, user_profile = await _build_trading_context(
+        broker_account_id, db, fast_mode=not deep_mode
+    )
     ai_persona = user_profile.ai_persona if user_profile and user_profile.ai_persona else "coach"
 
     session_memory = ""
@@ -558,8 +578,15 @@ async def chat_with_coach(
         from app.models.coach_session import CoachSession
         from sqlalchemy import desc
 
+        # Pre-LLM SEBI guard — zero DB cost on violation
+        if ai_service.check_sebi_violation(request.message):
+            return ChatResponse(
+                response=SEBI_REDIRECT,
+                timestamp=datetime.now(timezone.utc).isoformat()
+            )
+
         full_context, ai_persona, rag_context = await _build_chat_context(
-            broker_account_id, db, request.message
+            broker_account_id, db, request.message, deep_mode=(request.analysis_type == "deep")
         )
 
         # Generate AI response
@@ -793,8 +820,16 @@ async def chat_with_coach_stream(
     Session save runs as a background asyncio task after the stream completes.
     """
     try:
+        # Pre-LLM SEBI guard — zero DB cost on violation
+        if ai_service.check_sebi_violation(request.message):
+            async def _sebi_stream():
+                yield f"data: {_json.dumps({'text': SEBI_REDIRECT})}\n\n"
+                yield "data: [DONE]\n\n"
+            return StreamingResponse(_sebi_stream(), media_type="text/event-stream",
+                                     headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"})
+
         full_context, ai_persona, rag_context = await _build_chat_context(
-            broker_account_id, db, request.message
+            broker_account_id, db, request.message, deep_mode=(request.analysis_type == "deep")
         )
         history = [m.dict() for m in (request.history or [])]
         collected: list[str] = []
