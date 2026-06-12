@@ -458,7 +458,7 @@ class BehaviorEngine:
     def _detect_revenge_trade(self, ctx: EngineContext) -> Optional[DetectedEvent]:
         ct = ctx.completed_trade
         trades = ctx.session_trades
-        if not ct.entry_time or len(trades) < 2:
+        if not ct.entry_time or len(trades) < 1:
             return None
 
         prior = [t for t in trades if t.exit_time and t.exit_time < ct.entry_time]
@@ -585,8 +585,8 @@ class BehaviorEngine:
                                  "caution_limit": burst_caution, "danger_limit": burst_danger},
                     )
 
-        # Check 2: daily session count
-        daily_count = len(ctx.session_trades)
+        # Check 2: daily session count (include current trade in total)
+        daily_count = len(ctx.session_trades) + 1
         if daily_count >= daily_danger:
             return DetectedEvent(
                 event_type="overtrading_burst",
@@ -1532,14 +1532,14 @@ class BehaviorEngine:
         ct_parsed = parse_symbol(ct.tradingsymbol or "")
         underlying = ct_parsed.underlying
 
-        # Today's completed trades for this underlying on expiry
+        # Today's completed trades for this underlying on expiry (include current trade)
         today_expiry_trades = [
             t for t in ctx.session_trades
             if parse_symbol(t.tradingsymbol or "").underlying == underlying
             and t.instrument_type in ("CE", "PE", "FUT")
         ]
-        today_count = len(today_expiry_trades)
-        today_lots = sum(t.total_quantity or 1 for t in today_expiry_trades)
+        today_count = len(today_expiry_trades) + 1
+        today_lots = sum(t.total_quantity or 1 for t in today_expiry_trades) + (ct.total_quantity or 1)
 
         caution_count = ctx.thresholds.get("expiry_overtrading_caution_count", 5)
         danger_count  = ctx.thresholds.get("expiry_overtrading_danger_count", 8)
@@ -1600,7 +1600,8 @@ class BehaviorEngine:
 
         entry_ist = ct.entry_time.astimezone(IST)
         market_open = entry_ist.replace(hour=9, minute=15, second=0, microsecond=0)
-        trap_end    = entry_ist.replace(hour=9, minute=25, second=0, microsecond=0)
+        trap_window_end_min = ctx.thresholds.get("opening_trap_window_end_min", 10)
+        trap_end = market_open + timedelta(minutes=trap_window_end_min)
 
         if not (market_open <= entry_ist <= trap_end):
             return None
@@ -1618,8 +1619,10 @@ class BehaviorEngine:
         if ct.instrument_type in ("CE", "PE") and entry_price > 0 and qty > 0:
             loss_pct = abs(pnl) / (entry_price * qty) * 100
 
-        is_quick_reactive = duration <= 15
-        is_large_loss = loss_pct >= 30
+        quick_exit_min  = ctx.thresholds.get("opening_trap_quick_exit_min", 15)
+        large_loss_pct  = ctx.thresholds.get("opening_trap_large_loss_pct", 30)
+        is_quick_reactive = duration <= quick_exit_min
+        is_large_loss = loss_pct >= large_loss_pct
 
         if not (is_quick_reactive or is_large_loss):
             return None
@@ -1695,14 +1698,14 @@ class BehaviorEngine:
             squareoff_total_min = 15 * 60 + 15
             squareoff_str = "15:15"
 
-        # Count all MIS trades entered after 15:00 IST today
+        # Count all MIS trades entered after 15:00 IST today (include current trade)
         panic_trades = [
             t for t in ctx.session_trades
             if t.product in ("MIS", "INTRADAY")
             and t.entry_time
             and t.entry_time.astimezone(IST) >= panic_start
         ]
-        panic_count = len(panic_trades)
+        panic_count = len(panic_trades) + 1
 
         caution_count = ctx.thresholds.get("end_session_mis_caution_count", 2)
         danger_count  = ctx.thresholds.get("end_session_mis_danger_count", 3)

@@ -135,7 +135,9 @@ COLD_START_DEFAULTS: Dict[str, Any] = {
     # ── Opening 10-minute trap ────────────────────────────────────────────
     # 09:15-09:25 IST: widest spreads, most distorted option pricing of the day.
     # NSE data: 78% of retail opening-10-min derivative trades are unprofitable.
-    # (This pattern fires once per entry — no separate threshold needed)
+    'opening_trap_window_end_min':      10,   # minutes after 09:15 that the trap window closes (→ 09:25)
+    'opening_trap_quick_exit_min':      15,   # hold ≤ this = "quick reactive exit" trigger
+    'opening_trap_large_loss_pct':      30,   # loss ≥ this % of premium = "large loss" trigger
 
     # ── End-of-session MIS panic ──────────────────────────────────────────
     # MIS trades entered after 15:00 IST face auto-square-off at ~15:20.
@@ -176,7 +178,7 @@ COLD_START_DEFAULTS: Dict[str, Any] = {
     # SEBI FY2022: retail sold winning positions 2.7× faster than losing positions.
     # Disposition effect is 2-3× stronger in Indian retail vs institutional.
     'early_exit_ratio':                 0.40, # winner hold < 40% of loser hold
-    'early_exit_winner_max_min':        20,   # avg winner hold must be < 20 min absolute
+    'early_exit_winner_max_min':        60,   # avg winner hold must be < 60 min absolute (covers classic 25-40 min winner / 2-4 hr loser disposition pattern)
     'early_exit_min_samples':           3,    # need 3+ winners AND 3+ losers for signal
 
     # ── Options behavioral patterns ───────────────────────────────────────
