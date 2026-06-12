@@ -15,6 +15,9 @@ const PatternsTab   = lazy(() => import('@/components/analytics/PatternsTab'));
 const TradesTab     = lazy(() => import('@/components/analytics/TradesTab'));
 const BtstTab       = lazy(() => import('@/components/analytics/BtstTab'));
 const PnlPercentTab = lazy(() => import('@/components/analytics/PnlPercentTab'));
+const EdgeMapTab    = lazy(() => import('@/components/analytics/EdgeMapTab'));
+const ExpiryTab     = lazy(() => import('@/components/analytics/ExpiryTab'));
+const JournalCorrelationTab = lazy(() => import('@/components/analytics/JournalCorrelationTab'));
 
 function TabSkeleton() {
   return (
@@ -35,11 +38,14 @@ const PERIOD_OPTIONS = [
 ] as const;
 
 const TABS = [
-  { value: 'summary',  label: 'Summary'  },
-  { value: 'patterns', label: 'Patterns' },
-  { value: 'trades',   label: 'Trades'   },
-  { value: 'btst',     label: 'BTST'     },
-  { value: 'pnlpct',   label: '% Return' },
+  { value: 'summary',   label: 'Summary'   },
+  { value: 'patterns',  label: 'Patterns'  },
+  { value: 'trades',    label: 'Trades'    },
+  { value: 'btst',      label: 'BTST'      },
+  { value: 'pnlpct',    label: '% Return'  },
+  { value: 'edgemap',   label: 'Edge Map'  },
+  { value: 'expiry',    label: 'Expiry'    },
+  { value: 'journal',   label: 'Journal'   },
 ] as const;
 
 type TabValue = typeof TABS[number]['value'];
@@ -137,6 +143,9 @@ export default function Analytics() {
           {tab === 'trades'   && <TradesTab days={days} />}
           {tab === 'btst'     && <BtstTab days={days} />}
           {tab === 'pnlpct'   && <PnlPercentTab days={days} />}
+          {tab === 'edgemap'  && <EdgeMapTab days={days} />}
+          {tab === 'expiry'   && <ExpiryTab days={days} />}
+          {tab === 'journal'  && <JournalCorrelationTab days={days} />}
         </Suspense>
       </ErrorBoundary>
 

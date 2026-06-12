@@ -3084,3 +3084,89 @@ async def get_discipline_summary(
     except Exception as e:
         logger.error(f"discipline-summary failed: {e}")
         raise HTTPException(status_code=500, detail="Internal server error")
+
+
+@router.get("/expiry-pattern")
+async def get_expiry_pattern(
+    days: int = Query(default=90, ge=7, le=365),
+    broker_account_id: UUID = Depends(get_verified_broker_account_id),
+    db: AsyncSession = Depends(get_db),
+    _limiter: None = Depends(analytics_limiter),
+):
+    """Expiry day vs non-expiry day performance breakdown."""
+    try:
+        cutoff = datetime.now(timezone.utc) - timedelta(days=days)
+
+        result = await db.execute(
+            select(CompletedTrade, CompletedTradeFeature)
+            .outerjoin(
+                CompletedTradeFeature,
+                CompletedTrade.id == CompletedTradeFeature.completed_trade_id,
+            )
+            .where(
+                and_(
+                    CompletedTrade.broker_account_id == broker_account_id,
+                    CompletedTrade.exit_time >= cutoff,
+                )
+            )
+            .order_by(CompletedTrade.exit_time.desc())
+        )
+        rows = result.all()
+
+        if not rows:
+            return {"has_data": False, "period_days": days}
+
+        expiry: list[dict] = []
+        non_expiry: list[dict] = []
+
+        for ct, feat in rows:
+            pnl = float(ct.pnl) if ct.pnl is not None else 0.0
+            hour = ct.entry_time.hour if ct.entry_time else None
+            is_exp = bool(feat.is_expiry_day) if feat else False
+            trade_dict = {"pnl": pnl, "hour": hour, "symbol": ct.trading_symbol or ""}
+            if is_exp:
+                expiry.append(trade_dict)
+            else:
+                non_expiry.append(trade_dict)
+
+        def bucket_stats(trades: list[dict]) -> dict:
+            if not trades:
+                return {"trade_count": 0, "win_rate": 0, "avg_pnl": 0, "total_pnl": 0}
+            wins = sum(1 for t in trades if t["pnl"] > 0)
+            total_pnl = sum(t["pnl"] for t in trades)
+            return {
+                "trade_count": len(trades),
+                "win_rate": round(wins / len(trades) * 100, 1),
+                "avg_pnl": round(total_pnl / len(trades), 2),
+                "total_pnl": round(total_pnl, 2),
+            }
+
+        # Hour buckets for intraday breakdown (9–15 IST)
+        by_hour = []
+        for h in range(9, 16):
+            exp_h = [t for t in expiry if t["hour"] == h]
+            non_h = [t for t in non_expiry if t["hour"] == h]
+            if exp_h or non_h:
+                by_hour.append({
+                    "hour": h,
+                    "label": f"{h:02d}:00",
+                    "expiry_count": len(exp_h),
+                    "expiry_avg_pnl": round(sum(t["pnl"] for t in exp_h) / len(exp_h), 2) if exp_h else 0,
+                    "non_expiry_count": len(non_h),
+                    "non_expiry_avg_pnl": round(sum(t["pnl"] for t in non_h) / len(non_h), 2) if non_h else 0,
+                })
+
+        # Worst 5 expiry trades
+        worst_expiry = sorted(expiry, key=lambda t: t["pnl"])[:5]
+
+        return {
+            "has_data": True,
+            "period_days": days,
+            "expiry": bucket_stats(expiry),
+            "non_expiry": bucket_stats(non_expiry),
+            "by_hour": by_hour,
+            "worst_expiry_trades": worst_expiry,
+        }
+    except Exception as e:
+        logger.error(f"expiry-pattern failed: {e}")
+        raise HTTPException(status_code=500, detail="Internal server error")
