@@ -250,3 +250,39 @@ async def _calc_adherence_streak(broker_account_id, db) -> int:
         prev_date = s.session_date
 
     return streak
+
+
+@celery_app.task(name="app.tasks.intent_tasks.refresh_personalization_patterns", bind=True, max_retries=1)
+def refresh_personalization_patterns(self):
+    """
+    18:15 IST daily: re-learn behavioral patterns for all active accounts.
+    Populates UserProfile.detected_patterns so PredictiveContextStrip has real data.
+    Runs 15 min after daily score push (18:00) to avoid DB contention.
+    """
+    async def _run():
+        from app.services.ai_personalization_service import ai_personalization_service
+        async with SessionLocal() as db:
+            rows = (await db.execute(
+                select(BrokerAccount).where(
+                    and_(
+                        BrokerAccount.access_token.isnot(None),
+                        BrokerAccount.is_active == True,
+                    )
+                )
+            )).scalars().all()
+
+            for account in rows:
+                try:
+                    result = await ai_personalization_service.learn_patterns(
+                        broker_account_id=account.id,
+                        db=db,
+                        days_back=90,
+                    )
+                    if result.get("insufficient_data"):
+                        logger.debug(f"[Personalization] {account.id}: insufficient data ({result.get('trades_analyzed', 0)} trades)")
+                    else:
+                        logger.info(f"[Personalization] {account.id}: patterns refreshed ({result.get('trades_analyzed', 0)} trades)")
+                except Exception as e:
+                    logger.warning(f"[Personalization] pattern refresh failed for {account.id}: {e}")
+
+    asyncio.run(_run())

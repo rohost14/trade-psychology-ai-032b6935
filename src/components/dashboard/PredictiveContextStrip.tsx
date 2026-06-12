@@ -69,50 +69,65 @@ export function PredictiveContextStrip({ brokerAccountId }: Props) {
         api.get('/api/personalization/insights'),
         api.post('/api/personalization/predictive-check', {}),
       ]);
-      const insights = insRes.data;
-      const check    = chkRes.data;
+      const ins  = insRes.data;   // {has_data, danger_hours: int[], danger_days: str[], revenge_window_minutes: number|null}
+      const chk  = chkRes.data;
       const next: PredictiveItem[] = [];
 
-      const nowHour = `${new Date().getHours()}:00`;
-      if (insights.danger_hours?.includes(nowHour)) {
+      if (!ins.has_data) {
+        // No patterns learned yet — trigger background learn if stale, show nothing
+        const lastUpdated = ins.last_updated ? new Date(ins.last_updated).getTime() : 0;
+        const sevenDaysAgo = Date.now() - 7 * 24 * 60 * 60 * 1000;
+        if (lastUpdated < sevenDaysAgo) {
+          api.post('/api/personalization/learn', {}).catch(() => {}); // fire-and-forget
+        }
+        setItems([]);
+        return;
+      }
+
+      // danger_hours: list[int] e.g. [9, 14, 15]
+      const nowHour = new Date().getHours();
+      if (ins.danger_hours?.includes(nowHour)) {
         next.push({
           id: 'danger-hour',
           type: 'danger_hour',
           label: 'Danger hour',
-          detail: `You historically lose at ${nowHour}. Trade small or wait.`,
+          detail: `You historically lose at ${nowHour}:00. Trade smaller or wait it out.`,
           danger: true,
         });
       }
 
+      // danger_days: list[str] e.g. ["Friday", "Monday"]
       const days = ['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'];
       const today = days[new Date().getDay()];
-      if (insights.danger_days?.includes(today)) {
+      if (ins.danger_days?.includes(today)) {
         next.push({
           id: 'danger-day',
           type: 'danger_day',
           label: `${today} — danger day`,
-          detail: `Win rate below 35% historically on ${today}s.`,
+          detail: `Win rate below 35% on ${today}s historically. Trade with extra caution.`,
           danger: true,
         });
       }
 
-      if (insights.revenge_window_minutes && check.has_warning) {
+      // revenge_window_minutes: number | null, combined with real-time check
+      if (ins.revenge_window_minutes && chk.has_warning) {
         next.push({
           id: 'revenge-window',
           type: 'revenge_window',
           label: 'Revenge window',
-          detail: `You typically trade impulsively within ${insights.revenge_window_minutes}min of a loss. Take a breath.`,
+          detail: `You typically trade impulsively within ${Math.round(ins.revenge_window_minutes)}min of a loss. Step back.`,
           danger: false,
         });
       }
 
-      if (check.alert && !next.find(n => n.id === 'predictive-check')) {
+      // Additional predictive alert from server-side check
+      if (chk.alert && !next.find(n => n.id === 'predictive-check')) {
         next.push({
           id: 'predictive-check',
-          type: check.alert.type || 'danger_hour',
-          label: check.alert.title,
-          detail: check.alert.message,
-          danger: check.alert.severity === 'danger',
+          type: chk.alert.type || 'danger_hour',
+          label: chk.alert.title,
+          detail: chk.alert.message,
+          danger: chk.alert.severity === 'danger',
         });
       }
 

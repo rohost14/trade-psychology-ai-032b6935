@@ -164,6 +164,13 @@ celery_app.conf.update(
             "task": "app.tasks.intent_tasks.send_daily_score_push",
             "schedule": crontab(hour=18, minute=0),
         },
+        # Personalization pattern refresh — 6:15 PM IST daily.
+        # Keeps danger_hours/danger_days/revenge_window current for PredictiveContextStrip.
+        # Runs 15 min after daily-score to avoid DB contention.
+        "personalization-refresh": {
+            "task": "app.tasks.intent_tasks.refresh_personalization_patterns",
+            "schedule": crontab(hour=18, minute=15),
+        },
         # Guardrail rule monitor — every 60s during market hours (09:15–15:25 IST Mon–Fri)
         # Internal market-hours check inside the task body (beat doesn't support time ranges).
         "check-guardrails": {

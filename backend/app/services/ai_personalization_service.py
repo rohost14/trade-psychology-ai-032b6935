@@ -617,12 +617,23 @@ class AIPersonalizationService:
                 "recommendation": f"Set cooldown to at least {int(intervention['personal_revenge_window_minutes'] * 1.5)} minutes"
             })
 
+        # Flat lookup fields for the predictive context strip (avoid re-parsing insights array)
+        time_p = patterns.get("time_patterns", {})
+        int_p  = patterns.get("intervention_timing", {})
+        danger_hours_flat = [d["hour"] for d in time_p.get("danger_hours", [])]
+        danger_days_flat  = [d["day"]  for d in time_p.get("danger_days", [])]
+        revenge_window    = int_p.get("personal_revenge_window_minutes")
+
         return {
             "has_data": True,
             "last_updated": patterns.get("last_updated"),
             "trades_analyzed": patterns.get("trades_analyzed", 0),
             "insights": insights,
-            "predictive_alerts": patterns.get("predictive_windows", {}).get("alerts", [])
+            "predictive_alerts": patterns.get("predictive_windows", {}).get("alerts", []),
+            # Flat arrays consumed by PredictiveContextStrip
+            "danger_hours": danger_hours_flat,          # list[int]: hours like [9, 14]
+            "danger_days":  danger_days_flat,           # list[str]: days like ["Friday"]
+            "revenge_window_minutes": revenge_window,   # float | null
         }
 
 
