@@ -165,7 +165,7 @@ celery_app.conf.update(
             "schedule": crontab(hour=18, minute=0),
         },
         # Personalization pattern refresh — 6:15 PM IST daily.
-        # Keeps danger_hours/danger_days/revenge_window current for PredictiveContextStrip.
+        # Keeps danger_days/danger_hours current so morning intent push can include context.
         # Runs 15 min after daily-score to avoid DB contention.
         "personalization-refresh": {
             "task": "app.tasks.intent_tasks.refresh_personalization_patterns",

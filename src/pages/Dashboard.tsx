@@ -13,7 +13,6 @@ import ClosedTradesTable from '@/components/dashboard/ClosedTradesTable';
 import HoldingsCard from '@/components/dashboard/HoldingsCard';
 import { SessionHeroCard } from '@/components/dashboard/SessionHeroCard';
 import { AiCoachFab } from '@/components/dashboard/AiCoachFab';
-import { PredictiveContextStrip } from '@/components/dashboard/PredictiveContextStrip';
 import { useHoldings } from '@/hooks/useHoldings';
 import { TradeJournalSheet } from '@/components/dashboard/TradeJournalSheet';
 import { Button } from '@/components/ui/button';
@@ -527,9 +526,6 @@ export default function Dashboard() {
         closedTrades={closedTrades}
         unrealizedTotal={unrealizedTotal}
       />
-
-      {/* ── Predictive context (danger hour / day / revenge window) ──────── */}
-      {accountId && <PredictiveContextStrip brokerAccountId={accountId} />}
 
       {/* ── Real-time behavioral alerts ──────────────────────────────────── */}
       <div className="mb-5" aria-live="polite" aria-label="Behavioral alerts">

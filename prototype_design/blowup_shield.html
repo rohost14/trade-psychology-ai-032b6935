@@ -6,7 +6,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <meta name="description" content="Blowup Shield protection log. Review heeded and ignored alerts and their outcomes.">
   <link rel="icon" type="image/svg+xml" href="favicon.svg">
-  <title>Blowup Shield — TradeMentor AI</title>
+  <title>Blowup Shield | TradeMentor AI</title>
 
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -19,20 +19,21 @@
   <style type="text/tailwindcss">
     @theme {
       --font-sans: 'Inter', sans-serif;
-      --color-brand: #4F46E5;
+      --color-brand: #635BFF;
       --color-brandBg: #EEF2FF;
-      --color-profit: #059669;
-      --color-profitBg: #ecfdf5;
-      --color-loss: #dc2626;
-      --color-lossBg: #fef2f2;
-      --color-obs: #d97706;
-      --color-obsBg: #fffbeb;
+      --color-profit: #10B981;
+      --color-profitBg: #D1FAE5;
+      --color-loss: #EF4444;
+      --color-lossBg: #FEE2E2;
+      --color-obs: #F59E0B;
+      --color-obsBg: #FEF3C7;
       --color-surface: #ffffff;
-      --color-background: #F5F3FF;
+      --color-background: #F8FAFC;
       
-      --shadow-clay-card: 0 10px 24px -4px rgba(15, 23, 42, 0.04), 0 4px 12px -2px rgba(15, 23, 42, 0.02), inset -6px -6px 12px -1px rgba(15, 23, 42, 0.03), inset 6px 6px 12px rgba(255, 255, 255, 0.95);
-      --shadow-clay-card-hover: 0 20px 36px -6px rgba(99, 102, 241, 0.08), 0 8px 18px -2px rgba(15, 23, 42, 0.03), inset -8px -8px 16px -1px rgba(15, 23, 42, 0.04), inset 8px 8px 16px rgba(255, 255, 255, 0.95);
-      --shadow-clay-inset: inset 4px 4px 8px rgba(15, 23, 42, 0.05), inset -4px -4px 8px rgba(255, 255, 255, 0.85);
+      --shadow-sm: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
+      --shadow-card: 0 1px 3px 0 rgba(15, 23, 42, 0.05), 0 1px 2px -1px rgba(15, 23, 42, 0.06);
+      --shadow-card-hover: 0 4px 6px -1px rgba(15, 23, 42, 0.06), 0 2px 4px -2px rgba(15, 23, 42, 0.08);
+      --shadow-inset: inset 0 1.5px 3px 0 rgba(15, 23, 42, 0.06);
     }
   </style>
 </head>
@@ -127,14 +128,14 @@
   <main class="flex-1 w-full lg:ml-[260px] relative min-h-screen">
     <div class="bg-stripe-header"></div>
 
-        <!-- Inner Padding Wrapper -->
-    <div class="w-full px-4 sm:px-6 lg:px-10 py-6 lg:py-10 pb-20 max-w-6xl mx-auto">
+    <!-- Inner Padding Wrapper -->
+    <div class="w-full px-4 sm:px-6 lg:px-10 py-6 lg:py-10 pb-20 max-w-7xl mx-auto">
 
       <!-- Header -->
       <header class="flex flex-col sm:flex-row sm:items-end justify-between gap-4 mb-8">
         <div>
           <h1 class="text-[20px] sm:text-[24px] font-medium  text-slate-900 mb-1 flex items-center gap-3">
-            <div class="w-10 h-10 rounded-2xl bg-indigo-50 shadow-clay-inset flex items-center justify-center shrink-0">
+            <div class="w-10 h-10 rounded-lg border border-indigo-100 bg-indigo-50 shadow-inset flex items-center justify-center shrink-0">
               <svg aria-hidden="true" class="w-5 h-5 text-brand" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
                   d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z">
@@ -243,7 +244,7 @@
                 </button>
 
                 <div
-                  class="trades-block hidden mt-3 bg-slate-50 rounded-2xl border border-slate-100 divide-y divide-gray-100 shadow-clay-inset">
+                  class="trades-block hidden mt-3 bg-slate-50 rounded-lg border border-slate-200 divide-y divide-gray-100 shadow-inset">
                   <div class="flex items-center justify-between px-4 py-2.5">
                     <span class="text-[13px] font-bold text-slate-700 flex items-center gap-2"><span class="badge badge-brand">CE</span> BANKNIFTY 47500</span>
                     <span class="text-[13px] font-medium text-rose-600 tabular">-₹2,100</span>
