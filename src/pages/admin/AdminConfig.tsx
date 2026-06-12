@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { Save, AlertTriangle } from 'lucide-react';
+import { Save, AlertTriangle, Smartphone, ShieldCheck, ShieldOff } from 'lucide-react';
 import { adminApi } from '@/lib/adminApi';
 
 const C = {
@@ -28,6 +28,12 @@ export default function AdminConfig() {
   const [announcement, setAnnouncement] = useState('');
   const [saving, setSaving]             = useState<string | null>(null);
   const [saved, setSaved]               = useState<string | null>(null);
+
+  // TOTP setup state
+  const [totpPhase, setTotpPhase]       = useState<'idle' | 'setup' | 'confirm'>('idle');
+  const [totpData, setTotpData]         = useState<{ secret: string; qr_uri: string } | null>(null);
+  const [totpCode, setTotpCode]         = useState('');
+  const [totpMsg, setTotpMsg]           = useState('');
 
   const load = async () => {
     setLoading(true); setError('');
@@ -59,6 +65,32 @@ export default function AdminConfig() {
       setSaved('announcement'); setTimeout(() => setSaved(null), 2500);
     } catch (e: any) { setError(e.message); }
     finally { setSaving(null); }
+  };
+
+  const initTotpSetup = async () => {
+    setTotpMsg('');
+    try {
+      const d = await adminApi.totpSetupInit();
+      setTotpData(d);
+      setTotpPhase('setup');
+    } catch (e: any) { setTotpMsg(e.message); }
+  };
+
+  const confirmTotp = async () => {
+    setTotpMsg('');
+    try {
+      await adminApi.totpSetupConfirm(totpCode);
+      setTotpPhase('idle'); setTotpData(null); setTotpCode('');
+      setTotpMsg('TOTP enabled. Next login will require authenticator code.');
+    } catch (e: any) { setTotpMsg(e.message); }
+  };
+
+  const disableTotp = async () => {
+    setTotpMsg('');
+    try {
+      await adminApi.totpDisable();
+      setTotpMsg('TOTP disabled. Email OTP will be used for next login.');
+    } catch (e: any) { setTotpMsg(e.message); }
   };
 
   if (loading) return (
@@ -121,7 +153,7 @@ export default function AdminConfig() {
       </div>
 
       {/* Announcement */}
-      <div style={{ background: 'rgba(255,255,255,0.03)', border: `1px solid ${C.border}`, borderRadius: 14, padding: '1.5rem' }}>
+      <div style={{ background: 'rgba(255,255,255,0.03)', border: `1px solid ${C.border}`, borderRadius: 14, padding: '1.5rem', marginBottom: '1.5rem' }}>
         <div style={{ marginBottom: '1.25rem' }}>
           <h2 style={{ fontSize: '0.9rem', fontWeight: 600, color: C.text, margin: '0 0 4px' }}>Announcement Banner</h2>
           <p style={{ fontSize: '0.75rem', color: C.muted, margin: 0 }}>Shown across the app. Resets on server restart. Leave blank to clear.</p>
@@ -140,6 +172,70 @@ export default function AdminConfig() {
           <Save style={{ width: 13, height: 13 }} />
           {saving === 'announcement' ? 'Saving…' : saved === 'announcement' ? 'Saved ✓' : 'Save'}
         </button>
+      </div>
+
+      {/* TOTP MFA */}
+      <div style={{ background: 'rgba(255,255,255,0.03)', border: `1px solid ${C.border}`, borderRadius: 14, padding: '1.5rem' }}>
+        <div style={{ marginBottom: '1.25rem' }}>
+          <h2 style={{ fontSize: '0.9rem', fontWeight: 600, color: C.text, margin: '0 0 4px', display: 'flex', alignItems: 'center', gap: 8 }}>
+            <Smartphone style={{ width: 15, height: 15, color: C.amber }} /> Authenticator App (TOTP)
+          </h2>
+          <p style={{ fontSize: '0.75rem', color: C.muted, margin: 0 }}>
+            Replace email OTP with Google Authenticator or Authy for stronger MFA.
+          </p>
+        </div>
+
+        {totpMsg && (
+          <p style={{ fontSize: '0.78rem', color: totpMsg.includes('enabled') || totpMsg.includes('disabled') ? C.green : C.red, marginBottom: 12 }}>{totpMsg}</p>
+        )}
+
+        {totpPhase === 'idle' && (
+          <div style={{ display: 'flex', gap: 10 }}>
+            <button onClick={initTotpSetup}
+              style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '0.55rem 1rem', borderRadius: 9, background: 'rgba(245,158,11,0.12)', border: '1px solid rgba(245,158,11,0.25)', color: C.amber, fontSize: '0.8rem', cursor: 'pointer', fontFamily: C.dm }}>
+              <ShieldCheck style={{ width: 13, height: 13 }} /> Set Up TOTP
+            </button>
+            <button onClick={disableTotp}
+              style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '0.55rem 1rem', borderRadius: 9, background: 'rgba(239,68,68,0.08)', border: '1px solid rgba(239,68,68,0.2)', color: C.red, fontSize: '0.8rem', cursor: 'pointer', fontFamily: C.dm }}>
+              <ShieldOff style={{ width: 13, height: 13 }} /> Disable TOTP
+            </button>
+          </div>
+        )}
+
+        {totpPhase === 'setup' && totpData && (
+          <div>
+            <p style={{ fontSize: '0.78rem', color: C.muted, marginBottom: 12 }}>
+              1. Open Google Authenticator or Authy<br />
+              2. Scan the QR code below (or enter secret manually)<br />
+              3. Enter the 6-digit code to confirm
+            </p>
+            {/* QR Code via Google Charts API — no external dependency */}
+            <img
+              src={`https://api.qrserver.com/v1/create-qr-code/?size=180x180&data=${encodeURIComponent(totpData.qr_uri)}`}
+              alt="TOTP QR Code"
+              style={{ display: 'block', marginBottom: 12, borderRadius: 8, border: `1px solid ${C.border}` }}
+            />
+            <p style={{ fontSize: '0.7rem', color: C.dim, marginBottom: 12, fontFamily: 'monospace', wordBreak: 'break-all' }}>
+              Manual secret: {totpData.secret}
+            </p>
+            <div style={{ display: 'flex', gap: 10, alignItems: 'center' }}>
+              <input
+                type="text" value={totpCode}
+                onChange={e => setTotpCode(e.target.value.replace(/\D/g, '').slice(0, 6))}
+                placeholder="000000" maxLength={6}
+                style={{ width: 120, padding: '0.6rem 0.75rem', borderRadius: 9, background: 'rgba(255,255,255,0.04)', border: `1px solid ${C.border}`, color: C.text, fontFamily: 'monospace', fontSize: '1.1rem', textAlign: 'center', letterSpacing: '0.2em', outline: 'none' }}
+              />
+              <button onClick={confirmTotp} disabled={totpCode.length !== 6}
+                style={{ padding: '0.6rem 1rem', borderRadius: 9, background: 'rgba(245,158,11,0.15)', border: '1px solid rgba(245,158,11,0.3)', color: C.amber, fontSize: '0.8rem', cursor: totpCode.length !== 6 ? 'not-allowed' : 'pointer', fontFamily: C.dm, opacity: totpCode.length !== 6 ? 0.5 : 1 }}>
+                Verify & Enable
+              </button>
+              <button onClick={() => { setTotpPhase('idle'); setTotpData(null); setTotpCode(''); }}
+                style={{ padding: '0.6rem 0.75rem', borderRadius: 9, background: 'none', border: `1px solid ${C.border}`, color: C.muted, fontSize: '0.8rem', cursor: 'pointer', fontFamily: C.dm }}>
+                Cancel
+              </button>
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );

@@ -1,6 +1,15 @@
 """
-Admin authentication — email + password → OTP → JWT.
+Admin authentication — email + password → OTP/TOTP → JWT.
 Completely independent of Zerodha OAuth.
+
+Login flows:
+  A. TOTP configured:  password → totp_required → POST /totp/verify → JWT
+  B. TOTP not set up:  password → email OTP    → POST /verify      → JWT
+
+TOTP setup (requires active session):
+  GET  /totp/setup   → secret + QR URI (pending, stored in Redis 5 min)
+  POST /totp/confirm → verify code, store encrypted secret in DB
+  DELETE /totp       → disable TOTP (superadmin only)
 """
 import secrets
 import string
@@ -18,7 +27,7 @@ from jose import jwt
 from app.core.database import get_db
 from app.core.config import settings
 from app.models.admin_user import AdminUser
-from app.api.admin.deps import get_current_admin
+from app.api.admin.deps import get_current_admin, require_role
 from app.core.rate_limiter import admin_login_limiter, admin_otp_limiter
 
 _bearer_logout = HTTPBearer(auto_error=False)
@@ -29,11 +38,13 @@ pwd_ctx = CryptContext(schemes=["bcrypt"], deprecated="auto")
 
 OTP_TTL    = 300   # 5 minutes
 OTP_PREFIX = "admin_otp:"
+TOTP_PENDING_PREFIX = "admin_totp_pending:"
 
-# Per-email failed-attempt tracking (catches distributed IP attacks)
 LOGIN_FAIL_PREFIX  = "admin_fail:"
-LOGIN_FAIL_MAX     = 5      # lock after 5 consecutive failures
-LOGIN_FAIL_TTL     = 900    # 15-minute lockout window
+LOGIN_FAIL_MAX     = 5
+LOGIN_FAIL_TTL     = 900
+
+BLOCKLIST_PREFIX = "admin_jti_block:"
 
 
 def _redis():
@@ -45,9 +56,6 @@ def _make_otp() -> str:
     return "".join(secrets.choice(string.digits) for _ in range(6))
 
 
-BLOCKLIST_PREFIX = "admin_jti_block:"
-
-
 def _make_admin_jwt(admin: AdminUser) -> str:
     secret = settings.ADMIN_JWT_SECRET
     if not secret:
@@ -55,15 +63,26 @@ def _make_admin_jwt(admin: AdminUser) -> str:
     expire = datetime.now(timezone.utc) + timedelta(hours=settings.ADMIN_JWT_EXPIRE_HOURS)
     return jwt.encode(
         {
-            "sub": str(admin.id),
+            "sub":   str(admin.id),
             "email": admin.email,
-            "name": admin.name,
-            "exp": expire,
-            "jti": secrets.token_hex(16),   # unique token ID for blocklist on logout
+            "name":  admin.name,
+            "role":  admin.role,
+            "exp":   expire,
+            "jti":   secrets.token_hex(16),
         },
         secret,
         algorithm="HS256",
     )
+
+
+def _decrypt_totp_secret(enc: str) -> str:
+    from cryptography.fernet import Fernet
+    return Fernet(settings.ENCRYPTION_KEY.encode()).decrypt(enc.encode()).decode()
+
+
+def _encrypt_totp_secret(secret: str) -> str:
+    from cryptography.fernet import Fernet
+    return Fernet(settings.ENCRYPTION_KEY.encode()).encrypt(secret.encode()).decode()
 
 
 # ── Request/Response models ────────────────────────────────────────────────────
@@ -81,7 +100,7 @@ class TokenResponse(BaseModel):
     admin: dict
 
 
-# ── Endpoints ─────────────────────────────────────────────────────────────────
+# ── Step 1: Password verification ─────────────────────────────────────────────
 
 @router.post("/login")
 async def admin_login(
@@ -92,13 +111,12 @@ async def admin_login(
 ):
     """
     Step 1: verify email + password.
-    On success, generate OTP and send to admin's email.
-    Returns generic message regardless of whether email exists (no enumeration).
+    If admin has TOTP configured: returns {status: "totp_required"} — no email OTP sent.
+    Otherwise: sends email OTP and returns {status: "otp_sent"}.
     """
     r = _redis()
     fail_key = f"{LOGIN_FAIL_PREFIX}{body.email}"
 
-    # Check per-email lockout (catches attackers rotating IPs)
     fail_count = int(r.get(fail_key) or 0)
     if fail_count >= LOGIN_FAIL_MAX:
         ttl = r.ttl(fail_key)
@@ -113,13 +131,11 @@ async def admin_login(
     )
     admin = result.scalar_one_or_none()
 
-    # Always verify password to prevent timing attacks that reveal account existence
     dummy_hash = "$2b$12$dummy.hash.to.prevent.timing.attack.padding.xxxxxxxxxxx"
     check_hash = admin.password_hash if admin else dummy_hash
     valid = pwd_ctx.verify(body.password, check_hash)
 
     if not admin or not valid:
-        # Increment per-email failure counter
         pipe = r.pipeline()
         pipe.incr(fail_key)
         pipe.expire(fail_key, LOGIN_FAIL_TTL)
@@ -127,14 +143,16 @@ async def admin_login(
         logger.warning(f"Admin login failed for {body.email} (attempt {fail_count + 1})")
         raise HTTPException(status_code=401, detail="Invalid credentials")
 
-    # Success — clear failure counter
     r.delete(fail_key)
 
-    # Generate and store OTP
+    # TOTP path — skip email OTP entirely
+    if admin.totp_secret_enc:
+        return {"status": "totp_required", "message": "Enter your authenticator code"}
+
+    # Email OTP path
     otp = _make_otp()
     r.setex(f"{OTP_PREFIX}{body.email}", OTP_TTL, otp)
 
-    # Send OTP via email
     try:
         from app.services.email_service import email_service
         subject = "TradeMentor Admin — Your login code"
@@ -153,12 +171,15 @@ async def admin_login(
         await email_service.send_email(body.email, subject, html)
         logger.info(f"Admin OTP sent to {body.email}")
     except Exception as e:
-        logger.error(f"Failed to send admin OTP email to {body.email}: {e}. "
-                     "Configure SMTP_HOST/SMTP_USER/SMTP_PASS to enable email delivery. "
-                     "OTP is stored in Redis under key admin_otp:{email} — use redis-cli GET to retrieve in dev.")
+        logger.error(
+            f"Failed to send admin OTP email to {body.email}: {e}. "
+            "OTP stored in Redis under key admin_otp:{email} — use redis-cli GET in dev."
+        )
 
     return {"status": "otp_sent", "message": "Check your email for the login code"}
 
+
+# ── Step 2A: Email OTP verification ───────────────────────────────────────────
 
 @router.post("/verify", response_model=TokenResponse)
 async def admin_verify_otp(
@@ -167,16 +188,13 @@ async def admin_verify_otp(
     db: AsyncSession = Depends(get_db),
     _rl: None = Depends(admin_otp_limiter),
 ):
-    """
-    Step 2: verify OTP. On success, return admin JWT.
-    """
+    """Step 2 (email OTP path): verify OTP. Returns admin JWT."""
     r = _redis()
     stored_otp = r.get(f"{OTP_PREFIX}{body.email}")
 
     if not stored_otp or stored_otp != body.otp.strip():
         raise HTTPException(status_code=401, detail="Invalid or expired code")
 
-    # OTP is one-time — delete immediately
     r.delete(f"{OTP_PREFIX}{body.email}")
 
     result = await db.execute(
@@ -186,34 +204,151 @@ async def admin_verify_otp(
     if not admin:
         raise HTTPException(status_code=401, detail="Account not found")
 
-    # Update last login
     await db.execute(
-        update(AdminUser)
-        .where(AdminUser.id == admin.id)
+        update(AdminUser).where(AdminUser.id == admin.id)
         .values(last_login_at=datetime.now(timezone.utc))
     )
     await db.commit()
 
     token = _make_admin_jwt(admin)
-    logger.info(f"Admin login: {admin.email}")
-    # Write to DB audit log — admin logins are high-value security events
+    logger.info(f"Admin login (OTP): {admin.email} role={admin.role}")
     try:
         from app.api.admin.audit_writer import audit
         await audit(db, admin.email, "admin_login",
                     target_type="admin", target_id=str(admin.id),
-                    details={"name": admin.name})
-    except Exception as _audit_err:
-        logger.warning(f"Admin login audit log failed (non-fatal): {_audit_err}")
+                    details={"name": admin.name, "method": "email_otp"})
+    except Exception as _e:
+        logger.warning(f"Admin login audit log failed: {_e}")
+
     return TokenResponse(
         token=token,
-        admin={"id": str(admin.id), "email": admin.email, "name": admin.name},
+        admin={"id": str(admin.id), "email": admin.email, "name": admin.name, "role": admin.role},
     )
 
 
+# ── Step 2B: TOTP verification ────────────────────────────────────────────────
+
+@router.post("/totp/verify", response_model=TokenResponse)
+async def admin_verify_totp(
+    request: Request,
+    body: OTPRequest,
+    db: AsyncSession = Depends(get_db),
+    _rl: None = Depends(admin_otp_limiter),
+):
+    """Step 2 (TOTP path): verify 6-digit authenticator code. Returns admin JWT."""
+    result = await db.execute(
+        select(AdminUser).where(AdminUser.email == body.email, AdminUser.is_active == True)
+    )
+    admin = result.scalar_one_or_none()
+    if not admin or not admin.totp_secret_enc:
+        raise HTTPException(status_code=401, detail="TOTP not configured for this account")
+
+    import pyotp
+    secret = _decrypt_totp_secret(admin.totp_secret_enc)
+    totp   = pyotp.TOTP(secret)
+    if not totp.verify(body.otp.strip(), valid_window=1):
+        raise HTTPException(status_code=401, detail="Invalid authenticator code")
+
+    await db.execute(
+        update(AdminUser).where(AdminUser.id == admin.id)
+        .values(last_login_at=datetime.now(timezone.utc))
+    )
+    await db.commit()
+
+    token = _make_admin_jwt(admin)
+    logger.info(f"Admin login (TOTP): {admin.email} role={admin.role}")
+    try:
+        from app.api.admin.audit_writer import audit
+        await audit(db, admin.email, "admin_login",
+                    target_type="admin", target_id=str(admin.id),
+                    details={"name": admin.name, "method": "totp"})
+    except Exception as _e:
+        logger.warning(f"Admin login audit log failed: {_e}")
+
+    return TokenResponse(
+        token=token,
+        admin={"id": str(admin.id), "email": admin.email, "name": admin.name, "role": admin.role},
+    )
+
+
+# ── TOTP Management (requires active session) ─────────────────────────────────
+
+@router.get("/totp/setup")
+async def totp_setup_init(
+    admin_payload: dict = Depends(get_current_admin),
+):
+    """
+    Generate a new TOTP secret + QR code URI.
+    Secret is stored in Redis for 5 minutes pending confirmation.
+    Scan the QR URI with Google Authenticator / Authy, then call POST /totp/confirm.
+    """
+    import pyotp
+    secret  = pyotp.random_base32()
+    r       = _redis()
+    r.setex(f"{TOTP_PENDING_PREFIX}{admin_payload['email']}", 300, secret)
+
+    totp    = pyotp.TOTP(secret)
+    qr_uri  = totp.provisioning_uri(
+        name=admin_payload["email"],
+        issuer_name=settings.ADMIN_TOTP_ISSUER,
+    )
+    return {"secret": secret, "qr_uri": qr_uri}
+
+
+@router.post("/totp/confirm")
+async def totp_setup_confirm(
+    body: dict,
+    admin_payload: dict = Depends(get_current_admin),
+    db: AsyncSession = Depends(get_db),
+):
+    """
+    Confirm TOTP setup with a valid code from the authenticator app.
+    Stores the Fernet-encrypted secret in the DB. From next login, TOTP replaces email OTP.
+    """
+    r = _redis()
+    pending = r.get(f"{TOTP_PENDING_PREFIX}{admin_payload['email']}")
+    if not pending:
+        raise HTTPException(status_code=400, detail="No pending TOTP setup. Call GET /totp/setup first.")
+
+    import pyotp
+    totp = pyotp.TOTP(pending)
+    if not totp.verify((body.get("code") or "").strip(), valid_window=1):
+        raise HTTPException(status_code=401, detail="Invalid code. Scan the QR and try again.")
+
+    encrypted = _encrypt_totp_secret(pending)
+    result = await db.execute(select(AdminUser).where(AdminUser.id == admin_payload["sub"]))
+    admin  = result.scalar_one_or_none()
+    if not admin:
+        raise HTTPException(status_code=404)
+    admin.totp_secret_enc = encrypted
+    await db.commit()
+
+    r.delete(f"{TOTP_PENDING_PREFIX}{admin_payload['email']}")
+    logger.info(f"Admin TOTP enabled: {admin.email}")
+    return {"status": "totp_enabled", "message": "TOTP is now active for your account"}
+
+
+@router.delete("/totp")
+async def totp_disable(
+    admin_payload: dict = Depends(require_role("superadmin")),
+    db: AsyncSession = Depends(get_db),
+):
+    """Disable TOTP for the current admin account. Superadmin only."""
+    result = await db.execute(select(AdminUser).where(AdminUser.id == admin_payload["sub"]))
+    admin  = result.scalar_one_or_none()
+    if not admin:
+        raise HTTPException(status_code=404)
+    admin.totp_secret_enc = None
+    await db.commit()
+    logger.info(f"Admin TOTP disabled: {admin.email}")
+    return {"status": "totp_disabled"}
+
+
+# ── Session info + logout ─────────────────────────────────────────────────────
+
 @router.get("/me")
 async def admin_me(payload: dict = Depends(get_current_admin)):
-    """Return current admin info from JWT."""
-    return {"email": payload["email"], "name": payload["name"]}
+    return {"email": payload["email"], "name": payload["name"], "role": payload.get("role", "superadmin")}
 
 
 @router.post("/logout")
@@ -221,11 +356,7 @@ async def admin_logout(
     credentials: HTTPAuthorizationCredentials = Depends(_bearer_logout),
     payload: dict = Depends(get_current_admin),
 ):
-    """
-    Invalidate the current admin JWT server-side.
-    Stores the token's jti in Redis with TTL = remaining expiry so the
-    blocklist self-cleans — no manual pruning needed.
-    """
+    """Invalidate current admin JWT server-side via JTI blocklist."""
     jti = payload.get("jti")
     exp = payload.get("exp")
     if jti and exp:

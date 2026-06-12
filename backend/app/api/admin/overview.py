@@ -1,16 +1,19 @@
 """Admin overview — key metrics dashboard."""
 from fastapi import APIRouter, Depends
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select, func, text
-from datetime import datetime, timezone, timedelta
+from sqlalchemy import select, func
+from datetime import datetime, timezone, timedelta, time
+from zoneinfo import ZoneInfo
 
 from app.core.database import get_db
+from app.core.config import settings
 from app.api.admin.deps import get_current_admin
 from app.models.broker_account import BrokerAccount
 from app.models.risk_alert import RiskAlert
 from app.models.trade import Trade
 
 router = APIRouter()
+_IST = ZoneInfo("Asia/Kolkata")
 
 
 @router.get("/overview")
@@ -18,9 +21,11 @@ async def get_overview(
     db: AsyncSession = Depends(get_db),
     _:  dict         = Depends(get_current_admin),
 ):
-    now        = datetime.now(timezone.utc)
-    today_start = now.replace(hour=0, minute=0, second=0, microsecond=0)
-    week_start  = today_start - timedelta(days=7)
+    now = datetime.now(timezone.utc)
+    # Use IST midnight so "today" aligns with trading day, not UTC day
+    ist_today      = datetime.now(_IST).date()
+    today_start    = datetime.combine(ist_today, time.min, tzinfo=_IST).astimezone(timezone.utc)
+    week_start     = today_start - timedelta(days=7)
 
     # ── User counts ───────────────────────────────────────────────────────
     total_accounts = (await db.execute(
@@ -90,8 +95,6 @@ async def get_overview(
         health["redis"] = "ok"
     except Exception:
         health["redis"] = "error"
-
-    from app.core.config import settings
 
     return {
         "users": {

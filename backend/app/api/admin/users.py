@@ -1,4 +1,5 @@
 """Admin user management."""
+from datetime import datetime, timezone
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, func, desc, or_
@@ -6,12 +7,14 @@ from typing import Optional
 from uuid import UUID
 
 from app.core.database import get_db
-from app.api.admin.deps import get_current_admin
+from app.api.admin.deps import get_current_admin, require_role
+from app.api.admin.audit_writer import audit
 from app.models.broker_account import BrokerAccount
 from app.models.user import User
 from app.models.user_profile import UserProfile
 from app.models.trade import Trade
 from app.models.risk_alert import RiskAlert
+from app.models.admin_audit_log import AdminAuditLog
 
 router = APIRouter()
 
@@ -129,7 +132,7 @@ async def send_admin_message(
     account_id: UUID,
     body: dict,
     db: AsyncSession = Depends(get_db),
-    admin: dict = Depends(get_current_admin),
+    admin: dict = Depends(require_role("superadmin", "ops", "support")),
 ):
     """Send a WhatsApp message to a user from admin. Logged with sender info."""
     message = body.get("message", "").strip()
@@ -147,7 +150,6 @@ async def send_admin_message(
         raise HTTPException(status_code=400, detail="User has no phone number set")
 
     from app.services.whatsapp_service import whatsapp_service
-    from app.api.admin.audit_writer import audit
     success = await whatsapp_service.send_alert(user.guardian_phone, message)
 
     await audit(db, admin["email"], "send_message",
@@ -160,15 +162,14 @@ async def send_admin_message(
 async def toggle_suspend(
     account_id: UUID,
     db: AsyncSession = Depends(get_db),
-    admin: dict = Depends(get_current_admin),
+    admin: dict = Depends(require_role("superadmin", "ops")),
 ):
-    from app.api.admin.audit_writer import audit
     account = await db.get(BrokerAccount, account_id)
     if not account:
         raise HTTPException(status_code=404, detail="Account not found")
 
     new_status = "suspended" if account.status == "connected" else "connected"
-    action = "suspend_user" if new_status == "suspended" else "unsuspend_user"
+    action     = "suspend_user" if new_status == "suspended" else "unsuspend_user"
     account.status = new_status
     await db.commit()
     await audit(db, admin["email"], action,
@@ -181,31 +182,106 @@ async def toggle_suspend(
 async def delete_user(
     account_id: UUID,
     db: AsyncSession = Depends(get_db),
-    admin: dict = Depends(get_current_admin),
+    admin: dict = Depends(require_role("superadmin")),
 ):
-    """
-    Soft-delete a user account (DPDP right-to-erasure).
-
-    Revokes the Zerodha access token, marks account as 'deleted', and
-    writes an audit log entry. Does NOT hard-delete DB rows — use a
-    scheduled DB job or manual SQL for GDPR/DPDP hard erasure.
-    The account will no longer be accessible via any API endpoint.
-    """
-    from datetime import datetime, timezone
-    from app.api.admin.audit_writer import audit
-
+    """Soft-delete: revoke token, mark deleted. Does not wipe PII — use /erase for DPDP."""
     account = await db.get(BrokerAccount, account_id)
     if not account:
         raise HTTPException(status_code=404, detail="Account not found")
-    if account.status == "deleted":
-        raise HTTPException(status_code=409, detail="Account already deleted")
+    if account.status in ("deleted", "erased"):
+        raise HTTPException(status_code=409, detail="Account already deleted/erased")
 
-    account.status = "deleted"
+    account.status           = "deleted"
     account.token_revoked_at = datetime.now(timezone.utc)
-    account.access_token = None  # Remove stored token immediately
+    account.access_token     = None
     await db.commit()
 
     await audit(db, admin["email"], "delete_user",
                 target_type="user", target_id=str(account_id),
                 details={"note": "soft-delete: token revoked, status=deleted"})
     return {"status": "deleted", "account_id": str(account_id)}
+
+
+@router.delete("/users/{account_id}/erase")
+async def erase_user_data(
+    account_id: UUID,
+    db: AsyncSession = Depends(get_db),
+    admin: dict = Depends(require_role("superadmin")),
+):
+    """
+    DPDP right-to-erasure: permanently wipe all PII from the account.
+
+    Wipes: email, phone, access_token, broker_email, api_key fields.
+    Sets status to 'erased'. Writes audit entry with timestamp.
+    Irreversible — cannot be undone. Requires superadmin role.
+    """
+    account = await db.get(BrokerAccount, account_id)
+    if not account:
+        raise HTTPException(status_code=404, detail="Account not found")
+    if account.status == "erased":
+        raise HTTPException(status_code=409, detail="Account already erased")
+
+    user = await db.get(User, account.user_id) if account.user_id else None
+
+    erased_at = datetime.now(timezone.utc)
+    erased_fields = []
+
+    # Wipe broker account PII
+    if account.access_token:
+        account.access_token = None
+        erased_fields.append("access_token")
+    if account.broker_email:
+        account.broker_email = f"erased_{account_id}@deleted"
+        erased_fields.append("broker_email")
+    if hasattr(account, "api_secret_enc") and account.api_secret_enc:
+        account.api_secret_enc = None
+        erased_fields.append("api_secret_enc")
+    account.status           = "erased"
+    account.token_revoked_at = erased_at
+
+    # Wipe user PII
+    if user:
+        if user.email:
+            user.email = f"erased_{user.id}@deleted"
+            erased_fields.append("user.email")
+        if user.guardian_phone:
+            user.guardian_phone = None
+            erased_fields.append("user.guardian_phone")
+
+    await db.commit()
+
+    await audit(db, admin["email"], "erase_user",
+                target_type="user", target_id=str(account_id),
+                details={"note": "DPDP erasure", "erased_fields": erased_fields,
+                         "erased_at": erased_at.isoformat()})
+    return {"status": "erased", "account_id": str(account_id), "erased_fields": erased_fields}
+
+
+@router.get("/users/{account_id}/messages")
+async def get_message_history(
+    account_id: UUID,
+    db: AsyncSession = Depends(get_db),
+    _: dict = Depends(get_current_admin),
+):
+    """Admin→user message history from audit log (last 50 messages)."""
+    rows = (await db.execute(
+        select(AdminAuditLog)
+        .where(
+            AdminAuditLog.action == "send_message",
+            AdminAuditLog.target_id == str(account_id),
+        )
+        .order_by(desc(AdminAuditLog.created_at))
+        .limit(50)
+    )).scalars().all()
+
+    return [
+        {
+            "id":          str(r.id),
+            "admin_email": r.admin_email,
+            "preview":     r.details.get("preview") if r.details else None,
+            "to":          r.details.get("to") if r.details else None,
+            "success":     r.details.get("success") if r.details else None,
+            "created_at":  r.created_at.isoformat() if r.created_at else None,
+        }
+        for r in rows
+    ]

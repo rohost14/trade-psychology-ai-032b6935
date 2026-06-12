@@ -20,6 +20,8 @@ apscheduler>=3.10.4
 python-dateutil
 pytz
 pywebpush
+pyotp>=2.9.0
+qrcode[pil]>=7.4.2
 sentry-sdk[fastapi]>=2.0.0
 prometheus_client>=0.20.0
 

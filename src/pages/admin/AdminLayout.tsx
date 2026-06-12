@@ -7,14 +7,15 @@ import {
 import { useAdminAuth } from '@/contexts/AdminAuthContext';
 import { adminApi } from '@/lib/adminApi';
 
+// Role-based visibility: superadmin sees all, ops sees most, support sees read-only
 const NAV = [
-  { to: '/admin/overview',   icon: LayoutDashboard, label: 'Overview'      },
-  { to: '/admin/users',      icon: Users,           label: 'Users'         },
-  { to: '/admin/system',     icon: Activity,        label: 'System Health' },
-  { to: '/admin/insights',   icon: BarChart3,       label: 'Insights'      },
-  { to: '/admin/broadcast',  icon: Megaphone,       label: 'Broadcast'     },
-  { to: '/admin/audit-log',  icon: ScrollText,      label: 'Audit Log'     },
-  { to: '/admin/config',     icon: Settings,        label: 'Config'        },
+  { to: '/admin/overview',  icon: LayoutDashboard, label: 'Overview',      roles: ['superadmin', 'ops', 'support'] },
+  { to: '/admin/users',     icon: Users,           label: 'Users',         roles: ['superadmin', 'ops', 'support'] },
+  { to: '/admin/system',    icon: Activity,        label: 'System Health', roles: ['superadmin', 'ops', 'support'] },
+  { to: '/admin/insights',  icon: BarChart3,       label: 'Insights',      roles: ['superadmin', 'ops', 'support'] },
+  { to: '/admin/broadcast', icon: Megaphone,       label: 'Broadcast',     roles: ['superadmin', 'ops'] },
+  { to: '/admin/audit-log', icon: ScrollText,      label: 'Audit Log',     roles: ['superadmin', 'ops', 'support'] },
+  { to: '/admin/config',    icon: Settings,        label: 'Config',        roles: ['superadmin'] },
 ];
 
 const C = {
@@ -83,7 +84,7 @@ export default function AdminLayout() {
 
         {/* Nav */}
         <nav style={{ flex: 1, padding: '1rem 0.75rem', display: 'flex', flexDirection: 'column', gap: 2 }}>
-          {NAV.map(({ to, icon: Icon, label }) => {
+          {NAV.filter(item => item.roles.includes(admin.role || 'superadmin')).map(({ to, icon: Icon, label }) => {
             const active = location.pathname === to || (to !== '/admin/overview' && location.pathname.startsWith(to));
             return (
               <NavLink key={to} to={to} style={{ textDecoration: 'none' }}>
@@ -109,7 +110,8 @@ export default function AdminLayout() {
         <div style={{ padding: '1rem 0.75rem', borderTop: `1px solid ${C.border}` }}>
           <div style={{ marginBottom: 8 }}>
             <div style={{ fontSize: '0.78rem', fontWeight: 600, color: C.text, marginBottom: 2 }}>{admin.name}</div>
-            <div style={{ fontSize: '0.7rem', color: C.muted }}>{admin.email}</div>
+            <div style={{ fontSize: '0.7rem', color: C.muted, marginBottom: 3 }}>{admin.email}</div>
+            <span style={{ fontSize: '0.62rem', fontWeight: 600, padding: '0.1rem 0.4rem', borderRadius: 10, background: 'rgba(245,158,11,0.12)', color: C.amber, border: '1px solid rgba(245,158,11,0.2)', textTransform: 'uppercase', letterSpacing: '0.06em' }}>{admin.role || 'superadmin'}</span>
           </div>
           <button
             onClick={handleLogout}

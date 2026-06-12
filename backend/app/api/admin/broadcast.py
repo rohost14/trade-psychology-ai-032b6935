@@ -11,41 +11,45 @@ from sqlalchemy import select
 from typing import Literal
 
 from app.core.database import get_db
-from app.api.admin.deps import get_current_admin
+from app.api.admin.deps import get_current_admin, require_role
 from app.api.admin.audit_writer import audit
 from app.models.broker_account import BrokerAccount
 from app.models.user import User
 
 router = APIRouter()
 logger = logging.getLogger(__name__)
+_EXCLUDED_STATUSES = ("deleted", "suspended", "erased")
 
 
 class BroadcastRequest(BaseModel):
     segment: Literal["all_with_phone", "connected"]
     message: str
-    dry_run: bool = False   # True = count only, no messages sent
+    dry_run: bool = False
 
 
 @router.post("/broadcast")
 async def broadcast_message(
     body: BroadcastRequest,
     db:    AsyncSession = Depends(get_db),
-    admin: dict         = Depends(get_current_admin),
+    admin: dict         = Depends(require_role("superadmin", "ops")),
 ):
     """
     Send a WhatsApp message to a user segment.
-    Always do a dry_run=true first to preview recipient count.
+    Excludes deleted/suspended/erased accounts automatically.
+    Always do dry_run=true first to preview recipient count.
     """
     if not body.message.strip():
         raise HTTPException(status_code=400, detail="message is required")
     if len(body.message) > 700:
         raise HTTPException(status_code=400, detail="Message too long (max 700 chars)")
 
-    # Build target list
     q = (
         select(BrokerAccount, User)
         .outerjoin(User, BrokerAccount.user_id == User.id)
-        .where(User.guardian_phone.isnot(None))
+        .where(
+            User.guardian_phone.isnot(None),
+            BrokerAccount.status.notin_(_EXCLUDED_STATUSES),
+        )
     )
     if body.segment == "connected":
         q = q.where(BrokerAccount.status == "connected")

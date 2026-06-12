@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
-import { RefreshCw, AlertTriangle, Clock } from 'lucide-react';
+import { RefreshCw, AlertTriangle, Clock, Play } from 'lucide-react';
 import { adminApi } from '@/lib/adminApi';
+import { useAdminAuth } from '@/contexts/AdminAuthContext';
 
 const C = {
   text:   '#e2e8f0',
@@ -18,15 +19,15 @@ interface SystemData {
   celery:       { status: string; queue_depth?: number; ai_queue?: number; detail?: string };
   online_users: number | null;
   whatsapp:     { configured: boolean; provider: string };
-  email:        { configured: boolean };
   db_pool:      { pool_size: number; checked_in: number; checked_out: number; overflow: number } | null;
   config:       { maintenance_mode: boolean; environment: string; sentry_enabled: boolean };
 }
 
 interface TaskData {
   redis_connected: boolean;
-  tasks: { key: string; name: string; schedule: string; status: string; last_run_at: string | null; next_run_at: string | null }[];
+  tasks: { key: string; name: string; schedule: string; status: string; triggerable: boolean; last_run_at: string | null; next_run_at: string | null }[];
   queue_depths: Record<string, number | null>;
+  failed_count: number;
 }
 
 function Card({ title, children }: { title: string; children: React.ReactNode }) {
@@ -58,10 +59,15 @@ function TaskStatusDot({ status }: { status: string }) {
 }
 
 export default function AdminSystemHealth() {
-  const [sys,     setSys]     = useState<SystemData | null>(null);
-  const [tasks,   setTasks]   = useState<TaskData | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [error,   setError]   = useState('');
+  const { admin } = useAdminAuth();
+  const canTrigger = admin?.role === 'superadmin' || admin?.role === 'ops';
+
+  const [sys,         setSys]         = useState<SystemData | null>(null);
+  const [tasks,       setTasks]       = useState<TaskData | null>(null);
+  const [loading,     setLoading]     = useState(true);
+  const [error,       setError]       = useState('');
+  const [triggering,  setTriggering]  = useState<string | null>(null);
+  const [triggerMsg,  setTriggerMsg]  = useState<{ key: string; ok: boolean; msg: string } | null>(null);
 
   const load = async () => {
     setLoading(true); setError('');
@@ -70,6 +76,16 @@ export default function AdminSystemHealth() {
       setSys(s); setTasks(t);
     } catch (e: any) { setError(e.message); }
     finally { setLoading(false); }
+  };
+
+  const triggerTask = async (key: string) => {
+    setTriggering(key); setTriggerMsg(null);
+    try {
+      const r = await adminApi.triggerTask(key);
+      setTriggerMsg({ key, ok: true, msg: `Queued — Celery ID: ${r.celery_id?.slice(0, 8)}…` });
+    } catch (e: any) {
+      setTriggerMsg({ key, ok: false, msg: e.message });
+    } finally { setTriggering(null); }
   };
 
   useEffect(() => { load(); }, []);
@@ -140,9 +156,8 @@ export default function AdminSystemHealth() {
           <Card title="Integrations">
             <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
               {[
-                { label: 'WhatsApp (Gupshup)', ok: sys.whatsapp.configured, yes: 'configured',  no: 'not configured' },
-                { label: 'Email (SMTP/SES)',   ok: sys.email.configured,    yes: 'configured',  no: 'not configured' },
-                { label: 'Sentry',             ok: sys.config.sentry_enabled, yes: 'enabled',   no: 'disabled' },
+                { label: 'WhatsApp (Gupshup)', ok: sys.whatsapp.configured,    yes: 'configured', no: 'not configured' },
+                { label: 'Sentry',             ok: sys.config.sentry_enabled,   yes: 'enabled',    no: 'disabled' },
               ].map(({ label, ok, yes, no }) => (
                 <div key={label} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                   <span style={{ fontSize: '0.82rem', color: C.muted }}>{label}</span>
@@ -162,24 +177,45 @@ export default function AdminSystemHealth() {
           {/* Scheduled tasks */}
           {tasks && (
             <div style={{ gridColumn: '1 / -1', background: 'rgba(255,255,255,0.03)', border: `1px solid ${C.border}`, borderRadius: 14, padding: '1.25rem 1.5rem' }}>
-              <h2 style={{ fontSize: '0.85rem', fontWeight: 600, color: C.text, marginBottom: '1rem', display: 'flex', alignItems: 'center', gap: 8 }}>
-                <Clock style={{ width: 14, height: 14, color: C.amber }} />
-                Celery Beat — Scheduled Tasks
-              </h2>
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '1rem' }}>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '1rem' }}>
+                <h2 style={{ fontSize: '0.85rem', fontWeight: 600, color: C.text, display: 'flex', alignItems: 'center', gap: 8, margin: 0 }}>
+                  <Clock style={{ width: 14, height: 14, color: C.amber }} />
+                  Celery Beat — Scheduled Tasks ({tasks.tasks.length})
+                </h2>
+                {tasks.failed_count > 0 && (
+                  <span style={{ fontSize: '0.72rem', padding: '0.2rem 0.55rem', borderRadius: 20, background: 'rgba(239,68,68,0.12)', color: C.red, border: '1px solid rgba(239,68,68,0.25)' }}>
+                    {tasks.failed_count} failed in result backend
+                  </span>
+                )}
+              </div>
+              {triggerMsg && (
+                <div style={{ marginBottom: '0.75rem', padding: '0.5rem 0.75rem', borderRadius: 8, background: triggerMsg.ok ? 'rgba(16,185,129,0.08)' : 'rgba(239,68,68,0.08)', border: `1px solid ${triggerMsg.ok ? 'rgba(16,185,129,0.2)' : 'rgba(239,68,68,0.2)'}`, fontSize: '0.75rem', color: triggerMsg.ok ? C.green : C.red }}>
+                  {triggerMsg.key}: {triggerMsg.msg}
+                </div>
+              )}
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(240px, 1fr))', gap: '0.75rem' }}>
                 {tasks.tasks.map(t => (
                   <div key={t.key} style={{ background: 'rgba(255,255,255,0.02)', border: `1px solid ${C.border}`, borderRadius: 10, padding: '0.9rem 1rem' }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 7, marginBottom: 8 }}>
-                      <TaskStatusDot status={t.status} />
-                      <span style={{ fontSize: '0.8rem', fontWeight: 600, color: C.text }}>{t.name}</span>
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 6 }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 7 }}>
+                        <TaskStatusDot status={t.status} />
+                        <span style={{ fontSize: '0.78rem', fontWeight: 600, color: C.text }}>{t.name}</span>
+                      </div>
+                      {canTrigger && t.triggerable && (
+                        <button
+                          onClick={() => triggerTask(t.key)}
+                          disabled={triggering === t.key}
+                          title="Run now"
+                          style={{ display: 'flex', alignItems: 'center', gap: 4, padding: '0.2rem 0.5rem', borderRadius: 6, background: 'rgba(245,158,11,0.1)', border: '1px solid rgba(245,158,11,0.25)', color: C.amber, fontSize: '0.68rem', cursor: triggering === t.key ? 'not-allowed' : 'pointer', opacity: triggering === t.key ? 0.5 : 1, fontFamily: "'DM Sans', sans-serif" }}
+                        >
+                          <Play style={{ width: 10, height: 10 }} />
+                          {triggering === t.key ? '…' : 'Run'}
+                        </button>
+                      )}
                     </div>
-                    <div style={{ fontSize: '0.72rem', color: C.dim, marginBottom: 6 }}>{t.schedule}</div>
-                    <div style={{ fontSize: '0.7rem', color: C.muted }}>
-                      Last: {t.last_run_at ? new Date(t.last_run_at).toLocaleString() : <span style={{ color: C.dim }}>never</span>}
-                    </div>
-                    <div style={{ fontSize: '0.7rem', color: C.muted }}>
-                      Next: {t.next_run_at ? new Date(t.next_run_at).toLocaleString() : <span style={{ color: C.dim }}>unknown</span>}
-                    </div>
+                    <div style={{ fontSize: '0.68rem', color: C.dim, marginBottom: 6 }}>{t.schedule}</div>
+                    <div style={{ fontSize: '0.68rem', color: C.muted }}>Last: {t.last_run_at ? new Date(t.last_run_at).toLocaleString() : <span style={{ color: C.dim }}>never</span>}</div>
+                    <div style={{ fontSize: '0.68rem', color: C.muted }}>Next: {t.next_run_at ? new Date(t.next_run_at).toLocaleString() : <span style={{ color: C.dim }}>unknown</span>}</div>
                   </div>
                 ))}
               </div>

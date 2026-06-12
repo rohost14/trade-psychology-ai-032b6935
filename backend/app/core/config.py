@@ -75,6 +75,11 @@ class Settings(BaseSettings):
     # Generate with: python -c "import secrets; print(secrets.token_urlsafe(32))"
     ADMIN_JWT_SECRET: Optional[str] = None
     ADMIN_JWT_EXPIRE_HOURS: int = 8
+    # IP allowlist for admin panel — comma-separated IPs/CIDRs, empty = no restriction (dev mode)
+    # Example: "1.2.3.4,10.0.0.0/8,192.168.1.0/24"
+    ADMIN_IP_ALLOWLIST: Optional[str] = None
+    # TOTP issuer name shown in authenticator apps
+    ADMIN_TOTP_ISSUER: str = "TradeMentor Admin"
 
     # Gupshup WhatsApp (replaces Twilio)
     GUPSHUP_API_KEY: Optional[str] = None

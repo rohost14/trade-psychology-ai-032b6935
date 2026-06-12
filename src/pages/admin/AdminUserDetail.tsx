@@ -1,7 +1,8 @@
 import { useEffect, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { ArrowLeft, Send, Ban, CheckCircle, AlertTriangle } from 'lucide-react';
+import { ArrowLeft, Send, Ban, CheckCircle, AlertTriangle, Trash2, MessageSquare } from 'lucide-react';
 import { adminApi } from '@/lib/adminApi';
+import { useAdminAuth } from '@/contexts/AdminAuthContext';
 
 const C = {
   text:   '#e2e8f0',
@@ -14,7 +15,6 @@ const C = {
   dm:     "'DM Sans', sans-serif",
 };
 
-// Matches backend /api/admin/users/{id} response shape
 interface UserDetailData {
   account: { id: string; broker_user_id: string; broker_email: string | null; status: string; created_at: string | null };
   user: { id: string | null; email: string | null; guardian_phone: string | null } | null;
@@ -23,17 +23,26 @@ interface UserDetailData {
   recent_alerts: { id: string; pattern_type: string; severity: string; created_at: string }[];
 }
 
+interface MsgHistory { id: string; admin_email: string; preview: string | null; to: string | null; success: boolean | null; created_at: string | null; }
+
 const SEV_COLORS: Record<string, string> = { critical: C.red, high: '#f97316', medium: C.amber, low: C.green };
 
 export default function AdminUserDetail() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
-  const [data, setData]             = useState<UserDetailData | null>(null);
-  const [loading, setLoading]       = useState(true);
-  const [error, setError]           = useState('');
-  const [msgText, setMsgText]       = useState('');
-  const [msgStatus, setMsgStatus]   = useState('');
-  const [suspending, setSuspending] = useState(false);
+  const { admin: currentAdmin } = useAdminAuth();
+  const isSuperadmin = currentAdmin?.role === 'superadmin';
+
+  const [data, setData]               = useState<UserDetailData | null>(null);
+  const [loading, setLoading]         = useState(true);
+  const [error, setError]             = useState('');
+  const [msgText, setMsgText]         = useState('');
+  const [msgStatus, setMsgStatus]     = useState('');
+  const [suspending, setSuspending]   = useState(false);
+  const [erasing, setErasing]         = useState(false);
+  const [eraseConfirm, setEraseConfirm] = useState(false);
+  const [msgHistory, setMsgHistory]   = useState<MsgHistory[]>([]);
+  const [loadingHist, setLoadingHist] = useState(false);
 
   const load = async () => {
     if (!id) return;
@@ -43,7 +52,15 @@ export default function AdminUserDetail() {
     finally { setLoading(false); }
   };
 
-  useEffect(() => { load(); }, [id]);
+  const loadHistory = async () => {
+    if (!id) return;
+    setLoadingHist(true);
+    try { setMsgHistory(await adminApi.messageHistory(id)); }
+    catch {}
+    finally { setLoadingHist(false); }
+  };
+
+  useEffect(() => { load(); loadHistory(); }, [id]);
 
   const sendMessage = async () => {
     if (!id || !msgText.trim()) return;
@@ -61,6 +78,17 @@ export default function AdminUserDetail() {
     try { await adminApi.suspendUser(id); await load(); }
     catch (e: any) { setError(e.message); }
     finally { setSuspending(false); }
+  };
+
+  const eraseUser = async () => {
+    if (!id || !eraseConfirm) return;
+    setErasing(true);
+    try {
+      await adminApi.eraseUser(id);
+      await load();
+      setEraseConfirm(false);
+    } catch (e: any) { setError(e.message); }
+    finally { setErasing(false); }
   };
 
   if (loading) return (
@@ -97,13 +125,23 @@ export default function AdminUserDetail() {
           <p style={{ fontSize: '0.78rem', color: C.muted, margin: 0 }}>Zerodha ID: {data.account.broker_user_id}</p>
           {phone && <p style={{ fontSize: '0.75rem', color: C.dim, margin: '2px 0 0' }}>{phone}</p>}
         </div>
-        <button
-          onClick={toggleSuspend} disabled={suspending}
-          style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '0.55rem 1rem', borderRadius: 9, background: isSuspended ? 'rgba(16,185,129,0.1)' : 'rgba(239,68,68,0.1)', border: `1px solid ${isSuspended ? 'rgba(16,185,129,0.25)' : 'rgba(239,68,68,0.25)'}`, color: isSuspended ? C.green : C.red, fontSize: '0.8rem', cursor: suspending ? 'not-allowed' : 'pointer', fontFamily: C.dm, opacity: suspending ? 0.6 : 1 }}
-        >
-          {isSuspended ? <CheckCircle style={{ width: 13, height: 13 }} /> : <Ban style={{ width: 13, height: 13 }} />}
-          {isSuspended ? 'Unsuspend' : 'Suspend'}
-        </button>
+        <div style={{ display: 'flex', gap: 8 }}>
+          <button
+            onClick={toggleSuspend} disabled={suspending}
+            style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '0.55rem 1rem', borderRadius: 9, background: isSuspended ? 'rgba(16,185,129,0.1)' : 'rgba(239,68,68,0.1)', border: `1px solid ${isSuspended ? 'rgba(16,185,129,0.25)' : 'rgba(239,68,68,0.25)'}`, color: isSuspended ? C.green : C.red, fontSize: '0.8rem', cursor: suspending ? 'not-allowed' : 'pointer', fontFamily: C.dm, opacity: suspending ? 0.6 : 1 }}
+          >
+            {isSuspended ? <CheckCircle style={{ width: 13, height: 13 }} /> : <Ban style={{ width: 13, height: 13 }} />}
+            {isSuspended ? 'Unsuspend' : 'Suspend'}
+          </button>
+          {isSuperadmin && data.account.status !== 'erased' && (
+            <button
+              onClick={() => setEraseConfirm(v => !v)}
+              style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '0.55rem 1rem', borderRadius: 9, background: 'rgba(239,68,68,0.08)', border: '1px solid rgba(239,68,68,0.2)', color: C.red, fontSize: '0.8rem', cursor: 'pointer', fontFamily: C.dm }}
+            >
+              <Trash2 style={{ width: 13, height: 13 }} /> DPDP Erase
+            </button>
+          )}
+        </div>
       </div>
 
       {error && (
@@ -165,6 +203,54 @@ export default function AdminUserDetail() {
             {msgStatus === 'sent' && <p style={{ fontSize: '0.75rem', color: C.green, marginTop: 8 }}>Sent</p>}
             {msgStatus.startsWith('error:') && <p style={{ fontSize: '0.75rem', color: C.red, marginTop: 8 }}>{msgStatus.slice(6)}</p>}
           </>
+        )}
+      </div>
+
+      {/* DPDP Erasure Confirmation */}
+      {eraseConfirm && isSuperadmin && (
+        <div style={{ background: 'rgba(239,68,68,0.06)', border: '1px solid rgba(239,68,68,0.25)', borderRadius: 14, padding: '1.25rem', marginBottom: '2rem' }}>
+          <h2 style={{ fontSize: '0.9rem', fontWeight: 700, color: C.red, margin: '0 0 8px' }}>⚠ DPDP Permanent Erasure</h2>
+          <p style={{ fontSize: '0.78rem', color: 'rgba(226,232,240,0.6)', margin: '0 0 1rem', lineHeight: 1.6 }}>
+            This will permanently wipe all PII (email, phone, access token, API keys) from this account and set status to "erased".
+            This action is <strong style={{ color: C.red }}>irreversible</strong>.
+          </p>
+          <div style={{ display: 'flex', gap: 10 }}>
+            <button
+              onClick={eraseUser} disabled={erasing}
+              style={{ padding: '0.6rem 1.25rem', borderRadius: 9, background: C.red, color: '#fff', border: 'none', fontFamily: C.dm, fontWeight: 700, fontSize: '0.82rem', cursor: erasing ? 'not-allowed' : 'pointer', opacity: erasing ? 0.6 : 1 }}
+            >
+              {erasing ? 'Erasing…' : 'Confirm Permanent Erasure'}
+            </button>
+            <button onClick={() => setEraseConfirm(false)}
+              style={{ padding: '0.6rem 1rem', borderRadius: 9, background: 'none', border: `1px solid ${C.border}`, color: C.muted, fontFamily: C.dm, fontSize: '0.82rem', cursor: 'pointer' }}>
+              Cancel
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* Message History */}
+      <div style={{ background: 'rgba(255,255,255,0.03)', border: `1px solid ${C.border}`, borderRadius: 14, padding: '1.25rem', marginBottom: '2rem' }}>
+        <h2 style={{ fontSize: '0.85rem', fontWeight: 600, color: C.text, marginBottom: '0.75rem', display: 'flex', alignItems: 'center', gap: 8 }}>
+          <MessageSquare style={{ width: 13, height: 13, color: C.amber }} /> Message History
+        </h2>
+        {loadingHist ? (
+          <p style={{ fontSize: '0.78rem', color: C.dim }}>Loading…</p>
+        ) : msgHistory.length === 0 ? (
+          <p style={{ fontSize: '0.78rem', color: C.dim }}>No messages sent yet</p>
+        ) : (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+            {msgHistory.map(m => (
+              <div key={m.id} style={{ padding: '0.6rem 0.75rem', borderRadius: 8, background: 'rgba(255,255,255,0.02)', border: `1px solid ${C.border}` }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 3 }}>
+                  <span style={{ fontSize: '0.72rem', color: C.dim }}>{m.admin_email}</span>
+                  <span style={{ fontSize: '0.68rem', color: m.success ? C.green : C.red }}>{m.success ? 'delivered' : 'failed'}</span>
+                  <span style={{ fontSize: '0.68rem', color: C.dim }}>{m.created_at ? new Date(m.created_at).toLocaleString() : '—'}</span>
+                </div>
+                <p style={{ fontSize: '0.78rem', color: C.muted, margin: 0 }}>{m.preview}</p>
+              </div>
+            ))}
+          </div>
         )}
       </div>
 
