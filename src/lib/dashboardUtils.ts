@@ -50,6 +50,13 @@ export function getSessionDesc(
   return 'Session tracking normally — keep following your plan';
 }
 
+export function getISTMidnightUTC(): Date {
+  const IST_OFFSET_MS = 5.5 * 60 * 60 * 1000;
+  const nowIST = new Date(Date.now() + IST_OFFSET_MS);
+  nowIST.setUTCHours(0, 0, 0, 0);
+  return new Date(nowIST.getTime() - IST_OFFSET_MS);
+}
+
 export function formatTimeAgo(dateStr: string): string {
   const date = new Date(dateStr);
   const now = new Date();

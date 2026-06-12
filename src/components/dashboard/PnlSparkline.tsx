@@ -1,12 +1,12 @@
 import { CompletedTrade } from '@/types/api';
+import { getISTMidnightUTC } from '@/lib/dashboardUtils';
 
 export function PnlSparkline({ closed, unrealized, positive }: {
   closed: CompletedTrade[];
   unrealized: number;
   positive: boolean;
 }) {
-  const today = new Date(); today.setHours(0, 0, 0, 0);
-  const todayTrades = closed.filter(t => new Date(t.exit_time) >= today);
+  const todayTrades = closed.filter(t => new Date(t.exit_time) >= getISTMidnightUTC());
 
   const points: number[] = [0];
   let cum = 0;

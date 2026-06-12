@@ -64,7 +64,7 @@ async def get_exposure_metrics(
     return ExposureMetrics(
         total_positions=len(positions),
         total_value=Decimal(str(total_value)),
-        total_pnl=sum(p.realized_pnl or 0 for p in positions),
+        total_pnl=sum(float(p.unrealized_pnl or p.pnl or 0) for p in positions),
         largest_position_value=Decimal(str(largest)),
         concentration_pct=float(largest / total_value * 100) if total_value > 0 else 0.0
     )

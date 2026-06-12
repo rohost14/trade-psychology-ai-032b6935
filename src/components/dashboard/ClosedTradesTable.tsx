@@ -21,7 +21,7 @@ function parseSymbol(sym: string): { name: string; chip: string; strike: string 
   const mw6 = sym.match(/^([A-Z]+)\d{5}(\d{6})(CE|PE)$/);
   if (mw6) return { name: mw6[1], chip: mw6[3], strike: parseInt(mw6[2], 10).toLocaleString('en-IN') };
   // Monthly options: NAME + 2YY + 3MON + strike + CE/PE  e.g. NIFTY25MAR23000CE
-  const mm = sym.match(/^([A-Z]+)\d{2}[A-Z]{3}(\d{4,6})(CE|PE)$/);
+  const mm = sym.match(/^([A-Z]+)\d{2}[A-Z]{3}(\d{3,6})(CE|PE)$/);
   if (mm) return { name: mm[1], chip: mm[3], strike: parseInt(mm[2], 10).toLocaleString('en-IN') };
   // Futures  e.g. NIFTY25MARFUT, BANKNIFTY25APR25FUT
   const mf = sym.match(/^([A-Z]+)(?:\d{5}|\d{2}[A-Z]{3})FUT$/);

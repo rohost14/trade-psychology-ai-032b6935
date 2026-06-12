@@ -46,7 +46,7 @@ export function SetupNudgeCard() {
       ]);
 
       const profile = profileRes.data?.profile ?? {};
-      const limitsSet = !!(profile.daily_trade_limit || profile.daily_loss_limit);
+      const limitsSet = profile.daily_trade_limit != null || profile.daily_loss_limit != null;
 
       const newSteps: Step[] = [
         {
@@ -74,9 +74,9 @@ export function SetupNudgeCard() {
 
       setSteps(newSteps);
 
-      // Auto-dismiss if everything is done
+      // Auto-dismiss for this session only — no localStorage write.
+      // Persisting auto-dismiss would hide the card if the user later revokes permissions.
       if (newSteps.every(s => s.done)) {
-        localStorage.setItem(DISMISSED_KEY, '1');
         setDismissed(true);
       }
     } catch {

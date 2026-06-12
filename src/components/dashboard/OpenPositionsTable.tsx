@@ -85,7 +85,7 @@ export default function OpenPositionsTable({
     if (openPositions.length > 0 && isConnected) {
       subscribe(openPositions.map(p => p.tradingsymbol));
     }
-  }, [openPositions.length, isConnected, subscribe]);
+  }, [openPositions, isConnected, subscribe]);
 
   const getLivePnl = (p: PositionWithExtras) => {
     const live = prices[p.tradingsymbol];

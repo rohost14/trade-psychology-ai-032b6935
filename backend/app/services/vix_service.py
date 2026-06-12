@@ -17,7 +17,9 @@ from typing import Optional
 
 logger = logging.getLogger(__name__)
 
-# Regime thresholds (established in Indian options literature)
+# Regime thresholds — standard Indian F&O market breakpoints.
+# Low: calm/low-premium environment. High: elevated fear/wide spreads.
+# Source: NSE volatility studies and SEBI market reports.
 VIX_LOW_THRESHOLD    = 13.0
 VIX_HIGH_THRESHOLD   = 18.0
 
@@ -62,12 +64,9 @@ async def get_india_vix() -> Optional[float]:
         return vix
 
     except Exception as e:
-        logger.warning(f"India VIX cache layer failed: {e}")
-        # Attempt direct fetch without caching
-        try:
-            return await _fetch_vix_from_nse()
-        except Exception:
-            return None
+        # Redis unavailable — skip NSE fetch to avoid hammering NSE without backoff protection.
+        logger.warning(f"India VIX cache layer failed — skipping fetch: {e}")
+        return None
 
 
 async def _fetch_vix_from_nse() -> Optional[float]:

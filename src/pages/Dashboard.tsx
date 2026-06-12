@@ -23,7 +23,8 @@ import { Position, CompletedTrade } from '@/types/api';
 import { useAlerts, AlertNotification } from '@/contexts/AlertContext';
 import { useBroker } from '@/contexts/BrokerContext';
 import { useWebSocket } from '@/contexts/WebSocketContext';
-import { STATE_CFG, SessionState, getSessionState, formatTimeAgo } from '@/lib/dashboardUtils';
+import { STATE_CFG, SessionState, getSessionState, formatTimeAgo, getISTMidnightUTC } from '@/lib/dashboardUtils';
+import { normalizeSeverityStr } from '@/lib/alertSeverity';
 
 type PositionWithExtras = Position & { instrument_type: string; unrealized_pnl: number; current_value: number };
 
@@ -40,7 +41,7 @@ interface RiskStateData {
 export default function Dashboard() {
   const navigate = useNavigate();
   const { isConnected, isLoading: brokerLoading, account, connect, syncTrades, syncStatus, syncError, isTokenExpired } = useBroker();
-  const { lastTradeEvent } = useWebSocket();
+  const { lastTradeEvent, prices } = useWebSocket();
   const { alerts, isLoading: alertsLoading, acknowledgeAlert } = useAlerts();
 
   const accountId = account?.id;
@@ -57,7 +58,6 @@ export default function Dashboard() {
   const [tradesError, setTradesError] = useState<string | null>(null);
   const [riskState, setRiskState] = useState<RiskStateData | null>(null);
   const [dataLoaded, setDataLoaded] = useState(false);
-  const [sessionPnlDisplay, setSessionPnlDisplay] = useState<number>(0);
   const [realizedPnlDisplay, setRealizedPnlDisplay] = useState<number>(0);
 
   const [tradeStats, setTradeStats] = useState<{
@@ -245,8 +245,7 @@ export default function Dashboard() {
 
   // Compute session stats
   useEffect(() => {
-    const today = new Date(); today.setHours(0, 0, 0, 0);
-    const todayTrades = closedTrades.filter(t => new Date(t.exit_time) >= today);
+    const todayTrades = closedTrades.filter(t => new Date(t.exit_time) >= getISTMidnightUTC());
     const winners = todayTrades.filter(t => t.realized_pnl > 0);
     const realizedPnl = todayTrades.reduce((sum, t) => sum + t.realized_pnl, 0);
     const unrealizedPnl = positions.reduce((sum, p) => sum + (p.unrealized_pnl || 0), 0);
@@ -266,7 +265,6 @@ export default function Dashboard() {
       max_drawdown: -maxDrawdown,
       risk_used: 0,
     });
-    setSessionPnlDisplay(sessionPnl);
     setRealizedPnlDisplay(realizedPnl);
     setRiskState(prev => prev ? { ...prev, unrealized_pnl: sessionPnl } : prev);
   }, [closedTrades, positions]);
@@ -339,7 +337,7 @@ export default function Dashboard() {
         pattern_name: a.pattern.name,
         pattern: a.pattern.name,
         pattern_type: a.pattern.type,
-        severity: (a.pattern.severity === 'low' ? 'medium' : a.pattern.severity) as 'critical' | 'high' | 'medium' | 'positive',
+        severity: normalizeSeverityStr(a.pattern.severity),
         description: a.pattern.description,
         message: a.pattern.description,
         why_it_matters: a.pattern.insight,
@@ -357,17 +355,27 @@ export default function Dashboard() {
   }, [closedTrades]);
 
   const unreadCount = mergedAlerts.filter(a => !a.acknowledged).length;
-  const highSevCount = mergedAlerts.filter(a => !a.acknowledged && (a.severity === 'critical' || a.severity === 'high')).length;
+  const highSevCount = mergedAlerts.filter(a => !a.acknowledged && a.severity === 'danger').length;
   const sessionStateKey: SessionState = getSessionState(unreadCount, highSevCount);
   const stateCfg = STATE_CFG[sessionStateKey];
 
-  const unjournaled = recentTrades.filter(t => {
-    const today = new Date(); today.setHours(0, 0, 0, 0);
-    return new Date(t.exit_time) >= today && !journaledIds.has(t.id);
-  }).length;
+  const unjournaled = recentTrades.filter(t =>
+    new Date(t.exit_time) >= getISTMidnightUTC() && !journaledIds.has(t.id)
+  ).length;
 
+  const unrealizedTotal = useMemo(() =>
+    positions.reduce((s, p) => {
+      const live = prices[p.tradingsymbol];
+      if (live?.last_price) {
+        const mult = p.multiplier ?? 1;
+        return s + (live.last_price - p.average_entry_price) * p.total_quantity * mult;
+      }
+      return s + (p.unrealized_pnl || 0);
+    }, 0),
+    [positions, prices]
+  );
+  const sessionPnlDisplay = realizedPnlDisplay + unrealizedTotal;
   const pnlPositive = sessionPnlDisplay >= 0;
-  const unrealizedTotal = positions.reduce((s, p) => s + (p.unrealized_pnl || 0), 0);
 
   // ── Render guards ─────────────────────────────────────────────────────────
   if (brokerLoading) {
