@@ -5,6 +5,7 @@ Sends Web Push notifications to subscribed browsers/devices.
 Uses pywebpush library for VAPID authentication.
 """
 
+import asyncio
 import logging
 from typing import Dict, Any, List, Optional
 from uuid import UUID
@@ -12,7 +13,7 @@ from datetime import datetime, timezone
 import json
 
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select, update, delete
+from sqlalchemy import select, update, delete, and_
 
 from app.core.config import settings
 from app.models.push_subscription import PushSubscription
@@ -74,15 +75,19 @@ class PushNotificationService:
         Returns:
             Created or updated PushSubscription
         """
-        # Check if subscription already exists (same endpoint)
+        # Check if subscription already exists for this account + endpoint
         result = await db.execute(
-            select(PushSubscription).where(PushSubscription.endpoint == endpoint)
+            select(PushSubscription).where(
+                and_(
+                    PushSubscription.endpoint == endpoint,
+                    PushSubscription.broker_account_id == broker_account_id,
+                )
+            )
         )
         existing = result.scalar_one_or_none()
 
         if existing:
-            # Update existing subscription
-            existing.broker_account_id = broker_account_id
+            # Refresh keys for same account + endpoint
             existing.p256dh_key = p256dh_key
             existing.auth_key = auth_key
             existing.user_agent = user_agent
@@ -92,7 +97,10 @@ class PushNotificationService:
             existing.updated_at = datetime.now(timezone.utc)
             subscription = existing
         else:
-            # Create new subscription
+            # Remove any stale subscription for this endpoint from a different account
+            await db.execute(
+                delete(PushSubscription).where(PushSubscription.endpoint == endpoint)
+            )
             subscription = PushSubscription(
                 broker_account_id=broker_account_id,
                 endpoint=endpoint,
@@ -215,14 +223,17 @@ class PushNotificationService:
         for subscription in subscriptions:
             try:
                 success = await self._send_to_subscription(subscription, payload)
-                if success:
+                if success is True:
                     sent_count += 1
-                    # Update last used
                     subscription.last_used_at = datetime.now(timezone.utc)
+                elif success is None:
+                    # Expired endpoint — deactivate immediately
+                    subscription.is_active = False
+                    failed_count += 1
+                    failed_endpoints.append(subscription.endpoint)
                 else:
                     failed_count += 1
                     failed_endpoints.append(subscription.endpoint)
-                    # Track failure — deactivate after 3 failures
                     await self._handle_failed_delivery(subscription, db)
             except Exception as e:
                 logger.error(f"Push send error: {e}")
@@ -310,18 +321,26 @@ class PushNotificationService:
             return False
 
         try:
-            webpush(
-                subscription_info=subscription.to_dict(),
-                data=json.dumps(payload),
-                vapid_private_key=self.vapid_private_key,
-                vapid_claims=self.vapid_claims
-            )
+            sub_dict = subscription.to_dict()
+            data_str = json.dumps(payload)
+            vapid_private_key = self.vapid_private_key
+            vapid_claims = self.vapid_claims
+
+            def _do_webpush():
+                webpush(
+                    subscription_info=sub_dict,
+                    data=data_str,
+                    vapid_private_key=vapid_private_key,
+                    vapid_claims=vapid_claims,
+                )
+
+            await asyncio.to_thread(_do_webpush)
             return True
         except WebPushException as e:
             logger.error(f"WebPush error for {subscription.endpoint[:50]}...: {e}")
-            # Check if subscription is expired/invalid
             if e.response and e.response.status_code in [404, 410]:
                 logger.info(f"Subscription expired: {subscription.endpoint[:50]}...")
+                return None  # Expired — caller deactivates immediately
             return False
         except Exception as e:
             logger.error(f"Unexpected push error: {e}")

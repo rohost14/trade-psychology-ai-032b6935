@@ -166,7 +166,7 @@ class ProfileUpdate(BaseModel):
             raise ValueError("Time must be HH:MM format")
         return v
 
-    @field_validator("daily_loss_limit", "trading_capital")
+    @field_validator("daily_loss_limit", "trading_capital", "guardian_loss_limit")
     @classmethod
     def validate_positive_float(cls, v: Optional[float]) -> Optional[float]:
         if v is not None and v <= 0:
@@ -213,6 +213,7 @@ async def get_notification_status(
     return {
         "whatsapp": {"twilio_configured": whatsapp_service.is_configured},
         "push": {"vapid_configured": bool(settings.VAPID_PUBLIC_KEY and settings.VAPID_PRIVATE_KEY)},
+        "email": {"smtp_configured": False},
     }
 
 
@@ -452,7 +453,7 @@ async def update_profile(
     try:
         profile = await _get_or_create_profile(broker_account_id, db)
 
-        update_data = data.dict(exclude_unset=True)
+        update_data = data.model_dump(exclude_unset=True)
 
         # Guardian fields live on User, not UserProfile
         guardian_phone      = update_data.pop('guardian_phone', None)
@@ -594,7 +595,7 @@ async def send_guardian_test_message(
     """
     from app.services.whatsapp_service import whatsapp_service
     from app.services.push_notification_service import push_service
-    from app.models.trade import Trade
+    from app.models.completed_trade import CompletedTrade
     from sqlalchemy import and_
     from datetime import timedelta
 
@@ -612,19 +613,18 @@ async def send_guardian_test_message(
     # ── 1. Build mini analytics report ─────────────────────────────────────
     cutoff = datetime.now(timezone.utc) - timedelta(days=7)
     trade_result = await db.execute(
-        select(Trade).where(
+        select(CompletedTrade).where(
             and_(
-                Trade.broker_account_id == broker_account_id,
-                Trade.status == "COMPLETE",
-                Trade.order_timestamp >= cutoff
+                CompletedTrade.broker_account_id == broker_account_id,
+                CompletedTrade.exit_time >= cutoff,
             )
         )
     )
     trades = trade_result.scalars().all()
 
     trade_count = len(trades)
-    total_pnl = sum((t.pnl or 0) for t in trades)
-    wins = sum(1 for t in trades if (t.pnl or 0) > 0)
+    total_pnl = sum((t.realized_pnl or 0) for t in trades)
+    wins = sum(1 for t in trades if (t.realized_pnl or 0) > 0)
     win_rate = round((wins / trade_count * 100), 1) if trade_count > 0 else 0
 
     analytics_summary = (

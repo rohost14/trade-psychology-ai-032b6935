@@ -96,9 +96,7 @@ export function InsightsTab() {
     if (!account?.id) return;
     setLoading(true);
     try {
-      const res = await api.get('/api/personalization/insights', {
-        params: { broker_account_id: account.id },
-      });
+      const res = await api.get('/api/personalization/insights');
       setData(res.data);
     } catch {
       setData(null);
@@ -115,7 +113,7 @@ export function InsightsTab() {
     setLearnError(null);
     try {
       await api.post('/api/personalization/learn', null, {
-        params: { broker_account_id: account.id, days_back: 90 },
+        params: { days_back: 90 },
       });
       await fetchInsights();
     } catch {
