@@ -63,6 +63,12 @@ class TradingSession(Base):
     # State machine
     session_state: Mapped[str] = mapped_column(String(10), nullable=False, default="normal")
 
+    # Morning intent
+    intent_acknowledged: Mapped[bool] = mapped_column(nullable=False, default=False)
+    intent_max_trades: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
+    intent_max_loss: Mapped[Optional[Decimal]] = mapped_column(Numeric(15, 4), nullable=True)
+    intent_time: Mapped[Optional[datetime]] = mapped_column(TIMESTAMP(timezone=True), nullable=True)
+
     # Timestamps
     created_at: Mapped[datetime] = mapped_column(
         TIMESTAMP(timezone=True), server_default=text("now()"), nullable=False

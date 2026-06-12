@@ -418,6 +418,9 @@ app.include_router(guardrails.router, prefix="/api/guardrails", tags=["guardrail
 from app.api import portfolio_chat
 app.include_router(portfolio_chat.router, prefix="/api/portfolio-chat", tags=["portfolio-chat"])
 
+from app.api import session_intent
+app.include_router(session_intent.router, prefix="/api/session-intent", tags=["session-intent"])
+
 # Admin panel — separate JWT auth, returns 404 for non-admins
 from app.api.admin import auth as admin_auth, overview as admin_overview
 from app.api.admin import users as admin_users, system as admin_system

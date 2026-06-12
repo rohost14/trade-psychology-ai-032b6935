@@ -49,6 +49,7 @@ celery_app = Celery(
         "app.tasks.portfolio_radar_tasks",
         "app.tasks.guardrail_tasks",
         "app.tasks.portfolio_sync_tasks",
+        "app.tasks.intent_tasks",
     ]
 )
 
@@ -144,6 +145,18 @@ celery_app.conf.update(
         "eod-reconcile": {
             "task": "app.tasks.reconciliation_tasks.reconcile_trades",
             "schedule": crontab(hour=4, minute=0),
+        },
+        # Morning intent push — 8:30 AM IST Mon–Fri.
+        # Sends pre-market reminder with user's configured limits.
+        "morning-intent": {
+            "task": "app.tasks.intent_tasks.send_morning_intent_push",
+            "schedule": crontab(hour=8, minute=30, day_of_week="1-5"),
+        },
+        # EOD comparison push — 3:35 PM IST Mon–Fri.
+        # Compares planned intent limits vs actual session metrics.
+        "eod-comparison": {
+            "task": "app.tasks.intent_tasks.send_eod_comparison_push",
+            "schedule": crontab(hour=15, minute=35, day_of_week="1-5"),
         },
         # Guardrail rule monitor — every 60s during market hours (09:15–15:25 IST Mon–Fri)
         # Internal market-hours check inside the task body (beat doesn't support time ranges).

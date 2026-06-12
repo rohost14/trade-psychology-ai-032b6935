@@ -3,6 +3,8 @@ import { useNavigate } from 'react-router-dom';
 import { Link } from 'react-router-dom';
 import { Link2, Loader2, AlertTriangle, RefreshCw, X } from 'lucide-react';
 import BlowupShieldCard from '@/components/dashboard/BlowupShieldCard';
+import { MorningIntentCard } from '@/components/dashboard/MorningIntentCard';
+import { EodComparisonCard } from '@/components/dashboard/EodComparisonCard';
 import RecentAlertsCard from '@/components/dashboard/RecentAlertsCard';
 import AlertDetailSheet from '@/components/alerts/AlertDetailSheet';
 import OpenPositionsTable from '@/components/dashboard/OpenPositionsTable';
@@ -502,6 +504,12 @@ export default function Dashboard() {
             </>
           )}
         </div>
+      </div>
+
+      {/* ── Morning Intent / EOD Comparison ──────────────────────────────── */}
+      <div className="mb-4 space-y-4">
+        <MorningIntentCard />
+        <EodComparisonCard />
       </div>
 
       {/* ── VIX Context Strip ────────────────────────────────────────────── */}
