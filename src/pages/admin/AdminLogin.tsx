@@ -1,15 +1,21 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { Shield, Mail, Lock, KeyRound, Eye, EyeOff, Smartphone } from 'lucide-react';
 import { useAdminAuth } from '@/contexts/AdminAuthContext';
 
 export default function AdminLogin() {
-  const { step, pendingEmail, login, verifyOtp, verifyTotp } = useAdminAuth();
+  const { step, pendingEmail, admin, login, verifyOtp, verifyTotp } = useAdminAuth();
+  const navigate = useNavigate();
   const [email,    setEmail]    = useState('');
   const [password, setPassword] = useState('');
   const [code,     setCode]     = useState('');
   const [showPwd,  setShowPwd]  = useState(false);
   const [loading,  setLoading]  = useState(false);
   const [error,    setError]    = useState('');
+
+  useEffect(() => {
+    if (admin) navigate('/admin/overview', { replace: true });
+  }, [admin, navigate]);
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
