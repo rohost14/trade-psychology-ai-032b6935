@@ -260,7 +260,8 @@ export function getStreakData(): StreakData {
 
 export function updateStreak(adherence: GoalAdherence[], isTradingDay: boolean = true): StreakData {
   const streak = getStreakData();
-  const today = new Date().toISOString().split('T')[0];
+  // IST date: UTC+5:30 offset so streak records the correct Indian calendar day
+  const today = new Date(Date.now() + 5.5 * 3600_000).toISOString().split('T')[0];
   
   // Check if today was already recorded
   const existingToday = streak.daily_status.find((d) => d.date === today);

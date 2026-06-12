@@ -52,7 +52,8 @@ async def _check(
     redis_client,
 ) -> list[dict]:
     today_ist = datetime.now(IST).date()
-    today_start_utc = datetime.combine(today_ist, time.min).replace(tzinfo=timezone.utc)
+    # Correct IST→UTC: midnight IST = previous day 18:30 UTC
+    today_start_utc = datetime.combine(today_ist, time.min, tzinfo=IST).astimezone(timezone.utc)
 
     # Fetch profile limits
     profile_result = await db.execute(
@@ -60,7 +61,7 @@ async def _check(
     )
     profile = profile_result.scalar_one_or_none()
 
-    # Fetch today's completed trades (count + PnL sum only — no ordering needed)
+    # Fetch today's completed trades — no limit so P&L sum is always accurate
     trades_result = await db.execute(
         select(CompletedTrade)
         .where(
@@ -69,7 +70,6 @@ async def _check(
                 CompletedTrade.exit_time >= today_start_utc,
             )
         )
-        .limit(200)
     )
     trades_today = trades_result.scalars().all()
 
@@ -81,7 +81,7 @@ async def _check(
 
     # ── 1. P&L at 70% of daily loss limit ────────────────────────────────────
     if profile and profile.daily_loss_limit:
-        session_pnl = sum(float(t.pnl or 0) for t in trades_today)
+        session_pnl = sum(float(t.realized_pnl or 0) for t in trades_today)
         limit = float(profile.daily_loss_limit)
         used_pct = abs(session_pnl) / limit if session_pnl < 0 and limit > 0 else 0.0
 

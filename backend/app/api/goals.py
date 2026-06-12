@@ -4,8 +4,11 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, desc
 from uuid import UUID
 from datetime import datetime, timezone
+from zoneinfo import ZoneInfo
 from typing import List
 import logging
+
+IST = ZoneInfo("Asia/Kolkata")
 
 from app.core.database import get_db
 from app.api.deps import get_verified_broker_account_id
@@ -26,21 +29,24 @@ router = APIRouter()
 logger = logging.getLogger(__name__)
 
 
-async def _sync_goals_to_profile(broker_account_id: UUID, goals: Goal, db: AsyncSession):
+async def _apply_goals_to_profile(broker_account_id: UUID, goals: Goal, db: AsyncSession):
     """
     P-03: Sync goal limits → UserProfile thresholds so BehaviorEngine uses
     the user's stated goals instead of cold-start defaults.
 
     Mapping:
-      Goal.max_daily_loss          → UserProfile.daily_loss_limit
-      Goal.max_trades_per_day      → UserProfile.daily_trade_limit
-      Goal.max_position_size_pct   → UserProfile.max_position_size
-      Goal.starting_capital        → UserProfile.trading_capital (only if profile has none)
-      Goal.min_time_between_trades → UserProfile.cooldown_after_loss
+      Goal.max_daily_loss        → UserProfile.daily_loss_limit
+      Goal.max_trades_per_day    → UserProfile.daily_trade_limit
+      Goal.max_position_size_pct → UserProfile.max_position_size
+      Goal.starting_capital      → UserProfile.trading_capital (only if profile has none)
+
+    NOT mapped: min_time_between_trades_minutes — it means general pacing between any two
+    trades, not a post-loss cooldown. Mapping to cooldown_after_loss was semantically wrong.
+
+    Caller is responsible for committing — no commit here.
     """
     try:
         from app.models.user_profile import UserProfile
-        from datetime import datetime, timezone
 
         result = await db.execute(
             select(UserProfile).where(UserProfile.broker_account_id == broker_account_id)
@@ -63,10 +69,6 @@ async def _sync_goals_to_profile(broker_account_id: UUID, goals: Goal, db: Async
             profile.max_position_size = goals.max_position_size_percent
             changed = True
 
-        if goals.min_time_between_trades_minutes is not None:
-            profile.cooldown_after_loss = goals.min_time_between_trades_minutes
-            changed = True
-
         # Only set trading_capital from goals if profile doesn't already have one
         if goals.starting_capital and not profile.trading_capital:
             profile.trading_capital = goals.starting_capital
@@ -74,7 +76,6 @@ async def _sync_goals_to_profile(broker_account_id: UUID, goals: Goal, db: Async
 
         if changed:
             profile.updated_at = datetime.now(timezone.utc)
-            await db.commit()
             logger.info(f"[goals→profile] Synced thresholds for {broker_account_id}")
 
     except Exception as e:
@@ -198,12 +199,11 @@ async def update_goals(
             )
             db.add(log_entry)
 
+        # P-03: Sync goal limits → UserProfile before committing (single round-trip)
+        await _apply_goals_to_profile(broker_account_id, goals, db)
+
         await db.commit()
         await db.refresh(goals)
-
-        # P-03: Sync goal limits → UserProfile thresholds
-        # BehaviorEngine reads from UserProfile, so this wires goals to detection.
-        await _sync_goals_to_profile(broker_account_id, goals, db)
 
         return goals
     except Exception as e:
@@ -250,7 +250,7 @@ async def log_goal_broken(
         )
         db.add(log_entry)
 
-        # Reset streak
+        # Reset streak and record today as a broken day
         streak_result = await db.execute(
             select(StreakData).where(StreakData.broker_account_id == broker_account_id)
         )
@@ -259,6 +259,19 @@ async def log_goal_broken(
         if streak:
             streak.current_streak_days = 0
             streak.streak_start_date = None
+
+            # Insert daily_status entry so the day grid shows a red dot and
+            # increment_streak dedup correctly blocks a same-day override.
+            today_ist = datetime.now(IST).strftime("%Y-%m-%d")
+            daily_status = streak.daily_status or []
+            if not daily_status or daily_status[0].get("date") != today_ist:
+                daily_status = [{
+                    "date": today_ist,
+                    "all_goals_followed": False,
+                    "goals_broken": [goal_name] if goal_name else [],
+                    "trading_day": True,
+                }] + daily_status
+                streak.daily_status = daily_status[:60]
 
         await db.commit()
 
@@ -312,7 +325,7 @@ async def increment_streak(
             streak = StreakData(broker_account_id=broker_account_id)
             db.add(streak)
 
-        today = datetime.now(timezone.utc).strftime("%Y-%m-%d")
+        today = datetime.now(IST).strftime("%Y-%m-%d")
 
         # Check if already recorded today
         daily_status = streak.daily_status or []
