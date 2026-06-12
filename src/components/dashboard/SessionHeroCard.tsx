@@ -5,6 +5,7 @@ import { CompletedTrade } from '@/types/api';
 import { PnlSparkline } from './PnlSparkline';
 import { STATE_CFG, SessionState, getSessionDesc } from '@/lib/dashboardUtils';
 import { useCountUp } from '@/hooks/useCountUp';
+import VixStrip from './VixStrip';
 
 interface SessionHeroCardProps {
   stateCfg: typeof STATE_CFG[SessionState];
@@ -104,6 +105,11 @@ export function SessionHeroCard({
             </Link>
           </>
         )}
+      </div>
+
+      {/* VIX context — inline, no extra card chrome */}
+      <div className="px-5 pb-3">
+        <VixStrip />
       </div>
     </div>
   );

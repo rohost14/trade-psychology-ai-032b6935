@@ -11,11 +11,9 @@ import AlertDetailSheet from '@/components/alerts/AlertDetailSheet';
 import OpenPositionsTable from '@/components/dashboard/OpenPositionsTable';
 import ClosedTradesTable from '@/components/dashboard/ClosedTradesTable';
 import HoldingsCard from '@/components/dashboard/HoldingsCard';
-import PredictiveWarningsCard from '@/components/dashboard/PredictiveWarningsCard';
-import SessionPaceGoalCard from '@/components/dashboard/SessionPaceGoalCard';
 import { SessionHeroCard } from '@/components/dashboard/SessionHeroCard';
-import { AiCoachCta } from '@/components/dashboard/AiCoachCta';
-import VixStrip from '@/components/dashboard/VixStrip';
+import { AiCoachFab } from '@/components/dashboard/AiCoachFab';
+import { PredictiveContextStrip } from '@/components/dashboard/PredictiveContextStrip';
 import { useHoldings } from '@/hooks/useHoldings';
 import { TradeJournalSheet } from '@/components/dashboard/TradeJournalSheet';
 import { Button } from '@/components/ui/button';
@@ -507,21 +505,16 @@ export default function Dashboard() {
         </div>
       </div>
 
-      {/* ── Setup nudge (new users only, dismissable) ────────────────────── */}
+      {/* ── Setup nudge (new users, dismissable) ─────────────────────────── */}
       <SetupNudgeCard />
 
-      {/* ── Morning Intent / EOD Comparison ──────────────────────────────── */}
+      {/* ── Morning Intent / EOD Comparison (time-conditional) ───────────── */}
       <div className="mb-4 space-y-4">
         <MorningIntentCard />
         <EodComparisonCard />
       </div>
 
-      {/* ── VIX Context Strip ────────────────────────────────────────────── */}
-      <div className="mb-4">
-        <VixStrip />
-      </div>
-
-      {/* ── Session Hero ──────────────────────────────────────────────────── */}
+      {/* ── Session Hero (P&L + state + VIX inline) ──────────────────────── */}
       <SessionHeroCard
         stateCfg={stateCfg}
         sessionStateKey={sessionStateKey}
@@ -535,7 +528,10 @@ export default function Dashboard() {
         unrealizedTotal={unrealizedTotal}
       />
 
-      {/* ── Alerts (full-width) ───────────────────────────────────────────── */}
+      {/* ── Predictive context (danger hour / day / revenge window) ──────── */}
+      {accountId && <PredictiveContextStrip brokerAccountId={accountId} />}
+
+      {/* ── Real-time behavioral alerts ──────────────────────────────────── */}
       <div className="mb-5" aria-live="polite" aria-label="Behavioral alerts">
         <RecentAlertsCard
           alerts={mergedAlerts}
@@ -584,14 +580,6 @@ export default function Dashboard() {
         {/* Right — full width on mobile, 38% sticky on desktop */}
         <div className="w-full lg:flex-[38] min-w-0 space-y-5 lg:sticky lg:top-4">
           <BlowupShieldCard />
-          {accountId && (
-            <SessionPaceGoalCard
-              brokerAccountId={accountId}
-              tradesCount={tradeStats?.trades_today ?? 0}
-            />
-          )}
-
-          <AiCoachCta />
 
           {holdings.length > 0 && holdingsSummary && (
             <HoldingsCard
@@ -603,12 +591,8 @@ export default function Dashboard() {
         </div>
       </div>
 
-      {/* ── Predictive Warnings (full-width below) ─────────────────────────── */}
-      {accountId && (
-        <div className="mt-5">
-          <PredictiveWarningsCard brokerAccountId={accountId} />
-        </div>
-      )}
+      {/* ── AI Coach floating action button ──────────────────────────────── */}
+      <AiCoachFab />
 
       {/* ── Alert Detail Sheet ───────────────────────────────────────────── */}
       <AlertDetailSheet

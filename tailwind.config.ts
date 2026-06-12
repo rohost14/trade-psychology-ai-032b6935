@@ -103,10 +103,15 @@ export default {
           from: { height: "var(--radix-accordion-content-height)" },
           to:   { height: "0" },
         },
+        "pulse-slow": {
+          "0%, 100%": { opacity: "1" },
+          "50%":       { opacity: "0.7" },
+        },
       },
       animation: {
         "accordion-down": "accordion-down 0.2s ease-out",
         "accordion-up":   "accordion-up 0.2s ease-out",
+        "pulse-slow":     "pulse-slow 2.5s ease-in-out infinite",
       },
       fontFamily: {
         // Inter for all UI text
