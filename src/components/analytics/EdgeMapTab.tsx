@@ -76,6 +76,11 @@ export default function EdgeMapTab({ days }: { days: number }) {
 
   const { instruments, overall_win_rate, proportional_benchmark } = data;
 
+  // Best = highest avg P&L (most capital-effective instrument)
+  const bestInstrument = instruments.length > 0
+    ? [...instruments].sort((a, b) => b.avg_pnl - a.avg_pnl)[0]
+    : null;
+
   // Scatter data: x=trade_pct, y=win_rate, z=trade_count
   const scatterData = instruments.map(i => ({ ...i, x: i.trade_pct, y: i.win_rate, z: i.trade_count }));
 
@@ -102,10 +107,10 @@ export default function EdgeMapTab({ days }: { days: number }) {
         </div>
         <div className="tm-card p-4 col-span-2 sm:col-span-1">
           <p className="text-[11px] text-muted-foreground uppercase tracking-wide">Best instrument</p>
-          {instruments[0] ? (
+          {bestInstrument ? (
             <>
-              <p className="text-xl font-semibold text-foreground mt-1">{instruments[0].underlying}</p>
-              <p className="text-[11px] text-muted-foreground">{instruments[0].win_rate}% WR</p>
+              <p className="text-xl font-semibold text-foreground mt-1">{bestInstrument.underlying}</p>
+              <p className="text-[11px] text-muted-foreground">{bestInstrument.win_rate}% WR · {formatCurrencyWithSign(bestInstrument.avg_pnl)}/trade</p>
             </>
           ) : <p className="text-lg text-muted-foreground">—</p>}
         </div>

@@ -235,7 +235,7 @@ async def _get_discipline_streaks(account_id: UUID, db: AsyncSession):
                 and_(
                     RiskAlert.broker_account_id == account_id,
                     RiskAlert.detected_at >= cutoff,
-                    RiskAlert.pattern_type.in_(['revenge_trading', 'tilt', 'overtrading', 'martingale'])
+                    RiskAlert.pattern_type == 'revenge_trading'
                 )
             ).order_by(RiskAlert.detected_at.asc())
         )
@@ -1849,8 +1849,8 @@ async def get_btst_analytics(
             if entry_ist.date() == exit_ist.date():
                 continue
 
-            # Entry must be after 15:00 IST (late-day emotional entry)
-            if not (entry_ist.hour > 15 or (entry_ist.hour == 15 and entry_ist.minute >= 0)):
+            # Entry must be at or after 15:00 IST (late-day emotional entry)
+            if entry_ist.hour < 15:
                 continue
 
             # Exit must be before 09:45 IST on the next session
@@ -3115,11 +3115,13 @@ async def get_expiry_pattern(
         expiry: list[dict] = []
         non_expiry: list[dict] = []
 
+        from zoneinfo import ZoneInfo as _ZoneInfo
+        _IST = _ZoneInfo("Asia/Kolkata")
         for ct, feat in rows:
-            pnl = float(ct.pnl) if ct.pnl is not None else 0.0
-            hour = ct.entry_time.hour if ct.entry_time else None
+            pnl = float(ct.realized_pnl) if ct.realized_pnl is not None else 0.0
+            hour = ct.entry_time.astimezone(_IST).hour if ct.entry_time else None
             is_exp = bool(feat.is_expiry_day) if feat else False
-            trade_dict = {"pnl": pnl, "hour": hour, "symbol": ct.trading_symbol or ""}
+            trade_dict = {"pnl": pnl, "hour": hour, "symbol": ct.tradingsymbol or ""}
             if is_exp:
                 expiry.append(trade_dict)
             else:

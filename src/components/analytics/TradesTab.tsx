@@ -12,10 +12,14 @@ import type { CompletedTrade } from '@/types/api';
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
 function parseSymbol(sym: string): { name: string; chip: string; sub: string } {
-  const m5 = sym.match(/^([A-Z]+)\d{5}(\d{5})(CE|PE)$/);
-  if (m5) return { name: m5[1], chip: m5[3], sub: parseInt(m5[2], 10).toLocaleString('en-IN') };
-  const m6 = sym.match(/^([A-Z]+)\d{5}(\d{6})(CE|PE)$/);
-  if (m6) return { name: m6[1], chip: m6[3], sub: parseInt(m6[2], 10).toLocaleString('en-IN') };
+  const mw5 = sym.match(/^([A-Z]+)\d{5}(\d{5})(CE|PE)$/);
+  if (mw5) return { name: mw5[1], chip: mw5[3], sub: parseInt(mw5[2], 10).toLocaleString('en-IN') };
+  const mw6 = sym.match(/^([A-Z]+)\d{5}(\d{6})(CE|PE)$/);
+  if (mw6) return { name: mw6[1], chip: mw6[3], sub: parseInt(mw6[2], 10).toLocaleString('en-IN') };
+  const mm = sym.match(/^([A-Z]+)\d{2}[A-Z]{3}(\d{3,6})(CE|PE)$/);
+  if (mm) return { name: mm[1], chip: mm[3], sub: parseInt(mm[2], 10).toLocaleString('en-IN') };
+  const mf = sym.match(/^([A-Z]+)(?:\d{5}|\d{2}[A-Z]{3})FUT$/);
+  if (mf) return { name: mf[1], chip: 'FUT', sub: '' };
   return { name: sym, chip: 'EQ', sub: '' };
 }
 
@@ -108,8 +112,8 @@ function SortBtn({
 
 export default function TradesTab({ days }: { days: number }) {
   const [trades, setTrades]         = useState<CompletedTrade[]>([]);
-  const [total, setTotal]           = useState(0);
   const [offset, setOffset]         = useState(0);
+  const [lastPageFull, setLastPageFull] = useState(false);
   const [loadingMore, setLoadingMore] = useState(false);
   const [flagMap, setFlagMap]       = useState<Map<string, FlagReason[]>>(new Map());
   const [qualityMap, setQualityMap] = useState<Map<string, { score: number; tier: string }>>(new Map());
@@ -160,7 +164,7 @@ export default function TradesTab({ days }: { days: number }) {
         const all: CompletedTrade[] = tradesRes.value.data.trades ?? [];
         const inPeriod = all.filter((t) => t.exit_time && new Date(t.exit_time) >= cutoff);
         setTrades(inPeriod);
-        setTotal(tradesRes.value.data.total ?? 0);
+        setLastPageFull(all.length >= PAGE_SIZE);
         setOffset(PAGE_SIZE);
       }
       setFlagMap(map);
@@ -177,10 +181,12 @@ export default function TradesTab({ days }: { days: number }) {
       const res = await api.get('/api/trades/completed', {
         params: { limit: PAGE_SIZE, offset },
       });
-      const more: CompletedTrade[] = (res.data.trades ?? []).filter(
+      const fetched: CompletedTrade[] = res.data.trades ?? [];
+      const more = fetched.filter(
         (t: CompletedTrade) => t.exit_time && new Date(t.exit_time) >= cutoff
       );
       setTrades((prev) => [...prev, ...more]);
+      setLastPageFull(fetched.length >= PAGE_SIZE);
       setOffset((o) => o + PAGE_SIZE);
     } finally {
       setLoadingMore(false);
@@ -225,7 +231,7 @@ export default function TradesTab({ days }: { days: number }) {
   const winRate  = trades.length > 0 ? Math.round((winners / trades.length) * 100) : 0;
   const totalPnl = trades.reduce((s, t) => s + t.realized_pnl, 0);
   const flagCount = trades.filter((t) => flagMap.has(t.id)).length;
-  const hasMore = offset < total;
+  const hasMore = lastPageFull;
 
   if (isLoading) {
     return (
@@ -450,7 +456,7 @@ export default function TradesTab({ days }: { days: number }) {
             disabled={loadingMore}
             className="px-5 py-2 text-[12px] font-medium text-muted-foreground hover:text-foreground border border-border hover:border-foreground rounded-lg transition-colors disabled:opacity-50"
           >
-            {loadingMore ? 'Loading…' : `Load more (${total - trades.length} remaining)`}
+            {loadingMore ? 'Loading…' : 'Load more'}
           </button>
         </div>
       )}
