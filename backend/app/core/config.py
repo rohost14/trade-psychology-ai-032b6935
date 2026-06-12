@@ -80,6 +80,9 @@ class Settings(BaseSettings):
     ADMIN_IP_ALLOWLIST: Optional[str] = None
     # TOTP issuer name shown in authenticator apps
     ADMIN_TOTP_ISSUER: str = "TradeMentor Admin"
+    # Dev bypass — set to 1 in .env to skip OTP/TOTP and return JWT directly on password verify.
+    # NEVER set in production. Blocked when ENVIRONMENT != "development".
+    ADMIN_DEV_BYPASS: bool = False
 
     # Gupshup WhatsApp (replaces Twilio)
     GUPSHUP_API_KEY: Optional[str] = None

@@ -25,10 +25,10 @@ if not DATABASE_URL:
 
 
 async def main():
+    import bcrypt as _bcrypt
     from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession
     from sqlalchemy.orm import sessionmaker
     from sqlalchemy import select
-    from passlib.context import CryptContext
     import uuid
     from datetime import datetime, timezone
 
@@ -45,8 +45,6 @@ async def main():
     # Lazy import after env is loaded
     sys.path.insert(0, str(Path(__file__).parent.parent))
     from app.models.admin_user import AdminUser
-
-    pwd_ctx = CryptContext(schemes=["bcrypt"], deprecated="auto")
 
     print("=== TradeMentor Admin User Creator ===\n")
     email    = input("Email: ").strip()
@@ -65,7 +63,7 @@ async def main():
         print("ERROR: Invalid role.")
         sys.exit(1)
 
-    pw_hash = pwd_ctx.hash(password)
+    pw_hash = _bcrypt.hashpw(password.encode("utf-8"), _bcrypt.gensalt(rounds=12)).decode("utf-8")
 
     async with Session() as db:
         existing = (await db.execute(select(AdminUser).where(AdminUser.email == email))).scalar_one_or_none()

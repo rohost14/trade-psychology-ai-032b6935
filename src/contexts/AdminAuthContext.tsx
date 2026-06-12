@@ -36,7 +36,13 @@ export function AdminAuthProvider({ children }: { children: ReactNode }) {
   const login = async (email: string, password: string) => {
     const res = await adminApi.login(email, password);
     setPendingEmail(email);
-    if (res.status === 'totp_required') {
+    if (res.status === 'ok' && res.token) {
+      // Dev bypass — JWT returned directly, no 2FA step
+      localStorage.setItem(STORAGE_KEY, res.token);
+      setAdmin(res.admin);
+      setStep('idle');
+      setPendingEmail('');
+    } else if (res.status === 'totp_required') {
       setStep('totp_required');
     } else {
       setStep('otp_sent');

@@ -145,6 +145,17 @@ async def admin_login(
 
     r.delete(fail_key)
 
+    # Dev bypass — skip all 2FA, return JWT immediately (only in development)
+    if settings.ADMIN_DEV_BYPASS and settings.ENVIRONMENT == "development":
+        logger.warning(f"ADMIN_DEV_BYPASS active — issuing JWT for {admin.email} without 2FA")
+        token = _make_admin_jwt(admin)
+        await db.execute(
+            update(AdminUser).where(AdminUser.id == admin.id)
+            .values(last_login_at=datetime.now(timezone.utc))
+        )
+        await db.commit()
+        return {"status": "ok", "token": token, "admin": {"email": admin.email, "name": admin.name, "role": admin.role}}
+
     # TOTP path — skip email OTP entirely
     if admin.totp_secret_enc:
         return {"status": "totp_required", "message": "Enter your authenticator code"}
