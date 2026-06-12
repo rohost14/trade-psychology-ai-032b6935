@@ -439,10 +439,9 @@ return expected == trade_date
 
 ### MKT-1: NSE_HOLIDAYS_2026 is incomplete
 **File**: market_hours.py:42–49  
-**Status**: MINOR_ISSUE  
-**Finding**: `NSE_HOLIDAYS_2026` contains only 6 dates (Republic Day, Holi, Good Friday, Independence Day, Gandhi Jayanti, Christmas). The 2025 list has 13 dates. A typical NSE year has 12–14 holidays. Missing from 2026: Mahashivratri, Eid, Ambedkar Jayanti, Maharashtra Day, Ganesh Chaturthi, Diwali, Guru Nanak Jayanti.  
-**Impact**: `is_trading_holiday()` returns False on actual 2026 holidays, causing `is_expiry_day` and session boundary calculations to treat holidays as regular trading days.  
-**Fix**: Complete the 2026 holiday list from NSE official calendar.
+**Status**: ~~MINOR_ISSUE~~ **RESOLVED**  
+**Finding**: ~~Only 6 dates in NSE_HOLIDAYS_2026.~~  
+**Resolution**: `NSE_HOLIDAYS_2026` now has 14 dates: Republic Day, Mahashivratri, Holi, Ram Navami, Good Friday, Ambedkar Jayanti, Maharashtra Day, Bakri Id (tentative), Ganesh Chaturthi, Gandhi Jayanti, Diwali Laxmi Puja, Diwali Balipratipada, Guru Nanak Jayanti, Christmas. Verified 2026-06-12.
 
 ---
 
@@ -450,7 +449,7 @@ return expected == trade_date
 
 | ID | Pattern | Status | Severity |
 |----|---------|--------|----------|
-| CROSS-1 | session_trades includes current trade | MINOR_ISSUE | Low |
+| CROSS-1 | session_trades includes current trade | ~~MINOR_ISSUE~~ RESOLVED (2026-06-12) | Low |
 | CROSS-2 | consecutive_loss_streak double-build | MINOR_ISSUE | Low |
 | CROSS-3 | session_trades exit_time vs entry_time | MINOR_ISSUE | Low |
 | CROSS-4 | Decimal/float mixing | MINOR_ISSUE | Low |
@@ -479,7 +478,7 @@ return expected == trade_date
 | Pat-22 | end_of_session_mis_panic: wrong auto-squareoff time (15:20 vs 15:15/15:25) | BUG | Medium |
 | Pat-22 | end_of_session_mis_panic: stale comment says 15:10 | MINOR_ISSUE | Low |
 | Pat-23 | post_loss_recovery_bet: not in _STRATEGY_SUPPRESSED | MINOR_ISSUE | Low |
-| INVOKE-1 | run_risk_detection_async: latest CT only | MINOR_ISSUE | Low |
+| INVOKE-1 | run_risk_detection_async: latest CT only | ~~MINOR_ISSUE~~ RESOLVED (2026-06-12) | Low |
 | INVOKE-2 | run_behavior_engine_full_session: dedup uses now_utc not trade time | BUG | Medium |
 | EXPIRY-1 | is_expiry_day: holiday adjustment not implemented | BUG | High |
 | DEFAULTS-1 | trading_defaults: duplicate no_stoploss_monthly keys | BUG | Low |

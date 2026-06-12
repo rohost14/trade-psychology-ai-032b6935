@@ -80,11 +80,9 @@
 
 ### 1-H: `send_weekly_summary` — hardcoded "Consistent execution" / "Position sizing" as strengths/weaknesses
 **File**: `backend/app/tasks/report_tasks.py:265–268`  
-**Status**: MINOR_ISSUE  
-**Finding**: `send_weekly_summary` passes `key_strength="Consistent execution"` and `key_weakness="Position sizing"` as hardcoded constants to `ai_service.generate_whatsapp_report()`. These are never computed from actual trade data. Every user gets the same fabricated strength/weakness in their weekly AI summary.  
-**Evidence**: `report_tasks.py:265–268`.  
-**Impact**: AI summary content is misleading — a user who has no position sizing issues will be told that is their weakness. Erodes user trust.  
-**Fix**: Compute actual strengths/weaknesses from the week's alert patterns (most frequent pattern = weakness; least-triggered category = strength), or omit these fields.
+**Status**: ~~MINOR_ISSUE~~ **RESOLVED**  
+**Finding**: ~~`send_weekly_summary` passes hardcoded constants.~~  
+**Resolution**: Fixed in session 34. `report_tasks.py` now fetches the week's `RiskAlert` records, derives `key_weakness` from the most frequent `pattern_type` via `Counter`, and `key_strength` from the first common pattern that did NOT fire. Verified 2026-06-12.
 
 ---
 
@@ -100,11 +98,8 @@
 
 ### 1-J: APScheduler (`retention_tasks.py`) runs inside every FastAPI worker process
 **File**: `backend/app/tasks/retention_tasks.py:28`, `127–147`  
-**Status**: BUG  
-**Finding**: `scheduler = AsyncIOScheduler()` is a module-level singleton. `start_scheduler()` is presumably called in the FastAPI app lifespan. If the app is deployed with multiple uvicorn workers (e.g., `gunicorn -w 4`), each worker process imports and starts the scheduler independently. With 4 workers, every user receives 4× the reports at their configured time.  
-**Evidence**: `retention_tasks.py:28` — module-level `scheduler = AsyncIOScheduler()`. No distributed lock or process-coordination mechanism.  
-**Impact**: Users receive duplicate EOD/morning reports. At 4 workers × 1000 users = 4000 WhatsApp messages instead of 1000, burning API quota and violating WhatsApp template policies (repeated messages to same number within minutes may cause opt-outs or bans).  
-**Fix**: Use a Redis-backed distributed lock in `_dispatch_reports` (e.g., `SET report_lock:{current_time} 1 NX EX 59`) so only the first worker to acquire the lock dispatches. Alternatively, move all report scheduling to Celery Beat (which has `redbeat` for single-instance guarantee), and remove APScheduler entirely.
+**Status**: ~~BUG~~ **NOT APPLICABLE**  
+**Finding**: `start_scheduler()` is defined but **never called** from `main.py` or anywhere in the lifespan. The `AsyncIOScheduler` object is instantiated as a module-level singleton but never started. All report scheduling is handled by Celery Beat (`dispatch_reports_tick` every 60s with `redbeat` for single-instance guarantee). APScheduler is dead code. Verified 2026-06-12 by grepping all call sites of `start_scheduler`.
 
 ---
 
@@ -170,11 +165,9 @@
 
 ### 2-F: `validate_postback_checksum()` uses global `api_secret` — breaks per-user API keys
 **File**: `backend/app/services/zerodha_service.py:562–575`  
-**Status**: BUG  
-**Finding**: `validate_postback_checksum()` is a method on `ZerodhaClient`, and uses `self.api_secret` for the checksum. The global `zerodha_client` singleton uses the global `settings.ZERODHA_API_SECRET`. But per-user API keys are supported (via `get_service_for_account(account)` returning a user-scoped client). When a postback webhook arrives, the checksum is computed using the user's own `api_secret` but the webhook endpoint likely uses the global `zerodha_client.validate_postback_checksum()`. This means users with per-user API keys will have their webhooks rejected as invalid checksums.  
-**Evidence**: `zerodha_service.py:562–575` — `self.api_secret`. Webhook handler presumably calls the global `zerodha_client.validate_postback_checksum()`.  
-**Impact**: For any user with a personal API key configured, all real-time webhooks are silently dropped (checksum validation fails), making live trade tracking non-functional. They fall back to the daily reconciliation only.  
-**Fix**: In the webhook handler, look up the account's `api_secret` (decrypted from `api_secret_enc`) and use `get_service_for_account(account).validate_postback_checksum(payload, checksum)`.
+**Status**: ~~BUG~~ **RESOLVED**  
+**Finding**: ~~Webhook endpoint uses global zerodha_client.validate_postback_checksum() instead of per-user secret.~~  
+**Resolution**: Fixed in session 34. `webhooks.py` line 110 uses `account.decrypt_api_secret() or settings.ZERODHA_API_SECRET` — per-user secret first, global fallback. Both `verify_zerodha_checksum` (body) and `verify_zerodha_checksum_header` (header) paths use the per-user key. Verified 2026-06-12.
 
 ---
 
@@ -210,11 +203,9 @@
 
 ### 3-D: `Position` model — no unique constraint on `(broker_account_id, tradingsymbol, product)`
 **File**: `backend/app/models/position.py:12`  
-**Status**: BUG  
-**Finding**: The `positions` table has no unique constraint. Only `broker_account_id` is indexed. If `TradeSyncService.sync_positions()` is called twice concurrently (e.g., from the webhook path AND the EOD sync path), duplicate position rows can be created for the same symbol. The behavior engine and dashboard would then show doubled position quantities.  
-**Evidence**: `position.py:12–59` — no `UniqueConstraint`.  
-**Impact**: Double-counting of open positions in the risk exposure calculations, incorrect P&L display, and potential false alerts for position sizing.  
-**Fix**: Add `UniqueConstraint('broker_account_id', 'tradingsymbol', 'product', name='uq_positions_account_symbol_product')`.
+**Status**: ~~BUG~~ **RESOLVED**  
+**Finding**: ~~No unique constraint on positions table.~~  
+**Resolution**: `UniqueConstraint('broker_account_id', 'tradingsymbol', 'exchange', 'product', name='uq_position_account_symbol_exchange_product')` exists in `position.py`. Verified 2026-06-12.
 
 ---
 

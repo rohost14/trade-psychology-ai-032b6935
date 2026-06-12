@@ -97,4 +97,16 @@ class Settings(BaseSettings):
         extra="ignore"
     )
 
-settings = Settings()
+try:
+    settings = Settings()
+except Exception as _cfg_err:
+    import sys as _sys
+    _sys.stderr.write(
+        f"\n[TradeMentor] Startup failed — missing or invalid environment variables:\n"
+        f"  {_cfg_err}\n\n"
+        f"Required: ENCRYPTION_KEY, SECRET_KEY\n"
+        f"Copy backend/.env.example to backend/.env and fill in all required values.\n"
+        f"Generate ENCRYPTION_KEY: python -c \"from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())\"\n"
+        f"Generate SECRET_KEY:     python -c \"import secrets; print(secrets.token_urlsafe(32))\"\n\n"
+    )
+    _sys.exit(1)

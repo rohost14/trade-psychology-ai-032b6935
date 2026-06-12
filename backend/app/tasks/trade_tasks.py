@@ -190,6 +190,7 @@ def process_webhook_trade(self, trade_data: Dict[str, Any], broker_account_id: s
                 redis_client = None
                 fifo_lock_key = f"fifo_lock:{broker_account_id}"
                 fifo_lock_acquired = False
+                _closed_ct_id: UUID = None  # set when a CompletedTrade is created this pipeline run
 
                 try:
                     redis_client = _get_redis_client()
@@ -262,6 +263,7 @@ def process_webhook_trade(self, trade_data: Dict[str, Any], broker_account_id: s
                             if ct:
                                 db.add(ct)
                                 await db.flush()  # give ct.id before strategy detection
+                                _closed_ct_id = ct.id  # pass to run_risk_detection_async below
                                 logger.info(
                                     f"[ledger] CompletedTrade: {ct.tradingsymbol} "
                                     f"{ct.direction} pnl={ct.realized_pnl}"
@@ -346,7 +348,7 @@ def process_webhook_trade(self, trade_data: Dict[str, Any], broker_account_id: s
                         # the P&L is already saved. Log and move on.
                         return {"success": True, "trade_id": str(trade.id), "behavior_skipped": True}
 
-                    await run_risk_detection_async(account_id, db, trade)
+                    await run_risk_detection_async(account_id, db, trade, completed_trade_id=_closed_ct_id)
 
                 finally:
                     if redis_client and behavior_lock_acquired:
@@ -505,7 +507,12 @@ def run_risk_detection(broker_account_id: str, trigger_trade_id: str = None):
     return asyncio.run(_detect())
 
 
-async def run_risk_detection_async(broker_account_id: UUID, db, trigger_trade: Trade = None):
+async def run_risk_detection_async(
+    broker_account_id: UUID,
+    db,
+    trigger_trade: Trade = None,
+    completed_trade_id: UUID = None,
+):
     """
     Internal async helper for risk detection.
 
@@ -516,6 +523,10 @@ async def run_risk_detection_async(broker_account_id: UUID, db, trigger_trade: T
     - Session-scoped (today only, not 24h rolling)
     - Cumulative risk score via TradingSession
     - Returns RiskAlert objects ready for dedup + notification
+
+    completed_trade_id: when provided, analyze that specific CompletedTrade rather
+    than falling back to LIMIT 1 latest. Avoids race conditions when two trades
+    close in rapid succession.
     """
     try:
         from app.models.risk_alert import RiskAlert
@@ -523,14 +534,17 @@ async def run_risk_detection_async(broker_account_id: UUID, db, trigger_trade: T
         from app.services.behavior_engine import behavior_engine
         from sqlalchemy import desc
 
-        # Find the most recent CompletedTrade for this account (the closed position)
-        ct_result = await db.execute(
-            select(CompletedTrade)
-            .where(CompletedTrade.broker_account_id == broker_account_id)
-            .order_by(desc(CompletedTrade.exit_time))
-            .limit(1)
-        )
-        latest_ct = ct_result.scalar_one_or_none()
+        if completed_trade_id is not None:
+            latest_ct = await db.get(CompletedTrade, completed_trade_id)
+        else:
+            # Fallback: most recent CompletedTrade (used from eod_sync and legacy callers)
+            ct_result = await db.execute(
+                select(CompletedTrade)
+                .where(CompletedTrade.broker_account_id == broker_account_id)
+                .order_by(desc(CompletedTrade.exit_time))
+                .limit(1)
+            )
+            latest_ct = ct_result.scalar_one_or_none()
 
         if not latest_ct:
             # No completed trade yet — position still open, nothing to analyze

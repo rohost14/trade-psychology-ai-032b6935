@@ -269,6 +269,7 @@ class BehaviorEngine:
             .where(and_(
                 CompletedTrade.broker_account_id == broker_account_id,
                 CompletedTrade.exit_time >= session_start,
+                CompletedTrade.id != completed_trade.id,  # exclude current trade — it's already ctx.completed_trade
             ))
             .order_by(CompletedTrade.exit_time.asc())
         )
