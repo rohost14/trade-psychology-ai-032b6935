@@ -18,7 +18,7 @@ from enum import Enum
 from dataclasses import dataclass
 import logging
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select, and_, desc
+from sqlalchemy import select, and_, desc, func
 
 from app.models.cooldown import Cooldown, create_cooldown
 from app.models.risk_alert import RiskAlert
@@ -82,15 +82,22 @@ class CooldownService:
     # Default escalation ladder (in minutes)
     ESCALATION_LADDER = [5, 15, 30, 60, 120]
 
-    # Trigger types that warrant cooldowns
+    # Trigger types that warrant cooldowns.
+    # Names must match BehaviorEngine event_type / risk_detector pattern_type exactly.
     COOLDOWN_TRIGGERS = {
         "loss_limit_breach": CooldownType.HARD,
-        "revenge_trading": CooldownType.SOFT,
-        "overtrading": CooldownType.SOFT,
-        "tilt": CooldownType.SOFT,
-        "fomo": CooldownType.SOFT,
-        "loss_chasing": CooldownType.SOFT,
         "max_position_exceeded": CooldownType.HARD,
+        "revenge_trade": CooldownType.SOFT,          # BehaviorEngine
+        "revenge_sizing": CooldownType.SOFT,          # risk_detector
+        "overtrading": CooldownType.SOFT,             # risk_detector
+        "overtrading_burst": CooldownType.SOFT,       # BehaviorEngine
+        "tilt_loss_spiral": CooldownType.SOFT,        # risk_detector
+        "fomo": CooldownType.SOFT,                    # risk_detector
+        "fomo_entry": CooldownType.SOFT,              # BehaviorEngine
+        "session_meltdown": CooldownType.SOFT,        # BehaviorEngine
+        "post_loss_recovery_bet": CooldownType.SOFT,  # BehaviorEngine
+        "martingale_behaviour": CooldownType.SOFT,    # BehaviorEngine
+        "consecutive_loss_streak": CooldownType.SOFT, # BehaviorEngine
         "emotional_trading": CooldownType.SOFT,
     }
 
@@ -131,7 +138,7 @@ class CooldownService:
                 cooldown_id=str(active_cooldown.id),
                 expires_at=active_cooldown.expires_at,
                 reason=active_cooldown.reason,
-                current_duration_minutes=active_cooldown.duration_minutes,
+                current_duration_minutes=active_cooldown.remaining_minutes,  # remaining, not total
                 can_skip=active_cooldown.can_skip,
                 message=active_cooldown.message
             )
@@ -178,7 +185,11 @@ class CooldownService:
                 db, broker_account_id, trigger_reason
             )
         else:
-            duration_minutes = self._calculate_duration(account_id_str, trigger_reason)
+            # DB-backed escalation — survives server restarts and multi-worker gunicorn.
+            # In-memory _violation_counts resets on every restart, so graduated escalation
+            # never worked in production. Query the Cooldown table instead.
+            level = await self._db_escalation_level(db, broker_account_id, trigger_reason)
+            duration_minutes = self.ESCALATION_LADDER[level]
 
         # Determine if can skip (hard cooldowns can't be skipped)
         can_skip = cooldown_type != CooldownType.HARD
@@ -192,18 +203,13 @@ class CooldownService:
             message=custom_message,
             trigger_alert_id=trigger_alert_id,
             meta_data={
-                "escalation_level": self._get_escalation_level(account_id_str, trigger_reason) + 1,
                 "cooldown_type": cooldown_type.value,
-                "violation_count": self._get_violation_count(account_id_str, trigger_reason) + 1
             }
         )
 
         db.add(cooldown)
         await db.commit()
         await db.refresh(cooldown)
-
-        # Record violation for graduated escalation
-        self._record_violation(account_id_str, trigger_reason)
 
         # Send notification (respects rate limits)
         await self._send_cooldown_notification(
@@ -212,7 +218,7 @@ class CooldownService:
 
         logger.info(
             f"Started {cooldown_type.value} cooldown for account {broker_account_id}: "
-            f"{trigger_reason}, {duration_minutes} minutes (level {self._get_escalation_level(account_id_str, trigger_reason)})"
+            f"{trigger_reason}, {duration_minutes} minutes"
         )
 
         return CooldownResult(
@@ -221,7 +227,6 @@ class CooldownService:
             expires_at=cooldown.expires_at,
             reason=trigger_reason,
             current_duration_minutes=duration_minutes,
-            violations_today=self._get_violation_count(account_id_str, trigger_reason),
             can_skip=can_skip,
             message=cooldown.message
         )
@@ -302,6 +307,34 @@ class CooldownService:
             "next_duration_minutes": next_duration,
             "at_max_escalation": level >= len(self.ESCALATION_LADDER) - 1
         }
+
+    async def _db_escalation_level(
+        self,
+        db: AsyncSession,
+        broker_account_id: UUID,
+        trigger_reason: str,
+    ) -> int:
+        """
+        Derive escalation level from DB by counting recent cooldowns for this
+        (account, trigger_reason) pair within the reset window.
+
+        Replaces in-memory _violation_counts which reset on server restart.
+        """
+        cutoff = datetime.now(timezone.utc) - timedelta(hours=self.config.reset_after_hours)
+        try:
+            result = await db.execute(
+                select(func.count(Cooldown.id)).where(
+                    and_(
+                        Cooldown.broker_account_id == broker_account_id,
+                        Cooldown.reason == trigger_reason,
+                        Cooldown.created_at >= cutoff,
+                    )
+                )
+            )
+            count = result.scalar() or 0
+        except Exception:
+            count = 0
+        return min(count, len(self.ESCALATION_LADDER) - 1)
 
     def _calculate_duration(self, user_id: int, trigger_reason: str) -> int:
         """Calculate cooldown duration based on strategy."""

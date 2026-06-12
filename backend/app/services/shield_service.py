@@ -254,13 +254,20 @@ class ShieldService:
         db: AsyncSession,
         days: Optional[int],
     ) -> List[RiskAlert]:
-        query = select(RiskAlert).where(
-            RiskAlert.broker_account_id == broker_account_id
+        # Cap at 180 days when no explicit window — prevents loading thousands
+        # of rows for long-tenured users on the pattern breakdown query.
+        effective_days = days if days is not None else 180
+        cutoff = datetime.now(timezone.utc) - timedelta(days=effective_days)
+        query = (
+            select(RiskAlert)
+            .where(
+                and_(
+                    RiskAlert.broker_account_id == broker_account_id,
+                    RiskAlert.detected_at >= cutoff,
+                )
+            )
+            .order_by(RiskAlert.detected_at.desc())
         )
-        if days is not None:
-            cutoff = datetime.now(timezone.utc) - timedelta(days=days)
-            query = query.where(RiskAlert.detected_at >= cutoff)
-        query = query.order_by(RiskAlert.detected_at.desc())
         result = await db.execute(query)
         return list(result.scalars().all())
 

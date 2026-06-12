@@ -10,16 +10,20 @@ from sqlalchemy import select, and_, or_
 from pydantic import BaseModel
 from uuid import UUID
 from typing import Optional, List
-from datetime import datetime, timedelta, timezone
+from datetime import datetime, timedelta, timezone, time as _time
+from zoneinfo import ZoneInfo
 import logging
 
 from app.core.database import get_db
 from app.api.deps import get_verified_broker_account_id
 from app.models.cooldown import Cooldown, create_cooldown
 from app.models.trade import Trade
+from app.models.completed_trade import CompletedTrade
 from app.models.risk_alert import RiskAlert
 from app.models.user_profile import UserProfile
 from app.services.ai_personalization_service import ai_personalization_service
+
+_IST = ZoneInfo("Asia/Kolkata")
 
 router = APIRouter()
 logger = logging.getLogger(__name__)
@@ -344,15 +348,16 @@ async def pre_trade_check(
         profile = profile_result.scalar_one_or_none()
 
         if profile:
-            # Daily trade limit
+            # Daily trade limit — count CompletedTrade round-trips with IST midnight boundary
             if profile.daily_trade_limit:
-                today_start = now.replace(hour=0, minute=0, second=0, microsecond=0)
+                today_start_utc = datetime.combine(
+                    datetime.now(_IST).date(), _time.min, tzinfo=_IST
+                ).astimezone(timezone.utc)
                 today_trades_result = await db.execute(
-                    select(Trade).where(
+                    select(CompletedTrade).where(
                         and_(
-                            Trade.broker_account_id == broker_account_id,
-                            Trade.status == "COMPLETE",
-                            Trade.order_timestamp >= today_start
+                            CompletedTrade.broker_account_id == broker_account_id,
+                            CompletedTrade.exit_time >= today_start_utc,
                         )
                     )
                 )
