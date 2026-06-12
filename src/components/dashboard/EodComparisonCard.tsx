@@ -19,19 +19,14 @@ interface IntentData {
   } | null;
 }
 
-function getISTHour(): number {
+function getIST(): { hour: number; minute: number; isWeekday: boolean } {
   const now = new Date();
-  const istOffset = 5 * 60 + 30;
-  const utcMs = now.getTime() + now.getTimezoneOffset() * 60000;
-  return new Date(utcMs + istOffset * 60000).getHours();
-}
-
-function isWeekday(): boolean {
-  const now = new Date();
-  const istOffset = 5 * 60 + 30;
-  const utcMs = now.getTime() + now.getTimezoneOffset() * 60000;
-  const day = new Date(utcMs + istOffset * 60000).getDay();
-  return day >= 1 && day <= 5;
+  const ist = new Date(now.getTime() + now.getTimezoneOffset() * 60000 + (5 * 60 + 30) * 60000);
+  return {
+    hour: ist.getHours(),
+    minute: ist.getMinutes(),
+    isWeekday: ist.getDay() >= 1 && ist.getDay() <= 5,
+  };
 }
 
 function RuleRow({
@@ -89,16 +84,14 @@ export function EodComparisonCard() {
   }, [account?.id]);
 
   // Show after market close (3:30 PM IST) on weekdays
-  const hour = getISTHour();
-  const show = isWeekday() && hour >= 15;
+  const { hour, minute, isWeekday } = getIST();
+  const show = isWeekday && (hour > 15 || (hour === 15 && minute >= 30));
 
   if (!show || loading || !data) return null;
   if (!data.intent_acknowledged || !data.comparison) return null;
 
   const { comparison, planned, actual } = data;
-  const pnlLabel = actual.pnl >= 0
-    ? `+${formatCurrencyWithSign(actual.pnl)}`
-    : formatCurrencyWithSign(actual.pnl);
+  const pnlLabel = formatCurrencyWithSign(actual.pnl);
 
   return (
     <div className={cn(
@@ -135,9 +128,10 @@ export function EodComparisonCard() {
 
       {/* P&L hero */}
       <div className="px-5 py-4 border-b border-border text-center">
-        <p className="text-3xl font-bold font-mono tabular-nums" style={{
-          color: actual.pnl >= 0 ? 'rgb(var(--tm-profit))' : 'rgb(var(--tm-loss))'
-        }}>
+        <p className={cn(
+          'text-3xl font-bold font-mono tabular-nums',
+          actual.pnl >= 0 ? 'text-tm-profit' : 'text-tm-loss'
+        )}>
           {pnlLabel}
         </p>
         <p className="text-xs text-muted-foreground mt-1">Session P&L</p>

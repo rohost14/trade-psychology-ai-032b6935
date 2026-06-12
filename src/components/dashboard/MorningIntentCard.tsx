@@ -1,5 +1,6 @@
-import { useState, useEffect } from 'react';
-import { CheckCircle2, ChevronDown, ChevronUp, Loader2 } from 'lucide-react';
+import { useState, useEffect, useCallback } from 'react';
+import { CheckCircle2, ChevronDown, ChevronUp, Loader2, Settings } from 'lucide-react';
+import { Link } from 'react-router-dom';
 import { cn } from '@/lib/utils';
 import { api } from '@/lib/api';
 import { formatCurrency } from '@/lib/formatters';
@@ -16,40 +17,37 @@ interface Props {
   onAcknowledged?: () => void;
 }
 
-function getISTHour(): number {
+function getISTInfo(): { hour: number; isWeekday: boolean; minsUntilOpen: number } {
   const now = new Date();
-  const istOffset = 5 * 60 + 30;
-  const utcMs = now.getTime() + now.getTimezoneOffset() * 60000;
-  return new Date(utcMs + istOffset * 60000).getHours();
-}
-
-function isWeekday(): boolean {
-  const now = new Date();
-  const istOffset = 5 * 60 + 30;
-  const utcMs = now.getTime() + now.getTimezoneOffset() * 60000;
-  const day = new Date(utcMs + istOffset * 60000).getDay();
-  return day >= 1 && day <= 5;
-}
-
-function minsUntilOpen(): number {
-  const now = new Date();
-  const istOffset = 5 * 60 + 30;
-  const utcMs = now.getTime() + now.getTimezoneOffset() * 60000;
-  const ist = new Date(utcMs + istOffset * 60000);
+  const ist = new Date(now.getTime() + now.getTimezoneOffset() * 60000 + (5 * 60 + 30) * 60000);
+  const hour = ist.getHours();
+  const day  = ist.getDay();
   const openMin = 9 * 60 + 15;
-  const nowMin = ist.getHours() * 60 + ist.getMinutes();
-  return Math.max(0, openMin - nowMin);
+  const nowMin  = hour * 60 + ist.getMinutes();
+  return {
+    hour,
+    isWeekday: day >= 1 && day <= 5,
+    minsUntilOpen: Math.max(0, openMin - nowMin),
+  };
 }
 
 export function MorningIntentCard({ onAcknowledged }: Props) {
   const { account } = useBroker();
-  const [data, setData]               = useState<IntentData | null>(null);
-  const [loading, setLoading]         = useState(true);
-  const [submitting, setSubmitting]   = useState(false);
-  const [showOverride, setShowOverride] = useState(false);
+  const [data, setData]                     = useState<IntentData | null>(null);
+  const [loading, setLoading]               = useState(true);
+  const [submitting, setSubmitting]         = useState(false);
+  const [showOverride, setShowOverride]     = useState(false);
   const [overrideTrades, setOverrideTrades] = useState('');
   const [overrideLoss, setOverrideLoss]     = useState('');
-  const [done, setDone]               = useState(false);
+  const [done, setDone]                     = useState(false);
+  const [istInfo, setIstInfo]               = useState(getISTInfo);
+
+  // Re-evaluate IST time every minute so the card appears/disappears correctly
+  // even when the dashboard page is kept open across the 7 AM boundary.
+  useEffect(() => {
+    const id = setInterval(() => setIstInfo(getISTInfo()), 60_000);
+    return () => clearInterval(id);
+  }, []);
 
   useEffect(() => {
     if (!account?.id) return;
@@ -59,20 +57,42 @@ export function MorningIntentCard({ onAcknowledged }: Props) {
       .finally(() => setLoading(false));
   }, [account?.id]);
 
-  // Only show on trading days, between 7:30 AM and 9:30 AM IST
-  const hour = getISTHour();
-  const show = isWeekday() && hour >= 7 && hour < 10;
+  // Show on weekdays between 7:00 AM and 9:59 AM IST only
+  const { hour, isWeekday, minsUntilOpen: mins } = istInfo;
+  const show = isWeekday && hour >= 7 && hour < 10;
 
-  if (!show || loading || !data) return null;
-  if (data.intent_acknowledged || done) return null;
-  if (!data.planned.max_trades && !data.planned.max_loss) return null;
+  if (!show || loading) return null;
+  if (data?.intent_acknowledged || done) return null;
 
-  const mins = minsUntilOpen();
+  // No profile limits set — show a nudge to configure them
+  if (data && !data.planned.max_trades && !data.planned.max_loss) {
+    return (
+      <div className="tm-card overflow-hidden border-muted">
+        <div className="px-5 py-4 flex items-center justify-between gap-3">
+          <div>
+            <p className="text-sm font-semibold text-foreground">Set your trading rules</p>
+            <p className="text-xs text-muted-foreground mt-0.5">
+              Define a daily trade limit or loss limit to use the morning intent feature.
+            </p>
+          </div>
+          <Link
+            to="/settings"
+            className="shrink-0 flex items-center gap-1.5 text-xs font-medium text-tm-brand hover:text-tm-brand/80 transition-colors"
+          >
+            <Settings className="h-3.5 w-3.5" />
+            Settings
+          </Link>
+        </div>
+      </div>
+    );
+  }
+
+  if (!data) return null;
   const timeLabel = mins > 60
     ? `${Math.ceil(mins / 60)}h ${mins % 60}m`
     : mins > 0
-      ? `${mins} min`
-      : 'Open now';
+    ? `${mins} min`
+    : 'Open now';
 
   async function handleCommit() {
     setSubmitting(true);

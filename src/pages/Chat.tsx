@@ -352,7 +352,7 @@ export default function Chat() {
     }
   };
 
-  const lastAIMessage = messages.findLast((m) => m.role === 'assistant' && !m.isStreaming);
+  const lastAIMessage = [...messages].reverse().find((m) => m.role === 'assistant' && !m.isStreaming);
   const contextChips = lastAIMessage ? getContextChips(lastAIMessage.content) : INITIAL_CHIPS;
 
   if (!isConnected || !account) {

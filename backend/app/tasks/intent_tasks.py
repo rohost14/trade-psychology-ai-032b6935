@@ -18,6 +18,7 @@ from app.models.broker_account import BrokerAccount
 from app.models.user_profile import UserProfile
 from app.models.trading_session import TradingSession
 from app.services.push_notification_service import push_service
+from app.core.market_hours import is_trading_holiday
 
 logger = logging.getLogger(__name__)
 IST = ZoneInfo("Asia/Kolkata")
@@ -38,6 +39,9 @@ def send_morning_intent_push(self):
     """
     async def _run():
         today = _today_ist()
+        if is_trading_holiday(today):
+            logger.info(f"Skipping morning intent push — {today} is an NSE trading holiday")
+            return
         async with SessionLocal() as db:
             rows = (await db.execute(
                 select(BrokerAccount, UserProfile)
@@ -224,7 +228,18 @@ def send_daily_score_push(self):
 
 
 async def _calc_adherence_streak(broker_account_id, db) -> int:
-    """Count consecutive days where intent was acknowledged AND respected."""
+    """Count consecutive days where intent was acknowledged AND respected.
+
+    Uses effective limits (session override → profile default) so users who
+    commit via profile defaults (no per-session override) are evaluated correctly.
+    """
+    profile_result = await db.execute(
+        select(UserProfile).where(UserProfile.broker_account_id == broker_account_id)
+    )
+    profile = profile_result.scalar_one_or_none()
+    profile_max_trades = profile.daily_trade_limit if profile else None
+    profile_max_loss   = float(profile.daily_loss_limit) if profile and profile.daily_loss_limit else None
+
     result = await db.execute(
         select(TradingSession)
         .where(
@@ -241,11 +256,14 @@ async def _calc_adherence_streak(broker_account_id, db) -> int:
     streak = 0
     prev_date = None
     for s in sessions:
-        # Check if respected (within limits)
+        # Resolve effective limits — session override wins, falls back to profile
+        eff_max_trades = s.intent_max_trades if s.intent_max_trades is not None else profile_max_trades
+        eff_max_loss   = float(s.intent_max_loss) if s.intent_max_loss is not None else profile_max_loss
+
         respected = True
-        if s.intent_max_trades is not None and (s.trade_count or 0) > s.intent_max_trades:
+        if eff_max_trades is not None and (s.trade_count or 0) > eff_max_trades:
             respected = False
-        if s.intent_max_loss is not None and (s.session_pnl or 0) < -s.intent_max_loss:
+        if eff_max_loss is not None and float(s.session_pnl or 0) < -eff_max_loss:
             respected = False
 
         if not respected:

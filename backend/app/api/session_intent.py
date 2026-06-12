@@ -8,7 +8,7 @@ GET  /api/session-intent/today        — today's intent + actual vs planned
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, and_
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 from uuid import UUID
 from datetime import datetime, date, timezone, timedelta
 from decimal import Decimal
@@ -62,8 +62,8 @@ async def _get_profile(broker_account_id: UUID, db: AsyncSession) -> Optional[Us
 
 
 class AcknowledgeRequest(BaseModel):
-    max_trades: Optional[int] = None    # None → use profile default
-    max_loss: Optional[float] = None    # None → use profile default
+    max_trades: Optional[int]   = Field(None, ge=1)   # None → use profile default
+    max_loss:   Optional[float] = Field(None, gt=0)   # None → use profile default
 
 
 @router.post("/acknowledge")

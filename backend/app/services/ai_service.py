@@ -15,7 +15,7 @@ _SEBI_PATTERNS = [
     re.compile(r'\b(give me|share|send me|tell me).{0,20}\b(signal|call|tip|pick|trading recommendation)\b', re.I),
     re.compile(r'\btrading\s+(call|tip|signal)\b', re.I),
     re.compile(r'\b(entry|exit)\s+(level|price|point)\s+(?:for|of|on)\b', re.I),
-    re.compile(r'\b(will|going to|gonna)\b.{0,30}\b(go up|go down|rally|crash|dump|pump|reach|touch)\b', re.I),
+    re.compile(r'\b(will|going to|gonna)\b.{0,30}\b(rally|crash|dump|pump)\b', re.I),
     re.compile(r'\bwhat\s+(should|can|do)\s+i\s+trade\b', re.I),
     re.compile(r'\bwhich\s+(stock|instrument|option|strike|expiry)\s+(?:to|should|can)\s+(?:buy|trade|sell)\b', re.I),
     re.compile(r'\bwhat.{0,20}(?:target|stop.?loss|stoploss)\s+(?:should|to|for)\b', re.I),

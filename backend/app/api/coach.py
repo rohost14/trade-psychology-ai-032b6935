@@ -11,7 +11,7 @@ Key improvements:
 - Hourly + symbol performance analysis for 7-day window questions
 """
 
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, BackgroundTasks, Depends
 from fastapi.responses import StreamingResponse
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, func
@@ -36,6 +36,26 @@ import logging
 
 router = APIRouter()
 logger = logging.getLogger(__name__)
+
+
+def _extract_session_topics(messages: list[dict]) -> str:
+    """Derive meaningful topic labels from session messages for cross-session memory."""
+    topics: set[str] = set()
+    for msg in messages:
+        if msg.get("role") != "user":
+            continue
+        text = msg.get("content", "")[:150].lower()
+        if any(w in text for w in ("revenge", "impulse", "fomo", "frustrated", "emotional", "anger")):
+            topics.add("emotional control")
+        if any(w in text for w in ("loss", "losing", "drawdown", "red day")):
+            topics.add("losses")
+        if any(w in text for w in ("overtrad", "too many trades", "frequency")):
+            topics.add("overtrading")
+        if any(w in text for w in ("pattern", "habit", "behaviour", "behavior")):
+            topics.add("patterns")
+        if any(w in text for w in ("position", "entry", "setup", "trade ")):
+            topics.add("trade execution")
+    return ", ".join(sorted(topics)) or "general trading topics"
 
 IST = ZoneInfo("Asia/Kolkata")
 
@@ -183,9 +203,9 @@ async def _build_trading_context(
 
     # Section D: RECENT CLOSED POSITIONS (last 7 days, detailed)
     if positions:
-        total_pnl = sum(float(p.realized_pnl or p.pnl or 0) for p in positions)
-        winners = [p for p in positions if float(p.realized_pnl or p.pnl or 0) > 0]
-        losers = [p for p in positions if float(p.realized_pnl or p.pnl or 0) < 0]
+        total_pnl = sum(float(p.realized_pnl or 0) for p in positions)
+        winners = [p for p in positions if float(p.realized_pnl or 0) > 0]
+        losers = [p for p in positions if float(p.realized_pnl or 0) < 0]
         win_rate = round(len(winners) / len(positions) * 100, 1) if positions else 0
 
         lines.append(f"**Last 7 Days: {len(positions)} Closed Positions**")
@@ -196,7 +216,7 @@ async def _build_trading_context(
         # Most recent 5 positions — full detail so AI can answer "what was my last trade"
         lines.append("**Most Recent Closed Positions (newest first):**")
         for i, p in enumerate(positions[:8]):
-            pnl = float(p.realized_pnl or p.pnl or 0)
+            pnl = float(p.realized_pnl or 0)
             duration = f"{p.holding_duration_minutes}min" if p.holding_duration_minutes else "unknown duration"
             exit_time = _fmt(p.last_exit_time)
             entry_time = _fmt(p.first_entry_time)
@@ -213,7 +233,7 @@ async def _build_trading_context(
         symbol_pnl: dict[str, dict] = {}
         for p in positions:
             sym = p.tradingsymbol or "Unknown"
-            pnl = float(p.realized_pnl or p.pnl or 0)
+            pnl = float(p.realized_pnl or 0)
             if sym not in symbol_pnl:
                 symbol_pnl[sym] = {"total": 0.0, "count": 0, "wins": 0}
             symbol_pnl[sym]["total"] += pnl
@@ -235,7 +255,7 @@ async def _build_trading_context(
             ist_dt = _ist(p.first_entry_time)
             if ist_dt:
                 h = ist_dt.hour
-                pnl = float(p.realized_pnl or p.pnl or 0)
+                pnl = float(p.realized_pnl or 0)
                 pnl_by_hour.setdefault(h, []).append(pnl)
 
         if pnl_by_hour:
@@ -271,7 +291,18 @@ async def _build_trading_context(
     # Section E: Today's session summary — gives AI the numbers to do erosion math
     today_start_ist = now_ist.replace(hour=0, minute=0, second=0, microsecond=0)
     today_start_utc = today_start_ist.astimezone(timezone.utc)
-    today_closed = [p for p in positions if p.last_exit_time and p.last_exit_time >= today_start_utc]
+    # Separate unlimited query — positions list is capped at 25/50, so today's full
+    # session data would be wrong for traders with >limit trades today.
+    today_result = await db.execute(
+        select(Position)
+        .where(
+            Position.broker_account_id == broker_account_id,
+            Position.status == "closed",
+            Position.last_exit_time >= today_start_utc,
+        )
+        .order_by(Position.last_exit_time.asc())
+    )
+    today_closed = list(today_result.scalars().all())
     if today_closed:
         # Sort by exit time ascending to compute running P&L and find peak
         today_sorted = sorted(today_closed, key=lambda p: p.last_exit_time)
@@ -279,7 +310,7 @@ async def _build_trading_context(
         peak = 0.0
         running_series = []
         for p in today_sorted:
-            pnl = float(p.realized_pnl or p.pnl or 0)
+            pnl = float(p.realized_pnl or 0)
             running += pnl
             if running > peak:
                 peak = running
@@ -423,11 +454,11 @@ async def get_coach_insight(
                 Position.broker_account_id == broker_account_id,
                 Position.last_exit_time >= today_start_utc,
                 Position.status == "closed"
-            )
+            ).order_by(Position.last_exit_time.desc())
         )
         positions_today = list(pos_result.scalars().all())
-        total_pnl = sum(float(p.realized_pnl or p.pnl or 0) for p in positions_today)
-        recent_losses = [p for p in positions_today[-5:] if float(p.realized_pnl or p.pnl or 0) < 0]
+        total_pnl = sum(float(p.realized_pnl or 0) for p in positions_today)
+        recent_losses = [p for p in positions_today[:5] if float(p.realized_pnl or 0) < 0]
 
         patterns_active = []
         try:
@@ -556,8 +587,8 @@ async def _build_chat_context(
             broker_account_id=broker_account_id,
             patterns_active=[],
         )
-    except Exception:
-        pass
+    except Exception as e:
+        logger.warning(f"RAG context fetch failed (non-critical): {e}")
 
     return trading_context + session_memory, ai_persona, rag_context
 
@@ -632,19 +663,9 @@ async def chat_with_coach(
 
             # Generate summary after 4+ exchanges (8 messages)
             if len(msgs) >= 8 and not current_session.summary:
-                topics = set()
-                for msg in msgs:
-                    if msg["role"] == "user":
-                        content = msg["content"][:100].lower()
-                        if any(w in content for w in ["loss", "losing", "down"]):
-                            topics.add("losses")
-                        if any(w in content for w in ["trade", "position", "entry"]):
-                            topics.add("trades")
-                        if any(w in content for w in ["pattern", "behavior", "habit"]):
-                            topics.add("patterns")
                 current_session.summary = (
-                    f"Session discussed: {', '.join(topics) or 'general trading topics'}. "
-                    f"{len(msgs)//2} exchanges."
+                    f"Session discussed: {_extract_session_topics(msgs)}. "
+                    f"{len(msgs) // 2} exchanges."
                 )
 
             await db.commit()
@@ -701,18 +722,8 @@ async def _save_chat_session_bg(
             current_session.messages = msgs
 
             if len(msgs) >= 8 and not current_session.summary:
-                topics: set[str] = set()
-                for msg in msgs:
-                    if msg["role"] == "user":
-                        text = msg["content"][:100].lower()
-                        if any(w in text for w in ["loss", "losing", "down"]):
-                            topics.add("losses")
-                        if any(w in text for w in ["trade", "position", "entry"]):
-                            topics.add("trades")
-                        if any(w in text for w in ["pattern", "behavior", "habit"]):
-                            topics.add("patterns")
                 current_session.summary = (
-                    f"Session discussed: {', '.join(topics) or 'general trading topics'}. "
+                    f"Session discussed: {_extract_session_topics(msgs)}. "
                     f"{len(msgs) // 2} exchanges."
                 )
 
@@ -749,7 +760,7 @@ async def get_today_session(
                 Position.broker_account_id == broker_account_id,
                 Position.last_exit_time >= today_start_utc,
                 Position.status == "closed",
-            )
+            ).order_by(Position.last_exit_time.desc())
         ),
         db.execute(
             select(RiskAlert).where(
@@ -761,11 +772,11 @@ async def get_today_session(
 
     session = sess_result.scalar_one_or_none()
     positions_today = list(pos_result.scalars().all())
-    total_pnl = sum(float(p.realized_pnl or p.pnl or 0) for p in positions_today)
+    total_pnl = sum(float(p.realized_pnl or 0) for p in positions_today)
     alerts_today = list(alerts_result.scalars().all())
     active_alerts = len([a for a in alerts_today if getattr(a, "status", None) in (None, "active", "new")])
 
-    recent_losses = [p for p in positions_today[-5:] if float(p.realized_pnl or p.pnl or 0) < 0]
+    recent_losses = [p for p in positions_today[:5] if float(p.realized_pnl or 0) < 0]
     if len(positions_today) > 10 or len(recent_losses) >= 3:
         risk_state = "danger"
     elif len(positions_today) > 5 or len(recent_losses) >= 2:
@@ -810,6 +821,7 @@ async def clear_today_session(
 @router.post("/chat/stream")
 async def chat_with_coach_stream(
     request: ChatRequest,
+    background: BackgroundTasks,
     broker_account_id: UUID = Depends(get_verified_broker_account_id),
     db: AsyncSession = Depends(get_db),
     _limiter: None = Depends(coach_limiter),
@@ -848,13 +860,14 @@ async def chat_with_coach_stream(
 
             yield "data: [DONE]\n\n"
 
-            asyncio.create_task(
-                _save_chat_session_bg(
-                    str(broker_account_id),
-                    request.message,
-                    "".join(collected),
-                )
+        # BackgroundTasks run after StreamingResponse completes — collected is
+        # fully populated by then (generator exhausted before response finalises).
+        async def _save_after_stream():
+            await _save_chat_session_bg(
+                str(broker_account_id), request.message, "".join(collected)
             )
+
+        background.add_task(_save_after_stream)
 
         return StreamingResponse(
             generate(),

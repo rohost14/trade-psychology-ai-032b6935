@@ -4,17 +4,13 @@
  */
 export function formatCurrency(amount: number): string {
   const absAmount = Math.abs(amount);
-  const sign = amount < 0 ? '-' : amount > 0 ? '+' : '';
-  
-  // Use Indian locale for proper formatting
   const formatted = new Intl.NumberFormat('en-IN', {
     style: 'currency',
     currency: 'INR',
     minimumFractionDigits: 2,
     maximumFractionDigits: 2,
   }).format(absAmount);
-
-  return amount >= 0 ? formatted : `-${formatted.replace('₹', '₹')}`;
+  return amount >= 0 ? formatted : `-${formatted}`;
 }
 
 /**
