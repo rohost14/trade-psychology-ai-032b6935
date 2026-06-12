@@ -19,9 +19,9 @@ from datetime import datetime, timezone, timedelta
 from fastapi import APIRouter, HTTPException, Depends, Request
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from pydantic import BaseModel, EmailStr
+import bcrypt as _bcrypt
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, update
-from passlib.context import CryptContext
 from jose import jwt
 
 from app.core.database import get_db
@@ -34,7 +34,15 @@ _bearer_logout = HTTPBearer(auto_error=False)
 
 router = APIRouter()
 logger = logging.getLogger(__name__)
-pwd_ctx = CryptContext(schemes=["bcrypt"], deprecated="auto")
+
+def _hash_password(password: str) -> str:
+    return _bcrypt.hashpw(password.encode("utf-8"), _bcrypt.gensalt(rounds=12)).decode("utf-8")
+
+def _verify_password(password: str, hashed: str) -> bool:
+    try:
+        return _bcrypt.checkpw(password.encode("utf-8"), hashed.encode("utf-8"))
+    except Exception:
+        return False
 
 OTP_TTL    = 300   # 5 minutes
 OTP_PREFIX = "admin_otp:"
@@ -133,7 +141,7 @@ async def admin_login(
 
     dummy_hash = "$2b$12$dummy.hash.to.prevent.timing.attack.padding.xxxxxxxxxxx"
     check_hash = admin.password_hash if admin else dummy_hash
-    valid = pwd_ctx.verify(body.password, check_hash)
+    valid = _verify_password(body.password, check_hash)
 
     if not admin or not valid:
         pipe = r.pipeline()

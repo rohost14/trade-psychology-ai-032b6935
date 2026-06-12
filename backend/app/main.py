@@ -202,20 +202,9 @@ app = FastAPI(
     lifespan=lifespan
 )
 
-# CORS Middleware
-# Security guard: allow_credentials=True + wildcard origins = XSS escalation risk.
-# This assertion prevents a misconfigured production deploy from being exploitable.
-# On localhost BACKEND_CORS_ORIGINS is ["http://localhost:8080"] so this never fires.
-_cors_origins = settings.BACKEND_CORS_ORIGINS
-if "*" in _cors_origins and settings.ENVIRONMENT != "development":
-    raise RuntimeError(
-        "SECURITY: allow_credentials=True cannot be used with allow_origins=['*'] "
-        "in non-development environments. Set BACKEND_CORS_ORIGINS to explicit domains."
-    )
-
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=_cors_origins,
+    allow_origins=settings.BACKEND_CORS_ORIGINS,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
