@@ -589,32 +589,39 @@ async def run_risk_detection_async(
             )
         )
         all_existing = existing_result.scalars().all()
-        # last fired time per pattern_type
-        last_fired: dict = {}
+        # HIGH-3 fix: track both timestamp and severity of last fire so that
+        # severity escalation (caution → danger) is allowed through within the
+        # dedup window. Previously the escalation code was unreachable — the
+        # dedup `continue` ran before it.
+        _SEV_RANK = {"info": 0, "caution": 1, "danger": 2}
+        last_fired: dict = {}      # pattern_type → datetime
+        last_fired_sev: dict = {}  # pattern_type → severity string
         today_patterns: set = set()
         for a in all_existing:
             today_patterns.add(a.pattern_type)
             if a.pattern_type not in last_fired or a.detected_at > last_fired[a.pattern_type]:
                 last_fired[a.pattern_type] = a.detected_at
+                last_fired_sev[a.pattern_type] = a.severity
 
-        def _is_deduped(pattern_type: str) -> bool:
+        def _is_deduped(pattern_type: str, new_severity: str) -> bool:
             if pattern_type not in last_fired:
                 return False
             hours = _DEDUP_HOURS.get(pattern_type, 24)
-            return (now_utc - last_fired[pattern_type]) < timedelta(hours=hours)
+            if (now_utc - last_fired[pattern_type]) >= timedelta(hours=hours):
+                return False  # Window elapsed — allow
+            # Within window: allow severity escalation through (caution → danger)
+            prev_rank = _SEV_RANK.get(last_fired_sev.get(pattern_type, ""), 0)
+            new_rank = _SEV_RANK.get(new_severity, 0)
+            return new_rank <= prev_rank  # True = block; False = escalation
 
         new_alerts = []
         for alert in alerts:
-            if _is_deduped(alert.pattern_type):
+            if _is_deduped(alert.pattern_type, alert.severity):
                 continue
-            # consecutive_loss_streak fired again today → escalate to danger
-            # so the guardian (WhatsApp/push) notification triggers.
-            if alert.pattern_type == "consecutive_loss_streak" \
-                    and alert.pattern_type in today_patterns:
-                alert.severity = "danger"
             db.add(alert)
             new_alerts.append(alert)
             last_fired[alert.pattern_type] = latest_ct.exit_time or now_utc
+            last_fired_sev[alert.pattern_type] = alert.severity
             today_patterns.add(alert.pattern_type)
 
         await db.commit()
@@ -725,21 +732,29 @@ async def run_behavior_engine_full_session(broker_account_id: UUID, db) -> int:
         )
     )
     all_existing = existing_result.scalars().all()
+    # HIGH-3 fix: track severity of last fire to allow caution → danger escalation.
+    _SEV_RANK = {"info": 0, "caution": 1, "danger": 2}
     last_fired: dict = {}
+    last_fired_sev: dict = {}
     today_patterns: set = set()
     for a in all_existing:
         today_patterns.add(a.pattern_type)
         if a.pattern_type not in last_fired or a.detected_at > last_fired[a.pattern_type]:
             last_fired[a.pattern_type] = a.detected_at
+            last_fired_sev[a.pattern_type] = a.severity
 
-    def _is_deduped_full(pattern_type: str, trade_time: datetime) -> bool:
+    def _is_deduped_full(pattern_type: str, trade_time: datetime, new_severity: str) -> bool:
         if pattern_type not in last_fired:
             return False
         hours = _DEDUP_HOURS.get(pattern_type, 24)
-        # Use the trade's own exit_time as reference, not now_utc.
-        # During bulk historical replay (e.g. 6 PM) trades from 10 AM would
-        # compute now_utc - last_fired = 8h >> 2h window → dedup never fires.
-        return (trade_time - last_fired[pattern_type]) < timedelta(hours=hours)
+        # Use trade's own exit_time as reference (not now_utc) so bulk historical
+        # replay doesn't incorrectly suppress same-session patterns.
+        if (trade_time - last_fired[pattern_type]) >= timedelta(hours=hours):
+            return False  # Window elapsed — allow
+        # Within window: allow severity escalation (caution → danger)
+        prev_rank = _SEV_RANK.get(last_fired_sev.get(pattern_type, ""), 0)
+        new_rank = _SEV_RANK.get(new_severity, 0)
+        return new_rank <= prev_rank
 
     all_new_alerts: list[RiskAlert] = []
 
@@ -751,14 +766,12 @@ async def run_behavior_engine_full_session(broker_account_id: UUID, db) -> int:
             db=db,
         )
         for alert in result.alerts:
-            if _is_deduped_full(alert.pattern_type, trade_time):
+            if _is_deduped_full(alert.pattern_type, trade_time, alert.severity):
                 continue
-            if alert.pattern_type == "consecutive_loss_streak" \
-                    and alert.pattern_type in today_patterns:
-                alert.severity = "danger"
             db.add(alert)
             all_new_alerts.append(alert)
             last_fired[alert.pattern_type] = ct.exit_time or now_utc
+            last_fired_sev[alert.pattern_type] = alert.severity
             today_patterns.add(alert.pattern_type)
 
     if all_new_alerts:
@@ -823,9 +836,11 @@ async def _apply_alert_consolidation(
 
     HARD_CAP = 8
     if session_alert_count >= HARD_CAP:
-        logger.info(
+        # LOW-3: warn (not info) — danger alerts silently suppressed after cap is worth seeing in ops logs
+        suppressed_summary = [f"{a.pattern_type}({a.severity})" for a in alerts]
+        logger.warning(
             f"[consolidation] {broker_account_id}: session alert cap reached "
-            f"({session_alert_count}/{HARD_CAP}). Suppressing {len(alerts)} notifications."
+            f"({session_alert_count}/{HARD_CAP}). Suppressing: {suppressed_summary}"
         )
         return []  # All alerts saved to DB, none will notify
 
@@ -851,11 +866,10 @@ async def _apply_alert_consolidation(
             notifiable.append(alert)
             recent_patterns.add(alert.pattern_type)
 
-    # Increment session alert count for notifiable alerts
+    # LOW-1: batch counter increment — single DB write instead of N serial writes
     if notifiable and session:
         from app.services.trading_session_service import TradingSessionService
-        for _ in notifiable:
-            await TradingSessionService.increment_alerts_fired(session.id, db)
+        await TradingSessionService.increment_alerts_fired(session.id, db, count=len(notifiable))
         await db.commit()
 
     return notifiable

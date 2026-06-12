@@ -309,6 +309,15 @@ class BehaviorEngine:
             except Exception as _ot_err:
                 logger.debug(f"Exit order type lookup skipped: {_ot_err}")
 
+        # CRIT-1 fix: session.session_pnl is never written by any caller
+        # (add_session_pnl has zero call sites). Compute it fresh from actual
+        # CompletedTrades so session_meltdown and overtrading_burst get real data.
+        # update_risk_score() calls db.flush() which will persist this as a side effect.
+        session.session_pnl = (
+            sum(Decimal(str(t.realized_pnl or 0)) for t in session_trades)
+            + Decimal(str(completed_trade.realized_pnl or 0))
+        )
+
         return EngineContext(
             broker_account_id=broker_account_id,
             session=session,
@@ -396,22 +405,24 @@ class BehaviorEngine:
     # ── Pattern 1: Consecutive loss streak ────────────────────────────────
 
     def _detect_consecutive_loss_streak(self, ctx: EngineContext) -> Optional[DetectedEvent]:
-        trades = ctx.session_trades
-        if not trades:
+        # HIGH-1 fix: session_trades excludes the current trade — include it so
+        # the 5th consecutive loss correctly triggers danger (not the 6th).
+        all_trades = list(ctx.session_trades) + [ctx.completed_trade]
+        if not all_trades:
             return None
 
         streak = 0
         total_loss = Decimal("0")
         losing_trades = []
-        for ct in reversed(trades):
-            pnl = Decimal(str(ct.realized_pnl or 0))
+        for _t in reversed(all_trades):
+            pnl = Decimal(str(_t.realized_pnl or 0))
             if pnl < 0:
                 streak += 1
                 total_loss += abs(pnl)
                 losing_trades.append({
-                    "symbol": ct.tradingsymbol or "—",
+                    "symbol": _t.tradingsymbol or "—",
                     "pnl": float(pnl),
-                    "qty": ct.total_quantity or 0,
+                    "qty": _t.total_quantity or 0,
                 })
             else:
                 break
@@ -599,64 +610,9 @@ class BehaviorEngine:
                          "daily_danger": daily_danger, "session_pnl": round(session_pnl, 2)},
             )
 
-        # Check 3: gains erosion through continued trading (fires even below daily_caution)
-        # Catches the "6 good-start trades then 3-4 losses" pattern before it crosses
-        # the raw trade-count threshold. Different from profit_giveaway (session-wide
-        # peak erosion) — this specifically requires 3+ trades AFTER the peak, indicating
-        # overtrading behaviour drove the drawdown.
-        if len(ctx.session_trades) >= 4:
-            trade_pnls = [Decimal(str(t.realized_pnl or 0)) for t in ctx.session_trades]
-            running_pg = Decimal("0")
-            peak_pg = Decimal("0")
-            peak_pg_idx = 0
-            for _i, _p in enumerate(trade_pnls):
-                running_pg += _p
-                if running_pg > peak_pg:
-                    peak_pg = running_pg
-                    peak_pg_idx = _i
-            trades_after_peak = len(trade_pnls) - 1 - peak_pg_idx
-            min_peak = Decimal(str(ctx.thresholds.get("profit_giveaway_min_peak", 1000)))
-            if trades_after_peak >= 3 and peak_pg >= min_peak:
-                erosion_pg = peak_pg - running_pg
-                erosion_pct_pg = erosion_pg / peak_pg
-                if erosion_pct_pg >= Decimal("0.70"):
-                    return DetectedEvent(
-                        event_type="overtrading_burst",
-                        severity="danger",
-                        message=(
-                            f"Last {trades_after_peak} trades gave back "
-                            f"₹{float(erosion_pg):,.0f} ({float(erosion_pct_pg)*100:.0f}%) "
-                            f"of your ₹{float(peak_pg):,.0f} session peak — "
-                            f"session P&L now ₹{float(running_pg):,.0f}."
-                        ),
-                        context={
-                            "peak_pnl": round(float(peak_pg), 2),
-                            "current_pnl": round(float(running_pg), 2),
-                            "erosion": round(float(erosion_pg), 2),
-                            "erosion_pct": round(float(erosion_pct_pg), 2),
-                            "trades_after_peak": trades_after_peak,
-                            "daily_count": daily_count,
-                        },
-                    )
-                if erosion_pct_pg >= Decimal("0.50"):
-                    return DetectedEvent(
-                        event_type="overtrading_burst",
-                        severity="caution",
-                        message=(
-                            f"Last {trades_after_peak} trades gave back "
-                            f"₹{float(erosion_pg):,.0f} ({float(erosion_pct_pg)*100:.0f}%) "
-                            f"of your ₹{float(peak_pg):,.0f} session peak — "
-                            f"session P&L now ₹{float(running_pg):,.0f}."
-                        ),
-                        context={
-                            "peak_pnl": round(float(peak_pg), 2),
-                            "current_pnl": round(float(running_pg), 2),
-                            "erosion": round(float(erosion_pg), 2),
-                            "erosion_pct": round(float(erosion_pct_pg), 2),
-                            "trades_after_peak": trades_after_peak,
-                            "daily_count": daily_count,
-                        },
-                    )
+        # MED-4: Check 3 (gains erosion) removed — it computed the same metric as
+        # profit_giveaway, causing two alerts for one session state. profit_giveaway
+        # owns erosion detection and fires correctly after the HIGH-2 fix.
 
         return None
 
@@ -1063,10 +1019,14 @@ class BehaviorEngine:
             and t.instrument_type in ("CE", "PE", "FUT")
         ]
 
-        # Count distinct underlyings (not symbols — buying 2 NIFTY strikes is not FOMO)
+        # Count distinct underlyings (not symbols — buying 2 NIFTY strikes is not FOMO).
+        # LOW-2: include current trade's underlying so threshold N means N total
+        # (not N prior + current = N+1 total).
         distinct_underlyings = {
             parse_symbol(t.tradingsymbol or "").underlying for t in window_trades
         }
+        if ct_parsed.underlying:
+            distinct_underlyings.add(ct_parsed.underlying)
 
         # Determine threshold
         if is_expiry_day:
@@ -1869,14 +1829,17 @@ class BehaviorEngine:
     # This is the "one more trade" impulse after a good day.
 
     def _detect_profit_giveaway(self, ctx: EngineContext) -> Optional[DetectedEvent]:
-        trades = ctx.session_trades  # sorted by exit_time ASC, includes current trade
+        # HIGH-2 fix: session_trades excludes ctx.completed_trade (contrary to the
+        # old stale comment). The trade causing the giveaway would not be detected
+        # until the NEXT trade. Include it by sorting all trades by exit_time.
+        trades = sorted(
+            list(ctx.session_trades) + [ctx.completed_trade],
+            key=lambda t: t.exit_time or datetime.min.replace(tzinfo=timezone.utc),
+        )
         if len(trades) < 2:
             return None
 
         # Compute cumulative P&L at each exit to find session peak.
-        # No early-return on ct_pnl sign — the trigger trade may be a winner if
-        # this is called from the sync path (engine runs on most-recent trade, not
-        # necessarily the loss). The session state is what matters, not this one trade.
         running_pnl = Decimal("0")
         peak_pnl = Decimal("0")
         for t in trades:

@@ -21,11 +21,10 @@ Code that has been commented out or disabled. Kept for reference. Do not delete 
 ## RiskDetector (legacy P&L-based detector)
 
 **File**: `backend/app/services/risk_detector.py`  
-**Status**: File still present, no longer called from active pipeline. Comment at `trade_tasks.py:26`:
-> `# RiskDetector + BehavioralEvaluator — DEPRECATED (Phase 3 cutover)`
+**Status**: File still present. `calculate_risk_state()` was last called from `api/risk.py` — removed in Feature 2 review (MED-3 fix). No remaining callers.
 
-**What it did**: Earlier pattern detector using P&L thresholds. Wrote to `RiskAlert` table.
+**What it did**: Earlier pattern detector using P&L thresholds. Wrote to `RiskAlert` table. `calculate_risk_state()` read RiskAlerts and returned risk_state/active_patterns.
 
-**Why disabled**: Replaced by `BehaviorEngine`. Kept in case of rollback need.
+**Why disabled**: Replaced by `BehaviorEngine` + direct RiskAlert query in `/risk/state`. RiskDetector used a different risk vocabulary and didn't match BehaviorEngine's behavior_state.
 
 **When to delete**: After BehaviorEngine has run stably for 30+ days in production with no rollback requests.

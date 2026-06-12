@@ -171,10 +171,10 @@ class TradingSessionService:
             await db.flush()
 
     @staticmethod
-    async def increment_alerts_fired(session_id: UUID, db: AsyncSession) -> None:
+    async def increment_alerts_fired(session_id: UUID, db: AsyncSession, count: int = 1) -> None:
         session = await db.get(TradingSession, session_id)
         if session:
-            session.alerts_fired += 1
+            session.alerts_fired += count
             session.updated_at = datetime.now(timezone.utc)
             await db.flush()
 

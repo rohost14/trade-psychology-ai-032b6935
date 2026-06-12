@@ -8,7 +8,6 @@ from app.core.database import get_db
 from app.api.deps import get_verified_broker_account_id
 from app.models.risk_alert import RiskAlert
 from app.schemas.risk_alert import RiskAlertListResponse, RiskStateResponse
-from app.services.risk_detector import RiskDetector
 
 router = APIRouter()
 
@@ -17,18 +16,19 @@ async def get_risk_state(
     broker_account_id: UUID = Depends(get_verified_broker_account_id),
     db: AsyncSession = Depends(get_db)
 ):
-    """Get current risk state for account"""
-    risk_detector = RiskDetector()
-    state_data = await risk_detector.calculate_risk_state(broker_account_id, db)
-
-    # Get recent alerts for response
+    """Get current risk state — derived from BehaviorEngine RiskAlerts (last 4h)."""
+    # MED-3: replaced deprecated RiskDetector.calculate_risk_state() with a direct
+    # query. RiskDetector is still in the codebase (see docs/DEAD_CODE.md) but is
+    # no longer called. /risk/state now uses the same RiskAlert table that
+    # BehaviorEngine writes to, and uses its severity vocabulary (danger/caution).
     cutoff = datetime.now(timezone.utc) - timedelta(hours=4)
     result = await db.execute(
         select(RiskAlert)
         .where(
             and_(
                 RiskAlert.broker_account_id == broker_account_id,
-                RiskAlert.detected_at >= cutoff
+                RiskAlert.detected_at >= cutoff,
+                RiskAlert.acknowledged_at.is_(None),
             )
         )
         .order_by(desc(RiskAlert.detected_at))
@@ -36,11 +36,21 @@ async def get_risk_state(
     )
     recent_alerts = result.scalars().all()
 
+    if not recent_alerts:
+        risk_state = "safe"
+        active_patterns = []
+    elif any(a.severity == "danger" for a in recent_alerts):
+        risk_state = "danger"
+        active_patterns = list({a.pattern_type for a in recent_alerts if a.severity == "danger"})
+    else:
+        risk_state = "caution"
+        active_patterns = list({a.pattern_type for a in recent_alerts})
+
     return RiskStateResponse(
-        risk_state=state_data.get("risk_state", "safe"),
-        active_patterns=state_data.get("active_patterns", []),
+        risk_state=risk_state,
+        active_patterns=active_patterns,
         recent_alerts=recent_alerts,
-        recommendations=state_data.get("recommendations", [])
+        recommendations=[],
     )
 
 @router.get("/alerts", response_model=RiskAlertListResponse)

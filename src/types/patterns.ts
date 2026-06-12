@@ -22,7 +22,13 @@ export type PatternType =
   | 'all_loss_session'
   | 'options_direction_confusion'
   | 'options_premium_avg_down'
-  | 'iv_crush_behavior';
+  | 'iv_crush_behavior'
+  // Patterns added in Phase 3 / BehaviorEngine v2
+  | 'premium_destruction'
+  | 'opening_5min_trap'
+  | 'end_of_session_mis_panic'
+  | 'post_loss_recovery_bet'
+  | 'profit_giveaway';
 
 export type PatternSeverity = 'danger' | 'caution' | 'positive';
 

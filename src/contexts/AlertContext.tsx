@@ -108,6 +108,8 @@ const BACKEND_TO_FRONTEND_TYPE: Record<string, string> = {
   'revenge_sizing':    'revenge_trading',
   'tilt_loss_spiral':  'revenge_trading',
   'overtrading':       'overtrading',
+  // MED-2: overtrading_burst is the actual key emitted by BehaviorEngine
+  'overtrading_burst': 'overtrading',
   'fomo':              'fomo',
   'fomo_entry':        'fomo',
   'revenge_trade':     'revenge_trading',
@@ -126,6 +128,8 @@ const BACKEND_TO_FRONTEND_TYPE: Record<string, string> = {
   'options_direction_confusion': 'options_direction_confusion',
   'options_premium_avg_down':    'options_premium_avg_down',
   'iv_crush_behavior':           'iv_crush_behavior',
+  // MED-1: premium_destruction is a distinct pattern (not iv_crush_behavior)
+  'premium_destruction':         'premium_destruction',
   'expiry_day_overtrading':      'overtrading',
   'opening_5min_trap':           'opening_5min_trap',
   'end_of_session_mis_panic':    'end_of_session_mis_panic',
@@ -163,6 +167,7 @@ export function formatPatternName(patternType: string): string {
     'options_direction_confusion':   'Direction Confusion',
     'options_premium_avg_down':      'Premium Averaging Down',
     'iv_crush_behavior':             'IV Crush',
+    'premium_destruction':           'Premium Destroyed',
     'opening_5min_trap':             'Opening 5-Min Trap',
     'end_of_session_mis_panic':      'End-of-Session Panic',
     'post_loss_recovery_bet':        'Recovery Bet',
@@ -304,12 +309,13 @@ export function AlertProvider({ children }: { children: ReactNode }) {
 
             const sev = alert.pattern.severity;
             const label = SEVERITY_LABEL[sev] ?? '⚠️ Alert';
-            if (sev === 'critical' || sev === 'high') {
+            // CRIT-2 fix: PatternSeverity is 'danger' | 'caution', not 'critical'/'high'/'medium'
+            if (sev === 'danger') {
               toast.error(`${label}: ${alert.pattern.name}`, {
                 description: alert.pattern.description,
                 duration: 8000,
               });
-            } else if (sev === 'medium') {
+            } else if (sev === 'caution') {
               toast.warning(`${label}: ${alert.pattern.name}`, {
                 description: alert.pattern.description,
                 duration: 5000,
@@ -344,7 +350,8 @@ export function AlertProvider({ children }: { children: ReactNode }) {
           persistSeenIds(unseenIds);
 
           // One summary toast — don't spam N individual toasts at startup
-          const dangers = unseen.filter(a => a.pattern.severity === 'high' || a.pattern.severity === 'critical');
+          // CRIT-2 fix: PatternSeverity is 'danger', not 'high'/'critical'
+          const dangers = unseen.filter(a => a.pattern.severity === 'danger');
           const hasDanger = dangers.length > 0;
           const names = unseen.map(a => a.pattern.name).slice(0, 3).join(', ');
           const extra = unseen.length > 3 ? ` +${unseen.length - 3} more` : '';
