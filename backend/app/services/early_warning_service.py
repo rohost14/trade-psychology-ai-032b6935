@@ -1,13 +1,18 @@
 """
 Early Warning Service
 
-Fires soft push nudges BEFORE behavior engine thresholds trigger a full danger alert.
-- 2 consecutive losses → breathe before #3
-- P&L at 70% of daily loss limit → slow down
-- Trade count at 80% of daily limit → make them count
+Plan-based push warnings — fires when session approaches user's configured limits.
+Covers gaps the behavior engine doesn't: P&L limit proximity and trade count limit.
+
+- P&L at 70% of daily loss limit → "₹X remaining in your plan"
+- Trade count at 80% of daily limit → "N trades left in your plan"
+
+NOT included (removed to prevent spam):
+- 2 consecutive losses: behavior engine fires consecutive_loss_streak at 3 anyway.
+  Having both causes 2 pushes within seconds for the same situation.
 
 These do NOT create RiskAlert records (keeps alerts list clean).
-Redis dedup prevents spamming: one warning per type per day.
+Redis dedup: once per day per warning type.
 """
 
 import logging
@@ -55,7 +60,7 @@ async def _check(
     )
     profile = profile_result.scalar_one_or_none()
 
-    # Fetch today's completed trades (most recent first)
+    # Fetch today's completed trades (count + PnL sum only — no ordering needed)
     trades_result = await db.execute(
         select(CompletedTrade)
         .where(
@@ -64,8 +69,7 @@ async def _check(
                 CompletedTrade.exit_time >= today_start_utc,
             )
         )
-        .order_by(CompletedTrade.exit_time.desc())
-        .limit(25)
+        .limit(200)
     )
     trades_today = trades_result.scalars().all()
 
@@ -75,23 +79,7 @@ async def _check(
     warnings = []
     dedup_prefix = f"ew:{broker_account_id}:{today_ist.isoformat()}"
 
-    # ── 1. Two consecutive losses ─────────────────────────────────────────────
-    # Fire BEFORE the behavior engine's consecutive_loss_streak alert (needs 3).
-    # Gives trader a moment to breathe before the 3rd trade.
-    if len(trades_today) >= 2:
-        last_two = [float(t.pnl or 0) for t in trades_today[:2]]
-        if all(p < 0 for p in last_two):
-            key = f"{dedup_prefix}:consec2"
-            if _not_deduped(redis_client, key, ttl=3600):  # 1h — resets if they stop and resume
-                warnings.append({
-                    "title": "TradeMentor — Two Losses in a Row",
-                    "body": "2 consecutive losses. Step away for 5 minutes before the next trade. Your edge erodes under pressure.",
-                    "data": {"action": "open_dashboard", "type": "early_warning"},
-                    "severity": "caution",
-                    "tag": "ew-consec2",
-                })
-
-    # ── 2. P&L at 70% of daily loss limit ────────────────────────────────────
+    # ── 1. P&L at 70% of daily loss limit ────────────────────────────────────
     if profile and profile.daily_loss_limit:
         session_pnl = sum(float(t.pnl or 0) for t in trades_today)
         limit = float(profile.daily_loss_limit)
@@ -109,7 +97,7 @@ async def _check(
                     "tag": "ew-pnl70",
                 })
 
-    # ── 3. Trade count at 80% of daily limit ─────────────────────────────────
+    # ── 2. Trade count at 80% of daily limit ─────────────────────────────────
     if profile and profile.daily_trade_limit:
         count = len(trades_today)
         limit = profile.daily_trade_limit
