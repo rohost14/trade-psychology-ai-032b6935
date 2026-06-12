@@ -39,9 +39,8 @@ async def send_test_alert(
 
     # ── 1. Per-account rate limit ─────────────────────────────────────────────
     try:
-        import redis as redis_lib
-        from app.core.config import settings
-        r = redis_lib.from_url(settings.REDIS_URL, socket_connect_timeout=1)
+        from app.core.redis_pool import get_sync_redis
+        r = get_sync_redis()
         rl_key = f"rl:test_alert:{broker_account_id}"
         now = time.time()
         window_start = now - _TEST_ALERT_WINDOW

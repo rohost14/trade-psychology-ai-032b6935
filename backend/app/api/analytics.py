@@ -2576,8 +2576,6 @@ async def get_trading_dna(
     """
     try:
         from statistics import mean as _mean
-        import redis.asyncio as aioredis
-        from app.core.config import settings
         from app.services.ai_service import ai_service
         import json
         import re as _re
@@ -2608,7 +2606,8 @@ async def get_trading_dna(
         cache_key     = f"dna:{broker_account_id}:{days_back}"
         refresh_key   = f"dna_refreshes:{broker_account_id}:{datetime.now(timezone.utc).strftime('%Y-%m-%d')}"
 
-        r = aioredis.from_url(settings.REDIS_URL, decode_responses=True)
+        from app.core.redis_pool import get_async_redis
+        r = await get_async_redis()
 
         # Check refresh limit
         if force_refresh:
@@ -2616,7 +2615,6 @@ async def get_trading_dna(
             if refreshes >= REFRESH_LIMIT:
                 cached = await r.get(cache_key)
                 if cached:
-                    await r.aclose()
                     d = json.loads(cached)
                     d["refresh_limit_hit"] = True
                     return d
@@ -2630,7 +2628,6 @@ async def get_trading_dna(
         if not force_refresh:
             cached = await r.get(cache_key)
             if cached:
-                await r.aclose()
                 return json.loads(cached)
 
         # ── Compute pre-stats for AI prompt ──────────────────────────────────
@@ -2731,7 +2728,6 @@ async def get_trading_dna(
         }
 
         await r.set(cache_key, json.dumps(result, default=str), ex=CACHE_TTL_SEC)
-        await r.aclose()
         return result
 
     except Exception as e:

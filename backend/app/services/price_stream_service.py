@@ -217,9 +217,8 @@ class ZerodhaTicker:
         # Reduces Redis API calls by ~100x at 100 subscribed instruments.
         if ltp_updates:
             try:
-                from app.core.config import settings
-                import redis as redis_lib
-                r = redis_lib.from_url(settings.REDIS_URL, decode_responses=True)
+                from app.core.redis_pool import get_sync_redis
+                r = get_sync_redis()
                 pipe = r.pipeline(transaction=False)
                 for token, price in ltp_updates.items():
                     pipe.set(f"ltp:{token}", price, ex=2)
@@ -532,9 +531,8 @@ def get_cached_ltp(instrument_token: int) -> Optional[float]:
     TTL is 2 seconds — stale after that, treat as unavailable.
     """
     try:
-        from app.core.config import settings
-        import redis as redis_lib
-        r = redis_lib.from_url(settings.REDIS_URL, decode_responses=True, socket_timeout=1)
+        from app.core.redis_pool import get_sync_redis
+        r = get_sync_redis()
         val = r.get(f"ltp:{instrument_token}")
         return float(val) if val is not None else None
     except Exception:

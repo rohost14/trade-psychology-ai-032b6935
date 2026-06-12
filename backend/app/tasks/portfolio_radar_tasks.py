@@ -177,13 +177,11 @@ async def _run_for_single_account(broker_account_id: str) -> dict:
 
     # Debounce: skip if radar ran for this account in the last 60 seconds.
     # Prevents N tasks queuing up when a trader does a flurry of fills.
-    from app.core.config import settings
-    import redis as redis_lib
-    _r = redis_lib.from_url(settings.REDIS_URL, decode_responses=True)
+    from app.core.redis_pool import get_sync_redis
+    _r = get_sync_redis()
     debounce_key = f"radar_debounce:{broker_account_id}"
     if _r.set(debounce_key, 1, ex=60, nx=True) is None:
         return {"skipped": "debounced"}
-    _r.close()
 
     from app.models.broker_account import BrokerAccount
     from sqlalchemy import select

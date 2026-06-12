@@ -46,10 +46,8 @@ def rate_limit(max_calls: int = 10, window_seconds: int = 60) -> Callable:
         account_id: UUID = Depends(get_verified_broker_account_id),
     ) -> None:
         try:
-            import redis as redis_lib
-            from app.core.config import settings
-
-            r = redis_lib.from_url(settings.REDIS_URL, socket_connect_timeout=1)
+            from app.core.redis_pool import get_sync_redis
+            r = get_sync_redis()
             key = f"rl:{account_id}:{request.url.path}"
             now = time.time()
             window_start = now - window_seconds

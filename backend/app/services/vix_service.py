@@ -34,20 +34,16 @@ async def get_india_vix() -> Optional[float]:
     Caches in Redis. Silently returns None on any failure.
     """
     try:
-        import redis.asyncio as aioredis
-        from app.core.config import settings
-
-        r = aioredis.from_url(settings.REDIS_URL, decode_responses=True)
+        from app.core.redis_pool import get_async_redis
+        r = await get_async_redis()
 
         # Back-off guard
         if await r.exists(BACKOFF_KEY):
-            await r.aclose()
             return None
 
         # Cache hit
         cached = await r.get(CACHE_KEY)
         if cached:
-            await r.aclose()
             return float(cached)
 
         # Fetch from NSE
@@ -63,7 +59,6 @@ async def get_india_vix() -> Optional[float]:
                 await r.delete(FAIL_COUNT_KEY)
                 logger.warning("India VIX: 3 consecutive failures — backing off for 1h")
 
-        await r.aclose()
         return vix
 
     except Exception as e:

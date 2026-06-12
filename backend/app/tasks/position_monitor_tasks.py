@@ -35,8 +35,8 @@ IST = ZoneInfo("Asia/Kolkata")
 
 
 def _get_redis():
-    import redis as redis_lib
-    return redis_lib.from_url(settings.REDIS_URL, decode_responses=True)
+    from app.core.redis_pool import get_sync_redis
+    return get_sync_redis()
 
 # How long (minutes) a losing position must be held before alerting
 HOLDING_LOSER_MIN_DURATION = 30   # 30 minutes of holding a loss

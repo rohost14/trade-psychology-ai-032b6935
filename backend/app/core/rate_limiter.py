@@ -62,9 +62,8 @@ class RateLimiter:
         window_start = now - self.window_seconds
 
         try:
-            import redis as redis_lib
-            from app.core.config import settings
-            r = redis_lib.from_url(settings.REDIS_URL, socket_connect_timeout=1)
+            from app.core.redis_pool import get_sync_redis
+            r = get_sync_redis()
             pipe = r.pipeline()
             pipe.zremrangebyscore(redis_key, "-inf", window_start)
             pipe.zcard(redis_key)

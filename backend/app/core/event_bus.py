@@ -61,25 +61,17 @@ ACCOUNT_STREAM_PREFIX = "stream:"
 GLOBAL_MAXLEN = 50000
 ACCOUNT_MAXLEN = 500
 
-# Shared sync connection pool for Celery workers.
-# Initialized lazily on first publish_event() call.
-# Prevents opening a new TCP connection per call (critical at 50+ users).
-_sync_pool = None
-
 
 def _get_sync_redis():
-    """Return a Redis client borrowing from the shared sync connection pool."""
-    global _sync_pool
-    if _sync_pool is None:
-        import redis as redis_lib
-        from app.core.config import settings
-        _sync_pool = redis_lib.ConnectionPool.from_url(
-            settings.REDIS_URL,
-            decode_responses=True,
-            max_connections=10,
-        )
-    import redis as redis_lib
-    return redis_lib.Redis(connection_pool=_sync_pool)
+    """Return a Redis client from the shared sync pool (redis_pool module)."""
+    from app.core.redis_pool import get_sync_redis
+    return get_sync_redis()
+
+
+async def _get_async_redis():
+    """Return an async Redis client from the shared async pool (redis_pool module)."""
+    from app.core.redis_pool import get_async_redis
+    return await get_async_redis()
 
 
 def publish_event(
@@ -137,10 +129,7 @@ async def replay_events_for_account(
     since_event_id = '0-0' means return up to `limit` most recent events.
     """
     try:
-        from app.core.config import settings
-        import redis.asyncio as aioredis
-
-        r = aioredis.from_url(settings.REDIS_URL, decode_responses=True)
+        r = await _get_async_redis()
         account_stream = f"{ACCOUNT_STREAM_PREFIX}{broker_account_id}"
 
         # XREAD is exclusive of since_event_id — returns only events AFTER it
@@ -177,9 +166,6 @@ async def start_event_subscriber() -> None:
     Uses XREAD BLOCK to wait efficiently for new messages.
     Reconnects automatically on Redis error.
     """
-    from app.core.config import settings
-    import redis.asyncio as aioredis
-
     logger.info("[event_bus] Starting Redis Streams event subscriber...")
 
     # '$' = only read events that arrive AFTER this subscriber starts
@@ -188,7 +174,7 @@ async def start_event_subscriber() -> None:
 
     while True:
         try:
-            r = aioredis.from_url(settings.REDIS_URL, decode_responses=True)
+            r = await _get_async_redis()
             logger.info(f"[event_bus] Subscribed to {GLOBAL_STREAM}")
 
             while True:

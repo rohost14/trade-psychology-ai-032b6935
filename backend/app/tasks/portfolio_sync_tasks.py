@@ -89,8 +89,8 @@ SECTOR_MAP = {
 
 
 def _get_redis():
-    import redis as redis_lib
-    return redis_lib.from_url(settings.REDIS_URL, decode_responses=True)
+    from app.core.redis_pool import get_sync_redis
+    return get_sync_redis()
 
 
 def _compute_sector_exposure(holdings: list) -> dict:

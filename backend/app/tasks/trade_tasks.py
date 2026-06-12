@@ -35,10 +35,10 @@ logger = logging.getLogger(__name__)
 # ---------------------------------------------------------------------------
 
 def _get_redis_client():
-    """Return a synchronous redis client. Lazily imported so Celery workers
-    don't need Redis at import time if REDIS_URL is unset."""
-    import redis as redis_lib
-    return redis_lib.from_url(settings.REDIS_URL, decode_responses=True)
+    """Return a sync Redis client from the shared pool.
+    Pool is lazily initialized on first call — safe for Celery import time."""
+    from app.core.redis_pool import get_sync_redis
+    return get_sync_redis()
 
 
 def _acquire_lock(redis_client, key: str, ttl_seconds: int) -> bool:
