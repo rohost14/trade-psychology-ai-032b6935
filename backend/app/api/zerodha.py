@@ -48,8 +48,8 @@ def _store_auth_code(jwt_token: str, broker_account_id: str) -> str:
     """
     code = secrets.token_urlsafe(32)
     try:
-        import redis as redis_lib
-        r = redis_lib.from_url(settings.REDIS_URL, decode_responses=True)
+        from app.core.redis_pool import get_sync_redis
+        r = get_sync_redis()
         r.set(
             f"auth_code:{code}",
             f"{jwt_token}|{broker_account_id}",
@@ -100,8 +100,8 @@ async def exchange_auth_code(request: AuthExchangeRequest):
     code = request.code
 
     try:
-        import redis as redis_lib
-        r = redis_lib.from_url(settings.REDIS_URL, decode_responses=True)
+        from app.core.redis_pool import get_sync_redis
+        r = get_sync_redis()
         value = r.getdel(f"auth_code:{code}")  # getdel = atomic get + delete (single use)
     except Exception as e:
         logger.error(f"Redis error during auth exchange: {e}")
@@ -141,8 +141,8 @@ async def setup_credentials(
 
     setup_token = secrets.token_urlsafe(32)
     try:
-        import redis as redis_lib
-        r = redis_lib.from_url(settings.REDIS_URL, decode_responses=True)
+        from app.core.redis_pool import get_sync_redis
+        r = get_sync_redis()
         import json as _json
         r.set(
             f"zerodha_creds:{setup_token}",
@@ -174,9 +174,9 @@ async def connect_zerodha(
     if setup_token:
         # Retrieve personal credentials from Redis
         try:
-            import redis as redis_lib
+            from app.core.redis_pool import get_sync_redis
             import json as _json
-            r = redis_lib.from_url(settings.REDIS_URL, decode_responses=True)
+            r = get_sync_redis()
             raw = r.get(f"zerodha_creds:{setup_token}")
             if not raw:
                 raise HTTPException(status_code=400, detail="setup_token expired or invalid — please re-enter credentials")
@@ -201,10 +201,9 @@ async def connect_zerodha(
     # Persist nonce in Redis (120 s TTL — covers the Zerodha login page round-trip).
     # Callback validates and deletes it atomically; unmatched state = CSRF rejection.
     try:
-        import redis as redis_lib
-        _sr = redis_lib.from_url(settings.REDIS_URL, decode_responses=True)
+        from app.core.redis_pool import get_sync_redis
+        _sr = get_sync_redis()
         _sr.setex(f"oauth_state:{csrf_nonce}", 120, _state_value)
-        _sr.close()
     except Exception as e:
         logger.error(f"Redis error storing OAuth state nonce: {e}")
         raise HTTPException(status_code=503, detail="Service temporarily unavailable")
@@ -238,14 +237,13 @@ async def zerodha_callback(
     _csrf_nonce = state[len("setup:"):] if _is_setup_flow else state
 
     try:
-        import redis as redis_lib
+        from app.core.redis_pool import get_sync_redis
         import json as _json
-        _r = redis_lib.from_url(settings.REDIS_URL, decode_responses=True)
+        _r = get_sync_redis()
         _pipe = _r.pipeline()
         _pipe.get(f"oauth_state:{_csrf_nonce}")
         _pipe.delete(f"oauth_state:{_csrf_nonce}")
         _stored_value, _ = _pipe.execute()
-        _r.close()
     except Exception as e:
         logger.error(f"Redis error validating OAuth state nonce: {e}")
         return RedirectResponse(
@@ -268,9 +266,9 @@ async def zerodha_callback(
         # stored_value IS the original setup_token; use it to fetch credentials
         _setup_token = _stored_value
         try:
-            _r2 = redis_lib.from_url(settings.REDIS_URL, decode_responses=True)
+            from app.core.redis_pool import get_sync_redis
+            _r2 = get_sync_redis()
             _raw = _r2.get(f"zerodha_creds:{_setup_token}")
-            _r2.close()
             if _raw:
                 _creds = _json.loads(_raw)
                 _personal_api_key = _creds.get("api_key")
@@ -643,8 +641,8 @@ async def get_margins(
         # Try Redis cache first (written by trade_tasks.py on every webhook)
         import json as _json
         try:
-            import redis as redis_lib
-            r = redis_lib.from_url(settings.REDIS_URL, decode_responses=True)
+            from app.core.redis_pool import get_sync_redis
+            r = get_sync_redis()
             cached = r.get(f"margin:{broker_account_id}")
             if cached:
                 return _json.loads(cached)
@@ -903,48 +901,11 @@ async def sync_all_data(
                 logger.error(f"BehaviorEngine sync failed (non-fatal): {e}")
                 results["behavior_engine_error"] = str(e)
 
-            # 2. BehavioralEvaluator — new signal pipeline with confidence scoring
-            try:
-                from app.services.behavioral_evaluator import BehavioralEvaluator
-
-                evaluator = BehavioralEvaluator()
-
-                # Get fills from this sync cycle (new trades synced above)
-                new_fill_ids = trade_result.get("new_trade_ids", [])
-                new_fills = []
-                if new_fill_ids:
-                    fill_result = await db.execute(
-                        select(Trade).where(Trade.id.in_(new_fill_ids))
-                    )
-                    new_fills = fill_result.scalars().all()
-
-                if new_fills:
-                    events = await evaluator.evaluate(broker_account_id, new_fills, db, profile=_trader_profile)
-
-                    # Persist events (only after confidence validation + dedup)
-                    for event in events:
-                        db.add(event)
-
-                    if events:
-                        await db.commit()
-
-                        # Push to WebSocket (only after DB insert)
-                        try:
-                            from app.api.websocket import manager
-                            for event in events:
-                                await manager.push_behavioral_event(
-                                    str(broker_account_id), event
-                                )
-                        except Exception as ws_err:
-                            logger.warning(f"WebSocket push failed (non-fatal): {ws_err}")
-
-                    results["behavioral_events"] = len(events)
-                else:
-                    results["behavioral_events"] = 0
-
-            except Exception as e:
-                logger.error(f"Behavioral evaluation failed (non-fatal): {e}")
-                results["behavioral_events_error"] = str(e)
+            # DEAD CODE: BehavioralEvaluator replaced by BehaviorEngine (run above).
+            # Writes to BehavioralEvent table (separate from RiskAlert).
+            # BehavioralEvent table unused by frontend since Phase 3 cutover.
+            # Kept for reference — see docs/DEAD_CODE.md.
+            results["behavioral_events"] = 0
 
             # 3. DangerZone assessment — uses CompletedTrade P&L to detect danger
             try:

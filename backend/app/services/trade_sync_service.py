@@ -419,6 +419,14 @@ class TradeSyncService:
             if idem_key in seen_keys:
                 continue  # Already in ledger — skip (idempotent)
 
+            # BUG-2 fix: webhook stores idempotency_key as "{kite_order_id}:ledger"
+            # (uses Zerodha order_id, no trade_id available in postbacks).
+            # REST sync stores trade_id as order_id, so kite_order_id holds the
+            # actual Zerodha order_id. If the webhook already processed this order,
+            # skip to avoid double-counting position / P&L.
+            if trade.kite_order_id and f"{trade.kite_order_id}:ledger" in seen_keys:
+                continue
+
             qty = trade.filled_quantity or trade.quantity or 0
             signed_qty = qty if trade.transaction_type == "BUY" else -qty
             if signed_qty == 0:
@@ -431,7 +439,12 @@ class TradeSyncService:
                 fill_order_id=trade.order_id or str(trade.id),
                 fill_qty=signed_qty,
                 fill_price=_Decimal(str(trade.average_price or trade.price or 0)),
-                occurred_at=trade.order_timestamp or datetime.now(timezone.utc),
+                occurred_at=(
+                    trade.fill_timestamp
+                    or trade.exchange_timestamp
+                    or trade.order_timestamp
+                    or datetime.now(timezone.utc)
+                ),
                 idempotency_key=idem_key,
             )
 

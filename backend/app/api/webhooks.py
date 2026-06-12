@@ -227,6 +227,12 @@ async def process_trade_sync(trade_data: dict, broker_account_id: UUID, db: Asyn
     from app.utils.trade_classifier import classify_trade
     from app.models.trade import Trade
 
+    # BUG-3 fix: filter CNC/delivery trades — platform tracks MIS/NRML/MTF only
+    product = trade_data.get("product", "")
+    if product and product not in {"MIS", "NRML", "MTF"}:
+        logger.debug(f"process_trade_sync: skipping product={product} trade {trade_data.get('order_id')}")
+        return
+
     # Classify and transform
     classification = classify_trade(trade_data)
     normalized = TradeSyncService.transform_zerodha_order(trade_data)

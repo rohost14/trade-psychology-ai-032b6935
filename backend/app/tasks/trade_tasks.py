@@ -88,6 +88,12 @@ def process_webhook_trade(self, trade_data: Dict[str, Any], broker_account_id: s
                     logger.error(f"Broker account not found: {broker_account_id}")
                     return {"success": False, "error": "Account not found"}
 
+                # BUG-3 fix: filter CNC/delivery trades before any processing
+                product = trade_data.get("product", "")
+                if product and product not in {"MIS", "NRML", "MTF"}:
+                    logger.debug(f"Webhook: skipping product={product} trade {trade_data.get('order_id')}")
+                    return {"success": True, "skipped": f"product={product}"}
+
                 # Classify trade
                 classification = classify_trade(trade_data)
 
@@ -233,7 +239,12 @@ def process_webhook_trade(self, trade_data: Dict[str, Any], broker_account_id: s
                             fill_order_id=trade.order_id or str(trade.id),
                             fill_qty=signed_qty,
                             fill_price=_Decimal(str(trade.average_price or trade.price or 0)),
-                            occurred_at=trade.order_timestamp or datetime.now(timezone.utc),
+                            occurred_at=(
+                                trade.fill_timestamp
+                                or trade.exchange_timestamp
+                                or trade.order_timestamp
+                                or datetime.now(timezone.utc)
+                            ),
                             idempotency_key=f"{trade.order_id}:ledger",
                         )
 
