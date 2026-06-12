@@ -184,12 +184,14 @@ export default function NotificationSettings({ className }: NotificationSettings
               <p className="text-sm font-medium text-foreground mb-2">You'll be notified about:</p>
               <ul className="space-y-2">
                 {[
-                  { icon: '🚨', text: 'Danger alerts (consecutive losses, revenge trading)' },
-                  { icon: '⚠️', text: 'Caution alerts (overtrading, unusual sizing)' },
-                  { icon: '📊', text: 'Pattern detection results' }
+                  { icon: '🚨', text: 'Danger alerts — consecutive losses, revenge trading, loss spiral (real-time, over any app)' },
+                  { icon: '⚠️', text: 'Caution alerts — overtrading, unusual sizing, FOMO (real-time)' },
+                  { icon: '🎯', text: 'Pre-market intent — 8:30 AM, your limits for today' },
+                  { icon: '📋', text: 'Market close debrief — 3:35 PM, planned vs actual' },
+                  { icon: '📊', text: 'Daily discipline score — 6:00 PM, your score + streak' },
                 ].map((item, idx) => (
-                  <li key={idx} className="flex items-center gap-2 text-sm text-muted-foreground">
-                    <span>{item.icon}</span>
+                  <li key={idx} className="flex items-start gap-2 text-sm text-muted-foreground">
+                    <span className="shrink-0 mt-px">{item.icon}</span>
                     <span>{item.text}</span>
                   </li>
                 ))}

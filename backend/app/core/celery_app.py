@@ -158,6 +158,12 @@ celery_app.conf.update(
             "task": "app.tasks.intent_tasks.send_eod_comparison_push",
             "schedule": crontab(hour=15, minute=35, day_of_week="1-5"),
         },
+        # Daily discipline score push — 6:00 PM IST daily (including weekends for swing traders).
+        # Single score + streak to pull users back into the app.
+        "daily-score": {
+            "task": "app.tasks.intent_tasks.send_daily_score_push",
+            "schedule": crontab(hour=18, minute=0),
+        },
         # Guardrail rule monitor — every 60s during market hours (09:15–15:25 IST Mon–Fri)
         # Internal market-hours check inside the task body (beat doesn't support time ranges).
         "check-guardrails": {

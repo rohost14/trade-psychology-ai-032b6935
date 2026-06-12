@@ -11,7 +11,7 @@ from datetime import datetime, date, timezone, timedelta
 from decimal import Decimal
 from zoneinfo import ZoneInfo
 
-from sqlalchemy import select, and_
+from sqlalchemy import select, and_, func
 from app.core.celery_app import celery_app
 from app.core.database import SessionLocal
 from app.models.broker_account import BrokerAccount
@@ -151,3 +151,102 @@ def send_eod_comparison_push(self):
                     logger.warning(f"EOD comparison push failed for {account.id}: {e}")
 
     asyncio.run(_run())
+
+
+@celery_app.task(name="app.tasks.intent_tasks.send_daily_score_push", bind=True, max_retries=1)
+def send_daily_score_push(self):
+    """
+    18:00 IST daily: discipline score + streak push.
+    Pulls users back into the app with a single personalized number.
+    """
+    async def _run():
+        today = _today_ist()
+        async with SessionLocal() as db:
+            rows = (await db.execute(
+                select(BrokerAccount, TradingSession)
+                .outerjoin(TradingSession, and_(
+                    TradingSession.broker_account_id == BrokerAccount.id,
+                    TradingSession.session_date == today,
+                ))
+                .where(BrokerAccount.access_token.isnot(None))
+            )).all()
+
+            for account, session in rows:
+                try:
+                    # Only send if they traded today
+                    if not session or (session.trade_count or 0) == 0:
+                        continue
+
+                    # Fetch discipline score from analytics service
+                    from app.services.analytics_service import AnalyticsService
+                    analytics = AnalyticsService()
+                    score_data = await analytics.calculate_weekly_risk_score(
+                        account.id, db
+                    )
+                    score = score_data.get("score", 0)
+                    grade = score_data.get("grade", "")
+
+                    # Calculate intent adherence streak (days within limits)
+                    streak = await _calc_adherence_streak(account.id, db)
+
+                    # Build push body
+                    parts = [f"Discipline: {score}/100 {grade}"]
+                    if streak > 1:
+                        parts.append(f"Streak: {streak} days")
+
+                    actual_trades = session.trade_count or 0
+                    parts.append(f"{actual_trades} trades today")
+
+                    await push_service.send_notification(
+                        broker_account_id=account.id,
+                        title="TradeMentor — Today's Score",
+                        body=" · ".join(parts),
+                        db=db,
+                        data={"action": "open_my_patterns", "type": "daily_score"},
+                        severity="info",
+                        tag="daily-score",
+                    )
+                except Exception as e:
+                    logger.warning(f"Daily score push failed for {account.id}: {e}")
+
+    asyncio.run(_run())
+
+
+async def _calc_adherence_streak(broker_account_id, db) -> int:
+    """Count consecutive days where intent was acknowledged AND respected."""
+    result = await db.execute(
+        select(TradingSession)
+        .where(
+            and_(
+                TradingSession.broker_account_id == broker_account_id,
+                TradingSession.intent_acknowledged == True,
+            )
+        )
+        .order_by(TradingSession.session_date.desc())
+        .limit(30)
+    )
+    sessions = result.scalars().all()
+
+    streak = 0
+    prev_date = None
+    for s in sessions:
+        # Check if respected (within limits)
+        respected = True
+        if s.intent_max_trades is not None and (s.trade_count or 0) > s.intent_max_trades:
+            respected = False
+        if s.intent_max_loss is not None and (s.session_pnl or 0) < -s.intent_max_loss:
+            respected = False
+
+        if not respected:
+            break
+
+        # Check consecutive (skip weekends)
+        if prev_date is not None:
+            delta = (prev_date - s.session_date).days
+            if delta > 3:  # allow weekend gap
+                break
+
+        streak += 1
+        prev_date = s.session_date
+
+    return streak
