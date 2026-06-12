@@ -233,10 +233,10 @@ async def _dispatch_to_websocket(
         }
 
         if event_type in ("trade_update", "position_update"):
-            await manager.send_trade_update(account_id, data)
+            await manager.send_trade_update(account_id, data, event_id=event_id)
 
         elif event_type == "alert_update":
-            await manager.send_alert(account_id, data)
+            await manager.send_alert(account_id, data, event_id=event_id)
 
         elif event_type == "margin_update":
             await manager.send_to_account(account_id, {

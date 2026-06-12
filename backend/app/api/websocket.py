@@ -45,14 +45,6 @@ class ConnectionManager:
         # Lock for thread safety
         self._lock = asyncio.Lock()
 
-    async def connect(self, websocket: WebSocket, account_id: str):
-        """Accept new WebSocket connection."""
-        await websocket.accept()
-        async with self._lock:
-            self.active_connections[account_id] = websocket
-            self.subscriptions[account_id] = set()
-        logger.info(f"WebSocket connected: {account_id[:8]}...")
-
     async def disconnect(self, account_id: str):
         """Remove disconnected client."""
         async with self._lock:
@@ -114,18 +106,20 @@ class ConnectionManager:
                 return_exceptions=True,
             )
 
-    async def send_alert(self, account_id: str, alert_data: dict):
+    async def send_alert(self, account_id: str, alert_data: dict, event_id: str = ""):
         """Send risk alert to specific account."""
         await self.send_to_account(account_id, {
-            "type": "alert",
+            "type": "alert_update",
+            "event_id": event_id,
             "data": alert_data,
             "timestamp": datetime.now(timezone.utc).isoformat(),
         })
 
-    async def send_trade_update(self, account_id: str, trade_data: dict):
+    async def send_trade_update(self, account_id: str, trade_data: dict, event_id: str = ""):
         """Send trade update notification."""
         await self.send_to_account(account_id, {
-            "type": "trade",
+            "type": "trade_update",
+            "event_id": event_id,
             "data": trade_data,
             "timestamp": datetime.now(timezone.utc).isoformat(),
         })

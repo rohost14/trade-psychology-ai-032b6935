@@ -223,7 +223,6 @@ class ZerodhaTicker:
                 for token, price in ltp_updates.items():
                     pipe.set(f"ltp:{token}", price, ex=2)
                 pipe.execute()
-                r.close()
             except Exception:
                 pass  # Redis write failure never blocks the tick pipeline
 

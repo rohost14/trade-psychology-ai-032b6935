@@ -1,3 +1,5 @@
+// ARCHIVED — do not use. Puts JWT in URL query param (security violation SEC-C02).
+// Use useWebSocket() from @/contexts/WebSocketContext instead.
 import { useEffect, useRef, useState, useCallback } from 'react';
 import { useBroker } from '@/contexts/BrokerContext';
 import { AUTH_TOKEN_KEY } from '@/lib/api';
