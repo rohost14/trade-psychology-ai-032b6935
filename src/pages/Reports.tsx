@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import {
   Sunrise, BarChart2, CalendarDays, ChevronDown, ChevronUp,
-  FileText, Printer, TrendingUp, TrendingDown,
+  FileText, Printer, TrendingUp, TrendingDown, Loader2,
   AlertTriangle, CheckCircle2, Target, Lightbulb, Shield, Link2,
 } from 'lucide-react';
 import { Link } from 'react-router-dom';

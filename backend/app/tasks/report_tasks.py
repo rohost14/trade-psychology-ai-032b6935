@@ -10,7 +10,10 @@ Scheduled tasks for:
 import asyncio
 import logging
 from uuid import UUID
-from datetime import datetime, timezone
+from datetime import datetime, timezone, timedelta as _timedelta, time as _time
+from zoneinfo import ZoneInfo as _ZoneInfo
+
+_IST = _ZoneInfo("Asia/Kolkata")
 
 from app.core.celery_app import celery_app
 from app.core.database import SessionLocal
@@ -237,7 +240,9 @@ def send_weekly_summary(broker_account_id: str):
 
                 account_id = UUID(broker_account_id)
 
-                week_start = datetime.now(timezone.utc) - timedelta(days=7)
+                week_start = datetime.combine(
+                    (datetime.now(_IST) - _timedelta(days=7)).date(), _time.min, tzinfo=_IST
+                ).astimezone(timezone.utc)
                 result = await db.execute(
                     select(CompletedTrade).where(
                         and_(
@@ -403,7 +408,9 @@ def generate_commodity_weekly_report():
 
         async with SessionLocal() as db:
             # Find all accounts that have MCX CompletedTrades in the last 7 days
-            week_start = datetime.now(timezone.utc) - timedelta(days=7)
+            week_start = datetime.combine(
+                (datetime.now(_IST) - _timedelta(days=7)).date(), _time.min, tzinfo=_IST
+            ).astimezone(timezone.utc)
             result = await db.execute(
                 select(BrokerAccount.id)
                 .join(
@@ -429,7 +436,9 @@ def generate_commodity_weekly_report():
         for account_id in account_ids:
             try:
                 async with SessionLocal() as db:
-                    week_start_dt = datetime.now(timezone.utc) - timedelta(days=7)
+                    week_start_dt = datetime.combine(
+                        (datetime.now(_IST) - _timedelta(days=7)).date(), _time.min, tzinfo=_IST
+                    ).astimezone(timezone.utc)
 
                     ct_result = await db.execute(
                         select(CompletedTrade).where(

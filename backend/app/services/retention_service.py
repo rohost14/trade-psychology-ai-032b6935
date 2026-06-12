@@ -39,14 +39,27 @@ class RetentionService:
         """Save a generated report to the DB for the Reports Hub."""
         from app.models.generated_report import GeneratedReport
         from datetime import date as date_type
-        rpt = GeneratedReport(
-            broker_account_id=broker_account_id,
-            report_type=report_type,
-            report_date=report_date if isinstance(report_date, date_type) else date_type.fromisoformat(report_date),
-            report_data=report_data,
-            sent_via=sent_via,
+        rpt_date = report_date if isinstance(report_date, date_type) else date_type.fromisoformat(report_date)
+
+        existing = await db.execute(
+            select(GeneratedReport).where(
+                GeneratedReport.broker_account_id == broker_account_id,
+                GeneratedReport.report_type == report_type,
+                GeneratedReport.report_date == rpt_date,
+            )
         )
-        db.add(rpt)
+        rec = existing.scalar_one_or_none()
+        if rec:
+            rec.report_data = report_data
+            rec.sent_via = sent_via
+        else:
+            db.add(GeneratedReport(
+                broker_account_id=broker_account_id,
+                report_type=report_type,
+                report_date=rpt_date,
+                report_data=report_data,
+                sent_via=sent_via,
+            ))
         await db.commit()
 
     async def send_eod_report(

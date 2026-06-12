@@ -410,7 +410,7 @@ async def send_whatsapp_report(
             )
         )
         recent_alerts = alerts_result.scalars().all()
-        detected_patterns = list({a.alert_type for a in recent_alerts})
+        detected_patterns = list({a.pattern_type for a in recent_alerts})
 
         # Quick strength/weakness heuristic for the report
         key_strength = "Discipline" if not any(p for p in detected_patterns if "revenge" in p.lower() or "overtrading" in p.lower()) else "Resilience"
