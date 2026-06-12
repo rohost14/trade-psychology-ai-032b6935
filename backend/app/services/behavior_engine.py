@@ -129,7 +129,7 @@ def _trajectory(risk_before: Decimal, risk_after: Decimal) -> str:
 @dataclass
 class DetectedEvent:
     event_type: str
-    severity: str       # "danger" | "caution"
+    severity: str       # "danger" | "caution" | "info" (info = analytics-only, no user alert)
     message: str
     context: Dict[str, Any] = field(default_factory=dict)
     risk_delta: Decimal = Decimal("0")
@@ -364,6 +364,7 @@ class BehaviorEngine:
             self._detect_end_of_session_mis_panic,
             self._detect_post_loss_recovery_bet,
             self._detect_profit_giveaway,
+            self._detect_cooldown_violation,
         ]:
             try:
                 event = detector(ctx)
@@ -587,17 +588,16 @@ class BehaviorEngine:
                          "daily_danger": daily_danger, "session_pnl": round(session_pnl, 2)},
             )
         if daily_count >= daily_caution:
-            # Only fire daily count alert if session is in loss
-            if session_pnl < 0:
-                return DetectedEvent(
-                    event_type="overtrading_burst",
-                    severity="caution",
-                    message=(
-                        f"{daily_count} trades today, session P&L: ₹{session_pnl:+,.0f}."
-                    ),
-                    context={"daily_count": daily_count, "daily_caution": daily_caution,
-                             "daily_danger": daily_danger, "session_pnl": round(session_pnl, 2)},
-                )
+            return DetectedEvent(
+                event_type="overtrading_burst",
+                severity="caution",
+                message=(
+                    f"{daily_count} trades today"
+                    + (f", session P&L: ₹{session_pnl:+,.0f}." if session_pnl != 0 else ".")
+                ),
+                context={"daily_count": daily_count, "daily_caution": daily_caution,
+                         "daily_danger": daily_danger, "session_pnl": round(session_pnl, 2)},
+            )
 
         # Check 3: gains erosion through continued trading (fires even below daily_caution)
         # Catches the "6 good-start trades then 3-4 losses" pattern before it crosses
@@ -860,11 +860,14 @@ class BehaviorEngine:
         cooldown = ctx.active_cooldowns[0]
         remaining_min = (cooldown.expires_at - datetime.now(timezone.utc)).total_seconds() / 60
 
+        # severity="info" — recorded for analytics/risk scoring but never shown as
+        # a user-facing alert. Users ignore cooldown reminders; tracking the violation
+        # is enough to feed the personalization engine.
         return DetectedEvent(
             event_type="cooldown_violation",
-            severity="danger",
+            severity="info",
             message=(
-                f"You traded during an active cooldown period "
+                f"Traded during active cooldown "
                 f"({remaining_min:.0f}min remaining). "
                 f"Reason: {cooldown.reason or 'loss streak'}."
             ),

@@ -72,9 +72,10 @@ async def _reconcile_all_accounts():
     """Inner async function — reconciles all connected broker accounts."""
     today_ist = datetime.now(_IST_TZ).date()
 
-    async with SessionLocal() as db:
-        # Get all connected accounts with a valid (non-revoked) token
-        result = await db.execute(
+    # Fetch account list in its own session — isolation prevents one account's
+    # exception from rolling back the entire reconciliation batch.
+    async with SessionLocal() as list_db:
+        result = await list_db.execute(
             select(BrokerAccount).where(
                 and_(
                     BrokerAccount.status == "connected",
@@ -85,16 +86,18 @@ async def _reconcile_all_accounts():
         )
         accounts = result.scalars().all()
 
-        if not accounts:
-            logger.debug("[reconcile] No connected accounts to reconcile.")
-            return {"accounts_checked": 0}
+    if not accounts:
+        logger.debug("[reconcile] No connected accounts to reconcile.")
+        return {"accounts_checked": 0}
 
-        total_missing = 0
-        total_expired = 0
-        # Stagger: process 10 accounts per second to respect Kite rate limits.
-        # 1000 users → ~100 seconds at 4 AM. No user impact.
-        BATCH_SIZE = 10
-        for i, account in enumerate(accounts):
+    total_missing = 0
+    total_expired = 0
+    # Stagger: process 10 accounts per second to respect Kite rate limits.
+    # 1000 users → ~100 seconds at 4 AM. No user impact.
+    BATCH_SIZE = 10
+    for i, account in enumerate(accounts):
+        # Per-account session — failure in one account never affects others.
+        async with SessionLocal() as db:
             try:
                 missing = await _reconcile_account(account, db)
                 total_missing += missing
@@ -103,17 +106,17 @@ async def _reconcile_all_accounts():
                     f"[reconcile] Failed for account {account.id}: {e}",
                     exc_info=True
                 )
-            try:
-                expired = await _expire_stale_positions(account.id, today_ist)
-                total_expired += expired
-            except Exception as e:
-                logger.error(
-                    f"[reconcile] Expiry cleanup failed for account {account.id}: {e}",
-                    exc_info=True
-                )
-            # Pause 1 second after every batch of 10
-            if (i + 1) % BATCH_SIZE == 0:
-                await asyncio.sleep(1)
+        try:
+            expired = await _expire_stale_positions(account.id, today_ist)
+            total_expired += expired
+        except Exception as e:
+            logger.error(
+                f"[reconcile] Expiry cleanup failed for account {account.id}: {e}",
+                exc_info=True
+            )
+        # Pause 1 second after every batch of 10
+        if (i + 1) % BATCH_SIZE == 0:
+            await asyncio.sleep(1)
 
     logger.info(
         f"[reconcile] Done. {len(accounts)} accounts checked, "

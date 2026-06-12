@@ -243,7 +243,7 @@ class RiskDetector:
                     "recommendation": "STOP TRADING. This is classic revenge trading behavior."
                 },
                 trigger_trade_id=trigger_trade.id,
-                related_trade_ids=[str(recent_loss.id)]
+                related_trade_ids=[recent_loss.id]
             )
 
         return None
@@ -498,7 +498,7 @@ class RiskDetector:
                         "recommendation": "STOP IMMEDIATELY. You are tilting."
                     },
                     trigger_trade_id=trigger_trade.id if trigger_trade else None,
-                    related_trade_ids=[str(ct.id) for ct in recent_ct[-4:]]
+                    related_trade_ids=[ct.id for ct in recent_ct[-4:]]
                 )
 
         return None
