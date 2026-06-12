@@ -1,7 +1,10 @@
-import { useState, Suspense, lazy } from 'react';
+import { Fragment, useState, Suspense, lazy } from 'react';
 import { ErrorBoundary } from '@/components/ErrorBoundary';
 import { Link } from 'react-router-dom';
-import { Link2 } from 'lucide-react';
+import {
+  Link2, BarChart2, AlertTriangle, List,
+  Moon, Percent, Crosshair, Calendar, BookOpen,
+} from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import { cn } from '@/lib/utils';
@@ -22,11 +25,11 @@ const JournalCorrelationTab = lazy(() => import('@/components/analytics/JournalC
 function TabSkeleton() {
   return (
     <div className="space-y-4 pt-2">
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-        {[1,2,3,4].map(i => <Skeleton key={i} className="h-20 rounded-xl" />)}
+      <Skeleton className="h-[280px] rounded-xl" />
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-px">
+        {[1,2,3,4].map(i => <Skeleton key={i} className="h-20" />)}
       </div>
-      <Skeleton className="h-64 rounded-xl" />
-      <Skeleton className="h-48 rounded-xl" />
+      <Skeleton className="h-[200px] rounded-xl" />
     </div>
   );
 }
@@ -38,14 +41,14 @@ const PERIOD_OPTIONS = [
 ] as const;
 
 const TABS = [
-  { value: 'summary',   label: 'Summary'   },
-  { value: 'patterns',  label: 'Patterns'  },
-  { value: 'trades',    label: 'Trades'    },
-  { value: 'btst',      label: 'BTST'      },
-  { value: 'pnlpct',    label: '% Return'  },
-  { value: 'edgemap',   label: 'Edge Map'  },
-  { value: 'expiry',    label: 'Expiry'    },
-  { value: 'journal',   label: 'Journal'   },
+  { value: 'summary',  label: 'Summary',  icon: BarChart2,     group: 'core' as const },
+  { value: 'patterns', label: 'Patterns', icon: AlertTriangle, group: 'core' as const },
+  { value: 'trades',   label: 'Trades',   icon: List,          group: 'core' as const },
+  { value: 'btst',     label: 'BTST',     icon: Moon,          group: 'deep' as const },
+  { value: 'pnlpct',   label: 'Returns',  icon: Percent,       group: 'deep' as const },
+  { value: 'edgemap',  label: 'Edge Map', icon: Crosshair,     group: 'deep' as const },
+  { value: 'expiry',   label: 'Expiry',   icon: Calendar,      group: 'deep' as const },
+  { value: 'journal',  label: 'Journal',  icon: BookOpen,      group: 'deep' as const },
 ] as const;
 
 type TabValue = typeof TABS[number]['value'];
@@ -81,7 +84,7 @@ export default function Analytics() {
   return (
     <div className="w-full pb-12">
       {/* ── Page Header ── */}
-      <div className="mb-5 flex items-center justify-between">
+      <div className="mb-4 flex items-center justify-between">
         <h1 className="t-heading-lg text-foreground">Analytics</h1>
         <div className="flex items-center gap-3">
           <div className="flex items-center gap-0.5 p-0.5 bg-slate-100 dark:bg-neutral-800 rounded-lg">
@@ -106,24 +109,36 @@ export default function Analytics() {
         </div>
       </div>
 
-      {/* ── Tab Bar ── */}
-      <div role="tablist" aria-label="Analytics sections" className="flex gap-0 border-b border-border mb-6">
-        {TABS.map(({ value, label }) => (
-          <button
-            key={value}
-            role="tab"
-            aria-selected={tab === value}
-            onClick={() => setTab(value)}
-            className={cn(
-              'px-4 py-2.5 text-sm font-medium border-b-2 transition-colors -mb-px',
-              tab === value
-                ? 'border-tm-brand text-foreground'
-                : 'border-transparent text-muted-foreground hover:text-foreground'
-            )}
-          >
-            {label}
-          </button>
-        ))}
+      {/* ── Tab Bar — sticky so period switch & tab switch stay in view ── */}
+      <div className="sticky top-0 z-20 bg-background/95 backdrop-blur-sm border-b border-border -mx-4 sm:-mx-6 px-4 sm:px-6 mb-6">
+        <div
+          role="tablist"
+          aria-label="Analytics sections"
+          className="flex overflow-x-auto [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]"
+        >
+          {TABS.map(({ value, label, icon: Icon, group }, i) => (
+            <Fragment key={value}>
+              {/* Visual separator between core and deep-dive groups */}
+              {i > 0 && TABS[i - 1].group !== group && (
+                <div className="w-px bg-border/70 my-2 mx-1.5 shrink-0" />
+              )}
+              <button
+                role="tab"
+                aria-selected={tab === value}
+                onClick={() => setTab(value)}
+                className={cn(
+                  'flex items-center gap-1.5 px-3.5 py-2.5 text-[13px] font-medium border-b-2 transition-colors -mb-px whitespace-nowrap shrink-0',
+                  tab === value
+                    ? 'border-tm-brand text-foreground'
+                    : 'border-transparent text-muted-foreground hover:text-foreground'
+                )}
+              >
+                <Icon className="h-3.5 w-3.5 shrink-0" />
+                {label}
+              </button>
+            </Fragment>
+          ))}
+        </div>
       </div>
 
       {/* ── Tab Content ── */}
@@ -137,6 +152,7 @@ export default function Analytics() {
             <SummaryTab
               days={days}
               onInstrumentClick={(underlying) => setInstrumentPanel(underlying)}
+              onTabChange={(t) => setTab(t as TabValue)}
             />
           )}
           {tab === 'patterns' && <PatternsTab days={days} />}

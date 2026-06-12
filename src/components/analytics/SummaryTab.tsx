@@ -4,7 +4,7 @@ import {
   XAxis, YAxis, CartesianGrid, Tooltip,
   ResponsiveContainer, ReferenceLine, Cell,
 } from 'recharts';
-import { Trophy, Flame, ChevronRight } from 'lucide-react';
+import { Trophy, Flame, ChevronRight, ArrowRight, TrendingUp, TrendingDown, BarChart2 } from 'lucide-react';
 import { Skeleton } from '@/components/ui/skeleton';
 import AttributionCard from '@/components/analytics/AttributionCard';
 import { cn } from '@/lib/utils';
@@ -14,6 +14,7 @@ import { api } from '@/lib/api';
 interface SummaryTabProps {
   days: number;
   onInstrumentClick: (underlying: string) => void;
+  onTabChange: (tab: string) => void;
 }
 
 interface OverviewData {
@@ -44,6 +45,11 @@ interface PerfData {
     win_rate: number; avg_pnl: number;
   }>;
   by_hour: { hour: number; label: string; trades: number; pnl: number; win_rate: number }[];
+}
+
+interface DeltaInfo {
+  text: string;
+  improved: boolean | null;
 }
 
 function fmtDate(s: string) {
@@ -88,13 +94,24 @@ function groupByUnderlying(instruments: PerfData['by_instrument']) {
     .sort((a, b) => b.trades - a.trades);
 }
 
-function StatCell({ label, value, color, sub }: {
-  label: string; value: string; color?: string; sub?: string;
+function StatCell({ label, value, color, sub, delta }: {
+  label: string; value: string; color?: string; sub?: string; delta?: DeltaInfo;
 }) {
   return (
     <div className="bg-card px-4 py-3">
       <p className="text-xs text-muted-foreground mb-1">{label}</p>
       <p className={cn('t-mono-lg', color ?? 'text-foreground')}>{value}</p>
+      {delta && (
+        <p className={cn(
+          'text-[10px] font-medium mt-0.5 flex items-center gap-0.5',
+          delta.improved === true  ? 'text-tm-profit' :
+          delta.improved === false ? 'text-tm-loss'   : 'text-muted-foreground'
+        )}>
+          {delta.improved === true  && <TrendingUp  className="h-2.5 w-2.5 shrink-0" />}
+          {delta.improved === false && <TrendingDown className="h-2.5 w-2.5 shrink-0" />}
+          {delta.text} vs prev
+        </p>
+      )}
       {sub && <p className="text-[11px] text-muted-foreground mt-0.5">{sub}</p>}
     </div>
   );
@@ -128,20 +145,23 @@ function DailyTooltip({ active, payload }: any) {
   );
 }
 
-export default function SummaryTab({ days, onInstrumentClick }: SummaryTabProps) {
-  const [overview, setOverview]   = useState<OverviewData | null>(null);
-  const [perf, setPerf]           = useState<PerfData | null>(null);
-  const [isLoading, setIsLoading] = useState(true);
+export default function SummaryTab({ days, onInstrumentClick, onTabChange }: SummaryTabProps) {
+  const [overview, setOverview]       = useState<OverviewData | null>(null);
+  const [prevOverview, setPrevOverview] = useState<OverviewData | null>(null);
+  const [perf, setPerf]               = useState<PerfData | null>(null);
+  const [isLoading, setIsLoading]     = useState(true);
 
   useEffect(() => {
     let cancelled = false;
     setIsLoading(true);
     Promise.all([
       api.get('/api/analytics/overview',    { params: { days } }),
+      api.get('/api/analytics/overview',    { params: { days: days * 2 } }),
       api.get('/api/analytics/performance', { params: { days } }),
-    ]).then(([ov, pf]) => {
+    ]).then(([ov, prevOv, pf]) => {
       if (cancelled) return;
       setOverview(ov.data);
+      setPrevOverview(prevOv.data);
       setPerf(pf.data);
     }).catch(() => {}).finally(() => {
       if (!cancelled) setIsLoading(false);
@@ -150,12 +170,12 @@ export default function SummaryTab({ days, onInstrumentClick }: SummaryTabProps)
   }, [days]);
 
   if (isLoading) return (
-    <div className="space-y-3">
+    <div className="space-y-3 animate-pulse">
+      <Skeleton className="h-[280px] rounded-xl" />
       <div className="grid grid-cols-2 md:grid-cols-4 gap-px bg-border rounded-lg overflow-hidden">
         {[1,2,3,4].map(i => <Skeleton key={i} className="h-20 rounded-none" />)}
       </div>
-      <Skeleton className="h-[260px] rounded-xl" />
-      <Skeleton className="h-[160px] rounded-xl" />
+      <Skeleton className="h-[200px] rounded-xl" />
       <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
         <Skeleton className="md:col-span-3 h-[220px] rounded-xl" />
         <div className="md:col-span-2 space-y-4">
@@ -169,9 +189,12 @@ export default function SummaryTab({ days, onInstrumentClick }: SummaryTabProps)
   const kpis = overview?.kpis;
   if (!overview?.has_data || !kpis) {
     return (
-      <div className="tm-card flex flex-col items-center justify-center py-16">
+      <div className="tm-card flex flex-col items-center justify-center py-16 text-center">
+        <BarChart2 className="h-10 w-10 text-muted-foreground/30 mb-3" />
         <p className="font-medium text-foreground">No trades in this period</p>
-        <p className="text-sm text-muted-foreground mt-1">Complete some trades to see analytics</p>
+        <p className="text-sm text-muted-foreground mt-1 max-w-sm">
+          Sync your trades from Settings, then come back — analytics build automatically from your trade history.
+        </p>
       </div>
     );
   }
@@ -183,21 +206,109 @@ export default function SummaryTab({ days, onInstrumentClick }: SummaryTabProps)
   const bestHour    = byHour.length ? byHour.reduce((a, b) => a.pnl > b.pnl ? a : b) : null;
   const worstHour   = byHour.length ? byHour.reduce((a, b) => a.pnl < b.pnl ? a : b) : null;
 
+  // Prior-period deltas: fetch 2x window, prior period = (2x total) - (current)
+  const prevPeriodKpis = (() => {
+    if (!prevOverview?.kpis || !kpis) return null;
+    const pk = prevOverview.kpis;
+    const prevTrades  = pk.total_trades - kpis.total_trades;
+    const prevWinners = pk.winners - kpis.winners;
+    const prevPnl     = pk.total_pnl - kpis.total_pnl;
+    const prevWinRate = prevTrades > 0 ? Math.round(prevWinners / prevTrades * 100) : null;
+    return { pnl: prevPnl, win_rate: prevWinRate, total_trades: prevTrades };
+  })();
+
+  const pnlDelta: DeltaInfo | undefined = prevPeriodKpis && prevPeriodKpis.total_trades > 0
+    ? {
+        text: formatCurrencyWithSign(kpis.total_pnl - prevPeriodKpis.pnl),
+        improved: kpis.total_pnl > prevPeriodKpis.pnl
+          ? true : kpis.total_pnl < prevPeriodKpis.pnl ? false : null,
+      }
+    : undefined;
+
+  const wrDelta: DeltaInfo | undefined = prevPeriodKpis?.win_rate != null && prevPeriodKpis.total_trades > 0
+    ? {
+        text: `${kpis.win_rate - prevPeriodKpis.win_rate > 0 ? '+' : ''}${kpis.win_rate - prevPeriodKpis.win_rate}%`,
+        improved: kpis.win_rate > prevPeriodKpis.win_rate
+          ? true : kpis.win_rate < prevPeriodKpis.win_rate ? false : null,
+      }
+    : undefined;
+
+  const winDayPct = kpis.trading_days > 0
+    ? Math.round(kpis.win_days / kpis.trading_days * 100)
+    : 0;
+
   return (
     <div className="space-y-4 animate-fade-in-up">
 
-      {/* Row 1: Core KPIs */}
+      {/* ── HERO: Equity Curve ─────────────────────────────────────────── */}
+      {(overview.equity_curve?.length ?? 0) > 1 && (
+        <div className="tm-card overflow-hidden">
+          <div className="px-5 py-3.5 border-b border-border flex items-center justify-between">
+            <div>
+              <p className="tm-label">Equity Curve</p>
+              <p className="text-xs text-muted-foreground">Cumulative P&L — last {days} days</p>
+            </div>
+            <span className={cn('text-base font-bold font-mono tabular-nums',
+              isProfit ? 'text-tm-profit' : 'text-tm-loss')}>
+              {formatCurrencyWithSign(kpis.total_pnl)}
+            </span>
+          </div>
+          <div className="px-4 pt-4 pb-2">
+            <div className="h-[280px]">
+              <ResponsiveContainer width="100%" height="100%">
+                <AreaChart data={overview.equity_curve} margin={{ top: 8, right: 8, bottom: 0, left: 0 }}>
+                  <defs>
+                    <linearGradient id="eqGrad" x1="0" y1="0" x2="0" y2="1">
+                      <stop offset="5%"  stopColor={isProfit ? '#16A34A' : '#DC2626'} stopOpacity={0.18} />
+                      <stop offset="95%" stopColor={isProfit ? '#16A34A' : '#DC2626'} stopOpacity={0} />
+                    </linearGradient>
+                  </defs>
+                  <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" strokeOpacity={0.5} vertical={false} />
+                  <XAxis dataKey="date" tickFormatter={fmtDate} axisLine={false} tickLine={false}
+                    tick={{ fill: 'hsl(var(--muted-foreground))', fontSize: 11 }} interval="preserveStartEnd" />
+                  <YAxis axisLine={false} tickLine={false}
+                    tick={{ fill: 'hsl(var(--muted-foreground))', fontSize: 11 }}
+                    tickFormatter={(v) => `₹${(v/1000).toFixed(0)}k`} width={44} />
+                  <Tooltip content={<EquityTooltip />} />
+                  <ReferenceLine y={0} stroke="hsl(var(--border))" strokeWidth={1.5} />
+                  <Area type="monotone" dataKey="cumulative_pnl"
+                    stroke={isProfit ? '#16A34A' : '#DC2626'} strokeWidth={2}
+                    fill="url(#eqGrad)" dot={false} />
+                </AreaChart>
+              </ResponsiveContainer>
+            </div>
+          </div>
+          {/* Equity insight sentence */}
+          <div className={cn(
+            'mx-5 mb-4 px-4 py-2.5 rounded-lg text-[12px] leading-relaxed',
+            isProfit
+              ? 'bg-emerald-50/60 dark:bg-emerald-950/20 text-emerald-700 dark:text-emerald-300'
+              : 'bg-red-50/60 dark:bg-red-950/20 text-red-700 dark:text-red-400'
+          )}>
+            {isProfit
+              ? <>Up <strong>{formatCurrencyWithSign(kpis.total_pnl)}</strong> over {days} days across {kpis.total_trades} trades.
+                  {kpis.best_day && <> Best day: <strong>{formatCurrencyWithSign(kpis.best_day.pnl)}</strong> on {fmtDate(kpis.best_day.date)}.</>}</>
+              : <>Down <strong>{formatCurrencyWithSign(Math.abs(kpis.total_pnl))}</strong> over {days} days.
+                  {kpis.worst_day && <> Worst day: <strong>{formatCurrencyWithSign(kpis.worst_day.pnl)}</strong> on {fmtDate(kpis.worst_day.date)}.</>}</>
+            }
+          </div>
+        </div>
+      )}
+
+      {/* ── Row 1: Core KPIs (with prior-period deltas) ────────────────── */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-px bg-border rounded-lg overflow-hidden">
         <StatCell
           label="Total P&L"
           value={formatCurrencyWithSign(kpis.total_pnl)}
           color={isProfit ? 'text-tm-profit' : 'text-tm-loss'}
+          delta={pnlDelta}
           sub={`${kpis.total_trades} trades · ${kpis.trading_days} days`}
         />
         <StatCell
           label="Win Rate"
           value={`${kpis.win_rate}%`}
           color={kpis.win_rate >= 50 ? 'text-tm-profit' : 'text-tm-loss'}
+          delta={wrDelta}
           sub={`${kpis.winners}W / ${kpis.losers}L`}
         />
         <StatCell
@@ -214,7 +325,7 @@ export default function SummaryTab({ days, onInstrumentClick }: SummaryTabProps)
         />
       </div>
 
-      {/* Row 2: Win/Loss detail */}
+      {/* ── Row 2: Win / Loss detail ───────────────────────────────────── */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-px bg-border rounded-lg overflow-hidden">
         <StatCell
           label="Avg Win"
@@ -242,48 +353,7 @@ export default function SummaryTab({ days, onInstrumentClick }: SummaryTabProps)
         />
       </div>
 
-      {/* Equity Curve */}
-      {(overview.equity_curve?.length ?? 0) > 1 && (
-        <div className="tm-card overflow-hidden">
-          <div className="px-5 py-3.5 border-b border-border flex items-center justify-between">
-            <div>
-              <p className="tm-label">Equity Curve</p>
-              <p className="text-xs text-muted-foreground">Cumulative P&L over time</p>
-            </div>
-            <span className={cn('text-sm font-bold font-mono tabular-nums',
-              isProfit ? 'text-tm-profit' : 'text-tm-loss')}>
-              {formatCurrencyWithSign(kpis.total_pnl)}
-            </span>
-          </div>
-          <div className="px-4 py-4">
-            <div className="h-[240px]">
-              <ResponsiveContainer width="100%" height="100%">
-                <AreaChart data={overview.equity_curve}>
-                  <defs>
-                    <linearGradient id="eqGrad" x1="0" y1="0" x2="0" y2="1">
-                      <stop offset="5%"  stopColor={isProfit ? '#16A34A' : '#DC2626'} stopOpacity={0.18} />
-                      <stop offset="95%" stopColor={isProfit ? '#16A34A' : '#DC2626'} stopOpacity={0} />
-                    </linearGradient>
-                  </defs>
-                  <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" strokeOpacity={0.5} vertical={false} />
-                  <XAxis dataKey="date" tickFormatter={fmtDate} axisLine={false} tickLine={false}
-                    tick={{ fill: 'hsl(var(--muted-foreground))', fontSize: 11 }} interval="preserveStartEnd" />
-                  <YAxis axisLine={false} tickLine={false}
-                    tick={{ fill: 'hsl(var(--muted-foreground))', fontSize: 11 }}
-                    tickFormatter={(v) => `₹${(v/1000).toFixed(0)}k`} />
-                  <Tooltip content={<EquityTooltip />} />
-                  <ReferenceLine y={0} stroke="hsl(var(--border))" strokeWidth={1.5} />
-                  <Area type="monotone" dataKey="cumulative_pnl"
-                    stroke={isProfit ? '#16A34A' : '#DC2626'} strokeWidth={2}
-                    fill="url(#eqGrad)" />
-                </AreaChart>
-              </ResponsiveContainer>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Daily P&L */}
+      {/* ── Daily P&L ─────────────────────────────────────────────────── */}
       {(overview.daily_pnl?.length ?? 0) > 0 && (
         <div className="tm-card overflow-hidden">
           <div className="px-5 py-3.5 border-b border-border flex items-center justify-between">
@@ -300,16 +370,16 @@ export default function SummaryTab({ days, onInstrumentClick }: SummaryTabProps)
               </span>
             </div>
           </div>
-          <div className="px-4 py-4">
-            <div className="h-[160px]">
+          <div className="px-4 pt-4 pb-2">
+            <div className="h-[200px]">
               <ResponsiveContainer width="100%" height="100%">
-                <BarChart data={overview.daily_pnl}>
+                <BarChart data={overview.daily_pnl} margin={{ top: 4, right: 8, bottom: 0, left: 0 }}>
                   <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" strokeOpacity={0.5} vertical={false} />
                   <XAxis dataKey="date" tickFormatter={fmtDate} axisLine={false} tickLine={false}
                     tick={{ fill: 'hsl(var(--muted-foreground))', fontSize: 11 }} interval="preserveStartEnd" />
                   <YAxis axisLine={false} tickLine={false}
                     tick={{ fill: 'hsl(var(--muted-foreground))', fontSize: 11 }}
-                    tickFormatter={(v) => `₹${(v/1000).toFixed(0)}k`} />
+                    tickFormatter={(v) => `₹${(v/1000).toFixed(0)}k`} width={44} />
                   <Tooltip content={<DailyTooltip />} />
                   <ReferenceLine y={0} stroke="hsl(var(--border))" strokeWidth={1.5} />
                   <Bar dataKey="pnl" radius={[2,2,0,0]}>
@@ -321,18 +391,31 @@ export default function SummaryTab({ days, onInstrumentClick }: SummaryTabProps)
               </ResponsiveContainer>
             </div>
           </div>
+          {/* Daily P&L insight */}
+          <p className="text-[11px] text-muted-foreground text-center px-5 pb-3.5">
+            {kpis.win_days} of {kpis.trading_days} trading days were profitable
+            {kpis.trading_days > 0 && <> ({winDayPct}% green days)</>}
+          </p>
         </div>
       )}
 
-      {/* Bottom grid: Instruments (3/5) + Right column (2/5) */}
+      {/* ── Bottom grid: Instruments (3/5) + Right column (2/5) ───────── */}
       <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
 
         {/* Instrument Leaderboard */}
         {instruments.length > 0 && (
           <div className="md:col-span-3 tm-card overflow-hidden">
-            <div className="px-5 py-3.5 border-b border-border">
-              <p className="tm-label">Instruments</p>
-              <p className="text-xs text-muted-foreground">Click any row to see full breakdown</p>
+            <div className="px-5 py-3.5 border-b border-border flex items-center justify-between">
+              <div>
+                <p className="tm-label">Instruments</p>
+                <p className="text-xs text-muted-foreground">Click any row for full breakdown</p>
+              </div>
+              <button
+                onClick={() => onTabChange('edgemap')}
+                className="flex items-center gap-1 text-xs text-tm-brand hover:text-tm-brand/80 font-medium transition-colors shrink-0"
+              >
+                Edge Map <ArrowRight className="h-3 w-3" />
+              </button>
             </div>
             <table className="w-full">
               <thead>
@@ -379,6 +462,21 @@ export default function SummaryTab({ days, onInstrumentClick }: SummaryTabProps)
                 ))}
               </tbody>
             </table>
+            {/* Instruments insight */}
+            {instruments[0] && (
+              <div className="px-5 py-2.5 border-t border-border/50 bg-slate-50/50 dark:bg-neutral-800/20">
+                <p className="text-[11px] text-muted-foreground">
+                  <strong className="text-foreground">{instruments[0].underlying}</strong> is your most-traded
+                  — {instruments[0].win_rate}% WR across {instruments[0].trades} trades.
+                  {instruments[0].pnl < 0
+                    ? ' Despite high volume, it\'s in the red — consider whether overexposure is helping.'
+                    : instruments[0].avg_pnl > 0
+                    ? ` Avg ${formatCurrencyWithSign(instruments[0].avg_pnl)}/trade.`
+                    : ''
+                  }
+                </p>
+              </div>
+            )}
           </div>
         )}
 
@@ -451,6 +549,13 @@ export default function SummaryTab({ days, onInstrumentClick }: SummaryTabProps)
                     </div>
                     <p className="text-sm font-bold font-mono tabular-nums text-tm-loss">
                       {formatCurrencyWithSign(worstHour.pnl)}
+                    </p>
+                  </div>
+                )}
+                {bestHour && worstHour && bestHour.label !== worstHour.label && (
+                  <div className="px-5 py-2.5 bg-slate-50/50 dark:bg-neutral-800/20">
+                    <p className="text-[11px] text-muted-foreground">
+                      Trade more at {bestHour.label} and less at {worstHour.label}.
                     </p>
                   </div>
                 )}

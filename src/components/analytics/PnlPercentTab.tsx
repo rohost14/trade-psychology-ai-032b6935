@@ -119,8 +119,13 @@ export default function PnlPercentTab({ days }: { days: number }) {
   if (loading) return <PnlPercentSkeleton />;
   if (error)   return <p className="text-sm text-tm-loss p-4">{error}</p>;
   if (!data?.has_data) return (
-    <div className="text-center py-16 text-muted-foreground text-sm">
-      No closed trades with price data in the last {days} days.
+    <div className="tm-card flex flex-col items-center justify-center py-16 text-center">
+      <TrendingUp className="h-10 w-10 text-muted-foreground/30 mb-3" />
+      <p className="font-medium text-foreground">No % return data yet</p>
+      <p className="text-sm text-muted-foreground mt-1 max-w-sm">
+        Close some trades — this tab tracks your returns as a percentage of capital deployed,
+        so you can compare across different position sizes.
+      </p>
     </div>
   );
 

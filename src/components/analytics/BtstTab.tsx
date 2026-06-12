@@ -1,5 +1,9 @@
 import { useState, useEffect } from 'react';
 import { Moon } from 'lucide-react';
+import {
+  BarChart, Bar, XAxis, YAxis, CartesianGrid,
+  Tooltip, ResponsiveContainer, Cell,
+} from 'recharts';
 import { Skeleton } from '@/components/ui/skeleton';
 import { cn } from '@/lib/utils';
 import { formatCurrencyWithSign } from '@/lib/formatters';
@@ -87,6 +91,23 @@ export default function BtstTab({ days }: { days: number }) {
 
   const visible = showAll ? trades : trades.slice(0, 10);
 
+  // Group trades by month for bar chart
+  const monthlyPnl = (() => {
+    const map: Record<string, number> = {};
+    for (const t of trades) {
+      if (!t.entry_time) continue;
+      const d = new Date(t.entry_time);
+      const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+      map[key] = (map[key] ?? 0) + t.realized_pnl;
+    }
+    return Object.entries(map)
+      .sort(([a], [b]) => a.localeCompare(b))
+      .map(([key, pnl]) => ({
+        month: new Date(key + '-01').toLocaleDateString('en-IN', { month: 'short', year: '2-digit' }),
+        pnl: Math.round(pnl),
+      }));
+  })();
+
   return (
     <div className="space-y-5 animate-fade-in-up">
       {/* Summary grid */}
@@ -119,6 +140,42 @@ export default function BtstTab({ days }: { days: number }) {
           </div>
         ))}
       </div>
+
+      {/* Monthly P&L bar chart (UX-5) */}
+      {monthlyPnl.length >= 2 && (
+        <div className="tm-card overflow-hidden">
+          <div className="px-5 py-3.5 border-b border-border">
+            <p className="tm-label">Monthly BTST P&L</p>
+            <p className="text-xs text-muted-foreground">Profit/loss from overnight positions by month</p>
+          </div>
+          <div className="px-4 pt-4 pb-2">
+            <div className="h-[180px]">
+              <ResponsiveContainer width="100%" height="100%">
+                <BarChart data={monthlyPnl} margin={{ top: 4, right: 8, bottom: 0, left: 0 }}>
+                  <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" strokeOpacity={0.5} vertical={false} />
+                  <XAxis dataKey="month" axisLine={false} tickLine={false}
+                    tick={{ fill: 'hsl(var(--muted-foreground))', fontSize: 11 }} />
+                  <YAxis axisLine={false} tickLine={false}
+                    tick={{ fill: 'hsl(var(--muted-foreground))', fontSize: 11 }}
+                    tickFormatter={(v) => `₹${(v / 1000).toFixed(0)}k`} width={44} />
+                  <Tooltip
+                    formatter={(v: number) => [formatCurrencyWithSign(v), 'P&L']}
+                    contentStyle={{
+                      background: 'hsl(var(--popover))', border: '1px solid hsl(var(--border))',
+                      borderRadius: 8, fontSize: 12,
+                    }}
+                  />
+                  <Bar dataKey="pnl" radius={[3, 3, 0, 0]}>
+                    {monthlyPnl.map((entry, i) => (
+                      <Cell key={i} fill={entry.pnl >= 0 ? '#16A34A' : '#DC2626'} />
+                    ))}
+                  </Bar>
+                </BarChart>
+              </ResponsiveContainer>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Context blurb */}
       <div className="rounded-lg bg-indigo-50/60 dark:bg-indigo-950/20 border border-indigo-100 dark:border-indigo-900/40 px-4 py-3">

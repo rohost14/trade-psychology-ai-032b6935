@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { Calendar } from 'lucide-react';
 import { Skeleton } from '@/components/ui/skeleton';
 import { cn } from '@/lib/utils';
 import { api } from '@/lib/api';
@@ -107,10 +108,12 @@ export default function ExpiryTab({ days }: { days: number }) {
 
   if (!data?.has_data) {
     return (
-      <div className="flex flex-col items-center justify-center py-20 text-center">
-        <p className="text-sm font-medium text-foreground mb-1">No expiry data yet</p>
-        <p className="text-xs text-muted-foreground max-w-xs">
-          After {days} days of trading, expiry vs non-expiry breakdown will appear here.
+      <div className="tm-card flex flex-col items-center justify-center py-16 text-center">
+        <Calendar className="h-10 w-10 text-muted-foreground/30 mb-3" />
+        <p className="font-medium text-foreground">No expiry data yet</p>
+        <p className="text-sm text-muted-foreground mt-1 max-w-sm">
+          Trade options on expiry days (Thursday for weekly, last Thursday of month for monthly) —
+          this tab compares your edge on expiry vs non-expiry days.
         </p>
       </div>
     );

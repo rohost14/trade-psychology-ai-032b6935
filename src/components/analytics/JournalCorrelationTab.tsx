@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { BookOpen } from 'lucide-react';
 import { Skeleton } from '@/components/ui/skeleton';
 import { cn } from '@/lib/utils';
 import { api } from '@/lib/api';
@@ -107,11 +108,13 @@ export default function JournalCorrelationTab({ days }: { days: number }) {
 
   if (!data?.has_data) {
     return (
-      <div className="flex flex-col items-center justify-center py-20 text-center">
-        <p className="text-sm font-medium text-foreground mb-1">No journal data yet</p>
-        <p className="text-xs text-muted-foreground max-w-xs">
-          Tag your trades with emotions in the journal. Once you have {days > 30 ? '10+' : '5+'} entries,
-          the correlation between your mindset and P&L will appear here.
+      <div className="tm-card flex flex-col items-center justify-center py-16 text-center">
+        <BookOpen className="h-10 w-10 text-muted-foreground/30 mb-3" />
+        <p className="font-medium text-foreground">No journal entries yet</p>
+        <p className="text-sm text-muted-foreground mt-1 max-w-sm">
+          Tag trades with your pre-trade emotion in the journal (confident, anxious, FOMO...).
+          Once you have {days > 30 ? '10+' : '5+'} tagged entries, this tab reveals which mindsets
+          help or hurt your P&L.
         </p>
       </div>
     );
