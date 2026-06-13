@@ -4,6 +4,68 @@
 
 ---
 
+## Session 37 (2026-06-13) — Production Readiness + Design V2 Prototype
+
+### What happened
+
+**Part A: Production readiness Areas 3–5** (continuation from S36 context overflow):
+
+Commit `7f72232` — Areas 3+4:
+- `src/App.tsx`: QueryClient staleTime 5 min (prevents tab-switch refetches)
+- `src/components/analytics/SummaryTab.tsx`: Promise.all → Promise.allSettled (partial data on partial failure)
+- `src/lib/api.ts`: `dedupGet()` export — in-flight GET deduplication map
+- `backend/app/api/analytics.py`: `/unrealized-pnl` and `/pnl-percent` now have analytics_limiter (were the only 2 of 27 missing it)
+- `src/main.tsx`: global `unhandledrejection` handler (dev logging + 401/503 suppression)
+- `src/pages/Dashboard.tsx`: fetchPositions/fetchTrades catch blocks skip toast on 401 (token-expired flow handles it)
+
+Commit `e884ead` — Area 5:
+- `backend/app/api/settings.py`: guardian_name (max 100) + guardian_phone (E.164 regex) validators
+- `backend/app/api/profile.py`: display_name validator (max 50, strip, None if empty) on both OnboardingStep1 + ProfileUpdate; `profile_put_limiter` (10/60s) on PUT /
+- `backend/app/core/rate_limiter.py`: `profile_put_limiter` added
+- `backend/app/main.py`: global 500 handler includes request_id in body + X-Request-ID header
+- `backend/app/api/websocket.py`: subscribe rejects non-list, caps at 50 instruments, truncates each to 50 chars
+- `backend/app/api/goals.py`: GoalBrokenRequest Pydantic body (was raw query params) — goal_name max 200, cost ≥ 0
+- `src/lib/goalsApi.ts`: logGoalBroken sends JSON body not query params
+
+**Part B: UI/UX redesign prototype**
+
+User decided existing UI looks like "AI slop / vibe coded." Solution: design in standalone HTML prototypes first, port to React after approval.
+
+Commit `17544ca`:
+- `design_v2/base.css` — complete design system (dark/light, Inter+DM Mono, cards, buttons, badges, sidebar)
+- `design_v2/landing.html` — marketing page
+- `design_v2/dashboard.html` — main trading view
+- `design_v2/analytics.html` — 8-tab analytics
+- `design_v2/blowup-shield.html` — risk/shield view
+
+**CRITICAL CONSTRAINT (user verbatim):** "a new folder everything in that we are nothing our main codebase at all"
+— design_v2/ is the ONLY place design work goes until explicitly approved and ported.
+
+### Design tokens locked in design_v2/base.css (for porting reference)
+
+| Token | Dark | Light |
+|---|---|---|
+| Page bg | `#0B0B0F` | `#F2F2F7` |
+| Card | `#13131A` | `#FFFFFF` |
+| Elevated | `#1C1C27` | `#F8F8FC` |
+| Border subtle | `#1F1F2E` | `#E8E8F0` |
+| Brand | `#14B8A6` | `#0F766E` |
+| Profit | `#22C55E` | `#15803D` |
+| Loss | `#EF4444` | `#B91C1C` |
+| Warning | `#F59E0B` | `#92400E` |
+| Text primary | `#F0F0F8` | `#0C0C18` |
+| Text secondary | `#7A7A96` | `#60607A` |
+
+Fonts: Inter (all UI) + DM Mono (all financial numbers, tabular-nums).
+
+### Current status
+- All production readiness areas 1–5 complete and pushed
+- design_v2/ prototypes built and pushed (commit 17544ca)
+- **NEXT: User reviews design_v2/ in browser → gives feedback or approves → then we port to React one page at a time**
+- morning intent dynamic personalization still pending (see project_session36.md)
+
+---
+
 ## Session 31 (2026-04-02) — Design System + Dashboard Spec
 
 ### What happened
