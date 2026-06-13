@@ -1,16 +1,21 @@
-"""Admin overview — key metrics dashboard."""
-from fastapi import APIRouter, Depends
-from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select, func
-from datetime import datetime, timezone, timedelta, time
+"""Admin overview — business health dashboard with funnel, lifecycle, and adoption metrics."""
+from collections import Counter
+from datetime import datetime, time, timedelta, timezone
 from zoneinfo import ZoneInfo
 
-from app.core.database import get_db
-from app.core.config import settings
+from fastapi import APIRouter, Depends
+from sqlalchemy import func, select
+from sqlalchemy.ext.asyncio import AsyncSession
+
 from app.api.admin.deps import get_current_admin
+from app.api.admin.users import _compute_lifecycle
+from app.core.config import settings
+from app.core.database import get_db
 from app.models.broker_account import BrokerAccount
 from app.models.risk_alert import RiskAlert
 from app.models.trade import Trade
+from app.models.user import User
+from app.models.user_profile import UserProfile
 
 router = APIRouter()
 _IST = ZoneInfo("Asia/Kolkata")
@@ -19,15 +24,19 @@ _IST = ZoneInfo("Asia/Kolkata")
 @router.get("/overview")
 async def get_overview(
     db: AsyncSession = Depends(get_db),
-    _:  dict         = Depends(get_current_admin),
+    _: dict = Depends(get_current_admin),
 ):
     now = datetime.now(timezone.utc)
-    # Use IST midnight so "today" aligns with trading day, not UTC day
-    ist_today      = datetime.now(_IST).date()
-    today_start    = datetime.combine(ist_today, time.min, tzinfo=_IST).astimezone(timezone.utc)
-    week_start     = today_start - timedelta(days=7)
 
-    # ── User counts ───────────────────────────────────────────────────────
+    # IST midnight so "today" aligns with trading day, not UTC rollover
+    ist_today   = datetime.now(_IST).date()
+    today_start = datetime.combine(ist_today, time.min, tzinfo=_IST).astimezone(timezone.utc)
+    week_start  = today_start - timedelta(days=7)
+    dau_since   = now - timedelta(hours=24)
+    mau_since   = now - timedelta(days=30)
+    since_14d   = today_start - timedelta(days=13)
+
+    # ── User base ──────────────────────────────────────────────────────────
     total_accounts = (await db.execute(
         select(func.count()).select_from(BrokerAccount)
     )).scalar() or 0
@@ -42,12 +51,28 @@ async def get_overview(
         .where(BrokerAccount.created_at >= today_start)
     )).scalar() or 0
 
-    active_7d = (await db.execute(
+    # WAU: distinct traders in last 7 days by trade execution time
+    wau = (await db.execute(
         select(func.count(func.distinct(Trade.broker_account_id)))
-        .where(Trade.created_at >= week_start)
+        .where(func.coalesce(Trade.order_timestamp, Trade.created_at) >= week_start)
     )).scalar() or 0
 
-    # ── Activity ─────────────────────────────────────────────────────────
+    # ── Engagement: DAU / WAU / MAU ────────────────────────────────────────
+    # All three use trade execution time (order_timestamp fallback to created_at)
+    dau = (await db.execute(
+        select(func.count(func.distinct(Trade.broker_account_id)))
+        .where(func.coalesce(Trade.order_timestamp, Trade.created_at) >= dau_since)
+    )).scalar() or 0
+
+    mau = (await db.execute(
+        select(func.count(func.distinct(Trade.broker_account_id)))
+        .where(func.coalesce(Trade.order_timestamp, Trade.created_at) >= mau_since)
+    )).scalar() or 0
+
+    # Stickiness: DAU/MAU × 100. 0 if no monthly actives.
+    dau_mau_ratio = round(dau / mau * 100, 1) if mau > 0 else 0.0
+
+    # ── Activity ───────────────────────────────────────────────────────────
     total_trades = (await db.execute(
         select(func.count()).select_from(Trade)
     )).scalar() or 0
@@ -61,8 +86,77 @@ async def get_overview(
         .where(RiskAlert.created_at >= today_start)
     )).scalar() or 0
 
-    # ── User growth — signups per day for last 14 days ───────────────────
-    since_14d = today_start - timedelta(days=13)
+    # ── Conversion funnel ─────────────────────────────────────────────────
+    # Each stage = distinct accounts that reached that milestone
+    has_trades = (await db.execute(
+        select(func.count(func.distinct(Trade.broker_account_id)))
+    )).scalar() or 0
+
+    has_alerts = (await db.execute(
+        select(func.count(func.distinct(RiskAlert.broker_account_id)))
+    )).scalar() or 0
+
+    has_acknowledged = (await db.execute(
+        select(func.count(func.distinct(RiskAlert.broker_account_id)))
+        .where(RiskAlert.acknowledged_at.is_not(None))
+    )).scalar() or 0
+
+    # ── Lifecycle distribution ────────────────────────────────────────────
+    # Fetch all accounts (id, status, created_at) — two targeted queries,
+    # compute in Python. Acceptable for admin-only, on-demand refresh.
+    all_acc_rows = (await db.execute(
+        select(BrokerAccount.id, BrokerAccount.status, BrokerAccount.created_at)
+    )).all()
+
+    lt_rows = (await db.execute(
+        select(
+            Trade.broker_account_id,
+            func.max(func.coalesce(Trade.order_timestamp, Trade.created_at)).label("last_at"),
+        ).group_by(Trade.broker_account_id)
+    )).all()
+    last_trade_map: dict = {str(r.broker_account_id): r.last_at for r in lt_rows}
+
+    dist: Counter = Counter()
+    for acc_id, status, created_at in all_acc_rows:
+        lc = _compute_lifecycle(status, created_at, last_trade_map.get(str(acc_id)))
+        dist[lc] += 1
+
+    lifecycle_dist = {
+        "active":       dist["active"],
+        "new":          dist["new"],
+        "at_risk":      dist["at_risk"],
+        "churned":      dist["churned"],
+        "inactive":     dist["inactive"],
+        "suspended":    dist["suspended"],
+        "disconnected": dist["disconnected"],
+    }
+
+    # ── Feature adoption ──────────────────────────────────────────────────
+    push_enabled_n = (await db.execute(
+        select(func.count()).select_from(UserProfile)
+        .where(UserProfile.push_enabled.is_(True))
+    )).scalar() or 0
+
+    limits_configured_n = (await db.execute(
+        select(func.count()).select_from(UserProfile)
+        .where(
+            UserProfile.daily_trade_limit.is_not(None) |
+            UserProfile.daily_loss_limit.is_not(None)
+        )
+    )).scalar() or 0
+
+    whatsapp_n = (await db.execute(
+        select(func.count()).select_from(UserProfile)
+        .where(UserProfile.whatsapp_enabled.is_(True))
+    )).scalar() or 0
+
+    # guardian_phone IS NOT NULL and non-empty string
+    guardian_n = (await db.execute(
+        select(func.count()).select_from(User)
+        .where(User.guardian_phone.is_not(None), User.guardian_phone != "")
+    )).scalar() or 0
+
+    # ── User growth — signups per day for last 14 days ────────────────────
     daily_signups_rows = (await db.execute(
         select(
             func.date_trunc("day", BrokerAccount.created_at).label("day"),
@@ -78,7 +172,7 @@ async def get_overview(
         for r in daily_signups_rows
     ]
 
-    # ── Online users (in-memory WS manager) ──────────────────────────────
+    # ── Online users ──────────────────────────────────────────────────────
     online_now = 0
     try:
         from app.api.websocket import manager
@@ -86,7 +180,7 @@ async def get_overview(
     except Exception:
         pass
 
-    # ── Infrastructure health ────────────────────────────────────────────
+    # ── Infrastructure health ─────────────────────────────────────────────
     health = {"db": "ok", "redis": "unknown"}
     try:
         import redis as redis_lib
@@ -98,17 +192,37 @@ async def get_overview(
 
     return {
         "users": {
-            "total":       total_accounts,
-            "connected":   connected,
-            "new_today":   new_today,
-            "active_7d":   active_7d,
-            "online_now":  online_now,
+            "total":      total_accounts,
+            "connected":  connected,
+            "new_today":  new_today,
+            "online_now": online_now,
+        },
+        "engagement": {
+            "dau":           dau,
+            "wau":           wau,
+            "mau":           mau,
+            "dau_mau_ratio": dau_mau_ratio,
         },
         "activity": {
             "total_trades": total_trades,
             "total_alerts": total_alerts,
             "alerts_today": alerts_today,
         },
-        "health": health,
+        "funnel": {
+            "total":           total_accounts,
+            "connected":       connected,
+            "has_trades":      has_trades,
+            "has_alerts":      has_alerts,
+            "has_acknowledged": has_acknowledged,
+        },
+        "lifecycle_dist": lifecycle_dist,
+        "adoption": {
+            "push_enabled":      push_enabled_n,
+            "limits_configured": limits_configured_n,
+            "guardian_set":      guardian_n,
+            "whatsapp_enabled":  whatsapp_n,
+            "total":             total_accounts,
+        },
+        "health":        health,
         "daily_signups": daily_signups,
     }
