@@ -288,7 +288,7 @@ function Divider({ c }: { c: C }) {
 // ── main ─────────────────────────────────────────────────────────────────────
 export default function Welcome() {
   const navigate = useNavigate();
-  const { connectBroker, enterGuestMode, isAuthenticated } = useBroker();
+  const { connect: connectBroker, enterGuestMode, isConnected: isAuthenticated } = useBroker();
   const { resolvedTheme, setTheme } = useTheme();
 
   const isDark = resolvedTheme === 'dark';

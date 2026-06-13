@@ -96,8 +96,15 @@ class Settings(BaseSettings):
     MAINTENANCE_MODE: bool = False
     MAINTENANCE_MESSAGE: str = "We're performing scheduled maintenance. Back in a few minutes."
 
-    # Cors - Frontend runs on port 8080
-    BACKEND_CORS_ORIGINS: list[str] = ["http://localhost:8080", "http://localhost:3000"]
+    # Cors - Frontend runs on port 8080.
+    # In dev, also allow local-network IPs (192.168.x.x, 10.x.x.x) on common Vite ports
+    # so the app works when accessed from other devices on the same network.
+    BACKEND_CORS_ORIGINS: list[str] = [
+        "http://localhost:8080",
+        "http://localhost:3000",
+        "http://127.0.0.1:8080",
+    ]
+    BACKEND_CORS_ORIGIN_REGEX: str = r"http://(192\.168\.\d+\.\d+|10\.\d+\.\d+\.\d+)(:\d+)?"
 
     model_config = SettingsConfigDict(
         env_file=("backend/.env", ".env"), 
