@@ -181,8 +181,8 @@ export default function PatternsTab({ days }: PatternsTabProps) {
   );
 
   const flagged = critical?.trades ?? [];
-  const clean   = flagged.filter(t => t.flag_reasons.length === 0);
-  const dirty   = flagged.filter(t => t.flag_reasons.length > 0);
+  const clean   = flagged.filter(t => (t.flag_reasons ?? []).length === 0);
+  const dirty   = flagged.filter(t => (t.flag_reasons ?? []).length > 0);
 
   const cleanPnl  = clean.reduce((s, t) => s + t.realized_pnl, 0);
   const dirtyPnl  = dirty.reduce((s, t) => s + t.realized_pnl, 0);
@@ -194,7 +194,7 @@ export default function PatternsTab({ days }: PatternsTabProps) {
   // Group flagged trades by primary reason type
   const byReason: Record<string, FlaggedTrade[]> = {};
   for (const t of dirty) {
-    for (const r of t.flag_reasons) {
+    for (const r of (t.flag_reasons ?? [])) {
       if (!byReason[r.type]) byReason[r.type] = [];
       byReason[r.type].push(t);
     }

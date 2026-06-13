@@ -1555,7 +1555,7 @@ async def get_critical_trades(
                     "direction": ct.direction,
                     "realized_pnl": round(pnl, 2),
                     "duration_minutes": ct.duration_minutes,
-                    "reasons": reasons,
+                    "flag_reasons": reasons,
                     "severity": "critical" if any(r["type"] == "large_loss" for r in reasons) or len(reasons) >= 3
                                 else "high" if len(reasons) >= 2
                                 else "medium",
