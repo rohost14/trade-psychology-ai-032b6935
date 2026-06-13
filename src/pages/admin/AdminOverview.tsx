@@ -457,36 +457,38 @@ export default function AdminOverview() {
           </div>
 
           {/* ── KPI Row 2: Engagement ──────────────────────────────────── */}
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 12, marginBottom: 24 }}>
-            <KpiCard
-              label="DAU"
-              value={data.engagement.dau}
-              sub="Traders in last 24h"
-              accent={T.blue}
-            />
-            <KpiCard
-              label="WAU"
-              value={data.engagement.wau}
-              sub="Traders in last 7d"
-            />
-            <KpiCard
-              label="MAU"
-              value={data.engagement.mau}
-              sub="Traders in last 30d"
-            />
-            <KpiCard
-              label="DAU / MAU"
-              value={`${data.engagement.dau_mau_ratio}%`}
-              sub="Stickiness (>20% = healthy)"
-              accent={
-                data.engagement.dau_mau_ratio >= 20 ? T.green :
-                data.engagement.dau_mau_ratio >= 10 ? T.amber : T.red
-              }
-            />
-          </div>
+          {data.engagement && (
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 12, marginBottom: 24 }}>
+              <KpiCard
+                label="DAU"
+                value={data.engagement.dau}
+                sub="Traders in last 24h"
+                accent={T.blue}
+              />
+              <KpiCard
+                label="WAU"
+                value={data.engagement.wau}
+                sub="Traders in last 7d"
+              />
+              <KpiCard
+                label="MAU"
+                value={data.engagement.mau}
+                sub="Traders in last 30d"
+              />
+              <KpiCard
+                label="DAU / MAU"
+                value={`${data.engagement.dau_mau_ratio}%`}
+                sub="Stickiness (>20% = healthy)"
+                accent={
+                  data.engagement.dau_mau_ratio >= 20 ? T.green :
+                  data.engagement.dau_mau_ratio >= 10 ? T.amber : T.red
+                }
+              />
+            </div>
+          )}
 
           {/* ── Conversion Funnel ───────────────────────────────────────── */}
-          <FunnelSection f={data.funnel} />
+          {data.funnel && <FunnelSection f={data.funnel} />}
 
           {/* ── Bottom 3-col ────────────────────────────────────────────── */}
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 16, marginBottom: 16 }}>
@@ -515,10 +517,16 @@ export default function AdminOverview() {
             </div>
 
             {/* Lifecycle distribution */}
-            <LifecycleDist dist={data.lifecycle_dist} />
+            {data.lifecycle_dist
+              ? <LifecycleDist dist={data.lifecycle_dist} />
+              : <div style={{ background: T.surface, border: `1px solid ${T.border}`, borderRadius: 10, padding: '20px 22px' }}><SectionHeader title="Lifecycle Distribution" /><p style={{ fontSize: 12, color: T.dim }}>Backend not updated yet</p></div>
+            }
 
             {/* Feature adoption */}
-            <FeatureAdoption a={data.adoption} />
+            {data.adoption
+              ? <FeatureAdoption a={data.adoption} />
+              : <div style={{ background: T.surface, border: `1px solid ${T.border}`, borderRadius: 10, padding: '20px 22px' }}><SectionHeader title="Feature Adoption" /><p style={{ fontSize: 12, color: T.dim }}>Backend not updated yet</p></div>
+            }
           </div>
 
           {/* ── Infrastructure (slim row) ────────────────────────────── */}
@@ -533,7 +541,7 @@ export default function AdminOverview() {
             <div style={{ marginLeft: 'auto', display: 'flex', gap: 24 }}>
               {[
                 { label: 'Connect rate',  value: data.users.total > 0 ? pct(data.users.connected, data.users.total, 0) : '—' },
-                { label: '30d retention', value: data.users.total > 0 ? pct(data.engagement.mau, data.users.total, 0) : '—' },
+                { label: '30d retention', value: data.users.total > 0 && data.engagement ? pct(data.engagement.mau, data.users.total, 0) : '—' },
                 { label: 'Alerts / user', value: data.users.total > 0 ? (data.activity.total_alerts / data.users.total).toFixed(1) : '—' },
               ].map(({ label, value }) => (
                 <div key={label} style={{ textAlign: 'right' }}>
