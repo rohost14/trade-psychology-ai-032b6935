@@ -219,8 +219,8 @@ export default function OnboardingWizard({ brokerAccountId, onComplete, onSkip }
 
   return (
     <div className="fixed inset-0 bg-background/95 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-      <div className="tm-card overflow-hidden w-full max-w-2xl max-h-[90vh] overflow-auto">
-        <div className="px-6 py-5 border-b border-border">
+      <div className="tm-card overflow-hidden w-full max-w-2xl max-h-[90vh] flex flex-col">
+        <div className="px-6 py-5 border-b border-border flex-shrink-0">
           <div className="mb-5">
             {/* Progress bar */}
             <div className="h-1.5 bg-muted rounded-full overflow-hidden mb-3">
@@ -258,7 +258,7 @@ export default function OnboardingWizard({ brokerAccountId, onComplete, onSkip }
           <p className="text-sm text-muted-foreground mt-0.5">{STEPS[currentStep - 1].description}</p>
         </div>
 
-        <div className="px-6 pb-6">
+        <div className="flex-1 overflow-y-auto px-6 py-6">
           <div key={currentStep} className="animate-fade-in-up">
               {/* Step 1: Welcome */}
               {currentStep === 1 && (
@@ -526,34 +526,34 @@ export default function OnboardingWizard({ brokerAccountId, onComplete, onSkip }
                 </div>
               )}
             </div>
+        </div>
 
-          {/* Navigation */}
-          <div className="flex justify-between mt-8 pt-4 border-t border-border">
-            <div>
-              {currentStep === 1 ? (
-                <Button variant="ghost" onClick={handleSkip}>
-                  Skip Setup
-                </Button>
-              ) : (
-                <Button variant="outline" onClick={handleBack} disabled={isLoading}>
-                  <ChevronLeft className="h-4 w-4 mr-1" />
-                  Back
-                </Button>
-              )}
-            </div>
-
-            <Button
-              className="bg-tm-brand hover:bg-tm-brand/90 text-white"
-              onClick={handleNext}
-              disabled={isLoading}
-            >
-              {isLoading ? "Saving…" : currentStep === STEPS.length ? (
-                <>Complete Setup <Check className="h-4 w-4 ml-2" /></>
-              ) : (
-                <>Next <ChevronRight className="h-4 w-4 ml-1" /></>
-              )}
-            </Button>
+        {/* Navigation — outside the scrollable area so it's always visible */}
+        <div className="flex justify-between px-6 py-4 border-t border-border flex-shrink-0">
+          <div>
+            {currentStep === 1 ? (
+              <Button variant="ghost" onClick={handleSkip}>
+                Skip Setup
+              </Button>
+            ) : (
+              <Button variant="outline" onClick={handleBack} disabled={isLoading}>
+                <ChevronLeft className="h-4 w-4 mr-1" />
+                Back
+              </Button>
+            )}
           </div>
+
+          <Button
+            className="bg-tm-brand hover:bg-tm-brand/90 text-white"
+            onClick={handleNext}
+            disabled={isLoading}
+          >
+            {isLoading ? "Saving…" : currentStep === STEPS.length ? (
+              <>Complete Setup <Check className="h-4 w-4 ml-2" /></>
+            ) : (
+              <>Next <ChevronRight className="h-4 w-4 ml-1" /></>
+            )}
+          </Button>
         </div>
       </div>
     </div>
