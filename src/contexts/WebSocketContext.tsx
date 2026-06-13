@@ -89,6 +89,15 @@ export function WebSocketProvider({ children }: { children: React.ReactNode }) {
   const mountedRef = useRef(true);
   const pendingSubscriptions = useRef<string[]>([]);
 
+  // Price tick throttle: accumulate ticks in a ref, flush to React state every 200ms.
+  // Without this, 10+ open positions emit ticks at exchange speed → 100+ re-renders/sec.
+  const priceBufferRef = useRef<Record<string, PriceData>>({});
+
+  // Trade event debounce: if 5 rapid trades arrive together, only fire one state update
+  // after 300ms silence instead of triggering 5 back-to-back Dashboard refetches.
+  const tradeDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const pendingTradeEventRef = useRef<TradeEvent | null>(null);
+
   // last_event_id stored per account in localStorage for replay across app restarts
   const getLastEventId = useCallback((accountId: string) => {
     return localStorage.getItem(`${LAST_EVENT_KEY_PREFIX}${accountId}`) || '';
@@ -176,20 +185,29 @@ export function WebSocketProvider({ children }: { children: React.ReactNode }) {
               break;
 
             // ── Live price tick ───────────────────────────────────────────
+            // Buffer into ref; the 200ms flush interval drains it into state.
             case 'price':
               if (msg.instrument && msg.data) {
-                setPrices(prev => ({ ...prev, [msg.instrument]: msg.data }));
+                priceBufferRef.current[msg.instrument] = msg.data;
               }
               break;
 
             // ── Trade / position changed ──────────────────────────────────
+            // Debounce 300ms so rapid back-to-back trades collapse into one refetch.
             case 'trade':
             case 'trade_update':
             case 'position_update':
-              setLastTradeEvent({ ...msg.data, timestamp: ts });
+              pendingTradeEventRef.current = { ...msg.data, timestamp: ts };
               if (msg.event_id && account?.id) {
                 setLastEventId(account.id, msg.event_id);
               }
+              if (tradeDebounceRef.current) clearTimeout(tradeDebounceRef.current);
+              tradeDebounceRef.current = setTimeout(() => {
+                if (pendingTradeEventRef.current && mountedRef.current) {
+                  setLastTradeEvent(pendingTradeEventRef.current);
+                  pendingTradeEventRef.current = null;
+                }
+              }, 300);
               break;
 
             // ── Alert fired ───────────────────────────────────────────────
@@ -283,6 +301,18 @@ export function WebSocketProvider({ children }: { children: React.ReactNode }) {
       .catch(() => {}); // non-fatal, WebSocket will update on next trade
   }, [account?.id, isTokenExpired]);
 
+  // Flush buffered price ticks into React state every 200ms.
+  // Runs independently of the WebSocket connection lifecycle.
+  useEffect(() => {
+    const flushTimer = setInterval(() => {
+      const buf = priceBufferRef.current;
+      if (Object.keys(buf).length === 0) return;
+      priceBufferRef.current = {};
+      setPrices(prev => ({ ...prev, ...buf }));
+    }, 200);
+    return () => clearInterval(flushTimer);
+  }, []);
+
   useEffect(() => {
     mountedRef.current = true;
     connect();
@@ -291,6 +321,7 @@ export function WebSocketProvider({ children }: { children: React.ReactNode }) {
       mountedRef.current = false;
       if (pingRef.current) clearInterval(pingRef.current);
       if (reconnectRef.current) clearTimeout(reconnectRef.current);
+      if (tradeDebounceRef.current) clearTimeout(tradeDebounceRef.current);
       wsRef.current?.close(1000);
     };
   }, [connect]);

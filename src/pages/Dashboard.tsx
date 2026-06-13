@@ -19,6 +19,7 @@ import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 import { formatCurrencyWithSign } from '@/lib/formatters';
 import { api, apiDetailString } from '@/lib/api';
+import { toast } from '@/hooks/use-toast';
 import { Position, CompletedTrade } from '@/types/api';
 import { useAlerts, AlertNotification } from '@/contexts/AlertContext';
 import { useBroker } from '@/contexts/BrokerContext';
@@ -279,7 +280,11 @@ export default function Dashboard() {
       setShowCapitalPrompt(false);
       if (accountId) localStorage.setItem(`capital_prompt_dismissed_${accountId}`, '1');
     } catch {
-      setShowCapitalPrompt(false);
+      toast({
+        variant: 'destructive',
+        title: 'Could not save capital',
+        description: 'Please try again from Settings → Profile.',
+      });
     } finally {
       setCapitalSaving(false);
     }

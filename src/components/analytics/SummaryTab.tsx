@@ -4,7 +4,7 @@ import {
   XAxis, YAxis, CartesianGrid, Tooltip,
   ResponsiveContainer, ReferenceLine, Cell,
 } from 'recharts';
-import { Trophy, Flame, ChevronRight, ArrowRight, TrendingUp, TrendingDown, BarChart2 } from 'lucide-react';
+import { Trophy, Flame, ChevronRight, ArrowRight, TrendingUp, TrendingDown, BarChart2, AlertTriangle, RefreshCw } from 'lucide-react';
 import { Skeleton } from '@/components/ui/skeleton';
 import AttributionCard from '@/components/analytics/AttributionCard';
 import { cn } from '@/lib/utils';
@@ -153,14 +153,17 @@ function DailyTooltip({ active, payload }: any) {
 }
 
 export default function SummaryTab({ days, onInstrumentClick, onTabChange }: SummaryTabProps) {
-  const [overview, setOverview]       = useState<OverviewData | null>(null);
+  const [overview, setOverview]         = useState<OverviewData | null>(null);
   const [prevOverview, setPrevOverview] = useState<OverviewData | null>(null);
-  const [perf, setPerf]               = useState<PerfData | null>(null);
-  const [isLoading, setIsLoading]     = useState(true);
+  const [perf, setPerf]                 = useState<PerfData | null>(null);
+  const [isLoading, setIsLoading]       = useState(true);
+  const [error, setError]               = useState<string | null>(null);
+  const [retryKey, setRetryKey]         = useState(0);
 
   useEffect(() => {
     let cancelled = false;
     setIsLoading(true);
+    setError(null);
     Promise.all([
       api.get('/api/analytics/overview',    { params: { days } }),
       api.get('/api/analytics/overview',    { params: { days: days * 2 } }),
@@ -170,11 +173,17 @@ export default function SummaryTab({ days, onInstrumentClick, onTabChange }: Sum
       setOverview(ov.data);
       setPrevOverview(prevOv.data);
       setPerf(pf.data);
-    }).catch(() => {}).finally(() => {
+    }).catch((err: any) => {
+      if (cancelled) return;
+      const msg = err?.response?.status === 401
+        ? 'Session expired — please reconnect Zerodha.'
+        : 'Failed to load analytics data.';
+      setError(msg);
+    }).finally(() => {
       if (!cancelled) setIsLoading(false);
     });
     return () => { cancelled = true; };
-  }, [days]);
+  }, [days, retryKey]);
 
   if (isLoading) return (
     <div className="space-y-3 animate-pulse">
@@ -190,6 +199,20 @@ export default function SummaryTab({ days, onInstrumentClick, onTabChange }: Sum
           <Skeleton className="h-[80px] rounded-xl" />
         </div>
       </div>
+    </div>
+  );
+
+  if (error) return (
+    <div className="tm-card flex flex-col items-center justify-center py-16 text-center">
+      <AlertTriangle className="h-8 w-8 text-tm-loss mb-3" />
+      <p className="font-medium text-foreground">Failed to load analytics</p>
+      <p className="text-sm text-muted-foreground mt-1 max-w-xs">{error}</p>
+      <button
+        onClick={() => setRetryKey(k => k + 1)}
+        className="mt-4 flex items-center gap-1.5 text-sm text-tm-brand hover:underline"
+      >
+        <RefreshCw className="h-3.5 w-3.5" /> Try again
+      </button>
     </div>
   );
 
