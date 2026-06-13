@@ -16,6 +16,15 @@ from uuid import UUID
 import statistics
 import logging
 
+IST = timezone(timedelta(hours=5, minutes=30))
+
+
+def _fmt_hour(hour: int) -> str:
+    """Format 0-23 IST hour as 12-hour clock string: '9:00 AM', '1:00 PM'."""
+    suffix = "AM" if hour < 12 else "PM"
+    h = hour % 12 or 12
+    return f"{h}:00 {suffix}"
+
 from app.models.trade import Trade
 from app.models.risk_alert import RiskAlert
 from app.models.cooldown import Cooldown
@@ -79,12 +88,15 @@ class AIPersonalizationService:
         Learn trader's performance by time of day and day of week.
         Returns YOUR specific danger windows.
         """
-        # Hourly analysis
+        # Hourly analysis — convert UTC timestamps to IST before bucketing.
+        # order_timestamp is stored in UTC; IST = UTC+5:30. Without this conversion,
+        # a 9:15 AM IST trade appears as hour 3 (UTC), showing nonsensical pre-market times.
         hourly_stats = {}
         for trade in trades:
             if not trade.order_timestamp:
                 continue
-            hour = trade.order_timestamp.hour
+            ts_ist = trade.order_timestamp.astimezone(IST)
+            hour = ts_ist.hour
             pnl = float(trade.pnl or 0)
 
             if hour not in hourly_stats:
@@ -97,12 +109,13 @@ class AIPersonalizationService:
             elif pnl < 0:
                 hourly_stats[hour]["losses"] += 1
 
-        # Day of week analysis
+        # Day of week analysis — also in IST (a trade at 23:45 UTC = 5:15 AM IST next day).
         daily_stats = {}
         for trade in trades:
             if not trade.order_timestamp:
                 continue
-            day = trade.order_timestamp.strftime("%A")  # Monday, Tuesday, etc.
+            ts_ist = trade.order_timestamp.astimezone(IST)
+            day = ts_ist.strftime("%A")  # Monday, Tuesday, etc. in IST
             pnl = float(trade.pnl or 0)
 
             if day not in daily_stats:
@@ -409,13 +422,14 @@ class AIPersonalizationService:
         """
         predictive_alerts = []
 
-        # Time-based predictions
+        # Time-based predictions — hours are already stored as IST integers
         for danger_hour in time_patterns.get("danger_hours", []):
             hour = danger_hour["hour"]
+            next_hour = (hour + 1) % 24
             predictive_alerts.append({
                 "type": "time_warning",
-                "trigger_time": f"{(hour - 1) % 24}:45",  # 15 min before danger hour
-                "message": f"Heads up: {hour}:00-{hour+1}:00 is historically your weakest hour ({danger_hour['win_rate']}% win rate)",
+                "trigger_time": f"{(hour - 1) % 24}:45",  # 15 min before danger hour (IST)
+                "message": f"Heads up: {_fmt_hour(hour)}–{_fmt_hour(next_hour)} is historically your weakest hour ({danger_hour['win_rate']}% win rate)",
                 "severity": "caution" if danger_hour["win_rate"] > 25 else "danger"
             })
 
@@ -484,9 +498,10 @@ class AIPersonalizationService:
         if patterns.get("insufficient_data"):
             return None
 
-        now = context.get("current_time", datetime.now(timezone.utc)) if context else datetime.now(timezone.utc)
-        current_hour = now.hour
-        current_day = now.strftime("%A")
+        now_utc = context.get("current_time", datetime.now(timezone.utc)) if context else datetime.now(timezone.utc)
+        now_ist = now_utc.astimezone(IST)
+        current_hour = now_ist.hour   # stored danger_hour values are IST
+        current_day = now_ist.strftime("%A")  # stored danger_day values are IST weekday
         proposed_symbol = context.get("proposed_symbol") if context else None
 
         alerts = []
@@ -497,7 +512,7 @@ class AIPersonalizationService:
             if danger["hour"] == current_hour or danger["hour"] == current_hour + 1:
                 alerts.append({
                     "type": "time_warning",
-                    "message": f"⚠️ {danger['hour']}:00 is YOUR danger hour ({danger['win_rate']}% win rate). Trade carefully!",
+                    "message": f"⚠️ {_fmt_hour(danger['hour'])} is YOUR danger hour ({danger['win_rate']}% win rate). Trade carefully!",
                     "severity": "caution",
                     "data": danger
                 })
@@ -565,9 +580,9 @@ class AIPersonalizationService:
                 "type": "danger_time",
                 "icon": "⏰",
                 "title": "Your Danger Hour",
-                "value": f"{worst['hour']}:00",
-                "detail": f"{worst['win_rate']}% win rate",
-                "recommendation": f"Avoid trading at {worst['hour']}:00"
+                "value": _fmt_hour(worst["hour"]),
+                "detail": f"{worst['win_rate']}% win rate · {worst['trades']} trades",
+                "recommendation": f"Avoid trading at {_fmt_hour(worst['hour'])} (IST)"
             })
 
         if time_patterns.get("best_hours"):
@@ -576,9 +591,9 @@ class AIPersonalizationService:
                 "type": "best_time",
                 "icon": "✨",
                 "title": "Your Best Hour",
-                "value": f"{best['hour']}:00",
-                "detail": f"{best['win_rate']}% win rate",
-                "recommendation": f"Focus your trading around {best['hour']}:00"
+                "value": _fmt_hour(best["hour"]),
+                "detail": f"{best['win_rate']}% win rate · {best['trades']} trades",
+                "recommendation": f"Focus your trading around {_fmt_hour(best['hour'])} (IST)"
             })
 
         # Symbol insights
