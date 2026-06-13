@@ -280,10 +280,12 @@ async def request_id_middleware(request: Request, call_next):
 # Global Exception Handler
 @app.exception_handler(Exception)
 async def global_exception_handler(request: Request, exc: Exception):
-    logger.error(f"Global exception: {exc}", exc_info=True)
+    request_id = getattr(request.state, "request_id", str(uuid.uuid4()))
+    logger.error(f"Global exception [{request_id}]: {exc}", exc_info=True)
     return JSONResponse(
         status_code=500,
-        content={"message": "Internal Server Error"},
+        content={"message": "Internal Server Error", "request_id": request_id},
+        headers={"X-Request-ID": request_id},
     )
 
 # Health Check

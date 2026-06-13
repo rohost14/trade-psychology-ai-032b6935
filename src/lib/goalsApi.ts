@@ -45,9 +45,7 @@ export async function logGoalBroken(
   cost: number = 0
 ): Promise<boolean> {
   try {
-    await api.post('/api/goals/log-broken', null, {
-      params: { goal_name: goalName, cost }
-    });
+    await api.post('/api/goals/log-broken', { goal_name: goalName, cost });
     return true;
   } catch (error) {
     console.error('Error logging goal broken:', error);

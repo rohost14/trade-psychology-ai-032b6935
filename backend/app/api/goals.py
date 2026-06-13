@@ -1,5 +1,5 @@
 from fastapi import APIRouter, Depends, HTTPException, Query
-from pydantic import BaseModel
+from pydantic import BaseModel, field_validator
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, desc
 from uuid import UUID
@@ -233,14 +233,35 @@ async def get_commitment_log(
     )
 
 
+class GoalBrokenRequest(BaseModel):
+    goal_name: str = ""
+    cost: float = 0.0
+
+    @field_validator("goal_name")
+    @classmethod
+    def validate_goal_name(cls, v: str) -> str:
+        v = v.strip()
+        if len(v) > 200:
+            raise ValueError("goal_name must be 200 characters or fewer")
+        return v
+
+    @field_validator("cost")
+    @classmethod
+    def validate_cost(cls, v: float) -> float:
+        if v < 0:
+            raise ValueError("cost must be non-negative")
+        return round(v, 2)
+
+
 @router.post("/log-broken")
 async def log_goal_broken(
+    data: GoalBrokenRequest,
     broker_account_id: UUID = Depends(get_verified_broker_account_id),
-    goal_name: str = "",
-    cost: float = 0,
     db: AsyncSession = Depends(get_db)
 ):
     """Log when a goal is broken."""
+    goal_name = data.goal_name
+    cost = data.cost
     try:
         log_entry = CommitmentLog(
             broker_account_id=broker_account_id,

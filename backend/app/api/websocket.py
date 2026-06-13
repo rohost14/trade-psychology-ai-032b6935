@@ -271,7 +271,14 @@ async def websocket_prices(
                     await websocket.send_json({"type": "pong"})
 
                 elif action == "subscribe":
-                    instruments = set(message.get("instruments", []))
+                    raw = message.get("instruments", [])
+                    if not isinstance(raw, list):
+                        await websocket.send_json({"type": "error", "message": "instruments must be a list"})
+                        continue
+                    if len(raw) > 50:
+                        await websocket.send_json({"type": "error", "message": "Maximum 50 instruments per subscribe"})
+                        continue
+                    instruments = {str(i)[:50] for i in raw if isinstance(i, str) and i.strip()}
                     await manager.subscribe(account_id, instruments)
                     await websocket.send_json({
                         "type": "subscribed",

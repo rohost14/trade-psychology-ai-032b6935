@@ -101,3 +101,6 @@ general_limiter   = RateLimiter(max_requests=20, window_seconds=60)   # unauthen
 # Admin auth — strict brute-force protection
 admin_login_limiter = RateLimiter(max_requests=5, window_seconds=900)  # 5 attempts/15 min per IP
 admin_otp_limiter   = RateLimiter(max_requests=5, window_seconds=300)  # 5 OTP guesses/5 min per IP
+
+# Profile PUT — prevent bulk scraping / enumeration via rapid profile updates
+profile_put_limiter = RateLimiter(max_requests=10, window_seconds=60)  # 10 profile saves/min

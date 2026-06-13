@@ -16,6 +16,7 @@ import logging
 
 from app.core.database import get_db
 from app.api.deps import get_verified_broker_account_id, get_current_user_id
+from app.core.rate_limiter import profile_put_limiter
 from app.models.user import User
 from app.models.user_profile import UserProfile
 
@@ -28,6 +29,18 @@ class OnboardingStep1(BaseModel):
     """Basic info step"""
     display_name: Optional[str] = None
     trading_since: Optional[int] = None  # Year
+
+    @field_validator("display_name")
+    @classmethod
+    def validate_display_name(cls, v: Optional[str]) -> Optional[str]:
+        if v is None:
+            return v
+        v = v.strip()
+        if len(v) == 0:
+            return None
+        if len(v) > 50:
+            raise ValueError("display_name must be 50 characters or fewer")
+        return v
 
 
 class OnboardingStep2(BaseModel):
@@ -77,6 +90,18 @@ VALID_GUARDIAN_THRESHOLDS = {"critical", "danger", "warning"}
 class ProfileUpdate(BaseModel):
     """Full profile update — all fields optional, validated server-side."""
     display_name: Optional[str] = None
+
+    @field_validator("display_name")
+    @classmethod
+    def validate_display_name(cls, v: Optional[str]) -> Optional[str]:
+        if v is None:
+            return v
+        v = v.strip()
+        if len(v) == 0:
+            return None
+        if len(v) > 50:
+            raise ValueError("display_name must be 50 characters or fewer")
+        return v
     trading_since: Optional[int] = None
     experience_level: Optional[str] = None
     trading_style: Optional[str] = None
@@ -447,7 +472,8 @@ async def update_profile(
     data: ProfileUpdate,
     user_id: UUID = Depends(get_current_user_id),
     broker_account_id: UUID = Depends(get_verified_broker_account_id),
-    db: AsyncSession = Depends(get_db)
+    db: AsyncSession = Depends(get_db),
+    _limiter: None = Depends(profile_put_limiter),
 ):
     """Update user profile."""
     try:
