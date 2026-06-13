@@ -228,17 +228,11 @@ export function BrokerProvider({ children }: { children: ReactNode }) {
     return () => document.removeEventListener('visibilitychange', onVisible);
   }, [account, doSync]);
 
-  const connect = useCallback(async () => {
-    try {
-      const response = await api.get('/api/zerodha/connect');
-      const { login_url } = response.data;
-      if (login_url) {
-        window.location.href = login_url;
-      }
-    } catch (error) {
-      console.error('Failed to initiate OAuth:', error);
-      throw error;
-    }
+  const connect = useCallback(() => {
+    // Navigate directly so the browser sends the oauth_nonce cookie that /connect sets.
+    // XHR/fetch cannot follow cross-origin redirects or set cookies for us.
+    const apiBase = import.meta.env.VITE_API_URL || 'http://localhost:8000';
+    window.location.href = `${apiBase}/api/zerodha/connect`;
   }, []);
 
   const disconnect = useCallback(async () => {

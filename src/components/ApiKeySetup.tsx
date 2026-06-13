@@ -78,24 +78,13 @@ export default function ApiKeySetup({ onRedirecting, trigger }: Props) {
       });
       return res.data.setup_token as string;
     },
-    onSuccess: async (setupToken) => {
-      try {
-        const res = await api.get("/api/zerodha/connect", {
-          params: { setup_token: setupToken },
-        });
-        const { login_url } = res.data;
-        if (login_url) {
-          setOpen(false);
-          onRedirecting?.();
-          window.location.href = login_url;
-        }
-      } catch {
-        toast({
-          title: "Failed to generate login URL",
-          description: "Check your API key and try again.",
-          variant: "destructive",
-        });
-      }
+    onSuccess: (setupToken) => {
+      setOpen(false);
+      onRedirecting?.();
+      // Navigate directly — /connect sets an httpOnly cookie then redirects to Zerodha.
+      // XHR cannot follow that redirect flow; direct navigation is required.
+      const apiBase = import.meta.env.VITE_API_URL || 'http://localhost:8000';
+      window.location.href = `${apiBase}/api/zerodha/connect?setup_token=${encodeURIComponent(setupToken)}`;
     },
     onError: (e: any) => {
       toast({

@@ -10,7 +10,7 @@ from uuid import UUID
 from weakref import WeakValueDictionary
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Request
 from pydantic import BaseModel
 from fastapi.responses import RedirectResponse
 from cryptography.fernet import Fernet
@@ -163,16 +163,20 @@ async def connect_zerodha(
     setup_token: Optional[str] = None,
     db: AsyncSession = Depends(get_db)
 ) -> Any:
-    """Generate Zerodha login URL.
+    """Redirect browser to Zerodha login, setting an httpOnly cookie to carry the CSRF nonce.
 
-    If setup_token is provided, uses the user's personal KiteConnect credentials
-    stored in Redis (from POST /setup-credentials). The setup_token is passed as the
-    OAuth state so the callback can look up the same credentials.
+    Zerodha does not echo back the OAuth `state` parameter, so we cannot use URL-based CSRF
+    protection. Instead: /connect sets a short-lived `oauth_nonce` cookie; /callback reads it
+    from request.cookies. SameSite=Lax ensures the cookie is sent on top-level redirects from
+    Zerodha back to our callback URL (same host, different origin — Lax allows this).
+
+    If setup_token is provided, uses the user's personal KiteConnect credentials stored in Redis
+    (from POST /setup-credentials). The nonce maps to the setup_token so the callback can
+    look up the credentials.
     """
     callback_uri = settings.ZERODHA_REDIRECT_URI or "http://localhost:8000/api/zerodha/callback"
 
     if setup_token:
-        # Retrieve personal credentials from Redis
         try:
             from app.core.redis_pool import get_sync_redis
             import json as _json
@@ -188,53 +192,75 @@ async def connect_zerodha(
             raise HTTPException(status_code=503, detail="Service temporarily unavailable")
 
         client = ZerodhaClient(api_key=creds["api_key"], api_secret=creds["api_secret"])
-        # CSRF nonce — stored value is the setup_token so callback can retrieve creds
         csrf_nonce = secrets.token_urlsafe(16)
-        state = f"setup:{csrf_nonce}"
-        _state_value = setup_token
+        _state_value = f"setup:{setup_token}"
     else:
         client = zerodha_client
         csrf_nonce = secrets.token_urlsafe(16)
-        state = csrf_nonce
         _state_value = "regular"
 
-    # Persist nonce in Redis (120 s TTL — covers the Zerodha login page round-trip).
-    # Callback validates and deletes it atomically; unmatched state = CSRF rejection.
+    # Store nonce in Redis (300 s TTL — generous for slow Zerodha login pages).
+    # Callback validates and deletes it atomically; missing nonce = CSRF rejection.
     try:
         from app.core.redis_pool import get_sync_redis
         _sr = get_sync_redis()
-        _sr.setex(f"oauth_state:{csrf_nonce}", 120, _state_value)
+        _sr.setex(f"oauth_state:{csrf_nonce}", 300, _state_value)
     except Exception as e:
         logger.error(f"Redis error storing OAuth state nonce: {e}")
         raise HTTPException(status_code=503, detail="Service temporarily unavailable")
 
-    login_url = client.generate_login_url(callback_uri, state=state)
-    return {"login_url": login_url}
+    login_url = client.generate_login_url(callback_uri)
+    response = RedirectResponse(url=login_url, status_code=302)
+    # httpOnly prevents JS from reading it; SameSite=Lax allows the cookie to be sent
+    # when Zerodha redirects the browser back to our /callback (top-level GET navigation).
+    response.set_cookie(
+        key="oauth_nonce",
+        value=csrf_nonce,
+        httponly=True,
+        samesite="lax",
+        max_age=300,
+        path="/api/zerodha",
+        secure=settings.ENVIRONMENT != "development",
+    )
+    return response
+
+def _clear_nonce_cookie(response: RedirectResponse) -> RedirectResponse:
+    """Delete the oauth_nonce cookie — called on both success and error paths."""
+    response.delete_cookie(key="oauth_nonce", path="/api/zerodha")
+    return response
+
 
 @router.get("/callback")
 async def zerodha_callback(
+    request: Request,
     request_token: str,
     status: str,
-    state: Optional[str] = None,
+    state: Optional[str] = None,  # Zerodha does not echo this; kept for signature compatibility
     db: AsyncSession = Depends(get_db)
 ):
-    """Handle Zerodha OAuth callback. Issues JWT on success."""
+    """Handle Zerodha OAuth callback. Issues JWT on success.
+
+    CSRF nonce is read from the `oauth_nonce` httpOnly cookie set by /connect.
+    Zerodha does not echo the OAuth `state` URL parameter back to the callback,
+    so URL-state CSRF is impossible — cookie nonce is the only reliable mechanism.
+    """
     frontend_url = settings.FRONTEND_URL
 
     if status != "success":
-        return RedirectResponse(url=f"{frontend_url}/settings?error=OAuth+failed+or+cancelled", status_code=302)
+        resp = RedirectResponse(url=f"{frontend_url}/settings?error=OAuth+failed+or+cancelled", status_code=302)
+        return _clear_nonce_cookie(resp)
 
     # ── CSRF validation ───────────────────────────────────────────────────────
-    # state is a random nonce generated in /connect and stored in Redis (120 s TTL).
-    # We validate and atomically delete it so it can only be used once.
-    if not state:
-        return RedirectResponse(
+    # oauth_nonce cookie was set by /connect with a 300 s TTL.
+    # We validate and atomically delete the Redis key so the nonce is single-use.
+    _csrf_nonce = request.cookies.get("oauth_nonce")
+    if not _csrf_nonce:
+        logger.warning("OAuth callback: oauth_nonce cookie missing — possible CSRF or stale session")
+        resp = RedirectResponse(
             url=f"{frontend_url}/settings?error=OAuth+session+missing+%E2%80%94+please+try+again",
             status_code=302,
         )
-
-    _is_setup_flow = state.startswith("setup:")
-    _csrf_nonce = state[len("setup:"):] if _is_setup_flow else state
+        return _clear_nonce_cookie(resp)
 
     try:
         from app.core.redis_pool import get_sync_redis
@@ -246,25 +272,27 @@ async def zerodha_callback(
         _stored_value, _ = _pipe.execute()
     except Exception as e:
         logger.error(f"Redis error validating OAuth state nonce: {e}")
-        return RedirectResponse(
+        resp = RedirectResponse(
             url=f"{frontend_url}/settings?error=Authentication+service+unavailable+%E2%80%94+please+try+again",
             status_code=302,
         )
+        return _clear_nonce_cookie(resp)
 
     if _stored_value is None:
-        # Nonce not found — expired (>120 s), already used, or forged state parameter.
-        logger.warning(f"OAuth callback rejected: state nonce '{_csrf_nonce[:8]}…' not found in Redis")
-        return RedirectResponse(
+        logger.warning(f"OAuth callback rejected: nonce '{_csrf_nonce[:8]}…' not found in Redis (expired or replayed)")
+        resp = RedirectResponse(
             url=f"{frontend_url}/settings?error=OAuth+session+expired+%E2%80%94+please+try+connecting+again",
             status_code=302,
         )
+        return _clear_nonce_cookie(resp)
 
     # ── Resolve per-user credentials (setup flow) ─────────────────────────────
     _personal_api_key: Optional[str] = None
     _personal_api_secret: Optional[str] = None
+    _is_setup_flow = _stored_value.startswith("setup:")
     if _is_setup_flow:
-        # stored_value IS the original setup_token; use it to fetch credentials
-        _setup_token = _stored_value
+        # stored_value is "setup:<setup_token>"; extract the token to fetch creds
+        _setup_token = _stored_value[len("setup:"):]
         try:
             from app.core.redis_pool import get_sync_redis
             _r2 = get_sync_redis()
@@ -368,10 +396,10 @@ async def zerodha_callback(
             except Exception as sync_err:
                 logger.warning(f"Could not queue reconnect sync: {sync_err}")
 
-            return RedirectResponse(
+            return _clear_nonce_cookie(RedirectResponse(
                 url=f"{frontend_url}/settings?connected=true&code={_store_auth_code(jwt_token, str(existing_account.id))}",
                 status_code=302
-            )
+            ))
 
         else:
             # CREATE new broker_account linked to the user
@@ -426,10 +454,10 @@ async def zerodha_callback(
             except Exception as sync_err:
                 logger.warning(f"Could not queue initial sync: {sync_err}")
 
-            return RedirectResponse(
+            return _clear_nonce_cookie(RedirectResponse(
                 url=f"{frontend_url}/settings?connected=true&code={_store_auth_code(jwt_token, str(broker_account.id))}",
                 status_code=302
-            )
+            ))
 
     except Exception as e:
         logger.error(f"OAuth callback error: {e}", exc_info=True)
@@ -449,7 +477,7 @@ async def zerodha_callback(
             safe_msg = "Invalid+response+from+Zerodha+%E2%80%94+please+try+again"
         else:
             safe_msg = "Connection+failed+%E2%80%94+please+try+again"
-        return RedirectResponse(url=f"{frontend_url}/settings?error={safe_msg}", status_code=302)
+        return _clear_nonce_cookie(RedirectResponse(url=f"{frontend_url}/settings?error={safe_msg}", status_code=302))
 
 @router.get("/test")
 async def test_zerodha_config(
