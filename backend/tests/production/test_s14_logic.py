@@ -94,20 +94,20 @@ class TestLogicCorrectness:
             assert isinstance(data, (dict, list)), f"Unexpected insights shape: {type(data)}"
 
     def test_analytics_summary_no_nan(self, user: httpx.Client):
-        """5.1 Analytics summary endpoint returns valid numbers (no NaN in JSON)."""
-        r = user.get("/api/analytics/summary")
+        """5.1 Analytics overview endpoint returns valid numbers (no NaN in JSON)."""
+        r = user.get("/api/analytics/overview")
         assert r.status_code in (200, 404), (
-            f"Analytics summary crashed: {r.status_code}. Body: {r.text[:300]}"
+            f"Analytics overview crashed: {r.status_code}. Body: {r.text[:300]}"
         )
         if r.status_code == 200:
             # JSON spec forbids NaN — but Python's json module can produce it
             # Check raw text for 'NaN' which would cause JS parse errors
             assert "NaN" not in r.text, (
-                "Analytics summary contains literal 'NaN' in JSON response. "
+                "Analytics overview contains literal 'NaN' in JSON response. "
                 "This will cause JSON.parse() to fail in the browser."
             )
             assert "Infinity" not in r.text, (
-                "Analytics summary contains literal 'Infinity' in JSON response."
+                "Analytics overview contains literal 'Infinity' in JSON response."
             )
 
     def test_analytics_edge_map_no_nan(self, user: httpx.Client):

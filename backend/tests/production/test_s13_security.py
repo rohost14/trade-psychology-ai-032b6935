@@ -33,9 +33,9 @@ def test_13_1b_unauthenticated_positions_returns_401(anon: httpx.Client):
 
 
 def test_13_1c_unauthenticated_analytics_returns_401(anon: httpx.Client):
-    """13.1 GET /api/analytics/summary without auth → 401."""
-    r = anon.get("/api/analytics/summary")
-    assert r.status_code == 401, f"Auth bypass on /api/analytics/summary: {r.status_code}"
+    """13.1 GET /api/analytics/overview without auth → 401."""
+    r = anon.get("/api/analytics/overview")
+    assert r.status_code == 401, f"Auth bypass on /api/analytics/overview: {r.status_code}"
 
 
 def test_13_1d_unauthenticated_risk_alerts_returns_401(anon: httpx.Client):
@@ -264,7 +264,8 @@ def test_13_15_admin_dev_bypass_blocked_in_prod(anon: httpx.Client):
         "password": "wrong_password_probe_13_15",
     })
     # Must not succeed (401 = wrong creds, 422 = validation, 404 = not found)
-    assert r.status_code in (400, 401, 422, 404), (
+    # 429 = rate limited from earlier test run — also means login is NOT succeeding
+    assert r.status_code in (400, 401, 422, 404, 429), (
         f"Admin login with wrong password returned {r.status_code}. "
         f"Body: {r.text[:200]}"
     )

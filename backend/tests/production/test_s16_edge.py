@@ -63,11 +63,11 @@ class TestEdgeCasesWithAuth:
     def test_16_1_empty_account_analytics_no_crash(self, user: httpx.Client):
         """16.1 Analytics endpoints handle zero-trade accounts without NaN or crash."""
         endpoints = [
-            ("/api/analytics/summary", "summary"),
+            ("/api/analytics/overview", "overview"),
             ("/api/analytics/edge-map", "edge-map"),
         ]
         for path, name in endpoints:
-            r = user.get(path, params={"days_back": 1})  # Very short window = likely no data
+            r = user.get(path, params={"days_back": 1, "days": 1})  # Very short window = likely no data
             assert r.status_code in (200, 404), (
                 f"Analytics {name} crashed with {r.status_code} on empty data. "
                 f"Body: {r.text[:200]}"
@@ -80,7 +80,7 @@ class TestEdgeCasesWithAuth:
 
     def test_16_6_large_pnl_is_finite_number(self, user: httpx.Client):
         """16.6 P&L values from API are finite numbers (not Infinity or NaN)."""
-        r = user.get("/api/analytics/summary")
+        r = user.get("/api/analytics/overview")
         if r.status_code != 200:
             pytest.skip(f"Summary not available: {r.status_code}")
 

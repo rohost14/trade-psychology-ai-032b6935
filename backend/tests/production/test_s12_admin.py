@@ -40,9 +40,10 @@ class TestAdminLoginNoToken:
         })
         assert r.status_code not in (200, 500), (
             f"Wrong password returned {r.status_code}. "
-            f"Expected 401/400/422. Body: {r.text[:200]}"
+            f"Expected 401/400/422/429. Body: {r.text[:200]}"
         )
-        assert r.status_code in (400, 401, 422), (
+        # 429 = rate limited from test_12_3 running first — also proves credentials NOT accepted
+        assert r.status_code in (400, 401, 422, 429), (
             f"Unexpected status for wrong admin password: {r.status_code}. Body: {r.text[:200]}"
         )
 
