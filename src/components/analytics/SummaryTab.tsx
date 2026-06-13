@@ -63,11 +63,18 @@ function fmtDur(m: number) {
 }
 
 function extractUnderlying(sym: string): string {
+  // Weekly index options: 5-digit numeric expiry
   const m1 = sym.match(/^([A-Z\-]+?)\d{5}\d+(CE|PE)$/);
   if (m1) return m1[1];
+  // Stock options: DDMMMYY expiry (specific date, may have decimal strike)
+  // e.g. ADANIPOWER26JUN242.5CE → underlying = ADANIPOWER
+  const mDD = sym.match(/^([A-Z\-]+?)\d{2}[A-Z]{3}\d{2}\d+(?:\.\d+)?(CE|PE)$/);
+  if (mDD) return mDD[1];
+  // Monthly options: YYMMM expiry
   const m2 = sym.match(/^([A-Z\-]+?)\d{2}[A-Z]{3}\d+(CE|PE)$/);
   if (m2) return m2[1];
-  const m3 = sym.match(/^([A-Z\-]+?)(?:\d{5}|\d{2}[A-Z]{3})FUT$/);
+  // Futures
+  const m3 = sym.match(/^([A-Z\-]+?)(?:\d{5}|\d{2}[A-Z]{3}(?:\d{2})?)FUT$/);
   if (m3) return m3[1];
   return sym;
 }

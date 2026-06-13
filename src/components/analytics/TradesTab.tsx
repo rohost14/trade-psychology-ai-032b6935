@@ -11,14 +11,25 @@ import type { CompletedTrade } from '@/types/api';
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
+const _IDX = ['NIFTY', 'BANKNIFTY', 'FINNIFTY', 'MIDCPNIFTY', 'SENSEX', 'BANKEX'];
+function _fmtS(r: string) {
+  const n = parseFloat(r);
+  return Number.isInteger(n) ? n.toLocaleString('en-IN')
+    : n.toLocaleString('en-IN', { minimumFractionDigits: 1, maximumFractionDigits: 2 });
+}
 function parseSymbol(sym: string): { name: string; chip: string; sub: string } {
-  const mw5 = sym.match(/^([A-Z]+)\d{5}(\d{5})(CE|PE)$/);
-  if (mw5) return { name: mw5[1], chip: mw5[3], sub: parseInt(mw5[2], 10).toLocaleString('en-IN') };
-  const mw6 = sym.match(/^([A-Z]+)\d{5}(\d{6})(CE|PE)$/);
-  if (mw6) return { name: mw6[1], chip: mw6[3], sub: parseInt(mw6[2], 10).toLocaleString('en-IN') };
+  const mw = sym.match(/^([A-Z]+)\d{5}(\d{5,6})(CE|PE)$/);
+  if (mw) return { name: mw[1], chip: mw[3], sub: parseInt(mw[2], 10).toLocaleString('en-IN') };
+  if (!_IDX.some(p => sym.startsWith(p))) {
+    const mDD = sym.match(/^([A-Z]+)(\d{2})([A-Z]{3})(\d{2})(\d+(?:\.\d+)?)(CE|PE)$/);
+    if (mDD) {
+      const yr = parseInt(mDD[4], 10), sk = parseFloat(mDD[5]);
+      if (yr >= 24 && yr <= 40 && sk > 0) return { name: mDD[1], chip: mDD[6], sub: _fmtS(mDD[5]) };
+    }
+  }
   const mm = sym.match(/^([A-Z]+)\d{2}[A-Z]{3}(\d{3,6})(CE|PE)$/);
   if (mm) return { name: mm[1], chip: mm[3], sub: parseInt(mm[2], 10).toLocaleString('en-IN') };
-  const mf = sym.match(/^([A-Z]+)(?:\d{5}|\d{2}[A-Z]{3})FUT$/);
+  const mf = sym.match(/^([A-Z0-9]+)(?:\d{5}|\d{2}[A-Z]{3}(?:\d{2})?)FUT$/);
   if (mf) return { name: mf[1], chip: 'FUT', sub: '' };
   return { name: sym, chip: 'EQ', sub: '' };
 }

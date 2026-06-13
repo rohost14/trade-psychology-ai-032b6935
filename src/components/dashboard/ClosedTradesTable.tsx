@@ -12,21 +12,47 @@ interface ClosedTradesTableProps {
 }
 
 // ── Symbol parser ─────────────────────────────────────────────────────────────
-// Handles: weekly options, monthly options, futures, equity
+// See OpenPositionsTable.tsx for full format documentation.
+// Two Zerodha option expiry formats:
+//   YYMMM  → index/monthly stock options  e.g. ICICIGI24JUN1640PE
+//   DDMMMYY → stock options with specific date, supports decimal strikes e.g. ADANIPOWER26JUN242.5CE
+
+const INDEX_PREFIXES_CT = ['NIFTY', 'BANKNIFTY', 'FINNIFTY', 'MIDCPNIFTY', 'SENSEX', 'BANKEX'];
+
+function fmtStrikeCT(raw: string): string {
+  const n = parseFloat(raw);
+  return Number.isInteger(n)
+    ? n.toLocaleString('en-IN')
+    : n.toLocaleString('en-IN', { minimumFractionDigits: 1, maximumFractionDigits: 2 });
+}
+
 function parseSymbol(sym: string): { name: string; chip: string; strike: string } {
-  // Weekly options: NAME + 5-digit expiry + 5-digit strike + CE/PE  e.g. NIFTY2541524600CE
-  const mw5 = sym.match(/^([A-Z]+)\d{5}(\d{5})(CE|PE)$/);
-  if (mw5) return { name: mw5[1], chip: mw5[3], strike: parseInt(mw5[2], 10).toLocaleString('en-IN') };
-  // Weekly options: 6-digit strike  e.g. NIFTY25415100000CE
-  const mw6 = sym.match(/^([A-Z]+)\d{5}(\d{6})(CE|PE)$/);
-  if (mw6) return { name: mw6[1], chip: mw6[3], strike: parseInt(mw6[2], 10).toLocaleString('en-IN') };
-  // Monthly options: NAME + 2YY + 3MON + strike + CE/PE  e.g. NIFTY25MAR23000CE
+  // Weekly index options: 5-digit numeric expiry + 5 or 6-digit strike
+  const mw = sym.match(/^([A-Z]+)\d{5}(\d{5,6})(CE|PE)$/);
+  if (mw) return { name: mw[1], chip: mw[3], strike: parseInt(mw[2], 10).toLocaleString('en-IN') };
+
+  // Stock options: DDMMMYY expiry, decimal-or-integer strike
+  const isIndex = INDEX_PREFIXES_CT.some(p => sym.startsWith(p));
+  if (!isIndex) {
+    const mDD = sym.match(/^([A-Z]+)(\d{2})([A-Z]{3})(\d{2})(\d+(?:\.\d+)?)(CE|PE)$/);
+    if (mDD) {
+      const expYear = parseInt(mDD[4], 10);
+      const strike  = parseFloat(mDD[5]);
+      if (expYear >= 24 && expYear <= 40 && strike > 0) {
+        return { name: mDD[1], chip: mDD[6], strike: fmtStrikeCT(mDD[5]) };
+      }
+    }
+  }
+
+  // Monthly options: YYMMM expiry + integer strike
   const mm = sym.match(/^([A-Z]+)\d{2}[A-Z]{3}(\d{3,6})(CE|PE)$/);
   if (mm) return { name: mm[1], chip: mm[3], strike: parseInt(mm[2], 10).toLocaleString('en-IN') };
-  // Futures  e.g. NIFTY25MARFUT, BANKNIFTY25APR25FUT
-  const mf = sym.match(/^([A-Z]+)(?:\d{5}|\d{2}[A-Z]{3})FUT$/);
+
+  // Futures
+  const mf = sym.match(/^([A-Z0-9]+)(?:\d{5}|\d{2}[A-Z]{3}(?:\d{2})?)FUT$/);
   if (mf) return { name: mf[1], chip: 'FUT', strike: '' };
-  // Equity fallback
+
+  // Equity / unknown fallback
   return { name: sym, chip: 'EQ', strike: '' };
 }
 
