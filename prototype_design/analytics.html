@@ -18,7 +18,8 @@
   <script src="https://unpkg.com/@tailwindcss/browser@4"></script>
   <style type="text/tailwindcss">
     @theme {
-      --font-sans: 'Inter', sans-serif;
+      --font-sans: 'Outfit', sans-serif;
+      --font-mono: 'Geist Mono', monospace;
       --color-brand: #635BFF;
       --color-brandBg: #EEF2FF;
       --color-profit: #10B981;
@@ -169,164 +170,186 @@
           document.getElementById('tab-' + tabId).classList.remove('hidden');
           document.getElementById('btn-' + tabId).className = 'tab-btn px-5 py-3 border-b-2 border-brand text-brand font-semibold text-[14px]';
         }
+
+        function selectTaxEmotion(emotionName, winRate, impact, desc) {
+          document.getElementById('tax-emotion-title').innerText = emotionName.charAt(0).toUpperCase() + emotionName.slice(1) + " State";
+          document.getElementById('tax-emotion-desc').innerText = desc;
+          document.getElementById('tax-emotion-impact').innerText = impact;
+          
+          const badge = document.getElementById('tax-emotion-badge');
+          if (winRate > 50) {
+            badge.innerText = "Optimal";
+            badge.className = "px-2 py-0.5 bg-emerald-100 text-emerald-800 text-[10px] font-bold rounded";
+            document.getElementById('tax-emotion-impact').className = "text-sm font-bold text-emerald-600 font-mono font-tabular";
+          } else {
+            badge.innerText = "Taxed";
+            badge.className = "px-2 py-0.5 bg-rose-100 text-rose-800 text-[10px] font-bold rounded";
+            document.getElementById('tax-emotion-impact').className = "text-sm font-bold text-rose-600 font-mono font-tabular";
+          }
+          
+          document.querySelectorAll('.emotion-tax-row').forEach(row => {
+            row.classList.remove('bg-indigo-50/50', 'border-indigo-500');
+            row.classList.add('bg-white', 'border-slate-200');
+          });
+          
+          const activeRow = document.querySelector(`[data-emotion="${emotionName}"]`);
+          if (activeRow) {
+            activeRow.classList.remove('bg-white', 'border-slate-200');
+            activeRow.classList.add('bg-indigo-50/50', 'border-indigo-500');
+          }
+        }
       </script>
 
       <!-- Main Layout -->
-      <div id="tab-behavior" class="tab-content grid grid-cols-1 lg:grid-cols-2 gap-8 transition-opacity duration-300">
+      <div id="tab-behavior" class="tab-content space-y-6 transition-opacity duration-300">
 
-        <!-- Detected Patterns -->
-        <div class="tm-card p-8 flex flex-col h-full">
-          <h2 class="text-[14px] sm:text-[15px] font-semibold  text-slate-900 mb-5 lg:mb-6">Detected Patterns</h2>
+        <!-- Interactive Cooldown Meter (Top Section) -->
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+          <div class="tm-card p-6 flex flex-col justify-between">
+            <div>
+              <h3 class="text-xs font-bold text-slate-400 uppercase tracking-wider mb-2">Optimal Win Rate</h3>
+              <p class="text-3xl font-bold text-emerald-600 font-mono font-tabular">71%</p>
+            </div>
+            <div class="mt-4 text-xs text-slate-500 font-medium">
+              Achieved under a <span class="font-bold text-slate-700">Calm</span> state
+            </div>
+          </div>
 
-          <div class="flex-1 overflow-x-auto table-scroll-wrap">
-            <table class="w-full text-left whitespace-nowrap min-w-[400px]">
-              <thead>
-                <tr>
-                  <th class="text-xs font-medium text-slate-500 uppercase tracking-wider">Pattern</th>
-                  <th class="text-right">Occurrences</th>
-                  <th class="text-right">Est. Cost</th>
-                  <th class="text-right">Trend</th>
-                </tr>
-              </thead>
-              <tbody>
-                <tr class="hover:bg-slate-50 transition-colors cursor-pointer">
-                  <td class="font-bold text-slate-900 text-[13px]">Overtrading</td>
-                  <td class="text-right font-medium text-slate-600 tabular">12&times;</td>
-                  <td class="text-right font-medium text-rose-600 tabular">-₹4,200</td>
-                  <td class="text-right font-semibold text-profit text-[13px]">&darr; Improving</td>
-                </tr>
-                <tr class="hover:bg-slate-50 transition-colors cursor-pointer">
-                  <td class="font-bold text-slate-900 text-[13px]">Revenge Trading</td>
-                  <td class="text-right font-medium text-slate-600 tabular">4&times;</td>
-                  <td class="text-right font-medium text-rose-600 tabular">-₹2,800</td>
-                  <td class="text-right font-semibold text-slate-500 text-[13px]">&rarr; Stable</td>
-                </tr>
-                <tr class="hover:bg-slate-50 transition-colors cursor-pointer">
-                  <td class="font-bold text-slate-900 text-[13px]">No Stop Loss</td>
-                  <td class="text-right font-medium text-slate-600 tabular">8&times;</td>
-                  <td class="text-right font-medium text-rose-600 tabular">-₹1,100</td>
-                  <td class="text-right font-semibold text-loss text-[13px]">&uarr; Worsening</td>
-                </tr>
-                <tr class="hover:bg-slate-50 transition-colors cursor-pointer border-b-0">
-                  <td class="font-bold text-slate-900 text-[13px]">FOMO Entry</td>
-                  <td class="text-right font-medium text-slate-600 tabular">3&times;</td>
-                  <td class="text-right font-medium text-rose-600 tabular">-₹900</td>
-                  <td class="text-right font-semibold text-profit text-[13px]">&darr; Improving</td>
-                </tr>
-              </tbody>
-            </table>
+          <div class="tm-card p-6 flex flex-col justify-between">
+            <div>
+              <h3 class="text-xs font-bold text-slate-400 uppercase tracking-wider mb-2">Compromised Win Rate</h3>
+              <p class="text-3xl font-bold text-rose-600 font-mono font-tabular">28%</p>
+            </div>
+            <div class="mt-4 text-xs text-slate-500 font-medium">
+              Average rate under an <span class="font-bold text-slate-700">Anxious</span> state
+            </div>
+          </div>
+
+          <div class="tm-card p-6 flex flex-col justify-between border-l-4 border-l-rose-500">
+            <div>
+              <h3 class="text-xs font-bold text-slate-400 uppercase tracking-wider mb-2">Behavioral Loss Cost</h3>
+              <p class="text-3xl font-bold text-slate-900 font-mono font-tabular">-₹9,480</p>
+            </div>
+            <div class="mt-4 text-xs text-slate-500 font-medium">
+              Total monthly capital lost to emotional trades
+            </div>
           </div>
         </div>
 
-        <!-- Emotional Tax -->
-        <div
-          class="tm-card p-8 flex flex-col h-full bg-white">
-          <div class="flex items-center justify-between mb-5 lg:mb-6">
-            <h2 class="text-[14px] sm:text-[15px] font-semibold  text-slate-900">Emotional Tax</h2>
-            <span class="badge badge-brand">From Journal</span>
-          </div>
-
-          <p class="text-[13px] sm:text-[14px] text-slate-600 font-medium mb-6">Total estimated behavioral cost this
-            month: <span class="font-medium text-rose-600 tabular">-₹9,480</span></p>
-
-          <div class="space-y-4 mb-6">
-            <p class="text-[13px] font-medium text-slate-500 uppercase tracking-widest mb-1.5">Win Rate By Reported Emotion
-            </p>
-
-            <div class="flex items-center gap-3">
-              <span class="w-16 sm:w-20 text-[13px] sm:text-[13px] font-bold text-slate-700">Calm</span>
-              <div class="progress-bar flex-1">
-                <div class="progress-fill profit" style="width: 68%;"></div>
-              </div>
-              <span class="w-10 text-right text-[13px] sm:text-[13px] font-semibold text-slate-600 tabular">68%</span>
-            </div>
-
-            <div class="flex items-center gap-3">
-              <span class="w-16 sm:w-20 text-[13px] sm:text-[13px] font-bold text-slate-700">Confident</span>
-              <div class="progress-bar flex-1">
-                <div class="progress-fill profit" style="width: 71%;"></div>
-              </div>
-              <span class="w-10 text-right text-[13px] sm:text-[13px] font-semibold text-slate-600 tabular">71%</span>
-            </div>
-
-            <div class="flex items-center gap-3">
-              <span class="w-16 sm:w-20 text-[13px] sm:text-[13px] font-bold text-slate-700">Neutral</span>
-              <div class="progress-bar flex-1">
-                <div class="progress-fill muted" style="width: 61%;"></div>
-              </div>
-              <span class="w-10 text-right text-[13px] sm:text-[13px] font-semibold text-slate-600 tabular">61%</span>
-            </div>
-
-            <div class="flex items-center gap-3">
-              <span class="w-16 sm:w-20 text-[13px] sm:text-[13px] font-bold text-slate-700">Anxious</span>
-              <div class="progress-bar flex-1">
-                <div class="progress-fill brand" style="width: 28%;"></div>
-              </div>
-              <span class="w-10 text-right text-[13px] sm:text-[13px] font-semibold text-slate-600 tabular">28%</span>
-            </div>
-
-            <div class="flex items-center gap-3">
-              <span class="w-16 sm:w-20 text-[13px] sm:text-[13px] font-bold text-slate-700">Revenge</span>
-              <div class="progress-bar flex-1">
-                <div class="progress-fill loss" style="width: 11%;"></div>
-              </div>
-              <span class="w-10 text-right text-[13px] sm:text-[13px] font-semibold text-slate-600 tabular">11%</span>
-            </div>
-          </div>
-
-          <p class="text-[13px] font-medium text-slate-500 mt-auto pt-4 border-t border-slate-100">Note: trades without a
-            journal entry are excluded from this analysis.</p>
-        </div>
-
-        <!-- Trading Persona -->
-        <div class="tm-card p-8 lg:col-span-2">
-          <div class="flex flex-col md:flex-row gap-6 md:gap-12">
-            <div class="flex-[1.5]">
-              <h2 class="text-[14px] sm:text-[15px] font-semibold  text-slate-900 mb-4">Trading Persona</h2>
-              <div class="flex items-center gap-3 mb-3">
-                <div
-                  class="w-10 h-10 rounded-lg border border-indigo-100 bg-indigo-50 shadow-inset flex items-center justify-center">
-                  <span class="text-lg">⚡</span>
+        <!-- Workstation Split-Grid (Bottom Section) -->
+        <div class="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
+          
+          <!-- LEFT COLUMN: Trading Persona (5/12 width) -->
+          <div class="tm-card p-6 lg:col-span-5 space-y-6">
+            <div>
+              <span class="text-xs font-bold text-slate-400 uppercase tracking-wider">Trading Persona</span>
+              <div class="flex items-center gap-2.5 mt-2 mb-3">
+                <div class="w-9 h-9 rounded-lg bg-indigo-50 border border-indigo-100 flex items-center justify-center">
+                  <span class="text-base">⚡</span>
                 </div>
-                <h3 class="text-lg sm:text-xl font-bold text-brand">Adaptive Scalper</h3>
+                <h3 class="text-lg font-bold text-brand">Adaptive Scalper</h3>
               </div>
-              <p class="text-[13px] sm:text-[14px] text-slate-600 leading-relaxed font-medium">
-                You react quickly to price movement and trade in short bursts. When sessions go well you execute
-                cleanly. When sessions turn against you, trade frequency increases rapidly over baseline.
+              <p class="text-xs text-slate-600 leading-relaxed font-medium">
+                You react rapidly to sharp price movement and trade in compact timeframes. Under high discipline, you execute cleanly. Under stress or loss, trade frequency spikes exponentially.
               </p>
             </div>
 
-            <div class="flex-1 flex flex-col justify-center gap-6 border-l border-slate-100 pl-0 md:pl-10 pt-4 md:pt-0">
+            <div class="border-t border-slate-100 pt-4 space-y-4">
               <div>
-                <p
-                  class="text-[13px] sm:text-[13px] font-medium text-emerald-600 uppercase tracking-widest mb-2 flex items-center gap-1.5 ">
-                  <svg aria-hidden="true" class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M5 13l4 4L19 7"></path>
+                <h4 class="text-xs font-bold text-emerald-600 uppercase tracking-wider flex items-center gap-1.5 mb-2">
+                  <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2.5">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7" />
                   </svg>
                   Strengths
-                </p>
-                <ul class="text-[13px] text-slate-600 font-medium space-y-1">
-                  <li>&middot; Fast execution speeds</li>
-                  <li>&middot; High win rate when calm state reported</li>
+                </h4>
+                <ul class="text-xs text-slate-600 font-medium space-y-1.5 pl-5 list-disc">
+                  <li>Exceptional execution speeds on intraday breakout moves</li>
+                  <li>Sustained high win rates when journaling calm states</li>
                 </ul>
               </div>
+
               <div>
-                <p
-                  class="text-[13px] sm:text-[13px] font-medium text-rose-600 uppercase tracking-widest mb-2 flex items-center gap-1.5 ">
-                  <svg aria-hidden="true" class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5"
-                      d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z">
-                    </path>
+                <h4 class="text-xs font-bold text-rose-600 uppercase tracking-wider flex items-center gap-1.5 mb-2">
+                  <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2.5">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M12 9v2m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
                   </svg>
-                  Watch Out
-                </p>
-                <ul class="text-[13px] text-slate-600 font-medium space-y-1">
-                  <li>&middot; Elevated Revenge risk after losing trades</li>
-                  <li>&middot; Overtrading spirals in the last 30 mins</li>
+                  Watch Out Risks
+                </h4>
+                <ul class="text-xs text-slate-600 font-medium space-y-1.5 pl-5 list-disc">
+                  <li>Rapidly scaling size to recover initial stop-out losses</li>
+                  <li>Overtrading frequency peaks in final 30 minutes of session</li>
                 </ul>
               </div>
             </div>
           </div>
+
+          <!-- RIGHT COLUMN: Emotional Tax Calculator (7/12 width) -->
+          <div class="tm-card p-6 lg:col-span-7 space-y-4">
+            <div class="flex items-center justify-between pb-2 border-b border-slate-100">
+              <h3 class="text-sm font-bold text-slate-900">Emotional Tax Calculator</h3>
+              <span class="px-2 py-0.5 bg-slate-100 border border-slate-200 text-[10px] font-bold text-slate-600 rounded">Interactive</span>
+            </div>
+
+            <p class="text-xs text-slate-500 font-medium">Select an emotion to compute how state degradation impacts capital expectancy.</p>
+
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <!-- Left sub-panel: Emotion list -->
+              <div class="space-y-2">
+                <!-- Calm (Default Active) -->
+                <div onclick="selectTaxEmotion('calm', 71, '+₹14,500', 'No tax. Optimal trading state characterized by patience, clear execution, and strict rule adherence.')" class="emotion-tax-row p-3 border border-indigo-500 rounded-lg bg-indigo-50/50 cursor-pointer transition-all flex items-center justify-between" data-emotion="calm">
+                  <div>
+                    <span class="text-xs font-bold text-slate-800">Calm</span>
+                    <p class="text-[10px] text-slate-500 font-medium">Optimal state</p>
+                  </div>
+                  <div class="text-right">
+                    <span class="text-xs font-bold text-emerald-600 font-mono font-tabular">71% WR</span>
+                    <p class="text-[10px] text-slate-400 font-medium">0% tax</p>
+                  </div>
+                </div>
+
+                <!-- Anxious -->
+                <div onclick="selectTaxEmotion('anxious', 28, '-₹5,400', 'Hesitation tax. Delayed entries lead to bad risk-to-reward ratios. Exit rules are violated by premature scaling out.')" class="emotion-tax-row p-3 border border-slate-200 rounded-lg bg-white hover:bg-slate-50 cursor-pointer transition-all flex items-center justify-between" data-emotion="anxious">
+                  <div>
+                    <span class="text-xs font-bold text-slate-800">Anxious</span>
+                    <p class="text-[10px] text-slate-500 font-medium">Hesitation tax</p>
+                  </div>
+                  <div class="text-right">
+                    <span class="text-xs font-bold text-rose-600 font-mono font-tabular">28% WR</span>
+                    <p class="text-[10px] text-rose-500 font-medium">43% tax</p>
+                  </div>
+                </div>
+
+                <!-- Revenge -->
+                <div onclick="selectTaxEmotion('revenge', 11, '-₹8,100', 'Tilt tax. Blind entry sizing and immediate re-entry after loss. Drives severe drawdowns and stop-loss ignoring.')" class="emotion-tax-row p-3 border border-slate-200 rounded-lg bg-white hover:bg-slate-50 cursor-pointer transition-all flex items-center justify-between" data-emotion="revenge">
+                  <div>
+                    <span class="text-xs font-bold text-slate-800">Revenge</span>
+                    <p class="text-[10px] text-slate-500 font-medium">Tilt tax</p>
+                  </div>
+                  <div class="text-right">
+                    <span class="text-xs font-bold text-rose-600 font-mono font-tabular">11% WR</span>
+                    <p class="text-[10px] text-rose-500 font-medium">60% tax</p>
+                  </div>
+                </div>
+              </div>
+
+              <!-- Right sub-panel: Detail Panel -->
+              <div id="tax-details-panel" class="p-4 bg-slate-50 border border-slate-200 rounded-lg flex flex-col justify-between min-h-[160px]">
+                <div>
+                  <div class="flex items-center justify-between pb-2 border-b border-slate-200 mb-3">
+                    <h4 id="tax-emotion-title" class="text-xs font-bold text-slate-900 uppercase tracking-wider">Calm State</h4>
+                    <span id="tax-emotion-badge" class="px-2 py-0.5 bg-emerald-100 text-emerald-800 text-[10px] font-bold rounded">Optimal</span>
+                  </div>
+                  <p id="tax-emotion-desc" class="text-xs text-slate-600 leading-relaxed font-medium">No tax. Optimal trading state characterized by patience, clear execution, and strict rule adherence.</p>
+                </div>
+                
+                <div class="mt-4 pt-3 border-t border-slate-200 flex items-center justify-between">
+                  <span class="text-[11px] text-slate-400 font-bold uppercase tracking-wider">Est. P&L Impact</span>
+                  <span id="tax-emotion-impact" class="text-sm font-bold text-emerald-600 font-mono font-tabular">+₹14,500</span>
+                </div>
+              </div>
+            </div>
+          </div>
+
         </div>
 
       </div>

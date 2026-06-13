@@ -10,29 +10,30 @@
 
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Inter:ital,wght@0,400;0,500;0,600;0,700;0,800;1,400&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800&family=Geist+Mono:wght@300;400;500;600;700&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="shared.css">
 
-    <!-- Tailwind v4 Engine -->
+  <!-- Tailwind v4 Engine -->
   <script src="https://unpkg.com/@tailwindcss/browser@4"></script>
   <style type="text/tailwindcss">
     @theme {
-      --font-sans: 'Inter', sans-serif;
-      --color-brand: #635BFF;
-      --color-brandBg: #EEF2FF;
-      --color-profit: #10B981;
-      --color-profitBg: #D1FAE5;
-      --color-loss: #EF4444;
-      --color-lossBg: #FEE2E2;
-      --color-obs: #F59E0B;
-      --color-obsBg: #FEF3C7;
-      --color-surface: #ffffff;
-      --color-background: #F8FAFC;
+      --font-sans: 'Outfit', sans-serif;
+      --font-mono: 'Geist Mono', monospace;
+      --color-brand: #0071E3;
+      --color-brandBg: rgba(0, 113, 227, 0.05);
+      --color-profit: #34C759;
+      --color-profitBg: rgba(52, 199, 89, 0.08);
+      --color-loss: #FF3B30;
+      --color-lossBg: rgba(255, 59, 48, 0.08);
+      --color-obs: #FF9500;
+      --color-obsBg: rgba(255, 149, 0, 0.08);
+      --color-surface: #FFFFFF;
+      --color-background: #F5F5F7;
       
-      --shadow-sm: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
-      --shadow-card: 0 1px 3px 0 rgba(15, 23, 42, 0.05), 0 1px 2px -1px rgba(15, 23, 42, 0.06);
-      --shadow-card-hover: 0 4px 6px -1px rgba(15, 23, 42, 0.06), 0 2px 4px -2px rgba(15, 23, 42, 0.08);
-      --shadow-inset: inset 0 1.5px 3px 0 rgba(15, 23, 42, 0.06);
+      --shadow-sm: 0 2px 8px rgba(0, 0, 0, 0.02);
+      --shadow-card: 0 8px 30px rgba(0, 0, 0, 0.03);
+      --shadow-card-hover: 0 12px 40px rgba(0, 0, 0, 0.06);
+      --shadow-inset: inset 0 1.5px 3px 0 rgba(0, 0, 0, 0.02);
     }
   </style>
   <style>
@@ -41,7 +42,7 @@
   </style>
 </head>
 
-<body class="flex min-h-screen relative overflow-hidden lg:overflow-auto">
+<body class="flex min-h-screen relative overflow-hidden lg:overflow-auto bg-background">
 
   <!-- ── Application Sidebar ── -->
   <!-- 
@@ -135,314 +136,312 @@
   <!-- ── Main Canvas ── -->
   <!-- Margin pushing content right ONLY on large screens lg:ml-[260px] -->
   <main class="flex-1 w-full lg:ml-[260px] relative min-h-screen">
-    <div class="bg-stripe-header"></div>
-
-    <!-- Inner Padding Wrapper -->
-    <div class="w-full max-w-7xl mx-auto px-4 sm:px-6 lg:px-10 py-6 lg:py-10 pb-20 relative z-10">
-
-      <!-- Page Header -->
-      <header class="flex flex-col xl:flex-row xl:items-center justify-between gap-4 xl:gap-8 mb-6 lg:mb-8">
+    <div class="bg-stripe-h    <!-- Sticky Frosted Header -->
+    <header class="sticky top-0 z-40 w-full bg-white/70 backdrop-blur-md border-b border-black/5 py-4 px-4 sm:px-6 lg:px-10 flex items-center justify-between gap-4">
+      <div class="flex items-center gap-3">
+        <!-- Mobile Sidebar Toggle -->
+        <button class="p-2 text-slate-500 hover:text-slate-600 hover:bg-slate-100 rounded-md lg:hidden active:scale-[0.97] transition-all" onclick="toggleSidebar()" aria-label="Open sidebar">
+          <svg aria-hidden="true" class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16"/></svg>
+        </button>
         <div>
-          <h1 class="text-[20px] sm:text-[24px] font-medium  text-slate-900 mb-1">Overview Dashboard</h1>
-          <p class="text-xs sm:text-sm text-slate-500 font-medium">Tuesday, Oct 24 &middot; Active Live Session</p>
-        </div>
-
-        <!-- Top Action Pills -->
-        <div class="flex items-center gap-2 sm:gap-3 overflow-x-auto pb-1 sm:pb-0 shrink-0">
-          <div
-            class="px-3 sm:px-5 py-2.5 sm:py-3 bg-white border border-slate-200 rounded-lg shadow-sm flex flex-col justify-center shrink-0">
-            <span
-              class="text-[11px] sm:text-[12px] text-slate-500 font-bold uppercase tracking-wide leading-none mb-1 sm:mb-1.5">Margin
-              Available</span>
-            <span class="tabular font-bold text-[13px] sm:text-[15px] leading-none text-slate-900">₹4,25,000</span>
+          <div class="flex items-center gap-2">
+            <h1 class="text-lg sm:text-xl font-bold tracking-tight text-slate-900">Workstation Cockpit</h1>
+            <span class="flex items-center gap-1.5 px-2 py-0.5 bg-[#34C759]/10 text-[#34C759] border border-[#34C759]/20 text-xs font-semibold rounded-full">
+              <span class="w-1.5 h-1.5 rounded-full bg-[#34C759] animate-pulse"></span>
+              Safe Mode Active
+            </span>
           </div>
-
-          <div
-            class="px-4 sm:px-5 py-2.5 sm:py-3 bg-white border border-slate-200 rounded-lg shadow-sm flex items-center justify-center gap-2 h-full shrink-0">
-            <span class="w-2.5 h-2.5 rounded-full bg-profit animate-pulse shrink-0"></span>
-            <span class="tabular font-bold text-[16px] sm:text-[18px] text-profit leading-none">+₹24,500</span>
-          </div>
-        </div>
-      </header>
-
-      <!-- ── NEW UNIFIED HIERARCHY ── -->
-      <div class="flex flex-col xl:flex-row gap-6 lg:gap-8 items-start">
-        
-        <!-- ── Left Column (Main Context - 70%) ── -->
-        <div class="w-full xl:w-[70%] space-y-6 lg:space-y-8 min-w-0">
-          
-          <!-- Unified Hero -->
-          <div class="tm-card p-6 sm:p-8 flex flex-col md:flex-row justify-between items-start md:items-center gap-6">
-            <div>
-              <p class="text-[12px] sm:text-[13px] font-bold text-slate-500 uppercase tracking-widest mb-2 sm:mb-3">Net Realized P&L</p>
-              <div class="flex items-center gap-3 sm:gap-4 flex-wrap">
-                <span class="text-4xl sm:text-[56px] font-bold text-slate-900 tabular tracking-tighter leading-none">₹24,500.00</span>
-                <span class="badge badge-green mt-1 sm:mt-0">+5.76%</span>
-              </div>
-            </div>
-            
-            <div class="flex flex-col md:items-end gap-2 sm:gap-3 w-full md:w-auto mt-2 md:mt-0 pt-4 md:pt-0 border-t md:border-0 border-slate-100">
-              <span class="text-[11px] sm:text-[12px] font-bold text-slate-500 uppercase tracking-widest">System Risk State</span>
-              <div class="flex items-center gap-2.5 bg-emerald-50 border border-emerald-100 px-4 py-2.5 sm:py-3 rounded-lg shadow-inset w-full md:w-auto justify-center">
-                <span class="relative flex h-2.5 w-2.5">
-                  <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
-                  <span class="relative inline-flex rounded-full h-2.5 w-2.5 bg-emerald-500"></span>
-                </span>
-                <span class="text-[14px] sm:text-[15px] font-black text-emerald-700 uppercase tracking-widest">Safe Mode Active</span>
-              </div>
-            </div>
-          </div>
-
-          <!-- Behavioral Alerts Feed -->
-          <div class="tm-card bg-white">
-            <div class="p-5 sm:p-6 flex items-center justify-between border-b border-slate-100">
-              <h2 class="text-[14px] sm:text-[15px] font-bold text-slate-900 flex items-center gap-2">
-                <svg aria-hidden="true" class="w-4 h-4 text-obs" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2">
-                  <path stroke-linecap="round" stroke-linejoin="round" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"></path>
-                </svg>
-                Behavioral Alerts
-              </h2>
-              <span class="badge badge-amber shrink-0">2 Action Req</span>
-            </div>
-
-            <div class="divide-y divide-slate-100">
-              <div class="p-5 sm:p-6 hover:bg-slate-50 flex flex-col sm:flex-row items-start gap-4 transition-colors">
-                <div class="hidden sm:block w-1.5 h-[50px] bg-red-500 rounded-full mt-1 shrink-0"></div>
-                <div class="flex-1 w-full min-w-0">
-                  <div class="flex justify-between items-center mb-2 gap-1 block sm:hidden">
-                    <span class="w-1.5 h-4 bg-red-500 rounded-full shrink-0 block"></span>
-                    <h4 class="font-bold text-[14px] text-slate-900 w-full truncate ml-1">Revenge Matrix Triggered</h4>
-                    <span class="text-[12px] tabular text-slate-500 font-bold shrink-0 ml-auto">14m</span>
-                  </div>
-                  <div class="hidden sm:flex justify-between items-center mb-2">
-                    <h4 class="font-bold text-[15px] text-slate-900 truncate">Revenge Matrix Triggered</h4>
-                    <span class="text-[13px] tabular text-slate-500 font-bold">14 mins ago</span>
-                  </div>
-                  <p class="text-[13px] sm:text-[14px] text-slate-600 leading-relaxed mb-4">Re-entered BANKNIFTY 48000 PE immediately after a stop-out loss. Acknowledge this pattern before taking the next trade.</p>
-                  <div class="flex gap-2 sm:gap-3">
-                    <button class="btn btn-sm btn-danger text-[13px]">Review & Halt</button>
-                    <button class="btn btn-sm btn-secondary text-[13px]">Dismiss</button>
-                  </div>
-                </div>
-              </div>
-
-              <div class="p-5 sm:p-6 hover:bg-slate-50 flex items-start gap-3 sm:gap-4 transition-colors bg-amber-50/20">
-                <div class="w-1.5 h-[40px] bg-amber-400 rounded-full mt-1 shrink-0 hidden sm:block"></div>
-                <div class="flex-1 w-full min-w-0">
-                  <div class="flex justify-between items-center mb-1 sm:mb-2 gap-1">
-                    <h4 class="font-bold text-[14px] sm:text-[15px] text-slate-900 truncate flex items-center gap-2">
-                      <div class="sm:hidden w-1.5 h-4 bg-amber-400 rounded-full"></div>Volume Surge Warning
-                    </h4>
-                    <span class="text-[12px] sm:text-[13px] tabular text-slate-500 font-bold shrink-0">42 mins ago</span>
-                  </div>
-                  <p class="text-[13px] sm:text-[14px] text-slate-600 leading-relaxed">Position sizing on your last 2 trades exceeds daily psychological boundary by 15.4%.</p>
-                </div>
-              </div>
-            </div>
-          </div>
-
-          <!-- Active Positions -->
-          <div class="tm-card">
-            <div class="flex justify-between items-center p-5 sm:p-6 border-b border-slate-100">
-              <h2 class="text-[14px] sm:text-[15px] font-bold text-slate-900">Active Positions <span class="text-slate-400 font-medium ml-1 tabular">(3)</span></h2>
-              <button class="btn btn-sm btn-secondary text-emerald-600">Exit All</button>
-            </div>
-            <div class="overflow-x-auto table-scroll-wrap">
-              <table class="w-full text-left whitespace-nowrap min-w-[600px] mb-2 border-collapse">
-                <thead>
-                  <tr class="bg-slate-50/50">
-                    <th class="w-2/5 px-6 py-3 text-[11px] font-bold text-slate-500 uppercase tracking-widest border-b border-slate-100">Instrument</th>
-                    <th class="text-right px-6 py-3 text-[11px] font-bold text-slate-500 uppercase tracking-widest border-b border-slate-100">Qty</th>
-                    <th class="text-right px-6 py-3 text-[11px] font-bold text-slate-500 uppercase tracking-widest border-b border-slate-100">Avg Entry</th>
-                    <th class="text-right px-6 py-3 text-[11px] font-bold text-slate-500 uppercase tracking-widest border-b border-slate-100">LTP</th>
-                    <th class="text-right px-6 py-3 text-[11px] font-bold text-slate-500 uppercase tracking-widest border-b border-slate-100">Floating P&L</th>
-                  </tr>
-                </thead>
-                <tbody class="divide-y divide-slate-100">
-                  <tr class="hover:bg-slate-50/80 transition cursor-pointer">
-                    <td class="px-6 py-4">
-                      <div class="flex items-center gap-3">
-                        <span class="badge badge-brand shrink-0">CE</span>
-                        <div class="flex flex-col">
-                          <span class="font-bold text-slate-900 text-[13px]">NIFTY 24000 CE</span>
-                          <span class="text-[12px] text-slate-500 font-medium">24 Oct Expiry</span>
-                        </div>
-                      </div>
-                    </td>
-                    <td class="px-6 py-4 text-right tabular text-[14px] font-bold text-slate-900">1,200</td>
-                    <td class="px-6 py-4 text-right tabular text-[14px] font-medium text-slate-500">145.20</td>
-                    <td class="px-6 py-4 text-right tabular text-[14px] font-bold text-slate-700">165.40</td>
-                    <td class="px-6 py-4 text-right tabular text-[14px] font-black text-emerald-600">+₹24,240.00</td>
-                  </tr>
-                  <!-- New Extra position -->
-                  <tr class="hover:bg-slate-50/80 transition cursor-pointer">
-                    <td class="px-6 py-4">
-                      <div class="flex items-center gap-3">
-                        <span class="badge badge-gray shrink-0">EQ</span>
-                        <div class="flex flex-col">
-                          <span class="font-bold text-slate-900 text-[13px]">HDFCBANK</span>
-                          <span class="text-[12px] text-slate-500 font-medium">CNC</span>
-                        </div>
-                      </div>
-                    </td>
-                    <td class="px-6 py-4 text-right tabular text-[14px] font-bold text-slate-900">500</td>
-                    <td class="px-6 py-4 text-right tabular text-[14px] font-medium text-slate-500">1,540.00</td>
-                    <td class="px-6 py-4 text-right tabular text-[14px] font-bold text-slate-700">1,542.50</td>
-                    <td class="px-6 py-4 text-right tabular text-[14px] font-black text-emerald-600">+₹1,250.00</td>
-                  </tr>
-                  <!-- New Extra position Negative -->
-                  <tr class="hover:bg-slate-50/80 transition cursor-pointer">
-                    <td class="px-6 py-4">
-                      <div class="flex items-center gap-3">
-                        <span class="badge badge-red shrink-0">PE</span>
-                        <div class="flex flex-col">
-                          <span class="font-bold text-slate-900 text-[13px]">BANKNIFTY 48500 PE</span>
-                          <span class="text-[12px] text-slate-500 font-medium">24 Oct Expiry</span>
-                        </div>
-                      </div>
-                    </td>
-                    <td class="px-6 py-4 text-right tabular text-[14px] font-bold text-slate-900">150</td>
-                    <td class="px-6 py-4 text-right tabular text-[14px] font-medium text-slate-500">210.50</td>
-                    <td class="px-6 py-4 text-right tabular text-[14px] font-bold text-slate-700">203.90</td>
-                    <td class="px-6 py-4 text-right tabular text-[14px] font-black text-rose-600">-₹990.00</td>
-                  </tr>
-                </tbody>
-              </table>
-            </div>
-          </div>
-
-          <!-- Closed Positions -->
-          <div class="tm-card mt-8">
-            <div class="flex justify-between items-center p-5 sm:p-6 border-b border-slate-100">
-              <h2 class="text-[14px] sm:text-[15px] font-bold text-slate-900">Recently Closed <span class="text-slate-400 font-medium ml-1 tabular">(5)</span></h2>
-            </div>
-            <div class="overflow-x-auto table-scroll-wrap">
-              <table class="w-full text-left whitespace-nowrap min-w-[600px] mb-2 border-collapse">
-                <thead>
-                  <tr class="bg-slate-50/50">
-                    <th class="w-2/5 px-6 py-3 text-[11px] font-bold text-slate-500 uppercase tracking-widest border-b border-slate-100">Instrument</th>
-                    <th class="text-right px-6 py-3 text-[11px] font-bold text-slate-500 uppercase tracking-widest border-b border-slate-100">Status</th>
-                    <th class="text-right px-6 py-3 text-[11px] font-bold text-slate-500 uppercase tracking-widest border-b border-slate-100">Exit Price</th>
-                    <th class="text-right px-6 py-3 text-[11px] font-bold text-slate-500 uppercase tracking-widest border-b border-slate-100">Realized P&L</th>
-                  </tr>
-                </thead>
-                <tbody class="divide-y divide-slate-100">
-                  <tr class="hover:bg-slate-50/80 transition">
-                    <td class="px-6 py-4">
-                      <div class="flex items-center gap-3">
-                        <span class="badge badge-brand shrink-0">CE</span>
-                        <div class="flex flex-col">
-                          <span class="font-bold text-slate-900 text-[13px] line-through decoration-slate-300">NIFTY 23900 CE</span>
-                          <span class="text-[12px] text-slate-500 font-medium">Auto-squared</span>
-                        </div>
-                      </div>
-                    </td>
-                    <td class="px-6 py-4 text-right">
-                      <span class="badge badge-green">TP HIT</span>
-                    </td>
-                    <td class="px-6 py-4 text-right tabular text-[14px] font-bold text-slate-700">188.00</td>
-                    <td class="px-6 py-4 text-right tabular text-[14px] font-black text-emerald-600">+₹8,400.00</td>
-                  </tr>
-                  <tr class="hover:bg-slate-50/80 transition">
-                    <td class="px-6 py-4">
-                      <div class="flex items-center gap-3">
-                        <span class="badge badge-gray shrink-0">EQ</span>
-                        <div class="flex flex-col">
-                          <span class="font-bold text-slate-900 text-[13px] line-through decoration-slate-300">RELIANCE</span>
-                          <span class="text-[12px] text-slate-500 font-medium">Manual Exit</span>
-                        </div>
-                      </div>
-                    </td>
-                    <td class="px-6 py-4 text-right">
-                      <span class="badge badge-gray">CLOSED</span>
-                    </td>
-                    <td class="px-6 py-4 text-right tabular text-[14px] font-bold text-slate-700">2,940.50</td>
-                    <td class="px-6 py-4 text-right tabular text-[14px] font-black text-rose-600">-₹2,100.00</td>
-                  </tr>
-                </tbody>
-              </table>
-            </div>
-          </div>
-        </div>
-
-        <!-- ── Right Column (Statistics Rail - 30%) ── -->
-        <div class="w-full xl:w-[30%] space-y-6 lg:space-y-8 xl:sticky xl:top-[40px] min-w-0">
-          
-          <!-- Trading Context Grid -->
-          <div class="tm-card p-6 sm:p-7">
-            <h3 class="text-[13px] font-bold text-slate-500 uppercase tracking-widest mb-6 border-b border-slate-100 pb-4">Trading Context</h3>
-            
-            <div class="space-y-5">
-              <div class="flex justify-between items-center group">
-                <span class="text-[13px] sm:text-[14px] text-slate-600 font-medium group-hover:text-slate-900 transition">Win Rate</span>
-                <span class="text-[14px] sm:text-[15px] font-black text-slate-900 tabular">62.5%</span>
-              </div>
-              
-              <div class="flex justify-between items-center group">
-                <span class="text-[13px] sm:text-[14px] text-slate-600 font-medium group-hover:text-slate-900 transition flex items-center gap-1.5">
-                  Emotional Tax
-                  <div class="w-3 h-3 rounded bg-red-100 flex items-center justify-center"><div class="w-1.5 h-1.5 bg-red-500 rounded-sm"></div></div>
-                </span>
-                <span class="text-[14px] sm:text-[15px] font-black text-rose-600 tabular">-₹380 <span class="badge badge-red ml-1">18%</span></span>
-              </div>
-              
-              <div class="flex justify-between items-center group">
-                <span class="text-[13px] sm:text-[14px] text-slate-600 font-medium group-hover:text-slate-900 transition">Trades Executed</span>
-                <span class="text-[14px] sm:text-[15px] font-black text-slate-900 tabular">8 <span class="text-[12px] text-slate-400 font-bold ml-1">/ 10</span></span>
-              </div>
-              
-              <div class="flex justify-between items-center group">
-                <span class="text-[13px] sm:text-[14px] text-slate-600 font-medium group-hover:text-slate-900 transition">Avg Win</span>
-                <span class="text-[14px] sm:text-[15px] font-black text-emerald-600 tabular">+₹6,400</span>
-              </div>
-              
-              <div class="flex justify-between items-center group border-b border-slate-50 pb-5">
-                <span class="text-[13px] sm:text-[14px] text-slate-600 font-medium group-hover:text-slate-900 transition">Avg Loss</span>
-                <span class="text-[14px] sm:text-[15px] font-black text-rose-600 tabular">-₹2,500</span>
-              </div>
-              
-              <div class="flex justify-between items-center pt-1">
-                <span class="text-[13px] sm:text-[14px] text-slate-600 font-bold">Reward to Risk</span>
-                <span class="text-[15px] sm:text-[16px] font-black text-indigo-700 bg-indigo-50 border border-indigo-100 px-2 py-0.5 rounded shadow-sm tabular">2.56</span>
-              </div>
-            </div>
-          </div>
-
-          <!-- BLOWUP SHIELD Card (Retained) -->
-          <div class="tm-card p-6 sm:p-7">
-            <div class="flex items-center justify-between mb-6 sm:mb-8">
-              <h3 class="font-bold text-slate-900 text-[14px] sm:text-[15px] flex items-center gap-1.5 sm:gap-2">
-                <svg aria-hidden="true" class="w-4 h-4 text-brand" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2">
-                  <path stroke-linecap="round" stroke-linejoin="round" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"></path>
-                </svg>
-                Blowup Shield
-              </h3>
-              <span class="badge badge-gray">Active</span>
-            </div>
-
-            <div class="flex items-end gap-2 mb-1.5">
-              <span class="text-[40px] sm:text-[48px] font-black tracking-tighter leading-none text-obs tabular">40%</span>
-            </div>
-            <p class="text-[13px] text-slate-500 mb-5 font-medium leading-relaxed">Alerts heeded &middot; <strong class="text-slate-700">2/5</strong> total response rate</p>
-
-            <div class="progress-bar mb-2">
-              <div class="progress-fill obs w-[40%]"></div>
-            </div>
-            <div class="flex items-center justify-between mb-6 sm:mb-8">
-              <span class="text-[11px] text-slate-500 font-bold uppercase tracking-wider">0%</span>
-              <span class="text-[11px] text-slate-500 font-bold uppercase tracking-wider">100% Guard</span>
-            </div>
-
-            <div class="flex items-center justify-between rounded-lg border border-red-100 px-3 sm:px-4 py-3 bg-red-50 shadow-inset mb-5 sm:mb-6">
-              <span class="text-[13px] font-bold text-red-900 leading-tight">Follow-on Loss</span>
-              <span class="badge badge-red font-mono">-₹4,500</span>
-            </div>
-
-            <button class="btn btn-secondary w-full text-[13px]">View Shield Log &rarr;</button>
-          </div>
-
+          <p class="text-[11px] sm:text-xs text-slate-400 font-medium">Tuesday, Oct 24 · Active Live Session</p>
         </div>
       </div>
+
+      <div class="flex items-center gap-4">
+        <!-- Desktop Session Stats (Hidden on Mobile) -->
+        <div class="hidden sm:flex items-center gap-4 px-4 py-1.5 bg-[#F5F5F7] border border-black/5 rounded-full text-xs">
+          <div class="flex flex-col">
+            <span class="text-[9px] text-slate-400 font-semibold uppercase tracking-wider">Today's P&L</span>
+            <span class="font-bold text-[#34C759] font-mono">+₹24,500</span>
+          </div>
+          <div class="w-[1px] h-5 bg-black/10"></div>
+          <div class="flex flex-col">
+            <span class="text-[9px] text-slate-400 font-semibold uppercase tracking-wider">Active</span>
+            <span class="font-bold text-slate-800 font-mono">3 Pos</span>
+          </div>
+          <div class="w-[1px] h-5 bg-black/10"></div>
+          <div class="flex flex-col">
+            <span class="text-[9px] text-slate-400 font-semibold uppercase tracking-wider">Focus</span>
+            <span class="font-bold text-slate-800 font-mono">82%</span>
+          </div>
+        </div>
+
+        <!-- Emergency Halt Button -->
+        <button onclick="haltSession()" class="px-4 py-2 bg-[#FF3B30] hover:bg-[#FF453A] text-white font-bold text-xs rounded-full shadow-sm flex items-center gap-1.5 transition-all duration-200 active:scale-[0.97]">
+          <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2.5">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M18.364 18.364A9 9 0 005.636 5.636m12.728 12.728A9 9 0 005.636 5.636m12.728 12.728L5.636 5.636" />
+          </svg>
+          Halt Session
+        </button>
+      </div>
+    </header>
+
+    <!-- Inner Padding Wrapper -->
+    <div class="w-full px-4 sm:px-6 lg:px-10 py-8 pb-20 max-w-7xl mx-auto space-y-6">
+
+      <!-- Segment Switcher for Mobile/Tablet -->
+      <div class="segment-tab-bar">
+        <button class="segment-tab-btn active" onclick="switchSegment('alerts')">Behavior Alerts</button>
+        <button class="segment-tab-btn" onclick="switchSegment('market')">Market Monitor</button>
+        <button class="segment-tab-btn" onclick="switchSegment('analytics')">Analytics Rail</button>
+      </div>
+
+      <!-- Main Workspace Grid -->
+      <div class="grid grid-cols-1 lg:grid-cols-5 gap-6 items-start">
+
+        <!-- PANEL 1: Market Monitor (Left Column - 3/5 width on desktop, controls Hero & Positions) -->
+        <div id="segment-market" class="panel-segment lg:col-span-3 space-y-6">
+          
+          <!-- Tile 1: Workstation Hero Card -->
+          <div class="tm-card p-6 sm:p-8 flex flex-col justify-between min-h-[340px] bg-gradient-to-br from-white via-white to-[#0071E3]/3 relative overflow-hidden">
+            <!-- Abstract premium backdrop light glow -->
+            <div class="absolute -right-20 -top-20 w-64 h-64 bg-[#0071E3]/5 rounded-full blur-3xl pointer-events-none"></div>
+            
+            <div class="space-y-6 relative z-10">
+              <div class="flex items-center justify-between">
+                <span class="text-[11px] font-bold text-slate-400 uppercase tracking-widest">Live Performance</span>
+                <span class="px-2 py-0.5 bg-[#34C759]/10 text-[#34C759] text-[10px] font-bold rounded-full font-mono">Market Open</span>
+              </div>
+
+              <div>
+                <p class="text-xs text-slate-400 font-medium mb-1">Today's Realized Net P&L</p>
+                <div class="flex items-baseline gap-2">
+                  <span class="text-4xl sm:text-5xl font-extrabold text-[#34C759] font-mono tracking-tight">+₹24,500</span>
+                  <span class="text-xs font-bold text-[#34C759] bg-[#34C759]/10 border border-[#34C759]/20 px-2 py-0.5 rounded-md font-mono">+2.1%</span>
+                </div>
+                <p class="text-[11px] text-slate-400 mt-2 flex items-center gap-1.5">
+                  <svg class="w-3.5 h-3.5 text-[#34C759]" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M9 12l2 2 4-4" />
+                  </svg>
+                  Optimal trading rhythm maintained · No emotional leakage detected
+                </p>
+              </div>
+
+              <div class="grid grid-cols-2 gap-6 pt-4 border-t border-black/[0.04]">
+                <div>
+                  <p class="text-xs text-slate-400 font-medium mb-1">Emotional Tax</p>
+                  <p class="text-lg font-bold text-slate-800 font-mono">-₹380 <span class="text-xs font-normal text-slate-400">est.</span></p>
+                </div>
+                <div>
+                  <p class="text-xs text-slate-400 font-medium mb-1">Focus Score</p>
+                  <p class="text-lg font-bold text-slate-800 font-mono">82<span class="text-xs font-normal text-slate-400">/100</span></p>
+                </div>
+              </div>
+            </div>
+
+            <!-- Trades pacing progress bar -->
+            <div class="pt-6 border-t border-black/[0.04] mt-6 relative z-10">
+              <div class="flex justify-between items-baseline mb-2 text-xs">
+                <span class="font-medium text-slate-500">Daily Trade Limit Pacing</span>
+                <span class="font-bold text-slate-700 font-mono">6 of 10 Executed</span>
+              </div>
+              <div class="w-full bg-slate-100 h-2 rounded-full overflow-hidden">
+                <div class="bg-[#0071E3] h-full rounded-full transition-all duration-500" style="width: 60%;"></div>
+              </div>
+              <p class="text-[11px] text-slate-400 mt-1.5">4 trades remaining before automatic Shield Lockout triggers.</p>
+            </div>
+          </div>
+
+          <!-- Tile 2: Active Positions -->
+          <div class="tm-card p-6 flex flex-col justify-between min-h-[340px]">
+            <div class="space-y-4 flex-1">
+              <div class="flex items-center justify-between">
+                <h2 class="text-xs font-bold text-slate-400 uppercase tracking-widest">Active Positions</h2>
+                <button onclick="exitAllPositions()" class="text-xs font-bold text-[#FF3B30] hover:text-[#FF453A] active:scale-[0.97] transition-all">Exit All</button>
+              </div>
+
+              <!-- Position Card list -->
+              <div class="space-y-4">
+                <!-- Position Item 1 -->
+                <div class="p-4 bg-[#F5F5F7] rounded-xl border border-black/[0.02] relative overflow-hidden">
+                  <div class="flex items-center justify-between mb-3">
+                    <div>
+                      <span class="text-xs font-bold text-slate-800">NIFTY 24000 CE</span>
+                      <span class="text-[10px] text-slate-400 font-mono block">Expiry 24 Oct</span>
+                    </div>
+                    <span class="px-2 py-0.5 bg-[#0071E3]/10 text-[#0071E3] text-[9px] font-bold rounded-md font-mono">CE</span>
+                  </div>
+
+                  <div class="grid grid-cols-2 gap-y-2 gap-x-4 text-xs font-mono">
+                    <div class="flex justify-between">
+                      <span class="text-slate-400 font-sans">Quantity</span>
+                      <span class="font-bold text-slate-700">1,200</span>
+                    </div>
+                    <div class="flex justify-between">
+                      <span class="text-slate-400 font-sans">Avg Entry</span>
+                      <span class="font-bold text-slate-700">145.20</span>
+                    </div>
+                    <div class="flex justify-between">
+                      <span class="text-slate-400 font-sans">LTP</span>
+                      <span class="font-bold text-slate-700">165.40</span>
+                    </div>
+                    <div class="flex justify-between">
+                      <span class="text-slate-400 font-sans">P&L State</span>
+                      <span class="font-bold text-[#34C759]">+₹24,240</span>
+                    </div>
+                  </div>
+
+                  <div class="mt-3 pt-3 border-t border-black/[0.03] flex items-center justify-between">
+                    <span class="text-[10px] text-slate-400 flex items-center gap-1">
+                      <span class="w-1.5 h-1.5 rounded-full bg-[#34C759] animate-pulse"></span>
+                      Auto-Trailing Stop active
+                    </span>
+                    <span class="text-[10px] font-extrabold text-[#34C759] tracking-wider">IN THE MONEY</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <!-- Quick System Log / Session Activity Snippet -->
+            <div class="pt-4 border-t border-black/[0.04] mt-4">
+              <h3 class="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-2">Recent Session Activity</h3>
+              <div class="space-y-1.5 text-[11px] text-slate-500 font-mono">
+                <div class="flex justify-between">
+                  <span>[13:14:02] NIFTY Entry Executed</span>
+                  <span class="text-slate-400">1200 Qty</span>
+                </div>
+                <div class="flex justify-between">
+                  <span>[12:45:10] Rule Shield Lock warning</span>
+                  <span class="text-[#FF9500] font-bold">Volume</span>
+                </div>
+                <div class="flex justify-between">
+                  <span>[12:30:00] Focus Score Calculated</span>
+                  <span class="text-[#34C759] font-bold">82/100</span>
+                </div>
+              </div>
+            </div>
+          </div>
+
+        </div>
+
+        <!-- PANEL 2: Operations Feed (Right Column - 2/5 width on desktop, controls Alerts) -->
+        <div id="segment-alerts" class="panel-segment active-segment lg:col-span-2 space-y-6">
+          <div class="flex items-center justify-between pb-2">
+            <h2 class="text-xs font-bold text-slate-400 uppercase tracking-widest flex items-center gap-1.5">
+              <svg class="w-3.5 h-3.5 text-[#FF9500]" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+              </svg>
+              Behavioral Alerts
+            </h2>
+            <span class="px-2.5 py-0.5 bg-[#FF3B30]/10 text-[#FF3B30] text-[10px] font-bold rounded-full">2 Active Issues</span>
+          </div>
+
+          <!-- Alert 1 -->
+          <div class="alert-card severity-high flex flex-col gap-3">
+            <div class="flex items-start justify-between gap-2">
+              <div>
+                <h4 class="text-xs font-bold text-slate-800">Revenge Matrix Triggered</h4>
+                <p class="text-[10px] text-slate-400 font-mono mt-0.5">14m ago · NIFTY 24000 PE</p>
+              </div>
+              <span class="px-1.5 py-0.5 bg-[#FF3B30]/10 text-[#FF3B30] text-[9px] font-bold rounded uppercase">High Risk</span>
+            </div>
+            <p class="text-[11px] sm:text-xs text-slate-600 leading-relaxed">Re-entered position immediately after a stop-out loss. Clear deviation from rule-based trading system.</p>
+            <div class="flex items-center gap-2 mt-1">
+              <button onclick="haltSession()" class="px-3 py-1.5 bg-[#FF3B30] hover:bg-[#FF453A] text-white text-[11px] font-bold rounded-lg transition-all active:scale-[0.97] flex-1 text-center">Halt Trading</button>
+              <button onclick="dismissAlert(this)" class="px-3 py-1.5 bg-white hover:bg-slate-50 text-slate-500 border border-black/5 text-[11px] font-bold rounded-lg transition-all active:scale-[0.97] flex-1 text-center">Dismiss</button>
+            </div>
+          </div>
+
+          <!-- Alert 2 -->
+          <div class="alert-card severity-med flex flex-col gap-2">
+            <div class="flex items-start justify-between gap-2">
+              <div>
+                <h4 class="text-xs font-bold text-slate-800">Volume Surge Warning</h4>
+                <p class="text-[10px] text-slate-400 font-mono mt-0.5">42m ago · Size Boundary</p>
+              </div>
+              <span class="px-1.5 py-0.5 bg-[#FF9500]/10 text-[#FF9500] text-[9px] font-bold rounded uppercase">Medium Risk</span>
+            </div>
+            <p class="text-[11px] sm:text-xs text-slate-600 leading-relaxed">Position sizing on your last 2 trades exceeds daily psychological boundary by 15.4%.</p>
+            <div class="flex items-center gap-2 mt-1">
+              <a href="alerts.html" class="px-3 py-1.5 bg-[#FF9500]/10 hover:bg-[#FF9500]/20 text-[#FF9500] text-[11px] font-bold rounded-lg transition-all active:scale-[0.97] flex-1 text-center">Acknowledge Rules</a>
+            </div>
+          </div>
+        </div>
+
+        <!-- PANEL 3: Analytics Rail (Full Row Width on desktop, controls Shield & KPIs) -->
+        <div id="segment-analytics" class="panel-segment lg:col-span-5 space-y-6">
+          <div class="flex items-center justify-between pb-2">
+            <h2 class="text-xs font-bold text-slate-400 uppercase tracking-widest flex items-center gap-1.5">
+              <svg class="w-3.5 h-3.5 text-[#0071E3]" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" />
+              </svg>
+              Blowup Shield
+            </h2>
+            <span class="text-xs font-bold text-[#34C759] flex items-center gap-1">
+              <span class="w-1.5 h-1.5 rounded-full bg-[#34C759]"></span>
+              Guarding
+            </span>
+          </div>
+
+          <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <!-- Shield Guard Card -->
+            <div class="tm-card p-6 flex flex-col justify-between min-h-[220px]">
+              <div class="space-y-4">
+                <div class="flex justify-between items-baseline mb-1">
+                  <span class="text-xs font-bold text-slate-400 uppercase tracking-wider">Guard Score</span>
+                  <span class="text-2xl font-bold text-[#FF9500] font-mono">40%</span>
+                </div>
+                <!-- Circular/Horizontal progress and info -->
+                <div class="flex items-center gap-4 bg-[#F5F5F7] p-4 rounded-xl border border-black/[0.02]">
+                  <div class="relative w-16 h-16 flex items-center justify-center shrink-0">
+                    <svg class="w-full h-full transform -rotate-90" viewBox="0 0 36 36">
+                      <path class="text-slate-200" stroke-width="4" stroke="currentColor" fill="none" d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831" />
+                      <path class="text-[#FF9500]" stroke-width="4" stroke-dasharray="40, 100" stroke-linecap="round" stroke="currentColor" fill="none" d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831" />
+                    </svg>
+                    <div class="absolute text-xs font-bold text-slate-700 font-mono">40%</div>
+                  </div>
+                  <div>
+                    <p class="text-xs font-bold text-slate-700">Defensive Rating</p>
+                    <p class="text-[11px] text-slate-400 font-medium">Alerts heeded: 2 of 5 total</p>
+                  </div>
+                </div>
+              </div>
+
+              <a href="blowup_shield.html" class="block w-full py-2.5 bg-slate-50 hover:bg-slate-100 active:scale-[0.97] text-slate-600 text-xs font-bold rounded-lg border border-black/5 text-center transition-all mt-4">
+                Open Blowup Shield &rarr;
+              </a>
+            </div>
+
+            <!-- Win Rate Ratio Card -->
+            <div class="tm-card p-6 flex flex-col justify-between min-h-[220px]">
+              <div class="space-y-4">
+                <h3 class="text-xs font-bold text-slate-400 uppercase tracking-widest">Key Performance Indicators</h3>
+                <div class="grid grid-cols-3 gap-3 text-center text-xs font-mono">
+                  <div class="p-3 bg-[#F5F5F7] rounded-xl border border-black/[0.02]">
+                    <span class="text-[10px] text-slate-400 font-sans block mb-1">Win Rate</span>
+                    <span class="font-bold text-slate-700">62.5%</span>
+                  </div>
+                  <div class="p-3 bg-[#F5F5F7] rounded-xl border border-black/[0.02]">
+                    <span class="text-[10px] text-slate-400 font-sans block mb-1">Avg W/L</span>
+                    <span class="font-bold text-[#34C759]">2.56</span>
+                  </div>
+                  <div class="p-3 bg-[#F5F5F7] rounded-xl border border-black/[0.02]">
+                    <span class="text-[10px] text-slate-400 font-sans block mb-1">Profit Fac</span>
+                    <span class="font-bold text-slate-700">1.82</span>
+                  </div>
+                </div>
+              </div>
+
+              <div class="p-3 bg-[#FF3B30]/5 border border-[#FF3B30]/10 rounded-xl text-xs mt-4">
+                <div class="flex justify-between font-bold text-[#FF3B30]">
+                  <span>Follow-on Loss</span>
+                  <span class="font-mono">-₹4,500</span>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+      </div>
+    </div>
   </main>
 
   <!-- Mock Toast Notification -->
@@ -529,6 +528,27 @@
         }, 80); // ~8s timeout
       }
     }, 2500);
+
+    function switchSegment(segmentId) {
+      document.querySelectorAll('.panel-segment').forEach(el => el.classList.remove('active-segment'));
+      document.getElementById('segment-' + segmentId).classList.add('active-segment');
+      document.querySelectorAll('.segment-tab-btn').forEach(btn => btn.classList.remove('active'));
+      event.currentTarget.classList.add('active');
+    }
+
+    function haltSession() {
+      alert("Trading Halt simulation triggered. API connection blocked for 15 minutes.");
+    }
+
+    function exitAllPositions() {
+      if (confirm("Are you sure you want to EXIT all active positions immediately?")) {
+        alert("Positions closed successfully.");
+      }
+    }
+
+    function dismissAlert(btn) {
+      btn.closest('.alert-card').remove();
+    }
 
     function dismissToast() {
       const toast = document.getElementById('toast-notification');

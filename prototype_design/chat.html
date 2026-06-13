@@ -18,7 +18,8 @@
   <script src="https://unpkg.com/@tailwindcss/browser@4"></script>
   <style type="text/tailwindcss">
     @theme {
-      --font-sans: 'Inter', sans-serif;
+      --font-sans: 'Outfit', sans-serif;
+      --font-mono: 'Geist Mono', monospace;
       --color-brand: #635BFF;
       --color-brandBg: #EEF2FF;
       --color-profit: #10B981;
@@ -138,190 +139,171 @@
   <main class="main-content flex flex-col h-screen">
     <div class="bg-stripe-header"></div>
 
-        <!-- Main Chat Workspace -->
-    <div class="w-full max-w-4xl mx-auto px-4 sm:px-6 py-6 flex-1 flex flex-col h-[calc(100vh-72px)] lg:h-screen">
-
+    <!-- Main Chat Workspace -->
+    <div class="w-full max-w-7xl mx-auto px-4 sm:px-6 py-6 flex-1 flex flex-col h-[calc(100vh-72px)] lg:h-screen relative z-10">
+      
       <!-- Page Header -->
-      <header class="flex items-end justify-between gap-4 mb-4 shrink-0">
+      <header class="flex items-center justify-between gap-4 mb-4 shrink-0 pb-3 border-b border-slate-200">
         <div>
-          <h1 class="text-[22px] font-medium  text-slate-900 mb-1">AI Coach</h1>
-          <p class="text-sm text-slate-500 font-medium">Personalized guidance from your real trading data</p>
+          <h1 class="text-xl font-bold tracking-tight text-slate-900 font-sans">Psychology AI Coach</h1>
+          <p class="text-xs text-slate-500 font-medium">Real-time behavior analysis and coaching console</p>
         </div>
-        <button class="text-[13px] text-slate-500 hover:text-slate-900 font-medium flex items-center gap-2">
-          <svg aria-hidden="true" class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-              d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16">
-            </path>
+        <button onclick="clearChat()" class="text-xs text-slate-500 hover:text-slate-950 font-bold flex items-center gap-1.5 transition-colors">
+          <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
           </svg>
-          Clear
+          Reset Session
         </button>
       </header>
 
-      <!-- Chat Container -->
-      <div class="tm-card flex flex-col flex-1 overflow-hidden">
+      <!-- Workstation Split Grid -->
+      <div class="grid grid-cols-1 lg:grid-cols-10 gap-6 flex-1 min-h-0 overflow-hidden items-stretch">
+        
+        <!-- LEFT SIDEBAR PANEL: Session Context Rail (40% / col-span-4) -->
+        <div class="lg:col-span-4 space-y-4 flex flex-col justify-start">
+          <div class="text-xs font-bold text-slate-400 uppercase tracking-wider">Active Session Context</div>
+          
+          <!-- Context Card -->
+          <div class="tm-card p-5 space-y-4">
+            <div>
+              <h3 class="text-xs font-bold text-slate-900 mb-2.5">Today's Behavior Summary</h3>
+              <div class="space-y-2 text-xs">
+                <div class="flex justify-between">
+                  <span class="text-slate-500 font-medium">Session P&L:</span>
+                  <span class="font-bold text-rose-600 font-mono font-tabular">-₹4,200</span>
+                </div>
+                <div class="flex justify-between">
+                  <span class="text-slate-500 font-medium">Total Orders:</span>
+                  <span class="font-bold text-slate-800 font-mono font-tabular">12 trades</span>
+                </div>
+                <div class="flex justify-between">
+                  <span class="text-slate-500 font-medium">Behavioral Alerts:</span>
+                  <span class="font-bold text-amber-500 font-mono font-tabular flex items-center gap-1">
+                    <span class="w-1.5 h-1.5 rounded-full bg-amber-500 animate-pulse"></span>
+                    1 active
+                  </span>
+                </div>
+                <div class="flex justify-between">
+                  <span class="text-slate-500 font-medium">Current Status:</span>
+                  <span class="px-2 py-0.5 bg-rose-50 border border-rose-100 text-rose-700 text-[10px] font-bold rounded uppercase">Tilt Risk</span>
+                </div>
+              </div>
+            </div>
 
-        <!-- Snapshot Bar -->
-        <div class="px-4 py-2 border-b border-slate-100 bg-slate-50 flex items-center gap-3 text-xs flex-wrap">
-          <span class="font-bold text-slate-500">Today</span>
+            <div class="border-t border-slate-100 pt-3.5">
+              <h3 class="text-xs font-bold text-slate-900 mb-2">Flagged Anomalies</h3>
+              <div class="p-3 bg-amber-50 border border-amber-200 rounded-lg text-xs border">
+                <span class="font-bold text-amber-900">Revenge Entry Pattern</span>
+                <p class="text-[11px] text-amber-700 leading-normal mt-0.5">
+                  Re-entered NIFTY immediately after stop-out loss. Stat expectancy for this action is negative.
+                </p>
+              </div>
+            </div>
 
-          <span class="font-medium text-rose-600 flex items-center gap-1 tabular">
-            <svg aria-hidden="true" class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="3" d="M13 17h8m0 0V9m0 8l-8-8-4 4-6-6">
-              </path>
-            </svg>
-            -₹4,200
-          </span>
-
-          <span class="text-slate-500 font-medium">
-            12 trades
-          </span>
-
-          <span class="text-obs flex items-center gap-1 font-bold">
-            <svg aria-hidden="true" class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="3"
-                d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z">
-              </path>
-            </svg>
-            1 alert
-          </span>
-
-          <span
-            class="badge badge-red ml-auto flex items-center gap-1 uppercase">
-            <svg aria-hidden="true" class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z">
-              </path>
-            </svg>
-            Danger
-          </span>
+            <div class="border-t border-slate-100 pt-3.5">
+              <h3 class="text-xs font-bold text-slate-900 mb-2">Halt Intervention Status</h3>
+              <div class="w-full bg-slate-100 h-2 rounded-full overflow-hidden mb-1">
+                <div class="bg-brand h-full rounded-full" style="width: 80%;"></div>
+              </div>
+              <div class="flex justify-between text-[11px] text-slate-400 font-medium">
+                <span>8 of 10 daily trade cap</span>
+                <span>2 left</span>
+              </div>
+            </div>
+          </div>
         </div>
 
-        <!-- Chat Feed -->
-        <div class="flex-1 overflow-y-auto chat-scroll p-4 sm:p-6 space-y-6 bg-white">
+        <!-- RIGHT PANEL: AI Coach Feed (60% / col-span-6) -->
+        <div class="lg:col-span-6 flex flex-col h-full min-h-[450px]">
+          <div class="text-xs font-bold text-slate-400 uppercase tracking-wider mb-2">Coach Conversation</div>
 
-          <!-- AI intro -->
-          <div class="flex gap-3 max-w-[85%]">
-            <div
-              class="w-8 h-8 rounded-xl bg-indigo-50 border border-indigo-100 flex-shrink-0 flex items-center justify-center mt-1">
-              <svg aria-hidden="true" class="w-4 h-4 text-brand" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                  d="M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z">
-                </path>
-              </svg>
-            </div>
-            <div>
-              <div class="bubble-ai">
-                Welcome back, John. I notice you've taken 12 trades today and are currently down ₹4,200. The risk engine
-                has flagged you as being in a <strong>tilt state</strong> due to revenge trading on BANKNIFTY.
-                <br><br>
-                How are you feeling right now? Do you want me to analyze those recent losses?
-              </div>
-              <p class="text-[12px] text-slate-500 mt-1.5 px-1 font-medium select-none">10:45 AM</p>
-            </div>
-          </div>
-
-          <!-- User Message -->
-          <div class="flex gap-3 max-w-[80%] ml-auto justify-end">
-            <div class="flex flex-col items-end">
-              <div class="bubble-user">
-                I got stopped out early on a fake breakdown and jumped back in to recover. Why do I keep doing this?
-              </div>
-              <p class="text-[12px] text-slate-500 mt-1.5 px-1 font-medium select-none">10:47 AM</p>
-            </div>
-            <div
-              class="w-8 h-8 rounded-xl bg-slate-100 border border-slate-200 flex-shrink-0 flex items-center justify-center mt-1">
-              <span class="text-[13px] font-bold text-slate-500">JD</span>
-            </div>
-          </div>
-
-          <!-- AI Response -->
-          <div class="flex gap-3 max-w-[85%]">
-            <div
-              class="w-8 h-8 rounded-xl bg-indigo-50 border border-indigo-100 flex-shrink-0 flex items-center justify-center mt-1">
-              <svg aria-hidden="true" class="w-4 h-4 text-brand" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                  d="M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z">
-                </path>
-              </svg>
-            </div>
-            <div>
-              <div class="bubble-ai">
-                This is a classic immediate re-entry pattern. Looking at your history over the last 30 days:
-                <br><br>
-                <div class="flex gap-2 ml-1">
-                  <span class="text-brand font-bold">•</span>
-                  <span>When you re-enter the same instrument within 5 minutes of a stop-out, your win rate is only
-                    <strong>18%</strong>.</span>
+          <div class="tm-card flex-1 flex flex-col min-h-0 overflow-hidden bg-white">
+            <!-- Chat Feed -->
+            <div id="chat-feed" class="flex-1 overflow-y-auto chat-scroll p-4 sm:p-5 space-y-4 bg-white">
+              
+              <!-- Coach message -->
+              <div class="flex gap-2.5 max-w-[85%]">
+                <div class="w-7 h-7 rounded-lg bg-indigo-50 border border-indigo-100 flex-shrink-0 flex items-center justify-center mt-1 border">
+                  <span class="text-xs">🤖</span>
                 </div>
-                <div class="flex gap-2 ml-1 mt-1">
-                  <span class="text-brand font-bold">•</span>
-                  <span>This specific habit has cost you <strong>₹12,400</strong> this month.</span>
+                <div>
+                  <div class="bubble-ai text-xs">
+                    Welcome back, John. I notice you've taken 12 trades today and are currently down ₹4,200. The risk engine has flagged you as being in a <span class="font-bold">tilt state</span> due to revenge trading on BANKNIFTY.
+                    <br><br>
+                    How are you feeling right now? Do you want me to analyze those recent losses?
+                  </div>
+                  <span class="text-[9px] text-slate-400 font-mono mt-1 block pl-1">10:45 AM</span>
                 </div>
-                <br>
-                Your "Adaptive Scalper" persona works well when you are calm, but you abandon your criteria after a
-                loss. I recommend a hard 15-minute cooldown rule after any stop-out before trading the same ticker
-                again.
               </div>
-              <div class="flex items-center gap-2 mt-1.5 px-1">
-                <p class="text-[12px] text-slate-500 font-medium select-none">10:48 AM</p>
-                <button
-                  class="flex items-center gap-1 text-[12px] text-slate-500 hover:text-brand transition-colors font-medium cursor-pointer ml-2">
-                  <svg aria-hidden="true" class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                      d="M5 5a2 2 0 012-2h10a2 2 0 012 2v16l-7-3.5L5 21V5z"></path>
+
+              <!-- User message -->
+              <div class="flex gap-2.5 max-w-[85%] ml-auto justify-end font-medium">
+                <div class="flex flex-col items-end">
+                  <div class="bubble-user text-xs">
+                    I got stopped out early on a fake breakdown and jumped back in to recover. Why do I keep doing this?
+                  </div>
+                  <span class="text-[9px] text-slate-400 font-mono mt-1 block pr-1">10:47 AM</span>
+                </div>
+                <div class="w-7 h-7 rounded-lg bg-slate-100 border border-slate-200 flex-shrink-0 flex items-center justify-center mt-1 border">
+                  <span class="text-[10px] font-bold text-slate-500">JD</span>
+                </div>
+              </div>
+
+              <!-- Coach message 2 -->
+              <div class="flex gap-2.5 max-w-[85%]">
+                <div class="w-7 h-7 rounded-lg bg-indigo-50 border border-indigo-100 flex-shrink-0 flex items-center justify-center mt-1 border">
+                  <span class="text-xs">🤖</span>
+                </div>
+                <div>
+                  <div class="bubble-ai text-xs">
+                    This is a classic immediate re-entry pattern. Looking at your history over the last 30 days:
+                    <br><br>
+                    • When you re-enter the same instrument within 5 minutes of a stop-out, your win rate is only <span class="font-bold">18%</span>.<br>
+                    • This specific habit has cost you <span class="font-bold text-rose-600 font-mono">-₹12,400</span> this month.
+                    <br><br>
+                    Your "Adaptive Scalper" persona works well when you are calm, but you abandon your criteria after a loss. I recommend a hard 15-minute cooldown rule after any stop-out.
+                  </div>
+                  <div class="flex items-center gap-2 mt-1 pl-1">
+                    <span class="text-[9px] text-slate-400 font-mono">10:48 AM</span>
+                    <button onclick="saveToJournal()" class="text-[9px] text-brand hover:underline font-bold flex items-center gap-0.5">
+                      <svg class="w-2.5 h-2.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2.5">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M5 5a2 2 0 012-2h10a2 2 0 012 2v16l-7-3.5L5 21V5z" />
+                      </svg>
+                      Save to Journal
+                    </button>
+                  </div>
+                </div>
+              </div>
+
+            </div>
+
+            <!-- Suggestion Chips -->
+            <div class="px-4 pb-3 pt-1.5 border-t border-slate-100 bg-white">
+              <div class="flex gap-1.5 overflow-x-auto pb-1 chat-scroll">
+                <button onclick="sendSuggestion('How do I enforce a cooldown?')" class="chip text-xs py-1 px-2.5">How do I enforce a cooldown?</button>
+                <button onclick="sendSuggestion('Analyze my win rate by time of day')" class="chip text-xs py-1 px-2.5">Analyze my win rate by time of day</button>
+                <button onclick="sendSuggestion('Show me my best setups')" class="chip text-xs py-1 px-2.5">Show me my best setups</button>
+              </div>
+            </div>
+
+            <!-- Input Form -->
+            <div class="p-3 bg-slate-50 border-t border-slate-200">
+              <form id="chat-form" onsubmit="submitChat(event)" class="flex gap-2 items-end">
+                <textarea id="chat-input" required placeholder="Ask your AI coach..." rows="1" class="tm-input w-full text-xs font-medium py-2 px-3 focus:outline-none resize-none overflow-y-hidden max-h-[80px]" onkeydown="handleEnter(event)"></textarea>
+                <button type="submit" aria-label="Send message" class="btn btn-primary h-[34px] w-[34px] flex items-center justify-center p-0 rounded-lg flex-shrink-0">
+                  <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2.5">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8" />
                   </svg>
-                  Save to Journal
                 </button>
-              </div>
+              </form>
             </div>
           </div>
-
-        </div>
-
-        <!-- Follow-up Prompt Chips -->
-        <div class="px-4 pb-3 pt-1 border-t border-slate-100 bg-white">
-          <p class="text-[12px] font-medium text-slate-500 uppercase tracking-wider mb-2">Suggested Actions</p>
-          <div class="flex gap-2 overflow-x-auto pb-1 chat-scroll">
-            <button class="chip">
-              How do I enforce a cooldown?
-            </button>
-            <button class="chip">
-              Analyze my win rate by time of day
-            </button>
-            <button class="chip">
-              Show me my best setups
-            </button>
-          </div>
-        </div>
-
-        <!-- Input Area -->
-        <div class="p-4 bg-slate-50 border-t border-slate-200">
-          <div class="flex gap-3 items-end">
-            <div
-              class="flex-1 bg-white border border-slate-300 rounded-lg shadow-sm focus-within:border-brand focus-within:ring-2 focus-within:ring-brand/15 flex items-center transition">
-              <textarea placeholder="Ask your AI coach..." rows="1"
-                class="w-full px-4 py-3 bg-transparent text-[14px] text-slate-900 placeholder:text-slate-500 focus:outline-none resize-none overflow-y-hidden max-h-[120px] leading-relaxed"></textarea>
-            </div>
-            <button
-              aria-label="Send message"
-              class="btn btn-secondary h-[46px] w-[46px] flex items-center justify-center p-0 rounded-lg flex-shrink-0">
-              <svg aria-hidden="true" class="w-4 h-4 ml-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                  d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8"></path>
-              </svg>
-            </button>
-          </div>
-          <p class="text-[12px] text-slate-500 font-medium text-right mt-2 select-none">
-            Enter to send &middot; Shift+Enter for new line
-          </p>
         </div>
 
       </div>
 
-      <!-- Footer disclaimer -->
-      <p class="text-[13px] text-slate-500 text-center mt-4">TradeMentor AI is a coaching tool and does not provide
-        financial advice.</p>
     </div>
+  </main>  </div>
   </main>
 
 
@@ -351,7 +333,90 @@
       </a>
     </div>
   </nav>
-  <script>document.getElementById('bnav-chat').classList.add('active');</script>
+  <script>
+    document.getElementById('bnav-chat').classList.add('active');
+
+    function clearChat() {
+      if (confirm("Reset conversation session?")) {
+        const feed = document.getElementById('chat-feed');
+        feed.innerHTML = `
+          <div class="flex gap-2.5 max-w-[85%]">
+            <div class="w-7 h-7 rounded-lg bg-indigo-50 border border-indigo-100 flex-shrink-0 flex items-center justify-center mt-1 border">
+              <span class="text-xs">🤖</span>
+            </div>
+            <div>
+              <div class="bubble-ai text-xs">
+                Chat history reset. How can I help you improve your trading psychology today?
+              </div>
+              <span class="text-[9px] text-slate-400 font-mono mt-1 block pl-1">Just now</span>
+            </div>
+          </div>
+        `;
+      }
+    }
+
+    function saveToJournal() {
+      alert("Coaching recommendation saved directly to your psychological rules reflection log.");
+    }
+
+    function sendSuggestion(text) {
+      document.getElementById('chat-input').value = text;
+      document.getElementById('chat-form').dispatchEvent(new Event('submit', { cancelable: true }));
+    }
+
+    function handleEnter(e) {
+      if (e.key === 'Enter' && !e.shiftKey) {
+        e.preventDefault();
+        // Trigger submit
+        submitChat(new Event('submit'));
+      }
+    }
+
+    function submitChat(e) {
+      if (e) e.preventDefault();
+      const input = document.getElementById('chat-input');
+      const text = input.value.trim();
+      if (!text) return;
+      
+      const feed = document.getElementById('chat-feed');
+      
+      // Append user bubble
+      feed.innerHTML += `
+        <div class="flex gap-2.5 max-w-[85%] ml-auto justify-end font-medium">
+          <div class="flex flex-col items-end">
+            <div class="bubble-user text-xs">
+              ${text}
+            </div>
+            <span class="text-[9px] text-slate-400 font-mono mt-1 block pr-1">Just now</span>
+          </div>
+          <div class="w-7 h-7 rounded-lg bg-slate-100 border border-slate-200 flex-shrink-0 flex items-center justify-center mt-1 border">
+            <span class="text-[10px] font-bold text-slate-500">JD</span>
+          </div>
+        </div>
+      `;
+      
+      input.value = '';
+      feed.scrollTop = feed.scrollHeight;
+      
+      // Simulated Coach reply
+      setTimeout(() => {
+        feed.innerHTML += `
+          <div class="flex gap-2.5 max-w-[85%]">
+            <div class="w-7 h-7 rounded-lg bg-indigo-50 border border-indigo-100 flex-shrink-0 flex items-center justify-center mt-1 border">
+              <span class="text-xs">🤖</span>
+            </div>
+            <div>
+              <div class="bubble-ai text-xs">
+                Understood. Reflecting on your question: "${text}". To execute consistent size management, always pre-define the maximum loss per trade before punching order entry.
+              </div>
+              <span class="text-[9px] text-slate-400 font-mono mt-1 block pl-1">Just now</span>
+            </div>
+          </div>
+        `;
+        feed.scrollTop = feed.scrollHeight;
+      }, 1000);
+    }
+  </script>
 </body>
 
 </html>

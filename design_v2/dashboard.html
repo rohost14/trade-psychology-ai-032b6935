@@ -1,0 +1,729 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Dashboard — TradeMentor AI</title>
+  <link rel="stylesheet" href="base.css" />
+  <style>
+    /* ── DASHBOARD-SPECIFIC ──────────────────────────────────────── */
+
+    /* Session hero */
+    .session-hero {
+      display: grid;
+      grid-template-columns: 1fr auto;
+      gap: 24px;
+      align-items: start;
+    }
+    .state-pill {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 4px 10px 4px 8px;
+      border-radius: 99px;
+      font-size: 11px;
+      font-weight: 600;
+      letter-spacing: 0.04em;
+      text-transform: uppercase;
+      margin-bottom: 12px;
+    }
+    .state-pill .dot { width: 6px; height: 6px; border-radius: 50%; }
+    .state-pill.safe    { background:rgba(34,197,94,0.12);  border:1px solid rgba(34,197,94,0.25);  color:#22C55E; }
+    .state-pill.caution { background:rgba(245,158,11,0.12); border:1px solid rgba(245,158,11,0.25); color:#F59E0B; }
+    .state-pill.danger  { background:rgba(239,68,68,0.12);  border:1px solid rgba(239,68,68,0.25);  color:#EF4444; }
+    .state-pill.safe    .dot { background:#22C55E; }
+    .state-pill.caution .dot { background:#F59E0B; }
+    .state-pill.danger  .dot { background:#EF4444; }
+
+    .hero-pnl {
+      font-family: 'DM Mono', monospace;
+      font-size: 52px;
+      font-weight: 500;
+      letter-spacing: -0.03em;
+      line-height: 1;
+      margin-bottom: 6px;
+    }
+    .hero-meta {
+      font-size: 13px;
+      color: var(--text-secondary);
+      margin-bottom: 16px;
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+    .hero-meta .sep { opacity: 0.3; }
+
+    .hero-pnl-split {
+      display: flex;
+      align-items: center;
+      gap: 20px;
+      margin-bottom: 16px;
+    }
+    .pnl-split-item { display: flex; flex-direction: column; gap: 2px; }
+    .pnl-split-label { font-size: 10px; font-weight: 500; letter-spacing: 0.07em; text-transform: uppercase; color: var(--text-tertiary); }
+    .pnl-split-val { font-family: 'DM Mono', monospace; font-size: 16px; font-weight: 500; }
+
+    .limit-track-row { display: flex; flex-direction: column; gap: 6px; }
+    .limit-label { display: flex; justify-content: space-between; font-size: 11px; color: var(--text-tertiary); }
+
+    /* Sparkline panel */
+    .sparkline-panel {
+      background: var(--bg-elevated);
+      border: 1px solid var(--border-subtle);
+      border-radius: 10px;
+      padding: 16px;
+      min-width: 220px;
+    }
+    .sparkline-label { font-size: 10px; font-weight: 500; letter-spacing: 0.07em; text-transform: uppercase; color: var(--text-tertiary); margin-bottom: 8px; }
+    .sparkline-svg { width: 100%; height: 72px; display: block; }
+
+    /* KPI row */
+    .kpi-row {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 12px;
+    }
+    .kpi-card {
+      background: var(--bg-card);
+      border: 1px solid var(--border-subtle);
+      border-radius: 10px;
+      padding: 16px;
+      transition: border-color 0.15s;
+    }
+    .kpi-card:hover { border-color: var(--border-default); }
+    .kpi-label { font-size: 10px; font-weight: 500; letter-spacing: 0.07em; text-transform: uppercase; color: var(--text-tertiary); margin-bottom: 8px; }
+    .kpi-value { font-family: 'DM Mono', monospace; font-size: 24px; font-weight: 500; color: var(--text-primary); letter-spacing: -0.02em; line-height: 1; margin-bottom: 4px; }
+    .kpi-delta { font-size: 11px; display: flex; align-items: center; gap: 3px; }
+    .kpi-delta.up   { color: var(--profit); }
+    .kpi-delta.down { color: var(--loss); }
+    .kpi-delta.neutral { color: var(--text-tertiary); }
+
+    /* Positions table */
+    .positions-table { width: 100%; border-collapse: collapse; }
+    .positions-table th {
+      text-align: left;
+      font-size: 10px;
+      font-weight: 500;
+      letter-spacing: 0.07em;
+      text-transform: uppercase;
+      color: var(--text-tertiary);
+      padding: 0 0 10px;
+      border-bottom: 1px solid var(--border-subtle);
+    }
+    .positions-table th:not(:first-child) { text-align: right; }
+    .positions-table td {
+      padding: 10px 0;
+      border-bottom: 1px solid var(--border-subtle);
+      font-size: 13px;
+    }
+    .positions-table td:not(:first-child) { text-align: right; }
+    .positions-table tr:last-child td { border-bottom: none; }
+    .positions-table tr:hover td { background: var(--bg-hover); }
+
+    .sym-cell { display: flex; align-items: center; gap: 8px; }
+    .sym-name  { font-weight: 600; color: var(--text-primary); font-size: 13px; }
+    .sym-badge {
+      font-size: 9px;
+      font-weight: 700;
+      padding: 1px 5px;
+      border-radius: 3px;
+      letter-spacing: 0.04em;
+    }
+    .sym-badge.CE { background: rgba(34,197,94,0.12); color: #22C55E; border: 1px solid rgba(34,197,94,0.2); }
+    .sym-badge.PE { background: rgba(239,68,68,0.12); color: #EF4444; border: 1px solid rgba(239,68,68,0.2); }
+    .sym-badge.FUT { background: rgba(20,184,166,0.12); color: var(--brand); border: 1px solid var(--brand-border); }
+
+    .ltp-cell { font-family: 'DM Mono', monospace; color: var(--text-primary); }
+    .pnl-cell { font-family: 'DM Mono', monospace; font-weight: 500; }
+    .pnl-cell.pos { color: var(--profit); }
+    .pnl-cell.neg { color: var(--loss); }
+
+    .status-chip {
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+      font-size: 10px;
+      font-weight: 600;
+      padding: 2px 7px;
+      border-radius: 99px;
+      letter-spacing: 0.03em;
+    }
+    .status-chip.live { background: rgba(34,197,94,0.1); color: #22C55E; border: 1px solid rgba(34,197,94,0.18); }
+    .status-chip.flat { background: var(--neutral-bg); color: var(--text-tertiary); border: 1px solid var(--neutral-border); }
+
+    /* 2-col bottom row */
+    .bottom-row {
+      display: grid;
+      grid-template-columns: 3fr 2fr;
+      gap: 16px;
+    }
+
+    /* Alert list */
+    .alert-list { display: flex; flex-direction: column; gap: 8px; }
+    .alert-row {
+      display: flex;
+      align-items: flex-start;
+      gap: 0;
+      background: var(--bg-elevated);
+      border: 1px solid var(--border-subtle);
+      border-radius: 8px;
+      overflow: hidden;
+      transition: border-color 0.12s;
+    }
+    .alert-row:hover { border-color: var(--border-default); }
+    .alert-row-bar { width: 3px; flex-shrink: 0; }
+    .alert-row-bar.danger  { background: var(--loss); }
+    .alert-row-bar.warning { background: var(--warning); }
+    .alert-row-bar.info    { background: var(--brand); }
+    .alert-row-body { padding: 10px 14px; flex: 1; }
+    .alert-row-title { font-size: 13px; font-weight: 600; color: var(--text-primary); margin-bottom: 3px; }
+    .alert-row-desc  { font-size: 12px; color: var(--text-secondary); line-height: 1.5; margin-bottom: 6px; }
+    .alert-row-footer { display: flex; align-items: center; justify-content: space-between; }
+    .alert-row-time  { font-size: 10px; color: var(--text-tertiary); font-family: 'DM Mono', monospace; }
+    .alert-actions   { display: flex; gap: 6px; }
+    .alert-btn {
+      font-size: 11px;
+      font-weight: 500;
+      padding: 3px 9px;
+      border-radius: 5px;
+      border: 1px solid var(--border-default);
+      background: transparent;
+      color: var(--text-secondary);
+      cursor: pointer;
+      transition: all 0.1s;
+    }
+    .alert-btn:hover { background: var(--bg-hover); color: var(--text-primary); }
+    .alert-btn.dismiss { opacity: 0.6; }
+
+    /* Right column cards */
+    .coach-card-prompt {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      background: var(--bg-card);
+      border: 1px solid var(--border-subtle);
+      border-radius: 8px;
+      padding: 10px 14px;
+      margin-bottom: 8px;
+      font-size: 13px;
+      color: var(--text-secondary);
+      cursor: pointer;
+      transition: all 0.12s;
+    }
+    .coach-card-prompt:hover { border-color: var(--brand-border); color: var(--text-primary); background: var(--brand-bg); }
+    .coach-icon { width: 28px; height: 28px; border-radius: 7px; background: var(--brand-bg); border: 1px solid var(--brand-border); display: flex; align-items: center; justify-content: center; flex-shrink: 0; font-size: 14px; }
+    .coach-input {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      background: var(--bg-elevated);
+      border: 1px solid var(--border-default);
+      border-radius: 8px;
+      padding: 10px 14px;
+    }
+    .coach-input input {
+      flex: 1;
+      background: transparent;
+      border: none;
+      outline: none;
+      font-size: 13px;
+      color: var(--text-primary);
+      font-family: 'Inter', sans-serif;
+    }
+    .coach-input input::placeholder { color: var(--text-tertiary); }
+    .coach-input-btn {
+      width: 28px;
+      height: 28px;
+      border-radius: 6px;
+      background: var(--brand);
+      border: none;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+      flex-shrink: 0;
+    }
+
+    /* Shield mini */
+    .shield-metric-row {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 10px;
+      margin-bottom: 12px;
+    }
+    .shield-metric {
+      background: var(--bg-elevated);
+      border: 1px solid var(--border-subtle);
+      border-radius: 8px;
+      padding: 10px 12px;
+    }
+    .shield-metric-label { font-size: 10px; font-weight: 500; letter-spacing: 0.07em; text-transform: uppercase; color: var(--text-tertiary); margin-bottom: 4px; }
+    .shield-metric-val { font-family: 'DM Mono', monospace; font-size: 18px; font-weight: 500; }
+
+    /* Setup nudge */
+    .setup-nudge {
+      background: linear-gradient(135deg, var(--brand-bg) 0%, var(--bg-card) 100%);
+      border: 1px solid var(--brand-border);
+      border-radius: 10px;
+      padding: 14px 16px;
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      margin-bottom: 16px;
+    }
+    .setup-nudge-icon { font-size: 20px; }
+    .setup-nudge-text h4 { font-size: 13px; font-weight: 600; color: var(--text-primary); margin-bottom: 2px; }
+    .setup-nudge-text p  { font-size: 12px; color: var(--text-secondary); }
+    .setup-nudge-actions { margin-left: auto; display: flex; gap: 6px; flex-shrink: 0; }
+
+    /* VIX badge in top bar */
+    .vix-badge {
+      display: flex;
+      align-items: center;
+      gap: 5px;
+      background: var(--neutral-bg);
+      border: 1px solid var(--neutral-border);
+      border-radius: 6px;
+      padding: 4px 9px;
+      font-size: 12px;
+      color: var(--text-secondary);
+    }
+    .vix-badge .vix-val { font-family: 'DM Mono', monospace; font-weight: 500; color: var(--text-primary); }
+
+    /* Responsive */
+    @media (max-width: 900px) {
+      .kpi-row { grid-template-columns: repeat(2, 1fr); }
+      .bottom-row { grid-template-columns: 1fr; }
+      .session-hero { grid-template-columns: 1fr; }
+      .sparkline-panel { display: none; }
+    }
+  </style>
+</head>
+<body>
+<div class="app-layout">
+
+  <!-- SIDEBAR ──────────────────────────────────────────────── -->
+  <aside class="sidebar">
+    <div class="sidebar-logo">
+      <div class="logo-mark">
+        <svg viewBox="0 0 24 24"><polyline points="3 17 9 11 13 15 21 7"/><polyline points="14 7 21 7 21 14"/></svg>
+      </div>
+      <span class="logo-text">TradeMentor <span>AI</span></span>
+    </div>
+
+    <nav class="sidebar-nav">
+      <div class="nav-section-label">Trading</div>
+      <a href="dashboard.html" class="nav-item active">
+        <svg class="nav-icon icon-stroke" viewBox="0 0 24 24"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/></svg>
+        Dashboard
+      </a>
+      <a href="analytics.html" class="nav-item">
+        <svg class="nav-icon icon-stroke" viewBox="0 0 24 24"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg>
+        Analytics
+      </a>
+      <a href="#" class="nav-item">
+        <svg class="nav-icon icon-stroke" viewBox="0 0 24 24"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg>
+        Alerts
+        <span class="badge-square" style="margin-left:auto;">3</span>
+      </a>
+
+      <div class="nav-section-label" style="margin-top:12px;">Risk</div>
+      <a href="blowup-shield.html" class="nav-item">
+        <svg class="nav-icon icon-stroke" viewBox="0 0 24 24"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+        Blowup Shield
+      </a>
+      <a href="#" class="nav-item">
+        <svg class="nav-icon icon-stroke" viewBox="0 0 24 24"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>
+        My Patterns
+      </a>
+
+      <div class="nav-section-label" style="margin-top:12px;">Tools</div>
+      <a href="#" class="nav-item">
+        <svg class="nav-icon icon-stroke" viewBox="0 0 24 24"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
+        AI Coach
+      </a>
+      <a href="#" class="nav-item">
+        <svg class="nav-icon icon-stroke" viewBox="0 0 24 24"><rect x="2" y="3" width="20" height="14" rx="2" ry="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/></svg>
+        Reports
+      </a>
+    </nav>
+
+    <div class="sidebar-footer">
+      <div style="display:flex;align-items:center;gap:8px;padding:10px 12px;border-radius:8px;cursor:pointer;transition:background 0.12s;" onmouseover="this.style.background='var(--bg-hover)'" onmouseout="this.style.background='transparent'">
+        <div style="width:30px;height:30px;border-radius:50%;background:linear-gradient(135deg,#14B8A6,#0284C7);display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:600;color:#fff;flex-shrink:0;">R</div>
+        <div style="flex:1;min-width:0;">
+          <div style="font-size:12px;font-weight:600;color:var(--text-primary);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">Rohit Ostwal</div>
+          <div style="font-size:10px;color:var(--brand);">Zerodha · Pro</div>
+        </div>
+        <svg style="width:14px;height:14px;color:var(--text-tertiary);flex-shrink:0;" class="icon-stroke" viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M19.07 4.93a10 10 0 0 1 0 14.14M4.93 4.93a10 10 0 0 0 0 14.14"/></svg>
+      </div>
+    </div>
+  </aside>
+
+  <!-- MAIN ─────────────────────────────────────────────────── -->
+  <main class="main-content">
+
+    <!-- TOP BAR -->
+    <div class="top-bar">
+      <div style="display:flex;align-items:center;gap:8px;">
+        <span style="font-size:14px;font-weight:500;color:var(--text-primary);">Good morning, Rohit</span>
+        <span style="color:var(--text-tertiary);font-size:13px;">·</span>
+        <div class="vix-badge">
+          <span style="font-size:10px;font-weight:500;letter-spacing:0.05em;text-transform:uppercase;">VIX</span>
+          <span class="vix-val">14.2</span>
+          <span style="font-size:10px;color:var(--profit);">▼0.4</span>
+        </div>
+        <div class="vix-badge">
+          <span style="font-size:10px;">NSE</span>
+          <span style="width:6px;height:6px;border-radius:50%;background:#22C55E;display:inline-block;"></span>
+          <span style="font-size:11px;font-weight:500;color:var(--profit);">Live</span>
+        </div>
+      </div>
+      <div style="display:flex;align-items:center;gap:8px;">
+        <button class="btn btn-ghost btn-sm">
+          <svg class="icon icon-stroke" viewBox="0 0 24 24"><polyline points="1 4 1 10 7 10"/><path d="M3.51 15a9 9 0 1 0 .49-3.51"/></svg>
+          Sync
+        </button>
+        <button style="position:relative;width:34px;height:34px;border-radius:8px;border:1px solid var(--border-subtle);background:transparent;display:flex;align-items:center;justify-content:center;cursor:pointer;" class="btn-ghost">
+          <svg style="width:16px;height:16px;" class="icon-stroke" viewBox="0 0 24 24"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg>
+          <span style="position:absolute;top:6px;right:6px;width:7px;height:7px;border-radius:50%;background:#EF4444;border:1.5px solid var(--bg-card);"></span>
+        </button>
+        <button class="theme-toggle" onclick="toggleTheme()" title="Toggle theme">
+          <svg id="icon-sun" class="icon-stroke" viewBox="0 0 24 24" style="display:none"><circle cx="12" cy="12" r="5"/><line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/><line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/></svg>
+          <svg id="icon-moon" class="icon-stroke" viewBox="0 0 24 24"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>
+        </button>
+      </div>
+    </div>
+
+    <!-- PAGE CONTENT -->
+    <div class="page-content">
+
+      <!-- MORNING INTENT NUDGE -->
+      <div class="setup-nudge">
+        <div class="setup-nudge-icon">🌅</div>
+        <div class="setup-nudge-text">
+          <h4>Set your intention for today</h4>
+          <p>What's your focus? Max 6 trades · Stop at −₹5,000 · No revenge entries</p>
+        </div>
+        <div class="setup-nudge-actions">
+          <button class="btn btn-ghost btn-sm">Skip</button>
+          <button class="btn btn-primary btn-sm">Set Intent</button>
+        </div>
+      </div>
+
+      <!-- SESSION HERO CARD -->
+      <div class="tm-card overflow-hidden" style="margin-bottom:16px;">
+        <div style="padding:20px 20px 0;border-bottom:none;">
+          <div class="session-hero">
+            <div>
+              <div class="state-pill safe">
+                <span class="dot"></span>
+                Safe Zone
+              </div>
+              <div class="hero-pnl" style="color:var(--profit);">+₹8,420</div>
+              <div class="hero-meta">
+                <span>Today</span>
+                <span class="sep">·</span>
+                <span>4 trades</span>
+                <span class="sep">·</span>
+                <span style="color:var(--profit);">75% WR</span>
+                <span class="sep">·</span>
+                <span style="font-family:'DM Mono',monospace;font-size:12px;color:var(--text-tertiary);">10:42 IST</span>
+              </div>
+
+              <div class="hero-pnl-split">
+                <div class="pnl-split-item">
+                  <span class="pnl-split-label">Realized</span>
+                  <span class="pnl-split-val" style="color:var(--profit);">+₹6,800</span>
+                </div>
+                <div style="width:1px;height:28px;background:var(--border-subtle);"></div>
+                <div class="pnl-split-item">
+                  <span class="pnl-split-label">Unrealized</span>
+                  <span class="pnl-split-val" style="color:var(--profit);">+₹1,620</span>
+                </div>
+                <div style="width:1px;height:28px;background:var(--border-subtle);"></div>
+                <div class="pnl-split-item">
+                  <span class="pnl-split-label">Charges</span>
+                  <span class="pnl-split-val" style="color:var(--text-secondary);">−₹340</span>
+                </div>
+              </div>
+
+              <div class="limit-track-row" style="max-width:340px;">
+                <div class="limit-label">
+                  <span>Daily trade limit</span>
+                  <span>4 / 10 trades</span>
+                </div>
+                <div class="progress-track">
+                  <div class="progress-fill" style="width:40%;"></div>
+                </div>
+                <div class="limit-label">
+                  <span>Daily loss limit</span>
+                  <span style="color:var(--profit);">₹0 used of ₹10,000</span>
+                </div>
+                <div class="progress-track">
+                  <div class="progress-fill" style="width:0%;background:var(--loss);"></div>
+                </div>
+              </div>
+            </div>
+
+            <!-- Sparkline panel -->
+            <div class="sparkline-panel">
+              <div class="sparkline-label">Today's equity curve</div>
+              <svg class="sparkline-svg" viewBox="0 0 200 72" preserveAspectRatio="none">
+                <defs>
+                  <linearGradient id="sparkGrad" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="0%" stop-color="#22C55E" stop-opacity="0.25"/>
+                    <stop offset="100%" stop-color="#22C55E" stop-opacity="0"/>
+                  </linearGradient>
+                </defs>
+                <path d="M0,60 L20,55 L40,58 L60,42 L80,48 L100,35 L120,30 L140,22 L160,18 L180,15 L200,10" stroke="#22C55E" stroke-width="1.5" fill="none"/>
+                <path d="M0,60 L20,55 L40,58 L60,42 L80,48 L100,35 L120,30 L140,22 L160,18 L180,15 L200,10 L200,72 L0,72 Z" fill="url(#sparkGrad)"/>
+              </svg>
+              <div style="display:flex;justify-content:space-between;font-size:10px;color:var(--text-tertiary);font-family:'DM Mono',monospace;margin-top:4px;">
+                <span>09:15</span><span>10:42</span>
+              </div>
+              <div style="margin-top:10px;padding-top:10px;border-top:1px solid var(--border-subtle);">
+                <div style="font-size:10px;color:var(--text-tertiary);margin-bottom:3px;">Behavior score</div>
+                <div style="display:flex;align-items:center;gap:6px;">
+                  <div style="font-family:'DM Mono',monospace;font-size:20px;font-weight:500;color:#22C55E;">A+</div>
+                  <div style="font-size:11px;color:var(--text-secondary);">No alerts triggered today</div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- KPI ROW -->
+      <div class="kpi-row" style="margin-bottom:16px;">
+        <div class="kpi-card">
+          <div class="kpi-label">Win Rate</div>
+          <div class="kpi-value" style="color:var(--profit);">75%</div>
+          <div class="kpi-delta up">↑ vs 58% avg</div>
+        </div>
+        <div class="kpi-card">
+          <div class="kpi-label">Avg / Trade</div>
+          <div class="kpi-value" style="color:var(--profit);">+₹2,105</div>
+          <div class="kpi-delta up">↑ best this week</div>
+        </div>
+        <div class="kpi-card">
+          <div class="kpi-label">Max Drawdown</div>
+          <div class="kpi-value">₹1,200</div>
+          <div class="kpi-delta neutral">12% of daily limit</div>
+        </div>
+        <div class="kpi-card">
+          <div class="kpi-label">Charges Today</div>
+          <div class="kpi-value">₹340</div>
+          <div class="kpi-delta neutral">STT + brokerage</div>
+        </div>
+      </div>
+
+      <!-- OPEN POSITIONS -->
+      <div class="tm-card overflow-hidden" style="margin-bottom:16px;">
+        <div style="padding:14px 20px;border-bottom:1px solid var(--border-subtle);display:flex;align-items:center;justify-content:space-between;">
+          <div>
+            <span style="font-size:14px;font-weight:600;color:var(--text-primary);">Open Positions</span>
+            <span class="badge-square" style="margin-left:8px;">3</span>
+          </div>
+          <div style="display:flex;gap:8px;">
+            <button class="btn btn-ghost btn-sm">Add position</button>
+            <button class="btn btn-danger btn-sm">Exit All</button>
+          </div>
+        </div>
+        <div style="padding:4px 20px 16px;">
+          <table class="positions-table">
+            <thead>
+              <tr>
+                <th>Symbol</th>
+                <th>Qty</th>
+                <th>Avg Entry</th>
+                <th>LTP</th>
+                <th>Unrealized P&L</th>
+                <th>Status</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td>
+                  <div class="sym-cell">
+                    <span class="sym-name">NIFTY 23600</span>
+                    <span class="sym-badge CE">CE</span>
+                  </div>
+                </td>
+                <td style="font-family:'DM Mono',monospace;">50</td>
+                <td style="font-family:'DM Mono',monospace;color:var(--text-secondary);">₹142.50</td>
+                <td class="ltp-cell">₹158.80</td>
+                <td class="pnl-cell pos">+₹815</td>
+                <td><span class="status-chip live"><span style="width:5px;height:5px;border-radius:50%;background:#22C55E;"></span>Live</span></td>
+              </tr>
+              <tr>
+                <td>
+                  <div class="sym-cell">
+                    <span class="sym-name">BANKNIFTY 48000</span>
+                    <span class="sym-badge PE">PE</span>
+                  </div>
+                </td>
+                <td style="font-family:'DM Mono',monospace;">25</td>
+                <td style="font-family:'DM Mono',monospace;color:var(--text-secondary);">₹320.00</td>
+                <td class="ltp-cell">₹298.40</td>
+                <td class="pnl-cell neg">−₹540</td>
+                <td><span class="status-chip live"><span style="width:5px;height:5px;border-radius:50%;background:#22C55E;"></span>Live</span></td>
+              </tr>
+              <tr>
+                <td>
+                  <div class="sym-cell">
+                    <span class="sym-name">RELIANCE</span>
+                    <span class="sym-badge FUT">FUT</span>
+                  </div>
+                </td>
+                <td style="font-family:'DM Mono',monospace;">250</td>
+                <td style="font-family:'DM Mono',monospace;color:var(--text-secondary);">₹2,841.00</td>
+                <td class="ltp-cell">₹2,854.75</td>
+                <td class="pnl-cell pos">+₹3,438</td>
+                <td><span class="status-chip live"><span style="width:5px;height:5px;border-radius:50%;background:#22C55E;"></span>Live</span></td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <!-- BOTTOM 2-COL -->
+      <div class="bottom-row">
+
+        <!-- LEFT: Alerts -->
+        <div class="tm-card overflow-hidden">
+          <div style="padding:14px 20px;border-bottom:1px solid var(--border-subtle);display:flex;align-items:center;justify-content:space-between;">
+            <div style="display:flex;align-items:center;gap:8px;">
+              <span style="font-size:14px;font-weight:600;color:var(--text-primary);">Behavioral Alerts</span>
+              <span class="badge-square" style="background:rgba(239,68,68,0.15);color:#EF4444;border-color:rgba(239,68,68,0.25);">3</span>
+            </div>
+            <a href="#" style="font-size:12px;color:var(--brand);">View all</a>
+          </div>
+          <div style="padding:12px 16px;">
+            <div class="alert-list">
+
+              <div class="alert-row">
+                <div class="alert-row-bar danger"></div>
+                <div class="alert-row-body">
+                  <div class="alert-row-title">Revenge Trade Risk</div>
+                  <div class="alert-row-desc">Entering BANKNIFTY PUT 38 min after ₹−4,200 loss. Win rate in this window: <strong style="color:var(--loss);">22%</strong>.</div>
+                  <div class="alert-row-footer">
+                    <span class="alert-row-time">11:04 · High · Est. cost: ₹−2,800</span>
+                    <div class="alert-actions">
+                      <button class="alert-btn">Acknowledge</button>
+                      <button class="alert-btn dismiss">Dismiss</button>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <div class="alert-row">
+                <div class="alert-row-bar warning"></div>
+                <div class="alert-row-body">
+                  <div class="alert-row-title">Approaching Trade Limit</div>
+                  <div class="alert-row-desc">8 of 10 daily trades used. Win rate drops to <strong style="color:var(--warning);">31%</strong> after trade #8 in your history.</div>
+                  <div class="alert-row-footer">
+                    <span class="alert-row-time">10:52 · Medium</span>
+                    <div class="alert-actions">
+                      <button class="alert-btn">Acknowledge</button>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <div class="alert-row">
+                <div class="alert-row-bar info"></div>
+                <div class="alert-row-body">
+                  <div class="alert-row-title">Strong Session — Stay Disciplined</div>
+                  <div class="alert-row-desc">Up ₹+8,420 today. You typically give back <strong style="color:var(--brand);">68%</strong> of gains in afternoon overconfidence.</div>
+                  <div class="alert-row-footer">
+                    <span class="alert-row-time">10:30 · Info</span>
+                    <div class="alert-actions">
+                      <button class="alert-btn dismiss">Dismiss</button>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+            </div>
+          </div>
+        </div>
+
+        <!-- RIGHT: Coach + Shield -->
+        <div style="display:flex;flex-direction:column;gap:16px;">
+
+          <!-- AI Coach card -->
+          <div class="tm-card overflow-hidden">
+            <div style="padding:14px 20px;border-bottom:1px solid var(--border-subtle);display:flex;align-items:center;justify-content:space-between;">
+              <span style="font-size:14px;font-weight:600;color:var(--text-primary);">AI Coach</span>
+              <span style="font-size:11px;color:var(--text-tertiary);">3 sessions left today</span>
+            </div>
+            <div style="padding:12px 14px;">
+              <div class="coach-card-prompt">
+                <div class="coach-icon">🧠</div>
+                <span>Why do I keep losing on BANKNIFTY?</span>
+              </div>
+              <div class="coach-card-prompt">
+                <div class="coach-icon">📊</div>
+                <span>Show my worst trading patterns</span>
+              </div>
+              <div class="coach-input" style="margin-top:8px;">
+                <input type="text" placeholder="Ask anything about your trades..." />
+                <button class="coach-input-btn">
+                  <svg style="width:14px;height:14px;color:#fff;" class="icon-stroke" viewBox="0 0 24 24"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>
+                </button>
+              </div>
+            </div>
+          </div>
+
+          <!-- Blowup Shield mini -->
+          <div class="tm-card overflow-hidden">
+            <div style="padding:14px 20px;border-bottom:1px solid var(--border-subtle);display:flex;align-items:center;justify-content:space-between;">
+              <span style="font-size:14px;font-weight:600;color:var(--text-primary);">Blowup Shield</span>
+              <a href="blowup-shield.html" style="font-size:12px;color:var(--brand);">Details →</a>
+            </div>
+            <div style="padding:12px 14px;">
+              <div class="shield-metric-row">
+                <div class="shield-metric">
+                  <div class="shield-metric-label">Daily Loss</div>
+                  <div class="shield-metric-val" style="color:var(--profit);">₹0</div>
+                  <div style="font-size:10px;color:var(--text-tertiary);margin-top:2px;">of ₹10,000 limit</div>
+                </div>
+                <div class="shield-metric">
+                  <div class="shield-metric-label">Trade Count</div>
+                  <div class="shield-metric-val">4 / 10</div>
+                  <div style="font-size:10px;color:var(--text-tertiary);margin-top:2px;">40% of limit</div>
+                </div>
+              </div>
+              <div style="background:var(--profit-bg);border:1px solid var(--profit-border);border-radius:7px;padding:9px 12px;font-size:12px;color:var(--profit);display:flex;align-items:center;gap:6px;">
+                <svg style="width:13px;height:13px;flex-shrink:0;" class="icon-stroke" viewBox="0 0 24 24"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+                14-day clean streak · No blowup days
+              </div>
+            </div>
+          </div>
+
+        </div>
+      </div>
+
+    </div><!-- /page-content -->
+  </main>
+</div>
+
+<script>
+  function toggleTheme() {
+    const html = document.documentElement;
+    const next = html.getAttribute('data-theme') === 'dark' ? 'light' : 'dark';
+    html.setAttribute('data-theme', next);
+    localStorage.setItem('tm-theme', next);
+    updateThemeIcon(next);
+  }
+  function updateThemeIcon(theme) {
+    document.getElementById('icon-sun').style.display  = theme === 'light' ? 'block' : 'none';
+    document.getElementById('icon-moon').style.display = theme === 'dark'  ? 'block' : 'none';
+  }
+  const saved = localStorage.getItem('tm-theme') || 'dark';
+  document.documentElement.setAttribute('data-theme', saved);
+  updateThemeIcon(saved);
+</script>
+</body>
+</html>

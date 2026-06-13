@@ -1,0 +1,846 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Analytics — TradeMentor AI</title>
+  <link rel="stylesheet" href="base.css" />
+  <style>
+    /* ── ANALYTICS-SPECIFIC ──────────────────────────────────────── */
+
+    /* Period selector pills */
+    .period-group {
+      display: flex;
+      align-items: center;
+      gap: 2px;
+      background: var(--bg-elevated);
+      border: 1px solid var(--border-subtle);
+      border-radius: 8px;
+      padding: 3px;
+    }
+    .period-btn {
+      padding: 5px 14px;
+      border-radius: 6px;
+      font-size: 12px;
+      font-weight: 500;
+      color: var(--text-secondary);
+      border: none;
+      background: transparent;
+      cursor: pointer;
+      transition: all 0.12s;
+    }
+    .period-btn:hover { color: var(--text-primary); }
+    .period-btn.active { background: var(--bg-card); color: var(--text-primary); box-shadow: 0 1px 3px rgba(0,0,0,0.3); }
+
+    /* Tab bar */
+    .tab-bar {
+      display: flex;
+      align-items: center;
+      gap: 0;
+      border-bottom: 1px solid var(--border-subtle);
+      margin-bottom: 20px;
+      overflow-x: auto;
+    }
+    .tab-btn {
+      padding: 10px 16px;
+      font-size: 13px;
+      font-weight: 500;
+      color: var(--text-secondary);
+      border: none;
+      background: transparent;
+      border-bottom: 2px solid transparent;
+      cursor: pointer;
+      white-space: nowrap;
+      transition: all 0.12s;
+      margin-bottom: -1px;
+    }
+    .tab-btn:hover { color: var(--text-primary); }
+    .tab-btn.active { color: var(--brand); border-bottom-color: var(--brand); }
+
+    /* Equity chart mock */
+    .equity-chart-card { margin-bottom: 16px; }
+    .chart-area {
+      padding: 0 20px 16px;
+      position: relative;
+    }
+    .chart-header {
+      padding: 16px 20px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      border-bottom: 1px solid var(--border-subtle);
+      margin-bottom: 0;
+    }
+    .chart-title-group { display: flex; flex-direction: column; gap: 2px; }
+    .chart-title { font-size: 14px; font-weight: 600; color: var(--text-primary); }
+    .chart-subtitle { font-size: 12px; color: var(--text-secondary); }
+    .chart-pnl-big {
+      font-family: 'DM Mono', monospace;
+      font-size: 28px;
+      font-weight: 500;
+      letter-spacing: -0.02em;
+      color: var(--profit);
+    }
+
+    /* SVG chart */
+    .equity-svg {
+      width: 100%;
+      height: 180px;
+      display: block;
+      margin-top: 12px;
+    }
+
+    /* Axis labels */
+    .chart-axis-x {
+      display: flex;
+      justify-content: space-between;
+      padding: 6px 0 0;
+      font-size: 10px;
+      font-family: 'DM Mono', monospace;
+      color: var(--text-tertiary);
+    }
+
+    /* 4-col KPI */
+    .kpi-4 {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 12px;
+      margin-bottom: 16px;
+    }
+    .kpi-stat {
+      background: var(--bg-card);
+      border: 1px solid var(--border-subtle);
+      border-radius: 10px;
+      padding: 16px;
+    }
+    .kpi-stat-label { font-size: 10px; font-weight: 500; letter-spacing: 0.07em; text-transform: uppercase; color: var(--text-tertiary); margin-bottom: 8px; }
+    .kpi-stat-val   { font-family: 'DM Mono', monospace; font-size: 22px; font-weight: 500; color: var(--text-primary); letter-spacing: -0.02em; line-height: 1; margin-bottom: 6px; }
+    .kpi-stat-delta { font-size: 11px; display: flex; align-items: center; gap: 4px; }
+    .kpi-stat-delta.up   { color: var(--profit); }
+    .kpi-stat-delta.down { color: var(--loss); }
+    .kpi-stat-delta.neutral { color: var(--text-tertiary); }
+
+    /* Bottom 2-col */
+    .analytics-bottom {
+      display: grid;
+      grid-template-columns: 1.4fr 1fr;
+      gap: 16px;
+    }
+
+    /* Leaderboard table */
+    .leader-table { width: 100%; border-collapse: collapse; }
+    .leader-table th {
+      text-align: left;
+      font-size: 10px;
+      font-weight: 500;
+      letter-spacing: 0.07em;
+      text-transform: uppercase;
+      color: var(--text-tertiary);
+      padding: 0 0 10px;
+      border-bottom: 1px solid var(--border-subtle);
+    }
+    .leader-table th:not(:first-child) { text-align: right; }
+    .leader-table td {
+      padding: 10px 0;
+      border-bottom: 1px solid var(--border-subtle);
+      font-size: 13px;
+    }
+    .leader-table td:not(:first-child) { text-align: right; }
+    .leader-table tr:last-child td { border-bottom: none; }
+    .leader-table tr:hover td { background: var(--bg-hover); }
+
+    .rank-num { font-family: 'DM Mono', monospace; font-size: 11px; color: var(--text-tertiary); width: 20px; }
+    .inst-name { font-weight: 600; color: var(--text-primary); }
+    .inst-trades { font-size: 11px; color: var(--text-tertiary); margin-top: 1px; }
+    .wr-bar-inline {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+    .wr-track { flex: 1; max-width: 60px; height: 3px; background: var(--border-subtle); border-radius: 99px; overflow: hidden; }
+    .wr-fill  { height: 100%; border-radius: 99px; }
+    .wr-pct   { font-family: 'DM Mono', monospace; font-size: 12px; min-width: 36px; text-align: right; }
+
+    /* Patterns tab preview */
+    .pattern-card {
+      background: var(--bg-card);
+      border: 1px solid var(--border-subtle);
+      border-radius: 10px;
+      padding: 14px 16px;
+      margin-bottom: 10px;
+      display: flex;
+      align-items: flex-start;
+      gap: 12px;
+      transition: border-color 0.12s;
+    }
+    .pattern-card:hover { border-color: var(--border-default); }
+    .pattern-icon {
+      width: 34px;
+      height: 34px;
+      border-radius: 8px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 17px;
+      flex-shrink: 0;
+    }
+    .pattern-body { flex: 1; }
+    .pattern-name { font-size: 13px; font-weight: 600; color: var(--text-primary); margin-bottom: 3px; }
+    .pattern-desc { font-size: 12px; color: var(--text-secondary); line-height: 1.5; margin-bottom: 8px; }
+    .pattern-footer { display: flex; align-items: center; gap: 8px; }
+    .pattern-freq {
+      flex: 1;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+    .freq-track { flex: 1; max-width: 80px; height: 3px; background: var(--border-subtle); border-radius: 99px; overflow: hidden; }
+    .freq-fill  { height: 100%; border-radius: 99px; }
+    .freq-label { font-size: 11px; color: var(--text-tertiary); }
+    .pattern-cost { font-family: 'DM Mono', monospace; font-size: 13px; font-weight: 500; color: var(--loss); }
+
+    /* Hour heatmap table */
+    .hour-table { width: 100%; border-collapse: collapse; }
+    .hour-table th, .hour-table td {
+      padding: 7px 6px;
+      font-size: 11px;
+      border-bottom: 1px solid var(--border-subtle);
+    }
+    .hour-table th { font-weight: 500; letter-spacing: 0.05em; color: var(--text-tertiary); text-align: left; }
+    .hour-table td { color: var(--text-secondary); }
+    .hour-table td.best { color: var(--profit); font-family: 'DM Mono', monospace; font-weight: 500; }
+    .hour-table td.worst { color: var(--loss); font-family: 'DM Mono', monospace; font-weight: 500; }
+    .hour-table td.pnl-mono { font-family: 'DM Mono', monospace; }
+    .hour-table tr:last-child td { border-bottom: none; }
+    .hour-table tr:hover td { background: var(--bg-hover); }
+
+    /* Edge map chart */
+    .edge-bar-row {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 8px 0;
+      border-bottom: 1px solid var(--border-subtle);
+    }
+    .edge-bar-row:last-child { border-bottom: none; }
+    .edge-bar-label { font-size: 12px; color: var(--text-secondary); width: 100px; flex-shrink: 0; }
+    .edge-bar-track { flex: 1; height: 6px; background: var(--border-subtle); border-radius: 99px; overflow: hidden; }
+    .edge-bar-fill  { height: 100%; border-radius: 99px; }
+    .edge-bar-val   { font-family: 'DM Mono', monospace; font-size: 12px; font-weight: 500; min-width: 52px; text-align: right; }
+
+    /* Tab panels */
+    .tab-panel { display: none; }
+    .tab-panel.active { display: block; }
+
+    @media (max-width: 900px) {
+      .kpi-4 { grid-template-columns: repeat(2, 1fr); }
+      .analytics-bottom { grid-template-columns: 1fr; }
+    }
+  </style>
+</head>
+<body>
+<div class="app-layout">
+
+  <!-- SIDEBAR ──────────────────────────────────────────────── -->
+  <aside class="sidebar">
+    <div class="sidebar-logo">
+      <div class="logo-mark">
+        <svg viewBox="0 0 24 24"><polyline points="3 17 9 11 13 15 21 7"/><polyline points="14 7 21 7 21 14"/></svg>
+      </div>
+      <span class="logo-text">TradeMentor <span>AI</span></span>
+    </div>
+
+    <nav class="sidebar-nav">
+      <div class="nav-section-label">Trading</div>
+      <a href="dashboard.html" class="nav-item">
+        <svg class="nav-icon icon-stroke" viewBox="0 0 24 24"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/></svg>
+        Dashboard
+      </a>
+      <a href="analytics.html" class="nav-item active">
+        <svg class="nav-icon icon-stroke" viewBox="0 0 24 24"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg>
+        Analytics
+      </a>
+      <a href="#" class="nav-item">
+        <svg class="nav-icon icon-stroke" viewBox="0 0 24 24"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg>
+        Alerts
+        <span class="badge-square" style="margin-left:auto;">3</span>
+      </a>
+
+      <div class="nav-section-label" style="margin-top:12px;">Risk</div>
+      <a href="blowup-shield.html" class="nav-item">
+        <svg class="nav-icon icon-stroke" viewBox="0 0 24 24"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+        Blowup Shield
+      </a>
+      <a href="#" class="nav-item">
+        <svg class="nav-icon icon-stroke" viewBox="0 0 24 24"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>
+        My Patterns
+      </a>
+
+      <div class="nav-section-label" style="margin-top:12px;">Tools</div>
+      <a href="#" class="nav-item">
+        <svg class="nav-icon icon-stroke" viewBox="0 0 24 24"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
+        AI Coach
+      </a>
+      <a href="#" class="nav-item">
+        <svg class="nav-icon icon-stroke" viewBox="0 0 24 24"><rect x="2" y="3" width="20" height="14" rx="2" ry="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/></svg>
+        Reports
+      </a>
+    </nav>
+
+    <div class="sidebar-footer">
+      <div style="display:flex;align-items:center;gap:8px;padding:10px 12px;border-radius:8px;">
+        <div style="width:30px;height:30px;border-radius:50%;background:linear-gradient(135deg,#14B8A6,#0284C7);display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:600;color:#fff;flex-shrink:0;">R</div>
+        <div style="flex:1;min-width:0;">
+          <div style="font-size:12px;font-weight:600;color:var(--text-primary);">Rohit Ostwal</div>
+          <div style="font-size:10px;color:var(--brand);">Zerodha · Pro</div>
+        </div>
+      </div>
+    </div>
+  </aside>
+
+  <!-- MAIN ─────────────────────────────────────────────────── -->
+  <main class="main-content">
+
+    <!-- TOP BAR -->
+    <div class="top-bar">
+      <div style="display:flex;align-items:center;gap:10px;">
+        <span style="font-size:15px;font-weight:600;color:var(--text-primary);letter-spacing:-0.01em;">Analytics</span>
+        <span style="color:var(--text-tertiary);">·</span>
+        <div class="period-group">
+          <button class="period-btn" onclick="setPeriod(this,'7D')">7D</button>
+          <button class="period-btn active" onclick="setPeriod(this,'30D')">30D</button>
+          <button class="period-btn" onclick="setPeriod(this,'90D')">90D</button>
+          <button class="period-btn" onclick="setPeriod(this,'YTD')">YTD</button>
+        </div>
+      </div>
+      <div style="display:flex;align-items:center;gap:8px;">
+        <button class="btn btn-ghost btn-sm">Export CSV</button>
+        <button class="theme-toggle" onclick="toggleTheme()" title="Toggle theme">
+          <svg id="icon-sun" class="icon-stroke" viewBox="0 0 24 24" style="display:none"><circle cx="12" cy="12" r="5"/><line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/><line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/></svg>
+          <svg id="icon-moon" class="icon-stroke" viewBox="0 0 24 24"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>
+        </button>
+      </div>
+    </div>
+
+    <!-- PAGE CONTENT -->
+    <div class="page-content">
+
+      <!-- TAB BAR -->
+      <div class="tab-bar">
+        <button class="tab-btn active" onclick="setTab(this,'summary')">Summary</button>
+        <button class="tab-btn" onclick="setTab(this,'patterns')">Patterns</button>
+        <button class="tab-btn" onclick="setTab(this,'trades')">Trades</button>
+        <button class="tab-btn" onclick="setTab(this,'btst')">BTST</button>
+        <button class="tab-btn" onclick="setTab(this,'pct')">% Return</button>
+        <button class="tab-btn" onclick="setTab(this,'edge')">Edge Map</button>
+        <button class="tab-btn" onclick="setTab(this,'expiry')">Expiry</button>
+        <button class="tab-btn" onclick="setTab(this,'journal')">Journal</button>
+      </div>
+
+      <!-- ── SUMMARY TAB ─────────────────────────────────────────── -->
+      <div class="tab-panel active" id="tab-summary">
+
+        <!-- Equity curve card -->
+        <div class="tm-card overflow-hidden equity-chart-card">
+          <div class="chart-header">
+            <div class="chart-title-group">
+              <div class="chart-title">Equity Curve</div>
+              <div class="chart-subtitle">30 trading days · 84 completed trades</div>
+            </div>
+            <div style="text-align:right;">
+              <div class="chart-pnl-big">+₹1,24,500</div>
+              <div style="font-size:12px;color:var(--profit);margin-top:2px;">↑ +₹28,400 vs prev period</div>
+            </div>
+          </div>
+          <div class="chart-area">
+            <svg class="equity-svg" viewBox="0 0 800 180" preserveAspectRatio="none">
+              <defs>
+                <linearGradient id="eqGrad" x1="0" y1="0" x2="0" y2="1">
+                  <stop offset="0%" stop-color="#22C55E" stop-opacity="0.2"/>
+                  <stop offset="100%" stop-color="#22C55E" stop-opacity="0"/>
+                </linearGradient>
+                <!-- Grid lines -->
+              </defs>
+              <!-- Faint grid -->
+              <line x1="0" y1="45" x2="800" y2="45" stroke="var(--border-subtle)" stroke-width="1" stroke-dasharray="4,4"/>
+              <line x1="0" y1="90" x2="800" y2="90" stroke="var(--border-subtle)" stroke-width="1" stroke-dasharray="4,4"/>
+              <line x1="0" y1="135" x2="800" y2="135" stroke="var(--border-subtle)" stroke-width="1" stroke-dasharray="4,4"/>
+              <!-- Equity line — with a realistic F&O curve (ups, small pullbacks) -->
+              <path d="M0,160 L26,155 L53,148 L80,150 L106,158 L133,145 L160,130 L186,138 L213,120 L240,115 L266,110 L293,118 L320,100 L346,95 L373,90 L400,105 L426,88 L453,75 L480,68 L506,80 L533,62 L560,55 L586,50 L613,42 L640,48 L666,35 L693,28 L720,22 L746,18 L773,14 L800,10"
+                    stroke="#22C55E" stroke-width="1.5" fill="none" stroke-linejoin="round"/>
+              <path d="M0,160 L26,155 L53,148 L80,150 L106,158 L133,145 L160,130 L186,138 L213,120 L240,115 L266,110 L293,118 L320,100 L346,95 L373,90 L400,105 L426,88 L453,75 L480,68 L506,80 L533,62 L560,55 L586,50 L613,42 L640,48 L666,35 L693,28 L720,22 L746,18 L773,14 L800,10 L800,180 L0,180 Z"
+                    fill="url(#eqGrad)"/>
+              <!-- Baseline zero ref -->
+              <line x1="0" y1="162" x2="800" y2="162" stroke="var(--border-subtle)" stroke-width="1"/>
+            </svg>
+            <div class="chart-axis-x">
+              <span>Nov 13</span><span>Nov 20</span><span>Nov 27</span><span>Dec 4</span><span>Dec 11</span><span>Dec 13</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- KPI 4-col -->
+        <div class="kpi-4">
+          <div class="kpi-stat">
+            <div class="kpi-stat-label">Total P&L</div>
+            <div class="kpi-stat-val" style="color:var(--profit);">+₹1.24L</div>
+            <div class="kpi-stat-delta up">↑ +29% vs Nov</div>
+          </div>
+          <div class="kpi-stat">
+            <div class="kpi-stat-label">Win Rate</div>
+            <div class="kpi-stat-val">64%</div>
+            <div class="kpi-stat-delta up">↑ 54 / 84 trades</div>
+          </div>
+          <div class="kpi-stat">
+            <div class="kpi-stat-label">Profit Factor</div>
+            <div class="kpi-stat-val">2.18</div>
+            <div class="kpi-stat-delta neutral">Avg winner 2.18× loser</div>
+          </div>
+          <div class="kpi-stat">
+            <div class="kpi-stat-label">Avg / Trade</div>
+            <div class="kpi-stat-val" style="color:var(--profit);">+₹1,482</div>
+            <div class="kpi-stat-delta up">↑ from ₹940 prev</div>
+          </div>
+        </div>
+
+        <!-- Bottom 2-col -->
+        <div class="analytics-bottom">
+
+          <!-- Instrument leaderboard -->
+          <div class="tm-card overflow-hidden">
+            <div style="padding:14px 20px;border-bottom:1px solid var(--border-subtle);display:flex;align-items:center;justify-content:space-between;">
+              <span style="font-size:14px;font-weight:600;color:var(--text-primary);">Instrument Performance</span>
+              <div style="display:flex;gap:4px;">
+                <button class="period-btn active" style="font-size:11px;padding:3px 8px;">P&L</button>
+                <button class="period-btn" style="font-size:11px;padding:3px 8px;">WR</button>
+                <button class="period-btn" style="font-size:11px;padding:3px 8px;">Trades</button>
+              </div>
+            </div>
+            <div style="padding:6px 20px 16px;">
+              <table class="leader-table">
+                <thead>
+                  <tr>
+                    <th>#</th>
+                    <th>Instrument</th>
+                    <th>Win Rate</th>
+                    <th>P&L</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr>
+                    <td><span class="rank-num">01</span></td>
+                    <td>
+                      <div class="inst-name">NIFTY</div>
+                      <div class="inst-trades">32 trades</div>
+                    </td>
+                    <td>
+                      <div class="wr-bar-inline">
+                        <div class="wr-track"><div class="wr-fill" style="width:72%;background:var(--profit)"></div></div>
+                        <span class="wr-pct" style="color:var(--profit);">72%</span>
+                      </div>
+                    </td>
+                    <td style="font-family:'DM Mono',monospace;font-weight:500;color:var(--profit);">+₹68,400</td>
+                  </tr>
+                  <tr>
+                    <td><span class="rank-num">02</span></td>
+                    <td>
+                      <div class="inst-name">RELIANCE</div>
+                      <div class="inst-trades">18 trades</div>
+                    </td>
+                    <td>
+                      <div class="wr-bar-inline">
+                        <div class="wr-track"><div class="wr-fill" style="width:61%;background:var(--profit)"></div></div>
+                        <span class="wr-pct" style="color:var(--profit);">61%</span>
+                      </div>
+                    </td>
+                    <td style="font-family:'DM Mono',monospace;font-weight:500;color:var(--profit);">+₹42,100</td>
+                  </tr>
+                  <tr>
+                    <td><span class="rank-num">03</span></td>
+                    <td>
+                      <div class="inst-name">BANKNIFTY</div>
+                      <div class="inst-trades">24 trades</div>
+                    </td>
+                    <td>
+                      <div class="wr-bar-inline">
+                        <div class="wr-track"><div class="wr-fill" style="width:38%;background:var(--loss)"></div></div>
+                        <span class="wr-pct" style="color:var(--loss);">38%</span>
+                      </div>
+                    </td>
+                    <td style="font-family:'DM Mono',monospace;font-weight:500;color:var(--loss);">−₹22,800</td>
+                  </tr>
+                  <tr>
+                    <td><span class="rank-num">04</span></td>
+                    <td>
+                      <div class="inst-name">INFY</div>
+                      <div class="inst-trades">10 trades</div>
+                    </td>
+                    <td>
+                      <div class="wr-bar-inline">
+                        <div class="wr-track"><div class="wr-fill" style="width:70%;background:var(--profit)"></div></div>
+                        <span class="wr-pct" style="color:var(--profit);">70%</span>
+                      </div>
+                    </td>
+                    <td style="font-family:'DM Mono',monospace;font-weight:500;color:var(--profit);">+₹36,800</td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+          <!-- Best/Worst hours + Streak -->
+          <div style="display:flex;flex-direction:column;gap:12px;">
+            <div class="tm-card overflow-hidden">
+              <div style="padding:14px 20px;border-bottom:1px solid var(--border-subtle);">
+                <span style="font-size:14px;font-weight:600;color:var(--text-primary);">Win Rate by Hour</span>
+              </div>
+              <div style="padding:8px 20px 12px;">
+                <table class="hour-table">
+                  <thead>
+                    <tr>
+                      <th>Hour (IST)</th>
+                      <th>Trades</th>
+                      <th>Win %</th>
+                      <th>Avg P&L</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    <tr>
+                      <td style="font-family:'DM Mono',monospace;font-size:11px;">09:15–10:00</td>
+                      <td>18</td>
+                      <td class="best">74%</td>
+                      <td class="pnl-mono" style="color:var(--profit);">+₹3,240</td>
+                    </tr>
+                    <tr>
+                      <td style="font-family:'DM Mono',monospace;font-size:11px;">10:00–11:00</td>
+                      <td>22</td>
+                      <td class="best">68%</td>
+                      <td class="pnl-mono" style="color:var(--profit);">+₹1,820</td>
+                    </tr>
+                    <tr>
+                      <td style="font-family:'DM Mono',monospace;font-size:11px;">11:00–12:00</td>
+                      <td>20</td>
+                      <td>52%</td>
+                      <td class="pnl-mono" style="color:var(--profit);">+₹480</td>
+                    </tr>
+                    <tr>
+                      <td style="font-family:'DM Mono',monospace;font-size:11px;">12:00–13:30</td>
+                      <td>14</td>
+                      <td class="worst">28%</td>
+                      <td class="pnl-mono" style="color:var(--loss);">−₹2,100</td>
+                    </tr>
+                    <tr>
+                      <td style="font-family:'DM Mono',monospace;font-size:11px;">14:00–15:30</td>
+                      <td>10</td>
+                      <td>50%</td>
+                      <td class="pnl-mono" style="color:var(--profit);">+₹620</td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+            </div>
+
+            <div class="tm-card overflow-hidden">
+              <div style="padding:12px 16px;">
+                <div style="font-size:10px;font-weight:500;letter-spacing:0.07em;text-transform:uppercase;color:var(--text-tertiary);margin-bottom:10px;">Discipline Streak</div>
+                <div style="display:flex;align-items:center;gap:10px;margin-bottom:8px;">
+                  <div style="font-family:'DM Mono',monospace;font-size:36px;font-weight:500;color:var(--profit);line-height:1;">14</div>
+                  <div>
+                    <div style="font-size:13px;font-weight:600;color:var(--text-primary);">days clean</div>
+                    <div style="font-size:11px;color:var(--text-tertiary);">Best: 21 days</div>
+                  </div>
+                </div>
+                <div style="display:flex;gap:4px;flex-wrap:wrap;">
+                  <!-- 14 green dots + some red/grey -->
+                  <span title="Dec 13" style="width:14px;height:14px;border-radius:3px;background:rgba(34,197,94,0.7);display:inline-block;"></span>
+                  <span style="width:14px;height:14px;border-radius:3px;background:rgba(34,197,94,0.7);display:inline-block;"></span>
+                  <span style="width:14px;height:14px;border-radius:3px;background:rgba(34,197,94,0.7);display:inline-block;"></span>
+                  <span style="width:14px;height:14px;border-radius:3px;background:rgba(34,197,94,0.7);display:inline-block;"></span>
+                  <span style="width:14px;height:14px;border-radius:3px;background:rgba(34,197,94,0.7);display:inline-block;"></span>
+                  <span style="width:14px;height:14px;border-radius:3px;background:rgba(34,197,94,0.7);display:inline-block;"></span>
+                  <span style="width:14px;height:14px;border-radius:3px;background:rgba(34,197,94,0.7);display:inline-block;"></span>
+                  <span style="width:14px;height:14px;border-radius:3px;background:rgba(34,197,94,0.7);display:inline-block;"></span>
+                  <span style="width:14px;height:14px;border-radius:3px;background:rgba(34,197,94,0.7);display:inline-block;"></span>
+                  <span style="width:14px;height:14px;border-radius:3px;background:rgba(34,197,94,0.7);display:inline-block;"></span>
+                  <span style="width:14px;height:14px;border-radius:3px;background:rgba(34,197,94,0.7);display:inline-block;"></span>
+                  <span style="width:14px;height:14px;border-radius:3px;background:rgba(34,197,94,0.7);display:inline-block;"></span>
+                  <span style="width:14px;height:14px;border-radius:3px;background:rgba(34,197,94,0.7);display:inline-block;"></span>
+                  <span style="width:14px;height:14px;border-radius:3px;background:rgba(34,197,94,0.7);display:inline-block;"></span>
+                  <span title="Loss day" style="width:14px;height:14px;border-radius:3px;background:rgba(239,68,68,0.5);display:inline-block;"></span>
+                  <span style="width:14px;height:14px;border-radius:3px;background:rgba(239,68,68,0.5);display:inline-block;"></span>
+                  <span style="width:14px;height:14px;border-radius:3px;background:var(--border-subtle);display:inline-block;"></span>
+                  <span style="width:14px;height:14px;border-radius:3px;background:var(--border-subtle);display:inline-block;"></span>
+                  <span style="width:14px;height:14px;border-radius:3px;background:var(--border-subtle);display:inline-block;"></span>
+                  <span style="width:14px;height:14px;border-radius:3px;background:var(--border-subtle);display:inline-block;"></span>
+                  <span style="width:14px;height:14px;border-radius:3px;background:rgba(34,197,94,0.7);display:inline-block;"></span>
+                  <span style="width:14px;height:14px;border-radius:3px;background:rgba(34,197,94,0.7);display:inline-block;"></span>
+                  <span style="width:14px;height:14px;border-radius:3px;background:rgba(34,197,94,0.7);display:inline-block;"></span>
+                  <span style="width:14px;height:14px;border-radius:3px;background:rgba(34,197,94,0.7);display:inline-block;"></span>
+                  <span style="width:14px;height:14px;border-radius:3px;background:rgba(34,197,94,0.7);display:inline-block;"></span>
+                  <span style="width:14px;height:14px;border-radius:3px;background:rgba(34,197,94,0.7);display:inline-block;"></span>
+                  <span style="width:14px;height:14px;border-radius:3px;background:rgba(34,197,94,0.7);display:inline-block;"></span>
+                  <span style="width:14px;height:14px;border-radius:3px;background:rgba(34,197,94,0.7);display:inline-block;"></span>
+                  <span style="width:14px;height:14px;border-radius:3px;background:rgba(34,197,94,0.7);display:inline-block;"></span>
+                  <span style="width:14px;height:14px;border-radius:3px;background:rgba(34,197,94,0.7);display:inline-block;"></span>
+                </div>
+              </div>
+            </div>
+
+          </div>
+        </div>
+
+      </div><!-- /summary -->
+
+      <!-- ── PATTERNS TAB ────────────────────────────────────────── -->
+      <div class="tab-panel" id="tab-patterns">
+        <div style="margin-bottom:12px;font-size:13px;color:var(--text-secondary);">22 patterns analyzed · Last 30 days · Sorted by cost</div>
+
+        <div class="pattern-card" style="border-left:3px solid var(--loss);">
+          <div class="pattern-icon" style="background:var(--loss-bg);border:1px solid var(--loss-border);">⚡</div>
+          <div class="pattern-body">
+            <div style="display:flex;align-items:center;gap:8px;margin-bottom:3px;">
+              <span class="pattern-name">Revenge Trading</span>
+              <span class="badge badge-danger">High</span>
+            </div>
+            <div class="pattern-desc">Entering within 30 min of a loss. Win rate drops 44% in this window. Triggered 8 times this month.</div>
+            <div class="pattern-footer">
+              <div class="pattern-freq">
+                <div class="freq-track"><div class="freq-fill" style="width:80%;background:var(--loss);"></div></div>
+                <span class="freq-label">8× this month</span>
+              </div>
+              <span class="pattern-cost">−₹18,400</span>
+            </div>
+          </div>
+        </div>
+
+        <div class="pattern-card" style="border-left:3px solid var(--warning);">
+          <div class="pattern-icon" style="background:var(--warning-bg);border:1px solid var(--warning-border);">🔄</div>
+          <div class="pattern-body">
+            <div style="display:flex;align-items:center;gap:8px;margin-bottom:3px;">
+              <span class="pattern-name">Overtrading</span>
+              <span class="badge badge-caution">Medium</span>
+            </div>
+            <div class="pattern-desc">Trading beyond your optimal session count. Trades 9–12 have a 31% win rate vs 72% for trades 1–4.</div>
+            <div class="pattern-footer">
+              <div class="pattern-freq">
+                <div class="freq-track"><div class="freq-fill" style="width:55%;background:var(--warning);"></div></div>
+                <span class="freq-label">6× this month</span>
+              </div>
+              <span class="pattern-cost">−₹12,800</span>
+            </div>
+          </div>
+        </div>
+
+        <div class="pattern-card" style="border-left:3px solid var(--warning);">
+          <div class="pattern-icon" style="background:var(--warning-bg);border:1px solid var(--warning-border);">⏱️</div>
+          <div class="pattern-body">
+            <div style="display:flex;align-items:center;gap:8px;margin-bottom:3px;">
+              <span class="pattern-name">Loss Aversion — Holding Losers</span>
+              <span class="badge badge-caution">Medium</span>
+            </div>
+            <div class="pattern-desc">Average loser held 3.2× longer than winners. Exit delay compounds losses by ₹820 avg per trade.</div>
+            <div class="pattern-footer">
+              <div class="pattern-freq">
+                <div class="freq-track"><div class="freq-fill" style="width:40%;background:var(--warning);"></div></div>
+                <span class="freq-label">5× this month</span>
+              </div>
+              <span class="pattern-cost">−₹9,200</span>
+            </div>
+          </div>
+        </div>
+
+        <div class="pattern-card">
+          <div class="pattern-icon" style="background:var(--neutral-bg);border:1px solid var(--neutral-border);">🎯</div>
+          <div class="pattern-body">
+            <div style="display:flex;align-items:center;gap:8px;margin-bottom:3px;">
+              <span class="pattern-name">Early Exit — Cutting Winners</span>
+              <span class="badge badge-neutral">Low</span>
+            </div>
+            <div class="pattern-desc">Closing profitable positions before target. Avg winner cut at 41% of potential. Costing ₹580 per trade.</div>
+            <div class="pattern-footer">
+              <div class="pattern-freq">
+                <div class="freq-track"><div class="freq-fill" style="width:28%;background:var(--text-tertiary);"></div></div>
+                <span class="freq-label">3× this month</span>
+              </div>
+              <span class="pattern-cost">−₹4,100</span>
+            </div>
+          </div>
+        </div>
+
+      </div><!-- /patterns -->
+
+      <!-- ── EDGE MAP TAB ────────────────────────────────────────── -->
+      <div class="tab-panel" id="tab-edge">
+        <div style="margin-bottom:16px;font-size:13px;color:var(--text-secondary);">Where your actual trading edge lives — ranked by avg P&L per occurrence</div>
+
+        <div class="tm-card overflow-hidden" style="margin-bottom:16px;">
+          <div style="padding:14px 20px;border-bottom:1px solid var(--border-subtle);">
+            <span style="font-size:14px;font-weight:600;color:var(--text-primary);">Setup Performance</span>
+          </div>
+          <div style="padding:12px 20px 16px;">
+            <div class="edge-bar-row">
+              <div class="edge-bar-label">Opening gap fill</div>
+              <div class="edge-bar-track"><div class="edge-bar-fill" style="width:88%;background:var(--profit);"></div></div>
+              <div class="edge-bar-val" style="color:var(--profit);">+₹4,820</div>
+            </div>
+            <div class="edge-bar-row">
+              <div class="edge-bar-label">VWAP bounce</div>
+              <div class="edge-bar-track"><div class="edge-bar-fill" style="width:72%;background:var(--profit);"></div></div>
+              <div class="edge-bar-val" style="color:var(--profit);">+₹3,140</div>
+            </div>
+            <div class="edge-bar-row">
+              <div class="edge-bar-label">9:15 breakout</div>
+              <div class="edge-bar-track"><div class="edge-bar-fill" style="width:65%;background:var(--profit);"></div></div>
+              <div class="edge-bar-val" style="color:var(--profit);">+₹2,460</div>
+            </div>
+            <div class="edge-bar-row">
+              <div class="edge-bar-label">Trend continuation</div>
+              <div class="edge-bar-track"><div class="edge-bar-fill" style="width:48%;background:var(--warning);"></div></div>
+              <div class="edge-bar-val" style="color:var(--warning);">+₹820</div>
+            </div>
+            <div class="edge-bar-row">
+              <div class="edge-bar-label">Afternoon reversal</div>
+              <div class="edge-bar-track"><div class="edge-bar-fill" style="width:30%;background:var(--loss);"></div></div>
+              <div class="edge-bar-val" style="color:var(--loss);">−₹1,240</div>
+            </div>
+            <div class="edge-bar-row">
+              <div class="edge-bar-label">Lunch chop</div>
+              <div class="edge-bar-track"><div class="edge-bar-fill" style="width:12%;background:var(--loss);"></div></div>
+              <div class="edge-bar-val" style="color:var(--loss);">−₹2,800</div>
+            </div>
+          </div>
+        </div>
+      </div><!-- /edge -->
+
+      <!-- ── JOURNAL TAB ─────────────────────────────────────────── -->
+      <div class="tab-panel" id="tab-journal">
+        <div style="margin-bottom:12px;font-size:13px;color:var(--text-secondary);">Emotion tags vs avg P&L · How your mental state correlates with outcomes</div>
+
+        <div class="kpi-4" style="margin-bottom:20px;">
+          <div class="kpi-stat" style="border-left:3px solid var(--profit);">
+            <div class="kpi-stat-label">Best state</div>
+            <div style="font-size:18px;margin-bottom:4px;">😌 Calm</div>
+            <div class="kpi-stat-val" style="color:var(--profit);">+₹2,840</div>
+            <div class="kpi-stat-delta up">71% WR · 38 trades</div>
+          </div>
+          <div class="kpi-stat" style="border-left:3px solid var(--loss);">
+            <div class="kpi-stat-label">Worst state</div>
+            <div style="font-size:18px;margin-bottom:4px;">😤 Frustrated</div>
+            <div class="kpi-stat-val" style="color:var(--loss);">−₹3,120</div>
+            <div class="kpi-stat-delta down">22% WR · 27 trades</div>
+          </div>
+          <div class="kpi-stat">
+            <div class="kpi-stat-label">Most common</div>
+            <div style="font-size:18px;margin-bottom:4px;">🎯 Focused</div>
+            <div class="kpi-stat-val" style="color:var(--profit);">+₹1,420</div>
+            <div class="kpi-stat-delta up">58% WR · 43 trades</div>
+          </div>
+          <div class="kpi-stat">
+            <div class="kpi-stat-label">Baseline avg</div>
+            <div style="font-size:18px;margin-bottom:4px;">📊 All states</div>
+            <div class="kpi-stat-val">+₹1,482</div>
+            <div class="kpi-stat-delta neutral">64% WR · 84 trades</div>
+          </div>
+        </div>
+
+        <div class="tm-card overflow-hidden">
+          <div style="padding:14px 20px;border-bottom:1px solid var(--border-subtle);">
+            <span style="font-size:14px;font-weight:600;color:var(--text-primary);">Emotion → P&L correlation</span>
+          </div>
+          <div style="padding:12px 20px 16px;display:flex;flex-direction:column;gap:10px;">
+            <div class="edge-bar-row">
+              <div class="edge-bar-label">😌 Calm & rested</div>
+              <div class="edge-bar-track" style="background:var(--border-subtle);"><div class="edge-bar-fill" style="width:85%;background:var(--profit);"></div></div>
+              <div class="edge-bar-val" style="color:var(--profit);">+₹2,840</div>
+            </div>
+            <div class="edge-bar-row">
+              <div class="edge-bar-label">🎯 Focused</div>
+              <div class="edge-bar-track"><div class="edge-bar-fill" style="width:55%;background:var(--profit);"></div></div>
+              <div class="edge-bar-val" style="color:var(--profit);">+₹1,420</div>
+            </div>
+            <div class="edge-bar-row">
+              <div class="edge-bar-label">😐 Neutral</div>
+              <div class="edge-bar-track"><div class="edge-bar-fill" style="width:40%;background:var(--warning);"></div></div>
+              <div class="edge-bar-val" style="color:var(--warning);">+₹620</div>
+            </div>
+            <div class="edge-bar-row">
+              <div class="edge-bar-label">🎰 Overconfident</div>
+              <div class="edge-bar-track"><div class="edge-bar-fill" style="width:25%;background:var(--loss);"></div></div>
+              <div class="edge-bar-val" style="color:var(--loss);">−₹920</div>
+            </div>
+            <div class="edge-bar-row">
+              <div class="edge-bar-label">😤 Frustrated</div>
+              <div class="edge-bar-track"><div class="edge-bar-fill" style="width:10%;background:var(--loss);"></div></div>
+              <div class="edge-bar-val" style="color:var(--loss);">−₹3,120</div>
+            </div>
+          </div>
+        </div>
+      </div><!-- /journal -->
+
+      <!-- other tabs: empty placeholders -->
+      <div class="tab-panel" id="tab-trades">
+        <div class="tm-card overflow-hidden" style="padding:40px;text-align:center;">
+          <div style="font-size:32px;margin-bottom:12px;">📋</div>
+          <div style="font-size:15px;font-weight:600;color:var(--text-primary);margin-bottom:6px;">Trade Log</div>
+          <div style="font-size:13px;color:var(--text-secondary);">Full tabular view of all 84 trades with filters, sort, and export.</div>
+        </div>
+      </div>
+      <div class="tab-panel" id="tab-btst">
+        <div class="tm-card overflow-hidden" style="padding:40px;text-align:center;">
+          <div style="font-size:32px;margin-bottom:12px;">🌙</div>
+          <div style="font-size:15px;font-weight:600;color:var(--text-primary);margin-bottom:6px;">BTST Performance</div>
+          <div style="font-size:13px;color:var(--text-secondary);">Overnight positions · Gap statistics · BTST vs intraday comparison.</div>
+        </div>
+      </div>
+      <div class="tab-panel" id="tab-pct">
+        <div class="tm-card overflow-hidden" style="padding:40px;text-align:center;">
+          <div style="font-size:32px;margin-bottom:12px;">📈</div>
+          <div style="font-size:15px;font-weight:600;color:var(--text-primary);margin-bottom:6px;">% Return Analysis</div>
+          <div style="font-size:13px;color:var(--text-secondary);">Returns normalized by capital deployed, compared across periods.</div>
+        </div>
+      </div>
+      <div class="tab-panel" id="tab-expiry">
+        <div class="tm-card overflow-hidden" style="padding:40px;text-align:center;">
+          <div style="font-size:32px;margin-bottom:12px;">📅</div>
+          <div style="font-size:15px;font-weight:600;color:var(--text-primary);margin-bottom:6px;">Expiry Day Analysis</div>
+          <div style="font-size:13px;color:var(--text-secondary);">Expiry vs non-expiry performance · Hourly breakdown · Worst expiry trades.</div>
+        </div>
+      </div>
+
+    </div><!-- /page-content -->
+  </main>
+</div>
+
+<script>
+  function toggleTheme() {
+    const html = document.documentElement;
+    const next = html.getAttribute('data-theme') === 'dark' ? 'light' : 'dark';
+    html.setAttribute('data-theme', next);
+    localStorage.setItem('tm-theme', next);
+    updateThemeIcon(next);
+  }
+  function updateThemeIcon(theme) {
+    document.getElementById('icon-sun').style.display  = theme === 'light' ? 'block' : 'none';
+    document.getElementById('icon-moon').style.display = theme === 'dark'  ? 'block' : 'none';
+  }
+  const saved = localStorage.getItem('tm-theme') || 'dark';
+  document.documentElement.setAttribute('data-theme', saved);
+  updateThemeIcon(saved);
+
+  function setPeriod(btn, period) {
+    document.querySelectorAll('.period-btn').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+  }
+
+  const TAB_IDS = ['summary','patterns','trades','btst','pct','edge','expiry','journal'];
+  function setTab(btn, id) {
+    document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+    TAB_IDS.forEach(k => {
+      const el = document.getElementById('tab-' + k);
+      if (el) el.classList.toggle('active', k === id);
+    });
+  }
+</script>
+</body>
+</html>

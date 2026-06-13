@@ -2,47 +2,47 @@
    TradeMentor AI — Shared Design System
    Applies to all prototype pages in /prototype_design/
    ============================================================ */
-@import url('https://fonts.googleapis.com/css2?family=Geist+Mono:wght@400;500;600;700&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800&family=Geist+Mono:wght@300;400;500;600;700&display=swap');
 
 /* ── Root Tokens ── */
 :root {
-  --brand: #635BFF;
-  --brand-light: #EEF2FF;
-  --brand-mid: #4F46E5;
+  --brand: #0071E3; /* Apple Cobalt */
+  --brand-light: #F5F5F7;
+  --brand-mid: #0066CC;
 
-  --profit: #10B981;
-  --profit-bg: #D1FAE5;
-  --loss: #EF4444;
-  --loss-bg: #FEE2E2;
-  --obs: #F59E0B;
-  --obs-bg: #FEF3C7;
+  --profit: #34C759; /* Apple Green */
+  --profit-bg: rgba(52, 199, 89, 0.08);
+  --loss: #FF3B30; /* Apple Red */
+  --loss-bg: rgba(255, 59, 48, 0.08);
+  --obs: #FF9500; /* Apple Amber */
+  --obs-bg: rgba(255, 149, 0, 0.08);
 
-  --bg: #F8FAFC;
+  --bg: #F5F5F7; /* Apple Grey */
   --surface: #FFFFFF;
-  --border: #E2E8F0;
-  --border-soft: #F1F5F9;
+  --border: rgba(0, 0, 0, 0.06);
+  --border-soft: rgba(0, 0, 0, 0.03);
 
-  --text: #0F172A;
-  --text-muted: #475569;
-  --text-faint: #94A3B8;
+  --text: #1D1D1F; /* Apple Obsidian */
+  --text-muted: #86868B; /* Apple Charcoal */
+  --text-faint: #AEAEB2;
 
   --sidebar-w: 260px;
   --bottom-nav-h: 60px;
 
-  --radius-sm: 6px;
+  --radius-sm: 4px;
   --radius-md: 8px;
-  --radius-lg: 12px;
+  --radius-lg: 16px;
 
-  /* Minimalist shadows */
-  --shadow-sm: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
-  --shadow-card: 0 1px 3px 0 rgba(15, 23, 42, 0.05), 0 1px 2px -1px rgba(15, 23, 42, 0.06);
-  --shadow-card-hover: 0 4px 6px -1px rgba(15, 23, 42, 0.06), 0 2px 4px -2px rgba(15, 23, 42, 0.08);
-  --shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.05), 0 2px 4px -2px rgba(0, 0, 0, 0.05);
-  --shadow-lg: 0 10px 15px -3px rgba(15, 23, 42, 0.08), 0 4px 6px -4px rgba(15, 23, 42, 0.08);
-  --shadow-inset: inset 0 1.5px 3px 0 rgba(15, 23, 42, 0.06);
+  /* Minimalist Apple shadows */
+  --shadow-sm: 0 2px 8px rgba(0, 0, 0, 0.02);
+  --shadow-card: 0 8px 30px rgba(0, 0, 0, 0.03);
+  --shadow-card-hover: 0 12px 40px rgba(0, 0, 0, 0.06);
+  --shadow-md: 0 10px 20px rgba(0, 0, 0, 0.04);
+  --shadow-lg: 0 20px 40px rgba(0, 0, 0, 0.06);
+  --shadow-inset: inset 0 1.5px 3px 0 rgba(0, 0, 0, 0.02);
 
-  --transition: 0.15s ease;
-  --transition-slow: 0.25s ease;
+  --transition: 0.2s cubic-bezier(0.4, 0, 0.25, 1);
+  --transition-slow: 0.35s cubic-bezier(0.4, 0, 0.25, 1);
 }
 
 /* ── Base Reset & Typography ── */
@@ -57,7 +57,7 @@ html {
 }
 
 body {
-  font-family: 'Inter', system-ui, -apple-system, sans-serif;
+  font-family: 'Outfit', system-ui, -apple-system, sans-serif;
   background: #F8FAFC;
   color: var(--text);
   -webkit-font-smoothing: antialiased;
@@ -113,33 +113,42 @@ td.num,
 .tm-card {
   background: var(--surface);
   border-radius: var(--radius-lg);
-  border: 1px solid #E2E8F0;
+  border: none;
   box-shadow: var(--shadow-card);
-  transition: all 0.2s ease;
+  transition: all var(--transition);
   position: relative;
   overflow: hidden;
 }
 
 .tm-card:hover {
   box-shadow: var(--shadow-card-hover);
-  border-color: #CBD5E1;
-  transform: translateY(-1px);
+  transform: translateY(-2px);
+}
+
+/* Frosted glass panel */
+.tm-glass {
+  background: rgba(255, 255, 255, 0.7);
+  backdrop-filter: blur(20px) saturate(190%);
+  -webkit-backdrop-filter: blur(20px) saturate(190%);
+  border: 1px solid rgba(255, 255, 255, 0.65);
+  box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.02);
+  border-radius: var(--radius-lg);
 }
 
 /* Flat card */
 .tm-card-flat {
-  background: #F8FAFC;
+  background: rgba(0, 0, 0, 0.02);
   border-radius: var(--radius-md);
-  border: 1px solid #E2E8F0;
+  border: none;
   position: relative;
   overflow: hidden;
 }
 
 /* Tinted card */
 .tm-card-tint {
-  background: linear-gradient(135deg, #F8FAFC 0%, var(--surface) 100%);
+  background: linear-gradient(135deg, rgba(0,0,0,0.01) 0%, var(--surface) 100%);
   border-radius: var(--radius-lg);
-  border: 1px solid #E2E8F0;
+  border: none;
   box-shadow: var(--shadow-card);
 }
 
@@ -727,47 +736,45 @@ tbody tr:hover {
 }
 
 .btn-primary:hover {
-  background: #5145CD;
-  box-shadow: 0 2px 4px rgba(99, 91, 255, 0.2);
+  background: #0077ED;
   transform: translateY(-0.5px);
 }
 
 .btn-primary:active {
-  transform: translateY(0.5px);
+  transform: scale(0.97);
 }
 
 .btn-secondary {
   background: var(--surface);
-  color: var(--text-muted);
-  border-color: #D1D5DB;
+  color: var(--text);
+  border-color: rgba(0, 0, 0, 0.08);
   box-shadow: var(--shadow-sm);
 }
 
 .btn-secondary:hover {
-  background: #F9FAFB;
+  background: #F5F5F7;
   color: var(--text);
-  border-color: #C5C9D0;
+  border-color: rgba(0, 0, 0, 0.15);
   transform: translateY(-0.5px);
 }
 
 .btn-secondary:active {
-  background: #F3F4F6;
-  transform: translateY(0.5px);
+  transform: scale(0.97);
 }
 
 .btn-danger {
-  background: #EF4444;
+  background: var(--loss);
   color: white;
   box-shadow: var(--shadow-sm);
 }
 
 .btn-danger:hover {
-  background: #DC2626;
+  background: #FF453A;
   transform: translateY(-0.5px);
 }
 
 .btn-danger:active {
-  transform: translateY(0.5px);
+  transform: scale(0.97);
 }
 
 .btn-sm {
@@ -1154,4 +1161,52 @@ button {
 }
 button:active {
   transform: scale(0.98);
+}
+
+/* ── Workstation Segment Switcher & Panel Display Rules ── */
+.segment-tab-bar {
+  display: none;
+  background: #E2E8F0;
+  padding: 3px;
+  border-radius: var(--radius-md);
+  margin-bottom: 20px;
+  width: 100%;
+}
+.segment-tab-btn {
+  flex: 1;
+  text-align: center;
+  padding: 8px 12px;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-muted);
+  background: transparent;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+.segment-tab-btn.active {
+  background: var(--surface);
+  color: var(--text);
+  box-shadow: var(--shadow-sm);
+}
+
+@media (max-width: 1279px) {
+  .panel-segment {
+    display: none !important;
+  }
+  .panel-segment.active-segment {
+    display: block !important;
+  }
+  .segment-tab-bar {
+    display: flex !important;
+  }
+}
+@media (min-width: 1280px) {
+  .panel-segment {
+    display: block !important;
+  }
+  .segment-tab-bar {
+    display: none !important;
+  }
 }

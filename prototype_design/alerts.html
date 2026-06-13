@@ -18,7 +18,8 @@
   <script src="https://unpkg.com/@tailwindcss/browser@4"></script>
   <style type="text/tailwindcss">
     @theme {
-      --font-sans: 'Inter', sans-serif;
+      --font-sans: 'Outfit', sans-serif;
+      --font-mono: 'Geist Mono', monospace;
       --color-brand: #635BFF;
       --color-brandBg: #EEF2FF;
       --color-profit: #10B981;
@@ -154,172 +155,106 @@
       </div>
 
       <!-- Layout Grid -->
-      <div class="flex flex-col lg:flex-row gap-8 items-start">
+      <div class="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
 
-        <!-- Main Feed (70%) -->
-        <div class="w-full lg:w-[65%] 2xl:w-[70%] space-y-5" aria-live="polite">
-
-          <!-- Card 1: NEW Observation -->
-          <div class="alert-card severity-med">
-            <div class="flex items-start justify-between mb-3">
-              <h3 class="text-[15px] sm:text-[16px] font-bold text-slate-900 flex items-center gap-2">
+        <!-- LEFT SIDE PANEL: Alerts List (35% / col-span-4) -->
+        <div class="lg:col-span-4 space-y-3">
+          <div class="text-xs font-bold text-slate-400 uppercase tracking-wider mb-2">Observations Feed</div>
+          
+          <!-- Alert Item 1 (Overtrading - Active) -->
+          <div onclick="selectAlert('overtrading')" id="alert-item-overtrading" class="alert-list-item p-4 border border-indigo-500 rounded-lg bg-indigo-50/50 cursor-pointer transition-all hover:bg-slate-50 flex flex-col gap-1.5" data-alert-id="overtrading">
+            <div class="flex items-center justify-between">
+              <span class="flex items-center gap-1.5 text-xs font-bold text-slate-900">
                 <span class="status-dot warn"></span>
                 Overtrading
-                <span class="badge badge-brand ml-2">New</span>
-              </h3>
-              <span class="text-[13px] sm:text-[13px] font-medium text-slate-500">10:34 AM today</span>
+              </span>
+              <span class="text-[10px] text-slate-400 font-mono font-tabular">10:34 AM</span>
             </div>
-
-            <div class="pl-5 border-l-2 border-slate-100 ml-[5px] mb-5">
-              <p class="text-[13px] sm:text-[14px] text-slate-900 font-semibold mb-1">
-                8 trades placed in a 2-hour window. This is 40% above your daily average of 6.
-              </p>
-              <p class="text-[13px] sm:text-[14px] text-slate-600 font-medium leading-relaxed mb-4">
-                You typically only exceed this pace on days marked by high frustration in your journal. Please review
-                your session pace.
-              </p>
-
-              <div class="flex flex-wrap gap-2 mb-4">
-                <span class="badge badge-gray">NIFTY CE &times; 5</span>
-                <span class="badge badge-gray">BANKNIFTY &times; 3</span>
-              </div>
-
-              <p class="text-[13px] sm:text-[13px] font-medium text-slate-500">Estimated cost: <span
-                  class="font-medium text-rose-600 tabular">-₹1,200</span></p>
-            </div>
-
-            <div class="flex items-center gap-3 pl-5 ml-[5px]">
-              <button class="btn btn-secondary text-[13px]">Acknowledge</button>
-              <button class="btn btn-secondary text-[13px]">See trades &rarr;</button>
+            <p class="text-xs text-slate-500 line-clamp-2">8 trades placed in a 2-hour window. This is 40% above average.</p>
+            <div class="flex items-center justify-between mt-1">
+              <span class="px-1.5 py-0.5 bg-amber-100 text-amber-800 text-[9px] font-bold rounded uppercase border border-amber-200">Medium</span>
+              <span class="text-[10px] text-rose-500 font-mono font-tabular">-₹1,200</span>
             </div>
           </div>
 
-          <!-- Card 2: NEW Observation (High Severity) -->
-          <div class="alert-card severity-high">
-            <div class="flex items-start justify-between mb-3">
-              <h3 class="text-[15px] sm:text-[16px] font-bold text-slate-900 flex items-center gap-2">
+          <!-- Alert Item 2 (Revenge Trade) -->
+          <div onclick="selectAlert('revenge')" id="alert-item-revenge" class="alert-list-item p-4 border border-slate-200 rounded-lg bg-white cursor-pointer transition-all hover:bg-slate-50 flex flex-col gap-1.5" data-alert-id="revenge">
+            <div class="flex items-center justify-between">
+              <span class="flex items-center gap-1.5 text-xs font-bold text-slate-900">
                 <span class="status-dot danger"></span>
-                Revenge Trade Risk
-                <span class="badge badge-brand ml-2">New</span>
-              </h3>
-              <span class="text-[13px] sm:text-[13px] font-medium text-slate-500">09:58 AM today</span>
+                Revenge Trade
+              </span>
+              <span class="text-[10px] text-slate-400 font-mono font-tabular">09:58 AM</span>
             </div>
-
-            <div class="pl-5 border-l-2 border-slate-100 ml-[5px] mb-5">
-              <p class="text-[13px] sm:text-[14px] text-slate-900 font-semibold mb-1">
-                Re-entered BANKNIFTY CE 4 minutes after a ₹800 loss at 09:54 AM.
-              </p>
-              <p class="text-[13px] sm:text-[14px] text-slate-600 font-medium leading-relaxed mb-4">
-                Typical revenge pattern: entering the same underlying directly after a stop-out without an intentional
-                pause.
-              </p>
-            </div>
-
-            <div class="flex items-center gap-3 pl-5 ml-[5px]">
-              <button class="btn btn-danger text-[13px]">Acknowledge</button>
-              <button class="btn btn-secondary text-[13px]">See trades &rarr;</button>
+            <p class="text-xs text-slate-500 line-clamp-2">Re-entered BANKNIFTY CE 4 minutes after a ₹800 loss.</p>
+            <div class="flex items-center justify-between mt-1">
+              <span class="px-1.5 py-0.5 bg-red-100 text-red-800 text-[9px] font-bold rounded uppercase border border-red-200">Critical</span>
+              <span class="text-[10px] text-rose-600 font-mono font-tabular">-₹800</span>
             </div>
           </div>
 
-          <!-- Card 3: Acknowledged Observation -->
-          <div class="alert-card severity-low opacity-70">
-            <div class="flex items-start justify-between mb-3">
-              <h3 class="text-[15px] sm:text-[16px] font-bold text-slate-900 flex items-center gap-2">
+          <!-- Alert Item 3 (Opening Trap) -->
+          <div onclick="selectAlert('opening-trap')" id="alert-item-opening-trap" class="alert-list-item p-4 border border-slate-200 rounded-lg bg-white cursor-pointer transition-all hover:bg-slate-50 flex flex-col gap-1.5" data-alert-id="opening-trap">
+            <div class="flex items-center justify-between">
+              <span class="flex items-center gap-1.5 text-xs font-bold text-slate-900">
                 <span class="status-dot muted"></span>
                 Opening 5-Min Trap
-                <span class="badge badge-gray ml-2 flex items-center gap-1">
-                  <svg aria-hidden="true" class="w-3 h-3 text-slate-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="3" d="M5 13l4 4L19 7"></path>
-                  </svg>
-                  Acknowledged
-                </span>
-              </h3>
-              <span class="text-[13px] sm:text-[13px] font-medium text-slate-500">Mar 26 &middot; 09:18 AM</span>
+              </span>
+              <span class="text-[10px] text-slate-400 font-mono font-tabular">Mar 26</span>
             </div>
-
-            <div class="pl-5 border-l-2 border-slate-100 ml-[5px]">
-              <p class="text-[13px] text-slate-600 font-medium leading-relaxed">
-                Entered position within the first 5 minutes of market open. Historically, this has resulted in a 32% win
-                rate.
-              </p>
+            <p class="text-xs text-slate-500 line-clamp-2">Entered position within the first 5 minutes of market open.</p>
+            <div class="flex items-center justify-between mt-1">
+              <span class="px-1.5 py-0.5 bg-slate-100 text-slate-700 text-[9px] font-bold rounded uppercase border border-slate-200">Low</span>
+              <span class="text-[10px] text-slate-400 font-mono font-tabular">Acknowledged</span>
             </div>
           </div>
-
         </div>
 
-        <!-- Right Side Filter Container (35%) -->
-        <div class="w-full lg:w-[35%] 2xl:w-[30%]">
-          <div class="tm-card p-8 sticky top-24">
-            <h3 class="text-[13px] font-medium text-slate-500 uppercase tracking-wider mb-4 border-b border-slate-100 pb-2">
-              Filter Feed</h3>
+        <!-- RIGHT DETAIL PANEL: Alert Details (65% / col-span-8) -->
+        <div class="lg:col-span-8 space-y-4">
+          <div class="text-xs font-bold text-slate-400 uppercase tracking-wider mb-2">Observation Details</div>
 
-            <!-- Pattern Type -->
-            <div class="mb-6">
-              <p class="text-[13px] font-semibold text-slate-900 mb-3">Pattern Type</p>
-              <div class="space-y-3">
-                <label class="flex items-center gap-3 cursor-pointer group">
-                  <input type="checkbox" checked
-                    class="w-4 h-4 rounded text-brand border-gray-300 focus:ring-brand focus:ring-2 cursor-pointer">
-                  <span class="text-[14px] font-medium text-slate-600 group-hover:text-slate-900 transition">All
-                    Patterns</span>
-                </label>
-                <label class="flex items-center gap-3 cursor-pointer group">
-                  <input type="checkbox" checked
-                    class="w-4 h-4 rounded text-brand border-gray-300 focus:ring-brand focus:ring-2 cursor-pointer">
-                  <span
-                    class="text-[14px] font-medium text-slate-600 group-hover:text-slate-900 transition">Overtrading</span>
-                </label>
-                <label class="flex items-center gap-3 cursor-pointer group">
-                  <input type="checkbox" checked
-                    class="w-4 h-4 rounded text-brand border-gray-300 focus:ring-brand focus:ring-2 cursor-pointer">
-                  <span class="text-[14px] font-medium text-slate-600 group-hover:text-slate-900 transition">Revenge
-                    Risk</span>
-                </label>
-                <label class="flex items-center gap-3 cursor-pointer group">
-                  <input type="checkbox" checked
-                    class="w-4 h-4 rounded text-brand border-gray-300 focus:ring-brand focus:ring-2 cursor-pointer">
-                  <span class="text-[14px] font-medium text-slate-600 group-hover:text-slate-900 transition">FOMO
-                    Entry</span>
-                </label>
+          <!-- Details Card -->
+          <div id="alert-details-card" class="tm-card p-6 space-y-6">
+            <!-- Header section of active alert -->
+            <div class="flex items-start justify-between pb-4 border-b border-slate-200">
+              <div>
+                <span id="active-alert-severity" class="px-2 py-0.5 bg-amber-100 text-amber-800 text-[10px] font-bold rounded uppercase border border-amber-200">Medium Severity</span>
+                <h2 id="active-alert-title" class="text-lg font-bold text-slate-900 mt-1.5 font-sans">Overtrading Pattern Detected</h2>
+                <p id="active-alert-time" class="text-xs text-slate-500 font-mono font-tabular mt-0.5">Today at 10:34 AM | 8 trades in 2 hours</p>
+              </div>
+              <div class="text-right">
+                <span class="text-xs text-slate-400 font-medium">Estimated Cost</span>
+                <p id="active-alert-cost" class="text-xl font-bold text-rose-600 font-mono font-tabular">-₹1,200</p>
               </div>
             </div>
 
-            <!-- Severity -->
-            <div class="mb-6">
-              <p class="text-[13px] font-semibold text-slate-900 mb-3">Severity</p>
-              <div class="space-y-3">
-                <label class="flex items-center gap-3 cursor-pointer group">
-                  <input type="checkbox" checked
-                    class="w-4 h-4 rounded text-brand border-gray-300 focus:ring-brand focus:ring-2 cursor-pointer">
-                  <span class="status-dot danger"></span>
-                  <span class="text-[14px] font-medium text-slate-600 group-hover:text-slate-900 transition">High / Critical</span>
-                </label>
-                <label class="flex items-center gap-3 cursor-pointer group">
-                  <input type="checkbox" checked
-                    class="w-4 h-4 rounded text-brand border-gray-300 focus:ring-brand focus:ring-2 cursor-pointer">
-                  <span class="status-dot warn"></span>
-                  <span class="text-[14px] font-medium text-slate-600 group-hover:text-slate-900 transition">Medium</span>
-                </label>
-                <label class="flex items-center gap-3 cursor-pointer group">
-                  <input type="checkbox" checked
-                    class="w-4 h-4 rounded text-brand border-gray-300 focus:ring-brand focus:ring-2 cursor-pointer">
-                  <span class="status-dot muted"></span>
-                  <span class="text-[14px] font-medium text-slate-600 group-hover:text-slate-900 transition">Low</span>
-                </label>
+            <!-- Description -->
+            <div class="space-y-3">
+              <h4 class="text-xs font-bold text-slate-900 uppercase tracking-wider">Psychological Analysis</h4>
+              <p id="active-alert-desc" class="text-xs text-slate-600 leading-relaxed font-medium">
+                You placed 8 trades in a 2-hour window, which exceeds your daily average trade count of 6 by 40%. Historically, this high-frequency pacing is strongly correlated with emotional frustration or attempting to churn capital to recover a small initial loss. 
+              </p>
+              <div id="active-alert-badges" class="flex flex-wrap gap-2 pt-2">
+                <span class="px-2 py-0.5 bg-slate-100 border border-slate-200 text-[10px] font-bold text-slate-600 rounded font-mono font-tabular">NIFTY CE x 5</span>
+                <span class="px-2 py-0.5 bg-slate-100 border border-slate-200 text-[10px] font-bold text-slate-600 rounded font-mono font-tabular">BANKNIFTY x 3</span>
               </div>
             </div>
 
-            <!-- Date Range -->
-            <div>
-              <p class="text-[13px] font-semibold text-slate-900 mb-3">Date Range</p>
-              <button class="btn btn-secondary w-full text-[13px] flex items-center justify-between">
-                Today
-                <svg aria-hidden="true" class="w-4 h-4 text-slate-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path>
-                </svg>
-              </button>
+            <!-- Journaling Form -->
+            <div class="border-t border-slate-200 pt-4 space-y-4">
+              <h4 class="text-xs font-bold text-slate-900 uppercase tracking-wider">Rules Reflection Journal</h4>
+              <form id="rules-journal-form" onsubmit="submitJournal(event)" class="space-y-3">
+                <textarea id="rules-journal-input" required class="tm-input w-full text-xs font-medium" rows="3" placeholder="What psychological trigger caused this deviation? Note down your correction rule..."></textarea>
+                <div class="flex items-center justify-between gap-3 pt-1">
+                  <label class="flex items-center gap-2 cursor-pointer text-xs font-medium text-slate-500">
+                    <input id="lock-account-checkbox" type="checkbox" class="w-4 h-4 rounded text-brand border-slate-300 focus:ring-brand">
+                    Lock Zerodha console for 15 mins
+                  </label>
+                  <button type="submit" class="px-4 py-2 bg-brand hover:bg-brand-mid text-white text-xs font-bold rounded-lg shadow transition-all">Submit Reflection</button>
+                </div>
+              </form>
             </div>
-
           </div>
         </div>
 
@@ -355,7 +290,84 @@
       </a>
     </div>
   </nav>
-  <script>document.getElementById('bnav-alerts').classList.add('active');</script>
+  <script>
+    document.getElementById('bnav-alerts').classList.add('active');
+
+    // Database of alert details
+    const alertDb = {
+      'overtrading': {
+        title: 'Overtrading Pattern Detected',
+        severity: 'Medium Severity',
+        severityClass: 'bg-amber-100 text-amber-800 border-amber-200',
+        time: 'Today at 10:34 AM | 8 trades in 2 hours',
+        cost: '-₹1,200',
+        costClass: 'text-rose-600',
+        desc: 'You placed 8 trades in a 2-hour window, which exceeds your daily average trade count of 6 by 40%. Historically, this high-frequency pacing is strongly correlated with emotional frustration or attempting to churn capital to recover a small initial loss.',
+        badges: ['NIFTY CE x 5', 'BANKNIFTY x 3']
+      },
+      'revenge': {
+        title: 'Revenge Trade Risk Flagged',
+        severity: 'Critical Severity',
+        severityClass: 'bg-red-100 text-red-800 border-red-200',
+        time: 'Today at 09:58 AM | Fast re-entry after loss',
+        cost: '-₹800',
+        costClass: 'text-rose-600',
+        desc: 'You re-entered BANKNIFTY CE 4 minutes after a ₹800 loss at 09:54 AM. Entering the same underlying instrument immediately after a stop-out without an intentional pause is a classic revenge trade pattern.',
+        badges: ['BANKNIFTY CE', '4m Interval']
+      },
+      'opening-trap': {
+        title: 'Opening 5-Min Trap Violation',
+        severity: 'Low Severity',
+        severityClass: 'bg-slate-100 text-slate-700 border-slate-200',
+        time: 'Mar 26 at 09:18 AM | Market open entry',
+        cost: 'Acknowledged',
+        costClass: 'text-slate-500',
+        desc: 'You entered a position within the first 5 minutes of market open. Statistically, early morning volatility trap trades yield a 32% win rate on your history, resulting in negative expectancy.',
+        badges: ['9:18 AM', '32% Win Rate']
+      }
+    };
+
+    function selectAlert(id) {
+      const alert = alertDb[id];
+      if (!alert) return;
+      
+      // Update detail view
+      document.getElementById('active-alert-title').innerText = alert.title;
+      document.getElementById('active-alert-severity').innerText = alert.severity;
+      document.getElementById('active-alert-severity').className = `px-2 py-0.5 ${alert.severityClass} text-[10px] font-bold rounded uppercase border`;
+      document.getElementById('active-alert-time').innerText = alert.time;
+      document.getElementById('active-alert-cost').innerText = alert.cost;
+      document.getElementById('active-alert-cost').className = `text-xl font-bold ${alert.costClass} font-mono font-tabular`;
+      document.getElementById('active-alert-desc').innerText = alert.desc;
+      
+      // Update badges
+      const container = document.getElementById('active-alert-badges');
+      container.innerHTML = '';
+      alert.badges.forEach(b => {
+        container.innerHTML += `<span class="px-2 py-0.5 bg-slate-100 border border-slate-200 text-[10px] font-bold text-slate-600 rounded font-mono font-tabular">${b}</span>`;
+      });
+      
+      // Reset active list state
+      document.querySelectorAll('.alert-list-item').forEach(item => {
+        item.classList.remove('bg-indigo-50/50', 'border-indigo-500');
+        item.classList.add('bg-white', 'border-slate-200');
+      });
+      
+      const activeItem = document.getElementById(`alert-item-${id}`);
+      if (activeItem) {
+        activeItem.classList.remove('bg-white', 'border-slate-200');
+        activeItem.classList.add('bg-indigo-50/50', 'border-indigo-500');
+      }
+    }
+
+    function submitJournal(e) {
+      e.preventDefault();
+      const reflection = document.getElementById('rules-journal-input').value;
+      const lockConsole = document.getElementById('lock-account-checkbox').checked;
+      alert(`Reflection saved: "${reflection}"\n${lockConsole ? "Console locked for 15 mins." : "System unlocked."}`);
+      document.getElementById('rules-journal-input').value = '';
+    }
+  </script>
 </body>
 
 </html>
