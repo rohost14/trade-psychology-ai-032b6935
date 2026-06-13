@@ -82,7 +82,10 @@ export default function EdgeMapTab({ days }: { days: number }) {
     : null;
 
   // Scatter data: x=trade_pct, y=win_rate, z=trade_count
-  const scatterData = instruments.map(i => ({ ...i, x: i.trade_pct, y: i.win_rate, z: i.trade_count }));
+  // Coerce to numbers — null/undefined from backend would produce NaN in recharts
+  const scatterData = instruments
+    .filter(i => isFinite(i.trade_pct) && isFinite(i.win_rate) && isFinite(i.trade_count))
+    .map(i => ({ ...i, x: i.trade_pct, y: i.win_rate, z: i.trade_count }));
 
   // Identify misaligned instruments
   const overallocated = instruments.filter(i => i.trade_pct > proportional_benchmark && i.win_rate < overall_win_rate);
@@ -158,6 +161,7 @@ export default function EdgeMapTab({ days }: { days: number }) {
                 data={scatterData}
                 shape={(props: any) => {
                   const { cx, cy, r, payload } = props;
+                  if (!isFinite(cx) || !isFinite(cy) || !isFinite(r)) return null;
                   const color = payload.win_rate >= overall_win_rate ? '#16A34A' : '#DC2626';
                   return (
                     <g>
