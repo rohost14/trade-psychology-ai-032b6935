@@ -133,16 +133,17 @@ class TestLogicCorrectness:
         )
 
     def test_morning_intent_endpoints(self, user: httpx.Client):
-        """3.6/3.7 Morning intent GET and POST endpoints exist."""
+        """3.6/3.7 Morning intent GET and acknowledge POST endpoints exist."""
         r_get = user.get("/api/session-intent/today")
         assert r_get.status_code in (200, 404, 422), (
             f"Morning intent GET crashed: {r_get.status_code}"
         )
-        # POST — don't actually save, just verify endpoint exists
-        r_post = user.post("/api/session-intent/", json={
-            "intent": "test_probe",
-            "risk_appetite": "moderate",
+        # POST /acknowledge — commit to today's plan
+        r_post = user.post("/api/session-intent/acknowledge", json={
+            "planned_trades": 5,
+            "planned_risk_per_trade": 1000,
+            "trading_style_today": "intraday",
         })
         assert r_post.status_code not in (404, 405), (
-            f"Morning intent POST not found: {r_post.status_code}"
+            f"Morning intent POST /acknowledge not found: {r_post.status_code}"
         )

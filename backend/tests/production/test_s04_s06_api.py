@@ -99,19 +99,23 @@ class TestRiskStateAPI:
             f"Invalid risk state value: {state!r}. Must be safe/caution/danger."
         )
 
-    def test_6_3_risk_state_has_score(self, user: httpx.Client):
-        """6.3 Risk state response includes a score/level (not always zero)."""
+    def test_6_3_risk_state_has_required_fields(self, user: httpx.Client):
+        """6.3 Risk state response has all required fields for the frontend."""
         r = user.get("/api/risk/state")
         assert r.status_code == 200
         data = r.json()
-        # Score should be a number (can be 0 for new accounts)
-        score_fields = ("score", "risk_score", "level", "daily_loss_pct", "trade_count")
-        has_numeric = any(
-            isinstance(data.get(f), (int, float)) for f in score_fields
+        # Must have risk_state (string enum)
+        assert "risk_state" in data or "state" in data, (
+            f"Risk state response missing 'risk_state'/'state' field. Response: {data}"
         )
-        assert has_numeric, (
-            f"Risk state has no numeric score field. Response: {data}. "
-            f"Checked fields: {score_fields}"
+        # Must have active_patterns list (even if empty)
+        assert "active_patterns" in data or "patterns" in data, (
+            f"Risk state missing 'active_patterns' field. Response: {data}"
+        )
+        # active_patterns must be a list (never None)
+        patterns = data.get("active_patterns", data.get("patterns", []))
+        assert isinstance(patterns, list), (
+            f"'active_patterns' is not a list: {type(patterns)!r}. Frontend will crash."
         )
 
     def test_blowup_shield_daily_limits_present(self, user: httpx.Client):
