@@ -42,7 +42,13 @@ const AdminConfig     = lazy(() => import("./pages/admin/AdminConfig"));
 const AdminAuditLog   = lazy(() => import("./pages/admin/AdminAuditLog"));
 const AdminBroadcast  = lazy(() => import("./pages/admin/AdminBroadcast"));
 
-const queryClient = new QueryClient();
+const queryClient = new QueryClient({
+  defaultOptions: {
+    queries: {
+      staleTime: 5 * 60 * 1000,
+    },
+  },
+});
 
 const App = () => (
   <ErrorBoundary>

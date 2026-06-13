@@ -164,21 +164,21 @@ export default function SummaryTab({ days, onInstrumentClick, onTabChange }: Sum
     let cancelled = false;
     setIsLoading(true);
     setError(null);
-    Promise.all([
+    Promise.allSettled([
       api.get('/api/analytics/overview',    { params: { days } }),
       api.get('/api/analytics/overview',    { params: { days: days * 2 } }),
       api.get('/api/analytics/performance', { params: { days } }),
     ]).then(([ov, prevOv, pf]) => {
       if (cancelled) return;
-      setOverview(ov.data);
-      setPrevOverview(prevOv.data);
-      setPerf(pf.data);
-    }).catch((err: any) => {
-      if (cancelled) return;
-      const msg = err?.response?.status === 401
-        ? 'Session expired — please reconnect Zerodha.'
-        : 'Failed to load analytics data.';
-      setError(msg);
+      if (ov.status === 'fulfilled') setOverview(ov.value.data);
+      if (prevOv.status === 'fulfilled') setPrevOverview(prevOv.value.data);
+      if (pf.status === 'fulfilled') setPerf(pf.value.data);
+      if (ov.status === 'rejected') {
+        const err = ov.reason as any;
+        setError(err?.response?.status === 401
+          ? 'Session expired — please reconnect Zerodha.'
+          : 'Failed to load analytics data.');
+      }
     }).finally(() => {
       if (!cancelled) setIsLoading(false);
     });

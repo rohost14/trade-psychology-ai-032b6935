@@ -105,7 +105,11 @@ export default function Dashboard() {
       }));
       setPositions(transformedPositions);
     } catch (err: any) {
-      setPositionsError(apiDetailString(err.response?.data?.detail, err.message || 'Failed to fetch positions'));
+      const msg = apiDetailString(err.response?.data?.detail, err.message || 'Failed to fetch positions');
+      setPositionsError(msg);
+      if (err?.response?.status !== 401) {
+        toast({ variant: 'destructive', title: 'Could not load positions', description: msg });
+      }
     } finally {
       setPositionsLoading(false);
     }
@@ -143,7 +147,11 @@ export default function Dashboard() {
       }));
       setClosedTrades(trades);
     } catch (err: any) {
-      setTradesError(apiDetailString(err.response?.data?.detail, err.message || 'Failed to fetch trades'));
+      const msg = apiDetailString(err.response?.data?.detail, err.message || 'Failed to fetch trades');
+      setTradesError(msg);
+      if (err?.response?.status !== 401) {
+        toast({ variant: 'destructive', title: 'Could not load trades', description: msg });
+      }
     } finally {
       setTradesLoading(false);
     }

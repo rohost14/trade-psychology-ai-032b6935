@@ -1,4 +1,4 @@
-import axios from 'axios';
+import axios, { AxiosRequestConfig, AxiosResponse } from 'axios';
 import { isGuestMode, getGuestResponse } from './guestMode';
 
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000';
@@ -112,6 +112,27 @@ export async function fetchWithAuth(url: string, options: RequestInit = {}): Pro
   }
 
   return response;
+}
+
+/**
+ * Deduplicated GET — if two callers request the same URL+params before the
+ * first resolves, both receive the same Promise instead of two network calls.
+ * Entries are removed from the map as soon as the request settles.
+ */
+const _pendingGets = new Map<string, Promise<AxiosResponse<any>>>();
+
+export function dedupGet<T = any>(
+  url: string,
+  config?: AxiosRequestConfig,
+): Promise<AxiosResponse<T>> {
+  const key = `${url}::${JSON.stringify(config?.params ?? {})}`;
+  const pending = _pendingGets.get(key);
+  if (pending) return pending as Promise<AxiosResponse<T>>;
+  const req = api.get<T>(url, config).finally(() => {
+    _pendingGets.delete(key);
+  });
+  _pendingGets.set(key, req);
+  return req;
 }
 
 export default api;

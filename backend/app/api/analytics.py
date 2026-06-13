@@ -93,7 +93,8 @@ async def recalculate_pnl(
 @router.get("/unrealized-pnl")
 async def get_unrealized_pnl(
     broker_account_id: UUID = Depends(get_verified_broker_account_id),
-    db: AsyncSession = Depends(get_db)
+    db: AsyncSession = Depends(get_db),
+    _limiter: None = Depends(analytics_limiter),
 ):
     """Get unrealized P&L for open positions."""
     try:
@@ -2113,6 +2114,7 @@ async def get_pnl_percent(
     broker_account_id: UUID = Depends(get_verified_broker_account_id),
     days_back: int = Query(default=30, ge=1, le=365),
     db: AsyncSession = Depends(get_db),
+    _limiter: None = Depends(analytics_limiter),
 ):
     """
     Percentage P&L analysis across closed trades.
