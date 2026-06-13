@@ -55,6 +55,15 @@ export const adminApi = {
     req(`/users/${id}/send-message`, { method: 'POST', body: JSON.stringify({ message }) }),
   messageHistory: (id: string) => req(`/users/${id}/messages`),
 
+  // Phase 1 power tools
+  userTimeline:      (id: string, limit = 80) => req(`/users/${id}/timeline?limit=${limit}`),
+  userForceSync:     (id: string) => req(`/users/${id}/force-sync`, { method: 'POST' }),
+  updateUserLimits:  (id: string, body: Record<string, number>) =>
+    req(`/users/${id}/limits`, { method: 'PATCH', body: JSON.stringify(body) }),
+  userPushStatus:    (id: string) => req(`/users/${id}/push-status`),
+  userTestPush:      (id: string) => req(`/users/${id}/test-push`, { method: 'POST' }),
+  clearUserRateLimit:(id: string) => req(`/users/${id}/rate-limit`, { method: 'DELETE' }),
+
   exportUsersUrl: (status?: string) => {
     const q = new URLSearchParams({ limit: '1000' });
     if (status) q.set('status', status);

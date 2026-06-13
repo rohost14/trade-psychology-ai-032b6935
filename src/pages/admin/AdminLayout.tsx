@@ -2,36 +2,40 @@ import { useEffect } from 'react';
 import { Outlet, NavLink, useNavigate, useLocation } from 'react-router-dom';
 import {
   LayoutDashboard, Users, Activity, BarChart3, Settings,
-  Shield, LogOut, ScrollText, Megaphone
+  LogOut, ScrollText, Megaphone, Shield,
 } from 'lucide-react';
 import { useAdminAuth } from '@/contexts/AdminAuthContext';
 import { adminApi } from '@/lib/adminApi';
 
-// Role-based visibility: superadmin sees all, ops sees most, support sees read-only
-const NAV = [
-  { to: '/admin/overview',  icon: LayoutDashboard, label: 'Overview',      roles: ['superadmin', 'ops', 'support'] },
-  { to: '/admin/users',     icon: Users,           label: 'Users',         roles: ['superadmin', 'ops', 'support'] },
-  { to: '/admin/system',    icon: Activity,        label: 'System Health', roles: ['superadmin', 'ops', 'support'] },
-  { to: '/admin/insights',  icon: BarChart3,       label: 'Insights',      roles: ['superadmin', 'ops', 'support'] },
-  { to: '/admin/broadcast', icon: Megaphone,       label: 'Broadcast',     roles: ['superadmin', 'ops'] },
-  { to: '/admin/audit-log', icon: ScrollText,      label: 'Audit Log',     roles: ['superadmin', 'ops', 'support'] },
-  { to: '/admin/config',    icon: Settings,        label: 'Config',        roles: ['superadmin'] },
+const NAV_GROUPS = [
+  {
+    label: 'Monitor',
+    items: [
+      { to: '/admin/overview',  icon: LayoutDashboard, label: 'Overview',   roles: ['superadmin','ops','support'] },
+      { to: '/admin/users',     icon: Users,           label: 'Users',      roles: ['superadmin','ops','support'] },
+      { to: '/admin/system',    icon: Activity,        label: 'System',     roles: ['superadmin','ops','support'] },
+      { to: '/admin/insights',  icon: BarChart3,       label: 'Insights',   roles: ['superadmin','ops','support'] },
+    ],
+  },
+  {
+    label: 'Operations',
+    items: [
+      { to: '/admin/broadcast', icon: Megaphone,  label: 'Broadcast', roles: ['superadmin','ops'] },
+      { to: '/admin/audit-log', icon: ScrollText, label: 'Audit Log', roles: ['superadmin','ops','support'] },
+    ],
+  },
+  {
+    label: 'System',
+    items: [
+      { to: '/admin/config', icon: Settings, label: 'Config', roles: ['superadmin'] },
+    ],
+  },
 ];
-
-const C = {
-  bg:      '#04040e',
-  surface: 'rgba(255,255,255,0.03)',
-  border:  'rgba(255,255,255,0.07)',
-  amber:   '#f59e0b',
-  text:    '#e2e8f0',
-  muted:   'rgba(226,232,240,0.45)',
-  dm:      "'DM Sans', sans-serif",
-};
 
 export default function AdminLayout() {
   const { admin, isLoading, logout } = useAdminAuth();
-  const navigate = useNavigate();
-  const location = useLocation();
+  const navigate  = useNavigate();
+  const location  = useLocation();
 
   useEffect(() => {
     if (!isLoading && !admin) navigate('/admin/login', { replace: true });
@@ -43,95 +47,100 @@ export default function AdminLayout() {
     navigate('/admin/login', { replace: true });
   };
 
-  if (isLoading) {
-    return (
-      <div style={{ minHeight: '100vh', background: C.bg, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-        <div style={{ width: 32, height: 32, border: `2px solid ${C.amber}`, borderTopColor: 'transparent', borderRadius: '50%', animation: 'spin 0.8s linear infinite' }} />
-        <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
-      </div>
-    );
-  }
+  const initials = admin?.name
+    ? admin.name.split(' ').map(w => w[0]).join('').slice(0, 2).toUpperCase()
+    : '??';
+
+  if (isLoading) return (
+    <div className="min-h-screen flex items-center justify-center" style={{ background: '#09090b' }}>
+      <div className="w-7 h-7 rounded-full border-2 border-amber-500 border-t-transparent animate-spin" />
+    </div>
+  );
 
   if (!admin) return null;
 
   return (
-    <div style={{ display: 'flex', minHeight: '100vh', background: C.bg, fontFamily: C.dm }}>
-      {/* Sidebar */}
-      <aside style={{
-        width: 220, flexShrink: 0,
-        background: 'rgba(255,255,255,0.02)',
-        borderRight: `1px solid ${C.border}`,
-        display: 'flex', flexDirection: 'column',
-        position: 'sticky', top: 0, height: '100vh',
-      }}>
+    <div className="flex min-h-screen" style={{ background: '#09090b', fontFamily: "'Inter', 'DM Sans', sans-serif" }}>
+
+      {/* ── Sidebar ─────────────────────────────────────────────────────── */}
+      <aside className="flex flex-col sticky top-0 h-screen shrink-0" style={{ width: 236, background: '#0f0f14', borderRight: '1px solid #1c1c28' }}>
+
         {/* Logo */}
-        <div style={{ padding: '1.5rem 1.25rem', borderBottom: `1px solid ${C.border}` }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-            <div style={{
-              width: 32, height: 32, borderRadius: 9,
-              background: 'rgba(245,158,11,0.12)',
-              border: `1px solid rgba(245,158,11,0.3)`,
-              display: 'flex', alignItems: 'center', justifyContent: 'center',
-            }}>
-              <Shield style={{ width: 16, height: 16, color: C.amber }} />
-            </div>
-            <div>
-              <div style={{ fontSize: '0.82rem', fontWeight: 700, color: C.text, lineHeight: 1.2 }}>TradeMentor</div>
-              <div style={{ fontSize: '0.65rem', color: C.amber, fontWeight: 600, letterSpacing: '0.08em' }}>ADMIN</div>
-            </div>
+        <div className="flex items-center gap-2.5 px-4 py-4" style={{ borderBottom: '1px solid #1c1c28' }}>
+          <div className="flex items-center justify-center w-7 h-7 rounded-lg" style={{ background: 'rgba(245,158,11,0.15)', border: '1px solid rgba(245,158,11,0.25)' }}>
+            <Shield size={14} className="text-amber-400" />
+          </div>
+          <div>
+            <div className="text-xs font-semibold leading-tight" style={{ color: '#f1f0f5' }}>TradeMentor</div>
+            <div className="text-[10px] font-bold tracking-widest" style={{ color: '#f59e0b', letterSpacing: '0.1em' }}>ADMIN</div>
           </div>
         </div>
 
         {/* Nav */}
-        <nav style={{ flex: 1, padding: '1rem 0.75rem', display: 'flex', flexDirection: 'column', gap: 2 }}>
-          {NAV.filter(item => item.roles.includes(admin.role || 'superadmin')).map(({ to, icon: Icon, label }) => {
-            const active = location.pathname === to || (to !== '/admin/overview' && location.pathname.startsWith(to));
+        <nav className="flex-1 overflow-y-auto py-3 px-2" style={{ scrollbarWidth: 'none' }}>
+          {NAV_GROUPS.map(group => {
+            const visible = group.items.filter(item => item.roles.includes(admin.role || 'superadmin'));
+            if (!visible.length) return null;
             return (
-              <NavLink key={to} to={to} style={{ textDecoration: 'none' }}>
-                <div style={{
-                  display: 'flex', alignItems: 'center', gap: 10,
-                  padding: '0.55rem 0.75rem', borderRadius: 9,
-                  background: active ? 'rgba(245,158,11,0.1)' : 'transparent',
-                  border: active ? '1px solid rgba(245,158,11,0.2)' : '1px solid transparent',
-                  color: active ? C.amber : C.muted,
-                  fontSize: '0.825rem', fontWeight: active ? 600 : 400,
-                  transition: 'all 0.15s',
-                  cursor: 'pointer',
-                }}>
-                  <Icon style={{ width: 15, height: 15, flexShrink: 0 }} />
-                  {label}
+              <div key={group.label} className="mb-4">
+                <div className="px-3 mb-1 text-[10px] font-semibold uppercase tracking-widest" style={{ color: '#3a3a50', letterSpacing: '0.12em' }}>
+                  {group.label}
                 </div>
-              </NavLink>
+                {visible.map(({ to, icon: Icon, label }) => {
+                  const active = location.pathname === to || (to !== '/admin/overview' && location.pathname.startsWith(to));
+                  return (
+                    <NavLink key={to} to={to} style={{ textDecoration: 'none', display: 'block' }}>
+                      <div
+                        className="flex items-center gap-2.5 px-3 py-2 rounded-md text-[13px] transition-all duration-100"
+                        style={{
+                          color:      active ? '#fbbf24' : '#6b6a82',
+                          background: active ? 'rgba(245,158,11,0.07)' : 'transparent',
+                          borderLeft: active ? '2px solid #f59e0b' : '2px solid transparent',
+                          fontWeight:  active ? 500 : 400,
+                          marginLeft: -2,
+                          paddingLeft: active ? 10 : 12,
+                        }}
+                      >
+                        <Icon size={14} style={{ flexShrink: 0, opacity: active ? 1 : 0.6 }} />
+                        {label}
+                      </div>
+                    </NavLink>
+                  );
+                })}
+              </div>
             );
           })}
         </nav>
 
-        {/* User + Logout */}
-        <div style={{ padding: '1rem 0.75rem', borderTop: `1px solid ${C.border}` }}>
-          <div style={{ marginBottom: 8 }}>
-            <div style={{ fontSize: '0.78rem', fontWeight: 600, color: C.text, marginBottom: 2 }}>{admin.name}</div>
-            <div style={{ fontSize: '0.7rem', color: C.muted, marginBottom: 3 }}>{admin.email}</div>
-            <span style={{ fontSize: '0.62rem', fontWeight: 600, padding: '0.1rem 0.4rem', borderRadius: 10, background: 'rgba(245,158,11,0.12)', color: C.amber, border: '1px solid rgba(245,158,11,0.2)', textTransform: 'uppercase', letterSpacing: '0.06em' }}>{admin.role || 'superadmin'}</span>
+        {/* User row */}
+        <div className="px-3 py-3" style={{ borderTop: '1px solid #1c1c28' }}>
+          <div className="flex items-center gap-2.5 mb-2.5">
+            <div className="flex items-center justify-center w-7 h-7 rounded-full text-[11px] font-bold shrink-0" style={{ background: 'rgba(245,158,11,0.15)', color: '#f59e0b' }}>
+              {initials}
+            </div>
+            <div className="min-w-0 flex-1">
+              <div className="text-[12px] font-medium truncate" style={{ color: '#d4d4e8' }}>{admin.name}</div>
+              <div className="text-[11px] truncate" style={{ color: '#52526a' }}>{admin.email}</div>
+            </div>
+            <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded uppercase" style={{ background: 'rgba(245,158,11,0.1)', color: '#f59e0b', letterSpacing: '0.06em' }}>
+              {(admin.role || 'SA').slice(0, 2).toUpperCase()}
+            </span>
           </div>
           <button
             onClick={handleLogout}
-            style={{
-              display: 'flex', alignItems: 'center', gap: 8,
-              width: '100%', padding: '0.5rem 0.75rem', borderRadius: 8,
-              background: 'none', border: '1px solid rgba(255,255,255,0.06)',
-              color: 'rgba(226,232,240,0.4)', fontSize: '0.78rem',
-              cursor: 'pointer', fontFamily: C.dm,
-              transition: 'all 0.15s',
-            }}
+            className="flex items-center gap-2 w-full px-2.5 py-1.5 rounded-md text-[12px] transition-colors"
+            style={{ background: 'transparent', border: 'none', color: '#52526a', cursor: 'pointer' }}
+            onMouseEnter={e => (e.currentTarget.style.color = '#a0a0b8')}
+            onMouseLeave={e => (e.currentTarget.style.color = '#52526a')}
           >
-            <LogOut style={{ width: 13, height: 13 }} />
+            <LogOut size={12} />
             Sign out
           </button>
         </div>
       </aside>
 
-      {/* Main */}
-      <main style={{ flex: 1, overflow: 'auto', minWidth: 0 }}>
+      {/* ── Main ────────────────────────────────────────────────────────── */}
+      <main className="flex-1 overflow-auto min-w-0">
         <Outlet />
       </main>
     </div>

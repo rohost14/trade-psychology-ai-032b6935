@@ -21,11 +21,23 @@ interface UserItem {
   status: string;
   broker_email: string | null;
   created_at: string | null;
+  last_trade_at: string | null;
+  lifecycle: string;
   user: { id: string | null; email: string | null; guardian_phone: string | null } | null;
 }
 
 const STATUS_COLORS: Record<string, string> = {
   connected: C.green, guest: C.amber, suspended: C.red, disconnected: C.muted,
+};
+
+const LIFECYCLE_CFG: Record<string, { color: string; label: string }> = {
+  new:          { color: '#3b82f6', label: 'New' },
+  active:       { color: '#22c55e', label: 'Active' },
+  at_risk:      { color: '#f59e0b', label: 'At Risk' },
+  churned:      { color: '#ef4444', label: 'Churned' },
+  inactive:     { color: C.muted,   label: 'Inactive' },
+  suspended:    { color: '#ef4444', label: 'Suspended' },
+  disconnected: { color: C.muted,   label: 'Disconnected' },
 };
 
 export default function AdminUsers() {
@@ -118,7 +130,7 @@ export default function AdminUsers() {
         <table style={{ width: '100%', borderCollapse: 'collapse' }}>
           <thead>
             <tr style={{ borderBottom: `1px solid ${C.border}` }}>
-              {['User / Zerodha ID', 'Status', 'Phone', 'Joined'].map(h => (
+              {['User / Zerodha ID', 'Status', 'Lifecycle', 'Phone', 'Last Trade', 'Joined'].map(h => (
                 <th key={h} style={{ padding: '0.75rem 1rem', textAlign: 'left', fontSize: '0.72rem', fontWeight: 600, color: C.dim, textTransform: 'uppercase', letterSpacing: '0.06em' }}>{h}</th>
               ))}
             </tr>
@@ -148,9 +160,22 @@ export default function AdminUsers() {
                 <td style={{ padding: '0.8rem 1rem' }}>
                   <span style={{ fontSize: '0.7rem', fontWeight: 600, padding: '0.2rem 0.55rem', borderRadius: 20, background: `${STATUS_COLORS[u.status] || C.muted}18`, color: STATUS_COLORS[u.status] || C.muted, border: `1px solid ${STATUS_COLORS[u.status] || C.muted}30`, textTransform: 'capitalize' }}>{u.status}</span>
                 </td>
+                <td style={{ padding: '0.8rem 1rem' }}>
+                  {(() => {
+                    const lc = LIFECYCLE_CFG[u.lifecycle] || LIFECYCLE_CFG.inactive;
+                    return (
+                      <span style={{ fontSize: '0.68rem', fontWeight: 600, padding: '0.15rem 0.55rem', borderRadius: 20, background: `${lc.color}18`, color: lc.color, whiteSpace: 'nowrap' }}>
+                        {lc.label}
+                      </span>
+                    );
+                  })()}
+                </td>
                 <td style={{ padding: '0.8rem 1rem', fontSize: '0.78rem', color: C.muted }}>{u.user?.guardian_phone || '—'}</td>
                 <td style={{ padding: '0.8rem 1rem', fontSize: '0.75rem', color: C.muted }}>
-                  {u.created_at ? new Date(u.created_at).toLocaleDateString() : '—'}
+                  {u.last_trade_at ? new Date(u.last_trade_at).toLocaleDateString('en-IN', { day: '2-digit', month: 'short' }) : '—'}
+                </td>
+                <td style={{ padding: '0.8rem 1rem', fontSize: '0.75rem', color: C.muted }}>
+                  {u.created_at ? new Date(u.created_at).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: '2-digit' }) : '—'}
                 </td>
               </tr>
             ))}
