@@ -135,18 +135,9 @@ class TestAdminWithToken:
 
     def test_12_19_broadcast_segment_counts_non_negative(self, admin: httpx.Client):
         """12.19 Broadcast segment counts are non-negative integers."""
-        candidates = ["/api/admin/broadcast/segments", "/api/admin/broadcast"]
-        for path in candidates:
-            r = admin.get(path)
-            if r.status_code == 404:
-                continue
-            assert r.status_code == 200, f"Broadcast segments: {r.status_code}"
-            data = r.json()
-            # Check for negative counts
-            for key, val in data.items() if isinstance(data, dict) else []:
-                if isinstance(val, (int, float)):
-                    assert val >= 0, (
-                        f"Negative count for segment {key!r}: {val}"
-                    )
-            return
-        pytest.skip("Broadcast segments endpoint not found")
+        r = admin.get("/api/admin/broadcast/segment-counts")
+        assert r.status_code == 200, f"Broadcast segment-counts: {r.status_code}. Body: {r.text[:200]}"
+        data = r.json()
+        for key, val in (data.items() if isinstance(data, dict) else []):
+            if isinstance(val, (int, float)):
+                assert val >= 0, f"Negative count for segment {key!r}: {val}"
