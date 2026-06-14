@@ -45,9 +45,9 @@
     .hero {
       min-height: 100vh;
       display: grid;
-      grid-template-columns: 55fr 45fr;
+      grid-template-columns: 50fr 50fr;
       align-items: center;
-      gap: 40px;
+      gap: 48px;
       padding: 112px 72px 80px;
       position: relative;
       overflow: hidden;
@@ -55,8 +55,8 @@
     .hero-glow {
       position: absolute; inset: 0; pointer-events: none;
       background:
-        radial-gradient(ellipse 50% 60% at -5% 50%, rgba(20,184,166,0.05) 0%, transparent 55%),
-        radial-gradient(ellipse 70% 80% at 92% 50%, rgba(20,184,166,0.08) 0%, transparent 65%);
+        radial-gradient(ellipse 45% 55% at -5% 50%, rgba(20,184,166,0.045) 0%, transparent 55%),
+        radial-gradient(ellipse 65% 80% at 100% 48%, rgba(20,184,166,0.12) 0%, transparent 65%);
     }
     .hero-left { position: relative; z-index: 1; }
     .hero-right { position: relative; z-index: 1; display: flex; justify-content: center; align-items: center; }
@@ -102,13 +102,37 @@
       width: 100%;
       border-radius: 14px; overflow: hidden;
       border: 1px solid var(--border-default);
-      box-shadow: 0 32px 80px rgba(0,0,0,0.55), 0 0 0 1px rgba(255,255,255,0.04), inset 0 1px 0 rgba(255,255,255,0.05);
+      box-shadow:
+        0 0 0 1px rgba(20,184,166,0.08),
+        0 32px 80px rgba(0,0,0,0.6),
+        inset 0 1px 0 rgba(255,255,255,0.05);
       opacity: 0; transform: translateY(14px);
       transition: opacity 0.6s cubic-bezier(0.2,0,0,1), transform 0.6s cubic-bezier(0.2,0,0,1);
     }
     .mini-app.show { opacity: 1; transform: translateY(0); }
     .mini-app.fade-out { opacity: 0; transform: translateY(-8px); }
-    [data-theme="light"] .mini-app { box-shadow: 0 16px 48px rgba(0,0,0,0.12); border-color: var(--border-subtle); }
+    [data-theme="light"] .mini-app { box-shadow: 0 0 0 1px rgba(20,184,166,0.1), 0 16px 48px rgba(0,0,0,0.12); border-color: var(--border-subtle); }
+
+    /* Browser chrome bar */
+    .mini-chrome {
+      background: #0D0D12;
+      padding: 9px 14px;
+      display: flex; align-items: center; gap: 12px;
+      border-bottom: 1px solid rgba(255,255,255,0.06);
+    }
+    [data-theme="light"] .mini-chrome { background: #E8E8EE; border-bottom-color: rgba(0,0,0,0.1); }
+    .mini-chrome-dots { display: flex; gap: 5px; }
+    .mini-chrome-dots span { width: 9px; height: 9px; border-radius: 50%; display: block; }
+    .mini-chrome-dots .dot-r { background: #FF5F57; }
+    .mini-chrome-dots .dot-y { background: #FEBC2E; }
+    .mini-chrome-dots .dot-g { background: #28C840; }
+    .mini-chrome-url {
+      flex: 1; text-align: center;
+      font-family: 'DM Mono', monospace; font-size: 10px; color: rgba(255,255,255,0.3);
+      display: flex; align-items: center; justify-content: center; gap: 4px;
+    }
+    [data-theme="light"] .mini-chrome-url { color: rgba(0,0,0,0.35); }
+    .mini-chrome-url svg { width: 9px; height: 9px; stroke: currentColor; fill: none; stroke-width: 2; flex-shrink: 0; }
 
     /* Top bar */
     .mini-topbar {
@@ -132,7 +156,7 @@
     }
 
     /* Body */
-    .mini-body { background: var(--bg-card); position: relative; overflow: hidden; }
+    .mini-body { background: var(--bg-card); position: relative; overflow: hidden; min-height: 220px; }
     .mini-pos-header {
       padding: 8px 18px; font-size: 9.5px; font-weight: 600;
       letter-spacing: 0.08em; text-transform: uppercase; color: var(--text-muted);
@@ -152,6 +176,23 @@
     .mini-pos-right { text-align: right; }
     .mini-pos-ltp { font-family: 'DM Mono', monospace; font-size: 11px; color: var(--text-secondary); margin-bottom: 2px; }
     .mini-pos-pnl { font-family: 'DM Mono', monospace; font-size: 13.5px; font-weight: 500; color: var(--loss); }
+
+    /* Static position rows (always visible, no animation) */
+    .mini-pos-row-static {
+      padding: 13px 18px; display: flex; align-items: center; justify-content: space-between;
+      border-bottom: 1px solid var(--border-subtle);
+      border-left: 3px solid transparent;
+    }
+    .mini-pos-pnl-profit { font-family: 'DM Mono', monospace; font-size: 13.5px; font-weight: 500; color: var(--profit); }
+
+    /* Session bar at bottom */
+    .mini-session-bar {
+      padding: 9px 18px;
+      display: flex; align-items: center; gap: 16px;
+      font-size: 10px; color: var(--text-tertiary); font-family: 'DM Mono', monospace;
+      border-top: 1px solid var(--border-subtle);
+    }
+    .mini-session-bar .sb-sep { opacity: 0.3; }
 
     /* Alert slides down from top of body */
     .mini-alert {
@@ -516,6 +557,21 @@
   <!-- Right: Mini app frame -->
   <div class="hero-right">
     <div class="mini-app" id="mini-app">
+      <!-- Browser chrome bar -->
+      <div class="mini-chrome">
+        <div class="mini-chrome-dots">
+          <span class="dot-r"></span>
+          <span class="dot-y"></span>
+          <span class="dot-g"></span>
+        </div>
+        <div class="mini-chrome-url">
+          <svg viewBox="0 0 24 24" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+          app.tradementor.in
+        </div>
+        <div style="width:32px"></div>
+      </div>
+
+      <!-- App topbar (session state + P&L) -->
       <div class="mini-topbar">
         <div class="mini-state-pill">
           <span class="mini-state-dot"></span>CAUTION
@@ -525,8 +581,12 @@
           <div class="mini-pnl-num" id="anim-pnl-val">+₹22,400</div>
         </div>
       </div>
+
+      <!-- Positions body -->
       <div class="mini-body">
         <div class="mini-pos-header">Open Positions</div>
+
+        <!-- Alert overlay — slides down from top on trigger -->
         <div class="mini-alert" id="anim-alert">
           <div class="mini-alert-icon">⚡</div>
           <div>
@@ -534,6 +594,20 @@
             <div class="mini-alert-text">Entered 3 min after a ₹−1,075 stop hit</div>
           </div>
         </div>
+
+        <!-- Row 1: static, in profit -->
+        <div class="mini-pos-row-static">
+          <div>
+            <div class="mini-pos-name">NIFTY 22000 CE</div>
+            <div class="mini-pos-meta">MIS · Qty 75 · Entry ₹112.50</div>
+          </div>
+          <div class="mini-pos-right">
+            <div class="mini-pos-ltp">LTP ₹143.80</div>
+            <div class="mini-pos-pnl-profit">+₹2,348</div>
+          </div>
+        </div>
+
+        <!-- Row 2: animated — slides in, gets new-entry highlight, goes to loss -->
         <div class="mini-pos-row" id="anim-pos-row">
           <div>
             <div class="mini-pos-name">BANKNIFTY 48000 PE</div>
@@ -543,6 +617,27 @@
             <div class="mini-pos-ltp">LTP ₹125.60</div>
             <div class="mini-pos-pnl" id="anim-pos-pnl">−₹1,130</div>
           </div>
+        </div>
+
+        <!-- Row 3: static, small loss -->
+        <div class="mini-pos-row-static">
+          <div>
+            <div class="mini-pos-name">FINNIFTY 21800 CE</div>
+            <div class="mini-pos-meta">MIS · Qty 40 · Entry ₹68.10</div>
+          </div>
+          <div class="mini-pos-right">
+            <div class="mini-pos-ltp">LTP ₹57.60</div>
+            <div class="mini-pos-pnl">−₹420</div>
+          </div>
+        </div>
+
+        <!-- Session footer -->
+        <div class="mini-session-bar">
+          <span>3 positions</span>
+          <span class="sb-sep">·</span>
+          <span>4 alerts today</span>
+          <span class="sb-sep">·</span>
+          <span>6 trades</span>
         </div>
       </div>
     </div>
@@ -982,29 +1077,29 @@ function initHeroAnim() {
     reset();
     await sleep(300);
 
-    // Step 1: frame fades in — user sees healthy session
+    // Step 1: frame fades in — user sees 2 static rows (real data feel)
     frame.classList.add('show');
-    await sleep(1400);
+    await sleep(1800);
 
-    // Step 2: position row slides in as new entry
+    // Step 2: new position slides in, teal new-entry highlight
     posRow.classList.add('show');
-    await sleep(320);
+    await sleep(280);
     posRow.classList.add('new-entry');
-    await sleep(1600);
-
-    // Step 3: TradeMentor alert slides down from top
-    alertEl.classList.add('show');
     await sleep(1200);
 
-    // Step 4: P&L ticks down — green to red, panic ease-in
-    await new Promise(tickDown);
-    await sleep(2800);
+    // Step 3: TradeMentor detects — alert slides down
+    alertEl.classList.add('show');
+    await sleep(1000);
 
-    // Step 5: fade out everything
+    // Step 4: P&L bleeds red, ease-in panic feel
+    await new Promise(tickDown);
+    await sleep(2500);
+
+    // Step 5: fade frame out, reset, loop
     frame.classList.add('fade-out');
     await sleep(700);
 
-    run(); // loop
+    run();
   }
 
   run();
