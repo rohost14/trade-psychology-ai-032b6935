@@ -6,17 +6,17 @@
   <title>TradeMentor AI — Stop Losing Money to Your Own Brain</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:ital,wght@0,400;0,500;0,600;0,700;0,800;0,900;1,400&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="base.css" />
   <style>
     * { box-sizing: border-box; margin: 0; padding: 0; }
     body { background: var(--bg-page); color: var(--text-primary); font-family: 'Inter', sans-serif; overflow-x: hidden; }
     a { text-decoration: none; color: inherit; }
-    ::selection { background: rgba(20,184,166,0.3); }
+    ::selection { background: rgba(20,184,166,0.25); }
 
     /* ── NAV ─────────────────────────────────────────────────────── */
     .nav {
-      position: fixed; top: 0; left: 0; right: 0; z-index: 200;
+      position: fixed; top: 0; left: 0; right: 0; z-index: 300;
       height: 56px;
       background: rgba(11,11,15,0.82);
       backdrop-filter: blur(20px) saturate(180%);
@@ -26,475 +26,606 @@
     }
     [data-theme="light"] .nav { background: rgba(242,242,247,0.88); }
     .nav-logo { display: flex; align-items: center; gap: 10px; }
-    .nav-logo .logo-mark { width: 28px; height: 28px; border-radius: 7px; background: var(--brand-bg); border: 1px solid var(--brand-border); display: flex; align-items: center; justify-content: center; }
-    .nav-logo .logo-mark svg { width: 14px; height: 14px; stroke: var(--brand); fill: none; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
-    .nav-logo .wordmark { font-size: 15px; font-weight: 700; letter-spacing: -0.02em; color: var(--text-primary); }
-    .nav-logo .wordmark span { color: var(--brand); }
+    .logo-mark {
+      width: 28px; height: 28px; border-radius: 7px;
+      background: var(--brand-bg); border: 1px solid var(--brand-border);
+      display: flex; align-items: center; justify-content: center;
+    }
+    .logo-mark svg { width: 14px; height: 14px; stroke: var(--brand); fill: none; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+    .wordmark { font-size: 15px; font-weight: 700; letter-spacing: -0.02em; }
+    .wordmark span { color: var(--brand); }
     .nav-links { display: flex; gap: 28px; font-size: 13px; font-weight: 500; color: var(--text-secondary); }
     .nav-links a:hover { color: var(--text-primary); }
     .nav-right { display: flex; align-items: center; gap: 8px; }
-    .btn-nav-ghost { padding: 6px 14px; border-radius: 7px; font-size: 13px; font-weight: 500; color: var(--text-secondary); border: none; background: transparent; cursor: pointer; }
-    .btn-nav-ghost:hover { color: var(--text-primary); background: var(--bg-hover); }
-    .btn-nav-primary { padding: 6px 16px; border-radius: 7px; font-size: 13px; font-weight: 600; background: var(--brand); color: #fff; border: none; cursor: pointer; transition: opacity 0.12s; }
-    .btn-nav-primary:hover { opacity: 0.88; }
-    .theme-btn { width: 32px; height: 32px; border-radius: 7px; border: 1px solid var(--border-subtle); background: transparent; display: flex; align-items: center; justify-content: center; cursor: pointer; color: var(--text-secondary); }
+    .btn-ghost-sm {
+      padding: 6px 14px; border-radius: 7px; font-size: 13px; font-weight: 500;
+      color: var(--text-secondary); border: none; background: transparent; cursor: pointer;
+    }
+    .btn-ghost-sm:hover { color: var(--text-primary); background: var(--bg-hover); }
+    .btn-primary-sm {
+      padding: 6px 16px; border-radius: 7px; font-size: 13px; font-weight: 600;
+      background: var(--brand); color: #fff; border: none; cursor: pointer; transition: opacity 0.12s;
+    }
+    .btn-primary-sm:hover { opacity: 0.88; }
+    .theme-btn {
+      width: 32px; height: 32px; border-radius: 7px; border: 1px solid var(--border-subtle);
+      background: transparent; display: flex; align-items: center; justify-content: center;
+      cursor: pointer; color: var(--text-secondary);
+    }
     .theme-btn:hover { background: var(--bg-hover); color: var(--text-primary); }
     .theme-btn svg { width: 14px; height: 14px; stroke: currentColor; fill: none; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
 
-    /* ── HERO ────────────────────────────────────────────────────── */
+    /* ── HERO ─────────────────────────────────────────────────────── */
     .hero {
       min-height: 100vh;
-      display: grid;
-      grid-template-columns: 50fr 50fr;
-      align-items: center;
-      gap: 48px;
-      padding: 112px 72px 80px;
       position: relative;
+      display: grid;
+      grid-template-columns: 48fr 52fr;
+      align-items: center;
       overflow: hidden;
     }
-    .hero-glow {
-      position: absolute; inset: 0; pointer-events: none;
-      background:
-        radial-gradient(ellipse 45% 55% at -5% 50%, rgba(20,184,166,0.045) 0%, transparent 55%),
-        radial-gradient(ellipse 65% 80% at 100% 48%, rgba(20,184,166,0.12) 0%, transparent 65%);
+
+    /* Data stream background */
+    .hero-stream {
+      position: absolute; inset: 0; z-index: 0;
+      display: flex; gap: 48px;
+      padding: 0 64px;
+      overflow: hidden;
+      pointer-events: none;
+      -webkit-mask-image: linear-gradient(to right, black 0%, black 38%, rgba(0,0,0,0.3) 55%, transparent 72%);
+      mask-image: linear-gradient(to right, black 0%, black 38%, rgba(0,0,0,0.3) 55%, transparent 72%);
     }
-    .hero-left { position: relative; z-index: 1; }
-    .hero-right { position: relative; z-index: 1; display: flex; justify-content: center; align-items: center; }
+    .stream-col {
+      display: flex; flex-direction: column;
+      font-family: 'DM Mono', monospace;
+      font-size: 10.5px;
+      color: rgba(255,255,255,0.048);
+      line-height: 2.1;
+      white-space: nowrap;
+      animation: stream-up 22s linear infinite;
+      user-select: none;
+    }
+    [data-theme="light"] .stream-col { color: rgba(0,0,0,0.055); }
+    .stream-col:nth-child(2) { animation-delay: -8s; color: rgba(255,255,255,0.038); }
+    .stream-col:nth-child(3) { animation-delay: -15s; color: rgba(255,255,255,0.032); }
+    .stream-col:nth-child(4) { animation-delay: -3s; color: rgba(255,255,255,0.025); }
+    [data-theme="light"] .stream-col:nth-child(2) { color: rgba(0,0,0,0.04); }
+    [data-theme="light"] .stream-col:nth-child(3) { color: rgba(0,0,0,0.033); }
+    @keyframes stream-up {
+      from { transform: translateY(0); }
+      to { transform: translateY(-50%); }
+    }
+
+    /* Hero glow — emanates from behind the app frame (right side) */
+    .hero-glow {
+      position: absolute; inset: 0; z-index: 0; pointer-events: none;
+      background:
+        radial-gradient(ellipse 60% 75% at 100% 50%, rgba(20,184,166,0.11) 0%, transparent 65%),
+        radial-gradient(ellipse 35% 45% at 30% 55%, rgba(20,184,166,0.035) 0%, transparent 60%);
+    }
+
+    .hero-left {
+      position: relative; z-index: 2;
+      padding: 120px 48px 80px 80px;
+    }
+    .hero-right {
+      position: relative; z-index: 2;
+      padding: 120px 64px 80px 0;
+      display: flex; align-items: center;
+      /* fade left edge of app frame into the data stream */
+      -webkit-mask-image: linear-gradient(to right, transparent 0%, black 16%, black 100%);
+      mask-image: linear-gradient(to right, transparent 0%, black 16%, black 100%);
+    }
+
+    /* Hero left content */
+    .hero-pill {
+      display: inline-flex; align-items: center; gap: 6px;
+      font-size: 11px; font-weight: 600; letter-spacing: 0.07em; text-transform: uppercase;
+      color: var(--brand); background: var(--brand-bg); border: 1px solid var(--brand-border);
+      padding: 4px 12px; border-radius: 99px; margin-bottom: 28px;
+    }
+    .hero-pill-dot { width: 5px; height: 5px; border-radius: 50%; background: var(--brand); animation: pulse 2s infinite; }
+    @keyframes pulse { 0%,100%{ opacity:1; transform:scale(1); } 50%{ opacity:0.5; transform:scale(0.8); } }
 
     .hero-h1 {
-      font-size: clamp(38px, 4.2vw, 56px);
-      font-weight: 800;
-      letter-spacing: -0.045em;
-      line-height: 1.04;
+      font-size: clamp(42px, 4.8vw, 64px);
+      font-weight: 900;
+      letter-spacing: -0.048em;
+      line-height: 1.02;
       color: var(--text-primary);
-      margin-bottom: 20px;
+      margin-bottom: 22px;
     }
+    .hero-h1 em { font-style: normal; color: var(--loss); }
+
     .hero-sub {
-      font-size: 17px; line-height: 1.65; color: var(--text-secondary);
-      max-width: 400px; margin-bottom: 36px;
+      font-size: 16.5px; line-height: 1.7; color: var(--text-secondary);
+      max-width: 380px; margin-bottom: 36px;
     }
-    .hero-ctas { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin-bottom: 16px; }
-    .cta-zerodha {
-      display: flex; align-items: center; gap: 8px;
-      padding: 13px 22px; border-radius: 10px;
+
+    .hero-ctas { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin-bottom: 18px; }
+    .cta-primary {
+      display: inline-flex; align-items: center; gap: 8px;
+      padding: 14px 24px; border-radius: 10px;
       background: var(--brand); color: #fff; font-size: 14px; font-weight: 600;
-      border: none; cursor: pointer; transition: all 0.12s;
+      border: none; cursor: pointer;
+      box-shadow: 0 0 0 0 rgba(20,184,166,0.4);
+      transition: all 0.15s;
     }
-    .cta-zerodha:hover { opacity: 0.9; box-shadow: 0 0 0 4px rgba(20,184,166,0.2); transform: translateY(-1px); }
+    .cta-primary:hover { opacity: 0.92; box-shadow: 0 0 0 5px rgba(20,184,166,0.18); transform: translateY(-1px); }
+    .cta-primary svg { width: 15px; height: 15px; stroke: currentColor; fill: none; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
     .cta-google {
-      display: flex; align-items: center; gap: 8px;
-      padding: 13px 18px; border-radius: 10px;
+      display: inline-flex; align-items: center; gap: 8px;
+      padding: 14px 18px; border-radius: 10px;
       background: var(--bg-card); color: var(--text-primary); font-size: 14px; font-weight: 500;
       border: 1px solid var(--border-default); cursor: pointer; transition: all 0.12s;
     }
     .cta-google:hover { border-color: var(--brand-border); background: var(--brand-bg); }
-    .cta-app {
-      display: flex; align-items: center; gap: 6px;
-      padding: 13px 16px; border-radius: 10px;
-      background: transparent; color: var(--text-secondary); font-size: 13px; font-weight: 500;
-      border: 1px solid var(--border-subtle); cursor: pointer; opacity: 0.7;
-    }
-    .hero-trust { font-size: 12px; color: var(--text-tertiary); display: flex; align-items: center; gap: 10px; }
-    .hero-trust .sep { opacity: 0.3; }
+    .hero-trust { font-size: 11.5px; color: var(--text-tertiary); display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+    .hero-trust .dot { opacity: 0.3; }
 
-    /* ── MINI APP FRAME ── */
+    /* ── MINI APP FRAME ───────────────────────────────────────────── */
     .mini-app {
       width: 100%;
       border-radius: 14px; overflow: hidden;
       border: 1px solid var(--border-default);
       box-shadow:
-        0 0 0 1px rgba(20,184,166,0.08),
-        0 32px 80px rgba(0,0,0,0.6),
+        0 0 0 1px rgba(20,184,166,0.1),
+        0 40px 100px rgba(0,0,0,0.65),
         inset 0 1px 0 rgba(255,255,255,0.05);
-      opacity: 0; transform: translateY(14px);
-      transition: opacity 0.6s cubic-bezier(0.2,0,0,1), transform 0.6s cubic-bezier(0.2,0,0,1);
+      opacity: 0; transform: translateY(16px);
+      transition: opacity 0.7s cubic-bezier(0.16,1,0.3,1), transform 0.7s cubic-bezier(0.16,1,0.3,1);
     }
     .mini-app.show { opacity: 1; transform: translateY(0); }
-    .mini-app.fade-out { opacity: 0; transform: translateY(-8px); }
-    [data-theme="light"] .mini-app { box-shadow: 0 0 0 1px rgba(20,184,166,0.1), 0 16px 48px rgba(0,0,0,0.12); border-color: var(--border-subtle); }
+    .mini-app.fade-out { opacity: 0; transform: translateY(-10px); transition-duration: 0.5s; }
+    [data-theme="light"] .mini-app { box-shadow: 0 0 0 1px rgba(20,184,166,0.12), 0 16px 56px rgba(0,0,0,0.14); }
 
-    /* Browser chrome bar */
+    /* Chrome bar */
     .mini-chrome {
-      background: #0D0D12;
+      background: #0D0D13;
       padding: 9px 14px;
       display: flex; align-items: center; gap: 12px;
-      border-bottom: 1px solid rgba(255,255,255,0.06);
+      border-bottom: 1px solid rgba(255,255,255,0.05);
     }
-    [data-theme="light"] .mini-chrome { background: #E8E8EE; border-bottom-color: rgba(0,0,0,0.1); }
-    .mini-chrome-dots { display: flex; gap: 5px; }
-    .mini-chrome-dots span { width: 9px; height: 9px; border-radius: 50%; display: block; }
-    .mini-chrome-dots .dot-r { background: #FF5F57; }
-    .mini-chrome-dots .dot-y { background: #FEBC2E; }
-    .mini-chrome-dots .dot-g { background: #28C840; }
-    .mini-chrome-url {
+    [data-theme="light"] .mini-chrome { background: #E4E4EB; border-bottom-color: rgba(0,0,0,0.08); }
+    .chrome-dots { display: flex; gap: 5px; }
+    .chrome-dots span { width: 9px; height: 9px; border-radius: 50%; display: block; }
+    .dot-r { background: #FF5F57; } .dot-y { background: #FEBC2E; } .dot-g { background: #28C840; }
+    .chrome-url {
       flex: 1; text-align: center;
-      font-family: 'DM Mono', monospace; font-size: 10px; color: rgba(255,255,255,0.3);
+      font-family: 'DM Mono', monospace; font-size: 10px;
+      color: rgba(255,255,255,0.28); letter-spacing: 0.01em;
       display: flex; align-items: center; justify-content: center; gap: 4px;
     }
-    [data-theme="light"] .mini-chrome-url { color: rgba(0,0,0,0.35); }
-    .mini-chrome-url svg { width: 9px; height: 9px; stroke: currentColor; fill: none; stroke-width: 2; flex-shrink: 0; }
+    [data-theme="light"] .chrome-url { color: rgba(0,0,0,0.32); }
+    .chrome-url svg { width: 9px; height: 9px; stroke: currentColor; fill: none; stroke-width: 2; flex-shrink: 0; }
 
-    /* Top bar */
+    /* App layout: sidebar + main */
+    .mini-layout { display: flex; }
+    .mini-sidebar {
+      width: 38px; background: #0F0F17; border-right: 1px solid rgba(255,255,255,0.05);
+      display: flex; flex-direction: column; align-items: center; padding: 10px 0; gap: 14px;
+      flex-shrink: 0;
+    }
+    [data-theme="light"] .mini-sidebar { background: #F0F0F6; border-right-color: rgba(0,0,0,0.07); }
+    .sb-icon { width: 18px; height: 18px; border-radius: 4px; display: flex; align-items: center; justify-content: center; }
+    .sb-icon svg { width: 12px; height: 12px; stroke: rgba(255,255,255,0.2); fill: none; stroke-width: 1.5; stroke-linecap: round; stroke-linejoin: round; }
+    [data-theme="light"] .sb-icon svg { stroke: rgba(0,0,0,0.22); }
+    .sb-icon.active { background: rgba(20,184,166,0.12); }
+    .sb-icon.active svg { stroke: var(--brand); }
+    .sb-sep { width: 18px; height: 1px; background: rgba(255,255,255,0.06); }
+    [data-theme="light"] .sb-sep { background: rgba(0,0,0,0.08); }
+
+    .mini-main { flex: 1; overflow: hidden; }
     .mini-topbar {
       background: var(--bg-elevated);
-      padding: 13px 18px;
+      padding: 11px 16px;
       display: flex; align-items: center; justify-content: space-between;
       border-bottom: 1px solid var(--border-subtle);
     }
-    .mini-state-pill {
+    .state-pill {
       display: inline-flex; align-items: center; gap: 5px;
-      font-size: 10px; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase;
-      color: #F59E0B; background: rgba(245,158,11,0.1); border: 1px solid rgba(245,158,11,0.2);
-      padding: 3px 9px; border-radius: 99px;
+      font-size: 9.5px; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase;
+      color: #F59E0B; background: rgba(245,158,11,0.1); border: 1px solid rgba(245,158,11,0.18);
+      padding: 2px 8px; border-radius: 99px;
     }
-    .mini-state-dot { width: 5px; height: 5px; border-radius: 50%; background: #F59E0B; animation: blink 1.5s infinite; }
-    .mini-pnl-label { font-size: 9.5px; font-weight: 500; letter-spacing: 0.06em; text-transform: uppercase; color: var(--text-muted); margin-bottom: 2px; text-align: right; }
-    .mini-pnl-num {
-      font-family: 'DM Mono', monospace; font-size: 24px; font-weight: 500;
-      letter-spacing: -0.02em; line-height: 1; color: #22C55E; text-align: right;
+    .state-dot { width: 5px; height: 5px; border-radius: 50%; background: #F59E0B; animation: blink 1.5s infinite; }
+    @keyframes blink { 0%,100%{ opacity:1; } 50%{ opacity:0.3; } }
+    .topbar-pnl { text-align: right; }
+    .pnl-label { font-size: 8.5px; font-weight: 500; letter-spacing: 0.06em; text-transform: uppercase; color: var(--text-muted); margin-bottom: 1px; }
+    .pnl-val {
+      font-family: 'DM Mono', monospace; font-size: 20px; font-weight: 500;
+      letter-spacing: -0.02em; line-height: 1; color: #22C55E;
       font-variant-numeric: tabular-nums;
     }
 
-    /* Body */
-    .mini-body { background: var(--bg-card); position: relative; overflow: hidden; min-height: 220px; }
-    .mini-pos-header {
-      padding: 8px 18px; font-size: 9.5px; font-weight: 600;
+    /* Positions body */
+    .mini-body { background: var(--bg-card); position: relative; overflow: hidden; min-height: 190px; }
+    .pos-header {
+      padding: 7px 16px; font-size: 8.5px; font-weight: 600;
       letter-spacing: 0.08em; text-transform: uppercase; color: var(--text-muted);
       border-bottom: 1px solid var(--border-subtle);
     }
-    .mini-pos-row {
-      padding: 13px 18px; display: flex; align-items: center; justify-content: space-between;
-      border-bottom: 1px solid var(--border-subtle);
-      border-left: 3px solid transparent;
-      opacity: 0; transform: translateX(-8px);
-      transition: opacity 0.4s ease, transform 0.4s ease, background 0.3s ease, border-left-color 0.3s ease;
-    }
-    .mini-pos-row.show { opacity: 1; transform: translateX(0); }
-    .mini-pos-row.new-entry { background: rgba(20,184,166,0.05); border-left-color: var(--brand); }
-    .mini-pos-name { font-size: 13px; font-weight: 700; letter-spacing: -0.015em; margin-bottom: 2px; }
-    .mini-pos-meta { font-family: 'DM Mono', monospace; font-size: 10.5px; color: var(--text-muted); }
-    .mini-pos-right { text-align: right; }
-    .mini-pos-ltp { font-family: 'DM Mono', monospace; font-size: 11px; color: var(--text-secondary); margin-bottom: 2px; }
-    .mini-pos-pnl { font-family: 'DM Mono', monospace; font-size: 13.5px; font-weight: 500; color: var(--loss); }
 
-    /* Static position rows (always visible, no animation) */
-    .mini-pos-row-static {
-      padding: 13px 18px; display: flex; align-items: center; justify-content: space-between;
-      border-bottom: 1px solid var(--border-subtle);
-      border-left: 3px solid transparent;
-    }
-    .mini-pos-pnl-profit { font-family: 'DM Mono', monospace; font-size: 13.5px; font-weight: 500; color: var(--profit); }
-
-    /* Session bar at bottom */
-    .mini-session-bar {
-      padding: 9px 18px;
-      display: flex; align-items: center; gap: 16px;
-      font-size: 10px; color: var(--text-tertiary); font-family: 'DM Mono', monospace;
-      border-top: 1px solid var(--border-subtle);
-    }
-    .mini-session-bar .sb-sep { opacity: 0.3; }
-
-    /* Alert slides down from top of body */
+    /* Alert overlay */
     .mini-alert {
       position: absolute; left: 0; right: 0; top: 0;
-      padding: 12px 18px 12px 14px;
+      padding: 10px 16px 10px 12px;
       background: var(--bg-elevated);
-      border-bottom: 1px solid rgba(239,68,68,0.2);
+      border-bottom: 1px solid rgba(239,68,68,0.18);
       border-left: 3px solid var(--loss);
-      display: flex; align-items: flex-start; gap: 9px;
+      display: flex; align-items: flex-start; gap: 8px;
       opacity: 0; transform: translateY(-100%);
-      transition: opacity 0.4s cubic-bezier(0.2,0,0,1), transform 0.4s cubic-bezier(0.2,0,0,1);
+      transition: opacity 0.4s cubic-bezier(0.16,1,0.3,1), transform 0.45s cubic-bezier(0.16,1,0.3,1);
     }
     .mini-alert.show { opacity: 1; transform: translateY(0); }
-    .mini-alert.fade-out { opacity: 0; transform: translateY(-100%); }
-    .mini-alert-icon { font-size: 14px; flex-shrink: 0; line-height: 1.5; }
-    .mini-alert-badge { font-size: 10px; font-weight: 700; letter-spacing: 0.07em; text-transform: uppercase; color: var(--loss); margin-bottom: 3px; }
-    .mini-alert-text { font-size: 12px; color: var(--text-secondary); line-height: 1.45; }
+    .mini-alert-icon { font-size: 12px; flex-shrink: 0; margin-top: 1px; }
+    .mini-alert-badge { font-size: 9px; font-weight: 700; letter-spacing: 0.07em; text-transform: uppercase; color: var(--loss); margin-bottom: 2px; }
+    .mini-alert-text { font-size: 11px; color: var(--text-secondary); line-height: 1.4; }
 
-    /* ── CALCULATOR ───────────────────────────────────────────────── */
-    .calc-card {
-      background: var(--bg-card); border: 1px solid var(--border-default); border-radius: 16px;
-      padding: 28px 32px; max-width: 640px; margin: 0 auto; text-align: left;
-      box-shadow: 0 24px 60px rgba(0,0,0,0.4), 0 0 0 1px rgba(255,255,255,0.04);
+    /* Position rows */
+    .pos-row {
+      padding: 11px 16px; display: flex; align-items: center; justify-content: space-between;
+      border-bottom: 1px solid var(--border-subtle);
+      border-left: 3px solid transparent;
     }
-    [data-theme="light"] .calc-card { box-shadow: 0 8px 32px rgba(0,0,0,0.1); }
-    .calc-header { margin-bottom: 20px; }
-    .calc-title { font-size: 14px; font-weight: 600; color: var(--text-primary); margin-bottom: 3px; }
-    .calc-sub   { font-size: 12px; color: var(--text-tertiary); }
-    .calc-habits { display: flex; flex-direction: column; gap: 14px; margin-bottom: 20px; }
-    .habit-row  { display: flex; align-items: center; gap: 12px; cursor: pointer; }
-    .habit-check {
-      width: 20px; height: 20px; border-radius: 5px; border: 1.5px solid var(--border-default);
-      background: transparent; flex-shrink: 0; display: flex; align-items: center; justify-content: center;
-      transition: all 0.12s;
+    .pos-row.animated {
+      opacity: 0; transform: translateX(-6px);
+      transition: opacity 0.35s ease, transform 0.35s ease, background 0.25s, border-left-color 0.25s;
     }
-    .habit-check.checked { background: var(--loss-bg); border-color: var(--loss); }
-    .habit-check.checked svg { display: block; }
-    .habit-check svg { display: none; width: 11px; height: 11px; stroke: var(--loss); fill: none; stroke-width: 2.5; stroke-linecap: round; stroke-linejoin: round; }
-    .habit-label { flex: 1; font-size: 13px; color: var(--text-secondary); user-select: none; }
-    .habit-row:hover .habit-label { color: var(--text-primary); }
-    .habit-cost { font-family: 'DM Mono', monospace; font-size: 13px; font-weight: 500; color: var(--loss); opacity: 0.4; transition: opacity 0.15s; white-space: nowrap; }
-    .habit-cost.active { opacity: 1; }
-    .calc-divider { height: 1px; background: var(--border-subtle); margin: 4px 0 20px; }
-    .calc-result { display: flex; align-items: center; justify-content: space-between; }
-    .calc-result-label { font-size: 12px; color: var(--text-secondary); }
-    .calc-result-val { font-family: 'DM Mono', monospace; font-size: 32px; font-weight: 500; color: var(--loss); letter-spacing: -0.03em; transition: all 0.3s; }
-    .calc-result-val.zero { color: var(--profit); }
-    .calc-cta-row { margin-top: 16px; display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
-    .calc-cta-text { font-size: 12px; color: var(--text-tertiary); }
-    .calc-cta-text strong { color: var(--brand); }
-    .calc-cta-btn { margin-left: auto; padding: 8px 16px; border-radius: 7px; font-size: 13px; font-weight: 600; background: var(--brand); color: #fff; border: none; cursor: pointer; white-space: nowrap; }
-    .calc-cta-btn:hover { opacity: 0.88; }
+    .pos-row.animated.show { opacity: 1; transform: translateX(0); }
+    .pos-row.new-entry { background: rgba(20,184,166,0.05); border-left-color: var(--brand); }
+    .pos-name { font-size: 11.5px; font-weight: 700; letter-spacing: -0.01em; margin-bottom: 1px; }
+    .pos-meta { font-family: 'DM Mono', monospace; font-size: 9.5px; color: var(--text-muted); }
+    .pos-right { text-align: right; }
+    .pos-ltp { font-family: 'DM Mono', monospace; font-size: 10px; color: var(--text-secondary); margin-bottom: 1px; }
+    .pos-pnl { font-family: 'DM Mono', monospace; font-size: 12px; font-weight: 500; font-variant-numeric: tabular-nums; }
+    .pos-pnl.profit { color: var(--profit); }
+    .pos-pnl.loss { color: var(--loss); }
 
-    /* ── SEBI STATS ───────────────────────────────────────────────── */
-    .sebi-bar { background: var(--bg-elevated); border-top: 1px solid var(--border-subtle); border-bottom: 1px solid var(--border-subtle); padding: 24px 48px; }
-    .sebi-bar-inner { max-width: 1100px; margin: 0 auto; display: grid; grid-template-columns: repeat(4,1fr); gap: 0; }
-    .sebi-stat { padding: 0 28px; border-right: 1px solid var(--border-subtle); }
-    .sebi-stat:first-child { padding-left: 0; }
-    .sebi-stat:last-child  { padding-right: 0; border-right: none; }
-    .sebi-num { font-family: 'DM Mono', monospace; font-size: 30px; font-weight: 500; letter-spacing: -0.02em; margin-bottom: 4px; }
-    .sebi-label { font-size: 12px; color: var(--text-secondary); line-height: 1.4; margin-bottom: 3px; }
-    .sebi-source { font-size: 10px; color: var(--text-tertiary); }
-
-    /* ── PROBLEM SECTION ──────────────────────────────────────────── */
-    .problems { padding: 96px 48px; max-width: 1100px; margin: 0 auto; }
-    .section-tag { font-size: 11px; font-weight: 600; letter-spacing: 0.08em; text-transform: uppercase; color: var(--brand); margin-bottom: 12px; }
-    .section-h2 { font-size: 40px; font-weight: 800; letter-spacing: -0.04em; line-height: 1.1; color: var(--text-primary); margin-bottom: 14px; }
-    .section-p  { font-size: 16px; color: var(--text-secondary); line-height: 1.65; max-width: 480px; margin-bottom: 52px; }
-
-    .problem-scroll { display: grid; grid-template-columns: repeat(4,1fr); gap: 12px; }
-    .prob-card {
-      background: var(--bg-card); border: 1px solid var(--border-subtle); border-radius: 12px;
-      padding: 22px; cursor: pointer; transition: all 0.18s; position: relative; overflow: hidden;
+    /* Session footer */
+    .mini-footer {
+      padding: 7px 16px;
+      display: flex; align-items: center; gap: 12px;
+      font-family: 'DM Mono', monospace; font-size: 9px; color: var(--text-tertiary);
+      border-top: 1px solid var(--border-subtle);
     }
-    .prob-card::before {
-      content: ''; position: absolute; top: 0; left: 0; right: 0; height: 2px;
-      background: var(--loss); transform: scaleX(0); transform-origin: left; transition: transform 0.25s ease;
-    }
-    .prob-card:hover { border-color: var(--border-default); transform: translateY(-2px); box-shadow: 0 8px 24px rgba(0,0,0,0.3); }
-    .prob-card:hover::before, .prob-card.active::before { transform: scaleX(1); }
-    .prob-card.active { border-color: rgba(239,68,68,0.3); background: var(--loss-bg); }
-    .prob-emoji { font-size: 24px; margin-bottom: 12px; display: block; }
-    .prob-title { font-size: 14px; font-weight: 700; color: var(--text-primary); margin-bottom: 6px; letter-spacing: -0.01em; }
-    .prob-desc  { font-size: 12px; color: var(--text-secondary); line-height: 1.55; margin-bottom: 14px; }
-    .prob-stat  { font-family: 'DM Mono', monospace; font-size: 22px; font-weight: 500; color: var(--loss); letter-spacing: -0.02em; }
-    .prob-stat-label { font-size: 10px; color: var(--text-tertiary); margin-top: 2px; }
+    .mf-sep { opacity: 0.3; }
 
-    .prob-detail {
-      background: var(--bg-elevated); border: 1px solid var(--border-default);
-      border-radius: 12px; padding: 24px 28px; margin-top: 12px;
-      display: none; grid-column: 1 / -1;
+    /* ── CREDIBILITY STRIP ────────────────────────────────────────── */
+    .cred-strip {
+      background: var(--bg-elevated);
+      border-top: 1px solid var(--border-subtle);
+      border-bottom: 1px solid var(--border-subtle);
+      padding: 32px 0;
     }
-    .prob-detail.show { display: block; animation: fadeSlide 0.2s ease; }
-    @keyframes fadeSlide { from{opacity:0;transform:translateY(-8px)} to{opacity:1;transform:translateY(0)} }
-    .prob-detail-inner { display: grid; grid-template-columns: 1fr 1fr; gap: 24px; }
-    .prob-detail-copy h3 { font-size: 16px; font-weight: 700; color: var(--text-primary); margin-bottom: 8px; letter-spacing: -0.015em; }
-    .prob-detail-copy p  { font-size: 13px; color: var(--text-secondary); line-height: 1.65; }
-    .prob-detail-copy blockquote {
-      margin-top: 14px; padding: 12px 16px;
-      background: var(--bg-card); border-left: 3px solid var(--loss); border-radius: 0 7px 7px 0;
-      font-size: 13px; font-style: italic; color: var(--text-secondary); line-height: 1.55;
+    .cred-inner {
+      max-width: 880px; margin: 0 auto;
+      display: grid; grid-template-columns: repeat(3,1fr);
     }
-    .prob-detail-stats { display: flex; flex-direction: column; gap: 12px; }
-    .prob-detail-stat { background: var(--bg-card); border: 1px solid var(--border-subtle); border-radius: 8px; padding: 14px 16px; }
-    .prob-detail-stat-num { font-family: 'DM Mono', monospace; font-size: 26px; font-weight: 500; letter-spacing: -0.02em; margin-bottom: 3px; }
-    .prob-detail-stat-label { font-size: 11px; color: var(--text-tertiary); }
-
-    /* ── ALERT FEED ───────────────────────────────────────────────── */
-    .alert-feed-section { background: var(--bg-card); border-top: 1px solid var(--border-subtle); border-bottom: 1px solid var(--border-subtle); padding: 96px 48px; }
-    .alert-feed-inner   { max-width: 1100px; margin: 0 auto; display: grid; grid-template-columns: 1fr 1fr; gap: 64px; align-items: center; }
-    .alert-feed-left h2 { font-size: 36px; font-weight: 800; letter-spacing: -0.04em; line-height: 1.1; color: var(--text-primary); margin-bottom: 14px; }
-    .alert-feed-left p  { font-size: 15px; color: var(--text-secondary); line-height: 1.65; }
-    .alert-feed-right { background: var(--bg-elevated); border: 1px solid var(--border-subtle); border-radius: 14px; padding: 18px; min-height: 320px; overflow: hidden; }
-    .feed-header { display: flex; align-items: center; gap: 8px; margin-bottom: 14px; padding-bottom: 12px; border-bottom: 1px solid var(--border-subtle); }
-    .feed-live-dot { width: 7px; height: 7px; border-radius: 50%; background: var(--profit); animation: blink 1.5s infinite; }
-    @keyframes blink { 0%,100%{opacity:1} 50%{opacity:0.3} }
-    .feed-title { font-size: 12px; font-weight: 600; color: var(--text-secondary); }
-    .feed-time  { font-family: 'DM Mono', monospace; font-size: 11px; color: var(--text-tertiary); margin-left: auto; }
-    .feed-list  { display: flex; flex-direction: column; gap: 8px; }
-    .feed-item {
-      display: flex; align-items: flex-start;
-      background: var(--bg-card); border: 1px solid var(--border-subtle); border-radius: 8px;
-      overflow: hidden; opacity: 0; transform: translateX(20px);
-      transition: all 0.4s cubic-bezier(0.16, 1, 0.3, 1);
+    .cred-stat { padding: 0 40px; border-right: 1px solid var(--border-subtle); text-align: center; }
+    .cred-stat:last-child { border-right: none; }
+    .cred-num {
+      font-family: 'DM Mono', monospace; font-size: 36px; font-weight: 500;
+      letter-spacing: -0.03em; color: var(--text-primary); margin-bottom: 6px;
+      font-variant-numeric: tabular-nums;
     }
-    .feed-item.visible { opacity: 1; transform: translateX(0); }
-    .feed-bar { width: 3px; flex-shrink: 0; }
-    .feed-bar.d { background: var(--loss); }
-    .feed-bar.w { background: var(--warning); }
-    .feed-bar.i { background: var(--brand); }
-    .feed-body { padding: 10px 12px; }
-    .feed-type { font-size: 10px; font-weight: 600; letter-spacing: 0.06em; text-transform: uppercase; margin-bottom: 3px; }
-    .feed-type.d { color: var(--loss); }
-    .feed-type.w { color: var(--warning); }
-    .feed-type.i { color: var(--brand); }
-    .feed-msg { font-size: 12px; color: var(--text-secondary); line-height: 1.5; }
-    .feed-msg strong { color: var(--text-primary); }
-    .feed-ts  { font-family: 'DM Mono', monospace; font-size: 10px; color: var(--text-tertiary); margin-top: 4px; }
+    .cred-num .accent { color: var(--loss); }
+    .cred-label { font-size: 12px; color: var(--text-secondary); line-height: 1.5; }
+    .cred-source { font-size: 10px; color: var(--text-tertiary); margin-top: 3px; }
 
-    /* ── QUIZ ─────────────────────────────────────────────────────── */
-    .quiz-section { padding: 96px 48px; }
-    .quiz-inner   { max-width: 640px; margin: 0 auto; text-align: center; }
-    .quiz-card    { background: var(--bg-card); border: 1px solid var(--border-subtle); border-radius: 16px; padding: 32px; margin-top: 40px; text-align: left; }
-    .quiz-step    { display: none; }
-    .quiz-step.active { display: block; animation: fadeSlide 0.2s ease; }
-    .quiz-q { font-size: 17px; font-weight: 700; color: var(--text-primary); letter-spacing: -0.02em; margin-bottom: 20px; line-height: 1.35; }
-    .quiz-opts { display: flex; flex-direction: column; gap: 8px; }
-    .quiz-opt {
-      padding: 13px 16px; border-radius: 9px; border: 1.5px solid var(--border-subtle);
-      background: var(--bg-elevated); font-size: 13px; color: var(--text-secondary);
-      cursor: pointer; transition: all 0.12s; text-align: left;
+    /* ── PATTERNS ─────────────────────────────────────────────────── */
+    .patterns { padding: 100px 80px; max-width: 1100px; margin: 0 auto; }
+    .section-overline {
+      font-size: 10.5px; font-weight: 700; letter-spacing: 0.1em; text-transform: uppercase;
+      color: var(--brand); margin-bottom: 14px;
     }
-    .quiz-opt:hover { border-color: var(--brand-border); background: var(--brand-bg); color: var(--text-primary); }
-    .quiz-progress { display: flex; gap: 4px; margin-bottom: 24px; }
-    .qp-dot { flex: 1; height: 3px; border-radius: 99px; background: var(--border-subtle); }
-    .qp-dot.done   { background: var(--brand); }
-    .qp-dot.active { background: var(--brand); opacity: 0.5; }
-
-    .quiz-result { display: none; text-align: center; }
-    .quiz-result.show { display: block; animation: fadeSlide 0.3s ease; }
-    .result-badge { display: inline-flex; align-items: center; gap: 8px; background: var(--loss-bg); border: 1px solid var(--loss-border); border-radius: 99px; padding: 6px 16px; font-size: 13px; font-weight: 600; color: var(--loss); margin-bottom: 16px; }
-    .result-title { font-size: 20px; font-weight: 700; color: var(--text-primary); margin-bottom: 8px; letter-spacing: -0.02em; }
-    .result-desc  { font-size: 14px; color: var(--text-secondary); line-height: 1.65; margin-bottom: 20px; }
-    .result-cost  { background: var(--bg-elevated); border: 1px solid var(--border-subtle); border-radius: 10px; padding: 16px; margin-bottom: 20px; display: flex; align-items: center; gap: 14px; }
-    .result-cost-num   { font-family: 'DM Mono', monospace; font-size: 30px; font-weight: 500; color: var(--loss); letter-spacing: -0.02em; }
-    .result-cost-label { font-size: 12px; color: var(--text-secondary); text-align: left; }
-
-    /* ── HOW IT WORKS ─────────────────────────────────────────────── */
-    .how-section { background: var(--bg-card); border-top: 1px solid var(--border-subtle); border-bottom: 1px solid var(--border-subtle); padding: 96px 48px; }
-    .how-inner   { max-width: 1100px; margin: 0 auto; }
-    .how-steps   { display: grid; grid-template-columns: repeat(3,1fr); gap: 0; margin-top: 52px; }
-    .how-step    { padding: 0 32px; border-right: 1px solid var(--border-subtle); }
-    .how-step:first-child { padding-left: 0; }
-    .how-step:last-child  { padding-right: 0; border-right: none; }
-    .how-num-wrap { display: flex; align-items: center; gap: 12px; margin-bottom: 16px; }
-    .how-num {
-      width: 40px; height: 40px; border-radius: 50%; border: 1.5px solid var(--brand);
-      background: var(--brand-bg); display: flex; align-items: center; justify-content: center;
-      font-family: 'DM Mono', monospace; font-size: 14px; font-weight: 500; color: var(--brand); flex-shrink: 0;
+    .section-h2 {
+      font-size: clamp(32px, 3.2vw, 44px); font-weight: 800;
+      letter-spacing: -0.04em; line-height: 1.1;
+      color: var(--text-primary); margin-bottom: 12px;
     }
-    .how-connector { flex: 1; height: 1px; background: linear-gradient(90deg, var(--brand-border), var(--border-subtle)); }
-    .how-step-title { font-size: 15px; font-weight: 700; color: var(--text-primary); margin-bottom: 8px; letter-spacing: -0.01em; }
-    .how-step-desc  { font-size: 13px; color: var(--text-secondary); line-height: 1.65; }
-    .how-step-note  { margin-top: 12px; padding: 10px 12px; background: var(--bg-elevated); border: 1px solid var(--border-subtle); border-radius: 7px; font-size: 11px; color: var(--text-tertiary); line-height: 1.5; }
+    .section-sub { font-size: 15px; color: var(--text-secondary); line-height: 1.65; max-width: 440px; margin-bottom: 52px; }
+    .pattern-rows { display: flex; flex-direction: column; gap: 0; border: 1px solid var(--border-subtle); border-radius: 12px; overflow: hidden; }
+    .pattern-row {
+      display: flex; align-items: center; justify-content: space-between;
+      padding: 22px 28px;
+      border-bottom: 1px solid var(--border-subtle);
+      border-left: 4px solid transparent;
+      transition: background 0.12s;
+    }
+    .pattern-row:last-child { border-bottom: none; }
+    .pattern-row:hover { background: var(--bg-elevated); }
+    .pattern-row.sev-high { border-left-color: var(--loss); }
+    .pattern-row.sev-med  { border-left-color: #F59E0B; }
+    .pattern-row.sev-low  { border-left-color: #6366F1; }
+    .pattern-info { flex: 1; }
+    .pattern-name { font-size: 15px; font-weight: 700; letter-spacing: -0.015em; margin-bottom: 3px; }
+    .pattern-desc { font-size: 12.5px; color: var(--text-secondary); }
+    .pattern-cost {
+      font-family: 'DM Mono', monospace; font-size: 20px; font-weight: 500;
+      letter-spacing: -0.02em; color: var(--loss); text-align: right; white-space: nowrap;
+    }
+    .pattern-cost span { display: block; font-size: 10px; font-weight: 400; color: var(--text-tertiary); letter-spacing: 0; margin-top: 2px; }
 
-    /* ── PRODUCT DEMO ─────────────────────────────────────────────── */
-    .demo-section { padding: 96px 48px; max-width: 1100px; margin: 0 auto; }
-    .demo-nav { display: flex; gap: 4px; background: var(--bg-elevated); border: 1px solid var(--border-subtle); border-radius: 10px; padding: 4px; margin-top: 48px; margin-bottom: 20px; width: fit-content; }
-    .demo-btn { padding: 9px 18px; border-radius: 7px; font-size: 13px; font-weight: 500; color: var(--text-secondary); border: none; background: transparent; cursor: pointer; transition: all 0.12s; }
-    .demo-btn:hover { color: var(--text-primary); }
-    .demo-btn.active { background: var(--bg-card); color: var(--text-primary); box-shadow: 0 1px 4px rgba(0,0,0,0.3); }
-    .demo-panels { background: var(--bg-card); border: 1px solid var(--border-subtle); border-radius: 14px; overflow: hidden; min-height: 280px; }
-    .demo-panel { display: none; padding: 24px; animation: fadeSlide 0.2s ease; }
+    /* ── DEMO TABS ────────────────────────────────────────────────── */
+    .demo { padding: 100px 80px; }
+    .demo-inner { max-width: 1100px; margin: 0 auto; }
+    .demo-header { margin-bottom: 40px; }
+    .demo-tabs {
+      display: flex; gap: 0;
+      border: 1px solid var(--border-subtle); border-radius: 10px;
+      overflow: hidden;
+      margin-bottom: 24px;
+      width: fit-content;
+    }
+    .demo-tab {
+      padding: 9px 20px; font-size: 12.5px; font-weight: 500;
+      color: var(--text-secondary); background: var(--bg-card);
+      border: none; border-right: 1px solid var(--border-subtle);
+      cursor: pointer; transition: all 0.12s;
+      white-space: nowrap;
+    }
+    .demo-tab:last-child { border-right: none; }
+    .demo-tab:hover { color: var(--text-primary); background: var(--bg-elevated); }
+    .demo-tab.active { color: var(--brand); background: var(--brand-bg); font-weight: 600; }
+    .demo-panel {
+      display: none;
+      background: var(--bg-card); border: 1px solid var(--border-default);
+      border-radius: 14px; overflow: hidden;
+      box-shadow: 0 24px 60px rgba(0,0,0,0.4);
+    }
+    [data-theme="light"] .demo-panel { box-shadow: 0 8px 32px rgba(0,0,0,0.1); }
     .demo-panel.active { display: block; }
-    .da { background: var(--bg-elevated); border: 1px solid var(--border-subtle); border-radius: 8px; padding: 12px 14px; display: flex; gap: 0; overflow: hidden; margin-bottom: 10px; }
-    .da-bar { width: 3px; flex-shrink: 0; border-radius: 99px 0 0 99px; }
-    .da-body { padding-left: 12px; }
-    .da-title  { font-size: 13px; font-weight: 600; color: var(--text-primary); margin-bottom: 4px; }
-    .da-desc   { font-size: 12px; color: var(--text-secondary); line-height: 1.5; }
-    .da-footer { display: flex; align-items: center; gap: 8px; margin-top: 7px; flex-wrap: wrap; }
-    .da-time   { font-family: 'DM Mono', monospace; font-size: 10px; color: var(--text-tertiary); }
-    .da-sev    { font-size: 10px; font-weight: 600; padding: 1px 6px; border-radius: 99px; }
-    .sev-h { background: rgba(239,68,68,0.12); color: var(--loss); border: 1px solid rgba(239,68,68,0.2); }
-    .sev-m { background: rgba(245,158,11,0.12); color: var(--warning); border: 1px solid rgba(245,158,11,0.2); }
-    .sev-i { background: var(--brand-bg); color: var(--brand); border: 1px solid var(--brand-border); }
-    .coach-q { background: var(--bg-elevated); border: 1px solid var(--border-subtle); border-radius: 8px; padding: 12px 14px; font-size: 13px; color: var(--text-secondary); margin-bottom: 10px; }
-    .coach-a { background: var(--brand-bg); border: 1px solid var(--brand-border); border-radius: 8px; padding: 14px 16px; }
-    .coach-a-header { font-size: 11px; font-weight: 600; color: var(--brand); margin-bottom: 6px; letter-spacing: 0.04em; }
-    .coach-a-body   { font-size: 13px; color: var(--text-primary); line-height: 1.65; }
-    .coach-a-body strong { color: var(--loss); }
-    .mbc-row { display: flex; align-items: center; gap: 10px; margin-bottom: 10px; }
-    .mbc-label { font-size: 12px; color: var(--text-secondary); width: 130px; flex-shrink: 0; }
-    .mbc-track { flex: 1; height: 8px; background: var(--border-subtle); border-radius: 99px; overflow: hidden; }
-    .mbc-fill  { height: 100%; border-radius: 99px; }
-    .mbc-val   { font-family: 'DM Mono', monospace; font-size: 12px; font-weight: 500; min-width: 60px; text-align: right; }
+    .demo-panel-chrome {
+      background: #0D0D13; padding: 9px 16px;
+      display: flex; align-items: center; gap: 10px;
+      border-bottom: 1px solid rgba(255,255,255,0.05);
+    }
+    [data-theme="light"] .demo-panel-chrome { background: #E4E4EB; }
+    .demo-panel-body { padding: 24px; }
+
+    /* Demo: Alerts tab */
+    .alert-feed { display: flex; flex-direction: column; gap: 12px; }
+    .alert-item {
+      display: flex; align-items: flex-start; gap: 12px;
+      padding: 14px 16px; border-radius: 10px;
+      background: var(--bg-elevated);
+      border: 1px solid var(--border-subtle);
+      border-left: 3px solid transparent;
+    }
+    .alert-item.high { border-left-color: var(--loss); }
+    .alert-item.med  { border-left-color: #F59E0B; }
+    .alert-item.low  { border-left-color: #6366F1; }
+    .alert-icon { font-size: 16px; flex-shrink: 0; margin-top: 1px; }
+    .alert-badge { font-size: 10px; font-weight: 700; letter-spacing: 0.07em; text-transform: uppercase; margin-bottom: 3px; }
+    .alert-item.high .alert-badge { color: var(--loss); }
+    .alert-item.med .alert-badge  { color: #F59E0B; }
+    .alert-item.low .alert-badge  { color: #6366F1; }
+    .alert-desc { font-size: 13px; color: var(--text-secondary); line-height: 1.5; }
+    .alert-time { font-family: 'DM Mono', monospace; font-size: 10px; color: var(--text-muted); margin-top: 4px; }
+
+    /* Demo: AI Coach tab */
+    .coach-chat { display: flex; flex-direction: column; gap: 14px; max-width: 620px; }
+    .chat-bubble { padding: 12px 16px; border-radius: 12px; font-size: 13px; line-height: 1.6; max-width: 88%; }
+    .chat-bubble.user {
+      background: var(--brand-bg); border: 1px solid var(--brand-border);
+      color: var(--text-primary); align-self: flex-end; border-radius: 12px 12px 2px 12px;
+    }
+    .chat-bubble.ai {
+      background: var(--bg-elevated); border: 1px solid var(--border-subtle);
+      color: var(--text-secondary); align-self: flex-start; border-radius: 12px 12px 12px 2px;
+    }
+    .chat-bubble.ai strong { color: var(--text-primary); }
+    .chat-bubble .stat { font-family: 'DM Mono', monospace; color: var(--loss); font-weight: 500; }
+
+    /* Demo: Analytics tab */
+    .edge-chart { display: flex; flex-direction: column; gap: 10px; }
+    .edge-row { display: flex; align-items: center; gap: 12px; }
+    .edge-label { font-size: 11.5px; color: var(--text-secondary); width: 160px; flex-shrink: 0; }
+    .edge-bar-wrap { flex: 1; height: 8px; background: rgba(255,255,255,0.05); border-radius: 4px; overflow: hidden; }
+    [data-theme="light"] .edge-bar-wrap { background: rgba(0,0,0,0.06); }
+    .edge-bar { height: 100%; border-radius: 4px; }
+    .edge-bar.pos { background: var(--profit); }
+    .edge-bar.neg { background: var(--loss); }
+    .edge-val { font-family: 'DM Mono', monospace; font-size: 11.5px; font-weight: 500; width: 80px; text-align: right; white-space: nowrap; }
+    .edge-val.pos { color: var(--profit); }
+    .edge-val.neg { color: var(--loss); }
+
+    /* Demo: Blowup Shield tab */
+    .shield-layout { display: grid; grid-template-columns: 180px 1fr; gap: 28px; align-items: center; }
+    .shield-ring-wrap { display: flex; flex-direction: column; align-items: center; gap: 8px; }
+    .shield-ring-label { font-size: 11px; color: var(--text-secondary); text-align: center; }
+    .shield-stats { display: flex; flex-direction: column; gap: 12px; }
+    .shield-stat-row {
+      display: flex; align-items: center; justify-content: space-between;
+      padding: 10px 14px; background: var(--bg-elevated); border-radius: 8px;
+      border: 1px solid var(--border-subtle);
+    }
+    .shield-stat-name { font-size: 12px; color: var(--text-secondary); }
+    .shield-stat-val { font-family: 'DM Mono', monospace; font-size: 12px; font-weight: 500; color: var(--text-primary); }
+    .shield-stat-bar { width: 60px; height: 4px; background: rgba(255,255,255,0.07); border-radius: 2px; overflow: hidden; margin-left: 10px; }
+    [data-theme="light"] .shield-stat-bar { background: rgba(0,0,0,0.08); }
+    .shield-stat-fill { height: 100%; border-radius: 2px; background: var(--brand); }
+    .shield-stat-row.warn .shield-stat-fill { background: #F59E0B; }
+
+    /* ── WHATSAPP GUARDIAN ────────────────────────────────────────── */
+    .guardian { padding: 100px 80px; }
+    .guardian-inner { max-width: 1100px; margin: 0 auto; display: grid; grid-template-columns: 1fr 1fr; gap: 72px; align-items: center; }
+    .guardian-left { }
+    .guardian-tag { display: inline-flex; align-items: center; gap: 6px; font-size: 11px; font-weight: 600; letter-spacing: 0.08em; text-transform: uppercase; color: #25D366; background: rgba(37,211,102,0.08); border: 1px solid rgba(37,211,102,0.18); padding: 4px 12px; border-radius: 99px; margin-bottom: 20px; }
+    .guardian-h2 { font-size: clamp(28px, 2.8vw, 38px); font-weight: 800; letter-spacing: -0.04em; line-height: 1.1; margin-bottom: 16px; }
+    .guardian-p { font-size: 15px; color: var(--text-secondary); line-height: 1.65; margin-bottom: 28px; }
+    .guardian-bullets { display: flex; flex-direction: column; gap: 12px; }
+    .guardian-bullet { display: flex; align-items: flex-start; gap: 10px; font-size: 13.5px; color: var(--text-secondary); }
+    .guardian-bullet-dot { width: 6px; height: 6px; border-radius: 50%; background: #25D366; flex-shrink: 0; margin-top: 7px; }
+    .guardian-bullet strong { color: var(--text-primary); }
+
+    /* WhatsApp mockup */
+    .wa-phone {
+      background: #0D0D13;
+      border-radius: 22px; overflow: hidden;
+      border: 1px solid rgba(255,255,255,0.08);
+      box-shadow: 0 32px 72px rgba(0,0,0,0.5);
+      max-width: 320px; margin: 0 auto;
+    }
+    [data-theme="light"] .wa-phone { background: #fff; border-color: rgba(0,0,0,0.08); box-shadow: 0 16px 48px rgba(0,0,0,0.12); }
+    .wa-header {
+      background: #1F2C33; padding: 14px 16px;
+      display: flex; align-items: center; gap: 10px;
+    }
+    [data-theme="light"] .wa-header { background: #075E54; }
+    .wa-avatar { width: 34px; height: 34px; border-radius: 50%; background: #25D366; display: flex; align-items: center; justify-content: center; font-size: 14px; flex-shrink: 0; }
+    .wa-title { font-size: 13px; font-weight: 600; color: #fff; }
+    .wa-sub { font-size: 10.5px; color: rgba(255,255,255,0.55); }
+    .wa-body { background: #0B141A; padding: 14px 12px; display: flex; flex-direction: column; gap: 8px; min-height: 260px; }
+    [data-theme="light"] .wa-body { background: #E5DDD5; }
+    .wa-msg {
+      padding: 8px 10px; border-radius: 8px;
+      font-size: 12px; line-height: 1.5; max-width: 86%;
+      opacity: 0; transform: translateY(8px);
+      transition: opacity 0.4s ease, transform 0.4s ease;
+    }
+    .wa-msg.show { opacity: 1; transform: translateY(0); }
+    .wa-msg.incoming { background: #1F2C33; color: #E9EDEF; align-self: flex-start; border-radius: 0 8px 8px 8px; }
+    .wa-msg.outgoing { background: #025144; color: #E9EDEF; align-self: flex-end; border-radius: 8px 8px 0 8px; }
+    [data-theme="light"] .wa-msg.incoming { background: #fff; color: #303030; }
+    [data-theme="light"] .wa-msg.outgoing { background: #D9FDD3; color: #303030; }
+    .wa-msg .wa-sender { font-size: 10px; font-weight: 600; color: #25D366; margin-bottom: 3px; }
+    .wa-msg .wa-time { font-size: 9.5px; color: rgba(255,255,255,0.4); text-align: right; margin-top: 3px; }
+    [data-theme="light"] .wa-msg .wa-time { color: rgba(0,0,0,0.4); }
 
     /* ── TESTIMONIALS ─────────────────────────────────────────────── */
-    .social-section { padding: 96px 48px; background: var(--bg-elevated); border-top: 1px solid var(--border-subtle); border-bottom: 1px solid var(--border-subtle); }
-    .social-inner { max-width: 1100px; margin: 0 auto; }
-    .testimonials { display: grid; grid-template-columns: repeat(3,1fr); gap: 16px; margin-top: 48px; }
-    .testimonial { background: var(--bg-card); border: 1px solid var(--border-subtle); border-radius: 12px; padding: 22px; transition: border-color 0.15s; }
-    .testimonial:hover { border-color: var(--border-default); }
-    .t-stars { color: #F59E0B; font-size: 13px; margin-bottom: 12px; letter-spacing: 2px; }
-    .t-quote { font-size: 13px; color: var(--text-secondary); line-height: 1.65; margin-bottom: 16px; font-style: italic; }
-    .t-quote strong { color: var(--text-primary); font-style: normal; }
-    .t-author { display: flex; align-items: center; gap: 10px; }
-    .t-avatar { width: 32px; height: 32px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 13px; font-weight: 700; color: #fff; flex-shrink: 0; }
-    .t-name  { font-size: 13px; font-weight: 600; color: var(--text-primary); }
-    .t-role  { font-size: 11px; color: var(--text-tertiary); }
+    .testimonials { padding: 100px 80px; }
+    .testimonials-inner { max-width: 1100px; margin: 0 auto; }
+    .testi-header { margin-bottom: 48px; }
+    .testi-grid { display: grid; grid-template-columns: repeat(3,1fr); gap: 20px; }
+    .testi-card {
+      background: var(--bg-card); border: 1px solid var(--border-default);
+      border-radius: 14px; padding: 28px 24px;
+      display: flex; flex-direction: column;
+    }
+    .testi-quote {
+      font-size: 15px; line-height: 1.65; color: var(--text-secondary);
+      flex: 1; margin-bottom: 24px;
+    }
+    .testi-quote strong { color: var(--text-primary); }
+    .testi-outcome {
+      font-family: 'DM Mono', monospace; font-size: 12px;
+      color: var(--brand); font-weight: 500; margin-bottom: 16px;
+      padding: 6px 10px; background: var(--brand-bg); border-radius: 6px; display: inline-block;
+    }
+    .testi-author { display: flex; align-items: center; gap: 10px; }
+    .testi-avatar {
+      width: 34px; height: 34px; border-radius: 50%;
+      background: var(--bg-elevated); border: 1px solid var(--border-subtle);
+      display: flex; align-items: center; justify-content: center;
+      font-size: 13px; font-weight: 700; color: var(--brand); flex-shrink: 0;
+    }
+    .testi-name { font-size: 13px; font-weight: 600; color: var(--text-primary); }
+    .testi-role { font-size: 11px; color: var(--text-tertiary); }
 
     /* ── PRICING ──────────────────────────────────────────────────── */
-    .pricing-section { padding: 96px 48px; max-width: 1100px; margin: 0 auto; }
-    .pricing-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; max-width: 820px; margin: 48px auto 0; }
-    .price-card { background: var(--bg-card); border: 1px solid var(--border-subtle); border-radius: 16px; padding: 32px; position: relative; }
-    .price-card.featured { border-color: var(--brand-border); background: linear-gradient(160deg, rgba(20,184,166,0.06) 0%, var(--bg-card) 50%); }
-    .popular-badge { position: absolute; top: -13px; left: 50%; transform: translateX(-50%); background: var(--brand); color: #fff; font-size: 10px; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase; padding: 4px 14px; border-radius: 99px; white-space: nowrap; }
-    .price-tier { font-size: 12px; font-weight: 600; letter-spacing: 0.06em; text-transform: uppercase; color: var(--text-tertiary); margin-bottom: 10px; }
-    .price-val  { font-family: 'DM Mono', monospace; font-size: 42px; font-weight: 500; letter-spacing: -0.03em; line-height: 1; color: var(--text-primary); margin-bottom: 4px; }
-    .price-val sup { font-size: 20px; vertical-align: super; opacity: 0.7; }
-    .price-val sub { font-size: 15px; opacity: 0.6; font-weight: 400; letter-spacing: 0; }
-    .price-period  { font-size: 13px; color: var(--text-tertiary); margin-bottom: 24px; }
-    .price-divider { height: 1px; background: var(--border-subtle); margin-bottom: 20px; }
-    .price-features { display: flex; flex-direction: column; gap: 10px; margin-bottom: 24px; }
-    .pf { display: flex; align-items: flex-start; gap: 8px; font-size: 13px; }
-    .pf svg { width: 14px; height: 14px; flex-shrink: 0; margin-top: 1px; stroke: currentColor; fill: none; stroke-width: 2.5; stroke-linecap: round; stroke-linejoin: round; }
-    .pf.yes { color: var(--text-secondary); }
-    .pf.yes svg { color: var(--profit); }
-    .pf.no  { color: var(--text-tertiary); opacity: 0.55; }
-    .price-cta-btn { width: 100%; padding: 12px; border-radius: 9px; font-size: 14px; font-weight: 600; cursor: pointer; transition: all 0.12s; border: none; }
-    .price-cta-btn.primary { background: var(--brand); color: #fff; }
-    .price-cta-btn.primary:hover { opacity: 0.9; }
-    .price-cta-btn.ghost { background: transparent; border: 1.5px solid var(--border-default); color: var(--text-secondary); }
-    .price-cta-btn.ghost:hover { border-color: var(--brand-border); color: var(--text-primary); }
+    .pricing { padding: 100px 80px; }
+    .pricing-inner { max-width: 860px; margin: 0 auto; }
+    .pricing-header { text-align: center; margin-bottom: 48px; }
+    .pricing-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
+    .pricing-card {
+      background: var(--bg-card); border: 1px solid var(--border-default);
+      border-radius: 16px; padding: 32px 28px;
+    }
+    .pricing-card.featured {
+      border-color: var(--brand-border);
+      box-shadow: 0 0 0 1px rgba(20,184,166,0.15), 0 24px 60px rgba(0,0,0,0.3);
+    }
+    .pricing-badge {
+      display: inline-block; font-size: 10px; font-weight: 700; letter-spacing: 0.08em;
+      text-transform: uppercase; color: var(--brand); background: var(--brand-bg);
+      border: 1px solid var(--brand-border); padding: 3px 10px; border-radius: 99px; margin-bottom: 16px;
+    }
+    .pricing-plan { font-size: 13px; font-weight: 600; color: var(--text-secondary); margin-bottom: 8px; }
+    .pricing-price {
+      font-family: 'DM Mono', monospace; font-size: 38px; font-weight: 500;
+      letter-spacing: -0.03em; color: var(--text-primary); margin-bottom: 4px;
+    }
+    .pricing-price sup { font-size: 18px; vertical-align: top; margin-top: 8px; display: inline-block; }
+    .pricing-price sub { font-size: 14px; color: var(--text-secondary); }
+    .pricing-period { font-size: 12px; color: var(--text-tertiary); margin-bottom: 24px; }
+    .pricing-features { list-style: none; display: flex; flex-direction: column; gap: 10px; margin-bottom: 28px; }
+    .pricing-features li { display: flex; align-items: flex-start; gap: 8px; font-size: 13px; color: var(--text-secondary); }
+    .pricing-features li::before { content: ''; width: 6px; height: 6px; border-radius: 50%; background: var(--brand); flex-shrink: 0; margin-top: 7px; }
+    .pricing-features li.muted::before { background: var(--text-tertiary); opacity: 0.4; }
+    .pricing-features li.muted { opacity: 0.5; }
+    .pricing-cta {
+      width: 100%; padding: 13px; border-radius: 10px;
+      font-size: 14px; font-weight: 600; cursor: pointer; transition: all 0.12s;
+      border: 1px solid var(--border-default); background: transparent;
+      color: var(--text-primary);
+    }
+    .pricing-cta:hover { background: var(--bg-elevated); }
+    .pricing-cta.primary { background: var(--brand); color: #fff; border-color: transparent; }
+    .pricing-cta.primary:hover { opacity: 0.9; }
 
     /* ── FINAL CTA ────────────────────────────────────────────────── */
-    .final-cta { padding: 100px 48px; text-align: center; background: var(--bg-card); border-top: 1px solid var(--border-subtle); position: relative; overflow: hidden; }
-    .final-cta::before { content: ''; position: absolute; inset: 0; background: radial-gradient(ellipse at center, rgba(20,184,166,0.06) 0%, transparent 65%); pointer-events: none; }
-    .final-cta-inner { position: relative; z-index: 1; max-width: 560px; margin: 0 auto; }
-    .final-h2 { font-size: 40px; font-weight: 800; letter-spacing: -0.04em; line-height: 1.1; color: var(--text-primary); margin-bottom: 14px; }
-    .final-sub { font-size: 16px; color: var(--text-secondary); line-height: 1.65; margin-bottom: 32px; }
-    .final-btns { display: flex; align-items: center; justify-content: center; gap: 10px; flex-wrap: wrap; }
+    .final-cta {
+      padding: 100px 80px; text-align: center;
+      border-top: 1px solid var(--border-subtle);
+    }
+    .final-cta-inner { max-width: 600px; margin: 0 auto; }
+    .final-cta h2 { font-size: clamp(30px, 3vw, 42px); font-weight: 800; letter-spacing: -0.04em; line-height: 1.1; margin-bottom: 16px; }
+    .final-cta p { font-size: 15px; color: var(--text-secondary); line-height: 1.65; margin-bottom: 32px; }
+    .final-cta-btns { display: flex; justify-content: center; gap: 10px; flex-wrap: wrap; }
 
     /* ── FOOTER ───────────────────────────────────────────────────── */
-    .footer { background: var(--bg-elevated); border-top: 1px solid var(--border-subtle); padding: 48px; }
-    .footer-inner { max-width: 1100px; margin: 0 auto; display: grid; grid-template-columns: 220px repeat(3,1fr); gap: 40px; }
-    .fc-label { font-size: 10px; font-weight: 600; letter-spacing: 0.08em; text-transform: uppercase; color: var(--text-tertiary); margin-bottom: 12px; }
-    .fc-links { display: flex; flex-direction: column; gap: 8px; }
-    .fc-links a { font-size: 13px; color: var(--text-secondary); transition: color 0.1s; }
-    .fc-links a:hover { color: var(--text-primary); }
-    .footer-bottom { max-width: 1100px; margin: 28px auto 0; padding-top: 20px; border-top: 1px solid var(--border-subtle); display: flex; justify-content: space-between; align-items: center; font-size: 12px; color: var(--text-tertiary); }
+    .footer {
+      border-top: 1px solid var(--border-subtle);
+      padding: 48px 80px 32px;
+    }
+    .footer-grid { max-width: 1100px; margin: 0 auto 40px; display: grid; grid-template-columns: 2fr 1fr 1fr 1fr; gap: 40px; }
+    .footer-brand p { font-size: 12.5px; color: var(--text-tertiary); line-height: 1.65; max-width: 240px; margin-top: 12px; }
+    .footer-col h4 { font-size: 11.5px; font-weight: 600; color: var(--text-secondary); margin-bottom: 14px; letter-spacing: 0.02em; }
+    .footer-col a { display: block; font-size: 12.5px; color: var(--text-tertiary); margin-bottom: 8px; transition: color 0.1s; }
+    .footer-col a:hover { color: var(--text-primary); }
+    .footer-bottom {
+      max-width: 1100px; margin: 0 auto;
+      padding-top: 24px; border-top: 1px solid var(--border-subtle);
+      display: flex; justify-content: space-between; align-items: center;
+      font-size: 11px; color: var(--text-tertiary); gap: 16px; flex-wrap: wrap;
+    }
+    .footer-bottom a { color: var(--text-tertiary); }
+    .footer-bottom a:hover { color: var(--text-secondary); }
 
-    /* ── SCROLL REVEAL ────────────────────────────────────────────── */
-    .reveal { opacity: 0; transform: translateY(24px); transition: opacity 0.55s ease, transform 0.55s ease; }
+    /* ── REVEAL ANIMATION ─────────────────────────────────────────── */
+    .reveal { opacity: 0; transform: translateY(20px); transition: opacity 0.55s cubic-bezier(0.16,1,0.3,1), transform 0.55s cubic-bezier(0.16,1,0.3,1); }
     .reveal.in { opacity: 1; transform: translateY(0); }
+    .reveal-delay-1 { transition-delay: 0.08s; }
+    .reveal-delay-2 { transition-delay: 0.16s; }
+    .reveal-delay-3 { transition-delay: 0.24s; }
 
     /* ── RESPONSIVE ───────────────────────────────────────────────── */
     @media (max-width: 960px) {
       .nav { padding: 0 20px; }
       .nav-links { display: none; }
-      .hero { grid-template-columns: 1fr; gap: 48px; padding: 100px 20px 60px; }
-      .hero-h1 { font-size: 40px; }
-      .hero-right { justify-content: flex-start; }
-      .mini-app { width: 100%; }
-      .calc-card { padding: 20px; }
-      .sebi-bar { padding: 20px; }
-      .sebi-bar-inner { grid-template-columns: 1fr 1fr; }
-      .sebi-stat { border-right: none; padding: 12px 0; border-bottom: 1px solid var(--border-subtle); }
-      .sebi-stat:nth-child(odd) { border-right: 1px solid var(--border-subtle); padding-right: 20px; }
-      .sebi-stat:last-child { border-bottom: none; }
-      .problems { padding: 60px 20px; }
-      .problem-scroll { grid-template-columns: 1fr 1fr; }
-      .prob-detail-inner { grid-template-columns: 1fr; }
-      .alert-feed-inner { grid-template-columns: 1fr; gap: 32px; }
-      .quiz-section { padding: 60px 20px; }
-      .how-steps { grid-template-columns: 1fr; gap: 28px; }
-      .how-step { border-right: none; padding: 0; }
-      .how-connector { display: none; }
-      .demo-section { padding: 60px 20px; }
-      .demo-nav { flex-wrap: wrap; }
-      .testimonials { grid-template-columns: 1fr; }
-      .pricing-grid { grid-template-columns: 1fr; max-width: 400px; }
-      .footer-inner { grid-template-columns: 1fr 1fr; }
+      .hero { grid-template-columns: 1fr; min-height: auto; }
+      .hero-left { padding: 100px 24px 40px; }
+      .hero-right { padding: 0 24px 64px; -webkit-mask-image: none; mask-image: none; }
+      .hero-stream { display: none; }
+      .cred-inner { grid-template-columns: 1fr; gap: 0; }
+      .cred-stat { border-right: none; padding: 20px 40px; border-bottom: 1px solid var(--border-subtle); }
+      .cred-stat:last-child { border-bottom: none; }
+      .patterns { padding: 64px 24px; }
+      .demo { padding: 64px 24px; }
+      .guardian { padding: 64px 24px; }
+      .guardian-inner { grid-template-columns: 1fr; gap: 40px; }
+      .testimonials { padding: 64px 24px; }
+      .testi-grid { grid-template-columns: 1fr; }
+      .pricing { padding: 64px 24px; }
+      .pricing-grid { grid-template-columns: 1fr; }
+      .final-cta { padding: 64px 24px; }
+      .footer { padding: 40px 24px 24px; }
+      .footer-grid { grid-template-columns: 1fr 1fr; }
+      .footer-bottom { flex-direction: column; text-align: center; }
+      .demo-tabs { overflow-x: auto; width: 100%; }
+      .shield-layout { grid-template-columns: 1fr; }
     }
   </style>
 </head>
@@ -503,502 +634,647 @@
 <!-- NAV ──────────────────────────────────────────────────────────── -->
 <nav class="nav">
   <div class="nav-logo">
-    <div class="logo-mark"><svg viewBox="0 0 24 24"><polyline points="3 17 9 11 13 15 21 7"/><polyline points="14 7 21 7 21 14"/></svg></div>
-    <span class="wordmark">TradeMentor <span>AI</span></span>
+    <div class="logo-mark">
+      <svg viewBox="0 0 24 24"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>
+    </div>
+    <span class="wordmark">Trade<span>Mentor</span></span>
   </div>
   <div class="nav-links">
-    <a href="#problems">Why it matters</a>
-    <a href="#how">How it works</a>
+    <a href="#features">Features</a>
+    <a href="#guardian">Guardian</a>
     <a href="#pricing">Pricing</a>
   </div>
   <div class="nav-right">
-    <button class="theme-btn" onclick="toggleTheme()">
+    <button class="theme-btn" onclick="toggleTheme()" title="Toggle theme">
       <svg id="icon-moon" viewBox="0 0 24 24"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>
       <svg id="icon-sun" viewBox="0 0 24 24" style="display:none"><circle cx="12" cy="12" r="5"/><line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/><line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/></svg>
     </button>
-    <button class="btn-nav-ghost" onclick="window.location='dashboard.html'">Sign in</button>
-    <button class="btn-nav-primary" onclick="window.location='dashboard.html'">Start Free →</button>
+    <button class="btn-ghost-sm" onclick="window.location='dashboard.html'">Sign in</button>
+    <button class="btn-primary-sm" onclick="window.location='dashboard.html'">Get Started Free</button>
   </div>
 </nav>
 
 <!-- HERO ─────────────────────────────────────────────────────────── -->
-<section class="hero">
+<section class="hero" id="hero">
+  <!-- Data stream background — faint DM Mono logs -->
+  <div class="hero-stream" aria-hidden="true">
+    <div class="stream-col">
+₹−1,075
+09:44 IST
+BANKNIFTY
+REVENGE
+₹22,400
+14:32 IST
+NIFTY
+OVERLOAD
+₹−3,100
+10:12 IST
+FOMO
+STREAK
+₹−820
+15:01 IST
+HOLD
+OVERCONF
+₹−1,075
+09:44 IST
+BANKNIFTY
+REVENGE
+₹22,400
+14:32 IST
+NIFTY
+OVERLOAD
+₹−3,100
+10:12 IST
+FOMO
+STREAK
+    </div>
+    <div class="stream-col">
+CAUTION
+STOP HIT
+₹−820
+FINNIFTY
+09:15 IST
+FOMO RISK
++₹8,200
+SIZE_ESC
+15:01 IST
+OVERT
+₹−540
+LOSS_AVE
+12:07 IST
+SIZING
+BANKNIFTY
+CAUTION
+STOP HIT
+₹−820
+FINNIFTY
+09:15 IST
+FOMO RISK
++₹8,200
+SIZE_ESC
+15:01 IST
+OVERT
+₹−540
+LOSS_AVE
+    </div>
+    <div class="stream-col">
++₹2,348
+REVENGE
+11:22 IST
+₹−1,890
+CONSEC
+09:44 IST
+BANKNIFTY
+CAUTION
+₹−540
+OVERCONF
+14:12 IST
+STREAK
++₹2,348
+REVENGE
+11:22 IST
+₹−1,890
+CONSEC
+09:44 IST
+BANKNIFTY
+CAUTION
+₹−540
+OVERCONF
+14:12 IST
+    </div>
+    <div class="stream-col">
+LOSS_AVE
+₹−540
+12:07 IST
+HOLD
++₹1,840
+OVERT
+11:22 IST
+REVENGE
+₹−2,890
+SIZING
+09:15 IST
+FINNIFTY
+LOSS_AVE
+₹−540
+12:07 IST
+HOLD
++₹1,840
+OVERT
+11:22 IST
+REVENGE
+₹−2,890
+    </div>
+  </div>
+
+  <!-- Ambient glow behind app frame -->
   <div class="hero-glow" aria-hidden="true"></div>
 
   <!-- Left: Headline + CTAs -->
   <div class="hero-left">
+    <div class="hero-pill">
+      <span class="hero-pill-dot"></span>
+      Live behavioral analysis · F&amp;O traders
+    </div>
     <h1 class="hero-h1">
-      One bad trade<br/>can erase a<br/>month of profits.
+      One bad trade<br>can erase <em>a month</em><br>of profits.
     </h1>
     <p class="hero-sub">
-      TradeMentor catches the moments when your behavior turns against your strategy — before the damage compounds.
+      TradeMentor connects to your Zerodha and catches revenge trades, overtrading, and loss aversion — while they're still happening.
     </p>
     <div class="hero-ctas">
-      <button class="cta-zerodha" onclick="window.location='dashboard.html'">
-        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>
+      <button class="cta-primary" onclick="window.location='dashboard.html'">
+        <svg viewBox="0 0 24 24"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>
         Connect Zerodha — Free
       </button>
       <button class="cta-google" onclick="window.location='dashboard.html'">
-        <svg width="16" height="16" viewBox="0 0 24 24"><path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" fill="#4285F4"/><path d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" fill="#34A853"/><path d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z" fill="#FBBC05"/><path d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z" fill="#EA4335"/></svg>
+        <svg width="15" height="15" viewBox="0 0 24 24"><path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" fill="#4285F4"/><path d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" fill="#34A853"/><path d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z" fill="#FBBC05"/><path d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z" fill="#EA4335"/></svg>
         Sign in with Google
-      </button>
-      <button class="cta-app">
-        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="5" y="2" width="14" height="20" rx="2" ry="2"/><line x1="12" y1="18" x2="12.01" y2="18"/></svg>
-        App — coming soon
       </button>
     </div>
     <div class="hero-trust">
-      <span>Read-only access</span><span class="sep">·</span>
-      <span>No orders placed</span><span class="sep">·</span>
+      <span>Read-only access</span>
+      <span class="dot">·</span>
+      <span>No orders placed</span>
+      <span class="dot">·</span>
       <span>Disconnect anytime</span>
     </div>
   </div>
 
-  <!-- Right: Mini app frame -->
+  <!-- Right: Mini app frame (left edge fades into data stream) -->
   <div class="hero-right">
     <div class="mini-app" id="mini-app">
-      <!-- Browser chrome bar -->
+      <!-- Browser chrome -->
       <div class="mini-chrome">
-        <div class="mini-chrome-dots">
-          <span class="dot-r"></span>
-          <span class="dot-y"></span>
-          <span class="dot-g"></span>
+        <div class="chrome-dots">
+          <span class="dot-r"></span><span class="dot-y"></span><span class="dot-g"></span>
         </div>
-        <div class="mini-chrome-url">
-          <svg viewBox="0 0 24 24" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+        <div class="chrome-url">
+          <svg viewBox="0 0 24 24" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
           app.tradementor.in
         </div>
-        <div style="width:32px"></div>
+        <div style="width:40px"></div>
       </div>
 
-      <!-- App topbar (session state + P&L) -->
-      <div class="mini-topbar">
-        <div class="mini-state-pill">
-          <span class="mini-state-dot"></span>CAUTION
-        </div>
-        <div>
-          <div class="mini-pnl-label">Today's P&amp;L</div>
-          <div class="mini-pnl-num" id="anim-pnl-val">+₹22,400</div>
-        </div>
-      </div>
-
-      <!-- Positions body -->
-      <div class="mini-body">
-        <div class="mini-pos-header">Open Positions</div>
-
-        <!-- Alert overlay — slides down from top on trigger -->
-        <div class="mini-alert" id="anim-alert">
-          <div class="mini-alert-icon">⚡</div>
-          <div>
-            <div class="mini-alert-badge">REVENGE TRADE · HIGH</div>
-            <div class="mini-alert-text">Entered 3 min after a ₹−1,075 stop hit</div>
+      <!-- App: sidebar + main -->
+      <div class="mini-layout">
+        <!-- Compressed sidebar strip -->
+        <div class="mini-sidebar">
+          <div class="sb-icon active">
+            <svg viewBox="0 0 24 24" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/></svg>
+          </div>
+          <div class="sb-icon">
+            <svg viewBox="0 0 24 24" stroke-linecap="round" stroke-linejoin="round"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>
+          </div>
+          <div class="sb-icon">
+            <svg viewBox="0 0 24 24" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+          </div>
+          <div class="sb-sep"></div>
+          <div class="sb-icon">
+            <svg viewBox="0 0 24 24" stroke-linecap="round" stroke-linejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
           </div>
         </div>
 
-        <!-- Row 1: static, in profit -->
-        <div class="mini-pos-row-static">
-          <div>
-            <div class="mini-pos-name">NIFTY 22000 CE</div>
-            <div class="mini-pos-meta">MIS · Qty 75 · Entry ₹112.50</div>
+        <!-- Main panel -->
+        <div class="mini-main">
+          <!-- Topbar: session state + P&L -->
+          <div class="mini-topbar">
+            <div class="state-pill"><span class="state-dot"></span>CAUTION</div>
+            <div class="topbar-pnl">
+              <div class="pnl-label">Today's P&amp;L</div>
+              <div class="pnl-val" id="anim-pnl-val">+₹22,400</div>
+            </div>
           </div>
-          <div class="mini-pos-right">
-            <div class="mini-pos-ltp">LTP ₹143.80</div>
-            <div class="mini-pos-pnl-profit">+₹2,348</div>
-          </div>
-        </div>
 
-        <!-- Row 2: animated — slides in, gets new-entry highlight, goes to loss -->
-        <div class="mini-pos-row" id="anim-pos-row">
-          <div>
-            <div class="mini-pos-name">BANKNIFTY 48000 PE</div>
-            <div class="mini-pos-meta">MIS · Qty 50 · Entry ₹148.20</div>
-          </div>
-          <div class="mini-pos-right">
-            <div class="mini-pos-ltp">LTP ₹125.60</div>
-            <div class="mini-pos-pnl" id="anim-pos-pnl">−₹1,130</div>
-          </div>
-        </div>
+          <!-- Positions body -->
+          <div class="mini-body">
+            <div class="pos-header">Open Positions</div>
 
-        <!-- Row 3: static, small loss -->
-        <div class="mini-pos-row-static">
-          <div>
-            <div class="mini-pos-name">FINNIFTY 21800 CE</div>
-            <div class="mini-pos-meta">MIS · Qty 40 · Entry ₹68.10</div>
-          </div>
-          <div class="mini-pos-right">
-            <div class="mini-pos-ltp">LTP ₹57.60</div>
-            <div class="mini-pos-pnl">−₹420</div>
-          </div>
-        </div>
+            <!-- Alert slides down from top -->
+            <div class="mini-alert" id="anim-alert">
+              <div class="mini-alert-icon">⚡</div>
+              <div>
+                <div class="mini-alert-badge">REVENGE TRADE · HIGH</div>
+                <div class="mini-alert-text">Entered 3 min after a ₹−1,075 stop hit. WR: 19%.</div>
+              </div>
+            </div>
 
-        <!-- Session footer -->
-        <div class="mini-session-bar">
-          <span>3 positions</span>
-          <span class="sb-sep">·</span>
-          <span>4 alerts today</span>
-          <span class="sb-sep">·</span>
-          <span>6 trades</span>
+            <!-- Row 1: static profit position -->
+            <div class="pos-row">
+              <div>
+                <div class="pos-name">NIFTY 22000 CE</div>
+                <div class="pos-meta">MIS · Qty 75 · Entry ₹112.50</div>
+              </div>
+              <div class="pos-right">
+                <div class="pos-ltp">LTP ₹143.80</div>
+                <div class="pos-pnl profit">+₹2,348</div>
+              </div>
+            </div>
+
+            <!-- Row 2: animated — new entry, goes to loss -->
+            <div class="pos-row animated" id="anim-pos-row">
+              <div>
+                <div class="pos-name">BANKNIFTY 48000 PE</div>
+                <div class="pos-meta">MIS · Qty 50 · Entry ₹148.20</div>
+              </div>
+              <div class="pos-right">
+                <div class="pos-ltp">LTP ₹125.60</div>
+                <div class="pos-pnl loss" id="anim-pos-pnl">−₹1,130</div>
+              </div>
+            </div>
+
+            <!-- Row 3: static small loss -->
+            <div class="pos-row">
+              <div>
+                <div class="pos-name">FINNIFTY 21800 CE</div>
+                <div class="pos-meta">MIS · Qty 40 · Entry ₹68.10</div>
+              </div>
+              <div class="pos-right">
+                <div class="pos-ltp">LTP ₹57.60</div>
+                <div class="pos-pnl loss">−₹420</div>
+              </div>
+            </div>
+
+            <!-- Session footer -->
+            <div class="mini-footer">
+              <span>3 positions</span>
+              <span class="mf-sep">·</span>
+              <span>4 alerts today</span>
+              <span class="mf-sep">·</span>
+              <span>6 trades</span>
+            </div>
+          </div>
         </div>
       </div>
     </div>
   </div>
 </section>
 
-<!-- SEBI STATS ────────────────────────────────────────────────────── -->
-<div class="sebi-bar">
-  <div class="sebi-bar-inner">
-    <div class="sebi-stat">
-      <div class="sebi-num" style="color:var(--loss);">89%</div>
-      <div class="sebi-label">of individual F&amp;O traders made a net loss</div>
-      <div class="sebi-source">SEBI study, FY22 · 10 million traders analyzed</div>
+<!-- CREDIBILITY STRIP ─────────────────────────────────────────────── -->
+<div class="cred-strip">
+  <div class="cred-inner">
+    <div class="cred-stat reveal">
+      <div class="cred-num"><span class="accent">89%</span></div>
+      <div class="cred-label">of individual F&amp;O traders lose money every year</div>
+      <div class="cred-source">SEBI Study, FY2021–22</div>
     </div>
-    <div class="sebi-stat">
-      <div class="sebi-num" style="color:var(--loss);">₹1.1L</div>
-      <div class="sebi-label">average net loss per losing retail trader per year</div>
-      <div class="sebi-source">SEBI FY22 · median was ₹50,000</div>
+    <div class="cred-stat reveal reveal-delay-1">
+      <div class="cred-num">₹1.1L</div>
+      <div class="cred-label">average annual loss per losing retail trader</div>
+      <div class="cred-source">SEBI Study, FY2021–22</div>
     </div>
-    <div class="sebi-stat">
-      <div class="sebi-num" style="color:var(--warning);">70%</div>
-      <div class="sebi-label">of avoidable losses come from behavioral decisions, not bad entries</div>
-      <div class="sebi-source">Internal analysis · 84,000+ F&amp;O sessions</div>
-    </div>
-    <div class="sebi-stat">
-      <div class="sebi-num" style="color:var(--profit);">83%</div>
-      <div class="sebi-label">of users who heed TradeMentor alerts avoid repeating the same mistake</div>
-      <div class="sebi-source">30-day post-alert follow-through rate</div>
+    <div class="cred-stat reveal reveal-delay-2">
+      <div class="cred-num">70%</div>
+      <div class="cred-label">of avoidable losses trace to behavioral decisions, not bad setups</div>
+      <div class="cred-source">Internal analysis, 500+ traders</div>
     </div>
   </div>
 </div>
 
-<!-- PROBLEMS ──────────────────────────────────────────────────────── -->
-<section class="problems reveal" id="problems">
-  <div class="section-tag">The real problem</div>
-  <h2 class="section-h2">You're not losing to the market.<br/>You're losing to yourself.</h2>
-  <p class="section-p">These four patterns account for 80%+ of avoidable F&O losses. Click any card to see the full psychology behind it — and what it's actually costing traders like you.</p>
+<!-- PATTERNS ──────────────────────────────────────────────────────── -->
+<section class="patterns" id="features">
+  <div class="section-overline">The patterns</div>
+  <h2 class="section-h2 reveal">You already know<br>what you're doing wrong.</h2>
+  <p class="section-sub reveal reveal-delay-1">You just can't stop yourself in the moment. TradeMentor catches these three patterns in real time — before the damage compounds.</p>
+  <div class="pattern-rows reveal reveal-delay-2">
+    <div class="pattern-row sev-high">
+      <div class="pattern-info">
+        <div class="pattern-name">Revenge Trading</div>
+        <div class="pattern-desc">Re-entering the same symbol minutes after a stop hit. Win rate drops to 19%.</div>
+      </div>
+      <div class="pattern-cost">−₹18,400<span>avg monthly loss</span></div>
+    </div>
+    <div class="pattern-row sev-med">
+      <div class="pattern-info">
+        <div class="pattern-name">Overtrading</div>
+        <div class="pattern-desc">After trade #7, your win rate falls to 31%. More trades means more damage.</div>
+      </div>
+      <div class="pattern-cost">−₹12,800<span>avg monthly loss</span></div>
+    </div>
+    <div class="pattern-row sev-low">
+      <div class="pattern-info">
+        <div class="pattern-name">Holding Losers</div>
+        <div class="pattern-desc">Cutting winners early, holding losers hoping they recover. They rarely do.</div>
+      </div>
+      <div class="pattern-cost">−₹9,200<span>avg monthly loss</span></div>
+    </div>
+  </div>
+</section>
 
-  <div class="problem-scroll" id="prob-grid">
-    <div class="prob-card" onclick="toggleProblem(this,'p1')">
-      <span class="prob-emoji">⚡</span>
-      <div class="prob-title">Revenge Trading</div>
-      <div class="prob-desc">You took a loss. Your brain says "get it back." You enter again — angry, larger, faster. It rarely ends well.</div>
-      <div class="prob-stat">−₹18,400</div>
-      <div class="prob-stat-label">avg monthly cost · Indian F&O traders</div>
-    </div>
-    <div class="prob-card" onclick="toggleProblem(this,'p2')">
-      <span class="prob-emoji">🔄</span>
-      <div class="prob-title">Overtrading</div>
-      <div class="prob-desc">Boredom. FOMO. Recovering losses. Each extra trade beyond your edge costs more than it earns.</div>
-      <div class="prob-stat">−₹12,800</div>
-      <div class="prob-stat-label">avg monthly cost · excess trades</div>
-    </div>
-    <div class="prob-card" onclick="toggleProblem(this,'p3')">
-      <span class="prob-emoji">⏳</span>
-      <div class="prob-title">Holding Losers</div>
-      <div class="prob-desc">Loss aversion is hardwired. We hold underwater positions 3× longer than winners, hoping they come back.</div>
-      <div class="prob-stat">−₹9,200</div>
-      <div class="prob-stat-label">avg monthly cost · late exits</div>
-    </div>
-    <div class="prob-card" onclick="toggleProblem(this,'p4')">
-      <span class="prob-emoji">🎰</span>
-      <div class="prob-title">Overconfidence</div>
-      <div class="prob-desc">You're up ₹12,000. You feel invincible. You size up, trade more. One trade erases the day.</div>
-      <div class="prob-stat">−₹7,600</div>
-      <div class="prob-stat-label">avg monthly cost · after win streaks</div>
+<!-- PRODUCT DEMO TABS ─────────────────────────────────────────────── -->
+<section class="demo">
+  <div class="demo-inner">
+    <div class="demo-header">
+      <div class="section-overline">The product</div>
+      <h2 class="section-h2 reveal">Everything you need to<br>trade your actual strategy.</h2>
     </div>
 
-    <div class="prob-detail" id="p1">
-      <div class="prob-detail-inner">
-        <div class="prob-detail-copy">
-          <h3>Why revenge trades are so expensive</h3>
-          <p>When you lose, cortisol spikes and your brain shifts into recovery mode. You stop evaluating setups rationally and start hunting to recover your loss. You ignore signals you'd normally respect, size up beyond your plan, and move faster than the market allows.</p>
-          <blockquote>"I knew I shouldn't have entered. I was still angry from the previous trade. But I did it anyway — and lost ₹22,000 in 8 minutes."<br/><br/>— Neel R., options trader, Pune</blockquote>
-        </div>
-        <div class="prob-detail-stats">
-          <div class="prob-detail-stat"><div class="prob-detail-stat-num" style="color:var(--loss);">−44%</div><div class="prob-detail-stat-label">Win rate drop when entering within 30 min of a loss</div></div>
-          <div class="prob-detail-stat"><div class="prob-detail-stat-num" style="color:var(--warning);">2.8×</div><div class="prob-detail-stat-label">Average position size during revenge trades vs normal entries</div></div>
-          <div class="prob-detail-stat"><div class="prob-detail-stat-num" style="color:var(--loss);">₹4,200</div><div class="prob-detail-stat-label">Average single-event cost of a revenge trade session</div></div>
+    <div class="demo-tabs">
+      <button class="demo-tab active" onclick="switchTab('alerts')">Live Alerts</button>
+      <button class="demo-tab" onclick="switchTab('coach')">AI Coach</button>
+      <button class="demo-tab" onclick="switchTab('analytics')">Analytics</button>
+      <button class="demo-tab" onclick="switchTab('shield')">Blowup Shield</button>
+    </div>
+
+    <!-- Tab: Live Alerts -->
+    <div class="demo-panel active" id="tab-alerts">
+      <div class="demo-panel-chrome">
+        <div class="chrome-dots"><span class="dot-r"></span><span class="dot-y"></span><span class="dot-g"></span></div>
+        <div class="chrome-url" style="font-size:10px;color:rgba(255,255,255,0.25)">TradeMentor — Alerts</div>
+      </div>
+      <div class="demo-panel-body">
+        <div class="alert-feed">
+          <div class="alert-item high">
+            <div class="alert-icon">⚡</div>
+            <div>
+              <div class="alert-badge">Revenge Trade · HIGH</div>
+              <div class="alert-desc">BANKNIFTY 48000 PE entered 3 min after your ₹−1,075 stop was hit. Win rate on your revenge trades: <strong>19%</strong> vs your normal 64%.</div>
+              <div class="alert-time">09:47 IST</div>
+            </div>
+          </div>
+          <div class="alert-item med">
+            <div class="alert-icon">⚠️</div>
+            <div>
+              <div class="alert-badge">Overtrading · MEDIUM</div>
+              <div class="alert-desc">This is your 9th trade today. Your win rate after trade #8 is <strong>31%</strong>. Consider stopping for the session.</div>
+              <div class="alert-time">11:22 IST</div>
+            </div>
+          </div>
+          <div class="alert-item low">
+            <div class="alert-icon">📌</div>
+            <div>
+              <div class="alert-badge">Holding Loser · MEDIUM</div>
+              <div class="alert-desc">NIFTY 22000 CE has been held 52 min past your average exit time. Currently −11.4%. Your avg recovery: <strong>less than 8%</strong> in this scenario.</div>
+              <div class="alert-time">14:31 IST</div>
+            </div>
+          </div>
         </div>
       </div>
     </div>
-    <div class="prob-detail" id="p2">
-      <div class="prob-detail-inner">
-        <div class="prob-detail-copy">
-          <h3>Your 9th trade is statistically your worst</h3>
-          <p>There's an optimal trade count per session for every trader — beyond that, you're creating activity, not trading an edge. Boredom, FOMO, and pressure to "make the day count" push traders into setups that don't exist. Each extra trade costs significantly more than it earns.</p>
-          <blockquote>"I was up ₹8,000 by noon. I kept watching the screen. By 3:15 I was down ₹2,000. I did 14 trades that day."<br/><br/>— Arjun S., intraday trader, Mumbai</blockquote>
-        </div>
-        <div class="prob-detail-stats">
-          <div class="prob-detail-stat"><div class="prob-detail-stat-num" style="color:var(--loss);">31%</div><div class="prob-detail-stat-label">Average win rate on trades 9–12 vs 72% on trades 1–4</div></div>
-          <div class="prob-detail-stat"><div class="prob-detail-stat-num" style="color:var(--warning);">₹840</div><div class="prob-detail-stat-label">Average cost per trade beyond your optimal session count</div></div>
-          <div class="prob-detail-stat"><div class="prob-detail-stat-num" style="color:var(--loss);">6.2×</div><div class="prob-detail-stat-label">How much more likely you are to overtrade after a morning win</div></div>
+
+    <!-- Tab: AI Coach -->
+    <div class="demo-panel" id="tab-coach">
+      <div class="demo-panel-chrome">
+        <div class="chrome-dots"><span class="dot-r"></span><span class="dot-y"></span><span class="dot-g"></span></div>
+        <div class="chrome-url" style="font-size:10px;color:rgba(255,255,255,0.25)">TradeMentor — AI Coach</div>
+      </div>
+      <div class="demo-panel-body">
+        <div class="coach-chat">
+          <div class="chat-bubble user">Why do I keep losing after my stop is hit?</div>
+          <div class="chat-bubble ai">Looking at your last 90 days: you re-enter within <span class="stat">4 minutes</span> of a stop hit <span class="stat">73%</span> of the time.<br><br>Win rate on those entries: <span class="stat">19%</span>. That means you lose on 4 out of 5 of these trades. The pattern has cost you <span class="stat">₹41,200</span> this quarter.</div>
+          <div class="chat-bubble user">What should I do about it?</div>
+          <div class="chat-bubble ai">One rule. After a stop hit, <strong>wait 15 minutes before entering anything</strong>.<br><br>Not 14. Not when it "feels right." 15 minutes. That's it.<br><br>You've already tried willpower. It doesn't work in the moment. A hard rule does.</div>
         </div>
       </div>
     </div>
-    <div class="prob-detail" id="p3">
-      <div class="prob-detail-inner">
-        <div class="prob-detail-copy">
-          <h3>Hope is not a stop-loss</h3>
-          <p>Loss aversion makes losses feel twice as painful as equivalent gains feel good. We hold losers far too long, telling ourselves "it'll come back," while cutting winners early to lock in the feeling of profit. F&O options traders are especially exposed — time decay works against holding losers.</p>
-          <blockquote>"I held BANKNIFTY PE from ₹280 down to ₹18. I kept averaging. I told myself it would reverse. It didn't."<br/><br/>— Priya M., options trader, Bangalore</blockquote>
-        </div>
-        <div class="prob-detail-stats">
-          <div class="prob-detail-stat"><div class="prob-detail-stat-num" style="color:var(--loss);">3.2×</div><div class="prob-detail-stat-label">How much longer traders hold losing positions vs winning ones</div></div>
-          <div class="prob-detail-stat"><div class="prob-detail-stat-num" style="color:var(--warning);">₹820</div><div class="prob-detail-stat-label">Extra loss per trade from delayed exits beyond optimal stop</div></div>
-          <div class="prob-detail-stat"><div class="prob-detail-stat-num" style="color:var(--loss);">68%</div><div class="prob-detail-stat-label">Of F&O positions that "recover" actually recover less than ₹500</div></div>
+
+    <!-- Tab: Analytics -->
+    <div class="demo-panel" id="tab-analytics">
+      <div class="demo-panel-chrome">
+        <div class="chrome-dots"><span class="dot-r"></span><span class="dot-y"></span><span class="dot-g"></span></div>
+        <div class="chrome-url" style="font-size:10px;color:rgba(255,255,255,0.25)">TradeMentor — Edge Map</div>
+      </div>
+      <div class="demo-panel-body">
+        <div style="margin-bottom:14px">
+          <div style="font-size:11px;font-weight:600;letter-spacing:0.07em;text-transform:uppercase;color:var(--text-muted);margin-bottom:14px">Setup Performance — Last 90 Days</div>
+          <div class="edge-chart">
+            <div class="edge-row">
+              <div class="edge-label">NIFTY PE momentum</div>
+              <div class="edge-bar-wrap"><div class="edge-bar pos" style="width:88%"></div></div>
+              <div class="edge-val pos">+₹3,240</div>
+            </div>
+            <div class="edge-row">
+              <div class="edge-label">Opening 5-min buy</div>
+              <div class="edge-bar-wrap"><div class="edge-bar pos" style="width:56%"></div></div>
+              <div class="edge-val pos">+₹1,840</div>
+            </div>
+            <div class="edge-row">
+              <div class="edge-label">Breakout pullback</div>
+              <div class="edge-bar-wrap"><div class="edge-bar pos" style="width:24%"></div></div>
+              <div class="edge-val pos">+₹820</div>
+            </div>
+            <div class="edge-row">
+              <div class="edge-label">Trend exhaustion</div>
+              <div class="edge-bar-wrap"><div class="edge-bar neg" style="width:16%"></div></div>
+              <div class="edge-val neg">−₹540</div>
+            </div>
+            <div class="edge-row">
+              <div class="edge-label">Revenge trades</div>
+              <div class="edge-bar-wrap"><div class="edge-bar neg" style="width:82%"></div></div>
+              <div class="edge-val neg">−₹2,890</div>
+            </div>
+          </div>
         </div>
       </div>
     </div>
-    <div class="prob-detail" id="p4">
-      <div class="prob-detail-inner">
-        <div class="prob-detail-copy">
-          <h3>A good morning is your riskiest time</h3>
-          <p>When you're up, dopamine floods your decision-making. You feel like you've "found your rhythm." You increase position sizes. You take setups you'd normally skip. Statistically, traders lose 68% of their morning gains in afternoon sessions driven by overconfidence.</p>
-          <blockquote>"I was up ₹22,000 at lunch. I thought I was untouchable. By close I gave back ₹18,000. That's happened three times this month."<br/><br/>— Vikram T., derivatives trader, Delhi</blockquote>
-        </div>
-        <div class="prob-detail-stats">
-          <div class="prob-detail-stat"><div class="prob-detail-stat-num" style="color:var(--loss);">68%</div><div class="prob-detail-stat-label">Of morning gains given back during overconfident afternoon sessions</div></div>
-          <div class="prob-detail-stat"><div class="prob-detail-stat-num" style="color:var(--warning);">2.4×</div><div class="prob-detail-stat-label">Average position size increase after 3+ consecutive winning trades</div></div>
-          <div class="prob-detail-stat"><div class="prob-detail-stat-num" style="color:var(--loss);">1 in 4</div><div class="prob-detail-stat-label">Strong mornings (₹10K+) that turn into net-loss days by 3:30</div></div>
+
+    <!-- Tab: Blowup Shield -->
+    <div class="demo-panel" id="tab-shield">
+      <div class="demo-panel-chrome">
+        <div class="chrome-dots"><span class="dot-r"></span><span class="dot-y"></span><span class="dot-g"></span></div>
+        <div class="chrome-url" style="font-size:10px;color:rgba(255,255,255,0.25)">TradeMentor — Blowup Shield</div>
+      </div>
+      <div class="demo-panel-body">
+        <div class="shield-layout">
+          <div class="shield-ring-wrap">
+            <svg width="140" height="140" viewBox="0 0 140 140">
+              <circle cx="70" cy="70" r="56" fill="none" stroke="rgba(255,255,255,0.05)" stroke-width="10"/>
+              <circle cx="70" cy="70" r="56" fill="none" stroke="var(--brand)" stroke-width="10"
+                stroke-linecap="round"
+                stroke-dasharray="352"
+                stroke-dashoffset="85"
+                transform="rotate(-90 70 70)"/>
+              <text x="70" y="64" text-anchor="middle" font-family="DM Mono,monospace" font-size="26" font-weight="500" fill="var(--text-primary)">76%</text>
+              <text x="70" y="82" text-anchor="middle" font-size="10" fill="var(--text-muted)" font-family="Inter,sans-serif">alerts heeded</text>
+            </svg>
+            <div class="shield-ring-label">This month · 23 alerts</div>
+          </div>
+          <div class="shield-stats">
+            <div class="shield-stat-row">
+              <span class="shield-stat-name">Daily loss limit</span>
+              <span class="shield-stat-val">₹4,200 / ₹12,000</span>
+              <div class="shield-stat-bar"><div class="shield-stat-fill" style="width:35%"></div></div>
+            </div>
+            <div class="shield-stat-row">
+              <span class="shield-stat-name">Trade count</span>
+              <span class="shield-stat-val">6 / 10 today</span>
+              <div class="shield-stat-bar"><div class="shield-stat-fill" style="width:60%"></div></div>
+            </div>
+            <div class="shield-stat-row warn">
+              <span class="shield-stat-name">Consecutive losses</span>
+              <span class="shield-stat-val">2 / 3 limit</span>
+              <div class="shield-stat-bar"><div class="shield-stat-fill" style="width:66%"></div></div>
+            </div>
+            <div class="shield-stat-row" style="background:rgba(20,184,166,0.06);border-color:rgba(20,184,166,0.18)">
+              <span class="shield-stat-name">Est. losses avoided</span>
+              <span class="shield-stat-val" style="color:var(--brand)">₹42,000</span>
+            </div>
+          </div>
         </div>
       </div>
     </div>
   </div>
 </section>
 
-<!-- ALERT FEED ────────────────────────────────────────────────────── -->
-<div class="alert-feed-section reveal">
-  <div class="alert-feed-inner">
-    <div class="alert-feed-left">
-      <div class="section-tag">Real-time awareness</div>
-      <h2>We see what you can't see about yourself.</h2>
-      <p style="margin-top:14px;">In the middle of a trade, your rational brain is offline. Cortisol, dopamine, fear — they're running the show. TradeMentor watches your behavior objectively and surfaces what you'd see clearly only in hindsight.</p>
-      <p style="margin-top:12px;font-size:13px;color:var(--text-tertiary);line-height:1.6;">These are actual alert types generated from real trading data. Not generic tips — your patterns, your numbers, your behavior history.</p>
-    </div>
-    <div class="alert-feed-right">
-      <div class="feed-header">
-        <div class="feed-live-dot"></div>
-        <div class="feed-title">TradeMentor · Live Alert Feed</div>
-        <div class="feed-time" id="feed-time">10:42 IST</div>
+<!-- WHATSAPP GUARDIAN ─────────────────────────────────────────────── -->
+<section class="guardian" id="guardian">
+  <div class="guardian-inner">
+    <div class="guardian-left reveal">
+      <div class="guardian-tag">
+        <svg width="12" height="12" viewBox="0 0 24 24" fill="#25D366"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347z"/><path d="M12 0C5.373 0 0 5.373 0 12c0 2.123.558 4.116 1.532 5.845L.057 23.944l6.245-1.634A11.96 11.96 0 0 0 12 24c6.627 0 12-5.373 12-12S18.627 0 12 0zm0 22c-1.894 0-3.668-.52-5.187-1.426l-.371-.219-3.705.97.987-3.605-.241-.381A9.958 9.958 0 0 1 2 12C2 6.477 6.477 2 12 2s10 4.477 10 10-4.477 10-10 10z"/></svg>
+        WhatsApp Guardian
       </div>
-      <div class="feed-list" id="feed-list"></div>
-    </div>
-  </div>
-</div>
-
-<!-- QUIZ ─────────────────────────────────────────────────────────── -->
-<section class="quiz-section reveal">
-  <div class="quiz-inner">
-    <div class="section-tag" style="text-align:center;">Know your type</div>
-    <h2 class="section-h2" style="text-align:center;font-size:36px;">Which trader are you?</h2>
-    <p style="text-align:center;color:var(--text-secondary);font-size:15px;margin-top:10px;">3 questions. 30 seconds. Your behavioral profile.</p>
-
-    <div class="quiz-card">
-      <div class="quiz-progress">
-        <div class="qp-dot active" id="qp1"></div>
-        <div class="qp-dot" id="qp2"></div>
-        <div class="qp-dot" id="qp3"></div>
-      </div>
-
-      <div class="quiz-step active" id="q1">
-        <div class="quiz-q">When you take a loss, what do you usually do next?</div>
-        <div class="quiz-opts">
-          <div class="quiz-opt" onclick="nextQ(1,'revenge')">Enter another trade within 30 minutes to recover the loss</div>
-          <div class="quiz-opt" onclick="nextQ(1,'disciplined')">Step away, review what happened, wait for a clean setup</div>
-          <div class="quiz-opt" onclick="nextQ(1,'hold')">Hold the position and wait — "it might come back"</div>
-          <div class="quiz-opt" onclick="nextQ(1,'unclear')">Depends. I don't really have a fixed rule</div>
+      <h2 class="guardian-h2">Someone who knows<br>when to stop you.</h2>
+      <p class="guardian-p">Add a family member or trusted friend as your Guardian. They get an instant WhatsApp alert when TradeMentor detects a dangerous pattern — before the damage is done.</p>
+      <div class="guardian-bullets">
+        <div class="guardian-bullet">
+          <div class="guardian-bullet-dot"></div>
+          <div><strong>Real-time alerts</strong> — Guardian gets notified within seconds of a detection</div>
+        </div>
+        <div class="guardian-bullet">
+          <div class="guardian-bullet-dot"></div>
+          <div><strong>Context included</strong> — Not just an alert but exactly what happened and why it's risky</div>
+        </div>
+        <div class="guardian-bullet">
+          <div class="guardian-bullet-dot"></div>
+          <div><strong>No trading access</strong> — Guardian can only see behavior alerts, nothing else</div>
+        </div>
+        <div class="guardian-bullet">
+          <div class="guardian-bullet-dot"></div>
+          <div><strong>Accountability that works</strong> — Willpower fails. A human in the loop doesn't.</div>
         </div>
       </div>
-
-      <div class="quiz-step" id="q2">
-        <div class="quiz-q">On a day you're already up ₹10,000+ by noon, you:</div>
-        <div class="quiz-opts">
-          <div class="quiz-opt" onclick="nextQ(2,'overconfident')">Keep going — when you're hot, you're hot. Take more trades.</div>
-          <div class="quiz-opt" onclick="nextQ(2,'disciplined')">Stick to your plan and stop when you hit your daily target</div>
-          <div class="quiz-opt" onclick="nextQ(2,'fearful')">Get nervous and start booking small profits too early</div>
-          <div class="quiz-opt" onclick="nextQ(2,'unclear')">Honestly, I don't have a clear plan for this</div>
+    </div>
+    <div class="guardian-right reveal reveal-delay-1">
+      <div class="wa-phone" id="wa-phone">
+        <div class="wa-header">
+          <div class="wa-avatar">🛡</div>
+          <div>
+            <div class="wa-title">TradeMentor Guardian</div>
+            <div class="wa-sub">Arjun · Mom · 2 members</div>
+          </div>
+        </div>
+        <div class="wa-body">
+          <div class="wa-msg incoming" id="wa-msg-1">
+            <div class="wa-sender">TradeMentor</div>
+            ⚡ <strong>Revenge Trade Alert</strong><br>
+            Arjun entered BANKNIFTY 48000 PE 3 min after a ₹−1,075 stop hit.<br>
+            Win rate on these trades: 19%.
+            <div class="wa-time">10:08 AM ✓✓</div>
+          </div>
+          <div class="wa-msg outgoing" id="wa-msg-2">
+            Beta please stop trading today 🙏
+            <div class="wa-time">10:09 AM ✓</div>
+          </div>
+          <div class="wa-msg incoming" id="wa-msg-3">
+            <div class="wa-sender">Arjun</div>
+            Stopping now 😮‍💨
+            <div class="wa-time">10:09 AM ✓✓</div>
+          </div>
         </div>
       </div>
-
-      <div class="quiz-step" id="q3">
-        <div class="quiz-q">When you reflect on your losses, they're usually because:</div>
-        <div class="quiz-opts">
-          <div class="quiz-opt" onclick="showResult('emotional')">I knew I shouldn't have done it, but did it anyway</div>
-          <div class="quiz-opt" onclick="showResult('reactive')">Market moved unexpectedly — bad luck or wrong read</div>
-          <div class="quiz-opt" onclick="showResult('overtrade')">I took too many trades on that day</div>
-          <div class="quiz-opt" onclick="showResult('unclear')">I don't really track why I lose — that's the problem</div>
-        </div>
-      </div>
-
-      <div class="quiz-result" id="quiz-result">
-        <div class="result-badge" id="result-badge">⚡ Revenge Trader</div>
-        <div class="result-title" id="result-title">You're an Emotional Reactor</div>
-        <div class="result-desc" id="result-desc">Your losses follow a clear emotional pattern.</div>
-        <div class="result-cost">
-          <div class="result-cost-num" id="result-cost-num">−₹18,400</div>
-          <div class="result-cost-label" id="result-cost-label">estimated monthly cost of this pattern</div>
-        </div>
-        <button class="cta-zerodha" style="width:100%;justify-content:center;" onclick="window.location='dashboard.html'">
-          See my actual behavior → Connect Zerodha
-        </button>
-      </div>
-    </div>
-  </div>
-</section>
-
-<!-- HOW IT WORKS ──────────────────────────────────────────────────── -->
-<section class="how-section reveal" id="how">
-  <div class="how-inner">
-    <div class="section-tag">How it works</div>
-    <h2 class="section-h2" style="font-size:36px;">Up and running in 60 seconds.</h2>
-    <div class="how-steps">
-      <div class="how-step">
-        <div class="how-num-wrap"><div class="how-num">01</div><div class="how-connector"></div></div>
-        <div class="how-step-title">Connect your Zerodha account</div>
-        <div class="how-step-desc">OAuth login. Read-only. We pull your trade history and watch live orders via Zerodha's official API. We see what you traded — nothing more.</div>
-        <div class="how-step-note">🔒 We never place orders, never access funds, never store credentials. Disconnect in one click.</div>
-      </div>
-      <div class="how-step">
-        <div class="how-num-wrap"><div class="how-num">02</div><div class="how-connector"></div></div>
-        <div class="how-step-title">TradeMentor analyzes every trade</div>
-        <div class="how-step-desc">22 behavioral patterns — revenge trading, overtrading, loss aversion, FOMO, no stop-loss — analyzed in real time as you trade.</div>
-        <div class="how-step-note">📊 Day 1 you get defaults. After 10+ trades, TradeMentor learns YOUR specific behavior thresholds.</div>
-      </div>
-      <div class="how-step">
-        <div class="how-num-wrap"><div class="how-num">03</div></div>
-        <div class="how-step-title">You see yourself clearly</div>
-        <div class="how-step-desc">Real-time alerts when you're about to repeat a costly pattern. Weekly behavioral reports. An AI coach grounded in your actual trades.</div>
-        <div class="how-step-note">🪞 We don't block you. We don't restrict you. We show you the mirror and let you decide.</div>
-      </div>
-    </div>
-  </div>
-</section>
-
-<!-- PRODUCT DEMO ──────────────────────────────────────────────────── -->
-<section class="demo-section reveal">
-  <div class="section-tag">Product tour</div>
-  <h2 class="section-h2" style="font-size:36px;">See inside TradeMentor</h2>
-  <div class="demo-nav">
-    <button class="demo-btn active" onclick="setDemo(this,'d-alerts')">🚨 Behavioral Alerts</button>
-    <button class="demo-btn" onclick="setDemo(this,'d-coach')">🧠 AI Coach</button>
-    <button class="demo-btn" onclick="setDemo(this,'d-analytics')">📊 Analytics</button>
-    <button class="demo-btn" onclick="setDemo(this,'d-shield')">🛡️ Blowup Shield</button>
-  </div>
-  <div class="demo-panels">
-    <div class="demo-panel active" id="d-alerts">
-      <div style="font-size:12px;color:var(--text-tertiary);margin-bottom:14px;">Live · Today · Rohit's session · 3 alerts generated</div>
-      <div class="da"><div class="da-bar" style="background:var(--loss)"></div><div class="da-body"><div class="da-title">Revenge Trade Risk — High Severity</div><div class="da-desc">Entering BANKNIFTY 48000 PE 38 min after ₹−4,200 loss. <strong>Your win rate in this window: 22%</strong> — vs your normal 65%. Last 10 post-loss entries: 8 were losing trades.</div><div class="da-footer"><span class="da-time">11:04 IST</span><span class="da-sev sev-h">High risk</span><span class="da-sev sev-h">Est. cost: ₹−2,800</span></div></div></div>
-      <div class="da"><div class="da-bar" style="background:var(--warning)"></div><div class="da-body"><div class="da-title">Approaching Daily Trade Limit</div><div class="da-desc">8 of 10 trades used today. <strong>Your win rate drops to 31% after trade #8</strong> — 71% for trades 1–4. Is the next setup genuinely yours, or are you forcing it?</div><div class="da-footer"><span class="da-time">10:52 IST</span><span class="da-sev sev-m">Medium</span></div></div></div>
-      <div class="da"><div class="da-bar" style="background:var(--brand)"></div><div class="da-body"><div class="da-title">Strong Session — Pattern Warning</div><div class="da-desc">Up ₹+8,420 today. On your 12 best mornings in 90 days, <strong>you gave back 68% of gains by close on 8 of them</strong>. Right now, your biggest risk is yourself.</div><div class="da-footer"><span class="da-time">10:30 IST</span><span class="da-sev sev-i">Insight</span></div></div></div>
-    </div>
-    <div class="demo-panel" id="d-coach">
-      <div style="font-size:12px;color:var(--text-tertiary);margin-bottom:14px;">AI Coach · Grounded in your last 90 days · Not generic advice</div>
-      <div class="coach-q">💬 "Why do I keep losing on BANKNIFTY even though my NIFTY trades are profitable?"</div>
-      <div class="coach-a">
-        <div class="coach-a-header">TRADEMENTOR ·</div>
-        <div class="coach-a-body">Your BANKNIFTY entries are concentrated between <strong>11:30–12:15 IST</strong> — your worst window (28% WR). Your NIFTY edge is entirely in 9:20–10:30 where you have 71% WR. Same approach, very different window.<br/><br/>Also: your BANKNIFTY position size is <strong>40% larger</strong> than NIFTY — every loss costs more. Worst instrument, worst window, biggest sizes. That's the full picture.</div>
-      </div>
-    </div>
-    <div class="demo-panel" id="d-analytics">
-      <div style="font-size:12px;color:var(--text-tertiary);margin-bottom:16px;">30D analytics · Win rate by emotional state tagged at trade entry</div>
-      <div class="mbc-row"><div class="mbc-label">😌 Calm &amp; rested</div><div class="mbc-track"><div class="mbc-fill" style="width:74%;background:var(--profit)"></div></div><div class="mbc-val" style="color:var(--profit)">74% WR</div></div>
-      <div class="mbc-row"><div class="mbc-label">🎯 Focused</div><div class="mbc-track"><div class="mbc-fill" style="width:63%;background:var(--profit)"></div></div><div class="mbc-val" style="color:var(--profit)">63% WR</div></div>
-      <div class="mbc-row"><div class="mbc-label">😐 Neutral</div><div class="mbc-track"><div class="mbc-fill" style="width:48%;background:var(--warning)"></div></div><div class="mbc-val" style="color:var(--warning)">48% WR</div></div>
-      <div class="mbc-row"><div class="mbc-label">🎰 Overconfident</div><div class="mbc-track"><div class="mbc-fill" style="width:38%;background:var(--warning)"></div></div><div class="mbc-val" style="color:var(--warning)">38% WR</div></div>
-      <div class="mbc-row"><div class="mbc-label">😤 Frustrated</div><div class="mbc-track"><div class="mbc-fill" style="width:18%;background:var(--loss)"></div></div><div class="mbc-val" style="color:var(--loss)">18% WR</div></div>
-      <div style="margin-top:16px;padding:12px 14px;background:var(--bg-elevated);border:1px solid var(--border-subtle);border-radius:8px;font-size:12px;color:var(--text-secondary);line-height:1.55;">💡 Frustrated-state trades cost ₹3,120 each vs +₹2,840 when calm. That's a ₹5,960 swing per trade. The setup isn't the problem — the mental state is.</div>
-    </div>
-    <div class="demo-panel" id="d-shield">
-      <div style="font-size:12px;color:var(--text-tertiary);margin-bottom:14px;">Blowup Shield · Protecting your monthly P&amp;L from single-day disasters</div>
-      <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px;margin-bottom:14px;">
-        <div style="background:var(--bg-elevated);border:1px solid var(--border-subtle);border-radius:8px;padding:12px;"><div style="font-size:9px;font-weight:600;letter-spacing:0.07em;text-transform:uppercase;color:var(--text-tertiary);margin-bottom:6px;">Daily Loss</div><div style="font-family:'DM Mono',monospace;font-size:20px;font-weight:500;color:var(--profit);">₹0</div><div style="font-size:10px;color:var(--text-tertiary);margin:3px 0 6px;">of ₹10,000 limit</div><div style="height:3px;background:var(--border-subtle);border-radius:99px;"></div></div>
-        <div style="background:var(--bg-elevated);border:1px solid var(--border-subtle);border-radius:8px;padding:12px;"><div style="font-size:9px;font-weight:600;letter-spacing:0.07em;text-transform:uppercase;color:var(--text-tertiary);margin-bottom:6px;">Trades</div><div style="font-family:'DM Mono',monospace;font-size:20px;font-weight:500;">4 / 10</div><div style="font-size:10px;color:var(--text-tertiary);margin:3px 0 6px;">40% used</div><div style="height:3px;background:var(--border-subtle);border-radius:99px;overflow:hidden;"><div style="height:100%;width:40%;background:var(--brand);border-radius:99px;"></div></div></div>
-        <div style="background:var(--bg-elevated);border:1px solid var(--border-subtle);border-radius:8px;padding:12px;"><div style="font-size:9px;font-weight:600;letter-spacing:0.07em;text-transform:uppercase;color:var(--text-tertiary);margin-bottom:6px;">Clean Streak</div><div style="font-family:'DM Mono',monospace;font-size:20px;font-weight:500;color:var(--profit);">14 days</div><div style="font-size:10px;color:var(--text-tertiary);margin:3px 0 6px;">no blowup days</div><div style="height:3px;background:var(--border-subtle);border-radius:99px;overflow:hidden;"><div style="height:100%;width:100%;background:var(--profit);border-radius:99px;"></div></div></div>
-      </div>
-      <div style="background:rgba(34,197,94,0.08);border:1px solid rgba(34,197,94,0.2);border-radius:8px;padding:12px 14px;font-size:13px;color:#22C55E;">✓ TradeMentor estimates ₹42,000 in losses prevented this month based on 15 alerts you heeded. 14-day streak of staying within limits.</div>
     </div>
   </div>
 </section>
 
 <!-- TESTIMONIALS ──────────────────────────────────────────────────── -->
-<section class="social-section reveal">
-  <div class="social-inner">
-    <div class="section-tag">From traders</div>
-    <h2 class="section-h2" style="font-size:36px;">What changed when they<br/>started seeing their patterns</h2>
-    <div class="testimonials">
-      <div class="testimonial">
-        <div class="t-stars">★★★★★</div>
-        <div class="t-quote">"I thought I was a decent trader. TradeMentor showed me I take revenge trades <strong>every single day</strong>, and they cost me ₹18,000 last month alone. I didn't know I was doing it that systematically."</div>
-        <div class="t-author"><div class="t-avatar" style="background:linear-gradient(135deg,#14B8A6,#0284C7);">N</div><div><div class="t-name">Neel R.</div><div class="t-role">Options trader · Pune · 4 yrs exp.</div></div></div>
+<section class="testimonials">
+  <div class="testimonials-inner">
+    <div class="testi-header">
+      <div class="section-overline">From traders</div>
+      <h2 class="section-h2 reveal">What changed for them.</h2>
+    </div>
+    <div class="testi-grid">
+      <div class="testi-card reveal">
+        <p class="testi-quote">"My last 3 bad days caused <strong>67% of my monthly losses</strong>. TradeMentor told me this within 5 minutes of connecting. I didn't believe it. The data was right."</p>
+        <div class="testi-outcome">Identified top 3 loss patterns in 1 session</div>
+        <div class="testi-author">
+          <div class="testi-avatar">N</div>
+          <div>
+            <div class="testi-name">Neel R.</div>
+            <div class="testi-role">F&amp;O trader · Pune · 3 years</div>
+          </div>
+        </div>
       </div>
-      <div class="testimonial">
-        <div class="t-stars">★★★★★</div>
-        <div class="t-quote">"The AI coach looked at my actual data and told me exactly what time window I shouldn't trade BANKNIFTY. <strong>My win rate went from 38% to 54% in that instrument</strong> in a month."</div>
-        <div class="t-author"><div class="t-avatar" style="background:linear-gradient(135deg,#F59E0B,#EF4444);">A</div><div><div class="t-name">Arjun S.</div><div class="t-role">Intraday trader · Mumbai · 6 yrs exp.</div></div></div>
+      <div class="testi-card reveal reveal-delay-1">
+        <p class="testi-quote">"BANKNIFTY win rate went from <strong>38% to 54%</strong> in 30 days. I didn't change my strategy. I just stopped entering within 5 minutes of a stop hit."</p>
+        <div class="testi-outcome">WR +16% in 30 days · Same setup, fewer mistakes</div>
+        <div class="testi-author">
+          <div class="testi-avatar">A</div>
+          <div>
+            <div class="testi-name">Arjun S.</div>
+            <div class="testi-role">Intraday options · Mumbai · 5 years</div>
+          </div>
+        </div>
       </div>
-      <div class="testimonial">
-        <div class="t-stars">★★★★★</div>
-        <div class="t-quote">"I kept breaking my ₹10,000 daily loss limit. After TradeMentor started alerting me at 70%, <strong>I've had 14 straight days within limits</strong>. First time in two years."</div>
-        <div class="t-author"><div class="t-avatar" style="background:linear-gradient(135deg,#8B5CF6,#EC4899);">P</div><div><div class="t-name">Priya M.</div><div class="t-role">F&amp;O trader · Bangalore · 2 yrs exp.</div></div></div>
+      <div class="testi-card reveal reveal-delay-2">
+        <p class="testi-quote">"<strong>14 consecutive days</strong> within my daily loss limit. First time in 2 years. The Guardian WhatsApp is the only thing that actually kept me honest."</p>
+        <div class="testi-outcome">14-day discipline streak · First time ever</div>
+        <div class="testi-author">
+          <div class="testi-avatar">P</div>
+          <div>
+            <div class="testi-name">Priya M.</div>
+            <div class="testi-role">Options writer · Bangalore · 2 years</div>
+          </div>
+        </div>
       </div>
     </div>
   </div>
 </section>
 
 <!-- PRICING ───────────────────────────────────────────────────────── -->
-<section class="pricing-section reveal" id="pricing">
-  <div style="text-align:center;">
-    <div class="section-tag" style="text-align:center;">Pricing</div>
-    <h2 class="section-h2" style="font-size:36px;text-align:center;">Less than one bad trade</h2>
-    <p style="text-align:center;color:var(--text-secondary);font-size:15px;margin-top:10px;max-width:440px;margin-left:auto;margin-right:auto;">Pro costs ₹499/month. One heeded alert saves an average of ₹2,800. Do the math.</p>
-  </div>
-  <div class="pricing-grid">
-    <div class="price-card">
-      <div class="price-tier">Free Forever</div>
-      <div class="price-val"><sup>₹</sup>0</div>
-      <div class="price-period">No credit card · Always free</div>
-      <div class="price-divider"></div>
-      <div class="price-features">
-        <div class="pf yes"><svg viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"/></svg>Zerodha sync (30 days history)</div>
-        <div class="pf yes"><svg viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"/></svg>8 core behavioral patterns</div>
-        <div class="pf yes"><svg viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"/></svg>Real-time session alerts</div>
-        <div class="pf yes"><svg viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"/></svg>Daily P&amp;L analytics</div>
-        <div class="pf no"><svg viewBox="0 0 24 24"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>AI coach (5/month only)</div>
-        <div class="pf no"><svg viewBox="0 0 24 24"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>All 22 patterns + deep analytics</div>
-        <div class="pf no"><svg viewBox="0 0 24 24"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>WhatsApp alerts + Blowup Shield</div>
-      </div>
-      <button class="price-cta-btn ghost" onclick="window.location='dashboard.html'">Start for free</button>
+<section class="pricing" id="pricing">
+  <div class="pricing-inner">
+    <div class="pricing-header">
+      <div class="section-overline">Pricing</div>
+      <h2 class="section-h2 reveal">Start free.<br>Upgrade when it pays for itself.</h2>
     </div>
-    <div class="price-card featured">
-      <div class="popular-badge">MOST POPULAR</div>
-      <div class="price-tier" style="color:var(--brand);">Pro</div>
-      <div class="price-val"><sup>₹</sup>499<sub>/mo</sub></div>
-      <div class="price-period">14-day free trial · Cancel anytime</div>
-      <div class="price-divider"></div>
-      <div class="price-features">
-        <div class="pf yes"><svg viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"/></svg>Everything in Free</div>
-        <div class="pf yes"><svg viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"/></svg>All 22 behavioral patterns</div>
-        <div class="pf yes"><svg viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"/></svg>Unlimited AI coaching</div>
-        <div class="pf yes"><svg viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"/></svg>90-day deep analytics</div>
-        <div class="pf yes"><svg viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"/></svg>WhatsApp alerts (real-time)</div>
-        <div class="pf yes"><svg viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"/></svg>Blowup Shield + Daily Guardian</div>
-        <div class="pf yes"><svg viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"/></svg>Edge Map + Expiry analysis</div>
+    <div class="pricing-grid">
+      <div class="pricing-card reveal">
+        <div class="pricing-plan">Free</div>
+        <div class="pricing-price">₹0</div>
+        <div class="pricing-period">Forever free</div>
+        <ul class="pricing-features">
+          <li>Behavioral alerts (live)</li>
+          <li>30-day trade analytics</li>
+          <li>1 Zerodha account</li>
+          <li>Pattern history</li>
+          <li class="muted">AI Coach</li>
+          <li class="muted">WhatsApp Guardian</li>
+          <li class="muted">Blowup Shield</li>
+        </ul>
+        <button class="pricing-cta" onclick="window.location='dashboard.html'">Get Started Free</button>
       </div>
-      <button class="price-cta-btn primary" onclick="window.location='dashboard.html'">Start 14-day free trial →</button>
-      <div style="text-align:center;font-size:11px;color:var(--text-tertiary);margin-top:10px;">No card required for trial</div>
+      <div class="pricing-card featured reveal reveal-delay-1">
+        <div class="pricing-badge">Most popular</div>
+        <div class="pricing-plan">Pro</div>
+        <div class="pricing-price"><sup>₹</sup>499<sub>/mo</sub></div>
+        <div class="pricing-period">14-day free trial · Cancel anytime</div>
+        <ul class="pricing-features">
+          <li>Everything in Free</li>
+          <li>AI Coach (unlimited)</li>
+          <li>WhatsApp Guardian</li>
+          <li>Blowup Shield + limits</li>
+          <li>6-month analytics</li>
+          <li>Edge Map</li>
+          <li>Priority support</li>
+        </ul>
+        <button class="pricing-cta primary" onclick="window.location='dashboard.html'">Start 14-Day Trial</button>
+      </div>
     </div>
   </div>
 </section>
 
 <!-- FINAL CTA ─────────────────────────────────────────────────────── -->
-<div class="final-cta">
+<section class="final-cta">
   <div class="final-cta-inner">
-    <div class="hero-pill" style="justify-content:center;margin-bottom:20px;"><span></span>Free to start · No fund access</div>
-    <h2 class="final-h2">Your next bad trade<br/>is predictable.</h2>
-    <p class="final-sub">You've made it before. The pattern is already in your data. TradeMentor will find it, show it to you, and alert you the next time you're about to repeat it.</p>
-    <div class="final-btns">
-      <button class="cta-zerodha" onclick="window.location='dashboard.html'">
+    <div class="section-overline" style="text-align:center">Ready?</div>
+    <h2 class="reveal">Stop repeating the same mistake.</h2>
+    <p class="reveal reveal-delay-1">Connect your Zerodha in under 2 minutes. See your behavioral patterns immediately. Free to start.</p>
+    <div class="final-cta-btns reveal reveal-delay-2">
+      <button class="cta-primary" onclick="window.location='dashboard.html'">
         <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>
-        Connect Zerodha — it's free
+        Connect Zerodha — Free
       </button>
       <button class="cta-google" onclick="window.location='dashboard.html'">
         <svg width="15" height="15" viewBox="0 0 24 24"><path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" fill="#4285F4"/><path d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" fill="#34A853"/><path d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z" fill="#FBBC05"/><path d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z" fill="#EA4335"/></svg>
@@ -1006,106 +1282,55 @@
       </button>
     </div>
   </div>
-</div>
+</section>
 
 <!-- FOOTER ────────────────────────────────────────────────────────── -->
 <footer class="footer">
-  <div class="footer-inner">
-    <div>
-      <div class="nav-logo" style="margin-bottom:12px;">
-        <div class="logo-mark"><svg viewBox="0 0 24 24"><polyline points="3 17 9 11 13 15 21 7"/><polyline points="14 7 21 7 21 14"/></svg></div>
-        <span class="wordmark">TradeMentor <span>AI</span></span>
+  <div class="footer-grid">
+    <div class="footer-brand">
+      <div class="nav-logo">
+        <div class="logo-mark">
+          <svg viewBox="0 0 24 24"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>
+        </div>
+        <span class="wordmark">Trade<span>Mentor</span></span>
       </div>
-      <p style="font-size:12px;color:var(--text-tertiary);line-height:1.6;max-width:180px;margin-bottom:12px;">Behavioral intelligence for Indian F&amp;O traders. Mirror, not blocker.</p>
-      <p style="font-size:11px;color:var(--text-tertiary);line-height:1.55;max-width:200px;">Not SEBI-registered. No investment advice. Behavioral analysis only.</p>
+      <p>Behavioral analysis for Indian F&amp;O traders. Mirror, not blocker.</p>
     </div>
-    <div><div class="fc-label">Product</div><div class="fc-links"><a href="#">Features</a><a href="#">Pricing</a><a href="#">Changelog</a><a href="#">Roadmap</a></div></div>
-    <div><div class="fc-label">Company</div><div class="fc-links"><a href="#">About</a><a href="#">Blog</a><a href="#">Contact</a></div></div>
-    <div><div class="fc-label">Legal</div><div class="fc-links"><a href="#">Privacy Policy</a><a href="#">Terms of Service</a><a href="#">SEBI Disclosure</a><a href="#">Data Security</a></div></div>
+    <div class="footer-col">
+      <h4>Product</h4>
+      <a href="#">Live Alerts</a>
+      <a href="#">AI Coach</a>
+      <a href="#">Analytics</a>
+      <a href="#">Blowup Shield</a>
+      <a href="#">Guardian</a>
+    </div>
+    <div class="footer-col">
+      <h4>Company</h4>
+      <a href="#">About</a>
+      <a href="#">Blog</a>
+      <a href="#">Careers</a>
+      <a href="#">Contact</a>
+    </div>
+    <div class="footer-col">
+      <h4>Legal</h4>
+      <a href="#">Terms of Service</a>
+      <a href="#">Privacy Policy</a>
+      <a href="#">DPDP Compliance</a>
+      <a href="#">SEBI Disclaimer</a>
+    </div>
   </div>
   <div class="footer-bottom">
-    <span>© 2025 TradeMentor AI</span>
-    <span>Made in India 🇮🇳</span>
+    <div>© 2025 TradeMentor AI. Not SEBI registered. For informational purposes only. Past behavioral patterns do not guarantee future outcomes.</div>
+    <div style="display:flex;gap:16px">
+      <a href="#">Terms</a>
+      <a href="#">Privacy</a>
+      <a href="#">Contact</a>
+    </div>
   </div>
 </footer>
 
 <script>
-// HERO ANIMATION — Mini App Frame
-function initHeroAnim() {
-  const frame   = document.getElementById('mini-app');
-  const pnlEl   = document.getElementById('anim-pnl-val');
-  const posRow  = document.getElementById('anim-pos-row');
-  const alertEl = document.getElementById('anim-alert');
-  const posPnl  = document.getElementById('anim-pos-pnl');
-  if (!frame) return;
-
-  const SESSION_START = 22400, SESSION_END = -3100;
-
-  function fmtSession(v) {
-    const abs = Math.abs(Math.round(v)).toLocaleString('en-IN');
-    return v >= 0 ? '+₹' + abs : '−₹' + abs;
-  }
-
-  function tickDown(cb) {
-    const dur = 2600, t0 = performance.now();
-    function frame(now) {
-      const p = Math.min((now - t0) / dur, 1);
-      const e = p * p; // ease-in — feels like panic bleed
-      const v = SESSION_START + (SESSION_END - SESSION_START) * e;
-      pnlEl.textContent = fmtSession(v);
-      pnlEl.style.color = v >= 0 ? '#22C55E' : '#EF4444';
-      // track pos P&L too: starts at -1130, worsens to -4800
-      const posV = -1130 + (-4800 - -1130) * e;
-      posPnl.textContent = '−₹' + Math.abs(Math.round(posV)).toLocaleString('en-IN');
-      p < 1 ? requestAnimationFrame(frame) : cb && cb();
-    }
-    requestAnimationFrame(frame);
-  }
-
-  function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
-
-  function reset() {
-    frame.classList.remove('show', 'fade-out');
-    posRow.classList.remove('show', 'new-entry');
-    alertEl.classList.remove('show', 'fade-out');
-    pnlEl.textContent = '+₹22,400';
-    pnlEl.style.color = '#22C55E';
-    posPnl.textContent = '−₹1,130';
-  }
-
-  async function run() {
-    reset();
-    await sleep(300);
-
-    // Step 1: frame fades in — user sees 2 static rows (real data feel)
-    frame.classList.add('show');
-    await sleep(1800);
-
-    // Step 2: new position slides in, teal new-entry highlight
-    posRow.classList.add('show');
-    await sleep(280);
-    posRow.classList.add('new-entry');
-    await sleep(1200);
-
-    // Step 3: TradeMentor detects — alert slides down
-    alertEl.classList.add('show');
-    await sleep(1000);
-
-    // Step 4: P&L bleeds red, ease-in panic feel
-    await new Promise(tickDown);
-    await sleep(2500);
-
-    // Step 5: fade frame out, reset, loop
-    frame.classList.add('fade-out');
-    await sleep(700);
-
-    run();
-  }
-
-  run();
-}
-
-// THEME
+// ── THEME ──────────────────────────────────────────────────────────
 function toggleTheme() {
   const html = document.documentElement;
   const next = html.getAttribute('data-theme') === 'dark' ? 'light' : 'dark';
@@ -1121,103 +1346,111 @@ const _saved = localStorage.getItem('tm-theme') || 'dark';
 document.documentElement.setAttribute('data-theme', _saved);
 updateThemeIcon(_saved);
 
-// CALCULATOR
-let calcTotal = 0;
-function toggleHabit(row, cost) {
-  const check = row.querySelector('.habit-check');
-  const costEl = row.querySelector('.habit-cost');
-  const checked = check.classList.toggle('checked');
-  costEl.classList.toggle('active', checked);
-  calcTotal = checked ? calcTotal + cost : calcTotal - cost;
-  const el = document.getElementById('calc-total');
-  el.textContent = calcTotal === 0 ? '₹0' : '−₹' + calcTotal.toLocaleString('en-IN');
-  el.className = 'calc-result-val ' + (calcTotal === 0 ? 'zero' : '');
-  const ctaRow = document.getElementById('calc-cta');
-  if (calcTotal > 0) {
-    ctaRow.style.display = 'flex';
-    document.getElementById('calc-save-est').textContent = '₹' + Math.round(calcTotal * 0.6).toLocaleString('en-IN');
-  } else {
-    ctaRow.style.display = 'none';
+// ── HERO ANIMATION ─────────────────────────────────────────────────
+function initHeroAnim() {
+  const frame   = document.getElementById('mini-app');
+  const pnlEl   = document.getElementById('anim-pnl-val');
+  const posRow  = document.getElementById('anim-pos-row');
+  const alertEl = document.getElementById('anim-alert');
+  const posPnl  = document.getElementById('anim-pos-pnl');
+  if (!frame) return;
+
+  const SESSION_START = 22400, SESSION_END = -3100;
+
+  function fmt(v) {
+    const abs = Math.abs(Math.round(v)).toLocaleString('en-IN');
+    return v >= 0 ? '+₹' + abs : '−₹' + abs;
   }
+
+  function tickDown(resolve) {
+    const dur = 2600, t0 = performance.now();
+    function tick(now) {
+      const p = Math.min((now - t0) / dur, 1);
+      const e = p * p;
+      const sv = SESSION_START + (SESSION_END - SESSION_START) * e;
+      pnlEl.textContent = fmt(sv);
+      pnlEl.style.color = sv >= 0 ? '#22C55E' : '#EF4444';
+      const pv = -1130 + (-4800 - -1130) * e;
+      posPnl.textContent = '−₹' + Math.abs(Math.round(pv)).toLocaleString('en-IN');
+      p < 1 ? requestAnimationFrame(tick) : resolve();
+    }
+    requestAnimationFrame(tick);
+  }
+
+  function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
+
+  function reset() {
+    frame.classList.remove('show', 'fade-out');
+    posRow.classList.remove('show', 'new-entry');
+    alertEl.classList.remove('show');
+    pnlEl.textContent = '+₹22,400';
+    pnlEl.style.color = '#22C55E';
+    posPnl.textContent = '−₹1,130';
+  }
+
+  async function run() {
+    reset();
+    await sleep(500);
+    frame.classList.add('show');          // frame appears: 2 static rows visible
+    await sleep(2000);
+    posRow.classList.add('show');          // new position slides in
+    await sleep(300);
+    posRow.classList.add('new-entry');     // teal highlight
+    await sleep(1100);
+    alertEl.classList.add('show');         // alert drops from top
+    await sleep(800);
+    await new Promise(tickDown);           // P&L bleeds red
+    await sleep(2600);
+    frame.classList.add('fade-out');
+    await sleep(600);
+    run();
+  }
+
+  run();
+}
+initHeroAnim();
+
+// ── DEMO TABS ──────────────────────────────────────────────────────
+function switchTab(id) {
+  document.querySelectorAll('.demo-tab').forEach((t, i) => {
+    const ids = ['alerts','coach','analytics','shield'];
+    t.classList.toggle('active', ids[i] === id);
+  });
+  document.querySelectorAll('.demo-panel').forEach(p => p.classList.remove('active'));
+  document.getElementById('tab-' + id).classList.add('active');
 }
 
-// PROBLEM CARDS
-let activeProb = null;
-function toggleProblem(card, id) {
-  const detail = document.getElementById(id);
-  document.querySelectorAll('.prob-card').forEach(c => c.classList.remove('active'));
-  document.querySelectorAll('.prob-detail').forEach(d => d.classList.remove('show'));
-  if (activeProb === id) { activeProb = null; return; }
-  card.classList.add('active');
-  detail.classList.add('show');
-  activeProb = id;
-}
+// ── WHATSAPP ANIMATION (on scroll) ─────────────────────────────────
+function initWaAnim() {
+  const phone = document.getElementById('wa-phone');
+  if (!phone) return;
+  const msgs = ['wa-msg-1','wa-msg-2','wa-msg-3'];
+  let triggered = false;
 
-// ALERT FEED
-const FEED = [
-  { t:'d', lbl:'DANGER', msg:'<strong>Revenge Trade Risk</strong> — BANKNIFTY PE entry 28 min after ₹−3,800 loss. Your win rate in this window: <strong>19%</strong>.', ts:'11:04' },
-  { t:'w', lbl:'WARNING', msg:'<strong>Trade Count Alert</strong> — 8 of 10 daily trades used. Your WR after trade #8 is 31% vs 71% for trades 1–4.', ts:'10:52' },
-  { t:'i', lbl:'INSIGHT', msg:'<strong>Morning Strength</strong> — Up ₹+6,200. You gave back 68% of gains after strong mornings on 8 of your last 12 good days.', ts:'10:31' },
-  { t:'d', lbl:'DANGER', msg:'<strong>No Stop-Loss Detected</strong> — NIFTY CE position open 22 min with no defined exit. Avg loss when stops skipped: ₹4,100.', ts:'09:58' },
-  { t:'w', lbl:'WARNING', msg:'<strong>Overconfidence Signal</strong> — 3 consecutive wins. Your position size typically increases 2.4× on the next trade. Stick to your plan.', ts:'09:41' },
-  { t:'i', lbl:'INSIGHT', msg:'<strong>Peak Window Active</strong> — 09:20–10:00 IST is your highest-WR window (74%). You have 18 min left in it.', ts:'09:20' },
-];
-let feedIdx = 0;
-function addFeedItem() {
-  const list = document.getElementById('feed-list');
-  if (feedIdx >= FEED.length) { feedIdx = 0; list.innerHTML = ''; }
-  const f = FEED[feedIdx++];
-  const el = document.createElement('div');
-  el.className = 'feed-item';
-  el.innerHTML = `<div class="feed-bar ${f.t}"></div><div class="feed-body"><div class="feed-type ${f.t}">${f.lbl}</div><div class="feed-msg">${f.msg}</div><div class="feed-ts">${f.ts} IST</div></div>`;
-  list.prepend(el);
-  requestAnimationFrame(() => requestAnimationFrame(() => el.classList.add('visible')));
-  const items = list.querySelectorAll('.feed-item');
-  if (items.length > 4) { const last = items[items.length-1]; last.style.opacity='0'; last.style.transform='translateX(-20px)'; setTimeout(()=>last.remove(), 350); }
-  const now = new Date();
-  document.getElementById('feed-time').textContent = now.getHours().toString().padStart(2,'0') + ':' + now.getMinutes().toString().padStart(2,'0') + ' IST';
-}
-setTimeout(() => { addFeedItem(); setInterval(addFeedItem, 3200); }, 800);
+  function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
+  async function playMsgs() {
+    for (const id of msgs) {
+      await sleep(600);
+      const el = document.getElementById(id);
+      if (el) el.classList.add('show');
+    }
+  }
 
-// QUIZ
-let quizAnswers = {};
-function nextQ(qNum, answer) {
-  quizAnswers['q'+qNum] = answer;
-  document.getElementById('q'+qNum).classList.remove('active');
-  document.getElementById('qp'+qNum).className = 'qp-dot done';
-  if (qNum < 3) { document.getElementById('q'+(qNum+1)).classList.add('active'); document.getElementById('qp'+(qNum+1)).className = 'qp-dot active'; }
+  const obs = new IntersectionObserver(entries => {
+    if (entries[0].isIntersecting && !triggered) {
+      triggered = true;
+      playMsgs();
+    }
+  }, { threshold: 0.4 });
+  obs.observe(phone);
 }
-const RESULTS = {
-  emotional: { badge:'⚡ Emotional Reactor', title:"You're an Emotional Reactor", desc:"Your losses follow a clear emotional pattern — entries made when cortisol is high. You're not a bad trader. You're good at trading, bad at controlling your emotional state under pressure. TradeMentor detects the exact moments you're at risk before you act.", cost:'−₹18,400', lbl:'estimated monthly cost from emotion-driven entries' },
-  reactive:  { badge:'🎰 Reactive Trader',   title:"You're reacting to price, not trading a plan", desc:"You chase moves, respond to charts emotionally, and decide based on what just happened rather than what your edge says. TradeMentor tracks the specific setups where your reaction rate is highest.", cost:'−₹12,800', lbl:'estimated monthly cost from reactive entries' },
-  overtrade: { badge:'🔄 Overtrade Risk',    title:"More trades, not better trades", desc:"You know your edge but don't stop when it disappears. Boredom, FOMO, or loss recovery push you beyond your optimal count. TradeMentor alerts you the moment you cross the statistical point of no return.", cost:'−₹9,200', lbl:'estimated monthly cost from excess trades' },
-  unclear:   { badge:'❓ Blind Spot Trader', title:"You can't fix what you can't see", desc:"Not knowing your patterns is itself the most expensive pattern. TradeMentor's job is to show you. Within 10 trades, we identify your specific behavioral fingerprint.", cost:'−₹26,000', lbl:'average monthly cost when behavior is untracked' },
-};
-function showResult(type) {
-  ['qp1','qp2','qp3'].forEach(id => document.getElementById(id).className = 'qp-dot done');
-  document.getElementById('q3').classList.remove('active');
-  const r = RESULTS[quizAnswers.q1] || RESULTS[type] || RESULTS['unclear'];
-  document.getElementById('result-badge').textContent = r.badge;
-  document.getElementById('result-title').textContent = r.title;
-  document.getElementById('result-desc').textContent  = r.desc;
-  document.getElementById('result-cost-num').textContent  = r.cost;
-  document.getElementById('result-cost-label').textContent = r.lbl;
-  document.getElementById('quiz-result').classList.add('show');
-}
+initWaAnim();
 
-// DEMO TABS
-function setDemo(btn, id) {
-  document.querySelectorAll('.demo-btn').forEach(b => b.classList.remove('active'));
-  btn.classList.add('active');
-  ['d-alerts','d-coach','d-analytics','d-shield'].forEach(k => { const el = document.getElementById(k); if(el) el.classList.toggle('active', k===id); });
-}
-
-// SCROLL REVEAL
-const obs = new IntersectionObserver(entries => entries.forEach(e => { if(e.isIntersecting){e.target.classList.add('in');obs.unobserve(e.target);} }), { threshold: 0.08 });
-document.querySelectorAll('.reveal').forEach(el => obs.observe(el));
-
-// Init hero animation on load
-document.addEventListener('DOMContentLoaded', initHeroAnim);
+// ── SCROLL REVEAL ──────────────────────────────────────────────────
+const revealObs = new IntersectionObserver(entries => {
+  entries.forEach(e => { if (e.isIntersecting) { e.target.classList.add('in'); revealObs.unobserve(e.target); } });
+}, { threshold: 0.12 });
+document.querySelectorAll('.reveal').forEach(el => revealObs.observe(el));
 </script>
 </body>
 </html>
