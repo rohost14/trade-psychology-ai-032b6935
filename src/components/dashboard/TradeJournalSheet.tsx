@@ -4,7 +4,7 @@
 // Fields removed: market_condition (analysis not psychology), setup_quality (redundant),
 //   deviation_reason (captured by emotion), "maybe" on would_repeat (cop-out answer)
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { TrendingUp, TrendingDown, X, Save, Trash2 } from 'lucide-react';
 import { Sheet, SheetContent } from '@/components/ui/sheet';
 import { Button } from '@/components/ui/button';
@@ -16,6 +16,10 @@ import { formatCurrencyWithSign } from '@/lib/formatters';
 import { toast } from 'sonner';
 import { api } from '@/lib/api';
 import { useBroker } from '@/contexts/BrokerContext';
+import { useAlerts } from '@/contexts/AlertContext';
+import { SEV_DOT, SEV_LABEL_COLOR, SEV_LABEL } from '@/lib/alertSeverity';
+
+const ALERT_WINDOW_MS = 20 * 60 * 1000; // ±20 min around trade exit
 
 // ── Emotion options — mapped 1:1 to behavioral patterns we detect ─────────────
 const EMOTIONS = [
@@ -51,6 +55,8 @@ export interface JournalEntry {
   would_repeat?: string;
   market_condition?: string;
   notes?: string;
+  trade_pnl?: string;
+  trade_symbol?: string;
   created_at: string;
   updated_at: string;
 }
@@ -91,29 +97,32 @@ function Chip({ label, active, onClick }: { label: string; active: boolean; onCl
 // ── Main component ────────────────────────────────────────────────────────────
 export function TradeJournalSheet({ open, onOpenChange, trade, type }: TradeJournalSheetProps) {
   const { account } = useBroker();
+  const { alerts } = useAlerts();
 
-  const [emotion,      setEmotion]      = useState('');
+  const [emotions,     setEmotions]     = useState<string[]>([]);
   const [followedPlan, setFollowedPlan] = useState('');
   const [exitReason,   setExitReason]   = useState('');
   const [wouldRepeat,  setWouldRepeat]  = useState('');
   const [notes,        setNotes]        = useState('');
 
-  const [hasChanges,    setHasChanges]    = useState(false);
-  const [existingEntry, setExistingEntry] = useState<JournalEntry | null>(null);
-  const [isLoading,     setIsLoading]     = useState(false);
-  const [isSaving,      setIsSaving]      = useState(false);
+  const [hasChanges,     setHasChanges]     = useState(false);
+  const [existingEntry,  setExistingEntry]  = useState<JournalEntry | null>(null);
+  const [isLoading,      setIsLoading]      = useState(false);
+  const [isSaving,       setIsSaving]       = useState(false);
+  const [symbolHistory,  setSymbolHistory]  = useState<JournalEntry[]>([]);
 
   useEffect(() => {
     if (trade && open) loadEntry();
   }, [trade?.id, open]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const reset = () => {
-    setEmotion(''); setFollowedPlan(''); setExitReason('');
+    setEmotions([]); setFollowedPlan(''); setExitReason('');
     setWouldRepeat(''); setNotes(''); setExistingEntry(null); setHasChanges(false);
+    setSymbolHistory([]);
   };
 
   const apply = (e: JournalEntry) => {
-    setEmotion((e.emotion_tags ?? [])[0] ?? '');
+    setEmotions(e.emotion_tags ?? []);
     setFollowedPlan(e.followed_plan ?? '');
     setExitReason(e.exit_reason ?? '');
     setWouldRepeat(e.would_repeat ?? '');
@@ -126,9 +135,16 @@ export function TradeJournalSheet({ open, onOpenChange, trade, type }: TradeJour
     if (!trade || !account?.id) return;
     setIsLoading(true);
     try {
-      const res = await api.get(`/api/journal/trade/${trade.id}`);
-      if (res.data.entry) apply(res.data.entry);
+      const [entryRes, histRes] = await Promise.allSettled([
+        api.get(`/api/journal/trade/${trade.id}`),
+        api.get('/api/journal/', { params: { symbol: trade.tradingsymbol, limit: 4 } }),
+      ]);
+      if (entryRes.status === 'fulfilled' && entryRes.value.data.entry) apply(entryRes.value.data.entry);
       else reset();
+      if (histRes.status === 'fulfilled') {
+        const entries: JournalEntry[] = histRes.value.data.entries ?? histRes.value.data ?? [];
+        setSymbolHistory(entries.filter(e => e.trade_id !== String(trade.id)).slice(0, 3));
+      }
     } catch {
       reset();
     } finally {
@@ -141,18 +157,23 @@ export function TradeJournalSheet({ open, onOpenChange, trade, type }: TradeJour
     setHasChanges(true);
   };
 
+  const toggleEmotion = (val: string) => {
+    setEmotions(prev => prev.includes(val) ? prev.filter(x => x !== val) : [...prev, val]);
+    setHasChanges(true);
+  };
+
   const handleSave = async () => {
     if (!trade || !account?.id) return;
     setIsSaving(true);
     const isPos = isPosition(trade);
     const isCT  = isCompletedTrade(trade);
-    const pnl   = isPos ? ((trade as any).unrealized_pnl ?? 0)
+    const pnl   = isPos ? ((trade as Position & { unrealized_pnl?: number }).unrealized_pnl ?? 0)
                 : isCT  ? (trade as CompletedTrade).realized_pnl
                         : (trade as Trade).pnl;
     try {
       const res = await api.post('/api/journal/', {
         trade_id:       trade.id,
-        emotion_tags:   emotion ? [emotion] : [],
+        emotion_tags:   emotions,
         followed_plan:  followedPlan || undefined,
         exit_reason:    exitReason   || undefined,
         would_repeat:   wouldRepeat  || undefined,
@@ -187,18 +208,30 @@ export function TradeJournalSheet({ open, onOpenChange, trade, type }: TradeJour
     }
   };
 
+  // Alerts that fired around the same time as this trade's exit.
+  // Must be declared before the early return to satisfy rules-of-hooks.
+  const linkedAlerts = useMemo(() => {
+    if (!trade) return [];
+    const exitTimeRaw = isCompletedTrade(trade) ? (trade as CompletedTrade).exit_time : null;
+    const pivot = exitTimeRaw ? new Date(exitTimeRaw).getTime() : Date.now();
+    return alerts.filter(a => {
+      const alertTime = new Date(a.shown_at ?? 0).getTime();
+      return Math.abs(alertTime - pivot) <= ALERT_WINDOW_MS;
+    });
+  }, [trade, alerts]);
+
   if (!trade) return null;
 
   const isPos    = isPosition(trade);
   const isCT     = isCompletedTrade(trade);
   const isOpen   = type === 'position';
-  const pnl      = isPos ? ((trade as any).unrealized_pnl ?? 0)
+  const pnl      = isPos ? ((trade as Position & { unrealized_pnl?: number }).unrealized_pnl ?? 0)
                  : isCT  ? (trade as CompletedTrade).realized_pnl
                          : (trade as Trade).pnl;
   const isProfit = (pnl ?? 0) >= 0;
   const symbol   = trade.tradingsymbol;
   const duration = isCT ? (trade as CompletedTrade).duration_minutes : undefined;
-  const hasData  = emotion || followedPlan || exitReason || wouldRepeat || notes;
+  const hasData  = emotions.length > 0 || followedPlan || exitReason || wouldRepeat || notes;
 
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
@@ -255,30 +288,95 @@ export function TradeJournalSheet({ open, onOpenChange, trade, type }: TradeJour
               </div>
             </div>
 
+            {/* ── Alerts during this trade ── */}
+            {linkedAlerts.length > 0 && (
+              <div className="mx-5 mt-3 rounded-xl border border-amber-200 dark:border-amber-700/40 bg-amber-50/60 dark:bg-amber-900/10 px-4 py-3 space-y-1.5">
+                <p className="text-[11px] font-semibold text-tm-obs uppercase tracking-wide">
+                  Pattern{linkedAlerts.length > 1 ? 's' : ''} detected during this trade
+                </p>
+                {linkedAlerts.map(a => (
+                  <div key={a.id} className="flex items-center gap-2">
+                    <span className={cn('w-1.5 h-1.5 rounded-full flex-shrink-0', SEV_DOT[a.pattern.severity])} />
+                    <span className="text-[12px] font-medium text-foreground">{a.pattern.name}</span>
+                    <span className={cn('text-[10px] font-semibold uppercase tracking-wide', SEV_LABEL_COLOR[a.pattern.severity])}>
+                      {SEV_LABEL[a.pattern.severity]}
+                    </span>
+                  </div>
+                ))}
+              </div>
+            )}
+
+            {/* ── Symbol history context ── */}
+            {symbolHistory.length > 0 && (
+              <div className="mx-5 mt-3 rounded-xl border border-border bg-muted/30 px-4 py-3">
+                <p className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wide mb-2">
+                  Last {symbolHistory.length}× you journaled {symbol}
+                </p>
+                <div className="space-y-1.5">
+                  {symbolHistory.map((h, i) => {
+                    const pnlNum = parseFloat(h.trade_pnl ?? '0');
+                    const isWin = pnlNum >= 0;
+                    const emotionStr = h.emotion_tags?.length
+                      ? h.emotion_tags.map(t => t.charAt(0).toUpperCase() + t.slice(1)).join(', ')
+                      : '—';
+                    const planStr = h.followed_plan
+                      ? h.followed_plan === 'yes' ? 'followed plan' : h.followed_plan === 'no' ? 'broke plan' : 'partial plan'
+                      : null;
+                    return (
+                      <div key={h.id ?? i} className="flex items-center justify-between gap-3">
+                        <div className="flex items-center gap-2 min-w-0">
+                          <span className={cn(
+                            'w-1.5 h-1.5 rounded-full flex-shrink-0',
+                            isWin ? 'bg-tm-profit' : 'bg-tm-loss',
+                          )} />
+                          <span className="text-[12px] text-foreground truncate">{emotionStr}</span>
+                          {planStr && <span className="text-[11px] text-muted-foreground flex-shrink-0">· {planStr}</span>}
+                        </div>
+                        <span className={cn(
+                          'text-[12px] font-mono tabular-nums font-medium flex-shrink-0',
+                          isWin ? 'text-tm-profit' : 'text-tm-loss',
+                        )}>
+                          {isWin ? '+' : '−'}₹{Math.abs(pnlNum).toLocaleString('en-IN', { maximumFractionDigits: 0 })}
+                        </span>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
+
             <div className="px-5 pb-5 mt-5 space-y-6">
 
-              {/* ── Q1: How were you feeling? ── */}
+              {/* ── Q1: How were you feeling? (multi-select) ── */}
               <div className="space-y-2.5">
-                <p className="text-[13px] font-semibold text-foreground">How were you feeling?</p>
+                <div className="flex items-center justify-between">
+                  <p className="text-[13px] font-semibold text-foreground">How were you feeling?</p>
+                  {emotions.length > 0 && (
+                    <span className="text-[11px] text-muted-foreground">{emotions.length} selected</span>
+                  )}
+                </div>
                 <div className="space-y-1.5">
-                  {EMOTIONS.map(e => (
-                    <button
-                      key={e.value}
-                      type="button"
-                      onClick={() => pick(emotion, e.value, setEmotion)}
-                      className={cn(
-                        'w-full flex items-center justify-between px-4 py-2.5 rounded-xl border text-left transition-all',
-                        emotion === e.value
-                          ? 'bg-teal-50 dark:bg-teal-900/20 border-tm-brand'
-                          : 'bg-muted/30 border-transparent hover:border-border',
-                      )}
-                    >
-                      <span className={cn('text-[13px] font-medium', emotion === e.value ? 'text-tm-brand' : 'text-foreground')}>
-                        {e.label}
-                      </span>
-                      <span className="text-[11px] text-muted-foreground">{e.desc}</span>
-                    </button>
-                  ))}
+                  {EMOTIONS.map(e => {
+                    const active = emotions.includes(e.value);
+                    return (
+                      <button
+                        key={e.value}
+                        type="button"
+                        onClick={() => toggleEmotion(e.value)}
+                        className={cn(
+                          'w-full flex items-center justify-between px-4 py-2.5 rounded-xl border text-left transition-all',
+                          active
+                            ? 'bg-teal-50 dark:bg-teal-900/20 border-tm-brand'
+                            : 'bg-muted/30 border-transparent hover:border-border',
+                        )}
+                      >
+                        <span className={cn('text-[13px] font-medium', active ? 'text-tm-brand' : 'text-foreground')}>
+                          {e.label}
+                        </span>
+                        <span className="text-[11px] text-muted-foreground">{e.desc}</span>
+                      </button>
+                    );
+                  })}
                 </div>
               </div>
 

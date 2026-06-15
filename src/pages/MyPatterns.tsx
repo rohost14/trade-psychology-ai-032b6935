@@ -22,7 +22,7 @@ import { useWebSocket } from '@/contexts/WebSocketContext';
 import { EmotionalTaxCard } from '@/components/goals/EmotionalTaxCard';
 import { StreakTrackerCard } from '@/components/goals/StreakTrackerCard';
 import PatternCalendar from '@/components/patterns/PatternCalendar';
-import { calculateEmotionalTax, getTopRecommendations } from '@/lib/emotionalTaxCalculator';
+import { calculateEmotionalTax } from '@/lib/emotionalTaxCalculator';
 import type { DangerZoneStatus, CooldownRecord } from '@/types/api';
 import type { StreakData, DailyAdherence, StreakMilestone } from '@/types/patterns';
 
@@ -83,7 +83,7 @@ function ScoreGauge({ score, max }: { score: number; max: number }) {
   );
 }
 
-function DisciplineTrendTooltip({ active, payload }: any) {
+function DisciplineTrendTooltip({ active, payload }: { active?: boolean; payload?: { value: number }[] }) {
   if (!active || !payload?.length) return null;
   return (
     <div className="bg-card border border-border rounded-md px-2 py-1.5 text-xs">
@@ -286,7 +286,7 @@ export default function MyPatterns() {
       setAlertHistory(summaryRes.data.cooldown_history_7d || []);
 
       // Compute streak: consecutive days without a high/critical alert
-      const rawAlerts: any[] = alertsRes.data.alerts || [];
+      const rawAlerts: { detected_at?: string; created_at?: string; severity?: string }[] = alertsRes.data.alerts || [];
       const alertsByDate: Record<string, { hasHighCritical: boolean }> = {};
       for (const a of rawAlerts) {
         const date = new Date(a.detected_at || a.created_at)
@@ -345,8 +345,8 @@ export default function MyPatterns() {
         daily_status,
         milestones_achieved,
       });
-    } catch (err: any) {
-      if (err?.code === 'ERR_CANCELED') return; // aborted on unmount — not an error
+    } catch (err: unknown) {
+      if ((err as { code?: string })?.code === 'ERR_CANCELED') return; // aborted on unmount — not an error
       // Non-fatal — page still works without status
     } finally {
       if (!signal?.aborted) setStatusLoading(false);
@@ -390,8 +390,94 @@ export default function MyPatterns() {
     estimated_cost: 0,
     insight: '',
   })), [alerts]);
-  const emotionalTax    = useMemo(() => calculateEmotionalTax(patterns, []), [patterns]);
-  const recommendations = useMemo(() => getTopRecommendations(emotionalTax), [emotionalTax]);
+  const emotionalTax = useMemo(() => calculateEmotionalTax(patterns, []), [patterns]);
+
+  // Worst pattern: highest total estimated_cost in alerts, last 30 days
+  const worstPattern = useMemo(() => {
+    const cutoff = Date.now() - 30 * 24 * 60 * 60 * 1000;
+    const map = new Map<string, { name: string; cost: number; count: number }>();
+    for (const a of alerts) {
+      if (new Date(a.shown_at ?? 0).getTime() < cutoff) continue;
+      const key = a.pattern.type ?? a.pattern.backend_type;
+      const existing = map.get(key) ?? { name: a.pattern.name, cost: 0, count: 0 };
+      existing.cost += a.pattern.estimated_cost ?? 0;
+      existing.count += 1;
+      map.set(key, existing);
+    }
+    if (map.size === 0) return null;
+    return Array.from(map.entries())
+      .map(([type, d]) => ({ type, ...d }))
+      .sort((a, b) => b.cost !== a.cost ? b.cost - a.cost : b.count - a.count)[0];
+  }, [alerts]);
+
+  // All patterns detected last 30 days, sorted by count desc — for breakdown card
+  const patternBreakdown = useMemo(() => {
+    const cutoff = Date.now() - 30 * 24 * 60 * 60 * 1000;
+    const map = new Map<string, { name: string; cost: number; count: number }>();
+    for (const a of alerts) {
+      if (new Date(a.shown_at ?? 0).getTime() < cutoff) continue;
+      const key = a.pattern.type ?? a.pattern.backend_type;
+      const existing = map.get(key) ?? { name: a.pattern.name, cost: 0, count: 0 };
+      existing.cost += a.pattern.estimated_cost ?? 0;
+      existing.count += 1;
+      map.set(key, existing);
+    }
+    return Array.from(map.entries())
+      .map(([type, d]) => ({ type, ...d }))
+      .sort((a, b) => b.count - a.count)
+      .slice(0, 6);
+  }, [alerts]);
+
+  // Specific actionable recommendations derived from real data (not generic strings)
+  const specificRecs = useMemo((): string[] => {
+    const recs: string[] = [];
+
+    // 1. Worst pattern with real numbers
+    if (worstPattern && worstPattern.count >= 2) {
+      const costStr = worstPattern.cost > 0
+        ? ` — costing ₹${worstPattern.cost.toLocaleString('en-IN', { maximumFractionDigits: 0 })} total`
+        : '';
+      const patternRecs: Record<string, string> = {
+        revenge_trade:            `Revenge trading fired ${worstPattern.count}×${costStr}. Set a rule: no new trade within 10 minutes of a loss.`,
+        rapid_reentry:            `Rapid re-entry fired ${worstPattern.count}×${costStr}. After exiting a losing position, wait at least 5 minutes before the same instrument.`,
+        overtrading:              `Overtrading fired ${worstPattern.count}×${costStr}. Your best sessions have fewer trades — cap at your own session average.`,
+        size_escalation:          `Size escalation fired ${worstPattern.count}×${costStr}. When you're losing, shrink size — not the opposite.`,
+        martingale_behaviour:     `Martingale pattern fired ${worstPattern.count}×${costStr}. Doubling down after losses amplifies risk at the worst moment.`,
+        consecutive_loss_streak:  `${worstPattern.count} consecutive-loss alerts this month${costStr}. After 3 losses in a row, stop for the session.`,
+        panic_exit:               `Panic exits fired ${worstPattern.count}×${costStr}. Set your stop-loss at entry — not when the position is already down.`,
+        post_loss_recovery_bet:   `Recovery bets fired ${worstPattern.count}×${costStr}. Larger size after a loss is the highest-risk trade you can take.`,
+        profit_giveaway:          `You gave back gains ${worstPattern.count}×${costStr}. After a strong session P&L, treat the next trade with extra scrutiny.`,
+        fomo_entry:               `FOMO entries fired ${worstPattern.count}×${costStr}. Wait for your own setup — not one driven by watching a move you missed.`,
+        no_stoploss:              `No stop-loss exits fired ${worstPattern.count}×${costStr}. Define your exit before you enter — every time.`,
+        opening_5min_trap:        `Opening-5min entries fired ${worstPattern.count}×${costStr}. The first 8 minutes have the widest spreads. Wait.`,
+        end_of_session_mis_panic: `Late MIS entries fired ${worstPattern.count}×${costStr}. After 15:10 IST, MIS auto-squares in minutes — not a normal trade window.`,
+      };
+      const rec = patternRecs[worstPattern.type];
+      if (rec) recs.push(rec);
+      else recs.push(`${worstPattern.name} fired ${worstPattern.count}× this month${costStr}.`);
+    }
+
+    // 2. Danger zone state — from live status
+    if (status) {
+      if (status.consecutive_losses >= 3) {
+        recs.push(`${status.consecutive_losses} consecutive losses right now. History says the next trade is statistically weaker — consider stopping here.`);
+      } else if (status.consecutive_losses === 2) {
+        recs.push('2 consecutive losses. One more and consecutive-loss rules apply — trade with reduced size next.');
+      }
+      if (status.daily_loss_used_percent >= 80 && status.level !== 'safe') {
+        recs.push(`${status.daily_loss_used_percent.toFixed(0)}% of daily loss limit used. Remaining trades risk crossing the limit — size down or stop.`);
+      }
+    }
+
+    // 3. Week frequency context
+    const cutoffWeek = Date.now() - 7 * 24 * 60 * 60 * 1000;
+    const weekAlerts = alerts.filter(a => new Date(a.shown_at ?? 0).getTime() >= cutoffWeek);
+    if (weekAlerts.length >= 5 && recs.length < 3) {
+      recs.push(`${weekAlerts.length} behavioral alerts this week. More alerts in a week typically means session quality is declining — review the pattern calendar.`);
+    }
+
+    return recs.slice(0, 3);
+  }, [worstPattern, status, alerts]);
 
   const handleAlertGuardian = async () => {
     setIsAlerting(true);
@@ -462,6 +548,31 @@ export default function MyPatterns() {
       </div>
 
       <div className="space-y-5">
+        {/* Worst pattern callout */}
+        {worstPattern && (
+          <div className="tm-card border-l-2 border-l-tm-loss px-5 py-4">
+            <p className="text-[11px] font-semibold text-tm-loss uppercase tracking-wide mb-2">
+              Your #1 cost driver this month
+            </p>
+            <div className="flex items-start justify-between gap-4">
+              <div>
+                <p className="text-[15px] font-bold text-foreground">{worstPattern.name}</p>
+                <p className="text-[12px] text-muted-foreground mt-0.5">
+                  Detected {worstPattern.count}× in the last 30 days
+                </p>
+              </div>
+              {worstPattern.cost > 0 && (
+                <div className="text-right flex-shrink-0">
+                  <p className="text-[17px] font-bold font-mono tabular-nums text-tm-loss">
+                    ₹{worstPattern.cost.toLocaleString('en-IN', { maximumFractionDigits: 0 })}
+                  </p>
+                  <p className="text-[10px] text-muted-foreground mt-0.5">est. cost</p>
+                </div>
+              )}
+            </div>
+          </div>
+        )}
+
         {/* Live danger status */}
         {status && (
           <DangerStatusBanner
@@ -471,16 +582,16 @@ export default function MyPatterns() {
           />
         )}
 
-        {/* Recommendations */}
-        {recommendations.length > 0 && (
+        {/* Specific data-driven recommendations */}
+        {specificRecs.length > 0 && (
           <div className="tm-card border-l-2 border-l-tm-obs px-5 py-4 flex items-start gap-3">
             <AlertTriangle className="h-4 w-4 text-tm-obs flex-shrink-0 mt-0.5" />
             <div>
-              <p className="text-[12px] font-semibold text-foreground mb-1.5">Based on your patterns:</p>
-              <ul className="space-y-1">
-                {recommendations.map((rec, i) => (
-                  <li key={`main-rec-${i}`} className="text-[12px] text-muted-foreground flex items-center gap-2">
-                    <span className="w-1 h-1 rounded-full bg-tm-obs flex-shrink-0" />
+              <p className="text-[12px] font-semibold text-foreground mb-1.5">Based on your data:</p>
+              <ul className="space-y-1.5">
+                {specificRecs.map((rec, i) => (
+                  <li key={`srec-${i}`} className="text-[12px] text-muted-foreground flex items-start gap-2">
+                    <span className="w-1 h-1 rounded-full bg-tm-obs flex-shrink-0 mt-1.5" />
                     {rec}
                   </li>
                 ))}
@@ -491,6 +602,46 @@ export default function MyPatterns() {
 
         {/* Pattern Calendar */}
         <PatternCalendar />
+
+        {/* 30-day pattern breakdown */}
+        {patternBreakdown.length > 0 && (
+          <div className="tm-card overflow-hidden">
+            <div className="px-5 py-3.5 border-b border-border">
+              <p className="text-sm font-medium text-foreground">Pattern frequency — last 30 days</p>
+            </div>
+            <div className="divide-y divide-border">
+              {patternBreakdown.map(p => {
+                const maxCount = patternBreakdown[0].count;
+                const barPct = Math.round((p.count / maxCount) * 100);
+                return (
+                  <div key={p.type} className="px-5 py-3 flex items-center gap-3">
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center justify-between mb-1">
+                        <p className="text-[12px] font-medium text-foreground truncate">{p.name}</p>
+                        <div className="flex items-center gap-3 flex-shrink-0 ml-3">
+                          {p.cost > 0 && (
+                            <span className="text-[11px] font-mono tabular-nums text-tm-loss">
+                              ₹{p.cost.toLocaleString('en-IN', { maximumFractionDigits: 0 })}
+                            </span>
+                          )}
+                          <span className="text-[11px] font-mono tabular-nums text-muted-foreground w-8 text-right">
+                            {p.count}×
+                          </span>
+                        </div>
+                      </div>
+                      <div className="h-1 rounded-full bg-muted overflow-hidden">
+                        <div
+                          className="h-full bg-tm-loss/50 rounded-full transition-all"
+                          style={{ width: `${barPct}%` }}
+                        />
+                      </div>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        )}
 
         {/* Grid */}
         <div className="grid gap-5 lg:grid-cols-2">

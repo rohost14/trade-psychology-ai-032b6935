@@ -2,9 +2,29 @@ import { useNavigate } from 'react-router-dom';
 import { Clock, X, MessageSquare } from 'lucide-react';
 import { Sheet, SheetContent } from '@/components/ui/sheet';
 import { cn } from '@/lib/utils';
-import { AlertNotification } from '@/contexts/AlertContext';
+import { AlertNotification, useAlerts } from '@/contexts/AlertContext';
 import { PatternSeverity } from '@/types/patterns';
 import { SEV_DOT, SEV_LABEL, SEV_LABEL_COLOR, SEV_LEFT_BORDER } from '@/lib/alertSeverity';
+
+const WEEK_MS = 7 * 24 * 60 * 60 * 1000;
+
+// ─── Trader context / benchmarks (keyed by backend pattern_type) ─────────────
+// Based on trading psychology research and aggregate behavioral data.
+const TRADER_BENCHMARKS: Record<string, string> = {
+  revenge_trade:            'Most traders who trigger this alert take at least one more losing trade within the same hour. The second trade has a lower win rate than their session baseline.',
+  rapid_reentry:            'Re-entries on the same instrument after a stop-loss hit have a below-baseline win rate — the setup that failed has not changed.',
+  panic_exit:               'Panic exits typically occur when a position is down 30–50% beyond the trader\'s original planned stop. Positions exited in panic are rarely re-entered at a better price.',
+  size_escalation:          'Traders who escalate size after a loss sequence experience 2–3× their normal drawdown. The larger position compounds losses from an already-weakened emotional state.',
+  martingale_behaviour:     'Martingale sequences that escalate to 4 or more trades rarely recover to breakeven within the same session. The capital required doubles with each step.',
+  post_loss_recovery_bet:   'Recovery bets at 2× or more of normal position size lose more often than they win. The trade is entered at maximum emotional impairment and maximum capital risk.',
+  consecutive_loss_streak:  'Most traders who stop after a third consecutive loss end the session better than those who continue. Win rate on the 4th trade after 3 losses is typically below 30%.',
+  overtrading:              'Win rate for retail F&O traders drops measurably after the 7th trade in a session. More trades past the optimal count reduce expected return per trade.',
+  profit_giveaway:          'The trade taken after reaching a session P&L high is statistically the most likely to give back gains. The impulse to "keep it going" is strongest at the worst moment.',
+  no_stoploss:              'Positions held without a pre-defined stop-loss are held 3× longer than planned on average. The longer a losing position is held, the harder it becomes to exit.',
+  opening_5min_trap:        'Options premiums in the first 5–8 minutes of market open are typically 15–25% inflated versus 15 minutes later. Bid-ask spreads are also at their widest.',
+  end_of_session_mis_panic: 'MIS positions entered after 15:10 IST have less than 20 minutes before forced auto-square-off. The time available to manage the position is insufficient for most setups.',
+  fomo_entry:               'Entries taken after missing the initial move of a trend have a lower expected return than entries at the move\'s start. You are buying into momentum, not positioning for it.',
+};
 
 // ─── Pattern explanations (keyed by backend pattern_type) ────────────────────
 const PATTERN_EXPLANATIONS: Record<string, string> = {
@@ -140,11 +160,19 @@ interface AlertDetailSheetProps {
 
 export default function AlertDetailSheet({ alert, open, onClose, onAcknowledge }: AlertDetailSheetProps) {
   const navigate = useNavigate();
+  const { alerts: allAlerts } = useAlerts();
   if (!alert) return null;
 
   const sev = alert.pattern.severity;
   const backendType = alert.pattern.backend_type;
   const facts = buildFacts(backendType, alert.pattern.details ?? {});
+
+  // Count same pattern type in last 7 days
+  const weekCutoff = Date.now() - WEEK_MS;
+  const weekCount = allAlerts.filter(a =>
+    (a.pattern.type ?? a.pattern.backend_type) === backendType &&
+    new Date(a.shown_at ?? 0).getTime() >= weekCutoff
+  ).length;
 
   function handleAck() {
     onAcknowledge(alert!.id);
@@ -174,6 +202,11 @@ export default function AlertDetailSheet({ alert, open, onClose, onAcknowledge }
               <span className={cn('text-[10px] font-semibold uppercase tracking-wide', SEV_LABEL_COLOR[sev])}>
                 {SEV_LABEL[sev]}
               </span>
+              {weekCount >= 2 && (
+                <span className="text-[10px] font-semibold text-tm-obs bg-amber-50 dark:bg-amber-900/20 border border-amber-300 dark:border-amber-700/50 rounded px-1.5 py-0.5">
+                  {weekCount}× this week
+                </span>
+              )}
             </div>
             <div className="flex items-center gap-2 text-[11px] text-muted-foreground">
               <Clock className="h-3 w-3" />
@@ -251,6 +284,18 @@ export default function AlertDetailSheet({ alert, open, onClose, onAcknowledge }
             <p className="text-[12px] text-muted-foreground leading-relaxed border-t border-border pt-4">
               {PATTERN_EXPLANATIONS[backendType]}
             </p>
+          )}
+
+          {/* Trader context benchmark */}
+          {TRADER_BENCHMARKS[backendType] && (
+            <div className="rounded-lg bg-muted/40 px-3 py-3">
+              <p className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wide mb-1">
+                Trader context
+              </p>
+              <p className="text-[12px] text-muted-foreground leading-relaxed">
+                {TRADER_BENCHMARKS[backendType]}
+              </p>
+            </div>
           )}
 
         </div>

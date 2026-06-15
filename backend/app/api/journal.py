@@ -127,6 +127,7 @@ async def list_journal_entries(
     limit: int = Query(default=50, ge=1, le=200),
     offset: int = Query(default=0, ge=0),
     entry_type: Optional[str] = None,
+    symbol: Optional[str] = None,
     broker_account_id: UUID = Depends(get_verified_broker_account_id),
     db: AsyncSession = Depends(get_db)
 ):
@@ -138,6 +139,9 @@ async def list_journal_entries(
 
         if entry_type:
             query = query.where(JournalEntry.entry_type == entry_type)
+
+        if symbol:
+            query = query.where(JournalEntry.trade_symbol == symbol)
 
         query = query.order_by(JournalEntry.created_at.desc())
         query = query.limit(limit).offset(offset)

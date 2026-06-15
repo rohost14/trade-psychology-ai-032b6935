@@ -33,14 +33,31 @@ function formatIST(dateStr: string | undefined): string {
   });
 }
 
+// ─── Frequency helper ─────────────────────────────────────────────────────────
+
+const WEEK_MS = 7 * 24 * 60 * 60 * 1000;
+
+function buildWeekCounts(alertList: AlertNotification[]): Record<string, number> {
+  const cutoff = Date.now() - WEEK_MS;
+  const counts: Record<string, number> = {};
+  for (const a of alertList) {
+    if (new Date(a.shown_at ?? 0).getTime() < cutoff) continue;
+    const key = a.pattern.type ?? a.pattern.backend_type;
+    counts[key] = (counts[key] ?? 0) + 1;
+  }
+  return counts;
+}
+
 // ─── Alert row ────────────────────────────────────────────────────────────────
 
 function AlertRow({
   alert,
   onOpen,
+  weekCount = 0,
 }: {
   alert: AlertNotification;
   onOpen: (alert: AlertNotification) => void;
+  weekCount?: number;
 }) {
   const sev = alert.pattern.severity;
 
@@ -65,6 +82,11 @@ function AlertRow({
             <span className={cn('text-[10px] font-semibold uppercase tracking-wide', SEV_LABEL_COLOR[sev])}>
               {SEV_LABEL[sev]}
             </span>
+            {weekCount >= 2 && (
+              <span className="text-[10px] font-semibold text-tm-obs bg-amber-50 dark:bg-amber-900/20 border border-amber-300 dark:border-amber-700/50 rounded px-1.5 py-0.5">
+                {weekCount}× this week
+              </span>
+            )}
             {alert.acknowledged && (
               <span className="text-[10px] text-muted-foreground border border-border rounded px-1.5 py-0.5">
                 Reviewed
@@ -118,6 +140,7 @@ function AlertSkeleton() {
 
 function LiveTab({ onOpen }: { onOpen: (a: AlertNotification) => void }) {
   const { alerts, isLoading, acknowledgeAll } = useAlerts();
+  const weekCounts = useMemo(() => buildWeekCounts(alerts), [alerts]);
   const live = useMemo(
     () => alerts
       .filter(a => !a.acknowledged)
@@ -161,7 +184,7 @@ function LiveTab({ onOpen }: { onOpen: (a: AlertNotification) => void }) {
         </button>
       </div>
       {live.map(alert => (
-        <AlertRow key={alert.id} alert={alert} onOpen={onOpen} />
+        <AlertRow key={alert.id} alert={alert} onOpen={onOpen} weekCount={weekCounts[alert.pattern.type ?? alert.pattern.backend_type] ?? 0} />
       ))}
     </div>
   );
@@ -230,6 +253,7 @@ function HistoryTab({ onOpen }: { onOpen: (a: AlertNotification) => void }) {
 
   useEffect(() => { loadHistory(hours); }, [hours, loadHistory]);
 
+  const weekCounts = useMemo(() => buildWeekCounts(allAlerts), [allAlerts]);
   const filtered = useMemo(
     () => sevFilter === 'all' ? allAlerts : allAlerts.filter(a => a.pattern.severity === sevFilter),
     [allAlerts, sevFilter]
@@ -294,7 +318,7 @@ function HistoryTab({ onOpen }: { onOpen: (a: AlertNotification) => void }) {
       ) : (
         <div className="space-y-2">
           {filtered.map(alert => (
-            <AlertRow key={alert.id} alert={alert} onOpen={onOpen} />
+            <AlertRow key={alert.id} alert={alert} onOpen={onOpen} weekCount={weekCounts[alert.pattern.type ?? alert.pattern.backend_type] ?? 0} />
           ))}
         </div>
       )}

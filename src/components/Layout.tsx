@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { Outlet, NavLink, useLocation, useNavigate } from 'react-router-dom';
 import {
   LayoutDashboard, TrendingUp, MessageSquare, Settings,
-  Shield, Brain, Bell, BookOpen, X,
+  Shield, Brain, Bell, BookOpen, ScrollText, X,
   MoreHorizontal, ChevronRight,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
@@ -32,6 +32,7 @@ const mobileMoreGroups = [
     items: [
       { name: 'My Patterns', href: '/my-patterns', icon: Brain },
       { name: 'Reports',     href: '/reports',     icon: BookOpen },
+      { name: 'Journal',     href: '/journal',     icon: ScrollText },
     ],
   },
   {
