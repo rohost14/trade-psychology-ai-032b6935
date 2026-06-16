@@ -2,8 +2,7 @@ import { Fragment, useState, Suspense, lazy } from 'react';
 import { ErrorBoundary } from '@/components/ErrorBoundary';
 import { Link } from 'react-router-dom';
 import {
-  Link2, BarChart2, AlertTriangle, List,
-  Moon, Percent, Crosshair, Calendar, BookOpen,
+  Link2, BarChart2, Crosshair, Dna, Brain, Calendar, Moon,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -13,19 +12,18 @@ import ExportReportButton from '@/components/analytics/ExportReportButton';
 import ComplianceDisclaimer from '@/components/ComplianceDisclaimer';
 import InstrumentPanel from '@/components/analytics/InstrumentPanel';
 
-const SummaryTab    = lazy(() => import('@/components/analytics/SummaryTab'));
-const PatternsTab   = lazy(() => import('@/components/analytics/PatternsTab'));
-const TradesTab     = lazy(() => import('@/components/analytics/TradesTab'));
-const BtstTab       = lazy(() => import('@/components/analytics/BtstTab'));
-const PnlPercentTab = lazy(() => import('@/components/analytics/PnlPercentTab'));
-const EdgeMapTab    = lazy(() => import('@/components/analytics/EdgeMapTab'));
-const ExpiryTab     = lazy(() => import('@/components/analytics/ExpiryTab'));
-const JournalCorrelationTab = lazy(() => import('@/components/analytics/JournalCorrelationTab'));
+const OverviewTab  = lazy(() => import('@/components/analytics/OverviewTab'));
+const EdgeTab      = lazy(() => import('@/components/analytics/EdgeTab'));
+const TradeDnaTab  = lazy(() => import('@/components/analytics/TradeDnaTab'));
+const BehaviorTab  = lazy(() => import('@/components/analytics/BehaviorTab'));
+const SessionsTab  = lazy(() => import('@/components/analytics/SessionsTab'));
+const BtstTab      = lazy(() => import('@/components/analytics/BtstTab'));
 
 function TabSkeleton() {
   return (
-    <div className="space-y-4 pt-2">
-      <Skeleton className="h-[280px] rounded-xl" />
+    <div className="space-y-4 pt-2 animate-pulse">
+      <Skeleton className="h-16 rounded-xl" />
+      <Skeleton className="h-[260px] rounded-xl" />
       <div className="grid grid-cols-2 md:grid-cols-4 gap-px">
         {[1,2,3,4].map(i => <Skeleton key={i} className="h-20" />)}
       </div>
@@ -41,14 +39,12 @@ const PERIOD_OPTIONS = [
 ] as const;
 
 const TABS = [
-  { value: 'summary',  label: 'Summary',  icon: BarChart2,     group: 'core' as const },
-  { value: 'patterns', label: 'Patterns', icon: AlertTriangle, group: 'core' as const },
-  { value: 'trades',   label: 'Trades',   icon: List,          group: 'core' as const },
-  { value: 'btst',     label: 'BTST',     icon: Moon,          group: 'deep' as const },
-  { value: 'pnlpct',   label: 'Returns',  icon: Percent,       group: 'deep' as const },
-  { value: 'edgemap',  label: 'Edge Map', icon: Crosshair,     group: 'deep' as const },
-  { value: 'expiry',   label: 'Expiry',   icon: Calendar,      group: 'deep' as const },
-  { value: 'journal',  label: 'Journal',  icon: BookOpen,      group: 'deep' as const },
+  { value: 'overview',  label: 'Overview',   icon: BarChart2, group: 'core' as const },
+  { value: 'edge',      label: 'Edge',        icon: Crosshair, group: 'core' as const },
+  { value: 'dna',       label: 'Trade DNA',   icon: Dna,       group: 'core' as const },
+  { value: 'behavior',  label: 'Behavior',    icon: Brain,     group: 'core' as const },
+  { value: 'sessions',  label: 'Sessions',    icon: Calendar,  group: 'deep' as const },
+  { value: 'btst',      label: 'BTST',        icon: Moon,      group: 'deep' as const },
 ] as const;
 
 type TabValue = typeof TABS[number]['value'];
@@ -56,7 +52,7 @@ type TabValue = typeof TABS[number]['value'];
 export default function Analytics() {
   const { isConnected, isLoading: brokerLoading, account } = useBroker();
   const [days, setDays] = useState(30);
-  const [tab, setTab]   = useState<TabValue>('summary');
+  const [tab, setTab]   = useState<TabValue>('overview');
   const [instrumentPanel, setInstrumentPanel] = useState<string | null>(null);
 
   if (!brokerLoading && !isConnected) {
@@ -83,12 +79,13 @@ export default function Analytics() {
 
   return (
     <div className="w-full pb-12">
-      {/* ── Page Header ── */}
-      <div className="mb-4 flex items-center justify-between">
+
+      {/* ── Page Header ──────────────────────────────────────────────────────── */}
+      <div className="mb-4 flex items-center justify-between gap-3">
         <h1 className="t-heading-lg text-foreground">Analytics</h1>
         <div className="flex items-center gap-3">
           <div className="flex items-center gap-0.5 p-0.5 bg-slate-100 dark:bg-neutral-800 rounded-lg">
-            {PERIOD_OPTIONS.map((opt) => (
+            {PERIOD_OPTIONS.map(opt => (
               <button
                 key={opt.days}
                 onClick={() => setDays(opt.days)}
@@ -98,7 +95,7 @@ export default function Analytics() {
                   'px-3 py-1.5 text-[12px] font-medium rounded-md transition-all',
                   days === opt.days
                     ? 'bg-white dark:bg-neutral-700 text-foreground shadow-sm'
-                    : 'text-muted-foreground hover:text-foreground'
+                    : 'text-muted-foreground hover:text-foreground',
                 )}
               >
                 {opt.label}
@@ -109,7 +106,7 @@ export default function Analytics() {
         </div>
       </div>
 
-      {/* ── Tab Bar — sticky so period switch & tab switch stay in view ── */}
+      {/* ── Tab Bar ──────────────────────────────────────────────────────────── */}
       <div className="sticky top-0 z-20 bg-background/95 backdrop-blur-sm border-b border-border -mx-4 sm:-mx-6 px-4 sm:px-6 mb-6">
         <div
           role="tablist"
@@ -118,7 +115,6 @@ export default function Analytics() {
         >
           {TABS.map(({ value, label, icon: Icon, group }, i) => (
             <Fragment key={value}>
-              {/* Visual separator between core and deep-dive groups */}
               {i > 0 && TABS[i - 1].group !== group && (
                 <div className="w-px bg-border/70 my-2 mx-1.5 shrink-0" />
               )}
@@ -130,7 +126,7 @@ export default function Analytics() {
                   'flex items-center gap-1.5 px-3.5 py-2.5 text-[13px] font-medium border-b-2 transition-colors -mb-px whitespace-nowrap shrink-0',
                   tab === value
                     ? 'border-tm-brand text-foreground'
-                    : 'border-transparent text-muted-foreground hover:text-foreground'
+                    : 'border-transparent text-muted-foreground hover:text-foreground',
                 )}
               >
                 <Icon className="h-3.5 w-3.5 shrink-0" />
@@ -141,33 +137,30 @@ export default function Analytics() {
         </div>
       </div>
 
-      {/* ── Tab Content ── */}
+      {/* ── Tab Content ──────────────────────────────────────────────────────── */}
       <ErrorBoundary fallback={
         <div className="py-12 text-center text-sm text-muted-foreground">
-          This tab failed to load. Try refreshing the page.
+          This tab failed to load. Try refreshing.
         </div>
       }>
         <Suspense fallback={<TabSkeleton />}>
-          {tab === 'summary'  && (
-            <SummaryTab
+          {tab === 'overview' && <OverviewTab days={days} />}
+          {tab === 'edge'     && (
+            <EdgeTab
               days={days}
-              onInstrumentClick={(underlying) => setInstrumentPanel(underlying)}
-              onTabChange={(t) => setTab(t as TabValue)}
+              onInstrumentClick={u => setInstrumentPanel(u)}
             />
           )}
-          {tab === 'patterns' && <PatternsTab days={days} />}
-          {tab === 'trades'   && <TradesTab days={days} />}
+          {tab === 'dna'      && <TradeDnaTab days={days} />}
+          {tab === 'behavior' && <BehaviorTab days={days} />}
+          {tab === 'sessions' && <SessionsTab days={days} />}
           {tab === 'btst'     && <BtstTab days={days} />}
-          {tab === 'pnlpct'   && <PnlPercentTab days={days} />}
-          {tab === 'edgemap'  && <EdgeMapTab days={days} />}
-          {tab === 'expiry'   && <ExpiryTab days={days} />}
-          {tab === 'journal'  && <JournalCorrelationTab days={days} />}
         </Suspense>
       </ErrorBoundary>
 
       <ComplianceDisclaimer variant="footer" className="mt-8" />
 
-      {/* ── Instrument Drill-down Panel ── */}
+      {/* Instrument Drill-down Panel */}
       {instrumentPanel && (
         <InstrumentPanel
           underlying={instrumentPanel}
@@ -175,6 +168,7 @@ export default function Analytics() {
           onClose={() => setInstrumentPanel(null)}
         />
       )}
+
     </div>
   );
 }

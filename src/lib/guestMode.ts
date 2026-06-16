@@ -85,7 +85,16 @@ export function getGuestResponse(url: string, method = 'GET'): unknown | undefin
   if (path === '/api/analytics/progress') return DEMO_PROGRESS;
   if (path === '/api/analytics/risk-metrics') return DEMO_RISK_METRICS;
   if (path === '/api/analytics/risk-score') return DEMO_RISK_SCORE;
-  if (path === '/api/analytics/critical-trades') return DEMO_CRITICAL_TRADES;
+  if (path === '/api/analytics/critical-trades') {
+    // Normalize demo data: backend uses flag_reasons, demo uses reasons
+    return {
+      ...DEMO_CRITICAL_TRADES,
+      trades: DEMO_CRITICAL_TRADES.trades.map((t: any) => ({
+        ...t,
+        flag_reasons: t.flag_reasons ?? t.reasons ?? [],
+      })),
+    };
+  }
   if (path === '/api/analytics/edge-confidence') return DEMO_EDGE_CONFIDENCE;
   if (path === '/api/analytics/conditional-performance') return DEMO_CONDITIONAL_PERFORMANCE;
   if (path === '/api/analytics/options-behavior') return DEMO_OPTIONS_BEHAVIOR;
@@ -95,7 +104,7 @@ export function getGuestResponse(url: string, method = 'GET'): unknown | undefin
   if (path === '/api/analytics/dashboard-stats') {
     return {
       total_pnl: 7990, win_rate: 60, trade_count: 15,
-      money_saved: 21260, behavioral_alerts: 6,
+      money_saved: 45840, behavioral_alerts: 7,
     };
   }
   if (path === '/api/analytics/unrealized-pnl') {
@@ -105,6 +114,42 @@ export function getGuestResponse(url: string, method = 'GET'): unknown | undefin
   if (path === '/api/analytics/btst') return DEMO_BTST;
   if (path === '/api/analytics/pnl-attribution') return DEMO_PNL_ATTRIBUTION;
   if (path === '/api/analytics/quality-breakdown') return DEMO_QUALITY_BREAKDOWN;
+  if (path === '/api/analytics/expiry-pattern') {
+    return {
+      has_data: true,
+      period_days: 90,
+      expiry: { trade_count: 18, win_rate: 44.4, avg_pnl: -320, total_pnl: -5760 },
+      non_expiry: { trade_count: 47, win_rate: 61.7, avg_pnl: 285, total_pnl: 13395 },
+      by_hour: [
+        { hour: 9,  label: '09:00', expiry_count: 4, expiry_avg_pnl: -180, non_expiry_count: 8,  non_expiry_avg_pnl: 210 },
+        { hour: 10, label: '10:00', expiry_count: 6, expiry_avg_pnl: -420, non_expiry_count: 12, non_expiry_avg_pnl: 340 },
+        { hour: 11, label: '11:00', expiry_count: 3, expiry_avg_pnl: 150,  non_expiry_count: 9,  non_expiry_avg_pnl: 280 },
+        { hour: 14, label: '14:00', expiry_count: 5, expiry_avg_pnl: -580, non_expiry_count: 10, non_expiry_avg_pnl: 190 },
+        { hour: 15, label: '15:00', expiry_count: 0, expiry_avg_pnl: 0,    non_expiry_count: 8,  non_expiry_avg_pnl: 310 },
+      ],
+      worst_expiry_trades: [
+        { symbol: 'NIFTY25JUN24200PE', pnl: -2400, hour: 14 },
+        { symbol: 'BANKNIFTY25JUN50000PE', pnl: -1800, hour: 10 },
+      ],
+    };
+  }
+  if (path === '/api/analytics/trade-sequence') {
+    return {
+      has_data: true,
+      period_days: 90,
+      baseline_win_rate: 58.5,
+      baseline_avg_pnl: 220,
+      sequence: [
+        { ordinal: 1, label: '#1', trade_count: 52, win_rate: 67.3, avg_pnl: 380, delta_win_rate: 8.8 },
+        { ordinal: 2, label: '#2', trade_count: 48, win_rate: 62.5, avg_pnl: 290, delta_win_rate: 4.0 },
+        { ordinal: 3, label: '#3', trade_count: 42, win_rate: 59.5, avg_pnl: 210, delta_win_rate: 1.0 },
+        { ordinal: 4, label: '#4', trade_count: 35, win_rate: 54.3, avg_pnl: 140, delta_win_rate: -4.2 },
+        { ordinal: 5, label: '#5', trade_count: 28, win_rate: 46.4, avg_pnl: -80, delta_win_rate: -12.1 },
+        { ordinal: 6, label: '#6', trade_count: 18, win_rate: 38.9, avg_pnl: -210, delta_win_rate: -19.6 },
+        { ordinal: 7, label: '#7', trade_count: 12, win_rate: 33.3, avg_pnl: -390, delta_win_rate: -25.2 },
+      ],
+    };
+  }
   if (path === '/api/analytics/instrument') {
     // Return NIFTY data for any underlying in demo
     return DEMO_INSTRUMENT_NIFTY;
@@ -112,15 +157,15 @@ export function getGuestResponse(url: string, method = 'GET'): unknown | undefin
   if (path === '/api/analytics/discipline-summary') {
     return {
       has_data: true,
-      score: 68,
+      score: 52,
       max_score: 100,
       week_start: new Date(Date.now() - 6 * 86_400_000).toLocaleDateString('en-IN', { day: 'numeric', month: 'short' }),
-      danger_alerts: 2,
+      danger_alerts: 3,
       caution_alerts: 4,
       trades_this_week: 5,
-      revenge_free_days: 3,
-      weekly_trend: [72, 81, 55, 68],
-      breakdown: { alerts_score: 38, quality_score: 30 },
+      revenge_free_days: 1,
+      weekly_trend: [72, 81, 55, 52],
+      breakdown: { alerts_score: 22, quality_score: 30 },
     };
   }
 

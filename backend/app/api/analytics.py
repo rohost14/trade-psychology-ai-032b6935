@@ -3178,3 +3178,81 @@ async def get_expiry_pattern(
     except Exception as e:
         logger.error(f"expiry-pattern failed: {e}")
         raise HTTPException(status_code=500, detail="Internal server error")
+
+
+@router.get("/trade-sequence")
+async def get_trade_sequence(
+    days: int = Query(default=90, ge=7, le=365),
+    broker_account_id: UUID = Depends(get_verified_broker_account_id),
+    db: AsyncSession = Depends(get_db),
+    _limiter: None = Depends(analytics_limiter),
+):
+    """
+    Trade ordinal within the session (#1, #2, … #9+) vs win rate + avg P&L.
+    Reveals the overtrading threshold — the point where performance degrades.
+    """
+    from collections import defaultdict as _dd
+    from zoneinfo import ZoneInfo as _ZI
+
+    _IST = _ZI("Asia/Kolkata")
+    cutoff = datetime.now(timezone.utc) - timedelta(days=days)
+
+    result = await db.execute(
+        select(CompletedTrade)
+        .where(
+            and_(
+                CompletedTrade.broker_account_id == broker_account_id,
+                CompletedTrade.exit_time >= cutoff,
+                CompletedTrade.status == "closed",
+                CompletedTrade.realized_pnl.isnot(None),
+                CompletedTrade.entry_time.isnot(None),
+            )
+        )
+        .order_by(CompletedTrade.entry_time.asc())
+    )
+    trades = result.scalars().all()
+
+    if not trades:
+        return {"has_data": False, "period_days": days}
+
+    # Group by IST date, sort within each day by entry_time
+    by_date: dict[str, list] = _dd(list)
+    for t in trades:
+        date_key = t.entry_time.astimezone(_IST).date().isoformat()
+        by_date[date_key].append(t)
+    for d in by_date:
+        by_date[d].sort(key=lambda t: t.entry_time)
+
+    # Assign ordinals (cap at 9 meaning "9 or more")
+    by_ordinal: dict[int, list[float]] = _dd(list)
+    for day_trades in by_date.values():
+        for i, t in enumerate(day_trades):
+            ordinal = min(i + 1, 9)
+            by_ordinal[ordinal].append(float(t.realized_pnl))
+
+    # Baseline across all trades
+    all_pnls = [float(t.realized_pnl) for t in trades]
+    baseline_wr = round(sum(1 for p in all_pnls if p > 0) / len(all_pnls) * 100, 1) if all_pnls else 0
+    baseline_avg = round(sum(all_pnls) / len(all_pnls), 2) if all_pnls else 0
+
+    sequence = []
+    for ordinal in sorted(by_ordinal.keys()):
+        pnls = by_ordinal[ordinal]
+        wr = sum(1 for p in pnls if p > 0) / len(pnls) * 100
+        avg = sum(pnls) / len(pnls)
+        sequence.append({
+            "ordinal": ordinal,
+            "label": f"#{ordinal}" if ordinal < 9 else "#9+",
+            "trade_count": len(pnls),
+            "win_rate": round(wr, 1),
+            "avg_pnl": round(avg, 2),
+            "delta_win_rate": round(wr - baseline_wr, 1),
+        })
+
+    return {
+        "has_data": True,
+        "period_days": days,
+        "baseline_win_rate": baseline_wr,
+        "baseline_avg_pnl": baseline_avg,
+        "sequence": sequence,
+    }
