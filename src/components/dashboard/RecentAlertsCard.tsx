@@ -1,4 +1,4 @@
-import { CheckCircle2, Check, ChevronRight, Link as LinkIcon } from 'lucide-react';
+import { CheckCircle2, Check, ChevronRight } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { Skeleton } from '@/components/ui/skeleton';
 import { cn } from '@/lib/utils';
@@ -97,7 +97,7 @@ export default function RecentAlertsCard({ alerts, onAcknowledge, onOpen, loadin
                 className={cn(
                   'w-full flex items-start gap-3 px-5 py-3.5 text-left',
                   'transition-colors duration-100',
-                  'hover:bg-muted/40 dark:hover:bg-muted/20',
+                  'hover:bg-muted/60 dark:hover:bg-muted/30',
                   i < Math.min(alerts.length, 5) - 1 ? 'border-b border-border' : '',
                   isAcked && 'opacity-50',
                 )}
@@ -131,17 +131,6 @@ export default function RecentAlertsCard({ alerts, onAcknowledge, onOpen, loadin
             );
           })}
 
-          {/* Footer */}
-          <div className="px-5 py-2.5 border-t border-border">
-            <Link
-              to="/alerts"
-              className="flex items-center gap-1 text-[13px] font-medium text-tm-brand hover:underline"
-            >
-              <LinkIcon className="w-3 h-3" />
-              View full alert history
-              <ChevronRight className="w-3.5 h-3.5" />
-            </Link>
-          </div>
         </div>
       ) : (
         <div className="py-10 text-center">

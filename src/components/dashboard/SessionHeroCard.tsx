@@ -21,7 +21,7 @@ interface SessionHeroCardProps {
 function Zone({ label, children, className }: { label: string; children: React.ReactNode; className?: string }) {
   return (
     <div className={cn('flex flex-col justify-center px-4 py-3', className)}>
-      <p className="text-[9.5px] font-semibold text-muted-foreground/70 uppercase tracking-[0.09em] mb-1.5 whitespace-nowrap">
+      <p className="text-[9px] font-medium text-muted-foreground/50 uppercase tracking-[0.08em] mb-1.5 whitespace-nowrap">
         {label}
       </p>
       {children}
@@ -144,7 +144,7 @@ export function SessionHeroCard({
         {/* Row 1: P&L | Risk | Trades */}
         <div className="grid grid-cols-3 divide-x divide-border border-b border-border">
           <div className="px-4 py-3">
-            <p className="text-[9px] font-semibold text-muted-foreground/70 uppercase tracking-[0.09em] mb-1">P&L</p>
+            <p className="text-[9px] font-medium text-muted-foreground/50 uppercase tracking-[0.08em] mb-1">P&L</p>
             <span className={cn(
               'text-[22px] font-black font-mono tabular-nums leading-none block',
               pnlPositive ? 'text-tm-profit' : 'text-tm-loss',
@@ -153,7 +153,7 @@ export function SessionHeroCard({
             </span>
           </div>
           <div className="px-3 py-3 flex flex-col justify-center">
-            <p className="text-[9px] font-semibold text-muted-foreground/70 uppercase tracking-[0.09em] mb-1.5">RISK</p>
+            <p className="text-[9px] font-medium text-muted-foreground/50 uppercase tracking-[0.08em] mb-1.5">RISK</p>
             <span className={cn(
               'inline-flex items-center gap-1 text-[10.5px] font-semibold px-2 py-0.5 rounded-full self-start',
               stateCfg.pill,
@@ -163,7 +163,7 @@ export function SessionHeroCard({
             </span>
           </div>
           <div className="px-3 py-3 flex flex-col justify-center">
-            <p className="text-[9px] font-semibold text-muted-foreground/70 uppercase tracking-[0.09em] mb-1">TRADES</p>
+            <p className="text-[9px] font-medium text-muted-foreground/50 uppercase tracking-[0.08em] mb-1">TRADES</p>
             <span className={cn('text-[16px] font-semibold font-mono tabular-nums', tradeColor)}>
               {tradesToday}
               <span className="text-muted-foreground text-[12px] font-normal"> / {dailyTradeLimit}</span>
@@ -174,7 +174,7 @@ export function SessionHeroCard({
         {/* Row 2: Realized | Unrealized | Limit */}
         <div className="grid grid-cols-3 divide-x divide-border">
           <div className="px-4 py-2.5">
-            <p className="text-[9px] font-semibold text-muted-foreground/70 uppercase tracking-[0.07em] mb-1">Realized</p>
+            <p className="text-[9px] font-medium text-muted-foreground/50 uppercase tracking-[0.07em] mb-1">Realized</p>
             <span className={cn(
               'text-[12.5px] font-semibold font-mono tabular-nums',
               realizedPnlDisplay >= 0 ? 'text-tm-profit' : 'text-tm-loss',
@@ -183,7 +183,7 @@ export function SessionHeroCard({
             </span>
           </div>
           <div className="px-3 py-2.5">
-            <p className="text-[9px] font-semibold text-muted-foreground/70 uppercase tracking-[0.07em] mb-1">Unrealized</p>
+            <p className="text-[9px] font-medium text-muted-foreground/50 uppercase tracking-[0.07em] mb-1">Unrealized</p>
             <span className={cn(
               'text-[12.5px] font-semibold font-mono tabular-nums',
               unrealizedTotal > 0 ? 'text-tm-profit' : unrealizedTotal < 0 ? 'text-tm-loss' : 'text-muted-foreground',
@@ -192,7 +192,7 @@ export function SessionHeroCard({
             </span>
           </div>
           <div className="px-3 py-2.5">
-            <p className="text-[9px] font-semibold text-muted-foreground/70 uppercase tracking-[0.07em] mb-1">Loss limit</p>
+            <p className="text-[9px] font-medium text-muted-foreground/50 uppercase tracking-[0.07em] mb-1">Loss limit</p>
             <span className={cn('text-[12.5px] font-semibold font-mono tabular-nums', lossColor)}>
               {limitPct}%
             </span>

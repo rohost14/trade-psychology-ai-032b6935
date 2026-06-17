@@ -66,6 +66,9 @@ export default {
         'tm-loss':   "rgb(var(--tm-loss)   / <alpha-value>)",
         'tm-obs':    "rgb(var(--tm-obs)    / <alpha-value>)",
         'tm-brand':  "rgb(var(--tm-brand)  / <alpha-value>)",
+        'profit':    "rgb(var(--tm-profit) / <alpha-value>)",
+        'loss':      "rgb(var(--tm-loss)   / <alpha-value>)",
+        'loss-muted': "rgb(var(--tm-loss)   / <alpha-value>)",
 
         // ── Text hierarchy (3 tiers) ───────────────────────────────────────────
         // text-tm-primary   → headings, key data
@@ -114,8 +117,7 @@ export default {
         "pulse-slow":     "pulse-slow 2.5s ease-in-out infinite",
       },
       fontFamily: {
-        // Inter for all UI text
-        sans: ["Inter", "-apple-system", "BlinkMacSystemFont", "Segoe UI", "sans-serif"],
+        sans: ["Geist", "Inter", "-apple-system", "BlinkMacSystemFont", "Segoe UI", "sans-serif"],
         // DM Mono for ALL financial numbers (₹, %, counts, P&L)
         mono: ["DM Mono", "Fira Code", "Cascadia Code", "ui-monospace", "monospace"],
       },

@@ -1,4 +1,12 @@
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=DM+Mono:ital,wght@0,300;0,400;0,500&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=DM+Mono:ital,wght@0,300;0,400;0,500&display=swap');
+
+@font-face {
+  font-family: 'Geist';
+  src: url('/fonts/GeistSans-Variable.woff2') format('woff2');
+  font-weight: 100 900;
+  font-style: normal;
+  font-display: swap;
+}
 
 @tailwind base;
 @tailwind components;
@@ -12,66 +20,64 @@
 @layer base {
   :root {
     /* ── Layer System (Light) ──────────────────────────────────────────────── */
-    /* Each layer is progressively lighter; cards visually lift off the page.  */
-    --layer-page:          242 242 247;   /* #F2F2F7  hsl(240,13%,96%)  body  */
+    /* hsl(230,25%,97%) page — blue-indigo undertone throughout.              */
+    --layer-page:          244 245 250;   /* #F4F5FA  hsl(230,25%,97%)  body  */
     --layer-surface:       255 255 255;   /* #FFFFFF                    cards */
     --layer-elevated:      248 248 252;   /* #F8F8FC  hsl(240,20%,98%)  sidebar, modals */
-    --layer-overlay:       238 239 246;   /* #EEEFF6  hsl(235,18%,95%)  hover rows */
-    --layer-border:        226 226 238;   /* #E2E2EE  hsl(240,18%,91%)  card edges */
-    --layer-border-subtle: 235 235 245;   /* #EBEBF5  hsl(240,20%,94%)  row dividers */
+    --layer-overlay:       235 237 244;   /* #EBEDF4  hsl(230,20%,94%)  hover rows */
+    --layer-border:        225 228 236;   /* #E1E4EC  hsl(230,20%,90%)  card edges */
+    --layer-border-subtle: 233 235 242;   /* #E9EBF2  hsl(230,20%,93%)  row dividers */
 
     /* ── shadcn / Tailwind mapping ──────────────────────────────────────────── */
     --background:          var(--layer-page);
-    --foreground:          12 12 20;       /* #0C0C14 — primary text */
+    --foreground:          30 34 51;       /* #1E2233  hsl(226,28%,16%) */
 
     --card:                var(--layer-surface);
-    --card-foreground:     12 12 20;
+    --card-foreground:     30 34 51;
 
     --popover:             var(--layer-surface);
-    --popover-foreground:  12 12 20;
+    --popover-foreground:  30 34 51;
 
-    --primary:             15 118 110;     /* #0F766E  teal-700 */
+    --primary:             68 83 201;      /* #4453C9  hsl(232,58%,52%) indigo */
     --primary-foreground:  255 255 255;
 
     --secondary:           var(--layer-elevated);
-    --secondary-foreground: 12 12 20;
+    --secondary-foreground: 30 34 51;
 
-    --muted:               var(--layer-elevated);
-    --muted-foreground:    96 96 122;      /* #60607A — secondary text */
+    --muted:               var(--layer-overlay);
+    --muted-foreground:    108 114 135;    /* #6C7287  hsl(226,12%,46%) */
 
     --accent:              var(--layer-overlay);
-    --accent-foreground:   12 12 20;
+    --accent-foreground:   30 34 51;
 
-    --destructive:         185 28 28;      /* #B91C1C */
+    --destructive:         225 90 77;      /* #E15A4D  hsl(4,70%,58%) */
     --destructive-foreground: 255 255 255;
 
     --border:              var(--layer-border);
     --input:               var(--layer-border);
-    --ring:                15 118 110;     /* #0F766E */
+    --ring:                68 83 201;      /* #4453C9 */
 
     --radius: 0.5rem;
 
     /* ── Text hierarchy (3 tiers) ───────────────────────────────────────────── */
-    --text-primary:   12 12 20;    /* #0C0C14 — headings, key data */
-    --text-secondary: 96 96 122;   /* #60607A — descriptions, labels */
+    --text-primary:   30 34 51;    /* #1E2233 — headings, key data */
+    --text-secondary: 108 114 135; /* #6C7287 — descriptions, labels */
     --text-tertiary:  152 152 174; /* #9898AE — timestamps, metadata */
 
     /* ── TradeMentor financial & brand tokens ───────────────────────────────── */
-    /* WCAG AA corrected for light backgrounds (all ≥ 4.5:1 on white)          */
-    --tm-profit: 21 128 61;    /* #15803D  green-700  — 4.6:1 ✓ */
-    --tm-loss:   185 28 28;    /* #B91C1C  red-700    — 6.4:1 ✓ */
-    --tm-obs:    146 64 14;    /* #92400E  amber-800  — 7.4:1 ✓ */
-    --tm-brand:  15 118 110;   /* #0F766E  teal-700   — 4.6:1 ✓ */
+    --tm-profit: 52 162 108;   /* #34A26C  hsl(152,52%,42%) */
+    --tm-loss:   225 90 77;    /* #E15A4D  hsl(4,70%,58%)   */
+    --tm-obs:    240 162 26;   /* #F0A21A  hsl(38,88%,52%)  */
+    --tm-brand:  68 83 201;    /* #4453C9  indigo-600        */
 
     /* ── Status system tokens ───────────────────────────────────────────────── */
-    /* Use with opacity modifier: bg-tm-status-danger/7 border-tm-status-danger/20 */
-    --status-danger:  185 28 28;   /* #B91C1C */
-    --status-caution: 146 64 14;   /* #92400E */
-    --status-success: 21 128 61;   /* #15803D */
-    --status-info:    29 78 216;   /* #1D4ED8 */
+    --status-danger:  225 90 77;   /* #E15A4D */
+    --status-caution: 240 162 26;  /* #F0A21A */
+    --status-success: 52 162 108;  /* #34A26C */
+    --status-info:    68 83 201;   /* #4453C9 */
 
     /* ── Sidebar colors ─────────────────────────────────────────────────────── */
-    --sidebar-bg: 240 240 248;   /* #F0F0F8 — slightly deeper than page */
+    --sidebar-bg: 244 245 250;   /* #F4F5FA — same as page */
 
     /* ── Semantic aliases (kept for backwards compatibility) ────────────────── */
     --success: var(--tm-profit);
@@ -81,81 +87,80 @@
     --danger: var(--tm-loss);
     --danger-foreground: 255 255 255;
 
-    /* ── Shadow tokens (raw CSS values — light mode uses drop shadows) ───────── */
-    --shadow-card:     0 1px 2px rgba(0,0,0,0.06), 0 1px 4px rgba(0,0,0,0.04);
+    /* ── Shadow tokens ───────────────────────────────────────────────────────── */
+    --shadow-card:     0 1px 3px rgba(68,83,201,0.06), 0 1px 6px rgba(0,0,0,0.05);
     --shadow-elevated: 0 2px 8px rgba(0,0,0,0.08), 0 4px 20px rgba(0,0,0,0.06);
     --shadow-sheet:    0 8px 32px rgba(0,0,0,0.12), 0 24px 80px rgba(0,0,0,0.08);
   }
 
   .dark {
     /* ── Layer System (Dark) ──────────────────────────────────────────────────
-       Blue-purple undertone: hsl(240, ~12-15%, L%). Not blue — just tinted.
-       Delta between page (#09090C) and surface (#111116) is now clearly visible. */
-    --layer-page:          9 9 12;      /* #09090C  hsl(240,15%,4.5%) */
-    --layer-surface:       17 17 22;    /* #111116  hsl(240,12%,8%)   */
-    --layer-elevated:      26 26 34;    /* #1A1A22  hsl(240,13%,12%)  */
-    --layer-overlay:       35 35 48;    /* #232330  hsl(240,15%,17%)  */
-    --layer-border:        42 42 56;    /* #2A2A38  hsl(240,15%,20%)  */
-    --layer-border-subtle: 30 30 42;    /* #1E1E2A  hsl(240,15%,15%)  */
+       Blue-indigo undertone: hsl(226, ~18-22%, L%). */
+    --layer-page:          22 24 31;     /* #16181F  hsl(226,22%,11%) */
+    --layer-surface:       30 32 41;     /* #1E2029  hsl(226,20%,15%) */
+    --layer-elevated:      42 45 56;     /* #2A2D38  hsl(226,18%,20%) */
+    --layer-overlay:       52 55 70;     /* #343746  hsl(230,15%,24%) */
+    --layer-border:        46 49 61;     /* #2E313D  hsl(226,18%,22%) */
+    --layer-border-subtle: 36 39 50;     /* #242732  hsl(226,18%,17%) */
 
     /* ── shadcn / Tailwind mapping ──────────────────────────────────────────── */
     --background:         var(--layer-page);
-    --foreground:         240 240 248;  /* #F0F0F8 — slightly blue-tinted white */
+    --foreground:         229 231 238;  /* #E5E7EE  hsl(230,18%,92%) */
 
     --card:               var(--layer-surface);
-    --card-foreground:    240 240 248;
+    --card-foreground:    229 231 238;
 
     --popover:            var(--layer-elevated);
-    --popover-foreground: 240 240 248;
+    --popover-foreground: 229 231 238;
 
-    --primary:            45 212 191;   /* #2DD4BF  teal-400 */
-    --primary-foreground: 9 9 12;
+    --primary:            119 133 224;  /* #7785E0  hsl(232,62%,66%) indigo */
+    --primary-foreground: 22 24 31;
 
     --secondary:          var(--layer-elevated);
     --secondary-foreground: 220 220 230;
 
     --muted:              var(--layer-elevated);
-    --muted-foreground:   152 152 176;  /* #9898B0 — secondary text */
+    --muted-foreground:   148 152 165;  /* #9498A5  hsl(230,12%,62%) */
 
     --accent:             var(--layer-overlay);
     --accent-foreground:  220 220 230;
 
-    --destructive:        248 113 113;  /* #F87171 */
+    --destructive:        226 107 94;   /* #E26B5E  hsl(4,65%,60%) */
     --destructive-foreground: 255 255 255;
 
     --border:             var(--layer-border);
     --input:              var(--layer-border);
-    --ring:               45 212 191;   /* #2DD4BF */
+    --ring:               119 133 224;  /* #7785E0 */
 
     /* ── Text hierarchy ────────────────────────────────────────────────────── */
-    --text-primary:   240 240 248;  /* #F0F0F8 — not pure white, reduces strain */
-    --text-secondary: 152 152 176;  /* #9898B0 */
+    --text-primary:   229 231 238;  /* #E5E7EE */
+    --text-secondary: 148 152 165;  /* #9498A5 */
     --text-tertiary:  90 90 114;    /* #5A5A72 */
 
     /* ── Financial tokens ──────────────────────────────────────────────────── */
-    --tm-profit: 74 222 128;    /* #4ADE80  green-400  — bright on dark */
-    --tm-loss:   248 113 113;   /* #F87171  red-400    */
-    --tm-obs:    251 191 36;    /* #FBBF24  amber-400  */
-    --tm-brand:  45 212 191;    /* #2DD4BF  teal-400   */
+    --tm-profit: 84 194 138;    /* #54C28A  hsl(152,48%,54%) */
+    --tm-loss:   226 107 94;    /* #E26B5E  hsl(4,65%,60%)   */
+    --tm-obs:    235 169 72;    /* #EBA948  hsl(38,78%,58%)  */
+    --tm-brand:  119 133 224;   /* #7785E0  indigo-400        */
 
     /* ── Status system tokens ───────────────────────────────────────────────── */
-    --status-danger:  248 113 113;  /* #F87171 */
-    --status-caution: 251 191 36;   /* #FBBF24 */
-    --status-success: 74 222 128;   /* #4ADE80 */
-    --status-info:    96 165 250;   /* #60A5FA */
+    --status-danger:  226 107 94;   /* #E26B5E */
+    --status-caution: 235 169 72;   /* #EBA948 */
+    --status-success: 84 194 138;   /* #54C28A */
+    --status-info:    119 133 224;  /* #7785E0 */
 
     /* ── Sidebar ────────────────────────────────────────────────────────────── */
-    --sidebar-bg: 26 26 34;   /* #1A1A22 — Layer 2 */
+    --sidebar-bg: 42 45 56;   /* #2A2D38 — Layer 2 */
 
     /* ── Semantic aliases ───────────────────────────────────────────────────── */
     --success: var(--tm-profit);
-    --success-foreground: 9 9 12;
+    --success-foreground: 22 24 31;
     --warning: var(--tm-obs);
-    --warning-foreground: 9 9 12;
+    --warning-foreground: 22 24 31;
     --danger: var(--tm-loss);
-    --danger-foreground: 9 9 12;
+    --danger-foreground: 22 24 31;
 
-    /* ── Shadow tokens (dark mode uses edge highlights, not drop shadows) ────── */
+    /* ── Shadow tokens ──────────────────────────────────────────────────────── */
     --shadow-card:     inset 0 1px 0 rgba(255,255,255,0.06);
     --shadow-elevated: 0 0 0 1px rgba(255,255,255,0.08), 0 8px 32px rgba(0,0,0,0.5);
     --shadow-sheet:    0 0 0 1px rgba(255,255,255,0.10), 0 24px 80px rgba(0,0,0,0.7);
@@ -176,12 +181,12 @@
 
   body {
     @apply bg-background text-foreground;
-    font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+    font-family: 'Geist', 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
     line-height: 1.5;
   }
 
   /* Typography — headings use design system sizes */
-  h1 { font-size: 20px; font-weight: 600; line-height: 1.25; letter-spacing: -0.02em; @apply text-foreground; }
+  h1 { font-size: 22px; font-weight: 600; line-height: 1.25; letter-spacing: -0.025em; @apply text-foreground; }
   h2 { font-size: 16px; font-weight: 600; line-height: 1.35; letter-spacing: -0.015em; @apply text-foreground; }
   h3 { font-size: 14px; font-weight: 600; line-height: 1.4; letter-spacing: -0.01em; @apply text-foreground; }
   h4 { @apply text-base font-medium text-foreground; }
@@ -263,6 +268,10 @@ svg.lucide {
   /* P&L convenience aliases */
   .text-profit { color: rgb(var(--tm-profit)); }
   .text-loss   { color: rgb(var(--tm-loss)); }
+  .text-warning { color: rgb(var(--tm-obs)); }
+  .bg-profit   { background-color: rgb(var(--tm-profit)); }
+  .bg-loss     { background-color: rgb(var(--tm-loss)); }
+  .bg-warning  { background-color: rgb(var(--tm-obs)); }
 
   /* Simple badge */
   .badge         { @apply inline-flex items-center px-2.5 py-0.5 rounded text-xs font-medium; }
@@ -352,9 +361,23 @@ svg.lucide {
 
 .dark .tm-page-bg {
   background:
-    radial-gradient(ellipse 60% 45% at 92% 0%,  rgba(45,212,191,0.07) 0%, transparent 100%),
-    radial-gradient(ellipse 55% 50% at 0% 100%, rgba(45,212,191,0.05) 0%, transparent 100%),
-    #09090C;
+    radial-gradient(ellipse 60% 45% at 92% 0%,  rgba(119,133,224,0.12) 0%, transparent 100%),
+    radial-gradient(ellipse 55% 50% at 0% 100%, rgba(119,133,224,0.09) 0%, transparent 100%),
+    hsl(226 22% 11%);
+}
+
+/* ── Landing page hero gradient ──────────────────────────────────────────── */
+.landing-bg {
+  background:
+    radial-gradient(ellipse 60% 40% at 50% 0%, hsl(232 70% 94% / 0.7), transparent),
+    radial-gradient(ellipse 40% 40% at 100% 0%, hsl(280 60% 94% / 0.4), transparent),
+    hsl(230 25% 97%);
+}
+.dark .landing-bg {
+  background:
+    radial-gradient(ellipse 60% 40% at 50% 0%, hsl(232 50% 20% / 0.5), transparent),
+    radial-gradient(ellipse 40% 40% at 100% 0%, hsl(280 40% 18% / 0.3), transparent),
+    hsl(226 22% 11%);
 }
 
 /* ── Elevated surface (sidebar, modals) ─────────────────────────────────────── */

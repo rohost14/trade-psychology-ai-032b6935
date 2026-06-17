@@ -84,7 +84,7 @@ export default function Analytics() {
       <div className="mb-4 flex items-center justify-between gap-3">
         <h1 className="t-heading-lg text-foreground">Analytics</h1>
         <div className="flex items-center gap-3">
-          <div className="flex items-center gap-0.5 p-0.5 bg-slate-100 dark:bg-neutral-800 rounded-lg">
+          <div className="flex items-center gap-0.5 p-0.5 bg-muted rounded-lg">
             {PERIOD_OPTIONS.map(opt => (
               <button
                 key={opt.days}
@@ -94,7 +94,7 @@ export default function Analytics() {
                 className={cn(
                   'px-3 py-1.5 text-[12px] font-medium rounded-md transition-all',
                   days === opt.days
-                    ? 'bg-white dark:bg-neutral-700 text-foreground shadow-sm'
+                    ? 'bg-card text-foreground shadow-sm'
                     : 'text-muted-foreground hover:text-foreground',
                 )}
               >
@@ -129,7 +129,7 @@ export default function Analytics() {
                     : 'border-transparent text-muted-foreground hover:text-foreground',
                 )}
               >
-                <Icon className="h-3.5 w-3.5 shrink-0" />
+                <Icon className={cn('h-3.5 w-3.5 shrink-0', tab === value && 'text-foreground')} />
                 {label}
               </button>
             </Fragment>

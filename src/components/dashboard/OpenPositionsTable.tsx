@@ -190,7 +190,7 @@ export default function OpenPositionsTable({
                     onClick={() => onPositionClick?.(pos)}
                     className={cn(
                       'flex-shrink-0 snap-start w-44 rounded-xl border text-left p-3.5',
-                      'bg-card hover:bg-muted/30 transition-colors',
+                      'bg-card hover:bg-muted/60 transition-colors',
                       livePnl > 0 ? 'border-tm-profit/20' : livePnl < 0 ? 'border-tm-loss/20' : 'border-border',
                     )}
                   >
@@ -261,7 +261,7 @@ export default function OpenPositionsTable({
                 const { name, chip, sub } = parseSymbol(pos.tradingsymbol, pos.instrument_type);
                 return (
                   <tr key={pos.id} className={cn(
-                    'transition-colors hover:bg-muted/30',
+                    'transition-colors hover:bg-muted/60',
                     i < openPositions.length - 1 && 'border-b border-border/50',
                   )}>
                     <td className="px-5 py-3">
