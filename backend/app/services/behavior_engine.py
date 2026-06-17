@@ -527,94 +527,147 @@ class BehaviorEngine:
         daily_caution = ctx.thresholds.get("daily_trade_limit", 7)
         daily_danger  = ctx.thresholds.get("daily_trade_danger", 12)
 
-        # Session P&L context — used to gate/downgrade alerts when in profit
         session_pnl = float(ctx.session.session_pnl or 0) if ctx.session else 0
 
-        # Check 1: burst (30-min rolling window)
+        # ── Helpers ────────────────────────────────────────────────────────
+
+        def _trade_entry(t) -> dict:
+            """Single-trade dict for burst_trades / daily_trades context lists."""
+            pnl = float(t.realized_pnl or 0)
+            entry_ist = t.entry_time.astimezone(IST).strftime("%H:%M") if t.entry_time else None
+            exit_ist  = t.exit_time.astimezone(IST).strftime("%H:%M")  if t.exit_time  else None
+            return {
+                "symbol":        t.tradingsymbol or "—",
+                "entry_time_ist": entry_ist,
+                "exit_time_ist":  exit_ist,
+                "qty":           t.total_quantity or 0,
+                "pnl":           round(pnl, 2),
+                "is_loss":       pnl < 0,
+            }
+
+        def _burst_context(trades_in_window: list, include_loss_detail: bool = True) -> dict:
+            """Build shared context for all burst-window alert paths."""
+            all_trades = sorted(trades_in_window, key=lambda t: t.entry_time or datetime.min.replace(tzinfo=timezone.utc))
+            pnls = [float(t.realized_pnl or 0) for t in all_trades]
+            losing_pnls = [p for p in pnls if p < 0]
+            entry_times = [t.entry_time for t in all_trades if t.entry_time]
+            ctx_dict = {
+                "trades_in_window":    len(all_trades),
+                "window_minutes":      30,
+                "window_start_ist":    entry_times[0].astimezone(IST).strftime("%H:%M") if entry_times else None,
+                "window_end_ist":      entry_times[-1].astimezone(IST).strftime("%H:%M") if entry_times else None,
+                "winning_count":       sum(1 for p in pnls if p > 0),
+                "losing_count":        len(losing_pnls),
+                "total_loss_in_burst": round(sum(losing_pnls), 2),
+                "session_pnl":         round(session_pnl, 2),
+                "caution_limit":       burst_caution,
+                "danger_limit":        burst_danger,
+                "burst_trades":        [_trade_entry(t) for t in all_trades],
+            }
+            return ctx_dict
+
+        # ── Check 1: burst (30-min rolling window) ─────────────────────────
+        # "5 trades in 30 min" = 5 complete round-trips whose ENTRY fell within
+        # a 30-min window ending at the current trade's entry. Open positions are
+        # not counted (CompletedTrade only — engine is per-closed-trade by design).
         cutoff = ct.entry_time - timedelta(minutes=30)
         recent = [t for t in ctx.session_trades
                   if t.entry_time and t.entry_time >= cutoff and t.id != ct.id]
-        burst_count = len(recent) + 1
+        burst_all = recent + [ct]
+        burst_count = len(burst_all)
 
-        # Suppress burst alert entirely if session is profitable AND all burst trades won
-        # (high-frequency profitable trading is not a behavioral problem)
         if burst_count >= burst_caution:
-            recent_pnls = [float(t.realized_pnl or 0) for t in recent]
-            recent_pnls.append(float(ct.realized_pnl or 0))
+            recent_pnls = [float(t.realized_pnl or 0) for t in burst_all]
             all_burst_profitable = all(p > 0 for p in recent_pnls)
+
+            # Suppress entirely: profitable burst while session P&L positive
             if session_pnl > 0 and all_burst_profitable:
-                pass  # genuinely profitable burst — skip
+                pass
+
             elif burst_count >= burst_danger:
+                bctx = _burst_context(burst_all)
+                entry_range = (
+                    f"{bctx['window_start_ist']}–{bctx['window_end_ist']}"
+                    if bctx['window_start_ist'] else "30 min"
+                )
+                loss_note = (
+                    f" while down ₹{abs(session_pnl):,.0f} on the session."
+                    if session_pnl < 0 else "."
+                )
                 return DetectedEvent(
                     event_type="overtrading_burst",
                     severity="danger",
-                    message=(
-                        f"{burst_count} trades in 30 minutes"
-                        + (f" while down ₹{abs(session_pnl):,.0f} on the session." if session_pnl < 0 else ".")
-                    ),
-                    context={"trades_in_window": burst_count, "window_minutes": 30,
-                             "session_pnl": round(session_pnl, 2),
-                             "caution_limit": burst_caution, "danger_limit": burst_danger},
+                    message=f"{burst_count} positions opened {entry_range}{loss_note}",
+                    context=bctx,
                 )
+
             else:
-                # caution: fire only when session is in loss or mixed
+                bctx = _burst_context(burst_all)
+                entry_range = (
+                    f"{bctx['window_start_ist']}–{bctx['window_end_ist']}"
+                    if bctx['window_start_ist'] else "30 min"
+                )
+
                 if session_pnl < 0:
                     return DetectedEvent(
                         event_type="overtrading_burst",
                         severity="caution",
                         message=(
-                            f"{burst_count} trades in 30 minutes while the session is down "
-                            f"₹{abs(session_pnl):,.0f}."
+                            f"{burst_count} positions opened {entry_range} "
+                            f"while session is down ₹{abs(session_pnl):,.0f}."
                         ),
-                        context={"trades_in_window": burst_count, "window_minutes": 30,
-                                 "session_pnl": round(session_pnl, 2),
-                                 "caution_limit": burst_caution, "danger_limit": burst_danger},
+                        context=bctx,
                     )
-                # session positive but some burst trades losing — neutral observation
-                losing_in_burst = sum(1 for p in recent_pnls if p < 0)
+
+                losing_in_burst = bctx["losing_count"]
                 if losing_in_burst > 0:
+                    total_loss = abs(bctx["total_loss_in_burst"])
                     return DetectedEvent(
                         event_type="overtrading_burst",
                         severity="caution",
                         message=(
-                            f"{burst_count} trades in 30 minutes — "
-                            f"{losing_in_burst} of them closed at a loss."
+                            f"{burst_count} positions opened {entry_range} — "
+                            f"{losing_in_burst} closed at a loss "
+                            f"(₹{total_loss:,.0f} total)."
                         ),
-                        context={"trades_in_window": burst_count, "window_minutes": 30,
-                                 "losing_in_burst": losing_in_burst,
-                                 "session_pnl": round(session_pnl, 2),
-                                 "caution_limit": burst_caution, "danger_limit": burst_danger},
+                        context=bctx,
                     )
 
-        # Check 2: daily session count (include current trade in total)
-        daily_count = len(ctx.session_trades) + 1
-        if daily_count >= daily_danger:
-            return DetectedEvent(
-                event_type="overtrading_burst",
-                severity="danger",
-                message=(
-                    f"{daily_count} trades today"
-                    + (f", session P&L: ₹{session_pnl:+,.0f}." if session_pnl != 0 else ".")
-                ),
-                context={"daily_count": daily_count, "daily_caution": daily_caution,
-                         "daily_danger": daily_danger, "session_pnl": round(session_pnl, 2)},
-            )
+        # ── Check 2: daily session count ────────────────────────────────────
+        # Fires when total closed trades today cross the daily limit, regardless
+        # of whether any 30-min burst occurred. Same pattern_type, different trigger.
+        all_session = list(ctx.session_trades) + [ct]
+        daily_count = len(all_session)
+
         if daily_count >= daily_caution:
+            pnls_today = [float(t.realized_pnl or 0) for t in all_session]
+            winning_today = sum(1 for p in pnls_today if p > 0)
+            losing_today  = sum(1 for p in pnls_today if p < 0)
+            total_loss_today = sum(p for p in pnls_today if p < 0)
+            severity = "danger" if daily_count >= daily_danger else "caution"
             return DetectedEvent(
                 event_type="overtrading_burst",
-                severity="caution",
+                severity=severity,
                 message=(
                     f"{daily_count} trades today"
                     + (f", session P&L: ₹{session_pnl:+,.0f}." if session_pnl != 0 else ".")
                 ),
-                context={"daily_count": daily_count, "daily_caution": daily_caution,
-                         "daily_danger": daily_danger, "session_pnl": round(session_pnl, 2)},
+                context={
+                    "daily_count":       daily_count,
+                    "daily_caution":     daily_caution,
+                    "daily_danger":      daily_danger,
+                    "session_pnl":       round(session_pnl, 2),
+                    "winning_count":     winning_today,
+                    "losing_count":      losing_today,
+                    "total_loss_today":  round(total_loss_today, 2),
+                    "daily_trades": [_trade_entry(t) for t in sorted(
+                        all_session,
+                        key=lambda t: t.entry_time or datetime.min.replace(tzinfo=timezone.utc)
+                    )],
+                },
             )
 
-        # MED-4: Check 3 (gains erosion) removed — it computed the same metric as
-        # profit_giveaway, causing two alerts for one session state. profit_giveaway
-        # owns erosion detection and fires correctly after the HIGH-2 fix.
-
+        # MED-4: gains-erosion check removed — owned by profit_giveaway detector.
         return None
 
     # ── Pattern 4: Size escalation after losses ───────────────────────────
