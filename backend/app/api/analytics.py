@@ -3167,6 +3167,40 @@ async def get_expiry_pattern(
         # Worst 5 expiry trades
         worst_expiry = sorted(expiry, key=lambda t: t["pnl"])[:5]
 
+        # Expiry-week day-of-week breakdown
+        # Identify calendar weeks that contained at least one expiry trade
+        expiry_weeks: set[tuple[int, int]] = set()
+        for ct, feat in rows:
+            if feat and bool(feat.is_expiry_day) and ct.entry_time:
+                dt_ist = ct.entry_time.astimezone(_IST)
+                iso_cal = dt_ist.isocalendar()
+                expiry_weeks.add((iso_cal[0], iso_cal[1]))  # (year, week_number)
+
+        # Collect ALL trades from those expiry weeks, grouped by day
+        DOW_LABELS = {0: "Mon", 1: "Tue", 2: "Wed", 3: "Thu", 4: "Fri"}
+        expiry_week_by_dow: dict[int, list[float]] = {i: [] for i in range(5)}
+        for ct, feat in rows:
+            if ct.entry_time:
+                dt_ist = ct.entry_time.astimezone(_IST)
+                iso_cal = dt_ist.isocalendar()
+                if (iso_cal[0], iso_cal[1]) in expiry_weeks:
+                    dow = dt_ist.weekday()  # 0=Mon … 4=Fri
+                    if dow < 5:
+                        expiry_week_by_dow[dow].append(float(ct.realized_pnl or 0))
+
+        by_expiry_week_dow = []
+        for dow in range(5):
+            pnls = expiry_week_by_dow[dow]
+            if pnls:
+                wins = sum(1 for p in pnls if p > 0)
+                by_expiry_week_dow.append({
+                    "day": DOW_LABELS[dow],
+                    "trade_count": len(pnls),
+                    "win_rate": round(wins / len(pnls) * 100, 1),
+                    "avg_pnl": round(sum(pnls) / len(pnls), 2),
+                    "total_pnl": round(sum(pnls), 2),
+                })
+
         return {
             "has_data": True,
             "period_days": days,
@@ -3174,6 +3208,7 @@ async def get_expiry_pattern(
             "non_expiry": bucket_stats(non_expiry),
             "by_hour": by_hour,
             "worst_expiry_trades": worst_expiry,
+            "by_expiry_week_dow": by_expiry_week_dow,
         }
     except Exception as e:
         logger.error(f"expiry-pattern failed: {e}")

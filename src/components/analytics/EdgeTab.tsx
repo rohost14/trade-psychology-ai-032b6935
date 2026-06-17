@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip,
-  ResponsiveContainer, Cell,
+  ResponsiveContainer, Cell, ReferenceLine,
 } from 'recharts';
 import { RefreshCw, AlertTriangle } from 'lucide-react';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -28,6 +28,8 @@ interface HeatmapData {
   by_day: { day: string; trades: number; pnl: number; win_rate: number }[];
 }
 
+// ── Symbol classification ────────────────────────────────────────────────────
+
 function extractUnderlying(sym: string): string {
   const m1 = sym.match(/^([A-Z\-]+?)\d{5}\d+(CE|PE)$/);
   if (m1) return m1[1];
@@ -45,6 +47,15 @@ function optionType(sym: string): 'CE' | 'PE' | 'FUT' | 'EQ' {
   if (sym.endsWith('PE')) return 'PE';
   if (sym.endsWith('FUT')) return 'FUT';
   return 'EQ';
+}
+
+function classifyExpiry(sym: string): 'weekly' | 'monthly' | 'fut' | 'other' {
+  if (sym.endsWith('FUT')) return 'fut';
+  // Weekly: 5-6 consecutive digits as expiry code (YYMDD / YYMMDD format)
+  if (/^[A-Z\-]+\d{5,6}\d+(CE|PE)$/.test(sym)) return 'weekly';
+  // Monthly: DDMON or DDMONYY format with alpha month
+  if (/^[A-Z\-]+\d{2}[A-Z]{3}(\d{2})?\d+(CE|PE)$/.test(sym)) return 'monthly';
+  return 'other';
 }
 
 function groupByUnderlying(instruments: PerfData['by_instrument']) {
@@ -69,14 +80,44 @@ function groupByUnderlying(instruments: PerfData['by_instrument']) {
 }
 
 function pnlColor(v: number) { return v >= 0 ? '#16a34a' : '#dc2626'; }
-function heatColor(pnl: number, trades: number, maxAbsPnl: number): string {
-  if (trades === 0) return 'rgba(0,0,0,0.04)';
-  const intensity = Math.min(1, Math.abs(pnl) / (maxAbsPnl || 1));
-  if (pnl > 0) return `rgba(22,163,74,${0.15 + intensity * 0.5})`;
-  return `rgba(220,38,38,${0.15 + intensity * 0.5})`;
-}
 
 const DAY_ORDER = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri'];
+
+// ── F&O Session Windows ──────────────────────────────────────────────────────
+const SESSION_WINDOWS = [
+  { label: 'Opening',   range: '9:15–10:00', hours: [9] },
+  { label: 'Morning',   range: '10:00–12:00', hours: [10, 11] },
+  { label: 'Afternoon', range: '12:00–14:00', hours: [12, 13] },
+  { label: 'Close',     range: '14:00–15:30', hours: [14, 15] },
+];
+
+function buildSessionWindows(byHour: HeatmapData['by_hour']) {
+  return SESSION_WINDOWS.map(sw => {
+    const rows = byHour.filter(h => sw.hours.includes(h.hour));
+    const trades = rows.reduce((s, r) => s + r.trades, 0);
+    const totalPnl = rows.reduce((s, r) => s + r.pnl, 0);
+    const wins = rows.reduce((s, r) => s + Math.round(r.trades * r.win_rate / 100), 0);
+    const win_rate = trades > 0 ? Math.round(wins / trades * 100) : 0;
+    const avg_pnl  = trades > 0 ? Math.round(totalPnl / trades) : 0;
+    return { label: sw.label, range: sw.range, trades, pnl: Math.round(totalPnl), win_rate, avg_pnl };
+  });
+}
+
+// ── Tooltips ─────────────────────────────────────────────────────────────────
+
+function BarTooltip({ active, payload, labelKey }: any) {
+  if (!active || !payload?.length) return null;
+  const d = payload[0].payload;
+  return (
+    <div className="bg-popover border border-border rounded-lg px-3 py-2 shadow-lg text-sm">
+      <p className="font-medium mb-1">{d[labelKey ?? 'name']}</p>
+      <p className={cn('font-mono tabular-nums', d.avg_pnl >= 0 ? 'text-tm-profit' : 'text-tm-loss')}>
+        {formatCurrencyWithSign(d.avg_pnl)} avg
+      </p>
+      <p className="text-xs text-muted-foreground">{d.trades} trades · {d.win_rate}% WR</p>
+    </div>
+  );
+}
 
 function SizeTooltip({ active, payload }: any) {
   if (!active || !payload?.length) return null;
@@ -92,19 +133,21 @@ function SizeTooltip({ active, payload }: any) {
   );
 }
 
+// ── Component ─────────────────────────────────────────────────────────────────
+
 export default function EdgeTab({ days, onInstrumentClick }: EdgeTabProps) {
-  const [perf, setPerf]         = useState<PerfData | null>(null);
-  const [heatmap, setHeatmap]   = useState<HeatmapData | null>(null);
-  const [loading, setLoading]   = useState(true);
-  const [error, setError]       = useState<string | null>(null);
-  const [retry, setRetry]       = useState(0);
+  const [perf, setPerf]       = useState<PerfData | null>(null);
+  const [heatmap, setHeatmap] = useState<HeatmapData | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError]     = useState<string | null>(null);
+  const [retry, setRetry]     = useState(0);
 
   useEffect(() => {
     let cancelled = false;
     setLoading(true);
     setError(null);
     Promise.allSettled([
-      api.get('/api/analytics/performance', { params: { days } }),
+      api.get('/api/analytics/performance',    { params: { days } }),
       api.get('/api/analytics/timing-heatmap', { params: { days } }),
     ]).then(([pf, hm]) => {
       if (cancelled) return;
@@ -122,8 +165,8 @@ export default function EdgeTab({ days, onInstrumentClick }: EdgeTabProps) {
         <Skeleton className="h-24 rounded-xl" />
       </div>
       <Skeleton className="h-[260px] rounded-xl" />
-      <Skeleton className="h-[120px] rounded-xl" />
-      <Skeleton className="h-[180px] rounded-xl" />
+      <Skeleton className="h-[200px] rounded-xl" />
+      <Skeleton className="h-[200px] rounded-xl" />
     </div>
   );
 
@@ -139,9 +182,9 @@ export default function EdgeTab({ days, onInstrumentClick }: EdgeTabProps) {
 
   // CE/PE/FUT split
   const byInstrument = perf?.by_instrument ?? [];
-  const cePnl   = byInstrument.filter(i => optionType(i.symbol) === 'CE').reduce((s, i) => s + i.pnl, 0);
-  const pePnl   = byInstrument.filter(i => optionType(i.symbol) === 'PE').reduce((s, i) => s + i.pnl, 0);
-  const futPnl  = byInstrument.filter(i => optionType(i.symbol) === 'FUT').reduce((s, i) => s + i.pnl, 0);
+  const cePnl    = byInstrument.filter(i => optionType(i.symbol) === 'CE').reduce((s, i) => s + i.pnl, 0);
+  const pePnl    = byInstrument.filter(i => optionType(i.symbol) === 'PE').reduce((s, i) => s + i.pnl, 0);
+  const futPnl   = byInstrument.filter(i => optionType(i.symbol) === 'FUT').reduce((s, i) => s + i.pnl, 0);
   const ceTrades  = byInstrument.filter(i => optionType(i.symbol) === 'CE').reduce((s, i) => s + i.trades, 0);
   const peTrades  = byInstrument.filter(i => optionType(i.symbol) === 'PE').reduce((s, i) => s + i.trades, 0);
   const futTrades = byInstrument.filter(i => optionType(i.symbol) === 'FUT').reduce((s, i) => s + i.trades, 0);
@@ -149,17 +192,47 @@ export default function EdgeTab({ days, onInstrumentClick }: EdgeTabProps) {
   const grouped = groupByUnderlying(byInstrument);
   const maxAbsPnl = Math.max(...grouped.map(g => Math.abs(g.pnl)), 1);
 
-  // Heatmap
+  // Weekly vs Monthly split
+  const weeklyInstr  = byInstrument.filter(i => classifyExpiry(i.symbol) === 'weekly');
+  const monthlyInstr = byInstrument.filter(i => classifyExpiry(i.symbol) === 'monthly');
+  const wTrades = weeklyInstr.reduce((s, i) => s + i.trades, 0);
+  const mTrades = monthlyInstr.reduce((s, i) => s + i.trades, 0);
+  const wPnl    = weeklyInstr.reduce((s, i) => s + i.pnl, 0);
+  const mPnl    = monthlyInstr.reduce((s, i) => s + i.pnl, 0);
+  const wWins   = weeklyInstr.reduce((s, i) => s + Math.round(i.trades * i.win_rate / 100), 0);
+  const mWins   = monthlyInstr.reduce((s, i) => s + Math.round(i.trades * i.win_rate / 100), 0);
+  const wWR     = wTrades > 0 ? Math.round(wWins / wTrades * 100) : 0;
+  const mWR     = mTrades > 0 ? Math.round(mWins / mTrades * 100) : 0;
+
+  // Hour-of-day bar data
   const byHour = heatmap?.by_hour ?? [];
-  const byDay  = heatmap?.by_day  ?? [];
-  const maxHourPnl = Math.max(...byHour.map(h => Math.abs(h.pnl)), 1);
-  const maxDayPnl  = Math.max(...byDay.map(d => Math.abs(d.pnl)), 1);
+  const hourBarData = byHour.map(h => ({
+    label: `${String(h.hour).padStart(2,'0')}:00`,
+    hour: h.hour,
+    trades: h.trades,
+    avg_pnl: h.trades > 0 ? Math.round(h.pnl / h.trades) : 0,
+    win_rate: Math.round(h.win_rate),
+  }));
+  const bestHour  = [...hourBarData].sort((a, b) => b.avg_pnl - a.avg_pnl)[0];
+  const worstHour = [...hourBarData].sort((a, b) => a.avg_pnl - b.avg_pnl)[0];
 
-  // Day of week
-  const dowData = (perf?.by_day_of_week ?? []).filter(d => DAY_ORDER.includes(d.day));
-  dowData.sort((a, b) => DAY_ORDER.indexOf(a.day) - DAY_ORDER.indexOf(b.day));
+  // Day-of-week bar data
+  const dowRaw = (perf?.by_day_of_week ?? []).filter(d => DAY_ORDER.includes(d.day));
+  dowRaw.sort((a, b) => DAY_ORDER.indexOf(a.day) - DAY_ORDER.indexOf(b.day));
+  const dowBarData = dowRaw.map(d => ({
+    label: d.day,
+    trades: d.trades,
+    avg_pnl: d.trades > 0 ? Math.round(d.pnl / d.trades) : 0,
+    win_rate: Math.round(d.win_rate),
+  }));
+  const bestDow = [...dowBarData].sort((a, b) => b.avg_pnl - a.avg_pnl)[0];
 
-  // Size analysis
+  // F&O session windows
+  const sessionWindows = buildSessionWindows(byHour);
+  const bestSession  = [...sessionWindows].sort((a, b) => b.avg_pnl - a.avg_pnl)[0];
+  const worstSession = [...sessionWindows].sort((a, b) => a.avg_pnl - b.avg_pnl)[0];
+
+  // Position size
   const sizeData = perf?.size_analysis ?? [];
 
   return (
@@ -190,6 +263,37 @@ export default function EdgeTab({ days, onInstrumentClick }: EdgeTabProps) {
             {cePnl + pePnl > 0
               ? cePnl > pePnl ? 'You earn more from calls than puts this period.' : 'You earn more from puts than calls this period.'
               : 'Both calls and puts are net-negative. Review entry criteria.'}
+          </p>
+        </div>
+      )}
+
+      {/* Weekly vs Monthly Options */}
+      {(wTrades + mTrades > 0) && (
+        <div className="tm-card overflow-hidden">
+          <div className="px-5 py-3.5 border-b border-border">
+            <p className="font-semibold text-sm">Weekly vs Monthly Options</p>
+          </div>
+          <div className="grid grid-cols-2 divide-x divide-border">
+            {[
+              { label: 'Weekly Expiry', trades: wTrades, pnl: wPnl, wr: wWR },
+              { label: 'Monthly Expiry', trades: mTrades, pnl: mPnl, wr: mWR },
+            ].map(({ label, trades, pnl, wr }) => (
+              <div key={label} className="px-5 py-4">
+                <p className="text-[11px] text-muted-foreground uppercase tracking-wide mb-2">{label}</p>
+                <p className={cn('text-2xl font-mono font-bold tabular-nums', pnl >= 0 ? 'text-tm-profit' : 'text-tm-loss')}>
+                  {formatCurrencyWithSign(Math.round(pnl))}
+                </p>
+                <p className="text-[12px] text-muted-foreground mt-0.5">{trades} trades · {wr}% WR</p>
+              </div>
+            ))}
+          </div>
+          <p className="px-5 pb-3.5 text-[11px] text-muted-foreground">
+            {wTrades > 0 && mTrades > 0
+              ? wPnl / Math.max(wTrades, 1) > mPnl / Math.max(mTrades, 1)
+                ? `Weekly options give better avg P&L (${formatCurrencyWithSign(Math.round(wPnl / wTrades))} vs ${formatCurrencyWithSign(Math.round(mPnl / mTrades))} per trade).`
+                : `Monthly options give better avg P&L (${formatCurrencyWithSign(Math.round(mPnl / mTrades))} vs ${formatCurrencyWithSign(Math.round(wPnl / wTrades))} per trade).`
+              : 'Track both weekly and monthly options to discover where your edge lies.'
+            }
           </p>
         </div>
       )}
@@ -242,83 +346,97 @@ export default function EdgeTab({ days, onInstrumentClick }: EdgeTabProps) {
         </div>
       )}
 
-      {/* Time-of-Day Grid */}
-      {byHour.length > 0 && (
+      {/* F&O Session Windows */}
+      {sessionWindows.some(sw => sw.trades > 0) && (
+        <div className="tm-card overflow-hidden">
+          <div className="px-5 py-3.5 border-b border-border">
+            <p className="font-semibold text-sm">F&O Session Windows</p>
+          </div>
+          <div className="grid grid-cols-2 md:grid-cols-4 divide-y md:divide-y-0 divide-x divide-border">
+            {sessionWindows.map(sw => (
+              <div key={sw.label} className="px-4 py-3.5">
+                <p className="text-[10px] text-muted-foreground uppercase tracking-wide mb-0.5">{sw.label}</p>
+                <p className="text-[9px] text-muted-foreground/70 mb-2">{sw.range}</p>
+                {sw.trades > 0 ? (
+                  <>
+                    <p className={cn('text-[17px] font-mono font-bold tabular-nums', sw.avg_pnl >= 0 ? 'text-tm-profit' : 'text-tm-loss')}>
+                      {formatCurrencyWithSign(sw.avg_pnl)}
+                    </p>
+                    <p className="text-[11px] text-muted-foreground mt-0.5">{sw.trades}t · {sw.win_rate}% WR</p>
+                  </>
+                ) : (
+                  <p className="text-[13px] text-muted-foreground/50 font-mono">—</p>
+                )}
+              </div>
+            ))}
+          </div>
+          <p className="px-5 pb-3.5 text-[11px] text-muted-foreground">
+            {bestSession && worstSession && bestSession.trades > 0 && worstSession.trades > 0
+              ? `${bestSession.label} is your strongest session (${formatCurrencyWithSign(bestSession.avg_pnl)} avg). ${worstSession.label} is weakest (${formatCurrencyWithSign(worstSession.avg_pnl)} avg).`
+              : 'Session performance by time block — where your edge is concentrated.'
+            }
+          </p>
+        </div>
+      )}
+
+      {/* Hour-of-Day Bar Chart */}
+      {hourBarData.length > 0 && (
         <div className="tm-card overflow-hidden">
           <div className="px-5 py-3.5 border-b border-border">
             <p className="font-semibold text-sm">Hour-of-Day Performance</p>
           </div>
           <div className="p-4">
-            <div className="grid gap-1.5" style={{ gridTemplateColumns: `repeat(${byHour.length}, 1fr)` }}>
-              {byHour.map(h => (
-                <div key={h.hour} className="flex flex-col items-center gap-1">
-                  <div
-                    className="w-full rounded-md flex items-center justify-center text-[10px] font-mono font-semibold"
-                    style={{
-                      height: 40,
-                      backgroundColor: heatColor(h.pnl, h.trades, maxHourPnl),
-                      color: Math.abs(h.pnl) / (maxHourPnl || 1) > 0.4 ? 'white' : undefined,
-                    }}
-                    title={`${String(h.hour).padStart(2,'0')}:00 — ${formatCurrencyWithSign(Math.round(h.pnl))} · ${h.trades} trades · ${Math.round(h.win_rate)}% WR`}
-                  >
-                    {h.trades > 0 ? `${Math.round(h.win_rate)}%` : ''}
-                  </div>
-                  <span className="text-[9px] text-muted-foreground">{String(h.hour).padStart(2,'0')}</span>
-                </div>
-              ))}
-            </div>
-            <div className="flex items-center gap-4 mt-3 text-[10px] text-muted-foreground">
-              <div className="flex items-center gap-1"><div className="w-3 h-3 rounded" style={{ backgroundColor: 'rgba(22,163,74,0.6)' }} /> Profitable</div>
-              <div className="flex items-center gap-1"><div className="w-3 h-3 rounded" style={{ backgroundColor: 'rgba(220,38,38,0.6)' }} /> Losing</div>
-              <div className="flex items-center gap-1"><div className="w-3 h-3 rounded" style={{ backgroundColor: 'rgba(0,0,0,0.06)' }} /> No trades</div>
-            </div>
+            <ResponsiveContainer width="100%" height={180}>
+              <BarChart data={hourBarData} margin={{ top: 4, right: 4, left: -16, bottom: 0 }}>
+                <CartesianGrid strokeDasharray="3 3" stroke="rgba(0,0,0,0.06)" vertical={false} />
+                <XAxis dataKey="label" tick={{ fontSize: 10 }} tickLine={false} axisLine={false} />
+                <YAxis tick={{ fontSize: 10 }} tickLine={false} axisLine={false} tickFormatter={v => formatCurrency(v)} />
+                <Tooltip content={<BarTooltip labelKey="label" />} />
+                <ReferenceLine y={0} stroke="rgba(0,0,0,0.15)" />
+                <Bar dataKey="avg_pnl" radius={[3, 3, 0, 0]} maxBarSize={36}>
+                  {hourBarData.map((d, i) => (
+                    <Cell key={i} fill={d.avg_pnl >= 0 ? '#16a34a' : '#dc2626'} opacity={0.8} />
+                  ))}
+                </Bar>
+              </BarChart>
+            </ResponsiveContainer>
           </div>
           <p className="px-5 pb-3.5 text-[11px] text-muted-foreground">
-            {byHour.length > 0 && (() => {
-              const best = [...byHour].sort((a, b) => b.pnl - a.pnl)[0];
-              const worst = [...byHour].sort((a, b) => a.pnl - b.pnl)[0];
-              return `Best hour: ${String(best.hour).padStart(2,'0')}:00 (${formatCurrencyWithSign(Math.round(best.pnl))}) · Worst: ${String(worst.hour).padStart(2,'0')}:00 (${formatCurrencyWithSign(Math.round(worst.pnl))})`;
-            })()}
+            {bestHour && worstHour
+              ? `Best: ${bestHour.label} (${formatCurrencyWithSign(bestHour.avg_pnl)} avg) · Worst: ${worstHour.label} (${formatCurrencyWithSign(worstHour.avg_pnl)} avg)`
+              : 'Avg P&L per trade by hour of entry.'
+            }
           </p>
         </div>
       )}
 
-      {/* Day of Week */}
-      {dowData.length > 0 && (
+      {/* Day-of-Week Bar Chart */}
+      {dowBarData.length > 0 && (
         <div className="tm-card overflow-hidden">
           <div className="px-5 py-3.5 border-b border-border">
             <p className="font-semibold text-sm">Day of Week</p>
           </div>
           <div className="p-4">
-            <div className="grid grid-cols-5 gap-2">
-              {DAY_ORDER.map(day => {
-                const d = dowData.find(x => x.day === day);
-                if (!d) return (
-                  <div key={day} className="flex flex-col items-center gap-1">
-                    <div className="w-full h-12 rounded-lg bg-muted/30" />
-                    <span className="text-[11px] text-muted-foreground">{day}</span>
-                  </div>
-                );
-                return (
-                  <div key={day} className="flex flex-col items-center gap-1">
-                    <div
-                      className="w-full h-12 rounded-lg flex flex-col items-center justify-center gap-0.5"
-                      style={{ backgroundColor: heatColor(d.pnl, d.trades, maxDayPnl) }}
-                    >
-                      <span className="text-[10px] font-mono font-semibold">{Math.round(d.win_rate)}%</span>
-                      <span className="text-[9px] text-muted-foreground">{d.trades}t</span>
-                    </div>
-                    <span className="text-[11px] text-muted-foreground">{day}</span>
-                  </div>
-                );
-              })}
-            </div>
+            <ResponsiveContainer width="100%" height={180}>
+              <BarChart data={dowBarData} margin={{ top: 4, right: 4, left: -16, bottom: 0 }}>
+                <CartesianGrid strokeDasharray="3 3" stroke="rgba(0,0,0,0.06)" vertical={false} />
+                <XAxis dataKey="label" tick={{ fontSize: 11 }} tickLine={false} axisLine={false} />
+                <YAxis tick={{ fontSize: 10 }} tickLine={false} axisLine={false} tickFormatter={v => formatCurrency(v)} />
+                <Tooltip content={<BarTooltip labelKey="label" />} />
+                <ReferenceLine y={0} stroke="rgba(0,0,0,0.15)" />
+                <Bar dataKey="avg_pnl" radius={[3, 3, 0, 0]} maxBarSize={40}>
+                  {dowBarData.map((d, i) => (
+                    <Cell key={i} fill={d.avg_pnl >= 0 ? '#16a34a' : '#dc2626'} opacity={0.8} />
+                  ))}
+                </Bar>
+              </BarChart>
+            </ResponsiveContainer>
           </div>
           <p className="px-5 pb-3.5 text-[11px] text-muted-foreground">
-            {dowData.length > 0 && (() => {
-              const best = [...dowData].sort((a, b) => b.pnl - a.pnl)[0];
-              return `${best.day} is your most profitable trading day (${formatCurrencyWithSign(Math.round(best.pnl))} total).`;
-            })()}
+            {bestDow
+              ? `${bestDow.label} is your best trading day (${formatCurrencyWithSign(bestDow.avg_pnl)} avg per trade · ${bestDow.win_rate}% WR).`
+              : 'Avg P&L per trade by day of week.'
+            }
           </p>
         </div>
       )}

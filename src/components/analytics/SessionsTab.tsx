@@ -1,4 +1,8 @@
 import { useState, useEffect } from 'react';
+import {
+  BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip,
+  ResponsiveContainer, Cell, ReferenceLine,
+} from 'recharts';
 import { RefreshCw, AlertTriangle, Clock } from 'lucide-react';
 import { Skeleton } from '@/components/ui/skeleton';
 import { cn } from '@/lib/utils';
@@ -12,6 +16,14 @@ interface OverviewData {
   daily_pnl: { date: string; pnl: number; trades: number; win_rate: number }[];
 }
 
+interface ExpiryWeekDow {
+  day: string;
+  trade_count: number;
+  win_rate: number;
+  avg_pnl: number;
+  total_pnl: number;
+}
+
 interface ExpiryData {
   has_data: boolean;
   period_days: number;
@@ -19,6 +31,7 @@ interface ExpiryData {
   non_expiry: { trade_count: number; win_rate: number; avg_pnl: number; total_pnl: number };
   by_hour: { hour: number; label: string; expiry_count: number; expiry_avg_pnl: number; non_expiry_count: number; non_expiry_avg_pnl: number }[];
   worst_expiry_trades: { symbol: string; pnl: number; hour: number }[];
+  by_expiry_week_dow?: ExpiryWeekDow[];
 }
 
 interface ConditionalData {
@@ -41,6 +54,7 @@ function calendarBg(pnl: number, trades: number) {
 }
 
 const MONTHS_TO_SHOW = 3;
+const DOW_ORDER = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri'];
 
 function buildCalendar(dailyPnl: OverviewData['daily_pnl']) {
   const byDate: Record<string, { pnl: number; trades: number }> = {};
@@ -86,7 +100,7 @@ function CalendarMonth({ year, month, days }: { year: number; month: number; day
         <p className="font-semibold text-sm">{monthName}</p>
         {tradingDays.length > 0 && (
           <span className="text-xs text-muted-foreground">
-            {profitDays}/{tradingDays.length} days profitable
+            {profitDays}/{tradingDays.length} profitable
           </span>
         )}
       </div>
@@ -97,22 +111,22 @@ function CalendarMonth({ year, month, days }: { year: number; month: number; day
             <div key={i} className="text-center text-[9px] text-muted-foreground py-1">{d}</div>
           ))}
         </div>
-        {/* Day cells */}
+        {/* Day cells — min-h-[36px] ensures readable on mobile 390px */}
         <div className="grid grid-cols-7 gap-px">
-          {Array.from({ length: blanks }).map((_, i) => <div key={`b${i}`} />)}
+          {Array.from({ length: blanks }).map((_, i) => <div key={`b${i}`} className="min-h-[36px]" />)}
           {days.map(d => (
             <div
               key={d.date}
               className={cn(
-                'aspect-square rounded-sm flex flex-col items-center justify-center',
+                'min-h-[36px] rounded-sm flex flex-col items-center justify-center',
                 d.isWeekend ? 'opacity-25' : '',
               )}
               style={{ backgroundColor: d.trades > 0 ? calendarBg(d.pnl, d.trades) : undefined }}
               title={d.trades > 0 ? `${d.date}: ${formatCurrencyWithSign(Math.round(d.pnl))} · ${d.trades} trades` : d.date}
             >
-              <span className="text-[9px] text-muted-foreground leading-none">{parseInt(d.date.slice(8))}</span>
+              <span className="text-[10px] text-muted-foreground leading-none">{parseInt(d.date.slice(8))}</span>
               {d.trades > 0 && (
-                <span className={cn('text-[7px] font-mono leading-none mt-0.5', pnlColorClass(d.pnl))}>
+                <span className={cn('text-[8px] font-mono leading-none mt-0.5', pnlColorClass(d.pnl))}>
                   {d.pnl >= 0 ? '+' : ''}{Math.round(d.pnl / 1000)}k
                 </span>
               )}
@@ -120,6 +134,20 @@ function CalendarMonth({ year, month, days }: { year: number; month: number; day
           ))}
         </div>
       </div>
+    </div>
+  );
+}
+
+function DowTooltip({ active, payload }: any) {
+  if (!active || !payload?.length) return null;
+  const d = payload[0].payload;
+  return (
+    <div className="bg-popover border border-border rounded-lg px-3 py-2 shadow-lg text-sm">
+      <p className="font-medium mb-1">{d.day} (expiry weeks)</p>
+      <p className={cn('font-mono tabular-nums', d.avg_pnl >= 0 ? 'text-tm-profit' : 'text-tm-loss')}>
+        {formatCurrencyWithSign(Math.round(d.avg_pnl))} avg
+      </p>
+      <p className="text-xs text-muted-foreground">{d.trade_count} trades · {d.win_rate}% WR</p>
     </div>
   );
 }
@@ -137,8 +165,8 @@ export default function SessionsTab({ days }: SessionsTabProps) {
     setLoading(true);
     setError(null);
     Promise.allSettled([
-      api.get('/api/analytics/overview',              { params: { days: 90 } }),
-      api.get('/api/analytics/expiry-pattern',        { params: { days } }),
+      api.get('/api/analytics/overview',                { params: { days: 90 } }),
+      api.get('/api/analytics/expiry-pattern',          { params: { days } }),
       api.get('/api/analytics/conditional-performance', { params: { days } }),
     ]).then(([ov, ex, co]) => {
       if (cancelled) return;
@@ -161,6 +189,7 @@ export default function SessionsTab({ days }: SessionsTabProps) {
         <Skeleton className="h-28 rounded-xl" />
         <Skeleton className="h-28 rounded-xl" />
       </div>
+      <Skeleton className="h-[200px] rounded-xl" />
       <Skeleton className="h-[180px] rounded-xl" />
     </div>
   );
@@ -176,8 +205,19 @@ export default function SessionsTab({ days }: SessionsTabProps) {
   );
 
   const calendarMonths = overview?.daily_pnl ? buildCalendar(overview.daily_pnl) : [];
-  const first30 = conditional?.has_data ? conditional.first_30min : null;
-  const expiryDay = conditional?.has_data ? conditional.expiry_day : null;
+  const first30   = conditional?.has_data ? conditional.first_30min : null;
+  const expiryDay = conditional?.has_data ? conditional.expiry_day  : null;
+
+  // Expiry week DOW bar data — sort by Mon→Fri
+  const dowRaw  = (expiry?.by_expiry_week_dow ?? []).filter(d => DOW_ORDER.includes(d.day));
+  dowRaw.sort((a, b) => DOW_ORDER.indexOf(a.day) - DOW_ORDER.indexOf(b.day));
+  const bestDow  = [...dowRaw].sort((a, b) => b.avg_pnl - a.avg_pnl)[0];
+  const worstDow = [...dowRaw].sort((a, b) => a.avg_pnl - b.avg_pnl)[0];
+
+  // Expiry hourly avg pnl (for personalized insight)
+  const bestExpiryHour = expiry?.by_hour
+    ? [...expiry.by_hour].filter(h => h.expiry_count > 0).sort((a, b) => b.expiry_avg_pnl - a.expiry_avg_pnl)[0]
+    : null;
 
   return (
     <div className="space-y-5">
@@ -360,6 +400,40 @@ export default function SessionsTab({ days }: SessionsTabProps) {
               ? `You underperform on expiry days by ${formatCurrencyWithSign(Math.round(expiry.non_expiry.avg_pnl - expiry.expiry.avg_pnl))} per trade. Consider reducing size on expiry.`
               : `You perform better on expiry days than non-expiry days. Your edge is stronger near settlement.`
             }
+          </p>
+        </div>
+      )}
+
+      {/* Expiry Week DOW Breakdown */}
+      {dowRaw.length > 0 && (
+        <div className="tm-card overflow-hidden">
+          <div className="px-5 py-3.5 border-b border-border">
+            <p className="font-semibold text-sm">Expiry Week by Day</p>
+          </div>
+          <p className="px-5 pt-3 text-[11px] text-muted-foreground">
+            All trades taken during expiry weeks, broken down by weekday. Mon–Wed is pre-theta, Thu is settlement.
+          </p>
+          <div className="p-4">
+            <ResponsiveContainer width="100%" height={180}>
+              <BarChart data={dowRaw} margin={{ top: 4, right: 4, left: -16, bottom: 0 }}>
+                <CartesianGrid strokeDasharray="3 3" stroke="rgba(0,0,0,0.06)" vertical={false} />
+                <XAxis dataKey="day" tick={{ fontSize: 11 }} tickLine={false} axisLine={false} />
+                <YAxis tick={{ fontSize: 10 }} tickLine={false} axisLine={false} tickFormatter={v => formatCurrencyWithSign(v)} />
+                <Tooltip content={<DowTooltip />} />
+                <ReferenceLine y={0} stroke="rgba(0,0,0,0.15)" />
+                <Bar dataKey="avg_pnl" radius={[3, 3, 0, 0]} maxBarSize={44}>
+                  {dowRaw.map((d, i) => (
+                    <Cell key={i} fill={d.avg_pnl >= 0 ? '#16a34a' : '#dc2626'} opacity={0.8} />
+                  ))}
+                </Bar>
+              </BarChart>
+            </ResponsiveContainer>
+          </div>
+          <p className="px-5 pb-3.5 text-[11px] text-muted-foreground">
+            {bestDow && worstDow
+              ? `Your edge during expiry weeks is strongest on ${bestDow.day} (${formatCurrencyWithSign(Math.round(bestDow.avg_pnl))} avg). Weakest on ${worstDow.day} (${formatCurrencyWithSign(Math.round(worstDow.avg_pnl))} avg).`
+              : 'Day-by-day breakdown of expiry week performance.'}
+            {bestExpiryHour && ` Best expiry hour: ${String(bestExpiryHour.hour).padStart(2,'0')}:00.`}
           </p>
         </div>
       )}

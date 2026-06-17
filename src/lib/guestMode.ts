@@ -131,6 +131,13 @@ export function getGuestResponse(url: string, method = 'GET'): unknown | undefin
         { symbol: 'NIFTY25JUN24200PE', pnl: -2400, hour: 14 },
         { symbol: 'BANKNIFTY25JUN50000PE', pnl: -1800, hour: 10 },
       ],
+      by_expiry_week_dow: [
+        { day: 'Mon', trade_count: 12, win_rate: 58.3, avg_pnl: 240,  total_pnl: 2880  },
+        { day: 'Tue', trade_count: 18, win_rate: 55.6, avg_pnl: 180,  total_pnl: 3240  },
+        { day: 'Wed', trade_count: 22, win_rate: 50.0, avg_pnl: 80,   total_pnl: 1760  },
+        { day: 'Thu', trade_count: 28, win_rate: 39.3, avg_pnl: -420, total_pnl: -11760 },
+        { day: 'Fri', trade_count: 8,  win_rate: 62.5, avg_pnl: 310,  total_pnl: 2480  },
+      ],
     };
   }
   if (path === '/api/analytics/trade-sequence') {

@@ -401,11 +401,11 @@ export default function TradeDnaTab({ days }: TradeDnaTabProps) {
                 </div>
                 <div className="flex items-center gap-3 shrink-0">
                   <span className={cn(
-                    'text-[10px] px-1.5 py-0.5 rounded-full',
+                    'text-[10px] px-1.5 py-0.5 rounded-full font-mono',
                     t.score >= 6 ? 'bg-green-500/10 text-tm-profit' :
                     t.score >= 4 ? 'bg-amber-500/10 text-tm-obs' : 'bg-red-500/10 text-tm-loss',
                   )}>
-                    Q{t.score}
+                    {t.score}/8
                   </span>
                   <span className={cn('text-sm font-mono font-semibold', t.realized_pnl >= 0 ? 'text-tm-profit' : 'text-tm-loss')}>
                     {formatCurrencyWithSign(Math.round(t.realized_pnl))}
