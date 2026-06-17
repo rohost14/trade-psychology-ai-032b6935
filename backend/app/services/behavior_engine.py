@@ -1222,57 +1222,108 @@ class BehaviorEngine:
         ct = ctx.completed_trade
         trades = ctx.session_trades
 
+        # All prior session trades (any instrument) — streak check only.
+        # Streak = last N exits, any instrument, all won.
         prior = sorted(
             [t for t in trades if t.id != ct.id and t.exit_time],
             key=lambda t: t.exit_time,
         )
 
-        caution_streak = ctx.thresholds.get("overconfidence_win_streak_caution", 3)
-        danger_streak  = ctx.thresholds.get("overconfidence_win_streak_danger", 5)
-        size_mul       = ctx.thresholds.get("overconfidence_size_mul_caution", 1.3)
+        caution_streak   = ctx.thresholds.get("overconfidence_win_streak_caution", 3)
+        danger_streak    = ctx.thresholds.get("overconfidence_win_streak_danger", 5)
+        size_mul_caution = ctx.thresholds.get("overconfidence_size_mul_caution", 1.3)
+        size_mul_danger  = ctx.thresholds.get("overconfidence_size_mul_danger", 2.0)
 
-        # Check if prior N trades are all wins
         def is_win_streak(n: int) -> bool:
             if len(prior) < n:
                 return False
             return all(Decimal(str(t.realized_pnl or 0)) > 0 for t in prior[-n:])
 
-        # Danger: 5+ consecutive wins regardless of current size
-        if is_win_streak(danger_streak):
-            win_trades = prior[-danger_streak:]
-            total_profit = sum(Decimal(str(t.realized_pnl or 0)) for t in win_trades)
-            return DetectedEvent(
-                event_type="winning_streak_overconfidence",
-                severity="danger",
-                message=(
-                    f"{danger_streak} consecutive wins — ₹{float(total_profit):,.0f} total profit."
-                ),
-                context={
-                    "win_streak": danger_streak,
-                    "streak_profit": float(total_profit),
-                },
+        # Size baseline: avg qty of ALL prior trades on the SAME underlying today.
+        # Cross-instrument raw qty comparison is meaningless — NIFTY lot ≠ BANKNIFTY lot
+        # ≠ stock option lot. Same underlying guarantees lot size is identical across
+        # all compared trades (different expiries of same underlying share the same lot).
+        from app.services.instrument_parser import parse_symbol as _ps
+        try:
+            ct_underlying = _ps(ct.tradingsymbol or "").underlying or ct.tradingsymbol or ""
+        except Exception:
+            ct_underlying = ct.tradingsymbol or ""
+
+        prior_same = [
+            t for t in prior
+            if t.tradingsymbol and (
+                (_ps(t.tradingsymbol).underlying or t.tradingsymbol) == ct_underlying
             )
+        ]
+        avg_baseline = (
+            sum(t.total_quantity or 1 for t in prior_same) / len(prior_same)
+            if prior_same else None
+        )
+        current_qty = ct.total_quantity or 1
 
-        # Caution: 3+ wins + size escalation
+        def _streak_trade_list(win_list):
+            return [
+                {
+                    "symbol": t.tradingsymbol or "—",
+                    "qty": t.total_quantity or 0,
+                    "pnl": float(Decimal(str(t.realized_pnl or 0))),
+                    "exit_time": t.exit_time.isoformat() if t.exit_time else None,
+                }
+                for t in win_list
+            ]
+
+        # ── Danger: 5 wins (any instruments) + same-underlying size ≥ 2× avg ──
+        if is_win_streak(danger_streak):
+            if avg_baseline is not None and current_qty >= avg_baseline * size_mul_danger:
+                win_trades = prior[-danger_streak:]
+                total_profit = sum(Decimal(str(t.realized_pnl or 0)) for t in win_trades)
+                escalation_pct = (current_qty - avg_baseline) / max(avg_baseline, 1) * 100
+                return DetectedEvent(
+                    event_type="winning_streak_overconfidence",
+                    severity="danger",
+                    message=(
+                        f"{danger_streak} consecutive wins, then {ct_underlying} position jumped "
+                        f"{escalation_pct:.0f}% above your session average "
+                        f"({avg_baseline:.0f}→{current_qty} qty)."
+                    ),
+                    context={
+                        "win_streak": danger_streak,
+                        "streak_profit": float(total_profit),
+                        "avg_baseline_qty": round(avg_baseline, 1),
+                        "current_qty": current_qty,
+                        "escalation_pct": round(escalation_pct, 1),
+                        "underlying": ct_underlying,
+                        "trigger_symbol": ct.tradingsymbol,
+                        "streak_trades": _streak_trade_list(win_trades),
+                    },
+                )
+            # 5 wins but size not ≥ 2× (or no baseline) — fall through to caution check
+
+        # ── Caution: 3 wins (any instruments) + same-underlying size ≥ 1.3× avg ──
         if is_win_streak(caution_streak):
-            last_n = prior[-caution_streak:]
-            avg_streak_qty = sum(t.total_quantity or 1 for t in last_n) / caution_streak
-            current_qty = ct.total_quantity or 1
-
-            if current_qty >= avg_streak_qty * size_mul:
-                escalation_pct = (current_qty - avg_streak_qty) / max(avg_streak_qty, 1) * 100
+            if avg_baseline is None:
+                return None  # first trade on this underlying today — no baseline to compare
+            if current_qty >= avg_baseline * size_mul_caution:
+                win_trades = prior[-caution_streak:]
+                total_profit = sum(Decimal(str(t.realized_pnl or 0)) for t in win_trades)
+                escalation_pct = (current_qty - avg_baseline) / max(avg_baseline, 1) * 100
                 return DetectedEvent(
                     event_type="winning_streak_overconfidence",
                     severity="caution",
                     message=(
-                        f"{caution_streak} consecutive wins, then position size jumped "
-                        f"{escalation_pct:.0f}% ({avg_streak_qty:.0f}→{current_qty} units)."
+                        f"Last {caution_streak} trades all won. {ct_underlying} position jumped "
+                        f"{escalation_pct:.0f}% above your session average "
+                        f"({avg_baseline:.0f}→{current_qty} qty)."
                     ),
                     context={
                         "win_streak": caution_streak,
-                        "avg_prior_qty": round(avg_streak_qty, 1),
+                        "streak_profit": float(total_profit),
+                        "avg_baseline_qty": round(avg_baseline, 1),
                         "current_qty": current_qty,
                         "escalation_pct": round(escalation_pct, 1),
+                        "underlying": ct_underlying,
+                        "trigger_symbol": ct.tradingsymbol,
+                        "streak_trades": _streak_trade_list(win_trades),
                     },
                 )
         return None
