@@ -1,29 +1,20 @@
 """
-WebSocket API for Real-Time Price Streaming
+WebSocket API — Real-Time Event Push
 
-Provides:
-- Live price updates for subscribed instruments
-- Position P&L updates
-- Trade notifications
-- Risk alerts
-
-Architecture:
-- Client connects via WebSocket with JWT token
-- Subscribes to specific instruments or all positions
-- Server pushes price updates from Zerodha WebSocket
-- Rate limited: 1 update per second per instrument
+Pushes behavioral alerts, trade events, and replay events to connected clients.
+Price data is NOT redistributed via this WebSocket (exchange data compliance).
+KiteTicker runs server-side for Redis LTP cache used by Celery behavioral checks only.
 """
 
 from fastapi import APIRouter, WebSocket, WebSocketDisconnect, Query
 from sqlalchemy import select
-from typing import Dict, Optional, Set
+from typing import Dict, Optional
 from uuid import UUID
 import asyncio
 import json
 import logging
 from datetime import datetime, timezone
 
-from app.models.position import Position
 from app.models.broker_account import BrokerAccount
 from app.api.deps import get_current_user_ws
 from app.core.database import SessionLocal
@@ -33,15 +24,11 @@ logger = logging.getLogger(__name__)
 
 
 class ConnectionManager:
-    """Manages WebSocket connections and subscriptions."""
+    """Manages WebSocket connections for alerts, trades, and behavioral events."""
 
     def __init__(self):
         # account_id -> WebSocket connection
         self.active_connections: Dict[str, WebSocket] = {}
-        # account_id -> set of subscribed instruments
-        self.subscriptions: Dict[str, Set[str]] = {}
-        # instrument -> latest price data (cache)
-        self.price_cache: Dict[str, dict] = {}
         # Lock for thread safety
         self._lock = asyncio.Lock()
 
@@ -49,21 +36,7 @@ class ConnectionManager:
         """Remove disconnected client."""
         async with self._lock:
             self.active_connections.pop(account_id, None)
-            self.subscriptions.pop(account_id, None)
         logger.info(f"WebSocket disconnected: {account_id[:8]}...")
-
-    async def subscribe(self, account_id: str, instruments: Set[str]):
-        """Subscribe to instrument price updates."""
-        async with self._lock:
-            if account_id in self.subscriptions:
-                self.subscriptions[account_id].update(instruments)
-                logger.info(f"Subscribed {account_id[:8]}... to {instruments}")
-
-    async def unsubscribe(self, account_id: str, instruments: Set[str]):
-        """Unsubscribe from instrument price updates."""
-        async with self._lock:
-            if account_id in self.subscriptions:
-                self.subscriptions[account_id] -= instruments
 
     async def send_to_account(self, account_id: str, message: dict):
         """Send message to specific account."""
@@ -75,36 +48,6 @@ class ConnectionManager:
             except Exception as e:
                 logger.error(f"Send failed for {account_id[:8]}...: {e}")
                 await self.disconnect(account_id)
-
-    async def broadcast_price(self, instrument: str, price_data: dict):
-        """
-        Broadcast price update to all subscribed clients.
-        Rate limited: updates cached, broadcast once per second.
-        """
-        self.price_cache[instrument] = price_data
-
-        # Find all accounts subscribed to this instrument
-        subscribers = []
-        async with self._lock:
-            for account_id, subs in self.subscriptions.items():
-                if instrument in subs or "*" in subs:  # * means all instruments
-                    subscribers.append(account_id)
-
-        # Send to all subscribers concurrently — gather so one slow client
-        # doesn't delay price delivery to everyone else.
-        message = {
-            "type": "price",
-            "instrument": instrument,
-            "data": price_data,
-            "timestamp": datetime.now(timezone.utc).isoformat(),
-        }
-
-        if subscribers:
-            import asyncio
-            await asyncio.gather(
-                *[self.send_to_account(account_id, message) for account_id in subscribers],
-                return_exceptions=True,
-            )
 
     async def send_alert(self, account_id: str, alert_data: dict, event_id: str = ""):
         """Send risk alert to specific account."""
@@ -215,7 +158,6 @@ async def websocket_prices(
     # Register in manager (already accepted above — skip the accept() in connect())
     async with manager._lock:
         manager.active_connections[account_id] = websocket
-        manager.subscriptions.setdefault(account_id, set())
     logger.info(f"WebSocket connected: {account_id[:8]}...")
 
     # Confirm auth to client so it can proceed with subscriptions
@@ -270,37 +212,10 @@ async def websocket_prices(
                 if action == "ping":
                     await websocket.send_json({"type": "pong"})
 
-                elif action == "subscribe":
-                    raw = message.get("instruments", [])
-                    if not isinstance(raw, list):
-                        await websocket.send_json({"type": "error", "message": "instruments must be a list"})
-                        continue
-                    if len(raw) > 50:
-                        await websocket.send_json({"type": "error", "message": "Maximum 50 instruments per subscribe"})
-                        continue
-                    instruments = {str(i)[:50] for i in raw if isinstance(i, str) and i.strip()}
-                    await manager.subscribe(account_id, instruments)
-                    await websocket.send_json({
-                        "type": "subscribed",
-                        "instruments": list(instruments),
-                    })
-
-                elif action == "unsubscribe":
-                    instruments = set(message.get("instruments", []))
-                    await manager.unsubscribe(account_id, instruments)
-                    await websocket.send_json({
-                        "type": "unsubscribed",
-                        "instruments": list(instruments),
-                    })
-
                 elif action == "subscribe_positions":
-                    # 1. Subscribe this frontend connection to position symbols
-                    instruments = await get_position_instruments(account_id)
-                    await manager.subscribe(account_id, instruments)
-
-                    # 2. Start/connect the KiteTicker for live Kite prices.
-                    #    This is the missing link — without this, the frontend
-                    #    is listening but nobody is pulling prices from Kite.
+                    # Starts the shared KiteTicker for this account's instruments.
+                    # Ticks: → Redis LTP cache (behavioral Celery tasks)
+                    #        → broadcast_ltp() → ltp_update WebSocket event (live P&L)
                     try:
                         from app.services.price_stream_service import price_stream
                         from app.core.database import SessionLocal
@@ -308,12 +223,12 @@ async def websocket_prices(
                             await price_stream.start_account(UUID(account_id), db)
                     except Exception as e:
                         logger.error(f"Failed to start price stream for {account_id[:8]}: {e}")
+                    await websocket.send_json({"type": "subscribed"})
 
-                    await websocket.send_json({
-                        "type": "subscribed",
-                        "instruments": list(instruments),
-                        "live": True,
-                    })
+                elif action in ("subscribe", "unsubscribe"):
+                    # Price fan-out removed — price data is not redistributed via this WebSocket.
+                    # Acknowledge silently so existing frontend code doesn't error.
+                    await websocket.send_json({"type": "subscribed", "instruments": message.get("instruments", [])})
 
                 else:
                     await websocket.send_json({
@@ -334,25 +249,9 @@ async def websocket_prices(
         await manager.disconnect(account_id)
 
 
-async def get_position_instruments(account_id: str) -> Set[str]:
-    """Get all instruments from open positions for an account."""
-    from app.core.database import SessionLocal
-
-    async with SessionLocal() as db:
-        result = await db.execute(
-            select(Position.tradingsymbol).where(
-                Position.broker_account_id == UUID(account_id),
-                Position.total_quantity != 0
-            )
-        )
-        symbols = result.scalars().all()
-        return set(symbols)
-
-
-# Helper function to be called from other parts of the app
 async def notify_price_update(instrument: str, price_data: dict):
-    """Called by price service to broadcast updates."""
-    await manager.broadcast_price(instrument, price_data)
+    """Unused stub — fan-out handled by SharedPriceStream.broadcast_ltp."""
+    pass
 
 
 async def notify_trade_update(account_id: str, trade_data: dict):

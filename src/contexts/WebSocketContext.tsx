@@ -22,13 +22,6 @@ import { api } from '@/lib/api';
 const AUTH_TOKEN_KEY = 'tradementor_auth_token';
 const LAST_EVENT_KEY_PREFIX = 'tradementor_last_event_';  // + account_id
 
-interface PriceData {
-  last_price: number;
-  change?: number;
-  change_percent?: number;
-  instrument_token?: number;
-}
-
 interface TradeEvent {
   order_id?: string;
   status?: string;
@@ -42,25 +35,29 @@ interface AlertEvent {
   timestamp: string;
 }
 
+export interface LtpEvent {
+  symbol: string;
+  last_price: number;
+  instrument_token: number;
+}
+
 interface WebSocketContextValue {
-  prices: Record<string, PriceData>;
   margins: Record<string, unknown> | null;
   lastTradeEvent: TradeEvent | null;
   lastAlertEvent: AlertEvent | null;
+  lastLtpEvent: LtpEvent | null;
   isConnected: boolean;
   isReconnecting: boolean;
-  subscribe: (instruments: string[]) => void;
   subscribeToPositions: () => void;
 }
 
 const WebSocketContext = createContext<WebSocketContextValue>({
-  prices: {},
   margins: null,
   lastTradeEvent: null,
   lastAlertEvent: null,
+  lastLtpEvent: null,
   isConnected: false,
   isReconnecting: false,
-  subscribe: () => {},
   subscribeToPositions: () => {},
 });
 
@@ -74,10 +71,10 @@ const PING_INTERVAL = 30000;
 
 export function WebSocketProvider({ children }: { children: React.ReactNode }) {
   const { account, isTokenExpired } = useBroker();
-  const [prices, setPrices] = useState<Record<string, PriceData>>({});
   const [margins, setMargins] = useState<Record<string, unknown> | null>(null);
   const [lastTradeEvent, setLastTradeEvent] = useState<TradeEvent | null>(null);
   const [lastAlertEvent, setLastAlertEvent] = useState<AlertEvent | null>(null);
+  const [lastLtpEvent, setLastLtpEvent] = useState<LtpEvent | null>(null);
   const [isConnected, setIsConnected] = useState(false);
   const [isReconnecting, setIsReconnecting] = useState(false);
   const hasConnectedRef = useRef(false); // true once we've had a successful auth_ok
@@ -87,11 +84,6 @@ export function WebSocketProvider({ children }: { children: React.ReactNode }) {
   const reconnectRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const reconnectDelayRef = useRef(WS_RECONNECT_BASE);
   const mountedRef = useRef(true);
-  const pendingSubscriptions = useRef<string[]>([]);
-
-  // Price tick throttle: accumulate ticks in a ref, flush to React state every 200ms.
-  // Without this, 10+ open positions emit ticks at exchange speed → 100+ re-renders/sec.
-  const priceBufferRef = useRef<Record<string, PriceData>>({});
 
   // Trade event debounce: if 5 rapid trades arrive together, only fire one state update
   // after 300ms silence instead of triggering 5 back-to-back Dashboard refetches.
@@ -114,15 +106,6 @@ export function WebSocketProvider({ children }: { children: React.ReactNode }) {
       wsRef.current.send(JSON.stringify(msg));
     }
   }, []);
-
-  const subscribe = useCallback((instruments: string[]) => {
-    if (instruments.length === 0) return;
-    if (wsRef.current?.readyState === WebSocket.OPEN) {
-      sendMessage({ action: 'subscribe', instruments });
-    } else {
-      pendingSubscriptions.current = [...pendingSubscriptions.current, ...instruments];
-    }
-  }, [sendMessage]);
 
   const subscribeToPositions = useCallback(() => {
     sendMessage({ action: 'subscribe_positions' });
@@ -178,18 +161,6 @@ export function WebSocketProvider({ children }: { children: React.ReactNode }) {
               hasConnectedRef.current = true;
               reconnectDelayRef.current = WS_RECONNECT_BASE;
               ws.send(JSON.stringify({ action: 'subscribe_positions' }));
-              if (pendingSubscriptions.current.length > 0) {
-                ws.send(JSON.stringify({ action: 'subscribe', instruments: pendingSubscriptions.current }));
-                pendingSubscriptions.current = [];
-              }
-              break;
-
-            // ── Live price tick ───────────────────────────────────────────
-            // Buffer into ref; the 200ms flush interval drains it into state.
-            case 'price':
-              if (msg.instrument && msg.data) {
-                priceBufferRef.current[msg.instrument] = msg.data;
-              }
               break;
 
             // ── Trade / position changed ──────────────────────────────────
@@ -261,6 +232,17 @@ export function WebSocketProvider({ children }: { children: React.ReactNode }) {
               }
               break;
 
+            // ── Live price tick — update positions' last_price in-place ──
+            case 'ltp_update':
+              if (msg.data?.symbol != null && msg.data?.last_price != null) {
+                setLastLtpEvent({
+                  symbol: msg.data.symbol,
+                  last_price: msg.data.last_price,
+                  instrument_token: msg.data.instrument_token,
+                });
+              }
+              break;
+
             // ignore: pong, subscribed, unsubscribed, error
           }
         } catch {
@@ -301,18 +283,6 @@ export function WebSocketProvider({ children }: { children: React.ReactNode }) {
       .catch(() => {}); // non-fatal, WebSocket will update on next trade
   }, [account?.id, isTokenExpired]);
 
-  // Flush buffered price ticks into React state every 200ms.
-  // Runs independently of the WebSocket connection lifecycle.
-  useEffect(() => {
-    const flushTimer = setInterval(() => {
-      const buf = priceBufferRef.current;
-      if (Object.keys(buf).length === 0) return;
-      priceBufferRef.current = {};
-      setPrices(prev => ({ ...prev, ...buf }));
-    }, 200);
-    return () => clearInterval(flushTimer);
-  }, []);
-
   useEffect(() => {
     mountedRef.current = true;
     connect();
@@ -328,13 +298,12 @@ export function WebSocketProvider({ children }: { children: React.ReactNode }) {
 
   return (
     <WebSocketContext.Provider value={{
-      prices,
       margins,
       lastTradeEvent,
       lastAlertEvent,
+      lastLtpEvent,
       isConnected,
       isReconnecting,
-      subscribe,
       subscribeToPositions,
     }}>
       {children}

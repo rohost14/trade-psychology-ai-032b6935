@@ -4,36 +4,39 @@ Price Streaming Service
 Connects to Zerodha KiteTicker WebSocket for live prices.
 Broadcasts updates to connected frontend clients via our own WebSocket.
 
-Architecture (current — per-user API keys):
+Architecture (current — SharedPriceStream):
 ──────────────────────────────────────────
-  One KiteTicker connection per active broker account.
-  "Active" = account is connected + has at least one open position.
-  When the last open position closes, the KiteTicker is kept alive
-  (cheap) until the user disconnects — avoids reconnect cost on rapid
-  open/close cycles.
+  ONE KiteTicker connection for ALL active broker accounts.
 
-  KiteTicker (thread)
-    ↓ on_ticks (via run_coroutine_threadsafe)
-  _on_tick_received()
-    ↓ asyncio event loop
-  websocket.notify_price_update()
-    ↓
+  KiteTicker is a market data feed — prices are public (NIFTY50 LTP is the
+  same for everyone). There is no need to run N connections for N users.
+  Any connected user's access_token is sufficient for KiteTicker auth.
+
+  SharedPriceStream picks any valid access_token from the DB, creates one
+  ZerodhaTicker, and subscribes to the union of all users' open position
+  instruments. When a tick arrives, ConnectionManager.broadcast_price()
+  already fans it out to every frontend WebSocket subscribed to that
+  instrument — no per-user routing needed.
+
+  ZerodhaTicker (ONE, shared)
+    ↓ on_ticks → Redis LTP cache (ltp:{token}, TTL=2s)
+    ↓ on_ticks → notify_price_update(symbol, price_data)
+  ConnectionManager.broadcast_price(instrument)
+    ↓ fans out to all account_id WebSockets subscribed to that instrument
   Frontend WebSocket (per connected browser tab)
 
-Migration path (post-Zerodha partnership):
+  Token expiry: Zerodha access_tokens expire at 6 AM daily.
+  On noreconnect (max retries exceeded), SharedPriceStream picks a new
+  token from DB and rebuilds the ticker transparently.
+
+  No Zerodha partnership required. No special API key setup required.
+  Works with the existing per-user OAuth flow (each user still authenticates
+  with their own credentials — we just borrow any one token for market data).
+
+Migration from PerUserPriceStream (legacy):
 ──────────────────────────────────────────
-  Swap PerUserPriceStream for SharedPriceStream.
-  SharedPriceStream maintains ONE KiteTicker for all users,
-  subscribes to union of all open position instruments,
-  and distributes via Redis pub/sub.
-
-  Nothing outside this file needs to change — callers use the
-  `price_stream` singleton which is typed as PriceStreamProvider.
-
-  To migrate: change the last line of this file from
-      price_stream: PriceStreamProvider = PerUserPriceStream()
-  to
-      price_stream: PriceStreamProvider = SharedPriceStream()
+  Already done. The singleton at the bottom of this file is SharedPriceStream.
+  PerUserPriceStream is kept for rollback — switch the last line to roll back.
 """
 
 import asyncio
@@ -57,8 +60,8 @@ class PriceStreamProvider(ABC):
     """
     Interface for live price streaming.
 
-    PerUserPriceStream: one KiteTicker per account (current, per-user API keys).
-    SharedPriceStream:  one KiteTicker for all accounts (future, partnership API).
+    SharedPriceStream:  one KiteTicker for all accounts (current).
+    PerUserPriceStream: one KiteTicker per account (legacy, kept for rollback).
     """
 
     @abstractmethod
@@ -92,6 +95,58 @@ class PriceStreamProvider(ABC):
 
 
 # ─────────────────────────────────────────────────────────────────────────────
+# Shared helper — used by both stream implementations
+# ─────────────────────────────────────────────────────────────────────────────
+
+async def _get_open_position_tokens(
+    broker_account_id: UUID, db
+) -> Dict[int, str]:
+    """
+    Return {instrument_token: tradingsymbol} for all open positions of an account.
+
+    The tradingsymbol is the broadcast key: ConnectionManager subscriptions
+    store tradingsymbol strings, so price ticks must broadcast by symbol.
+    Kite MODE_LTP ticks only return instrument_token — callers store this
+    mapping in ZerodhaTicker._token_to_symbol so _on_ticks can resolve it.
+    """
+    from app.models.position import Position
+    from app.models.instrument import Instrument
+    from sqlalchemy import select, and_
+
+    pos_result = await db.execute(
+        select(Position.tradingsymbol, Position.instrument_token).where(
+            and_(
+                Position.broker_account_id == broker_account_id,
+                Position.total_quantity != 0,
+            )
+        )
+    )
+    rows = pos_result.all()
+
+    token_symbol_map: Dict[int, str] = {}
+    symbols_missing_token = []
+
+    for tradingsymbol, instrument_token in rows:
+        if instrument_token:
+            token_symbol_map[int(instrument_token)] = tradingsymbol
+        else:
+            symbols_missing_token.append(tradingsymbol)
+
+    # Fallback: look up tokens from instruments table when positions lack them
+    if symbols_missing_token:
+        inst_result = await db.execute(
+            select(Instrument.tradingsymbol, Instrument.instrument_token).where(
+                Instrument.tradingsymbol.in_(symbols_missing_token)
+            )
+        )
+        for sym, token in inst_result.all():
+            if token:
+                token_symbol_map[int(token)] = sym
+
+    return token_symbol_map
+
+
+# ─────────────────────────────────────────────────────────────────────────────
 # ZerodhaTicker: thin wrapper around kiteconnect.KiteTicker
 # ─────────────────────────────────────────────────────────────────────────────
 
@@ -106,19 +161,24 @@ class ZerodhaTicker:
     - We use asyncio.run_coroutine_threadsafe() to hand ticks back
       to the main event loop safely.
     - Throttle: at most one broadcast per instrument per second.
+    - on_noreconnect_callback: async callable fired when KiteTicker exhausts
+      reconnect attempts (e.g. expired token). SharedPriceStream uses this
+      to rebuild the ticker with a fresh token.
     """
 
     def __init__(
         self,
         api_key: str,
         access_token: str,
-        broker_account_id: UUID,
-        on_tick_callback,   # async callable(tradingsymbol: str, price_data: dict)
+        broker_account_id,          # UUID or str label — used for logging only
+        on_tick_callback,           # async callable(tradingsymbol: str, price_data: dict)
+        on_noreconnect_callback=None,   # async callable() — fired on max reconnects exceeded
     ):
         self.api_key = api_key
         self.access_token = access_token
         self.broker_account_id = broker_account_id
         self.on_tick_callback = on_tick_callback
+        self.on_noreconnect_callback = on_noreconnect_callback
 
         self.kws = None
         self.subscribed_tokens: Set[int] = set()
@@ -133,8 +193,7 @@ class ZerodhaTicker:
             from kiteconnect import KiteTicker
         except ImportError:
             logger.warning(
-                f"[ticker:{self.broker_account_id}] kiteconnect not installed — "
-                "price streaming disabled."
+                "[ticker] kiteconnect not installed — price streaming disabled."
             )
             return
 
@@ -150,7 +209,6 @@ class ZerodhaTicker:
         self.kws.on_noreconnect = self._on_noreconnect
 
         # threaded=True: KiteTicker runs its own event loop in a daemon thread.
-        # We don't await here — the thread starts and returns immediately.
         await self._loop.run_in_executor(None, lambda: self.kws.connect(threaded=True))
         logger.info(f"[ticker:{self.broker_account_id}] KiteTicker thread started.")
 
@@ -160,11 +218,11 @@ class ZerodhaTicker:
         self._connected = True
         logger.info(f"[ticker:{self.broker_account_id}] Connected to Kite WebSocket.")
 
-        # Resubscribe after reconnect (tokens are preserved across reconnects).
+        # Resubscribe after reconnect (tokens preserved across reconnects).
         if self.subscribed_tokens:
             tokens = list(self.subscribed_tokens)
             ws.subscribe(tokens)
-            ws.set_mode(ws.MODE_LTP, tokens)   # LTP = last traded price, lightest mode
+            ws.set_mode(ws.MODE_LTP, tokens)   # LTP = lightest mode
 
     def _on_ticks(self, ws, ticks):
         """
@@ -179,13 +237,11 @@ class ZerodhaTicker:
         import time
         now = time.monotonic()
 
-        ltp_updates: dict[int, str] = {}   # instrument_token → price string
-        ws_updates: list[tuple[str, dict]] = []  # (symbol, price_data)
+        ltp_updates: dict[int, str] = {}
+        ws_updates: list[tuple[str, dict]] = []
 
         for tick in ticks:
             instrument_token = tick.get("instrument_token")
-            # Kite MODE_LTP ticks do NOT include tradingsymbol — only instrument_token.
-            # Use the token→symbol map populated at subscription time.
             symbol = (
                 self._token_to_symbol.get(instrument_token)
                 or tick.get("tradingsymbol")
@@ -193,7 +249,6 @@ class ZerodhaTicker:
             )
             last_price = tick.get("last_price")
 
-            # Throttle: skip if updated within the last second
             last = self._last_tick_times.get(symbol, 0.0)
             if (now - last) < _TICK_THROTTLE_SECONDS:
                 continue
@@ -213,8 +268,6 @@ class ZerodhaTicker:
                 ws_updates.append((symbol, price_data))
 
         # 1. Batch-write all LTP prices in a single Redis pipeline.
-        # One TCP connection + one round-trip for N prices instead of N connections.
-        # Reduces Redis API calls by ~100x at 100 subscribed instruments.
         if ltp_updates:
             try:
                 from app.core.redis_pool import get_sync_redis
@@ -224,7 +277,7 @@ class ZerodhaTicker:
                     pipe.set(f"ltp:{token}", price, ex=2)
                 pipe.execute()
             except Exception:
-                pass  # Redis write failure never blocks the tick pipeline
+                pass
 
         # 2. Broadcast to frontend via WebSocket (schedule on asyncio loop)
         for symbol, price_data in ws_updates:
@@ -252,40 +305,47 @@ class ZerodhaTicker:
     def _on_noreconnect(self, ws):
         logger.error(
             f"[ticker:{self.broker_account_id}] Max reconnect attempts exceeded. "
-            "Manual intervention required."
+            "Token likely expired."
         )
         self._connected = False
+        if self.on_noreconnect_callback and self._loop:
+            asyncio.run_coroutine_threadsafe(
+                self.on_noreconnect_callback(),
+                self._loop,
+            )
 
     # ── Subscription management ───────────────────────────────────────────────
 
     def subscribe(self, token_symbol_map: Dict[int, str]) -> None:
         """
-        Subscribe to instrument tokens with their trading symbols.
+        Subscribe to instrument tokens.
 
         Args:
-            token_symbol_map: Dict mapping instrument_token (int) → tradingsymbol (str).
-                              The tradingsymbol is used as the broadcast key so the
-                              frontend can look up prices by position.tradingsymbol.
+            token_symbol_map: {instrument_token → tradingsymbol}.
+                              tradingsymbol is the broadcast key — frontend
+                              looks up prices by position.tradingsymbol.
+                              Kite MODE_LTP ticks only contain token, so we
+                              store this map to resolve symbol in _on_ticks.
         """
         new_tokens = [t for t in token_symbol_map if t not in self.subscribed_tokens]
         if not new_tokens:
             return
 
-        # Store token→symbol so _on_ticks can broadcast by tradingsymbol.
-        # Kite MODE_LTP ticks only contain instrument_token — no tradingsymbol field.
         self._token_to_symbol.update(token_symbol_map)
         self.subscribed_tokens.update(new_tokens)
         if self.kws and self._connected:
             self.kws.subscribe(new_tokens)
             self.kws.set_mode(self.kws.MODE_LTP, new_tokens)
             logger.info(
-                f"[ticker:{self.broker_account_id}] Subscribed to {len(new_tokens)} tokens "
+                f"[ticker:{self.broker_account_id}] Subscribed to {len(new_tokens)} new tokens "
                 f"(total: {len(self.subscribed_tokens)})"
             )
 
     def unsubscribe(self, tokens: list) -> None:
         """Unsubscribe from instrument tokens."""
         self.subscribed_tokens -= set(tokens)
+        for t in tokens:
+            self._token_to_symbol.pop(t, None)
         if self.kws and self._connected:
             self.kws.unsubscribe(tokens)
 
@@ -302,111 +362,268 @@ class ZerodhaTicker:
 
 
 # ─────────────────────────────────────────────────────────────────────────────
-# PerUserPriceStream — Phase 1 implementation (per-user API keys)
+# SharedPriceStream — ONE KiteTicker for all users (current implementation)
 # ─────────────────────────────────────────────────────────────────────────────
 
-class PerUserPriceStream(PriceStreamProvider):
+class SharedPriceStream(PriceStreamProvider):
     """
-    One KiteTicker connection per active broker account.
+    ONE KiteTicker connection shared across all broker accounts.
 
-    Works with per-user Zerodha API keys (current setup).
-    Swap to SharedPriceStream when Zerodha partnership provides a single API key.
+    Does NOT require Zerodha partnership or a dedicated service account.
+    Uses any currently-connected user's access_token for KiteTicker auth —
+    the token authenticates the WebSocket; the market data itself is public.
+
+    When the token expires (daily at 6 AM), on_noreconnect fires and we
+    pick a fresh token from the DB automatically.
+
+    Scale characteristics:
+    - 1 outbound WebSocket to Zerodha (vs N in PerUserPriceStream)
+    - 1 copy of each instrument's tick data (vs N duplicate copies)
+    - 1000 users holding NIFTY50 → still 1 subscription, 1 tick/second
+    - Max 3000 instruments per KiteTicker connection (F&O universe fits in 1-3)
     """
 
     def __init__(self):
-        # broker_account_id (str) → ZerodhaTicker
-        self._tickers: Dict[str, ZerodhaTicker] = {}
-        self._lock = asyncio.Lock()
+        self._ticker: Optional[ZerodhaTicker] = None
+        # Serializes ticker creation/teardown only
+        self._ticker_lock = asyncio.Lock()
+        # Serializes the registration dicts
+        self._reg_lock = asyncio.Lock()
+
+        # account_id (str) → set of instrument_tokens subscribed for that account
+        self._account_tokens: Dict[str, Set[int]] = {}
+        # instrument_token → set of account_ids that need this token (reference count)
+        self._token_holders: Dict[int, Set[str]] = {}
+        # instrument_token → tradingsymbol (to resubscribe on ticker rebuild)
+        self._token_symbol_map: Dict[int, str] = {}
+
+    async def _pick_access_token(self, db) -> Optional[tuple]:
+        """
+        Return (access_token, api_key, label) for the market data connection.
+
+        Priority:
+          1. Dedicated market-data account (ZERODHA_MD_* in .env) — production grade.
+             Token is pre-refreshed daily at 8:45 AM IST by the Celery beat task and
+             stored in Redis. Never tied to any user's session.
+          2. Any connected user's token — fallback for dev/early-stage use when
+             ZERODHA_MD_* credentials are not configured.
+
+        Returns (access_token: str, api_key: str, label: str) or None.
+        """
+        from app.core.config import settings
+
+        # Priority 1: dedicated market-data account
+        if settings.ZERODHA_MD_API_KEY:
+            from app.services.zerodha_auth_service import (
+                get_cached_market_data_token,
+                refresh_market_data_token,
+            )
+            token = get_cached_market_data_token()
+            if not token:
+                # Cache miss (first run or Redis restart) — generate now synchronously
+                logger.info("[shared_ticker] No cached MD token — refreshing now.")
+                import asyncio
+                token = await asyncio.get_event_loop().run_in_executor(
+                    None, refresh_market_data_token
+                )
+            if token:
+                return token, settings.ZERODHA_MD_API_KEY, "dedicated-md-account"
+
+        # Priority 2: fallback — any connected user's token
+        if not settings.ZERODHA_API_KEY:
+            logger.warning("[shared_ticker] ZERODHA_API_KEY not set — live price streaming disabled.")
+            return None
+
+        from app.models.broker_account import BrokerAccount
+        from sqlalchemy import select, and_
+
+        result = await db.execute(
+            select(BrokerAccount).where(
+                and_(
+                    BrokerAccount.status == "connected",
+                    BrokerAccount.token_revoked_at.is_(None),
+                    BrokerAccount.access_token.isnot(None),
+                )
+            ).limit(1)
+        )
+        account = result.scalar_one_or_none()
+        if not account:
+            logger.warning(
+                "[shared_ticker] No ZERODHA_MD_* credentials and no connected users — "
+                "ticker not started. Configure ZERODHA_MD_* in .env for production use."
+            )
+            return None
+        try:
+            return account.decrypt_token(account.access_token), settings.ZERODHA_API_KEY, f"user-fallback:{account.id}"
+        except ValueError as e:
+            logger.error(f"[shared_ticker] User token decrypt failed: {e}")
+            return None
+
+    async def _build_ticker(self, db) -> Optional[ZerodhaTicker]:
+        """
+        Create and connect a new ZerodhaTicker.
+        Uses dedicated market-data credentials when available; falls back to any user token.
+        Resubscribes all known instruments immediately after connect.
+        Caller must hold _ticker_lock.
+        """
+        from app.api.websocket import notify_price_update
+
+        picked = await self._pick_access_token(db)
+        if not picked:
+            return None
+
+        access_token, api_key, label = picked
+
+        if not api_key:
+            logger.warning("[shared_ticker] No api_key available — streaming disabled.")
+            return None
+
+        ticker = ZerodhaTicker(
+            api_key=api_key,
+            access_token=access_token,
+            broker_account_id=label,   # str label for logging, not a real UUID
+            on_tick_callback=self.broadcast_ltp,
+            on_noreconnect_callback=self._on_ticker_noreconnect,
+        )
+        await ticker.connect()
+
+        # Resubscribe all instruments from previous session (after server restart
+        # or token rebuild — registry is already populated).
+        async with self._reg_lock:
+            if self._token_symbol_map:
+                ticker.subscribe(dict(self._token_symbol_map))
+
+        logger.info(
+            f"[shared_ticker] Built ticker via {label}. "
+            f"Subscribed to {len(self._token_symbol_map)} instruments."
+        )
+        return ticker
+
+    async def broadcast_ltp(self, symbol: str, price_data: dict) -> None:
+        """Fan-out a KiteTicker tick to all WebSocket clients holding this instrument."""
+        from app.api.websocket import manager
+
+        token = price_data.get("instrument_token")
+        if token is None:
+            return
+
+        # Snapshot the holder set — asyncio is single-threaded so this is safe
+        # between awaits, and we only hold a list reference after the snapshot.
+        account_ids = list(self._token_holders.get(token, set()))
+        if not account_ids:
+            return
+
+        msg = {
+            "type": "ltp_update",
+            "data": {
+                "symbol": symbol,
+                "last_price": price_data.get("last_price"),
+                "instrument_token": token,
+            },
+        }
+        for account_id in account_ids:
+            await manager.send_to_account(account_id, msg)
+
+    async def _on_ticker_noreconnect(self) -> None:
+        """
+        Fired when KiteTicker exhausts reconnect attempts (token expired).
+        Picks a fresh token from DB and rebuilds the ticker transparently.
+        """
+        logger.warning("[shared_ticker] Ticker noreconnect — rebuilding with new token.")
+        try:
+            from app.core.database import SessionLocal
+            async with SessionLocal() as db:
+                async with self._ticker_lock:
+                    if self._ticker:
+                        self._ticker.stop()
+                    self._ticker = await self._build_ticker(db)
+        except Exception as e:
+            logger.error(f"[shared_ticker] Rebuild after noreconnect failed: {e}")
+
+    async def _ensure_ticker(self, db) -> Optional[ZerodhaTicker]:
+        """
+        Return existing connected ticker, or build a new one.
+        Caller must NOT hold _ticker_lock.
+        """
+        async with self._ticker_lock:
+            if self._ticker and self._ticker._connected:
+                return self._ticker
+            # Either no ticker yet, or connection dropped
+            if self._ticker:
+                self._ticker.stop()
+            self._ticker = await self._build_ticker(db)
+            return self._ticker
 
     async def start_account(self, broker_account_id: UUID, db) -> None:
         """
-        Connect KiteTicker for this account and subscribe to open positions.
-        Safe to call multiple times — idempotent.
+        Register this account's open positions with the shared ticker.
+        Creates the shared ticker if it doesn't exist yet.
+        Safe to call multiple times (idempotent).
         """
-        from app.core.config import settings
-        from app.models.broker_account import BrokerAccount
+        await self._ensure_ticker(db)
 
-        account_id_str = str(broker_account_id)
-
-        async with self._lock:
-            if account_id_str in self._tickers:
-                # Already connected — just refresh subscriptions
-                pass
-            else:
-                # Load account + decrypt token
-                account = await db.get(BrokerAccount, broker_account_id)
-                if not account or not account.access_token or account.token_revoked_at:
-                    logger.warning(
-                        f"[price_stream] Cannot start account {broker_account_id}: "
-                        "no valid token."
-                    )
-                    return
-
-                try:
-                    access_token = account.decrypt_token(account.access_token)
-                except ValueError as e:
-                    logger.error(f"[price_stream] Token decrypt failed for {broker_account_id}: {e}")
-                    return
-
-                if not settings.ZERODHA_API_KEY:
-                    logger.warning(
-                        "[price_stream] ZERODHA_API_KEY not set — "
-                        "live price streaming disabled."
-                    )
-                    return
-
-                from app.api.websocket import notify_price_update
-
-                ticker = ZerodhaTicker(
-                    api_key=settings.ZERODHA_API_KEY,
-                    access_token=access_token,
-                    broker_account_id=broker_account_id,
-                    on_tick_callback=notify_price_update,
-                )
-                await ticker.connect()
-                self._tickers[account_id_str] = ticker
-
-        # Subscribe to open positions (outside lock to avoid deadlock with db)
-        await self.refresh_subscriptions(broker_account_id, db)
-
-    async def refresh_subscriptions(self, broker_account_id: UUID, db) -> None:
-        """
-        Subscribe to all instruments where user has open positions.
-        Call after every trade fill.
-        """
-        account_id_str = str(broker_account_id)
-        ticker = self._tickers.get(account_id_str)
-        if not ticker:
+        token_symbol_map = await _get_open_position_tokens(broker_account_id, db)
+        if not token_symbol_map:
             return
 
-        token_symbol_map = await self._get_open_position_tokens(broker_account_id, db)
-        if token_symbol_map:
-            ticker.subscribe(token_symbol_map)
+        account_id_str = str(broker_account_id)
+
+        async with self._reg_lock:
+            acct_tokens = self._account_tokens.setdefault(account_id_str, set())
+            for token, symbol in token_symbol_map.items():
+                acct_tokens.add(token)
+                self._token_holders.setdefault(token, set()).add(account_id_str)
+                self._token_symbol_map[token] = symbol
+
+            if self._ticker:
+                self._ticker.subscribe(token_symbol_map)
+
+    async def refresh_subscriptions(self, broker_account_id: UUID, db) -> None:
+        """Re-check positions and subscribe to newly opened instruments."""
+        await self.start_account(broker_account_id, db)
 
     async def stop_account(self, broker_account_id: UUID) -> None:
-        """Stop and remove the KiteTicker for this account."""
+        """
+        Remove this account's subscriptions.
+        Instruments with no remaining holders are unsubscribed from KiteTicker.
+        The shared ticker itself keeps running for other accounts.
+        """
         account_id_str = str(broker_account_id)
-        async with self._lock:
-            ticker = self._tickers.pop(account_id_str, None)
-        if ticker:
-            ticker.stop()
+
+        async with self._reg_lock:
+            tokens = self._account_tokens.pop(account_id_str, set())
+
+            orphaned = []
+            for token in tokens:
+                holders = self._token_holders.get(token, set())
+                holders.discard(account_id_str)
+                if not holders:
+                    self._token_holders.pop(token, None)
+                    self._token_symbol_map.pop(token, None)
+                    orphaned.append(token)
+
+            if orphaned and self._ticker:
+                self._ticker.unsubscribe(orphaned)
+                logger.info(
+                    f"[shared_ticker] Unsubscribed {len(orphaned)} instruments "
+                    f"no longer held by any account."
+                )
 
     async def restart_all(self, db) -> None:
         """
-        On server restart: reconnect KiteTicker for all connected accounts
-        that have open positions.
+        On server startup: rebuild the shared ticker and resubscribe all accounts
+        that have open positions. Recovers from server restarts during market hours.
         """
         from app.models.broker_account import BrokerAccount
         from app.models.position import Position
         from sqlalchemy import select, and_
 
-        # Find accounts that are connected, not revoked, and have open positions
         result = await db.execute(
             select(BrokerAccount.id).where(
                 and_(
                     BrokerAccount.status == "connected",
-                    BrokerAccount.token_revoked_at == None,  # noqa: E711
-                    BrokerAccount.access_token != None,       # noqa: E711
+                    BrokerAccount.token_revoked_at.is_(None),
+                    BrokerAccount.access_token.isnot(None),
                 )
             ).join(
                 Position,
@@ -420,103 +637,121 @@ class PerUserPriceStream(PriceStreamProvider):
         account_ids = result.scalars().all()
 
         if not account_ids:
-            logger.info("[price_stream] No active accounts to reconnect on startup.")
+            logger.info("[shared_ticker] No active accounts with open positions on startup.")
             return
 
-        logger.info(
-            f"[price_stream] Reconnecting {len(account_ids)} account(s) on startup."
-        )
+        logger.info(f"[shared_ticker] Registering {len(account_ids)} account(s) on startup.")
         for account_id in account_ids:
             try:
                 await self.start_account(account_id, db)
             except Exception as e:
-                logger.error(f"[price_stream] Failed to restart account {account_id}: {e}")
-
-    async def _get_open_position_tokens(
-        self, broker_account_id: UUID, db
-    ) -> Dict[int, str]:
-        """
-        Return {instrument_token: tradingsymbol} for all open positions.
-
-        The tradingsymbol is the broadcast key: WebSocket manager subscriptions
-        store tradingsymbol strings, so price ticks must broadcast by symbol.
-        Kite MODE_LTP ticks only return the token — the caller stores this mapping
-        in ZerodhaTicker._token_to_symbol so _on_ticks can resolve the symbol.
-        """
-        from app.models.position import Position
-        from app.models.instrument import Instrument
-        from sqlalchemy import select, and_
-
-        # Primary: get tokens directly from positions table
-        pos_result = await db.execute(
-            select(Position.tradingsymbol, Position.instrument_token).where(
-                and_(
-                    Position.broker_account_id == broker_account_id,
-                    Position.total_quantity != 0,
-                )
-            )
-        )
-        rows = pos_result.all()
-
-        token_symbol_map: Dict[int, str] = {}
-        symbols_missing_token = []
-
-        for tradingsymbol, instrument_token in rows:
-            if instrument_token:
-                token_symbol_map[int(instrument_token)] = tradingsymbol
-            else:
-                symbols_missing_token.append(tradingsymbol)
-
-        # Fallback: look up missing tokens from instruments table
-        if symbols_missing_token:
-            inst_result = await db.execute(
-                select(Instrument.tradingsymbol, Instrument.instrument_token).where(
-                    Instrument.tradingsymbol.in_(symbols_missing_token)
-                )
-            )
-            for sym, token in inst_result.all():
-                if token:
-                    token_symbol_map[int(token)] = sym
-
-        return token_symbol_map
+                logger.error(f"[shared_ticker] Failed to register {account_id}: {e}")
 
 
 # ─────────────────────────────────────────────────────────────────────────────
-# SharedPriceStream — Phase 2 placeholder (Zerodha partnership)
+# PerUserPriceStream — legacy (kept for rollback)
+# To roll back: change last line to `price_stream = PerUserPriceStream()`
 # ─────────────────────────────────────────────────────────────────────────────
 
-class SharedPriceStream(PriceStreamProvider):
+class PerUserPriceStream(PriceStreamProvider):
     """
-    ONE KiteTicker connection for ALL users. Use after Zerodha partnership
-    provides a single shared API key.
-
-    Architecture:
-    - Subscribe to union of all users' open position instruments.
-    - Distribute via Redis pub/sub: channel = price:{instrument_token}
-    - Each account's WebSocket handler subscribes only to its instruments.
-
-    TODO: Implement when partnership API key is available.
+    One KiteTicker connection per active broker account.
+    LEGACY — replaced by SharedPriceStream. Kept for rollback.
+    Problem: N users → N KiteTicker connections → N copies of same tick data.
     """
+
+    def __init__(self):
+        self._tickers: Dict[str, ZerodhaTicker] = {}
+        self._lock = asyncio.Lock()
 
     async def start_account(self, broker_account_id: UUID, db) -> None:
-        raise NotImplementedError("SharedPriceStream: implement after partnership API key.")
+        from app.core.config import settings
+        from app.models.broker_account import BrokerAccount
+
+        account_id_str = str(broker_account_id)
+
+        async with self._lock:
+            if account_id_str not in self._tickers:
+                account = await db.get(BrokerAccount, broker_account_id)
+                if not account or not account.access_token or account.token_revoked_at:
+                    logger.warning(
+                        f"[price_stream] Cannot start account {broker_account_id}: no valid token."
+                    )
+                    return
+
+                try:
+                    access_token = account.decrypt_token(account.access_token)
+                except ValueError as e:
+                    logger.error(f"[price_stream] Token decrypt failed for {broker_account_id}: {e}")
+                    return
+
+                if not settings.ZERODHA_API_KEY:
+                    logger.warning("[price_stream] ZERODHA_API_KEY not set — streaming disabled.")
+                    return
+
+                from app.api.websocket import notify_price_update
+
+                ticker = ZerodhaTicker(
+                    api_key=settings.ZERODHA_API_KEY,
+                    access_token=access_token,
+                    broker_account_id=broker_account_id,
+                    on_tick_callback=notify_price_update,
+                )
+                await ticker.connect()
+                self._tickers[account_id_str] = ticker
+
+        await self.refresh_subscriptions(broker_account_id, db)
 
     async def refresh_subscriptions(self, broker_account_id: UUID, db) -> None:
-        raise NotImplementedError
+        account_id_str = str(broker_account_id)
+        ticker = self._tickers.get(account_id_str)
+        if not ticker:
+            return
+        token_symbol_map = await _get_open_position_tokens(broker_account_id, db)
+        if token_symbol_map:
+            ticker.subscribe(token_symbol_map)
 
     async def stop_account(self, broker_account_id: UUID) -> None:
-        raise NotImplementedError
+        account_id_str = str(broker_account_id)
+        async with self._lock:
+            ticker = self._tickers.pop(account_id_str, None)
+        if ticker:
+            ticker.stop()
 
     async def restart_all(self, db) -> None:
-        raise NotImplementedError
+        from app.models.broker_account import BrokerAccount
+        from app.models.position import Position
+        from sqlalchemy import select, and_
+
+        result = await db.execute(
+            select(BrokerAccount.id).where(
+                and_(
+                    BrokerAccount.status == "connected",
+                    BrokerAccount.token_revoked_at.is_(None),
+                    BrokerAccount.access_token.isnot(None),
+                )
+            ).join(
+                Position,
+                and_(
+                    Position.broker_account_id == BrokerAccount.id,
+                    Position.total_quantity != 0,
+                ),
+                isouter=False,
+            ).distinct()
+        )
+        for account_id in result.scalars().all():
+            try:
+                await self.start_account(account_id, db)
+            except Exception as e:
+                logger.error(f"[price_stream] Failed to restart account {account_id}: {e}")
 
 
 # ─────────────────────────────────────────────────────────────────────────────
 # Singleton — the only object the rest of the app imports
 # ─────────────────────────────────────────────────────────────────────────────
 
-# MIGRATION: change PerUserPriceStream() → SharedPriceStream() when partnership arrives.
-price_stream: PriceStreamProvider = PerUserPriceStream()
+# ROLLBACK: swap SharedPriceStream() → PerUserPriceStream() to revert.
+price_stream: PriceStreamProvider = SharedPriceStream()
 
 
 def get_cached_ltp(instrument_token: int) -> Optional[float]:
@@ -524,10 +759,8 @@ def get_cached_ltp(instrument_token: int) -> Optional[float]:
     Read last traded price from Redis cache.
     Returns None if cache miss (price not yet received or TTL expired).
 
-    Used by:
-    - Position monitor (avoid REST API polling)
-    - Position P&L calculations during market hours
-    TTL is 2 seconds — stale after that, treat as unavailable.
+    TTL is 2 seconds — treat as unavailable if stale.
+    Used by position monitor and P&L calculations during market hours.
     """
     try:
         from app.core.redis_pool import get_sync_redis

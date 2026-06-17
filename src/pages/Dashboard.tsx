@@ -43,7 +43,7 @@ interface RiskStateData {
 export default function Dashboard() {
   const navigate = useNavigate();
   const { isConnected, isLoading: brokerLoading, account, connect, syncTrades, syncStatus, syncError, isTokenExpired } = useBroker();
-  const { lastTradeEvent } = useWebSocket();
+  const { lastTradeEvent, lastLtpEvent } = useWebSocket();
   const { alerts, isLoading: alertsLoading, acknowledgeAlert } = useAlerts();
 
   const accountId = account?.id;
@@ -244,8 +244,15 @@ export default function Dashboard() {
     fetchMargins();
   }, [lastTradeEvent]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  // No periodic polling — positions and P&L update via WebSocket events (lastTradeEvent)
-  // which fire when Zerodha sends order postbacks. Polling at scale is prohibitive.
+  // Patch positions' last_price on every KiteTicker tick — no API call needed
+  useEffect(() => {
+    if (!lastLtpEvent) return;
+    setPositions(prev => prev.map(pos =>
+      pos.tradingsymbol === lastLtpEvent.symbol
+        ? { ...pos, last_price: lastLtpEvent.last_price }
+        : pos
+    ));
+  }, [lastLtpEvent]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Journal auto-prompt: open journal 45s after new trade closes
   useEffect(() => {
