@@ -200,6 +200,7 @@ class BehaviorEngine:
                     trigger_trade_id=None,
                 )
                 for e in events
+                if e.severity != "info"  # "info" = analytics-only, never user-facing (e.g. cooldown_violation)
             ]
 
             total_delta = sum(

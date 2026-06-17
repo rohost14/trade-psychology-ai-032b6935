@@ -851,31 +851,20 @@ class TradeSyncService:
                 overnight_qty = int(pos.get("overnight_quantity", 0))
                 realised = float(pos.get("realised", 0.0))
                 if qty == 0 and overnight_qty != 0 and abs(realised) > 0.01:
-                    # M1 guard: only backfill if we have at least one BUY trade in DB for
-                    # this symbol today. Prevents phantom CompletedTrade records for
-                    # positions opened on another platform or before our tracking started.
+                    # M1 guard: only backfill if we have a Position record in DB for this
+                    # symbol (meaning we were tracking it). Pure overnight closes have the
+                    # entry BUY from a previous day — checking for a BUY today incorrectly
+                    # blocked those positions from being backfilled.
                     _symbol = pos.get("tradingsymbol")
-                    _today_ist = datetime.now(IST).date()
-                    _today_start_utc = datetime.combine(
-                        _today_ist, time(0, 0), tzinfo=IST
-                    ).astimezone(timezone.utc)
-                    try:
-                        _entry_count = await db.scalar(
-                            select(sa_func.count()).select_from(Trade).where(
-                                Trade.broker_account_id == broker_account_id,
-                                Trade.tradingsymbol == _symbol,
-                                Trade.transaction_type == "BUY",
-                                Trade.order_timestamp >= _today_start_utc,
-                            )
+                    _exchange = pos.get("exchange")
+                    _product = pos.get("product")
+                    _pos_key = (_symbol, _exchange, _product)
+                    if _pos_key not in existing_positions:
+                        logger.info(
+                            f"[overnight] {_symbol}: no Position record in DB — "
+                            f"skipping backfill (untracked position)"
                         )
-                        if not _entry_count:
-                            logger.info(
-                                f"[overnight] {_symbol}: no BUY entry in DB today — "
-                                f"skipping backfill (untracked position)"
-                            )
-                            continue
-                    except Exception as _m1e:
-                        logger.warning(f"[overnight] M1 guard query failed for {_symbol}: {_m1e}")
+                        continue
                     stats["overnight_closed"].append(pos)
 
         except Exception as e:

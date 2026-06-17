@@ -244,7 +244,8 @@ export default function Dashboard() {
     fetchMargins();
   }, [lastTradeEvent]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  // Periodic position polling during market hours (9:15–15:30 IST every 30s)
+  // Periodic live P&L refresh during market hours (9:15–15:30 IST every 30s)
+  // Uses POST /refresh which fetches from Zerodha directly, not stale DB.
   useEffect(() => {
     if (!isConnected || !accountId || !dataLoaded || isTokenExpired) return;
     function isMarketHours() {
@@ -255,12 +256,27 @@ export default function Dashboard() {
       return day >= 1 && day <= 5 && mins >= 9 * 60 + 15 && mins <= 15 * 60 + 30;
     }
     if (!isMarketHours()) return;
-    const id = setInterval(() => {
-      fetchPositions();
+    const id = setInterval(async () => {
+      try {
+        const response = await api.post('/api/positions/refresh');
+        const transformed = (response.data.positions || []).map((pos: any) => ({
+          ...pos,
+          instrument_type: pos.instrument_type || 'OPTION',
+          unrealized_pnl: parseFloat(pos.unrealized_pnl) || parseFloat(pos.pnl) || 0,
+          current_value: pos.last_price
+            ? parseFloat(pos.last_price) * Math.abs(pos.total_quantity || 0) * (parseFloat(pos.multiplier) || 1)
+            : (parseFloat(pos.average_entry_price) || 0) * Math.abs(pos.total_quantity || 0) * (parseFloat(pos.multiplier) || 1),
+          last_price: parseFloat(pos.last_price) || 0,
+          day_pnl: parseFloat(pos.day_pnl) || 0,
+        }));
+        setPositions(transformed);
+      } catch {
+        // silent — keep showing last known positions
+      }
       fetchRiskState();
     }, 30_000);
     return () => clearInterval(id);
-  }, [isConnected, accountId, dataLoaded, isTokenExpired, fetchPositions, fetchRiskState]);
+  }, [isConnected, accountId, dataLoaded, isTokenExpired, fetchRiskState]);
 
   // Journal auto-prompt: open journal 45s after new trade closes
   useEffect(() => {

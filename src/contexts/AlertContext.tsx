@@ -387,6 +387,12 @@ export function AlertProvider({ children }: { children: ReactNode }) {
     if (lastAlertEvent) fetchAlerts(true);
   }, [lastAlertEvent]); // eslint-disable-line react-hooks/exhaustive-deps
 
+  // Fallback poll every 60s — catches alerts if WebSocket event was missed
+  useEffect(() => {
+    const id = setInterval(() => fetchAlerts(true), 60_000);
+    return () => clearInterval(id);
+  }, [fetchAlerts]);
+
 
   // ---------------------------------------------------------------------------
   // Alert actions

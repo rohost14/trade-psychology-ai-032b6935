@@ -7,6 +7,9 @@ from app.models.position import Position
 from app.schemas.position import PositionListResponse, ExposureMetrics
 from decimal import Decimal
 from uuid import UUID
+import logging
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter()
 
@@ -34,6 +37,40 @@ async def get_positions(
         "total_value": Decimal(str(total_value)) if total_value else Decimal(0),
         "total_pnl": Decimal(str(total_pnl)) if total_pnl else Decimal(0)
     }
+
+@router.post("/refresh", response_model=PositionListResponse)
+async def refresh_positions(
+    broker_account_id: UUID = Depends(get_verified_broker_account_id),
+    db: AsyncSession = Depends(get_db)
+):
+    """
+    Fetch live positions from Zerodha and update DB, then return fresh data.
+    Called by frontend every 30s during market hours for real-time P&L.
+    """
+    try:
+        from app.services.trade_sync_service import TradeSyncService
+        await TradeSyncService.sync_positions(broker_account_id, db)
+    except Exception as e:
+        logger.warning(f"[refresh_positions] sync failed, returning cached: {e}")
+
+    result = await db.execute(
+        select(Position).where(
+            Position.broker_account_id == broker_account_id,
+            Position.status == 'open'
+        )
+    )
+    positions = result.scalars().all()
+
+    total_value = sum(float(p.value or 0) for p in positions)
+    total_pnl = sum(float(p.unrealized_pnl or p.pnl or 0) for p in positions)
+
+    return {
+        "positions": positions,
+        "total_count": len(positions),
+        "total_value": Decimal(str(total_value)) if total_value else Decimal(0),
+        "total_pnl": Decimal(str(total_pnl)) if total_pnl else Decimal(0)
+    }
+
 
 @router.get("/exposure", response_model=ExposureMetrics)
 async def get_exposure_metrics(
