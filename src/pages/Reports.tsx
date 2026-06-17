@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import {
   Sunrise, BarChart2, CalendarDays, ChevronDown, ChevronUp,
-  FileText, Printer, TrendingUp, TrendingDown, Loader2,
+  FileText, TrendingUp, TrendingDown, Loader2,
   AlertTriangle, CheckCircle2, Target, Lightbulb, Shield, Link2,
 } from 'lucide-react';
 import { Link } from 'react-router-dom';
@@ -98,7 +98,7 @@ function PostMarketDetail({ data }: { data: Record<string, any> }) {
       {/* Emotional journey */}
       {journey.timeline?.length > 0 && (
         <div>
-          <p className="text-xs font-medium text-muted-foreground uppercase tracking-widest mb-2">Emotional Journey</p>
+          <p className="text-xs font-medium text-muted-foreground mb-2">Emotional Journey</p>
           <div className="flex flex-wrap gap-2">
             {journey.timeline.map((entry: any, i: number) => (
               <div key={i} className="flex items-center gap-1.5 bg-muted/40 rounded-lg px-2.5 py-1.5 text-xs">
@@ -116,7 +116,7 @@ function PostMarketDetail({ data }: { data: Record<string, any> }) {
       {/* Patterns */}
       {patterns.length > 0 && (
         <div>
-          <p className="text-xs font-medium text-muted-foreground uppercase tracking-widest mb-2">Patterns Detected</p>
+          <p className="text-xs font-medium text-muted-foreground mb-2">Patterns Detected</p>
           <div className="flex flex-wrap gap-2">
             {patterns.map((p: any, i: number) => (
               <span key={i} className={cn(
@@ -135,7 +135,7 @@ function PostMarketDetail({ data }: { data: Record<string, any> }) {
       {/* Lessons */}
       {lessons.length > 0 && (
         <div>
-          <p className="text-xs font-medium text-muted-foreground uppercase tracking-widest mb-2">Key Lessons</p>
+          <p className="text-xs font-medium text-muted-foreground mb-2">Key Lessons</p>
           <div className="space-y-2">
             {lessons.slice(0, 3).map((l: any, i: number) => (
               <div key={i} className={cn(
@@ -210,7 +210,7 @@ function MorningBriefDetail({ data }: { data: Record<string, any> }) {
       {/* Trend stats */}
       {trend && (trend.seven_day?.has_data || trend.thirty_day?.has_data) && (
         <div>
-          <p className="text-xs font-medium text-muted-foreground uppercase tracking-widest mb-2">Rolling Performance</p>
+          <p className="text-xs font-medium text-muted-foreground mb-2">Rolling Performance</p>
           <div className="grid grid-cols-2 gap-3">
             {[
               { label: '7-Day', data: trend.seven_day },
@@ -236,7 +236,7 @@ function MorningBriefDetail({ data }: { data: Record<string, any> }) {
       {/* Watch-outs */}
       {watchOuts.length > 0 && (
         <div>
-          <p className="text-xs font-medium text-muted-foreground uppercase tracking-widest mb-2">Watch-Outs</p>
+          <p className="text-xs font-medium text-muted-foreground mb-2">Watch-Outs</p>
           <div className="space-y-2">
             {watchOuts.map((wo: any, i: number) => (
               <div key={i} className={cn(
@@ -256,7 +256,7 @@ function MorningBriefDetail({ data }: { data: Record<string, any> }) {
       {/* Checklist */}
       {checklist.length > 0 && (
         <div>
-          <p className="text-xs font-medium text-muted-foreground uppercase tracking-widest mb-2">Mental Checklist</p>
+          <p className="text-xs font-medium text-muted-foreground mb-2">Mental Checklist</p>
           <div className="space-y-1.5">
             {checklist.map((item: any, i: number) => (
               <div key={i} className="flex items-start gap-2 text-sm text-foreground">
@@ -299,7 +299,7 @@ function WeeklySummaryDetail({ data }: { data: Record<string, any> }) {
 
       {Object.keys(imp).length > 0 && (
         <div>
-          <p className="text-xs font-medium text-muted-foreground uppercase tracking-widest mb-2">Week-over-Week</p>
+          <p className="text-xs font-medium text-muted-foreground mb-2">Week-over-Week</p>
           <div className="space-y-1.5">
             {imp.pnl && (
               <div className="flex items-center gap-2 text-sm">
@@ -356,7 +356,7 @@ function ReportCard({ report }: { report: ReportSummary }) {
       {/* Header row */}
       <button
         onClick={handleExpand}
-        className="w-full px-5 py-4 flex items-start gap-4 text-left hover:bg-muted/30 transition-colors"
+        className="w-full px-5 py-4 flex items-start gap-4 text-left hover:bg-muted/60 transition-colors"
       >
         {/* Type badge */}
         <div className={cn('flex items-center gap-1.5 rounded-lg border px-2.5 py-1.5 shrink-0', meta.bg)}>
@@ -528,13 +528,6 @@ export default function Reports() {
             Morning briefs, EOD reports, and weekly summaries
           </p>
         </div>
-        <button
-          onClick={() => window.print()}
-          className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-border text-sm text-muted-foreground hover:text-foreground hover:border-foreground transition-colors"
-        >
-          <Printer className="h-4 w-4" />
-          Print
-        </button>
       </div>
 
       {/* Filter tabs */}

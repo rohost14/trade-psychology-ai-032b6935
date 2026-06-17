@@ -357,7 +357,7 @@ export default function Chat() {
 
   if (!isConnected || !account) {
     return (
-      <div className="max-w-3xl mx-auto h-[calc(100vh-8rem)]">
+      <div className="max-w-3xl mx-auto h-[calc(100dvh-8rem)]">
         <div className="mb-5">
           <h1 className="t-heading-lg text-foreground">AI Coach</h1>
         </div>
@@ -381,7 +381,7 @@ export default function Chat() {
   }
 
   return (
-    <div className="max-w-3xl mx-auto h-[calc(100vh-8rem)]">
+    <div className="max-w-3xl mx-auto h-[calc(100dvh-8rem)]">
       {/* Header */}
       <div className="mb-4 flex items-center justify-between">
         <div>
@@ -527,7 +527,7 @@ export default function Chat() {
                       {/* Message footer: timestamp + save button (visible on hover) */}
                       <div
                         className={cn(
-                          'flex items-center gap-2 px-1 opacity-0 group-hover:opacity-100 transition-opacity duration-150',
+                          'flex items-center gap-2 px-1 sm:opacity-0 sm:group-hover:opacity-100 transition-opacity duration-150',
                           message.role === 'user' ? 'flex-row-reverse' : 'flex-row'
                         )}
                       >

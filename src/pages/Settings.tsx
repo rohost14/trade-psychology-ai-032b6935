@@ -17,6 +17,7 @@ export default function Settings() {
   const [isConnecting, setIsConnecting] = useState(false);
   const [isDisconnecting, setIsDisconnecting] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
+  const [isDirty, setIsDirty] = useState(false);
   const [isLoadingProfile, setIsLoadingProfile] = useState(false);
   const [notificationStatus, setNotificationStatus] = useState<NotificationStatus | null>(null);
 
@@ -39,6 +40,11 @@ export default function Settings() {
     guardian_enabled: false,
   });
 
+  const updateProfile = useCallback((action: Parameters<typeof setProfile>[0]) => {
+    setProfile(action);
+    setIsDirty(true);
+  }, []);
+
   const fetchProfile = useCallback(async () => {
     if (!account?.id) return;
     setIsLoadingProfile(true);
@@ -51,6 +57,7 @@ export default function Settings() {
       console.error('Failed to fetch profile:', error);
     } finally {
       setIsLoadingProfile(false);
+      setIsDirty(false);
     }
   }, [account?.id]);
 
@@ -113,6 +120,7 @@ export default function Settings() {
 
       await api.put('/api/profile/', payload);
       toast.success('Settings saved successfully');
+      setIsDirty(false);
     } catch (error) {
       console.error('Failed to save profile:', error);
       toast.error('Failed to save settings');
@@ -206,14 +214,19 @@ export default function Settings() {
           </p>
         </div>
         {isConnected && (
-          <Button onClick={handleSaveProfile} disabled={isSaving}>
-            {isSaving ? (
-              <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-            ) : (
-              <Save className="h-4 w-4 mr-2" />
+          <div className="flex items-center gap-3">
+            {isDirty && !isSaving && (
+              <span className="text-[11px] text-muted-foreground">Unsaved changes</span>
             )}
-            Save All Settings
-          </Button>
+            <Button onClick={handleSaveProfile} disabled={isSaving}>
+              {isSaving ? (
+                <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+              ) : (
+                <Save className="h-4 w-4 mr-2" />
+              )}
+              Save All Settings
+            </Button>
+          </div>
         )}
       </div>
 
@@ -248,13 +261,13 @@ export default function Settings() {
           </TabsList>
 
           <TabsContent value="profile">
-            <ProfileTab profile={profile} setProfile={setProfile} />
+            <ProfileTab profile={profile} setProfile={updateProfile} />
           </TabsContent>
 
           <TabsContent value="notifications">
             <NotificationsTab
               profile={profile}
-              setProfile={setProfile}
+              setProfile={updateProfile}
               notificationStatus={notificationStatus}
               account={account}
               onTestGuardian={handleTestGuardian}

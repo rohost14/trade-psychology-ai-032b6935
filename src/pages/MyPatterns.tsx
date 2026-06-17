@@ -48,7 +48,7 @@ interface DisciplineData {
 
 function ScoreGauge({ score, max }: { score: number; max: number }) {
   const pct = Math.min(100, (score / max) * 100);
-  const color = pct >= 70 ? '#16A34A' : pct >= 45 ? '#D97706' : '#DC2626';
+  const color = pct >= 70 ? 'rgb(var(--tm-profit))' : pct >= 45 ? 'rgb(var(--tm-obs))' : 'rgb(var(--tm-loss))';
   const circumference = 2 * Math.PI * 45;
   const dashOffset = circumference * (1 - pct / 100);
 
@@ -59,7 +59,7 @@ function ScoreGauge({ score, max }: { score: number; max: number }) {
           <circle cx="50" cy="50" r="45" stroke="var(--border)" strokeWidth="8" fill="none" />
           <circle
             cx="50" cy="50" r="45"
-            stroke={color}
+            style={{ stroke: color }}
             strokeWidth="8"
             fill="none"
             strokeDasharray={circumference}
@@ -164,7 +164,7 @@ function DangerStatusBanner({
             {status.daily_loss_used_percent.toFixed(0)}%
           </div>
           <div className="text-[10px] text-muted-foreground">Daily Loss Used</div>
-          <div className="mt-1.5 w-full bg-slate-100 dark:bg-neutral-700/40 rounded-full h-1">
+          <div className="mt-1.5 w-full bg-muted rounded-full h-1">
             <div className={`h-1 rounded-full ${lossBarColor}`} style={{ width: `${Math.min(status.daily_loss_used_percent, 100)}%` }} />
           </div>
         </div>
@@ -511,7 +511,7 @@ export default function MyPatterns() {
     return (
       <div className="w-full pb-12">
         <div className="mb-5">
-          <h1 className="t-heading-lg text-foreground">Risk Monitor</h1>
+          <h1 className="t-heading-lg text-foreground">My Patterns</h1>
         </div>
         <div className="tm-card flex flex-col items-center justify-center min-h-[50vh] text-center py-16">
           <div className="p-4 rounded-full bg-teal-50 dark:bg-teal-900/20 mb-5">

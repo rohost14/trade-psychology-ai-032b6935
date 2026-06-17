@@ -210,6 +210,13 @@ export default function BlowupShieldPage() {
   // Additional losses = continued P&L when negative
   const additionalLoss = s.post_alert_pnl_continued < 0 ? s.post_alert_pnl_continued : null;
 
+  // Costliest ignored pattern
+  const costliestIgnored = patterns.length > 0
+    ? [...patterns]
+        .filter(p => p.post_alert_pnl < 0 && p.continued > 0)
+        .sort((a, b) => a.post_alert_pnl - b.post_alert_pnl)[0]
+    : null;
+
   return (
     <div className="pb-12">
       <Link
@@ -227,6 +234,46 @@ export default function BlowupShieldPage() {
           What you did after each alert — facts only.
         </p>
       </div>
+
+      {/* Insight banner — only when there is real data */}
+      {s.total_alerts > 0 && (
+        <div className="tm-card px-5 py-4 mb-6 animate-fade-in-up border-l-4 border-tm-brand">
+          <div className="flex flex-col sm:flex-row sm:items-center gap-3">
+            <div className="flex-1 min-w-0 space-y-1">
+              {s.continued_count > 0 && additionalLoss !== null && (
+                <p className="text-sm text-foreground">
+                  <span className="font-semibold text-tm-loss font-mono">{s.continued_count}×</span>
+                  {' '}you kept trading after an alert,{' '}
+                  <span className="font-semibold text-tm-loss font-mono">{formatCurrencyWithSign(additionalLoss)}</span>
+                  {' '}in additional losses.
+                </p>
+              )}
+              {s.heeded_count > 0 && (
+                <p className="text-sm text-foreground">
+                  <span className="font-semibold text-tm-profit font-mono">{s.heeded_count}×</span>
+                  {' '}you stopped: zero post-alert exposure on those trades.
+                </p>
+              )}
+              {s.continued_count === 0 && s.heeded_count > 0 && (
+                <p className="text-xs text-tm-profit font-medium mt-1">
+                  Perfect record — you've heeded every alert.
+                </p>
+              )}
+            </div>
+            {heedRate !== null && (
+              <div className="flex-shrink-0 text-right">
+                <span className={cn(
+                  'text-3xl font-black font-mono tabular-nums',
+                  heedRate >= 70 ? 'text-tm-profit' : heedRate >= 40 ? 'text-tm-obs' : 'text-tm-loss',
+                )}>
+                  {heedRate}%
+                </span>
+                <p className="text-[11px] text-muted-foreground mt-0.5">heed rate</p>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
 
       {/* Summary metrics */}
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-6 animate-fade-in-up">
@@ -278,11 +325,27 @@ export default function BlowupShieldPage() {
         </div>
       </div>
 
+      {/* Costliest ignored pattern callout */}
+      {costliestIgnored && (
+        <div className="tm-card px-5 py-3.5 mb-4 animate-fade-in-up flex items-center gap-4 border-l-4 border-tm-loss">
+          <AlertTriangle className="h-4 w-4 text-tm-loss flex-shrink-0" />
+          <p className="text-sm text-foreground flex-1 min-w-0">
+            Costliest ignored: <span className="font-semibold">{costliestIgnored.display_name}</span>.
+            {' '}Ignoring this alert cost{' '}
+            <span className="font-semibold text-tm-loss font-mono">
+              {formatCurrencyWithSign(costliestIgnored.post_alert_pnl)}
+            </span>
+            {' '}({costliestIgnored.continued} time{costliestIgnored.continued !== 1 ? 's' : ''}).
+          </p>
+        </div>
+      )}
+
       {/* Pattern breakdown */}
       {patterns.length > 0 && (
         <div className="tm-card overflow-hidden mb-6 animate-fade-in-up">
           <div className="px-5 py-3.5 border-b border-border">
             <p className="text-sm font-medium text-foreground">By Pattern</p>
+            <p className="text-xs text-muted-foreground mt-0.5">What happened after each type of alert</p>
           </div>
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
@@ -296,8 +359,21 @@ export default function BlowupShieldPage() {
               </thead>
               <tbody className="divide-y divide-border">
                 {patterns.map((p) => (
-                  <tr key={p.pattern_type} className="hover:bg-muted/20 transition-colors">
-                    <td className="px-5 py-3 font-medium text-foreground">{p.display_name}</td>
+                  <tr
+                    key={p.pattern_type}
+                    className={cn(
+                      'hover:bg-muted/40 transition-colors',
+                      costliestIgnored?.pattern_type === p.pattern_type && 'bg-red-500/5',
+                    )}
+                  >
+                    <td className="px-5 py-3 font-medium text-foreground">
+                      {p.display_name}
+                      {costliestIgnored?.pattern_type === p.pattern_type && (
+                        <span className="ml-2 text-[10px] font-semibold uppercase tracking-wide text-tm-loss">
+                          costliest
+                        </span>
+                      )}
+                    </td>
                     <td className="text-center px-3 py-3 text-muted-foreground font-mono">{p.alerts}</td>
                     <td className="text-center px-3 py-3">
                       <span className={cn(
@@ -338,11 +414,16 @@ export default function BlowupShieldPage() {
             <p className="text-sm text-muted-foreground">{error}</p>
           </div>
         ) : timeline.length === 0 ? (
-          <div className="p-8 text-center">
-            <Shield className="h-12 w-12 text-muted-foreground/40 mx-auto mb-3" />
-            <p className="text-base font-medium text-foreground mb-1">No alerts yet</p>
-            <p className="text-sm text-muted-foreground">
-              Behavioural alerts appear here as you trade. Each one shows whether you stopped or kept going.
+          <div className="p-10 text-center">
+            <div className="inline-flex items-center justify-center w-14 h-14 rounded-full bg-muted/50 mb-4">
+              <Shield className="h-7 w-7 text-muted-foreground/50" />
+            </div>
+            <p className="text-base font-semibold text-foreground mb-1.5">No alerts recorded yet</p>
+            <p className="text-sm text-muted-foreground max-w-xs mx-auto leading-relaxed">
+              Behavioral alerts appear here as you trade. Each entry shows what you did after the alert fired — stopped or kept going.
+            </p>
+            <p className="text-xs text-muted-foreground/60 mt-3">
+              Alerts are generated in real-time during live sessions.
             </p>
           </div>
         ) : (

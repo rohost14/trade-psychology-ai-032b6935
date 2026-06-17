@@ -64,7 +64,7 @@ function AlertRow({
   return (
     <button
       onClick={() => onOpen(alert)}
-      aria-label={`${alert.pattern.name} — ${SEV_LABEL[sev]}${alert.acknowledged ? ', reviewed' : ', unreviewed'}`}
+      aria-label={`${alert.pattern.name} - ${SEV_LABEL[sev]}${alert.acknowledged ? ', reviewed' : ', unreviewed'}`}
       className={cn(
         'tm-card w-full text-left border-l-[3px] transition-colors',
         severityBorderClass(sev),
@@ -264,7 +264,7 @@ function HistoryTab({ onOpen }: { onOpen: (a: AlertNotification) => void }) {
       {/* Controls row */}
       <div className="flex items-center gap-3 flex-wrap">
         {/* Period selector */}
-        <div className="flex items-center gap-0.5 p-0.5 bg-slate-100 dark:bg-neutral-700/50 rounded-lg">
+        <div className="flex items-center gap-0.5 p-0.5 bg-muted rounded-lg">
           {PERIOD_OPTIONS.map(opt => (
             <button
               key={opt.hours}
@@ -273,7 +273,7 @@ function HistoryTab({ onOpen }: { onOpen: (a: AlertNotification) => void }) {
               className={cn(
                 'px-3 py-1 text-[11px] font-medium rounded-md transition-all',
                 hours === opt.hours
-                  ? 'bg-white dark:bg-neutral-800 text-foreground shadow-sm'
+                  ? 'bg-card text-foreground shadow-sm'
                   : 'text-muted-foreground hover:text-foreground'
               )}
             >
@@ -283,7 +283,7 @@ function HistoryTab({ onOpen }: { onOpen: (a: AlertNotification) => void }) {
         </div>
 
         {/* Severity filter */}
-        <div className="flex items-center gap-0.5 p-0.5 bg-slate-100 dark:bg-neutral-700/50 rounded-lg">
+        <div className="flex items-center gap-0.5 p-0.5 bg-muted rounded-lg">
           {SEVERITY_OPTIONS.map(opt => (
             <button
               key={opt.value}
@@ -292,7 +292,7 @@ function HistoryTab({ onOpen }: { onOpen: (a: AlertNotification) => void }) {
               className={cn(
                 'px-3 py-1 text-[11px] font-medium rounded-md transition-all',
                 sevFilter === opt.value
-                  ? 'bg-white dark:bg-neutral-800 text-foreground shadow-sm'
+                  ? 'bg-card text-foreground shadow-sm'
                   : 'text-muted-foreground hover:text-foreground'
               )}
             >
@@ -408,7 +408,7 @@ function PatternsTab() {
           </div>
 
           {/* Frequency bar */}
-          <div className="w-full bg-slate-100 dark:bg-neutral-700/40 rounded-full h-1 mb-2.5">
+          <div className="w-full bg-muted rounded-full h-1 mb-2.5">
             <div
               className={cn('h-1 rounded-full transition-all', SEV_DOT[s.worstSeverity])}
               style={{ width: `${Math.min((s.count / maxCount) * 100, 100)}%` }}
@@ -469,7 +469,6 @@ export default function AlertsPage() {
           <div className="flex items-center gap-3 text-[12px] text-muted-foreground">
             <span>{stats.total} total</span>
             {stats.critical > 0 && <><span className="text-muted-foreground/40">·</span><span className="text-tm-loss">{stats.critical} critical</span></>}
-            {stats.high > 0 && <><span className="text-muted-foreground/40">·</span><span className="text-tm-loss/70">{stats.high} high</span></>}
             {stats.unacked > 0 && <><span className="text-muted-foreground/40">·</span><span className="text-tm-obs">{stats.unacked} unread</span></>}
           </div>
         )}
