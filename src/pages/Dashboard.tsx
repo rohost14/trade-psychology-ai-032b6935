@@ -2,7 +2,6 @@ import { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Link } from 'react-router-dom';
 import { Link2, Loader2, AlertTriangle, RefreshCw, X } from 'lucide-react';
-import BlowupShieldCard from '@/components/dashboard/BlowupShieldCard';
 import { MorningIntentCard } from '@/components/dashboard/MorningIntentCard';
 import { EodComparisonCard } from '@/components/dashboard/EodComparisonCard';
 import { SetupNudgeCard } from '@/components/dashboard/SetupNudgeCard';
@@ -10,10 +9,9 @@ import RecentAlertsCard from '@/components/dashboard/RecentAlertsCard';
 import AlertDetailSheet from '@/components/alerts/AlertDetailSheet';
 import OpenPositionsTable from '@/components/dashboard/OpenPositionsTable';
 import ClosedTradesTable from '@/components/dashboard/ClosedTradesTable';
-import HoldingsCard from '@/components/dashboard/HoldingsCard';
 import { SessionHeroCard } from '@/components/dashboard/SessionHeroCard';
+import { PredictiveContextStrip } from '@/components/dashboard/PredictiveContextStrip';
 import { AiCoachFab } from '@/components/dashboard/AiCoachFab';
-import { useHoldings } from '@/hooks/useHoldings';
 import { TradeJournalSheet } from '@/components/dashboard/TradeJournalSheet';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
@@ -21,6 +19,7 @@ import { formatCurrencyWithSign } from '@/lib/formatters';
 import { api, apiDetailString } from '@/lib/api';
 import { toast } from '@/hooks/use-toast';
 import { Position, CompletedTrade } from '@/types/api';
+import type { MarginStatus } from '@/types/api';
 import { useAlerts, AlertNotification } from '@/contexts/AlertContext';
 import { useBroker } from '@/contexts/BrokerContext';
 import { useWebSocket } from '@/contexts/WebSocketContext';
@@ -36,19 +35,19 @@ interface RiskStateData {
   unrealized_pnl: number;
   ai_recommendations: string[];
   last_synced: string;
+  daily_loss_limit: number;
+  daily_trade_limit: number;
 }
 
 // ─── Dashboard ────────────────────────────────────────────────────────────────
 export default function Dashboard() {
   const navigate = useNavigate();
   const { isConnected, isLoading: brokerLoading, account, connect, syncTrades, syncStatus, syncError, isTokenExpired } = useBroker();
-  const { lastTradeEvent, prices } = useWebSocket();
+  const { lastTradeEvent } = useWebSocket();
   const { alerts, isLoading: alertsLoading, acknowledgeAlert } = useAlerts();
 
   const accountId = account?.id;
   const lastSyncAt = account?.last_sync_at;
-
-  const { holdings, summary: holdingsSummary, isLoading: holdingsLoading } = useHoldings(accountId);
 
   const [isSyncing, setIsSyncing] = useState(false);
   const [positions, setPositions] = useState<PositionWithExtras[]>([]);
@@ -58,6 +57,7 @@ export default function Dashboard() {
   const [tradesLoading, setTradesLoading] = useState(false);
   const [tradesError, setTradesError] = useState<string | null>(null);
   const [riskState, setRiskState] = useState<RiskStateData | null>(null);
+  const [margins, setMargins] = useState<MarginStatus | null>(null);
   const [dataLoaded, setDataLoaded] = useState(false);
   const [realizedPnlDisplay, setRealizedPnlDisplay] = useState<number>(0);
 
@@ -164,27 +164,41 @@ export default function Dashboard() {
       const response = await api.get('/api/risk/state');
       const data = response.data;
       setRiskState({
-        risk_state: data.risk_state || 'safe',
-        status_message: data.risk_state === 'danger' ? 'High Risk Zone' :
-          data.risk_state === 'caution' ? 'Caution Advised' : 'Trading Safely',
+        risk_state: data.risk_state || data.state || 'safe',
+        status_message: (data.risk_state || data.state) === 'danger' ? 'High Risk Zone' :
+          (data.risk_state || data.state) === 'caution' ? 'Caution Advised' : 'Trading Safely',
         active_patterns: data.active_patterns || [],
         unrealized_pnl: 0,
         ai_recommendations: data.recommendations || [],
         last_synced: lastSyncAt ? `Synced ${formatTimeAgo(lastSyncAt)}` : 'Not synced yet',
+        daily_loss_limit: data.daily_loss_limit || 25000,
+        daily_trade_limit: data.daily_trade_limit || 10,
       });
     } catch {
       setRiskState({
         risk_state: 'safe', status_message: 'Unable to fetch risk state',
         active_patterns: [], unrealized_pnl: 0, ai_recommendations: [], last_synced: 'Unknown',
+        daily_loss_limit: 25000, daily_trade_limit: 10,
       });
     }
   }, [lastSyncAt]);
 
+  const fetchMargins = useCallback(async () => {
+    const id = accountIdRef.current;
+    if (!id) return;
+    try {
+      const res = await api.get('/api/zerodha/margins');
+      setMargins(res.data);
+    } catch {
+      // non-critical — show nothing
+    }
+  }, []);
+
   const fetchAllData = useCallback(async () => {
     if (!accountIdRef.current) return;
-    await Promise.all([fetchPositions(), fetchTrades(), fetchRiskState()]);
+    await Promise.all([fetchPositions(), fetchTrades(), fetchRiskState(), fetchMargins()]);
     setDataLoaded(true);
-  }, [fetchPositions, fetchTrades, fetchRiskState]);
+  }, [fetchPositions, fetchTrades, fetchRiskState, fetchMargins]);
 
   // Fetch journal entries
   useEffect(() => {
@@ -227,7 +241,26 @@ export default function Dashboard() {
     if (!lastTradeEvent || !isConnected || isTokenExpired) return;
     fetchTrades();
     fetchPositions();
+    fetchMargins();
   }, [lastTradeEvent]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Periodic position polling during market hours (9:15–15:30 IST every 30s)
+  useEffect(() => {
+    if (!isConnected || !accountId || !dataLoaded || isTokenExpired) return;
+    function isMarketHours() {
+      const now = new Date();
+      const ist = new Date(now.getTime() + now.getTimezoneOffset() * 60000 + (5 * 60 + 30) * 60000);
+      const day = ist.getDay();
+      const mins = ist.getHours() * 60 + ist.getMinutes();
+      return day >= 1 && day <= 5 && mins >= 9 * 60 + 15 && mins <= 15 * 60 + 30;
+    }
+    if (!isMarketHours()) return;
+    const id = setInterval(() => {
+      fetchPositions();
+      fetchRiskState();
+    }, 30_000);
+    return () => clearInterval(id);
+  }, [isConnected, accountId, dataLoaded, isTokenExpired, fetchPositions, fetchRiskState]);
 
   // Journal auto-prompt: open journal 45s after new trade closes
   useEffect(() => {
@@ -336,9 +369,6 @@ export default function Dashboard() {
 
   // ── Computed values ───────────────────────────────────────────────────────
   const mergedAlerts = useMemo(() => {
-    // IST midnight cutoff — alerts from today's session only.
-    // Market alerts only fire 9:15–15:30 IST, so IST-day boundary is correct.
-    // IST = UTC+5:30; compute UTC timestamp of today's 00:00 IST.
     const IST_OFFSET_MS = 5.5 * 60 * 60 * 1000;
     const nowIST = new Date(Date.now() + IST_OFFSET_MS);
     nowIST.setUTCHours(0, 0, 0, 0);
@@ -362,12 +392,13 @@ export default function Dashboard() {
       .slice(0, 8);
   }, [alerts]);
 
+  // Today's closed trades only
   const recentTrades = useMemo(() => {
-    const threeDaysAgo = Date.now() - 3 * 24 * 60 * 60 * 1000;
-    return closedTrades.filter(t => new Date(t.exit_time).getTime() > threeDaysAgo);
+    return closedTrades.filter(t => new Date(t.exit_time) >= getISTMidnightUTC());
   }, [closedTrades]);
 
   const unreadCount = mergedAlerts.filter(a => !a.acknowledged).length;
+  const acknowledgedTodayCount = mergedAlerts.filter(a => a.acknowledged).length;
   const highSevCount = mergedAlerts.filter(a => !a.acknowledged && a.severity === 'danger').length;
   const sessionStateKey: SessionState = getSessionState(unreadCount, highSevCount);
   const stateCfg = STATE_CFG[sessionStateKey];
@@ -378,17 +409,19 @@ export default function Dashboard() {
 
   const unrealizedTotal = useMemo(() =>
     positions.reduce((s, p) => {
-      const live = prices[p.tradingsymbol];
-      if (live?.last_price) {
+      if (p.last_price) {
         const mult = p.multiplier ?? 1;
-        return s + (live.last_price - p.average_entry_price) * p.total_quantity * mult;
+        return s + (p.last_price - p.average_entry_price) * p.total_quantity * mult;
       }
       return s + (p.unrealized_pnl || 0);
     }, 0),
-    [positions, prices]
+    [positions]
   );
   const sessionPnlDisplay = realizedPnlDisplay + unrealizedTotal;
   const pnlPositive = sessionPnlDisplay >= 0;
+
+  const dailyLossLimit = riskState?.daily_loss_limit ?? 25000;
+  const dailyTradeLimit = riskState?.daily_trade_limit ?? 10;
 
   // ── Render guards ─────────────────────────────────────────────────────────
   if (brokerLoading) {
@@ -440,15 +473,13 @@ export default function Dashboard() {
   return (
     <div className="w-full min-h-screen tm-page-bg">
 
-      {/* ── Banners ───────────────────────────────────────────────────────── */}
+      {/* ── System banners (token / sync / capital) ───────────────────────── */}
       {isTokenExpired && dataLoaded && (
-        <div className="mb-4 px-3 py-2.5 rounded-lg bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800/30 flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            <AlertTriangle className="h-3.5 w-3.5 text-amber-600 dark:text-amber-400 shrink-0" />
-            <span className="text-[13px] text-amber-700 dark:text-amber-300">
-              Live sync paused — showing last known data. Analytics, chat and history still work.
-            </span>
-          </div>
+        <div className="mb-4 px-3 py-2.5 rounded-lg bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800/30 flex items-center gap-2">
+          <AlertTriangle className="h-3.5 w-3.5 text-amber-600 dark:text-amber-400 shrink-0" />
+          <span className="text-[13px] text-amber-700 dark:text-amber-300">
+            Live sync paused — showing last known data. Analytics and history still work.
+          </span>
         </div>
       )}
 
@@ -457,7 +488,7 @@ export default function Dashboard() {
           <div className="flex-1 min-w-0">
             <p className="text-[13px] font-medium text-foreground">Enable position sizing alerts</p>
             <p className="text-[12px] text-muted-foreground mt-0.5">
-              Without your trading capital, we can't detect oversized positions.
+              Add your trading capital to detect oversized positions.
             </p>
           </div>
           <div className="flex items-center gap-2 flex-shrink-0">
@@ -499,70 +530,45 @@ export default function Dashboard() {
         </div>
       )}
 
-      {/* ── Page Header ───────────────────────────────────────────────────── */}
-      <div className="flex items-center justify-between mb-1">
-        <h1 className="t-heading-lg text-foreground">Dashboard</h1>
-        <div className="flex items-center gap-3 t-mono-sm text-muted-foreground">
-          <span>{tradeStats?.trades_today ?? 0} trades</span>
-          <span className="text-muted-foreground/30">·</span>
-          <span className={cn('font-semibold', pnlPositive ? 'text-tm-profit' : 'text-tm-loss')}>
-            {formatCurrencyWithSign(sessionPnlDisplay)}
-          </span>
-          {unreadCount > 0 && (
-            <>
-              <span className="text-muted-foreground/30">·</span>
-              <Link to="/alerts" className="text-tm-obs hover:underline font-medium">
-                {unreadCount} alert{unreadCount !== 1 ? 's' : ''}
-              </Link>
-            </>
-          )}
-          {unjournaled > 0 && (
-            <>
-              <span className="text-muted-foreground/30">·</span>
-              <span className="text-tm-obs">{unjournaled} to journal</span>
-            </>
-          )}
-        </div>
-      </div>
-
-      {/* ── Setup nudge (new users, dismissable) ─────────────────────────── */}
-      <SetupNudgeCard />
-
-      {/* ── Morning Intent / EOD Comparison (time-conditional) ───────────── */}
-      <div className="mb-4 space-y-4">
-        <MorningIntentCard />
-        <EodComparisonCard />
-      </div>
-
-      {/* ── Session Hero (P&L + state + VIX inline) ──────────────────────── */}
-      <SessionHeroCard
-        stateCfg={stateCfg}
-        sessionStateKey={sessionStateKey}
-        sessionPnlDisplay={sessionPnlDisplay}
-        realizedPnlDisplay={realizedPnlDisplay}
-        tradeStats={tradeStats}
-        pnlPositive={pnlPositive}
-        unreadCount={unreadCount}
-        unjournaled={unjournaled}
-        closedTrades={closedTrades}
-        unrealizedTotal={unrealizedTotal}
-      />
-
-      {/* ── Real-time behavioral alerts ──────────────────────────────────── */}
-      <div className="mb-5" aria-live="polite" aria-label="Behavioral alerts">
-        <RecentAlertsCard
-          alerts={mergedAlerts}
-          loading={alertsLoading}
-          onAcknowledge={acknowledgeAlert}
-          onOpen={id => setSelectedAlert(alerts.find(a => a.id === id) ?? null)}
+      {/* ── Compact session strip (replaces giant hero card) ─────────────── */}
+      <div className="-mx-4 sm:-mx-6 md:-mx-8 mb-4">
+        <SessionHeroCard
+          stateCfg={stateCfg}
+          sessionPnlDisplay={sessionPnlDisplay}
+          realizedPnlDisplay={realizedPnlDisplay}
+          tradeStats={tradeStats}
+          pnlPositive={pnlPositive}
+          unreadCount={unreadCount}
+          acknowledgedTodayCount={acknowledgedTodayCount}
+          unrealizedTotal={unrealizedTotal}
+          dailyLossLimit={dailyLossLimit}
+          dailyTradeLimit={dailyTradeLimit}
+          margins={margins}
         />
       </div>
 
-      {/* ── Two-column layout ─────────────────────────────────────────────── */}
+      {/* ── Main content: mobile=stack, desktop=2-col grid ────────────────── */}
       <div className="flex flex-col lg:flex-row gap-5 items-start">
 
-        {/* Left — full width on mobile, 62% on desktop */}
-        <div className="w-full lg:flex-[62] min-w-0 space-y-5">
+        {/* ── LEFT COLUMN (full width mobile, 65% desktop) ────────────────── */}
+        <div className="w-full lg:flex-[65] min-w-0 flex flex-col gap-4">
+
+          {/* Morning Intent — mobile only (shows between strip and alerts) */}
+          <div className="lg:hidden">
+            <MorningIntentCard />
+          </div>
+
+          {/* Behavioral alerts */}
+          <div aria-live="polite" aria-label="Behavioral alerts">
+            <RecentAlertsCard
+              alerts={mergedAlerts}
+              loading={alertsLoading}
+              onAcknowledge={acknowledgeAlert}
+              onOpen={id => setSelectedAlert(alerts.find(a => a.id === id) ?? null)}
+            />
+          </div>
+
+          {/* Open Positions */}
           {positionsError && !positionsLoading && positions.length === 0 ? (
             <div className="tm-card p-5 text-center">
               <AlertTriangle className="h-5 w-5 text-tm-loss mx-auto mb-2" />
@@ -578,6 +584,7 @@ export default function Dashboard() {
             />
           )}
 
+          {/* Today's closed trades */}
           {tradesError && !tradesLoading && closedTrades.length === 0 ? (
             <div className="tm-card p-5 text-center">
               <AlertTriangle className="h-5 w-5 text-tm-loss mx-auto mb-2" />
@@ -592,19 +599,32 @@ export default function Dashboard() {
               onTradeClick={handleTradeClick}
             />
           )}
+
+          {/* EOD comparison — mobile only (full-width below trades) */}
+          <div className="lg:hidden">
+            <EodComparisonCard />
+          </div>
+
+          {/* Setup nudge — mobile only at bottom */}
+          <div className="lg:hidden">
+            <SetupNudgeCard />
+          </div>
         </div>
 
-        {/* Right — full width on mobile, 38% sticky on desktop */}
-        <div className="w-full lg:flex-[38] min-w-0 space-y-5 lg:sticky lg:top-4">
-          <BlowupShieldCard />
+        {/* ── RIGHT COLUMN (35% desktop, hidden on mobile) ────────────────── */}
+        <div className="hidden lg:flex lg:flex-[35] min-w-0 flex-col gap-4 sticky top-4">
 
-          {holdings.length > 0 && holdingsSummary && (
-            <HoldingsCard
-              holdings={holdings}
-              summary={holdingsSummary}
-              isLoading={holdingsLoading}
-            />
-          )}
+          {/* Morning Intent — desktop sticky panel */}
+          <MorningIntentCard />
+
+          {/* Predictive context strip */}
+          {accountId && <PredictiveContextStrip brokerAccountId={accountId} />}
+
+          {/* Setup nudge for new users */}
+          <SetupNudgeCard />
+
+          {/* EOD comparison — desktop right column */}
+          <EodComparisonCard />
         </div>
       </div>
 

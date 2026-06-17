@@ -1,9 +1,9 @@
 import { useState, useEffect, useCallback } from 'react';
-import { CheckCircle2, ChevronDown, ChevronUp, Loader2, Settings } from 'lucide-react';
+import { ChevronDown, ChevronUp, CheckCircle2, Loader2, Settings, Pencil } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { cn } from '@/lib/utils';
-import { api } from '@/lib/api';
 import { formatCurrency } from '@/lib/formatters';
+import { api } from '@/lib/api';
 import { useBroker } from '@/contexts/BrokerContext';
 
 interface IntentData {
@@ -21,9 +21,9 @@ function getISTInfo(): { hour: number; isWeekday: boolean; minsUntilOpen: number
   const now = new Date();
   const ist = new Date(now.getTime() + now.getTimezoneOffset() * 60000 + (5 * 60 + 30) * 60000);
   const hour = ist.getHours();
-  const day  = ist.getDay();
+  const day = ist.getDay();
   const openMin = 9 * 60 + 15;
-  const nowMin  = hour * 60 + ist.getMinutes();
+  const nowMin = hour * 60 + ist.getMinutes();
   return {
     hour,
     isWeekday: day >= 1 && day <= 5,
@@ -33,17 +33,15 @@ function getISTInfo(): { hour: number; isWeekday: boolean; minsUntilOpen: number
 
 export function MorningIntentCard({ onAcknowledged }: Props) {
   const { account } = useBroker();
-  const [data, setData]                     = useState<IntentData | null>(null);
-  const [loading, setLoading]               = useState(true);
-  const [submitting, setSubmitting]         = useState(false);
-  const [showOverride, setShowOverride]     = useState(false);
+  const [data, setData] = useState<IntentData | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [submitting, setSubmitting] = useState(false);
+  const [showOverride, setShowOverride] = useState(false);
   const [overrideTrades, setOverrideTrades] = useState('');
-  const [overrideLoss, setOverrideLoss]     = useState('');
-  const [done, setDone]                     = useState(false);
-  const [istInfo, setIstInfo]               = useState(getISTInfo);
+  const [overrideLoss, setOverrideLoss] = useState('');
+  const [done, setDone] = useState(false);
+  const [istInfo, setIstInfo] = useState(getISTInfo);
 
-  // Re-evaluate IST time every minute so the card appears/disappears correctly
-  // even when the dashboard page is kept open across the 7 AM boundary.
   useEffect(() => {
     const id = setInterval(() => setIstInfo(getISTInfo()), 60_000);
     return () => clearInterval(id);
@@ -57,144 +55,163 @@ export function MorningIntentCard({ onAcknowledged }: Props) {
       .finally(() => setLoading(false));
   }, [account?.id]);
 
-  // Show on weekdays between 7:00 AM and 9:59 AM IST only
   const { hour, isWeekday, minsUntilOpen: mins } = istInfo;
   const show = isWeekday && hour >= 7 && hour < 10;
 
   if (!show || loading) return null;
   if (data?.intent_acknowledged || done) return null;
 
-  // No profile limits set — show a nudge to configure them
+  // No limits configured — show a subtle nudge to settings
   if (data && !data.planned.max_trades && !data.planned.max_loss) {
     return (
-      <div className="tm-card overflow-hidden border-muted">
-        <div className="px-5 py-4 flex items-center justify-between gap-3">
+      <div className="rounded-xl border border-amber-200/60 dark:border-amber-800/30 bg-amber-50/60 dark:bg-amber-900/10 px-4 py-3 flex items-center justify-between gap-3 mb-4">
+        <div className="flex items-center gap-2.5">
+          <Pencil className="h-3.5 w-3.5 text-amber-600 dark:text-amber-400 shrink-0" />
           <div>
-            <p className="text-sm font-semibold text-foreground">Set your trading rules</p>
-            <p className="text-xs text-muted-foreground mt-0.5">
-              Define a daily trade limit or loss limit to use the morning intent feature.
+            <p className="text-[12.5px] font-semibold text-amber-900 dark:text-amber-200">Set your daily trading rules</p>
+            <p className="text-[11.5px] text-amber-700/70 dark:text-amber-400/70 mt-0.5">
+              Define a trade limit or loss limit to use morning intent.
             </p>
           </div>
-          <Link
-            to="/settings"
-            className="shrink-0 flex items-center gap-1.5 text-xs font-medium text-tm-brand hover:text-tm-brand/80 transition-colors"
-          >
-            <Settings className="h-3.5 w-3.5" />
-            Settings
-          </Link>
         </div>
+        <Link
+          to="/settings"
+          className="shrink-0 flex items-center gap-1 text-[11.5px] font-medium text-amber-700 dark:text-amber-400 hover:underline"
+        >
+          <Settings className="h-3.5 w-3.5" />
+          Settings
+        </Link>
       </div>
     );
   }
 
   if (!data) return null;
+
   const timeLabel = mins > 60
     ? `${Math.ceil(mins / 60)}h ${mins % 60}m`
-    : mins > 0
-    ? `${mins} min`
-    : 'Open now';
+    : mins > 0 ? `${mins} min` : 'Open now';
+
+  const effectiveTrades = overrideTrades ? parseInt(overrideTrades, 10) : data.planned.max_trades;
+  const effectiveLoss = overrideLoss ? parseFloat(overrideLoss) : data.planned.max_loss;
 
   async function handleCommit() {
     setSubmitting(true);
     try {
       await api.post('/api/session-intent/acknowledge', {
         max_trades: overrideTrades ? parseInt(overrideTrades, 10) : null,
-        max_loss:   overrideLoss   ? parseFloat(overrideLoss)     : null,
+        max_loss: overrideLoss ? parseFloat(overrideLoss) : null,
       });
       setDone(true);
       onAcknowledged?.();
     } catch {
-      // silent — user can try again
+      // silent
     } finally {
       setSubmitting(false);
     }
   }
 
-  const effectiveTrades = overrideTrades ? parseInt(overrideTrades, 10) : data.planned.max_trades;
-  const effectiveLoss   = overrideLoss   ? parseFloat(overrideLoss)     : data.planned.max_loss;
+  // Build a human-readable intent summary
+  const parts: string[] = [];
+  if (effectiveTrades != null) parts.push(`Max ${effectiveTrades} trades`);
+  if (effectiveLoss != null) parts.push(`₹${formatCurrency(effectiveLoss)} loss limit`);
+  const intentSummary = parts.join(' · ') || 'Your rules for today';
 
   return (
-    <div className="tm-card overflow-hidden border-tm-brand/30 bg-tm-brand/[0.04]">
-      {/* Header */}
-      <div className="px-5 py-3.5 border-b border-tm-brand/20 flex items-center justify-between">
-        <div>
-          <p className="text-sm font-semibold text-foreground">Market opens in {timeLabel}</p>
-          <p className="text-xs text-muted-foreground mt-0.5">Commit to your trading rules for today</p>
+    <div className={cn(
+      'rounded-xl border mb-4 overflow-hidden',
+      'bg-amber-50 dark:bg-amber-900/[0.12]',
+      'border-amber-200/70 dark:border-amber-700/30',
+    )}>
+      {/* ── Header ─────────────────────────────────────────────────────────── */}
+      <div className="px-4 pt-3.5 pb-0 flex items-center justify-between">
+        <div className="flex items-center gap-2">
+          <Pencil className="h-3.5 w-3.5 text-amber-600 dark:text-amber-400 shrink-0" />
+          <span className="text-[10px] font-bold text-amber-700 dark:text-amber-400 uppercase tracking-[0.1em]">
+            Morning Intent
+          </span>
         </div>
-        <div className="shrink-0 w-9 h-9 rounded-full bg-tm-brand/10 flex items-center justify-center">
-          <span className="text-lg">🎯</span>
-        </div>
+        <span className="text-[11px] text-amber-600/70 dark:text-amber-400/60">
+          {timeLabel} to open
+        </span>
       </div>
 
-      {/* Today's rules */}
-      <div className="px-5 pt-4 pb-3 grid grid-cols-2 gap-3">
-        {effectiveTrades != null && (
-          <div className="bg-background rounded-xl p-3 text-center border border-border">
-            <p className="text-2xl font-bold font-mono text-foreground">{effectiveTrades}</p>
-            <p className="text-xs text-muted-foreground mt-0.5">max trades</p>
-          </div>
-        )}
-        {effectiveLoss != null && (
-          <div className="bg-background rounded-xl p-3 text-center border border-border">
-            <p className="text-2xl font-bold font-mono text-tm-loss">₹{formatCurrency(effectiveLoss)}</p>
-            <p className="text-xs text-muted-foreground mt-0.5">loss limit</p>
-          </div>
-        )}
+      {/* ── Plan summary ───────────────────────────────────────────────────── */}
+      <div className="px-4 pt-2.5 pb-3">
+        <p className="text-[15px] font-medium italic text-amber-900 dark:text-amber-100 leading-snug">
+          "{intentSummary}"
+        </p>
+        <p className="text-[11px] text-amber-700/60 dark:text-amber-400/50 mt-1">
+          Your plan for today. Tap below to commit.
+        </p>
       </div>
 
-      {/* Override toggle */}
-      <div className="px-5 pb-2">
+      {/* ── Override toggle ────────────────────────────────────────────────── */}
+      <div className="px-4 pb-1">
         <button
           onClick={() => setShowOverride(v => !v)}
-          className="flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground transition-colors py-1"
+          className="flex items-center gap-1.5 text-[11.5px] text-amber-700/70 dark:text-amber-400/60 hover:text-amber-900 dark:hover:text-amber-300 transition-colors py-0.5"
         >
-          {showOverride ? <ChevronUp className="h-3.5 w-3.5" /> : <ChevronDown className="h-3.5 w-3.5" />}
+          {showOverride ? <ChevronUp className="h-3 w-3" /> : <ChevronDown className="h-3 w-3" />}
           Change today's limits
         </button>
 
         {showOverride && (
           <div className="mt-2 grid grid-cols-2 gap-2">
             <div>
-              <label className="text-[11px] text-muted-foreground mb-1 block">Max trades</label>
+              <label className="text-[10.5px] text-amber-700/70 dark:text-amber-400/60 mb-1 block">Max trades</label>
               <input
                 type="number"
                 min={1}
                 placeholder={String(data.planned.max_trades ?? '')}
                 value={overrideTrades}
                 onChange={e => setOverrideTrades(e.target.value)}
-                className="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-tm-brand/40"
+                className={cn(
+                  'w-full rounded-lg px-3 py-2 text-sm outline-none',
+                  'bg-amber-100/60 dark:bg-amber-900/30',
+                  'border border-amber-300/60 dark:border-amber-700/40',
+                  'text-amber-900 dark:text-amber-100',
+                  'placeholder:text-amber-500/50',
+                  'focus:border-amber-400 dark:focus:border-amber-600',
+                )}
               />
             </div>
             <div>
-              <label className="text-[11px] text-muted-foreground mb-1 block">Loss limit (₹)</label>
+              <label className="text-[10.5px] text-amber-700/70 dark:text-amber-400/60 mb-1 block">Loss limit (₹)</label>
               <input
                 type="number"
                 min={0}
                 placeholder={String(data.planned.max_loss ?? '')}
                 value={overrideLoss}
                 onChange={e => setOverrideLoss(e.target.value)}
-                className="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-tm-brand/40"
+                className={cn(
+                  'w-full rounded-lg px-3 py-2 text-sm outline-none',
+                  'bg-amber-100/60 dark:bg-amber-900/30',
+                  'border border-amber-300/60 dark:border-amber-700/40',
+                  'text-amber-900 dark:text-amber-100',
+                  'placeholder:text-amber-500/50',
+                  'focus:border-amber-400 dark:focus:border-amber-600',
+                )}
               />
             </div>
           </div>
         )}
       </div>
 
-      {/* CTA */}
-      <div className="px-5 pb-5">
+      {/* ── Commit button ──────────────────────────────────────────────────── */}
+      <div className="px-4 pb-4 pt-2">
         <button
           onClick={handleCommit}
           disabled={submitting}
           className={cn(
-            'w-full h-12 rounded-xl font-semibold text-sm text-white transition-all',
-            'bg-tm-brand hover:bg-tm-brand/90 active:scale-[0.98]',
+            'w-full h-10 rounded-xl font-semibold text-[13px] transition-all',
+            'bg-amber-500 hover:bg-amber-600 text-white',
+            'active:scale-[0.98] disabled:opacity-60 disabled:cursor-not-allowed',
             'flex items-center justify-center gap-2',
-            submitting && 'opacity-70 cursor-not-allowed'
           )}
         >
           {submitting
-            ? <><Loader2 className="h-4 w-4 animate-spin" /> Committing…</>
-            : <><CheckCircle2 className="h-4 w-4" /> I'll stick to my plan today</>
+            ? <><Loader2 className="h-3.5 w-3.5 animate-spin" /> Saving…</>
+            : <><CheckCircle2 className="h-3.5 w-3.5" /> I'll stick to this today</>
           }
         </button>
       </div>

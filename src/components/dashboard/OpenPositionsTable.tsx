@@ -2,7 +2,6 @@ import { useEffect, useRef, useState } from 'react';
 import { Briefcase, Pencil, CheckCircle2 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { formatPrice, formatNumber, formatCurrencyWithSign } from '@/lib/formatters';
-import { useWebSocket } from '@/contexts/WebSocketContext';
 import type { Position } from '@/types/api';
 
 type PositionWithExtras = Position & {
@@ -123,22 +122,14 @@ export default function OpenPositionsTable({
   positions, isLoading, journaledIds = new Set(), onPositionClick,
 }: OpenPositionsTableProps) {
   const openPositions = positions.filter(p => p.status === 'open');
-  const { prices, isConnected, subscribe } = useWebSocket();
-
-  useEffect(() => {
-    if (openPositions.length > 0 && isConnected) {
-      subscribe(openPositions.map(p => p.tradingsymbol));
-    }
-  }, [openPositions, isConnected, subscribe]);
 
   const getLivePnl = (p: PositionWithExtras) => {
-    const live = prices[p.tradingsymbol];
-    if (live?.last_price) {
+    if (p.last_price) {
       // p.multiplier is Zerodha's contract multiplier:
       //   NSE/BSE F&O (NFO/BFO): multiplier=1 — Kite sends qty in units already
       //   MCX commodities: multiplier=lot_size (e.g. GOLDM=10, SILVERM=30, CRUDEOIL=100)
       const mult = (p as any).multiplier ?? 1;
-      return (live.last_price - p.average_entry_price) * p.total_quantity * mult;
+      return (p.last_price - p.average_entry_price) * p.total_quantity * mult;
     }
     return p.unrealized_pnl;
   };
@@ -148,10 +139,15 @@ export default function OpenPositionsTable({
   if (isLoading) {
     return (
       <div className="tm-card">
-        <div className="px-5 py-3 border-b border-slate-100 dark:border-neutral-700/60">
+        <div className="px-5 py-3 border-b border-border">
           <div className="h-4 w-40 bg-muted animate-pulse rounded" />
         </div>
-        <div className="p-5 space-y-3">
+        {/* Mobile skeleton cards */}
+        <div className="md:hidden flex gap-3 px-4 py-3 overflow-hidden">
+          {[1, 2].map(i => <div key={i} className="h-24 w-40 flex-shrink-0 bg-muted animate-pulse rounded-xl" />)}
+        </div>
+        {/* Desktop skeleton rows */}
+        <div className="hidden md:block p-5 space-y-3">
           {[1, 2].map(i => <div key={i} className="h-10 bg-muted animate-pulse rounded" />)}
         </div>
       </div>
@@ -161,120 +157,171 @@ export default function OpenPositionsTable({
   return (
     <div className="tm-card">
       {/* Header */}
-      <div className="flex items-center justify-between px-5 py-3 border-b border-slate-100 dark:border-neutral-700/60">
+      <div className="flex items-center justify-between px-5 py-3 border-b border-border">
         <div className="flex items-center gap-2">
           <span className="tm-label">Open Positions</span>
           <span className="text-[11px] text-muted-foreground font-mono tabular-nums">
             {openPositions.length}
           </span>
         </div>
-        <div className="flex items-center gap-3">
-          {/* Live dot */}
-          {isConnected && openPositions.length > 0 && (
-            <div className="flex items-center gap-1.5 px-2 py-0.5 rounded-full bg-teal-50 dark:bg-teal-900/30">
-              <span className="w-1.5 h-1.5 rounded-full animate-pulse bg-teal-500 dark:bg-teal-400" />
-              <span className="text-[11px] font-semibold text-teal-600 dark:text-teal-400 uppercase tracking-wide">Live</span>
-            </div>
-          )}
-          {/* Total P&L */}
-          {openPositions.length > 0 && (
-            <span className={cn(
-              'text-sm font-semibold font-mono tabular-nums',
-              totalPnl >= 0 ? 'text-tm-profit' : 'text-tm-loss',
-            )}>
-              {formatCurrencyWithSign(totalPnl)}
-            </span>
-          )}
-        </div>
+        {openPositions.length > 0 && (
+          <span className={cn(
+            'text-sm font-semibold font-mono tabular-nums',
+            totalPnl >= 0 ? 'text-tm-profit' : 'text-tm-loss',
+          )}>
+            {formatCurrencyWithSign(totalPnl)}
+          </span>
+        )}
       </div>
 
       {openPositions.length > 0 ? (
-        <table className="w-full">
-          <thead>
-            <tr className="border-b-2 border-b-slate-200 dark:border-b-neutral-700/80">
-              {['Symbol', 'Qty', 'Avg', 'LTP', 'P&L', ''].map((h, idx) => (
-                <th key={idx} className={cn(
-                  'py-3 table-header',
-                  idx === 0 ? 'px-5 text-left' :
-                  idx === 5 ? 'px-5 w-10 text-left' :
-                  'px-3 text-right',
-                )}>
-                  {h === '' ? <Pencil className="w-3 h-3 text-muted-foreground/50" /> : h}
-                </th>
-              ))}
-            </tr>
-          </thead>
-          <tbody>
-            {openPositions.map((pos, i) => {
-              const livePnl = getLivePnl(pos);
-              const liveData = prices[pos.tradingsymbol];
-              const qty = pos.total_quantity;
-              const isJournaled = journaledIds.has(pos.id);
-              const { name, chip, sub } = parseSymbol(pos.tradingsymbol, pos.instrument_type);
-              return (
-                <tr key={pos.id} className={cn(
-                  'transition-colors hover:bg-slate-50 dark:hover:bg-slate-700/30',
-                  i < openPositions.length - 1 && 'border-b border-slate-50 dark:border-neutral-700/30',
-                  livePnl > 0 && 'bg-tm-profit/[0.03]',
-                  livePnl < 0 && 'bg-tm-loss/[0.03]',
-                )}>
-                  <td className="px-5 py-3">
-                    <div className="flex items-center gap-1.5">
-                      <span className="text-sm font-semibold text-foreground leading-none">{name}</span>
-                      <span className={chipClass(chip)}>{chip}</span>
+        <>
+          {/* ── Mobile: horizontal scroll snap cards ─────────────────────── */}
+          <div className="md:hidden overflow-x-auto [-webkit-overflow-scrolling:touch] scroll-smooth">
+            <div className="flex gap-3 px-4 py-3 snap-x snap-mandatory">
+              {openPositions.map((pos) => {
+                const livePnl = getLivePnl(pos);
+                const qty = pos.total_quantity;
+                const isJournaled = journaledIds.has(pos.id);
+                const { name, chip, sub } = parseSymbol(pos.tradingsymbol, pos.instrument_type);
+                return (
+                  <button
+                    key={pos.id}
+                    onClick={() => onPositionClick?.(pos)}
+                    className={cn(
+                      'flex-shrink-0 snap-start w-44 rounded-xl border text-left p-3.5',
+                      'bg-card hover:bg-muted/30 transition-colors',
+                      livePnl > 0 ? 'border-tm-profit/20' : livePnl < 0 ? 'border-tm-loss/20' : 'border-border',
+                    )}
+                  >
+                    <div className="flex items-center justify-between mb-2">
+                      <div className="flex items-center gap-1.5">
+                        <span className="text-[13px] font-semibold text-foreground leading-none">{name}</span>
+                        <span className={chipClass(chip)}>{chip}</span>
+                      </div>
+                      {isJournaled
+                        ? <CheckCircle2 className="w-3.5 h-3.5 text-tm-profit" />
+                        : <Pencil className="w-3.5 h-3.5 text-muted-foreground/50" />
+                      }
                     </div>
                     {sub && (
-                      <span className="text-[12px] text-muted-foreground font-mono tabular-nums mt-1 block">
-                        {sub} · {pos.product}
-                      </span>
+                      <p className="text-[11px] text-muted-foreground font-mono tabular-nums mb-2">{sub}</p>
                     )}
-                  </td>
-                  <td className="px-3 py-3 text-right">
-                    <span className={cn('text-sm font-semibold', qty > 0 ? 'text-tm-profit' : 'text-tm-loss')}>
-                      {qty > 0 ? 'BUY' : 'SELL'}
-                    </span>
-                    <span className="ml-1.5 text-sm font-mono tabular-nums text-foreground">
-                      {formatNumber(Math.abs(qty))}
-                    </span>
-                  </td>
-                  <td className="px-3 py-3 text-right text-sm font-mono tabular-nums font-medium text-muted-foreground">
-                    {formatPrice(pos.average_entry_price)}
-                  </td>
-                  <td className="px-3 py-3 text-right text-sm font-medium">
-                    <PriceCell
-                      symbol={pos.tradingsymbol}
-                      staticPrice={pos.last_price || pos.average_entry_price}
-                      livePrice={liveData?.last_price}
-                    />
-                  </td>
-                  <td className="px-3 py-3 text-right">
-                    <span className={cn(
-                      'text-sm font-mono tabular-nums font-semibold',
-                      livePnl > 0 ? 'text-tm-profit' : livePnl < 0 ? 'text-tm-loss' : 'text-muted-foreground',
-                    )}>
-                      {formatCurrencyWithSign(livePnl)}
-                    </span>
-                  </td>
-                  <td className="px-5 py-3">
-                    <button
-                      onClick={() => onPositionClick?.(pos)}
-                      aria-label={isJournaled ? `View journal for ${pos.tradingsymbol}` : `Add journal entry for ${pos.tradingsymbol}`}
-                      className="w-7 h-7 flex items-center justify-center rounded hover:bg-muted/60 transition-colors relative"
-                    >
-                      {isJournaled
-                        ? <CheckCircle2 className="w-[18px] h-[18px] text-tm-profit" />
-                        : <>
-                            <Pencil className="w-[14px] h-[14px] text-muted-foreground" />
-                            <span className="absolute top-0.5 right-0.5 w-[5px] h-[5px] rounded-full bg-tm-obs" />
-                          </>
-                      }
-                    </button>
-                  </td>
-                </tr>
-              );
-            })}
-          </tbody>
-        </table>
+                    <div className="space-y-1">
+                      <div className="flex items-center justify-between">
+                        <span className="text-[10.5px] text-muted-foreground">
+                          {qty > 0 ? 'BUY' : 'SELL'} {formatNumber(Math.abs(qty))}
+                        </span>
+                        <span className="text-[11px] font-mono tabular-nums text-muted-foreground">
+                          avg {formatPrice(pos.average_entry_price)}
+                        </span>
+                      </div>
+                      <div className="flex items-center justify-between">
+                        <span className="text-[10.5px] text-muted-foreground">LTP</span>
+                        <PriceCell
+                          symbol={pos.tradingsymbol}
+                          staticPrice={pos.last_price || pos.average_entry_price}
+                          livePrice={pos.last_price || undefined}
+                        />
+                      </div>
+                      <div className={cn(
+                        'text-[16px] font-black font-mono tabular-nums mt-1.5 leading-none',
+                        livePnl > 0 ? 'text-tm-profit' : livePnl < 0 ? 'text-tm-loss' : 'text-muted-foreground',
+                      )}>
+                        {formatCurrencyWithSign(livePnl)}
+                      </div>
+                    </div>
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+
+          {/* ── Desktop: standard table ───────────────────────────────────── */}
+          <table className="hidden md:table w-full">
+            <thead>
+              <tr className="border-b border-border">
+                {['Symbol', 'Qty', 'Avg', 'LTP', 'P&L', ''].map((h, idx) => (
+                  <th key={idx} className={cn(
+                    'py-3 table-header',
+                    idx === 0 ? 'px-5 text-left' :
+                    idx === 5 ? 'px-5 w-10 text-left' :
+                    'px-3 text-right',
+                  )}>
+                    {h === '' ? <Pencil className="w-3 h-3 text-muted-foreground/50" /> : h}
+                  </th>
+                ))}
+              </tr>
+            </thead>
+            <tbody>
+              {openPositions.map((pos, i) => {
+                const livePnl = getLivePnl(pos);
+                const qty = pos.total_quantity;
+                const isJournaled = journaledIds.has(pos.id);
+                const { name, chip, sub } = parseSymbol(pos.tradingsymbol, pos.instrument_type);
+                return (
+                  <tr key={pos.id} className={cn(
+                    'transition-colors hover:bg-muted/30',
+                    i < openPositions.length - 1 && 'border-b border-border/50',
+                  )}>
+                    <td className="px-5 py-3">
+                      <div className="flex items-center gap-1.5">
+                        <span className="text-sm font-semibold text-foreground leading-none">{name}</span>
+                        <span className={chipClass(chip)}>{chip}</span>
+                      </div>
+                      {sub && (
+                        <span className="text-[12px] text-muted-foreground font-mono tabular-nums mt-1 block">
+                          {sub} · {pos.product}
+                        </span>
+                      )}
+                    </td>
+                    <td className="px-3 py-3 text-right">
+                      <span className={cn('text-sm font-semibold', qty > 0 ? 'text-tm-profit' : 'text-tm-loss')}>
+                        {qty > 0 ? 'BUY' : 'SELL'}
+                      </span>
+                      <span className="ml-1.5 text-sm font-mono tabular-nums text-foreground">
+                        {formatNumber(Math.abs(qty))}
+                      </span>
+                    </td>
+                    <td className="px-3 py-3 text-right text-sm font-mono tabular-nums font-medium text-muted-foreground">
+                      {formatPrice(pos.average_entry_price)}
+                    </td>
+                    <td className="px-3 py-3 text-right text-sm font-medium">
+                      <PriceCell
+                        symbol={pos.tradingsymbol}
+                        staticPrice={pos.last_price || pos.average_entry_price}
+                        livePrice={pos.last_price || undefined}
+                      />
+                    </td>
+                    <td className="px-3 py-3 text-right">
+                      <span className={cn(
+                        'text-sm font-mono tabular-nums font-semibold',
+                        livePnl > 0 ? 'text-tm-profit' : livePnl < 0 ? 'text-tm-loss' : 'text-muted-foreground',
+                      )}>
+                        {formatCurrencyWithSign(livePnl)}
+                      </span>
+                    </td>
+                    <td className="px-5 py-3">
+                      <button
+                        onClick={() => onPositionClick?.(pos)}
+                        aria-label={isJournaled ? `View journal for ${pos.tradingsymbol}` : `Add journal entry for ${pos.tradingsymbol}`}
+                        className="w-7 h-7 flex items-center justify-center rounded hover:bg-muted/60 transition-colors relative"
+                      >
+                        {isJournaled
+                          ? <CheckCircle2 className="w-[18px] h-[18px] text-tm-profit" />
+                          : <>
+                              <Pencil className="w-[14px] h-[14px] text-muted-foreground" />
+                              <span className="absolute top-0.5 right-0.5 w-[5px] h-[5px] rounded-full bg-tm-obs" />
+                            </>
+                        }
+                      </button>
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </>
       ) : (
         <div className="py-12 text-center">
           <Briefcase className="h-10 w-10 text-muted-foreground/40 mx-auto mb-3" />
