@@ -52,7 +52,7 @@ from dataclasses import dataclass, field
 from datetime import datetime, timedelta, timezone
 from decimal import Decimal
 from typing import List, Optional, Dict, Any
-from uuid import UUID
+from uuid import UUID, uuid4
 from zoneinfo import ZoneInfo
 
 from sqlalchemy import select, and_
@@ -62,7 +62,9 @@ from app.models.completed_trade import CompletedTrade
 from app.models.trading_session import TradingSession
 from app.models.cooldown import Cooldown
 from app.models.risk_alert import RiskAlert
+from app.models.behavior_event import BehaviorEvent as BehaviorEventRecord
 from app.models.strategy_group import StrategyGroup
+from app.services.detector_registry import REGISTRY, BY_NAME
 from app.services.trading_session_service import TradingSessionService
 from app.core.trading_defaults import get_thresholds, estimate_capital_at_risk
 
@@ -134,21 +136,29 @@ def _trajectory(risk_before: Decimal, risk_after: Decimal) -> str:
 @dataclass
 class DetectedEvent:
     event_type: str
-    severity: str       # "danger" | "caution" | "info" (info = analytics-only, no user alert)
+    severity: str       # "info" | "caution" | "danger" | "critical" (info = analytics-only, no user alert)
     message: str
     context: Dict[str, Any] = field(default_factory=dict)
     risk_delta: Decimal = Decimal("0")
+    confidence: Optional[float] = None  # 0-100; None → derived from data quality
+    suppressed_reason: Optional[str] = None  # e.g. "strategy_group" — event recorded, no alert
 
 
 @dataclass
 class DetectionResult:
     alerts: List[RiskAlert]
+    events: List["BehaviorEventRecord"]  # ALL detections incl. info/suppressed — caller persists
     risk_score_before: Decimal
     risk_score_after: Decimal
     total_delta: Decimal
     behavior_state: str
     trajectory: str
     session_id: Optional[UUID]
+
+
+# Data quality → deterministic-detector confidence (master §1.3: for arithmetic
+# detectors, confidence ≈ data quality).
+DATA_QUALITY_CONFIDENCE = {"GOOD": 100.0, "PARTIAL": 75.0, "UNKNOWN": 50.0, "INVALID": 0.0}
 
 
 @dataclass
@@ -181,6 +191,7 @@ class BehaviorEngine:
         completed_trade: CompletedTrade,
         db: AsyncSession,
         profile=None,
+        source: str = "webhook",  # webhook | bulk_sync | unknown — drives data quality
     ) -> DetectionResult:
         try:
             today_ist = datetime.now(ZoneInfo("Asia/Kolkata")).date()
@@ -198,8 +209,25 @@ class BehaviorEngine:
             # detected_at = the trade's own exit time, never processing time.
             # A trade synced at 17:05 that closed at 14:20 gets detected_at 14:20.
             trade_time = completed_trade.exit_time or now
-            alerts = [
-                RiskAlert(
+
+            # ── Data quality (A.6) ────────────────────────────────────────
+            # webhook = live single-trade path; bulk_sync = historical replay
+            # (state reconstructed, order context may be stale); unknown =
+            # LIMIT-1 fallback. Missing exit order types degrades one level.
+            data_quality = {"webhook": "GOOD", "bulk_sync": "PARTIAL"}.get(source, "UNKNOWN")
+            if data_quality == "GOOD" and not ctx.exit_order_types:
+                data_quality = "PARTIAL"
+            default_confidence = DATA_QUALITY_CONFIDENCE.get(data_quality, 50.0)
+
+            # ── Alerts: notification records ──────────────────────────────
+            # info severity and suppressed events never alert — but ALL events
+            # are recorded below (§1C.8: suppression is notification-layer only).
+            alerts = []
+            for e in events:
+                if e.severity == "info" or e.suppressed_reason:
+                    continue
+                alerts.append(RiskAlert(
+                    id=uuid4(),  # explicit id so events can link pre-flush
                     broker_account_id=broker_account_id,
                     pattern_type=e.event_type,
                     severity=e.severity,
@@ -207,15 +235,42 @@ class BehaviorEngine:
                     details={**e.context, "exchange": completed_trade.exchange},
                     trigger_trade_id=None,
                     trigger_completed_trade_id=completed_trade.id,
-                    detector_version=ENGINE_VERSION,
+                    detector_version=self._detector_version(e.event_type),
+                    confidence=e.confidence if e.confidence is not None else default_confidence,
+                    detected_at=trade_time,
+                ))
+
+            # ── BehaviorEvents: evidence records for EVERY detection ──────
+            input_snapshot = {
+                "completed_trade_id": str(completed_trade.id),
+                "session_trade_ids": [str(t.id) for t in ctx.session_trades],
+                "source": source,
+            }
+            behavior_events = [
+                BehaviorEventRecord(
+                    broker_account_id=broker_account_id,
+                    detector=e.event_type,
+                    detector_version=self._detector_version(e.event_type),
+                    severity=e.severity,
+                    confidence=e.confidence if e.confidence is not None else default_confidence,
+                    data_quality=data_quality,
+                    message=e.message,
+                    evidence=(
+                        {**e.context, "_suppressed": e.suppressed_reason}
+                        if e.suppressed_reason else dict(e.context)
+                    ),
+                    input_snapshot=input_snapshot,
+                    trigger_completed_trade_id=completed_trade.id,
                     detected_at=trade_time,
                 )
                 for e in events
-                if e.severity != "info"  # "info" = analytics-only, never user-facing (e.g. cooldown_violation)
             ]
 
+            # Suppressed events are recorded as evidence but do not move the
+            # risk score (pre-registry behavior: they never reached this sum).
             total_delta = sum(
-                RISK_DELTAS.get(e.event_type, Decimal("0")) for e in events
+                RISK_DELTAS.get(e.event_type, Decimal("0"))
+                for e in events if not e.suppressed_reason
             )
             new_risk = max(Decimal("0"), min(Decimal("100"), risk_before + total_delta))
             state = _behavior_state(new_risk, session.peak_risk_score)
@@ -235,6 +290,7 @@ class BehaviorEngine:
 
             return DetectionResult(
                 alerts=alerts,
+                events=behavior_events,
                 risk_score_before=risk_before,
                 risk_score_after=new_risk,
                 total_delta=total_delta,
@@ -247,6 +303,7 @@ class BehaviorEngine:
             logger.error(f"[BehaviorEngine] analyze failed: {e}", exc_info=True)
             return DetectionResult(
                 alerts=[],
+                events=[],
                 risk_score_before=Decimal("0"),
                 risk_score_after=Decimal("0"),
                 total_delta=Decimal("0"),
@@ -254,6 +311,12 @@ class BehaviorEngine:
                 trajectory="stable",
                 session_id=None,
             )
+
+    @staticmethod
+    def _detector_version(pattern_type: str) -> str:
+        """Per-detector version from the registry, falling back to engine version."""
+        spec = BY_NAME.get(pattern_type)
+        return spec.version if spec else ENGINE_VERSION
 
     # ── Context loader ─────────────────────────────────────────────────────
 
@@ -359,57 +422,47 @@ class BehaviorEngine:
     })
 
     def _run_all_detectors(self, ctx: EngineContext) -> List[DetectedEvent]:
+        """
+        Iterate the Detector Registry (A.1) in declaration order.
+
+        Suppression (strategy legs, options overlap) marks events with
+        suppressed_reason instead of dropping them — the BehaviorEvent is
+        always recorded, only the notification is withheld (master §1C.8).
+        """
         events = []
         _SEV_RANK = {"critical": 0, "danger": 1, "caution": 2, "positive": 3}
-        for detector in [
-            self._detect_consecutive_loss_streak,
-            self._detect_revenge_trade,
-            self._detect_overtrading_burst,
-            self._detect_size_escalation,
-            self._detect_rapid_reentry,
-            self._detect_panic_exit,
-            self._detect_martingale_behaviour,
-            self._detect_rapid_flip,
-            self._detect_excess_exposure,
-            self._detect_session_meltdown,
-            self._detect_fomo_entry,
-            self._detect_no_stoploss,
-            self._detect_early_exit,
-            self._detect_winning_streak_overconfidence,
-            self._detect_options_direction_confusion,
-            self._detect_options_premium_avg_down,
-            self._detect_iv_crush_behavior,
-            self._detect_premium_destruction,
-            self._detect_expiry_day_overtrading,
-            self._detect_opening_5min_trap,
-            self._detect_end_of_session_mis_panic,
-            self._detect_post_loss_recovery_bet,
-            self._detect_profit_giveaway,
-            self._detect_cooldown_violation,
-        ]:
+        for spec in REGISTRY:
+            detector = getattr(self, spec.method, None)
+            if detector is None:
+                logger.error(f"[BehaviorEngine] registry method missing: {spec.method}")
+                continue
             try:
                 event = detector(ctx)
                 if event:
                     if ctx.strategy_group and event.event_type in self._STRATEGY_SUPPRESSED:
+                        event.suppressed_reason = f"strategy_group:{ctx.strategy_group.strategy_type}"
                         logger.debug(
                             f"[BehaviorEngine] suppressed {event.event_type} — "
                             f"trade is part of {ctx.strategy_group.strategy_type}"
                         )
-                        continue
                     events.append(event)
             except Exception as e:
-                logger.warning(f"[BehaviorEngine] {detector.__name__} failed: {e}")
+                logger.warning(f"[BehaviorEngine] {spec.method} failed: {e}")
 
         # iv_crush_behavior and premium_destruction both analyse the same fast premium
-        # collapse — if both fire for this trade keep only the higher-severity one.
+        # collapse — if both fire for this trade only the higher-severity one alerts;
+        # the other is kept as a suppressed evidence record.
         _OPTIONS_OVERLAP = {"iv_crush_behavior", "premium_destruction"}
-        options_events = [e for e in events if e.event_type in _OPTIONS_OVERLAP]
+        options_events = [e for e in events
+                          if e.event_type in _OPTIONS_OVERLAP and not e.suppressed_reason]
         if len(options_events) >= 2:
             best = min(options_events, key=lambda e: _SEV_RANK.get(e.severity, 99))
-            events = [e for e in events if e.event_type not in _OPTIONS_OVERLAP] + [best]
+            for e in options_events:
+                if e is not best:
+                    e.suppressed_reason = f"options_overlap:{best.event_type}"
             logger.debug(
                 f"[BehaviorEngine] options dedup: kept {best.event_type} ({best.severity}), "
-                f"dropped {[e.event_type for e in options_events if e is not best]}"
+                f"suppressed {[e.event_type for e in options_events if e is not best]}"
             )
 
         return events

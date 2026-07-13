@@ -562,11 +562,12 @@ async def run_risk_detection_async(
             # No completed trade yet — position still open, nothing to analyze
             return
 
-        # Run BehaviorEngine — returns RiskAlert objects
+        # Run BehaviorEngine — returns RiskAlert objects + BehaviorEvent evidence
         result = await behavior_engine.analyze(
             broker_account_id=broker_account_id,
             completed_trade=latest_ct,
             db=db,
+            source="webhook" if completed_trade_id is not None else "unknown",
         )
         alerts = result.alerts  # List[RiskAlert], ready to save
 
@@ -616,14 +617,27 @@ async def run_risk_detection_async(
             return new_rank <= prev_rank  # True = block; False = escalation
 
         new_alerts = []
+        deduped_patterns = set()
         for alert in alerts:
             if _is_deduped(alert.pattern_type, alert.severity):
+                deduped_patterns.add(alert.pattern_type)
                 continue
             db.add(alert)
             new_alerts.append(alert)
             last_fired[alert.pattern_type] = latest_ct.exit_time or now_utc
             last_fired_sev[alert.pattern_type] = alert.severity
             today_patterns.add(alert.pattern_type)
+
+        # Persist BehaviorEvents for EVERY detection (§1C.8 — evidence is never
+        # suppressed). Link each event to its surviving alert; deduped ones get
+        # a marker instead of a link.
+        surviving_by_pattern = {a.pattern_type: a.id for a in new_alerts}
+        for ev in result.events:
+            if ev.detector in surviving_by_pattern:
+                ev.risk_alert_id = surviving_by_pattern[ev.detector]
+            elif ev.detector in deduped_patterns:
+                ev.evidence = {**(ev.evidence or {}), "_suppressed": "dedup"}
+            db.add(ev)
 
         await db.commit()
 
@@ -778,18 +792,34 @@ async def run_behavior_engine_full_session(broker_account_id: UUID, db) -> int:
             broker_account_id=broker_account_id,
             completed_trade=ct,
             db=db,
+            source="bulk_sync",
         )
+        surviving_by_pattern: dict = {}
+        deduped_patterns: set = set()
         for alert in result.alerts:
             if _is_deduped_full(alert.pattern_type, trade_time, alert.severity):
+                deduped_patterns.add(alert.pattern_type)
                 continue
             db.add(alert)
             all_new_alerts.append(alert)
+            surviving_by_pattern[alert.pattern_type] = alert.id
             last_fired[alert.pattern_type] = ct.exit_time or now_utc
             last_fired_sev[alert.pattern_type] = alert.severity
             today_patterns.add(alert.pattern_type)
 
+        # Evidence records for every detection (§1C.8), linked where an alert survived
+        for ev in result.events:
+            if ev.detector in surviving_by_pattern:
+                ev.risk_alert_id = surviving_by_pattern[ev.detector]
+            elif ev.detector in deduped_patterns:
+                ev.evidence = {**(ev.evidence or {}), "_suppressed": "dedup"}
+            db.add(ev)
+
+    # Commit regardless of alert survival — BehaviorEvents (evidence) must
+    # persist even when every notification was deduped.
+    await db.commit()
+
     if all_new_alerts:
-        await db.commit()
         all_new_alerts = await _apply_alert_consolidation(broker_account_id, all_new_alerts, db)
 
         # Staleness gate (master Q12): bulk sync processes hours of history —
