@@ -200,6 +200,12 @@ COLD_START_DEFAULTS: Dict[str, Any] = {
     'iv_crush_proxy_hold_min':          30,   # hold < 30 min for this to be IV (not theta)
     'iv_crush_proxy_loss_pct':          40,   # lost > 40% of premium paid
 
+    # ── Baseline confidence targets (Engine v2 Phase 3, master §1B.4) ────
+    # Confidence = min(1, n / target). Session-level metrics mature with
+    # SESSIONS; trade-level with TRADES (per-metric confidence, Q23).
+    'baseline_target_sessions':         30,
+    'baseline_target_trades':           100,
+
     # ── Constitution violation ladder (Engine v2 Phase 2, master §1C.4) ──
     # Level 1 "approaching" at 80% of a rule → caution
     # Level 2 "breached"   at 100%           → danger
@@ -261,10 +267,44 @@ def get_thresholds(profile=None) -> Dict[str, Any]:
     result = dict(COLD_START_DEFAULTS)  # Start with Tier 2 research defaults
 
     if profile:
-        # Tier 2 override: behavioural baseline from user's own 30-session history.
-        # When available, replaces generic defaults with personal patterns.
+        # Tier 2 override: per-metric behavioral baseline (Engine v2 Phase 3).
+        # Continuous confidence blend — no activation cliff (master §1B.4):
+        #   effective = confidence × personal + (1 − confidence) × default
+        # A trader with 3 sessions barely moves the needle; 40 sessions ≈ their
+        # own numbers. Universal floors still apply at the end of this function.
         baseline = (getattr(profile, 'detected_patterns', None) or {}).get('baseline')
-        if baseline and isinstance(baseline, dict):
+        metrics = (baseline or {}).get('metrics') if isinstance(baseline, dict) else None
+        if metrics and isinstance(metrics, dict):
+
+            def _blend(metric_key: str, derive, default_val: float) -> float:
+                rec = metrics.get(metric_key)
+                if not rec or rec.get('value') is None:
+                    return default_val
+                conf = float(rec.get('confidence') or 0)
+                personal = derive(float(rec['value']))
+                return conf * personal + (1 - conf) * default_val
+
+            # Overtrading: your normal day × 1.5 = your caution line
+            result['daily_trade_limit'] = int(round(_blend(
+                'avg_daily_trades', lambda v: v * 1.5, result['daily_trade_limit'])))
+            result['daily_trade_danger'] = max(
+                result['daily_trade_limit'] + 1,
+                int(round(result['daily_trade_limit'] * 1.5)),
+            )
+            # Burst: a quarter of your typical day inside 30 min = unusual
+            result['burst_trades_per_30min_caution'] = int(round(_blend(
+                'avg_daily_trades', lambda v: max(3.0, v / 4),
+                result['burst_trades_per_30min_caution'])))
+            result['burst_trades_per_30min_danger'] = max(
+                result['burst_trades_per_30min_caution'] + 2,
+                int(round(result['burst_trades_per_30min_caution'] * 1.6)),
+            )
+            # Revenge window: half your natural re-entry pace after a loss
+            result['revenge_window_caution_min'] = round(_blend(
+                'median_reentry_after_loss_min', lambda v: max(5.0, v * 0.5),
+                result['revenge_window_caution_min']), 1)
+        elif baseline and isinstance(baseline, dict):
+            # Legacy flat-key baseline shape (pre-Phase 3) — direct values
             for key in (
                 'daily_trade_limit', 'burst_trades_per_30min_caution',
                 'revenge_window_caution_min', 'consecutive_loss_caution',
@@ -315,6 +355,14 @@ def get_thresholds(profile=None) -> Dict[str, Any]:
         if result.get('max_position_size'):
             result['max_position_pct_caution'] = float(result['max_position_size'])
             result['max_position_pct_danger']  = float(result['max_position_size']) * 2.0
+
+        # Profit-giveaway floor scales with capital (master P2 item): a ₹1,000
+        # peak is noise on a ₹5L account. 0.2% of capital, never below default.
+        if result.get('trading_capital'):
+            result['profit_giveaway_min_peak'] = max(
+                result['profit_giveaway_min_peak'],
+                float(result['trading_capital']) * 0.002,
+            )
     else:
         # Cold start: no profile — capital fields are unknown
         result['trading_capital']    = None

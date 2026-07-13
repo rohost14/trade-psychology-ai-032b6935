@@ -69,6 +69,25 @@ class AIPersonalizationService:
         intervention_timing = await self._learn_intervention_timing(broker_account_id, db, trades)
         predictive_windows = self._calculate_predictive_windows(time_patterns, symbol_patterns)
 
+        # Engine v2 Phase 3: per-metric behavioral baseline (master §1B.4).
+        # Writes the "baseline" key get_thresholds() reads — this connects the
+        # adaptive-threshold wiring that was dead since inception (the key was
+        # read but never written). Uses CompletedTrade P&L, not Trade.pnl.
+        baseline = {}
+        try:
+            from app.services.baseline_service import compute_baseline
+            from app.models.user_profile import UserProfile as _UP
+            prof_res = await db.execute(
+                select(_UP).where(_UP.broker_account_id == broker_account_id)
+            )
+            _prof = prof_res.scalar_one_or_none()
+            baseline = await compute_baseline(
+                broker_account_id, db, days=days_back,
+                trading_capital=getattr(_prof, "trading_capital", None),
+            )
+        except Exception as _b_err:
+            logger.warning(f"[baseline] computation failed (non-fatal): {_b_err}")
+
         learned_patterns = {
             "last_updated": datetime.now(timezone.utc).isoformat(),
             "trades_analyzed": len(trades),
@@ -76,6 +95,7 @@ class AIPersonalizationService:
             "symbol_patterns": symbol_patterns,
             "intervention_timing": intervention_timing,
             "predictive_windows": predictive_windows,
+            "baseline": baseline,
         }
 
         # Store in user profile
