@@ -69,6 +69,11 @@ from app.core.trading_defaults import get_thresholds, estimate_capital_at_risk
 logger = logging.getLogger(__name__)
 IST = ZoneInfo("Asia/Kolkata")
 
+# Detector code version, stored on every alert (Engine v2 Appendix A.2).
+# Bump on any detection-logic change so alerts remain attributable to the
+# logic that produced them.
+ENGINE_VERSION = "1.1.0"
+
 # ---------------------------------------------------------------------------
 # Risk score deltas per pattern
 # ---------------------------------------------------------------------------
@@ -190,6 +195,9 @@ class BehaviorEngine:
             events = self._run_all_detectors(ctx)
 
             now = datetime.now(timezone.utc)
+            # detected_at = the trade's own exit time, never processing time.
+            # A trade synced at 17:05 that closed at 14:20 gets detected_at 14:20.
+            trade_time = completed_trade.exit_time or now
             alerts = [
                 RiskAlert(
                     broker_account_id=broker_account_id,
@@ -198,6 +206,9 @@ class BehaviorEngine:
                     message=e.message,
                     details={**e.context, "exchange": completed_trade.exchange},
                     trigger_trade_id=None,
+                    trigger_completed_trade_id=completed_trade.id,
+                    detector_version=ENGINE_VERSION,
+                    detected_at=trade_time,
                 )
                 for e in events
                 if e.severity != "info"  # "info" = analytics-only, never user-facing (e.g. cooldown_violation)
@@ -349,7 +360,7 @@ class BehaviorEngine:
 
     def _run_all_detectors(self, ctx: EngineContext) -> List[DetectedEvent]:
         events = []
-        _SEV_RANK = {"danger": 1, "caution": 2, "positive": 3}
+        _SEV_RANK = {"critical": 0, "danger": 1, "caution": 2, "positive": 3}
         for detector in [
             self._detect_consecutive_loss_streak,
             self._detect_revenge_trade,
@@ -424,6 +435,7 @@ class BehaviorEngine:
                     "symbol": _t.tradingsymbol or "—",
                     "pnl": float(pnl),
                     "qty": _t.total_quantity or 0,
+                    "exit_time_ist": _t.exit_time.astimezone(IST).strftime("%H:%M") if _t.exit_time else None,
                 })
             else:
                 break
@@ -759,7 +771,9 @@ class BehaviorEngine:
                 ),
                 context={"symbol": ct.tradingsymbol, "gap_minutes": round(gap_min, 1),
                          "prior_pnl": float(prior_pnl), "window_min": window,
-                         "trigger_symbol": ct.tradingsymbol},
+                         "trigger_symbol": ct.tradingsymbol,
+                         "prior_exit_time_ist": last_same.exit_time.astimezone(IST).strftime("%H:%M") if last_same.exit_time else None,
+                         "reentry_time_ist": ct.entry_time.astimezone(IST).strftime("%H:%M") if ct.entry_time else None},
             )
         return None
 
@@ -835,6 +849,21 @@ class BehaviorEngine:
         all_sizes = sizes + [ct.total_quantity or 1]
         seq_str = "→".join(str(s) for s in all_sizes)
 
+        trade_list = [
+            {
+                "symbol": t.tradingsymbol or "—",
+                "qty": t.total_quantity or 0,
+                "pnl": float(Decimal(str(t.realized_pnl or 0))),
+                "exit_time_ist": t.exit_time.astimezone(IST).strftime("%H:%M") if t.exit_time else None,
+            }
+            for t in prior
+        ] + [{
+            "symbol": ct.tradingsymbol or "—",
+            "qty": ct.total_quantity or 0,
+            "pnl": float(Decimal(str(ct.realized_pnl or 0))),
+            "exit_time_ist": ct.exit_time.astimezone(IST).strftime("%H:%M") if ct.exit_time else None,
+        }]
+
         if max_ratio >= danger_mul:
             return DetectedEvent(
                 event_type="martingale_behaviour",
@@ -845,7 +874,7 @@ class BehaviorEngine:
                 ),
                 context={"size_sequence": all_sizes, "max_ratio": round(max_ratio, 2),
                          "consecutive_losses": loss_count, "underlying": ct_underlying,
-                         "trigger_symbol": ct.tradingsymbol},
+                         "trigger_symbol": ct.tradingsymbol, "trade_list": trade_list},
             )
         if max_ratio >= caution_mul:
             return DetectedEvent(
@@ -857,7 +886,7 @@ class BehaviorEngine:
                 ),
                 context={"size_sequence": all_sizes, "max_ratio": round(max_ratio, 2),
                          "consecutive_losses": loss_count, "underlying": ct_underlying,
-                         "trigger_symbol": ct.tradingsymbol},
+                         "trigger_symbol": ct.tradingsymbol, "trade_list": trade_list},
             )
         return None
 
@@ -1898,6 +1927,15 @@ class BehaviorEngine:
             "prior_total_loss": float(total_prior_loss),
             "underlying": ct_underlying,
             "trigger_symbol": ct.tradingsymbol,
+            "prior_trades": [
+                {
+                    "symbol": t.tradingsymbol or "—",
+                    "qty": t.total_quantity or 0,
+                    "pnl": float(Decimal(str(t.realized_pnl or 0))),
+                    "exit_time_ist": t.exit_time.astimezone(IST).strftime("%H:%M") if t.exit_time else None,
+                }
+                for t in prior[-3:]
+            ],
         }
 
         if size_ratio >= danger_mul:

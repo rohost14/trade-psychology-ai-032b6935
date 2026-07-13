@@ -67,24 +67,6 @@ class ConnectionManager:
             "timestamp": datetime.now(timezone.utc).isoformat(),
         })
 
-    async def push_behavioral_event(self, account_id: str, event):
-        """
-        Push behavioral event to connected client.
-        Only called AFTER event is persisted in DB.
-        """
-        await self.send_to_account(account_id, {
-            "type": "behavioral_event",
-            "data": {
-                "event_type": event.event_type,
-                "severity": event.severity,
-                "message": event.message,
-                "confidence": float(event.confidence),
-                "detected_at": event.detected_at.isoformat() if event.detected_at else None,
-                "trigger_position_key": event.trigger_position_key,
-            },
-            "timestamp": datetime.now(timezone.utc).isoformat(),
-        })
-
 
 # Global connection manager
 manager = ConnectionManager()

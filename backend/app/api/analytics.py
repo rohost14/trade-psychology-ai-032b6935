@@ -1475,7 +1475,7 @@ async def get_critical_trades(
 ):
     """Critical trades: large losses, behavioral alerts, or oversized positions."""
     try:
-        from app.models.behavioral_event import BehavioralEvent
+        from app.models.risk_alert import RiskAlert
 
         cutoff = datetime.now(timezone.utc) - timedelta(days=days)
 
@@ -1500,14 +1500,17 @@ async def get_critical_trades(
         avg_loss = sum(losses) / len(losses) if losses else 0  # negative number
         loss_threshold = avg_loss * 2  # 2x avg loss = critical (more negative)
 
-        # Fetch all behavioral events in period
+        # Fetch all risk alerts in period.
+        # Previously read the BehavioralEvent table, which has been frozen since the
+        # Session 21 engine cutover — no rows exist after that date, so behavioral
+        # reasons silently never matched. RiskAlert is the live alert store.
         be_result = await db.execute(
-            select(BehavioralEvent)
+            select(RiskAlert)
             .where(and_(
-                BehavioralEvent.broker_account_id == broker_account_id,
-                BehavioralEvent.detected_at >= cutoff,
+                RiskAlert.broker_account_id == broker_account_id,
+                RiskAlert.detected_at >= cutoff,
             ))
-            .order_by(BehavioralEvent.detected_at)
+            .order_by(RiskAlert.detected_at)
         )
         behavioral_events = be_result.scalars().all()
 
@@ -1531,8 +1534,8 @@ async def get_critical_trades(
                 for be in alerts_during:
                     reasons.append({
                         "type": "behavioral_alert",
-                        "label": be.event_type.replace("_", " ").title() if be.event_type else "Alert",
-                        "event_type": be.event_type,
+                        "label": be.pattern_type.replace("_", " ").title() if be.pattern_type else "Alert",
+                        "event_type": be.pattern_type,
                         "severity": be.severity,
                     })
 

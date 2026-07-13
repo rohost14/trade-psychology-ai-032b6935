@@ -15,6 +15,7 @@ from typing import Dict, Any
 from app.core.celery_app import celery_app
 from app.core.database import SessionLocal
 from app.core.config import settings
+from app.core.trading_defaults import COLD_START_DEFAULTS
 from app.services.trade_sync_service import TradeSyncService
 from app.services.pnl_calculator import pnl_calculator
 from app.models.user import User
@@ -593,7 +594,7 @@ async def run_risk_detection_async(
         # severity escalation (caution → danger) is allowed through within the
         # dedup window. Previously the escalation code was unreachable — the
         # dedup `continue` ran before it.
-        _SEV_RANK = {"info": 0, "caution": 1, "danger": 2}
+        _SEV_RANK = {"info": 0, "caution": 1, "danger": 2, "critical": 3}
         last_fired: dict = {}      # pattern_type → datetime
         last_fired_sev: dict = {}  # pattern_type → severity string
         today_patterns: set = set()
@@ -630,8 +631,21 @@ async def run_risk_detection_async(
         new_alerts = await _apply_alert_consolidation(broker_account_id, new_alerts, db)
 
         # ── Send notifications for danger alerts ──────────────────────
-        danger_alerts = [a for a in new_alerts if a.severity == "danger"]
-        for alert in danger_alerts:
+        # Staleness gate (master Q12): push only when the triggering trade is
+        # recent. detected_at = trade time, so bulk-synced old trades are
+        # naturally suppressed here while still saved + visible in-app.
+        danger_alerts = [a for a in new_alerts if a.severity in ("danger", "critical")]
+        stale_cutoff = now_utc - timedelta(
+            minutes=COLD_START_DEFAULTS.get("alert_stale_push_min", 30)
+        )
+        pushable = [a for a in danger_alerts if (a.detected_at or now_utc) >= stale_cutoff]
+        suppressed = len(danger_alerts) - len(pushable)
+        if suppressed:
+            logger.info(
+                f"[staleness] {broker_account_id}: {suppressed} danger alert(s) "
+                f"older than push window — saved, not pushed"
+            )
+        for alert in pushable:
             send_danger_alert.delay(str(broker_account_id), str(alert.id))
 
         logger.info(
@@ -733,7 +747,7 @@ async def run_behavior_engine_full_session(broker_account_id: UUID, db) -> int:
     )
     all_existing = existing_result.scalars().all()
     # HIGH-3 fix: track severity of last fire to allow caution → danger escalation.
-    _SEV_RANK = {"info": 0, "caution": 1, "danger": 2}
+    _SEV_RANK = {"info": 0, "caution": 1, "danger": 2, "critical": 3}
     last_fired: dict = {}
     last_fired_sev: dict = {}
     today_patterns: set = set()
@@ -778,8 +792,21 @@ async def run_behavior_engine_full_session(broker_account_id: UUID, db) -> int:
         await db.commit()
         all_new_alerts = await _apply_alert_consolidation(broker_account_id, all_new_alerts, db)
 
-        danger_alerts = [a for a in all_new_alerts if a.severity == "danger"]
-        for alert in danger_alerts:
+        # Staleness gate (master Q12): bulk sync processes hours of history —
+        # only trades closed within the push window may notify. Everything else
+        # is saved for analytics/in-app only.
+        danger_alerts = [a for a in all_new_alerts if a.severity in ("danger", "critical")]
+        stale_cutoff = now_utc - timedelta(
+            minutes=COLD_START_DEFAULTS.get("alert_stale_push_min", 30)
+        )
+        pushable = [a for a in danger_alerts if (a.detected_at or now_utc) >= stale_cutoff]
+        suppressed = len(danger_alerts) - len(pushable)
+        if suppressed:
+            logger.info(
+                f"[staleness/FullSession] {broker_account_id}: {suppressed} danger "
+                f"alert(s) older than push window — saved, not pushed"
+            )
+        for alert in pushable:
             send_danger_alert.delay(str(broker_account_id), str(alert.id))
 
         if all_new_alerts:
@@ -819,7 +846,9 @@ async def _apply_alert_consolidation(
     import pytz
 
     now_utc = datetime.now(timezone.utc)
-    five_min_ago = now_utc - timedelta(minutes=5)
+    five_min_ago = now_utc - timedelta(
+        minutes=COLD_START_DEFAULTS.get("alert_bucket_minutes", 5)
+    )
     today_ist = datetime.now(pytz.timezone("Asia/Kolkata")).date()
 
     # Check today's session alert count
@@ -834,7 +863,7 @@ async def _apply_alert_consolidation(
     session = session_result.scalar_one_or_none()
     session_alert_count = session.alerts_fired if session else 0
 
-    HARD_CAP = 8
+    HARD_CAP = COLD_START_DEFAULTS.get("alert_session_hard_cap", 8)
     if session_alert_count >= HARD_CAP:
         # LOW-3: warn (not info) — danger alerts silently suppressed after cap is worth seeing in ops logs
         suppressed_summary = [f"{a.pattern_type}({a.severity})" for a in alerts]

@@ -200,6 +200,18 @@ COLD_START_DEFAULTS: Dict[str, Any] = {
     'iv_crush_proxy_hold_min':          30,   # hold < 30 min for this to be IV (not theta)
     'iv_crush_proxy_loss_pct':          40,   # lost > 40% of premium paid
 
+    # ── Alert consolidation (P-02, formerly inline in trade_tasks) ───────
+    'alert_session_hard_cap':           8,   # max notified alerts per session (fatigue guard)
+    'alert_bucket_minutes':             5,   # same pattern re-notification bucket
+
+    # ── Notification staleness (Engine v2 Phase 0, master Q12) ───────────
+    # Push/WhatsApp only fire for alerts whose triggering trade is recent.
+    # Bulk-synced historical trades (detected_at = trade time, hours old)
+    # produce analytics/in-app rows only — a 5:05pm push about a 2:20pm trade
+    # makes users think the app is broken. Past-session trades are always
+    # older than this window, so they are auto-suppressed too.
+    'alert_stale_push_min':            30,   # no push if trade older than 30 min
+
     # Premium destruction: options trade exits losing > X% of entry premium.
     # Fires regardless of hold time — measures exit severity, not speed.
     # -60 means the threshold is "worse than -60%" (e.g. -65%, -80%, -99%).
