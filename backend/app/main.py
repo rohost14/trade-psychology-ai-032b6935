@@ -389,6 +389,9 @@ app.include_router(journal.router, prefix="/api/journal", tags=["journal"])
 from app.api import profile
 app.include_router(profile.router, prefix="/api/profile", tags=["profile"])
 
+from app.api import constitution
+app.include_router(constitution.router, prefix="/api/constitution", tags=["constitution"])
+
 from app.api import cooldown
 app.include_router(cooldown.router, prefix="/api/cooldown", tags=["cooldown"])
 

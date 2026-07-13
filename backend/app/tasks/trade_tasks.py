@@ -42,6 +42,17 @@ def _get_redis_client():
     return get_sync_redis()
 
 
+def _pattern_dedup_key(pattern_type: str, details) -> str:
+    """
+    Dedup key for alerts. constitution_violation covers many rules under one
+    pattern_type (Q15) — a cooldown breach must not suppress a later daily-loss
+    breach, so the rule joins the key.
+    """
+    if pattern_type == "constitution_violation":
+        return f"constitution_violation:{(details or {}).get('rule', '')}"
+    return pattern_type
+
+
 def _acquire_lock(redis_client, key: str, ttl_seconds: int) -> bool:
     """
     Try to acquire a Redis SETNX lock.
@@ -596,36 +607,38 @@ async def run_risk_detection_async(
         # dedup window. Previously the escalation code was unreachable — the
         # dedup `continue` ran before it.
         _SEV_RANK = {"info": 0, "caution": 1, "danger": 2, "critical": 3}
-        last_fired: dict = {}      # pattern_type → datetime
-        last_fired_sev: dict = {}  # pattern_type → severity string
+        last_fired: dict = {}      # dedup key → datetime
+        last_fired_sev: dict = {}  # dedup key → severity string
         today_patterns: set = set()
         for a in all_existing:
+            k = _pattern_dedup_key(a.pattern_type, a.details)
             today_patterns.add(a.pattern_type)
-            if a.pattern_type not in last_fired or a.detected_at > last_fired[a.pattern_type]:
-                last_fired[a.pattern_type] = a.detected_at
-                last_fired_sev[a.pattern_type] = a.severity
+            if k not in last_fired or a.detected_at > last_fired[k]:
+                last_fired[k] = a.detected_at
+                last_fired_sev[k] = a.severity
 
-        def _is_deduped(pattern_type: str, new_severity: str) -> bool:
-            if pattern_type not in last_fired:
+        def _is_deduped(key: str, pattern_type: str, new_severity: str) -> bool:
+            if key not in last_fired:
                 return False
             hours = _DEDUP_HOURS.get(pattern_type, 24)
-            if (now_utc - last_fired[pattern_type]) >= timedelta(hours=hours):
+            if (now_utc - last_fired[key]) >= timedelta(hours=hours):
                 return False  # Window elapsed — allow
             # Within window: allow severity escalation through (caution → danger)
-            prev_rank = _SEV_RANK.get(last_fired_sev.get(pattern_type, ""), 0)
+            prev_rank = _SEV_RANK.get(last_fired_sev.get(key, ""), 0)
             new_rank = _SEV_RANK.get(new_severity, 0)
             return new_rank <= prev_rank  # True = block; False = escalation
 
         new_alerts = []
-        deduped_patterns = set()
+        deduped_keys = set()
         for alert in alerts:
-            if _is_deduped(alert.pattern_type, alert.severity):
-                deduped_patterns.add(alert.pattern_type)
+            k = _pattern_dedup_key(alert.pattern_type, alert.details)
+            if _is_deduped(k, alert.pattern_type, alert.severity):
+                deduped_keys.add(k)
                 continue
             db.add(alert)
             new_alerts.append(alert)
-            last_fired[alert.pattern_type] = latest_ct.exit_time or now_utc
-            last_fired_sev[alert.pattern_type] = alert.severity
+            last_fired[k] = latest_ct.exit_time or now_utc
+            last_fired_sev[k] = alert.severity
             today_patterns.add(alert.pattern_type)
 
         # Persist BehaviorEvents for EVERY detection (§1C.8 — evidence is never
@@ -636,11 +649,14 @@ async def run_risk_detection_async(
         # unflushed alert violates the FK (caught in Phase 1 validation).
         if new_alerts:
             await db.flush()
-        surviving_by_pattern = {a.pattern_type: a.id for a in new_alerts}
+        surviving_by_key = {
+            _pattern_dedup_key(a.pattern_type, a.details): a.id for a in new_alerts
+        }
         for ev in result.events:
-            if ev.detector in surviving_by_pattern:
-                ev.risk_alert_id = surviving_by_pattern[ev.detector]
-            elif ev.detector in deduped_patterns:
+            ek = _pattern_dedup_key(ev.detector, ev.evidence)
+            if ek in surviving_by_key:
+                ev.risk_alert_id = surviving_by_key[ek]
+            elif ek in deduped_keys:
                 ev.evidence = {**(ev.evidence or {}), "_suppressed": "dedup"}
             db.add(ev)
 
@@ -771,21 +787,22 @@ async def run_behavior_engine_full_session(broker_account_id: UUID, db) -> int:
     last_fired_sev: dict = {}
     today_patterns: set = set()
     for a in all_existing:
+        k = _pattern_dedup_key(a.pattern_type, a.details)
         today_patterns.add(a.pattern_type)
-        if a.pattern_type not in last_fired or a.detected_at > last_fired[a.pattern_type]:
-            last_fired[a.pattern_type] = a.detected_at
-            last_fired_sev[a.pattern_type] = a.severity
+        if k not in last_fired or a.detected_at > last_fired[k]:
+            last_fired[k] = a.detected_at
+            last_fired_sev[k] = a.severity
 
-    def _is_deduped_full(pattern_type: str, trade_time: datetime, new_severity: str) -> bool:
-        if pattern_type not in last_fired:
+    def _is_deduped_full(key: str, pattern_type: str, trade_time: datetime, new_severity: str) -> bool:
+        if key not in last_fired:
             return False
         hours = _DEDUP_HOURS.get(pattern_type, 24)
         # Use trade's own exit_time as reference (not now_utc) so bulk historical
         # replay doesn't incorrectly suppress same-session patterns.
-        if (trade_time - last_fired[pattern_type]) >= timedelta(hours=hours):
+        if (trade_time - last_fired[key]) >= timedelta(hours=hours):
             return False  # Window elapsed — allow
         # Within window: allow severity escalation (caution → danger)
-        prev_rank = _SEV_RANK.get(last_fired_sev.get(pattern_type, ""), 0)
+        prev_rank = _SEV_RANK.get(last_fired_sev.get(key, ""), 0)
         new_rank = _SEV_RANK.get(new_severity, 0)
         return new_rank <= prev_rank
 
@@ -799,27 +816,29 @@ async def run_behavior_engine_full_session(broker_account_id: UUID, db) -> int:
             db=db,
             source="bulk_sync",
         )
-        surviving_by_pattern: dict = {}
-        deduped_patterns: set = set()
+        surviving_by_key: dict = {}
+        deduped_keys: set = set()
         for alert in result.alerts:
-            if _is_deduped_full(alert.pattern_type, trade_time, alert.severity):
-                deduped_patterns.add(alert.pattern_type)
+            k = _pattern_dedup_key(alert.pattern_type, alert.details)
+            if _is_deduped_full(k, alert.pattern_type, trade_time, alert.severity):
+                deduped_keys.add(k)
                 continue
             db.add(alert)
             all_new_alerts.append(alert)
-            surviving_by_pattern[alert.pattern_type] = alert.id
-            last_fired[alert.pattern_type] = ct.exit_time or now_utc
-            last_fired_sev[alert.pattern_type] = alert.severity
+            surviving_by_key[k] = alert.id
+            last_fired[k] = ct.exit_time or now_utc
+            last_fired_sev[k] = alert.severity
             today_patterns.add(alert.pattern_type)
 
         # Evidence records for every detection (§1C.8), linked where an alert survived.
         # Flush alerts first — FK ordering (see webhook path note).
-        if surviving_by_pattern:
+        if surviving_by_key:
             await db.flush()
         for ev in result.events:
-            if ev.detector in surviving_by_pattern:
-                ev.risk_alert_id = surviving_by_pattern[ev.detector]
-            elif ev.detector in deduped_patterns:
+            ek = _pattern_dedup_key(ev.detector, ev.evidence)
+            if ek in surviving_by_key:
+                ev.risk_alert_id = surviving_by_key[ek]
+            elif ek in deduped_keys:
                 ev.evidence = {**(ev.evidence or {}), "_suppressed": "dedup"}
             db.add(ev)
 

@@ -104,6 +104,7 @@ RISK_DELTAS: Dict[str, Decimal] = {
     "end_of_session_mis_panic":         Decimal("15"),
     "post_loss_recovery_bet":           Decimal("20"),
     "profit_giveaway":                  Decimal("20"),
+    "constitution_violation":           Decimal("25"),
     "premium_destruction":              Decimal("25"),
 }
 
@@ -328,6 +329,24 @@ class BehaviorEngine:
         db: AsyncSession,
         profile=None,
     ) -> EngineContext:
+        # Phase 2 fix: no live caller ever passed profile, so get_thresholds(None)
+        # ran on pure research defaults — user-declared limits (daily loss, trade
+        # cap, position size) were silently ignored in production detection.
+        # Fetch it here; also apply any pending constitution loosening that has
+        # reached its next-session effective time.
+        if profile is None:
+            try:
+                from app.models.user_profile import UserProfile as _UP
+                prof_result = await db.execute(
+                    select(_UP).where(_UP.broker_account_id == broker_account_id)
+                )
+                profile = prof_result.scalar_one_or_none()
+                if profile is not None:
+                    from app.services.constitution_service import ConstitutionService
+                    await ConstitutionService.apply_pending_if_due(profile, db)
+            except Exception as _p_err:
+                logger.warning(f"[BehaviorEngine] profile load failed, using defaults: {_p_err}")
+
         thresholds = get_thresholds(profile)
 
         session_start = session.market_open
@@ -437,8 +456,12 @@ class BehaviorEngine:
                 logger.error(f"[BehaviorEngine] registry method missing: {spec.method}")
                 continue
             try:
-                event = detector(ctx)
-                if event:
+                result = detector(ctx)
+                if not result:
+                    continue
+                # constitution_violation returns a list (multiple rules can
+                # breach on one trade); everything else returns a single event.
+                for event in (result if isinstance(result, list) else [result]):
                     if ctx.strategy_group and event.event_type in self._STRATEGY_SUPPRESSED:
                         event.suppressed_reason = f"strategy_group:{ctx.strategy_group.strategy_type}"
                         logger.debug(
@@ -464,6 +487,33 @@ class BehaviorEngine:
                 f"[BehaviorEngine] options dedup: kept {best.event_type} ({best.severity}), "
                 f"suppressed {[e.event_type for e in options_events if e is not best]}"
             )
+
+        # Constitution suppression (master §1C.8): when the user's OWN rule is
+        # BREACHED (danger+), the overlapping behavioral pattern's notification
+        # is withheld — "you violated YOUR rule" is the stronger message. The
+        # behavioral event is still recorded and still feeds state/scores.
+        _CONSTITUTION_PAIRS = {
+            "cooldown":               ("revenge_trade",),
+            "max_consecutive_losses": ("consecutive_loss_streak",),
+            "daily_trades":           ("overtrading_burst",),
+            "max_trade_risk":         ("excess_exposure",),
+            "daily_loss":             ("session_meltdown",),
+        }
+        breached_rules = {
+            e.context.get("rule") for e in events
+            if e.event_type == "constitution_violation"
+            and e.severity in ("danger", "critical")
+            and not e.suppressed_reason
+        }
+        if breached_rules:
+            suppressible = {p for r in breached_rules for p in _CONSTITUTION_PAIRS.get(r, ())}
+            for e in events:
+                if e.event_type in suppressible and not e.suppressed_reason:
+                    e.suppressed_reason = "constitution_breach"
+                    logger.debug(
+                        f"[BehaviorEngine] {e.event_type} notification suppressed — "
+                        f"constitution rule breached ({breached_rules})"
+                    )
 
         return events
 
@@ -2106,6 +2156,147 @@ class BehaviorEngine:
             )
 
         return None
+
+    # ── Constitution violation (Engine v2 Phase 2, master §1C.4 / Q15) ──────
+    #
+    # Single pattern_type covering every user-declared rule; the specific rule
+    # lives in context["rule"]. Severity ladder per rule:
+    #   approaching (80% of rule)  → caution
+    #   breached    (100%)         → danger
+    #   severe      (120%+)        → critical (guardian-eligible)
+    # Binary rules (cooldown, restricted windows) have no "approaching" — they
+    # fire danger on violation.
+    # Rules only exist if the user declared them; no declaration → no check.
+
+    def _detect_constitution_violation(self, ctx: EngineContext) -> Optional[List[DetectedEvent]]:
+        th = ctx.thresholds
+        ct = ctx.completed_trade
+        approaching = float(th.get("constitution_approaching_pct", 0.80))
+        severe = float(th.get("constitution_severe_pct", 1.20))
+        events: List[DetectedEvent] = []
+
+        def ladder(ratio: float) -> Optional[str]:
+            if ratio >= severe:
+                return "critical"
+            if ratio >= 1.0:
+                return "danger"
+            if ratio >= approaching:
+                return "caution"
+            return None
+
+        def add(rule: str, severity: str, message: str, extra: Dict[str, Any]):
+            events.append(DetectedEvent(
+                event_type="constitution_violation",
+                severity=severity,
+                message=message,
+                context={"rule": rule, **extra},
+            ))
+
+        # ── Rule: daily loss limit ────────────────────────────────────────
+        loss_limit = th.get("daily_loss_limit")
+        if loss_limit:
+            session_pnl = Decimal(str(ctx.session.session_pnl or 0)) if ctx.session else Decimal("0")
+            loss = float(-session_pnl) if session_pnl < 0 else 0.0
+            ratio = loss / float(loss_limit)
+            sev = ladder(ratio)
+            if sev:
+                if ratio >= 1.0:
+                    msg = (f"Your daily loss limit is breached: ₹{loss:,.0f} lost "
+                           f"of your ₹{float(loss_limit):,.0f} limit ({ratio*100:.0f}%).")
+                else:
+                    msg = (f"Approaching your daily loss limit: ₹{loss:,.0f} of "
+                           f"₹{float(loss_limit):,.0f} ({ratio*100:.0f}%).")
+                add("daily_loss", sev, msg,
+                    {"limit": float(loss_limit), "current": round(loss, 2),
+                     "ratio": round(ratio, 2)})
+
+        # ── Rule: max trades per day ──────────────────────────────────────
+        trade_limit = th.get("user_daily_trade_limit")
+        if trade_limit:
+            count = len(ctx.session_trades) + 1
+            ratio = count / float(trade_limit)
+            sev = ladder(ratio)
+            if sev:
+                verb = "breached" if ratio >= 1.0 else "approaching"
+                add("daily_trades", sev,
+                    f"Your daily trade limit {verb}: {count} of {int(trade_limit)} trades.",
+                    {"limit": int(trade_limit), "current": count, "ratio": round(ratio, 2)})
+
+        # ── Rule: max consecutive losses ──────────────────────────────────
+        max_consec = th.get("max_consecutive_losses")
+        if max_consec:
+            streak = 0
+            for t in reversed(list(ctx.session_trades) + [ct]):
+                if Decimal(str(t.realized_pnl or 0)) < 0:
+                    streak += 1
+                else:
+                    break
+            ratio = streak / float(max_consec)
+            sev = ladder(ratio)
+            if sev:
+                verb = "breached" if ratio >= 1.0 else "approaching"
+                add("max_consecutive_losses", sev,
+                    f"Your consecutive-loss rule {verb}: {streak} losses in a row "
+                    f"(your stop point: {int(max_consec)}).",
+                    {"limit": int(max_consec), "current": streak, "ratio": round(ratio, 2)})
+
+        # ── Rule: cooldown after loss (binary) ────────────────────────────
+        cooldown_min = th.get("user_cooldown_min")
+        if cooldown_min and ct.entry_time:
+            prior_losses = [t for t in ctx.session_trades
+                            if t.exit_time and t.exit_time <= ct.entry_time
+                            and Decimal(str(t.realized_pnl or 0)) < 0]
+            if prior_losses:
+                last_loss = max(prior_losses, key=lambda t: t.exit_time)
+                gap_min = (ct.entry_time - last_loss.exit_time).total_seconds() / 60
+                if 0 <= gap_min < float(cooldown_min):
+                    add("cooldown", "danger",
+                        f"Your {int(cooldown_min)}-minute cooldown rule violated: entered "
+                        f"{ct.tradingsymbol} {gap_min:.0f} min after a "
+                        f"₹{abs(float(last_loss.realized_pnl or 0)):,.0f} loss.",
+                        {"limit_min": int(cooldown_min), "gap_min": round(gap_min, 1),
+                         "prior_loss": float(last_loss.realized_pnl or 0),
+                         "prior_symbol": last_loss.tradingsymbol})
+
+        # ── Rule: restricted windows (binary) ─────────────────────────────
+        windows = th.get("restricted_windows") or []
+        if windows and ct.entry_time:
+            entry_ist = ct.entry_time.astimezone(IST)
+            entry_min = entry_ist.hour * 60 + entry_ist.minute
+            for w in windows:
+                try:
+                    start_s, end_s = w.split("-")
+                    sh, sm = map(int, start_s.split(":"))
+                    eh, em = map(int, end_s.split(":"))
+                    if sh * 60 + sm <= entry_min <= eh * 60 + em:
+                        add("restricted_window", "danger",
+                            f"Your no-trade window ({w} IST) violated: entered "
+                            f"{ct.tradingsymbol} at {entry_ist.strftime('%H:%M')}.",
+                            {"window": w, "entry_time_ist": entry_ist.strftime("%H:%M")})
+                        break
+                except (ValueError, AttributeError):
+                    continue
+
+        # ── Rule: max capital-at-risk per trade ───────────────────────────
+        risk_pct_limit = th.get("max_position_size")
+        capital = th.get("trading_capital")
+        if risk_pct_limit and capital:
+            risk = estimate_capital_at_risk(
+                ct.instrument_type, ct.tradingsymbol or "", ct.direction or "LONG",
+                float(ct.avg_entry_price or 0), int(ct.total_quantity or 0),
+            )
+            risk_pct = risk / float(capital) * 100
+            ratio = risk_pct / float(risk_pct_limit)
+            sev = ladder(ratio)
+            if sev:
+                verb = "breached" if ratio >= 1.0 else "approaching"
+                add("max_trade_risk", sev,
+                    f"Your per-trade risk rule {verb}: {ct.tradingsymbol} risked "
+                    f"{risk_pct:.1f}% of capital (your limit: {float(risk_pct_limit):.0f}%).",
+                    {"limit_pct": float(risk_pct_limit), "current_pct": round(risk_pct, 2),
+                     "ratio": round(ratio, 2), "capital_at_risk": round(risk, 2)})
+
+        return events or None
 
 
 # Singleton

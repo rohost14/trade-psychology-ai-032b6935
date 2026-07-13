@@ -109,12 +109,20 @@ REGISTRY: Tuple[DetectorSpec, ...] = (
     DetectorSpec("profit_giveaway", "_detect_profit_giveaway",
                  "1.0.0", "emotional", "alerting", "exit", 2,
                  consumes=("session", "session_trades", "completed_trade", "thresholds")),
-    # cooldown_violation: severity=info today (invisible), Phase 2 redesigns it
-    # as the constitution_violation discipline pattern.
+    # cooldown_violation: system-suggested cooldowns (Cooldown DB records),
+    # analytics-only. Distinct from the constitution cooldown rule below.
     DetectorSpec("cooldown_violation", "_detect_cooldown_violation",
                  "1.0.0", "discipline", "analytics", "exit", 0,
                  uses_constitution=True,
                  consumes=("active_cooldowns", "completed_trade")),
+    # Constitution violation (Phase 2, Q15): one pattern for every user-declared
+    # rule — daily_loss, daily_trades, max_consecutive_losses, cooldown,
+    # restricted_window, max_trade_risk. Ladder: 80% caution / 100% danger /
+    # 120% critical (guardian-eligible). Returns a LIST (multi-rule breaches).
+    DetectorSpec("constitution_violation", "_detect_constitution_violation",
+                 "1.0.0", "discipline", "alerting", "exit", 4,
+                 guardian_eligible=True, uses_constitution=True,
+                 consumes=("session", "session_trades", "completed_trade", "thresholds")),
 )
 
 # Fast lookups

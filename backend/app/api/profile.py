@@ -500,6 +500,28 @@ async def update_profile(
                 if guardian_loss_limit is not None:
                     user.guardian_loss_limit = guardian_loss_limit
 
+        # Constitution rule fields are change-controlled (Engine v2 Phase 2):
+        # tighten = instant, loosen = friction flow via /api/constitution.
+        # Route them through ConstitutionService so Settings cannot silently
+        # bypass the lock; loosening attempts here return 409.
+        from app.services.constitution_service import (
+            ConstitutionService, LoosenRequiresOverride, RULE_FIELDS,
+        )
+        rule_changes = {f: update_data.pop(f) for f in list(update_data)
+                        if f in RULE_FIELDS and update_data[f] is not None}
+        if rule_changes:
+            try:
+                await ConstitutionService.apply_changes(profile, db, rule_changes)
+            except LoosenRequiresOverride as lro:
+                raise HTTPException(
+                    status_code=409,
+                    detail={
+                        "code": "override_required",
+                        "loosening_fields": lro.fields,
+                        "message": "Relaxing your trading rules requires confirmation via My Rules.",
+                    },
+                )
+
         for field, value in update_data.items():
             if hasattr(profile, field) and value is not None:
                 setattr(profile, field, value)

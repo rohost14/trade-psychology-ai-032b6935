@@ -71,14 +71,24 @@ class UserProfile(Base):
     trading_hours_start = Column(String(5), default="09:15")  # HH:MM
     trading_hours_end = Column(String(5), default="15:30")
 
-    # Risk management settings
-    daily_loss_limit = Column(Float, nullable=True)       # Max loss per day
+    # Risk management settings — THE CONSTITUTION (Engine v2 §1C.2).
+    # These fields are the user's trading rulebook: single source of truth,
+    # change-controlled by ConstitutionService (tighten instant, loosen =
+    # friction + history + next-session effect). Migration 065.
+    daily_loss_limit = Column(Float, nullable=True)       # Max loss per day (₹)
     daily_trade_limit = Column(Integer, nullable=True)    # Max trades per day
-    max_position_size = Column(Float, nullable=True)      # Max position size (% of capital as decimal, e.g. 10.0 = 10%)
+    max_position_size = Column(Float, nullable=True)      # Max capital-at-risk per trade (% of capital, e.g. 10.0)
     cooldown_after_loss = Column(Integer, default=15)     # Minutes to wait after loss
+    max_consecutive_losses = Column(Integer, nullable=True)  # Stop after N losses in a row
+    restricted_windows = Column(JSONB, default=list)      # ["13:00-14:00"] IST no-trade windows
     trading_capital = Column(Float, nullable=True)        # Rs amount of capital deployed for trading
     sl_percent_futures = Column(Float, nullable=True)     # Typical SL % of notional for futures (e.g., 1.0)
     sl_percent_options = Column(Float, nullable=True)     # % of premium to exit losing options (e.g., 50.0)
+
+    # Constitution lock/override metadata (§1C.3, migration 065)
+    constitution_accepted_at = Column(DateTime(timezone=True), nullable=True)   # review-screen acceptance
+    constitution_locked_until = Column(DateTime(timezone=True), nullable=True)  # 30-day soft lock
+    constitution_pending = Column(JSONB, nullable=True)   # loosening changes awaiting next session
 
     # Known weaknesses (from analysis or self-reported)
     known_weaknesses = Column(JSONB, default=list)  # ['revenge_trading', 'fomo', 'overtrading']
@@ -129,6 +139,11 @@ class UserProfile(Base):
             "daily_trade_limit": self.daily_trade_limit,
             "max_position_size": self.max_position_size,
             "cooldown_after_loss": self.cooldown_after_loss,
+            "max_consecutive_losses": self.max_consecutive_losses,
+            "restricted_windows": self.restricted_windows or [],
+            "constitution_accepted_at": self.constitution_accepted_at.isoformat() if self.constitution_accepted_at else None,
+            "constitution_locked_until": self.constitution_locked_until.isoformat() if self.constitution_locked_until else None,
+            "constitution_pending": self.constitution_pending,
             "trading_capital": self.trading_capital,
             "sl_percent_futures": self.sl_percent_futures,
             "sl_percent_options": self.sl_percent_options,

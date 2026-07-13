@@ -67,7 +67,7 @@ def make_ctx(current, priors, session_pnl=0, strategy_group=None):
 
 # ── 1. Registry integrity ─────────────────────────────────────────────────
 print("1. Detector registry")
-check("24 detectors registered", len(REGISTRY) == 24, f"got {len(REGISTRY)}")
+check("25 detectors registered (24 + constitution_violation)", len(REGISTRY) == 25, f"got {len(REGISTRY)}")
 check("all registry methods exist on engine",
       all(hasattr(behavior_engine, s.method) for s in REGISTRY),
       str([s.method for s in REGISTRY if not hasattr(behavior_engine, s.method)]))

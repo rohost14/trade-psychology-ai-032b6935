@@ -200,6 +200,13 @@ COLD_START_DEFAULTS: Dict[str, Any] = {
     'iv_crush_proxy_hold_min':          30,   # hold < 30 min for this to be IV (not theta)
     'iv_crush_proxy_loss_pct':          40,   # lost > 40% of premium paid
 
+    # ── Constitution violation ladder (Engine v2 Phase 2, master §1C.4) ──
+    # Level 1 "approaching" at 80% of a rule → caution
+    # Level 2 "breached"   at 100%           → danger
+    # Level 3 "severe"     at 120%           → critical (guardian-eligible)
+    'constitution_approaching_pct':     0.80,
+    'constitution_severe_pct':          1.20,
+
     # ── Alert consolidation (P-02, formerly inline in trade_tasks) ───────
     'alert_session_hard_cap':           8,   # max notified alerts per session (fatigue guard)
     'alert_bucket_minutes':             5,   # same pattern re-notification bucket
@@ -295,6 +302,11 @@ def get_thresholds(profile=None) -> Dict[str, Any]:
         result['trading_capital']   = getattr(profile, 'trading_capital', None)
         result['daily_loss_limit']  = getattr(profile, 'daily_loss_limit', None)
         result['max_position_size'] = getattr(profile, 'max_position_size', None)
+        # Constitution rules (Engine v2 Phase 2) — raw declared values
+        result['max_consecutive_losses'] = getattr(profile, 'max_consecutive_losses', None)
+        result['restricted_windows']     = getattr(profile, 'restricted_windows', None) or []
+        result['user_daily_trade_limit'] = getattr(profile, 'daily_trade_limit', None)
+        result['user_cooldown_min']      = getattr(profile, 'cooldown_after_loss', None)
         result['sl_percent_futures'] = getattr(profile, 'sl_percent_futures', None) or 1.0
         result['sl_percent_options'] = getattr(profile, 'sl_percent_options', None) or 50.0
         result['risk_tolerance']    = getattr(profile, 'risk_tolerance', None) or 'moderate'
@@ -308,6 +320,10 @@ def get_thresholds(profile=None) -> Dict[str, Any]:
         result['trading_capital']    = None
         result['daily_loss_limit']   = None
         result['max_position_size']  = None
+        result['max_consecutive_losses'] = None
+        result['restricted_windows']     = []
+        result['user_daily_trade_limit'] = None
+        result['user_cooldown_min']      = None
         result['sl_percent_futures'] = 1.0
         result['sl_percent_options'] = 50.0
         result['risk_tolerance']     = 'moderate'
