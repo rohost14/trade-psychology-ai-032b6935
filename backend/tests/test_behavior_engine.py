@@ -167,14 +167,19 @@ class TestDetectors:
 
     # ── Consecutive loss streak ───────────────────────────────────────────
 
+    # Engine contract (HIGH-1 fix + _load_context): session_trades EXCLUDES the
+    # current trade — the detector appends ctx.completed_trade itself. These
+    # tests originally passed the current trade in both, double-counting it;
+    # updated to match the production contract (trades[:-1]).
+
     def test_no_alert_on_winner(self):
         ct = make_ct(pnl=500)
-        ctx = make_ctx(completed_trade=ct, session_trades=[ct])
+        ctx = make_ctx(completed_trade=ct, session_trades=[])
         assert engine._detect_consecutive_loss_streak(ctx) is None
 
     def test_caution_on_3_losses(self):
         trades = [make_ct(pnl=-100) for _ in range(3)]
-        ctx = make_ctx(completed_trade=trades[-1], session_trades=trades)
+        ctx = make_ctx(completed_trade=trades[-1], session_trades=trades[:-1])
         event = engine._detect_consecutive_loss_streak(ctx)
         assert event is not None
         assert event.severity == "caution"
@@ -182,7 +187,7 @@ class TestDetectors:
 
     def test_danger_on_5_losses(self):
         trades = [make_ct(pnl=-100) for _ in range(5)]
-        ctx = make_ctx(completed_trade=trades[-1], session_trades=trades)
+        ctx = make_ctx(completed_trade=trades[-1], session_trades=trades[:-1])
         event = engine._detect_consecutive_loss_streak(ctx)
         assert event is not None
         assert event.severity == "danger"
@@ -194,7 +199,7 @@ class TestDetectors:
             make_ct(pnl=200),
             make_ct(pnl=-100), make_ct(pnl=-100),
         ]
-        ctx = make_ctx(completed_trade=trades[-1], session_trades=trades)
+        ctx = make_ctx(completed_trade=trades[-1], session_trades=trades[:-1])
         event = engine._detect_consecutive_loss_streak(ctx)
         # Streak = 2, below caution threshold of 3
         assert event is None
@@ -286,7 +291,10 @@ class TestDetectors:
         event = engine._detect_cooldown_violation(ctx)
         assert event is not None
         assert event.event_type == "cooldown_violation"
-        assert event.severity == "danger"
+        # S28+: cooldown_violation is analytics-only (severity="info", never a
+        # user-facing alert). Registry: disposition=analytics, level 0.
+        # Phase 2 redesigns it as the constitution_violation discipline pattern.
+        assert event.severity == "info"
 
     def test_no_violation_without_cooldown(self):
         ctx = make_ctx(active_cooldowns=[])

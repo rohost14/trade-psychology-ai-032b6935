@@ -631,6 +631,11 @@ async def run_risk_detection_async(
         # Persist BehaviorEvents for EVERY detection (§1C.8 — evidence is never
         # suppressed). Link each event to its surviving alert; deduped ones get
         # a marker instead of a link.
+        # Flush alerts BEFORE adding events: the UOW does not order these
+        # inserts by the risk_alert_id FK, and an event row referencing an
+        # unflushed alert violates the FK (caught in Phase 1 validation).
+        if new_alerts:
+            await db.flush()
         surviving_by_pattern = {a.pattern_type: a.id for a in new_alerts}
         for ev in result.events:
             if ev.detector in surviving_by_pattern:
@@ -807,7 +812,10 @@ async def run_behavior_engine_full_session(broker_account_id: UUID, db) -> int:
             last_fired_sev[alert.pattern_type] = alert.severity
             today_patterns.add(alert.pattern_type)
 
-        # Evidence records for every detection (§1C.8), linked where an alert survived
+        # Evidence records for every detection (§1C.8), linked where an alert survived.
+        # Flush alerts first — FK ordering (see webhook path note).
+        if surviving_by_pattern:
+            await db.flush()
         for ev in result.events:
             if ev.detector in surviving_by_pattern:
                 ev.risk_alert_id = surviving_by_pattern[ev.detector]
