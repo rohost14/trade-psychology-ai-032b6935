@@ -3,7 +3,7 @@ import { Outlet, NavLink, useLocation, useNavigate } from 'react-router-dom';
 import {
   LayoutDashboard, TrendingUp, MessageSquare, Settings,
   Shield, Brain, Bell, BookOpen, ScrollText, X,
-  MoreHorizontal, ChevronRight,
+  MoreHorizontal, ChevronRight, Scale,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { ThemeToggle } from './ThemeToggle';
@@ -38,6 +38,7 @@ const mobileMoreGroups = [
   {
     label: 'Risk',
     items: [
+      { name: 'My Rules',      href: '/my-rules',      icon: Scale },
       { name: 'Blowup Shield', href: '/blowup-shield', icon: Shield },
     ],
   },

@@ -59,11 +59,13 @@ class OnboardingStep3(BaseModel):
 
 
 class OnboardingStep4(BaseModel):
-    """Risk management"""
+    """Risk management — the constitution review step (Engine v2 Q24)"""
     daily_loss_limit: Optional[float] = None
     daily_trade_limit: Optional[int] = None
     max_position_size: Optional[float] = None
     cooldown_after_loss: int = 15
+    max_consecutive_losses: Optional[int] = None
+    trading_capital: Optional[float] = None
     known_weaknesses: List[str] = []  # Self-reported weaknesses
 
 
@@ -390,18 +392,32 @@ async def onboarding_step4(
     broker_account_id: UUID = Depends(get_verified_broker_account_id),
     db: AsyncSession = Depends(get_db)
 ):
-    """Complete onboarding step 4: Risk management"""
+    """
+    Complete onboarding step 4: constitution review + acceptance (Q24).
+    Rules route through ConstitutionService with change_type="accept" — this
+    records the acceptance timestamp, writes constitution_history, and starts
+    the 30-day soft lock. Explicit acceptance = psychological ownership.
+    """
     try:
         profile = await _get_or_create_profile(broker_account_id, db)
 
-        profile.daily_loss_limit = data.daily_loss_limit
-        profile.daily_trade_limit = data.daily_trade_limit
-        profile.max_position_size = data.max_position_size
-        profile.cooldown_after_loss = data.cooldown_after_loss
+        if data.trading_capital is not None:
+            profile.trading_capital = data.trading_capital
         profile.known_weaknesses = data.known_weaknesses
         profile.onboarding_step = max(profile.onboarding_step, 4)
 
-        await db.commit()
+        from app.services.constitution_service import ConstitutionService
+        rules = {
+            "daily_loss_limit": data.daily_loss_limit,
+            "daily_trade_limit": data.daily_trade_limit,
+            "max_position_size": data.max_position_size,
+            "cooldown_after_loss": data.cooldown_after_loss,
+            "max_consecutive_losses": data.max_consecutive_losses,
+        }
+        await ConstitutionService.apply_changes(
+            profile, db, {k: v for k, v in rules.items() if v is not None},
+            change_type_override="accept",
+        )
 
         return {"success": True, "step": 4, "next_step": 5}
 

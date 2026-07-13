@@ -1,7 +1,7 @@
 import { NavLink, useLocation } from 'react-router-dom';
 import {
   LayoutDashboard, TrendingUp, MessageSquare, Settings,
-  Shield, Brain, Bell, BookOpen, ScrollText,
+  Shield, Brain, Bell, BookOpen, ScrollText, Scale,
   ChevronLeft, ChevronRight,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
@@ -21,6 +21,7 @@ const sections = [
     items: [
       { name: 'Dashboard', href: '/dashboard', icon: LayoutDashboard, hasBadge: false },
       { name: 'Analytics', href: '/analytics', icon: TrendingUp, hasBadge: false },
+      { name: 'My Rules',  href: '/my-rules',  icon: Scale, hasBadge: false },
     ],
   },
   {

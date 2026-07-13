@@ -26,6 +26,7 @@ const Chat          = lazy(() => import("./pages/Chat"));
 const Settings      = lazy(() => import("./pages/Settings"));
 const Reports           = lazy(() => import("./pages/Reports"));
 const Journal           = lazy(() => import("./pages/Journal"));
+const MyRules           = lazy(() => import("./pages/MyRules"));
 const TermsOfService = lazy(() => import("./pages/TermsOfService"));
 const PrivacyPolicy  = lazy(() => import("./pages/PrivacyPolicy"));
 const Maintenance   = lazy(() => import("./pages/Maintenance"));
@@ -86,6 +87,7 @@ const App = () => (
                     <Route path="chat" element={<Chat />} />
                     <Route path="reports" element={<Reports />} />
                     <Route path="journal" element={<Journal />} />
+                    <Route path="my-rules" element={<MyRules />} />
                     <Route path="settings" element={<Settings />} />
                   </Route>
                   <Route path="welcome" element={<Welcome />} />

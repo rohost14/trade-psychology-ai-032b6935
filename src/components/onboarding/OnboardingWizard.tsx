@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import {
   User,
   TrendingUp,
@@ -47,6 +47,8 @@ interface OnboardingData {
   daily_trade_limit: number;
   max_position_size: number;
   cooldown_after_loss: number;
+  max_consecutive_losses: number;
+  trading_capital: number | null;
   known_weaknesses: string[];
   push_enabled: boolean;
   whatsapp_enabled: boolean;
@@ -117,6 +119,8 @@ export default function OnboardingWizard({ brokerAccountId, onComplete, onSkip }
     daily_trade_limit: 10,
     max_position_size: 50000,
     cooldown_after_loss: 15,
+    max_consecutive_losses: 3,
+    trading_capital: null,
     known_weaknesses: [],
     push_enabled: true,
     whatsapp_enabled: false,
@@ -125,6 +129,29 @@ export default function OnboardingWizard({ brokerAccountId, onComplete, onSkip }
   });
 
   const progress = (currentStep / STEPS.length) * 100;
+
+  // Constitution review (Engine v2 Q24): when the review step opens, prefill
+  // recommended rules from experience + capital. Mirrors backend
+  // ConstitutionService.generate_defaults; the accepted values are what count.
+  const prefilledRef = useRef(false);
+  useEffect(() => {
+    if (currentStep !== 4 || prefilledRef.current) return;
+    const matrix: Record<string, { lossPct: number; trades: number; cd: number; consec: number; riskPct: number }> = {
+      beginner:     { lossPct: 0.02,  trades: 5,  cd: 15, consec: 3, riskPct: 1.0 },
+      intermediate: { lossPct: 0.02,  trades: 10, cd: 10, consec: 4, riskPct: 2.0 },
+      experienced:  { lossPct: 0.025, trades: 15, cd: 5,  consec: 5, riskPct: 2.5 },
+      professional: { lossPct: 0.03,  trades: 20, cd: 5,  consec: 5, riskPct: 3.0 },
+    };
+    const m = matrix[data.experience_level] || matrix.beginner;
+    setData(d => ({
+      ...d,
+      daily_loss_limit: d.trading_capital ? Math.round(d.trading_capital * m.lossPct) : d.daily_loss_limit,
+      daily_trade_limit: m.trades,
+      cooldown_after_loss: m.cd,
+      max_consecutive_losses: m.consec,
+    }));
+    prefilledRef.current = true;
+  }, [currentStep, data.experience_level]);
 
   const handleNext = async () => {
     setIsLoading(true);
@@ -185,6 +212,8 @@ export default function OnboardingWizard({ brokerAccountId, onComplete, onSkip }
           daily_trade_limit: data.daily_trade_limit,
           max_position_size: data.max_position_size,
           cooldown_after_loss: data.cooldown_after_loss,
+          max_consecutive_losses: data.max_consecutive_losses,
+          trading_capital: data.trading_capital,
           known_weaknesses: data.known_weaknesses,
         };
       case 5:
@@ -419,9 +448,42 @@ export default function OnboardingWizard({ brokerAccountId, onComplete, onSkip }
                 </div>
               )}
 
-              {/* Step 4: Risk Management */}
+              {/* Step 4: Constitution review — accept or adjust (Q24) */}
               {currentStep === 4 && (
                 <div className="space-y-6">
+                  <div className="rounded-lg border border-tm-brand/30 bg-tm-brand/5 px-4 py-3">
+                    <p className="text-sm text-foreground font-medium">
+                      Based on your profile, here are your recommended trading rules.
+                    </p>
+                    <p className="text-xs text-muted-foreground mt-1">
+                      Accept them or customize now. You can always tighten them instantly,
+                      while relaxing them later requires additional safeguards.
+                    </p>
+                  </div>
+
+                  <div className="space-y-3">
+                    <Label className="flex items-center gap-2">
+                      <Wallet className="h-4 w-4" />
+                      Trading Capital (₹)
+                    </Label>
+                    <Input
+                      type="number"
+                      placeholder="e.g. 200000"
+                      value={data.trading_capital ?? ''}
+                      onChange={(e) => {
+                        const cap = e.target.value === '' ? null : Number(e.target.value);
+                        setData(d => ({
+                          ...d,
+                          trading_capital: cap,
+                          daily_loss_limit: cap ? Math.max(1000, Math.round(cap * 0.02 / 500) * 500) : d.daily_loss_limit,
+                        }));
+                      }}
+                    />
+                    <p className="text-xs text-muted-foreground">
+                      Powers your loss limit and position sizing rules
+                    </p>
+                  </div>
+
                   <div className="space-y-3">
                     <div className="flex justify-between">
                       <Label className="flex items-center gap-2">
@@ -470,6 +532,23 @@ export default function OnboardingWizard({ brokerAccountId, onComplete, onSkip }
                       min={5}
                       max={60}
                       step={5}
+                    />
+                  </div>
+
+                  <div className="space-y-3">
+                    <div className="flex justify-between">
+                      <Label className="flex items-center gap-2">
+                        <Shield className="h-4 w-4" />
+                        Stop After Consecutive Losses
+                      </Label>
+                      <span className="text-sm font-medium">{data.max_consecutive_losses} losses</span>
+                    </div>
+                    <Slider
+                      value={[data.max_consecutive_losses]}
+                      onValueChange={([value]) => setData({ ...data, max_consecutive_losses: value })}
+                      min={2}
+                      max={10}
+                      step={1}
                     />
                   </div>
 

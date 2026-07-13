@@ -43,6 +43,15 @@ async def create_tables():
     CI starts with a blank database — migrations are Supabase-only.
     This replaces the migration step for the test environment.
     """
+    # This fixture exists ONLY to bootstrap a BLANK CI database (migrations are
+    # Supabase-only). Local dev runs against live Supabase where the schema
+    # already exists — and this fixture's dedicated NullPool engine has been
+    # observed to hang into the 2-min statement timeout there, erroring every
+    # test at setup. Skip it entirely unless we are actually in CI.
+    import os
+    if os.getenv("CI", "").lower() not in ("1", "true"):
+        return
+
     engine = create_async_engine(
         settings.DATABASE_URL,
         poolclass=NullPool,
