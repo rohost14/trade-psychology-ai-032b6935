@@ -132,3 +132,17 @@ async def test_email_delivery(admin: dict = Depends(get_current_admin)):
     except Exception as e:
         logger.warning(f"Admin test email failed: {e}")
         return {"success": False, "error": str(e)[:200]}
+
+
+@router.get("/engine-metrics")
+async def engine_metrics(
+    _: dict = Depends(get_current_admin),
+):
+    """
+    P1 observability: engine pipeline counters + timings (Redis, 7-day
+    retention) with threshold flags. The SLO metric is alert_e2e_lag_ms
+    (trade completion -> detection persisted; target < 3000ms).
+    """
+    from app.core.metrics import snapshot, health_flags
+    snap = snapshot(days=2)
+    return {"metrics": snap, "flags": health_flags(snap)}

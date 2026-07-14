@@ -113,7 +113,12 @@ async def _persist_events(db, events, surviving_by_key: dict, deduped_keys: set)
             "detected_at": ev.detected_at,
         })
     stmt = pg_insert(BehaviorEvent).values(rows).on_conflict_do_nothing()
-    await db.execute(stmt)
+    result = await db.execute(stmt)
+    from app.core.metrics import incr as _mi
+    written = result.rowcount if result.rowcount is not None and result.rowcount >= 0 else len(rows)
+    _mi("events_written", written)
+    if written < len(rows):
+        _mi("events_conflict_skipped", len(rows) - written)
 
 
 async def _already_analyzed(broker_account_id: UUID, completed_trade_id, db) -> bool:
@@ -132,12 +137,10 @@ async def _already_analyzed(broker_account_id: UUID, completed_trade_id, db) -> 
     return result.scalar_one_or_none() is not None
 
 
-def _incr_metric(name: str):
-    """Best-effort Redis counter (P0 fix #2 observability seed)."""
-    try:
-        _get_redis_client().incr(f"metrics:{name}")
-    except Exception:
-        pass
+def _incr_metric(name: str, n: int = 1):
+    """P1: delegate to the metrics module (daily buckets, TTL)."""
+    from app.core.metrics import incr
+    incr(name, n)
 
 
 async def _run_death_spiral(broker_account_id: UUID, db, latest_trade_time=None):
@@ -533,6 +536,7 @@ def process_webhook_trade(self, trade_data: Dict[str, Any], broker_account_id: s
                         # the detection via the idempotent bulk path (pre-check
                         # + unique index make re-processing safe) and COUNT it.
                         _incr_metric("behavior_lock_exhausted")
+                        _incr_metric("behavior_requeued")
                         logger.error(
                             f"behavior_lock exhausted for {broker_account_id} - "
                             f"requeuing detection for trade {trade.id}"
@@ -748,6 +752,7 @@ async def run_risk_detection_async(
                     f"[BehaviorEngine] {broker_account_id}: trade "
                     f"{completed_trade_id} already analyzed - skipping (idempotent)"
                 )
+                _incr_metric("trades_skipped_idempotent")
                 return
             latest_ct = await db.get(CompletedTrade, completed_trade_id)
         else:
@@ -765,12 +770,15 @@ async def run_risk_detection_async(
             return
 
         # Run BehaviorEngine — returns RiskAlert objects + BehaviorEvent evidence
-        result = await behavior_engine.analyze(
-            broker_account_id=broker_account_id,
-            completed_trade=latest_ct,
-            db=db,
-            source="webhook" if completed_trade_id is not None else "unknown",
-        )
+        from app.core.metrics import timer as _mtimer, observe_ms as _mobserve, incr as _mincr
+        with _mtimer("analyze_ms"):
+            result = await behavior_engine.analyze(
+                broker_account_id=broker_account_id,
+                completed_trade=latest_ct,
+                db=db,
+                source="webhook" if completed_trade_id is not None else "unknown",
+            )
+        _mincr("trades_analyzed")
         alerts = result.alerts  # List[RiskAlert], ready to save
 
         # ── Deduplicate with pattern-specific windows ─────────────────
@@ -833,6 +841,7 @@ async def run_risk_detection_async(
             k = _pattern_dedup_key(alert.pattern_type, alert.details)
             if _is_deduped(k, alert.pattern_type, alert.severity, alert.details):
                 deduped_keys.add(k)
+                _mincr("alerts_deduped")
                 continue
             db.add(alert)
             new_alerts.append(alert)
@@ -847,20 +856,27 @@ async def run_risk_detection_async(
         # Flush alerts BEFORE adding events: the UOW does not order these
         # inserts by the risk_alert_id FK, and an event row referencing an
         # unflushed alert violates the FK (caught in Phase 1 validation).
-        if new_alerts:
-            await db.flush()
-        surviving_by_key = {
-            _pattern_dedup_key(a.pattern_type, a.details): a.id for a in new_alerts
-        }
-        await _persist_events(db, result.events, surviving_by_key, deduped_keys)
+        with _mtimer("persist_ms"):
+            if new_alerts:
+                await db.flush()
+            surviving_by_key = {
+                _pattern_dedup_key(a.pattern_type, a.details): a.id for a in new_alerts
+            }
+            await _persist_events(db, result.events, surviving_by_key, deduped_keys)
+            await db.commit()
+        _mincr("alerts_created", len(new_alerts))
 
-        await db.commit()
+        # THE SLO metric: trade completion -> detection persisted
+        if latest_ct.exit_time:
+            _mobserve("alert_e2e_lag_ms",
+                      (now_utc - latest_ct.exit_time).total_seconds() * 1000)
 
         # ── Death spiral meta-check (Phase 5) — after evidence persisted ──
         try:
-            spiral_alert = await _run_death_spiral(
-                broker_account_id, db, latest_ct.exit_time or now_utc
-            )
+            with _mtimer("death_spiral_ms"):
+                spiral_alert = await _run_death_spiral(
+                    broker_account_id, db, latest_ct.exit_time or now_utc
+                )
             if spiral_alert:
                 new_alerts.append(spiral_alert)
         except Exception as _ds_err:
@@ -880,10 +896,12 @@ async def run_risk_detection_async(
         pushable = [a for a in danger_alerts if (a.detected_at or now_utc) >= stale_cutoff]
         suppressed = len(danger_alerts) - len(pushable)
         if suppressed:
+            _mincr("notifications_stale_suppressed", suppressed)
             logger.info(
                 f"[staleness] {broker_account_id}: {suppressed} danger alert(s) "
                 f"older than push window — saved, not pushed"
             )
+        _mincr("notifications_dispatched", len(pushable))
         for alert in pushable:
             send_danger_alert.delay(str(broker_account_id), str(alert.id))
 
