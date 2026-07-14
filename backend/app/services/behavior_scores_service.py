@@ -58,6 +58,10 @@ _NATURE_TO_DRIVER = {
 _ALIAS_NATURE = {
     "daily_overtrading": "emotional",
     "death_spiral": "emotional",
+    # Position-monitor patterns (Phase 6, entry-time)
+    "overexposure": "risk",
+    "portfolio_concentration": "risk",
+    "holding_loser": "risk",
 }
 
 

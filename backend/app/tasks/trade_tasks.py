@@ -485,11 +485,21 @@ def process_webhook_trade(self, trade_data: Dict[str, Any], broker_account_id: s
                     from app.tasks.position_monitor_tasks import (
                         check_position_overexposure,
                         check_holding_loser_scheduled,
+                        check_portfolio_concentration,
+                        check_entry_rules,
                     )
                     # Immediate overexposure check for this symbol
                     check_position_overexposure.delay(
                         broker_account_id, trade.tradingsymbol or ""
                     )
+                    # Phase 6 entry-time checks: concentration across all open
+                    # positions + constitution rules AT THE FILL (intervention
+                    # while the position is still open)
+                    check_portfolio_concentration.delay(broker_account_id)
+                    if trade.transaction_type == "BUY":
+                        check_entry_rules.delay(
+                            broker_account_id, trade.tradingsymbol or ""
+                        )
                     # For BUY fills: schedule holding-loser check 30 min out.
                     # Use SETNX chain key so multiple BUY fills don't spawn
                     # parallel chains — only one chain active per account.

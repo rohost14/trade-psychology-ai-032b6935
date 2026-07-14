@@ -182,3 +182,74 @@ async def get_behavioral_insights(
         "top_users":  top_users,
         "recurrence": recurrence,
     }
+
+
+@router.get("/detector-stats")
+async def detector_stats(
+    days: int = Query(default=30, ge=1, le=180),
+    db: AsyncSession = Depends(get_db),
+    _: dict = Depends(get_current_admin),
+):
+    """
+    Detector evaluation (Engine v2 A.5): per-detector fires, severity mix,
+    acknowledge rate (dismiss-rate proxy), average confidence, suppression
+    counts. Six months in, "FOMO precision 27%" starts here.
+    """
+    from datetime import datetime, timedelta, timezone
+    from sqlalchemy import select, and_
+    from app.models.risk_alert import RiskAlert
+    from app.models.behavior_event import BehaviorEvent
+    from app.services.detector_registry import BY_NAME, ALIASES
+
+    cutoff = datetime.now(timezone.utc) - timedelta(days=days)
+
+    alerts_res = await db.execute(
+        select(RiskAlert).where(RiskAlert.detected_at >= cutoff)
+    )
+    alerts = list(alerts_res.scalars().all())
+    events_res = await db.execute(
+        select(BehaviorEvent).where(BehaviorEvent.detected_at >= cutoff)
+    )
+    events = list(events_res.scalars().all())
+
+    stats: dict = {}
+    for ev in events:
+        d = stats.setdefault(ev.detector, {
+            "events": 0, "suppressed": 0, "alerts": 0, "acknowledged": 0,
+            "severities": {}, "confidence_sum": 0.0, "confidence_n": 0,
+        })
+        d["events"] += 1
+        d["severities"][ev.severity] = d["severities"].get(ev.severity, 0) + 1
+        if (ev.evidence or {}).get("_suppressed"):
+            d["suppressed"] += 1
+        if ev.confidence is not None:
+            d["confidence_sum"] += float(ev.confidence)
+            d["confidence_n"] += 1
+
+    for a in alerts:
+        d = stats.setdefault(a.pattern_type, {
+            "events": 0, "suppressed": 0, "alerts": 0, "acknowledged": 0,
+            "severities": {}, "confidence_sum": 0.0, "confidence_n": 0,
+        })
+        d["alerts"] += 1
+        if a.acknowledged_at is not None:
+            d["acknowledged"] += 1
+
+    rows = []
+    for name, d in stats.items():
+        spec = BY_NAME.get(name)
+        rows.append({
+            "detector": name,
+            "version": spec.version if spec else ALIASES.get(name, "-"),
+            "nature": spec.nature if spec else None,
+            "disposition": spec.disposition if spec else None,
+            "events": d["events"],
+            "suppressed": d["suppressed"],
+            "alerts": d["alerts"],
+            "ack_rate": round(d["acknowledged"] / d["alerts"], 2) if d["alerts"] else None,
+            "avg_confidence": round(d["confidence_sum"] / d["confidence_n"], 1)
+                              if d["confidence_n"] else None,
+            "severities": d["severities"],
+        })
+    rows.sort(key=lambda r: -r["events"])
+    return {"window_days": days, "detectors": rows}

@@ -166,7 +166,7 @@ src = inspect.getsource(behavior_engine._run_all_detectors)
 check("engine options-dedup ranks critical", '"critical": 0' in src)
 from app.tasks import trade_tasks as tt
 src2 = inspect.getsource(tt)
-check("trade_tasks sev ranks include critical", src2.count('"critical": 3') == 2)
+check("trade_tasks sev ranks include critical", src2.count('"critical": 3') >= 2)
 check("staleness gate present in both paths", src2.count("alert_stale_push_min") >= 2)
 
 print()

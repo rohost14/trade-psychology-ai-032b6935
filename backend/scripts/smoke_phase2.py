@@ -104,7 +104,7 @@ check("no capital -> no loss limit, behavior defaults still set",
 
 # ── 3. Registry ───────────────────────────────────────────────────────────
 print("3. Registry")
-check("25 detectors now", len(REGISTRY) == 25, f"got {len(REGISTRY)}")
+check("27 detectors now (Phase 7 end-state)", len(REGISTRY) == 27, f"got {len(REGISTRY)}")
 spec = BY_NAME["constitution_violation"]
 check("constitution: discipline/alerting/level4/guardian",
       spec.nature == "discipline" and spec.disposition == "alerting"

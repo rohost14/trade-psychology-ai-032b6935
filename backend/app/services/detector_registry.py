@@ -126,6 +126,13 @@ REGISTRY: Tuple[DetectorSpec, ...] = (
     DetectorSpec("time_of_day_bias", "_detect_time_of_day_bias",
                  "1.0.0", "performance", "alerting", "exit", 1,
                  uses_baseline=True),
+    # Phase 7: performance analytics (info-only, feed the Strategy driver)
+    DetectorSpec("win_rate_collapse", "_detect_win_rate_collapse",
+                 "1.0.0", "performance", "analytics", "session", 0,
+                 uses_baseline=True),
+    DetectorSpec("strategy_breakdown", "_detect_strategy_breakdown",
+                 "1.0.0", "performance", "analytics", "session", 0,
+                 uses_baseline=True),
 )
 
 # Event types emitted by a detector under a different name than its spec
@@ -135,6 +142,10 @@ ALIASES = {
     # Meta-detector (L2, behavior_scores_service) — consumes BehaviorEvents,
     # never iterated with the L1 detectors.
     "death_spiral": "1.0.0",
+    # Position-monitor (entry-time) patterns - Phase 6
+    "overexposure": "2.0.0",
+    "portfolio_concentration": "1.0.0",
+    "holding_loser": "1.0.0",
 }
 
 # Fast lookups

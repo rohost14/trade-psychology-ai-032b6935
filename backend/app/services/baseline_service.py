@@ -56,6 +56,14 @@ def _metric(values: List[float], n: int, target: int) -> Optional[Dict]:
     }
 
 
+def _profit_factor(trades) -> float | None:
+    gross_win = sum(float(t.realized_pnl or 0) for t in trades if float(t.realized_pnl or 0) > 0)
+    gross_loss = abs(sum(float(t.realized_pnl or 0) for t in trades if float(t.realized_pnl or 0) < 0))
+    if gross_loss <= 0:
+        return None  # no losses in window - PF undefined/infinite
+    return round(gross_win / gross_loss, 3)
+
+
 async def compute_baseline(
     broker_account_id: UUID,
     db: AsyncSession,
@@ -155,6 +163,8 @@ async def compute_baseline(
         "avg_winner_hold_min": _metric(winner_holds, len(winner_holds), target_trades // 2),
         "avg_loser_hold_min": _metric(loser_holds, len(loser_holds), target_trades // 2),
         "win_rate": _metric([wins / n_trades * 100], n_trades, target_trades),
+        "profit_factor": _metric([_profit_factor(trades)], n_trades, target_trades)
+                         if _profit_factor(trades) is not None else None,
         "median_position_risk_pct": _metric(risk_pcts, len(risk_pcts), target_trades),
     }
     # p95 daily trades as a plain value on the avg record (upper-bound signal)

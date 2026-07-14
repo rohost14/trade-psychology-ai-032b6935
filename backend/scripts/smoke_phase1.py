@@ -67,7 +67,7 @@ def make_ctx(current, priors, session_pnl=0, strategy_group=None):
 
 # ── 1. Registry integrity ─────────────────────────────────────────────────
 print("1. Detector registry")
-check("25 detectors registered (24 + constitution_violation)", len(REGISTRY) == 25, f"got {len(REGISTRY)}")
+check("27 detectors registered (Phase 7 end-state)", len(REGISTRY) == 27, f"got {len(REGISTRY)}")
 check("all registry methods exist on engine",
       all(hasattr(behavior_engine, s.method) for s in REGISTRY),
       str([s.method for s in REGISTRY if not hasattr(behavior_engine, s.method)]))
@@ -130,7 +130,7 @@ check("drawdown identical", incremental.drawdown_from_peak == rebuilt.drawdown_f
 
 # ── 6. Detector version resolution ────────────────────────────────────────
 print("6. Detector versioning (A.2)")
-check("registry version resolves", behavior_engine._detector_version("overtrading_burst") == "1.1.0")
+check("registry version resolves", behavior_engine._detector_version("overtrading_burst") == "2.0.0")
 check("unknown falls back to engine version",
       behavior_engine._detector_version("nonexistent") == "1.1.0")
 

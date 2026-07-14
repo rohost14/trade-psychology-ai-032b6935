@@ -111,6 +111,11 @@ RISK_DELTAS: Dict[str, Decimal] = {
     "same_symbol_obsession":            Decimal("20"),
     "time_of_day_bias":                 Decimal("5"),
     "death_spiral":                     Decimal("30"),
+    "overexposure":                     Decimal("15"),
+    "portfolio_concentration":          Decimal("15"),
+    "holding_loser":                    Decimal("10"),
+    "win_rate_collapse":                Decimal("10"),
+    "strategy_breakdown":               Decimal("15"),
     "premium_destruction":              Decimal("25"),
 }
 
@@ -2437,6 +2442,89 @@ class BehaviorEngine:
                 "historical_avg_pnl": hit.get("avg_pnl"),
                 "trigger_symbol": ct.tradingsymbol,
             },
+        )
+
+
+    # ── Win rate collapse (Phase 7, doc 4 P29 — ANALYTICS-ONLY) ─────────────
+    #
+    # Never a real-time alert (user review #5: win rate is strategy-dependent;
+    # a 30% WR trader with PF 2.3 is excellent). info severity feeds the
+    # Strategy Health driver only. Guards against noise: needs 8+ trades today
+    # AND a trade-count-confident baseline.
+
+    def _detect_win_rate_collapse(self, ctx: EngineContext) -> Optional[DetectedEvent]:
+        baseline = ctx.thresholds.get("baseline_win_rate")
+        if not baseline or (baseline.get("confidence") or 0) < 0.5:
+            return None
+        trades = list(ctx.session_trades) + [ctx.completed_trade]
+        n = len(trades)
+        if n < 8:
+            return None
+        wins = sum(1 for t in trades if float(t.realized_pnl or 0) > 0)
+        today_wr = wins / n * 100
+        base_wr = float(baseline["value"])
+        if base_wr <= 0:
+            return None
+        deterioration = (base_wr - today_wr) / base_wr
+        if deterioration < 0.4:  # severe tier only — mild tiers are pure variance
+            return None
+        return DetectedEvent(
+            event_type="win_rate_collapse",
+            severity="info",
+            confidence=min(100.0, float(baseline.get("confidence", 0.5)) * 100),
+            message=(
+                f"Today's win rate {today_wr:.0f}% vs your {base_wr:.0f}% baseline "
+                f"({n} trades). Strategy or conditions, not psychology."
+            ),
+            context={"today_win_rate": round(today_wr, 1), "baseline_win_rate": base_wr,
+                     "deterioration_pct": round(deterioration * 100, 1), "trades_today": n},
+        )
+
+    # ── Strategy breakdown (Phase 7, doc 4 P30 — ANALYTICS-ONLY) ────────────
+    #
+    # Multi-signal degradation: win rate collapse AND profit factor collapse
+    # together. Statistically sounder than either alone. info → Strategy driver.
+
+    def _detect_strategy_breakdown(self, ctx: EngineContext) -> Optional[DetectedEvent]:
+        wr_base = ctx.thresholds.get("baseline_win_rate")
+        pf_base = ctx.thresholds.get("baseline_profit_factor")
+        if not wr_base or not pf_base:
+            return None
+        if (wr_base.get("confidence") or 0) < 0.5 or (pf_base.get("confidence") or 0) < 0.5:
+            return None
+        trades = list(ctx.session_trades) + [ctx.completed_trade]
+        n = len(trades)
+        if n < 8:
+            return None
+        pnls = [float(t.realized_pnl or 0) for t in trades]
+        wins = sum(1 for p in pnls if p > 0)
+        gross_win = sum(p for p in pnls if p > 0)
+        gross_loss = abs(sum(p for p in pnls if p < 0))
+        if gross_loss <= 0:
+            return None
+        today_wr = wins / n * 100
+        today_pf = gross_win / gross_loss
+        base_wr = float(wr_base["value"])
+        base_pf = float(pf_base["value"])
+        if base_wr <= 0 or base_pf <= 0:
+            return None
+        wr_collapsed = (base_wr - today_wr) / base_wr >= 0.4
+        pf_collapsed = today_pf <= base_pf * 0.5
+        if not (wr_collapsed and pf_collapsed):
+            return None
+        return DetectedEvent(
+            event_type="strategy_breakdown",
+            severity="info",
+            confidence=min(100.0, min(float(wr_base.get("confidence", 0.5)),
+                                      float(pf_base.get("confidence", 0.5))) * 100),
+            message=(
+                f"Multiple performance signals degrading: win rate "
+                f"{today_wr:.0f}% (baseline {base_wr:.0f}%) and profit factor "
+                f"{today_pf:.2f} (baseline {base_pf:.2f}) over {n} trades today."
+            ),
+            context={"today_win_rate": round(today_wr, 1), "baseline_win_rate": base_wr,
+                     "today_profit_factor": round(today_pf, 2),
+                     "baseline_profit_factor": base_pf, "trades_today": n},
         )
 
 

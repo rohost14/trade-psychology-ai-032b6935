@@ -390,22 +390,60 @@ async def _overexposure_task(broker_account_id: str, tradingsymbol: str) -> dict
     max_size = thresholds.get("max_position_size") or 10.0
 
     if exposure_pct > max_size * 1.5:
-        # danger if >2x limit (critical overexposure), caution if 1.5-2x
-        severity = "danger" if exposure_pct > max_size * 2 else "caution"
+        # Phase 6 All-In ladder (master 1D.8 - one detector, presentation tier):
+        #   caution  1.5-2x limit
+        #   danger   >2x limit
+        #   critical >=30% of capital - and >=50% presents as ALL-IN BET
+        all_in = exposure_pct >= 50.0
+        if exposure_pct >= 30.0:
+            severity = "critical"
+        elif exposure_pct > max_size * 2:
+            severity = "danger"
+        else:
+            severity = "caution"
+
+        # Emotional multiplier (doc 4 P32): recent emotional danger events
+        # (recovery bet / martingale / revenge) bump severity one level -
+        # oversized AFTER losses is the "make it back" bet.
+        emotional_bump = False
+        async with SessionLocal() as ev_db:
+            from app.models.behavior_event import BehaviorEvent
+            from sqlalchemy import select as _sel, and_ as _and
+            ist_now = datetime.now(timezone.utc)
+            day_start = ist_now - timedelta(hours=12)
+            ev_res = await ev_db.execute(_sel(BehaviorEvent).where(_and(
+                BehaviorEvent.broker_account_id == UUID(broker_account_id),
+                BehaviorEvent.detected_at >= day_start,
+                BehaviorEvent.detector.in_(
+                    ("post_loss_recovery_bet", "martingale_behaviour", "revenge_trade")),
+                BehaviorEvent.severity.in_(("danger", "critical")),
+            )))
+            if ev_res.scalars().first():
+                emotional_bump = True
+        if emotional_bump and severity == "caution":
+            severity = "danger"
+        elif emotional_bump and severity == "danger":
+            severity = "critical"
+
+        label = "ALL-IN BET" if all_in else "Overexposure"
         async with SessionLocal() as alert_db:
             await _fire_position_alert(
                 broker_account_id=broker_account_id,
                 pattern_type="overexposure",
                 severity=severity,
                 message=(
-                    f"{tradingsymbol}: ₹{position_value:,.0f} exposure "
-                    f"({exposure_pct:.1f}% of capital, limit {max_size:.0f}%)"
+                    f"{label}: {tradingsymbol} ₹{position_value:,.0f} exposure "
+                    f"({exposure_pct:.1f}% of capital, your limit {max_size:.0f}%)"
+                    + (" after recent loss-chasing behavior." if emotional_bump else ".")
                 ),
                 details={
                     "symbol": tradingsymbol,
                     "position_value": round(position_value),
                     "exposure_pct": round(exposure_pct, 1),
                     "limit_pct": max_size,
+                    "all_in": all_in,
+                    "emotional_bump": emotional_bump,
+                    "_confidence": 95.0,
                 },
                 db=alert_db,
             )
@@ -431,10 +469,14 @@ async def _fire_position_alert(
     Returns True if a new alert was created, False if suppressed by dedup.
     """
     from app.models.risk_alert import RiskAlert
+    from app.models.behavior_event import BehaviorEvent
     from app.core.event_bus import publish_event
     from sqlalchemy import select, and_
+    from uuid import uuid4 as _uuid4
 
-    # 30-min dedup window (matches the check_holding_loser_scheduled interval)
+    # 30-min dedup window; rule-aware for constitution (Q15) and
+    # escalation-aware (Phase 6): a higher severity always passes.
+    _RANK = {"info": 0, "caution": 1, "danger": 2, "critical": 3}
     cutoff = datetime.now(timezone.utc) - timedelta(minutes=30)
     existing = await db.execute(
         select(RiskAlert).where(
@@ -445,21 +487,52 @@ async def _fire_position_alert(
             )
         )
     )
-    if existing.scalar_one_or_none():
+    rule = (details or {}).get("rule")
+    recent = [a for a in existing.scalars().all()
+              if rule is None or (a.details or {}).get("rule") == rule]
+    max_recent = max((_RANK.get(a.severity, 0) for a in recent), default=-1)
+    if recent and _RANK.get(severity, 0) <= max_recent:
         logger.debug(
             f"[position_monitor] {pattern_type} for {broker_account_id[:8]} "
-            f"suppressed — already alerted in last 30 min"
+            f"suppressed — already alerted at this level in last 30 min"
         )
         return False
 
+    from app.services.behavior_engine import ENGINE_VERSION
+    from app.services.detector_registry import BY_NAME as _SPECS, ALIASES as _ALIASES
+    _spec = _SPECS.get(pattern_type)
+    version = _spec.version if _spec else _ALIASES.get(pattern_type, ENGINE_VERSION)
+    confidence = (details or {}).pop("_confidence", 90.0)
+    data_quality = (details or {}).pop("_data_quality", "GOOD")
+    now_utc = datetime.now(timezone.utc)
+
     alert = RiskAlert(
+        id=_uuid4(),
         broker_account_id=UUID(broker_account_id),
         pattern_type=pattern_type,
         severity=severity,
         message=message,
         details=details,
+        detector_version=version,
+        confidence=confidence,
+        detected_at=now_utc,
     )
     db.add(alert)
+    await db.flush()
+    # Evidence record (1C.8) — entry-time detections feed state/scores too
+    db.add(BehaviorEvent(
+        broker_account_id=UUID(broker_account_id),
+        detector=pattern_type,
+        detector_version=version,
+        severity=severity,
+        confidence=confidence,
+        data_quality=data_quality,
+        message=message,
+        evidence=dict(details or {}),
+        input_snapshot={"source": "position_monitor"},
+        risk_alert_id=alert.id,
+        detected_at=now_utc,
+    ))
     await db.commit()
     await db.refresh(alert)
 
@@ -475,9 +548,193 @@ async def _fire_position_alert(
         f"{broker_account_id[:8]} | severity={severity} | {message[:80]}"
     )
 
-    # WhatsApp + push for danger-level alerts (e.g. critical overexposure)
-    if severity == "danger":
+    # WhatsApp + push for danger/critical alerts (guardian gating + monthly
+    # budget enforced inside send_danger_alert - Phase 5)
+    if severity in ("danger", "critical"):
         from app.tasks.trade_tasks import send_danger_alert
         send_danger_alert.delay(broker_account_id, str(alert.id))
 
     return True
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Phase 6: portfolio concentration + entry-time constitution rules
+# ─────────────────────────────────────────────────────────────────────────────
+
+@celery_app.task(name="app.tasks.position_monitor_tasks.check_portfolio_concentration")
+def check_portfolio_concentration(broker_account_id: str):
+    """
+    Entry-time concentration check (master 10b / doc 4 P31):
+    largest underlying exposure / total exposure, levels 40/60/80%.
+    Requires 2+ open underlyings — a single position is overexposure's job.
+    LTP from Redis cache; falls back to entry price (data quality PARTIAL).
+    """
+    import asyncio
+    return asyncio.run(_concentration_task(broker_account_id))
+
+
+async def _concentration_task(broker_account_id: str) -> dict:
+    from app.models.position import Position
+    from app.services.instrument_parser import parse_symbol
+    from sqlalchemy import select, and_
+
+    async with SessionLocal() as db:
+        result = await db.execute(
+            select(Position).where(and_(
+                Position.broker_account_id == UUID(broker_account_id),
+                Position.total_quantity != 0,
+            ))
+        )
+        positions = list(result.scalars().all())
+
+    if len(positions) < 2:
+        return {"skipped": "single_position"}
+
+    by_underlying: dict = {}
+    partial = False
+    for pos in positions:
+        try:
+            u = parse_symbol(pos.tradingsymbol or "").underlying or pos.tradingsymbol
+        except Exception:
+            u = pos.tradingsymbol
+        ltp = get_cached_ltp(pos.instrument_token) if pos.instrument_token else None
+        if ltp is None:
+            ltp = float(pos.average_entry_price or 0)
+            partial = True
+        by_underlying[u] = by_underlying.get(u, 0.0) + ltp * abs(pos.total_quantity or 0)
+
+    if len(by_underlying) < 2:
+        return {"skipped": "single_underlying"}
+    total = sum(by_underlying.values())
+    if total <= 0:
+        return {"skipped": "zero_exposure"}
+
+    top_u, top_v = max(by_underlying.items(), key=lambda kv: kv[1])
+    pct = top_v / total * 100
+
+    if pct >= 80:
+        severity = "critical"
+    elif pct >= 60:
+        severity = "danger"
+    elif pct >= 40:
+        severity = "caution"
+    else:
+        return {"underlying": top_u, "pct": round(pct, 1), "alerted": False}
+
+    async with SessionLocal() as alert_db:
+        fired = await _fire_position_alert(
+            broker_account_id=broker_account_id,
+            pattern_type="portfolio_concentration",
+            severity=severity,
+            message=(
+                f"{top_u} is {pct:.0f}% of your open exposure "
+                f"(₹{top_v:,.0f} of ₹{total:,.0f} across "
+                f"{len(by_underlying)} underlyings). Looks diversified, is not."
+            ),
+            details={
+                "top_underlying": top_u,
+                "top_pct": round(pct, 1),
+                "total_exposure": round(total),
+                "by_underlying": {k: round(v) for k, v in by_underlying.items()},
+                "_confidence": 75.0 if partial else 95.0,
+                "_data_quality": "PARTIAL" if partial else "GOOD",
+            },
+            db=alert_db,
+        )
+    return {"underlying": top_u, "pct": round(pct, 1), "alerted": fired}
+
+
+@celery_app.task(name="app.tasks.position_monitor_tasks.check_entry_rules")
+def check_entry_rules(broker_account_id: str, tradingsymbol: str):
+    """
+    Entry-time constitution checks (Phase 6): cooldown + restricted windows,
+    evaluated AT THE FILL - while intervention still matters - instead of
+    waiting for the position to close.
+    """
+    import asyncio
+    return asyncio.run(_entry_rules_task(broker_account_id, tradingsymbol))
+
+
+async def _entry_rules_task(broker_account_id: str, tradingsymbol: str) -> dict:
+    from zoneinfo import ZoneInfo as _ZI
+    from app.models.user_profile import UserProfile
+    from app.models.completed_trade import CompletedTrade
+    from app.core.trading_defaults import get_thresholds
+    from sqlalchemy import select, and_, desc
+
+    IST = _ZI("Asia/Kolkata")
+    now_utc = datetime.now(timezone.utc)
+    fired = []
+
+    async with SessionLocal() as db:
+        prof_res = await db.execute(
+            select(UserProfile).where(UserProfile.broker_account_id == UUID(broker_account_id))
+        )
+        profile = prof_res.scalar_one_or_none()
+        if not profile:
+            return {"skipped": "no_profile"}
+        th = get_thresholds(profile)
+
+        # Rule: restricted window (binary)
+        windows = th.get("restricted_windows") or []
+        now_ist = now_utc.astimezone(IST)
+        now_min = now_ist.hour * 60 + now_ist.minute
+        for w in windows:
+            try:
+                start_s, end_s = w.split("-")
+                sh, sm = map(int, start_s.split(":"))
+                eh, em = map(int, end_s.split(":"))
+            except (ValueError, AttributeError):
+                continue
+            if sh * 60 + sm <= now_min <= eh * 60 + em:
+                await _fire_position_alert(
+                    broker_account_id=broker_account_id,
+                    pattern_type="constitution_violation",
+                    severity="danger",
+                    message=(
+                        f"Your no-trade window ({w} IST) violated: entered "
+                        f"{tradingsymbol} at {now_ist.strftime('%H:%M')} - position is OPEN."
+                    ),
+                    details={"rule": "restricted_window", "window": w,
+                             "entry_time_ist": now_ist.strftime("%H:%M"),
+                             "symbol": tradingsymbol, "at_entry": True,
+                             "_confidence": 100.0},
+                    db=db,
+                )
+                fired.append("restricted_window")
+                break
+
+        # Rule: cooldown after loss (binary)
+        cooldown_min = th.get("user_cooldown_min")
+        if cooldown_min:
+            loss_res = await db.execute(
+                select(CompletedTrade).where(and_(
+                    CompletedTrade.broker_account_id == UUID(broker_account_id),
+                    CompletedTrade.realized_pnl < 0,
+                    CompletedTrade.exit_time >= now_utc - timedelta(minutes=int(cooldown_min)),
+                )).order_by(desc(CompletedTrade.exit_time)).limit(1)
+            )
+            last_loss = loss_res.scalar_one_or_none()
+            if last_loss and last_loss.exit_time:
+                gap = (now_utc - last_loss.exit_time).total_seconds() / 60
+                await _fire_position_alert(
+                    broker_account_id=broker_account_id,
+                    pattern_type="constitution_violation",
+                    severity="danger",
+                    message=(
+                        f"Your {int(cooldown_min)}-minute cooldown violated: entered "
+                        f"{tradingsymbol} {gap:.0f} min after a "
+                        f"₹{abs(float(last_loss.realized_pnl or 0)):,.0f} loss - "
+                        f"position is OPEN."
+                    ),
+                    details={"rule": "cooldown", "gap_min": round(gap, 1),
+                             "limit_min": int(cooldown_min),
+                             "prior_loss": float(last_loss.realized_pnl or 0),
+                             "prior_symbol": last_loss.tradingsymbol,
+                             "symbol": tradingsymbol, "at_entry": True,
+                             "_confidence": 100.0},
+                    db=db,
+                )
+                fired.append("cooldown")
+
+    return {"fired": fired}

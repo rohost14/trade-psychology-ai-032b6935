@@ -68,13 +68,13 @@ def make_ctx(current, priors, session_pnl=0, strategy_group=None):
 
 # ── 1. Registry shape ─────────────────────────────────────────────────────
 print("1. Registry")
-check("25 detectors (merged 2, added 2)", len(REGISTRY) == 25, str(len(REGISTRY)))
+check("27 detectors (Phase 7 end-state)", len(REGISTRY) == 27, str(len(REGISTRY)))
 check("old names gone", all(n not in BY_NAME for n in
       ("rapid_flip", "options_direction_confusion", "iv_crush_behavior", "premium_destruction")))
 check("new names present", all(n in BY_NAME for n in
       ("direction_instability", "premium_loss_event", "same_symbol_obsession", "time_of_day_bias")))
-check("5 analytics dispositions (4 Phase 4 moves + cooldown_violation)",
-      sum(1 for s in REGISTRY if s.disposition == "analytics") == 5,
+check("7 analytics dispositions (4 moves + cooldown + 2 performance)",
+      sum(1 for s in REGISTRY if s.disposition == "analytics") == 7,
       str([s.name for s in REGISTRY if s.disposition == "analytics"]))
 check("daily_overtrading alias versioned", ALIASES.get("daily_overtrading") == "2.0.0")
 check("version lookup via alias", behavior_engine._detector_version("daily_overtrading") == "2.0.0")
