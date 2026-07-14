@@ -132,6 +132,9 @@ REGISTRY: Tuple[DetectorSpec, ...] = (
 # (version lookup only — never iterated).
 ALIASES = {
     "daily_overtrading": "2.0.0",
+    # Meta-detector (L2, behavior_scores_service) — consumes BehaviorEvents,
+    # never iterated with the L1 detectors.
+    "death_spiral": "1.0.0",
 }
 
 # Fast lookups

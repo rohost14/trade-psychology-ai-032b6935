@@ -77,6 +77,84 @@ def _worsened(pattern_type: str, old_details, new_details) -> bool:
     return old_v > 0 and new_v >= old_v * _WORSEN_FACTOR
 
 
+async def _run_death_spiral(broker_account_id: UUID, db, latest_trade_time=None):
+    """
+    Phase 5 meta-detector (L2): evaluates today's BehaviorEvents for the
+    death-spiral state and persists alert + evidence when it fires.
+    Dedup: severity-escalation-only within the day (warning->danger->critical
+    each fire once). Returns the new RiskAlert or None.
+    """
+    from zoneinfo import ZoneInfo as _ZI
+    from app.models.behavior_event import BehaviorEvent
+    from app.models.risk_alert import RiskAlert
+    from app.services.behavior_scores_service import evaluate_death_spiral
+    from app.services.behavior_engine import ENGINE_VERSION
+    from uuid import uuid4 as _uuid4
+
+    now_utc = datetime.now(timezone.utc)
+    ist_now = now_utc.astimezone(_ZI("Asia/Kolkata"))
+    day_start = ist_now.replace(hour=0, minute=0, second=0, microsecond=0).astimezone(timezone.utc)
+
+    ev_result = await db.execute(
+        select(BehaviorEvent).where(and_(
+            BehaviorEvent.broker_account_id == broker_account_id,
+            BehaviorEvent.detected_at >= day_start,
+        ))
+    )
+    events = list(ev_result.scalars().all())
+    verdict = evaluate_death_spiral(events, now_utc)
+    if not verdict:
+        return None
+
+    _RANK = {"info": 0, "caution": 1, "danger": 2, "critical": 3}
+    prior_result = await db.execute(
+        select(RiskAlert).where(and_(
+            RiskAlert.broker_account_id == broker_account_id,
+            RiskAlert.pattern_type == "death_spiral",
+            RiskAlert.detected_at >= day_start,
+        ))
+    )
+    prior = list(prior_result.scalars().all())
+    max_prior = max((_RANK.get(a.severity, 0) for a in prior), default=-1)
+    if _RANK.get(verdict["severity"], 0) <= max_prior:
+        return None  # already fired at this level or higher today
+
+    detected_at = latest_trade_time or now_utc
+    alert = RiskAlert(
+        id=_uuid4(),
+        broker_account_id=broker_account_id,
+        pattern_type="death_spiral",
+        severity=verdict["severity"],
+        message=verdict["message"],
+        details=verdict["context"],
+        trigger_completed_trade_id=None,
+        detector_version="1.0.0",
+        confidence=90.0,  # multi-domain agreement IS the confidence
+        detected_at=detected_at,
+    )
+    db.add(alert)
+    await db.flush()
+    db.add(BehaviorEvent(
+        broker_account_id=broker_account_id,
+        detector="death_spiral",
+        detector_version="1.0.0",
+        severity=verdict["severity"],
+        confidence=90.0,
+        data_quality="GOOD",
+        message=verdict["message"],
+        evidence=verdict["context"],
+        input_snapshot={"source": "meta", "events_considered": len(events)},
+        risk_alert_id=alert.id,
+        detected_at=detected_at,
+    ))
+    await db.commit()
+    logger.warning(
+        f"[death_spiral] {broker_account_id}: {verdict['severity'].upper()} - "
+        f"domains={verdict['context'].get('domains')}"
+    )
+    return alert
+
+
 def _acquire_lock(redis_client, key: str, ttl_seconds: int) -> bool:
     """
     Try to acquire a Redis SETNX lock.
@@ -695,6 +773,16 @@ async def run_risk_detection_async(
 
         await db.commit()
 
+        # ── Death spiral meta-check (Phase 5) — after evidence persisted ──
+        try:
+            spiral_alert = await _run_death_spiral(
+                broker_account_id, db, latest_ct.exit_time or now_utc
+            )
+            if spiral_alert:
+                new_alerts.append(spiral_alert)
+        except Exception as _ds_err:
+            logger.warning(f"[death_spiral] evaluation failed (non-fatal): {_ds_err}")
+
         # ── Alert consolidation (5-min bucket + hard cap) ─────────────
         new_alerts = await _apply_alert_consolidation(broker_account_id, new_alerts, db)
 
@@ -886,6 +974,16 @@ async def run_behavior_engine_full_session(broker_account_id: UUID, db) -> int:
     # persist even when every notification was deduped.
     await db.commit()
 
+    # Death spiral meta-check (Phase 5). Staleness gate below keeps historical
+    # replays from pushing; the alert row itself is still valuable evidence.
+    try:
+        last_time = trades_today[-1].exit_time if trades_today else now_utc
+        spiral_alert = await _run_death_spiral(broker_account_id, db, last_time)
+        if spiral_alert:
+            all_new_alerts.append(spiral_alert)
+    except Exception as _ds_err:
+        logger.warning(f"[death_spiral] evaluation failed (non-fatal): {_ds_err}")
+
     if all_new_alerts:
         all_new_alerts = await _apply_alert_consolidation(broker_account_id, all_new_alerts, db)
 
@@ -1037,13 +1135,28 @@ def send_danger_alert(self, broker_account_id: str, alert_id: str):
             except Exception as e:
                 logger.error(f"Push notification failed: {e}")
 
-            # 2. WhatsApp alert — propagates on failure so task can retry
+            # 2. WhatsApp (guardian) alert — propagates on failure so task can retry.
+            # Phase 5 gates (§1B.8): guardian is emergency accountability, not
+            # daily coaching. Only guardian-eligible patterns reach it, and a
+            # hard monthly budget applies — a guardian pinged weekly stops reading.
             user = await db.get(User, account.user_id) if account.user_id else None
             phone = user.guardian_phone if user else None
             if phone:
-                alert_service = AlertService()
-                sent = await alert_service.send_risk_alert(alert, account, phone)
-                results["whatsapp"] = sent
+                from app.services.detector_registry import BY_NAME as _SPECS
+                spec = _SPECS.get(alert.pattern_type)
+                guardian_ok = (
+                    (spec.guardian_eligible if spec else alert.pattern_type == "death_spiral")
+                    and alert.severity in ("danger", "critical")
+                )
+                if guardian_ok:
+                    from app.services.behavior_scores_service import check_guardian_budget
+                    guardian_ok = await check_guardian_budget(UUID(broker_account_id), db)
+                if guardian_ok:
+                    alert_service = AlertService()
+                    sent = await alert_service.send_risk_alert(alert, account, phone)
+                    results["whatsapp"] = sent
+                else:
+                    results["whatsapp"] = "skipped"
 
             return results
 

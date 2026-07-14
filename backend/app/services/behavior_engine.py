@@ -110,6 +110,7 @@ RISK_DELTAS: Dict[str, Decimal] = {
     "daily_overtrading":                Decimal("10"),
     "same_symbol_obsession":            Decimal("20"),
     "time_of_day_bias":                 Decimal("5"),
+    "death_spiral":                     Decimal("30"),
     "premium_destruction":              Decimal("25"),
 }
 

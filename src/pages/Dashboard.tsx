@@ -5,6 +5,7 @@ import { Link2, Loader2, AlertTriangle, RefreshCw, X } from 'lucide-react';
 import { MorningIntentCard } from '@/components/dashboard/MorningIntentCard';
 import { EodComparisonCard } from '@/components/dashboard/EodComparisonCard';
 import { SetupNudgeCard } from '@/components/dashboard/SetupNudgeCard';
+import { BehaviorRiskBadge } from '@/components/dashboard/BehaviorRiskBadge';
 import RecentAlertsCard from '@/components/dashboard/RecentAlertsCard';
 import AlertDetailSheet from '@/components/alerts/AlertDetailSheet';
 import OpenPositionsTable from '@/components/dashboard/OpenPositionsTable';
@@ -537,6 +538,11 @@ export default function Dashboard() {
           dailyTradeLimit={dailyTradeLimit}
           margins={margins}
         />
+      </div>
+
+      {/* ── Behavior Risk band (Phase 5, master Q10 — ambient, not an alert) ── */}
+      <div className="mb-4">
+        <BehaviorRiskBadge />
       </div>
 
       {/* ── Main content: mobile=stack, desktop=2-col grid ────────────────── */}

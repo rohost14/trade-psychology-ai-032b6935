@@ -224,6 +224,34 @@ COLD_START_DEFAULTS: Dict[str, Any] = {
     # ── Time-of-day bias (doc 4 P28) ─────────────────────────────────────
     'tod_bias_min_sessions':           30,   # need 30 sessions of history
 
+    # ── Behavioral scores (Engine v2 Phase 5, master §1D.1/§1D.9) ────────
+    # Driver score = Σ(pattern_weight × severity_mult × confidence × decay),
+    # exponential decay by event age, clamped 0-100. No recency double-count,
+    # no positive credits in v1 (user V4).
+    'score_halflife_min':              90,    # exp decay half-life (minutes)
+    'score_sev_mult_info':             0.5,
+    'score_sev_mult_caution':          1.0,
+    'score_sev_mult_danger':           1.5,
+    'score_sev_mult_critical':         2.0,
+    'score_band_elevated':             30,    # 0-30 normal · 30-60 elevated
+    'score_band_high':                 60,    # 60-80 high
+    'score_band_critical':             80,    # 80+ critical
+    # Headline: dominant driver + small weighted contribution of the rest (V4)
+    'headline_other_weight':           0.15,
+
+    # ── Death spiral (Engine v2 Phase 5, master §1D.2 FINAL) ─────────────
+    # Levels are STATE-based, never raw counts:
+    #   warning  = behavior deteriorating (2+ domains active)
+    #   danger   = + capital at meaningful risk (risk domain has danger+)
+    #   critical = 3+ independent domains + CONTINUED ESCALATION (trader still
+    #              opening trades after the discipline/risk breach) within the
+    #              compression window
+    'spiral_domain_min_severity':      'danger',  # a domain "deteriorates" on danger+
+    'spiral_warning_domains':          2,
+    'spiral_critical_domains':         3,
+    'spiral_window_min':               180,   # time compression: domains must fire within 3h
+    'guardian_monthly_budget':         3,     # hard cap on guardian sends per month (§1B.8)
+
     # ── Baseline confidence targets (Engine v2 Phase 3, master §1B.4) ────
     # Confidence = min(1, n / target). Session-level metrics mature with
     # SESSIONS; trade-level with TRADES (per-metric confidence, Q23).

@@ -20,6 +20,7 @@ import { useBroker } from '@/contexts/BrokerContext';
 import { useAlerts } from '@/contexts/AlertContext';
 import { useWebSocket } from '@/contexts/WebSocketContext';
 import { EmotionalTaxCard } from '@/components/goals/EmotionalTaxCard';
+import { BehaviorScoresCard } from '@/components/patterns/BehaviorScoresCard';
 import { StreakTrackerCard } from '@/components/goals/StreakTrackerCard';
 import PatternCalendar from '@/components/patterns/PatternCalendar';
 import { calculateEmotionalTax } from '@/lib/emotionalTaxCalculator';
@@ -548,6 +549,9 @@ export default function MyPatterns() {
       </div>
 
       <div className="space-y-5">
+        {/* Behavior Risk headline + drivers (Phase 5, master 1D.9) */}
+        <BehaviorScoresCard />
+
         {/* Worst pattern callout */}
         {worstPattern && (
           <div className="tm-card border-l-2 border-l-tm-loss px-5 py-4">
