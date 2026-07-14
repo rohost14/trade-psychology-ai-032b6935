@@ -74,7 +74,9 @@ CREATE TABLE behavior_events_y2027m05 PARTITION OF behavior_events FOR VALUES FR
 CREATE TABLE behavior_events_y2027m06 PARTITION OF behavior_events FOR VALUES FROM ('2027-06-01') TO ('2027-07-01');
 CREATE TABLE behavior_events_default PARTITION OF behavior_events DEFAULT;
 
--- 5. Copy any existing rows (pre-2026-07 rows land in DEFAULT)
+-- 5. Copy existing rows (pre-2026-07 rows land in DEFAULT). Required because
+-- Postgres cannot convert a regular table to partitioned in place - the only
+-- path is new-table + copy + swap.
 INSERT INTO behavior_events (
     id, broker_account_id, detector, detector_version, severity, confidence,
     data_quality, message, evidence, input_snapshot,
@@ -87,5 +89,15 @@ SELECT id, broker_account_id, detector, detector_version, severity, confidence,
        detected_at, created_at
 FROM behavior_events_legacy;
 
--- 6. Drop the legacy table
-DROP TABLE behavior_events_legacy;
+-- 6. Verify the copy, then KEEP the legacy table for manual cleanup.
+-- Run this check - both counts must match:
+--   SELECT (SELECT COUNT(*) FROM behavior_events)        AS new_count,
+--          (SELECT COUNT(*) FROM behavior_events_legacy) AS legacy_count;
+-- After verifying (and after a few live trading days), drop it yourself:
+--   DROP TABLE behavior_events_legacy;
+-- Nothing writes to or reads from the legacy table once this migration runs.
+
+-- 7. Future partitions are AUTO-CREATED by the monthly Celery beat task
+-- ensure_behavior_event_partitions (see app/tasks/maintenance_tasks.py) -
+-- it idempotently creates the next 3 months. The DEFAULT partition is only
+-- the safety net if that task somehow fails for months in a row.

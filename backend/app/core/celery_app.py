@@ -50,6 +50,8 @@ celery_app = Celery(
         "app.tasks.guardrail_tasks",
         "app.tasks.portfolio_sync_tasks",
         "app.tasks.intent_tasks",
+        "app.tasks.maintenance_tasks",
+        "app.tasks.market_data_tasks",
     ]
 )
 
@@ -69,6 +71,9 @@ celery_app.conf.update(
     # Worker settings
     worker_prefetch_multiplier=1,  # One task at a time per worker
     worker_concurrency=4,  # 4 prefork workers — safe for 512MB Render free tier (~100MB each)
+    # Heartbeat every 60s instead of default 2s — reduces Redis command count ~30× on Upstash free tier.
+    # Workers are still detected as "lost" after 3 missed heartbeats (= 3 minutes), acceptable.
+    worker_heartbeat=60,
 
     # Task routing
     task_routes={
@@ -106,6 +111,10 @@ celery_app.conf.update(
     # Run Beat with: celery -A app.core.celery_app beat -S redbeat.RedBeatScheduler
     beat_scheduler="redbeat.RedBeatScheduler",
     redbeat_redis_url=settings.REDIS_URL,
+    # Redbeat checks schedule every 5s by default → ~1M Redis commands/month.
+    # 60s interval is sufficient: our shortest beat task fires every 60s anyway.
+    redbeat_lock_timeout=90,  # seconds (must be > max_loop_interval)
+    beat_max_loop_interval=60,  # seconds between schedule checks (default: 5s)
 
     # Beat schedule for periodic tasks (uses crontab)
     #
@@ -171,12 +180,28 @@ celery_app.conf.update(
             "task": "app.tasks.intent_tasks.refresh_personalization_patterns",
             "schedule": crontab(hour=18, minute=15),
         },
+        # behavior_events partition upkeep (P2): idempotently creates the next
+        # 3 monthly partitions on the 1st and 15th (twice for redundancy) at
+        # 02:00 IST. Nobody creates partitions by hand - ever.
+        "ensure-behavior-event-partitions": {
+            "task": "app.tasks.maintenance_tasks.ensure_behavior_event_partitions",
+            "schedule": crontab(hour=2, minute=0, day_of_month="1,15"),
+        },
         # Guardrail rule monitor — every 60s during market hours (09:15–15:25 IST Mon–Fri)
         # Internal market-hours check inside the task body (beat doesn't support time ranges).
         "check-guardrails": {
             "task": "app.tasks.guardrail_tasks.check_guardrail_rules",
             "schedule": 60.0,  # every 60 seconds
         },
+        # Market-data token refresh — 8:45 AM IST Mon–Fri.
+        # Refreshes the dedicated ZERODHA_MD_* account access_token before market open.
+        # SharedPriceStream picks up the new token automatically on next ticker build.
+        # No-op if ZERODHA_MD_* credentials are not configured.
+        "refresh-market-data-token": {
+            "task": "app.tasks.market_data_tasks.refresh_market_data_token",
+            "schedule": crontab(hour=8, minute=45, day_of_week="1-5"),
+        },
+
         # NOTE: position-monitor and portfolio-radar are NOT beat tasks.
         # They are triggered per-trade fill in trade_tasks.py:
         #   check_position_overexposure    — immediately after every COMPLETE fill
