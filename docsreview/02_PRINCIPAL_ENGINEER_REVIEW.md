@@ -217,3 +217,33 @@ Hardest & most bug-prone by far: the state machine cutover — which is precisel
 7. **Would I approve implementation today?** For the current user base and a staged rollout: **yes, conditionally** — ship after fixing (a) duplicate BehaviorEvents on bulk sync [correctness, days], (b) silent behavior_skipped loss [correctness, days], (c) minimum observability [1 wk]. For the stated 50k workload: **no** — I would block until the hot-path state machine, event idempotency/partitioning, and task coalescing land. The team should feel good about the design and honest about the distance between the spec's runtime and the shipped one: the spec already knew the answer ("update state, run O(1) checks — never load 1000 trades and run 24 detectors"); the implementation still does the latter on every trade.
 
 *Filed without implementation, per instruction. Priority queue if/when approved: S3 defect fixes → observability → hot-path state machine (replay-gated) → partitions/retention → coalescing.*
+
+---
+
+## ADDENDUM — Review of Review (user modifications, accepted 2026-07-14)
+
+Five modifications to the fix plan, all accepted:
+
+1. **Replay Parity Validation → standalone P1** (was buried inside the migration
+   item). Gate exists BEFORE migration starts: every detector moved to the state
+   machine must produce identical output to the rescan engine on historical data.
+2. **Nightly state-consistency validation**: rebuild SessionState from trades,
+   compare to incremental, metric on mismatch. Designed with the migration,
+   deployed with it.
+3. **input_snapshot severity-gated, not dropped** (danger/critical only, ~5-10%
+   of events). Rationale sharpened: not replay (which reconstructs) but AUDIT -
+   preserves what the engine saw when underlying data later changes. 80-90%
+   storage reduction retained.
+4. **Detector performance metrics**: extend existing /detector-stats with
+   execution time. HONESTY FLAG: precision/FP% requires a labeling mechanism
+   (user feedback loop) that does not exist - dismiss rate is the only honest
+   proxy until then.
+5. **Incremental shadow rollout schedule** (compute-ignored -> compare -> shadow
+   -> 1 detector -> 5 -> all -> delete rescan). Cost accepted: dual context
+   construction during the mixed period.
+
+Renamed: P2 "Scale Hot Path" -> **P2 "Runtime Architecture Migration"** - this
+is implementing the originally-specified architecture, not optimization.
+
+Confirmed NOT added at this tier: Kafka, event sourcing, CQRS, microservices,
+multiple databases, distributed caches, Kubernetes.
