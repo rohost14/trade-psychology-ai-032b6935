@@ -61,7 +61,33 @@ class AIPersonalizationService:
         trades = list(result.scalars().all())
 
         if len(trades) < 20:
-            return {"insufficient_data": True, "trades_analyzed": len(trades)}
+            # Legacy time/symbol patterns need volume, but the Phase 3 baseline
+            # explicitly does NOT: small samples yield LOW confidence and the
+            # threshold blend stays near defaults (master §1B.4 — no activation
+            # cliff). Compute and store it even here so partial personalization
+            # begins from the first sessions.
+            partial = {"insufficient_data": True, "trades_analyzed": len(trades)}
+            try:
+                from app.services.baseline_service import compute_baseline
+                from app.models.user_profile import UserProfile as _UP
+                prof_res = await db.execute(
+                    select(_UP).where(_UP.broker_account_id == broker_account_id)
+                )
+                _prof = prof_res.scalar_one_or_none()
+                baseline = await compute_baseline(
+                    broker_account_id, db, days=days_back,
+                    trading_capital=getattr(_prof, "trading_capital", None),
+                )
+                if _prof is not None:
+                    existing = dict(_prof.detected_patterns or {})
+                    existing["baseline"] = baseline
+                    existing["last_updated"] = datetime.now(timezone.utc).isoformat()
+                    _prof.detected_patterns = existing
+                    await db.commit()
+                    partial["baseline"] = baseline
+            except Exception as _b_err:
+                logger.warning(f"[baseline] low-volume computation failed (non-fatal): {_b_err}")
+            return partial
 
         # Learn all patterns
         time_patterns = self._learn_time_patterns(trades)
