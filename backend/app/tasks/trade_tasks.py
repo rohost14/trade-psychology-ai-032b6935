@@ -77,6 +77,69 @@ def _worsened(pattern_type: str, old_details, new_details) -> bool:
     return old_v > 0 and new_v >= old_v * _WORSEN_FACTOR
 
 
+async def _persist_events(db, events, surviving_by_key: dict, deduped_keys: set):
+    """
+    P0 fix #1: insert BehaviorEvents with ON CONFLICT DO NOTHING on the
+    idempotency key - webhook retries and bulk-sync re-processing become
+    insert-safe. Alert linkage / dedup markers applied before insert.
+    """
+    if not events:
+        return
+    from sqlalchemy.dialects.postgresql import insert as pg_insert
+    from app.models.behavior_event import BehaviorEvent
+    from uuid import uuid4 as _uuid4
+
+    rows = []
+    for ev in events:
+        ek = _pattern_dedup_key(ev.detector, ev.evidence)
+        risk_alert_id = surviving_by_key.get(ek)
+        evidence = ev.evidence or {}
+        if risk_alert_id is None and ek in deduped_keys:
+            evidence = {**evidence, "_suppressed": "dedup"}
+        rows.append({
+            "id": _uuid4(),
+            "broker_account_id": ev.broker_account_id,
+            "detector": ev.detector,
+            "detector_version": ev.detector_version,
+            "severity": ev.severity,
+            "confidence": ev.confidence,
+            "data_quality": ev.data_quality,
+            "message": ev.message,
+            "evidence": evidence,
+            "input_snapshot": ev.input_snapshot,
+            "trigger_completed_trade_id": ev.trigger_completed_trade_id,
+            "risk_alert_id": risk_alert_id,
+            "idempotency_key": ev.idempotency_key,
+            "detected_at": ev.detected_at,
+        })
+    stmt = pg_insert(BehaviorEvent).values(rows).on_conflict_do_nothing()
+    await db.execute(stmt)
+
+
+async def _already_analyzed(broker_account_id: UUID, completed_trade_id, db) -> bool:
+    """
+    P0 fix #5: idempotency pre-check. If evidence already exists for this
+    trigger trade, a previous attempt completed its commit - re-running
+    analyze() would double-increment the session risk score and re-notify.
+    """
+    from app.models.behavior_event import BehaviorEvent
+    result = await db.execute(
+        select(BehaviorEvent.id).where(and_(
+            BehaviorEvent.broker_account_id == broker_account_id,
+            BehaviorEvent.trigger_completed_trade_id == completed_trade_id,
+        )).limit(1)
+    )
+    return result.scalar_one_or_none() is not None
+
+
+def _incr_metric(name: str):
+    """Best-effort Redis counter (P0 fix #2 observability seed)."""
+    try:
+        _get_redis_client().incr(f"metrics:{name}")
+    except Exception:
+        pass
+
+
 async def _run_death_spiral(broker_account_id: UUID, db, latest_trade_time=None):
     """
     Phase 5 meta-detector (L2): evaluates today's BehaviorEvents for the
@@ -465,13 +528,20 @@ def process_webhook_trade(self, trade_data: Dict[str, Any], broker_account_id: s
                         await _asyncio.sleep(2)
 
                     if not behavior_lock_acquired:
-                        logger.warning(
-                            f"Could not acquire behavior_lock for {broker_account_id}. "
-                            f"Behavioral detection skipped for this trade."
+                        # P0 fix #2: skipping detection silently loses exactly
+                        # the burst-moment analysis that matters most. Requeue
+                        # the detection via the idempotent bulk path (pre-check
+                        # + unique index make re-processing safe) and COUNT it.
+                        _incr_metric("behavior_lock_exhausted")
+                        logger.error(
+                            f"behavior_lock exhausted for {broker_account_id} - "
+                            f"requeuing detection for trade {trade.id}"
                         )
-                        # Don't retry the whole task for behavioral detection —
-                        # the P&L is already saved. Log and move on.
-                        return {"success": True, "trade_id": str(trade.id), "behavior_skipped": True}
+                        run_behavior_detection_retry.apply_async(
+                            args=[str(broker_account_id)], countdown=10,
+                        )
+                        return {"success": True, "trade_id": str(trade.id),
+                                "behavior_requeued": True}
 
                     await run_risk_detection_async(account_id, db, trade, completed_trade_id=_closed_ct_id)
 
@@ -670,6 +740,15 @@ async def run_risk_detection_async(
         from sqlalchemy import desc
 
         if completed_trade_id is not None:
+            # P0 fix #5: skip if a prior (retried) attempt already committed
+            # evidence for this trade - prevents risk-score double-increment
+            # and duplicate notifications on Celery retries.
+            if await _already_analyzed(broker_account_id, completed_trade_id, db):
+                logger.info(
+                    f"[BehaviorEngine] {broker_account_id}: trade "
+                    f"{completed_trade_id} already analyzed - skipping (idempotent)"
+                )
+                return
             latest_ct = await db.get(CompletedTrade, completed_trade_id)
         else:
             # Fallback: most recent CompletedTrade (used from eod_sync and legacy callers)
@@ -773,13 +852,7 @@ async def run_risk_detection_async(
         surviving_by_key = {
             _pattern_dedup_key(a.pattern_type, a.details): a.id for a in new_alerts
         }
-        for ev in result.events:
-            ek = _pattern_dedup_key(ev.detector, ev.evidence)
-            if ek in surviving_by_key:
-                ev.risk_alert_id = surviving_by_key[ek]
-            elif ek in deduped_keys:
-                ev.evidence = {**(ev.evidence or {}), "_suppressed": "dedup"}
-            db.add(ev)
+        await _persist_events(db, result.events, surviving_by_key, deduped_keys)
 
         await db.commit()
 
@@ -875,6 +948,29 @@ async def run_behavior_engine_full_session(broker_account_id: UUID, db) -> int:
     from datetime import date as _date
     from zoneinfo import ZoneInfo as _ZI
 
+    # P0 fix #4: bulk sync must not race the webhook path on the same
+    # account - same lock, abort with metric if unavailable (sync can rerun).
+    _redis = None
+    _lock_key = f"behavior_lock:{broker_account_id}"
+    _lock_acquired = False
+    try:
+        _redis = _get_redis_client()
+        for _ in range(5):
+            _lock_acquired = _acquire_lock(_redis, _lock_key, ttl_seconds=300)
+            if _lock_acquired:
+                break
+            import asyncio as _a
+            await _a.sleep(2)
+    except Exception as _lk_err:
+        logger.warning(f"[FullSession] lock infra unavailable: {_lk_err}")
+    if _redis is not None and not _lock_acquired:
+        _incr_metric("behavior_bulk_lock_abort")
+        logger.warning(
+            f"[FullSession] {broker_account_id}: behavior_lock busy - aborting "
+            f"bulk detection (webhook path active); rerun sync to retry"
+        )
+        return 0
+
     today_ist = datetime.now(_ZI("Asia/Kolkata")).date()
     today_start_utc = datetime.combine(
         today_ist, datetime.min.time()
@@ -946,6 +1042,11 @@ async def run_behavior_engine_full_session(broker_account_id: UUID, db) -> int:
     all_new_alerts: list[RiskAlert] = []
 
     for ct in trades_today:
+        # P0 fix #1/#5: webhook path (or an earlier sync) already analyzed
+        # this trade - skip. The unique index is the backstop; this is the
+        # fast path that also avoids re-running detectors.
+        if await _already_analyzed(broker_account_id, ct.id, db):
+            continue
         trade_time = ct.exit_time or now_utc
         result = await behavior_engine.analyze(
             broker_account_id=broker_account_id,
@@ -972,13 +1073,7 @@ async def run_behavior_engine_full_session(broker_account_id: UUID, db) -> int:
         # Flush alerts first — FK ordering (see webhook path note).
         if surviving_by_key:
             await db.flush()
-        for ev in result.events:
-            ek = _pattern_dedup_key(ev.detector, ev.evidence)
-            if ek in surviving_by_key:
-                ev.risk_alert_id = surviving_by_key[ek]
-            elif ek in deduped_keys:
-                ev.evidence = {**(ev.evidence or {}), "_suppressed": "dedup"}
-            db.add(ev)
+        await _persist_events(db, result.events, surviving_by_key, deduped_keys)
 
     # Commit regardless of alert survival — BehaviorEvents (evidence) must
     # persist even when every notification was deduped.
@@ -1026,6 +1121,9 @@ async def run_behavior_engine_full_session(broker_account_id: UUID, db) -> int:
             f"[BehaviorEngine/FullSession] {broker_account_id}: "
             f"{len(all_new_alerts)} alerts from {len(trades_today)} trades"
         )
+
+    if _redis is not None and _lock_acquired:
+        _release_lock(_redis, _lock_key)
 
     return len(all_new_alerts)
 
@@ -1218,3 +1316,24 @@ def eod_sync_all_accounts():
 
     import asyncio as _asyncio
     return _asyncio.run(_sync_all())
+
+
+@celery_app.task(name="app.tasks.trade_tasks.run_behavior_detection_retry",
+                 bind=True, max_retries=2, default_retry_delay=15)
+def run_behavior_detection_retry(self, broker_account_id: str):
+    """
+    P0 fix #2: deferred detection after behavior_lock exhaustion. The full-
+    session path is idempotent (per-trade pre-check + unique event index),
+    so it safely analyzes exactly the trades the skipped webhook missed.
+    """
+    import asyncio
+
+    async def _run():
+        async with SessionLocal() as db:
+            return await run_behavior_engine_full_session(UUID(broker_account_id), db)
+
+    try:
+        analyzed = asyncio.run(_run())
+        return {"requeued_analysis_alerts": analyzed}
+    except Exception as exc:
+        raise self.retry(exc=exc)

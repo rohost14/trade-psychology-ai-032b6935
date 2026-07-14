@@ -50,15 +50,29 @@ class AIPersonalizationService:
         """
         cutoff = datetime.now(timezone.utc) - timedelta(days=days_back)
 
-        # Fetch trades
+        # P0 fix #3 (Principal Engineer review): this path used Trade.pnl,
+        # which is ALWAYS 0 — every win_rate computed here defaulted to 50%,
+        # danger_hours never matched its <35% filter, and time_of_day_bias
+        # was dead on arrival. Source from CompletedTrade (real realized P&L)
+        # via a shim exposing the four fields the learners consume.
+        from app.models.completed_trade import CompletedTrade as _CT
+
+        class _TradeShim:
+            __slots__ = ("order_timestamp", "pnl", "tradingsymbol", "quantity")
+
+            def __init__(self, ct):
+                self.order_timestamp = ct.entry_time or ct.exit_time
+                self.pnl = float(ct.realized_pnl or 0)
+                self.tradingsymbol = ct.tradingsymbol
+                self.quantity = ct.total_quantity or 0
+
         result = await db.execute(
-            select(Trade).where(
-                Trade.broker_account_id == broker_account_id,
-                Trade.status == "COMPLETE",
-                Trade.order_timestamp >= cutoff
-            ).order_by(Trade.order_timestamp)
+            select(_CT).where(
+                _CT.broker_account_id == broker_account_id,
+                _CT.exit_time >= cutoff,
+            ).order_by(_CT.exit_time)
         )
-        trades = list(result.scalars().all())
+        trades = [_TradeShim(ct) for ct in result.scalars().all()]
 
         if len(trades) < 20:
             # Legacy time/symbol patterns need volume, but the Phase 3 baseline

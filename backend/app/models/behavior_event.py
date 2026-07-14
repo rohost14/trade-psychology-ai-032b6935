@@ -55,6 +55,12 @@ class BehaviorEvent(Base):
         ForeignKey("risk_alerts.id", ondelete="SET NULL"),
     )
 
+    # Idempotency (migration 066): detector:trigger_trade_id:rule — makes
+    # webhook retries and bulk-sync re-processing insert-safe (ON CONFLICT
+    # DO NOTHING). NULL for events without a trigger trade (death_spiral,
+    # position monitor) which carry their own dedup.
+    idempotency_key = Column(Text)
+
     detected_at = Column(TIMESTAMP(timezone=True), nullable=False)  # trade time
     created_at = Column(TIMESTAMP(timezone=True), server_default=text("now()"))
 

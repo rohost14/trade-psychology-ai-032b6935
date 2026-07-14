@@ -263,6 +263,13 @@ class BehaviorEngine:
                 BehaviorEventRecord(
                     broker_account_id=broker_account_id,
                     detector=e.event_type,
+                    # P0 fix #1: deterministic key makes retries + bulk-sync
+                    # re-processing insert-safe (rule disambiguates the
+                    # multi-event constitution detector).
+                    idempotency_key=(
+                        f"{e.event_type}:{completed_trade.id}:"
+                        f"{(e.context or {}).get('rule', '')}"
+                    ),
                     detector_version=self._detector_version(e.event_type),
                     severity=e.severity,
                     confidence=(min(e.confidence, default_confidence)
