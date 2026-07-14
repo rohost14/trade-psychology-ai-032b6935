@@ -53,6 +53,30 @@ def _pattern_dedup_key(pattern_type: str, details) -> str:
     return pattern_type
 
 
+# Dedup v2 stateful re-arm (Engine v2 1B.9): within the dedup window a
+# pattern may re-fire if its driving metric got MATERIALLY worse - martingale
+# fires again when size doubles again, not on a clock. Metric per pattern:
+_WORSEN_METRIC = {
+    "martingale_behaviour":   "max_ratio",
+    "premium_loss_event":     "loss_pct",
+    "same_symbol_obsession":  "total_loss",
+    "constitution_violation": "ratio",
+}
+_WORSEN_FACTOR = 1.20  # metric must grow >=20% past the last fired value
+
+
+def _worsened(pattern_type: str, old_details, new_details) -> bool:
+    key = _WORSEN_METRIC.get(pattern_type)
+    if not key:
+        return False
+    try:
+        old_v = float((old_details or {}).get(key))
+        new_v = float((new_details or {}).get(key))
+    except (TypeError, ValueError):
+        return False
+    return old_v > 0 and new_v >= old_v * _WORSEN_FACTOR
+
+
 def _acquire_lock(redis_client, key: str, ttl_seconds: int) -> bool:
     """
     Try to acquire a Redis SETNX lock.
@@ -607,8 +631,9 @@ async def run_risk_detection_async(
         # dedup window. Previously the escalation code was unreachable — the
         # dedup `continue` ran before it.
         _SEV_RANK = {"info": 0, "caution": 1, "danger": 2, "critical": 3}
-        last_fired: dict = {}      # dedup key → datetime
-        last_fired_sev: dict = {}  # dedup key → severity string
+        last_fired: dict = {}      # dedup key -> datetime
+        last_fired_sev: dict = {}  # dedup key -> severity string
+        last_fired_details: dict = {}  # dedup key -> details (worsening re-arm)
         today_patterns: set = set()
         for a in all_existing:
             k = _pattern_dedup_key(a.pattern_type, a.details)
@@ -616,8 +641,9 @@ async def run_risk_detection_async(
             if k not in last_fired or a.detected_at > last_fired[k]:
                 last_fired[k] = a.detected_at
                 last_fired_sev[k] = a.severity
+                last_fired_details[k] = a.details
 
-        def _is_deduped(key: str, pattern_type: str, new_severity: str) -> bool:
+        def _is_deduped(key: str, pattern_type: str, new_severity: str, new_details=None) -> bool:
             if key not in last_fired:
                 return False
             hours = _DEDUP_HOURS.get(pattern_type, 24)
@@ -626,19 +652,26 @@ async def run_risk_detection_async(
             # Within window: allow severity escalation through (caution → danger)
             prev_rank = _SEV_RANK.get(last_fired_sev.get(key, ""), 0)
             new_rank = _SEV_RANK.get(new_severity, 0)
-            return new_rank <= prev_rank  # True = block; False = escalation
+            if new_rank > prev_rank:
+                return False  # escalation always passes
+            # Stateful re-arm (1B.9): same severity but the driving metric
+            # materially worsened - fire again.
+            if _worsened(pattern_type, last_fired_details.get(key), new_details):
+                return False
+            return True
 
         new_alerts = []
         deduped_keys = set()
         for alert in alerts:
             k = _pattern_dedup_key(alert.pattern_type, alert.details)
-            if _is_deduped(k, alert.pattern_type, alert.severity):
+            if _is_deduped(k, alert.pattern_type, alert.severity, alert.details):
                 deduped_keys.add(k)
                 continue
             db.add(alert)
             new_alerts.append(alert)
             last_fired[k] = latest_ct.exit_time or now_utc
             last_fired_sev[k] = alert.severity
+            last_fired_details[k] = alert.details
             today_patterns.add(alert.pattern_type)
 
         # Persist BehaviorEvents for EVERY detection (§1C.8 — evidence is never
@@ -785,6 +818,7 @@ async def run_behavior_engine_full_session(broker_account_id: UUID, db) -> int:
     _SEV_RANK = {"info": 0, "caution": 1, "danger": 2, "critical": 3}
     last_fired: dict = {}
     last_fired_sev: dict = {}
+    last_fired_details: dict = {}
     today_patterns: set = set()
     for a in all_existing:
         k = _pattern_dedup_key(a.pattern_type, a.details)
@@ -792,8 +826,9 @@ async def run_behavior_engine_full_session(broker_account_id: UUID, db) -> int:
         if k not in last_fired or a.detected_at > last_fired[k]:
             last_fired[k] = a.detected_at
             last_fired_sev[k] = a.severity
+            last_fired_details[k] = a.details
 
-    def _is_deduped_full(key: str, pattern_type: str, trade_time: datetime, new_severity: str) -> bool:
+    def _is_deduped_full(key: str, pattern_type: str, trade_time: datetime, new_severity: str, new_details=None) -> bool:
         if key not in last_fired:
             return False
         hours = _DEDUP_HOURS.get(pattern_type, 24)
@@ -804,7 +839,11 @@ async def run_behavior_engine_full_session(broker_account_id: UUID, db) -> int:
         # Within window: allow severity escalation (caution → danger)
         prev_rank = _SEV_RANK.get(last_fired_sev.get(key, ""), 0)
         new_rank = _SEV_RANK.get(new_severity, 0)
-        return new_rank <= prev_rank
+        if new_rank > prev_rank:
+            return False
+        if _worsened(pattern_type, last_fired_details.get(key), new_details):
+            return False
+        return True
 
     all_new_alerts: list[RiskAlert] = []
 
@@ -820,7 +859,7 @@ async def run_behavior_engine_full_session(broker_account_id: UUID, db) -> int:
         deduped_keys: set = set()
         for alert in result.alerts:
             k = _pattern_dedup_key(alert.pattern_type, alert.details)
-            if _is_deduped_full(k, alert.pattern_type, trade_time, alert.severity):
+            if _is_deduped_full(k, alert.pattern_type, trade_time, alert.severity, alert.details):
                 deduped_keys.add(k)
                 continue
             db.add(alert)
@@ -828,6 +867,7 @@ async def run_behavior_engine_full_session(broker_account_id: UUID, db) -> int:
             surviving_by_key[k] = alert.id
             last_fired[k] = ct.exit_time or now_utc
             last_fired_sev[k] = alert.severity
+            last_fired_details[k] = alert.details
             today_patterns.add(alert.pattern_type)
 
         # Evidence records for every detection (§1C.8), linked where an alert survived.

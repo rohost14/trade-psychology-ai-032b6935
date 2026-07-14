@@ -151,7 +151,7 @@ class TestBehaviorStateMachine:
         patterns = [
             "consecutive_loss_streak", "revenge_trade", "overtrading_burst",
             "size_escalation", "rapid_reentry", "panic_exit",
-            "martingale_behaviour", "cooldown_violation", "rapid_flip",
+            "martingale_behaviour", "cooldown_violation", "direction_instability",
             "excess_exposure", "session_meltdown",
         ]
         for p in patterns:
@@ -301,9 +301,9 @@ class TestDetectors:
         event = engine._detect_cooldown_violation(ctx)
         assert event is None
 
-    # ── Rapid flip ────────────────────────────────────────────────────────
+    # ── Direction instability (Phase 4: absorbed rapid_flip) ──────────────
 
-    def test_rapid_flip_detected(self):
+    def test_direction_instability_detected(self):
         now = now_utc()
         long_trade = make_ct(direction="LONG", pnl=-100)
         long_trade.exit_time = now - timedelta(minutes=2)
@@ -315,9 +315,10 @@ class TestDetectors:
             completed_trade=short_trade,
             session_trades=[long_trade, short_trade],
         )
-        event = engine._detect_rapid_flip(ctx)
+        event = engine._detect_direction_instability(ctx)
         assert event is not None
-        assert event.event_type == "rapid_flip"
+        assert event.event_type == "direction_instability"
+        assert event.context.get("level") == 1  # exact-instrument reversal
 
     def test_no_flip_on_same_direction(self):
         now = now_utc()
@@ -327,7 +328,7 @@ class TestDetectors:
         t2.entry_time = now - timedelta(minutes=1)
 
         ctx = make_ctx(completed_trade=t2, session_trades=[t1, t2])
-        event = engine._detect_rapid_flip(ctx)
+        event = engine._detect_direction_instability(ctx)
         assert event is None
 
     # ── Session meltdown ──────────────────────────────────────────────────

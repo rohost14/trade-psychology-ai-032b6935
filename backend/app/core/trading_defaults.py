@@ -200,6 +200,30 @@ COLD_START_DEFAULTS: Dict[str, Any] = {
     'iv_crush_proxy_hold_min':          30,   # hold < 30 min for this to be IV (not theta)
     'iv_crush_proxy_loss_pct':          40,   # lost > 40% of premium paid
 
+    # ── Confidence signal points (Engine v2 Phase 4, master §1.4) ────────
+    # Relative importance → tunable values. Starting points, not spec constants.
+    'signal_points_critical':          30,
+    'signal_points_high':              20,
+    'signal_points_medium':            10,
+    'signal_points_low':                5,
+    'confidence_alert_gate':           50,   # below this: recorded as info, no alert
+
+    # ── Premium loss event (merged iv_crush + premium_destruction) ───────
+    # Levels are % of premium lost. Expiry day shifts all levels up — deep
+    # OTM near expiry loses 40% routinely without any behavioral failure.
+    'premium_loss_caution_pct':        40,
+    'premium_loss_danger_pct':         60,
+    'premium_loss_critical_pct':       80,
+    'premium_loss_expiry_shift_pct':   15,   # +15pp on expiry day
+    'premium_loss_fast_hold_min':      30,   # context flag: fast collapse (IV-crush-like)
+
+    # ── Same symbol obsession (doc 4 P27) ────────────────────────────────
+    'obsession_min_losses':             3,   # 3+ losses on one underlying today
+    'obsession_min_reentries':          2,   # after 2+ re-entries
+
+    # ── Time-of-day bias (doc 4 P28) ─────────────────────────────────────
+    'tod_bias_min_sessions':           30,   # need 30 sessions of history
+
     # ── Baseline confidence targets (Engine v2 Phase 3, master §1B.4) ────
     # Confidence = min(1, n / target). Session-level metrics mature with
     # SESSIONS; trade-level with TRADES (per-metric confidence, Q23).
@@ -347,6 +371,12 @@ def get_thresholds(profile=None) -> Dict[str, Any]:
         result['restricted_windows']     = getattr(profile, 'restricted_windows', None) or []
         result['user_daily_trade_limit'] = getattr(profile, 'daily_trade_limit', None)
         result['user_cooldown_min']      = getattr(profile, 'cooldown_after_loss', None)
+
+        # Learned danger hours (Phase 4 time_of_day_bias): [{"hour": 13, ...}]
+        dp = getattr(profile, 'detected_patterns', None) or {}
+        tp = dp.get('time_patterns') or {}
+        result['danger_hours'] = tp.get('danger_hours') or []
+        result['baseline_sessions'] = (dp.get('baseline') or {}).get('sessions_analyzed', 0)
         result['sl_percent_futures'] = getattr(profile, 'sl_percent_futures', None) or 1.0
         result['sl_percent_options'] = getattr(profile, 'sl_percent_options', None) or 50.0
         result['risk_tolerance']    = getattr(profile, 'risk_tolerance', None) or 'moderate'
@@ -372,6 +402,8 @@ def get_thresholds(profile=None) -> Dict[str, Any]:
         result['restricted_windows']     = []
         result['user_daily_trade_limit'] = None
         result['user_cooldown_min']      = None
+        result['danger_hours']           = []
+        result['baseline_sessions']      = 0
         result['sl_percent_futures'] = 1.0
         result['sl_percent_options'] = 50.0
         result['risk_tolerance']     = 'moderate'

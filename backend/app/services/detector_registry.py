@@ -11,9 +11,8 @@ version             per-detector semver; bump on ANY logic change (A.2).
                     Alerts/events store max(detector version, ENGINE_VERSION).
 nature              emotional | risk | discipline | performance   (master §1.1 Axis A)
 disposition         alerting | analytics                          (master §1.1 Axis C)
-                    NOTE: dispositions describe the CURRENT engine. The Phase 4
-                    strangler migration flips panic_exit/early_exit/opening_trap/
-                    rapid_reentry to analytics — do not flip here before then.
+                    Phase 4 flipped panic_exit/early_exit/opening_trap/
+                    rapid_reentry to analytics (severity=info, evidence only).
 trigger             exit | session   — when the detector can fire. All detectors
                     are exit-triggered today (engine runs per CompletedTrade);
                     'session' marks session-level patterns that will move to
@@ -56,22 +55,24 @@ REGISTRY: Tuple[DetectorSpec, ...] = (
                  "1.1.0", "emotional", "alerting", "exit", 2,
                  uses_baseline=True, uses_constitution=True),
     DetectorSpec("revenge_trade", "_detect_revenge_trade",
-                 "1.0.0", "emotional", "alerting", "exit", 2,
+                 "2.0.0", "emotional", "alerting", "exit", 2,
                  uses_constitution=True),
+    # Emits overtrading_burst (30-min window) AND daily_overtrading (Phase 4
+    # split) — version lookup for the alias lives in ALIASES below.
     DetectorSpec("overtrading_burst", "_detect_overtrading_burst",
-                 "1.1.0", "emotional", "alerting", "exit", 2,
+                 "2.0.0", "emotional", "alerting", "exit", 2,
                  uses_baseline=True, uses_constitution=True),
     DetectorSpec("size_escalation", "_detect_size_escalation",
                  "1.1.0", "emotional", "alerting", "exit", 1),
     DetectorSpec("rapid_reentry", "_detect_rapid_reentry",
-                 "1.1.0", "emotional", "alerting", "exit", 1),
+                 "2.0.0", "emotional", "analytics", "exit", 0),
     DetectorSpec("panic_exit", "_detect_panic_exit",
-                 "1.0.0", "emotional", "alerting", "exit", 1,
+                 "2.0.0", "emotional", "analytics", "exit", 0,
                  consumes=("completed_trade", "exit_order_types", "thresholds")),
     DetectorSpec("martingale_behaviour", "_detect_martingale_behaviour",
                  "1.1.0", "risk", "alerting", "exit", 2),
-    DetectorSpec("rapid_flip", "_detect_rapid_flip",
-                 "1.0.0", "emotional", "alerting", "exit", 1),
+    DetectorSpec("direction_instability", "_detect_direction_instability",
+                 "2.0.0", "emotional", "alerting", "exit", 1),
     DetectorSpec("excess_exposure", "_detect_excess_exposure",
                  "1.0.0", "risk", "alerting", "exit", 2,
                  uses_constitution=True),
@@ -85,25 +86,21 @@ REGISTRY: Tuple[DetectorSpec, ...] = (
                  "1.0.0", "risk", "alerting", "exit", 2,
                  consumes=("completed_trade", "exit_order_types", "thresholds")),
     DetectorSpec("early_exit", "_detect_early_exit",
-                 "1.0.0", "performance", "alerting", "session", 1),
+                 "2.0.0", "performance", "analytics", "session", 0),
     DetectorSpec("winning_streak_overconfidence", "_detect_winning_streak_overconfidence",
                  "1.1.0", "emotional", "alerting", "exit", 1,
                  uses_baseline=True),
-    DetectorSpec("options_direction_confusion", "_detect_options_direction_confusion",
-                 "1.0.0", "emotional", "alerting", "exit", 1),
     DetectorSpec("options_premium_avg_down", "_detect_options_premium_avg_down",
                  "1.0.0", "emotional", "alerting", "exit", 1),
-    DetectorSpec("iv_crush_behavior", "_detect_iv_crush_behavior",
-                 "1.0.0", "risk", "alerting", "exit", 1),
-    DetectorSpec("premium_destruction", "_detect_premium_destruction",
-                 "1.0.0", "risk", "alerting", "exit", 2),
+    DetectorSpec("premium_loss_event", "_detect_premium_loss_event",
+                 "2.0.0", "risk", "alerting", "exit", 3),
     DetectorSpec("expiry_day_overtrading", "_detect_expiry_day_overtrading",
                  "1.0.0", "emotional", "alerting", "exit", 2,
                  uses_baseline=True),
     DetectorSpec("opening_5min_trap", "_detect_opening_5min_trap",
-                 "1.0.0", "emotional", "alerting", "exit", 1),
+                 "2.0.0", "emotional", "analytics", "exit", 0),
     DetectorSpec("end_of_session_mis_panic", "_detect_end_of_session_mis_panic",
-                 "1.0.0", "emotional", "alerting", "exit", 1),
+                 "2.0.0", "emotional", "alerting", "exit", 1),
     DetectorSpec("post_loss_recovery_bet", "_detect_post_loss_recovery_bet",
                  "1.1.0", "risk", "alerting", "exit", 2),
     DetectorSpec("profit_giveaway", "_detect_profit_giveaway",
@@ -123,7 +120,19 @@ REGISTRY: Tuple[DetectorSpec, ...] = (
                  "1.0.0", "discipline", "alerting", "exit", 4,
                  guardian_eligible=True, uses_constitution=True,
                  consumes=("session", "session_trades", "completed_trade", "thresholds")),
+    # Phase 4 additions
+    DetectorSpec("same_symbol_obsession", "_detect_same_symbol_obsession",
+                 "1.0.0", "emotional", "alerting", "exit", 2),
+    DetectorSpec("time_of_day_bias", "_detect_time_of_day_bias",
+                 "1.0.0", "performance", "alerting", "exit", 1,
+                 uses_baseline=True),
 )
+
+# Event types emitted by a detector under a different name than its spec
+# (version lookup only — never iterated).
+ALIASES = {
+    "daily_overtrading": "2.0.0",
+}
 
 # Fast lookups
 BY_NAME = {spec.name: spec for spec in REGISTRY}

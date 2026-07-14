@@ -105,6 +105,11 @@ RISK_DELTAS: Dict[str, Decimal] = {
     "post_loss_recovery_bet":           Decimal("20"),
     "profit_giveaway":                  Decimal("20"),
     "constitution_violation":           Decimal("25"),
+    "direction_instability":            Decimal("15"),
+    "premium_loss_event":               Decimal("15"),
+    "daily_overtrading":                Decimal("10"),
+    "same_symbol_obsession":            Decimal("20"),
+    "time_of_day_bias":                 Decimal("5"),
     "premium_destruction":              Decimal("25"),
 }
 
@@ -237,7 +242,8 @@ class BehaviorEngine:
                     trigger_trade_id=None,
                     trigger_completed_trade_id=completed_trade.id,
                     detector_version=self._detector_version(e.event_type),
-                    confidence=e.confidence if e.confidence is not None else default_confidence,
+                    confidence=(min(e.confidence, default_confidence)
+                                if e.confidence is not None else default_confidence),
                     detected_at=trade_time,
                 ))
 
@@ -253,7 +259,8 @@ class BehaviorEngine:
                     detector=e.event_type,
                     detector_version=self._detector_version(e.event_type),
                     severity=e.severity,
-                    confidence=e.confidence if e.confidence is not None else default_confidence,
+                    confidence=(min(e.confidence, default_confidence)
+                                if e.confidence is not None else default_confidence),
                     data_quality=data_quality,
                     message=e.message,
                     evidence=(
@@ -317,7 +324,10 @@ class BehaviorEngine:
     def _detector_version(pattern_type: str) -> str:
         """Per-detector version from the registry, falling back to engine version."""
         spec = BY_NAME.get(pattern_type)
-        return spec.version if spec else ENGINE_VERSION
+        if spec:
+            return spec.version
+        from app.services.detector_registry import ALIASES
+        return ALIASES.get(pattern_type, ENGINE_VERSION)
 
     # ── Context loader ─────────────────────────────────────────────────────
 
@@ -438,6 +448,7 @@ class BehaviorEngine:
         "rapid_reentry",
         "no_stoploss",
         "post_loss_recovery_bet",
+        "direction_instability",   # straddle/strangle legs are CE+PE by design
     })
 
     def _run_all_detectors(self, ctx: EngineContext) -> List[DetectedEvent]:
@@ -472,21 +483,8 @@ class BehaviorEngine:
             except Exception as e:
                 logger.warning(f"[BehaviorEngine] {spec.method} failed: {e}")
 
-        # iv_crush_behavior and premium_destruction both analyse the same fast premium
-        # collapse — if both fire for this trade only the higher-severity one alerts;
-        # the other is kept as a suppressed evidence record.
-        _OPTIONS_OVERLAP = {"iv_crush_behavior", "premium_destruction"}
-        options_events = [e for e in events
-                          if e.event_type in _OPTIONS_OVERLAP and not e.suppressed_reason]
-        if len(options_events) >= 2:
-            best = min(options_events, key=lambda e: _SEV_RANK.get(e.severity, 99))
-            for e in options_events:
-                if e is not best:
-                    e.suppressed_reason = f"options_overlap:{best.event_type}"
-            logger.debug(
-                f"[BehaviorEngine] options dedup: kept {best.event_type} ({best.severity}), "
-                f"suppressed {[e.event_type for e in options_events if e is not best]}"
-            )
+        # (Phase 4: the old iv_crush/premium_destruction overlap dedup is gone —
+        # they are one pattern now: premium_loss_event.)
 
         # Constitution suppression (master §1C.8): when the user's OWN rule is
         # BREACHED (danger+), the overlapping behavioral pattern's notification
@@ -495,7 +493,7 @@ class BehaviorEngine:
         _CONSTITUTION_PAIRS = {
             "cooldown":               ("revenge_trade",),
             "max_consecutive_losses": ("consecutive_loss_streak",),
-            "daily_trades":           ("overtrading_burst",),
+            "daily_trades":           ("overtrading_burst", "daily_overtrading"),
             "max_trade_risk":         ("excess_exposure",),
             "daily_loss":             ("session_meltdown",),
         }
@@ -597,38 +595,85 @@ class BehaviorEngine:
         caution_window = ctx.thresholds.get("revenge_window_caution_min", 20)
         danger_window  = ctx.thresholds.get("revenge_window_danger_min", 5)
 
-        same_symbol = ct.tradingsymbol == last.tradingsymbol
-        if same_symbol:
-            entry_desc = f"Re-entered {ct.tradingsymbol}"
-            loss_desc  = f"{gap_min:.0f}min after a ₹{abs(float(last_pnl)):,.0f} loss on the same instrument"
-        else:
-            entry_desc = f"Entered {ct.tradingsymbol}"
-            loss_desc  = f"{gap_min:.0f}min after a ₹{abs(float(last_pnl)):,.0f} loss on {last.tradingsymbol}"
+        if gap_min > caution_window:
+            return None
 
-        base_ctx = {
-            "gap_minutes": round(gap_min, 1),
-            "prior_loss": float(last_pnl),
-            "prior_symbol": last.tradingsymbol,
-            "trigger_symbol": ct.tradingsymbol,
-            "caution_window": caution_window,
-            "danger_window": danger_window,
+        # ── Phase 4: signal-stacking confidence (master §1.4, doc 2) ──────
+        # Timing alone is weak evidence. Stack independent signals; below the
+        # gate the event is recorded as info (evidence) but never alerts.
+        pts = {
+            "critical": ctx.thresholds.get("signal_points_critical", 30),
+            "high":     ctx.thresholds.get("signal_points_high", 20),
+            "medium":   ctx.thresholds.get("signal_points_medium", 10),
+            "low":      ctx.thresholds.get("signal_points_low", 5),
         }
+        from app.services.instrument_parser import parse_symbol as _ps
+        try:
+            same_underlying = (_ps(ct.tradingsymbol or "").underlying
+                               == _ps(last.tradingsymbol or "").underlying)
+        except Exception:
+            same_underlying = ct.tradingsymbol == last.tradingsymbol
+        same_symbol = ct.tradingsymbol == last.tradingsymbol
+        size_ratio = (ct.total_quantity or 1) / max(last.total_quantity or 1, 1) \
+            if same_underlying else None
+        session_pnl = float(ctx.session.session_pnl or 0) if ctx.session else 0
 
+        evidence = []
+        confidence = float(pts["critical"])          # base: meaningful loss + inside window
+        evidence.append({"signal": "loss_then_reentry_in_window", "value": round(gap_min, 1),
+                         "importance": "critical"})
         if gap_min <= danger_window:
-            return DetectedEvent(
-                event_type="revenge_trade",
-                severity="danger",
-                message=f"{entry_desc} — {loss_desc}.",
-                context=base_ctx,
-            )
-        if gap_min <= caution_window:
-            return DetectedEvent(
-                event_type="revenge_trade",
-                severity="caution",
-                message=f"{entry_desc} — {loss_desc}. Was this entry planned before the loss?",
-                context=base_ctx,
-            )
-        return None
+            confidence += pts["high"]
+            evidence.append({"signal": "fast_reentry", "value": round(gap_min, 1),
+                             "importance": "high"})
+        if same_underlying:
+            confidence += pts["high"]
+            evidence.append({"signal": "same_underlying", "value": True, "importance": "high"})
+        if same_symbol:
+            confidence += pts["medium"]
+            evidence.append({"signal": "same_symbol", "value": True, "importance": "medium"})
+        if size_ratio is not None and size_ratio >= 1.5:
+            confidence += pts["high"]
+            evidence.append({"signal": "bigger_position", "value": round(size_ratio, 2),
+                             "importance": "high"})
+        if session_pnl < 0:
+            confidence += pts["medium"]
+            evidence.append({"signal": "session_red", "value": round(session_pnl, 2),
+                             "importance": "medium"})
+        confidence = min(confidence, 100.0)
+
+        # Severity = risk impact, independent of confidence (master §1.3):
+        # a fast re-entry with escalated size is dangerous; timing alone is caution.
+        severity = "danger" if (gap_min <= danger_window
+                                and size_ratio is not None and size_ratio >= 1.5) \
+            else "danger" if gap_min <= danger_window and same_underlying \
+            else "caution"
+
+        gate = ctx.thresholds.get("confidence_alert_gate", 50)
+        if confidence < gate:
+            severity = "info"  # recorded as evidence, never alerts
+
+        loc = "the same instrument" if same_symbol else last.tradingsymbol
+        return DetectedEvent(
+            event_type="revenge_trade",
+            severity=severity,
+            confidence=confidence,
+            message=(
+                f"Entered {ct.tradingsymbol} {gap_min:.0f}min after a "
+                f"₹{abs(float(last_pnl)):,.0f} loss on {loc}."
+                + (f" Position is {size_ratio:.1f}× the losing trade." if size_ratio and size_ratio >= 1.5 else "")
+            ),
+            context={
+                "gap_minutes": round(gap_min, 1),
+                "prior_loss": float(last_pnl),
+                "prior_symbol": last.tradingsymbol,
+                "trigger_symbol": ct.tradingsymbol,
+                "caution_window": caution_window,
+                "danger_window": danger_window,
+                "size_ratio": round(size_ratio, 2) if size_ratio is not None else None,
+                "signals": evidence,
+            },
+        )
 
     # ── Pattern 3: Overtrading burst + daily count ────────────────────────
 
@@ -760,8 +805,11 @@ class BehaviorEngine:
             losing_today  = sum(1 for p in pnls_today if p < 0)
             total_loss_today = sum(p for p in pnls_today if p < 0)
             severity = "danger" if daily_count >= daily_danger else "caution"
+            # Phase 4 split (master §2 3b): daily total is its own pattern —
+            # a 30-min burst and a heavy day are different behaviors with
+            # different dedup and their own constitution pairing.
             return DetectedEvent(
-                event_type="overtrading_burst",
+                event_type="daily_overtrading",
                 severity=severity,
                 message=(
                     f"{daily_count} trades today"
@@ -867,7 +915,7 @@ class BehaviorEngine:
         if 0 <= gap_min <= window:
             return DetectedEvent(
                 event_type="rapid_reentry",
-                severity="caution",
+                severity="info",  # Phase 4: analytics-only — profitable traders re-enter; evidence feeds revenge confidence
                 message=(
                     f"{ct.tradingsymbol}: re-entered {gap_min:.0f}min after a "
                     f"₹{abs(float(prior_pnl)):,.0f} loss on the same instrument."
@@ -901,7 +949,7 @@ class BehaviorEngine:
 
         return DetectedEvent(
             event_type="panic_exit",
-            severity="caution",
+            severity="info",  # Phase 4: analytics-only — retrospective, never interrupts
             message=(
                 f"{ct.tradingsymbol}: closed after {hold_min:.0f}min at "
                 f"₹{abs(pnl):,.0f} loss — no stop-loss order, quick manual exit."
@@ -1019,46 +1067,105 @@ class BehaviorEngine:
 
     # ── Pattern 9: Rapid flip (direction reversal) ────────────────────────
 
-    def _detect_rapid_flip(self, ctx: EngineContext) -> Optional[DetectedEvent]:
+    def _detect_direction_instability(self, ctx: EngineContext) -> Optional[DetectedEvent]:
+        """
+        Phase 4 merge of rapid_flip + options_direction_confusion (master §1D.2 doc 1).
+
+        A directional flip = betting the market goes the other way, minutes after
+        betting it went this way. Two flavours, one pattern:
+          Level 1 — exact instrument reversal (LONG→SHORT same symbol)
+          Level 2 — underlying-level reversal (CE→PE / PE→CE on same underlying)
+          Level 3 — 3+ flips this session → danger (whipsaw churn)
+        Context includes the prior position's P&L: flip after a loss is
+        emotional; flip after a profit may be strategy (severity stays caution).
+        """
         ct = ctx.completed_trade
-        if not ct.entry_time or not ct.direction:
+        if not ct.entry_time:
             return None
 
-        prior_same = sorted(
-            [t for t in ctx.session_trades
-             if t.tradingsymbol == ct.tradingsymbol and t.id != ct.id
-             and t.exit_time and t.direction],
-            key=lambda t: t.exit_time,
-        )
-        if not prior_same:
-            return None
-
-        last = prior_same[-1]
-        if last.direction == ct.direction:
-            return None
-
-        gap_min = (ct.entry_time - last.exit_time).total_seconds() / 60
-        if gap_min < 0:
-            return None  # data issue: timestamps out of order
+        from app.services.instrument_parser import parse_symbol as _ps
         window = ctx.thresholds.get("rapid_flip_min", 10)
+        confusion_window = ctx.thresholds.get("direction_confusion_window_min", 10)
 
-        if gap_min < window:
-            return DetectedEvent(
-                event_type="rapid_flip",
-                severity="caution",
-                message=(
-                    f"{ct.tradingsymbol}: direction reversed "
-                    f"{last.direction}→{ct.direction} within {gap_min:.0f}min."
-                ),
-                context={
-                    "symbol": ct.tradingsymbol,
-                    "from_direction": last.direction,
-                    "to_direction": ct.direction,
-                    "gap_minutes": round(gap_min, 1),
-                    "window_min": window,
-                },
-            )
-        return None
+        def _underlying(sym: str) -> str:
+            try:
+                return _ps(sym or "").underlying or sym or ""
+            except Exception:
+                return sym or ""
+
+        def _is_flip(prior, current) -> Optional[str]:
+            """Return 'exact' | 'underlying' | None for a prior→current pair."""
+            if not (prior.exit_time and current.entry_time):
+                return None
+            gap = (current.entry_time - prior.exit_time).total_seconds() / 60
+            if gap < 0:
+                return None
+            # Level 1: same symbol, opposite direction
+            if (prior.tradingsymbol == current.tradingsymbol
+                    and prior.direction and current.direction
+                    and prior.direction != current.direction
+                    and gap < window):
+                return "exact"
+            # Level 2: same underlying, CE↔PE (both LONG option buys)
+            if (prior.instrument_type in ("CE", "PE") and current.instrument_type in ("CE", "PE")
+                    and prior.instrument_type != current.instrument_type
+                    and prior.direction == "LONG" and current.direction == "LONG"
+                    and _underlying(prior.tradingsymbol) == _underlying(current.tradingsymbol)
+                    and gap < confusion_window):
+                return "underlying"
+            return None
+
+        # Does the current trade flip against any recent prior?
+        priors = sorted([t for t in ctx.session_trades if t.id != ct.id and t.exit_time],
+                        key=lambda t: t.exit_time)
+        flip_kind = None
+        flip_prior = None
+        for prior in reversed(priors):
+            kind = _is_flip(prior, ct)
+            if kind:
+                flip_kind, flip_prior = kind, prior
+                break
+        if not flip_kind:
+            return None
+
+        # Level 3: count flips across the whole session (including this one)
+        ordered = priors + [ct]
+        session_flips = 0
+        for i in range(1, len(ordered)):
+            if _is_flip(ordered[i - 1], ordered[i]):
+                session_flips += 1
+
+        gap_min = (ct.entry_time - flip_prior.exit_time).total_seconds() / 60
+        prior_pnl = float(flip_prior.realized_pnl or 0)
+        underlying = _underlying(ct.tradingsymbol)
+
+        if flip_kind == "exact":
+            flip_desc = (f"{ct.tradingsymbol}: direction reversed "
+                         f"{flip_prior.direction}→{ct.direction} within {gap_min:.0f}min")
+        else:
+            flip_desc = (f"{underlying}: flipped {flip_prior.instrument_type}→"
+                         f"{ct.instrument_type} in {gap_min:.0f}min")
+
+        severity = "danger" if session_flips >= 3 else "caution"
+        suffix = (f" — {session_flips} direction changes this session."
+                  if session_flips >= 3 else
+                  (" after a loss on that view." if prior_pnl < 0 else "."))
+
+        return DetectedEvent(
+            event_type="direction_instability",
+            severity=severity,
+            message=flip_desc + suffix,
+            context={
+                "level": 3 if session_flips >= 3 else (1 if flip_kind == "exact" else 2),
+                "flip_kind": flip_kind,
+                "underlying": underlying,
+                "prior_symbol": flip_prior.tradingsymbol,
+                "trigger_symbol": ct.tradingsymbol,
+                "prior_pnl": round(prior_pnl, 2),
+                "gap_minutes": round(gap_min, 1),
+                "session_flips": session_flips,
+            },
+        )
 
     # ── Pattern 10: Excess exposure ───────────────────────────────────────
 
@@ -1382,7 +1489,7 @@ class BehaviorEngine:
             ratio = avg_loser_hold / max(avg_winner_hold, 1)
             return DetectedEvent(
                 event_type="early_exit",
-                severity="caution",
+                severity="info",  # Phase 4: analytics-only — EOD/Journal insight, not an interrupt
                 message=(
                     f"Today's pattern: winners held {avg_winner_hold:.0f}min avg, "
                     f"losers held {avg_loser_hold:.0f}min avg ({ratio:.1f}× longer). "
@@ -1519,56 +1626,8 @@ class BehaviorEngine:
     # CE→PE (or PE→CE) flip on the same underlying within the confusion window.
     # Legitimate reversals require analysis time. < 10 min = confusion, not strategy.
 
-    def _detect_options_direction_confusion(self, ctx: EngineContext) -> Optional[DetectedEvent]:
-        ct = ctx.completed_trade
-        if ct.instrument_type not in ("CE", "PE") or ct.direction != "LONG":
-            return None
-        if not ct.entry_time:
-            return None
-
-        from app.services.instrument_parser import parse_symbol
-        ct_parsed = parse_symbol(ct.tradingsymbol or "")
-        if not ct_parsed.underlying:
-            return None
-
-        window_min = ctx.thresholds.get("direction_confusion_window_min", 10)
-        window_start = ct.entry_time - timedelta(minutes=window_min)
-        opposite_type = "PE" if ct.instrument_type == "CE" else "CE"
-
-        for prior in ctx.session_trades:
-            if prior.id == ct.id:
-                continue
-            if prior.instrument_type != opposite_type or prior.direction != "LONG":
-                continue
-            if not prior.exit_time:
-                continue
-            # Prior trade must have exited within the confusion window before current entry
-            if not (window_start <= prior.exit_time <= ct.entry_time):
-                continue
-            prior_parsed = parse_symbol(prior.tradingsymbol or "")
-            if prior_parsed.underlying != ct_parsed.underlying:
-                continue
-
-            minutes_apart = (ct.entry_time - prior.exit_time).total_seconds() / 60
-            return DetectedEvent(
-                event_type="options_direction_confusion",
-                severity="caution",
-                message=(
-                    f"You flipped from {prior.instrument_type} to {ct.instrument_type} on "
-                    f"{ct_parsed.underlying} in {minutes_apart:.0f}min. "
-                    f"Switching direction on the same underlying this fast indicates confusion "
-                    f"about market direction — not a revised analysis."
-                ),
-                context={
-                    "underlying": ct_parsed.underlying,
-                    "from_type": prior.instrument_type,
-                    "to_type": ct.instrument_type,
-                    "minutes_apart": round(minutes_apart, 1),
-                    "prior_symbol": prior.tradingsymbol,
-                    "current_symbol": ct.tradingsymbol,
-                },
-            )
-        return None
+    # options_direction_confusion: MERGED into direction_instability Level 2
+    # (Phase 4, master doc 1). Historical alerts keep the old pattern_type.
 
     # ── Pattern 17: Options premium averaging down ────────────────────────
     #
@@ -1635,117 +1694,92 @@ class BehaviorEngine:
     # Fast large premium collapse without a large directional move = IV crush.
     # Common pattern: buying before an event (FOMC, results, expiry) when IV is peaked.
 
-    def _detect_iv_crush_behavior(self, ctx: EngineContext) -> Optional[DetectedEvent]:
-        ct = ctx.completed_trade
-        if ct.instrument_type not in ("CE", "PE") or ct.direction != "LONG":
-            return None
+    # iv_crush_behavior: MERGED into premium_loss_event (Phase 4, master doc 1).
+    # Fast collapse is now a context flag on the same event — one trade, one alert.
 
-        pnl = Decimal(str(ct.realized_pnl or 0))
-        if pnl >= 0:
-            return None
-
-        # duration_minutes is None when entry/exit timestamps are missing — treat
-        # as "unknown hold time" and skip rather than defaulting to 0, which would
-        # pass the < 30 min threshold and produce a false positive.
-        if ct.duration_minutes is None:
-            return None
-        hold_min = ct.duration_minutes
-        hold_threshold = ctx.thresholds.get("iv_crush_proxy_hold_min", 30)
-        if hold_min >= hold_threshold:
-            return None  # Held too long — theta decay, not IV crush
-
-        entry_price = Decimal(str(ct.avg_entry_price or 0))
-        qty = ct.total_quantity or 1
-        premium_paid = entry_price * qty
-        if premium_paid <= 0:
-            return None
-
-        loss_pct = abs(pnl) / premium_paid * 100
-        loss_threshold = ctx.thresholds.get("iv_crush_proxy_loss_pct", 40)
-        if loss_pct < Decimal(str(loss_threshold)):
-            return None
-
-        return DetectedEvent(
-            event_type="iv_crush_behavior",
-            severity="caution",
-            message=(
-                f"{ct.tradingsymbol}: {float(loss_pct):.0f}% of premium lost "
-                f"(₹{abs(float(pnl)):,.0f}) in {hold_min}min — "
-                f"fast premium collapse consistent with IV crush."
-            ),
-            context={
-                "tradingsymbol": ct.tradingsymbol,
-                "hold_minutes": hold_min,
-                "loss_pct": round(float(loss_pct), 1),
-                "realized_pnl": float(pnl),
-                "premium_paid": round(float(premium_paid)),
-            },
-        )
-
-
-    # ── Pattern 19 (new): Premium destruction ─────────────────────────────
+    # ── Premium loss event (merged iv_crush + premium_destruction) ─────────
     #
-    # Options trade exits with > 60% of premium lost.
-    # Distinct from iv_crush_behavior (which fires on fast < 30 min collapse).
-    # premium_destruction fires regardless of hold time — it measures the
-    # severity of the exit, not the speed of the move.
-    #
-    # Severity escalation:
-    #   caution  — first occurrence in session, or single trade > 60%
-    #   danger   — 2+ trades in session each losing > 60% of premium
+    # Options trade exits losing a large share of premium. Levels (config):
+    #   caution  ≥ 40% · danger ≥ 60% · critical ≥ 80%
+    # Expiry day shifts all levels up (+15pp default) — deep OTM near expiry
+    # loses 40% routinely without any behavioral failure.
+    # hold < 30 min flags a fast collapse (IV-crush-like) in context.
 
-    def _detect_premium_destruction(self, ctx: EngineContext) -> Optional[DetectedEvent]:
+    def _detect_premium_loss_event(self, ctx: EngineContext) -> Optional[DetectedEvent]:
         ct = ctx.completed_trade
         if ct.instrument_type not in ("CE", "PE") or ct.direction != "LONG":
             return None
 
         # Use stored pnl_pct if available; fall back to computing it
         if ct.pnl_pct is not None:
-            loss_pct = float(ct.pnl_pct)
+            pnl_pct = float(ct.pnl_pct)
         else:
             entry_price = float(ct.avg_entry_price or 0)
             exit_price  = float(ct.avg_exit_price  or 0)
             if entry_price <= 0:
                 return None
-            loss_pct = (exit_price - entry_price) / entry_price * 100
-
-        threshold = float(ctx.thresholds.get("premium_destruction_pct", -60))
-        if loss_pct >= threshold:   # threshold is negative (e.g. -60)
+            pnl_pct = (exit_price - entry_price) / entry_price * 100
+        loss_pct = -pnl_pct  # positive % of premium lost
+        if loss_pct <= 0:
             return None
 
-        # Count how many options trades today also crossed the threshold
-        prior_destruction = [
-            t for t in ctx.session_trades
-            if t.id != ct.id
-            and t.instrument_type in ("CE", "PE")
-            and t.direction == "LONG"
-            and (
-                (float(t.pnl_pct) if t.pnl_pct is not None
-                 else (float(t.avg_exit_price or 0) - float(t.avg_entry_price or 1))
-                      / float(t.avg_entry_price or 1) * 100)
-                < threshold
-            )
-        ]
+        l_caution  = float(ctx.thresholds.get("premium_loss_caution_pct", 40))
+        l_danger   = float(ctx.thresholds.get("premium_loss_danger_pct", 60))
+        l_critical = float(ctx.thresholds.get("premium_loss_critical_pct", 80))
 
-        severity = "danger" if prior_destruction else "caution"
-        count_msg = (
-            f" ({len(prior_destruction) + 1} trades today with >60% premium loss)"
-            if prior_destruction else ""
+        # Expiry-day adjustment (master §1D.7 review): thresholds shift up
+        try:
+            from app.services.instrument_parser import is_expiry_day as _ied
+            if ct.exit_time and _ied(ct.tradingsymbol or "", ct.exit_time.astimezone(IST).date()):
+                shift = float(ctx.thresholds.get("premium_loss_expiry_shift_pct", 15))
+                l_caution += shift
+                l_danger += shift
+                l_critical += shift
+        except Exception:
+            pass
+
+        if loss_pct < l_caution:
+            return None
+        severity = ("critical" if loss_pct >= l_critical
+                    else "danger" if loss_pct >= l_danger
+                    else "caution")
+
+        fast_hold = ctx.thresholds.get("premium_loss_fast_hold_min", 30)
+        fast_collapse = (ct.duration_minutes is not None
+                         and ct.duration_minutes < fast_hold)
+
+        # Repeat destruction today escalates danger→critical
+        repeat_count = sum(
+            1 for t in ctx.session_trades
+            if t.id != ct.id and t.instrument_type in ("CE", "PE")
+            and t.direction == "LONG" and t.pnl_pct is not None
+            and float(t.pnl_pct) <= -l_danger
         )
+        if repeat_count >= 1 and severity == "danger":
+            severity = "critical"
+
+        speed_note = (f" in {ct.duration_minutes}min — fast collapse, likely bought into peak IV"
+                      if fast_collapse else "")
+        repeat_note = (f" ({repeat_count + 1} trades today past the danger level)"
+                       if repeat_count else "")
 
         return DetectedEvent(
-            event_type="premium_destruction",
+            event_type="premium_loss_event",
             severity=severity,
             message=(
-                f"{ct.tradingsymbol}: {abs(loss_pct):.0f}% of premium lost "
-                f"(₹{abs(float(ct.realized_pnl or 0)):,.0f}){count_msg}."
+                f"{ct.tradingsymbol}: {loss_pct:.0f}% of premium lost "
+                f"(₹{abs(float(ct.realized_pnl or 0)):,.0f}){speed_note}{repeat_note}."
             ),
             context={
-                "tradingsymbol":        ct.tradingsymbol,
-                "pnl_pct":              round(loss_pct, 1),
-                "realized_pnl":         float(ct.realized_pnl or 0),
-                "prior_destruction_count": len(prior_destruction),
-                "hold_minutes":         ct.duration_minutes or 0,
+                "tradingsymbol": ct.tradingsymbol,
+                "loss_pct": round(loss_pct, 1),
+                "entry_premium": round(float(ct.avg_entry_price or 0), 2),
+                "exit_premium": round(float(ct.avg_exit_price or 0), 2),
+                "realized_pnl": float(ct.realized_pnl or 0),
+                "hold_minutes": ct.duration_minutes,
+                "fast_collapse": fast_collapse,
+                "repeat_count_today": repeat_count,
+                "levels": {"caution": l_caution, "danger": l_danger, "critical": l_critical},
             },
         )
 
@@ -1888,7 +1922,7 @@ class BehaviorEngine:
 
         return DetectedEvent(
             event_type="opening_5min_trap",
-            severity=severity,
+            severity="info",  # Phase 4: analytics-only — trade already closed when this fires
             message=(
                 f"{ct.tradingsymbol}: {detail}. "
                 f"The 09:15–09:25 window has the widest bid-ask spreads of the day "
@@ -1944,13 +1978,19 @@ class BehaviorEngine:
         ]
         panic_count = len(panic_trades) + 1
 
+        # Phase 4 (master doc 1): all late MIS entries profitable + session green
+        # = deliberate late scalping, not panic. Record as info, don't alert.
+        late_pnls = [float(t.realized_pnl or 0) for t in panic_trades] + [float(ct.realized_pnl or 0)]
+        session_pnl_now = float(ctx.session.session_pnl or 0) if ctx.session else 0
+        all_late_profitable = all(p > 0 for p in late_pnls) and session_pnl_now > 0
+
         caution_count = ctx.thresholds.get("end_session_mis_caution_count", 2)
         danger_count  = ctx.thresholds.get("end_session_mis_danger_count", 3)
 
         if panic_count >= danger_count:
             return DetectedEvent(
                 event_type="end_of_session_mis_panic",
-                severity="danger",
+                severity="info" if all_late_profitable else "danger",
                 message=(
                     f"{panic_count} MIS trades after 15:00 IST today. "
                     f"Zerodha auto-squares {exchange or 'MIS'} at {squareoff_str}."
@@ -1961,6 +2001,8 @@ class BehaviorEngine:
             )
         if panic_count >= caution_count:
             mins_remaining = max(0, squareoff_total_min - (entry_ist.hour * 60 + entry_ist.minute))
+            if all_late_profitable:
+                return None  # deliberate late scalping — not even worth an info row at caution level
             return DetectedEvent(
                 event_type="end_of_session_mis_panic",
                 severity="caution",
@@ -2297,6 +2339,104 @@ class BehaviorEngine:
                      "ratio": round(ratio, 2), "capital_at_risk": round(risk, 2)})
 
         return events or None
+
+    # ── Same symbol obsession (Phase 4, doc 4 P27) ──
+    #
+    # Chasing one underlying: 3+ losses on it today after repeated re-entries.
+    # "Not trading. Chasing." Escalates to danger when position size is rising.
+
+    def _detect_same_symbol_obsession(self, ctx: EngineContext) -> Optional[DetectedEvent]:
+        ct = ctx.completed_trade
+        from app.services.instrument_parser import parse_symbol as _ps
+
+        def _u(sym):
+            try:
+                return _ps(sym or "").underlying or sym or ""
+            except Exception:
+                return sym or ""
+
+        underlying = _u(ct.tradingsymbol)
+        if not underlying:
+            return None
+
+        same = sorted(
+            [t for t in ctx.session_trades if t.id != ct.id and _u(t.tradingsymbol) == underlying],
+            key=lambda t: t.exit_time or datetime.min.replace(tzinfo=timezone.utc),
+        ) + [ct]
+
+        losses = [t for t in same if float(t.realized_pnl or 0) < 0]
+        reentries = len(same) - 1
+        min_losses = ctx.thresholds.get("obsession_min_losses", 3)
+        min_reentries = ctx.thresholds.get("obsession_min_reentries", 2)
+        if len(losses) < min_losses or reentries < min_reentries:
+            return None
+
+        total_loss = sum(abs(float(t.realized_pnl or 0)) for t in losses)
+        qtys = [t.total_quantity or 1 for t in same]
+        size_rising = len(qtys) >= 2 and qtys[-1] > qtys[0]
+
+        return DetectedEvent(
+            event_type="same_symbol_obsession",
+            severity="danger" if size_rising else "caution",
+            message=(
+                f"{underlying}: {len(losses)} losses across {len(same)} attempts today "
+                f"(₹{total_loss:,.0f} total)"
+                + (" and position size is growing." if size_rising else ".")
+            ),
+            context={
+                "underlying": underlying,
+                "attempts": len(same),
+                "losses": len(losses),
+                "total_loss": round(total_loss, 2),
+                "size_rising": size_rising,
+                "trade_list": [
+                    {"symbol": t.tradingsymbol or "—", "qty": t.total_quantity or 0,
+                     "pnl": round(float(t.realized_pnl or 0), 2),
+                     "exit_time_ist": t.exit_time.astimezone(IST).strftime("%H:%M") if t.exit_time else None}
+                    for t in same
+                ],
+            },
+        )
+
+    # ── Time-of-day bias (Phase 4, doc 4 P28) ──
+    #
+    # The learned danger_hours (learn_patterns, nightly) finally consumed in
+    # real time: trade entered inside a historically losing hour → nudge with
+    # the user's own numbers. Needs 30+ sessions of history (config).
+
+    def _detect_time_of_day_bias(self, ctx: EngineContext) -> Optional[DetectedEvent]:
+        ct = ctx.completed_trade
+        if not ct.entry_time:
+            return None
+        danger_hours = ctx.thresholds.get("danger_hours") or []
+        if not danger_hours:
+            return None
+        if ctx.thresholds.get("baseline_sessions", 0) < ctx.thresholds.get("tod_bias_min_sessions", 30):
+            return None
+
+        entry_hour = ct.entry_time.astimezone(IST).hour
+        hit = next((d for d in danger_hours if d.get("hour") == entry_hour), None)
+        if not hit:
+            return None
+
+        h12 = entry_hour % 12 or 12
+        ampm = "AM" if entry_hour < 12 else "PM"
+        return DetectedEvent(
+            event_type="time_of_day_bias",
+            severity="caution",
+            message=(
+                f"Entered {ct.tradingsymbol} at {ct.entry_time.astimezone(IST).strftime('%H:%M')} — "
+                f"historically your {h12} {ampm} hour runs a {hit.get('win_rate', 0):.0f}% win rate "
+                f"over {hit.get('trades', 0)} trades (avg ₹{hit.get('avg_pnl', 0):,.0f})."
+            ),
+            context={
+                "entry_hour_ist": entry_hour,
+                "historical_win_rate": hit.get("win_rate"),
+                "historical_trades": hit.get("trades"),
+                "historical_avg_pnl": hit.get("avg_pnl"),
+                "trigger_symbol": ct.tradingsymbol,
+            },
+        )
 
 
 # Singleton
