@@ -185,6 +185,11 @@ class EngineContext:
     # order_type values of the exit fills for the current completed_trade
     # (e.g. ["MKT"], ["SL"], ["SL-M", "MKT"]).  Empty when exit_trade_ids unknown.
     exit_order_types: List[str] = None  # type: ignore[assignment]
+    # P2 shadow (Runtime Architecture Migration): fold-derived session state,
+    # computed alongside the legacy recompute and compared per trade. Detectors
+    # do NOT read this yet - cutover happens detector-by-detector once shadow
+    # mismatch count stays zero across live sessions.
+    session_state: Optional[object] = None
 
 
 # ---------------------------------------------------------------------------
@@ -254,6 +259,9 @@ class BehaviorEngine:
                 ))
 
             # ── BehaviorEvents: evidence records for EVERY detection ──────
+            # Addendum #3: snapshot only for danger/critical (~5-10% of
+            # events) - audit of what the engine saw when data later changes.
+            # 80-90% write-volume reduction on the heaviest column.
             input_snapshot = {
                 "completed_trade_id": str(completed_trade.id),
                 "session_trade_ids": [str(t.id) for t in ctx.session_trades],
@@ -280,7 +288,8 @@ class BehaviorEngine:
                         {**e.context, "_suppressed": e.suppressed_reason}
                         if e.suppressed_reason else dict(e.context)
                     ),
-                    input_snapshot=input_snapshot,
+                    input_snapshot=(input_snapshot
+                                    if e.severity in ("danger", "critical") else None),
                     trigger_completed_trade_id=completed_trade.id,
                     detected_at=trade_time,
                 )
@@ -435,6 +444,26 @@ class BehaviorEngine:
             + Decimal(str(completed_trade.realized_pnl or 0))
         )
 
+        # ── P2 shadow: SessionState fold vs legacy recompute ──────────────
+        # Zero extra IO (folds rows already loaded). A mismatch means the
+        # fold and the rescan disagree about reality - the exact drift the
+        # migration gate must catch. Counted, never raised.
+        shadow_state = None
+        try:
+            from app.services.state.session_state import SessionState
+            from app.core.metrics import incr as _minc
+            shadow_state = SessionState.rebuild(list(session_trades) + [completed_trade])
+            _minc("state_shadow_checked")
+            if shadow_state.session_pnl != session.session_pnl:
+                _minc("state_shadow_mismatch")
+                logger.error(
+                    f"[state-shadow] session_pnl mismatch for {broker_account_id}: "
+                    f"fold={shadow_state.session_pnl} legacy={session.session_pnl} "
+                    f"trade={completed_trade.id}"
+                )
+        except Exception as _sh_err:
+            logger.warning(f"[state-shadow] compute failed (non-fatal): {_sh_err}")
+
         return EngineContext(
             broker_account_id=broker_account_id,
             session=session,
@@ -444,6 +473,7 @@ class BehaviorEngine:
             thresholds=thresholds,
             strategy_group=strategy_group,
             exit_order_types=exit_order_types,
+            session_state=shadow_state,
         )
 
     # ── Run all detectors ──────────────────────────────────────────────────

@@ -36,6 +36,9 @@ COUNTERS = (
     "alerts_deduped",
     "notifications_dispatched",
     "notifications_stale_suppressed",
+    "state_shadow_checked",
+    "state_shadow_mismatch",
+    "events_info_gated",
 )
 TIMINGS = (
     "alert_e2e_lag_ms",      # trade exit -> detection persisted (the SLO)
@@ -137,6 +140,11 @@ def health_flags(snap: Dict) -> Dict:
         flags["detection_skips"] = f"{c['behavior_lock_exhausted']} lock exhaustions today (requeued)"
     if c.get("behavior_bulk_lock_abort", 0) > 0:
         flags["bulk_aborts"] = f"{c['behavior_bulk_lock_abort']} bulk sync aborts"
+    if c.get("state_shadow_mismatch", 0) > 0:
+        flags["state_drift"] = (
+            f"{c['state_shadow_mismatch']} SessionState shadow mismatches - "
+            f"MIGRATION BLOCKED until zero"
+        )
     lag = t.get("alert_e2e_lag_ms", {})
     if lag and lag.get("avg_ms", 0) > 3000:
         flags["slo_breach"] = f"avg e2e lag {lag['avg_ms']}ms exceeds 3s SLO"

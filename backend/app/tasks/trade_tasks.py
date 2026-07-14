@@ -89,8 +89,22 @@ async def _persist_events(db, events, surviving_by_key: dict, deduped_keys: set)
     from app.models.behavior_event import BehaviorEvent
     from uuid import uuid4 as _uuid4
 
+    from app.services.detector_registry import BY_NAME as _SPECS_G
+    from app.core.metrics import incr as _mi_gate
+
     rows = []
     for ev in events:
+        # P2 write gating (review S7): info events from ALERTING detectors
+        # with no suppression marker are confidence-demoted noise (e.g.
+        # revenge at 30 confidence) - half the write volume, near-zero read
+        # value. Analytics-disposition info events are the product (journal,
+        # strategy driver) and suppressed evidence is sacred (1C.8) - both kept.
+        if ev.severity == "info":
+            spec = _SPECS_G.get(ev.detector)
+            suppressed = bool((ev.evidence or {}).get("_suppressed"))
+            if spec and spec.disposition == "alerting" and not suppressed:
+                _mi_gate("events_info_gated")
+                continue
         ek = _pattern_dedup_key(ev.detector, ev.evidence)
         risk_alert_id = surviving_by_key.get(ek)
         evidence = ev.evidence or {}
@@ -557,23 +571,28 @@ def process_webhook_trade(self, trade_data: Dict[str, Any], broker_account_id: s
                 # These are fire-and-forget — failures don't retry the trade task.
                 try:
                     from app.tasks.position_monitor_tasks import (
-                        check_position_overexposure,
                         check_holding_loser_scheduled,
-                        check_portfolio_concentration,
-                        check_entry_rules,
+                        _overexposure_task,
+                        _concentration_task,
+                        _entry_rules_task,
                     )
-                    # Immediate overexposure check for this symbol
-                    check_position_overexposure.delay(
-                        broker_account_id, trade.tradingsymbol or ""
-                    )
-                    # Phase 6 entry-time checks: concentration across all open
-                    # positions + constitution rules AT THE FILL (intervention
-                    # while the position is still open)
-                    check_portfolio_concentration.delay(broker_account_id)
+                    # P2 coalescing (review S6.2): position checks run INLINE
+                    # in this worker instead of 3 spawned Celery tasks - kills
+                    # the task fan-out and its per-task connection churn.
+                    # Each is individually non-fatal.
+                    try:
+                        await _overexposure_task(broker_account_id, trade.tradingsymbol or "")
+                    except Exception as _oe:
+                        logger.warning(f"overexposure inline check failed: {_oe}")
+                    try:
+                        await _concentration_task(broker_account_id)
+                    except Exception as _ce:
+                        logger.warning(f"concentration inline check failed: {_ce}")
                     if trade.transaction_type == "BUY":
-                        check_entry_rules.delay(
-                            broker_account_id, trade.tradingsymbol or ""
-                        )
+                        try:
+                            await _entry_rules_task(broker_account_id, trade.tradingsymbol or "")
+                        except Exception as _ee:
+                            logger.warning(f"entry rules inline check failed: {_ee}")
                     # For BUY fills: schedule holding-loser check 30 min out.
                     # Use SETNX chain key so multiple BUY fills don't spawn
                     # parallel chains — only one chain active per account.
