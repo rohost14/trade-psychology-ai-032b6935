@@ -2203,6 +2203,28 @@ class BehaviorEngine:
         # called from a webhook (real-time) or a sync (retroactive).
 
         ct = ctx.completed_trade
+        # Green-to-red (user gap #2): the session CROSSED from profit into
+        # loss - erosion past 100% of peak. Same detector, distinct narrative;
+        # "you gave back 70%" and "your green day is now red" land differently.
+        if current_pnl < 0 and erosion_pct >= Decimal("1.0"):
+            return DetectedEvent(
+                event_type="profit_giveaway",
+                severity="danger",
+                message=(
+                    f"Your session turned from profit to loss: you were up "
+                    f"₹{float(peak_pnl):,.0f} today and are now down "
+                    f"₹{abs(float(current_pnl)):,.0f}."
+                ),
+                context={
+                    "peak_pnl": round(float(peak_pnl), 2),
+                    "current_pnl": round(float(current_pnl), 2),
+                    "erosion": round(float(erosion), 2),
+                    "erosion_pct": round(float(erosion_pct), 2),
+                    "sign_flip": True,
+                    "trigger_symbol": ct.tradingsymbol,
+                },
+            )
+
         if erosion_pct >= danger_pct:
             return DetectedEvent(
                 event_type="profit_giveaway",

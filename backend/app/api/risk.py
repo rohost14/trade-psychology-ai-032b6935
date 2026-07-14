@@ -134,3 +134,40 @@ async def get_behavior_scores(
         import logging
         logging.getLogger(__name__).error(f"scores computation failed: {e}", exc_info=True)
         raise HTTPException(status_code=500, detail="Internal server error")
+
+
+@router.get("/alert-response-stats")
+async def alert_response_stats(
+    days: int = 30,
+    broker_account_id: UUID = Depends(get_verified_broker_account_id),
+    db: AsyncSession = Depends(get_db),
+):
+    """
+    User gap #8: how do YOU respond to your alerts? Ignored (never
+    acknowledged) vs acted-on per pattern - the honest dismiss-rate proxy
+    until a real feedback label exists. "Revenge alerts ignored: 18" is
+    itself a behavioral insight.
+    """
+    cutoff = datetime.now(timezone.utc) - timedelta(days=min(days, 180))
+    result = await db.execute(
+        select(RiskAlert).where(and_(
+            RiskAlert.broker_account_id == broker_account_id,
+            RiskAlert.detected_at >= cutoff,
+        ))
+    )
+    alerts = list(result.scalars().all())
+    by_pattern: dict = {}
+    for a in alerts:
+        d = by_pattern.setdefault(a.pattern_type, {"total": 0, "acknowledged": 0})
+        d["total"] += 1
+        if a.acknowledged_at is not None:
+            d["acknowledged"] += 1
+    rows = [
+        {"pattern": p, "total": d["total"], "acknowledged": d["acknowledged"],
+         "ignored": d["total"] - d["acknowledged"],
+         "ack_rate": round(d["acknowledged"] / d["total"], 2) if d["total"] else None}
+        for p, d in by_pattern.items()
+    ]
+    rows.sort(key=lambda r: -r["ignored"])
+    return {"window_days": days, "patterns": rows,
+            "total_ignored": sum(r["ignored"] for r in rows)}

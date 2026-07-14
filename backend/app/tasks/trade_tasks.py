@@ -61,6 +61,7 @@ _WORSEN_METRIC = {
     "premium_loss_event":     "loss_pct",
     "same_symbol_obsession":  "total_loss",
     "constitution_violation": "ratio",
+    "profit_giveaway":        "erosion_pct",  # deepening giveback re-fires
 }
 _WORSEN_FACTOR = 1.20  # metric must grow >=20% past the last fired value
 
@@ -921,8 +922,36 @@ async def run_risk_detection_async(
                 f"older than push window — saved, not pushed"
             )
         _mincr("notifications_dispatched", len(pushable))
-        for alert in pushable:
+        from app.services.detector_registry import BY_NAME as _SPECS_N
+        guardian_alerts = [a for a in pushable
+                           if (_SPECS_N.get(a.pattern_type)
+                               and _SPECS_N[a.pattern_type].guardian_eligible)
+                           or a.pattern_type == "death_spiral"]
+        other_alerts = [a for a in pushable if a not in guardian_alerts]
+        for alert in guardian_alerts:
             send_danger_alert.delay(str(broker_account_id), str(alert.id))
+        if len(other_alerts) > 1:
+            # One merged push instead of N (user gap #4: alert fatigue)
+            try:
+                from app.services.push_notification_service import push_service
+                titles = [a.pattern_type.replace("_", " ") for a in other_alerts]
+                await push_service.send_notification(
+                    broker_account_id=broker_account_id,
+                    title=f"{len(other_alerts)} risk patterns on your last trade",
+                    body=" · ".join(a.message[:70] for a in other_alerts[:3]),
+                    db=db,
+                    data={"type": "merged_alerts",
+                          "alert_ids": [str(a.id) for a in other_alerts]},
+                    severity="danger",
+                    tag="merged-risk",
+                )
+                _mincr("notifications_merged")
+            except Exception as _mp_err:
+                logger.warning(f"merged push failed, falling back: {_mp_err}")
+                for alert in other_alerts:
+                    send_danger_alert.delay(str(broker_account_id), str(alert.id))
+        elif other_alerts:
+            send_danger_alert.delay(str(broker_account_id), str(other_alerts[0].id))
 
         logger.info(
             f"[BehaviorEngine] {broker_account_id}: {len(new_alerts)} new alerts "

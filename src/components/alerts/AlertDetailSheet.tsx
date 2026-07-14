@@ -279,6 +279,38 @@ export default function AlertDetailSheet({ alert, open, onClose, onAcknowledge }
             );
           })()}
 
+          {/* Why this fired - confidence signal evidence (Engine v2, A.8).
+              Rendered whenever the backend stacked signals for this alert. */}
+          {(() => {
+            const d = alert.pattern.details ?? {};
+            const signals: { signal: string; value: unknown; importance: string }[] =
+              Array.isArray(d.signals) ? (d.signals as { signal: string; value: unknown; importance: string }[]) : [];
+            if (signals.length === 0) return null;
+            return (
+              <div>
+                <p className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wide mb-2">
+                  Why this fired
+                </p>
+                <ul className="space-y-1.5">
+                  {signals.map((sig, i) => (
+                    <li key={i} className="flex items-center gap-2 text-[12px]">
+                      <span className={cn(
+                        'h-1.5 w-1.5 rounded-full shrink-0',
+                        sig.importance === 'critical' ? 'bg-tm-loss' :
+                        sig.importance === 'high' ? 'bg-tm-loss/70' :
+                        'bg-amber-500'
+                      )} />
+                      <span className="text-foreground">
+                        {sig.signal.replace(/_/g, ' ')}
+                        {typeof sig.value === 'number' && `: ${sig.value}`}
+                      </span>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            );
+          })()}
+
           {/* Pattern explanation */}
           {PATTERN_EXPLANATIONS[backendType] && (
             <p className="text-[12px] text-muted-foreground leading-relaxed border-t border-border pt-4">

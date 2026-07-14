@@ -187,6 +187,18 @@ celery_app.conf.update(
             "task": "app.tasks.maintenance_tasks.ensure_behavior_event_partitions",
             "schedule": crontab(hour=2, minute=0, day_of_month="1,15"),
         },
+        # Capital-vs-margin reality check (nightly 17:45 IST, after EOD sync):
+        # nudges when declared capital persistently exceeds 1.5x the account.
+        "check-capital-reality": {
+            "task": "app.tasks.maintenance_tasks.check_capital_reality",
+            "schedule": crontab(hour=17, minute=45, day_of_week="1-5"),
+        },
+        # Tilt recovery recognition (16:00 IST, after market + squareoff):
+        # positive reinforcement for the trader who STOPPED after an alert.
+        "recognize-tilt-recovery": {
+            "task": "app.tasks.maintenance_tasks.recognize_tilt_recovery",
+            "schedule": crontab(hour=16, minute=0, day_of_week="1-5"),
+        },
         # Guardrail rule monitor — every 60s during market hours (09:15–15:25 IST Mon–Fri)
         # Internal market-hours check inside the task body (beat doesn't support time ranges).
         "check-guardrails": {

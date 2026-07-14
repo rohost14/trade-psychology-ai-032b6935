@@ -39,6 +39,9 @@ COUNTERS = (
     "state_shadow_checked",
     "state_shadow_mismatch",
     "events_info_gated",
+    "notifications_merged",
+    "capital_mismatch_nudges",
+    "tilt_recovery_recognitions",
 )
 TIMINGS = (
     "alert_e2e_lag_ms",      # trade exit -> detection persisted (the SLO)
