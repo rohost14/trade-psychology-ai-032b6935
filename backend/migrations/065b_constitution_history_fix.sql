@@ -4,6 +4,20 @@
 -- connections). This version creates the table without the FK, then adds
 -- the constraint NOT VALID (no long lock) and validates (instant on an
 -- empty table). Run statements ONE AT A TIME if the editor still times out.
+--
+-- If the ALTERs time out too, an "idle in transaction" session is holding
+-- the lock (observed: Supavisor session from an earlier editor timeout).
+-- Kill it first, then retry with a fail-fast lock timeout:
+--
+--   SELECT pg_terminate_backend(pid) FROM pg_stat_activity
+--   WHERE datname = current_database() AND pid <> pg_backend_pid()
+--     AND state = 'idle in transaction';
+--   SET lock_timeout = '5s';
+--   -- then re-run the two ALTER statements below
+--
+-- LAST RESORT: skip both ALTERs. The FK is optional — the table is an
+-- append-only audit written only by ConstitutionService with valid ids;
+-- account-erasure cleanup can delete rows explicitly (DPDP flow).
 
 CREATE TABLE IF NOT EXISTS constitution_history (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
