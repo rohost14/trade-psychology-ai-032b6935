@@ -18,7 +18,7 @@ from app.utils.trade_classifier import classify_trade
 from app.services.zerodha_service import zerodha_client
 from app.services.pnl_calculator import pnl_calculator
 from app.services.instrument_service import instrument_service
-from app.services.mcx_contract_specs import get_lot_multiplier
+from app.services.mcx_contract_specs import get_lot_multiplier_or_none
 from app.services.position_ledger_service import _compute_pnl_pct
 from app.core.market_hours import market_minutes
 from app.models.instrument import Instrument
@@ -376,15 +376,23 @@ class TradeSyncService:
         never reached apply_fill().  This method finds those gaps and replays them.
 
         Design:
+        - UNIFIED IDEMPOTENCY (finding 3.1): all ingestion paths key the ledger on the
+          Kite ORDER id, not the execution/trade id. The webhook and the per-user
+          order-update stream are order-level (one fill per order, key
+          "{kite_order_id}:ledger"). The REST /trades endpoint returns one row per
+          EXECUTION (an order that fills in two tranches yields two trade rows sharing
+          one kite_order_id). To collide with the real-time paths, this method groups
+          executions by kite_order_id and applies ONE aggregated fill per order with the
+          SAME "{kite_order_id}:ledger" key. This makes apply_fill()'s built-in
+          idempotency handle every path/order combination — no path can double-count.
         - apply_fill() is idempotent (same idempotency_key → return existing, is_new=False).
-          Fills that already arrived via webhook are safely skipped — no double-counting.
-        - Processes fills in ascending timestamp order so position state accumulates
+        - Processes orders in ascending timestamp order so position state accumulates
           correctly (same invariant as the webhook path).
         - On CLOSE/FLIP: calls build_completed_trade_on_close() to create the
           CompletedTrade.  Existing CompletedTrades (from successful webhooks) are
           never deleted or overwritten.
 
-        Returns: number of fills that were newly processed (missed_webhook count).
+        Returns: number of orders that were newly processed (missed_webhook count).
         """
         from decimal import Decimal as _Decimal
         from app.services.position_ledger_service import PositionLedgerService, FillData
@@ -413,48 +421,76 @@ class TradeSyncService:
         )
         seen_keys = {row[0] for row in key_result}
 
-        missed = 0
+        # ── Group executions by (kite_order_id, symbol, exchange, txn_type) ──────
+        # kite_order_id is the stable order identity shared with the webhook/order
+        # stream. Symbol/exchange/txn_type are included defensively so a reused id can
+        # never merge unrelated fills. Fallback to order_id for legacy rows that predate
+        # the kite_order_id column.
+        groups: Dict[tuple, Dict[str, Any]] = {}
         for trade in all_trades:
-            idem_key = f"{trade.order_id}:ledger"
-            if idem_key in seen_keys:
-                continue  # Already in ledger — skip (idempotent)
-
-            # BUG-2 fix: webhook stores idempotency_key as "{kite_order_id}:ledger"
-            # (uses Zerodha order_id, no trade_id available in postbacks).
-            # REST sync stores trade_id as order_id, so kite_order_id holds the
-            # actual Zerodha order_id. If the webhook already processed this order,
-            # skip to avoid double-counting position / P&L.
-            if trade.kite_order_id and f"{trade.kite_order_id}:ledger" in seen_keys:
+            order_key = trade.kite_order_id or trade.order_id
+            if not order_key:
                 continue
-
             qty = trade.filled_quantity or trade.quantity or 0
-            signed_qty = qty if trade.transaction_type == "BUY" else -qty
+            if qty == 0:
+                continue
+            gkey = (order_key, trade.tradingsymbol, trade.exchange, trade.transaction_type)
+            occurred = (
+                trade.fill_timestamp
+                or trade.exchange_timestamp
+                or trade.order_timestamp
+                or datetime.now(timezone.utc)
+            )
+            price = _Decimal(str(trade.average_price or trade.price or 0))
+            g = groups.get(gkey)
+            if g is None:
+                groups[gkey] = {
+                    "order_id": order_key,
+                    "tradingsymbol": trade.tradingsymbol or "",
+                    "exchange": trade.exchange or "",
+                    "transaction_type": trade.transaction_type,
+                    "qty": qty,
+                    "notional": price * qty,   # for weighted-average price
+                    "occurred_at": occurred,
+                }
+            else:
+                g["qty"] += qty
+                g["notional"] += price * qty
+                if occurred < g["occurred_at"]:
+                    g["occurred_at"] = occurred
+
+        # Apply one aggregated fill per order, in chronological order.
+        ordered_groups = sorted(groups.values(), key=lambda g: g["occurred_at"])
+
+        missed = 0
+        for g in ordered_groups:
+            idem_key = f"{g['order_id']}:ledger"
+            if idem_key in seen_keys:
+                continue  # Already applied via webhook / order stream / prior sync
+
+            total_qty = g["qty"]
+            signed_qty = total_qty if g["transaction_type"] == "BUY" else -total_qty
             if signed_qty == 0:
                 continue
+            avg_price = (g["notional"] / total_qty) if total_qty else _Decimal("0")
 
             fill = FillData(
                 broker_account_id=broker_account_id,
-                tradingsymbol=trade.tradingsymbol or "",
-                exchange=trade.exchange or "",
-                fill_order_id=trade.order_id or str(trade.id),
+                tradingsymbol=g["tradingsymbol"],
+                exchange=g["exchange"],
+                fill_order_id=g["order_id"],
                 fill_qty=signed_qty,
-                fill_price=_Decimal(str(trade.average_price or trade.price or 0)),
-                occurred_at=(
-                    trade.fill_timestamp
-                    or trade.exchange_timestamp
-                    or trade.order_timestamp
-                    or datetime.now(timezone.utc)
-                ),
+                fill_price=avg_price,
+                occurred_at=g["occurred_at"],
                 idempotency_key=idem_key,
             )
 
             try:
                 ledger_entry, is_new = await PositionLedgerService.apply_fill(fill, db)
+                seen_keys.add(idem_key)
                 if not is_new:
-                    seen_keys.add(idem_key)
                     continue  # Race: another worker got there first
 
-                seen_keys.add(idem_key)
                 missed += 1
 
                 # If position closed: create CompletedTrade (if one doesn't exist)
@@ -472,11 +508,11 @@ class TradeSyncService:
 
             except Exception as e:
                 logger.error(
-                    f"[ledger replay] apply_fill failed for {trade.tradingsymbol} "
-                    f"order={trade.order_id}: {e}",
+                    f"[ledger replay] apply_fill failed for {g['tradingsymbol']} "
+                    f"order={g['order_id']}: {e}",
                     exc_info=True,
                 )
-                # Non-fatal: continue with remaining fills
+                # Non-fatal: continue with remaining orders
 
         return missed
 
@@ -765,6 +801,25 @@ class TradeSyncService:
                     classification = classify_trade(pos)
                     existing = existing_positions.get(key)
 
+                    # Resolve the contract multiplier for correct P&L. Our hardcoded
+                    # MCX/CDS table is authoritative for known contracts (Kite's
+                    # instruments CSV wrongly reports lot_size=1 for MCX). For an MCX
+                    # contract not yet in the table, fall back to Zerodha's own per-
+                    # position `multiplier` field rather than silently using 1 (which
+                    # would show wrong P&L). NSE/BSE/NFO/BFO always resolve to 1.
+                    _resolved_mult = get_lot_multiplier_or_none(
+                        pos.get("exchange", ""), pos.get("tradingsymbol", "")
+                    )
+                    if _resolved_mult is None:
+                        _zerodha_mult = safe_float(pos.get("multiplier"), 1.0)
+                        _resolved_mult = _zerodha_mult if _zerodha_mult and _zerodha_mult != 1 else 1.0
+                        logger.warning(
+                            "[sync_positions] Unknown MCX contract %r — using Zerodha "
+                            "multiplier %.4f. Add it to MCX_MULTIPLIERS in "
+                            "mcx_contract_specs.py for a stable value.",
+                            pos.get("tradingsymbol"), float(_resolved_mult),
+                        )
+
                     # Fields to update from Zerodha snapshot
                     update_fields = {
                         "instrument_type": classification["instrument_type"],
@@ -772,13 +827,7 @@ class TradeSyncService:
                         "average_entry_price": safe_float(pos.get("average_price")),
                         "instrument_token": safe_int(pos.get("instrument_token")) or None,
                         "overnight_quantity": safe_int(pos.get("overnight_quantity")),
-                        # Use our authoritative multiplier table for MCX/CDS — Zerodha's
-                        # instruments CSV sets lot_size=1 for all MCX instruments, so
-                        # pos.get("multiplier") is unreliable (returns 1 for CRUDEOIL etc.).
-                        # get_lot_multiplier returns 1 for NSE/BSE/NFO/BFO (no change there).
-                        "multiplier": float(get_lot_multiplier(
-                            pos.get("exchange", ""), pos.get("tradingsymbol", "")
-                        )),
+                        "multiplier": float(_resolved_mult),
                         "pnl": safe_float(pos.get("pnl")),
                         "unrealized_pnl": safe_float(pos.get("unrealised")),
                         "realized_pnl": safe_float(pos.get("realised")),

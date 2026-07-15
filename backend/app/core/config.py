@@ -18,6 +18,22 @@ class Settings(BaseSettings):
     ZERODHA_API_KEY: Optional[str] = None
     ZERODHA_API_SECRET: Optional[str] = None
     ZERODHA_REDIRECT_URI: Optional[str] = None
+
+    # Dedicated market-data Zerodha account (for shared KiteTicker).
+    # Use your own Zerodha trading account + a KiteConnect app registered on it.
+    # When set, SharedPriceStream uses these credentials exclusively — never borrows a user's token.
+    # When not set, SharedPriceStream falls back to any connected user's token (dev/early-stage use).
+    #
+    # Setup:
+    #   1. kite.trade/developers → create an app → get ZERODHA_MD_API_KEY + ZERODHA_MD_API_SECRET
+    #   2. Enable TOTP on the Zerodha account → save the 32-char TOTP secret
+    #   3. A Celery beat task refreshes the token daily at 8:45 AM IST automatically
+    #
+    ZERODHA_MD_API_KEY: Optional[str] = None
+    ZERODHA_MD_API_SECRET: Optional[str] = None
+    ZERODHA_MD_USER_ID: Optional[str] = None       # Zerodha client ID (e.g. AB1234)
+    ZERODHA_MD_PASSWORD: Optional[str] = None      # Zerodha login password
+    ZERODHA_MD_TOTP_SECRET: Optional[str] = None   # 32-char base32 TOTP secret from Zerodha 2FA setup
     
     OPENROUTER_API_KEY: Optional[str] = None
 

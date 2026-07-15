@@ -19,6 +19,43 @@ import secrets
 
 logger = logging.getLogger(__name__)
 
+# ── OAuth state store (Postgres-backed, no Redis dependency) ─────────────────
+# Uses oauth_temp_store table (migration 061). Single-use rows with expires_at.
+# Works across multiple workers and survives restarts — production-grade.
+# JWT never appears in the URL; one-time opaque code pattern is preserved.
+
+from sqlalchemy import text as _text
+
+async def _oauth_store_set(db: AsyncSession, key: str, value: str, ttl_seconds: int) -> None:
+    """Insert (or replace) a key/value pair with TTL into oauth_temp_store."""
+    expires_at = datetime.now(timezone.utc) + timedelta(seconds=ttl_seconds)
+    await db.execute(
+        _text(
+            "INSERT INTO oauth_temp_store (key, value, expires_at) VALUES (:key, :value, :expires_at) "
+            "ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value, expires_at = EXCLUDED.expires_at"
+        ),
+        {"key": key, "value": value, "expires_at": expires_at},
+    )
+    await db.commit()
+    # Best-effort cleanup of expired rows to keep the table small (non-blocking failure ok)
+    try:
+        await db.execute(_text("DELETE FROM oauth_temp_store WHERE expires_at < now()"))
+        await db.commit()
+    except Exception:
+        await db.rollback()
+
+async def _oauth_store_get_del(db: AsyncSession, key: str) -> Optional[str]:
+    """Atomically fetch and delete a non-expired row. Returns None if missing/expired."""
+    result = await db.execute(
+        _text(
+            "DELETE FROM oauth_temp_store WHERE key = :key AND expires_at > now() RETURNING value"
+        ),
+        {"key": key},
+    )
+    row = result.fetchone()
+    await db.commit()
+    return row[0] if row else None
+
 from app.schemas.broker import BrokerAccountResponse, BrokerStatusResponse
 from app.services.zerodha_service import zerodha_client, ZerodhaClient, KiteTokenExpiredError, KiteAPIError
 from app.services.margin_service import margin_service
@@ -38,28 +75,13 @@ from app.core.rate_limiter import sync_limiter, general_limiter
 router = APIRouter()
 
 
-def _store_auth_code(jwt_token: str, broker_account_id: str) -> str:
+async def _store_auth_code(db: AsyncSession, jwt_token: str, broker_account_id: str) -> str:
     """
-    Store JWT in Redis with a one-time code (30s TTL).
-    Returns the code to embed in the redirect URL instead of the raw JWT.
-
-    Security: JWT never appears in the URL, browser history, or server logs.
-    The code is single-use and expires in 30 seconds.
+    Store JWT behind a one-time opaque code (30s TTL) in Postgres.
+    Returns the code to embed in the redirect URL — JWT never touches the URL.
     """
     code = secrets.token_urlsafe(32)
-    try:
-        from app.core.redis_pool import get_sync_redis
-        r = get_sync_redis()
-        r.set(
-            f"auth_code:{code}",
-            f"{jwt_token}|{broker_account_id}",
-            ex=30  # 30-second TTL
-        )
-    except Exception as e:
-        # Redis unavailable — do NOT fall back to token-in-URL (exposes JWT in logs/history).
-        # Let the exception propagate so the caller redirects to an error page instead.
-        logger.error(f"Redis unavailable for auth code storage: {e}. Cannot complete OAuth safely.")
-        raise RuntimeError("Auth session store temporarily unavailable. Please try again.") from e
+    await _oauth_store_set(db, f"auth_code:{code}", f"{jwt_token}|{broker_account_id}", 30)
     return code
 
 
@@ -87,25 +109,17 @@ class AuthExchangeRequest(BaseModel):
     code: str
 
 @router.post("/auth/exchange")
-async def exchange_auth_code(request: AuthExchangeRequest):
+async def exchange_auth_code(
+    request: AuthExchangeRequest,
+    db: AsyncSession = Depends(get_db),
+):
     """
     Exchange a one-time auth code for a JWT token.
-
-    The OAuth callback now redirects with ?code= instead of ?token=
-    so the JWT never appears in the URL or browser history.
-
-    The code is stored in Redis with a 30-second TTL and is single-use.
+    Code is stored in Postgres (oauth_temp_store) with 30s TTL — single use.
+    JWT never appears in the URL or browser history.
     Returns: { token, broker_account_id }
     """
-    code = request.code
-
-    try:
-        from app.core.redis_pool import get_sync_redis
-        r = get_sync_redis()
-        value = r.getdel(f"auth_code:{code}")  # getdel = atomic get + delete (single use)
-    except Exception as e:
-        logger.error(f"Redis error during auth exchange: {e}")
-        raise HTTPException(status_code=503, detail="Auth service temporarily unavailable")
+    value = await _oauth_store_get_del(db, f"auth_code:{request.code}")
 
     if not value:
         raise HTTPException(status_code=401, detail="Invalid or expired auth code")
@@ -199,15 +213,8 @@ async def connect_zerodha(
         csrf_nonce = secrets.token_urlsafe(16)
         _state_value = "regular"
 
-    # Store nonce in Redis (300 s TTL — generous for slow Zerodha login pages).
-    # Callback validates and deletes it atomically; missing nonce = CSRF rejection.
-    try:
-        from app.core.redis_pool import get_sync_redis
-        _sr = get_sync_redis()
-        _sr.setex(f"oauth_state:{csrf_nonce}", 300, _state_value)
-    except Exception as e:
-        logger.error(f"Redis error storing OAuth state nonce: {e}")
-        raise HTTPException(status_code=503, detail="Service temporarily unavailable")
+    # Store nonce in Postgres (300s TTL). Works across workers and restarts.
+    await _oauth_store_set(db, f"oauth_nonce:{csrf_nonce}", _state_value, 300)
 
     login_url = client.generate_login_url(callback_uri)
     response = RedirectResponse(url=login_url, status_code=302)
@@ -262,24 +269,11 @@ async def zerodha_callback(
         )
         return _clear_nonce_cookie(resp)
 
-    try:
-        from app.core.redis_pool import get_sync_redis
-        import json as _json
-        _r = get_sync_redis()
-        _pipe = _r.pipeline()
-        _pipe.get(f"oauth_state:{_csrf_nonce}")
-        _pipe.delete(f"oauth_state:{_csrf_nonce}")
-        _stored_value, _ = _pipe.execute()
-    except Exception as e:
-        logger.error(f"Redis error validating OAuth state nonce: {e}")
-        resp = RedirectResponse(
-            url=f"{frontend_url}/settings?error=Authentication+service+unavailable+%E2%80%94+please+try+again",
-            status_code=302,
-        )
-        return _clear_nonce_cookie(resp)
+    import json as _json
+    _stored_value = await _oauth_store_get_del(db, f"oauth_nonce:{_csrf_nonce}")
 
     if _stored_value is None:
-        logger.warning(f"OAuth callback rejected: nonce '{_csrf_nonce[:8]}…' not found in Redis (expired or replayed)")
+        logger.warning(f"OAuth callback rejected: nonce '{_csrf_nonce[:8]}…' not found (expired or replayed)")
         resp = RedirectResponse(
             url=f"{frontend_url}/settings?error=OAuth+session+expired+%E2%80%94+please+try+connecting+again",
             status_code=302,
@@ -396,8 +390,9 @@ async def zerodha_callback(
             except Exception as sync_err:
                 logger.warning(f"Could not queue reconnect sync: {sync_err}")
 
+            _auth_code = await _store_auth_code(db, jwt_token, str(existing_account.id))
             return _clear_nonce_cookie(RedirectResponse(
-                url=f"{frontend_url}/settings?connected=true&code={_store_auth_code(jwt_token, str(existing_account.id))}",
+                url=f"{frontend_url}/settings?connected=true&code={_auth_code}",
                 status_code=302
             ))
 
@@ -454,8 +449,9 @@ async def zerodha_callback(
             except Exception as sync_err:
                 logger.warning(f"Could not queue initial sync: {sync_err}")
 
+            _auth_code = await _store_auth_code(db, jwt_token, str(broker_account.id))
             return _clear_nonce_cookie(RedirectResponse(
-                url=f"{frontend_url}/settings?connected=true&code={_store_auth_code(jwt_token, str(broker_account.id))}",
+                url=f"{frontend_url}/settings?connected=true&code={_auth_code}",
                 status_code=302
             ))
 
@@ -987,15 +983,14 @@ async def sync_all_data(
 
             # Refresh KiteTicker subscriptions so any newly opened positions
             # get live price ticks immediately — no page refresh needed.
+            # This runs in the FastAPI process, where the shared ticker lives, so
+            # refresh_subscriptions() both subscribes the new instrument tokens on
+            # KiteTicker AND registers this account in _token_holders — which is what
+            # broadcast_ltp() uses to fan ticks out to the browser. No separate WS
+            # routing table is needed (SharedPriceStream fans out by _token_holders).
             try:
                 from app.services.price_stream_service import price_stream
-                from app.api.websocket import manager as ws_manager, get_position_instruments
                 await price_stream.refresh_subscriptions(broker_account_id, db)
-                # Also update the WebSocket routing table so ticks for new positions
-                # are forwarded to the connected browser tab.
-                new_instruments = await get_position_instruments(str(broker_account_id))
-                if new_instruments:
-                    await ws_manager.subscribe(str(broker_account_id), new_instruments)
             except Exception as e:
                 logger.warning(f"Subscription refresh failed (non-fatal): {e}")
 

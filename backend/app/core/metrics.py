@@ -42,6 +42,12 @@ COUNTERS = (
     "notifications_merged",
     "capital_mismatch_nudges",
     "tilt_recovery_recognitions",
+    "behavior_detection_retry_dlq",    # deferred detection lost after retry exhaustion
+    # ── Real-time ingestion (market-data path observability) ──────────────
+    "postbacks_received",              # Zerodha postbacks that passed verification
+    "postbacks_rejected_unverified",   # discarded — no secret to verify checksum
+    "order_stream_fills",              # COMPLETE fills ingested via per-user order stream
+    "order_stream_started",            # per-user order-update connections opened
 )
 TIMINGS = (
     "alert_e2e_lag_ms",      # trade exit -> detection persisted (the SLO)

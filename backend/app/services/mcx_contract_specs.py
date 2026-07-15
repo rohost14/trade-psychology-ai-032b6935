@@ -192,3 +192,23 @@ def get_lot_multiplier(exchange: str, tradingsymbol: str) -> int:
         return get_cds_multiplier(tradingsymbol)
     # NSE, BSE, NFO, BFO — quantity already in units
     return 1
+
+
+def get_lot_multiplier_or_none(exchange: str, tradingsymbol: str) -> Optional[int]:
+    """
+    Like get_lot_multiplier, but returns None when the multiplier is genuinely
+    UNKNOWN (an MCX contract whose prefix is not in MCX_MULTIPLIERS) instead of
+    silently defaulting to 1 and producing wrong P&L.
+
+    Callers use None as the signal to fall back to Zerodha's own per-position
+    `multiplier` field (the only reliable source for a not-yet-tabulated contract).
+    NSE/BSE/NFO/BFO always return 1; CDS returns its table value or the 1000 default
+    (a safe standard lot), so those never return None.
+    """
+    exch = (exchange or "").upper()
+    if exch == "MCX":
+        prefix = _extract_prefix(tradingsymbol)
+        return MCX_MULTIPLIERS.get(prefix)  # None when the contract is unknown
+    if exch == "CDS":
+        return get_cds_multiplier(tradingsymbol)
+    return 1

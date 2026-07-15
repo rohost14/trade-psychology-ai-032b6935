@@ -105,10 +105,14 @@ async def _run_checks():
                     # Fall back to stored unrealized_pnl
                     pnl_map[pos.tradingsymbol] = float(pos.unrealized_pnl or pos.pnl or 0)
                 else:
-                    avg = float(pos.average_price or 0)
-                    qty = int(pos.quantity or 0)
-                    multiplier = 1 if (pos.transaction_type or "BUY") == "BUY" else -1
-                    pnl_map[pos.tradingsymbol] = (ltp - avg) * qty * multiplier
+                    # total_quantity is signed (net position): +ve = long, -ve = short.
+                    # (ltp - avg) * signed_qty gives the correct sign for both directions.
+                    # multiplier is the contract multiplier (1 for NSE/BSE F&O; lot size
+                    # for MCX/CDS where Kite reports qty in lots).
+                    avg = float(pos.average_entry_price or 0)
+                    qty = int(pos.total_quantity or 0)
+                    mult = float(pos.multiplier or 1)
+                    pnl_map[pos.tradingsymbol] = (ltp - avg) * qty * mult
 
             total_pnl = sum(pnl_map.values())
 

@@ -429,11 +429,15 @@ class SharedPriceStream(PriceStreamProvider):
             if token:
                 return token, settings.ZERODHA_MD_API_KEY, "dedicated-md-account"
 
-        # Priority 2: fallback — any connected user's token
-        if not settings.ZERODHA_API_KEY:
-            logger.warning("[shared_ticker] ZERODHA_API_KEY not set — live price streaming disabled.")
-            return None
-
+        # Priority 2: fallback — any connected user's token.
+        #
+        # CRITICAL: KiteTicker authenticates with a (api_key, access_token) PAIR.
+        # A token minted under one KiteConnect app (api_key) does NOT authenticate
+        # against a different api_key. Accounts connected via the per-user
+        # setup-credentials flow hold tokens issued under THEIR OWN api_key, not
+        # the global ZERODHA_API_KEY. We must therefore pair each token with the
+        # api_key stored on that account (BrokerAccount.api_key), falling back to
+        # the global key only for legacy rows where api_key was never recorded.
         from app.models.broker_account import BrokerAccount
         from sqlalchemy import select, and_
 
@@ -444,20 +448,29 @@ class SharedPriceStream(PriceStreamProvider):
                     BrokerAccount.token_revoked_at.is_(None),
                     BrokerAccount.access_token.isnot(None),
                 )
-            ).limit(1)
+            ).order_by(BrokerAccount.api_key.isnot(None).desc(), BrokerAccount.connected_at.desc())
         )
-        account = result.scalar_one_or_none()
-        if not account:
+        accounts = result.scalars().all()
+        if not accounts:
             logger.warning(
                 "[shared_ticker] No ZERODHA_MD_* credentials and no connected users — "
                 "ticker not started. Configure ZERODHA_MD_* in .env for production use."
             )
             return None
-        try:
-            return account.decrypt_token(account.access_token), settings.ZERODHA_API_KEY, f"user-fallback:{account.id}"
-        except ValueError as e:
-            logger.error(f"[shared_ticker] User token decrypt failed: {e}")
-            return None
+
+        for account in accounts:
+            api_key = account.api_key or settings.ZERODHA_API_KEY
+            if not api_key:
+                continue
+            try:
+                token = account.decrypt_token(account.access_token)
+            except ValueError as e:
+                logger.warning(f"[shared_ticker] User token decrypt failed for {account.id}: {e}")
+                continue
+            return token, api_key, f"user-fallback:{account.id}"
+
+        logger.warning("[shared_ticker] No connected account yielded a usable (api_key, token) pair.")
+        return None
 
     async def _build_ticker(self, db) -> Optional[ZerodhaTicker]:
         """
@@ -751,6 +764,22 @@ class PerUserPriceStream(PriceStreamProvider):
 # ─────────────────────────────────────────────────────────────────────────────
 
 # ROLLBACK: swap SharedPriceStream() → PerUserPriceStream() to revert.
+#
+# MULTI-PROCESS / HORIZONTAL SCALING NOTE
+# ───────────────────────────────────────
+# `price_stream` is a per-PROCESS singleton. Each FastAPI worker/replica builds its
+# OWN KiteTicker covering the instruments of the browsers connected to THAT process,
+# and delivers ticks to THAT process's local WebSocket clients (broadcast_ltp →
+# ConnectionManager). So LTP delivery is self-contained per process — no cross-process
+# relay is required, and running multiple workers is correct for delivery.
+#
+# The binding constraint is Zerodha's limit of ~3 KiteTicker connections per api_key.
+# With the dedicated market-data account (ZERODHA_MD_*), every process authenticates
+# the ticker with the SAME md api_key, so you may run at most ~3 FastAPI processes
+# before hitting that cap. Beyond that, move market data to a single dedicated process
+# that owns the ticker and relays ticks to web workers via Redis pub/sub (documented
+# in docs/architecture/KITETICKER_SHARED_POOL.md §4). Do that at the scale where >3
+# web processes are actually needed — not before.
 price_stream: PriceStreamProvider = SharedPriceStream()
 
 

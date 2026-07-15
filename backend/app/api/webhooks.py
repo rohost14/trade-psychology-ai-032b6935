@@ -109,7 +109,25 @@ async def zerodha_postback(
 
     # 4. Verify checksum using per-user API secret (fallback to global if not stored)
     #    Must happen AFTER account lookup so we can use the right secret.
-    api_secret = account.decrypt_api_secret() or settings.ZERODHA_API_SECRET or ""
+    #
+    # SECURITY: never fall back to an empty secret. With api_secret="" the checksum
+    # sha256(order_id + order_timestamp + "") is attacker-computable, so an unauthenticated
+    # caller could forge fills. If no secret is configured for this account, we cannot
+    # verify authenticity — discard the postback (200 so Zerodha does not retry; this is
+    # a permanent config state, not a transient failure).
+    api_secret = account.decrypt_api_secret() or settings.ZERODHA_API_SECRET
+    if not api_secret:
+        logger.error(
+            f"Postback for account {broker_account_id} rejected: no API secret available "
+            f"to verify checksum (order {form_dict.get('order_id')}). Configure the account's "
+            f"api_secret or ZERODHA_API_SECRET."
+        )
+        try:
+            from app.core.metrics import incr
+            incr("postbacks_rejected_unverified")
+        except Exception:
+            pass
+        return {"status": "ok", "message": "No verification secret"}
     header_checksum = request.headers.get("X-Kite-Checksum")
     if header_checksum:
         is_valid = verify_zerodha_checksum_header(
@@ -124,6 +142,11 @@ async def zerodha_postback(
     if not is_valid:
         logger.warning(f"Invalid checksum in postback for account {broker_account_id}")
         return {"status": "ok", "message": "Invalid checksum"}
+    try:
+        from app.core.metrics import incr
+        incr("postbacks_received")
+    except Exception:
+        pass
     if acct_status == "deleted":
         logger.info(
             f"Postback for deleted account {broker_account_id} "

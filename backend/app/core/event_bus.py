@@ -74,17 +74,26 @@ async def _get_async_redis():
     return await get_async_redis()
 
 
+# Internal server-side event types: consumed by the FastAPI event subscriber to
+# perform a server action (NOT forwarded to the browser). These are published with
+# replay=False so they never pollute the per-account replay stream.
+INTERNAL_EVENT_TYPES = {"subscription_refresh"}
+
+
 def publish_event(
     broker_account_id: str,
     event_type: str,
     data: Optional[dict] = None,
+    replay: bool = True,
 ) -> Optional[str]:
     """
     Publish an event from a Celery worker (sync context).
 
-    Writes to BOTH streams:
-      - stream:events        (global, for real-time WebSocket push)
-      - stream:{account_id}  (per-account, for replay on app open)
+    Writes to the global stream (real-time push) and, when replay=True, also to the
+    per-account stream (durable replay on app open).
+
+    replay=False is used for INTERNAL server-side events (e.g. subscription_refresh)
+    that trigger a FastAPI-process action but must never be replayed to a browser.
 
     Returns the stream entry ID, or None if Redis unavailable.
     Never raises — event bus failure must not crash the pipeline.
@@ -99,15 +108,17 @@ def publish_event(
             "ts": str(int(time.time() * 1000)),
         }
 
-        # Write to per-account stream (replay storage)
-        account_stream = f"{ACCOUNT_STREAM_PREFIX}{broker_account_id}"
-        entry_id = r.xadd(account_stream, fields, maxlen=ACCOUNT_MAXLEN, approximate=True)
+        entry_id = None
+        # Write to per-account stream (replay storage) unless this is internal-only
+        if replay:
+            account_stream = f"{ACCOUNT_STREAM_PREFIX}{broker_account_id}"
+            entry_id = r.xadd(account_stream, fields, maxlen=ACCOUNT_MAXLEN, approximate=True)
 
-        # Write to global stream (real-time push)
-        r.xadd(GLOBAL_STREAM, fields, maxlen=GLOBAL_MAXLEN, approximate=True)
+        # Write to global stream (real-time push / server-side dispatch)
+        global_id = r.xadd(GLOBAL_STREAM, fields, maxlen=GLOBAL_MAXLEN, approximate=True)
 
-        logger.debug(f"[event_bus] {event_type} for {broker_account_id[:8]} → {entry_id}")
-        return entry_id
+        logger.debug(f"[event_bus] {event_type} for {broker_account_id[:8]} → {entry_id or global_id}")
+        return entry_id or global_id
 
     except Exception as e:
         logger.warning(f"[event_bus] publish_event failed (non-fatal): {e}")
@@ -178,11 +189,25 @@ async def start_event_subscriber() -> None:
             logger.info(f"[event_bus] Subscribed to {GLOBAL_STREAM}")
 
             while True:
-                # Block up to 100ms waiting for new messages
-                # This is efficient — no busy-loop, wakes up on new data
+                # Skip XREAD when no WebSocket clients are connected — avoids burning
+                # Upstash free-tier commands (block=100 was 10 XREAD/s = 26M cmds/month).
+                # On reconnect the client sends ?since=<last_event_id> and gets replay.
+                try:
+                    from app.api.websocket import manager
+                    has_clients = bool(manager.active_connections)
+                except Exception:
+                    has_clients = True  # unknown — proceed normally
+
+                if not has_clients:
+                    import asyncio as _asyncio
+                    await _asyncio.sleep(5)
+                    continue
+
+                # Block up to 2s waiting for new messages (was 100ms).
+                # 0.5 XREAD/s vs 10/s — reduces idle command count 20×.
                 results = await r.xread(
                     {GLOBAL_STREAM: last_id},
-                    block=100,
+                    block=2000,
                     count=20,
                 )
 
@@ -196,6 +221,13 @@ async def start_event_subscriber() -> None:
                         account_id = fields.get("account_id")
                         event_type = fields.get("type")
                         if not account_id or not event_type:
+                            continue
+
+                        # Internal server-side events act on the FastAPI process itself
+                        # (e.g. refresh the shared ticker's subscriptions) and are NOT
+                        # forwarded to any browser WebSocket.
+                        if event_type in INTERNAL_EVENT_TYPES:
+                            await _handle_internal_event(account_id, event_type)
                             continue
 
                         try:
@@ -214,6 +246,28 @@ async def start_event_subscriber() -> None:
             # disconnect window are replayed. If Redis trimmed that ID from the
             # stream, XREAD will start from the oldest available entry (safe).
             # Only the initial startup uses "$" (line above the outer while loop).
+
+
+async def _handle_internal_event(account_id: str, event_type: str) -> None:
+    """
+    Execute a server-side action requested by a Celery worker.
+
+    Celery workers run in separate processes and cannot reach the FastAPI process's
+    in-memory SharedPriceStream ticker. When a worker opens a new position it publishes
+    a `subscription_refresh` internal event; the FastAPI event subscriber (this process,
+    which owns the live ticker + browser WebSockets) handles it here by refreshing the
+    ticker's instrument subscriptions locally.
+    """
+    if event_type == "subscription_refresh":
+        try:
+            from uuid import UUID
+            from app.services.price_stream_service import price_stream
+            from app.core.database import SessionLocal
+            async with SessionLocal() as db:
+                await price_stream.refresh_subscriptions(UUID(account_id), db)
+            logger.info(f"[event_bus] Refreshed price subscriptions for {account_id[:8]}")
+        except Exception as e:
+            logger.warning(f"[event_bus] subscription_refresh failed for {account_id[:8]}: {e}")
 
 
 async def _dispatch_to_websocket(

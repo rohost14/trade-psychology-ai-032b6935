@@ -34,7 +34,7 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.position_ledger import PositionLedger, ENTRY_TYPES
-from app.services.mcx_contract_specs import get_lot_multiplier
+from app.services.mcx_contract_specs import get_lot_multiplier_or_none
 
 logger = logging.getLogger(__name__)
 
@@ -132,7 +132,9 @@ class PositionLedgerService:
         # Apply lot multiplier for MCX/CDS — Kite sends fill qty in LOTS for these
         # exchanges (e.g. 1 CRUDEOIL lot = 100 barrels).  _compute_fill_effect is
         # exchange-agnostic so we apply the multiplier here.
-        _lot_mult = Decimal(str(get_lot_multiplier(fill.exchange, fill.tradingsymbol)))
+        _lot_mult = await PositionLedgerService._resolve_lot_mult(
+            fill.broker_account_id, fill.exchange, fill.tradingsymbol, db
+        )
         if _lot_mult != 1 and realized_pnl:
             realized_pnl = realized_pnl * _lot_mult
 
@@ -232,7 +234,9 @@ class PositionLedgerService:
         running_avg: Optional[Decimal] = None
 
         # Lot multiplier — same for all entries in this symbol (exchange is fixed)
-        _replay_lot_mult = Decimal(str(get_lot_multiplier(fill.exchange, fill.tradingsymbol)))
+        _replay_lot_mult = await PositionLedgerService._resolve_lot_mult(
+            fill.broker_account_id, fill.exchange, fill.tradingsymbol, db
+        )
 
         # Find the index where the new entry sits — only entries at or after
         # that index need updating (entries before are unchanged)
@@ -259,12 +263,90 @@ class PositionLedgerService:
 
         await db.flush()
 
+        # Rebuild the CompletedTrades derived from the rounds this late fill changed.
+        # A late fill can alter qty/price/P&L of an already-closed round, or change an
+        # entry's type (e.g. CLOSE→DECREASE so a round no longer closes there). The
+        # derived CompletedTrades built from the OLD values are now stale, so we delete
+        # and recreate the ledger-derived CompletedTrades for every round closing at or
+        # after this fill's timestamp. The new_entry's OWN round is excluded here — the
+        # caller (webhook / replay path) builds that one, so it can run strategy
+        # detection on the fresh CompletedTrade.
+        await PositionLedgerService._rebuild_completed_trades_after_replay(
+            fill.broker_account_id,
+            fill.tradingsymbol,
+            fill.exchange,
+            fill.occurred_at,
+            exclude_entry_id=new_entry.id,
+            db=db,
+        )
+
         logger.info(
             f"[ledger] Replay complete for {fill.tradingsymbol}: "
             f"{len(existing_entries)} existing entries recomputed, "
             f"new fill inserted at position {new_idx}/{len(all_entries)}"
         )
         return new_entry, True
+
+    @staticmethod
+    async def _rebuild_completed_trades_after_replay(
+        broker_account_id: UUID,
+        tradingsymbol: str,
+        exchange: str,
+        from_dt: datetime,
+        exclude_entry_id,
+        db: AsyncSession,
+    ) -> None:
+        """
+        Delete and recreate ledger-derived CompletedTrades for a symbol's rounds that
+        close at or after `from_dt`, using the (already-recomputed) ledger as truth.
+
+        Called only from _apply_fill_with_replay after an out-of-order fill mutates the
+        ledger. Overnight-backfill CompletedTrades (no exit_trade_ids — their entry leg
+        predates the ledger) are left untouched. The round terminated by the new fill
+        (exclude_entry_id) is skipped so the caller can build it and run strategy
+        detection on the result.
+        """
+        from app.models.completed_trade import CompletedTrade as CTModel
+
+        # 1. Delete stale ledger-derived CompletedTrades closing at/after from_dt.
+        stale_result = await db.execute(
+            select(CTModel).where(
+                and_(
+                    CTModel.broker_account_id == broker_account_id,
+                    CTModel.tradingsymbol == tradingsymbol,
+                    CTModel.exchange == exchange,
+                    CTModel.exit_time >= from_dt,
+                )
+            )
+        )
+        for ct in stale_result.scalars().all():
+            # exit_trade_ids populated ⇒ ledger-derived (safe to rebuild).
+            # Empty ⇒ overnight backfill (ledger lacks its entry leg) — leave intact.
+            if ct.exit_trade_ids:
+                await db.delete(ct)
+        await db.flush()
+
+        # 2. Rebuild each CLOSE/FLIP round closing at/after from_dt from the ledger,
+        #    excluding the new fill's own round (the caller builds that one).
+        entries_result = await db.execute(
+            select(PositionLedger)
+            .where(
+                and_(
+                    PositionLedger.broker_account_id == broker_account_id,
+                    PositionLedger.tradingsymbol == tradingsymbol,
+                    PositionLedger.exchange == exchange,
+                )
+            )
+            .order_by(PositionLedger.occurred_at.asc(), PositionLedger.created_at.asc())
+        )
+        for entry in entries_result.scalars().all():
+            if entry.id == exclude_entry_id:
+                continue
+            if entry.entry_type in ("CLOSE", "FLIP") and entry.occurred_at >= from_dt:
+                ct = await PositionLedgerService.build_completed_trade_on_close(entry, db)
+                if ct:
+                    db.add(ct)
+        await db.flush()
 
     # ------------------------------------------------------------------
     # Read: current position state
@@ -468,6 +550,45 @@ class PositionLedgerService:
     # ------------------------------------------------------------------
     # Internal helpers
     # ------------------------------------------------------------------
+
+    @staticmethod
+    async def _resolve_lot_mult(
+        broker_account_id: UUID,
+        exchange: str,
+        tradingsymbol: str,
+        db: AsyncSession,
+    ) -> Decimal:
+        """
+        Resolve the contract multiplier used to scale realized P&L.
+
+        Fast path (NSE/BSE/NFO/BFO and known MCX/CDS contracts): returned from the
+        hardcoded table with no DB access. Only an MCX contract missing from the table
+        falls through to a single query for Zerodha's own multiplier, which sync_positions
+        stored on the Position row. Defaults to 1 if still unresolved.
+        """
+        mult = get_lot_multiplier_or_none(exchange, tradingsymbol)
+        if mult is not None:
+            return Decimal(str(mult))
+
+        from app.models.position import Position
+        result = await db.execute(
+            select(Position.multiplier)
+            .where(
+                and_(
+                    Position.broker_account_id == broker_account_id,
+                    Position.tradingsymbol == tradingsymbol,
+                    Position.exchange == exchange,
+                )
+            )
+            .order_by(Position.synced_at.desc())
+            .limit(1)
+        )
+        val = result.scalar_one_or_none()
+        try:
+            resolved = Decimal(str(val)) if val else Decimal("1")
+        except Exception:
+            resolved = Decimal("1")
+        return resolved if resolved > 0 else Decimal("1")
 
     @staticmethod
     async def _get_by_idempotency_key(

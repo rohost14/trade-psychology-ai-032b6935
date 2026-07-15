@@ -24,30 +24,53 @@ logger = logging.getLogger(__name__)
 
 
 class ConnectionManager:
-    """Manages WebSocket connections for alerts, trades, and behavioral events."""
+    """Manages WebSocket connections for alerts, trades, and behavioral events.
+
+    An account may have MULTIPLE live connections (several browser tabs / devices),
+    so connections are stored as a set per account. A message is fanned out to every
+    live socket for the account; dead sockets are pruned individually.
+    """
 
     def __init__(self):
-        # account_id -> WebSocket connection
-        self.active_connections: Dict[str, WebSocket] = {}
+        # account_id -> set of WebSocket connections
+        self.active_connections: Dict[str, "set[WebSocket]"] = {}
         # Lock for thread safety
         self._lock = asyncio.Lock()
 
-    async def disconnect(self, account_id: str):
-        """Remove disconnected client."""
+    async def connect(self, account_id: str, websocket: WebSocket):
+        """Register a live connection for an account (additive — does not evict tabs)."""
         async with self._lock:
-            self.active_connections.pop(account_id, None)
+            self.active_connections.setdefault(account_id, set()).add(websocket)
+
+    async def disconnect(self, account_id: str, websocket: Optional[WebSocket] = None):
+        """Remove a specific connection, or all connections for the account when
+        websocket is None. The account entry is dropped once no sockets remain."""
+        async with self._lock:
+            if websocket is None:
+                self.active_connections.pop(account_id, None)
+            else:
+                conns = self.active_connections.get(account_id)
+                if conns is not None:
+                    conns.discard(websocket)
+                    if not conns:
+                        self.active_connections.pop(account_id, None)
         logger.info(f"WebSocket disconnected: {account_id[:8]}...")
 
     async def send_to_account(self, account_id: str, message: dict):
-        """Send message to specific account."""
-        websocket = self.active_connections.get(account_id)
-        if websocket:
+        """Fan a message out to every live socket for this account."""
+        async with self._lock:
+            conns = list(self.active_connections.get(account_id, ()))
+        if not conns:
+            return
+        dead = []
+        for websocket in conns:
             try:
-                import asyncio
                 await asyncio.wait_for(websocket.send_json(message), timeout=2.0)
             except Exception as e:
                 logger.error(f"Send failed for {account_id[:8]}...: {e}")
-                await self.disconnect(account_id)
+                dead.append(websocket)
+        for websocket in dead:
+            await self.disconnect(account_id, websocket)
 
     async def send_alert(self, account_id: str, alert_data: dict, event_id: str = ""):
         """Send risk alert to specific account."""
@@ -138,12 +161,23 @@ async def websocket_prices(
     account_id = str(account_uuid)
 
     # Register in manager (already accepted above — skip the accept() in connect())
-    async with manager._lock:
-        manager.active_connections[account_id] = websocket
+    await manager.connect(account_id, websocket)
     logger.info(f"WebSocket connected: {account_id[:8]}...")
 
     # Confirm auth to client so it can proceed with subscriptions
     await asyncio.wait_for(websocket.send_json({"type": "auth_ok"}), timeout=2.0)
+
+    # Start real-time order ingestion for this session.
+    # TradeMentor is a mirror — users place orders in the Kite app, so Zerodha
+    # postbacks never fire for them. A per-user KiteTicker order-update stream is
+    # the only real-time source of those fills. Reference-counted, so multiple tabs
+    # share one connection; torn down when the last tab disconnects (finally block).
+    try:
+        from app.services.order_stream_service import order_stream
+        async with SessionLocal() as db:
+            await order_stream.start_account(account_uuid, db)
+    except Exception as e:
+        logger.warning(f"Failed to start order stream for {account_id[:8]}: {e}")
 
     # Event replay — send all events missed since last connection
     # Client sends ?since=last_event_id on reconnect.
@@ -225,10 +259,19 @@ async def websocket_prices(
                 })
 
     except WebSocketDisconnect:
-        await manager.disconnect(account_id)
+        pass
     except Exception as e:
         logger.error(f"WebSocket error for {account_id[:8]}...: {e}")
-        await manager.disconnect(account_id)
+    finally:
+        # Prune only THIS socket (other tabs for the account stay live).
+        await manager.disconnect(account_id, websocket)
+        # Release this session's hold on the per-user order stream. Reference-counted:
+        # the underlying KiteTicker is torn down only when the last tab disconnects.
+        try:
+            from app.services.order_stream_service import order_stream
+            await order_stream.stop_account(account_uuid)
+        except Exception as e:
+            logger.warning(f"Failed to stop order stream for {account_id[:8]}: {e}")
 
 
 async def notify_price_update(instrument: str, price_data: dict):

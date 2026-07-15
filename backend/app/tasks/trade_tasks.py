@@ -180,6 +180,8 @@ async def _run_death_spiral(broker_account_id: UUID, db, latest_trade_time=None)
         select(BehaviorEvent).where(and_(
             BehaviorEvent.broker_account_id == broker_account_id,
             BehaviorEvent.detected_at >= day_start,
+            # Shadow detector events never contribute to the death-spiral verdict.
+            BehaviorEvent.shadow.is_(False),
         ))
     )
     events = list(ev_result.scalars().all())
@@ -310,15 +312,16 @@ def process_webhook_trade(self, trade_data: Dict[str, Any], broker_account_id: s
                 except Exception as e:
                     logger.error(f"Failed to sync positions in webhook: {e}")
 
-                # Refresh KiteTicker subscriptions — new position may have opened.
-                try:
-                    from app.services.price_stream_service import price_stream
-                    await price_stream.refresh_subscriptions(account_id, db)
-                except Exception as e:
-                    logger.error(f"Failed to refresh price subscriptions: {e}")
+                # Refresh KiteTicker subscriptions — a new position may have opened.
+                # The shared ticker lives in the FastAPI process, NOT in this Celery
+                # worker, so calling price_stream.refresh_subscriptions() here would only
+                # touch a dead process-local singleton (and could spawn a rogue second
+                # KiteTicker). Instead we publish an internal event; the FastAPI event
+                # subscriber (which owns the live ticker) performs the refresh locally.
+                from app.core.event_bus import publish_event
+                publish_event(str(account_id), "subscription_refresh", {}, replay=False)
 
                 # Publish position update event (durable, replayable)
-                from app.core.event_bus import publish_event
                 publish_event(str(account_id), "position_update", {
                     "order_id": trade_data.get("order_id"),
                     "status": trade_data.get("status"),
@@ -1402,4 +1405,25 @@ def run_behavior_detection_retry(self, broker_account_id: str):
         analyzed = asyncio.run(_run())
         return {"requeued_analysis_alerts": analyzed}
     except Exception as exc:
-        raise self.retry(exc=exc)
+        # Bounded retry (max_retries=2). On exhaustion, surface it — a poison
+        # account must not fail silently. Mirror process_webhook_trade's DLQ path.
+        try:
+            raise self.retry(exc=exc)
+        except Exception as dlq_exc:
+            from celery.exceptions import MaxRetriesExceededError
+            if isinstance(dlq_exc, MaxRetriesExceededError):
+                _incr_metric("behavior_detection_retry_dlq")
+                try:
+                    import sentry_sdk
+                    sentry_sdk.capture_message(
+                        f"[DLQ] run_behavior_detection_retry exhausted retries for "
+                        f"account {broker_account_id}. Deferred detection lost.",
+                        level="error",
+                    )
+                except Exception:
+                    pass
+                logger.error(
+                    f"[DLQ] run_behavior_detection_retry: account {broker_account_id} "
+                    f"lost after {self.max_retries} retries"
+                )
+            raise

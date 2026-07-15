@@ -28,63 +28,96 @@ class InstrumentService:
     3. Option strike/expiry mapping
     """
 
-    SUPPORTED_EXCHANGES = ["NSE", "NFO", "BSE", "BFO", "MCX"]
+    # CDS (currency derivatives) included so its instrument tokens + lot sizes are
+    # resolvable (needed for price subscriptions and position-sizing on USDINR etc.).
+    SUPPORTED_EXCHANGES = ["NSE", "NFO", "BSE", "BFO", "MCX", "CDS"]
 
-    async def load_master_cache(self, exchanges: List[str] = None) -> Dict:
-        """
-        Download instrument master CSV and load into memory.
-        Avoids daily SQL bulk insert (100k rows).
-        """
-        exchanges = exchanges or self.SUPPORTED_EXCHANGES
-        count = 0
-        errors = []
-
-        # Initialize/Clear cache
-        if not hasattr(self, "master_cache"):
-            self.master_cache = {}
-
-        for exchange in exchanges:
-            try:
-                instruments = await zerodha_client.get_instruments(exchange)
-                
-                for inst in instruments:
-                    token = inst["instrument_token"]
-                    self.master_cache[token] = {
-                        "instrument_token": token,
-                        "exchange_token": inst.get("exchange_token"),
-                        "tradingsymbol": inst["tradingsymbol"],
-                        "name": inst.get("name"),
-                        "last_price": inst.get("last_price"),
-                        "expiry": self._parse_date(inst.get("expiry")),
-                        "strike": inst.get("strike"),
-                        "tick_size": inst.get("tick_size", 0.05),
-                        "lot_size": inst.get("lot_size", 1),
-                        "instrument_type": inst.get("instrument_type"),
-                        "segment": inst.get("segment"),
-                        "exchange": inst.get("exchange"),
-                        "updated_at": datetime.now(timezone.utc)
-                    }
-                    count += 1
-                
-                logger.info(f"Loaded {len(instruments)} instruments for {exchange} into memory")
-
-            except Exception as e:
-                logger.error(f"Failed to load instruments for {exchange}: {e}")
-                errors.append(f"{exchange}: {str(e)}")
-
-        return {"total": count, "model": "Lazy Memory Cache", "errors": errors}
+    # Rows per bulk-upsert statement — keeps each INSERT well under Postgres param limits.
+    _UPSERT_BATCH = 1000
 
     async def refresh_instruments(
         self,
         db: AsyncSession,
-        exchanges: List[str] = None
+        exchanges: List[str] = None,
     ) -> Dict:
         """
-        DEPRECATED: Use load_master_cache() instead.
-        Kept for backward compatibility to prevent crashes during migration.
+        Download the Kite instrument master per exchange and persist it into the
+        `instruments` table via bulk UPSERT (ON CONFLICT on instrument_token).
+
+        The DB table is the source of truth for every reader (instrument_token
+        lookups for price subscriptions, lot sizes for position-sizing alerts, option
+        chains). This runs at most once per day, gated by the 23-hour staleness check
+        in the trade-sync pipeline, so the one-time bulk write is not a hot path.
         """
-        logger.warning("refresh_instruments is deprecated. Switching to in-memory cache.")
-        return await self.load_master_cache(exchanges)
+        exchanges = exchanges or self.SUPPORTED_EXCHANGES
+        now = datetime.now(timezone.utc)
+        total = 0
+        errors: List[str] = []
+
+        for exchange in exchanges:
+            try:
+                instruments = await zerodha_client.get_instruments(exchange)
+            except Exception as e:
+                logger.error(f"Failed to fetch instruments for {exchange}: {e}")
+                errors.append(f"{exchange}: {str(e)}")
+                continue
+
+            batch: List[Dict] = []
+            for inst in instruments:
+                token = inst.get("instrument_token")
+                if token is None:
+                    continue
+                batch.append({
+                    "instrument_token": int(token),
+                    "exchange_token": inst.get("exchange_token"),
+                    "tradingsymbol": inst.get("tradingsymbol"),
+                    "name": inst.get("name"),
+                    "last_price": inst.get("last_price") or None,
+                    "expiry": self._parse_date(inst.get("expiry")),
+                    "strike": inst.get("strike") or None,
+                    "tick_size": inst.get("tick_size", 0.05),
+                    "lot_size": inst.get("lot_size", 1) or 1,
+                    "instrument_type": inst.get("instrument_type"),
+                    "segment": inst.get("segment"),
+                    "exchange": inst.get("exchange") or exchange,
+                    "updated_at": now,
+                })
+                if len(batch) >= self._UPSERT_BATCH:
+                    total += await self._upsert_batch(db, batch)
+                    batch = []
+
+            if batch:
+                total += await self._upsert_batch(db, batch)
+
+            logger.info(f"Upserted instruments for {exchange}")
+
+        await db.commit()
+        return {"total": total, "model": "DB upsert", "errors": errors}
+
+    async def _upsert_batch(self, db: AsyncSession, rows: List[Dict]) -> int:
+        """Bulk INSERT ... ON CONFLICT (instrument_token) DO UPDATE for one batch."""
+        if not rows:
+            return 0
+        stmt = insert(Instrument).values(rows)
+        stmt = stmt.on_conflict_do_update(
+            index_elements=["instrument_token"],
+            set_={
+                "exchange_token": stmt.excluded.exchange_token,
+                "tradingsymbol": stmt.excluded.tradingsymbol,
+                "name": stmt.excluded.name,
+                "last_price": stmt.excluded.last_price,
+                "expiry": stmt.excluded.expiry,
+                "strike": stmt.excluded.strike,
+                "tick_size": stmt.excluded.tick_size,
+                "lot_size": stmt.excluded.lot_size,
+                "instrument_type": stmt.excluded.instrument_type,
+                "segment": stmt.excluded.segment,
+                "exchange": stmt.excluded.exchange,
+                "updated_at": stmt.excluded.updated_at,
+            },
+        )
+        await db.execute(stmt)
+        return len(rows)
 
     async def get_instrument(
         self,
