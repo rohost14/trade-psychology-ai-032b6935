@@ -5,13 +5,9 @@
 import { useState, useEffect, useCallback, useMemo } from 'react';
 import { Link } from 'react-router-dom';
 import {
-  Brain, Link2, AlertTriangle, Shield,
-  Clock, RefreshCw, Phone, TrendingUp, Zap, Flame,
+  Link2, AlertTriangle, Shield,
+  Clock, RefreshCw, Phone,
 } from 'lucide-react';
-import {
-  LineChart, Line, XAxis, YAxis, CartesianGrid,
-  Tooltip, ResponsiveContainer,
-} from 'recharts';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Button } from '@/components/ui/button';
 import { toast } from 'sonner';
@@ -19,79 +15,11 @@ import { api } from '@/lib/api';
 import { useBroker } from '@/contexts/BrokerContext';
 import { useAlerts } from '@/contexts/AlertContext';
 import { useWebSocket } from '@/contexts/WebSocketContext';
-import { EmotionalTaxCard } from '@/components/goals/EmotionalTaxCard';
 import { BehaviorScoresCard } from '@/components/patterns/BehaviorScoresCard';
 import { StreakTrackerCard } from '@/components/goals/StreakTrackerCard';
 import PatternCalendar from '@/components/patterns/PatternCalendar';
-import { calculateEmotionalTax } from '@/lib/emotionalTaxCalculator';
 import type { DangerZoneStatus, CooldownRecord } from '@/types/api';
 import type { StreakData, DailyAdherence, StreakMilestone } from '@/types/patterns';
-
-// ---------------------------------------------------------------------------
-// Discipline types + components
-// ---------------------------------------------------------------------------
-
-interface DisciplineData {
-  has_data: boolean;
-  score: number;
-  max_score: number;
-  week_start: string;
-  danger_alerts: number;
-  caution_alerts: number;
-  trades_this_week: number;
-  revenge_free_days: number;
-  weekly_trend: number[];
-  breakdown: {
-    alerts_score: number;
-    quality_score: number;
-  };
-}
-
-function ScoreGauge({ score, max }: { score: number; max: number }) {
-  const pct = Math.min(100, (score / max) * 100);
-  const color = pct >= 70 ? 'rgb(var(--tm-profit))' : pct >= 45 ? 'rgb(var(--tm-obs))' : 'rgb(var(--tm-loss))';
-  const circumference = 2 * Math.PI * 45;
-  const dashOffset = circumference * (1 - pct / 100);
-
-  return (
-    <div className="flex flex-col items-center">
-      <div className="relative w-28 h-28">
-        <svg viewBox="0 0 100 100" className="transform -rotate-90 w-full h-full">
-          <circle cx="50" cy="50" r="45" stroke="var(--border)" strokeWidth="8" fill="none" />
-          <circle
-            cx="50" cy="50" r="45"
-            style={{ stroke: color }}
-            strokeWidth="8"
-            fill="none"
-            strokeDasharray={circumference}
-            strokeDashoffset={dashOffset}
-            strokeLinecap="round"
-            className="transition-all duration-700"
-          />
-        </svg>
-        <div className="absolute inset-0 flex flex-col items-center justify-center">
-          <p className="text-2xl font-bold font-mono tabular-nums text-foreground">{score}</p>
-          <p className="text-[10px] text-muted-foreground">/ {max}</p>
-        </div>
-      </div>
-      <p className={cn(
-        'text-xs font-semibold mt-1.5',
-        pct >= 70 ? 'text-tm-profit' : pct >= 45 ? 'text-tm-obs' : 'text-tm-loss'
-      )}>
-        {pct >= 80 ? 'Excellent' : pct >= 60 ? 'Good' : pct >= 40 ? 'Needs work' : 'Struggling'}
-      </p>
-    </div>
-  );
-}
-
-function DisciplineTrendTooltip({ active, payload }: { active?: boolean; payload?: { value: number }[] }) {
-  if (!active || !payload?.length) return null;
-  return (
-    <div className="bg-card border border-border rounded-md px-2 py-1.5 text-xs">
-      <p className="font-mono tabular-nums">{payload[0].value} / 100</p>
-    </div>
-  );
-}
 
 // ---------------------------------------------------------------------------
 // Danger level display config
@@ -212,7 +140,7 @@ function AlertHistoryCard({ history }: { history: CooldownRecord[] }) {
     <div className="tm-card overflow-hidden">
       <div className="px-5 py-3.5 border-b border-border flex items-center gap-2">
         <Clock className="h-4 w-4 text-muted-foreground" />
-        <span className="tm-label">Alert History (7 days)</span>
+        <span className="tm-label">Cooldown History (7 days)</span>
       </div>
       <div className="px-5 py-4">
         {history.length > 0 ? (
@@ -239,7 +167,7 @@ function AlertHistoryCard({ history }: { history: CooldownRecord[] }) {
         ) : (
           <div className="flex flex-col items-center py-6 text-center">
             <Shield className="h-7 w-7 text-muted-foreground/30 mb-2" />
-            <p className="text-[12px] text-muted-foreground">No alerts in the last 7 days</p>
+            <p className="text-[12px] text-muted-foreground">No cooldowns in the last 7 days</p>
           </div>
         )}
       </div>
@@ -272,7 +200,6 @@ export default function MyPatterns() {
   const [streakData, setStreakData] = useState<StreakData>(EMPTY_STREAK);
   const [statusLoading, setStatusLoading] = useState(true);
   const [isAlerting, setIsAlerting] = useState(false);
-  const [disciplineData, setDisciplineData] = useState<DisciplineData | null>(null);
 
   // Fetch live danger zone status + alert history + streak data
   const fetchStatus = useCallback(async (signal?: AbortSignal) => {
@@ -293,7 +220,10 @@ export default function MyPatterns() {
         const date = new Date(a.detected_at || a.created_at)
           .toLocaleDateString('en-CA', { timeZone: 'Asia/Kolkata' }); // YYYY-MM-DD
         if (!alertsByDate[date]) alertsByDate[date] = { hasHighCritical: false };
-        if (a.severity === 'high' || a.severity === 'critical') {
+        // Backend severities are danger/caution/critical/info. A "clean" day = no
+        // danger/critical alert. (Was checking 'high', which never occurs, so danger
+        // days were silently counted as clean — inflating the streak.)
+        if (a.severity === 'danger' || a.severity === 'critical') {
           alertsByDate[date].hasHighCritical = true;
         }
       }
@@ -366,60 +296,32 @@ export default function MyPatterns() {
     if (lastTradeEvent || lastAlertEvent) fetchStatus();
   }, [lastTradeEvent, lastAlertEvent]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  // Discipline score — fetched once on mount, independent of status polling
-  useEffect(() => {
-    if (!account?.id) return;
-    api.get('/api/analytics/discipline-summary')
-      .then(r => setDisciplineData(r.data))
-      .catch(() => setDisciplineData(null));
-  }, [account?.id]);
-
-  // Derive BehaviorPattern objects from backend alerts for EmotionalTax.
-  // Alert has no .pattern sub-object; map the fields we do have.
-  // estimated_cost is not returned by the backend yet — defaults to 0.
-  const patterns = useMemo(() => alerts.map(a => ({
-    id: a.id,
-    type: (a.pattern_type ?? a.pattern_name ?? 'overtrading') as import('@/types/patterns').PatternType,
-    name: a.pattern_name,
-    severity: a.severity as import('@/types/patterns').PatternSeverity,
-    detected_at: a.timestamp || a.detected_at || new Date().toISOString(),
-    description: a.message,
-    evidence: { trades_involved: a.related_trade_ids ?? [], time_range: '', market_context: '' },
-    historical_insight: '',
-    frequency_this_week: 0,
-    frequency_this_month: 0,
-    estimated_cost: 0,
-    insight: '',
-  })), [alerts]);
-  const emotionalTax = useMemo(() => calculateEmotionalTax(patterns, []), [patterns]);
-
-  // Worst pattern: highest total estimated_cost in alerts, last 30 days
+  // Most frequent pattern, last 30 days. Keyed by backend_type so the tailored
+  // recommendation lookup (patternRecs, backend-keyed) matches.
   const worstPattern = useMemo(() => {
     const cutoff = Date.now() - 30 * 24 * 60 * 60 * 1000;
-    const map = new Map<string, { name: string; cost: number; count: number }>();
+    const map = new Map<string, { name: string; count: number }>();
     for (const a of alerts) {
       if (new Date(a.shown_at ?? 0).getTime() < cutoff) continue;
-      const key = a.pattern.type ?? a.pattern.backend_type;
-      const existing = map.get(key) ?? { name: a.pattern.name, cost: 0, count: 0 };
-      existing.cost += a.pattern.estimated_cost ?? 0;
+      const key = a.pattern.backend_type ?? a.pattern.type;
+      const existing = map.get(key) ?? { name: a.pattern.name, count: 0 };
       existing.count += 1;
       map.set(key, existing);
     }
     if (map.size === 0) return null;
     return Array.from(map.entries())
       .map(([type, d]) => ({ type, ...d }))
-      .sort((a, b) => b.cost !== a.cost ? b.cost - a.cost : b.count - a.count)[0];
+      .sort((a, b) => b.count - a.count)[0];
   }, [alerts]);
 
   // All patterns detected last 30 days, sorted by count desc — for breakdown card
   const patternBreakdown = useMemo(() => {
     const cutoff = Date.now() - 30 * 24 * 60 * 60 * 1000;
-    const map = new Map<string, { name: string; cost: number; count: number }>();
+    const map = new Map<string, { name: string; count: number }>();
     for (const a of alerts) {
       if (new Date(a.shown_at ?? 0).getTime() < cutoff) continue;
-      const key = a.pattern.type ?? a.pattern.backend_type;
-      const existing = map.get(key) ?? { name: a.pattern.name, cost: 0, count: 0 };
-      existing.cost += a.pattern.estimated_cost ?? 0;
+      const key = a.pattern.backend_type ?? a.pattern.type;
+      const existing = map.get(key) ?? { name: a.pattern.name, count: 0 };
       existing.count += 1;
       map.set(key, existing);
     }
@@ -435,9 +337,8 @@ export default function MyPatterns() {
 
     // 1. Worst pattern with real numbers
     if (worstPattern && worstPattern.count >= 2) {
-      const costStr = worstPattern.cost > 0
-        ? ` — costing ₹${worstPattern.cost.toLocaleString('en-IN', { maximumFractionDigits: 0 })} total`
-        : '';
+      // Cost modelling intentionally not shown (raw-P&L / no-estimation policy).
+      const costStr = '';
       const patternRecs: Record<string, string> = {
         revenge_trade:            `Revenge trading fired ${worstPattern.count}×${costStr}. Set a rule: no new trade within 10 minutes of a loss.`,
         rapid_reentry:            `Rapid re-entry fired ${worstPattern.count}×${costStr}. After exiting a losing position, wait at least 5 minutes before the same instrument.`,
@@ -537,9 +438,9 @@ export default function MyPatterns() {
     <div className="w-full pb-12">
       {/* Page header */}
       <div className="mb-5 flex items-center justify-between">
-        <h1 className="t-heading-lg text-foreground">Risk Monitor</h1>
+        <h1 className="t-heading-lg text-foreground">My Patterns</h1>
         <button
-          onClick={fetchStatus}
+          onClick={() => fetchStatus()}
           disabled={statusLoading}
           className="flex items-center gap-1.5 text-[12px] text-muted-foreground hover:text-foreground transition-colors disabled:opacity-50"
         >
@@ -556,7 +457,7 @@ export default function MyPatterns() {
         {worstPattern && (
           <div className="tm-card border-l-2 border-l-tm-loss px-5 py-4">
             <p className="text-[11px] font-semibold text-tm-loss uppercase tracking-wide mb-2">
-              Your #1 cost driver this month
+              Your most frequent pattern this month
             </p>
             <div className="flex items-start justify-between gap-4">
               <div>
@@ -565,14 +466,9 @@ export default function MyPatterns() {
                   Detected {worstPattern.count}× in the last 30 days
                 </p>
               </div>
-              {worstPattern.cost > 0 && (
-                <div className="text-right flex-shrink-0">
-                  <p className="text-[17px] font-bold font-mono tabular-nums text-tm-loss">
-                    ₹{worstPattern.cost.toLocaleString('en-IN', { maximumFractionDigits: 0 })}
-                  </p>
-                  <p className="text-[10px] text-muted-foreground mt-0.5">est. cost</p>
-                </div>
-              )}
+              <div className="text-right flex-shrink-0">
+                <p className="text-[17px] font-bold font-mono tabular-nums text-tm-loss">{worstPattern.count}×</p>
+              </div>
             </div>
           </div>
         )}
@@ -622,16 +518,9 @@ export default function MyPatterns() {
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center justify-between mb-1">
                         <p className="text-[12px] font-medium text-foreground truncate">{p.name}</p>
-                        <div className="flex items-center gap-3 flex-shrink-0 ml-3">
-                          {p.cost > 0 && (
-                            <span className="text-[11px] font-mono tabular-nums text-tm-loss">
-                              ₹{p.cost.toLocaleString('en-IN', { maximumFractionDigits: 0 })}
-                            </span>
-                          )}
-                          <span className="text-[11px] font-mono tabular-nums text-muted-foreground w-8 text-right">
-                            {p.count}×
-                          </span>
-                        </div>
+                        <span className="text-[11px] font-mono tabular-nums text-muted-foreground w-8 text-right flex-shrink-0 ml-3">
+                          {p.count}×
+                        </span>
                       </div>
                       <div className="h-1 rounded-full bg-muted overflow-hidden">
                         <div
@@ -649,136 +538,9 @@ export default function MyPatterns() {
 
         {/* Grid */}
         <div className="grid gap-5 lg:grid-cols-2">
-          <div className="space-y-5">
-            <EmotionalTaxCard tax={emotionalTax} period="month" />
-          </div>
-          <div className="space-y-5">
-            <StreakTrackerCard streak={streakData} goalDays={30} />
-            <AlertHistoryCard history={alertHistory} />
-          </div>
+          <StreakTrackerCard streak={streakData} goalDays={30} />
+          <AlertHistoryCard history={alertHistory} />
         </div>
-
-        {/* Weekly Discipline Score */}
-        {disciplineData?.has_data && (
-          <div className="tm-card overflow-hidden">
-            <div className="px-5 py-3.5 border-b border-border flex items-center gap-2">
-              <Zap className="h-4 w-4 text-tm-brand" />
-              <p className="text-sm font-medium text-foreground">Weekly Score</p>
-              <span className="text-[11px] text-muted-foreground ml-auto">
-                Week of {disciplineData.week_start}
-              </span>
-            </div>
-            <div className="p-5">
-              <div className="flex flex-col sm:flex-row items-center gap-6">
-                <ScoreGauge score={disciplineData.score} max={disciplineData.max_score} />
-
-                <div className="flex-1 w-full space-y-3">
-                  {/* Breakdown bars */}
-                  <div className="space-y-2">
-                    <div>
-                      <div className="flex justify-between text-[11px] text-muted-foreground mb-1">
-                        <span>Alert control</span>
-                        <span className="font-mono">{disciplineData.breakdown.alerts_score} / 60</span>
-                      </div>
-                      <div className="h-1.5 rounded-full bg-muted overflow-hidden">
-                        <div
-                          className="h-full bg-tm-brand transition-all"
-                          style={{ width: `${(disciplineData.breakdown.alerts_score / 60) * 100}%` }}
-                        />
-                      </div>
-                    </div>
-                    <div>
-                      <div className="flex justify-between text-[11px] text-muted-foreground mb-1">
-                        <span>Trade quality</span>
-                        <span className="font-mono">{disciplineData.breakdown.quality_score} / 40</span>
-                      </div>
-                      <div className="h-1.5 rounded-full bg-muted overflow-hidden">
-                        <div
-                          className="h-full bg-tm-brand transition-all"
-                          style={{ width: `${(disciplineData.breakdown.quality_score / 40) * 100}%` }}
-                        />
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* Quick stats */}
-                  <div className="flex gap-4 pt-1">
-                    <div>
-                      <p className="text-[10px] text-muted-foreground uppercase">Trades</p>
-                      <p className="text-sm font-mono font-semibold text-foreground">
-                        {disciplineData.trades_this_week}
-                      </p>
-                    </div>
-                    <div>
-                      <p className="text-[10px] text-muted-foreground uppercase">Danger alerts</p>
-                      <p className={cn(
-                        'text-sm font-mono font-semibold',
-                        disciplineData.danger_alerts > 0 ? 'text-tm-loss' : 'text-tm-profit',
-                      )}>
-                        {disciplineData.danger_alerts}
-                      </p>
-                    </div>
-                    <div>
-                      <p className="text-[10px] text-muted-foreground uppercase">Caution alerts</p>
-                      <p className={cn(
-                        'text-sm font-mono font-semibold',
-                        disciplineData.caution_alerts > 2 ? 'text-tm-obs' : 'text-foreground',
-                      )}>
-                        {disciplineData.caution_alerts}
-                      </p>
-                    </div>
-                    <div>
-                      <p className="text-[10px] text-muted-foreground uppercase flex items-center gap-1">
-                        <Flame className="h-2.5 w-2.5 text-tm-obs" /> Revenge-free
-                      </p>
-                      <p className={cn(
-                        'text-sm font-mono font-semibold',
-                        disciplineData.revenge_free_days >= 5 ? 'text-tm-profit'
-                          : disciplineData.revenge_free_days >= 2 ? 'text-tm-obs'
-                            : 'text-tm-loss',
-                      )}>
-                        {disciplineData.revenge_free_days}d
-                      </p>
-                    </div>
-                  </div>
-                </div>
-
-                {/* 4-week trend (only when enough data) */}
-                {disciplineData.weekly_trend.length > 1 && (
-                  <div className="w-full sm:w-48 shrink-0">
-                    <div className="flex items-center gap-1.5 mb-2">
-                      <TrendingUp className="h-3.5 w-3.5 text-muted-foreground" />
-                      <p className="text-[11px] text-muted-foreground font-medium">4-Week Trend</p>
-                    </div>
-                    <ResponsiveContainer width="100%" height={80}>
-                      <LineChart
-                        data={disciplineData.weekly_trend.map((s, i) => ({
-                          week: `W-${disciplineData.weekly_trend.length - i}`,
-                          score: s,
-                        }))}
-                      >
-                        <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" vertical={false} />
-                        <XAxis
-                          dataKey="week"
-                          tick={{ fontSize: 10, fill: 'var(--muted-foreground)' }}
-                          axisLine={false} tickLine={false}
-                        />
-                        <YAxis domain={[0, 100]} hide />
-                        <Tooltip content={<DisciplineTrendTooltip />} />
-                        <Line
-                          type="monotone" dataKey="score"
-                          stroke="#0D9488" strokeWidth={2}
-                          dot={{ fill: '#0D9488', r: 2 }}
-                          activeDot={{ r: 4 }}
-                        />
-                      </LineChart>
-                    </ResponsiveContainer>
-                  </div>
-                )}
-              </div>
-            </div>
-          </div>
-        )}
       </div>
     </div>
   );
