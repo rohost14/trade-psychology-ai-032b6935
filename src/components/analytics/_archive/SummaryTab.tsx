@@ -6,7 +6,7 @@ import {
 } from 'recharts';
 import { Trophy, Flame, ChevronRight, ArrowRight, TrendingUp, TrendingDown, BarChart2, AlertTriangle, RefreshCw } from 'lucide-react';
 import { Skeleton } from '@/components/ui/skeleton';
-import AttributionCard from '@/components/analytics/AttributionCard';
+import AttributionCard from '@/components/analytics/_archive/AttributionCard';
 import { cn } from '@/lib/utils';
 import { formatCurrency, formatCurrencyWithSign } from '@/lib/formatters';
 import { api } from '@/lib/api';

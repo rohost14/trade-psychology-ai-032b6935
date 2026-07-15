@@ -9,6 +9,7 @@ import { TrendingUp, TrendingDown, RefreshCw, AlertTriangle, CheckCircle2, Activ
 import { Skeleton } from '@/components/ui/skeleton';
 import { cn } from '@/lib/utils';
 import { formatCurrency, formatCurrencyWithSign } from '@/lib/formatters';
+import { extractUnderlying } from '@/lib/symbolClassify';
 import { api } from '@/lib/api';
 
 interface OverviewTabProps { days: number }
@@ -44,18 +45,6 @@ interface PerfData {
 
 function fmtDate(s: string) {
   return new Date(s).toLocaleDateString('en-IN', { day: 'numeric', month: 'short' });
-}
-
-function extractUnderlying(sym: string): string {
-  const m1 = sym.match(/^([A-Z\-]+?)\d{5}\d+(CE|PE)$/);
-  if (m1) return m1[1];
-  const mDD = sym.match(/^([A-Z\-]+?)\d{2}[A-Z]{3}\d{2}\d+(?:\.\d+)?(CE|PE)$/);
-  if (mDD) return mDD[1];
-  const m2 = sym.match(/^([A-Z\-]+?)\d{2}[A-Z]{3}\d+(CE|PE)$/);
-  if (m2) return m2[1];
-  const m3 = sym.match(/^([A-Z\-]+?)(?:\d{5}|\d{2}[A-Z]{3}(?:\d{2})?)FUT$/);
-  if (m3) return m3[1];
-  return sym;
 }
 
 function buildPieData(instruments: PerfData['by_instrument']) {
@@ -183,7 +172,7 @@ function PnlHeroCell({
 }) {
   return (
     <div className="flex flex-col justify-center px-4 py-3.5 col-span-2 md:col-span-1 min-w-0 border-b md:border-b-0 md:border-r border-border">
-      <p className="text-[10px] text-muted-foreground uppercase tracking-wide mb-1.5">Net P&L</p>
+      <p className="text-[10px] text-muted-foreground uppercase tracking-wide mb-1.5">P&L</p>
       <p className={cn('font-mono font-black tabular-nums leading-none', color)}
         style={{ fontSize: 'clamp(22px, 5vw, 28px)' }}>
         {value}

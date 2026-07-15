@@ -11,7 +11,7 @@ import { api } from '@/lib/api';
 import { useOrderAnalytics } from '@/hooks/useOrderAnalytics';
 import AINarrativeCard from './AINarrativeCard';
 import { useBroker } from '@/contexts/BrokerContext';
-import OrderAnalyticsCard from '@/components/analytics/OrderAnalyticsCard';
+import OrderAnalyticsCard from '@/components/analytics/_archive/OrderAnalyticsCard';
 
 interface PerformanceTabProps {
   days: number;

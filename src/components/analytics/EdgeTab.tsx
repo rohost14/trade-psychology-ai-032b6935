@@ -7,6 +7,7 @@ import { RefreshCw, AlertTriangle } from 'lucide-react';
 import { Skeleton } from '@/components/ui/skeleton';
 import { cn } from '@/lib/utils';
 import { formatCurrency, formatCurrencyWithSign } from '@/lib/formatters';
+import { extractUnderlying, optionType, classifyExpiry } from '@/lib/symbolClassify';
 import { api } from '@/lib/api';
 
 interface EdgeTabProps {
@@ -28,35 +29,7 @@ interface HeatmapData {
   by_day: { day: string; trades: number; pnl: number; win_rate: number }[];
 }
 
-// ── Symbol classification ────────────────────────────────────────────────────
-
-function extractUnderlying(sym: string): string {
-  const m1 = sym.match(/^([A-Z\-]+?)\d{5}\d+(CE|PE)$/);
-  if (m1) return m1[1];
-  const mDD = sym.match(/^([A-Z\-]+?)\d{2}[A-Z]{3}\d{2}\d+(?:\.\d+)?(CE|PE)$/);
-  if (mDD) return mDD[1];
-  const m2 = sym.match(/^([A-Z\-]+?)\d{2}[A-Z]{3}\d+(CE|PE)$/);
-  if (m2) return m2[1];
-  const m3 = sym.match(/^([A-Z\-]+?)(?:\d{5}|\d{2}[A-Z]{3}(?:\d{2})?)FUT$/);
-  if (m3) return m3[1];
-  return sym;
-}
-
-function optionType(sym: string): 'CE' | 'PE' | 'FUT' | 'EQ' {
-  if (sym.endsWith('CE')) return 'CE';
-  if (sym.endsWith('PE')) return 'PE';
-  if (sym.endsWith('FUT')) return 'FUT';
-  return 'EQ';
-}
-
-function classifyExpiry(sym: string): 'weekly' | 'monthly' | 'fut' | 'other' {
-  if (sym.endsWith('FUT')) return 'fut';
-  // Weekly: 5-6 consecutive digits as expiry code (YYMDD / YYMMDD format)
-  if (/^[A-Z\-]+\d{5,6}\d+(CE|PE)$/.test(sym)) return 'weekly';
-  // Monthly: DDMON or DDMONYY format with alpha month
-  if (/^[A-Z\-]+\d{2}[A-Z]{3}(\d{2})?\d+(CE|PE)$/.test(sym)) return 'monthly';
-  return 'other';
-}
+// ── Symbol classification lives in @/lib/symbolClassify (shared with OverviewTab) ──
 
 function groupByUnderlying(instruments: PerfData['by_instrument']) {
   const map: Record<string, { trades: number; pnl: number; wins: number }> = {};
