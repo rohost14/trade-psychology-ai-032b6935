@@ -1,0 +1,264 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="light">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1.0">
+<title>Reports — TradeMentor</title>
+<link rel="stylesheet" href="base.css">
+<style>
+.app-shell{display:flex;min-height:100vh}
+.sidebar{width:220px;flex-shrink:0;background:var(--bg-card);border-right:1px solid var(--border-subtle);display:flex;flex-direction:column;position:fixed;top:0;left:0;bottom:0;z-index:50}
+.main-content{margin-left:220px;flex:1;display:flex;flex-direction:column;min-height:100vh}
+.sb-logo{display:flex;align-items:center;gap:10px;padding:18px 16px 14px;border-bottom:1px solid var(--border-subtle)}
+.sb-logomark{width:26px;height:26px;border-radius:6px;background:var(--brand);display:flex;align-items:center;justify-content:center;flex-shrink:0}
+.sb-logomark svg{width:13px;height:13px;stroke:#fff;fill:none;stroke-width:2.2;stroke-linecap:round;stroke-linejoin:round}
+.sb-wordmark{font-family:'Geist',sans-serif;font-size:13.5px;font-weight:600;letter-spacing:-.02em;color:var(--text-primary)}
+.sb-wordmark em{font-style:normal;color:var(--brand)}
+.sb-nav{padding:8px;flex:1;display:flex;flex-direction:column;gap:1px;overflow-y:auto}
+.sb-section{font-size:9.5px;font-weight:600;letter-spacing:.09em;text-transform:uppercase;color:var(--text-tertiary);padding:10px 10px 4px;margin-top:4px}
+.sb-item{display:flex;align-items:center;gap:9px;padding:8px 10px;border-radius:7px;border:1px solid transparent;font-size:13px;font-weight:500;color:var(--text-secondary);transition:all .1s;position:relative}
+.sb-item:hover{background:var(--bg-hover);color:var(--text-primary)}
+.sb-item.active{background:var(--brand-bg);color:var(--brand);border-color:var(--brand-border)}
+.sb-item.active::before{content:'';position:absolute;left:-1px;top:7px;bottom:7px;width:2px;border-radius:99px;background:var(--brand)}
+.sb-item svg{width:15px;height:15px;fill:none;stroke:currentColor;stroke-width:1.75;stroke-linecap:round;stroke-linejoin:round;flex-shrink:0}
+.sb-badge{margin-left:auto;background:var(--loss);color:#fff;font-size:10px;font-weight:600;min-width:17px;height:17px;border-radius:99px;display:flex;align-items:center;justify-content:center;padding:0 4px}
+.sb-foot{padding:12px 8px;border-top:1px solid var(--border-subtle);display:flex;align-items:center;gap:9px}
+.sb-avatar{width:28px;height:28px;border-radius:50%;background:var(--brand-bg);border:1px solid var(--brand-border);display:flex;align-items:center;justify-content:center;font-family:'DM Mono',monospace;font-size:10px;font-weight:600;color:var(--brand);flex-shrink:0}
+.sb-uname{font-size:12px;font-weight:500;color:var(--text-primary);line-height:1.2}
+.sb-usub{font-size:10.5px;color:var(--text-tertiary)}
+
+.top-bar{height:48px;padding:0 22px;border-bottom:1px solid var(--border-subtle);background:var(--bg-card);display:flex;align-items:center;justify-content:space-between;position:sticky;top:0;z-index:40;flex-shrink:0}
+.top-l{display:flex;align-items:center;gap:12px}
+.top-title{font-family:'Geist',sans-serif;font-size:13.5px;font-weight:600;color:var(--text-primary)}
+.top-r{display:flex;align-items:center;gap:6px}
+.icon-btn{width:32px;height:32px;border-radius:7px;border:1px solid var(--border-subtle);background:transparent;display:flex;align-items:center;justify-content:center;color:var(--text-secondary);cursor:pointer}
+.icon-btn svg{width:15px;height:15px;fill:none;stroke:currentColor;stroke-width:1.75;stroke-linecap:round;stroke-linejoin:round}
+.i-sun,.i-moon{display:none}
+[data-theme="light"] .i-sun{display:block}
+[data-theme="dark"] .i-moon{display:block}
+
+.page{padding:16px 22px 20px;flex:1;display:flex;flex-direction:column;gap:14px}
+.card{background:var(--bg-card);border:1px solid var(--border-subtle);border-radius:10px;box-shadow:var(--shadow-card)}
+.card-hdr{padding:11px 16px;border-bottom:1px solid var(--border-subtle);display:flex;align-items:center;justify-content:space-between;gap:8px}
+.card-title{font-family:'Geist',sans-serif;font-size:13px;font-weight:600;color:var(--text-primary)}
+
+/* Latest report card */
+.latest-report{background:var(--bg-card);border:1px solid var(--border-subtle);border-radius:10px;box-shadow:var(--shadow-card)}
+.lr-hdr{padding:14px 18px;border-bottom:1px solid var(--border-subtle);display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px}
+.lr-date{font-family:'Geist',sans-serif;font-size:14px;font-weight:600;color:var(--text-primary)}
+.lr-meta{font-size:11.5px;color:var(--text-tertiary)}
+.lr-badge{font-size:11px;font-weight:600;padding:3px 10px;border-radius:5px}
+.lb-safe{background:var(--profit-bg);color:var(--profit);border:1px solid var(--profit-border)}
+.lb-caution{background:var(--warning-bg);color:var(--warning);border:1px solid var(--warning-border)}
+.lr-kpis{display:grid;grid-template-columns:repeat(6,1fr);padding:16px 18px;gap:0;border-bottom:1px solid var(--border-subtle)}
+.lr-kpi{padding:0 12px;border-right:1px solid var(--border-subtle)}
+.lr-kpi:first-child{padding-left:0}
+.lr-kpi:last-child{border-right:none}
+.lk-lbl{font-size:9.5px;font-weight:600;letter-spacing:.08em;text-transform:uppercase;color:var(--text-tertiary);margin-bottom:4px}
+.lk-val{font-family:'DM Mono',monospace;font-size:18px;font-weight:500;font-variant-numeric:tabular-nums}
+.lk-sub{font-size:10.5px;color:var(--text-tertiary);margin-top:2px}
+
+.lr-body{padding:16px 18px;display:grid;grid-template-columns:1fr 1fr;gap:16px}
+.lb-section-title{font-size:10px;font-weight:600;letter-spacing:.08em;text-transform:uppercase;color:var(--text-tertiary);margin-bottom:8px}
+.lb-text{font-size:12.5px;color:var(--text-secondary);line-height:1.65}
+.lb-text strong{color:var(--text-primary);font-weight:600}
+.lb-alert{display:flex;gap:7px;align-items:flex-start;padding:8px 10px;border-radius:6px;border:1px solid var(--loss-border);background:var(--loss-bg);margin-bottom:5px}
+.la-dot{width:5px;height:5px;border-radius:50%;background:var(--loss);margin-top:5px;flex-shrink:0}
+.la-text{font-size:12px;color:var(--text-secondary)}
+
+.lr-sparkline{padding:10px 18px 16px}
+.ls-label{font-size:10px;font-weight:600;letter-spacing:.07em;text-transform:uppercase;color:var(--text-tertiary);margin-bottom:8px}
+.lr-download{padding:12px 18px;border-top:1px solid var(--border-subtle);display:flex;align-items:center;justify-content:flex-end;gap:8px}
+.btn-download{font-size:12px;font-weight:500;padding:6px 14px;border-radius:7px;border:1px solid var(--border-default);background:var(--bg-card);color:var(--text-secondary);cursor:pointer;display:inline-flex;align-items:center;gap:5px}
+.btn-download:hover{border-color:var(--brand);color:var(--brand)}
+
+/* History table */
+.data-table{width:100%;border-collapse:collapse;font-size:12.5px}
+.data-table thead th{font-size:10px;font-weight:600;letter-spacing:.07em;text-transform:uppercase;color:var(--text-tertiary);padding:9px 14px;text-align:left;background:var(--bg-elevated);border-bottom:1px solid var(--border-subtle)}
+.data-table tbody td{padding:10px 14px;border-bottom:1px solid var(--border-subtle);vertical-align:middle}
+.data-table tbody tr:last-child td{border-bottom:none}
+.data-table tbody tr:hover{background:var(--bg-hover)}
+.mono{font-family:'DM Mono',monospace;font-variant-numeric:tabular-nums}
+.score-badge{font-size:10.5px;font-weight:600;padding:2px 8px;border-radius:4px}
+.sc-high{background:var(--profit-bg);color:var(--profit);border:1px solid var(--profit-border)}
+.sc-mid{background:var(--brand-bg);color:var(--brand);border:1px solid var(--brand-border)}
+.sc-low{background:var(--warning-bg);color:var(--warning);border:1px solid var(--warning-border)}
+
+/* Sparkline column mini */
+.spark-col{display:flex;align-items:flex-end;gap:1.5px;height:22px}
+.sc-bar{width:6px;border-radius:1px}
+</style>
+</head>
+<body>
+<div class="app-shell">
+  <aside class="sidebar">
+    <div class="sb-logo">
+      <div class="sb-logomark"><svg viewBox="0 0 24 24"><polyline points="22 7 13.5 15.5 8.5 10.5 2 17"/><polyline points="16 7 22 7 22 13"/></svg></div>
+      <div class="sb-wordmark">Trade<em>Mentor</em></div>
+    </div>
+    <nav class="sb-nav">
+      <div class="sb-section">Main</div>
+      <a href="dashboard.html" class="sb-item"><svg viewBox="0 0 24 24"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg>Dashboard</a>
+      <a href="analytics.html" class="sb-item"><svg viewBox="0 0 24 24"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg>Analytics</a>
+      <a href="alerts.html" class="sb-item"><svg viewBox="0 0 24 24"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg>Alerts<span class="sb-badge">3</span></a>
+      <a href="my-patterns.html" class="sb-item"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M12 2v3M12 19v3M4.22 4.22l2.12 2.12M17.66 17.66l2.12 2.12M2 12h3M19 12h3M4.22 19.78l2.12-2.12M17.66 6.34l2.12-2.12"/></svg>My Patterns</a>
+      <a href="blowup-shield.html" class="sb-item"><svg viewBox="0 0 24 24"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>Blowup Shield</a>
+      <a href="chat.html" class="sb-item"><svg viewBox="0 0 24 24"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>AI Coach</a>
+      <div class="sb-section">Records</div>
+      <a href="journal.html" class="sb-item"><svg viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>Journal</a>
+      <a href="reports.html" class="sb-item active"><svg viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>Reports</a>
+      <a href="settings.html" class="sb-item"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>Settings</a>
+    </nav>
+    <div class="sb-foot">
+      <div class="sb-avatar">RS</div>
+      <div><div class="sb-uname">Rohit S.</div><div class="sb-usub">Zerodha · Connected</div></div>
+    </div>
+  </aside>
+
+  <div class="main-content">
+    <div class="top-bar">
+      <div class="top-l"><span class="top-title">Session Reports</span><span style="font-size:11.5px;color:var(--text-tertiary)">Daily EOD summaries</span></div>
+      <div class="top-r">
+        <button class="icon-btn" onclick="toggleTheme()">
+          <svg class="i-sun" viewBox="0 0 24 24"><circle cx="12" cy="12" r="5"/><line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/><line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/></svg>
+          <svg class="i-moon" viewBox="0 0 24 24"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>
+        </button>
+      </div>
+    </div>
+
+    <div class="page">
+
+      <!-- LATEST REPORT -->
+      <div class="latest-report">
+        <div class="lr-hdr">
+          <div>
+            <div class="lr-date">Yesterday — Jun 12, 2026</div>
+            <div class="lr-meta">Generated 15:38 IST · 6 trades · NIFTY + BANKNIFTY</div>
+          </div>
+          <span class="lr-badge lb-safe">SAFE session</span>
+        </div>
+        <div class="lr-kpis">
+          <div class="lr-kpi"><div class="lk-lbl">Net P&amp;L</div><div class="lk-val" style="color:var(--profit)">+&#8377;4,210</div><div class="lk-sub">+2.8% of capital</div></div>
+          <div class="lr-kpi"><div class="lk-lbl">Win Rate</div><div class="lk-val" style="color:var(--brand)">66.7%</div><div class="lk-sub">4 of 6 trades</div></div>
+          <div class="lr-kpi"><div class="lk-lbl">Trades</div><div class="lk-val" style="color:var(--text-primary)">6 / 7</div><div class="lk-sub">Within limit</div></div>
+          <div class="lr-kpi"><div class="lk-lbl">Alerts</div><div class="lk-val" style="color:var(--warning)">2</div><div class="lk-sub">1 heeded</div></div>
+          <div class="lr-kpi"><div class="lk-lbl">Behavior</div><div class="lk-val" style="color:var(--brand)">78</div><div class="lk-sub">/ 100</div></div>
+          <div class="lr-kpi"><div class="lk-lbl">Est. saved</div><div class="lk-val" style="color:var(--profit)">+&#8377;1,800</div><div class="lk-sub">Heeded 1 alert</div></div>
+        </div>
+        <div class="lr-body">
+          <div>
+            <div class="lb-section-title">Session Summary</div>
+            <div class="lb-text">Strong BANKNIFTY day. Entered CE at breakout at 14:12 and held to target. Exited cleanly. <strong>Position sizing was within limits all day.</strong> One NIFTY loss at 11:04 — entered 8th trade past optimal count. Win rate on that trade: 31%.</div>
+          </div>
+          <div>
+            <div class="lb-section-title">Alerts Fired</div>
+            <div class="lb-alert"><div class="la-dot"></div><div class="la-text">Overtrading — 7th trade taken. Win rate on trade 7+: 31%. <strong>Acknowledged.</strong></div></div>
+            <div class="lb-alert" style="border-color:var(--warning-border);background:var(--warning-bg)"><div class="la-dot" style="background:var(--warning)"></div><div class="la-text" style="color:var(--text-secondary)">Position escalation — NIFTY trade 2× normal size. <strong>Not heeded — took the trade.</strong></div></div>
+          </div>
+        </div>
+        <div class="lr-sparkline">
+          <div class="ls-label">Intraday P&amp;L curve</div>
+          <svg width="100%" height="50" viewBox="0 0 560 50" preserveAspectRatio="none" style="display:block">
+            <path d="M0,35 C50,34 100,40 150,30 C200,20 250,25 300,18 C350,12 400,8 450,5 C500,3 530,6 560,4" fill="none" stroke="#2F9E68" stroke-width="2"/>
+          </svg>
+        </div>
+        <div class="lr-download">
+          <button class="btn-download">
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+            Download PDF
+          </button>
+          <button class="btn-download">Share via WhatsApp</button>
+        </div>
+      </div>
+
+      <!-- HISTORY TABLE -->
+      <div class="card">
+        <div class="card-hdr"><span class="card-title">Report History</span><span style="font-size:11.5px;color:var(--text-tertiary)">Last 30 sessions</span></div>
+        <table class="data-table">
+          <thead>
+            <tr>
+              <th>Date</th>
+              <th>Net P&amp;L</th>
+              <th>Trades</th>
+              <th>Win Rate</th>
+              <th>Alerts</th>
+              <th>Behavior</th>
+              <th>Intraday Curve</th>
+              <th>State</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td style="font-weight:500">Jun 12</td>
+              <td class="mono" style="color:var(--profit)">+&#8377;4,210</td>
+              <td class="mono">6</td>
+              <td class="mono">66.7%</td>
+              <td class="mono">2</td>
+              <td><span class="score-badge sc-high">78</span></td>
+              <td><div class="spark-col"><div class="sc-bar" style="height:40%;background:var(--profit)"></div><div class="sc-bar" style="height:55%;background:var(--profit)"></div><div class="sc-bar" style="height:70%;background:var(--profit)"></div><div class="sc-bar" style="height:85%;background:var(--profit)"></div><div class="sc-bar" style="height:80%;background:var(--profit)"></div><div class="sc-bar" style="height:95%;background:var(--profit)"></div></div></td>
+              <td><span class="score-badge sc-high">SAFE</span></td>
+            </tr>
+            <tr>
+              <td style="font-weight:500">Jun 11</td>
+              <td class="mono" style="color:var(--profit)">+&#8377;6,800</td>
+              <td class="mono">5</td>
+              <td class="mono">80%</td>
+              <td class="mono">0</td>
+              <td><span class="score-badge sc-high">92</span></td>
+              <td><div class="spark-col"><div class="sc-bar" style="height:30%;background:var(--profit)"></div><div class="sc-bar" style="height:55%;background:var(--profit)"></div><div class="sc-bar" style="height:80%;background:var(--profit)"></div><div class="sc-bar" style="height:90%;background:var(--profit)"></div><div class="sc-bar" style="height:100%;background:var(--profit)"></div></div></td>
+              <td><span class="score-badge sc-high">SAFE</span></td>
+            </tr>
+            <tr>
+              <td style="font-weight:500">Jun 7</td>
+              <td class="mono" style="color:var(--loss)">&#8722;&#8377;2,100</td>
+              <td class="mono">7</td>
+              <td class="mono">28.6%</td>
+              <td class="mono">4</td>
+              <td><span class="score-badge sc-low">41</span></td>
+              <td><div class="spark-col"><div class="sc-bar" style="height:60%;background:var(--loss)"></div><div class="sc-bar" style="height:40%;background:var(--loss)"></div><div class="sc-bar" style="height:30%;background:var(--loss)"></div><div class="sc-bar" style="height:25%;background:var(--loss)"></div><div class="sc-bar" style="height:20%;background:var(--loss)"></div><div class="sc-bar" style="height:15%;background:var(--loss)"></div></div></td>
+              <td><span class="score-badge" style="background:var(--loss-bg);color:var(--loss);border:1px solid var(--loss-border)">DANGER</span></td>
+            </tr>
+            <tr>
+              <td style="font-weight:500">Jun 6</td>
+              <td class="mono" style="color:var(--profit)">+&#8377;3,400</td>
+              <td class="mono">6</td>
+              <td class="mono">66.7%</td>
+              <td class="mono">1</td>
+              <td><span class="score-badge sc-mid">72</span></td>
+              <td><div class="spark-col"><div class="sc-bar" style="height:30%;background:var(--loss)"></div><div class="sc-bar" style="height:45%;background:var(--profit)"></div><div class="sc-bar" style="height:65%;background:var(--profit)"></div><div class="sc-bar" style="height:75%;background:var(--profit)"></div><div class="sc-bar" style="height:80%;background:var(--profit)"></div></div></td>
+              <td><span class="score-badge" style="background:var(--warning-bg);color:var(--warning);border:1px solid var(--warning-border)">CAUTION</span></td>
+            </tr>
+            <tr>
+              <td style="font-weight:500">Jun 5</td>
+              <td class="mono" style="color:var(--loss)">&#8722;&#8377;820</td>
+              <td class="mono">4</td>
+              <td class="mono">50%</td>
+              <td class="mono">2</td>
+              <td><span class="score-badge sc-mid">65</span></td>
+              <td><div class="spark-col"><div class="sc-bar" style="height:50%;background:var(--profit)"></div><div class="sc-bar" style="height:40%;background:var(--loss)"></div><div class="sc-bar" style="height:35%;background:var(--loss)"></div><div class="sc-bar" style="height:30%;background:var(--loss)"></div></div></td>
+              <td><span class="score-badge" style="background:var(--warning-bg);color:var(--warning);border:1px solid var(--warning-border)">CAUTION</span></td>
+            </tr>
+            <tr>
+              <td style="font-weight:500">Jun 4</td>
+              <td class="mono" style="color:var(--profit)">+&#8377;5,100</td>
+              <td class="mono">5</td>
+              <td class="mono">80%</td>
+              <td class="mono">0</td>
+              <td><span class="score-badge sc-high">88</span></td>
+              <td><div class="spark-col"><div class="sc-bar" style="height:40%;background:var(--profit)"></div><div class="sc-bar" style="height:65%;background:var(--profit)"></div><div class="sc-bar" style="height:78%;background:var(--profit)"></div><div class="sc-bar" style="height:85%;background:var(--profit)"></div><div class="sc-bar" style="height:90%;background:var(--profit)"></div></div></td>
+              <td><span class="score-badge sc-high">SAFE</span></td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+
+    </div>
+  </div>
+</div>
+
+<script>
+function toggleTheme(){const h=document.documentElement;h.setAttribute('data-theme',h.getAttribute('data-theme')==='dark'?'light':'dark');localStorage.setItem('tm-theme',h.getAttribute('data-theme'))}
+(function(){const t=localStorage.getItem('tm-theme');if(t)document.documentElement.setAttribute('data-theme',t)})();
+</script>
+</body>
+</html>

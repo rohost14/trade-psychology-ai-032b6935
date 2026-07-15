@@ -193,14 +193,46 @@
             </div>
           </div>
 
-          <!-- Alert Item 3 (Opening Trap) -->
+          <!-- Alert Item 3 (Position Sizing) -->
+          <div onclick="selectAlert('position-sizing')" id="alert-item-position-sizing" class="alert-list-item p-4 border border-slate-200 rounded-lg bg-white cursor-pointer transition-all hover:bg-slate-50 flex flex-col gap-1.5" data-alert-id="position-sizing">
+            <div class="flex items-center justify-between">
+              <span class="flex items-center gap-1.5 text-xs font-bold text-slate-900">
+                <span class="status-dot danger"></span>
+                Position Size Escalation
+              </span>
+              <span class="text-[10px] text-slate-400 font-mono font-tabular">10:51 AM</span>
+            </div>
+            <p class="text-xs text-slate-500 line-clamp-2">100 lots entered after a loss — 4× your average size (BANKNIFTY 45500 PE).</p>
+            <div class="flex items-center justify-between mt-1">
+              <span class="px-1.5 py-0.5 bg-red-100 text-red-800 text-[9px] font-bold rounded uppercase border border-red-200">Critical</span>
+              <span class="text-[10px] text-rose-600 font-mono font-tabular">-₹4,200</span>
+            </div>
+          </div>
+
+          <!-- Alert Item 4 (Early Exit) -->
+          <div onclick="selectAlert('early-exit')" id="alert-item-early-exit" class="alert-list-item p-4 border border-slate-200 rounded-lg bg-white cursor-pointer transition-all hover:bg-slate-50 flex flex-col gap-1.5" data-alert-id="early-exit">
+            <div class="flex items-center justify-between">
+              <span class="flex items-center gap-1.5 text-xs font-bold text-slate-900">
+                <span class="status-dot warn"></span>
+                Early Exit — Left Profits
+              </span>
+              <span class="text-[10px] text-slate-400 font-mono font-tabular">09:38 AM</span>
+            </div>
+            <p class="text-xs text-slate-500 line-clamp-2">Exited NIFTY CE after 8 min at +₹820. Price continued to +₹2,100.</p>
+            <div class="flex items-center justify-between mt-1">
+              <span class="px-1.5 py-0.5 bg-amber-100 text-amber-800 text-[9px] font-bold rounded uppercase border border-amber-200">Medium</span>
+              <span class="text-[10px] text-rose-500 font-mono font-tabular">-₹1,280 opp.</span>
+            </div>
+          </div>
+
+          <!-- Alert Item 5 (Opening Trap) -->
           <div onclick="selectAlert('opening-trap')" id="alert-item-opening-trap" class="alert-list-item p-4 border border-slate-200 rounded-lg bg-white cursor-pointer transition-all hover:bg-slate-50 flex flex-col gap-1.5" data-alert-id="opening-trap">
             <div class="flex items-center justify-between">
               <span class="flex items-center gap-1.5 text-xs font-bold text-slate-900">
                 <span class="status-dot muted"></span>
                 Opening 5-Min Trap
               </span>
-              <span class="text-[10px] text-slate-400 font-mono font-tabular">Mar 26</span>
+              <span class="text-[10px] text-slate-400 font-mono font-tabular">09:20 AM</span>
             </div>
             <p class="text-xs text-slate-500 line-clamp-2">Entered position within the first 5 minutes of market open.</p>
             <div class="flex items-center justify-between mt-1">
@@ -276,7 +308,7 @@
         Analytics
       </a>
       <a href="alerts.html" class="bottom-nav-item" id="bnav-alerts">
-        <span class="bottom-nav-badge">2</span>
+        <span class="bottom-nav-badge">5</span>
         <svg fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"/></svg>
         Alerts
       </a>
@@ -315,15 +347,35 @@
         desc: 'You re-entered BANKNIFTY CE 4 minutes after a ₹800 loss at 09:54 AM. Entering the same underlying instrument immediately after a stop-out without an intentional pause is a classic revenge trade pattern.',
         badges: ['BANKNIFTY CE', '4m Interval']
       },
+      'position-sizing': {
+        title: 'Position Size Escalation — BANKNIFTY 45500 PE',
+        severity: 'Critical Severity',
+        severityClass: 'bg-red-100 text-red-800 border-red-200',
+        time: 'Today at 10:51 AM | 100 lots immediately after loss',
+        cost: '-₹4,200',
+        costClass: 'text-rose-600',
+        desc: 'You entered 100 lots immediately after a ₹2,600 loss — 4× your average position size of 25 lots. Post-loss oversized entries in your data have a 28% win rate vs your normal 60%. This is a recovery attempt using increased capital exposure — the most dangerous pattern in your 30-day history. Open position risk: ₹4,800 if stop-loss is hit.',
+        badges: ['100 lots', '4× avg size', 'BANKNIFTY 45500 PE', '28% win rate']
+      },
+      'early-exit': {
+        title: 'Early Exit — Profits Cut Short',
+        severity: 'Medium Severity',
+        severityClass: 'bg-amber-100 text-amber-800 border-amber-200',
+        time: 'Today at 09:38 AM | NIFTY CE exited after 8 min',
+        cost: '-₹1,280 opp.',
+        costClass: 'text-rose-500',
+        desc: 'You exited NIFTY CE after only 8 minutes at +₹820. The position continued to +₹2,100 in the next 20 minutes. You exit profitable trades 42% too early on average. This is a recurring pattern — 6× this month. 30-day opportunity cost from early exits: ₹7,680.',
+        badges: ['NIFTY CE', 'Held 8 min', 'Continued +₹2,100', '6× this month']
+      },
       'opening-trap': {
         title: 'Opening 5-Min Trap Violation',
         severity: 'Low Severity',
         severityClass: 'bg-slate-100 text-slate-700 border-slate-200',
-        time: 'Mar 26 at 09:18 AM | Market open entry',
-        cost: 'Acknowledged',
-        costClass: 'text-slate-500',
-        desc: 'You entered a position within the first 5 minutes of market open. Statistically, early morning volatility trap trades yield a 32% win rate on your history, resulting in negative expectancy.',
-        badges: ['9:18 AM', '32% Win Rate']
+        time: 'Today at 09:20 AM | Market open entry',
+        cost: 'Heeded — +₹820',
+        costClass: 'text-emerald-600',
+        desc: 'You entered a position within the first 5 minutes of market open. Your opening 5-min win rate: 41% vs 58% baseline. You acknowledged this alert and exited quickly with +₹820 — a good decision. Historically, holding past the first 5 minutes improves outcome by 19 percentage points.',
+        badges: ['9:20 AM', '41% Win Rate', 'Acknowledged']
       }
     };
 

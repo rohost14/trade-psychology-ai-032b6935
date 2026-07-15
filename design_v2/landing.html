@@ -1,729 +1,1514 @@
 <!DOCTYPE html>
-<html lang="en" data-theme="dark">
+<html lang="en" data-theme="light">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>TradeMentor AI — Behavioral analysis for F&O traders</title>
-  <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600;700;800&family=Inter:wght@400;500;600;700&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
-  <style>
-/* TOKENS */
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1.0">
+<title>TradeMentor - Know what your habits cost you</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600;700&family=Inter:wght@400;500;600&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+
+/* ===== TOKENS ===== */
 :root {
-  --bg-page: #FFFFFF; --bg-alt: #F2F2F8; --bg-card: #FFFFFF; --bg-hover: #F7F7FC;
-  --t1: #0C0C16; --t2: #50506A; --t3: #888898; --t4: #ADADBE;
-  --brand: #0D9488; --brand-bg: rgba(13,148,136,0.08); --brand-bdr: rgba(13,148,136,0.2);
-  --profit: #15803D; --loss: #DC2626; --warn: #D97706;
-  --bdr: rgba(0,0,0,0.08); --bdr-s: rgba(0,0,0,0.14);
-  --sh-sm: 0 1px 2px rgba(10,10,20,.05),0 4px 12px rgba(10,10,20,.08);
-  --sh-md: 0 1px 3px rgba(10,10,20,.04),0 12px 40px rgba(10,10,20,.12);
-  --sh-lg: 0 2px 6px rgba(10,10,20,.03),0 28px 80px rgba(10,10,20,.18);
+  --bg:     #F7F8FC;
+  --surface:#FFFFFF;
+  --raised: #ECEEF5;
+  --t1:     #171923;
+  --t2:     #575F74;
+  --t3:     #9299AB;
+  --brand:  #4453C9;
+  --b-bg:   rgba(68,83,201,.07);
+  --b-bdr:  rgba(68,83,201,.18);
+  --loss:   #D94F43;
+  --profit: #2F9E68;
+  --warn:   #E09B17;
+  --bdr:    #DDE0EA;
+  --sh:     0 1px 2px rgba(0,0,0,.05),0 4px 12px rgba(0,0,0,.07);
+  --sh-md:  0 2px 6px rgba(0,0,0,.06),0 12px 36px rgba(0,0,0,.09);
+  --r:      10px;
+  --r-lg:   14px;
 }
 [data-theme="dark"] {
-  --bg-page: #0B0B0F; --bg-alt: #13131A; --bg-card: #13131A; --bg-hover: #1A1A24;
-  --t1: #EEEEF6; --t2: #88889A; --t3: #55556C; --t4: #3C3C50;
-  --brand: #14B8A6; --brand-bg: rgba(20,184,166,0.08); --brand-bdr: rgba(20,184,166,0.2);
-  --profit: #22C55E; --loss: #EF4444; --warn: #F59E0B;
-  --bdr: rgba(255,255,255,0.07); --bdr-s: rgba(255,255,255,0.12);
-  --sh-sm: 0 1px 2px rgba(0,0,0,.4),0 4px 12px rgba(0,0,0,.5);
-  --sh-md: 0 1px 3px rgba(0,0,0,.3),0 12px 40px rgba(0,0,0,.6);
-  --sh-lg: 0 28px 80px rgba(0,0,0,.75);
+  --bg:     #14161D;
+  --surface:#1C1F2A;
+  --raised: #232636;
+  --t1:     #E8EAF2;
+  --t2:     #8B90A4;
+  --t3:     #555A6E;
+  --brand:  #6B7AE0;
+  --b-bg:   rgba(107,122,224,.08);
+  --b-bdr:  rgba(107,122,224,.22);
+  --loss:   #E06B5E;
+  --profit: #4DBF84;
+  --warn:   #E8A830;
+  --bdr:    rgba(255,255,255,.07);
+  --sh:     0 1px 2px rgba(0,0,0,.35),0 4px 12px rgba(0,0,0,.45);
+  --sh-md:  0 2px 8px rgba(0,0,0,.5),0 12px 40px rgba(0,0,0,.6);
 }
 
-/* RESET */
-*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
-html{scroll-behavior:smooth}
-body{background:var(--bg-page);color:var(--t1);font-family:'Inter',sans-serif;font-size:16px;line-height:1.6;overflow-x:hidden;transition:background .25s,color .25s}
-a{text-decoration:none;color:inherit}
-button{font-family:inherit;cursor:pointer}
-::selection{background:rgba(20,184,166,.2)}
-
-/* NAV */
-.nav{position:fixed;top:0;left:0;right:0;z-index:200;height:60px;background:rgba(255,255,255,.88);backdrop-filter:blur(20px) saturate(180%);border-bottom:1px solid var(--bdr);display:flex;align-items:center;justify-content:space-between;padding:0 48px;transition:background .25s,border-color .25s}
-[data-theme="dark"] .nav{background:rgba(11,11,15,.88)}
-.nav-logo{display:flex;align-items:center;gap:9px}
-.logo-icon{width:30px;height:30px;border-radius:8px;background:var(--brand-bg);border:1px solid var(--brand-bdr);display:flex;align-items:center;justify-content:center}
-.logo-icon svg{width:15px;height:15px;stroke:var(--brand);fill:none;stroke-width:2.2;stroke-linecap:round;stroke-linejoin:round}
-.logo-word{font-family:'Geist',sans-serif;font-size:15px;font-weight:700;letter-spacing:-.03em;color:var(--t1)}
-.logo-word em{font-style:normal;color:var(--brand)}
-.nav-links{display:flex;gap:32px}
-.nav-links a{font-size:13.5px;font-weight:500;color:var(--t2);transition:color .12s}
-.nav-links a:hover{color:var(--t1)}
-.nav-right{display:flex;align-items:center;gap:6px}
-.btn-ghost-xs{padding:7px 14px;border-radius:8px;font-size:13px;font-weight:500;color:var(--t2);background:none;border:none;transition:color .12s,background .12s}
-.btn-ghost-xs:hover{color:var(--t1);background:var(--bg-hover)}
-.btn-brand-xs{padding:7px 16px;border-radius:8px;font-size:13px;font-weight:600;background:var(--brand);color:#fff;border:none;transition:opacity .12s}
-.btn-brand-xs:hover{opacity:.88}
-.theme-toggle{width:34px;height:34px;border-radius:8px;border:1px solid var(--bdr);background:none;display:flex;align-items:center;justify-content:center;color:var(--t3);transition:color .12s,background .12s}
-.theme-toggle:hover{color:var(--t1);background:var(--bg-hover)}
-.theme-toggle svg{width:15px;height:15px;stroke:currentColor;fill:none;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
-
-/* SECTION SHARED */
-.section{padding:112px 48px}
-.section.alt{background:var(--bg-alt)}
-.inner{max-width:1100px;margin:0 auto}
-.overline{font-size:11px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:var(--brand);margin-bottom:14px}
-.section-h2{font-family:'Geist',sans-serif;font-size:clamp(30px,3.2vw,44px);font-weight:700;letter-spacing:-.03em;line-height:1.1;color:var(--t1);margin-bottom:14px}
-.section-sub{font-size:16px;line-height:1.75;color:var(--t2);max-width:540px}
-
-/* BUTTONS */
-.btn-primary{display:inline-flex;align-items:center;gap:8px;padding:13px 22px;border-radius:10px;background:var(--brand);color:#fff;font-size:14px;font-weight:600;border:none;transition:opacity .14s,transform .14s,box-shadow .14s}
-.btn-primary:hover{opacity:.9;transform:translateY(-1px);box-shadow:0 0 0 4px var(--brand-bg)}
-.btn-primary svg{width:15px;height:15px;stroke:currentColor;fill:none;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
-.btn-outline{display:inline-flex;align-items:center;gap:8px;padding:12px 20px;border-radius:10px;background:var(--bg-card);color:var(--t1);font-size:14px;font-weight:500;border:1px solid var(--bdr-s);transition:border-color .12s,background .12s}
-.btn-outline:hover{border-color:var(--brand-bdr);background:var(--brand-bg)}
-
-/* HERO */
-.hero{padding:160px 48px 0;display:flex;flex-direction:column;align-items:center;text-align:center;overflow:hidden;background:var(--bg-page)}
-.hero-badge{display:inline-flex;align-items:center;gap:6px;font-size:11px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--brand);background:var(--brand-bg);border:1px solid var(--brand-bdr);padding:5px 13px;border-radius:99px;margin-bottom:30px}
-.hero-badge-dot{width:5px;height:5px;border-radius:50%;background:var(--brand);animation:pulse 2s infinite}
-@keyframes pulse{0%,100%{opacity:1}50%{opacity:.3}}
-.hero-h1{font-family:'Geist',sans-serif;font-size:clamp(42px,5vw,68px);font-weight:600;letter-spacing:-.034em;line-height:1.04;color:var(--t1);margin-bottom:22px;max-width:800px}
-.hero-h1 strong{color:var(--loss);font-weight:600}
-.hero-sub{font-size:17px;line-height:1.75;color:var(--t2);max-width:520px;margin:0 auto 38px}
-.hero-actions{display:flex;align-items:center;justify-content:center;gap:10px;flex-wrap:wrap;margin-bottom:16px}
-.hero-trust{font-size:12px;color:var(--t3);display:flex;align-items:center;justify-content:center;gap:8px;flex-wrap:wrap}
-.trust-dot{opacity:.35}
-.hero-frame-wrap{margin-top:64px;width:100%;max-width:980px;-webkit-mask-image:linear-gradient(to bottom,black 0%,black 68%,transparent 100%);mask-image:linear-gradient(to bottom,black 0%,black 68%,transparent 100%)}
-
-/* APP FRAME — static screenshot */
-.app-frame{width:100%;border-radius:12px 12px 0 0;border:1px solid rgba(255,255,255,.1);border-bottom:none;overflow:hidden;box-shadow:0 0 0 1px rgba(20,184,166,.08),0 32px 100px rgba(0,0,0,.8);background:#0C0C12;pointer-events:none;user-select:none}
-[data-theme="light"] .app-frame{border-color:rgba(0,0,0,.14);box-shadow:0 0 0 1px rgba(0,0,0,.08),0 24px 80px rgba(0,0,0,.22)}
-.af-chrome{background:#0A0A10;border-bottom:1px solid rgba(255,255,255,.06);padding:9px 16px;display:flex;align-items:center;gap:14px}
-.af-dots{display:flex;gap:5px}
-.af-dots span{display:block;width:10px;height:10px;border-radius:50%}
-.af-url{flex:1;text-align:center;font-family:'DM Mono',monospace;font-size:11px;color:rgba(255,255,255,.22);display:flex;align-items:center;justify-content:center;gap:5px}
-.af-url svg{width:9px;height:9px;stroke:currentColor;fill:none;stroke-width:2;flex-shrink:0}
-.af-topbar{background:#111118;border-bottom:1px solid rgba(255,255,255,.06);padding:11px 20px;display:flex;align-items:center;gap:18px}
-.af-state{display:inline-flex;align-items:center;gap:5px;font-size:9.5px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:#EF4444;background:rgba(239,68,68,.1);border:1px solid rgba(239,68,68,.2);padding:4px 10px;border-radius:99px;white-space:nowrap;flex-shrink:0}
-.af-state-dot{width:5px;height:5px;border-radius:50%;background:#EF4444}
-.af-meters{flex:1;display:flex;flex-direction:column;gap:5px}
-.af-meter{display:flex;align-items:center;gap:8px}
-.af-meter-lbl{font-size:9.5px;font-family:'DM Mono',monospace;color:rgba(255,255,255,.28);width:100px;flex-shrink:0}
-.af-meter-track{flex:1;height:3px;background:rgba(255,255,255,.07);border-radius:2px;overflow:hidden}
-.af-meter-fill{height:100%;border-radius:2px}
-.af-meter-fill.over{background:#EF4444;width:100%}
-.af-meter-fill.warn{background:#F59E0B;width:68%}
-.af-pnl{text-align:right;flex-shrink:0}
-.af-pnl-lbl{font-size:9px;font-weight:500;letter-spacing:.06em;text-transform:uppercase;color:rgba(255,255,255,.25);font-family:'DM Mono',monospace}
-.af-pnl-val{font-family:'DM Mono',monospace;font-size:24px;font-weight:500;letter-spacing:-.02em;color:#EF4444;font-variant-numeric:tabular-nums}
-.af-alert{background:rgba(239,68,68,.07);border-bottom:1px solid rgba(239,68,68,.18);border-left:3px solid #EF4444;padding:10px 20px;display:flex;align-items:flex-start;gap:10px}
-.af-alert-icon{font-size:14px;flex-shrink:0;margin-top:1px}
-.af-alert-badge{font-size:9.5px;font-weight:700;letter-spacing:.07em;text-transform:uppercase;color:#EF4444;margin-bottom:3px}
-.af-alert-msg{font-size:12px;color:rgba(238,238,246,.7);line-height:1.5}
-.af-alert-msg strong{color:#EEEEF6}
-.af-table{width:100%;border-collapse:collapse;background:#0C0C12}
-.af-thead td{font-size:9px;font-weight:700;letter-spacing:.07em;text-transform:uppercase;color:rgba(255,255,255,.22);padding:8px 12px;border-bottom:1px solid rgba(255,255,255,.06)}
-.af-thead td:first-child{padding-left:20px}
-.af-thead td:last-child{padding-right:20px;text-align:right}
-.af-row td{font-size:12px;padding:11px 12px;border-bottom:1px solid rgba(255,255,255,.04);border-left:3px solid transparent;color:rgba(238,238,246,.65);font-family:'DM Mono',monospace;font-variant-numeric:tabular-nums}
-.af-row td:first-child{padding-left:17px;font-family:'Inter',sans-serif;font-size:12.5px;font-weight:700;color:#EEEEF6;letter-spacing:-.01em;font-variant-numeric:normal}
-.af-row td:last-child{text-align:right;padding-right:20px}
-.af-type{font-size:9px!important;font-weight:700;letter-spacing:.05em;color:#14B8A6!important;font-family:'Inter',sans-serif!important;font-variant-numeric:normal!important}
-.af-loss{color:#EF4444!important;font-weight:500}
-.af-profit{color:#22C55E!important;font-weight:500}
-.af-row.flagged td{border-left-color:#EF4444;background:rgba(239,68,68,.03)}
-.af-row.new-entry td{border-left-color:#14B8A6;background:rgba(20,184,166,.04)}
-.af-footer{background:#111118;border-top:1px solid rgba(255,255,255,.06);padding:9px 20px;display:flex;align-items:center;gap:12px;font-family:'DM Mono',monospace;font-size:10px;color:rgba(255,255,255,.22)}
-.af-footer .sep{opacity:.3}
-.af-footer .score{color:#EF4444}
-
-/* CREDIBILITY */
-.cred-grid{display:grid;grid-template-columns:repeat(3,1fr);border:1px solid var(--bdr);border-radius:14px;overflow:hidden;box-shadow:var(--sh-sm)}
-.cred-cell{padding:36px 40px;border-right:1px solid var(--bdr)}
-.cred-cell:last-child{border-right:none}
-.cred-num{font-family:'DM Mono',monospace;font-size:40px;font-weight:500;letter-spacing:-.03em;line-height:1;margin-bottom:8px;font-variant-numeric:tabular-nums}
-.cred-num.loss{color:var(--loss)}
-.cred-desc{font-size:13.5px;color:var(--t2);line-height:1.6}
-.cred-source{font-size:11px;color:var(--t3);margin-top:5px}
-
-/* PROBLEM CARDS */
-.problem-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:20px;margin-top:44px}
-.problem-card{background:var(--bg-card);border:1px solid var(--bdr);border-radius:14px;overflow:hidden;box-shadow:var(--sh-md);transition:transform .2s,box-shadow .2s}
-.problem-card:hover{transform:translateY(-3px);box-shadow:var(--sh-lg)}
-.problem-card-stripe{height:4px}
-.problem-card-stripe.red{background:var(--loss)}
-.problem-card-stripe.amber{background:var(--warn)}
-.problem-card-stripe.indigo{background:#6366F1}
-.problem-card-body{padding:24px 22px 28px}
-.problem-label{font-size:10.5px;font-weight:700;letter-spacing:.07em;text-transform:uppercase;margin-bottom:10px}
-.problem-label.red{color:var(--loss)}
-.problem-label.amber{color:var(--warn)}
-.problem-label.indigo{color:#6366F1}
-.problem-name{font-family:'Geist',sans-serif;font-size:20px;font-weight:700;letter-spacing:-.025em;margin-bottom:10px;color:var(--t1)}
-.problem-desc{font-size:13.5px;color:var(--t2);line-height:1.65;margin-bottom:22px}
-.problem-cost-label{font-size:11px;color:var(--t3);text-transform:uppercase;letter-spacing:.06em;font-weight:600;margin-bottom:4px}
-.problem-cost{font-family:'DM Mono',monospace;font-size:28px;font-weight:500;letter-spacing:-.02em;font-variant-numeric:tabular-nums}
-.problem-cost.red{color:var(--loss)}
-.problem-cost.amber{color:var(--warn)}
-.problem-cost.indigo{color:#6366F1}
-
-/* DEMO */
-.demo-tabs{display:flex;border:1px solid var(--bdr);border-radius:10px;overflow:hidden;width:fit-content;margin-bottom:24px}
-.demo-tab{padding:9px 20px;font-size:13px;font-weight:500;color:var(--t2);background:var(--bg-card);border:none;border-right:1px solid var(--bdr);cursor:pointer;transition:all .12s;white-space:nowrap}
-.demo-tab:last-child{border-right:none}
-.demo-tab.active{color:var(--brand);background:var(--brand-bg);font-weight:600}
-.demo-tab:not(.active):hover{color:var(--t1);background:var(--bg-hover)}
-.demo-panel{display:none}
-.demo-panel.active{display:block}
-.demo-frame{background:var(--bg-card);border:1px solid var(--bdr);border-radius:14px;overflow:hidden;box-shadow:var(--sh-lg)}
-.demo-chrome{background:var(--bg-alt);border-bottom:1px solid var(--bdr);padding:9px 16px;display:flex;align-items:center;gap:10px}
-[data-theme="dark"] .demo-chrome{background:rgba(255,255,255,.03)}
-.demo-chrome-title{flex:1;text-align:center;font-size:11px;color:var(--t3);font-family:'DM Mono',monospace}
-.demo-body{padding:24px}
-.demo-dots{display:flex;gap:5px}
-.demo-dots span{display:block;width:10px;height:10px;border-radius:50%}
-
-/* ALERT FEED */
-.alert-feed{display:flex;flex-direction:column;gap:10px}
-.alert-item{display:flex;align-items:flex-start;gap:12px;padding:14px 16px;border-radius:10px;background:var(--bg-alt);border:1px solid var(--bdr);border-left:3px solid transparent}
-.alert-item.high{border-left-color:var(--loss)}
-.alert-item.med{border-left-color:var(--warn)}
-.alert-item.low{border-left-color:#6366F1}
-.alert-icon{font-size:14px;flex-shrink:0;margin-top:1px}
-.alert-badge{font-size:9.5px;font-weight:700;letter-spacing:.07em;text-transform:uppercase;margin-bottom:3px}
-.alert-item.high .alert-badge{color:var(--loss)}
-.alert-item.med .alert-badge{color:var(--warn)}
-.alert-item.low .alert-badge{color:#6366F1}
-.alert-desc{font-size:13px;color:var(--t2);line-height:1.55}
-.alert-desc strong{color:var(--t1)}
-.alert-time{font-size:10.5px;color:var(--t3);margin-top:5px;font-family:'DM Mono',monospace}
-
-/* COACH */
-.coach-chat{display:flex;flex-direction:column;gap:12px;max-width:600px}
-.bubble{padding:12px 16px;border-radius:12px;font-size:13.5px;line-height:1.65}
-.bubble.user{background:var(--brand-bg);border:1px solid var(--brand-bdr);color:var(--t1);align-self:flex-end;border-radius:12px 12px 2px 12px}
-.bubble.ai{background:var(--bg-alt);border:1px solid var(--bdr);color:var(--t2);align-self:flex-start;border-radius:12px 12px 12px 2px}
-.bubble.ai strong{color:var(--t1)}
-.stat{font-family:'DM Mono',monospace;color:var(--loss);font-weight:500}
-
-/* ANALYTICS */
-.analytics-kpi{display:grid;grid-template-columns:repeat(3,1fr);gap:14px;margin-bottom:20px}
-.kpi-card{padding:16px 18px;background:var(--bg-alt);border:1px solid var(--bdr);border-radius:10px}
-.kpi-val{font-family:'DM Mono',monospace;font-size:26px;font-weight:500;letter-spacing:-.02em;font-variant-numeric:tabular-nums;margin-bottom:4px}
-.kpi-val.pos{color:var(--profit)}
-.kpi-val.neg{color:var(--loss)}
-.kpi-lbl{font-size:11.5px;color:var(--t2)}
-.chart-lbl{font-size:10px;font-weight:600;letter-spacing:.07em;text-transform:uppercase;color:var(--t3);margin-bottom:10px}
-
-/* SHIELD */
-.shield-list{display:flex;flex-direction:column}
-.shield-item{display:flex;align-items:flex-start;gap:14px;padding:16px 0;border-bottom:1px solid var(--bdr)}
-.shield-item:last-of-type{border-bottom:none}
-.shield-date{font-family:'DM Mono',monospace;font-size:10.5px;color:var(--t3);width:48px;flex-shrink:0;padding-top:2px}
-.shield-dot{width:8px;height:8px;border-radius:50%;flex-shrink:0;margin-top:4px}
-.shield-dot.hi{background:var(--loss)}
-.shield-dot.md{background:var(--warn)}
-.shield-content .stitle{font-size:13.5px;font-weight:600;color:var(--t1);margin-bottom:3px}
-.shield-content .sdetail{font-size:12.5px;color:var(--t2);line-height:1.5}
-.shield-content .ssaved{font-family:'DM Mono',monospace;font-size:12px;color:var(--profit);font-weight:500;margin-top:4px}
-.shield-total{display:flex;align-items:center;justify-content:space-between;padding:14px 16px;border-radius:10px;background:var(--brand-bg);border:1px solid var(--brand-bdr);margin-top:16px}
-.shield-total-lbl{font-size:13px;color:var(--t2)}
-.shield-total-val{font-family:'DM Mono',monospace;font-size:24px;font-weight:500;color:var(--brand);font-variant-numeric:tabular-nums}
-
-/* GUARDIAN — always dark */
-.section-guardian{padding:112px 48px;background:#0D1421}
-.guardian-inner{max-width:1100px;margin:0 auto;display:grid;grid-template-columns:1fr 1fr;gap:80px;align-items:center}
-.g-tag{display:inline-flex;align-items:center;gap:7px;font-size:11px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:#25D366;background:rgba(37,211,102,.08);border:1px solid rgba(37,211,102,.18);padding:5px 13px;border-radius:99px;margin-bottom:22px}
-.g-h2{font-family:'Geist',sans-serif;font-size:clamp(28px,3vw,40px);font-weight:700;letter-spacing:-.032em;line-height:1.1;color:#EEEEF6;margin-bottom:16px}
-.g-p{font-size:15px;color:rgba(238,238,246,.6);line-height:1.75;margin-bottom:12px}
-.g-callout{font-size:14px;font-weight:600;color:#EEEEF6;border-left:3px solid #25D366;padding-left:14px;line-height:1.6;margin-bottom:28px;font-style:italic}
-.g-bullets{display:flex;flex-direction:column;gap:12px}
-.g-bullet{display:flex;align-items:flex-start;gap:10px;font-size:13.5px;color:rgba(238,238,246,.6)}
-.g-bdot{width:6px;height:6px;border-radius:50%;background:#25D366;flex-shrink:0;margin-top:7px}
-.g-bullet strong{color:#EEEEF6}
-
-/* WA PHONE */
-.wa-wrap{display:flex;justify-content:center}
-.wa-phone{width:280px;border-radius:24px;overflow:hidden;background:#0D0D12;border:1px solid rgba(255,255,255,.1);box-shadow:0 32px 80px rgba(0,0,0,.6)}
-.wa-hdr{background:#1F2C33;padding:12px 14px;display:flex;align-items:center;gap:10px}
-.wa-avatar{width:34px;height:34px;border-radius:50%;background:#25D366;display:flex;align-items:center;justify-content:center;font-size:15px;flex-shrink:0}
-.wa-name{font-size:13px;font-weight:600;color:#E9EDEF}
-.wa-status{font-size:10.5px;color:rgba(233,238,239,.5)}
-.wa-body{background:#0B141A;padding:12px 10px;min-height:220px;display:flex;flex-direction:column;gap:7px}
-.wa-msg{padding:8px 10px;border-radius:8px;font-size:11.5px;line-height:1.5;max-width:92%;opacity:0;transform:translateY(6px);transition:opacity .4s ease,transform .4s ease}
-.wa-msg.show{opacity:1;transform:translateY(0)}
-.wa-msg.in{background:#1F2C33;color:#E9EDEF;align-self:flex-start;border-radius:0 8px 8px 8px}
-.wa-msg.out{background:#025144;color:#E9EDEF;align-self:flex-end;border-radius:8px 8px 0 8px}
-.wa-sender{font-size:9.5px;font-weight:600;color:#25D366;margin-bottom:3px}
-.wa-time{font-size:9px;color:rgba(255,255,255,.3);text-align:right;margin-top:3px}
-
-/* TESTIMONIALS */
-.testi-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:20px;margin-top:44px}
-.testi-card{background:var(--bg-card);border:1px solid var(--bdr);border-radius:14px;padding:26px 22px;display:flex;flex-direction:column;box-shadow:var(--sh-sm)}
-.testi-outcome{font-family:'DM Mono',monospace;font-size:11.5px;color:var(--brand);font-weight:500;background:var(--brand-bg);border-radius:6px;padding:5px 9px;display:inline-block;margin-bottom:16px}
-.testi-quote{font-size:14px;line-height:1.7;color:var(--t2);flex:1;margin-bottom:20px}
-.testi-quote strong{color:var(--t1)}
-.testi-author{display:flex;align-items:center;gap:10px}
-.testi-av{width:34px;height:34px;border-radius:50%;background:var(--brand-bg);border:1px solid var(--brand-bdr);display:flex;align-items:center;justify-content:center;font-size:14px;font-weight:700;color:var(--brand);flex-shrink:0;font-family:'Geist',sans-serif}
-.testi-name{font-size:13px;font-weight:600;color:var(--t1)}
-.testi-role{font-size:11.5px;color:var(--t3)}
-
-/* PRICING */
-.pricing-grid{display:grid;grid-template-columns:1fr 1fr;gap:20px;max-width:760px;margin:44px auto 0}
-.pricing-card{background:var(--bg-card);border:1px solid var(--bdr);border-radius:16px;padding:32px 28px;box-shadow:var(--sh-sm)}
-.pricing-card.featured{border-color:var(--brand-bdr);box-shadow:var(--sh-md),0 0 0 1px var(--brand-bdr)}
-.pricing-badge{display:inline-block;font-size:10px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--brand);background:var(--brand-bg);border:1px solid var(--brand-bdr);padding:3px 10px;border-radius:99px;margin-bottom:18px}
-.pricing-plan{font-size:13px;font-weight:600;color:var(--t2);margin-bottom:8px}
-.pricing-price{font-family:'DM Mono',monospace;font-size:40px;font-weight:500;letter-spacing:-.03em;color:var(--t1);margin-bottom:4px;font-variant-numeric:tabular-nums}
-.pricing-price sup{font-size:18px;vertical-align:top;margin-top:8px;display:inline-block}
-.pricing-price sub{font-size:14px;color:var(--t2)}
-.pricing-period{font-size:12px;color:var(--t3);margin-bottom:24px}
-.pricing-features{list-style:none;display:flex;flex-direction:column;gap:10px;margin-bottom:28px}
-.pricing-features li{display:flex;align-items:flex-start;gap:8px;font-size:13.5px;color:var(--t2)}
-.pricing-features li::before{content:'';width:6px;height:6px;border-radius:50%;background:var(--brand);flex-shrink:0;margin-top:7px}
-.pricing-features li.dim{opacity:.4}
-.pricing-features li.dim::before{background:var(--t3)}
-.pricing-cta{width:100%;padding:13px;border-radius:10px;font-size:14px;font-weight:600;cursor:pointer;transition:all .12s;border:1px solid var(--bdr-s);background:transparent;color:var(--t1)}
-.pricing-cta:hover{background:var(--bg-hover)}
-.pricing-cta.primary{background:var(--brand);color:#fff;border-color:transparent}
-.pricing-cta.primary:hover{opacity:.9}
-
-/* FOOTER — always dark */
-.footer{background:#060608;padding:64px 48px 36px;border-top:1px solid rgba(255,255,255,.06)}
-.footer-grid{max-width:1100px;margin:0 auto 44px;display:grid;grid-template-columns:2fr 1fr 1fr 1fr;gap:40px}
-.footer-brand-p{font-size:13px;color:rgba(238,238,246,.35);line-height:1.65;max-width:240px;margin-top:12px}
-.footer-col h4{font-size:11.5px;font-weight:600;color:rgba(238,238,246,.4);margin-bottom:14px;letter-spacing:.04em}
-.footer-col a{display:block;font-size:13px;color:rgba(238,238,246,.35);margin-bottom:9px;transition:color .12s}
-.footer-col a:hover{color:rgba(238,238,246,.7)}
-.footer-bottom{max-width:1100px;margin:0 auto;padding-top:28px;border-top:1px solid rgba(255,255,255,.06);display:flex;justify-content:space-between;align-items:center;font-size:11.5px;color:rgba(238,238,246,.25);flex-wrap:wrap;gap:12px}
-.footer-bottom a{color:rgba(238,238,246,.25)}
-.footer-bottom a:hover{color:rgba(238,238,246,.5)}
-.footer-logo{display:flex;align-items:center;gap:8px;margin-bottom:12px}
-.footer-word{font-family:'Geist',sans-serif;font-size:15px;font-weight:700;letter-spacing:-.03em;color:rgba(238,238,246,.7)}
-.footer-word em{font-style:normal;color:#14B8A6}
-
-/* REVEAL */
-.reveal{opacity:0;transform:translateY(16px);transition:opacity .55s cubic-bezier(.16,1,.3,1),transform .55s cubic-bezier(.16,1,.3,1)}
-.reveal.in{opacity:1;transform:none}
-.reveal-d1{transition-delay:.08s}
-.reveal-d2{transition-delay:.16s}
-.reveal-d3{transition-delay:.24s}
-
-/* RESPONSIVE */
-@media(max-width:960px){
-  .nav{padding:0 20px}
-  .nav-links{display:none}
-  .hero{padding:120px 20px 0}
-  .section{padding:72px 24px}
-  .section-guardian{padding:72px 24px}
-  .footer{padding:48px 24px 28px}
-  .cred-grid{grid-template-columns:1fr}
-  .cred-cell{border-right:none;border-bottom:1px solid var(--bdr)}
-  .cred-cell:last-child{border-bottom:none}
-  .problem-grid,.testi-grid{grid-template-columns:1fr}
-  .guardian-inner{grid-template-columns:1fr;gap:40px}
-  .pricing-grid{grid-template-columns:1fr;max-width:400px}
-  .footer-grid{grid-template-columns:1fr 1fr}
-  .analytics-kpi{grid-template-columns:1fr}
-  .demo-tabs{overflow-x:auto;width:100%}
-  .footer-bottom{flex-direction:column;text-align:center}
+/* ===== RESET ===== */
+*,*::before,*::after { box-sizing:border-box; margin:0; padding:0 }
+html { scroll-behavior:smooth }
+body {
+  background:var(--bg);
+  color:var(--t1);
+  font-family:'Inter',sans-serif;
+  font-size:16px;
+  line-height:1.6;
+  overflow-x:hidden;
+  -webkit-font-smoothing:antialiased;
+  transition:background .2s,color .2s;
 }
-  </style>
+a { text-decoration:none; color:inherit }
+button { cursor:pointer; border:none; background:none; font-family:inherit }
+table { border-collapse:collapse }
+::selection { background:rgba(68,83,201,.13) }
+
+/* ===== SCROLL REVEAL ===== */
+@media (prefers-reduced-motion:no-preference) {
+  .rev { opacity:0; transform:translateY(22px); transition:opacity .7s cubic-bezier(.16,1,.3,1),transform .7s cubic-bezier(.16,1,.3,1) }
+  .rev.in { opacity:1; transform:none }
+  .d1 { transition-delay:.1s }
+  .d2 { transition-delay:.2s }
+  .d3 { transition-delay:.32s }
+}
+
+/* ===== NAV ===== */
+.nav {
+  position:fixed; top:0; left:0; right:0; z-index:100;
+  height:60px; padding:0 6%;
+  display:flex; align-items:center; justify-content:space-between;
+  background:rgba(247,248,252,.92);
+  backdrop-filter:blur(18px); -webkit-backdrop-filter:blur(18px);
+  border-bottom:1px solid var(--bdr);
+  transition:background .2s;
+}
+[data-theme="dark"] .nav { background:rgba(20,22,29,.92) }
+.nav-mark {
+  font-family:'Geist',sans-serif; font-size:15px; font-weight:700;
+  letter-spacing:-.03em; color:var(--t1);
+}
+.nav-mark em { font-style:normal; color:var(--brand) }
+.nav-links { display:flex; gap:28px }
+.nav-links a { font-size:13.5px; font-weight:500; color:var(--t2); transition:color .12s }
+.nav-links a:hover { color:var(--t1) }
+.nav-r { display:flex; align-items:center; gap:8px }
+.nav-login {
+  padding:7px 14px; border-radius:8px; font-size:13px; font-weight:500;
+  color:var(--t2); transition:color .12s,background .12s;
+}
+.nav-login:hover { color:var(--t1); background:var(--raised) }
+.nav-cta {
+  padding:8px 18px; border-radius:8px; background:var(--brand); color:#fff;
+  font-size:13px; font-weight:600; transition:opacity .12s;
+}
+.nav-cta:hover { opacity:.88 }
+.nav-tog {
+  width:32px; height:32px; border-radius:7px; border:1px solid var(--bdr);
+  display:flex; align-items:center; justify-content:center;
+  color:var(--t3); transition:color .12s;
+}
+.nav-tog:hover { color:var(--t1) }
+.nav-tog svg { width:14px; height:14px; stroke:currentColor; fill:none; stroke-width:1.8; stroke-linecap:round; stroke-linejoin:round }
+.i-sun,.i-moon { display:none }
+[data-theme="light"] .i-sun { display:block }
+[data-theme="dark"]  .i-moon { display:block }
+@media(max-width:860px) { .nav-links,.nav-login { display:none } }
+
+/* ===== SHARED ===== */
+.w  { max-width:1200px; margin:0 auto }
+.ws { max-width:680px;  margin:0 auto }
+.s  { padding:96px 6% }
+.sa { padding:96px 6%; background:var(--raised) }
+.btn {
+  display:inline-flex; align-items:center; gap:8px;
+  padding:12px 22px; border-radius:8px; font-size:14px; font-weight:600;
+  white-space:nowrap; cursor:pointer; transition:opacity .12s,transform .1s;
+}
+.btn-f { background:var(--brand); color:#fff }
+.btn-f:hover { opacity:.88; transform:translateY(-1px) }
+.btn-o { border:1px solid var(--bdr); color:var(--t2) }
+.btn-o:hover { color:var(--t1); border-color:var(--t3); background:var(--raised) }
+
+/* ===== HERO ===== */
+.hero {
+  padding:128px 6% 88px;
+  background:var(--surface);
+  border-bottom:1px solid var(--bdr);
+}
+.hero-grid {
+  display:grid;
+  grid-template-columns:44fr 56fr;
+  gap:80px;
+  align-items:center;
+}
+/* left: stat block */
+.hero-stat {
+  font-family:'DM Mono',monospace;
+  font-size:clamp(80px,10vw,128px);
+  font-weight:500;
+  line-height:1;
+  letter-spacing:-.05em;
+  color:var(--t1);
+  font-variant-numeric:tabular-nums;
+  margin-bottom:10px;
+}
+.hero-stat-src {
+  font-size:13px;
+  color:var(--t3);
+  margin-bottom:32px;
+  padding-bottom:32px;
+  border-bottom:1px solid var(--bdr);
+}
+.hero-stat-src strong { color:var(--t2); font-weight:500 }
+.hero-h1 {
+  font-family:'Geist',sans-serif;
+  font-size:clamp(28px,3.2vw,42px);
+  font-weight:600;
+  letter-spacing:-.036em;
+  line-height:1.15;
+  color:var(--t1);
+  margin-bottom:16px;
+}
+.hero-sub {
+  font-size:16.5px;
+  line-height:1.72;
+  color:var(--t2);
+  margin-bottom:34px;
+  max-width:420px;
+}
+.hero-actions { display:flex; gap:12px; flex-wrap:wrap }
+
+/* right: habit cost report card */
+.hcr {
+  background:var(--surface);
+  border:1px solid var(--bdr);
+  border-radius:var(--r-lg);
+  overflow:hidden;
+  box-shadow:var(--sh-md);
+}
+.hcr-head {
+  padding:14px 20px;
+  border-bottom:1px solid var(--bdr);
+  background:var(--raised);
+  display:flex;
+  justify-content:space-between;
+  align-items:baseline;
+}
+.hcr-title {
+  font-family:'Geist',sans-serif;
+  font-size:13px;
+  font-weight:600;
+  color:var(--t1);
+}
+.hcr-period {
+  font-family:'DM Mono',monospace;
+  font-size:11px;
+  color:var(--t3);
+}
+.hcr-table {
+  width:100%;
+}
+.hcr-table thead th {
+  font-size:9.5px;
+  font-weight:600;
+  letter-spacing:.09em;
+  text-transform:uppercase;
+  color:var(--t3);
+  padding:10px 20px;
+  text-align:left;
+  border-bottom:1px solid var(--bdr);
+  background:var(--surface);
+}
+.hcr-table thead th:last-child,
+.hcr-table thead th:nth-child(2) { text-align:right }
+.hcr-table tbody td {
+  font-size:13px;
+  padding:13px 20px;
+  color:var(--t1);
+  border-bottom:1px solid var(--bdr);
+  vertical-align:middle;
+}
+.hcr-table tbody tr:last-child td { border-bottom:none }
+.hcr-table tbody td:nth-child(2) {
+  font-family:'DM Mono',monospace;
+  font-size:12.5px;
+  text-align:right;
+  color:var(--t3);
+  font-variant-numeric:tabular-nums;
+}
+.hcr-table tbody td:last-child {
+  font-family:'DM Mono',monospace;
+  font-size:13.5px;
+  font-weight:500;
+  text-align:right;
+  color:var(--loss);
+  font-variant-numeric:tabular-nums;
+}
+.hcr-sev {
+  display:inline-block;
+  width:7px; height:7px;
+  border-radius:50%;
+  margin-right:8px;
+  vertical-align:middle;
+  flex-shrink:0;
+}
+.hcr-sev.h { background:var(--loss) }
+.hcr-sev.m { background:var(--warn) }
+.hcr-sev.l { background:var(--brand) }
+.hcr-total {
+  padding:16px 20px;
+  display:flex;
+  justify-content:space-between;
+  align-items:baseline;
+  background:rgba(217,79,67,.04);
+  border-top:1px solid rgba(217,79,67,.14);
+}
+.hcr-total-label { font-size:13px; font-weight:600; color:var(--t1) }
+.hcr-total-label span { display:block; font-size:11px; font-weight:400; color:var(--t3); margin-top:2px }
+.hcr-total-val {
+  font-family:'DM Mono',monospace;
+  font-size:26px;
+  font-weight:500;
+  color:var(--loss);
+  letter-spacing:-.03em;
+  font-variant-numeric:tabular-nums;
+}
+.hcr-foot {
+  padding:9px 20px;
+  background:var(--raised);
+  border-top:1px solid var(--bdr);
+  font-size:11px;
+  color:var(--t3);
+  line-height:1.5;
+}
+
+@media(max-width:960px) {
+  .hero-grid { grid-template-columns:1fr; gap:52px }
+  .hcr { max-width:520px }
+}
+@media(max-width:640px) {
+  .hero { padding:96px 5% 64px }
+  .hero-stat { font-size:80px }
+}
+
+/* ===== RECOGNITION ===== */
+.recog { padding:96px 6% }
+.recog-inner { max-width:680px; margin:0 auto }
+.recog-h2 {
+  font-family:'Geist',sans-serif;
+  font-size:clamp(24px,2.8vw,36px);
+  font-weight:600;
+  letter-spacing:-.034em;
+  line-height:1.15;
+  color:var(--t1);
+  margin-bottom:52px;
+}
+.recog-item {
+  padding:36px 0;
+  border-top:1px solid var(--bdr);
+}
+.recog-item:last-child { border-bottom:1px solid var(--bdr) }
+.recog-text {
+  font-family:'Geist',sans-serif;
+  font-size:clamp(17px,2vw,24px);
+  font-weight:400;
+  line-height:1.45;
+  color:var(--t1);
+}
+.recog-text em {
+  font-style:italic;
+  color:var(--t2);
+  line-height:1.2;
+  display:inline-block;
+  padding-bottom:1px;
+}
+
+/* ===== HOW IT WORKS ===== */
+.hiw { padding:96px 6%; background:var(--raised) }
+.hiw-inner { max-width:1200px; margin:0 auto }
+.hiw-h2 {
+  font-family:'Geist',sans-serif;
+  font-size:clamp(26px,3vw,40px);
+  font-weight:600;
+  letter-spacing:-.034em;
+  color:var(--t1);
+  margin-bottom:64px;
+}
+.hiw-steps {
+  display:grid;
+  grid-template-columns:repeat(3,1fr);
+  gap:0;
+}
+.hiw-step { padding-right:48px }
+.hiw-step + .hiw-step { padding-left:48px; border-left:1px solid var(--bdr) }
+.step-n {
+  font-family:'DM Mono',monospace;
+  font-size:48px;
+  font-weight:500;
+  color:var(--bdr);
+  letter-spacing:-.04em;
+  line-height:1;
+  margin-bottom:28px;
+  font-variant-numeric:tabular-nums;
+  transition:color .2s;
+}
+.hiw-step:hover .step-n { color:var(--brand) }
+.step-title {
+  font-family:'Geist',sans-serif;
+  font-size:18px;
+  font-weight:600;
+  letter-spacing:-.02em;
+  color:var(--t1);
+  margin-bottom:10px;
+}
+.step-body {
+  font-size:14.5px;
+  line-height:1.72;
+  color:var(--t2);
+}
+@media(max-width:760px) {
+  .hiw-steps { grid-template-columns:1fr; gap:0 }
+  .hiw-step { padding-right:0; padding:32px 0; border-left:none!important; border-top:1px solid var(--bdr) }
+  .hiw-step:first-child { border-top:none; padding-top:0 }
+  .step-n { font-size:36px; margin-bottom:18px }
+}
+
+/* ===== ALERTS FEED ===== */
+.alerts-s { padding:96px 6% }
+.alerts-inner { max-width:1200px; margin:0 auto }
+.alerts-top { margin-bottom:52px }
+.alerts-eyebrow {
+  font-size:11px;
+  font-weight:700;
+  letter-spacing:.14em;
+  text-transform:uppercase;
+  color:var(--brand);
+  margin-bottom:14px;
+}
+.alerts-h2 {
+  font-family:'Geist',sans-serif;
+  font-size:clamp(26px,3vw,40px);
+  font-weight:600;
+  letter-spacing:-.034em;
+  color:var(--t1);
+  margin-bottom:14px;
+}
+.alerts-sub {
+  font-size:16px;
+  line-height:1.7;
+  color:var(--t2);
+  max-width:540px;
+}
+/* two-col: description left, feed right */
+.alerts-grid {
+  display:grid;
+  grid-template-columns:1fr 1fr;
+  gap:80px;
+  align-items:start;
+}
+.alerts-desc { padding-top:8px }
+.alerts-desc-h3 {
+  font-family:'Geist',sans-serif;
+  font-size:20px;
+  font-weight:600;
+  letter-spacing:-.02em;
+  color:var(--t1);
+  margin-bottom:12px;
+}
+.alerts-desc-body {
+  font-size:15px;
+  line-height:1.75;
+  color:var(--t2);
+  margin-bottom:24px;
+}
+.attrs { display:flex; flex-direction:column; gap:14px }
+.attr { display:flex; gap:12px; font-size:14.5px; color:var(--t2); line-height:1.6 }
+.attr-dot {
+  width:5px; height:5px; border-radius:50%;
+  background:var(--brand); flex-shrink:0; margin-top:7px;
+}
+.attr strong { color:var(--t1); font-weight:600 }
+
+/* alert notification cards */
+.alert-feed { display:flex; flex-direction:column; gap:0 }
+.alert-card {
+  display:flex;
+  align-items:stretch;
+  background:var(--surface);
+  border:1px solid var(--bdr);
+  border-radius:var(--r);
+  overflow:hidden;
+  box-shadow:var(--sh);
+  margin-bottom:10px;
+  transition:box-shadow .2s;
+}
+.alert-card:hover { box-shadow:var(--sh-md) }
+.alert-card:last-child { margin-bottom:0 }
+.alert-stripe { width:4px; flex-shrink:0 }
+.alert-stripe.crit { background:var(--loss) }
+.alert-stripe.warn { background:var(--warn) }
+.alert-stripe.info { background:var(--brand) }
+.alert-body { padding:16px 18px; flex:1 }
+.alert-type {
+  font-size:9.5px;
+  font-weight:700;
+  letter-spacing:.09em;
+  text-transform:uppercase;
+  margin-bottom:5px;
+}
+.alert-type.crit { color:var(--loss) }
+.alert-type.warn { color:var(--warn) }
+.alert-type.info { color:var(--brand) }
+.alert-msg {
+  font-size:13.5px;
+  font-weight:500;
+  color:var(--t1);
+  line-height:1.45;
+  margin-bottom:6px;
+}
+.alert-meta {
+  font-family:'DM Mono',monospace;
+  font-size:11px;
+  color:var(--t3);
+  font-variant-numeric:tabular-nums;
+}
+.alert-cost {
+  display:flex;
+  flex-direction:column;
+  align-items:flex-end;
+  justify-content:center;
+  padding:16px 18px;
+  border-left:1px solid var(--bdr);
+  min-width:90px;
+}
+.alert-cost-val {
+  font-family:'DM Mono',monospace;
+  font-size:14px;
+  font-weight:500;
+  color:var(--loss);
+  font-variant-numeric:tabular-nums;
+}
+.alert-cost-lbl { font-size:10px; color:var(--t3); margin-top:3px; white-space:nowrap }
+
+@media(max-width:900px) {
+  .alerts-grid { grid-template-columns:1fr; gap:48px }
+}
+
+/* ===== ANALYTICS / SESSION HISTORY ===== */
+.analytics-s { padding:96px 6%; background:var(--raised) }
+.analytics-grid {
+  max-width:1200px; margin:0 auto;
+  display:grid;
+  grid-template-columns:40fr 60fr;
+  gap:80px;
+  align-items:start;
+}
+.analytics-copy { padding-top:12px }
+.analytics-h2 {
+  font-family:'Geist',sans-serif;
+  font-size:clamp(26px,3vw,40px);
+  font-weight:600;
+  letter-spacing:-.034em;
+  line-height:1.12;
+  color:var(--t1);
+  margin-bottom:18px;
+}
+.analytics-body {
+  font-size:15.5px;
+  line-height:1.75;
+  color:var(--t2);
+  margin-bottom:28px;
+}
+.analytics-facts { display:flex; flex-direction:column; gap:20px }
+.a-fact { border-left:2px solid var(--b-bdr); padding-left:16px }
+.a-fact-title {
+  font-size:14px;
+  font-weight:600;
+  color:var(--t1);
+  margin-bottom:4px;
+}
+.a-fact-body { font-size:13.5px; color:var(--t2); line-height:1.6 }
+
+/* session history table card */
+.sh-card {
+  background:var(--surface);
+  border:1px solid var(--bdr);
+  border-radius:var(--r-lg);
+  overflow:hidden;
+  box-shadow:var(--sh-md);
+}
+.sh-head {
+  padding:14px 20px;
+  border-bottom:1px solid var(--bdr);
+  background:var(--raised);
+  display:flex;
+  justify-content:space-between;
+  align-items:baseline;
+}
+.sh-head-title {
+  font-family:'Geist',sans-serif;
+  font-size:13px;
+  font-weight:600;
+  color:var(--t1);
+}
+.sh-head-tag {
+  font-family:'DM Mono',monospace;
+  font-size:11px;
+  color:var(--t3);
+}
+.sh-table { width:100% }
+.sh-table thead th {
+  font-size:9.5px;
+  font-weight:600;
+  letter-spacing:.09em;
+  text-transform:uppercase;
+  color:var(--t3);
+  padding:9px 16px;
+  text-align:left;
+  background:var(--surface);
+  border-bottom:1px solid var(--bdr);
+}
+.sh-table thead th:nth-child(2),
+.sh-table thead th:nth-child(3) { text-align:center }
+.sh-table thead th:last-child { text-align:right }
+.sh-table tbody td {
+  font-size:12.5px;
+  padding:11px 16px;
+  color:var(--t1);
+  border-bottom:1px solid var(--bdr);
+  vertical-align:middle;
+}
+.sh-table tbody tr:last-child td { border-bottom:none }
+.sh-table tbody tr:hover { background:var(--raised) }
+.sh-date {
+  font-family:'DM Mono',monospace;
+  font-size:12px;
+  color:var(--t2);
+  font-variant-numeric:tabular-nums;
+}
+.sh-trades {
+  text-align:center;
+  font-family:'DM Mono',monospace;
+  font-size:12.5px;
+  color:var(--t1);
+  font-variant-numeric:tabular-nums;
+}
+.sh-pnl {
+  text-align:right;
+  font-family:'DM Mono',monospace;
+  font-size:13px;
+  font-weight:500;
+  font-variant-numeric:tabular-nums;
+}
+.sh-pnl.pos { color:var(--profit) }
+.sh-pnl.neg { color:var(--loss) }
+.sh-alerts-cell { text-align:center }
+.sh-tag {
+  display:inline-block;
+  font-size:10px;
+  font-weight:600;
+  padding:2px 7px;
+  border-radius:4px;
+  letter-spacing:.03em;
+  text-transform:uppercase;
+}
+.sh-tag.r { background:rgba(217,79,67,.1); color:var(--loss) }
+.sh-tag.w { background:rgba(224,155,23,.1); color:var(--warn) }
+.sh-tag.ok { background:rgba(47,158,104,.1); color:var(--profit) }
+.sh-footer {
+  padding:12px 16px;
+  background:var(--raised);
+  border-top:1px solid var(--bdr);
+  font-size:11px;
+  color:var(--t3);
+  text-align:right;
+}
+
+@media(max-width:900px) {
+  .analytics-grid { grid-template-columns:1fr; gap:48px }
+}
+
+/* ===== TESTIMONIALS ===== */
+.testi { padding:96px 6% }
+.testi-inner { max-width:1200px; margin:0 auto }
+.testi-eyebrow {
+  font-size:11px;
+  font-weight:700;
+  letter-spacing:.14em;
+  text-transform:uppercase;
+  color:var(--brand);
+  margin-bottom:52px;
+  text-align:center;
+}
+/* Featured: one large centered quote */
+.testi-featured {
+  max-width:680px;
+  margin:0 auto 48px;
+  text-align:center;
+}
+.testi-quote-big {
+  font-family:'Geist',sans-serif;
+  font-size:clamp(20px,2.4vw,30px);
+  font-weight:400;
+  line-height:1.45;
+  color:var(--t1);
+  margin-bottom:24px;
+}
+.testi-quote-big::before { content:'\201C'; color:var(--brand); margin-right:2px }
+.testi-quote-big::after  { content:'\201D'; color:var(--brand); margin-left:2px }
+.testi-attr-feat {
+  font-size:13.5px;
+  color:var(--t2);
+  line-height:1.6;
+}
+.testi-attr-feat strong { display:block; font-size:15px; font-weight:600; color:var(--t1); margin-bottom:3px }
+.testi-metric-feat {
+  display:inline-block;
+  margin-top:14px;
+  font-family:'DM Mono',monospace;
+  font-size:11.5px;
+  font-weight:500;
+  color:var(--brand);
+  background:var(--b-bg);
+  border:1px solid var(--b-bdr);
+  padding:4px 12px;
+  border-radius:99px;
+  font-variant-numeric:tabular-nums;
+}
+/* divider between featured and minis */
+.testi-divide {
+  height:1px;
+  background:var(--bdr);
+  max-width:680px;
+  margin:0 auto 48px;
+}
+/* two smaller quotes side by side */
+.testi-grid {
+  display:grid;
+  grid-template-columns:1fr 1fr;
+  gap:32px;
+  max-width:900px;
+  margin:0 auto;
+}
+.testi-mini {
+  background:var(--surface);
+  border:1px solid var(--bdr);
+  border-radius:var(--r-lg);
+  padding:24px;
+  box-shadow:var(--sh);
+}
+.testi-mini-metric {
+  font-family:'DM Mono',monospace;
+  font-size:11px;
+  font-weight:500;
+  color:var(--brand);
+  background:var(--b-bg);
+  border:1px solid var(--b-bdr);
+  padding:3px 10px;
+  border-radius:99px;
+  display:inline-block;
+  margin-bottom:16px;
+  font-variant-numeric:tabular-nums;
+}
+.testi-mini-q {
+  font-size:14.5px;
+  line-height:1.65;
+  color:var(--t1);
+  margin-bottom:18px;
+}
+.testi-mini-q::before { content:'\201C' }
+.testi-mini-q::after  { content:'\201D' }
+.testi-mini-attr { font-size:13px; color:var(--t2); line-height:1.5 }
+.testi-mini-attr strong { display:block; color:var(--t1); font-weight:600; margin-bottom:2px }
+
+@media(max-width:700px) { .testi-grid { grid-template-columns:1fr } }
+
+/* ===== PRICING ===== */
+.pricing { padding:96px 6%; background:var(--raised) }
+.pricing-inner { max-width:1200px; margin:0 auto }
+.pricing-header { margin-bottom:52px }
+.pricing-h2 {
+  font-family:'Geist',sans-serif;
+  font-size:clamp(26px,3vw,40px);
+  font-weight:600;
+  letter-spacing:-.034em;
+  color:var(--t1);
+  margin-bottom:12px;
+}
+.pricing-sub { font-size:16px; color:var(--t2); max-width:460px }
+.pricing-grid {
+  display:grid;
+  grid-template-columns:1fr 1fr;
+  gap:24px;
+  max-width:800px;
+}
+.plan {
+  background:var(--surface);
+  border:1px solid var(--bdr);
+  border-radius:var(--r-lg);
+  padding:32px;
+  box-shadow:var(--sh);
+  position:relative;
+}
+.plan.pro {
+  border-color:var(--brand);
+  border-width:2px;
+  box-shadow:var(--sh),0 0 0 4px var(--b-bg);
+}
+.plan-badge {
+  font-size:10px;
+  font-weight:700;
+  letter-spacing:.09em;
+  text-transform:uppercase;
+  background:var(--brand);
+  color:#fff;
+  padding:3px 9px;
+  border-radius:99px;
+  display:inline-block;
+  margin-bottom:14px;
+}
+.plan-name {
+  font-family:'Geist',sans-serif;
+  font-size:19px;
+  font-weight:600;
+  letter-spacing:-.02em;
+  color:var(--t1);
+  margin-bottom:8px;
+}
+.plan-price {
+  font-family:'DM Mono',monospace;
+  font-size:44px;
+  font-weight:500;
+  color:var(--t1);
+  letter-spacing:-.04em;
+  line-height:1;
+  font-variant-numeric:tabular-nums;
+  margin-bottom:4px;
+}
+.plan-price sup { font-size:22px; vertical-align:top; margin-top:6px }
+.plan-price-mo { font-size:14px; color:var(--t2); margin-bottom:6px }
+.plan-trial { font-size:12px; color:var(--t3); margin-bottom:28px }
+.plan-rule { height:1px; background:var(--bdr); margin-bottom:24px }
+.plan-feats { display:flex; flex-direction:column; gap:11px; margin-bottom:28px }
+.pf {
+  display:flex;
+  gap:10px;
+  font-size:14px;
+  color:var(--t2);
+  line-height:1.5;
+  align-items:flex-start;
+}
+.pf-check {
+  width:16px; height:16px;
+  border-radius:50%;
+  flex-shrink:0;
+  display:flex; align-items:center; justify-content:center;
+  margin-top:2px;
+}
+.pf-check.y { background:rgba(47,158,104,.12) }
+.pf-check.n { background:var(--raised) }
+.pf-check.y svg { stroke:var(--profit); width:9px; height:9px; fill:none; stroke-width:2.5; stroke-linecap:round; stroke-linejoin:round }
+.pf-check.n svg { stroke:var(--t3); width:8px; height:8px; fill:none; stroke-width:2; stroke-linecap:round; stroke-linejoin:round }
+.pf.off { color:var(--t3) }
+.plan-cta {
+  width:100%; padding:13px; border-radius:8px;
+  font-size:14px; font-weight:600; text-align:center; cursor:pointer;
+  display:block; transition:opacity .12s,background .12s;
+}
+.plan-cta.free { border:1px solid var(--bdr); color:var(--t1); background:transparent }
+.plan-cta.free:hover { background:var(--raised) }
+.plan-cta.pro  { background:var(--brand); color:#fff }
+.plan-cta.pro:hover  { opacity:.88 }
+
+@media(max-width:640px) { .pricing-grid { grid-template-columns:1fr } }
+
+/* ===== DARK BLOCK (stats + CTA + footer) ===== */
+.dk { background:#13151C }
+
+/* stats */
+.stats { padding:88px 6% }
+.stats-inner { max-width:1200px; margin:0 auto }
+.stats-grid {
+  display:grid;
+  grid-template-columns:repeat(4,1fr);
+  border-top:1px solid rgba(255,255,255,.07);
+  border-left:1px solid rgba(255,255,255,.07);
+}
+.stat-cell {
+  padding:48px 36px;
+  border-right:1px solid rgba(255,255,255,.07);
+  border-bottom:1px solid rgba(255,255,255,.07);
+}
+.stat-n {
+  font-family:'DM Mono',monospace;
+  font-size:clamp(38px,4.5vw,58px);
+  font-weight:500;
+  color:#E4E6F0;
+  letter-spacing:-.04em;
+  line-height:1;
+  margin-bottom:14px;
+  font-variant-numeric:tabular-nums;
+}
+.stat-lbl {
+  font-size:14px;
+  line-height:1.55;
+  color:rgba(228,230,240,.45);
+  margin-bottom:8px;
+}
+.stat-src {
+  font-size:11px;
+  color:rgba(228,230,240,.22);
+  font-family:'DM Mono',monospace;
+}
+@media(max-width:860px) { .stats-grid { grid-template-columns:repeat(2,1fr) } }
+@media(max-width:480px) { .stats-grid { grid-template-columns:1fr } .stat-cell { padding:32px 24px } }
+
+/* footer CTA */
+.fcta {
+  padding:88px 6%;
+  text-align:center;
+  border-top:1px solid rgba(255,255,255,.06);
+}
+.fcta-inner { max-width:560px; margin:0 auto }
+.fcta-h2 {
+  font-family:'Geist',sans-serif;
+  font-size:clamp(26px,3.4vw,44px);
+  font-weight:600;
+  letter-spacing:-.04em;
+  line-height:1.1;
+  color:#E4E6F0;
+  margin-bottom:14px;
+}
+.fcta-sub {
+  font-size:16px;
+  line-height:1.7;
+  color:rgba(228,230,240,.45);
+  margin-bottom:36px;
+}
+.fcta-btn {
+  display:inline-flex;
+  align-items:center;
+  gap:8px;
+  padding:14px 30px;
+  border-radius:8px;
+  background:#6B7AE0;
+  color:#fff;
+  font-size:15px;
+  font-weight:600;
+  cursor:pointer;
+  border:none;
+  transition:opacity .12s;
+}
+.fcta-btn:hover { opacity:.88 }
+.fcta-note {
+  margin-top:18px;
+  font-size:12px;
+  color:rgba(228,230,240,.22);
+}
+
+/* footer */
+.footer {
+  padding:52px 6% 40px;
+  border-top:1px solid rgba(255,255,255,.06);
+}
+.footer-grid {
+  max-width:1200px;
+  margin:0 auto 40px;
+  display:grid;
+  grid-template-columns:2fr 1fr 1fr 1fr;
+  gap:48px;
+}
+.footer-brand {
+  font-family:'Geist',sans-serif;
+  font-size:15px;
+  font-weight:700;
+  letter-spacing:-.03em;
+  color:#E4E6F0;
+  margin-bottom:10px;
+}
+.footer-brand em { font-style:normal; color:#6B7AE0 }
+.footer-tagline { font-size:13px; color:rgba(228,230,240,.35); line-height:1.65; max-width:210px }
+.foot-col-title { font-size:11px; font-weight:600; color:rgba(228,230,240,.4); margin-bottom:14px; letter-spacing:.03em }
+.foot-links { display:flex; flex-direction:column; gap:10px }
+.foot-links a { font-size:13px; color:rgba(228,230,240,.3); transition:color .12s }
+.foot-links a:hover { color:rgba(228,230,240,.65) }
+.footer-bottom {
+  max-width:1200px;
+  margin:0 auto;
+  padding-top:24px;
+  border-top:1px solid rgba(255,255,255,.06);
+  display:flex;
+  gap:24px;
+  align-items:flex-start;
+  flex-wrap:wrap;
+}
+.footer-disc {
+  font-size:11.5px;
+  color:rgba(228,230,240,.2);
+  line-height:1.65;
+  max-width:760px;
+}
+.footer-copy {
+  font-size:11.5px;
+  color:rgba(228,230,240,.2);
+  white-space:nowrap;
+  margin-left:auto;
+}
+@media(max-width:760px) { .footer-grid { grid-template-columns:1fr 1fr } .footer-copy { margin-left:0 } }
+@media(max-width:440px) { .footer-grid { grid-template-columns:1fr } }
+
+</style>
 </head>
 <body>
 
-<!-- NAV -->
+<!-- ======================================================
+     NAV
+====================================================== -->
 <nav class="nav">
-  <div class="nav-logo">
-    <div class="logo-icon">
-      <svg viewBox="0 0 24 24"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>
-    </div>
-    <span class="logo-word">Trade<em>Mentor</em></span>
-  </div>
+  <div class="nav-mark">Trade<em>Mentor</em></div>
+
   <div class="nav-links">
-    <a href="#problem">The Problem</a>
-    <a href="#demo">Product</a>
-    <a href="#guardian">Guardian</a>
+    <a href="#alerts">Features</a>
     <a href="#pricing">Pricing</a>
+    <a href="#hiw">How it works</a>
   </div>
-  <div class="nav-right">
-    <button class="theme-toggle" onclick="toggleTheme()" title="Toggle theme">
-      <svg id="icon-moon" viewBox="0 0 24 24"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>
-      <svg id="icon-sun" viewBox="0 0 24 24" style="display:none"><circle cx="12" cy="12" r="5"/><line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/><line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/></svg>
+
+  <div class="nav-r">
+    <button class="nav-login">Log in</button>
+    <button class="nav-cta">Connect Zerodha</button>
+    <button class="nav-tog" onclick="toggleTheme()" aria-label="Toggle theme">
+      <svg class="i-sun" viewBox="0 0 24 24"><circle cx="12" cy="12" r="5"/><line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/><line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/></svg>
+      <svg class="i-moon" viewBox="0 0 24 24"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>
     </button>
-    <button class="btn-ghost-xs">Sign in</button>
-    <button class="btn-brand-xs">Get Started Free</button>
   </div>
 </nav>
 
-<!-- HERO -->
+<!-- ======================================================
+     HERO
+     Layout: 44/56 grid. Left = stat block + pitch + CTAs.
+     Right  = habit cost report (real HTML data table).
+====================================================== -->
 <section class="hero">
-  <div class="hero-badge"><span class="hero-badge-dot"></span>Real-time behavioral analysis · F&amp;O traders</div>
-  <h1 class="hero-h1">You don't have a strategy problem.<br>You have a <strong>behavior problem.</strong></h1>
-  <p class="hero-sub">Most F&amp;O losses aren't caused by bad setups — they're caused by what you do in the 7 seconds after a stop hit. TradeMentor shows you your patterns before they compound.</p>
-  <div class="hero-actions">
-    <button class="btn-primary">
-      <svg viewBox="0 0 24 24"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>
-      Connect Zerodha — Free
-    </button>
-    <button class="btn-outline">
-      <svg width="15" height="15" viewBox="0 0 24 24" style="flex-shrink:0"><path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" fill="#4285F4"/><path d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" fill="#34A853"/><path d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z" fill="#FBBC05"/><path d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z" fill="#EA4335"/></svg>
-      Sign in with Google
-    </button>
+  <div class="hero-grid w">
+
+    <!-- left -->
+    <div class="hero-left">
+      <div class="hero-stat">89%</div>
+      <p class="hero-stat-src">
+        <strong>of F&amp;O traders lose money every year.</strong>
+        SEBI FY24 annual study, 1.1 crore retail participants.
+      </p>
+      <h1 class="hero-h1">Know exactly which habits<br>make up your share.</h1>
+      <p class="hero-sub">Connect your Zerodha account. TradeMentor tracks every trade and shows you, in real time, which behavioral patterns are eroding your edge.</p>
+      <div class="hero-actions">
+        <button class="btn btn-f">Connect Zerodha</button>
+        <a href="#hiw" class="btn btn-o">How it works</a>
+      </div>
+    </div>
+
+    <!-- right: habit cost report card (real data table, not a screenshot) -->
+    <div class="hero-right rev">
+      <div class="hcr">
+        <div class="hcr-head">
+          <span class="hcr-title">Habit cost report</span>
+          <span class="hcr-period">Jun 2024 &nbsp;|&nbsp; Sample data</span>
+        </div>
+        <table class="hcr-table">
+          <thead>
+            <tr>
+              <th>Pattern</th>
+              <th>Occurrences</th>
+              <th>Est. cost</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td><span class="hcr-sev h"></span>Revenge trading</td>
+              <td>13</td>
+              <td>-&#8377;12,400</td>
+            </tr>
+            <tr>
+              <td><span class="hcr-sev m"></span>Overtrading</td>
+              <td>9 sessions</td>
+              <td>-&#8377;8,100</td>
+            </tr>
+            <tr>
+              <td><span class="hcr-sev h"></span>No stop-loss entry</td>
+              <td>6</td>
+              <td>-&#8377;6,600</td>
+            </tr>
+            <tr>
+              <td><span class="hcr-sev l"></span>FOMO late entries</td>
+              <td>4</td>
+              <td>-&#8377;3,200</td>
+            </tr>
+          </tbody>
+        </table>
+        <div class="hcr-total">
+          <div class="hcr-total-label">
+            Total habit cost
+            <span>This month, from tracked patterns</span>
+          </div>
+          <div class="hcr-total-val">-&#8377;30,300</div>
+        </div>
+        <p class="hcr-foot">Estimates use your historical win-rate delta per pattern type. Actual figures appear after connecting.</p>
+      </div>
+    </div>
+
   </div>
-  <div class="hero-trust">
-    <span>Read-only access</span><span class="trust-dot">·</span>
-    <span>No orders placed</span><span class="trust-dot">·</span>
-    <span>Disconnect anytime</span>
+</section>
+
+<!-- ======================================================
+     RECOGNITION
+     Layout: centered narrow editorial. Pure typography.
+     No cards, no icons, no decorative elements.
+====================================================== -->
+<section class="recog s">
+  <div class="recog-inner">
+    <h2 class="recog-h2 rev">Every trader we spoke to<br>has said one of these.</h2>
+
+    <div class="recog-item rev d1">
+      <p class="recog-text">"Just one more trade to recover what I lost this morning."</p>
+    </div>
+    <div class="recog-item rev d1">
+      <p class="recog-text">"Different lot size this time. <em>I have a better feel now.</em>"</p>
+    </div>
+    <div class="recog-item rev d2">
+      <p class="recog-text">"It'll come back. I'll exit if it drops another 200 points."</p>
+    </div>
+    <div class="recog-item rev d2">
+      <p class="recog-text">"Why do I always take a bigger position <em>right after a losing streak?</em>"</p>
+    </div>
   </div>
-  <div class="hero-frame-wrap">
-    <div class="app-frame">
-      <div class="af-chrome">
-        <div class="af-dots"><span style="background:#FF5F57"></span><span style="background:#FEBC2E"></span><span style="background:#28C840"></span></div>
-        <div class="af-url"><svg viewBox="0 0 24 24" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>app.tradementor.in/dashboard</div>
-        <div style="width:48px"></div>
+</section>
+
+<!-- ======================================================
+     HOW IT WORKS
+     Layout: 3-col grid, alt bg, DM Mono decorative numbers.
+====================================================== -->
+<section class="hiw" id="hiw">
+  <div class="hiw-inner">
+    <h2 class="hiw-h2 rev">Up and running in 2 minutes.</h2>
+    <div class="hiw-steps">
+      <div class="hiw-step rev">
+        <div class="step-n">01</div>
+        <div class="step-title">Connect your broker</div>
+        <p class="step-body">Link your Zerodha account with read-only access. No fund movements, no orders. You can disconnect any time from your Zerodha settings.</p>
       </div>
-      <div class="af-topbar">
-        <div class="af-state"><span class="af-state-dot"></span>DANGER</div>
-        <div class="af-meters">
-          <div class="af-meter"><span class="af-meter-lbl">11 / 10 trades</span><div class="af-meter-track"><div class="af-meter-fill over"></div></div></div>
-          <div class="af-meter"><span class="af-meter-lbl">₹8.2k / ₹12k loss</span><div class="af-meter-track"><div class="af-meter-fill warn"></div></div></div>
-        </div>
-        <div class="af-pnl">
-          <div class="af-pnl-lbl">Today's P&amp;L</div>
-          <div class="af-pnl-val">−₹8,200</div>
-        </div>
+      <div class="hiw-step rev d1">
+        <div class="step-n">02</div>
+        <div class="step-title">Trade as you normally do</div>
+        <p class="step-body">TradeMentor analyzes every trade the moment it happens. 22 behavioral patterns tracked automatically. No manual input, no journal to fill.</p>
       </div>
-      <div class="af-alert">
-        <div class="af-alert-icon">⚡</div>
-        <div>
-          <div class="af-alert-badge">REVENGE TRADE · HIGH RISK · 3rd today</div>
-          <div class="af-alert-msg">BANKNIFTY 48000 CE entered <strong>3 min after ₹−1,830 stop hit.</strong> Your win rate on revenge trades: <strong>19%</strong> vs your normal 64%.</div>
-        </div>
-      </div>
-      <table class="af-table">
-        <tr class="af-thead"><td>Symbol</td><td>Type</td><td>Qty</td><td>Avg Entry</td><td>LTP</td><td style="text-align:right">Unrealized P&amp;L</td></tr>
-        <tr class="af-row flagged"><td>NIFTY 22000 PE</td><td class="af-type">MIS</td><td>75</td><td>₹124.50</td><td>₹89.20</td><td class="af-loss">−₹2,648</td></tr>
-        <tr class="af-row flagged"><td>BANKNIFTY 48500 PE</td><td class="af-type">MIS</td><td>50</td><td>₹183.40</td><td>₹131.80</td><td class="af-loss">−₹2,580</td></tr>
-        <tr class="af-row new-entry"><td>BANKNIFTY 48000 CE</td><td class="af-type">MIS</td><td>50</td><td>₹148.20</td><td>₹141.60</td><td class="af-loss">−₹330</td></tr>
-        <tr class="af-row"><td>FINNIFTY 21700 CE</td><td class="af-type">MIS</td><td>40</td><td>₹45.60</td><td>₹48.90</td><td class="af-profit">+₹132</td></tr>
-      </table>
-      <div class="af-footer">
-        <span>4 positions open</span><span class="sep">·</span>
-        <span>11 trades today</span><span class="sep">·</span>
-        <span>4 alerts fired</span><span class="sep">·</span>
-        <span class="score">Behavior score: 28/100</span>
+      <div class="hiw-step rev d2">
+        <div class="step-n">03</div>
+        <div class="step-title">See your patterns</div>
+        <p class="step-body">Live alerts during the session. Session analytics after market close. A daily report at 3:45 PM with what happened, what it cost, and where your edge shifted.</p>
       </div>
     </div>
   </div>
 </section>
 
-<!-- CREDIBILITY -->
-<section class="section alt" style="padding-top:80px;padding-bottom:80px">
-  <div class="inner">
-    <div class="cred-grid reveal">
-      <div class="cred-cell">
-        <div class="cred-num loss">89%</div>
-        <div class="cred-desc">of individual F&amp;O traders lose money every year</div>
-        <div class="cred-source">SEBI Study FY2021–22 · 45 lakh traders sampled</div>
-      </div>
-      <div class="cred-cell">
-        <div class="cred-num">₹1.1L</div>
-        <div class="cred-desc">average annual loss per losing retail F&amp;O trader</div>
-        <div class="cred-source">SEBI Study FY2021–22</div>
-      </div>
-      <div class="cred-cell">
-        <div class="cred-num">70%</div>
-        <div class="cred-desc">of avoidable losses trace to behavior, not market direction</div>
-        <div class="cred-source">TradeMentor internal analysis · 500+ traders</div>
-      </div>
+<!-- ======================================================
+     ALERTS FEATURE
+     Layout: 2-col. Left = copy + facts. Right = alert feed.
+     (Not a symmetric split - left is narrower, content-driven.)
+====================================================== -->
+<section class="alerts-s" id="alerts">
+  <div class="alerts-inner">
+    <div class="alerts-top rev">
+      <p class="alerts-eyebrow">Real-time behavioral alerts</p>
+      <h2 class="alerts-h2">Fires while the position is still open.</h2>
+      <p class="alerts-sub">Most tools show you what went wrong after you've already exited. TradeMentor alerts you the moment a pattern begins, while there's still time to act on it.</p>
     </div>
-  </div>
-</section>
-
-<!-- PROBLEM -->
-<section class="section" id="problem">
-  <div class="inner">
-    <div class="overline reveal">The patterns</div>
-    <h2 class="section-h2 reveal">Three habits responsible for most of your losses.</h2>
-    <p class="section-sub reveal reveal-d1">They don't feel like bad decisions in the moment. That's what makes them so costly.</p>
-    <div class="problem-grid">
-      <div class="problem-card reveal reveal-d1">
-        <div class="problem-card-stripe red"></div>
-        <div class="problem-card-body">
-          <div class="problem-label red">Most costly · High risk</div>
-          <div class="problem-name">Revenge Trading</div>
-          <div class="problem-desc">Re-entering the same instrument minutes after a stop hit. The loss feels personal. The next trade feels like justice. It rarely is.</div>
-          <div class="problem-cost-label">Avg monthly loss</div>
-          <div class="problem-cost red">−₹18,400</div>
+    <div class="alerts-grid">
+      <!-- left: description -->
+      <div class="alerts-desc rev">
+        <h3 class="alerts-desc-h3">Pattern-specific, not generic</h3>
+        <p class="alerts-desc-body">Each alert is calibrated against your own historical data. If your revenge-trade win rate is 24% vs your baseline 58%, that gap is what you see, not a fixed threshold.</p>
+        <div class="attrs">
+          <div class="attr">
+            <span class="attr-dot"></span>
+            <span><strong>Estimated cost per occurrence</strong> - shown in rupees, based on your own trade history.</span>
+          </div>
+          <div class="attr">
+            <span class="attr-dot"></span>
+            <span><strong>Pattern context</strong> - time since last loss, position size delta, consecutive trade count.</span>
+          </div>
+          <div class="attr">
+            <span class="attr-dot"></span>
+            <span><strong>No false positives</strong> - alert thresholds auto-adjust as your behavior data grows.</span>
+          </div>
         </div>
       </div>
-      <div class="problem-card reveal reveal-d2">
-        <div class="problem-card-stripe amber"></div>
-        <div class="problem-card-body">
-          <div class="problem-label amber">Trade fatigue · Medium risk</div>
-          <div class="problem-name">Overtrading</div>
-          <div class="problem-desc">After trade #7, win rate falls to 31%. More trades don't recover the session — they accelerate the damage.</div>
-          <div class="problem-cost-label">Avg monthly loss</div>
-          <div class="problem-cost amber">−₹12,800</div>
+      <!-- right: notification feed -->
+      <div class="alert-feed rev d1">
+        <div class="alert-card">
+          <div class="alert-stripe crit"></div>
+          <div class="alert-body">
+            <div class="alert-type crit">Revenge trade</div>
+            <div class="alert-msg">NIFTY 24000 CE re-entered 3 min after stop-loss</div>
+            <div class="alert-meta">Win rate on revenge entries: 24% &nbsp;&nbsp;Baseline: 58%</div>
+          </div>
+          <div class="alert-cost">
+            <div class="alert-cost-val">-&#8377;3,200</div>
+            <div class="alert-cost-lbl">avg cost</div>
+          </div>
         </div>
-      </div>
-      <div class="problem-card reveal reveal-d3">
-        <div class="problem-card-stripe indigo"></div>
-        <div class="problem-card-body">
-          <div class="problem-label indigo">Loss aversion · Medium risk</div>
-          <div class="problem-name">Holding Losers</div>
-          <div class="problem-desc">Cutting winners early, holding losers hoping they recover. The math is always negative — small wins, compounding losses.</div>
-          <div class="problem-cost-label">Avg monthly loss</div>
-          <div class="problem-cost indigo">−₹9,200</div>
+        <div class="alert-card">
+          <div class="alert-stripe warn"></div>
+          <div class="alert-body">
+            <div class="alert-type warn">Overtrading</div>
+            <div class="alert-msg">14 trades before 11:30 AM - your edge degrades after 8</div>
+            <div class="alert-meta">Session win rate: 36% &nbsp;&nbsp;Baseline: 62%</div>
+          </div>
+          <div class="alert-cost">
+            <div class="alert-cost-val">-&#8377;900</div>
+            <div class="alert-cost-lbl">per extra trade</div>
+          </div>
         </div>
-      </div>
-    </div>
-  </div>
-</section>
-
-<!-- PRODUCT DEMO -->
-<section class="section alt" id="demo">
-  <div class="inner">
-    <div class="overline reveal">The product</div>
-    <h2 class="section-h2 reveal">See exactly what's costing you,<br>while you can still stop it.</h2>
-    <p class="section-sub reveal reveal-d1" style="margin-bottom:32px">Four tools, all driven by your actual trading data. No generic advice.</p>
-    <div class="demo-tabs">
-      <button class="demo-tab active" onclick="switchTab('alerts')">Live Alerts</button>
-      <button class="demo-tab" onclick="switchTab('coach')">AI Coach</button>
-      <button class="demo-tab" onclick="switchTab('analytics')">Analytics</button>
-      <button class="demo-tab" onclick="switchTab('shield')">Blowup Shield</button>
-    </div>
-
-    <div class="demo-panel active" id="tab-alerts">
-      <div class="demo-frame">
-        <div class="demo-chrome"><div class="demo-dots"><span style="background:#FF5F57"></span><span style="background:#FEBC2E"></span><span style="background:#28C840"></span></div><div class="demo-chrome-title">TradeMentor — Alerts</div></div>
-        <div class="demo-body">
-          <div class="alert-feed">
-            <div class="alert-item high"><div class="alert-icon">⚡</div><div><div class="alert-badge">Revenge Trade · HIGH</div><div class="alert-desc">BANKNIFTY 48000 PE entered <strong>3 min after ₹−1,075 stop hit.</strong> Win rate on your revenge trades: <strong>19%</strong> vs your normal 64%. Cost this quarter: ₹41,200.</div><div class="alert-time">09:47 IST · Just now</div></div></div>
-            <div class="alert-item med"><div class="alert-icon">⚠️</div><div><div class="alert-badge">Overtrading · MEDIUM</div><div class="alert-desc">This is your <strong>9th trade today.</strong> Your win rate after trade #8 drops to <strong>31%.</strong> Session P&amp;L has been negative since trade #7.</div><div class="alert-time">11:22 IST</div></div></div>
-            <div class="alert-item low"><div class="alert-icon">📌</div><div><div class="alert-badge">Holding Loser · MEDIUM</div><div class="alert-desc">NIFTY 22000 CE held <strong>52 min past your average exit window.</strong> Currently −11.4%. Your avg recovery in this scenario: 7.8%.</div><div class="alert-time">14:31 IST</div></div></div>
+        <div class="alert-card">
+          <div class="alert-stripe info"></div>
+          <div class="alert-body">
+            <div class="alert-type info">Position sizing</div>
+            <div class="alert-msg">BNF 53000 PE at 3x typical size, entered after 2 losses</div>
+            <div class="alert-meta">Capital at risk: 4.2% &nbsp;&nbsp;Your usual: 1.4%</div>
+          </div>
+          <div class="alert-cost">
+            <div class="alert-cost-val">-&#8377;5,800</div>
+            <div class="alert-cost-lbl">excess exposure</div>
           </div>
         </div>
       </div>
     </div>
+  </div>
+</section>
 
-    <div class="demo-panel" id="tab-coach">
-      <div class="demo-frame">
-        <div class="demo-chrome"><div class="demo-dots"><span style="background:#FF5F57"></span><span style="background:#FEBC2E"></span><span style="background:#28C840"></span></div><div class="demo-chrome-title">TradeMentor — AI Coach</div></div>
-        <div class="demo-body">
-          <div class="coach-chat">
-            <div class="bubble user">Why do I keep losing after my stop is hit?</div>
-            <div class="bubble ai">Your last 90 days: you re-enter within <span class="stat">4 minutes</span> of a stop hit <span class="stat">73%</span> of the time.<br><br>Win rate on those trades: <span class="stat">19%.</span> That's 4 losers for every 1 winner. This pattern has cost you <span class="stat">₹41,200</span> this quarter alone.</div>
-            <div class="bubble user">What should I do about it?</div>
-            <div class="bubble ai">One rule. After a stop hit, <strong>wait 15 minutes before entering anything.</strong><br><br>Not when it "feels right." A hard rule. Set a timer.<br><br>You've tried willpower. The data says it doesn't work in the moment. A rule does.</div>
-          </div>
+<!-- ======================================================
+     ANALYTICS / SESSION HISTORY
+     Layout: 40/60 grid. Left = copy. Right = session table.
+     Different from alerts section (different ratio + content type).
+====================================================== -->
+<section class="analytics-s" id="analytics">
+  <div class="analytics-grid">
+    <!-- left: copy -->
+    <div class="analytics-copy rev">
+      <h2 class="analytics-h2">See every session through the lens of behavior, not just P&amp;L.</h2>
+      <p class="analytics-body">Your best trading days share something. So do your worst. TradeMentor surfaces the patterns behind both, so you can make deliberate choices instead of reactive ones.</p>
+      <div class="analytics-facts">
+        <div class="a-fact">
+          <div class="a-fact-title">Edge Map</div>
+          <div class="a-fact-body">Monthly breakdown of habit costs by pattern type. See which behavior costs you the most.</div>
+        </div>
+        <div class="a-fact">
+          <div class="a-fact-title">Win rate by condition</div>
+          <div class="a-fact-body">How your win rate shifts after a loss, during expiry week, or in the first 30 minutes.</div>
+        </div>
+        <div class="a-fact">
+          <div class="a-fact-title">Behavior trend</div>
+          <div class="a-fact-body">Track week-over-week changes in how often each pattern fires. The goal is fewer triggers.</div>
         </div>
       </div>
     </div>
-
-    <div class="demo-panel" id="tab-analytics">
-      <div class="demo-frame">
-        <div class="demo-chrome"><div class="demo-dots"><span style="background:#FF5F57"></span><span style="background:#FEBC2E"></span><span style="background:#28C840"></span></div><div class="demo-chrome-title">TradeMentor — Analytics</div></div>
-        <div class="demo-body">
-          <div class="analytics-kpi">
-            <div class="kpi-card"><div class="kpi-val pos">64%</div><div class="kpi-lbl">Win rate — planned entries</div></div>
-            <div class="kpi-card"><div class="kpi-val neg">19%</div><div class="kpi-lbl">Win rate — revenge trades (3× worse)</div></div>
-            <div class="kpi-card"><div class="kpi-val neg">−₹41k</div><div class="kpi-lbl">Behavioral cost this quarter</div></div>
-          </div>
-          <div class="chart-lbl">Session P&amp;L — Today · 09:15 to 15:30 IST</div>
-          <svg viewBox="0 0 640 120" width="100%" style="display:block;border-radius:8px;overflow:hidden">
-            <defs><linearGradient id="cg" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="rgba(21,128,61,0.3)"/><stop offset="45%" stop-color="rgba(21,128,61,0.04)"/><stop offset="55%" stop-color="rgba(220,38,38,0.04)"/><stop offset="100%" stop-color="rgba(220,38,38,0.35)"/></linearGradient></defs>
-            <rect width="640" height="120" fill="var(--bg-alt)" rx="8"/>
-            <line x1="0" y1="72" x2="640" y2="72" stroke="var(--bdr)" stroke-width="1" stroke-dasharray="4 4"/>
-            <path d="M0,72 L40,58 L100,18 L160,32 L220,44 L270,58 L300,64 L340,80 L400,98 L460,93 L520,108 L580,112 L640,116 L640,72 L0,72Z" fill="url(#cg)" opacity=".8"/>
-            <path d="M0,72 L40,58 L100,18 L160,32 L220,44 L270,58 L300,64" fill="none" stroke="var(--profit)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
-            <path d="M300,64 L340,80 L400,98 L460,93 L520,108 L580,112 L640,116" fill="none" stroke="var(--loss)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
-            <circle cx="300" cy="64" r="4" fill="var(--loss)"/>
-            <text x="282" y="56" font-size="9" fill="rgba(220,38,38,.85)" font-family="Inter,sans-serif">⚡ Revenge entry</text>
-            <text x="76" y="14" font-size="9" fill="rgba(21,128,61,.9)" font-family="DM Mono,monospace">+₹22,400</text>
-            <text x="570" y="112" font-size="9" fill="rgba(220,38,38,.9)" font-family="DM Mono,monospace">−₹8,200</text>
-          </svg>
+    <!-- right: session history table -->
+    <div class="rev d1">
+      <div class="sh-card">
+        <div class="sh-head">
+          <span class="sh-head-title">Session history</span>
+          <span class="sh-head-tag">Jun 2024 &nbsp;|&nbsp; Sample data</span>
         </div>
-      </div>
-    </div>
-
-    <div class="demo-panel" id="tab-shield">
-      <div class="demo-frame">
-        <div class="demo-chrome"><div class="demo-dots"><span style="background:#FF5F57"></span><span style="background:#FEBC2E"></span><span style="background:#28C840"></span></div><div class="demo-chrome-title">TradeMentor — Blowup Shield</div></div>
-        <div class="demo-body">
-          <div class="shield-list">
-            <div class="shield-item"><div class="shield-date">Oct 8</div><div class="shield-dot hi"></div><div class="shield-content"><div class="stitle">Revenge trade — session stopped</div><div class="sdetail">Alert fired at 10:47 AM. You stopped for the day. Guardian (Mom) was notified.</div><div class="ssaved">Estimated saved: +₹3,800</div></div></div>
-            <div class="shield-item"><div class="shield-date">Oct 14</div><div class="shield-dot hi"></div><div class="shield-content"><div class="stitle">Daily loss limit hit — ₹12,000</div><div class="sdetail">Session locked. Most blow-ups start with "I'll make it back." This one didn't happen.</div><div class="ssaved">Estimated saved: +₹4,200</div></div></div>
-            <div class="shield-item"><div class="shield-date">Oct 19</div><div class="shield-dot md"></div><div class="shield-content"><div class="stitle">3 consecutive losses detected</div><div class="sdetail">Guardian messaged. You took a 25-minute break, then closed 2 profitable trades.</div><div class="ssaved">Estimated saved: +₹2,100</div></div></div>
-          </div>
-          <div class="shield-total"><div class="shield-total-lbl">Total estimated saved · October</div><div class="shield-total-val">₹10,100</div></div>
-        </div>
+        <table class="sh-table">
+          <thead>
+            <tr>
+              <th>Date</th>
+              <th>Trades</th>
+              <th>Alerts</th>
+              <th>P&amp;L</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td class="sh-date">Jun 12</td>
+              <td class="sh-trades">11</td>
+              <td class="sh-alerts-cell"><span class="sh-tag w">Overtrading</span></td>
+              <td class="sh-pnl pos">+&#8377;2,840</td>
+            </tr>
+            <tr>
+              <td class="sh-date">Jun 11</td>
+              <td class="sh-trades">18</td>
+              <td class="sh-alerts-cell"><span class="sh-tag r">Revenge, OT</span></td>
+              <td class="sh-pnl neg">-&#8377;6,200</td>
+            </tr>
+            <tr>
+              <td class="sh-date">Jun 10</td>
+              <td class="sh-trades">8</td>
+              <td class="sh-alerts-cell"><span class="sh-tag ok">None</span></td>
+              <td class="sh-pnl pos">+&#8377;4,100</td>
+            </tr>
+            <tr>
+              <td class="sh-date">Jun 9</td>
+              <td class="sh-trades">14</td>
+              <td class="sh-alerts-cell"><span class="sh-tag r">No stop-loss</span></td>
+              <td class="sh-pnl neg">-&#8377;1,940</td>
+            </tr>
+            <tr>
+              <td class="sh-date">Jun 8</td>
+              <td class="sh-trades">21</td>
+              <td class="sh-alerts-cell"><span class="sh-tag r">OT, Revenge</span></td>
+              <td class="sh-pnl neg">-&#8377;9,800</td>
+            </tr>
+            <tr>
+              <td class="sh-date">Jun 7</td>
+              <td class="sh-trades">9</td>
+              <td class="sh-alerts-cell"><span class="sh-tag ok">None</span></td>
+              <td class="sh-pnl pos">+&#8377;3,620</td>
+            </tr>
+          </tbody>
+        </table>
+        <div class="sh-footer">Showing 6 of 22 sessions this month</div>
       </div>
     </div>
   </div>
 </section>
 
-<!-- GUARDIAN -->
-<section class="section-guardian" id="guardian">
-  <div class="guardian-inner">
-    <div>
-      <div class="g-tag">
-        <svg width="12" height="12" viewBox="0 0 24 24" fill="#25D366"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347z"/><path d="M12 0C5.373 0 0 5.373 0 12c0 2.123.558 4.116 1.532 5.845L.057 23.944l6.245-1.634A11.96 11.96 0 0 0 12 24c6.627 0 12-5.373 12-12S18.627 0 12 0zm0 22c-1.894 0-3.668-.52-5.187-1.426l-.371-.219-3.705.97.987-3.605-.241-.381A9.958 9.958 0 0 1 2 12C2 6.477 6.477 2 12 2s10 4.477 10 10-4.477 10-10 10z"/></svg>
-        WhatsApp Guardian
-      </div>
-      <h2 class="g-h2 reveal">Someone who tells you<br>to stop — and you listen.</h2>
-      <p class="g-p reveal reveal-d1">Most account blow-ups start with <strong style="color:#EEEEF6">"I'll make it back."</strong> In that moment, willpower doesn't work. A message from someone who matters to you does.</p>
-      <p class="g-callout reveal reveal-d1">Add a family member or trusted friend as your Guardian. They get a WhatsApp alert the moment TradeMentor detects dangerous behavior — with full context.</p>
-      <div class="g-bullets reveal reveal-d2">
-        <div class="g-bullet"><div class="g-bdot"></div><div><strong>Real-time</strong> — Alert fires within seconds of detection, not end-of-day</div></div>
-        <div class="g-bullet"><div class="g-bdot"></div><div><strong>Context included</strong> — Not just "stop trading" but exactly what you did and why it's a red flag</div></div>
-        <div class="g-bullet"><div class="g-bdot"></div><div><strong>Privacy-first</strong> — Guardian sees behavior alerts only. Your account data stays private.</div></div>
-        <div class="g-bullet"><div class="g-bdot"></div><div><strong>Unique to TradeMentor</strong> — No other trading platform in India has this.</div></div>
-      </div>
-    </div>
-    <div class="wa-wrap reveal reveal-d1">
-      <div class="wa-phone">
-        <div class="wa-hdr">
-          <div class="wa-avatar">🛡</div>
-          <div><div class="wa-name">TradeMentor Guardian</div><div class="wa-status">Arjun · Mom · 2 members</div></div>
-        </div>
-        <div class="wa-body">
-          <div class="wa-msg in" id="wa1"><div class="wa-sender">TradeMentor</div>⚡ <strong>Revenge Trade Alert</strong><br>Arjun entered BANKNIFTY 48000 PE 3 min after a ₹−1,075 stop hit.<br><br>Win rate on these: 19%.<div class="wa-time">10:08 AM ✓✓</div></div>
-          <div class="wa-msg out" id="wa2">Beta please stop trading today 🙏<div class="wa-time">10:09 AM ✓</div></div>
-          <div class="wa-msg in" id="wa3"><div class="wa-sender">Arjun</div>Stopping now 😮‍💨 thank you<div class="wa-time">10:09 AM ✓✓</div></div>
-        </div>
-      </div>
-    </div>
-  </div>
-</section>
+<!-- ======================================================
+     TESTIMONIALS
+     Layout: 1 large featured quote centered + divider +
+             2 smaller cards side by side.
+     NOT 3 equal cards.
+====================================================== -->
+<section class="testi s">
+  <div class="testi-inner">
+    <p class="testi-eyebrow rev">From traders using it</p>
 
-<!-- TESTIMONIALS -->
-<section class="section">
-  <div class="inner">
-    <div class="overline reveal">From traders</div>
-    <h2 class="section-h2 reveal">What actually changed.</h2>
+    <!-- featured large quote -->
+    <div class="testi-featured rev">
+      <p class="testi-quote-big">I stopped entering within 5 minutes of a stop-loss. That one change moved my BANKNIFTY win rate from 38% to 52% in 6 weeks.</p>
+      <div class="testi-attr-feat">
+        <strong>Arjun S.</strong>
+        Intraday options, Mumbai - 5 years F&amp;O
+      </div>
+      <span class="testi-metric-feat">WR 38% to 52% in 6 weeks</span>
+    </div>
+
+    <div class="testi-divide"></div>
+
+    <!-- two smaller quotes -->
     <div class="testi-grid">
-      <div class="testi-card reveal">
-        <div class="testi-outcome">Top 3 loss patterns found in 1 session</div>
-        <p class="testi-quote">"My last 3 bad days caused <strong>67% of my monthly losses.</strong> TradeMentor showed me this in 5 minutes. I didn't believe it. The data was right."</p>
-        <div class="testi-author"><div class="testi-av">N</div><div><div class="testi-name">Neel R.</div><div class="testi-role">F&amp;O trader · Pune · 3 years</div></div></div>
+      <div class="testi-mini rev">
+        <span class="testi-mini-metric">&#8377;38,000 in habit costs, week 1</span>
+        <p class="testi-mini-q">I thought my setup was broken. Turns out I was revenge trading every NIFTY failure. That one pattern cost more than my brokerage all year.</p>
+        <div class="testi-mini-attr">
+          <strong>Neel R.</strong>
+          F&amp;O trader, Pune - 3 years
+        </div>
       </div>
-      <div class="testi-card reveal reveal-d1">
-        <div class="testi-outcome">BANKNIFTY WR 38% → 54% in 30 days</div>
-        <p class="testi-quote">"Win rate went from <strong>38% to 54% in a month.</strong> I didn't change my strategy. I just stopped entering within 5 minutes of a stop hit."</p>
-        <div class="testi-author"><div class="testi-av">A</div><div><div class="testi-name">Arjun S.</div><div class="testi-role">Intraday options · Mumbai · 5 years</div></div></div>
-      </div>
-      <div class="testi-card reveal reveal-d2">
-        <div class="testi-outcome">14-day discipline streak — first ever</div>
-        <p class="testi-quote">"<strong>14 consecutive days within my loss limit.</strong> First time in 2 years. The WhatsApp Guardian was the only accountability that actually worked."</p>
-        <div class="testi-author"><div class="testi-av">P</div><div><div class="testi-name">Priya M.</div><div class="testi-role">Options writer · Bangalore · 2 years</div></div></div>
+      <div class="testi-mini rev d1">
+        <span class="testi-mini-metric">14 days within daily loss limit</span>
+        <p class="testi-mini-q">The WhatsApp alert to my brother was the only thing that worked. First 14-day streak within my daily limit in two years.</p>
+        <div class="testi-mini-attr">
+          <strong>Priya M.</strong>
+          Options writer, Bangalore - 2 years
+        </div>
       </div>
     </div>
   </div>
 </section>
 
-<!-- PRICING -->
-<section class="section alt" id="pricing">
-  <div class="inner" style="text-align:center">
-    <div class="overline reveal">Pricing</div>
-    <h2 class="section-h2 reveal">Free to start. Pro pays for itself.</h2>
-    <p class="section-sub reveal reveal-d1" style="margin:0 auto 0">One caught revenge trade covers a month of Pro. Usually happens in the first session.</p>
+<!-- ======================================================
+     PRICING
+     Layout: left-aligned 2-col cards. Max-width 800px.
+====================================================== -->
+<section class="pricing" id="pricing">
+  <div class="pricing-inner">
+    <div class="pricing-header rev">
+      <h2 class="pricing-h2">Start free. Upgrade when it pays for itself.</h2>
+      <p class="pricing-sub">Most traders find their first prevented revenge trade covers a full year of Pro.</p>
+    </div>
     <div class="pricing-grid">
-      <div class="pricing-card reveal">
-        <div class="pricing-plan">Free</div>
-        <div class="pricing-price">₹0</div>
-        <div class="pricing-period">No credit card required</div>
-        <ul class="pricing-features">
-          <li>Behavioral alerts (live)</li>
-          <li>30-day trade analytics</li>
-          <li>1 Zerodha account</li>
-          <li>22-pattern detection</li>
-          <li class="dim">AI Coach</li>
-          <li class="dim">WhatsApp Guardian</li>
-          <li class="dim">Blowup Shield limits</li>
-        </ul>
-        <button class="pricing-cta">Get Started Free</button>
+      <!-- free -->
+      <div class="plan rev">
+        <div class="plan-name">Free</div>
+        <div class="plan-price">&#8377;0</div>
+        <div class="plan-price-mo">forever</div>
+        <div class="plan-trial">No credit card required</div>
+        <div class="plan-rule"></div>
+        <div class="plan-feats">
+          <div class="pf">
+            <div class="pf-check y"><svg viewBox="0 0 10 10"><polyline points="1.5,5 4,7.5 8.5,2"/></svg></div>
+            <span>Real-time alerts (10 pattern types)</span>
+          </div>
+          <div class="pf">
+            <div class="pf-check y"><svg viewBox="0 0 10 10"><polyline points="1.5,5 4,7.5 8.5,2"/></svg></div>
+            <span>30-day session analytics</span>
+          </div>
+          <div class="pf">
+            <div class="pf-check y"><svg viewBox="0 0 10 10"><polyline points="1.5,5 4,7.5 8.5,2"/></svg></div>
+            <span>1 broker account</span>
+          </div>
+          <div class="pf off">
+            <div class="pf-check n"><svg viewBox="0 0 10 10"><line x1="2" y1="2" x2="8" y2="8"/><line x1="8" y1="2" x2="2" y2="8"/></svg></div>
+            <span>AI Coach</span>
+          </div>
+          <div class="pf off">
+            <div class="pf-check n"><svg viewBox="0 0 10 10"><line x1="2" y1="2" x2="8" y2="8"/><line x1="8" y1="2" x2="2" y2="8"/></svg></div>
+            <span>WhatsApp Guardian</span>
+          </div>
+          <div class="pf off">
+            <div class="pf-check n"><svg viewBox="0 0 10 10"><line x1="2" y1="2" x2="8" y2="8"/><line x1="8" y1="2" x2="2" y2="8"/></svg></div>
+            <span>Daily session reports</span>
+          </div>
+        </div>
+        <button class="plan-cta free">Get started free</button>
       </div>
-      <div class="pricing-card featured reveal reveal-d1">
-        <div class="pricing-badge">Most popular</div>
-        <div class="pricing-plan">Pro</div>
-        <div class="pricing-price"><sup>₹</sup>499<sub>/mo</sub></div>
-        <div class="pricing-period">14-day free trial · Cancel anytime</div>
-        <ul class="pricing-features">
-          <li>Everything in Free</li>
-          <li>AI Coach (unlimited)</li>
-          <li>WhatsApp Guardian</li>
-          <li>Blowup Shield + custom limits</li>
-          <li>6-month analytics + Edge Map</li>
-          <li>Journal correlation</li>
-          <li>Priority support</li>
-        </ul>
-        <button class="pricing-cta primary">Start 14-Day Trial</button>
+      <!-- pro -->
+      <div class="plan pro rev d1">
+        <span class="plan-badge">Most popular</span>
+        <div class="plan-name">Pro</div>
+        <div class="plan-price"><sup>&#8377;</sup>499</div>
+        <div class="plan-price-mo">per month</div>
+        <div class="plan-trial">14-day free trial - cancel any time</div>
+        <div class="plan-rule"></div>
+        <div class="plan-feats">
+          <div class="pf">
+            <div class="pf-check y"><svg viewBox="0 0 10 10"><polyline points="1.5,5 4,7.5 8.5,2"/></svg></div>
+            <span>All 22 behavioral patterns</span>
+          </div>
+          <div class="pf">
+            <div class="pf-check y"><svg viewBox="0 0 10 10"><polyline points="1.5,5 4,7.5 8.5,2"/></svg></div>
+            <span>90-day analytics + Edge Map</span>
+          </div>
+          <div class="pf">
+            <div class="pf-check y"><svg viewBox="0 0 10 10"><polyline points="1.5,5 4,7.5 8.5,2"/></svg></div>
+            <span>AI Coach (unlimited sessions)</span>
+          </div>
+          <div class="pf">
+            <div class="pf-check y"><svg viewBox="0 0 10 10"><polyline points="1.5,5 4,7.5 8.5,2"/></svg></div>
+            <span>WhatsApp Guardian alerts</span>
+          </div>
+          <div class="pf">
+            <div class="pf-check y"><svg viewBox="0 0 10 10"><polyline points="1.5,5 4,7.5 8.5,2"/></svg></div>
+            <span>Daily session reports at 3:45 PM</span>
+          </div>
+          <div class="pf">
+            <div class="pf-check y"><svg viewBox="0 0 10 10"><polyline points="1.5,5 4,7.5 8.5,2"/></svg></div>
+            <span>2 broker accounts</span>
+          </div>
+        </div>
+        <button class="plan-cta pro">Start free trial</button>
       </div>
     </div>
   </div>
 </section>
 
-<!-- FOOTER -->
-<footer class="footer">
-  <div class="footer-grid">
-    <div>
-      <div class="footer-logo">
-        <div class="logo-icon"><svg viewBox="0 0 24 24"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg></div>
-        <span class="footer-word">Trade<em>Mentor</em></span>
+<!-- ======================================================
+     DARK BLOCK - continuous dark ending
+     Stats 4-col -> CTA centered -> Footer 4-col
+====================================================== -->
+<div class="dk">
+
+  <!-- stats -->
+  <section class="stats">
+    <div class="stats-inner">
+      <div class="stats-grid">
+        <div class="stat-cell rev">
+          <div class="stat-n">89%</div>
+          <div class="stat-lbl">of F&amp;O traders lose money every year</div>
+          <div class="stat-src">SEBI FY24</div>
+        </div>
+        <div class="stat-cell rev d1">
+          <div class="stat-n">&#8377;1.1L</div>
+          <div class="stat-lbl">average annual loss per retail F&amp;O participant</div>
+          <div class="stat-src">SEBI FY24</div>
+        </div>
+        <div class="stat-cell rev d2">
+          <div class="stat-n">22</div>
+          <div class="stat-lbl">behavioral patterns tracked automatically in your account</div>
+          <div class="stat-src">TradeMentor</div>
+        </div>
+        <div class="stat-cell rev d3">
+          <div class="stat-n">&#8377;0</div>
+          <div class="stat-lbl">stock tips, signals, or calls. We track behavior, not markets.</div>
+          <div class="stat-src">TradeMentor</div>
+        </div>
       </div>
-      <p class="footer-brand-p">Behavioral analysis for Indian F&amp;O traders. Mirror, not blocker.</p>
     </div>
-    <div class="footer-col"><h4>Product</h4><a href="#">Live Alerts</a><a href="#">AI Coach</a><a href="#">Analytics</a><a href="#">Blowup Shield</a><a href="#">Guardian</a></div>
-    <div class="footer-col"><h4>Company</h4><a href="#">About</a><a href="#">Blog</a><a href="#">Careers</a><a href="#">Contact</a></div>
-    <div class="footer-col"><h4>Legal</h4><a href="#">Terms of Service</a><a href="#">Privacy Policy</a><a href="#">DPDP Compliance</a><a href="#">SEBI Disclaimer</a></div>
-  </div>
-  <div class="footer-bottom">
-    <span>© 2025 TradeMentor AI. Not SEBI registered. For informational and educational purposes only.</span>
-    <div style="display:flex;gap:16px"><a href="#">Terms</a><a href="#">Privacy</a><a href="#">Contact</a></div>
-  </div>
-</footer>
+  </section>
+
+  <!-- footer CTA -->
+  <section class="fcta">
+    <div class="fcta-inner">
+      <h2 class="fcta-h2 rev">Ready to see what your habits cost you?</h2>
+      <p class="fcta-sub rev d1">Connect your Zerodha account. Read-only access. It takes 2 minutes. Your first month is free.</p>
+      <button class="fcta-btn rev d2">Connect Zerodha</button>
+      <p class="fcta-note rev d3">No stock tips. No signals. No funds access. SEBI compliant.</p>
+    </div>
+  </section>
+
+  <!-- footer -->
+  <footer class="footer">
+    <div class="footer-grid">
+      <div>
+        <div class="footer-brand">Trade<em>Mentor</em></div>
+        <p class="footer-tagline">Behavioral analysis for active F&amp;O traders. Not investment advice.</p>
+      </div>
+      <div>
+        <div class="foot-col-title">Product</div>
+        <div class="foot-links">
+          <a href="#">Live Alerts</a>
+          <a href="#">Analytics</a>
+          <a href="#">Blowup Shield</a>
+          <a href="#">Guardian</a>
+          <a href="#">Daily Reports</a>
+        </div>
+      </div>
+      <div>
+        <div class="foot-col-title">Company</div>
+        <div class="foot-links">
+          <a href="#">About</a>
+          <a href="#">Pricing</a>
+          <a href="#">Contact</a>
+        </div>
+      </div>
+      <div>
+        <div class="foot-col-title">Legal</div>
+        <div class="foot-links">
+          <a href="#">Terms of Service</a>
+          <a href="#">Privacy Policy</a>
+          <a href="#">DPDP Compliance</a>
+          <a href="#">SEBI Disclaimer</a>
+        </div>
+      </div>
+    </div>
+    <div class="footer-bottom">
+      <p class="footer-disc">Not SEBI registered. TradeMentor does not provide investment advice, stock tips, trading signals, or portfolio management services. All behavioral insights are for informational and educational purposes only. Trading in F&amp;O instruments involves substantial risk of loss. Past behavioral patterns do not guarantee future results.</p>
+      <span class="footer-copy">&copy; 2025 TradeMentor AI</span>
+    </div>
+  </footer>
+
+</div><!-- /dark block -->
 
 <script>
-// THEME
-const html = document.documentElement;
 function toggleTheme() {
-  const next = html.getAttribute('data-theme') === 'dark' ? 'light' : 'dark';
-  html.setAttribute('data-theme', next);
+  const h = document.documentElement;
+  const next = h.getAttribute('data-theme') === 'dark' ? 'light' : 'dark';
+  h.setAttribute('data-theme', next);
   localStorage.setItem('tm-theme', next);
-  syncIcon(next);
 }
-function syncIcon(t) {
-  document.getElementById('icon-moon').style.display = t === 'dark'  ? 'block' : 'none';
-  document.getElementById('icon-sun').style.display  = t === 'light' ? 'block' : 'none';
-}
-const saved = localStorage.getItem('tm-theme') || 'dark';
-html.setAttribute('data-theme', saved);
-syncIcon(saved);
-
-// DEMO TABS
-function switchTab(id) {
-  const ids = ['alerts','coach','analytics','shield'];
-  document.querySelectorAll('.demo-tab').forEach((t,i) => t.classList.toggle('active', ids[i] === id));
-  document.querySelectorAll('.demo-panel').forEach(p => p.classList.remove('active'));
-  document.getElementById('tab-' + id).classList.add('active');
-}
-
-// WA ANIMATION
-(function(){
-  const phone = document.querySelector('.wa-phone');
-  if (!phone) return;
-  let fired = false;
-  new IntersectionObserver(entries => {
-    if (entries[0].isIntersecting && !fired) {
-      fired = true;
-      ['wa1','wa2','wa3'].forEach((id, i) => {
-        setTimeout(() => {
-          const el = document.getElementById(id);
-          if (el) el.classList.add('show');
-        }, i * 700 + 300);
-      });
-    }
-  }, { threshold: 0.4 }).observe(phone);
+(function() {
+  const saved = localStorage.getItem('tm-theme');
+  if (saved) document.documentElement.setAttribute('data-theme', saved);
 })();
-
-// SCROLL REVEAL
-const ro = new IntersectionObserver(entries => {
-  entries.forEach(e => { if (e.isIntersecting) { e.target.classList.add('in'); ro.unobserve(e.target); } });
-}, { threshold: 0.1 });
-document.querySelectorAll('.reveal').forEach(el => ro.observe(el));
+(function() {
+  const obs = new IntersectionObserver(function(entries) {
+    entries.forEach(function(e) {
+      if (e.isIntersecting) { e.target.classList.add('in'); obs.unobserve(e.target); }
+    });
+  }, { threshold: 0.08 });
+  document.querySelectorAll('.rev').forEach(function(el) { obs.observe(el); });
+})();
 </script>
 </body>
 </html>

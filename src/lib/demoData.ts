@@ -219,11 +219,11 @@ export const DEMO_POSITIONS: Position[] = [
 // Risk state
 // ---------------------------------------------------------------------------
 export const DEMO_RISK_STATE = {
-  state: 'caution',
-  score: 62,
+  state: 'danger',
+  score: 76,
   factors: [
     { name: 'Daily P&L', status: 'caution', value: '-₹15,700', detail: '63% of daily limit used' },
-    { name: 'Behavioral Alerts', status: 'danger', value: '3 alerts', detail: 'Revenge trading detected' },
+    { name: 'Behavioral Alerts', status: 'danger', value: '7 alerts', detail: '3 high-severity unacknowledged' },
     { name: 'Position Count', status: 'safe', value: '2 open', detail: 'Within normal range' },
   ],
   daily_pnl: -15700,
@@ -270,6 +270,61 @@ export const DEMO_RISK_ALERTS = [
       max_ratio: 3,
       consecutive_losses: 3,
       estimated_cost: 4500,
+    },
+  },
+  {
+    id: 'ra-004', pattern_type: 'size_escalation', severity: 'high',
+    message: 'BANKNIFTY 45500 PE entry at 100 lots — 4× your average size — 8 min after ₹2,600 loss. Win rate on oversized entries: 28% vs 60% baseline.',
+    created_at: daysAgo(0, 10, 51), acknowledged: false,
+    details: {
+      underlying: 'BANKNIFTY',
+      symbol: 'BANKNIFTY45500PE',
+      lots: 100,
+      avg_lots: 25,
+      ratio: 4,
+      prior_loss: 2600,
+      win_rate_oversized: 0.28,
+      win_rate_normal: 0.60,
+      estimated_cost: 4200,
+    },
+  },
+  {
+    id: 'ra-005', pattern_type: 'early_exit', severity: 'medium',
+    message: 'NIFTY CE exited at +₹820 after 8 min. Position continued to +₹2,100. You exit 42% early on average — ₹7,680 in unrealised gains left behind this month.',
+    created_at: daysAgo(0, 9, 38), acknowledged: false,
+    details: {
+      symbol: 'NIFTY23000CE',
+      exit_pnl: 820,
+      continued_to: 2100,
+      avg_early_exit_pct: 42,
+      monthly_cost: 7680,
+      times_this_month: 6,
+      estimated_cost: 1280,
+    },
+  },
+  {
+    id: 'ra-006', pattern_type: 'no_stoploss', severity: 'high',
+    message: 'FINNIFTY 19800 CE open 47 min with no stop-loss. Unrealised loss: ₹3,200. Positions without stop-loss average 3× larger final loss for you.',
+    created_at: daysAgo(0, 9, 15), acknowledged: false,
+    details: {
+      symbol: 'FINNIFTY19800CE',
+      open_minutes: 47,
+      unrealised_loss: 3200,
+      loss_multiplier: 3,
+      estimated_cost: 5800,
+    },
+  },
+  {
+    id: 'ra-007', pattern_type: 'opening_5min_trap', severity: 'medium',
+    message: 'NIFTY CE entry at 09:17 — within opening 5-min window. Your win rate on opening entries is 19% vs 54% after 09:30. This pattern cost ₹9,400 last month.',
+    created_at: daysAgo(1, 9, 20), acknowledged: true,
+    details: {
+      symbol: 'NIFTY23000CE',
+      entry_time: '09:17',
+      win_rate_opening: 0.19,
+      win_rate_after_open: 0.54,
+      monthly_cost: 9400,
+      estimated_cost: 1800,
     },
   },
 ];
@@ -406,8 +461,8 @@ export const DEMO_BEHAVIORAL = {
     },
   ],
   summary: {
-    total_behavioral_cost: 21260,
-    clean_days: 7, flagged_days: 3,
+    total_behavioral_cost: 45840,
+    clean_days: 5, flagged_days: 5,
     most_frequent_pattern: 'revenge_trading',
   },
 };
@@ -452,13 +507,13 @@ export const DEMO_AI_INSIGHTS = {
 // ---------------------------------------------------------------------------
 export const DEMO_AI_SUMMARY = {
   has_data: true,
-  summary: `This month you traded 15 completed positions with a net P&L of ₹7,990. Your win rate is solid at 60%, but 3 revenge-trading incidents cost you ~₹8,400 that you didn't have to lose.
+  summary: `This month you traded 15 completed positions with a net P&L of ₹7,990. Your win rate is 60%, but 7 behavioral patterns have cost you an estimated ₹45,840 — meaning your clean trades made ₹53,830 and habits gave most of it back.
 
-Your strongest edge is in morning NIFTY/BANKNIFTY options (9–10 AM), where you win 80% of the time. Your weakest period is 2–3:30 PM — especially after an earlier loss. Consider a hard rule: no new entries after 2 PM if you're down on the day.
+Three patterns stand out: revenge trading (3 incidents, ₹8,400), early exits leaving ₹7,680 on the table across 6 trades, and opening 5-min entries with a 19% win rate. You also have 2 open positions without stop-losses right now.
 
-The SOLARINDS trade stands out: you held a losing intraday position for 3+ hours and took a ₹13,000 hit. A simple max-hold rule (e.g., 90 min for MIS) would have limited the damage significantly.
+Your strongest edge is 9–10 AM NIFTY/BANKNIFTY (80% win rate). Your worst period is 2 PM onward — every afternoon loss this month followed a morning drawdown. Consider a rule: no new entries after 2 PM if you're already down.
 
-One thing to build on: your FORTIS options trades were textbook — patient entry, clear thesis, disciplined exit.`,
+One thing to build on: FORTIS options — both trades were textbook. Patient entry, defined hold time, clean exit.`,
 };
 
 // ---------------------------------------------------------------------------
@@ -479,7 +534,7 @@ export const DEMO_PROGRESS = {
     trade_count:  { change: 0,      improved: true,  percent: 0 },
     danger_alerts:{ change: 2,      improved: false, percent: 200 },
   },
-  alerts: { this_week: 3, last_week: 1 },
+  alerts: { this_week: 7, last_week: 1 },
   streaks: { days_without_revenge: 2, current_streak: 2, best_streak: 7 },
 };
 
@@ -502,10 +557,10 @@ export const DEMO_RISK_METRICS = {
 // Analytics: risk score
 // ---------------------------------------------------------------------------
 export const DEMO_RISK_SCORE = {
-  score: 62,
-  label: 'Moderate Risk',
+  score: 76,
+  label: 'High Risk',
   components: {
-    drawdown: 55, volatility: 70, behavioral: 65, discipline: 58,
+    drawdown: 60, volatility: 70, behavioral: 84, discipline: 52,
   },
   trend: 'deteriorating',
 };
@@ -787,7 +842,27 @@ export const DEMO_BEHAVIORAL_ANALYSIS = {
       estimated_cost: 3660, last_seen: daysAgo(6, 11, 50),
       description: 'High-frequency trading day correlated with net loss',
     },
+    {
+      pattern_type: 'size_escalation', count: 2, severity: 'high',
+      estimated_cost: 6300, last_seen: daysAgo(0, 10, 51),
+      description: 'Position size 3–4× average after consecutive losses',
+    },
+    {
+      pattern_type: 'early_exit', count: 6, severity: 'medium',
+      estimated_cost: 7680, last_seen: daysAgo(0, 9, 38),
+      description: 'Exiting profitable positions 42% before their peak on average',
+    },
+    {
+      pattern_type: 'no_stoploss', count: 2, severity: 'high',
+      estimated_cost: 5800, last_seen: daysAgo(0, 9, 15),
+      description: 'Open positions held 40+ min with no stop-loss defined',
+    },
+    {
+      pattern_type: 'opening_5min_trap', count: 3, severity: 'medium',
+      estimated_cost: 4800, last_seen: daysAgo(1, 9, 20),
+      description: 'Entries within opening 5-min window — 19% win rate vs 54% baseline',
+    },
   ],
-  total_behavioral_cost: 21260,
-  clean_days_pct: 70,
+  total_behavioral_cost: 45840,
+  clean_days_pct: 52,
 };

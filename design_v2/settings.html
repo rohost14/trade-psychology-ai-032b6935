@@ -1,0 +1,412 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="light">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1.0">
+<title>Settings — TradeMentor</title>
+<link rel="stylesheet" href="base.css">
+<style>
+.app-shell{display:flex;min-height:100vh}
+.sidebar{width:220px;flex-shrink:0;background:var(--bg-card);border-right:1px solid var(--border-subtle);display:flex;flex-direction:column;position:fixed;top:0;left:0;bottom:0;z-index:50}
+.main-content{margin-left:220px;flex:1;display:flex;flex-direction:column;min-height:100vh}
+.sb-logo{display:flex;align-items:center;gap:10px;padding:18px 16px 14px;border-bottom:1px solid var(--border-subtle)}
+.sb-logomark{width:26px;height:26px;border-radius:6px;background:var(--brand);display:flex;align-items:center;justify-content:center;flex-shrink:0}
+.sb-logomark svg{width:13px;height:13px;stroke:#fff;fill:none;stroke-width:2.2;stroke-linecap:round;stroke-linejoin:round}
+.sb-wordmark{font-family:'Geist',sans-serif;font-size:13.5px;font-weight:600;letter-spacing:-.02em;color:var(--text-primary)}
+.sb-wordmark em{font-style:normal;color:var(--brand)}
+.sb-nav{padding:8px;flex:1;display:flex;flex-direction:column;gap:1px;overflow-y:auto}
+.sb-section{font-size:9.5px;font-weight:600;letter-spacing:.09em;text-transform:uppercase;color:var(--text-tertiary);padding:10px 10px 4px;margin-top:4px}
+.sb-item{display:flex;align-items:center;gap:9px;padding:8px 10px;border-radius:7px;border:1px solid transparent;font-size:13px;font-weight:500;color:var(--text-secondary);transition:all .1s;position:relative}
+.sb-item:hover{background:var(--bg-hover);color:var(--text-primary)}
+.sb-item.active{background:var(--brand-bg);color:var(--brand);border-color:var(--brand-border)}
+.sb-item.active::before{content:'';position:absolute;left:-1px;top:7px;bottom:7px;width:2px;border-radius:99px;background:var(--brand)}
+.sb-item svg{width:15px;height:15px;fill:none;stroke:currentColor;stroke-width:1.75;stroke-linecap:round;stroke-linejoin:round;flex-shrink:0}
+.sb-badge{margin-left:auto;background:var(--loss);color:#fff;font-size:10px;font-weight:600;min-width:17px;height:17px;border-radius:99px;display:flex;align-items:center;justify-content:center;padding:0 4px}
+.sb-foot{padding:12px 8px;border-top:1px solid var(--border-subtle);display:flex;align-items:center;gap:9px}
+.sb-avatar{width:28px;height:28px;border-radius:50%;background:var(--brand-bg);border:1px solid var(--brand-border);display:flex;align-items:center;justify-content:center;font-family:'DM Mono',monospace;font-size:10px;font-weight:600;color:var(--brand);flex-shrink:0}
+.sb-uname{font-size:12px;font-weight:500;color:var(--text-primary);line-height:1.2}
+.sb-usub{font-size:10.5px;color:var(--text-tertiary)}
+
+.top-bar{height:48px;padding:0 22px;border-bottom:1px solid var(--border-subtle);background:var(--bg-card);display:flex;align-items:center;justify-content:space-between;position:sticky;top:0;z-index:40;flex-shrink:0}
+.top-l{display:flex;align-items:center;gap:12px}
+.top-title{font-family:'Geist',sans-serif;font-size:13.5px;font-weight:600;color:var(--text-primary)}
+.top-r{display:flex;align-items:center;gap:6px}
+.icon-btn{width:32px;height:32px;border-radius:7px;border:1px solid var(--border-subtle);background:transparent;display:flex;align-items:center;justify-content:center;color:var(--text-secondary);cursor:pointer}
+.icon-btn svg{width:15px;height:15px;fill:none;stroke:currentColor;stroke-width:1.75;stroke-linecap:round;stroke-linejoin:round}
+.i-sun,.i-moon{display:none}
+[data-theme="light"] .i-sun{display:block}
+[data-theme="dark"] .i-moon{display:block}
+
+.settings-shell{display:flex;flex:1;overflow:hidden}
+.settings-nav{width:180px;flex-shrink:0;border-right:1px solid var(--border-subtle);padding:16px 10px;display:flex;flex-direction:column;gap:2px;background:var(--bg-elevated)}
+.sn-item{padding:7px 10px;border-radius:6px;font-size:13px;font-weight:500;color:var(--text-secondary);cursor:pointer;transition:all .1s}
+.sn-item:hover{background:var(--bg-hover);color:var(--text-primary)}
+.sn-item.active{background:var(--brand-bg);color:var(--brand);font-weight:600}
+.settings-body{flex:1;overflow-y:auto;padding:20px 24px;display:flex;flex-direction:column;gap:20px}
+
+.settings-section{display:flex;flex-direction:column;gap:12px}
+.ss-title{font-family:'Geist',sans-serif;font-size:14px;font-weight:600;color:var(--text-primary);padding-bottom:8px;border-bottom:1px solid var(--border-subtle)}
+.setting-row{display:flex;align-items:center;justify-content:space-between;padding:12px 0;border-bottom:1px solid var(--border-subtle)}
+.setting-row:last-child{border-bottom:none}
+.sr-left{flex:1}
+.sr-label{font-size:13px;font-weight:500;color:var(--text-primary);margin-bottom:2px}
+.sr-desc{font-size:12px;color:var(--text-tertiary);line-height:1.5}
+.sr-right{flex-shrink:0;margin-left:16px}
+
+/* Toggle switch */
+.toggle{position:relative;width:36px;height:20px;cursor:pointer}
+.toggle input{opacity:0;width:0;height:0;position:absolute}
+.toggle-track{position:absolute;inset:0;border-radius:99px;background:var(--neutral-bg);border:1px solid var(--border-default);transition:all .2s}
+.toggle input:checked + .toggle-track{background:var(--brand);border-color:var(--brand)}
+.toggle-thumb{position:absolute;top:2px;left:2px;width:14px;height:14px;border-radius:50%;background:#fff;box-shadow:0 1px 3px rgba(0,0,0,.2);transition:transform .2s}
+.toggle input:checked ~ .toggle-thumb{transform:translateX(16px)}
+
+/* Inputs */
+.settings-input{font-size:12.5px;padding:6px 10px;border:1px solid var(--border-default);border-radius:7px;background:var(--bg-card);color:var(--text-primary);outline:none;min-width:140px}
+.settings-input:focus{border-color:var(--brand);box-shadow:0 0 0 3px var(--brand-bg)}
+.settings-select{font-size:12.5px;padding:6px 10px;border:1px solid var(--border-default);border-radius:7px;background:var(--bg-card);color:var(--text-primary)}
+
+/* Broker card */
+.broker-card{background:var(--bg-card);border:1px solid var(--border-subtle);border-radius:10px;padding:15px 16px;display:flex;align-items:center;gap:14px;box-shadow:var(--shadow-card)}
+.bc-logo{width:36px;height:36px;border-radius:8px;background:linear-gradient(135deg,#FF4F00,#D94F43);display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:700;color:#fff;flex-shrink:0}
+.bc-info{flex:1}
+.bc-name{font-size:13px;font-weight:600;color:var(--text-primary)}
+.bc-status{font-size:11.5px;color:var(--profit);margin-top:2px}
+.bc-actions{display:flex;gap:6px}
+.btn-sm{font-size:11.5px;font-weight:500;padding:5px 12px;border-radius:6px;border:1px solid var(--border-default);background:transparent;color:var(--text-secondary);cursor:pointer}
+.btn-sm:hover{background:var(--bg-hover)}
+.btn-sm-danger{border-color:var(--loss-border);color:var(--loss)}
+.btn-sm-danger:hover{background:var(--loss-bg)}
+
+/* Guardian card */
+.guardian-card{background:var(--bg-card);border:1px solid var(--border-subtle);border-radius:10px;padding:15px 16px;box-shadow:var(--shadow-card)}
+.gc-hdr{display:flex;align-items:center;justify-content:space-between;margin-bottom:12px}
+.gc-title{font-size:13px;font-weight:600;color:var(--text-primary)}
+.gc-status{font-size:11px;font-weight:600;padding:2px 8px;border-radius:4px;background:var(--profit-bg);color:var(--profit);border:1px solid var(--profit-border)}
+.gc-fields{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.field-label{font-size:10.5px;font-weight:600;color:var(--text-tertiary);margin-bottom:4px}
+
+/* Risk limit rows */
+.limit-row{display:flex;align-items:center;gap:12px;padding:10px 0;border-bottom:1px solid var(--border-subtle)}
+.limit-row:last-child{border-bottom:none}
+.lr-label{font-size:13px;font-weight:500;color:var(--text-primary);flex:1}
+.lr-sub{font-size:11.5px;color:var(--text-tertiary)}
+
+/* Notification toggles */
+.notif-section{display:flex;flex-direction:column;gap:0}
+
+/* Profile */
+.profile-card{display:flex;align-items:center;gap:16px;padding:16px;background:var(--bg-elevated);border-radius:10px;border:1px solid var(--border-subtle)}
+.profile-avatar{width:48px;height:48px;border-radius:50%;background:var(--brand-bg);border:2px solid var(--brand-border);display:flex;align-items:center;justify-content:center;font-family:'DM Mono',monospace;font-size:14px;font-weight:600;color:var(--brand);flex-shrink:0}
+.profile-info{flex:1}
+.pi-name{font-size:14px;font-weight:600;color:var(--text-primary)}
+.pi-email{font-size:12.5px;color:var(--text-tertiary);margin-top:2px}
+
+.btn-save{font-size:12.5px;font-weight:600;padding:7px 18px;border-radius:7px;background:var(--brand);color:#fff;border:none;cursor:pointer}
+.btn-save:hover{opacity:.9}
+
+/* Tab panels */
+.settings-panel{display:none}
+.settings-panel.active{display:flex;flex-direction:column;gap:20px}
+</style>
+</head>
+<body>
+<div class="app-shell">
+  <aside class="sidebar">
+    <div class="sb-logo">
+      <div class="sb-logomark"><svg viewBox="0 0 24 24"><polyline points="22 7 13.5 15.5 8.5 10.5 2 17"/><polyline points="16 7 22 7 22 13"/></svg></div>
+      <div class="sb-wordmark">Trade<em>Mentor</em></div>
+    </div>
+    <nav class="sb-nav">
+      <div class="sb-section">Main</div>
+      <a href="dashboard.html" class="sb-item"><svg viewBox="0 0 24 24"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg>Dashboard</a>
+      <a href="analytics.html" class="sb-item"><svg viewBox="0 0 24 24"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg>Analytics</a>
+      <a href="alerts.html" class="sb-item"><svg viewBox="0 0 24 24"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg>Alerts<span class="sb-badge">3</span></a>
+      <a href="my-patterns.html" class="sb-item"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M12 2v3M12 19v3M4.22 4.22l2.12 2.12M17.66 17.66l2.12 2.12M2 12h3M19 12h3M4.22 19.78l2.12-2.12M17.66 6.34l2.12-2.12"/></svg>My Patterns</a>
+      <a href="blowup-shield.html" class="sb-item"><svg viewBox="0 0 24 24"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>Blowup Shield</a>
+      <a href="chat.html" class="sb-item"><svg viewBox="0 0 24 24"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>AI Coach</a>
+      <div class="sb-section">Records</div>
+      <a href="journal.html" class="sb-item"><svg viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>Journal</a>
+      <a href="reports.html" class="sb-item"><svg viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>Reports</a>
+      <a href="settings.html" class="sb-item active"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>Settings</a>
+    </nav>
+    <div class="sb-foot">
+      <div class="sb-avatar">RS</div>
+      <div><div class="sb-uname">Rohit S.</div><div class="sb-usub">Zerodha · Connected</div></div>
+    </div>
+  </aside>
+
+  <div class="main-content">
+    <div class="top-bar">
+      <div class="top-l"><span class="top-title">Settings</span></div>
+      <div class="top-r">
+        <button class="icon-btn" onclick="toggleTheme()">
+          <svg class="i-sun" viewBox="0 0 24 24"><circle cx="12" cy="12" r="5"/><line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/><line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/></svg>
+          <svg class="i-moon" viewBox="0 0 24 24"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>
+        </button>
+      </div>
+    </div>
+
+    <div class="settings-shell">
+      <!-- SETTINGS NAV -->
+      <div class="settings-nav">
+        <div class="sn-item active" onclick="switchPanel('profile',this)">Profile</div>
+        <div class="sn-item" onclick="switchPanel('broker',this)">Broker</div>
+        <div class="sn-item" onclick="switchPanel('limits',this)">Risk Limits</div>
+        <div class="sn-item" onclick="switchPanel('guardian',this)">Guardian</div>
+        <div class="sn-item" onclick="switchPanel('notifications',this)">Notifications</div>
+        <div class="sn-item" onclick="switchPanel('insights',this)">Insights</div>
+      </div>
+
+      <div class="settings-body">
+
+        <!-- PROFILE PANEL -->
+        <div id="panel-profile" class="settings-panel active">
+          <div class="settings-section">
+            <div class="ss-title">Profile</div>
+            <div class="profile-card">
+              <div class="profile-avatar">RS</div>
+              <div class="profile-info">
+                <div class="pi-name">Rohit Sharma</div>
+                <div class="pi-email">Rohitostwal09@gmail.com</div>
+              </div>
+              <button class="btn-sm">Change photo</button>
+            </div>
+            <div class="setting-row">
+              <div class="sr-left"><div class="sr-label">Display name</div><div class="sr-desc">Shown in reports and WhatsApp messages</div></div>
+              <div class="sr-right"><input class="settings-input" type="text" value="Rohit S."></div>
+            </div>
+            <div class="setting-row">
+              <div class="sr-left"><div class="sr-label">Phone number</div><div class="sr-desc">For WhatsApp Guardian notifications</div></div>
+              <div class="sr-right"><input class="settings-input" type="text" value="+91 98765 43210"></div>
+            </div>
+            <div class="setting-row">
+              <div class="sr-left"><div class="sr-label">Trading since</div><div class="sr-desc">Helps calibrate behavioral benchmarks</div></div>
+              <div class="sr-right">
+                <select class="settings-select">
+                  <option>Less than 1 year</option>
+                  <option selected>1–3 years</option>
+                  <option>3–5 years</option>
+                  <option>5+ years</option>
+                </select>
+              </div>
+            </div>
+            <div class="setting-row">
+              <div class="sr-left"><div class="sr-label">Primary instruments</div><div class="sr-desc">Used for context in behavioral analysis</div></div>
+              <div class="sr-right">
+                <select class="settings-select">
+                  <option selected>NIFTY + BANKNIFTY Options</option>
+                  <option>Equity F&O</option>
+                  <option>Equity Intraday</option>
+                </select>
+              </div>
+            </div>
+            <div><button class="btn-save">Save profile</button></div>
+          </div>
+        </div>
+
+        <!-- BROKER PANEL -->
+        <div id="panel-broker" class="settings-panel">
+          <div class="settings-section">
+            <div class="ss-title">Connected Broker</div>
+            <div class="broker-card">
+              <div class="bc-logo">Z</div>
+              <div class="bc-info">
+                <div class="bc-name">Zerodha Kite</div>
+                <div class="bc-status">&#9679; Connected · Read-only access · rohit_sharma_kite</div>
+              </div>
+              <div class="bc-actions">
+                <button class="btn-sm">Sync now</button>
+                <button class="btn-sm btn-sm-danger">Disconnect</button>
+              </div>
+            </div>
+            <div class="setting-row">
+              <div class="sr-left"><div class="sr-label">Auto-sync trades</div><div class="sr-desc">Automatically sync after every completed trade</div></div>
+              <div class="sr-right">
+                <label class="toggle"><input type="checkbox" checked><div class="toggle-track"></div><div class="toggle-thumb"></div></label>
+              </div>
+            </div>
+            <div class="setting-row">
+              <div class="sr-left"><div class="sr-label">Sync interval</div><div class="sr-desc">How often to sync during market hours</div></div>
+              <div class="sr-right"><select class="settings-select"><option>Every 60 seconds</option><option selected>Every 30 seconds</option><option>Every 15 seconds</option></select></div>
+            </div>
+            <div style="padding:12px;background:var(--neutral-bg);border-radius:7px;font-size:12px;color:var(--text-secondary);border:1px solid var(--border-subtle)">
+              TradeMentor uses <strong>read-only API access</strong>. We cannot place orders, view funds, or access your portfolio outside of trade history. Access can be revoked at any time via Zerodha Console.
+            </div>
+          </div>
+        </div>
+
+        <!-- RISK LIMITS PANEL -->
+        <div id="panel-limits" class="settings-panel">
+          <div class="settings-section">
+            <div class="ss-title">Daily Risk Limits</div>
+            <div class="limit-row">
+              <div class="lr-label">Daily loss limit<div class="lr-sub">Alert when reached, warning at 70%</div></div>
+              <div style="display:flex;align-items:center;gap:6px">
+                <span style="font-size:13px;color:var(--text-tertiary)">&#8377;</span>
+                <input class="settings-input" type="number" value="10000" style="width:100px">
+              </div>
+            </div>
+            <div class="limit-row">
+              <div class="lr-label">Max trades per session<div class="lr-sub">Warning at 70%, alert at 100%</div></div>
+              <input class="settings-input" type="number" value="7" style="width:70px">
+            </div>
+            <div class="limit-row">
+              <div class="lr-label">Consecutive loss limit<div class="lr-sub">Alert at N losses in a row</div></div>
+              <input class="settings-input" type="number" value="3" style="width:70px">
+            </div>
+            <div class="limit-row">
+              <div class="lr-label">Max position size (lots)<div class="lr-sub">Alert when a single trade exceeds this</div></div>
+              <input class="settings-input" type="number" value="50" style="width:70px">
+            </div>
+            <div class="limit-row">
+              <div class="sr-left"><div class="sr-label">Early warning push at 70%</div><div class="sr-desc">Send a push notification when you reach 70% of any limit</div></div>
+              <label class="toggle"><input type="checkbox" checked><div class="toggle-track"></div><div class="toggle-thumb"></div></label>
+            </div>
+            <div><button class="btn-save">Save limits</button></div>
+          </div>
+        </div>
+
+        <!-- GUARDIAN PANEL -->
+        <div id="panel-guardian" class="settings-panel">
+          <div class="settings-section">
+            <div class="ss-title">WhatsApp Guardian</div>
+            <div class="guardian-card">
+              <div class="gc-hdr">
+                <span class="gc-title">Guardian contact</span>
+                <span class="gc-status">Active</span>
+              </div>
+              <div class="gc-fields">
+                <div>
+                  <div class="field-label">Name</div>
+                  <input class="settings-input" type="text" value="Priya (wife)" style="width:100%">
+                </div>
+                <div>
+                  <div class="field-label">WhatsApp number</div>
+                  <input class="settings-input" type="text" value="+91 98210 55182" style="width:100%">
+                </div>
+              </div>
+            </div>
+            <div class="setting-row">
+              <div class="sr-left"><div class="sr-label">Send on DANGER state</div><div class="sr-desc">When you hit your daily loss limit</div></div>
+              <label class="toggle"><input type="checkbox" checked><div class="toggle-track"></div><div class="toggle-thumb"></div></label>
+            </div>
+            <div class="setting-row">
+              <div class="sr-left"><div class="sr-label">Send on HIGH severity alerts</div><div class="sr-desc">Revenge trade risk, excessive position sizing</div></div>
+              <label class="toggle"><input type="checkbox" checked><div class="toggle-track"></div><div class="toggle-thumb"></div></label>
+            </div>
+            <div class="setting-row">
+              <div class="sr-left"><div class="sr-label">Daily summary to guardian</div><div class="sr-desc">EOD report sent to guardian at 15:35 IST</div></div>
+              <label class="toggle"><input type="checkbox"><div class="toggle-track"></div><div class="toggle-thumb"></div></label>
+            </div>
+            <div style="padding:12px;background:var(--neutral-bg);border-radius:7px;font-size:12px;color:var(--text-secondary);border:1px solid var(--border-subtle)">
+              Guardian receives behavioral alerts only — pattern name, your historical stats, and estimated risk. They cannot see your account balance, P&amp;L, or trade history.
+            </div>
+          </div>
+        </div>
+
+        <!-- NOTIFICATIONS PANEL -->
+        <div id="panel-notifications" class="settings-panel">
+          <div class="settings-section">
+            <div class="ss-title">Notification Preferences</div>
+            <div class="setting-row">
+              <div class="sr-left"><div class="sr-label">Push notifications</div><div class="sr-desc">Browser/app push for live alerts</div></div>
+              <label class="toggle"><input type="checkbox" checked><div class="toggle-track"></div><div class="toggle-thumb"></div></label>
+            </div>
+            <div class="setting-row">
+              <div class="sr-left"><div class="sr-label">Morning intent prompt</div><div class="sr-desc">8:30 AM daily — "What's your plan today?"</div></div>
+              <label class="toggle"><input type="checkbox" checked><div class="toggle-track"></div><div class="toggle-thumb"></div></label>
+            </div>
+            <div class="setting-row">
+              <div class="sr-left"><div class="sr-label">EOD comparison push</div><div class="sr-desc">3:35 PM — how your session compared to your morning intent</div></div>
+              <label class="toggle"><input type="checkbox" checked><div class="toggle-track"></div><div class="toggle-thumb"></div></label>
+            </div>
+            <div class="setting-row">
+              <div class="sr-left"><div class="sr-label">HIGH alert push</div><div class="sr-desc">Immediate push for revenge trade risk, oversized position</div></div>
+              <label class="toggle"><input type="checkbox" checked><div class="toggle-track"></div><div class="toggle-thumb"></div></label>
+            </div>
+            <div class="setting-row">
+              <div class="sr-left"><div class="sr-label">MED alert push</div><div class="sr-desc">Trade count warning, FOMO signals</div></div>
+              <label class="toggle"><input type="checkbox" checked><div class="toggle-track"></div><div class="toggle-thumb"></div></label>
+            </div>
+            <div class="setting-row">
+              <div class="sr-left"><div class="sr-label">Weekly pattern report</div><div class="sr-desc">Sunday 7 PM — behavioral summary for the week</div></div>
+              <label class="toggle"><input type="checkbox" checked><div class="toggle-track"></div><div class="toggle-thumb"></div></label>
+            </div>
+            <div class="setting-row">
+              <div class="sr-left"><div class="sr-label">Quiet hours</div><div class="sr-desc">No alerts between</div></div>
+              <div class="sr-right" style="display:flex;align-items:center;gap:6px">
+                <input class="settings-input" type="time" value="22:00" style="width:90px">
+                <span style="font-size:12px;color:var(--text-tertiary)">to</span>
+                <input class="settings-input" type="time" value="08:00" style="width:90px">
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- INSIGHTS PANEL -->
+        <div id="panel-insights" class="settings-panel">
+          <div class="settings-section">
+            <div class="ss-title">AI &amp; Insights</div>
+            <div class="setting-row">
+              <div class="sr-left"><div class="sr-label">AI Coach</div><div class="sr-desc">Enable the AI behavioral coaching chat</div></div>
+              <label class="toggle"><input type="checkbox" checked><div class="toggle-track"></div><div class="toggle-thumb"></div></label>
+            </div>
+            <div class="setting-row">
+              <div class="sr-left"><div class="sr-label">Predictive warnings</div><div class="sr-desc">AI predicts high-risk sessions based on your history</div></div>
+              <label class="toggle"><input type="checkbox" checked><div class="toggle-track"></div><div class="toggle-thumb"></div></label>
+            </div>
+            <div class="setting-row">
+              <div class="sr-left"><div class="sr-label">Pattern auto-learning</div><div class="sr-desc">Refines detection thresholds from your trade data (runs 6:15 PM daily)</div></div>
+              <label class="toggle"><input type="checkbox" checked><div class="toggle-track"></div><div class="toggle-thumb"></div></label>
+            </div>
+            <div class="setting-row">
+              <div class="sr-left"><div class="sr-label">Community benchmarks</div><div class="sr-desc">Show how your patterns compare to other Indian F&O traders</div></div>
+              <label class="toggle"><input type="checkbox" checked><div class="toggle-track"></div><div class="toggle-thumb"></div></label>
+            </div>
+            <div class="setting-row">
+              <div class="sr-left"><div class="sr-label">Opening trap sensitivity</div><div class="sr-desc">Minutes after 9:15 AM considered "danger zone"</div></div>
+              <div class="sr-right"><input class="settings-input" type="number" value="5" style="width:70px"></div>
+            </div>
+            <div class="setting-row">
+              <div class="sr-left"><div class="sr-label">Revenge trade window</div><div class="sr-desc">Minutes after a stop-loss to flag re-entry risk</div></div>
+              <div class="sr-right"><input class="settings-input" type="number" value="10" style="width:70px"></div>
+            </div>
+            <div><button class="btn-save">Save preferences</button></div>
+          </div>
+          <div class="settings-section">
+            <div class="ss-title" style="color:var(--loss)">Data &amp; Privacy</div>
+            <div class="setting-row">
+              <div class="sr-left"><div class="sr-label">Export all my data</div><div class="sr-desc">Download all trade history, journal entries, and alerts as JSON</div></div>
+              <button class="btn-sm">Export</button>
+            </div>
+            <div class="setting-row">
+              <div class="sr-left"><div class="sr-label" style="color:var(--loss)">Delete my account</div><div class="sr-desc">Permanently removes all data. Cannot be undone.</div></div>
+              <button class="btn-sm btn-sm-danger">Delete account</button>
+            </div>
+          </div>
+        </div>
+
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+function toggleTheme(){const h=document.documentElement;h.setAttribute('data-theme',h.getAttribute('data-theme')==='dark'?'light':'dark');localStorage.setItem('tm-theme',h.getAttribute('data-theme'))}
+(function(){const t=localStorage.getItem('tm-theme');if(t)document.documentElement.setAttribute('data-theme',t)})();
+function switchPanel(id,el){
+  document.querySelectorAll('.sn-item').forEach(i=>i.classList.remove('active'));
+  el.classList.add('active');
+  document.querySelectorAll('.settings-panel').forEach(p=>p.classList.remove('active'));
+  document.getElementById('panel-'+id).classList.add('active');
+}
+// Toggle thumb follows checkbox
+document.querySelectorAll('.toggle input').forEach(cb=>{
+  const thumb=cb.parentElement.querySelector('.toggle-thumb');
+  cb.addEventListener('change',()=>{thumb.style.transform=cb.checked?'translateX(16px)':'translateX(0)'});
+  thumb.style.transform=cb.checked?'translateX(16px)':'translateX(0)';
+});
+</script>
+</body>
+</html>

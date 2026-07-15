@@ -3,7 +3,7 @@
    Dark + Premium Hybrid · Inter + DM Mono · 8px grid
    ═══════════════════════════════════════════════════════════════════ */
 
-@import url('https://fonts.googleapis.com/css2?family=Inter:ital,opsz,wght@0,14..32,400;0,14..32,500;0,14..32,600;0,14..32,700;1,14..32,400&family=DM+Mono:wght@400;500&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600;700&family=Inter:ital,opsz,wght@0,14..32,400;0,14..32,500;0,14..32,600;0,14..32,700;1,14..32,400&family=DM+Mono:wght@400;500&display=swap');
 
 /* ── RESET ─────────────────────────────────────────────────────── */
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
@@ -12,40 +12,84 @@ img, svg { display: block; max-width: 100%; }
 button { cursor: pointer; font-family: inherit; }
 a { text-decoration: none; color: inherit; }
 
-/* ── DARK THEME (default) ──────────────────────────────────────── */
+/* ── LIGHT THEME (default) ─────────────────────────────────────── */
 :root,
+[data-theme="light"] {
+  --bg-page:      #F7F8FC;
+  --bg-card:      #FFFFFF;
+  --bg-elevated:  #ECEEF5;
+  --bg-hover:     rgba(0, 0, 0, 0.03);
+  --bg-overlay:   rgba(0, 0, 0, 0.42);
+
+  --border-subtle:  #DDE0EA;
+  --border-default: #C8CCE0;
+  --border-strong:  #A0A6C0;
+
+  --text-primary:   #171923;
+  --text-secondary: #575F74;
+  --text-tertiary:  #9299AB;
+  --text-disabled:  #C8CCE0;
+
+  --brand:          #4453C9;
+  --brand-dim:      #3545B8;
+  --brand-bg:       rgba(68, 83, 201, 0.07);
+  --brand-border:   rgba(68, 83, 201, 0.18);
+
+  --profit:         #2F9E68;
+  --profit-bg:      rgba(47, 158, 104, 0.07);
+  --profit-border:  rgba(47, 158, 104, 0.18);
+
+  --loss:           #D94F43;
+  --loss-bg:        rgba(217, 79, 67, 0.07);
+  --loss-border:    rgba(217, 79, 67, 0.18);
+
+  --warning:        #E09B17;
+  --warning-bg:     rgba(224, 155, 23, 0.07);
+  --warning-border: rgba(224, 155, 23, 0.18);
+
+  --neutral-bg:     rgba(0, 0, 0, 0.03);
+  --neutral-border: rgba(0, 0, 0, 0.07);
+
+  --shadow-card:     0 1px 2px rgba(0,0,0,.05), 0 4px 12px rgba(0,0,0,.07);
+  --shadow-elevated: 0 2px 6px rgba(0,0,0,.06), 0 12px 36px rgba(0,0,0,.09);
+  --shadow-overlay:  0 24px 64px rgba(0,0,0,0.16);
+
+  color-scheme: light;
+}
+
+/* ── DARK THEME ────────────────────────────────────────────────── */
 [data-theme="dark"] {
-  --bg-page:      #0B0B0F;
-  --bg-card:      #13131A;
-  --bg-elevated:  #1C1C27;
-  --bg-hover:     rgba(255, 255, 255, 0.035);
+  --bg-page:      #14161D;
+  --bg-card:      #1C1F2A;
+  --bg-elevated:  #232636;
+  --bg-hover:     rgba(255, 255, 255, 0.04);
   --bg-overlay:   rgba(0, 0, 0, 0.72);
 
-  --border-subtle: #1F1F2E;
-  --border-default: #2A2A3C;
-  --border-strong:  #3A3A52;
+  --border-subtle:  rgba(255,255,255,.07);
+  --border-default: rgba(255,255,255,.11);
+  --border-strong:  rgba(255,255,255,.18);
 
-  --text-primary:   #F0F0F8;
-  --text-secondary: #7A7A96;
-  --text-tertiary:  #4A4A60;
-  --text-disabled:  #2A2A3C;
+  --text-primary:   #E8EAF2;
+  --text-secondary: #8B90A4;
+  --text-tertiary:  #555A6E;
+  --text-disabled:  #3A3D4E;
 
-  --brand:          #14B8A6;
-  --brand-dim:      #0D9488;
-  --brand-bg:       rgba(20, 184, 166, 0.08);
-  --brand-border:   rgba(20, 184, 166, 0.20);
+  --brand:          #6B7AE0;
+  --brand-dim:      #5B6AD0;
+  --brand-bg:       rgba(107, 122, 224, 0.08);
+  --brand-border:   rgba(107, 122, 224, 0.22);
 
-  --profit:         #22C55E;
-  --profit-bg:      rgba(34, 197, 94, 0.07);
-  --profit-border:  rgba(34, 197, 94, 0.18);
+  --profit:         #4DBF84;
+  --profit-bg:      rgba(77, 191, 132, 0.07);
+  --profit-border:  rgba(77, 191, 132, 0.18);
 
-  --loss:           #EF4444;
-  --loss-bg:        rgba(239, 68, 68, 0.07);
-  --loss-border:    rgba(239, 68, 68, 0.18);
+  --loss:           #E06B5E;
+  --loss-bg:        rgba(224, 107, 94, 0.07);
+  --loss-border:    rgba(224, 107, 94, 0.18);
 
-  --warning:        #F59E0B;
-  --warning-bg:     rgba(245, 158, 11, 0.07);
-  --warning-border: rgba(245, 158, 11, 0.18);
+  --warning:        #E8A830;
+  --warning-bg:     rgba(232, 168, 48, 0.07);
+  --warning-border: rgba(232, 168, 48, 0.18);
 
   --neutral-bg:     rgba(255, 255, 255, 0.04);
   --neutral-border: rgba(255, 255, 255, 0.07);
@@ -55,50 +99,6 @@ a { text-decoration: none; color: inherit; }
   --shadow-overlay:  0 24px 80px rgba(0,0,0,0.72);
 
   color-scheme: dark;
-}
-
-/* ── LIGHT THEME ───────────────────────────────────────────────── */
-[data-theme="light"] {
-  --bg-page:      #F2F2F7;
-  --bg-card:      #FFFFFF;
-  --bg-elevated:  #F8F8FC;
-  --bg-hover:     rgba(0, 0, 0, 0.03);
-  --bg-overlay:   rgba(0, 0, 0, 0.42);
-
-  --border-subtle: #E6E6EF;
-  --border-default: #D2D2DF;
-  --border-strong:  #B2B2C4;
-
-  --text-primary:   #0C0C18;
-  --text-secondary: #60607A;
-  --text-tertiary:  #9898AE;
-  --text-disabled:  #D2D2DF;
-
-  --brand:          #0F766E;
-  --brand-dim:      #0D6B63;
-  --brand-bg:       rgba(15, 118, 110, 0.07);
-  --brand-border:   rgba(15, 118, 110, 0.20);
-
-  --profit:         #15803D;
-  --profit-bg:      rgba(21, 128, 61, 0.07);
-  --profit-border:  rgba(21, 128, 61, 0.18);
-
-  --loss:           #B91C1C;
-  --loss-bg:        rgba(185, 28, 28, 0.07);
-  --loss-border:    rgba(185, 28, 28, 0.18);
-
-  --warning:        #92400E;
-  --warning-bg:     rgba(146, 64, 14, 0.07);
-  --warning-border: rgba(146, 64, 14, 0.18);
-
-  --neutral-bg:     rgba(0, 0, 0, 0.03);
-  --neutral-border: rgba(0, 0, 0, 0.08);
-
-  --shadow-card:     0 1px 3px rgba(0,0,0,0.07), 0 1px 2px rgba(0,0,0,0.04);
-  --shadow-elevated: 0 8px 24px rgba(0,0,0,0.10), 0 1px 3px rgba(0,0,0,0.06);
-  --shadow-overlay:  0 24px 64px rgba(0,0,0,0.16);
-
-  color-scheme: light;
 }
 
 /* ── BASE ──────────────────────────────────────────────────────── */
@@ -118,9 +118,17 @@ body {
 }
 
 /* ── TYPOGRAPHY ────────────────────────────────────────────────── */
+
+/* Geist for headings — call this on any heading element */
+.font-geist,
+.t-display, .t-display-sm, .t-hero, .t-h1, .t-h2, .t-h3, .t-heading,
+.card-title, .page-title, .section-title, .logo-text {
+  font-family: 'Geist', -apple-system, BlinkMacSystemFont, sans-serif;
+}
+
 .t-display {
   font-size: 48px;
-  font-weight: 700;
+  font-weight: 600;
   letter-spacing: -0.04em;
   line-height: 1.0;
   color: var(--text-primary);
@@ -303,7 +311,7 @@ body {
 .btn-primary:hover {
   background: var(--brand-dim);
   transform: translateY(-0.5px);
-  box-shadow: 0 2px 8px rgba(20, 184, 166, 0.30);
+  box-shadow: 0 2px 8px rgba(68, 83, 201, 0.30);
 }
 .btn-ghost {
   background: transparent;

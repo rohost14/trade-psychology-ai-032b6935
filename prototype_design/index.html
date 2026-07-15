@@ -3,24 +3,24 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>TradeMentor AI — Protect Your Capital from Trading Tilt</title>
-  <meta name="description" content="Psychological circuit breaker for options and retail traders. Stream broker API metrics, trigger real-time head-space alerts, and send automated WhatsApp accountability alerts when risk gates are violated.">
+  <title>TradeMentor — Protect Your Capital from Trading Tilt</title>
+  <meta name="description" content="Behavioral safety co-pilot for options and retail traders. Stream broker API metrics, trigger real-time workspace alerts, and send automated WhatsApp accountability alerts to partners.">
   <link rel="icon" type="image/svg+xml" href="favicon.svg">
 
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800&family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
 
   <!-- Tailwind v4 Engine -->
   <script src="https://unpkg.com/@tailwindcss/browser@4"></script>
   
   <style type="text/tailwindcss">
     @theme {
-      --font-sans: 'Inter', sans-serif;
-      --font-display: 'Outfit', sans-serif;
+      --font-sans: 'Plus Jakarta Sans', sans-serif;
+      --font-display: 'Plus Jakarta Sans', sans-serif;
       
-      --color-primary: #3488e8;
-      --color-secondary: #4e7cb1;
+      --color-primary: #1f7ae0;
+      --color-secondary: #9f7701;
       
       --color-page-bg: var(--page-bg);
       --color-text-main: var(--text-main);
@@ -66,69 +66,152 @@
   </style>
 
   <style>
-    /* Spacing Grid Utilities (Strictly Multiples of 10px) */
-    .gap-10px { gap: 10px; }
-    .gap-20px { gap: 20px; }
-    .gap-30px { gap: 30px; }
-    .gap-40px { gap: 40px; }
-    .gap-60px { gap: 60px; }
-    .gap-80px { gap: 80px; }
+    /* Spacing Grid Utilities (Strictly Multiples of 12px matching smallcase) */
+    .gap-12px { gap: 12px; }
+    .gap-24px { gap: 24px; }
+    .gap-36px { gap: 36px; }
+    .gap-48px { gap: 48px; }
+    .gap-72px { gap: 72px; }
+    .gap-96px { gap: 96px; }
 
-    .p-10px { padding: 10px; }
-    .p-20px { padding: 20px; }
-    .p-30px { padding: 30px; }
-    .p-40px { padding: 40px; }
+    .p-12px { padding: 12px; }
+    .p-24px { padding: 24px; }
+    .p-36px { padding: 36px; }
+    .p-48px { padding: 48px; }
+    .p-60px { padding: 60px; }
 
-    /* Theme CSS variables */
+    /* CSS Grid Patterns & Glowing Blurs */
+    .bg-grid-pattern {
+      background-image: radial-gradient(rgba(83, 91, 98, 0.05) 1.2px, transparent 1.2px);
+      background-size: 24px 24px;
+    }
+    body.dark .bg-grid-pattern {
+      background-image: radial-gradient(rgba(241, 245, 249, 0.03) 1.2px, transparent 1.2px);
+    }
+    .bg-grid-dark {
+      background-image: radial-gradient(rgba(255, 255, 255, 0.02) 1.2px, transparent 1.2px);
+      background-size: 24px 24px;
+    }
+    .glow-orb {
+      position: absolute;
+      border-radius: 9999px;
+      filter: blur(100px);
+      background: radial-gradient(circle, rgba(31, 122, 224, 0.12) 0%, transparent 70%);
+      pointer-events: none;
+      z-index: 0;
+    }
+    body.dark .glow-orb {
+      background: radial-gradient(circle, rgba(31, 122, 224, 0.2) 0%, transparent 70%);
+    }
+
+    /* Premium Button Styles (smallcase design system) */
+    .btn-primary {
+      background-color: #1f7ae0;
+      color: #ffffff;
+      padding: 12px 24px;
+      border-radius: 4px;
+      font-size: 13px;
+      font-weight: 600;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      transition: all 0.2s ease;
+      cursor: pointer;
+      text-decoration: none;
+      border: 1px solid #1f7ae0;
+      box-shadow: rgba(31, 122, 224, 0.15) 0px 4px 12px;
+    }
+    .btn-primary:hover {
+      background-color: #1a66bc;
+      border-color: #1a66bc;
+      box-shadow: rgba(31, 122, 224, 0.25) 0px 6px 16px;
+      transform: translateY(-1px);
+    }
+    .btn-primary:active {
+      transform: translateY(0) scale(0.98);
+    }
+
+    .btn-ghost-light {
+      background-color: #ffffff;
+      color: #1e293b;
+      border-radius: 4px;
+      padding: 12px 24px;
+      font-size: 13px;
+      font-weight: 600;
+      border: 1px solid rgba(30, 41, 59, 0.25);
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      transition: all 0.2s ease;
+      text-decoration: none;
+    }
+    body.dark .btn-ghost-light {
+      background-color: #121620;
+      color: #f1f5f9;
+      border-color: rgba(241, 245, 249, 0.2);
+    }
+    .btn-ghost-light:hover {
+      background-color: #f9fafc;
+      border-color: rgba(30, 41, 59, 0.4);
+    }
+    body.dark .btn-ghost-light:hover {
+      background-color: rgba(255, 255, 255, 0.05);
+    }
+    .btn-ghost-light:active {
+      transform: scale(0.98);
+    }
+
+    /* Theme CSS variables (Light themed by default matching smallcase) */
     :root {
       --page-bg: #ffffff;
-      --text-main: #121416;
-      --text-muted: #666666;
-      --border-subtle: #f3f4f6;
+      --text-main: #1e293b;
+      --text-muted: #475569;
+      --border-subtle: #f1f5f9;
       
-      --card-bg: #f8fafc;
+      --card-bg: #ffffff;
       --card-border: #e2e8f0;
-      --card-text: #121416;
-      --card-shadow: rgba(0, 0, 0, 0.03) 0px 8px 30px;
+      --card-text: #1e293b;
+      --card-shadow: rgba(0, 0, 0, 0.03) 0px 4px 20px;
       
-      --cell-teal-bg: #c5f8f9;
-      --cell-teal-border: #a5e8e9;
-      --cell-teal-text: #121416;
+      --cell-teal-bg: #e0f2fe;
+      --cell-teal-border: #bae6fd;
+      --cell-teal-text: #0369a1;
       
-      --cell-yellow-bg: #ffe178;
-      --cell-yellow-border: #ffd452;
-      --cell-yellow-text: #121416;
+      --cell-yellow-bg: #fef3c7;
+      --cell-yellow-border: #fde68a;
+      --cell-yellow-text: #9a3412;
       
-      --cell-blue-bg: #ebf4ff;
-      --cell-blue-border: #cbd5e1;
-      --cell-blue-text: #121416;
+      --cell-blue-bg: #eff6ff;
+      --cell-blue-border: #dbeafe;
+      --cell-blue-text: #1e40af;
       
       --sim-outer-bg: #f8fafc;
       --sim-outer-border: #e2e8f0;
       --sim-inner-bg: #ffffff;
       --sim-inner-border: #e2e8f0;
-      --sim-sidebar-bg: #f1f5f9;
+      --sim-sidebar-bg: #f8fafc;
       --sim-chart-bg: #ffffff;
-      --sim-logs-bg: #f1f5f9;
-      --sim-logs-border: #cbd5e1;
-      --sim-logs-text: #1e293b;
+      --sim-logs-bg: #f8fafc;
+      --sim-logs-border: #e2e8f0;
+      --sim-logs-text: #334155;
       
       --footer-bg: #f8fafc;
       --footer-border: #e2e8f0;
-      --footer-text: #4b5563;
-      --footer-text-muted: #9ca3af;
+      --footer-text: #334155;
+      --footer-text-muted: #64748b;
     }
 
     body.dark {
-      --page-bg: #121416;
-      --text-main: #d0d1d2;
-      --text-muted: #888888;
-      --border-subtle: #1e2124;
+      --page-bg: #0b0f19;
+      --text-main: #f8fafc;
+      --text-muted: #cbd5e1;
+      --border-subtle: #1e293b;
       
-      --card-bg: #1e2124;
-      --card-border: #2d3139;
-      --card-text: #d0d1d2;
-      --card-shadow: rgba(0, 0, 0, 0.8) 0px 12px 32px -8px;
+      --card-bg: #121620;
+      --card-border: #1e293b;
+      --card-text: #f8fafc;
+      --card-shadow: rgba(0, 0, 0, 0.4) 0px 8px 30px;
       
       --cell-teal-bg: #0d2d30;
       --cell-teal-border: #134e4a;
@@ -140,70 +223,45 @@
       
       --cell-blue-bg: #0b1a2e;
       --cell-blue-border: #1e293b;
-      --cell-blue-text: #d0d1d2;
+      --cell-blue-text: #cbd5e1;
       
-      --sim-outer-bg: #1e2124;
-      --sim-outer-border: #2d3139;
-      --sim-inner-bg: #121416;
-      --sim-inner-border: #1e2124;
-      --sim-sidebar-bg: #121416;
+      --sim-outer-bg: #121620;
+      --sim-outer-border: #1e293b;
+      --sim-inner-bg: #0b0f19;
+      --sim-inner-border: #1e293b;
+      --sim-sidebar-bg: #0b0f19;
       --sim-chart-bg: #090d16;
       --sim-logs-bg: #090d16;
-      --sim-logs-border: #1e2124;
-      --sim-logs-text: #94a3b8;
+      --sim-logs-border: #1e293b;
+      --sim-logs-text: #cbd5e1;
       
       --footer-bg: #090d16;
-      --footer-border: #1e2124;
-      --footer-text: #a1a1aa;
-      --footer-text-muted: #52525b;
+      --footer-border: #1e293b;
+      --footer-text: #cbd5e1;
+      --footer-text-muted: #94a3b8;
     }
 
-    /* Stripe-like Grid Background Pattern */
-    .bg-grid-pattern {
-      background-size: 50px 50px;
-      background-image: 
-        linear-gradient(to right, var(--border-subtle) 1px, transparent 1px),
-        linear-gradient(to bottom, var(--border-subtle) 1px, transparent 1px);
+    /* Scrolling Logo wall animation */
+    @keyframes scroll {
+      0% { transform: translateX(0); }
+      100% { transform: translateX(-50%); }
+    }
+    .animate-scroll {
+      display: flex;
+      width: max-content;
+      animation: scroll 20s linear infinite;
     }
 
-    /* Core Sensibull Component Styles */
-    .btn-primary {
-      background: #3488e8;
-      color: #ffffff;
-      border-radius: 8px;
-      padding: 10px 20px;
-      font-size: 14px;
-      font-weight: 600;
-      border: none;
-      cursor: pointer;
-      display: inline-flex;
-      align-items: center;
-      justify-content: center;
-      transition: background 0.2s ease, transform 0.1s ease;
-      touch-action: manipulation;
+    /* CSS Phone 3D Rotation */
+    .phone-perspective {
+      perspective: 1000px;
     }
-    .btn-primary:hover {
-      background: #4e7cb1;
+    .phone-3d-card {
+      transform: rotateY(-10deg) rotateX(6deg);
+      transition: transform 0.5s ease;
     }
-    .btn-primary:active {
-      transform: scale(0.98);
-    }
-
-    .btn-ghost-light {
-      background: transparent;
-      color: var(--text-main);
-      border-radius: 0px;
-      padding: 0px 0px;
-      font-size: 18px;
-      font-weight: 400;
-      border: none;
-      cursor: pointer;
-      display: inline-flex;
-      align-items: center;
-      transition: opacity 0.2s ease;
-    }
-    .btn-ghost-light:hover {
-      opacity: 0.8;
+    .phone-3d-card:hover {
+      transform: rotateY(0deg) rotateX(0deg) scale(1.02);
     }
 
     /* Custom Animations */
@@ -222,51 +280,136 @@
       0% { background-color: rgba(239, 68, 68, 0.9); }
       100% { background-color: rgba(239, 68, 68, 0.95); }
     }
+
+    /* Floating Confessions System */
+    .floating-confessions-wrapper {
+      position: absolute;
+      inset: 0;
+      overflow: hidden;
+      pointer-events: none;
+      z-index: 0;
+    }
+    @keyframes floatDrift {
+      0% {
+        top: 105%;
+        transform: translateX(0) rotate(var(--start-rot, 0deg));
+        opacity: 0;
+      }
+      10% {
+        opacity: var(--float-opacity, 0.18);
+      }
+      90% {
+        opacity: var(--float-opacity, 0.18);
+      }
+      100% {
+        top: -5%;
+        transform: translateX(var(--drift-x, 20px)) rotate(var(--drift-rot, 4deg));
+        opacity: 0;
+      }
+    }
+    .floating-confession {
+      position: absolute;
+      top: 100%;
+      pointer-events: none;
+      z-index: 0;
+      font-family: Georgia, serif;
+      font-style: italic;
+      white-space: nowrap;
+      font-size: clamp(11px, 1.2vw, 16px);
+      letter-spacing: 0.01em;
+      color: #475569; /* Slate 600 - distinct but soft */
+      --float-opacity: 0.18;
+      animation: floatDrift var(--float-duration, 25s) linear infinite;
+    }
+    body.dark .floating-confession {
+      color: #cbd5e1; /* Slate 200 */
+      --float-opacity: 0.12;
+    }
+    /* Crimson drift for dark CTA */
+    .dark-bg-drift .floating-confession {
+      color: #f87171; /* Red 400 */
+      --float-opacity: 0.15;
+    }
+    
+    @keyframes pulse-border-red {
+      0% { box-shadow: 0 4px 14px -6px rgba(239, 68, 68, 0.25); border-color: rgba(239, 68, 68, 0.2); }
+      100% { box-shadow: 0 4px 14px -6px rgba(239, 68, 68, 0.55); border-color: rgba(239, 68, 68, 0.45); }
+    }
+    @keyframes pulse-border-amber {
+      0% { box-shadow: 0 4px 14px -6px rgba(245, 158, 11, 0.25); border-color: rgba(245, 158, 11, 0.2); }
+      100% { box-shadow: 0 4px 14px -6px rgba(245, 158, 11, 0.55); border-color: rgba(245, 158, 11, 0.45); }
+    }
+    @keyframes pulse-border-emerald {
+      0% { box-shadow: 0 18px 50px -20px rgba(0, 0, 0, 0.8); border-color: rgba(16, 185, 129, 0.2); }
+      100% { box-shadow: 0 18px 50px -20px rgba(0, 0, 0, 0.8); border-color: rgba(16, 185, 129, 0.55); }
+    }
+    .animate-fade-in {
+      animation: fadeIn 0.4s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+    }
+    @keyframes fadeIn {
+      from { opacity: 0; transform: translateY(-8px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+    .flash-up {
+      animation: flash-green-anim 0.5s ease-out;
+    }
+    .flash-down {
+      animation: flash-red-anim 0.5s ease-out;
+    }
+    @keyframes flash-green-anim {
+      0% { color: #10b981; background-color: rgba(16, 185, 129, 0.15); }
+      100% { color: inherit; background-color: transparent; }
+    }
+    @keyframes flash-red-anim {
+      0% { color: #ef4444; background-color: rgba(239, 68, 68, 0.15); }
+      100% { color: inherit; background-color: transparent; }
+    }
+    @keyframes scan {
+      0% { top: 0%; opacity: 0; }
+      10% { opacity: 1; }
+      90% { opacity: 1; }
+      100% { top: 100%; opacity: 0; }
+    }
   </style>
 </head>
-<body class="bg-page-bg text-text-main font-sans antialiased transition-colors duration-200 bg-grid-pattern relative">
-
-  <!-- Glow spots -->
-  <div class="absolute inset-0 overflow-hidden pointer-events-none -z-10 select-none">
-    <div class="absolute top-[10%] left-[20%] w-[500px] h-[500px] bg-primary/10 dark:bg-primary/5 rounded-full blur-[120px]"></div>
-    <div class="absolute top-[35%] right-[10%] w-[600px] h-[600px] bg-[#9333ea]/5 dark:bg-[#9333ea]/2 rounded-full blur-[140px]"></div>
-    <div class="absolute bottom-[20%] left-[5%] w-[450px] h-[450px] bg-accent-teal/5 dark:bg-accent-teal/2 rounded-full blur-[100px]"></div>
-  </div>
+<body class="bg-page-bg text-text-main font-sans antialiased transition-colors duration-200 relative dark">
   
   <script>
-    // Immediate execution script to load theme and avoid layout flashes
+    // Immediate execution script to load theme and default to dark
     const savedTheme = localStorage.getItem('theme');
-    if (savedTheme === 'dark' || (!savedTheme && window.matchMedia('(prefers-color-scheme: dark)').matches)) {
+    if (savedTheme === 'light') {
+      document.body.classList.remove('dark');
+    } else {
       document.body.classList.add('dark');
     }
   </script>
 
   <!-- Navigation Bar (Height: 70px) -->
-  <nav class="h-[70px] border-b border-border-subtle bg-page-bg/95 backdrop-blur-md sticky top-0 z-50 transition-colors duration-200">
-    <div class="max-w-[1400px] mx-auto h-full px-[30px] flex items-center justify-between">
+  <nav class="h-[70px] border-b border-card-border bg-page-bg/95 backdrop-blur-md sticky top-0 z-50 transition-colors duration-200">
+    <div class="max-w-[1400px] mx-auto h-full px-[24px] md:px-[36px] flex items-center justify-between">
       <!-- Logo Brand -->
       <a href="index.html" class="flex items-center gap-2 select-none group">
-        <div class="w-8 h-8 rounded-lg bg-primary flex items-center justify-center shadow-md">
+        <div class="w-8 h-8 rounded-lg bg-primary flex items-center justify-center shadow-sm">
           <svg class="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2.5">
-            <path stroke-linecap="round" stroke-linejoin="round" d="M13 10V3L4 14h7v7l9-11h-7z"/>
+            <path stroke-linecap="round" stroke-linejoin="round" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"/>
           </svg>
         </div>
-        <span class="text-xl font-bold font-display tracking-tight text-text-main">TradeMentor <span class="text-primary">AI</span></span>
+        <span class="text-xl font-medium font-display tracking-tight text-text-main">TradeMentor</span>
       </a>
 
       <!-- Desktop Links -->
-      <div class="hidden md:flex items-center gap-30px">
-        <a href="#problem" class="text-sm font-semibold font-display text-text-muted hover:text-primary transition-colors">The Problem</a>
-        <a href="#product-tour" class="text-sm font-semibold font-display text-text-muted hover:text-primary transition-colors">Product Tour</a>
-        <a href="#features" class="text-sm font-semibold font-display text-text-muted hover:text-primary transition-colors">Features</a>
-        <a href="#pricing" class="text-sm font-semibold font-display text-text-muted hover:text-primary transition-colors">Pricing</a>
+      <div class="hidden md:flex items-center gap-36px">
+        <a href="#problem" class="text-sm font-medium font-display text-text-muted hover:text-text-main transition-colors">Product</a>
+        <a href="#product-tour" class="text-sm font-medium font-display text-text-muted hover:text-text-main transition-colors">How it works</a>
+        <a href="#pricing" class="text-sm font-medium font-display text-text-muted hover:text-text-main transition-colors">Pricing</a>
+        <a href="#product-tour" class="text-sm font-medium font-display text-text-muted hover:text-text-main transition-colors">FAQ</a>
       </div>
 
       <!-- Action Items & Theme Toggle -->
-      <div class="flex items-center gap-20px">
+      <div class="flex items-center gap-24px">
         <!-- Theme Switcher Button -->
-        <button onclick="toggleTheme()" class="w-10 h-10 rounded-full flex items-center justify-center border border-border-subtle hover:bg-gray-100 dark:hover:bg-white/5 active:scale-[0.97] transition-all cursor-pointer" aria-label="Toggle theme">
-          <svg id="theme-icon-moon" class="w-5 h-5 text-gray-600 dark:hidden" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2">
+        <button onclick="toggleTheme()" class="w-10 h-10 rounded-full flex items-center justify-center border border-card-border hover:bg-gray-100 dark:hover:bg-white/5 active:scale-[0.97] transition-all cursor-pointer" aria-label="Toggle theme">
+          <svg id="theme-icon-moon" class="w-5 h-5 text-gray-400 dark:hidden" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2">
             <path stroke-linecap="round" stroke-linejoin="round" d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z"/>
           </svg>
           <svg id="theme-icon-sun" class="w-5 h-5 text-accent-yellow hidden dark:block" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2">
@@ -274,816 +417,1520 @@
           </svg>
         </button>
 
-        <a href="dashboard.html" class="btn-primary">Launch Workstation</a>
+        <a href="dashboard.html" class="text-sm font-medium text-text-muted hover:text-text-main transition-colors">Log in</a>
+        <a href="dashboard.html" class="btn-primary font-display">Get started</a>
       </div>
     </div>
   </nav>
 
-  <!-- Hero Section -->
-  <header class="relative bg-transparent pt-20px pb-[60px] overflow-hidden transition-colors duration-200">
-    <div class="max-w-[1400px] mx-auto px-[30px] grid grid-cols-1 lg:grid-cols-12 gap-40px items-center min-h-[calc(100vh-170px)]">
-      <!-- Left Copy Column (col-span-7) -->
-      <div class="lg:col-span-7 space-y-30px flex flex-col justify-center">
-        <!-- Brand Eyebrow -->
-        <span class="inline-flex items-center gap-2 px-3 py-1 bg-primary/10 text-primary text-xs font-bold font-display rounded-full max-w-max">
-          <span class="w-2 h-2 rounded-full bg-primary animate-pulse"></span>
-          REAL-TIME TRADING BEHAVIOR CIRCUIT BREAKER
-        </span>
+  <!-- SECTION 1: HERO -->
+  <header id="hero" class="relative bg-zinc-950 min-h-[calc(100dvh-70px)] flex items-center py-12 lg:py-20 overflow-hidden transition-colors duration-200">
+    <!-- Subtle premium radial glow behind the right side animation -->
+    <div class="absolute right-[5%] top-1/2 -translate-y-1/2 w-[600px] h-[600px] bg-[radial-gradient(circle_at_center,rgba(59,130,246,0.04)_0%,transparent_70%)] pointer-events-none z-0"></div>
+    <div class="absolute left-[-10%] top-[-10%] w-[500px] h-[500px] bg-[radial-gradient(circle_at_center,rgba(239,68,68,0.02)_0%,transparent_70%)] pointer-events-none z-0"></div>
+    
+    <div class="max-w-[1180px] mx-auto px-6 w-full grid grid-cols-1 lg:grid-cols-2 gap-12 lg:gap-14 items-center relative z-10">
+      
+      <!-- Left side: Headline, Subheadline, CTAs -->
+      <div class="space-y-6 flex flex-col justify-center">
+        <!-- Eyebrow Pill -->
+        <div class="inline-flex items-center gap-2 px-3 py-1.5 rounded-full border border-zinc-800 bg-zinc-900/40 backdrop-blur-sm self-start">
+          <span class="h-1.5 w-1.5 rounded-full bg-red-500 animate-pulse"></span>
+          <span class="text-[12px] font-medium text-zinc-400 tracking-tight">
+            ₹46,000 leaked per trader this year. Mostly to themselves.
+          </span>
+        </div>
 
-        <h1 class="text-4xl md:text-5xl lg:text-6xl font-light font-display tracking-tight leading-none text-text-main">
-          Protect your capital from <span class="text-primary font-normal">trading tilt</span>.
+        <!-- Headline -->
+        <h1 class="font-display text-[40px] sm:text-[52px] lg:text-[62px] leading-[1.05] font-semibold text-white tracking-tight">
+          You don't have a<br>
+          <span class="text-red-500">strategy</span> problem.<br>
+          You have a <span class="underline decoration-red-500 decoration-[3px] underline-offset-[6px]">7-second</span> problem.
         </h1>
 
-        <p class="text-base md:text-lg text-text-muted leading-relaxed max-w-[50ch] font-semibold">
-          TradeMentor AI streams your broker API logs, alerts you to emotional tilt, and triggers terminal lockouts before you blow up.
+        <!-- Subheadline -->
+        <p class="text-[17px] lg:text-[18px] leading-[1.55] text-zinc-400 max-w-[540px]">
+          The seven seconds between getting stopped out and clicking buy again. That's where the month dies — not in your chart setup. TradeMentor sits in those seven seconds and refuses to let you punch yourself in the face.
         </p>
 
-        <!-- CTAs -->
-        <div class="flex flex-wrap items-center gap-20px pt-10px">
-          <a href="#product-tour" class="btn-primary text-base px-6 py-3 font-display">Explore Previews</a>
-          <a href="dashboard.html" class="btn-ghost-light text-base group gap-2 font-semibold font-display">
-            Launch Cockpit
-            <svg class="w-5 h-5 group-hover:translate-x-1 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2">
-              <path stroke-linecap="round" stroke-linejoin="round" d="M17 8l4 4m0 0l-4 4m4-4H3"/>
+        <!-- CTA Buttons -->
+        <div class="flex flex-wrap items-center gap-3 pt-2">
+          <a href="dashboard.html" class="inline-flex items-center justify-center h-12 px-6 text-[14.5px] font-semibold gap-2 rounded-lg bg-white text-zinc-950 hover:bg-zinc-100 transition-all active:scale-[0.98] shadow-sm">
+            See it watching live
+            <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2">
+              <path stroke-linecap="round" stroke-linejoin="round" d="M14 5l7 7m0 0l-7 7m7-7H3"/>
             </svg>
           </a>
+          <a href="#habits-cost" class="inline-flex items-center justify-center h-12 px-6 text-[14.5px] font-semibold rounded-lg border border-zinc-800 bg-zinc-900/40 hover:bg-zinc-900/80 text-zinc-300 hover:text-white transition-all active:scale-[0.98]">
+            Show me why I lose
+          </a>
+        </div>
+
+        <!-- Bullet indicators under CTAs -->
+        <div class="flex flex-wrap items-center gap-5 text-[12.5px] text-zinc-400 pt-2">
+          <span class="flex items-center gap-1.5">
+            <svg class="h-3.5 w-3.5 text-emerald-500 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2.5">
+              <path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7"/>
+            </svg>
+            Read-only · we can't trade for you
+          </span>
+          <span class="flex items-center gap-1.5">
+            <svg class="h-3.5 w-3.5 text-emerald-500 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2">
+              <path stroke-linecap="round" stroke-linejoin="round" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"/>
+            </svg>
+            Free forever plan
+          </span>
         </div>
       </div>
 
-      <!-- Right Graphic Column (col-span-5) -->
-      <div class="lg:col-span-5 relative flex justify-center">
-        <div class="absolute -left-20 -top-20 w-72 h-72 bg-primary/10 rounded-full blur-3xl -z-10"></div>
-        <div class="w-full max-w-[480px] bg-card-bg rounded-[24px] p-20px shadow-lg border border-card-border relative transition-all duration-200">
-          <img src="premium_hero_shield.png" alt="TradeMentor AI 3D Glassmorphism Protective Shield Graphic" class="w-full rounded-[16px] shadow-sm border border-card-border object-cover bg-slate-900/5 dark:bg-black/20" />
-          <div class="absolute -bottom-4 -right-4 bg-accent-teal-bg text-bg-secondary border border-accent-teal/30 p-10px rounded-[12px] shadow-md flex items-center gap-2 max-w-xs">
-            <span class="w-2.5 h-2.5 rounded-full bg-accent-teal animate-pulse"></span>
-            <span class="text-xs font-bold font-display">Psychological Guardrails Armed</span>
-          </div>
-        </div>
-      </div>
-    </div>
-  </header>
-
-  <!-- Problem Section -->
-  <section id="problem" class="py-[80px] border-y border-border-subtle bg-gray-50/50 dark:bg-white/[0.01] transition-colors duration-200 scroll-mt-20">
-    <div class="max-w-[1400px] mx-auto px-[30px] grid grid-cols-1 lg:grid-cols-12 gap-60px items-center">
-      <!-- Problem Copy -->
-      <div class="lg:col-span-6 space-y-20px">
-        <h2 class="text-3xl md:text-4xl font-bold font-display tracking-tight text-text-main">
-          The Invisible Trading Loss: Emotional Tax
-        </h2>
-        <p class="text-sm md:text-base text-text-muted leading-relaxed font-semibold">
-          Why do 95% of options and day traders fail? It is rarely a failure of strategy—it is a breakdown of psychological discipline.
-        </p>
-        <p class="text-sm text-text-muted leading-relaxed font-medium">
-          Revenge trading to win back a loss, sizing up under anger, and exceeding daily trade frequency limits are emotional taxes. They drain account balances, turning profitable execution systems into net drawdowns.
-        </p>
+      <!-- Right side: Live interactive hero terminal -->
+      <div class="relative w-full max-w-[520px] lg:max-w-none justify-self-center lg:justify-self-end">
         
-        <div class="pt-10px">
-          <a href="#product-tour" class="btn-primary font-display">Learn How TradeMentor AI Intervenes</a>
-        </div>
-      </div>
-
-      <!-- Problem Metrics Card -->
-      <div class="lg:col-span-6 bg-card-bg border border-card-border rounded-[24px] p-30px shadow-md space-y-20px transition-colors">
-        <span class="text-xs font-bold text-red-600 dark:text-red-400 font-mono uppercase tracking-widest">REALISTIC MONTHLY PERFORMANCE ANALYSIS</span>
-        
-        <div class="space-y-10px">
-          <div class="flex justify-between items-center text-xs">
-            <span class="font-bold text-text-muted">Gross Returns (Disciplined Setups)</span>
-            <span class="font-bold text-green-600 dark:text-green-400 font-mono">+₹42,000</span>
-          </div>
-          <div class="w-full bg-gray-200 dark:bg-white/10 h-2 rounded-full overflow-hidden">
-            <div class="bg-green-500 h-full rounded-full" style="width: 100%;"></div>
-          </div>
-        </div>
-
-        <div class="space-y-10px">
-          <div class="flex justify-between items-center text-xs">
-            <span class="font-bold text-text-muted">Emotional Tax Lost (Revenge Trades, Sizing Tilts)</span>
-            <span class="font-bold text-red-600 dark:text-red-500 font-mono">-₹28,500</span>
-          </div>
-          <div class="w-full bg-gray-200 dark:bg-white/10 h-2 rounded-full overflow-hidden">
-            <div class="bg-red-500 h-full rounded-full" style="width: 68%;"></div>
-          </div>
-        </div>
-
-        <div class="border-t border-card-border pt-20px flex items-center justify-between">
-          <div>
-            <span class="text-xs text-text-muted font-bold block">NET REALIZED RETURNS</span>
-            <span class="text-xs text-text-muted font-medium">Tilt consumes 68% of gross returns</span>
-          </div>
-          <div class="text-2xl font-bold font-mono text-text-main">
-            ₹13,500
-          </div>
-        </div>
-      </div>
-    </div>
-  </section>
-
-  <!-- Interactive Product Tour (Actual Application Previews) -->
-  <section id="product-tour" class="py-[80px] bg-transparent scroll-mt-20 transition-colors duration-200">
-    <div class="max-w-[1400px] mx-auto px-[30px] space-y-[40px]">
-      <div class="text-center max-w-[65ch] mx-auto">
-        <span class="text-xs font-bold text-primary font-mono uppercase tracking-widest">LIVE PRODUCT TOUR</span>
-        <h2 class="text-3xl md:text-4xl font-bold font-display tracking-tight text-text-main mt-10px">
-          Interactive Application Previews
-        </h2>
-        <p class="text-sm md:text-base text-text-muted mt-[10px] font-semibold">
-          Click the tabs below to explore real components and layouts from the TradeMentor AI application suite.
-        </p>
-      </div>
-
-      <!-- Tab Switcher Menu -->
-      <div class="flex flex-wrap items-center justify-center gap-10px border-b border-border-subtle pb-20px">
-        <button onclick="switchTourTab('tour-cockpit', this)" class="px-5 py-2.5 font-bold font-display text-sm rounded-lg bg-primary text-white border border-primary transition-all cursor-pointer tour-tab-btn">
-          Overview Cockpit
-        </button>
-        <button onclick="switchTourTab('tour-alerts', this)" class="px-5 py-2.5 font-bold font-display text-sm rounded-lg text-text-muted hover:text-text-main border border-transparent transition-all cursor-pointer tour-tab-btn">
-          Behavioral Alerts
-        </button>
-        <button onclick="switchTourTab('tour-accountability', this)" class="px-5 py-2.5 font-bold font-display text-sm rounded-lg text-text-muted hover:text-text-main border border-transparent transition-all cursor-pointer tour-tab-btn">
-          WhatsApp Accountability
-        </button>
-        <button onclick="switchTourTab('tour-coach', this)" class="px-5 py-2.5 font-bold font-display text-sm rounded-lg text-text-muted hover:text-text-main border border-transparent transition-all cursor-pointer tour-tab-btn">
-          AI Mindset Coach
-        </button>
-      </div>
-
-      <!-- Tab Display Panels Container -->
-      <div class="bg-sim-outer-bg border border-sim-outer-border rounded-[24px] p-20px md:p-30px shadow-lg transition-colors duration-200 min-h-[460px] flex flex-col justify-between relative overflow-hidden">
-        
-        <!-- Tab 1: Overview Cockpit -->
-        <div id="tour-cockpit" class="tour-panel-content space-y-20px">
-          <div class="flex flex-col sm:flex-row sm:items-center justify-between border-b border-sim-inner-border pb-10px gap-10px">
-            <div>
-              <span class="text-xs font-bold text-text-muted font-mono block">DASHBOARD WORKSTATION COCKPIT</span>
-              <span class="text-xs text-text-muted font-medium">Safe Mode Active · Session duration: 02h 45m</span>
+        <!-- Terminal card -->
+        <div class="rounded-2xl border border-zinc-800 bg-zinc-900/40 overflow-hidden shadow-[0_30px_80px_-30px_rgba(0,0,0,0.8)] backdrop-blur-md relative z-10">
+          
+          <!-- Title bar -->
+          <div class="flex items-center justify-between px-4 py-2.5 border-b border-zinc-800 bg-zinc-950/40">
+            <div class="flex items-center gap-2">
+              <span class="h-2 w-2 rounded-full bg-red-500/70" />
+              <span class="h-2 w-2 rounded-full bg-amber-500/70" />
+              <span class="h-2 w-2 rounded-full bg-emerald-500/70" />
+              <span class="ml-2 text-[11px] font-medium text-zinc-500 tracking-wide font-mono">
+                tradementor · live session
+              </span>
             </div>
-            <!-- Delta badge -->
-            <span class="px-2.5 py-1 bg-green-500/10 text-green-600 dark:text-green-400 border border-green-500/20 text-xs font-bold rounded-full font-mono flex items-center gap-1.5 font-display">
-              <span class="w-2 h-2 rounded-full bg-green-500 animate-pulse"></span>
-              Today's P&L: +₹24,500 (+2.1%)
+            <span class="flex items-center gap-1.5 text-[10.5px] text-zinc-400 font-mono uppercase tracking-wider">
+              <span class="h-1.5 w-1.5 rounded-full bg-emerald-500 animate-pulse" />
+              streaming
             </span>
           </div>
 
-          <!-- Quick Metrics Bar -->
-          <div class="grid grid-cols-1 md:grid-cols-3 gap-20px">
-            <div class="bg-sim-inner-bg border border-sim-inner-border p-20px rounded-[12px] transition-colors">
-              <span class="text-[10px] font-bold text-text-muted uppercase tracking-wider block font-display">EMOTIONAL TAX INCURRED</span>
-              <span class="text-2xl font-bold font-mono text-text-main">-₹380 <span class="text-xs font-normal text-text-muted">est.</span></span>
+          <!-- NIFTY strip -->
+          <div class="flex items-center justify-between px-4 py-2 border-b border-zinc-800 text-xs">
+            <div class="flex items-baseline gap-2">
+              <span class="text-[10.5px] uppercase tracking-wider text-zinc-500 font-medium font-mono">NIFTY 50</span>
+              <span id="nifty-price" class="text-[13px] font-semibold text-white font-mono transition-all">22,486.20</span>
+              <span id="nifty-change" class="text-[11px] font-mono text-emerald-400">+0.42%</span>
             </div>
-            <div class="bg-sim-inner-bg border border-sim-inner-border p-20px rounded-[12px] transition-colors">
-              <span class="text-[10px] font-bold text-text-muted uppercase tracking-wider block font-display">PSYCHOLOGICAL FOCUS SCORE</span>
-              <span class="text-2xl font-bold font-mono text-green-600 dark:text-green-400">82 <span class="text-xs font-normal text-text-muted">/ 100</span></span>
+            <!-- Sparkline container -->
+            <svg id="nifty-sparkline" width="88" height="22" class="overflow-visible">
+              <path d="" fill="none" stroke="#10b981" stroke-width="1.5"/>
+            </svg>
+          </div>
+
+          <!-- Intraday P&L focal -->
+          <div class="px-4 pt-4 pb-3">
+            <div class="flex items-center justify-between text-xs">
+              <span class="text-[10.5px] uppercase tracking-[0.1em] text-zinc-500 font-medium font-mono">
+                Intraday P&L
+              </span>
+              <span class="text-[10.5px] text-zinc-500 font-mono">2 positions · NSE</span>
             </div>
-            <div class="bg-sim-inner-bg border border-sim-inner-border p-20px rounded-[12px] transition-colors flex flex-col justify-between">
-              <div class="flex justify-between items-baseline mb-1 text-[10px] font-bold text-text-muted uppercase tracking-wider font-display">
-                <span>DAILY EXECUTION PACING</span>
-                <span class="font-mono text-text-main">6 of 10 trades</span>
-              </div>
-              <div class="w-full bg-gray-200 dark:bg-white/10 h-1.5 rounded-full overflow-hidden">
-                <div class="bg-primary h-full rounded-full" style="width: 60%;"></div>
-              </div>
+            <div class="mt-1 flex items-baseline gap-3">
+              <span id="pnl-value" class="font-display text-[34px] sm:text-[40px] font-semibold tracking-tight text-red-500 transition-all">−₹1,850</span>
+              <span id="pnl-pct" class="text-[12px] font-mono text-red-500">▼ 100.0%</span>
+            </div>
+            <div class="mt-1 text-[11px] text-zinc-400">
+              Down day · 4 of last 5 entries flagged behaviorally.
             </div>
           </div>
 
-          <!-- Active Positions mockup -->
-          <div class="bg-sim-inner-bg border border-sim-inner-border rounded-[12px] p-20px space-y-10px transition-colors">
-            <span class="text-xs font-bold text-text-muted block uppercase tracking-wider font-display">ACTIVE OPTION POSITIONS</span>
-            <div class="overflow-x-auto">
-              <table class="w-full text-left border-collapse text-xs">
-                <thead>
-                  <tr class="border-b border-sim-inner-border text-text-muted font-bold font-mono text-[10px]">
-                    <th class="pb-2">CONTRACT</th>
-                    <th class="pb-2">QTY</th>
-                    <th class="pb-2">ENTRY AVG</th>
-                    <th class="pb-2">LTP</th>
-                    <th class="pb-2">P&L STATE</th>
-                    <th class="pb-2">STOP LOSS STATUS</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  <tr class="border-b border-sim-inner-border/50 text-text-main font-semibold">
-                    <td class="py-3">NIFTY 24000 CE</td>
-                    <td class="py-3">1,200</td>
-                    <td class="py-3 font-mono">145.20</td>
-                    <td class="py-3 font-mono">165.40</td>
-                    <td class="py-3 font-mono text-green-600 dark:text-green-400">+₹24,240</td>
-                    <td class="py-3 font-mono text-green-600 dark:text-green-400">ACTIVE (Trailing)</td>
-                  </tr>
-                </tbody>
-              </table>
-            </div>
-          </div>
-        </div>
-
-        <!-- Tab 2: Behavioral Alerts -->
-        <div id="tour-alerts" class="tour-panel-content hidden space-y-20px">
-          <div class="border-b border-sim-inner-border pb-10px">
-            <span class="text-xs font-bold text-text-muted font-mono block">SHIELD OBSERVATIONS & BEHAVIOR FEED</span>
-            <span class="text-xs text-text-muted font-medium">Real-time alerts streamed from connection filters.</span>
-          </div>
-
-          <!-- Alert feed list -->
-          <div class="space-y-10px" id="tour-alerts-feed">
-            <!-- Alert 1 (Interactive) -->
-            <div class="border border-red-500/30 bg-red-500/10 p-20px rounded-[12px] flex flex-col md:flex-row items-start md:items-center justify-between gap-15px transition-all" id="mock-alert-revenge">
-              <div class="space-y-4px">
-                <div class="flex items-center gap-10px">
-                  <span class="px-2 py-0.5 bg-red-500/20 text-red-600 dark:text-red-400 text-[9px] font-bold rounded uppercase">High Risk</span>
-                  <span class="text-xs font-bold text-text-main font-display">Revenge Matrix Triggered</span>
-                </div>
-                <p class="text-xs text-text-muted font-medium leading-relaxed">
-                  Re-entered position on NIFTY 24000 PE immediately after a stop-out loss. Clear deviation from rule-based trading system.
-                </p>
-              </div>
-              <div class="flex items-center gap-10px w-full md:w-auto">
-                <button onclick="triggerHaltFromAlert()" class="px-3 py-1.5 bg-red-600 hover:bg-red-700 text-white font-bold text-xs rounded-lg transition-all active:scale-[0.97] flex-1 md:flex-initial cursor-pointer font-display">
-                  Trigger Partner Alert
-                </button>
-                <button onclick="dismissMockAlert('mock-alert-revenge')" class="px-3 py-1.5 bg-sim-inner-bg hover:bg-gray-100 dark:hover:bg-white/5 text-text-main border border-sim-inner-border font-bold text-xs rounded-lg transition-all active:scale-[0.97] flex-1 md:flex-initial cursor-pointer font-display">
-                  Dismiss
-                </button>
-              </div>
-            </div>
-
-            <!-- Alert 2 -->
-            <div class="border border-amber-500/30 bg-amber-500/10 p-20px rounded-[12px] flex flex-col md:flex-row items-start md:items-center justify-between gap-15px transition-all">
-              <div class="space-y-4px">
-                <div class="flex items-center gap-10px">
-                  <span class="px-2 py-0.5 bg-amber-500/20 text-amber-600 dark:text-amber-400 text-[9px] font-bold rounded uppercase">Medium Risk</span>
-                  <span class="text-xs font-bold text-text-main font-display">Drawdown Threshold Gate Alert</span>
-                </div>
-                <p class="text-xs text-text-muted font-medium leading-relaxed">
-                  Daily drawdown has reached -₹12,000, representing 80% of daily max drawdown limit (₹15,000).
-                </p>
-              </div>
-            </div>
-
-            <!-- Alert 3 -->
-            <div class="border border-gray-200 dark:border-white/10 bg-gray-100/50 dark:bg-white/5 p-20px rounded-[12px] flex flex-col md:flex-row items-start md:items-center justify-between gap-15px transition-all">
-              <div class="space-y-4px">
-                <div class="flex items-center gap-10px">
-                  <span class="px-2 py-0.5 bg-gray-200 dark:bg-white/20 text-text-muted text-[9px] font-bold rounded uppercase">Low Risk</span>
-                  <span class="text-xs font-bold text-text-main font-display">Order Frequency Warning</span>
-                </div>
-                <p class="text-xs text-text-muted font-medium leading-relaxed">
-                  Executed 4 trades in 10 minutes. Trade frequency is exceeding average cadence rules.
-                </p>
-              </div>
-            </div>
-          </div>
-        </div>
-
-        <!-- Tab 3: WhatsApp Accountability -->
-        <div id="tour-accountability" class="tour-panel-content hidden space-y-20px relative">
-          <div class="border-b border-sim-inner-border pb-10px">
-            <span class="text-xs font-bold text-text-muted font-mono block">AUTOMATED WHATSAPP ACCOUNTABILITY PARTNER</span>
-            <span class="text-xs text-text-muted font-medium">Automatic alerts sent to your mentor or partner when emotional limits are crossed.</span>
-          </div>
-
-          <!-- Phone WhatsApp screen and layout -->
-          <div class="grid grid-cols-1 md:grid-cols-12 gap-20px items-stretch" id="whatsapp-panel-container">
-            <!-- Information side -->
-            <div class="md:col-span-5 space-y-10px flex flex-col justify-center">
-              <h4 class="text-sm font-bold text-text-main font-display">The Psychological Friction Point</h4>
-              <p class="text-xs text-text-muted leading-relaxed font-semibold">
-                You define a designated accountability partner (partner, trading buddy, or mentor). When risk rules are repeatedly broken, TradeMentor AI sends them a real-time summary via WhatsApp.
-              </p>
-              <p class="text-xs text-text-muted leading-relaxed font-medium">
-                The anticipation of social friction and real-time review is a powerful psychological tool to stop tilt.
-              </p>
-              
-              <div class="pt-5px">
-                <button onclick="triggerMockWhatsAppSend()" class="px-4 py-2 bg-primary hover:bg-secondary text-white font-bold text-xs rounded-lg transition-all active:scale-[0.97] cursor-pointer font-display">
-                  Trigger Revenge Breach Alert
-                </button>
-              </div>
-            </div>
-
-            <!-- Mobile mockup side -->
-            <div class="md:col-span-7 bg-[#dfdbd3] dark:bg-zinc-800 rounded-xl p-15px border border-sim-inner-border shadow-inner flex flex-col justify-between h-[280px] relative overflow-hidden transition-colors">
-              <!-- phone header -->
-              <div class="flex items-center gap-10px bg-[#075e54] text-white p-10px rounded-t-lg -mx-15px -mt-15px select-none">
-                <div class="w-8 h-8 rounded-full bg-teal-800 flex items-center justify-center font-bold text-sm">M</div>
-                <div>
-                  <span class="text-xs font-bold block">Mentor / Trading Buddy</span>
-                  <span class="text-[9px] opacity-75 block">online</span>
-                </div>
-              </div>
-
-              <!-- Message feed -->
-              <div class="flex-1 overflow-y-auto p-10px space-y-10px font-semibold text-xs" id="whatsapp-chat-box">
-                <div class="text-gray-500 text-[9px] text-center my-10px select-none">TODAY</div>
-                <div class="bg-white dark:bg-zinc-900 border border-gray-200 dark:border-zinc-750 p-2.5 rounded-lg shadow-sm text-text-main max-w-[90%] leading-relaxed transition-colors">
-                  "Hey John, hope the morning session goes well. Stick to the daily plan."
-                </div>
-              </div>
-
-              <!-- Input bar spacer -->
-              <div class="flex items-center gap-10px bg-[#f0f0f0] dark:bg-zinc-900 p-10px rounded-b-lg -mx-15px -mb-15px border-t border-gray-300 dark:border-zinc-800 select-none transition-colors">
-                <div class="flex-1 bg-white dark:bg-zinc-800 rounded-full h-8 px-10px text-[10px] text-gray-400 flex items-center transition-colors">Type a message...</div>
-                <div class="w-8 h-8 rounded-full bg-[#075e54] flex items-center justify-center text-white">
-                  <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8"/></svg>
-                </div>
-              </div>
-            </div>
-          </div>
-
-          <!-- Full Screen visual overlay override (Takeover override simulation) -->
-          <div id="takeover-overlay" class="absolute inset-0 pulse-overlay-warning text-white flex flex-col items-center justify-center p-20px space-y-20px transition-all duration-300 opacity-0 pointer-events-none rounded-[24px] z-20">
-            <div class="w-16 h-16 rounded-full bg-white/20 border border-white/50 flex items-center justify-center text-white animate-bounce">
-              <svg class="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/></svg>
+          <!-- Positions table -->
+          <div class="border-t border-zinc-800">
+            <div class="grid grid-cols-[1fr_56px_82px_70px] px-4 py-1.5 text-[10px] uppercase tracking-wider text-zinc-500 font-medium border-b border-zinc-800 font-mono">
+              <span>Position</span>
+              <span class="text-right">Qty</span>
+              <span class="text-right">LTP</span>
+              <span class="text-right">P&L</span>
             </div>
             
-            <div class="text-center space-y-10px">
-              <h4 class="text-2xl font-bold font-display tracking-wider">BEHAVIORAL BREACH WARNING</h4>
-              <p class="text-sm font-semibold max-w-[42ch] mx-auto leading-relaxed">
-                Visual override triggered. Sizing up under stress detected. Accountability alert has been dispatched to your partner via WhatsApp.
-              </p>
+            <!-- Position: RELIANCE -->
+            <div class="grid grid-cols-[1fr_56px_82px_70px] items-center gap-2 px-4 py-2 border-b border-zinc-800 text-[12px]">
+              <div class="flex items-center gap-2 min-w-0">
+                <svg id="reliance-sparkline" width="36" height="16" class="overflow-visible shrink-0">
+                  <path d="" fill="none" stroke="#10b981" stroke-width="1.2"/>
+                </svg>
+                <span class="font-semibold text-white truncate font-mono">RELIANCE</span>
+              </div>
+              <span class="text-right font-mono text-zinc-400">50</span>
+              <span id="reliance-price" class="text-right text-white font-mono transition-all">2,487.40</span>
+              <span id="reliance-pnl" class="text-right font-semibold text-emerald-400 font-mono transition-all">₹0</span>
             </div>
 
-            <div class="bg-black/45 border border-white/10 rounded-[12px] p-15px max-w-sm text-left space-y-6px font-mono text-[10px] text-gray-300">
-              <div class="text-red-400 font-bold">&gt; Speech Alarm: "Revenge trading detected. Step away."</div>
-              <div>&gt; WhatsApp Dispatched: To "Mentor" [+91 98XXX XXX55]</div>
-              <div class="text-green-400">&gt; Status: Partner Checked In (Friction Injected)</div>
+            <!-- Position: INFY -->
+            <div class="grid grid-cols-[1fr_56px_82px_70px] items-center gap-2 px-4 py-2 text-[12px]">
+              <div class="flex items-center gap-2 min-w-0">
+                <svg id="infy-sparkline" width="36" height="16" class="overflow-visible shrink-0">
+                  <path d="" fill="none" stroke="#ef4444" stroke-width="1.2"/>
+                </svg>
+                <span class="font-semibold text-white truncate font-mono">INFY</span>
+              </div>
+              <span class="text-right font-mono text-zinc-400">40</span>
+              <span id="infy-price" class="text-right text-white font-mono transition-all">1,521.60</span>
+              <span id="infy-pnl" class="text-right font-semibold text-emerald-400 font-mono transition-all">₹0</span>
             </div>
+          </div>
 
-            <button onclick="resetMockTakeover()" class="px-5 py-2.5 bg-white text-red-600 hover:bg-gray-100 font-bold text-xs rounded-lg transition-all active:scale-[0.97] cursor-pointer font-display border border-white">
-              Reset Intervention Simulator
+          <!-- Alert stream -->
+          <div id="terminal-alerts-container" class="border-t border-zinc-800 bg-zinc-950/20 px-3 py-3 space-y-2 min-h-[170px] transition-all">
+            <!-- Rendered dynamically via JS -->
+          </div>
+        </div>
+
+        <!-- Floating "saved" pill -->
+        <div class="hidden sm:flex absolute -right-4 -bottom-5 items-center gap-3 bg-zinc-950 border border-zinc-800 rounded-xl px-4 py-2.5 shadow-[0_18px_50px_-20px_rgba(0,0,0,0.8)] z-20 animate-[pulse-border-emerald_1.5s_infinite_alternate]">
+          <div class="h-8 w-8 rounded-lg bg-emerald-500/10 text-emerald-400 flex items-center justify-center shrink-0">
+            <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2">
+              <path stroke-linecap="round" stroke-linejoin="round" d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9"/>
+            </svg>
+          </div>
+          <div>
+            <p class="text-[10px] uppercase tracking-wider text-zinc-500 font-semibold font-mono">Cooldown enforced</p>
+            <p class="text-[13px] font-semibold text-emerald-400 font-mono">+₹6,400 protected</p>
+          </div>
+        </div>
+
+      </div>
+
+    </div>
+  </header>
+
+
+
+  <!-- SECTION 3: REVENGE SPIRAL SIMULATOR -->
+  <section id="timeline" class="border-t border-zinc-800 bg-zinc-950/20 py-20 lg:py-28 relative scroll-mt-20 border-b border-zinc-800">
+    <!-- Floating Ambient Background Confessions Layer -->
+    <div class="floating-confessions-wrapper"></div>
+    <div class="max-w-[1180px] mx-auto px-6 relative z-10">
+      <div class="grid lg:grid-cols-[1fr_1.15fr] gap-12 lg:gap-16 items-start">
+        
+        <!-- Left Column: Copy -->
+        <div class="lg:sticky lg:top-24">
+          <p class="text-[12px] font-medium uppercase tracking-[0.15em] text-red-500 mb-4 font-mono">
+            Why traders actually blow up
+          </p>
+          <h2 class="font-display text-[32px] lg:text-[44px] leading-[1.05] font-semibold text-white tracking-tight">
+            It's never one bad trade.<br>
+            It's the next four.
+          </h2>
+          <p class="mt-5 text-[16px] leading-[1.6] text-zinc-400 max-w-[480px]">
+            Watch a real revenge-trading spiral play out — the kind that turns a planned −₹2,000 stop into a −₹18,400 wipeout in twenty minutes. If this feels familiar, you're not alone. It's the same loop happening to ~90% of retail traders, every single day.
+          </p>
+          <p class="mt-5 text-[15px] leading-[1.6] text-white font-medium max-w-[460px]">
+            TradeMentor sits between step 1 and step 2 — and refuses to let you click.
+          </p>
+          <div class="mt-7 flex items-center gap-2">
+            <button id="sim-play-btn" onclick="toggleSimPlaying()" class="inline-flex items-center gap-2 h-9 px-4 rounded-lg border border-zinc-800 bg-zinc-900/60 text-[13px] font-medium text-white hover:bg-zinc-900 transition-colors cursor-pointer select-none active:scale-[0.98]">
+              <!-- Pause Icon (Default) -->
+              <svg id="sim-play-icon" class="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M15.75 5.25v13.5m-7.5-13.5v13.5"/>
+              </svg>
+              <span id="sim-play-text">Pause</span>
+            </button>
+            <button onclick="replaySim()" class="inline-flex items-center gap-2 h-9 px-4 rounded-lg border border-zinc-800 bg-zinc-900/60 text-[13px] font-medium text-zinc-400 hover:text-white hover:bg-zinc-900 transition-colors cursor-pointer select-none active:scale-[0.98]">
+              <!-- Replay Icon -->
+              <svg class="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M16.023 9.348h4.992v-.001M2.985 19.644v-4.992m0 0h4.992m-4.993 0l3.181 3.183a8.25 8.25 0 0013.803-3.7M4.031 9.865a8.25 8.25 0 0113.803-3.7l3.181 3.182m0-4.991v4.99"/>
+              </svg>
+              Replay
             </button>
           </div>
         </div>
 
-        <!-- Tab 4: AI Mindset Coach -->
-        <div id="tour-coach" class="tour-panel-content hidden space-y-20px">
-          <div class="border-b border-sim-inner-border pb-10px">
-            <span class="text-xs font-bold text-text-muted font-mono block">AI PSYCHOLOGICAL MINDSET COACH</span>
-            <span class="text-xs text-text-muted font-medium">Conversational cognitive feedback to reset trading posture.</span>
+        <!-- Right Column: Simulator Widget -->
+        <div class="rounded-2xl border border-zinc-800 bg-zinc-900/40 overflow-hidden shadow-2xl backdrop-blur-md">
+          <!-- Headline P&L -->
+          <div class="px-5 pt-5 pb-4 border-b border-zinc-800 bg-zinc-950/40">
+            <div class="flex items-center justify-between text-xs">
+              <span class="text-[10.5px] uppercase tracking-[0.1em] font-medium text-zinc-500 font-mono">
+                Account P&L · simulated session
+              </span>
+              <span class="text-[10.5px] font-mono text-zinc-500 font-semibold">
+                step <span id="sim-step-idx">1</span> / 4
+              </span>
+            </div>
+            <div class="mt-1.5 flex items-baseline gap-3">
+              <span id="sim-pnl-text" class="font-display text-[40px] sm:text-[48px] font-semibold tracking-tight text-red-500 font-mono tabular-nums">
+                −₹2,100
+              </span>
+              <span id="sim-pnl-pct" class="text-[12px] font-mono text-red-500">
+                ▼ 4.20% of capital
+              </span>
+            </div>
+            <div class="mt-3 h-1.5 rounded-full bg-zinc-800 overflow-hidden">
+              <div id="sim-progress-bar" class="h-full bg-red-500 transition-all duration-700 ease-out" style="width: 11.4%"></div>
+            </div>
+            <div class="mt-1.5 flex items-center justify-between text-[10.5px] text-zinc-500 font-mono">
+              <span>Planned stop · −₹2,000</span>
+              <span>Actual blow · −₹18,400</span>
+            </div>
           </div>
 
-          <!-- Chat interface -->
-          <div class="bg-sim-inner-bg border border-sim-inner-border rounded-[12px] p-20px flex flex-col justify-between h-[280px] transition-colors">
-            <!-- Messages feed -->
-            <div class="flex-1 overflow-y-auto space-y-10px font-semibold text-xs pr-10px scrollbar-thin" id="tour-chat-feed">
-              <div class="text-text-muted flex items-start gap-10px max-w-[85%]">
-                <div class="w-6 h-6 rounded bg-primary flex items-center justify-center text-[10px] font-bold text-white flex-shrink-0">C</div>
-                <div class="bg-gray-100 dark:bg-white/5 border border-sim-inner-border p-2.5 rounded-[12px] leading-relaxed transition-colors">
-                  "Drawdown trade registered. What is your emotional state right now?"
+          <!-- Timeline Steps -->
+          <ol class="divide-y divide-zinc-800/60" id="sim-timeline">
+            <!-- Step 1 -->
+            <li id="sim-row-1" class="flex gap-4 px-5 py-4 transition-all duration-500 opacity-30">
+              <div class="shrink-0 flex flex-col items-center">
+                <div id="sim-dot-1" class="h-7 w-7 rounded-full flex items-center justify-center text-[11px] font-bold border-2 transition-colors bg-zinc-800 text-zinc-400 border-zinc-700 font-mono">1</div>
+                <div id="sim-line-1" class="w-px flex-1 mt-1 bg-zinc-800"></div>
+              </div>
+              <div class="flex-1 min-w-0 pb-1">
+                <div class="flex items-baseline justify-between gap-3 flex-wrap">
+                  <p class="text-[13px] font-semibold text-white">RELIANCE · long 50 @ 2,487</p>
+                  <span class="text-[10.5px] font-mono text-zinc-500">09:21</span>
+                </div>
+                <p class="text-[12px] text-zinc-400 mt-0.5 leading-snug">Stopped out −₹2,100. Within plan. You should've been done.</p>
+                <div id="sim-extra-1" class="mt-2 flex items-center gap-2 flex-wrap hidden">
+                  <span class="text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-[3px] bg-amber-500/10 text-amber-400">Annoyed</span>
+                  <span class="text-[11.5px] italic text-zinc-300">"Market just shook me out. Let me get it back."</span>
+                </div>
+              </div>
+            </li>
+
+            <!-- Step 2 -->
+            <li id="sim-row-2" class="flex gap-4 px-5 py-4 transition-all duration-500 opacity-30">
+              <div class="shrink-0 flex flex-col items-center">
+                <div id="sim-dot-2" class="h-7 w-7 rounded-full flex items-center justify-center text-[11px] font-bold border-2 transition-colors bg-zinc-800 text-zinc-400 border-zinc-700 font-mono">2</div>
+                <div id="sim-line-2" class="w-px flex-1 mt-1 bg-zinc-800"></div>
+              </div>
+              <div class="flex-1 min-w-0 pb-1">
+                <div class="flex items-baseline justify-between gap-3 flex-wrap">
+                  <p class="text-[13px] font-semibold text-white">RELIANCE · re-entry 80 @ 2,492</p>
+                  <span class="text-[10.5px] font-mono text-zinc-500">09:27</span>
+                </div>
+                <p class="text-[12px] text-zinc-400 mt-0.5 leading-snug">1.6× size. No setup. 6 minutes after the loss.</p>
+                <div id="sim-extra-2" class="mt-2 flex items-center gap-2 flex-wrap hidden">
+                  <span class="text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-[3px] bg-amber-500/10 text-amber-400">Tilted</span>
+                  <span class="text-[11.5px] italic text-zinc-300">"This one has to work. I saw the move coming."</span>
+                </div>
+              </div>
+            </li>
+
+            <!-- Step 3 -->
+            <li id="sim-row-3" class="flex gap-4 px-5 py-4 transition-all duration-500 opacity-30">
+              <div class="shrink-0 flex flex-col items-center">
+                <div id="sim-dot-3" class="h-7 w-7 rounded-full flex items-center justify-center text-[11px] font-bold border-2 transition-colors bg-zinc-800 text-zinc-400 border-zinc-700 font-mono">3</div>
+                <div id="sim-line-3" class="w-px flex-1 mt-1 bg-zinc-800"></div>
+              </div>
+              <div class="flex-1 min-w-0 pb-1">
+                <div class="flex items-baseline justify-between gap-3 flex-wrap">
+                  <p class="text-[13px] font-semibold text-white">RELIANCE · stop pulled, added 40</p>
+                  <span class="text-[10.5px] font-mono text-zinc-500">09:34</span>
+                </div>
+                <p class="text-[12px] text-zinc-400 mt-0.5 leading-snug">Original SL removed. Position doubled. Hope replaced the plan.</p>
+                <div id="sim-extra-3" class="mt-2 flex items-center gap-2 flex-wrap hidden">
+                  <span class="text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-[3px] bg-red-500/10 text-red-400">Desperate</span>
+                  <span class="text-[11.5px] italic text-zinc-300">"I can't take another loss. It'll come back."</span>
+                </div>
+              </div>
+            </li>
+
+            <!-- Step 4 -->
+            <li id="sim-row-4" class="flex gap-4 px-5 py-4 transition-all duration-500 opacity-30">
+              <div class="shrink-0 flex flex-col items-center">
+                <div id="sim-dot-4" class="h-7 w-7 rounded-full flex items-center justify-center text-[11px] font-bold border-2 transition-colors bg-zinc-800 text-zinc-400 border-zinc-700 font-mono">4</div>
+              </div>
+              <div class="flex-1 min-w-0 pb-1">
+                <div class="flex items-baseline justify-between gap-3 flex-wrap">
+                  <p class="text-[13px] font-semibold text-white">Forced exit at market</p>
+                  <span class="text-[10.5px] font-mono text-zinc-500">09:41</span>
+                </div>
+                <p class="text-[12px] text-zinc-400 mt-0.5 leading-snug">Panic close. One bad trade became the worst day of the month.</p>
+                <div id="sim-extra-4" class="mt-2 flex items-center gap-2 flex-wrap hidden">
+                  <span class="text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-[3px] bg-red-500/10 text-red-400">Blown out</span>
+                  <span class="text-[11.5px] italic text-zinc-300">"Why do I keep doing this?"</span>
+                </div>
+              </div>
+            </li>
+          </ol>
+
+          <!-- Footer -->
+          <div class="px-5 py-4 border-t border-zinc-800 bg-zinc-950/40 flex items-center justify-between gap-3 text-xs">
+            <p class="text-[12px] text-zinc-400">
+              With TradeMentor, step 2 never happens.{" "}
+              <span class="text-white font-semibold">−₹16,300 saved.</span>
+            </p>
+            <span class="text-[10.5px] uppercase tracking-wider text-zinc-500 font-medium font-mono">
+              simulated
+            </span>
+          </div>
+
+        </div>
+
+      </div>
+    </div>
+  </section>
+
+  <!-- SECTION 4: BEHAVIORAL LEAKAGE CALCULATOR -->
+  <section id="habits-cost" class="py-[96px] bg-sim-outer-bg border-b border-card-border scroll-mt-20 relative bg-grid-pattern">
+    <!-- Floating Ambient Background Confessions Layer -->
+    <div class="floating-confessions-wrapper"></div>
+    <div class="max-w-[1400px] mx-auto px-[24px] md:px-[36px] grid grid-cols-1 lg:grid-cols-12 gap-[72px] items-center relative z-10">
+      
+      <!-- Left side: Habits Checklist -->
+      <div class="lg:col-span-6 space-y-[24px]">
+        <span class="text-xs font-bold text-primary font-mono uppercase tracking-widest">BEHAVIORAL CALCULATOR</span>
+        <h2 class="text-3xl md:text-4xl font-extrabold font-display tracking-[-1px] text-text-main leading-tight">
+          What your emotional habits cost you.
+        </h2>
+        <p class="text-sm text-text-muted">
+          Toggle each behavior to see how emotional mistakes leak real profits. You are not losing money to bad strategy—you're paying an emotional tax.
+        </p>
+
+        <!-- Checklist -->
+        <div class="space-y-[12px] pt-[12px]">
+          <label class="flex items-center gap-[18px] bg-card-bg border border-card-border p-[18px] rounded-xl cursor-pointer select-none hover:border-primary/45 transition-colors">
+            <input type="checkbox" data-habit="revenge" checked onchange="updateCalculatorTotal()" class="habit-checkbox w-4 h-4 text-primary rounded focus:ring-primary focus:outline-none" />
+            <div>
+              <span class="text-xs font-bold text-text-main block">Revenge Trading Leaks</span>
+              <span class="text-[10px] text-text-muted">Re-buying same options contracts immediately after stop-loss.</span>
+            </div>
+          </label>
+
+          <label class="flex items-center gap-[18px] bg-card-bg border border-card-border p-[18px] rounded-xl cursor-pointer select-none hover:border-primary/45 transition-colors">
+            <input type="checkbox" data-habit="overtrading" checked onchange="updateCalculatorTotal()" class="habit-checkbox w-4 h-4 text-primary rounded focus:ring-primary focus:outline-none" />
+            <div>
+              <span class="text-xs font-bold text-text-main block">Overtrading Leaks</span>
+              <span class="text-[10px] text-text-muted">Exceeding daily trade count counts due to boredom or market FOMO.</span>
+            </div>
+          </label>
+
+          <label class="flex items-center gap-[18px] bg-card-bg border border-card-border p-[18px] rounded-xl cursor-pointer select-none hover:border-primary/45 transition-colors">
+            <input type="checkbox" data-habit="losers" checked onchange="updateCalculatorTotal()" class="habit-checkbox w-4 h-4 text-primary rounded focus:ring-primary focus:outline-none" />
+            <div>
+              <span class="text-xs font-bold text-text-main block">Holding Losers Leaks</span>
+              <span class="text-[10px] text-text-muted">Averaging down on expiring options hoping for a dead-cat bounce.</span>
+            </div>
+          </label>
+
+          <label class="flex items-center gap-[18px] bg-card-bg border border-card-border p-[18px] rounded-xl cursor-pointer select-none hover:border-primary/45 transition-colors">
+            <input type="checkbox" data-habit="oversizing" checked onchange="updateCalculatorTotal()" class="habit-checkbox w-4 h-4 text-primary rounded focus:ring-primary focus:outline-none" />
+            <div>
+              <span class="text-xs font-bold text-text-main block">Oversizing Leaks</span>
+              <span class="text-[10px] text-text-muted">Multiplying contract quantity under emotional distress to recover.</span>
+            </div>
+          </label>
+        </div>
+      </div>
+
+      <!-- Right side: Visual P&L Audit & Bar comparison -->
+      <div class="lg:col-span-6 flex justify-center">
+        <div class="w-full max-w-[480px] bg-card-bg border border-card-border rounded-2xl p-[36px] shadow-sm space-y-[24px] relative overflow-hidden">
+          <div class="glow-orb w-[200px] h-[200px] -bottom-10 -right-10 opacity-30"></div>
+          
+          <span class="text-xs font-semibold text-text-muted uppercase tracking-wider block border-b border-card-border pb-[12px] font-display">Behavioral P&L Audit</span>
+          
+          <!-- Dynamic Bar Comparison -->
+          <div class="space-y-[20px] relative z-10">
+            <!-- Actual P&L Bar -->
+            <div class="space-y-[8px]">
+              <div class="flex justify-between text-xs font-bold text-text-main">
+                <span>Actual Monthly Net P&L</span>
+                <span class="text-green-600 font-mono">₹24,000</span>
+              </div>
+              <div class="w-full bg-gray-100 dark:bg-white/5 h-[32px] rounded-[6px] overflow-hidden border border-card-border">
+                <div class="bg-emerald-500 h-full rounded-l-[4px] flex items-center px-3 text-white text-[10px] font-bold font-mono transition-all duration-500" style="width: 33.3%;">
+                  ₹24,000
+                </div>
+              </div>
+            </div>
+
+            <!-- Potential P&L Bar (with Gradient) -->
+            <div class="space-y-[8px]">
+              <div class="flex justify-between text-xs font-bold text-primary">
+                <span>Potential P&L (Bias Eliminated)</span>
+                <span id="potential-val" class="font-mono">₹72,000</span>
+              </div>
+              <div class="w-full bg-gray-100 dark:bg-white/5 h-[32px] rounded-[6px] overflow-hidden border border-card-border">
+                <div id="potential-bar" class="bg-gradient-to-r from-primary to-emerald-400 h-full rounded-l-[4px] flex items-center px-3 text-white text-[10px] font-bold font-mono transition-all duration-500" style="width: 100%;">
+                  ₹72,000
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Individual Leak Values list -->
+          <div class="grid grid-cols-2 gap-[12px] border-t border-card-border pt-[20px] text-[10px] font-semibold text-text-muted">
+            <div id="cost-revenge" class="flex justify-between font-mono">
+              <span>Revenge Leaks:</span>
+              <span class="text-red-500">-₹18,400</span>
+            </div>
+            <div id="cost-overtrading" class="flex justify-between font-mono">
+              <span>Overtrading Leaks:</span>
+              <span class="text-red-500">-₹12,800</span>
+            </div>
+            <div id="cost-losers" class="flex justify-between font-mono">
+              <span>Losers Leaks:</span>
+              <span class="text-red-500">-₹9,200</span>
+            </div>
+            <div id="cost-oversizing" class="flex justify-between font-mono">
+              <span>Oversizing Leaks:</span>
+              <span class="text-red-500">-₹7,600</span>
+            </div>
+          </div>
+
+          <div class="border-t border-card-border pt-[20px] space-y-[12px]">
+            <div class="flex justify-between items-center">
+              <span class="text-xs font-extrabold text-text-main">Monthly Behavioral Leak</span>
+              <span id="calc-total" class="text-3xl font-extrabold font-mono text-red-600">₹48,000</span>
+            </div>
+            <p class="text-[11px] text-text-muted font-normal italic leading-relaxed pt-1">
+              "The market didn't take ₹48,000. Your behavior did."
+            </p>
+          </div>
+
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- SECTION 5: LIVE CONTROL COCKPIT & TOUR -->
+  <section id="product-tour" class="py-[96px] bg-[#ffffff] dark:bg-page-bg scroll-mt-20 border-b border-card-border relative bg-grid-pattern">
+    <!-- Floating Ambient Background Confessions Layer -->
+    <div class="floating-confessions-wrapper"></div>
+    <div class="glow-orb w-[450px] h-[450px] top-10 right-10 opacity-30"></div>
+    <div class="max-w-[1400px] mx-auto px-[24px] md:px-[36px] grid grid-cols-1 lg:grid-cols-12 gap-[72px] items-center relative z-10">
+      
+      <!-- Left side copy & tabs -->
+      <div class="lg:col-span-5 space-y-[24px]">
+        <span class="text-xs font-bold text-primary font-mono uppercase tracking-widest">PRODUCT COCKPIT</span>
+        <h2 class="text-3xl md:text-4xl font-extrabold font-display tracking-[-1px] text-text-main leading-tight">
+          Interact with the behavioral firewall.
+        </h2>
+        <p class="text-sm text-text-muted leading-relaxed font-normal">
+          TradeMentor streams broker order logs to block emotional mistakes before they hit the exchange. Enforce friction, track daily metrics, and protect your capital.
+        </p>
+
+        <!-- Tabs Menu (Strictly 4) -->
+        <div class="flex flex-col gap-[12px] pt-[12px]">
+          <button onclick="switchRedesignTour('tour-alerts', this)" class="w-full text-left px-5 py-4 font-bold font-display text-xs rounded-xl bg-primary text-white border border-primary transition-all cursor-pointer redesign-tour-btn flex items-center justify-between group">
+            <span>Tab 1: Live Alert Firewall</span>
+            <svg class="w-4 h-4 opacity-75 group-hover:translate-x-1 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M9 5l7 7-7 7"/></svg>
+          </button>
+          <button onclick="switchRedesignTour('tour-reports', this)" class="w-full text-left px-5 py-4 font-bold font-display text-xs rounded-xl text-text-muted hover:text-text-main hover:bg-sim-outer-bg border border-card-border transition-all cursor-pointer redesign-tour-btn flex items-center justify-between group">
+            <span>Tab 2: Daily Reports</span>
+            <svg class="w-4 h-4 opacity-0 group-hover:opacity-75 group-hover:translate-x-1 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M9 5l7 7-7 7"/></svg>
+          </button>
+          <button onclick="switchRedesignTour('tour-intelligence', this)" class="w-full text-left px-5 py-4 font-bold font-display text-xs rounded-xl text-text-muted hover:text-text-main hover:bg-sim-outer-bg border border-card-border transition-all cursor-pointer redesign-tour-btn flex items-center justify-between group">
+            <span>Tab 3: Behavior Intelligence</span>
+            <svg class="w-4 h-4 opacity-0 group-hover:opacity-75 group-hover:translate-x-1 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M9 5l7 7-7 7"/></svg>
+          </button>
+          <button onclick="switchRedesignTour('tour-accountability', this)" class="w-full text-left px-5 py-4 font-bold font-display text-xs rounded-xl text-text-muted hover:text-text-main hover:bg-sim-outer-bg border border-card-border transition-all cursor-pointer redesign-tour-btn flex items-center justify-between group">
+            <span>Tab 4: WhatsApp Accountability Dispatch</span>
+            <svg class="w-4 h-4 opacity-0 group-hover:opacity-75 group-hover:translate-x-1 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M9 5l7 7-7 7"/></svg>
+          </button>
+        </div>
+      </div>
+
+      <!-- Right side: Product Interactive View -->
+      <div class="lg:col-span-7 flex justify-center relative">
+        <!-- Interactive Panel Card -->
+        <div class="w-full max-w-[560px] bg-card-bg border border-card-border rounded-2xl p-[36px] shadow-sm min-h-[380px] flex flex-col justify-between relative overflow-hidden transition-colors duration-200">
+          <div class="glow-orb w-[200px] h-[200px] -top-10 -left-10 opacity-30"></div>
+          
+          <!-- Tab 1: Live Alerts Panel -->
+          <div id="tour-alerts" class="redesign-tour-panel space-y-[24px] relative z-10">
+            <div class="border-b border-card-border pb-[12px] flex justify-between items-center">
+              <div>
+                <span class="text-xs font-bold text-text-main font-mono block">LIVE ALERTS FIREWALL</span>
+                <span class="text-[10px] text-text-muted">Real-time warning triggers running on your active workstation.</span>
+              </div>
+              <button onclick="triggerFirewallSimulation()" class="btn-primary text-[10px] font-bold py-2 px-3 shadow-none hover:shadow-none bg-primary border-primary">
+                Simulate Warning
+              </button>
+            </div>
+            
+            <div class="space-y-[12px]" id="firewall-feed-container">
+              <!-- Default Alert logs in firewall feed -->
+              <div class="border border-red-100 dark:border-red-950/30 bg-red-50/50 dark:bg-red-950/10 p-[16px] rounded-xl flex items-start justify-between gap-[18px] transition-all duration-300">
+                <div class="space-y-[4px]">
+                  <div class="flex items-center gap-[12px]">
+                    <span class="text-[9px] font-bold text-red-600 dark:text-red-400 font-mono">10:22 AM</span>
+                    <span class="text-xs font-semibold text-text-main">⚠ Sizing Limit Alert</span>
+                  </div>
+                  <p class="text-[11px] text-text-muted leading-relaxed">
+                    You are buying 600 Qty. Average size for contract is 100 Qty.
+                  </p>
+                </div>
+                <span class="px-2.5 py-0.5 bg-red-100 dark:bg-red-900/40 text-red-600 dark:text-red-400 text-[8px] font-extrabold rounded">BLOCKED</span>
+              </div>
+              
+              <div class="border border-amber-100 dark:border-amber-950/30 bg-amber-50/50 dark:bg-amber-950/10 p-[16px] rounded-xl flex items-start justify-between gap-[18px] transition-all duration-300">
+                <div class="space-y-[4px]">
+                  <div class="flex items-center gap-[12px]">
+                    <span class="text-[9px] font-bold text-amber-600 dark:text-amber-400 font-mono">11:04 AM</span>
+                    <span class="text-xs font-semibold text-text-main">⚠ Trade Count Warning</span>
+                  </div>
+                  <p class="text-[11px] text-text-muted leading-relaxed">
+                    8 trades placed. Your historical win rate after trade #8 drops to 31%.
+                  </p>
+                </div>
+                <span class="px-2.5 py-0.5 bg-amber-100 dark:bg-amber-900/40 text-amber-600 dark:text-amber-400 text-[8px] font-extrabold rounded">WARNING</span>
+              </div>
+            </div>
+          </div>
+
+          <!-- Tab 2: Daily Reports Panel -->
+          <div id="tour-reports" class="redesign-tour-panel hidden space-y-[24px] relative z-10">
+            <div class="border-b border-card-border pb-[12px]">
+              <span class="text-xs font-bold text-text-main font-mono block">DAILY PSYCHOLOGICAL REPORT</span>
+              <span class="text-[10px] text-text-muted">Generated after broker settlement at market close.</span>
+            </div>
+            <div class="grid grid-cols-3 gap-[18px]">
+              <div class="bg-sim-outer-bg border border-sim-inner-border p-[18px] rounded-xl text-center space-y-1">
+                <span class="text-[9px] font-bold text-text-muted block uppercase tracking-wider">Discipline Score</span>
+                <span class="text-lg font-extrabold text-green-600 block">A- (91/100)</span>
+              </div>
+              <div class="bg-sim-outer-bg border border-sim-inner-border p-[18px] rounded-xl text-center space-y-1">
+                <span class="text-[9px] font-bold text-text-muted block uppercase tracking-wider">Loss Leakage</span>
+                <span class="text-lg font-extrabold text-red-600 block">-₹4,500</span>
+              </div>
+              <div class="bg-sim-outer-bg border border-sim-inner-border p-[18px] rounded-xl text-center space-y-1">
+                <span class="text-[9px] font-bold text-text-muted block uppercase tracking-wider">Friction Blocks</span>
+                <span class="text-lg font-extrabold text-text-main block">3 Actions</span>
+              </div>
+            </div>
+            <p class="text-xs text-text-muted leading-relaxed font-normal">
+              Reports compile daily performance metrics over official broker logs. Syncs automatically.
+            </p>
+          </div>
+
+          <!-- Tab 3: Behavior Intelligence Panel -->
+          <div id="tour-intelligence" class="redesign-tour-panel hidden space-y-[24px] relative z-10">
+            <div class="border-b border-card-border pb-[12px]">
+              <span class="text-xs font-bold text-text-main font-mono block">BEHAVIOR INTELLIGENCE MATRIX</span>
+              <span class="text-[10px] text-text-muted">Core psychological indicators calculated over historical broker logs.</span>
+            </div>
+            
+            <div class="space-y-[16px]">
+              <!-- Indicator 1 -->
+              <div class="space-y-[6px]">
+                <div class="flex justify-between text-xs font-bold text-text-main">
+                  <span>Revenge Bias Indicator</span>
+                  <span class="text-green-600 font-mono">18% (Low Risk)</span>
+                </div>
+                <div class="w-full bg-gray-100 dark:bg-white/5 h-2 rounded-full overflow-hidden border border-card-border">
+                  <div class="bg-green-500 h-full rounded-full" style="width: 18%;"></div>
                 </div>
               </div>
               
-              <div class="text-white flex items-start justify-end gap-10px max-w-[85%] ml-auto">
-                <div class="bg-primary p-2.5 rounded-[12px] leading-relaxed text-right">
-                  "Frustrated. I want to double down on the next candle to make it back."
+              <!-- Indicator 2 -->
+              <div class="space-y-[6px]">
+                <div class="flex justify-between text-xs font-bold text-text-main">
+                  <span>Overtrading Propensity</span>
+                  <span class="text-amber-600 font-mono">45% (Moderate Risk)</span>
+                </div>
+                <div class="w-full bg-gray-100 dark:bg-white/5 h-2 rounded-full overflow-hidden border border-card-border">
+                  <div class="bg-amber-500 h-full rounded-full" style="width: 45%;"></div>
                 </div>
               </div>
 
-              <div class="text-text-muted flex items-start gap-10px max-w-[85%]">
-                <div class="w-6 h-6 rounded bg-primary flex items-center justify-center text-[10px] font-bold text-white flex-shrink-0">C</div>
-                <div class="bg-gray-100 dark:bg-white/5 border border-sim-inner-border p-2.5 rounded-[12px] leading-relaxed transition-colors">
-                  "That is revenge trading. Double-down trades under frustration have an 88% statistical failure rate. Close the terminal, step away for 10 minutes, and focus on rule alignment."
+              <!-- Indicator 3 -->
+              <div class="space-y-[6px]">
+                <div class="flex justify-between text-xs font-bold text-text-main">
+                  <span>Sizing Deviation Score</span>
+                  <span class="text-red-600 font-mono">72% (Critical Risk)</span>
+                </div>
+                <div class="w-full bg-gray-100 dark:bg-white/5 h-2 rounded-full overflow-hidden border border-card-border">
+                  <div class="bg-red-500 h-full rounded-full" style="width: 72%;"></div>
                 </div>
               </div>
             </div>
-
-            <!-- Send Input box -->
-            <form onsubmit="handleMockChatSubmit(event)" class="mt-15px flex items-center gap-10px border-t border-sim-inner-border pt-10px transition-colors">
-              <input type="text" id="tour-chat-input" placeholder="Explain your current trading thoughts..." class="flex-1 bg-sim-logs-bg border border-sim-logs-border rounded-lg px-15px py-2.5 text-xs text-text-main placeholder-text-muted focus:outline-none focus:border-primary transition-colors" />
-              <button type="submit" class="btn-primary py-2.5 cursor-pointer font-display">Send</button>
-            </form>
           </div>
-        </div>
 
-        <!-- Tab Footer (Broker Status Panel) -->
-        <div class="mt-20px pt-15px border-t border-sim-inner-border flex flex-col sm:flex-row items-center justify-between gap-10px">
-          <div class="flex items-center gap-10px text-xs font-semibold text-text-muted">
-            <span class="w-2.5 h-2.5 rounded-full bg-green-500 animate-pulse"></span>
-            Broker Stream: Online (0ms delay)
+          <!-- Tab 4: Partner Alert Panel -->
+          <div id="tour-accountability" class="redesign-tour-panel hidden space-y-[24px] relative z-10">
+            <div class="border-b border-card-border pb-[12px]">
+              <span class="text-xs font-bold text-text-main font-mono block">ACCOUNTABILITY PARTNER DISPATCH</span>
+              <span class="text-[10px] text-text-muted">SMS & WhatsApp accountability alert configuration details.</span>
+            </div>
+            
+            <div class="space-y-[12px]">
+              <div class="bg-sim-outer-bg border border-sim-inner-border p-[18px] rounded-xl flex items-center justify-between text-xs text-text-main">
+                <span class="font-bold">Active Recipient:</span>
+                <span class="font-mono text-text-muted font-bold">+91 98XXX XXX45</span>
+              </div>
+              <div class="bg-sim-outer-bg border border-sim-inner-border p-[18px] rounded-xl flex items-center justify-between text-xs text-text-main">
+                <span class="font-bold">Dispatch Status:</span>
+                <span class="px-2 py-0.5 bg-emerald-100 dark:bg-emerald-950/30 text-emerald-800 dark:text-emerald-400 font-bold text-[9px] rounded uppercase tracking-wider font-mono">CONNECTED</span>
+              </div>
+            </div>
+            <p class="text-xs text-text-muted leading-relaxed font-normal">
+              If daily risk quotient climbs to dangerous limits, a detailed report is dispatched to your partner.
+            </p>
           </div>
-          <span class="text-[10px] font-mono text-text-muted font-bold uppercase">Psychology Co-pilot armed</span>
+
+          <!-- Tab Footer info -->
+          <div class="border-t border-card-border pt-[12px] flex justify-between items-center text-[9px] text-text-muted font-mono font-bold">
+            <span>CO-PILOT ENGINE ACTIVE</span>
+            <span>DISCONNECT ANYTIME</span>
+          </div>
+
         </div>
       </div>
     </div>
   </section>
 
-  <!-- Feature Highlights (How It Helps) -->
-  <section id="features" class="py-[80px] bg-white border-t border-border-subtle scroll-mt-20 transition-colors duration-200">
-    <div class="max-w-[1400px] mx-auto px-[30px] space-y-[60px]">
-      <div class="text-center max-w-[65ch] mx-auto">
-        <h2 class="text-3xl md:text-4xl font-bold font-display tracking-tight text-text-main">
-          Features designed to keep you disciplined.
+  <!-- SECTION 6: ACCOUNTABILITY PARTNER -->
+  <section id="partner" class="py-[96px] bg-sim-outer-bg border-b border-card-border scroll-mt-20 relative bg-grid-pattern">
+    <!-- Floating Ambient Background Confessions Layer -->
+    <div class="floating-confessions-wrapper"></div>
+    <div class="glow-orb w-[400px] h-[400px] bottom-10 left-10 opacity-30"></div>
+    <div class="max-w-[1400px] mx-auto px-[24px] md:px-[36px] grid grid-cols-1 lg:grid-cols-12 gap-[72px] items-center relative z-10">
+      
+      <!-- Left side: WhatsApp Mockup -->
+      <div class="lg:col-span-6 flex justify-center phone-perspective">
+        <!-- Floating warm paper backdrop card -->
+        <div class="bg-card-bg rounded-2xl p-[36px] shadow-sm border border-card-border w-full max-w-[400px] flex justify-center items-center phone-3d-card transition-colors duration-200">
+          <!-- CSS Phone container -->
+          <div class="relative w-[260px] h-[500px] bg-black rounded-[36px] p-[10px] shadow-xl border-[3px] border-zinc-800">
+            <!-- Dynamic Island Notch -->
+            <div class="absolute top-[18px] left-1/2 -translate-x-1/2 w-[80px] h-[22px] bg-black rounded-full z-30"></div>
+            <!-- Speaker slot -->
+            <div class="absolute top-[10px] left-1/2 -translate-x-1/2 w-[40px] h-[3px] bg-zinc-800 rounded-full z-30"></div>
+
+            <!-- Phone Screen -->
+            <div class="relative w-full h-full bg-[#f0f2f5] rounded-[28px] overflow-hidden flex flex-col justify-between p-[12px] pt-[30px] border border-zinc-700/30">
+              
+              <!-- WhatsApp Header -->
+              <div class="flex items-center gap-[10px] bg-[#075e54] text-white p-[12px] rounded-t-lg -mx-[12px] -mt-[30px] select-none shadow-sm">
+                <!-- Dynamic Avatar -->
+                <div id="wa-avatar" class="w-7 h-7 rounded-full bg-emerald-800 flex items-center justify-center font-bold text-xs">M</div>
+                <div>
+                  <div class="flex items-center gap-1 bg-transparent">
+                    <span id="wa-title" class="text-[10px] font-semibold block leading-none">Mentor Partner</span>
+                    <svg class="w-3 h-3 text-[#34b7f1]" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l5-5z" clip-rule="evenodd"/></svg>
+                  </div>
+                  <span class="text-[8px] opacity-80 block mt-[2px]">Business Account</span>
+                </div>
+              </div>
+
+              <!-- Message area -->
+              <div class="flex-1 py-[15px] space-y-[10px] overflow-y-auto" id="wa-msg-area">
+                <div class="text-[8px] text-gray-400 text-center my-[5px] font-bold select-none uppercase tracking-wider font-mono">Today</div>
+                <div class="text-[8px] text-gray-400 text-center mb-[5px] select-none font-medium">12:15 PM</div>
+
+                <!-- Green Bot Alert bubble -->
+                <div class="bg-[#e2f7cb] text-zinc-800 p-[12px] rounded-lg rounded-tl-none shadow-sm max-w-[95%] text-[10px] leading-relaxed relative font-medium border border-emerald-500/10 space-y-1">
+                  <div class="text-[9px] text-emerald-800 font-bold uppercase tracking-wider font-mono border-b border-emerald-500/10 pb-1">🚨 TRADEMENTOR ALERT</div>
+                  <div>Current Loss: <span class="font-bold font-mono">₹8,400</span></div>
+                  <div>Behavior Risk: <span class="text-red-600 font-bold font-mono">HIGH</span></div>
+                  <div class="pt-1 text-zinc-700">Accountability Alert Triggered: Rahul has crossed risk limits.</div>
+                  <span class="text-[7px] text-gray-400 absolute bottom-1 right-2 font-mono">12:15 PM ✓✓</span>
+                </div>
+              </div>
+
+              <!-- Chat input mockup -->
+              <div class="flex items-center gap-[10px] bg-[#eae6df] p-[8px] rounded-b-lg -mx-[12px] -mb-[12px] border-t border-gray-300 select-none">
+                <div class="flex-1 bg-white rounded-full h-7 px-[10px] text-[9px] text-gray-400 flex items-center shadow-inner">Type a message...</div>
+                <div class="w-7 h-7 rounded-full bg-[#075e54] flex items-center justify-center text-white shadow-sm">
+                  <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8"/></svg>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Right Column Copy -->
+      <div class="lg:col-span-6 space-y-[24px]">
+        <span class="text-xs font-bold text-primary font-mono uppercase tracking-widest">ACCOUNTABILITY</span>
+        <h2 class="text-3xl md:text-4xl font-extrabold font-display tracking-[-1px] text-text-main leading-tight">
+          When discipline fails, someone else gets notified.
         </h2>
-        <p class="text-sm md:text-base text-text-muted mt-[10px] font-semibold">
-          TradeMentor AI sits quietly alongside your broker stream, acting as a behavioral circuit breaker.
+        <p class="text-sm text-text-muted leading-relaxed font-normal">
+          Define your accountability partner. If you blow past your stop loss and keep click-trading, they receive a detailed WhatsApp alert containing your execution risk quotient.
         </p>
-      </div>
 
-      <div class="grid grid-cols-1 md:grid-cols-3 gap-30px">
-        <!-- Feature 1 -->
-        <div class="bg-card-bg border border-card-border p-30px rounded-[16px] space-y-15px transition-colors shadow-low">
-          <div class="w-10 h-10 rounded-lg bg-primary/10 text-primary flex items-center justify-center shadow-sm">
-            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/><path stroke-linecap="round" stroke-linejoin="round" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"/></svg>
+        <!-- Selector Tabs -->
+        <div class="space-y-[12px] pt-[12px]">
+          <span class="text-xs font-bold text-text-muted uppercase tracking-wider block">Choose Accountability Partner:</span>
+          <div class="grid grid-cols-2 sm:grid-cols-4 gap-[12px]">
+            <button onclick="switchAccountabilityTarget('Mentor')" class="partner-btn px-4 py-2 border border-primary bg-primary text-white font-medium text-xs rounded-[4px] cursor-pointer text-center transition-all">
+              Mentor
+            </button>
+            <button onclick="switchAccountabilityTarget('Friend')" class="partner-btn px-4 py-2 border border-card-border bg-white text-text-main hover:bg-gray-50 font-medium text-xs rounded-[4px] cursor-pointer text-center transition-all">
+              Friend
+            </button>
+            <button onclick="switchAccountabilityTarget('Spouse')" class="partner-btn px-4 py-2 border border-card-border bg-white text-text-main hover:bg-gray-50 font-medium text-xs rounded-[4px] cursor-pointer text-center transition-all">
+              Spouse
+            </button>
+            <button onclick="switchAccountabilityTarget('Partner')" class="partner-btn px-4 py-2 border border-card-border bg-white text-text-main hover:bg-gray-50 font-medium text-xs rounded-[4px] cursor-pointer text-center transition-all">
+              Trading Partner
+            </button>
           </div>
-          <h3 class="text-lg font-bold font-display text-text-main">Behavioral Auditing</h3>
-          <p class="text-xs text-text-muted leading-relaxed font-semibold">
-            Monitors re-entry pacing, volume escalations, and sizing deviations in real-time. Immediately flags anomalies when emotional trading triggers are activated.
-          </p>
         </div>
 
-        <!-- Feature 2 -->
-        <div class="bg-card-bg border border-card-border p-30px rounded-[16px] space-y-15px transition-colors shadow-low">
-          <div class="w-10 h-10 rounded-lg bg-primary/10 text-primary flex items-center justify-center shadow-sm">
-            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z"/></svg>
-          </div>
-          <h3 class="text-lg font-bold font-display text-text-main">WhatsApp Accountability</h3>
-          <p class="text-xs text-text-muted leading-relaxed font-semibold">
-            Social friction is the strongest deterrent. Automatically sends live rule-breach reports and stats to your designated buddy, partner, or spouse when you tilt.
-          </p>
-        </div>
-
-        <!-- Feature 3 -->
-        <div class="bg-card-bg border border-card-border p-30px rounded-[16px] space-y-15px transition-colors shadow-low">
-          <div class="w-10 h-10 rounded-lg bg-primary/10 text-primary flex items-center justify-center shadow-sm">
-            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M8 10h.01M12 10h.01M16 10h.01M9 16H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-5l-5 5v-5z"/></svg>
-          </div>
-          <h3 class="text-lg font-bold font-display text-text-main">AI Mindset Resets</h3>
-          <p class="text-xs text-text-muted leading-relaxed font-semibold">
-            Provides instant speech-audio warnings and conversational check-ins. Guides you back to a calibrated mental state between trades to avoid emotional drawdowns.
-          </p>
+        <div class="pt-[12px]">
+          <a href="dashboard.html" class="btn-primary text-xs font-display">Protect My Trading Account</a>
         </div>
       </div>
+
     </div>
   </section>
 
-  <!-- Pricing Section (Sensibull Styling) -->
-  <section id="pricing" class="py-[80px] bg-gray-50/50 dark:bg-white/[0.01] border-t border-border-subtle scroll-mt-20 transition-colors duration-200">
-    <div class="max-w-[1400px] mx-auto px-[30px] space-y-[60px]">
-      <div class="text-center max-w-[65ch] mx-auto">
-        <h2 class="text-3xl md:text-4xl font-bold font-display tracking-tight text-text-main">
-          Invest in Your Capital Security
-        </h2>
-        <p class="text-sm md:text-base text-text-muted mt-[10px] font-semibold">
-          Pay a flat subscription fee. Save thousands in psychological trading drawdowns.
-        </p>
-      </div>
-
-      <div class="grid grid-cols-1 md:grid-cols-3 gap-30px items-stretch">
-        <!-- Tier 1: Free -->
-        <div class="bg-card-bg border border-card-border text-card-text rounded-[24px] p-30px flex flex-col justify-between shadow-low transition-all duration-200">
-          <div class="space-y-20px">
-            <div>
-              <span class="text-xs font-mono text-primary font-bold uppercase tracking-widest">01 / BASIC</span>
-              <h3 class="text-xl font-bold font-display text-text-main mt-4px">Calm Basic</h3>
-              <p class="text-xs text-text-muted mt-[10px] font-semibold">For retail traders looking to monitor emotional patterns.</p>
-            </div>
-            
-            <div class="flex items-baseline gap-2 pt-10px">
-              <span class="text-4xl font-light text-text-main transition-colors">₹0</span>
-              <span class="text-xs text-text-muted font-bold uppercase">Free Forever</span>
-            </div>
-
-            <ul class="space-y-10px pt-20px text-xs font-semibold text-text-main">
-              <li class="flex items-center gap-10px">
-                <svg class="w-4 h-4 text-primary" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M5 13l4 4L19 7"/></svg>
-                Read-Only Broker Integration
-              </li>
-              <li class="flex items-center gap-10px">
-                <svg class="w-4 h-4 text-primary" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M5 13l4 4L19 7"/></svg>
-                Behavior Alert Indicators
-              </li>
-              <li class="flex items-center gap-10px">
-                <svg class="w-4 h-4 text-primary" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M5 13l4 4L19 7"/></svg>
-                Focus Score Dashboard
-              </li>
-              <li class="flex items-center gap-10px text-text-muted/50">
-                <svg class="w-4 h-4 text-text-muted/30" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M6 18L18 6M6 6l12 12"/></svg>
-                WhatsApp Accountability
-              </li>
-            </ul>
-          </div>
-
-          <div class="pt-30px">
-            <button onclick="location.href='dashboard.html'" class="btn-primary w-full cursor-pointer font-display">Launch Workstation</button>
-          </div>
-        </div>
-
-        <!-- Tier 2: Pro (Best Value) -->
-        <div class="bg-card-bg border-2 border-primary text-card-text rounded-[24px] p-30px relative flex flex-col justify-between shadow-md transition-all duration-200">
-          <div class="absolute -top-4 left-1/2 -translate-x-1/2 bg-primary text-white text-[10px] font-extrabold uppercase px-3 py-1 rounded-full tracking-wider">
-            MOST POPULAR
-          </div>
-
-          <div class="space-y-20px">
-            <div>
-              <span class="text-xs font-mono text-primary font-bold uppercase tracking-widest">02 / INTERMEDIATE</span>
-              <h3 class="text-xl font-bold font-display text-text-main mt-4px">Discipline Pro</h3>
-              <p class="text-xs text-text-muted mt-[10px] font-semibold">For options & intraday traders who need real accountability.</p>
-            </div>
-            
-            <div class="flex items-baseline gap-2 pt-10px">
-              <span class="text-4xl font-light text-text-main transition-colors">₹1,499</span>
-              <span class="text-xs text-text-muted font-bold uppercase">/ Month</span>
-            </div>
-
-            <ul class="space-y-10px pt-20px text-xs font-semibold text-text-main">
-              <li class="flex items-center gap-10px">
-                <svg class="w-4 h-4 text-primary" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M5 13l4 4L19 7"/></svg>
-                Real-time WhatsApp Partner Alerts
-              </li>
-              <li class="flex items-center gap-10px">
-                <svg class="w-4 h-4 text-primary" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M5 13l4 4L19 7"/></svg>
-                Speech Audio & Takeover warnings
-              </li>
-              <li class="flex items-center gap-10px">
-                <svg class="w-4 h-4 text-primary" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M5 13l4 4L19 7"/></svg>
-                All broker APIs supported
-              </li>
-              <li class="flex items-center gap-10px">
-                <svg class="w-4 h-4 text-primary" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M5 13l4 4L19 7"/></svg>
-                Unlimited AI Coach mindset resets
-              </li>
-            </ul>
-          </div>
-
-          <div class="pt-30px">
-            <button onclick="location.href='dashboard.html'" class="btn-primary w-full cursor-pointer font-display">Start Discipline Pro</button>
-          </div>
-        </div>
-
-        <!-- Tier 3: Team / Prop Desk -->
-        <div class="bg-card-bg border border-card-border text-card-text rounded-[24px] p-30px flex flex-col justify-between shadow-low transition-all duration-200">
-          <div class="space-y-20px">
-            <div>
-              <span class="text-xs font-mono text-primary font-bold uppercase tracking-widest">03 / ENTERPRISE</span>
-              <h3 class="text-xl font-bold font-display text-text-main mt-4px">Prop Desk</h3>
-              <p class="text-xs text-text-muted mt-[10px] font-semibold">For prop groups, investment pools, and custom desk setups.</p>
-            </div>
-            
-            <div class="flex items-baseline gap-2 pt-10px">
-              <span class="text-4xl font-light text-text-main transition-colors">₹4,999</span>
-              <span class="text-xs text-text-muted font-bold uppercase">/ Month</span>
-            </div>
-
-            <ul class="space-y-10px pt-20px text-xs font-semibold text-text-main">
-              <li class="flex items-center gap-10px">
-                <svg class="w-4 h-4 text-primary" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M5 13l4 4L19 7"/></svg>
-                Up to 10 traders monitored
-              </li>
-              <li class="flex items-center gap-10px">
-                <svg class="w-4 h-4 text-primary" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M5 13l4 4L19 7"/></svg>
-                Central risk coordinator dashboard
-              </li>
-              <li class="flex items-center gap-10px">
-                <svg class="w-4 h-4 text-primary" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M5 13l4 4L19 7"/></svg>
-                Custom Webhook integrations
-              </li>
-              <li class="flex items-center gap-10px">
-                <svg class="w-4 h-4 text-primary" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M5 13l4 4L19 7"/></svg>
-                Dedicated psychological reviews
-              </li>
-            </ul>
-          </div>
-
-          <div class="pt-30px">
-            <button onclick="location.href='dashboard.html'" class="btn-primary w-full cursor-pointer font-display">Contact Sales</button>
-          </div>
-        </div>
-      </div>
-    </div>
-  </section>
-
-  <!-- Testimonials Section -->
-  <section class="py-[80px] bg-page-bg border-t border-border-subtle transition-colors duration-200">
-    <div class="max-w-[1400px] mx-auto px-[30px] space-y-[50px]">
+  <!-- SECTION 7: TESTIMONIALS -->
+  <section class="py-[96px] bg-[#ffffff] dark:bg-page-bg border-b border-card-border relative">
+    <!-- Floating Ambient Background Confessions Layer -->
+    <div class="floating-confessions-wrapper"></div>
+    <div class="max-w-[1400px] mx-auto px-[24px] md:px-[36px] space-y-[48px]">
       <div class="max-w-[65ch]">
-        <h2 class="text-3xl md:text-4xl font-bold font-display tracking-tight text-text-main">
-          What disciplined traders say.
+        <h2 class="text-3xl md:text-4xl font-extrabold font-display tracking-[-1px] text-text-main">
+          What disciplined F&O traders say.
         </h2>
-        <p class="text-sm md:text-base text-text-muted mt-[10px] font-semibold">
-          Actual feedback from option and retail traders who saved their accounts from blowing up.
+        <p class="text-sm text-text-muted mt-[12px] font-normal">
+          Real feedback from retail options and intraday traders who saved their accounts from blowing up.
         </p>
       </div>
 
-      <!-- Testimonial Grid -->
-      <div class="grid grid-cols-1 md:grid-cols-3 gap-30px">
+      <!-- Testimonial Grid (Exactly 3) -->
+      <div class="grid grid-cols-1 md:grid-cols-3 gap-[36px]">
         <!-- Testimonial 1 -->
-        <div class="bg-card-bg border border-card-border p-30px rounded-[16px] space-y-20px shadow-low transition-colors duration-200">
-          <p class="text-sm text-text-main leading-relaxed font-semibold italic">
-            "Before using this shield, I would lose weeks of gains in one emotional afternoon. The accountability alerts saved my capital last week."
+        <div class="bg-card-bg border border-card-border p-[36px] rounded-2xl space-y-[24px] shadow-sm transition-colors duration-200 hover:shadow-md">
+          <p class="text-sm text-text-main leading-relaxed font-normal italic">
+            "My last three trades were responsible for 72% of my losses. I would've never found that without TradeMentor. Connecting Zerodha literally saved my capital."
           </p>
           <div>
-            <h5 class="text-xs font-bold text-text-main font-semibold font-display">Rohan Sharma</h5>
-            <p class="text-[10px] text-text-muted font-bold font-display">Nifty Options Scalper · Mumbai</p>
+            <h5 class="text-xs font-bold text-text-main font-display">Rohan Sharma</h5>
+            <p class="text-[10px] text-text-muted font-bold font-display uppercase tracking-wider mt-0.5">Nifty Options Scalper · Mumbai</p>
           </div>
         </div>
 
         <!-- Testimonial 2 -->
-        <div class="bg-card-bg border border-card-border p-30px rounded-[16px] space-y-20px shadow-low transition-colors duration-200">
-          <p class="text-sm text-text-main leading-relaxed font-semibold italic">
-            "The speech audio warnings sound annoying at first, but they snap you out of trading tilt instantly. The AI coach reset has become my checklist."
+        <div class="bg-card-bg border border-card-border p-[36px] rounded-2xl space-y-[24px] shadow-sm transition-colors duration-200 hover:shadow-md">
+          <p class="text-sm text-text-main leading-relaxed font-normal italic">
+            "The WhatsApp alert to my brother is the only thing that stops me from depositing more money after a losing streak. It introduces the exact social friction I need."
           </p>
           <div>
-            <h5 class="text-xs font-bold text-text-main font-semibold font-display">Anjali Nair</h5>
-            <p class="text-[10px] text-text-muted font-bold font-display">Swing Trader · Bangalore</p>
+            <h5 class="text-xs font-bold text-text-main font-display">Anjali Nair</h5>
+            <p class="text-[10px] text-text-muted font-bold font-display uppercase tracking-wider mt-0.5">Swing Trader · Bangalore</p>
           </div>
         </div>
 
         <!-- Testimonial 3 -->
-        <div class="bg-card-bg border border-card-border p-30px rounded-[16px] space-y-20px shadow-low transition-colors duration-200">
-          <p class="text-sm text-text-main leading-relaxed font-semibold italic">
-            "Adding this to my API workflow has reduced my overall trades per month by 40% while maintaining the exact same return. Highly recommended."
+        <div class="bg-card-bg border border-card-border p-[36px] rounded-2xl space-y-[24px] shadow-sm transition-colors duration-200 hover:shadow-md">
+          <p class="text-sm text-text-main leading-relaxed font-normal italic">
+            "I connected my broker and realized I entered 90% of my trades out of boredom, not real edge. TradeMentor's live trade counts keep me disciplined."
           </p>
           <div>
-            <h5 class="text-xs font-bold text-text-main font-semibold font-display">Michael K.</h5>
-            <p class="text-[10px] text-text-muted font-bold font-display">Intraday F&O Trader · Chennai</p>
+            <h5 class="text-xs font-bold text-text-main font-display">Michael K.</h5>
+            <p class="text-[10px] text-text-muted font-bold font-display uppercase tracking-wider mt-0.5">Intraday F&O Trader · Chennai</p>
           </div>
         </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- SECTION 8: TRUST & API SAFETY PROTOCOLS -->
+  <section class="py-[48px] bg-sim-outer-bg border-b border-card-border">
+    <div class="max-w-[1400px] mx-auto px-[24px] md:px-[36px]">
+      <div class="grid grid-cols-2 md:grid-cols-5 gap-[24px] text-center">
+        <div class="space-y-1">
+          <span class="text-xs font-extrabold text-text-main block">Read-only Access</span>
+          <span class="text-[10px] text-text-muted block font-semibold">We cannot view or handle your funds</span>
+        </div>
+        <div class="space-y-1">
+          <span class="text-xs font-extrabold text-text-main block">No Capital Access</span>
+          <span class="text-[10px] text-text-muted block font-semibold">Funds stay inside your broker terminal</span>
+        </div>
+        <div class="space-y-1">
+          <span class="text-xs font-extrabold text-text-main block">No Order Routing</span>
+          <span class="text-[10px] text-text-muted block font-semibold">We never place, buy, or sell orders</span>
+        </div>
+        <div class="space-y-1">
+          <span class="text-xs font-extrabold text-text-main block">Official Broker APIs</span>
+          <span class="text-[10px] text-text-muted block font-semibold">Zerodha, Dhan & Upstox approved</span>
+        </div>
+        <div class="space-y-1">
+          <span class="text-xs font-extrabold text-text-main block">Disconnect Anytime</span>
+          <span class="text-[10px] text-text-muted block font-semibold">One-click API key revocation</span>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- SECTION 9: PRICING -->
+  <section id="pricing" class="py-[96px] bg-[#ffffff] dark:bg-page-bg scroll-mt-20 relative">
+    <!-- Floating Ambient Background Confessions Layer -->
+    <div class="floating-confessions-wrapper"></div>
+    <div class="max-w-[1400px] mx-auto px-[24px] md:px-[36px] space-y-[48px]">
+      <div class="text-center max-w-[65ch] mx-auto space-y-[12px]">
+        <span class="text-xs font-bold text-primary font-mono uppercase tracking-widest">PRICING PLANS</span>
+        <h2 class="text-3xl md:text-4xl font-extrabold font-display tracking-[-1px] text-text-main">
+          Invest in Your Capital Security
+        </h2>
+        <p class="text-sm text-text-muted">
+          No complicated multi-tier structures. Pay a flat discipline co-pilot subscription.
+        </p>
+      </div>
+
+      <!-- Pricing Deck (2-tier only) -->
+      <div class="grid grid-cols-1 md:grid-cols-2 gap-[48px] max-w-[800px] mx-auto items-stretch">
+        <!-- Card 1: Free Trial -->
+        <div class="bg-card-bg border border-card-border text-card-text rounded-2xl p-[36px] flex flex-col justify-between shadow-sm transition-all duration-200 hover:border-primary/30">
+          <div class="space-y-[24px]">
+            <div>
+              <span class="text-xs font-mono text-primary font-semibold uppercase tracking-widest font-display">01 / TRIAL</span>
+              <h3 class="text-xl font-bold text-text-main mt-[4px] font-display">Free Trial</h3>
+              <p class="text-xs text-text-muted mt-[10px] font-normal leading-relaxed">Test TradeMentor's behavioral co-pilot before committing capital.</p>
+            </div>
+            
+            <div class="flex items-baseline gap-2 pt-1">
+              <span class="text-4xl font-extrabold text-text-main tracking-[-1px] transition-colors">₹0</span>
+              <span class="text-xs text-text-muted font-bold uppercase">For 14 Days</span>
+            </div>
+
+            <ul class="space-y-[12px] pt-4 text-xs font-semibold text-text-main">
+              <li class="flex items-center gap-[12px]">
+                <svg class="w-4 h-4 text-primary shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M5 13l4 4L19 7"/></svg>
+                <span>Read-Only Broker Integration</span>
+              </li>
+              <li class="flex items-center gap-[12px]">
+                <svg class="w-4 h-4 text-primary shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M5 13l4 4L19 7"/></svg>
+                <span>Behavior Alert Warning Popups</span>
+              </li>
+              <li class="flex items-center gap-[12px] text-text-muted/50">
+                <svg class="w-4 h-4 text-text-muted/30 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M6 18L18 6M6 6l12 12"/></svg>
+                <span>WhatsApp Accountability Partner Alerts</span>
+              </li>
+            </ul>
+          </div>
+
+          <div class="pt-[24px]">
+            <button onclick="location.href='dashboard.html'" class="btn-primary w-full cursor-pointer font-display">Start Free Trial</button>
+          </div>
+        </div>
+
+        <!-- Card 2: Pro -->
+        <div class="bg-card-bg border-2 border-primary text-card-text rounded-2xl p-[36px] relative flex flex-col justify-between shadow-md transition-all duration-200">
+          <div class="absolute -top-3 left-1/2 -translate-x-1/2 bg-primary text-white text-[9px] font-bold uppercase px-3 py-1 rounded-[4px] tracking-wider">
+            RECOMMENDED
+          </div>
+
+          <div class="space-y-[24px]">
+            <div>
+              <span class="text-xs font-mono text-primary font-semibold uppercase tracking-widest font-display">02 / PRO PLAN</span>
+              <h3 class="text-xl font-bold text-text-main mt-[4px] font-display">Discipline Pro</h3>
+              <p class="text-xs text-text-muted mt-[10px] font-normal leading-relaxed">Real-time alerts, sizing friction guards, and partner reports.</p>
+            </div>
+            
+            <div class="flex items-baseline gap-2 pt-1">
+              <span class="text-4xl font-extrabold text-text-main tracking-[-1px] transition-colors">₹999</span>
+              <span class="text-xs text-text-muted font-bold uppercase">/ Month</span>
+            </div>
+
+            <ul class="space-y-[12px] pt-4 text-xs font-semibold text-text-main">
+              <li class="flex items-center gap-[12px]">
+                <svg class="w-4 h-4 text-primary shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M5 13l4 4L19 7"/></svg>
+                <span>Real-time WhatsApp Partner Alerts</span>
+              </li>
+              <li class="flex items-center gap-[12px]">
+                <svg class="w-4 h-4 text-primary shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M5 13l4 4L19 7"/></svg>
+                <span>Live Behavioral Firewall warning popups</span>
+              </li>
+              <li class="flex items-center gap-[12px]">
+                <svg class="w-4 h-4 text-primary shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M5 13l4 4L19 7"/></svg>
+                <span>All broker APIs supported (Zerodha, Upstox, Dhan)</span>
+              </li>
+            </ul>
+          </div>
+
+          <div class="pt-[24px]">
+            <button onclick="location.href='dashboard.html'" class="btn-primary w-full cursor-pointer font-display">Upgrade to Pro</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- SECTION 10: FINAL CTA -->
+  <section class="py-[96px] bg-[#0c101b] text-white relative overflow-hidden dark-bg-drift">
+    <div class="glow-orb w-[500px] h-[500px] -bottom-20 -right-20 opacity-30"></div>
+    <!-- Floating Ambient Background Confessions Layer -->
+    <div class="floating-confessions-wrapper"></div>
+    <div class="max-w-[1400px] mx-auto px-[24px] md:px-[36px] text-center space-y-[24px] relative z-10">
+      <h2 class="text-3xl md:text-5xl font-extrabold font-display tracking-[-1.5px] leading-tight max-w-3xl mx-auto text-white">
+        The market isn't your biggest risk.<br/>
+        <span class="text-red-500 font-bold">Your next impulsive trade is.</span>
+      </h2>
+      <p class="text-sm text-gray-400 max-w-[60ch] mx-auto font-normal">
+        Connect your active broker account in less than 2 minutes. Identify your trading behavior blind spots before they cost you another week.
+      </p>
+      
+      <div class="pt-4 flex justify-center">
+        <a href="dashboard.html" class="btn-primary py-3 px-8 text-sm font-display bg-primary border-primary text-white">
+          Connect Zerodha & Find My Blind Spots
+        </a>
       </div>
     </div>
   </section>
 
   <!-- Footer Section -->
-  <footer class="bg-footer-bg text-footer-text py-[60px] border-t border-footer-border transition-colors duration-200">
-    <div class="max-w-[1400px] mx-auto px-[30px] grid grid-cols-1 md:grid-cols-12 gap-40px">
+  <footer class="bg-footer-bg text-footer-text py-[60px] border-t border-card-border transition-colors duration-200">
+    <div class="max-w-[1400px] mx-auto px-[24px] md:px-[36px] grid grid-cols-1 md:grid-cols-12 gap-[48px]">
       <!-- Info Column (col-span-5) -->
-      <div class="md:col-span-5 space-y-20px">
+      <div class="md:col-span-5 space-y-[24px]">
         <a href="#" class="flex items-center gap-2">
           <div class="w-8 h-8 rounded-lg bg-primary flex items-center justify-center">
             <svg class="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2.5">
-              <path stroke-linecap="round" stroke-linejoin="round" d="M13 10V3L4 14h7v7l9-11h-7z"/>
+              <path stroke-linecap="round" stroke-linejoin="round" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"/>
             </svg>
           </div>
-          <span class="text-xl font-bold font-display tracking-tight text-text-main">TradeMentor <span class="text-primary">AI</span></span>
+          <span class="text-xl font-medium font-display tracking-tight text-text-main">TradeMentor</span>
         </a>
-        <p class="text-xs text-footer-text-muted leading-relaxed max-w-[35ch] font-semibold">
-          The psychological guardrails for retail options & equity traders. Stream API execution logs and enforce trading discipline automatically.
+        <p class="text-xs text-footer-text-muted leading-relaxed max-w-[35ch] font-normal font-semibold">
+          Automated psychological guardrails for options and retail traders. Stream API execution logs and enforce trading discipline.
         </p>
         <p class="text-[10px] text-footer-text-muted font-mono font-bold">© 2026 TradeMentor AI. All rights reserved.</p>
       </div>
 
       <!-- Links Column 1 -->
-      <div class="md:col-span-3 space-y-10px">
-        <h5 class="text-xs font-bold text-text-muted uppercase tracking-widest font-display">PRODUCT</h5>
-        <ul class="space-y-10px text-xs font-semibold text-footer-text">
-          <li><a href="#problem" class="hover:text-primary transition-colors">The Problem</a></li>
-          <li><a href="#product-tour" class="hover:text-primary transition-colors">Product Tour</a></li>
-          <li><a href="dashboard.html" class="hover:text-primary transition-colors">Workstation Cockpit</a></li>
-          <li><a href="alerts.html" class="hover:text-primary transition-colors">Shield Warnings</a></li>
+      <div class="md:col-span-3 space-y-[16px]">
+        <h5 class="text-xs font-semibold text-text-muted uppercase tracking-widest font-display">PRODUCT</h5>
+        <ul class="space-y-[12px] text-xs font-normal text-text-main">
+          <li><a href="#hero" class="hover:text-primary transition-colors">Hero Tour</a></li>
+          <li><a href="loss_experience.html" class="hover:text-primary transition-colors">Behavior Loss Simulator</a></li>
+          <li><a href="#pricing" class="hover:text-primary transition-colors">Pricing Cards</a></li>
+          <li><a href="dashboard.html" class="hover:text-primary transition-colors">Workstation Sandbox</a></li>
         </ul>
       </div>
 
       <!-- Links Column 2 -->
-      <div class="md:col-span-4 space-y-10px">
-        <h5 class="text-xs font-bold text-text-muted uppercase tracking-widest font-display">SAFETY DISCLAIMER</h5>
-        <p class="text-[10px] text-footer-text-muted leading-relaxed font-medium">
+      <div class="md:col-span-4 space-y-[16px]">
+        <h5 class="text-xs font-semibold text-text-muted uppercase tracking-widest font-display">SAFETY DISCLAIMER</h5>
+        <p class="text-[10px] text-footer-text-muted leading-relaxed font-normal">
           Trading derivatives and equities involves significant risk. TradeMentor AI operates purely as a third-party software co-pilot. We do not operate brokerage layers, do not handle client trade routes, and cannot block trades or halt broker accounts directly. Use responsibly.
         </p>
       </div>
     </div>
   </footer>
 
-  <!-- Live Product Tour Scripts -->
+  <!-- Simulation, Timeline, Calculator & Dialog Scripts -->
   <script>
-    // Tab switching logic
-    function switchTourTab(tabId, buttonEl) {
+    // Live Telemetry Simulation Data
+    const entryPrices = {
+      RELIANCE: 2487.40,
+      INFY: 1521.60,
+      NIFTY: 22486.20
+    };
+
+    const currentPrices = {
+      RELIANCE: 2487.40,
+      INFY: 1521.60,
+      NIFTY: 22486.20
+    };
+
+    const priceHistories = {
+      RELIANCE: [2485.40, 2487.20, 2486.10, 2487.80, 2487.40],
+      INFY: [1522.60, 1520.40, 1521.80, 1520.90, 1521.60],
+      NIFTY: [22482.20, 22485.50, 22483.10, 22486.90, 22486.20]
+    };
+
+    function updateTick(symbol, baseVolatility) {
+      const oldPrice = currentPrices[symbol];
+      // Generate a tiny price fluctuation
+      const changePct = (Math.random() - 0.495) * baseVolatility;
+      const newPrice = oldPrice * (1 + changePct / 100);
+      
+      currentPrices[symbol] = newPrice;
+      
+      priceHistories[symbol].push(newPrice);
+      if (priceHistories[symbol].length > 8) {
+        priceHistories[symbol].shift();
+      }
+
+      return { oldPrice, newPrice, changePct };
+    }
+
+    function generateSparklineD(data, width, height) {
+      if (!data || data.length === 0) return '';
+      const min = Math.min(...data);
+      const max = Math.max(...data);
+      const range = max - min === 0 ? 1 : max - min;
+      const points = data.map((val, idx) => {
+        const x = (idx / (data.length - 1)) * width;
+        const y = height - ((val - min) / range) * height - 1; // 1px padding
+        return `${x.toFixed(1)},${y.toFixed(1)}`;
+      });
+      return 'M' + points.join(' L');
+    }
+
+    function triggerFlash(elId, dir) {
+      const el = document.getElementById(elId);
+      if (!el) return;
+      el.classList.remove('flash-up', 'flash-down');
+      void el.offsetWidth; // trigger reflow
+      el.classList.add(dir === 'up' ? 'flash-up' : 'flash-down');
+    }
+
+    function updateUI() {
+      // 1. Update ticks
+      const niftyTick = updateTick('NIFTY', 0.04);
+      const niftyEl = document.getElementById('nifty-price');
+      if (niftyEl) {
+        niftyEl.innerText = currentPrices.NIFTY.toFixed(2);
+        triggerFlash('nifty-price', niftyTick.newPrice >= niftyTick.oldPrice ? 'up' : 'down');
+      }
+      
+      const niftyChgEl = document.getElementById('nifty-change');
+      if (niftyChgEl) {
+        const niftyChgPct = ((currentPrices.NIFTY - entryPrices.NIFTY) / entryPrices.NIFTY) * 100;
+        niftyChgEl.innerText = (niftyChgPct >= 0 ? '+' : '') + niftyChgPct.toFixed(2) + '%';
+        niftyChgEl.className = `text-[11px] font-mono ${niftyChgPct >= 0 ? 'text-emerald-400' : 'text-red-400'}`;
+      }
+      
+      const niftyPath = document.querySelector('#nifty-sparkline path');
+      if (niftyPath) {
+        niftyPath.setAttribute('d', generateSparklineD(priceHistories.NIFTY, 88, 22));
+      }
+
+      // Reliance Position
+      const relTick = updateTick('RELIANCE', 0.06);
+      const relPriceEl = document.getElementById('reliance-price');
+      if (relPriceEl) {
+        relPriceEl.innerText = currentPrices.RELIANCE.toFixed(2);
+        triggerFlash('reliance-price', relTick.newPrice >= relTick.oldPrice ? 'up' : 'down');
+      }
+      
+      const relChgPct = ((currentPrices.RELIANCE - entryPrices.RELIANCE) / entryPrices.RELIANCE) * 100;
+      const relPnl = relChgPct * 50 * 10; // Pl based on price change * qty (50)
+      const relPnlEl = document.getElementById('reliance-pnl');
+      if (relPnlEl) {
+        relPnlEl.innerText = (relPnl >= 0 ? '+' : '−') + '₹' + Math.abs(Math.round(relPnl)).toLocaleString('en-IN');
+        relPnlEl.className = `text-right font-semibold font-mono ${relPnl >= 0 ? 'text-emerald-400' : 'text-red-400'}`;
+        triggerFlash('reliance-pnl', relTick.newPrice >= relTick.oldPrice ? 'up' : 'down');
+      }
+
+      const relPath = document.querySelector('#reliance-sparkline path');
+      if (relPath) {
+        relPath.setAttribute('d', generateSparklineD(priceHistories.RELIANCE, 36, 16));
+        relPath.setAttribute('stroke', relChgPct >= 0 ? '#10b981' : '#ef4444');
+      }
+
+      // Infy Position
+      const infyTick = updateTick('INFY', 0.10);
+      const infyPriceEl = document.getElementById('infy-price');
+      if (infyPriceEl) {
+        infyPriceEl.innerText = currentPrices.INFY.toFixed(2);
+        triggerFlash('infy-price', infyTick.newPrice >= infyTick.oldPrice ? 'up' : 'down');
+      }
+
+      const infyChgPct = ((currentPrices.INFY - entryPrices.INFY) / entryPrices.INFY) * 100;
+      const infyPnl = infyChgPct * 40 * 10; // Pl based on price change * qty (40)
+      const infyPnlEl = document.getElementById('infy-pnl');
+      if (infyPnlEl) {
+        infyPnlEl.innerText = (infyPnl >= 0 ? '+' : '−') + '₹' + Math.abs(Math.round(infyPnl)).toLocaleString('en-IN');
+        infyPnlEl.className = `text-right font-semibold font-mono ${infyPnl >= 0 ? 'text-emerald-400' : 'text-red-400'}`;
+        triggerFlash('infy-pnl', infyTick.newPrice >= infyTick.oldPrice ? 'up' : 'down');
+      }
+
+      const infyPath = document.querySelector('#infy-sparkline path');
+      if (infyPath) {
+        infyPath.setAttribute('d', generateSparklineD(priceHistories.INFY, 36, 16));
+        infyPath.setAttribute('stroke', infyChgPct >= 0 ? '#10b981' : '#ef4444');
+      }
+
+      // Intraday P&L Focal
+      const totalPnl = Math.round(-1850 + relChgPct * 700 + infyChgPct * 520);
+      const pnlValueEl = document.getElementById('pnl-value');
+      if (pnlValueEl) {
+        pnlValueEl.innerText = (totalPnl >= 0 ? '+' : '−') + '₹' + Math.abs(totalPnl).toLocaleString('en-IN');
+        pnlValueEl.className = `font-display text-[34px] sm:text-[40px] font-semibold tracking-tight transition-all ${totalPnl >= 0 ? 'text-emerald-400' : 'text-red-400'}`;
+        triggerFlash('pnl-value', totalPnl >= -1850 ? 'up' : 'down');
+      }
+
+      const pnlPctEl = document.getElementById('pnl-pct');
+      if (pnlPctEl) {
+        const pnlPct = Math.abs((totalPnl / 1850) * 100);
+        pnlPctEl.innerText = (totalPnl >= 0 ? '▲' : '▼') + ' ' + pnlPct.toFixed(1) + '%';
+        pnlPctEl.className = `text-[12px] font-mono ${totalPnl >= 0 ? 'text-emerald-400' : 'text-red-400'}`;
+      }
+    }
+
+    // Alert Queue logic
+    const alertsQueue = [
+      {
+        tone: "loss",
+        icon: `<svg class="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/></svg>`,
+        title: "Revenge trade detected",
+        body: "3rd RELIANCE entry within 4 min after a stop-out.",
+      },
+      {
+        tone: "warning",
+        icon: `<svg class="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M22 12h-4l-3 9L9 3l-3 9H2"/></svg>`,
+        title: "Overtrading pace",
+        body: "7 trades in 22 min — 2.1× your weekly average.",
+      },
+      {
+        tone: "warning",
+        icon: `<svg class="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M13 17h8m0 0V9m0 8l-8-8-4 4-6-6"/></svg>`,
+        title: "Adding to a loser",
+        body: "INFY position up 60%. Down 18 minutes straight.",
+      },
+      {
+        tone: "loss",
+        icon: `<svg class="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9"/></svg>`,
+        title: "Stop-loss pulled",
+        body: "TCS · SL removed at −₹420. Cooldown suggested.",
+      },
+    ];
+
+    let activeAlerts = [
+      {
+        ...alertsQueue[0],
+        id: "seed-0",
+        ts: Date.now() - 1500
+      }
+    ];
+
+    let alertIdx = 1;
+
+    function getToneStyles(t) {
+      if (t === "loss") {
+        return { 
+          border: "border-red-500/30", 
+          text: "text-red-400", 
+          chip: "bg-red-500/12", 
+          pulse: "animate-[pulse-border-red_1.5s_infinite_alternate]" 
+        };
+      } else if (t === "warning") {
+        return { 
+          border: "border-amber-500/30", 
+          text: "text-amber-400", 
+          chip: "bg-amber-500/12", 
+          pulse: "animate-[pulse-border-amber_1.5s_infinite_alternate]" 
+        };
+      } else {
+        return { 
+          border: "border-blue-500/30", 
+          text: "text-blue-400", 
+          chip: "bg-blue-500/12", 
+          pulse: "animate-[pulse-border-blue_1.5s_infinite_alternate]" 
+        };
+      }
+    }
+
+    function timeAgo(ts) {
+      const s = Math.max(0, Math.floor((Date.now() - ts) / 1000));
+      if (s < 3) return "just now";
+      if (s < 60) return `${s}s ago`;
+      return `${Math.floor(s / 60)}m ago`;
+    }
+
+    function renderAlerts() {
+      const container = document.getElementById('terminal-alerts-container');
+      if (!container) return;
+
+      container.innerHTML = '';
+
+      activeAlerts.forEach((a, i) => {
+        const st = getToneStyles(a.tone);
+        const isNew = Date.now() - a.ts < 600;
+        const div = document.createElement('div');
+        
+        div.className = `flex items-start gap-2.5 rounded-lg border ${st.border} bg-zinc-950 px-3 py-2.5 transition-all duration-300 ${isNew ? 'animate-fade-in' : ''} ${i === 0 ? st.pulse : 'opacity-90'}`;
+        div.innerHTML = `
+          <div class="h-7 w-7 rounded-md ${st.chip} ${st.text} flex items-center justify-center shrink-0">
+            ${a.icon}
+          </div>
+          <div class="min-w-0 flex-1">
+            <div class="flex items-baseline justify-between gap-2">
+              <p class="text-[12.5px] font-semibold ${st.text}">${a.title}</p>
+              <span class="text-[10.5px] text-zinc-500 font-mono shrink-0 alert-time-label" data-ts="${a.ts}">
+                ${timeAgo(a.ts)}
+              </span>
+            </div>
+            <p class="text-[11.5px] text-zinc-400 mt-0.5 leading-snug font-normal">${a.body}</p>
+          </div>
+        `;
+        container.appendChild(div);
+      });
+    }
+
+    function dripAlert() {
+      const q = alertsQueue[alertIdx % alertsQueue.length];
+      activeAlerts.unshift({
+        ...q,
+        id: `a-${Date.now()}`,
+        ts: Date.now()
+      });
+      activeAlerts = activeAlerts.slice(0, 3);
+      alertIdx++;
+      renderAlerts();
+      
+      if (q.tone === 'loss') {
+        playBeep(880, 0.1, 'sawtooth');
+        setTimeout(() => playBeep(880, 0.1, 'sawtooth'), 80);
+      } else {
+        playBeep(650, 0.12, 'triangle');
+      }
+    }
+
+    function updateAlertClocks() {
+      const labels = document.querySelectorAll('.alert-time-label');
+      labels.forEach(lbl => {
+        const ts = parseInt(lbl.getAttribute('data-ts'));
+        if (ts) {
+          lbl.innerText = timeAgo(ts);
+        }
+      });
+    }
+
+    // Initialize intervals
+    setInterval(updateUI, 1500);
+    setInterval(dripAlert, 5000);
+    setInterval(updateAlertClocks, 1000);
+
+    // Initial render
+    updateUI();
+    renderAlerts();
+
+    // Floating Confessions Dynamic Spawner
+    const confessionQuotes = [
+      "I knew I shouldn't have entered.",
+      "Just one more trade.",
+      "I'll recover it back.",
+      "Why did I increase my size?",
+      "I broke my own rules again.",
+      "One trade ruined my entire day.",
+      "My stop loss was right there. Why did I pull it?",
+      "I'm trading with money I can't afford to lose.",
+      "I watched the screen for 6 hours, then blew it in 5 minutes.",
+      "My hands were shaking while clicking buy.",
+      "I promised myself yesterday would be the last time."
+    ];
+
+    function spawnFloatingConfessions() {
+      const wrappers = document.querySelectorAll('.floating-confessions-wrapper');
+      const isMobile = window.innerWidth < 768;
+      const countPerWrapper = isMobile ? 3 : 8;
+
+      wrappers.forEach((wrapper) => {
+        wrapper.innerHTML = '';
+        
+        for (let i = 0; i < countPerWrapper; i++) {
+          const conf = document.createElement('div');
+          conf.className = 'floating-confession';
+          
+          const quoteIndex = Math.floor(Math.random() * confessionQuotes.length);
+          conf.textContent = `"${confessionQuotes[quoteIndex]}"`;
+          
+          const leftPos = (i * (90 / countPerWrapper)) + (Math.random() * (90 / countPerWrapper - 5));
+          conf.style.left = `${leftPos}%`;
+          
+          const duration = 20 + Math.random() * 20;
+          const delay = -Math.random() * duration;
+          
+          conf.style.animation = `floatDrift ${duration}s linear infinite`;
+          conf.style.animationDelay = `${delay}s`;
+          
+          const startRot = -10 + Math.random() * 20;
+          const driftRot = startRot + (-5 + Math.random() * 10);
+          const driftX = -50 + Math.random() * 100;
+          
+          conf.style.setProperty('--start-rot', `${startRot}deg`);
+          conf.style.setProperty('--drift-rot', `${driftRot}deg`);
+          conf.style.setProperty('--drift-x', `${driftX}px`);
+          
+          wrapper.appendChild(conf);
+        }
+      });
+    }
+
+    spawnFloatingConfessions();
+
+    let resizeTimer;
+    window.addEventListener('resize', () => {
+      clearTimeout(resizeTimer);
+      resizeTimer = setTimeout(spawnFloatingConfessions, 250);
+    });
+
+    // Interactive Habits Calculator
+    const habitCosts = {
+      revenge: 18400,
+      overtrading: 12800,
+      losers: 9200,
+      oversizing: 7600
+    };
+
+    function updateCalculatorTotal() {
+      let total = 0;
+      const checkboxes = document.querySelectorAll('.habit-checkbox');
+      
+      checkboxes.forEach(cb => {
+        const habit = cb.dataset.habit;
+        const rowEl = document.getElementById(`cost-${habit}`);
+        if (cb.checked) {
+          total += habitCosts[habit];
+          if (rowEl) rowEl.classList.remove('opacity-25');
+        } else {
+          if (rowEl) rowEl.classList.add('opacity-25');
+        }
+      });
+
+      // Update Monthly Behavioral Leak total
+      const totalEl = document.getElementById('calc-total');
+      let currentVal = parseInt(totalEl.innerText.replace(/[^\d]/g, '')) || 0;
+      let diff = total - currentVal;
+      let steps = 15;
+      let increment = Math.round(diff / steps);
+      let stepCount = 0;
+
+      let timer = setInterval(() => {
+        currentVal += increment;
+        stepCount++;
+        if (stepCount >= steps) {
+          currentVal = total;
+          clearInterval(timer);
+        }
+        totalEl.innerText = '₹' + currentVal.toLocaleString('en-IN');
+      }, 20);
+
+      // Update Potential P&L bar and text
+      const potentialValEl = document.getElementById('potential-val');
+      const potentialBarEl = document.getElementById('potential-bar');
+      const potentialTotal = 24000 + total;
+      
+      potentialValEl.innerText = '₹' + potentialTotal.toLocaleString('en-IN');
+      // Potential bar percentage (max is ₹72,000)
+      const pct = (potentialTotal / 72000) * 100;
+      potentialBarEl.style.width = pct + '%';
+      potentialBarEl.innerText = '₹' + potentialTotal.toLocaleString('en-IN');
+
+      playBeep(480, 0.05, 'sine');
+    }
+
+    // Live Behavioral Firewall simulated stream
+    const mockFirewallAlerts = [
+      { time: '10:22 AM', title: '⚠ Sizing Limit Alert', desc: 'You are buying 600 Qty. Average size for contract is 100 Qty.' },
+      { time: '11:04 AM', title: '⚠ Revenge Trade Risk', desc: 'Same instrument. Loss 28 minutes ago. Historical win rate 19%.' },
+      { time: '12:11 PM', title: '⚠ Position Escalation', desc: 'Current quantity 4x average size contract settings.' }
+    ];
+    let firewallIndex = 0;
+
+    function triggerFirewallSimulation() {
+      const feed = document.getElementById('firewall-feed-container');
+      
+      // Select mock alert item
+      const alertItem = mockFirewallAlerts[firewallIndex];
+      firewallIndex = (firewallIndex + 1) % mockFirewallAlerts.length;
+
+      // Construct alert DOM element
+      const div = document.createElement('div');
+      div.className = "border border-red-200 bg-red-100/50 dark:bg-red-950/20 p-[16px] rounded-xl flex items-start justify-between gap-[18px] transform opacity-0 translate-y-2 transition-all duration-300";
+      div.innerHTML = `
+        <div class="space-y-[4px]">
+          <div class="flex items-center gap-[12px]">
+            <span class="text-[9px] font-bold text-red-600 dark:text-red-400 font-mono">${alertItem.time}</span>
+            <span class="text-xs font-semibold text-text-main">${alertItem.title}</span>
+          </div>
+          <p class="text-[11px] text-text-muted leading-relaxed">${alertItem.desc}</p>
+        </div>
+        <span class="px-2.5 py-0.5 bg-red-100 dark:bg-red-900/40 text-red-600 dark:text-red-400 text-[8px] font-extrabold rounded">BLOCKED</span>`;
+      
+      feed.insertBefore(div, feed.firstChild);
+
+      // Trigger fade in animation
+      setTimeout(() => {
+        div.classList.remove('opacity-0', 'translate-y-2');
+        div.classList.add('opacity-100', 'translate-y-0');
+      }, 50);
+
+      // Prune list if items length exceeds 4
+      if (feed.children.length > 4) {
+        feed.lastElementChild.remove();
+      }
+
+      playBeep(880, 0.1, 'sawtooth');
+      setTimeout(() => playBeep(660, 0.1, 'sawtooth'), 100);
+    }
+
+    // Accountability Partner selector switcher
+    const partnerMessages = {
+      Mentor: {
+        avatar: 'M',
+        title: 'Mentor Partner',
+        msg: '⚠️ Coach, Rahul has crossed his daily stop loss threshold of ₹10,000. Sizing scale is High. Dispatched via Zerodha webhook.'
+      },
+      Friend: {
+        avatar: 'F',
+        title: 'Buddy / Friend',
+        msg: 'Hey Amit, Rahul asked me to alert you: his daily stop loss threshold has been breached. Let him know to close terminals.'
+      },
+      Spouse: {
+        avatar: 'S',
+        title: 'Priya (Spouse)',
+        msg: '⚠️ Priya, Rahul has crossed his daily loss limit of ₹10,000 and is still placing trades. He asked you to check in.'
+      },
+      Partner: {
+        avatar: 'P',
+        title: 'Trading Partner',
+        msg: 'TradeMentor Dispatch Alert: partner account rahul_t breached stop loss quota settings. Risk quotient is HIGH.'
+      }
+    };
+
+    function switchAccountabilityTarget(partnerName) {
+      // Toggle button styles
+      const buttons = document.querySelectorAll('.partner-btn');
+      buttons.forEach(btn => {
+        if (btn.innerText.trim() === partnerName || (partnerName === 'Partner' && btn.innerText.trim() === 'Trading Partner')) {
+          btn.className = "partner-btn px-4 py-2 border border-primary bg-primary text-white font-medium text-xs rounded-[4px] cursor-pointer text-center transition-all";
+        } else {
+          btn.className = "partner-btn px-4 py-2 border border-card-border bg-white text-text-main hover:bg-gray-50 font-medium text-xs rounded-[4px] cursor-pointer text-center transition-all";
+        }
+      });
+
+      // Update WhatsApp mockup
+      const data = partnerMessages[partnerName];
+      document.getElementById('wa-avatar').innerText = data.avatar;
+      document.getElementById('wa-title').innerText = data.title;
+      
+      const chatBox = document.getElementById('wa-msg-area');
+      chatBox.innerHTML = `
+        <div class="text-[8px] text-gray-400 text-center my-[5px] font-bold select-none uppercase tracking-wider font-mono">Today</div>
+        <div class="text-[8px] text-gray-400 text-center mb-[5px] select-none font-medium">12:15 PM</div>
+        <div class="bg-[#e2f7cb] text-zinc-800 p-[12px] rounded-lg rounded-tl-none shadow-sm max-w-[95%] text-[10px] leading-relaxed relative font-medium border border-emerald-500/10 space-y-1">
+          <div class="text-[9px] text-emerald-800 font-bold uppercase tracking-wider font-mono border-b border-emerald-500/10 pb-1">🚨 TRADEMENTOR ALERT</div>
+          <div>Current Loss: <span class="font-bold font-mono">₹8,400</span></div>
+          <div>Behavior Risk: <span class="text-red-600 font-bold font-mono">HIGH</span></div>
+          <div class="pt-1 text-zinc-700">${data.msg}</div>
+          <span class="text-[7px] text-gray-400 absolute bottom-1 right-2 font-mono">12:15 PM ✓✓</span>
+        </div>`;
+
+      playBeep(580, 0.05, 'sine');
+    }
+
+    // Product Tour Tab Switcher
+    function switchRedesignTour(tabId, btnEl) {
       // Hide all panels
-      const panels = document.querySelectorAll('.tour-panel-content');
+      const panels = document.querySelectorAll('.redesign-tour-panel');
       panels.forEach(p => p.classList.add('hidden'));
 
-      // Show the selected panel
+      // Show selected panel
       const target = document.getElementById(tabId);
       if (target) {
         target.classList.remove('hidden');
       }
 
-      // Reset active styles on all tab buttons
-      const buttons = document.querySelectorAll('.tour-tab-btn');
+      // Reset tab button states
+      const buttons = document.querySelectorAll('.redesign-tour-btn');
       buttons.forEach(btn => {
-        btn.className = "px-5 py-2.5 font-bold font-display text-sm rounded-lg text-text-muted hover:text-text-main border border-transparent transition-all cursor-pointer tour-tab-btn";
+        btn.className = "w-full text-left px-5 py-4 font-bold font-display text-xs rounded-xl text-text-muted hover:text-text-main hover:bg-sim-outer-bg border border-card-border transition-all cursor-pointer redesign-tour-btn flex items-center justify-between group";
+        const arrow = btn.querySelector('svg');
+        if (arrow) {
+          arrow.className = "w-4 h-4 opacity-0 group-hover:opacity-75 group-hover:translate-x-1 transition-transform";
+        }
       });
 
-      // Set active styles on target button
-      buttonEl.className = "px-5 py-2.5 font-bold font-display text-sm rounded-lg bg-primary text-white border border-primary transition-all cursor-pointer tour-tab-btn";
-    }
-
-    // Mock alert dismissed
-    function dismissMockAlert(alertId) {
-      const el = document.getElementById(alertId);
-      if (el) {
-        el.style.opacity = '0';
-        setTimeout(() => {
-          el.remove();
-          // If no more alerts, show a placeholder
-          const feed = document.getElementById('tour-alerts-feed');
-          if (feed.children.length === 0) {
-            feed.innerHTML = `
-              <div class="p-30px text-center border border-dashed border-sim-inner-border rounded-[12px] text-xs text-text-muted font-semibold">
-                All alerts cleared. Trading psychology calibrated.
-              </div>`;
-          }
-        }, 300);
+      // Set active tab button state
+      btnEl.className = "w-full text-left px-5 py-4 font-bold font-display text-xs rounded-xl bg-primary text-white border border-primary transition-all cursor-pointer redesign-tour-btn flex items-center justify-between group";
+      const activeArrow = btnEl.querySelector('svg');
+      if (activeArrow) {
+        activeArrow.className = "w-4 h-4 opacity-75 group-hover:translate-x-1 transition-transform";
       }
+      
       playBeep(600, 0.05, 'sine');
-    }
-
-    // Simulated WhatsApp Accountability Alerts
-    function triggerMockWhatsAppSend() {
-      const chatBox = document.getElementById('whatsapp-chat-box');
-      
-      // Play high risk alert beeps
-      playBeep(880, 0.3, 'triangle');
-      setTimeout(() => playBeep(880, 0.3, 'triangle'), 150);
-      
-      // Append WhatsApp bot warning bubble
-      setTimeout(() => {
-        const msg = document.createElement('div');
-        msg.className = "bg-[#dcf8c6] dark:bg-emerald-950 border border-emerald-800/10 p-2.5 rounded-lg shadow-sm text-text-main max-w-[90%] ml-auto text-left leading-relaxed transition-colors self-end";
-        msg.innerHTML = `
-          <div class="text-[9px] text-emerald-800 dark:text-emerald-300 font-bold uppercase tracking-wider mb-2 font-mono">🚨 TRADEMENTOR AI BOT</div>
-          <span class="font-bold">Rule Breach Alert: John Doe</span><br/>
-          • Action: Revenge trade on NIFTY<br/>
-          • Today Loss: -₹14,820 (Daily Max: ₹15,000)<br/>
-          • Psychological Focus: 38% (High Tilt)<br/>
-          <span class="text-[10px] block mt-1 select-none text-emerald-700 dark:text-emerald-400">Buddy, John is tilting. Check in on him immediately.</span>
-        `;
-        chatBox.appendChild(msg);
-        chatBox.scrollTop = chatBox.scrollHeight;
-        
-        playBeep(520, 0.1, 'sine');
-      }, 500);
-
-      // Trigger full screen visual takeover after 1.5 seconds
-      setTimeout(() => {
-        const takeover = document.getElementById('takeover-overlay');
-        takeover.classList.remove('pointer-events-none');
-        takeover.classList.remove('opacity-0');
-        takeover.classList.add('opacity-100');
-        
-        playBeep(220, 0.5, 'sawtooth');
-        setTimeout(() => playBeep(180, 0.6, 'sawtooth'), 200);
-      }, 1500);
-    }
-
-    function resetMockTakeover() {
-      const takeover = document.getElementById('takeover-overlay');
-      takeover.classList.add('pointer-events-none');
-      takeover.classList.remove('opacity-100');
-      takeover.classList.add('opacity-0');
-      
-      // Reset whatsapp chat
-      const chatBox = document.getElementById('whatsapp-chat-box');
-      chatBox.innerHTML = `
-        <div class="text-gray-500 text-[9px] text-center my-10px select-none">TODAY</div>
-        <div class="bg-white dark:bg-zinc-900 border border-gray-200 dark:border-zinc-750 p-2.5 rounded-lg shadow-sm text-text-main max-w-[90%] leading-relaxed transition-colors">
-          "Hey John, hope the morning session goes well. Stick to the daily plan."
-        </div>`;
-      
-      playBeep(600, 0.1, 'sine');
-    }
-
-    function triggerHaltFromAlert() {
-      const partnerTabBtn = document.querySelectorAll('.tour-tab-btn')[2]; // WhatsApp tab button
-      switchTourTab('tour-accountability', partnerTabBtn);
-      setTimeout(triggerMockWhatsAppSend, 200);
-    }
-
-    // Mock Chat Submit
-    function handleMockChatSubmit(event) {
-      event.preventDefault();
-      const input = document.getElementById('tour-chat-input');
-      const text = input.value.trim();
-      if (!text) return;
-
-      const feed = document.getElementById('tour-chat-feed');
-      
-      // Append user bubble
-      const userBubble = document.createElement('div');
-      userBubble.className = "text-white flex items-start justify-end gap-10px max-w-[85%] ml-auto";
-      userBubble.innerHTML = `
-        <div class="bg-primary p-2.5 rounded-[12px] leading-relaxed text-right">
-          ${text}
-        </div>`;
-      feed.appendChild(userBubble);
-      input.value = '';
-      feed.scrollTop = feed.scrollHeight;
-      
-      playBeep(500, 0.05, 'sine');
-
-      // Coach Typing simulation
-      setTimeout(() => {
-        const coachBubble = document.createElement('div');
-        coachBubble.className = "text-text-muted flex items-start gap-10px max-w-[85%]";
-        coachBubble.innerHTML = `
-          <div class="w-6 h-6 rounded bg-primary flex items-center justify-center text-[10px] font-bold text-white flex-shrink-0">C</div>
-          <div class="bg-gray-100 dark:bg-white/5 border border-sim-inner-border p-2.5 rounded-[12px] leading-relaxed transition-colors">
-            "I hear you. But remember: execution is the only thing we control. Stop watching the P&L tick. Focus on your process."
-          </div>`;
-        feed.appendChild(coachBubble);
-        feed.scrollTop = feed.scrollHeight;
-        playBeep(580, 0.08, 'triangle');
-      }, 1000);
     }
 
     // Web Audio alert beep

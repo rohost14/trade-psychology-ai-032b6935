@@ -1,846 +1,717 @@
 <!DOCTYPE html>
-<html lang="en" data-theme="dark">
+<html lang="en" data-theme="light">
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Analytics — TradeMentor AI</title>
-  <link rel="stylesheet" href="base.css" />
-  <style>
-    /* ── ANALYTICS-SPECIFIC ──────────────────────────────────────── */
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1.0">
+<title>Analytics — TradeMentor</title>
+<link rel="stylesheet" href="base.css">
+<style>
+.app-shell{display:flex;min-height:100vh}
+.sidebar{width:220px;flex-shrink:0;background:var(--bg-card);border-right:1px solid var(--border-subtle);display:flex;flex-direction:column;position:fixed;top:0;left:0;bottom:0;z-index:50}
+.main-content{margin-left:220px;flex:1;display:flex;flex-direction:column;min-height:100vh}
+.sb-logo{display:flex;align-items:center;gap:10px;padding:18px 16px 14px;border-bottom:1px solid var(--border-subtle)}
+.sb-logomark{width:26px;height:26px;border-radius:6px;background:var(--brand);display:flex;align-items:center;justify-content:center;flex-shrink:0}
+.sb-logomark svg{width:13px;height:13px;stroke:#fff;fill:none;stroke-width:2.2;stroke-linecap:round;stroke-linejoin:round}
+.sb-wordmark{font-family:'Geist',sans-serif;font-size:13.5px;font-weight:600;letter-spacing:-.02em;color:var(--text-primary)}
+.sb-wordmark em{font-style:normal;color:var(--brand)}
+.sb-nav{padding:8px;flex:1;display:flex;flex-direction:column;gap:1px;overflow-y:auto}
+.sb-section{font-size:9.5px;font-weight:600;letter-spacing:.09em;text-transform:uppercase;color:var(--text-tertiary);padding:10px 10px 4px;margin-top:4px}
+.sb-item{display:flex;align-items:center;gap:9px;padding:8px 10px;border-radius:7px;border:1px solid transparent;font-size:13px;font-weight:500;color:var(--text-secondary);transition:all .1s;position:relative;text-decoration:none}
+.sb-item:hover{background:var(--bg-hover);color:var(--text-primary)}
+.sb-item.active{background:var(--brand-bg);color:var(--brand);border-color:var(--brand-border)}
+.sb-item.active::before{content:'';position:absolute;left:-1px;top:7px;bottom:7px;width:2px;border-radius:99px;background:var(--brand)}
+.sb-item svg{width:15px;height:15px;fill:none;stroke:currentColor;stroke-width:1.75;stroke-linecap:round;stroke-linejoin:round;flex-shrink:0}
+.sb-badge{margin-left:auto;background:var(--loss);color:#fff;font-size:10px;font-weight:600;min-width:17px;height:17px;border-radius:99px;display:flex;align-items:center;justify-content:center;padding:0 4px}
+.sb-foot{padding:12px 8px;border-top:1px solid var(--border-subtle);display:flex;align-items:center;gap:9px}
+.sb-avatar{width:28px;height:28px;border-radius:50%;background:var(--brand-bg);border:1px solid var(--brand-border);display:flex;align-items:center;justify-content:center;font-family:'DM Mono',monospace;font-size:10px;font-weight:600;color:var(--brand);flex-shrink:0}
+.sb-uname{font-size:12px;font-weight:500;color:var(--text-primary);line-height:1.2}
+.sb-usub{font-size:10.5px;color:var(--text-tertiary)}
 
-    /* Period selector pills */
-    .period-group {
-      display: flex;
-      align-items: center;
-      gap: 2px;
-      background: var(--bg-elevated);
-      border: 1px solid var(--border-subtle);
-      border-radius: 8px;
-      padding: 3px;
-    }
-    .period-btn {
-      padding: 5px 14px;
-      border-radius: 6px;
-      font-size: 12px;
-      font-weight: 500;
-      color: var(--text-secondary);
-      border: none;
-      background: transparent;
-      cursor: pointer;
-      transition: all 0.12s;
-    }
-    .period-btn:hover { color: var(--text-primary); }
-    .period-btn.active { background: var(--bg-card); color: var(--text-primary); box-shadow: 0 1px 3px rgba(0,0,0,0.3); }
+.top-bar{height:48px;padding:0 22px;border-bottom:1px solid var(--border-subtle);background:var(--bg-card);display:flex;align-items:center;justify-content:space-between;position:sticky;top:0;z-index:40;flex-shrink:0}
+.top-l{display:flex;align-items:center;gap:12px}
+.top-title{font-family:'Geist',sans-serif;font-size:13.5px;font-weight:600;color:var(--text-primary)}
+.top-r{display:flex;align-items:center;gap:6px}
+.icon-btn{width:32px;height:32px;border-radius:7px;border:1px solid var(--border-subtle);background:transparent;display:flex;align-items:center;justify-content:center;color:var(--text-secondary);cursor:pointer;transition:all .1s}
+.icon-btn:hover{background:var(--bg-hover);color:var(--text-primary)}
+.icon-btn svg{width:15px;height:15px;fill:none;stroke:currentColor;stroke-width:1.75;stroke-linecap:round;stroke-linejoin:round}
+.i-sun,.i-moon{display:none}
+[data-theme="light"] .i-sun{display:block}
+[data-theme="dark"] .i-moon{display:block}
+.period-sel{font-size:12px;font-weight:500;padding:5px 11px;border-radius:7px;border:1px solid var(--border-default);background:var(--bg-card);color:var(--text-primary);cursor:pointer;outline:none}
 
-    /* Tab bar */
-    .tab-bar {
-      display: flex;
-      align-items: center;
-      gap: 0;
-      border-bottom: 1px solid var(--border-subtle);
-      margin-bottom: 20px;
-      overflow-x: auto;
-    }
-    .tab-btn {
-      padding: 10px 16px;
-      font-size: 13px;
-      font-weight: 500;
-      color: var(--text-secondary);
-      border: none;
-      background: transparent;
-      border-bottom: 2px solid transparent;
-      cursor: pointer;
-      white-space: nowrap;
-      transition: all 0.12s;
-      margin-bottom: -1px;
-    }
-    .tab-btn:hover { color: var(--text-primary); }
-    .tab-btn.active { color: var(--brand); border-bottom-color: var(--brand); }
+.tab-bar{display:flex;gap:0;border-bottom:1px solid var(--border-subtle);background:var(--bg-card);padding:0 22px;position:sticky;top:48px;z-index:39;overflow-x:auto;scrollbar-width:none}
+.tab-bar::-webkit-scrollbar{display:none}
+.tab-item{padding:11px 14px;font-size:12.5px;font-weight:500;color:var(--text-tertiary);border-bottom:2px solid transparent;white-space:nowrap;cursor:pointer;transition:all .12s;user-select:none}
+.tab-item:hover{color:var(--text-secondary)}
+.tab-item.active{color:var(--brand);border-bottom-color:var(--brand);font-weight:600}
 
-    /* Equity chart mock */
-    .equity-chart-card { margin-bottom: 16px; }
-    .chart-area {
-      padding: 0 20px 16px;
-      position: relative;
-    }
-    .chart-header {
-      padding: 16px 20px;
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      border-bottom: 1px solid var(--border-subtle);
-      margin-bottom: 0;
-    }
-    .chart-title-group { display: flex; flex-direction: column; gap: 2px; }
-    .chart-title { font-size: 14px; font-weight: 600; color: var(--text-primary); }
-    .chart-subtitle { font-size: 12px; color: var(--text-secondary); }
-    .chart-pnl-big {
-      font-family: 'DM Mono', monospace;
-      font-size: 28px;
-      font-weight: 500;
-      letter-spacing: -0.02em;
-      color: var(--profit);
-    }
+.page{padding:16px 22px 24px;flex:1;display:flex;flex-direction:column;gap:14px}
+.card{background:var(--bg-card);border:1px solid var(--border-subtle);border-radius:10px;box-shadow:var(--shadow-card)}
+.card-hdr{padding:11px 16px;border-bottom:1px solid var(--border-subtle);display:flex;align-items:center;justify-content:space-between;gap:8px;flex-wrap:wrap}
+.card-title{font-family:'Geist',sans-serif;font-size:13px;font-weight:600;color:var(--text-primary)}
+.card-sub{font-size:11.5px;color:var(--text-tertiary)}
 
-    /* SVG chart */
-    .equity-svg {
-      width: 100%;
-      height: 180px;
-      display: block;
-      margin-top: 12px;
-    }
+.kpi-row{display:grid;grid-template-columns:repeat(5,1fr);gap:10px}
+.kpi{background:var(--bg-card);border:1px solid var(--border-subtle);border-radius:9px;padding:13px 14px;box-shadow:var(--shadow-card)}
+.kpi-lbl{font-size:10px;font-weight:600;letter-spacing:.07em;text-transform:uppercase;color:var(--text-tertiary);margin-bottom:4px}
+.kpi-val{font-family:'DM Mono',monospace;font-size:20px;font-weight:500;font-variant-numeric:tabular-nums;line-height:1.2}
+.kpi-sub{font-size:11px;color:var(--text-tertiary);margin-top:2px}
 
-    /* Axis labels */
-    .chart-axis-x {
-      display: flex;
-      justify-content: space-between;
-      padding: 6px 0 0;
-      font-size: 10px;
-      font-family: 'DM Mono', monospace;
-      color: var(--text-tertiary);
-    }
+.chart-grid{display:grid;grid-template-columns:2fr 1fr;gap:14px}
+.two-col{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+.three-col{display:grid;grid-template-columns:repeat(3,1fr);gap:12px}
 
-    /* 4-col KPI */
-    .kpi-4 {
-      display: grid;
-      grid-template-columns: repeat(4, 1fr);
-      gap: 12px;
-      margin-bottom: 16px;
-    }
-    .kpi-stat {
-      background: var(--bg-card);
-      border: 1px solid var(--border-subtle);
-      border-radius: 10px;
-      padding: 16px;
-    }
-    .kpi-stat-label { font-size: 10px; font-weight: 500; letter-spacing: 0.07em; text-transform: uppercase; color: var(--text-tertiary); margin-bottom: 8px; }
-    .kpi-stat-val   { font-family: 'DM Mono', monospace; font-size: 22px; font-weight: 500; color: var(--text-primary); letter-spacing: -0.02em; line-height: 1; margin-bottom: 6px; }
-    .kpi-stat-delta { font-size: 11px; display: flex; align-items: center; gap: 4px; }
-    .kpi-stat-delta.up   { color: var(--profit); }
-    .kpi-stat-delta.down { color: var(--loss); }
-    .kpi-stat-delta.neutral { color: var(--text-tertiary); }
+.bar-section{display:flex;flex-direction:column;gap:7px;padding:14px 16px}
+.bar-row{display:flex;align-items:center;gap:10px}
+.bar-lbl{font-size:12px;font-weight:500;color:var(--text-secondary);width:130px;flex-shrink:0}
+.bar-track{flex:1;height:7px;background:var(--neutral-bg);border-radius:99px;overflow:hidden}
+.bar-fill{height:100%;border-radius:99px;transition:width .4s}
+.bar-val{font-family:'DM Mono',monospace;font-size:11.5px;font-variant-numeric:tabular-nums;width:72px;text-align:right;flex-shrink:0}
 
-    /* Bottom 2-col */
-    .analytics-bottom {
-      display: grid;
-      grid-template-columns: 1.4fr 1fr;
-      gap: 16px;
-    }
+.data-table{width:100%;border-collapse:collapse;font-size:12.5px}
+.data-table thead th{font-size:10px;font-weight:600;letter-spacing:.07em;text-transform:uppercase;color:var(--text-tertiary);padding:9px 14px;text-align:left;background:var(--bg-elevated);border-bottom:1px solid var(--border-subtle)}
+.data-table thead th.r{text-align:right}
+.data-table tbody td{padding:10px 14px;border-bottom:1px solid var(--border-subtle);vertical-align:middle}
+.data-table tbody td.r{text-align:right}
+.data-table tbody tr:last-child td{border-bottom:none}
+.data-table tbody tr:hover{background:var(--bg-hover)}
+.mono{font-family:'DM Mono',monospace;font-variant-numeric:tabular-nums}
+.profit{color:var(--profit)}
+.loss{color:var(--loss)}
+.brand{color:var(--brand)}
+.warn{color:var(--warning)}
 
-    /* Leaderboard table */
-    .leader-table { width: 100%; border-collapse: collapse; }
-    .leader-table th {
-      text-align: left;
-      font-size: 10px;
-      font-weight: 500;
-      letter-spacing: 0.07em;
-      text-transform: uppercase;
-      color: var(--text-tertiary);
-      padding: 0 0 10px;
-      border-bottom: 1px solid var(--border-subtle);
-    }
-    .leader-table th:not(:first-child) { text-align: right; }
-    .leader-table td {
-      padding: 10px 0;
-      border-bottom: 1px solid var(--border-subtle);
-      font-size: 13px;
-    }
-    .leader-table td:not(:first-child) { text-align: right; }
-    .leader-table tr:last-child td { border-bottom: none; }
-    .leader-table tr:hover td { background: var(--bg-hover); }
+.insight-strip{display:flex;align-items:flex-start;gap:10px;background:var(--brand-bg);border:1px solid var(--brand-border);border-radius:8px;padding:11px 14px}
+.insight-text{font-size:12.5px;color:var(--text-secondary);line-height:1.6}
+.insight-text strong{color:var(--text-primary);font-weight:600}
 
-    .rank-num { font-family: 'DM Mono', monospace; font-size: 11px; color: var(--text-tertiary); width: 20px; }
-    .inst-name { font-weight: 600; color: var(--text-primary); }
-    .inst-trades { font-size: 11px; color: var(--text-tertiary); margin-top: 1px; }
-    .wr-bar-inline {
-      display: flex;
-      align-items: center;
-      gap: 6px;
-    }
-    .wr-track { flex: 1; max-width: 60px; height: 3px; background: var(--border-subtle); border-radius: 99px; overflow: hidden; }
-    .wr-fill  { height: 100%; border-radius: 99px; }
-    .wr-pct   { font-family: 'DM Mono', monospace; font-size: 12px; min-width: 36px; text-align: right; }
+.heat-row{display:flex;gap:4px;padding:12px 16px 6px;flex-wrap:wrap}
+.heat-cell{width:60px;height:36px;border-radius:5px;display:flex;align-items:center;justify-content:center;font-family:'DM Mono',monospace;font-size:9.5px;font-weight:600;border:1px solid transparent;cursor:default}
+.hc-0{background:var(--neutral-bg);color:var(--text-tertiary)}
+.hc-1{background:rgba(47,158,104,.15);color:var(--profit)}
+.hc-2{background:rgba(47,158,104,.38);color:var(--profit)}
+.hc-3{background:rgba(47,158,104,.65);color:#fff}
+.hc-neg{background:rgba(217,79,67,.18);color:var(--loss)}
+.hc-neg2{background:rgba(217,79,67,.45);color:#fff}
 
-    /* Patterns tab preview */
-    .pattern-card {
-      background: var(--bg-card);
-      border: 1px solid var(--border-subtle);
-      border-radius: 10px;
-      padding: 14px 16px;
-      margin-bottom: 10px;
-      display: flex;
-      align-items: flex-start;
-      gap: 12px;
-      transition: border-color 0.12s;
-    }
-    .pattern-card:hover { border-color: var(--border-default); }
-    .pattern-icon {
-      width: 34px;
-      height: 34px;
-      border-radius: 8px;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      font-size: 17px;
-      flex-shrink: 0;
-    }
-    .pattern-body { flex: 1; }
-    .pattern-name { font-size: 13px; font-weight: 600; color: var(--text-primary); margin-bottom: 3px; }
-    .pattern-desc { font-size: 12px; color: var(--text-secondary); line-height: 1.5; margin-bottom: 8px; }
-    .pattern-footer { display: flex; align-items: center; gap: 8px; }
-    .pattern-freq {
-      flex: 1;
-      display: flex;
-      align-items: center;
-      gap: 6px;
-    }
-    .freq-track { flex: 1; max-width: 80px; height: 3px; background: var(--border-subtle); border-radius: 99px; overflow: hidden; }
-    .freq-fill  { height: 100%; border-radius: 99px; }
-    .freq-label { font-size: 11px; color: var(--text-tertiary); }
-    .pattern-cost { font-family: 'DM Mono', monospace; font-size: 13px; font-weight: 500; color: var(--loss); }
+.sev-dot{width:6px;height:6px;border-radius:50%;display:inline-block;margin-right:5px;flex-shrink:0}
+.sev-h{background:var(--loss)}
+.sev-m{background:var(--warning)}
+.sev-l{background:var(--brand)}
 
-    /* Hour heatmap table */
-    .hour-table { width: 100%; border-collapse: collapse; }
-    .hour-table th, .hour-table td {
-      padding: 7px 6px;
-      font-size: 11px;
-      border-bottom: 1px solid var(--border-subtle);
-    }
-    .hour-table th { font-weight: 500; letter-spacing: 0.05em; color: var(--text-tertiary); text-align: left; }
-    .hour-table td { color: var(--text-secondary); }
-    .hour-table td.best { color: var(--profit); font-family: 'DM Mono', monospace; font-weight: 500; }
-    .hour-table td.worst { color: var(--loss); font-family: 'DM Mono', monospace; font-weight: 500; }
-    .hour-table td.pnl-mono { font-family: 'DM Mono', monospace; }
-    .hour-table tr:last-child td { border-bottom: none; }
-    .hour-table tr:hover td { background: var(--bg-hover); }
+.chip{font-size:10px;font-weight:600;padding:2px 7px;border-radius:4px}
+.chip-warn{background:var(--warning-bg);color:var(--warning);border:1px solid var(--warning-border)}
+.chip-loss{background:var(--loss-bg);color:var(--loss);border:1px solid var(--loss-border)}
+.chip-ok{background:var(--profit-bg);color:var(--profit);border:1px solid var(--profit-border)}
+.chip-brand{background:var(--brand-bg);color:var(--brand);border:1px solid var(--brand-border)}
 
-    /* Edge map chart */
-    .edge-bar-row {
-      display: flex;
-      align-items: center;
-      gap: 10px;
-      padding: 8px 0;
-      border-bottom: 1px solid var(--border-subtle);
-    }
-    .edge-bar-row:last-child { border-bottom: none; }
-    .edge-bar-label { font-size: 12px; color: var(--text-secondary); width: 100px; flex-shrink: 0; }
-    .edge-bar-track { flex: 1; height: 6px; background: var(--border-subtle); border-radius: 99px; overflow: hidden; }
-    .edge-bar-fill  { height: 100%; border-radius: 99px; }
-    .edge-bar-val   { font-family: 'DM Mono', monospace; font-size: 12px; font-weight: 500; min-width: 52px; text-align: right; }
+/* Pattern detail card */
+.pattern-detail{border:1px solid var(--border-subtle);border-radius:8px;overflow:hidden;margin-bottom:8px}
+.pd-hdr{display:flex;align-items:center;gap:10px;padding:11px 14px;background:var(--bg-elevated);border-bottom:1px solid var(--border-subtle)}
+.pd-name{font-size:13px;font-weight:600;color:var(--text-primary);flex:1}
+.pd-body{padding:12px 14px;display:grid;grid-template-columns:repeat(4,1fr);gap:12px}
+.pd-stat{display:flex;flex-direction:column;gap:3px}
+.pd-lbl{font-size:10px;color:var(--text-tertiary);text-transform:uppercase;letter-spacing:.05em;font-weight:600}
+.pd-val{font-family:'DM Mono',monospace;font-size:14px;font-weight:500;font-variant-numeric:tabular-nums}
 
-    /* Tab panels */
-    .tab-panel { display: none; }
-    .tab-panel.active { display: block; }
+/* Calendar heatmap (patterns tab) */
+.cal-mini{display:grid;grid-template-columns:repeat(7,1fr);gap:3px;padding:12px 14px}
+.cm-day{aspect-ratio:1;border-radius:3px}
+.cd-0{background:var(--neutral-bg)}
+.cd-1{background:rgba(47,158,104,.2)}
+.cd-2{background:rgba(47,158,104,.5)}
+.cd-3{background:rgba(47,158,104,.85)}
+.cd-neg{background:rgba(217,79,67,.25)}
+.cd-neg2{background:rgba(217,79,67,.6)}
+.cd-hol{background:var(--bg-elevated);opacity:.4}
 
-    @media (max-width: 900px) {
-      .kpi-4 { grid-template-columns: repeat(2, 1fr); }
-      .analytics-bottom { grid-template-columns: 1fr; }
-    }
-  </style>
+/* Scatter / edge map */
+.edge-plot{position:relative;height:260px;background:var(--bg-elevated);border-radius:6px;overflow:hidden;margin:12px 16px}
+.edge-axis-x{position:absolute;bottom:28px;left:40px;right:12px;height:1px;background:var(--border-subtle)}
+.edge-axis-y{position:absolute;left:40px;top:12px;bottom:28px;width:1px;background:var(--border-subtle)}
+.edge-label-x{position:absolute;bottom:8px;right:12px;font-size:10px;color:var(--text-tertiary)}
+.edge-label-y{position:absolute;top:12px;left:4px;font-size:10px;color:var(--text-tertiary)}
+.edge-dot{position:absolute;border-radius:50%;border:1.5px solid var(--bg-card);transform:translate(-50%,-50%)}
+
+/* Emotion bars */
+.emo-bar-row{display:flex;align-items:center;gap:10px;padding:9px 0;border-bottom:1px solid var(--border-subtle)}
+.emo-bar-row:last-child{border-bottom:none}
+.emo-name{font-size:12.5px;font-weight:500;color:var(--text-secondary);width:110px;flex-shrink:0}
+.emo-track{flex:1;height:8px;background:var(--neutral-bg);border-radius:99px;overflow:hidden;position:relative}
+.emo-fill{height:100%;border-radius:99px;position:absolute;top:0}
+.emo-left{right:50%;background:var(--loss)}
+.emo-right{left:50%;background:var(--profit)}
+.emo-zero{position:absolute;left:50%;top:-2px;bottom:-2px;width:1px;background:var(--border-default)}
+.emo-val{font-family:'DM Mono',monospace;font-size:11.5px;font-variant-numeric:tabular-nums;width:72px;text-align:right;flex-shrink:0}
+.emo-count{font-size:11px;color:var(--text-tertiary);width:50px;text-align:right;flex-shrink:0}
+
+/* Expiry stats */
+.expiry-compare{display:grid;grid-template-columns:1fr 1fr;gap:0;border:1px solid var(--border-subtle);border-radius:8px;overflow:hidden}
+.ec-col{padding:16px}
+.ec-col:first-child{border-right:1px solid var(--border-subtle)}
+.ec-label{font-size:10px;font-weight:600;letter-spacing:.08em;text-transform:uppercase;color:var(--text-tertiary);margin-bottom:10px}
+.ec-stat{display:flex;justify-content:space-between;padding:6px 0;border-bottom:1px solid var(--border-subtle)}
+.ec-stat:last-child{border-bottom:none}
+.ec-key{font-size:12.5px;color:var(--text-secondary)}
+.ec-val{font-family:'DM Mono',monospace;font-size:12.5px;font-variant-numeric:tabular-nums}
+
+/* Sparkline mini in trade table */
+.spark-mini{display:inline-flex;align-items:flex-end;gap:1.5px;height:18px;vertical-align:middle}
+.sm-bar{width:4px;border-radius:1px 1px 0 0;flex-shrink:0}
+
+/* Return scatter */
+.return-grid{display:grid;grid-template-columns:repeat(7,1fr);gap:6px;padding:14px}
+.rg-cell{display:flex;flex-direction:column;gap:3px}
+.rg-lbl{font-size:9.5px;color:var(--text-tertiary);text-align:center}
+.rg-bar-wrap{display:flex;align-items:center;justify-content:center;height:80px;position:relative}
+.rg-bar-up{position:absolute;bottom:50%;width:28px;border-radius:3px 3px 0 0}
+.rg-bar-dn{position:absolute;top:50%;width:28px;border-radius:0 0 3px 3px}
+.rg-mid{position:absolute;top:50%;width:36px;height:1px;background:var(--border-default);left:50%;transform:translateX(-50%)}
+.rg-val{font-family:'DM Mono',monospace;font-size:9.5px;text-align:center;font-variant-numeric:tabular-nums}
+
+.tab-panel{display:none}
+.tab-panel.active{display:flex;flex-direction:column;gap:14px;padding:16px 22px 24px}
+</style>
 </head>
 <body>
-<div class="app-layout">
-
-  <!-- SIDEBAR ──────────────────────────────────────────────── -->
+<div class="app-shell">
   <aside class="sidebar">
-    <div class="sidebar-logo">
-      <div class="logo-mark">
-        <svg viewBox="0 0 24 24"><polyline points="3 17 9 11 13 15 21 7"/><polyline points="14 7 21 7 21 14"/></svg>
-      </div>
-      <span class="logo-text">TradeMentor <span>AI</span></span>
+    <div class="sb-logo">
+      <div class="sb-logomark"><svg viewBox="0 0 24 24"><polyline points="22 7 13.5 15.5 8.5 10.5 2 17"/><polyline points="16 7 22 7 22 13"/></svg></div>
+      <div class="sb-wordmark">Trade<em>Mentor</em></div>
     </div>
-
-    <nav class="sidebar-nav">
-      <div class="nav-section-label">Trading</div>
-      <a href="dashboard.html" class="nav-item">
-        <svg class="nav-icon icon-stroke" viewBox="0 0 24 24"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/></svg>
-        Dashboard
-      </a>
-      <a href="analytics.html" class="nav-item active">
-        <svg class="nav-icon icon-stroke" viewBox="0 0 24 24"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg>
-        Analytics
-      </a>
-      <a href="#" class="nav-item">
-        <svg class="nav-icon icon-stroke" viewBox="0 0 24 24"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg>
-        Alerts
-        <span class="badge-square" style="margin-left:auto;">3</span>
-      </a>
-
-      <div class="nav-section-label" style="margin-top:12px;">Risk</div>
-      <a href="blowup-shield.html" class="nav-item">
-        <svg class="nav-icon icon-stroke" viewBox="0 0 24 24"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
-        Blowup Shield
-      </a>
-      <a href="#" class="nav-item">
-        <svg class="nav-icon icon-stroke" viewBox="0 0 24 24"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>
-        My Patterns
-      </a>
-
-      <div class="nav-section-label" style="margin-top:12px;">Tools</div>
-      <a href="#" class="nav-item">
-        <svg class="nav-icon icon-stroke" viewBox="0 0 24 24"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
-        AI Coach
-      </a>
-      <a href="#" class="nav-item">
-        <svg class="nav-icon icon-stroke" viewBox="0 0 24 24"><rect x="2" y="3" width="20" height="14" rx="2" ry="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/></svg>
-        Reports
-      </a>
+    <nav class="sb-nav">
+      <div class="sb-section">Main</div>
+      <a href="dashboard.html" class="sb-item"><svg viewBox="0 0 24 24"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg>Dashboard</a>
+      <a href="analytics.html" class="sb-item active"><svg viewBox="0 0 24 24"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg>Analytics</a>
+      <a href="alerts.html" class="sb-item"><svg viewBox="0 0 24 24"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg>Alerts<span class="sb-badge">3</span></a>
+      <a href="my-patterns.html" class="sb-item"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M12 2v3M12 19v3M4.22 4.22l2.12 2.12M17.66 17.66l2.12 2.12M2 12h3M19 12h3M4.22 19.78l2.12-2.12M17.66 6.34l2.12-2.12"/></svg>My Patterns</a>
+      <a href="blowup-shield.html" class="sb-item"><svg viewBox="0 0 24 24"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>Blowup Shield</a>
+      <a href="chat.html" class="sb-item"><svg viewBox="0 0 24 24"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>AI Coach</a>
+      <div class="sb-section">Records</div>
+      <a href="journal.html" class="sb-item"><svg viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>Journal</a>
+      <a href="reports.html" class="sb-item"><svg viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>Reports</a>
+      <a href="settings.html" class="sb-item"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>Settings</a>
     </nav>
-
-    <div class="sidebar-footer">
-      <div style="display:flex;align-items:center;gap:8px;padding:10px 12px;border-radius:8px;">
-        <div style="width:30px;height:30px;border-radius:50%;background:linear-gradient(135deg,#14B8A6,#0284C7);display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:600;color:#fff;flex-shrink:0;">R</div>
-        <div style="flex:1;min-width:0;">
-          <div style="font-size:12px;font-weight:600;color:var(--text-primary);">Rohit Ostwal</div>
-          <div style="font-size:10px;color:var(--brand);">Zerodha · Pro</div>
-        </div>
-      </div>
+    <div class="sb-foot">
+      <div class="sb-avatar">RS</div>
+      <div><div class="sb-uname">Rohit S.</div><div class="sb-usub">Zerodha · Connected</div></div>
     </div>
   </aside>
 
-  <!-- MAIN ─────────────────────────────────────────────────── -->
-  <main class="main-content">
-
-    <!-- TOP BAR -->
+  <div class="main-content">
     <div class="top-bar">
-      <div style="display:flex;align-items:center;gap:10px;">
-        <span style="font-size:15px;font-weight:600;color:var(--text-primary);letter-spacing:-0.01em;">Analytics</span>
-        <span style="color:var(--text-tertiary);">·</span>
-        <div class="period-group">
-          <button class="period-btn" onclick="setPeriod(this,'7D')">7D</button>
-          <button class="period-btn active" onclick="setPeriod(this,'30D')">30D</button>
-          <button class="period-btn" onclick="setPeriod(this,'90D')">90D</button>
-          <button class="period-btn" onclick="setPeriod(this,'YTD')">YTD</button>
-        </div>
-      </div>
-      <div style="display:flex;align-items:center;gap:8px;">
-        <button class="btn btn-ghost btn-sm">Export CSV</button>
-        <button class="theme-toggle" onclick="toggleTheme()" title="Toggle theme">
-          <svg id="icon-sun" class="icon-stroke" viewBox="0 0 24 24" style="display:none"><circle cx="12" cy="12" r="5"/><line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/><line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/></svg>
-          <svg id="icon-moon" class="icon-stroke" viewBox="0 0 24 24"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>
+      <div class="top-l"><span class="top-title">Analytics</span></div>
+      <div class="top-r">
+        <select class="period-sel" id="periodSel">
+          <option value="7">Last 7 days</option>
+          <option value="30" selected>Last 30 days</option>
+          <option value="90">Last 90 days</option>
+        </select>
+        <button class="icon-btn" onclick="toggleTheme()">
+          <svg class="i-sun" viewBox="0 0 24 24"><circle cx="12" cy="12" r="5"/><line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/><line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/></svg>
+          <svg class="i-moon" viewBox="0 0 24 24"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>
         </button>
       </div>
     </div>
 
-    <!-- PAGE CONTENT -->
-    <div class="page-content">
+    <div class="tab-bar">
+      <div class="tab-item active" onclick="switchTab('summary',this)">Summary</div>
+      <div class="tab-item" onclick="switchTab('patterns',this)">Patterns</div>
+      <div class="tab-item" onclick="switchTab('trades',this)">Trades</div>
+      <div class="tab-item" onclick="switchTab('btst',this)">BTST</div>
+      <div class="tab-item" onclick="switchTab('pct',this)">% Return</div>
+      <div class="tab-item" onclick="switchTab('edge',this)">Edge Map</div>
+      <div class="tab-item" onclick="switchTab('expiry',this)">Expiry</div>
+      <div class="tab-item" onclick="switchTab('journal',this)">Journal</div>
+    </div>
 
-      <!-- TAB BAR -->
-      <div class="tab-bar">
-        <button class="tab-btn active" onclick="setTab(this,'summary')">Summary</button>
-        <button class="tab-btn" onclick="setTab(this,'patterns')">Patterns</button>
-        <button class="tab-btn" onclick="setTab(this,'trades')">Trades</button>
-        <button class="tab-btn" onclick="setTab(this,'btst')">BTST</button>
-        <button class="tab-btn" onclick="setTab(this,'pct')">% Return</button>
-        <button class="tab-btn" onclick="setTab(this,'edge')">Edge Map</button>
-        <button class="tab-btn" onclick="setTab(this,'expiry')">Expiry</button>
-        <button class="tab-btn" onclick="setTab(this,'journal')">Journal</button>
+    <!-- ═══════════════════ SUMMARY ═══════════════════ -->
+    <div id="tab-summary" class="tab-panel active">
+      <div class="kpi-row">
+        <div class="kpi"><div class="kpi-lbl">Net P&amp;L (30d)</div><div class="kpi-val profit">+&#8377;18,240</div><div class="kpi-sub">+12.4% vs prev. period</div></div>
+        <div class="kpi"><div class="kpi-lbl">Win Rate</div><div class="kpi-val brand">58.3%</div><div class="kpi-sub">105 of 180 trades</div></div>
+        <div class="kpi"><div class="kpi-lbl">Avg Win : Avg Loss</div><div class="kpi-val" style="color:var(--text-primary)">1.41 : 1</div><div class="kpi-sub">+&#8377;2,840 / &#8722;&#8377;2,013</div></div>
+        <div class="kpi"><div class="kpi-lbl">Behavior Score</div><div class="kpi-val brand">74 / 100</div><div class="kpi-sub">&#9650; 6 vs last month</div></div>
+        <div class="kpi"><div class="kpi-lbl">Est. Habit Cost</div><div class="kpi-val loss">&#8722;&#8377;9,400</div><div class="kpi-sub">Preventable losses</div></div>
       </div>
 
-      <!-- ── SUMMARY TAB ─────────────────────────────────────────── -->
-      <div class="tab-panel active" id="tab-summary">
-
-        <!-- Equity curve card -->
-        <div class="tm-card overflow-hidden equity-chart-card">
-          <div class="chart-header">
-            <div class="chart-title-group">
-              <div class="chart-title">Equity Curve</div>
-              <div class="chart-subtitle">30 trading days · 84 completed trades</div>
-            </div>
-            <div style="text-align:right;">
-              <div class="chart-pnl-big">+₹1,24,500</div>
-              <div style="font-size:12px;color:var(--profit);margin-top:2px;">↑ +₹28,400 vs prev period</div>
-            </div>
-          </div>
-          <div class="chart-area">
-            <svg class="equity-svg" viewBox="0 0 800 180" preserveAspectRatio="none">
+      <div class="chart-grid">
+        <div class="card">
+          <div class="card-hdr"><span class="card-title">Cumulative P&amp;L — 30 days</span><span class="mono profit" style="font-size:13px">+&#8377;18,240</span></div>
+          <div style="padding:14px 16px">
+            <svg width="100%" height="160" viewBox="0 0 560 160" preserveAspectRatio="none" style="display:block">
               <defs>
-                <linearGradient id="eqGrad" x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="0%" stop-color="#22C55E" stop-opacity="0.2"/>
-                  <stop offset="100%" stop-color="#22C55E" stop-opacity="0"/>
+                <linearGradient id="pg" x1="0" y1="0" x2="0" y2="1">
+                  <stop offset="0%" stop-color="#2F9E68" stop-opacity=".18"/>
+                  <stop offset="100%" stop-color="#2F9E68" stop-opacity="0"/>
                 </linearGradient>
-                <!-- Grid lines -->
               </defs>
-              <!-- Faint grid -->
-              <line x1="0" y1="45" x2="800" y2="45" stroke="var(--border-subtle)" stroke-width="1" stroke-dasharray="4,4"/>
-              <line x1="0" y1="90" x2="800" y2="90" stroke="var(--border-subtle)" stroke-width="1" stroke-dasharray="4,4"/>
-              <line x1="0" y1="135" x2="800" y2="135" stroke="var(--border-subtle)" stroke-width="1" stroke-dasharray="4,4"/>
-              <!-- Equity line — with a realistic F&O curve (ups, small pullbacks) -->
-              <path d="M0,160 L26,155 L53,148 L80,150 L106,158 L133,145 L160,130 L186,138 L213,120 L240,115 L266,110 L293,118 L320,100 L346,95 L373,90 L400,105 L426,88 L453,75 L480,68 L506,80 L533,62 L560,55 L586,50 L613,42 L640,48 L666,35 L693,28 L720,22 L746,18 L773,14 L800,10"
-                    stroke="#22C55E" stroke-width="1.5" fill="none" stroke-linejoin="round"/>
-              <path d="M0,160 L26,155 L53,148 L80,150 L106,158 L133,145 L160,130 L186,138 L213,120 L240,115 L266,110 L293,118 L320,100 L346,95 L373,90 L400,105 L426,88 L453,75 L480,68 L506,80 L533,62 L560,55 L586,50 L613,42 L640,48 L666,35 L693,28 L720,22 L746,18 L773,14 L800,10 L800,180 L0,180 Z"
-                    fill="url(#eqGrad)"/>
-              <!-- Baseline zero ref -->
-              <line x1="0" y1="162" x2="800" y2="162" stroke="var(--border-subtle)" stroke-width="1"/>
+              <line x1="0" y1="40" x2="560" y2="40" stroke="var(--border-subtle)" stroke-width="1"/>
+              <line x1="0" y1="80" x2="560" y2="80" stroke="var(--border-subtle)" stroke-width="1"/>
+              <line x1="0" y1="120" x2="560" y2="120" stroke="var(--border-subtle)" stroke-width="1"/>
+              <line x1="0" y1="108" x2="560" y2="108" stroke="var(--border-default)" stroke-width="1" stroke-dasharray="4,3"/>
+              <text x="4" y="106" font-size="9" fill="var(--text-tertiary)">0</text>
+              <path d="M0,140 L0,120 C30,118 55,124 85,112 C115,100 140,82 175,68 C205,54 230,78 265,65 C295,52 325,40 360,32 C390,24 418,38 448,28 C475,18 510,14 540,10 L560,8 L560,140 Z" fill="url(#pg)"/>
+              <path d="M0,120 C30,118 55,124 85,112 C115,100 140,82 175,68 C205,54 230,78 265,65 C295,52 325,40 360,32 C390,24 418,38 448,28 C475,18 510,14 540,10 L560,8" fill="none" stroke="#2F9E68" stroke-width="2" stroke-linecap="round"/>
             </svg>
-            <div class="chart-axis-x">
-              <span>Nov 13</span><span>Nov 20</span><span>Nov 27</span><span>Dec 4</span><span>Dec 11</span><span>Dec 13</span>
+            <div style="display:flex;justify-content:space-between;margin-top:5px">
+              <span style="font-size:10px;color:var(--text-tertiary)">May 14</span>
+              <span style="font-size:10px;color:var(--text-tertiary)">May 21</span>
+              <span style="font-size:10px;color:var(--text-tertiary)">May 28</span>
+              <span style="font-size:10px;color:var(--text-tertiary)">Jun 6</span>
+              <span style="font-size:10px;color:var(--text-tertiary)">Jun 13</span>
             </div>
           </div>
         </div>
-
-        <!-- KPI 4-col -->
-        <div class="kpi-4">
-          <div class="kpi-stat">
-            <div class="kpi-stat-label">Total P&L</div>
-            <div class="kpi-stat-val" style="color:var(--profit);">+₹1.24L</div>
-            <div class="kpi-stat-delta up">↑ +29% vs Nov</div>
+        <div class="card">
+          <div class="card-hdr"><span class="card-title">Alert Frequency (30d)</span></div>
+          <div class="bar-section">
+            <div class="bar-row"><span class="bar-lbl"><span class="sev-dot sev-h"></span>Revenge Trade</span><div class="bar-track"><div class="bar-fill" style="width:78%;background:var(--loss)"></div></div><span class="bar-val loss">14</span></div>
+            <div class="bar-row"><span class="bar-lbl"><span class="sev-dot sev-m"></span>Overtrading</span><div class="bar-track"><div class="bar-fill" style="width:55%;background:var(--warning)"></div></div><span class="bar-val warn">10</span></div>
+            <div class="bar-row"><span class="bar-lbl"><span class="sev-dot sev-h"></span>Pos. Sizing</span><div class="bar-track"><div class="bar-fill" style="width:38%;background:var(--loss)"></div></div><span class="bar-val loss">7</span></div>
+            <div class="bar-row"><span class="bar-lbl"><span class="sev-dot sev-m"></span>FOMO Entry</span><div class="bar-track"><div class="bar-fill" style="width:28%;background:var(--warning)"></div></div><span class="bar-val warn">5</span></div>
+            <div class="bar-row"><span class="bar-lbl"><span class="sev-dot sev-l"></span>Early Exit</span><div class="bar-track"><div class="bar-fill" style="width:17%;background:var(--brand)"></div></div><span class="bar-val brand">3</span></div>
           </div>
-          <div class="kpi-stat">
-            <div class="kpi-stat-label">Win Rate</div>
-            <div class="kpi-stat-val">64%</div>
-            <div class="kpi-stat-delta up">↑ 54 / 84 trades</div>
-          </div>
-          <div class="kpi-stat">
-            <div class="kpi-stat-label">Profit Factor</div>
-            <div class="kpi-stat-val">2.18</div>
-            <div class="kpi-stat-delta neutral">Avg winner 2.18× loser</div>
-          </div>
-          <div class="kpi-stat">
-            <div class="kpi-stat-label">Avg / Trade</div>
-            <div class="kpi-stat-val" style="color:var(--profit);">+₹1,482</div>
-            <div class="kpi-stat-delta up">↑ from ₹940 prev</div>
-          </div>
-        </div>
-
-        <!-- Bottom 2-col -->
-        <div class="analytics-bottom">
-
-          <!-- Instrument leaderboard -->
-          <div class="tm-card overflow-hidden">
-            <div style="padding:14px 20px;border-bottom:1px solid var(--border-subtle);display:flex;align-items:center;justify-content:space-between;">
-              <span style="font-size:14px;font-weight:600;color:var(--text-primary);">Instrument Performance</span>
-              <div style="display:flex;gap:4px;">
-                <button class="period-btn active" style="font-size:11px;padding:3px 8px;">P&L</button>
-                <button class="period-btn" style="font-size:11px;padding:3px 8px;">WR</button>
-                <button class="period-btn" style="font-size:11px;padding:3px 8px;">Trades</button>
-              </div>
-            </div>
-            <div style="padding:6px 20px 16px;">
-              <table class="leader-table">
-                <thead>
-                  <tr>
-                    <th>#</th>
-                    <th>Instrument</th>
-                    <th>Win Rate</th>
-                    <th>P&L</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  <tr>
-                    <td><span class="rank-num">01</span></td>
-                    <td>
-                      <div class="inst-name">NIFTY</div>
-                      <div class="inst-trades">32 trades</div>
-                    </td>
-                    <td>
-                      <div class="wr-bar-inline">
-                        <div class="wr-track"><div class="wr-fill" style="width:72%;background:var(--profit)"></div></div>
-                        <span class="wr-pct" style="color:var(--profit);">72%</span>
-                      </div>
-                    </td>
-                    <td style="font-family:'DM Mono',monospace;font-weight:500;color:var(--profit);">+₹68,400</td>
-                  </tr>
-                  <tr>
-                    <td><span class="rank-num">02</span></td>
-                    <td>
-                      <div class="inst-name">RELIANCE</div>
-                      <div class="inst-trades">18 trades</div>
-                    </td>
-                    <td>
-                      <div class="wr-bar-inline">
-                        <div class="wr-track"><div class="wr-fill" style="width:61%;background:var(--profit)"></div></div>
-                        <span class="wr-pct" style="color:var(--profit);">61%</span>
-                      </div>
-                    </td>
-                    <td style="font-family:'DM Mono',monospace;font-weight:500;color:var(--profit);">+₹42,100</td>
-                  </tr>
-                  <tr>
-                    <td><span class="rank-num">03</span></td>
-                    <td>
-                      <div class="inst-name">BANKNIFTY</div>
-                      <div class="inst-trades">24 trades</div>
-                    </td>
-                    <td>
-                      <div class="wr-bar-inline">
-                        <div class="wr-track"><div class="wr-fill" style="width:38%;background:var(--loss)"></div></div>
-                        <span class="wr-pct" style="color:var(--loss);">38%</span>
-                      </div>
-                    </td>
-                    <td style="font-family:'DM Mono',monospace;font-weight:500;color:var(--loss);">−₹22,800</td>
-                  </tr>
-                  <tr>
-                    <td><span class="rank-num">04</span></td>
-                    <td>
-                      <div class="inst-name">INFY</div>
-                      <div class="inst-trades">10 trades</div>
-                    </td>
-                    <td>
-                      <div class="wr-bar-inline">
-                        <div class="wr-track"><div class="wr-fill" style="width:70%;background:var(--profit)"></div></div>
-                        <span class="wr-pct" style="color:var(--profit);">70%</span>
-                      </div>
-                    </td>
-                    <td style="font-family:'DM Mono',monospace;font-weight:500;color:var(--profit);">+₹36,800</td>
-                  </tr>
-                </tbody>
-              </table>
-            </div>
-          </div>
-
-          <!-- Best/Worst hours + Streak -->
-          <div style="display:flex;flex-direction:column;gap:12px;">
-            <div class="tm-card overflow-hidden">
-              <div style="padding:14px 20px;border-bottom:1px solid var(--border-subtle);">
-                <span style="font-size:14px;font-weight:600;color:var(--text-primary);">Win Rate by Hour</span>
-              </div>
-              <div style="padding:8px 20px 12px;">
-                <table class="hour-table">
-                  <thead>
-                    <tr>
-                      <th>Hour (IST)</th>
-                      <th>Trades</th>
-                      <th>Win %</th>
-                      <th>Avg P&L</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    <tr>
-                      <td style="font-family:'DM Mono',monospace;font-size:11px;">09:15–10:00</td>
-                      <td>18</td>
-                      <td class="best">74%</td>
-                      <td class="pnl-mono" style="color:var(--profit);">+₹3,240</td>
-                    </tr>
-                    <tr>
-                      <td style="font-family:'DM Mono',monospace;font-size:11px;">10:00–11:00</td>
-                      <td>22</td>
-                      <td class="best">68%</td>
-                      <td class="pnl-mono" style="color:var(--profit);">+₹1,820</td>
-                    </tr>
-                    <tr>
-                      <td style="font-family:'DM Mono',monospace;font-size:11px;">11:00–12:00</td>
-                      <td>20</td>
-                      <td>52%</td>
-                      <td class="pnl-mono" style="color:var(--profit);">+₹480</td>
-                    </tr>
-                    <tr>
-                      <td style="font-family:'DM Mono',monospace;font-size:11px;">12:00–13:30</td>
-                      <td>14</td>
-                      <td class="worst">28%</td>
-                      <td class="pnl-mono" style="color:var(--loss);">−₹2,100</td>
-                    </tr>
-                    <tr>
-                      <td style="font-family:'DM Mono',monospace;font-size:11px;">14:00–15:30</td>
-                      <td>10</td>
-                      <td>50%</td>
-                      <td class="pnl-mono" style="color:var(--profit);">+₹620</td>
-                    </tr>
-                  </tbody>
-                </table>
-              </div>
-            </div>
-
-            <div class="tm-card overflow-hidden">
-              <div style="padding:12px 16px;">
-                <div style="font-size:10px;font-weight:500;letter-spacing:0.07em;text-transform:uppercase;color:var(--text-tertiary);margin-bottom:10px;">Discipline Streak</div>
-                <div style="display:flex;align-items:center;gap:10px;margin-bottom:8px;">
-                  <div style="font-family:'DM Mono',monospace;font-size:36px;font-weight:500;color:var(--profit);line-height:1;">14</div>
-                  <div>
-                    <div style="font-size:13px;font-weight:600;color:var(--text-primary);">days clean</div>
-                    <div style="font-size:11px;color:var(--text-tertiary);">Best: 21 days</div>
-                  </div>
-                </div>
-                <div style="display:flex;gap:4px;flex-wrap:wrap;">
-                  <!-- 14 green dots + some red/grey -->
-                  <span title="Dec 13" style="width:14px;height:14px;border-radius:3px;background:rgba(34,197,94,0.7);display:inline-block;"></span>
-                  <span style="width:14px;height:14px;border-radius:3px;background:rgba(34,197,94,0.7);display:inline-block;"></span>
-                  <span style="width:14px;height:14px;border-radius:3px;background:rgba(34,197,94,0.7);display:inline-block;"></span>
-                  <span style="width:14px;height:14px;border-radius:3px;background:rgba(34,197,94,0.7);display:inline-block;"></span>
-                  <span style="width:14px;height:14px;border-radius:3px;background:rgba(34,197,94,0.7);display:inline-block;"></span>
-                  <span style="width:14px;height:14px;border-radius:3px;background:rgba(34,197,94,0.7);display:inline-block;"></span>
-                  <span style="width:14px;height:14px;border-radius:3px;background:rgba(34,197,94,0.7);display:inline-block;"></span>
-                  <span style="width:14px;height:14px;border-radius:3px;background:rgba(34,197,94,0.7);display:inline-block;"></span>
-                  <span style="width:14px;height:14px;border-radius:3px;background:rgba(34,197,94,0.7);display:inline-block;"></span>
-                  <span style="width:14px;height:14px;border-radius:3px;background:rgba(34,197,94,0.7);display:inline-block;"></span>
-                  <span style="width:14px;height:14px;border-radius:3px;background:rgba(34,197,94,0.7);display:inline-block;"></span>
-                  <span style="width:14px;height:14px;border-radius:3px;background:rgba(34,197,94,0.7);display:inline-block;"></span>
-                  <span style="width:14px;height:14px;border-radius:3px;background:rgba(34,197,94,0.7);display:inline-block;"></span>
-                  <span style="width:14px;height:14px;border-radius:3px;background:rgba(34,197,94,0.7);display:inline-block;"></span>
-                  <span title="Loss day" style="width:14px;height:14px;border-radius:3px;background:rgba(239,68,68,0.5);display:inline-block;"></span>
-                  <span style="width:14px;height:14px;border-radius:3px;background:rgba(239,68,68,0.5);display:inline-block;"></span>
-                  <span style="width:14px;height:14px;border-radius:3px;background:var(--border-subtle);display:inline-block;"></span>
-                  <span style="width:14px;height:14px;border-radius:3px;background:var(--border-subtle);display:inline-block;"></span>
-                  <span style="width:14px;height:14px;border-radius:3px;background:var(--border-subtle);display:inline-block;"></span>
-                  <span style="width:14px;height:14px;border-radius:3px;background:var(--border-subtle);display:inline-block;"></span>
-                  <span style="width:14px;height:14px;border-radius:3px;background:rgba(34,197,94,0.7);display:inline-block;"></span>
-                  <span style="width:14px;height:14px;border-radius:3px;background:rgba(34,197,94,0.7);display:inline-block;"></span>
-                  <span style="width:14px;height:14px;border-radius:3px;background:rgba(34,197,94,0.7);display:inline-block;"></span>
-                  <span style="width:14px;height:14px;border-radius:3px;background:rgba(34,197,94,0.7);display:inline-block;"></span>
-                  <span style="width:14px;height:14px;border-radius:3px;background:rgba(34,197,94,0.7);display:inline-block;"></span>
-                  <span style="width:14px;height:14px;border-radius:3px;background:rgba(34,197,94,0.7);display:inline-block;"></span>
-                  <span style="width:14px;height:14px;border-radius:3px;background:rgba(34,197,94,0.7);display:inline-block;"></span>
-                  <span style="width:14px;height:14px;border-radius:3px;background:rgba(34,197,94,0.7);display:inline-block;"></span>
-                  <span style="width:14px;height:14px;border-radius:3px;background:rgba(34,197,94,0.7);display:inline-block;"></span>
-                  <span style="width:14px;height:14px;border-radius:3px;background:rgba(34,197,94,0.7);display:inline-block;"></span>
-                </div>
-              </div>
-            </div>
-
-          </div>
-        </div>
-
-      </div><!-- /summary -->
-
-      <!-- ── PATTERNS TAB ────────────────────────────────────────── -->
-      <div class="tab-panel" id="tab-patterns">
-        <div style="margin-bottom:12px;font-size:13px;color:var(--text-secondary);">22 patterns analyzed · Last 30 days · Sorted by cost</div>
-
-        <div class="pattern-card" style="border-left:3px solid var(--loss);">
-          <div class="pattern-icon" style="background:var(--loss-bg);border:1px solid var(--loss-border);">⚡</div>
-          <div class="pattern-body">
-            <div style="display:flex;align-items:center;gap:8px;margin-bottom:3px;">
-              <span class="pattern-name">Revenge Trading</span>
-              <span class="badge badge-danger">High</span>
-            </div>
-            <div class="pattern-desc">Entering within 30 min of a loss. Win rate drops 44% in this window. Triggered 8 times this month.</div>
-            <div class="pattern-footer">
-              <div class="pattern-freq">
-                <div class="freq-track"><div class="freq-fill" style="width:80%;background:var(--loss);"></div></div>
-                <span class="freq-label">8× this month</span>
-              </div>
-              <span class="pattern-cost">−₹18,400</span>
-            </div>
-          </div>
-        </div>
-
-        <div class="pattern-card" style="border-left:3px solid var(--warning);">
-          <div class="pattern-icon" style="background:var(--warning-bg);border:1px solid var(--warning-border);">🔄</div>
-          <div class="pattern-body">
-            <div style="display:flex;align-items:center;gap:8px;margin-bottom:3px;">
-              <span class="pattern-name">Overtrading</span>
-              <span class="badge badge-caution">Medium</span>
-            </div>
-            <div class="pattern-desc">Trading beyond your optimal session count. Trades 9–12 have a 31% win rate vs 72% for trades 1–4.</div>
-            <div class="pattern-footer">
-              <div class="pattern-freq">
-                <div class="freq-track"><div class="freq-fill" style="width:55%;background:var(--warning);"></div></div>
-                <span class="freq-label">6× this month</span>
-              </div>
-              <span class="pattern-cost">−₹12,800</span>
-            </div>
-          </div>
-        </div>
-
-        <div class="pattern-card" style="border-left:3px solid var(--warning);">
-          <div class="pattern-icon" style="background:var(--warning-bg);border:1px solid var(--warning-border);">⏱️</div>
-          <div class="pattern-body">
-            <div style="display:flex;align-items:center;gap:8px;margin-bottom:3px;">
-              <span class="pattern-name">Loss Aversion — Holding Losers</span>
-              <span class="badge badge-caution">Medium</span>
-            </div>
-            <div class="pattern-desc">Average loser held 3.2× longer than winners. Exit delay compounds losses by ₹820 avg per trade.</div>
-            <div class="pattern-footer">
-              <div class="pattern-freq">
-                <div class="freq-track"><div class="freq-fill" style="width:40%;background:var(--warning);"></div></div>
-                <span class="freq-label">5× this month</span>
-              </div>
-              <span class="pattern-cost">−₹9,200</span>
-            </div>
-          </div>
-        </div>
-
-        <div class="pattern-card">
-          <div class="pattern-icon" style="background:var(--neutral-bg);border:1px solid var(--neutral-border);">🎯</div>
-          <div class="pattern-body">
-            <div style="display:flex;align-items:center;gap:8px;margin-bottom:3px;">
-              <span class="pattern-name">Early Exit — Cutting Winners</span>
-              <span class="badge badge-neutral">Low</span>
-            </div>
-            <div class="pattern-desc">Closing profitable positions before target. Avg winner cut at 41% of potential. Costing ₹580 per trade.</div>
-            <div class="pattern-footer">
-              <div class="pattern-freq">
-                <div class="freq-track"><div class="freq-fill" style="width:28%;background:var(--text-tertiary);"></div></div>
-                <span class="freq-label">3× this month</span>
-              </div>
-              <span class="pattern-cost">−₹4,100</span>
-            </div>
-          </div>
-        </div>
-
-      </div><!-- /patterns -->
-
-      <!-- ── EDGE MAP TAB ────────────────────────────────────────── -->
-      <div class="tab-panel" id="tab-edge">
-        <div style="margin-bottom:16px;font-size:13px;color:var(--text-secondary);">Where your actual trading edge lives — ranked by avg P&L per occurrence</div>
-
-        <div class="tm-card overflow-hidden" style="margin-bottom:16px;">
-          <div style="padding:14px 20px;border-bottom:1px solid var(--border-subtle);">
-            <span style="font-size:14px;font-weight:600;color:var(--text-primary);">Setup Performance</span>
-          </div>
-          <div style="padding:12px 20px 16px;">
-            <div class="edge-bar-row">
-              <div class="edge-bar-label">Opening gap fill</div>
-              <div class="edge-bar-track"><div class="edge-bar-fill" style="width:88%;background:var(--profit);"></div></div>
-              <div class="edge-bar-val" style="color:var(--profit);">+₹4,820</div>
-            </div>
-            <div class="edge-bar-row">
-              <div class="edge-bar-label">VWAP bounce</div>
-              <div class="edge-bar-track"><div class="edge-bar-fill" style="width:72%;background:var(--profit);"></div></div>
-              <div class="edge-bar-val" style="color:var(--profit);">+₹3,140</div>
-            </div>
-            <div class="edge-bar-row">
-              <div class="edge-bar-label">9:15 breakout</div>
-              <div class="edge-bar-track"><div class="edge-bar-fill" style="width:65%;background:var(--profit);"></div></div>
-              <div class="edge-bar-val" style="color:var(--profit);">+₹2,460</div>
-            </div>
-            <div class="edge-bar-row">
-              <div class="edge-bar-label">Trend continuation</div>
-              <div class="edge-bar-track"><div class="edge-bar-fill" style="width:48%;background:var(--warning);"></div></div>
-              <div class="edge-bar-val" style="color:var(--warning);">+₹820</div>
-            </div>
-            <div class="edge-bar-row">
-              <div class="edge-bar-label">Afternoon reversal</div>
-              <div class="edge-bar-track"><div class="edge-bar-fill" style="width:30%;background:var(--loss);"></div></div>
-              <div class="edge-bar-val" style="color:var(--loss);">−₹1,240</div>
-            </div>
-            <div class="edge-bar-row">
-              <div class="edge-bar-label">Lunch chop</div>
-              <div class="edge-bar-track"><div class="edge-bar-fill" style="width:12%;background:var(--loss);"></div></div>
-              <div class="edge-bar-val" style="color:var(--loss);">−₹2,800</div>
-            </div>
-          </div>
-        </div>
-      </div><!-- /edge -->
-
-      <!-- ── JOURNAL TAB ─────────────────────────────────────────── -->
-      <div class="tab-panel" id="tab-journal">
-        <div style="margin-bottom:12px;font-size:13px;color:var(--text-secondary);">Emotion tags vs avg P&L · How your mental state correlates with outcomes</div>
-
-        <div class="kpi-4" style="margin-bottom:20px;">
-          <div class="kpi-stat" style="border-left:3px solid var(--profit);">
-            <div class="kpi-stat-label">Best state</div>
-            <div style="font-size:18px;margin-bottom:4px;">😌 Calm</div>
-            <div class="kpi-stat-val" style="color:var(--profit);">+₹2,840</div>
-            <div class="kpi-stat-delta up">71% WR · 38 trades</div>
-          </div>
-          <div class="kpi-stat" style="border-left:3px solid var(--loss);">
-            <div class="kpi-stat-label">Worst state</div>
-            <div style="font-size:18px;margin-bottom:4px;">😤 Frustrated</div>
-            <div class="kpi-stat-val" style="color:var(--loss);">−₹3,120</div>
-            <div class="kpi-stat-delta down">22% WR · 27 trades</div>
-          </div>
-          <div class="kpi-stat">
-            <div class="kpi-stat-label">Most common</div>
-            <div style="font-size:18px;margin-bottom:4px;">🎯 Focused</div>
-            <div class="kpi-stat-val" style="color:var(--profit);">+₹1,420</div>
-            <div class="kpi-stat-delta up">58% WR · 43 trades</div>
-          </div>
-          <div class="kpi-stat">
-            <div class="kpi-stat-label">Baseline avg</div>
-            <div style="font-size:18px;margin-bottom:4px;">📊 All states</div>
-            <div class="kpi-stat-val">+₹1,482</div>
-            <div class="kpi-stat-delta neutral">64% WR · 84 trades</div>
-          </div>
-        </div>
-
-        <div class="tm-card overflow-hidden">
-          <div style="padding:14px 20px;border-bottom:1px solid var(--border-subtle);">
-            <span style="font-size:14px;font-weight:600;color:var(--text-primary);">Emotion → P&L correlation</span>
-          </div>
-          <div style="padding:12px 20px 16px;display:flex;flex-direction:column;gap:10px;">
-            <div class="edge-bar-row">
-              <div class="edge-bar-label">😌 Calm & rested</div>
-              <div class="edge-bar-track" style="background:var(--border-subtle);"><div class="edge-bar-fill" style="width:85%;background:var(--profit);"></div></div>
-              <div class="edge-bar-val" style="color:var(--profit);">+₹2,840</div>
-            </div>
-            <div class="edge-bar-row">
-              <div class="edge-bar-label">🎯 Focused</div>
-              <div class="edge-bar-track"><div class="edge-bar-fill" style="width:55%;background:var(--profit);"></div></div>
-              <div class="edge-bar-val" style="color:var(--profit);">+₹1,420</div>
-            </div>
-            <div class="edge-bar-row">
-              <div class="edge-bar-label">😐 Neutral</div>
-              <div class="edge-bar-track"><div class="edge-bar-fill" style="width:40%;background:var(--warning);"></div></div>
-              <div class="edge-bar-val" style="color:var(--warning);">+₹620</div>
-            </div>
-            <div class="edge-bar-row">
-              <div class="edge-bar-label">🎰 Overconfident</div>
-              <div class="edge-bar-track"><div class="edge-bar-fill" style="width:25%;background:var(--loss);"></div></div>
-              <div class="edge-bar-val" style="color:var(--loss);">−₹920</div>
-            </div>
-            <div class="edge-bar-row">
-              <div class="edge-bar-label">😤 Frustrated</div>
-              <div class="edge-bar-track"><div class="edge-bar-fill" style="width:10%;background:var(--loss);"></div></div>
-              <div class="edge-bar-val" style="color:var(--loss);">−₹3,120</div>
-            </div>
-          </div>
-        </div>
-      </div><!-- /journal -->
-
-      <!-- other tabs: empty placeholders -->
-      <div class="tab-panel" id="tab-trades">
-        <div class="tm-card overflow-hidden" style="padding:40px;text-align:center;">
-          <div style="font-size:32px;margin-bottom:12px;">📋</div>
-          <div style="font-size:15px;font-weight:600;color:var(--text-primary);margin-bottom:6px;">Trade Log</div>
-          <div style="font-size:13px;color:var(--text-secondary);">Full tabular view of all 84 trades with filters, sort, and export.</div>
-        </div>
-      </div>
-      <div class="tab-panel" id="tab-btst">
-        <div class="tm-card overflow-hidden" style="padding:40px;text-align:center;">
-          <div style="font-size:32px;margin-bottom:12px;">🌙</div>
-          <div style="font-size:15px;font-weight:600;color:var(--text-primary);margin-bottom:6px;">BTST Performance</div>
-          <div style="font-size:13px;color:var(--text-secondary);">Overnight positions · Gap statistics · BTST vs intraday comparison.</div>
-        </div>
-      </div>
-      <div class="tab-panel" id="tab-pct">
-        <div class="tm-card overflow-hidden" style="padding:40px;text-align:center;">
-          <div style="font-size:32px;margin-bottom:12px;">📈</div>
-          <div style="font-size:15px;font-weight:600;color:var(--text-primary);margin-bottom:6px;">% Return Analysis</div>
-          <div style="font-size:13px;color:var(--text-secondary);">Returns normalized by capital deployed, compared across periods.</div>
-        </div>
-      </div>
-      <div class="tab-panel" id="tab-expiry">
-        <div class="tm-card overflow-hidden" style="padding:40px;text-align:center;">
-          <div style="font-size:32px;margin-bottom:12px;">📅</div>
-          <div style="font-size:15px;font-weight:600;color:var(--text-primary);margin-bottom:6px;">Expiry Day Analysis</div>
-          <div style="font-size:13px;color:var(--text-secondary);">Expiry vs non-expiry performance · Hourly breakdown · Worst expiry trades.</div>
         </div>
       </div>
 
-    </div><!-- /page-content -->
-  </main>
+      <div class="insight-strip">
+        <div style="flex-shrink:0;margin-top:1px"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--brand)" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg></div>
+        <div class="insight-text"><strong>Key insight:</strong> Revenge trades happen exclusively on BANKNIFTY between 10:30–11:30 AM. Win rate during that window: <strong class="loss">22%</strong> vs your overall BANKNIFTY win rate of <strong class="profit">61%</strong>. Skipping re-entries after losses in that window would have saved <strong class="profit">~&#8377;9,200</strong> this month.</div>
+      </div>
+
+      <div class="two-col">
+        <div class="card">
+          <div class="card-hdr"><span class="card-title">Trade Hour Heatmap</span><span class="card-sub">Avg P&amp;L by session hour</span></div>
+          <div class="heat-row">
+            <div class="heat-cell hc-neg2">9–10</div>
+            <div class="heat-cell hc-3">10–11</div>
+            <div class="heat-cell hc-neg">11–12</div>
+            <div class="heat-cell hc-2">12–1 PM</div>
+            <div class="heat-cell hc-1">1–2 PM</div>
+            <div class="heat-cell hc-neg">2–3 PM</div>
+            <div class="heat-cell hc-2">3–3:30</div>
+          </div>
+          <div style="padding:0 16px 12px;font-size:11px;color:var(--text-tertiary)">Green = avg profitable hour · Red = avg losing hour</div>
+        </div>
+        <div class="card">
+          <div class="card-hdr"><span class="card-title">Pattern Cost Impact</span></div>
+          <table class="data-table">
+            <thead><tr><th>Pattern</th><th class="r">Count</th><th class="r">Est. Cost</th></tr></thead>
+            <tbody>
+              <tr><td>Revenge Trade</td><td class="r mono">14</td><td class="r mono loss">&#8722;&#8377;6,400</td></tr>
+              <tr><td>Position Sizing</td><td class="r mono">7</td><td class="r mono loss">&#8722;&#8377;3,100</td></tr>
+              <tr><td>Overtrading</td><td class="r mono">10</td><td class="r mono loss">&#8722;&#8377;1,800</td></tr>
+              <tr><td>FOMO Entry</td><td class="r mono">5</td><td class="r mono loss">&#8722;&#8377;1,200</td></tr>
+              <tr><td>Early Exit</td><td class="r mono">3</td><td class="r mono loss">&#8722;&#8377;900</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <!-- ═══════════════════ PATTERNS ═══════════════════ -->
+    <div id="tab-patterns" class="tab-panel">
+      <div class="card">
+        <div class="card-hdr"><span class="card-title">Pattern Calendar — Jun 2026</span><span class="card-sub">Click day to filter</span></div>
+        <div style="display:flex;justify-content:space-between;padding:8px 14px 0;font-size:10.5px;color:var(--text-tertiary)"><span>Mon</span><span>Tue</span><span>Wed</span><span>Thu</span><span>Fri</span><span>Sat</span><span>Sun</span></div>
+        <div class="cal-mini">
+          <!-- May 14 week -->
+          <div class="cm-day cd-neg2" title="May 14 · 2 alerts"></div><div class="cm-day cd-1" title="May 15 · clean day"></div><div class="cm-day cd-neg" title="May 16 · 1 alert"></div><div class="cm-day cd-3" title="May 17 · best day"></div><div class="cm-day cd-2" title="May 18"></div><div class="cm-day cd-hol"></div><div class="cm-day cd-hol"></div>
+          <!-- May 21 week -->
+          <div class="cm-day cd-1"></div><div class="cm-day cd-neg2" title="May 22 · 3 alerts"></div><div class="cm-day cd-neg"></div><div class="cm-day cd-0"></div><div class="cm-day cd-2"></div><div class="cm-day cd-hol"></div><div class="cm-day cd-hol"></div>
+          <!-- May 28 week -->
+          <div class="cm-day cd-neg2"></div><div class="cm-day cd-1"></div><div class="cm-day cd-3"></div><div class="cm-day cd-2"></div><div class="cm-day cd-neg"></div><div class="cm-day cd-hol"></div><div class="cm-day cd-hol"></div>
+          <!-- Jun 4 week -->
+          <div class="cm-day cd-1"></div><div class="cm-day cd-neg"></div><div class="cm-day cd-2"></div><div class="cm-day cd-neg2"></div><div class="cm-day cd-1"></div><div class="cm-day cd-hol"></div><div class="cm-day cd-hol"></div>
+          <!-- Jun 11 week -->
+          <div class="cm-day cd-3"></div><div class="cm-day cd-2"></div><div class="cm-day cd-neg" title="Jun 13 · today"></div><div class="cm-day cd-0"></div><div class="cm-day cd-0"></div><div class="cm-day cd-hol"></div><div class="cm-day cd-hol"></div>
+        </div>
+        <div style="display:flex;align-items:center;gap:8px;padding:8px 14px 12px;font-size:10.5px;color:var(--text-tertiary)">
+          <span>Few alerts</span>
+          <div style="width:11px;height:11px;border-radius:2px;background:rgba(47,158,104,.2)"></div>
+          <div style="width:11px;height:11px;border-radius:2px;background:rgba(47,158,104,.85)"></div>
+          <span>Many profitable trades</span>
+          <span style="margin-left:8px">Bad days:</span>
+          <div style="width:11px;height:11px;border-radius:2px;background:rgba(217,79,67,.25)"></div>
+          <div style="width:11px;height:11px;border-radius:2px;background:rgba(217,79,67,.6)"></div>
+        </div>
+      </div>
+
+      <div class="pattern-detail">
+        <div class="pd-hdr">
+          <span class="pd-name">Revenge Trading</span>
+          <span class="chip chip-loss">HIGH</span>
+          <span style="font-size:11.5px;color:var(--text-tertiary);margin-left:auto">14 occurrences · 30 days</span>
+        </div>
+        <div class="pd-body">
+          <div class="pd-stat"><span class="pd-lbl">Win rate (revenge)</span><span class="pd-val loss">24%</span></div>
+          <div class="pd-stat"><span class="pd-lbl">Baseline win rate</span><span class="pd-val profit">61%</span></div>
+          <div class="pd-stat"><span class="pd-lbl">Avg loss / instance</span><span class="pd-val loss">&#8722;&#8377;2,800</span></div>
+          <div class="pd-stat"><span class="pd-lbl">Est. 30d cost</span><span class="pd-val loss">&#8722;&#8377;6,400</span></div>
+        </div>
+      </div>
+
+      <div class="pattern-detail">
+        <div class="pd-hdr">
+          <span class="pd-name">Overtrading</span>
+          <span class="chip chip-warn">MED</span>
+          <span style="font-size:11.5px;color:var(--text-tertiary);margin-left:auto">10 occurrences · 30 days</span>
+        </div>
+        <div class="pd-body">
+          <div class="pd-stat"><span class="pd-lbl">WR trade 1–6</span><span class="pd-val profit">62%</span></div>
+          <div class="pd-stat"><span class="pd-lbl">WR trade 7+</span><span class="pd-val warn">31%</span></div>
+          <div class="pd-stat"><span class="pd-lbl">Avg extra loss / day</span><span class="pd-val loss">&#8722;&#8377;680</span></div>
+          <div class="pd-stat"><span class="pd-lbl">Est. 30d cost</span><span class="pd-val loss">&#8722;&#8377;1,800</span></div>
+        </div>
+      </div>
+
+      <div class="pattern-detail">
+        <div class="pd-hdr">
+          <span class="pd-name">Position Size Escalation</span>
+          <span class="chip chip-loss">HIGH</span>
+          <span style="font-size:11.5px;color:var(--text-tertiary);margin-left:auto">7 occurrences · 30 days</span>
+        </div>
+        <div class="pd-body">
+          <div class="pd-stat"><span class="pd-lbl">Normal size WR</span><span class="pd-val profit">60%</span></div>
+          <div class="pd-stat"><span class="pd-lbl">Oversized WR</span><span class="pd-val loss">28%</span></div>
+          <div class="pd-stat"><span class="pd-lbl">Avg loss × size</span><span class="pd-val loss">&#8722;&#8377;4,200</span></div>
+          <div class="pd-stat"><span class="pd-lbl">Est. 30d cost</span><span class="pd-val loss">&#8722;&#8377;3,100</span></div>
+        </div>
+      </div>
+
+      <div class="pattern-detail">
+        <div class="pd-hdr"><span class="pd-name">FOMO Entry</span><span class="chip chip-warn">MED</span><span style="font-size:11.5px;color:var(--text-tertiary);margin-left:auto">5 occurrences · 30 days</span></div>
+        <div class="pd-body">
+          <div class="pd-stat"><span class="pd-lbl">Late entry WR</span><span class="pd-val warn">38%</span></div>
+          <div class="pd-stat"><span class="pd-lbl">Normal entry WR</span><span class="pd-val profit">61%</span></div>
+          <div class="pd-stat"><span class="pd-lbl">Avg slippage cost</span><span class="pd-val loss">&#8722;&#8377;320</span></div>
+          <div class="pd-stat"><span class="pd-lbl">Est. 30d cost</span><span class="pd-val loss">&#8722;&#8377;1,200</span></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ═══════════════════ TRADES ═══════════════════ -->
+    <div id="tab-trades" class="tab-panel">
+      <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
+        <select class="period-sel"><option>All symbols</option><option>BANKNIFTY</option><option>NIFTY</option></select>
+        <select class="period-sel"><option>All products</option><option>MIS</option><option>NRML</option></select>
+        <select class="period-sel"><option>All outcomes</option><option>Wins only</option><option>Losses only</option></select>
+        <select class="period-sel"><option>All patterns</option><option>Revenge Trade</option><option>Overtrading</option></select>
+        <span style="margin-left:auto;font-size:11.5px;color:var(--text-tertiary)">180 trades · 30 days</span>
+      </div>
+      <div class="card">
+        <table class="data-table">
+          <thead>
+            <tr><th>Date / Time</th><th>Symbol</th><th>Type</th><th class="r">Qty</th><th class="r">Entry</th><th class="r">Exit</th><th class="r">Duration</th><th class="r">P&amp;L</th><th>Pattern</th></tr>
+          </thead>
+          <tbody>
+            <tr><td class="mono" style="color:var(--text-tertiary)">Jun 13 · 10:31</td><td>BANKNIFTY 45000 PE</td><td><span class="chip chip-loss" style="font-size:9.5px">MIS</span></td><td class="r mono">50</td><td class="r mono">&#8377;142.50</td><td class="r mono">&#8377;78.50</td><td class="r mono">16 min</td><td class="r mono loss">&#8722;&#8377;3,200</td><td><span class="chip chip-warn" style="font-size:9.5px">Revenge</span></td></tr>
+            <tr><td class="mono" style="color:var(--text-tertiary)">Jun 13 · 09:27</td><td>NIFTY 23400 CE</td><td><span class="chip chip-brand" style="font-size:9.5px">MIS</span></td><td class="r mono">75</td><td class="r mono">&#8377;81.00</td><td class="r mono">&#8377;105.65</td><td class="r mono">21 min</td><td class="r mono profit">+&#8377;1,850</td><td><span style="font-size:11px;color:var(--text-tertiary)">—</span></td></tr>
+            <tr><td class="mono" style="color:var(--text-tertiary)">Jun 12 · 14:12</td><td>BANKNIFTY 47500 CE</td><td><span class="chip chip-brand" style="font-size:9.5px">MIS</span></td><td class="r mono">25</td><td class="r mono">&#8377;312.00</td><td class="r mono">&#8377;408.00</td><td class="r mono">26 min</td><td class="r mono profit">+&#8377;2,400</td><td><span style="font-size:11px;color:var(--text-tertiary)">—</span></td></tr>
+            <tr><td class="mono" style="color:var(--text-tertiary)">Jun 12 · 11:04</td><td>NIFTY 23300 PE</td><td><span class="chip chip-loss" style="font-size:9.5px">MIS</span></td><td class="r mono">75</td><td class="r mono">&#8377;64.50</td><td class="r mono">&#8377;49.80</td><td class="r mono">15 min</td><td class="r mono loss">&#8722;&#8377;1,100</td><td><span class="chip chip-warn" style="font-size:9.5px">Overtrade</span></td></tr>
+            <tr><td class="mono" style="color:var(--text-tertiary)">Jun 11 · 10:55</td><td>BANKNIFTY 47800 CE</td><td><span class="chip chip-brand" style="font-size:9.5px">MIS</span></td><td class="r mono">50</td><td class="r mono">&#8377;188.00</td><td class="r mono">&#8377;252.00</td><td class="r mono">33 min</td><td class="r mono profit">+&#8377;3,200</td><td><span style="font-size:11px;color:var(--text-tertiary)">—</span></td></tr>
+            <tr><td class="mono" style="color:var(--text-tertiary)">Jun 11 · 09:32</td><td>NIFTY 23500 CE</td><td><span class="chip chip-brand" style="font-size:9.5px">MIS</span></td><td class="r mono">50</td><td class="r mono">&#8377;92.00</td><td class="r mono">&#8377;138.50</td><td class="r mono">44 min</td><td class="r mono profit">+&#8377;2,325</td><td><span style="font-size:11px;color:var(--text-tertiary)">—</span></td></tr>
+            <tr><td class="mono" style="color:var(--text-tertiary)">Jun 7 · 13:40</td><td>BANKNIFTY 45500 PE</td><td><span class="chip chip-loss" style="font-size:9.5px">MIS</span></td><td class="r mono">100</td><td class="r mono">&#8377;224.50</td><td class="r mono">&#8377;181.20</td><td class="r mono">28 min</td><td class="r mono loss">&#8722;&#8377;4,330</td><td><span class="chip chip-loss" style="font-size:9.5px">Pos. Size</span></td></tr>
+            <tr><td class="mono" style="color:var(--text-tertiary)">Jun 7 · 11:18</td><td>BANKNIFTY 46000 CE</td><td><span class="chip chip-loss" style="font-size:9.5px">MIS</span></td><td class="r mono">50</td><td class="r mono">&#8377;156.00</td><td class="r mono">&#8377;102.50</td><td class="r mono">22 min</td><td class="r mono loss">&#8722;&#8377;2,675</td><td><span class="chip chip-warn" style="font-size:9.5px">Revenge</span></td></tr>
+            <tr><td class="mono" style="color:var(--text-tertiary)">Jun 7 · 10:45</td><td>BANKNIFTY 46000 PE</td><td><span class="chip chip-loss" style="font-size:9.5px">MIS</span></td><td class="r mono">50</td><td class="r mono">&#8377;198.00</td><td class="r mono">&#8377;164.00</td><td class="r mono">18 min</td><td class="r mono loss">&#8722;&#8377;1,700</td><td><span style="font-size:11px;color:var(--text-tertiary)">—</span></td></tr>
+            <tr><td class="mono" style="color:var(--text-tertiary)">Jun 6 · 10:15</td><td>NIFTY 23200 CE</td><td><span class="chip chip-brand" style="font-size:9.5px">MIS</span></td><td class="r mono">75</td><td class="r mono">&#8377;118.00</td><td class="r mono">&#8377;164.00</td><td class="r mono">55 min</td><td class="r mono profit">+&#8377;3,450</td><td><span style="font-size:11px;color:var(--text-tertiary)">—</span></td></tr>
+          </tbody>
+        </table>
+        <div style="padding:10px 14px;border-top:1px solid var(--border-subtle);display:flex;justify-content:space-between;align-items:center;background:var(--bg-elevated)">
+          <span style="font-size:11.5px;color:var(--text-tertiary)">Showing 10 of 180 · sorted by date desc</span>
+          <button style="font-size:11.5px;padding:4px 11px;border:1px solid var(--border-default);border-radius:6px;background:transparent;color:var(--text-secondary);cursor:pointer">Load more</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- ═══════════════════ BTST ═══════════════════ -->
+    <div id="tab-btst" class="tab-panel">
+      <div class="three-col">
+        <div class="kpi"><div class="kpi-lbl">BTST trades (30d)</div><div class="kpi-val" style="color:var(--text-primary)">8</div><div class="kpi-sub">4.4% of all trades</div></div>
+        <div class="kpi"><div class="kpi-lbl">BTST P&amp;L</div><div class="kpi-val profit">+&#8377;6,240</div><div class="kpi-sub">Avg +&#8377;780 / trade</div></div>
+        <div class="kpi"><div class="kpi-lbl">BTST Win Rate</div><div class="kpi-val profit">75%</div><div class="kpi-sub">6W · 2L</div></div>
+      </div>
+
+      <div class="two-col">
+        <div class="card">
+          <div class="card-hdr"><span class="card-title">BTST vs Intraday Comparison</span></div>
+          <table class="data-table">
+            <thead><tr><th>Metric</th><th class="r">BTST</th><th class="r">Intraday</th></tr></thead>
+            <tbody>
+              <tr><td>Win Rate</td><td class="r mono profit">75%</td><td class="r mono brand">57%</td></tr>
+              <tr><td>Avg Win</td><td class="r mono profit">+&#8377;4,100</td><td class="r mono profit">+&#8377;2,200</td></tr>
+              <tr><td>Avg Loss</td><td class="r mono loss">&#8722;&#8377;3,800</td><td class="r mono loss">&#8722;&#8377;1,650</td></tr>
+              <tr><td>Avg hold time</td><td class="r mono">1.4 days</td><td class="r mono">31 min</td></tr>
+              <tr><td>Overnight risk (avg)</td><td class="r mono warn">&#8377;12,400</td><td class="r mono">—</td></tr>
+              <tr><td>Net P&amp;L</td><td class="r mono profit">+&#8377;6,240</td><td class="r mono profit">+&#8377;12,000</td></tr>
+            </tbody>
+          </table>
+        </div>
+        <div class="card">
+          <div class="card-hdr"><span class="card-title">BTST Trade Log</span></div>
+          <table class="data-table">
+            <thead><tr><th>Symbol</th><th>Held</th><th class="r">P&amp;L</th></tr></thead>
+            <tbody>
+              <tr><td>BANKNIFTY 47500 CE</td><td class="mono">Jun 11→12</td><td class="r mono profit">+&#8377;4,200</td></tr>
+              <tr><td>NIFTY 23400 CE</td><td class="mono">Jun 6→7</td><td class="r mono loss">&#8722;&#8377;1,800</td></tr>
+              <tr><td>BANKNIFTY 47000 PE</td><td class="mono">Jun 4→5</td><td class="r mono profit">+&#8377;3,100</td></tr>
+              <tr><td>NIFTY 23300 PE</td><td class="mono">May 30→31</td><td class="r mono profit">+&#8377;1,640</td></tr>
+              <tr><td>BANKNIFTY 46500 CE</td><td class="mono">May 28→29</td><td class="r mono loss">&#8722;&#8377;2,020</td></tr>
+              <tr><td>NIFTY 23500 CE</td><td class="mono">May 22→23</td><td class="r mono profit">+&#8377;2,800</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <div class="insight-strip">
+        <div style="flex-shrink:0"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--brand)" stroke-width="1.75" stroke-linecap="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg></div>
+        <div class="insight-text"><strong>BTST edge:</strong> Your BTST win rate (75%) significantly outperforms intraday (57%). But overnight exposure averages ₹12,400 capital at risk. Your 2 BTST losses were both on expiry weeks — consider avoiding BTST during expiry.</div>
+      </div>
+    </div>
+
+    <!-- ═══════════════════ % RETURN ═══════════════════ -->
+    <div id="tab-pct" class="tab-panel">
+      <div class="three-col">
+        <div class="kpi"><div class="kpi-lbl">Avg daily return</div><div class="kpi-val profit">+1.47%</div><div class="kpi-sub">On capital deployed</div></div>
+        <div class="kpi"><div class="kpi-lbl">Best day</div><div class="kpi-val profit">+4.8%</div><div class="kpi-sub">Jun 11 · ₹7,200</div></div>
+        <div class="kpi"><div class="kpi-lbl">Worst day</div><div class="kpi-val loss">&#8722;2.1%</div><div class="kpi-sub">Jun 7 · &#8722;&#8377;3,100</div></div>
+      </div>
+
+      <div class="card">
+        <div class="card-hdr"><span class="card-title">Daily % Return — 30 Days</span><span class="card-sub">Based on ₹1,50,000 capital</span></div>
+        <div class="return-grid">
+          <div class="rg-cell"><div class="rg-lbl">May 14</div><div class="rg-bar-wrap"><div class="rg-mid"></div><div class="rg-bar-dn" style="height:28px;background:var(--loss)"></div></div><div class="rg-val loss">&#8722;1.2%</div></div>
+          <div class="rg-cell"><div class="rg-lbl">May 15</div><div class="rg-bar-wrap"><div class="rg-mid"></div><div class="rg-bar-up" style="height:18px;background:var(--profit)"></div></div><div class="rg-val profit">+0.8%</div></div>
+          <div class="rg-cell"><div class="rg-lbl">May 16</div><div class="rg-bar-wrap"><div class="rg-mid"></div><div class="rg-bar-dn" style="height:12px;background:var(--loss)"></div></div><div class="rg-val loss">&#8722;0.5%</div></div>
+          <div class="rg-cell"><div class="rg-lbl">May 17</div><div class="rg-bar-wrap"><div class="rg-mid"></div><div class="rg-bar-up" style="height:40px;background:var(--profit)"></div></div><div class="rg-val profit">+3.2%</div></div>
+          <div class="rg-cell"><div class="rg-lbl">May 18</div><div class="rg-bar-wrap"><div class="rg-mid"></div><div class="rg-bar-up" style="height:24px;background:var(--profit)"></div></div><div class="rg-val profit">+1.4%</div></div>
+          <div class="rg-cell"><div class="rg-lbl">May 22</div><div class="rg-bar-wrap"><div class="rg-mid"></div><div class="rg-bar-dn" style="height:36px;background:var(--loss)"></div></div><div class="rg-val loss">&#8722;2.1%</div></div>
+          <div class="rg-cell"><div class="rg-lbl">May 25</div><div class="rg-bar-wrap"><div class="rg-mid"></div><div class="rg-bar-up" style="height:20px;background:var(--profit)"></div></div><div class="rg-val profit">+1.0%</div></div>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card-hdr"><span class="card-title">Return by Symbol</span></div>
+        <table class="data-table">
+          <thead><tr><th>Symbol</th><th class="r">Trades</th><th class="r">Win Rate</th><th class="r">Net P&amp;L</th><th class="r">Avg Return</th></tr></thead>
+          <tbody>
+            <tr><td style="font-weight:500">BANKNIFTY</td><td class="r mono">102</td><td class="r mono profit">62%</td><td class="r mono profit">+&#8377;14,800</td><td class="r mono profit">+1.82%</td></tr>
+            <tr><td style="font-weight:500">NIFTY</td><td class="r mono">78</td><td class="r mono brand">52%</td><td class="r mono profit">+&#8377;3,440</td><td class="r mono profit">+0.90%</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- ═══════════════════ EDGE MAP ═══════════════════ -->
+    <div id="tab-edge" class="tab-panel">
+      <div class="card">
+        <div class="card-hdr"><span class="card-title">Edge Map — Win Rate × Risk:Reward</span><span class="card-sub">Bubble size = trade count · Colors = symbol</span></div>
+        <div class="edge-plot">
+          <div class="edge-axis-x"></div>
+          <div class="edge-axis-y"></div>
+          <div class="edge-label-x">Avg Risk:Reward →</div>
+          <div class="edge-label-y">↑ Win %</div>
+          <!-- BANKNIFTY clusters (indigo) -->
+          <div class="edge-dot" style="width:28px;height:28px;background:rgba(68,83,201,.7);left:72%;bottom:55%;"></div>
+          <div class="edge-dot" style="width:18px;height:18px;background:rgba(68,83,201,.5);left:60%;bottom:44%;"></div>
+          <div class="edge-dot" style="width:22px;height:22px;background:rgba(68,83,201,.6);left:48%;bottom:36%;"></div>
+          <!-- NIFTY clusters (teal) -->
+          <div class="edge-dot" style="width:22px;height:22px;background:rgba(47,158,104,.7);left:55%;bottom:48%;"></div>
+          <div class="edge-dot" style="width:16px;height:16px;background:rgba(47,158,104,.5);left:40%;bottom:32%;"></div>
+          <!-- loss clusters (red) -->
+          <div class="edge-dot" style="width:20px;height:20px;background:rgba(217,79,67,.65);left:30%;bottom:22%;"></div>
+          <div class="edge-dot" style="width:14px;height:14px;background:rgba(217,79,67,.5);left:22%;bottom:28%;"></div>
+          <!-- labels -->
+          <div style="position:absolute;left:69%;bottom:59%;font-size:9.5px;color:var(--text-tertiary)">BNF morning</div>
+          <div style="position:absolute;left:52%;bottom:52%;font-size:9.5px;color:var(--text-tertiary)">NF pullback</div>
+          <div style="position:absolute;left:26%;bottom:18%;font-size:9.5px;color:var(--loss)">Revenge trades</div>
+          <!-- axes labels -->
+          <div style="position:absolute;left:40px;bottom:4px;font-family:'DM Mono',monospace;font-size:9px;color:var(--text-tertiary)">0.5</div>
+          <div style="position:absolute;left:50%;bottom:4px;font-family:'DM Mono',monospace;font-size:9px;color:var(--text-tertiary)">1.0</div>
+          <div style="position:absolute;left:75%;bottom:4px;font-family:'DM Mono',monospace;font-size:9px;color:var(--text-tertiary)">1.5</div>
+          <div style="position:absolute;left:4px;top:50%;font-family:'DM Mono',monospace;font-size:9px;color:var(--text-tertiary)">50%</div>
+          <div style="position:absolute;left:4px;top:25%;font-family:'DM Mono',monospace;font-size:9px;color:var(--text-tertiary)">70%</div>
+        </div>
+        <div style="display:flex;gap:16px;padding:10px 16px;border-top:1px solid var(--border-subtle)">
+          <div style="display:flex;align-items:center;gap:5px"><div style="width:10px;height:10px;border-radius:50%;background:rgba(68,83,201,.7)"></div><span style="font-size:11px;color:var(--text-tertiary)">BANKNIFTY</span></div>
+          <div style="display:flex;align-items:center;gap:5px"><div style="width:10px;height:10px;border-radius:50%;background:rgba(47,158,104,.7)"></div><span style="font-size:11px;color:var(--text-tertiary)">NIFTY</span></div>
+          <div style="display:flex;align-items:center;gap:5px"><div style="width:10px;height:10px;border-radius:50%;background:rgba(217,79,67,.65)"></div><span style="font-size:11px;color:var(--text-tertiary)">Pattern-tagged losses</span></div>
+        </div>
+      </div>
+      <div class="insight-strip">
+        <div style="flex-shrink:0"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--brand)" stroke-width="1.75" stroke-linecap="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg></div>
+        <div class="insight-text"><strong>Your edge:</strong> BANKNIFTY morning breakout (9:30–10:30) has your best risk:reward ratio at 1.4:1 and 64% win rate. This is where you should concentrate size. Revenge trade cluster sits at 0.6 R:R and 24% win rate — a clear negative-edge zone.</div>
+      </div>
+    </div>
+
+    <!-- ═══════════════════ EXPIRY ═══════════════════ -->
+    <div id="tab-expiry" class="tab-panel">
+      <div class="card">
+        <div class="card-hdr"><span class="card-title">Expiry Day vs Non-Expiry</span></div>
+        <div class="expiry-compare">
+          <div class="ec-col">
+            <div class="ec-label">Expiry Day (Thu)</div>
+            <div class="ec-stat"><span class="ec-key">Trade count</span><span class="ec-val mono">38 trades (21%)</span></div>
+            <div class="ec-stat"><span class="ec-key">Win rate</span><span class="ec-val mono loss">42%</span></div>
+            <div class="ec-stat"><span class="ec-key">Avg P&amp;L / trade</span><span class="ec-val mono loss">&#8722;&#8377;420</span></div>
+            <div class="ec-stat"><span class="ec-key">Net P&amp;L</span><span class="ec-val mono loss">&#8722;&#8377;4,800</span></div>
+            <div class="ec-stat"><span class="ec-key">Avg hold time</span><span class="ec-val mono">14 min</span></div>
+            <div class="ec-stat"><span class="ec-key">Most alerts</span><span class="ec-val mono warn">Revenge (6)</span></div>
+          </div>
+          <div class="ec-col">
+            <div class="ec-label">Non-Expiry Day</div>
+            <div class="ec-stat"><span class="ec-key">Trade count</span><span class="ec-key ec-val mono">142 trades (79%)</span></div>
+            <div class="ec-stat"><span class="ec-key">Win rate</span><span class="ec-val mono profit">63%</span></div>
+            <div class="ec-stat"><span class="ec-key">Avg P&amp;L / trade</span><span class="ec-val mono profit">+&#8377;161</span></div>
+            <div class="ec-stat"><span class="ec-key">Net P&amp;L</span><span class="ec-val mono profit">+&#8377;23,040</span></div>
+            <div class="ec-stat"><span class="ec-key">Avg hold time</span><span class="ec-val mono">34 min</span></div>
+            <div class="ec-stat"><span class="ec-key">Most alerts</span><span class="ec-val mono warn">Overtrade (7)</span></div>
+          </div>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card-hdr"><span class="card-title">Expiry Day Hourly Breakdown</span></div>
+        <div style="padding:14px 16px">
+          <svg width="100%" height="120" viewBox="0 0 560 120" preserveAspectRatio="none" style="display:block">
+            <!-- grid -->
+            <line x1="0" y1="60" x2="560" y2="60" stroke="var(--border-subtle)" stroke-width="1"/>
+            <line x1="0" y1="30" x2="560" y2="30" stroke="var(--border-subtle)" stroke-width="1" stroke-dasharray="3,3"/>
+            <line x1="0" y1="90" x2="560" y2="90" stroke="var(--border-subtle)" stroke-width="1" stroke-dasharray="3,3"/>
+            <!-- bars: loss=red, profit=green, relative to midline 60 -->
+            <rect x="20"  y="65"  width="50" height="28" fill="rgba(217,79,67,.6)" rx="2"/>
+            <rect x="100" y="30"  width="50" height="30" fill="rgba(47,158,104,.6)" rx="2"/>
+            <rect x="180" y="50"  width="50" height="10" fill="rgba(217,79,67,.4)" rx="2"/>
+            <rect x="260" y="42"  width="50" height="18" fill="rgba(47,158,104,.5)" rx="2"/>
+            <rect x="340" y="65"  width="50" height="35" fill="rgba(217,79,67,.7)" rx="2"/>
+            <rect x="420" y="48"  width="50" height="12" fill="rgba(47,158,104,.4)" rx="2"/>
+            <rect x="490" y="62"  width="50" height="18" fill="rgba(217,79,67,.5)" rx="2"/>
+          </svg>
+          <div style="display:flex;justify-content:space-between;margin-top:5px;padding:0 14px">
+            <span style="font-size:10px;color:var(--text-tertiary)">9–10</span>
+            <span style="font-size:10px;color:var(--text-tertiary)">10–11</span>
+            <span style="font-size:10px;color:var(--text-tertiary)">11–12</span>
+            <span style="font-size:10px;color:var(--text-tertiary)">12–1</span>
+            <span style="font-size:10px;color:var(--text-tertiary)">1–2</span>
+            <span style="font-size:10px;color:var(--text-tertiary)">2–3</span>
+            <span style="font-size:10px;color:var(--text-tertiary)">3–3:30</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card-hdr"><span class="card-title">Worst Expiry Day Trades</span></div>
+        <table class="data-table">
+          <thead><tr><th>Date</th><th>Symbol</th><th class="r">P&amp;L</th><th>Pattern</th></tr></thead>
+          <tbody>
+            <tr><td class="mono warn">Jun 7 (Thu)</td><td>BANKNIFTY 45500 PE (100 lots)</td><td class="r mono loss">&#8722;&#8377;4,330</td><td><span class="chip chip-loss" style="font-size:9.5px">Pos. Size</span></td></tr>
+            <tr><td class="mono warn">May 29 (Thu)</td><td>BANKNIFTY 46500 CE</td><td class="r mono loss">&#8722;&#8377;2,800</td><td><span class="chip chip-warn" style="font-size:9.5px">Revenge</span></td></tr>
+            <tr><td class="mono warn">May 22 (Thu)</td><td>NIFTY 23000 PE</td><td class="r mono loss">&#8722;&#8377;1,900</td><td><span class="chip chip-warn" style="font-size:9.5px">FOMO</span></td></tr>
+          </tbody>
+        </table>
+      </div>
+      <div class="insight-strip">
+        <div style="flex-shrink:0"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--brand)" stroke-width="1.75" stroke-linecap="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg></div>
+        <div class="insight-text"><strong>Expiry insight:</strong> Your non-expiry days are <strong class="profit">63% win rate</strong>. Your expiry days are <strong class="loss">42%</strong>. Thursday is your most expensive trading day. Consider reducing trade count or sitting out first and last hour on expiry Thursdays.</div>
+      </div>
+    </div>
+
+    <!-- ═══════════════════ JOURNAL ═══════════════════ -->
+    <div id="tab-journal" class="tab-panel">
+      <div class="card">
+        <div class="card-hdr"><span class="card-title">Emotion → Avg P&amp;L</span><span class="card-sub">Based on 47 journal entries · 30 days</span></div>
+        <div style="padding:14px 16px">
+          <div class="emo-bar-row">
+            <span class="emo-name">Calm</span>
+            <div class="emo-track"><div class="emo-zero"></div><div class="emo-fill emo-right" style="width:62%"></div></div>
+            <span class="emo-val profit">+&#8377;2,840</span>
+            <span class="emo-count">9 entries</span>
+          </div>
+          <div class="emo-bar-row">
+            <span class="emo-name">Confident</span>
+            <div class="emo-track"><div class="emo-zero"></div><div class="emo-fill emo-right" style="width:48%"></div></div>
+            <span class="emo-val profit">+&#8377;1,620</span>
+            <span class="emo-count">7 entries</span>
+          </div>
+          <div class="emo-bar-row">
+            <span class="emo-name">Excited</span>
+            <div class="emo-track"><div class="emo-zero"></div><div class="emo-fill emo-right" style="width:18%"></div></div>
+            <span class="emo-val profit">+&#8377;340</span>
+            <span class="emo-count">5 entries</span>
+          </div>
+          <div class="emo-bar-row">
+            <span class="emo-name">Neutral</span>
+            <div class="emo-track"><div class="emo-zero"></div><div class="emo-fill emo-right" style="width:8%"></div></div>
+            <span class="emo-val profit">+&#8377;120</span>
+            <span class="emo-count">4 entries</span>
+          </div>
+          <div class="emo-bar-row">
+            <span class="emo-name">Anxious</span>
+            <div class="emo-track"><div class="emo-zero"></div><div class="emo-fill emo-left" style="width:24%"></div></div>
+            <span class="emo-val loss">&#8722;&#8377;320</span>
+            <span class="emo-count">18 entries</span>
+          </div>
+          <div class="emo-bar-row">
+            <span class="emo-name">Frustrated</span>
+            <div class="emo-track"><div class="emo-zero"></div><div class="emo-fill emo-left" style="width:44%"></div></div>
+            <span class="emo-val loss">&#8722;&#8377;1,480</span>
+            <span class="emo-count">12 entries</span>
+          </div>
+          <div class="emo-bar-row">
+            <span class="emo-name">Greedy</span>
+            <div class="emo-track"><div class="emo-zero"></div><div class="emo-fill emo-left" style="width:68%"></div></div>
+            <span class="emo-val loss">&#8722;&#8377;2,100</span>
+            <span class="emo-count">6 entries</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="two-col">
+        <div class="card">
+          <div class="card-hdr"><span class="card-title">Plan Adherence Impact</span></div>
+          <table class="data-table">
+            <thead><tr><th>Plan Followed?</th><th class="r">Trades</th><th class="r">Win Rate</th><th class="r">Avg P&amp;L</th></tr></thead>
+            <tbody>
+              <tr><td><span class="chip chip-ok">Yes</span></td><td class="r mono">29</td><td class="r mono profit">68%</td><td class="r mono profit">+&#8377;1,840</td></tr>
+              <tr><td><span class="chip chip-loss">No</span></td><td class="r mono">18</td><td class="r mono loss">39%</td><td class="r mono loss">&#8722;&#8377;960</td></tr>
+            </tbody>
+          </table>
+        </div>
+        <div class="card">
+          <div class="card-hdr"><span class="card-title">Top Emotion Combos</span></div>
+          <table class="data-table">
+            <thead><tr><th>Emotions</th><th class="r">Avg P&amp;L</th></tr></thead>
+            <tbody>
+              <tr><td>Calm + Confident</td><td class="r mono profit">+&#8377;3,200</td></tr>
+              <tr><td>Calm only</td><td class="r mono profit">+&#8377;2,840</td></tr>
+              <tr><td>Anxious + Frustrated</td><td class="r mono loss">&#8722;&#8377;2,400</td></tr>
+              <tr><td>Greedy + Excited</td><td class="r mono loss">&#8722;&#8377;1,800</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <div class="insight-strip">
+        <div style="flex-shrink:0"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--brand)" stroke-width="1.75" stroke-linecap="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg></div>
+        <div class="insight-text"><strong>Emotion insight:</strong> You tag "Anxious" on 38% of trades — your highest frequency emotion. Average P&amp;L when anxious: <strong class="loss">&#8722;&#8377;320</strong>. When calm: <strong class="profit">+&#8377;2,840</strong>. That's a &#8377;3,160 difference per trade based solely on emotional state. Consider a 2-minute pause before entering any trade when you feel anxious.</div>
+      </div>
+    </div>
+
+  </div><!-- /main-content -->
 </div>
 
 <script>
-  function toggleTheme() {
-    const html = document.documentElement;
-    const next = html.getAttribute('data-theme') === 'dark' ? 'light' : 'dark';
-    html.setAttribute('data-theme', next);
-    localStorage.setItem('tm-theme', next);
-    updateThemeIcon(next);
-  }
-  function updateThemeIcon(theme) {
-    document.getElementById('icon-sun').style.display  = theme === 'light' ? 'block' : 'none';
-    document.getElementById('icon-moon').style.display = theme === 'dark'  ? 'block' : 'none';
-  }
-  const saved = localStorage.getItem('tm-theme') || 'dark';
-  document.documentElement.setAttribute('data-theme', saved);
-  updateThemeIcon(saved);
+function toggleTheme(){const h=document.documentElement;h.setAttribute('data-theme',h.getAttribute('data-theme')==='dark'?'light':'dark');localStorage.setItem('tm-theme',h.getAttribute('data-theme'))}
+(function(){const t=localStorage.getItem('tm-theme');if(t)document.documentElement.setAttribute('data-theme',t)})();
 
-  function setPeriod(btn, period) {
-    document.querySelectorAll('.period-btn').forEach(b => b.classList.remove('active'));
-    btn.classList.add('active');
-  }
-
-  const TAB_IDS = ['summary','patterns','trades','btst','pct','edge','expiry','journal'];
-  function setTab(btn, id) {
-    document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
-    btn.classList.add('active');
-    TAB_IDS.forEach(k => {
-      const el = document.getElementById('tab-' + k);
-      if (el) el.classList.toggle('active', k === id);
-    });
-  }
+function switchTab(id,el){
+  document.querySelectorAll('.tab-item').forEach(t=>t.classList.remove('active'));
+  el.classList.add('active');
+  document.querySelectorAll('.tab-panel').forEach(p=>p.classList.remove('active'));
+  document.getElementById('tab-'+id).classList.add('active');
+}
 </script>
 </body>
 </html>

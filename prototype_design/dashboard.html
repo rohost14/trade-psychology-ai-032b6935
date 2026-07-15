@@ -331,7 +331,7 @@
               </svg>
               Behavioral Alerts
             </h2>
-            <span class="px-2.5 py-0.5 bg-[#FF3B30]/10 text-[#FF3B30] text-[10px] font-bold rounded-full">2 Active Issues</span>
+            <span class="px-2.5 py-0.5 bg-[#FF3B30]/10 text-[#FF3B30] text-[10px] font-bold rounded-full">5 Active Issues</span>
           </div>
 
           <!-- Alert 1 -->
@@ -354,16 +354,63 @@
           <div class="alert-card severity-med flex flex-col gap-2">
             <div class="flex items-start justify-between gap-2">
               <div>
-                <h4 class="text-xs font-bold text-slate-800">Volume Surge Warning</h4>
-                <p class="text-[10px] text-slate-400 font-mono mt-0.5">42m ago · Size Boundary</p>
+                <h4 class="text-xs font-bold text-slate-800">Position Size Escalation — BANKNIFTY 45500 PE</h4>
+                <p class="text-[10px] text-slate-400 font-mono mt-0.5">32m ago · 100 lots entered · 4× avg size</p>
               </div>
               <span class="px-1.5 py-0.5 bg-[#FF9500]/10 text-[#FF9500] text-[9px] font-bold rounded uppercase">Medium Risk</span>
             </div>
-            <p class="text-[11px] sm:text-xs text-slate-600 leading-relaxed">Position sizing on your last 2 trades exceeds daily psychological boundary by 15.4%.</p>
+            <p class="text-[11px] sm:text-xs text-slate-600 leading-relaxed">You entered <strong>100 lots immediately after a ₹2,600 loss</strong> — 4× your average position size. Post-loss oversized entries: <span class="text-[#FF3B30] font-bold">28% win rate</span> vs your normal 60%. You're trying to recover in one trade.</p>
+            <p class="text-[10px] font-mono text-[#FF3B30]">Open risk: ₹4,800 · 30d cost pattern: ₹3,100</p>
             <div class="flex items-center gap-2 mt-1">
               <a href="alerts.html" class="px-3 py-1.5 bg-[#FF9500]/10 hover:bg-[#FF9500]/20 text-[#FF9500] text-[11px] font-bold rounded-lg transition-all active:scale-[0.97] flex-1 text-center">Acknowledge Rules</a>
+              <button onclick="dismissAlert(this)" class="px-3 py-1.5 bg-white hover:bg-slate-50 text-slate-500 border border-black/5 text-[11px] font-bold rounded-lg transition-all active:scale-[0.97] flex-1 text-center">Dismiss</button>
             </div>
           </div>
+
+          <!-- Alert 3 -->
+          <div class="alert-card severity-med flex flex-col gap-2">
+            <div class="flex items-start justify-between gap-2">
+              <div>
+                <h4 class="text-xs font-bold text-slate-800">Trade Count Warning — 6 of 7</h4>
+                <p class="text-[10px] text-slate-400 font-mono mt-0.5">18m ago · Overtrading pattern · 3× this week</p>
+              </div>
+              <span class="px-1.5 py-0.5 bg-[#FF9500]/10 text-[#FF9500] text-[9px] font-bold rounded uppercase">Medium Risk</span>
+            </div>
+            <p class="text-[11px] sm:text-xs text-slate-600 leading-relaxed">You've used <strong>6 of your 7 daily trade limit</strong>. Your win rate on trade #7+: <span class="text-[#FF9500] font-bold">31%</span> vs 58% baseline. Your last 10 extra trades have an aggregate P&L of <span class="text-[#FF3B30] font-bold">₹−4,200</span>. Your edge erodes past this point.</p>
+            <div class="flex items-center gap-2 mt-1">
+              <button onclick="dismissAlert(this)" class="px-3 py-1.5 bg-white hover:bg-slate-50 text-slate-500 border border-black/5 text-[11px] font-bold rounded-lg transition-all active:scale-[0.97] flex-1 text-center">Acknowledge</button>
+            </div>
+          </div>
+
+          <!-- Alert 4 -->
+          <div class="alert-card severity-med flex flex-col gap-2">
+            <div class="flex items-start justify-between gap-2">
+              <div>
+                <h4 class="text-xs font-bold text-slate-800">Early Exit — Left Profits on Table</h4>
+                <p class="text-[10px] text-slate-400 font-mono mt-0.5">1h 22m ago · NIFTY CE · 6× this month</p>
+              </div>
+              <span class="px-1.5 py-0.5 bg-[#FF9500]/10 text-[#FF9500] text-[9px] font-bold rounded uppercase">Medium Risk</span>
+            </div>
+            <p class="text-[11px] sm:text-xs text-slate-600 leading-relaxed">You exited NIFTY CE after 8 min at <span class="text-[#34C759] font-bold">+₹820</span>. Price continued to <span class="text-[#34C759] font-bold">+₹2,100</span> in next 20 min. You exit profitable trades <strong>42% too early on average</strong>. Opportunity cost this instance: <span class="text-[#FF3B30] font-bold">₹1,280</span>.</p>
+            <p class="text-[10px] font-mono text-[#FF3B30]">30-day early exit opportunity cost: ₹7,680</p>
+            <div class="flex items-center gap-2 mt-1">
+              <a href="journal.html" class="px-3 py-1.5 bg-[#0071E3]/10 hover:bg-[#0071E3]/20 text-[#0071E3] text-[11px] font-bold rounded-lg transition-all active:scale-[0.97] flex-1 text-center">Add Journal Note</a>
+              <button onclick="dismissAlert(this)" class="px-3 py-1.5 bg-white hover:bg-slate-50 text-slate-500 border border-black/5 text-[11px] font-bold rounded-lg transition-all active:scale-[0.97] flex-1 text-center">Dismiss</button>
+            </div>
+          </div>
+
+          <!-- Alert 5 — acknowledged/low -->
+          <div class="alert-card severity-low flex flex-col gap-2" style="opacity:0.6">
+            <div class="flex items-start justify-between gap-2">
+              <div>
+                <h4 class="text-xs font-bold text-slate-800">Opening 5-Min Trap — Avoided ✓</h4>
+                <p class="text-[10px] text-slate-400 font-mono mt-0.5">4h 50m ago · BANKNIFTY CE · Acknowledged</p>
+              </div>
+              <span class="px-1.5 py-0.5 bg-[#34C759]/10 text-[#34C759] text-[9px] font-bold rounded uppercase">Heeded</span>
+            </div>
+            <p class="text-[11px] sm:text-xs text-slate-600 leading-relaxed">Entry at 9:20 AM — first 5 minutes. Opening trap win rate: 41%. You acknowledged and exited quickly with +₹820. Good discipline.</p>
+          </div>
+
         </div>
 
         <!-- PANEL 3: Analytics Rail (Full Row Width on desktop, controls Shield & KPIs) -->
@@ -400,7 +447,7 @@
                   </div>
                   <div>
                     <p class="text-xs font-bold text-slate-700">Defensive Rating</p>
-                    <p class="text-[11px] text-slate-400 font-medium">Alerts heeded: 2 of 5 total</p>
+                    <p class="text-[11px] text-slate-400 font-medium">Alerts heeded: 1 of 5 today · 83% (30d)</p>
                   </div>
                 </div>
               </div>

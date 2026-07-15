@@ -13,6 +13,9 @@ import {
 } from 'lucide-react';
 import { useBroker } from '@/contexts/BrokerContext';
 import { useTheme } from '@/components/ThemeProvider';
+import LiveHeroTerminal from '@/components/LiveHeroTerminal';
+import LossSpiralSimulator from '@/components/LossSpiralSimulator';
+import { FeatureStory, AlertFeedMock, ShieldMock, CoachMock, type Story } from '@/components/FeatureStory';
 
 const FONT_URL =
   'https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap';
@@ -326,72 +329,119 @@ export default function Welcome() {
   const mono = 'JetBrains Mono,monospace';
   const sans = 'Plus Jakarta Sans,sans-serif';
 
+  const alertStory: Story = {
+    eyebrow: "Behavioral safety net",
+    title: "Real-time alerts that interrupt the spiral",
+    body: "TradeMentor runs quiet in the background, matching your live executions against your historical blind spots. When it detects a pattern, it doesn't just display a warning — it interrupts the loop.",
+    bullets: [
+      "Revenge trading alerts within seconds of a stop-out",
+      "Overtrading notifications when pace exceeds limits",
+      "Adding-to-a-loser flags based on behavioral data",
+      "Circuit breaker prompts suggesting a cooldown period"
+    ],
+    visual: <AlertFeedMock />
+  };
+
+  const shieldStory: Story = {
+    eyebrow: "Accountability Loop",
+    title: "A circuit breaker that actually stops you",
+    body: "If you blow past your stop loss and keep click-trading, TradeMentor enforces a cooldown. It can automatically trigger a circuit breaker and dispatch an accountability alert to your partner.",
+    bullets: [
+      "Opt-in circuit breaker to lock terminal access",
+      "WhatsApp dispatch to your accountability partner",
+      "Threshold calculations based on your risk tolerance",
+      "Proven pattern disruption to stop cascade losses"
+    ],
+    reverse: true,
+    visual: <ShieldMock />
+  };
+
+  const coachStory: Story = {
+    eyebrow: "Behavioral Analytics",
+    title: "An AI Coach that knows your history",
+    body: "Why did you make that trade? Ask your AI Psychology Coach. It cross-references your live trade logs with your history to point out structural patterns, not generic advice.",
+    bullets: [
+      "Win rate and profitability stats by day and time",
+      "Personalized danger-zone profiling from historical logs",
+      "Conversational prompts to explore trading emotions",
+      "Streak tracking and pattern commitments"
+    ],
+    visual: <CoachMock />
+  };
+
   return (
     <div style={{ background: c.bg, color: c.text, fontFamily: sans, minHeight: '100vh' }}>
       <Navbar c={c} isDark={isDark} onToggleTheme={toggleTheme} consent={consent} onConnect={handleConnect} onGuest={handleGuest} scrolled={scrolled} />
 
       {/* ── HERO ─────────────────────────────────────────────────────────── */}
-      <section style={{ ...section(c.bg), paddingTop: 'clamp(6rem,12vw,9rem)' }}>
-        <div style={{ ...wrap, display: 'grid', gridTemplateColumns: 'minmax(0,1.05fr) minmax(0,0.95fr)', gap: 'clamp(2rem,5vw,4rem)', alignItems: 'center' }}>
-
-          {/* Left */}
-          <div>
-            <div className="wm-u0">
-              <SectionLabel c={c}>LIVE · ZERODHA F&amp;O INTEGRATION</SectionLabel>
+      <section className="relative overflow-hidden border-b border-border/60 bg-background min-h-[calc(100dvh-70px)] flex items-center">
+        {/* Subtle radial glows */}
+        <div className="absolute right-[5%] top-1/2 -translate-y-1/2 w-[600px] h-[600px] bg-[radial-gradient(circle_at_center,rgba(59,130,246,0.04)_0%,transparent_70%)] pointer-events-none z-0"></div>
+        <div className="absolute left-[-10%] top-[-10%] w-[500px] h-[500px] bg-[radial-gradient(circle_at_center,rgba(239,68,68,0.02)_0%,transparent_70%)] pointer-events-none z-0"></div>
+        
+        <div className="max-w-[1180px] mx-auto px-6 grid lg:grid-cols-[2fr_3fr] gap-12 lg:gap-14 items-center w-full relative z-10">
+          {/* Left side: Headline, Subheadline, CTAs */}
+          <div className="flex flex-col gap-6 lg:gap-8 justify-center py-12 lg:py-20 z-10">
+            {/* Eyebrow Pill */}
+            <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full border border-border bg-background/60 backdrop-blur-sm self-start">
+              <span className="h-1.5 w-1.5 rounded-full bg-loss animate-pulse" />
+              <span className="text-[12px] font-medium text-muted-foreground tracking-tight">
+                ₹46,000 leaked per trader this year. Mostly to themselves.
+              </span>
             </div>
-            <h1 className="wm-u1" style={{ fontFamily: sans, fontWeight: 800, fontSize: 'clamp(2rem,4.5vw,3.25rem)', lineHeight: 1.1, letterSpacing: '-0.03em', color: c.text, margin: '0 0 1.25rem' }}>
-              Stop repeating{' '}
-              <span style={{ color: c.primary }}>expensive</span>{' '}
-              trading mistakes.
+
+            {/* Headline */}
+            <h1 className="font-display text-[40px] sm:text-[52px] lg:text-[62px] leading-[1.05] font-semibold text-foreground tracking-tight">
+              You don't have a<br />
+              <span className="text-loss">strategy</span> problem.<br />
+              You have a <span className="underline decoration-loss decoration-[3px] underline-offset-[6px]">7-second</span> problem.
             </h1>
-            <p className="wm-u2" style={{ fontFamily: sans, fontSize: 'clamp(0.9375rem,1.2vw,1.0625rem)', color: c.sub, lineHeight: 1.75, margin: '0 0 2rem', maxWidth: 480 }}>
-              TradeMentor watches your Zerodha trades in real-time and alerts you the moment
-              you're revenge trading, overtrading, or heading toward a blowup — before the damage compounds.
+
+            {/* Subheadline */}
+            <p className="text-[16px] lg:text-[18px] leading-[1.6] text-muted-foreground max-w-[540px]">
+              The seven seconds between getting stopped out and clicking buy again. That's where the month dies — not in your chart setup. TradeMentor sits in those seven seconds and refuses to let you punch yourself in the face.
             </p>
 
-            {/* Consent */}
-            <label className="wm-u3" style={{ display: 'flex', alignItems: 'flex-start', gap: 10, cursor: 'pointer', marginBottom: '1.5rem' }}>
-              <div onClick={() => setConsent(v => !v)} style={{ width: 18, height: 18, borderRadius: 4, border: `2px solid ${consent ? c.primary : c.border2}`, background: consent ? c.primary : 'transparent', flexShrink: 0, marginTop: 2, display: 'flex', alignItems: 'center', justifyContent: 'center', transition: 'all 0.15s', cursor: 'pointer' }}>
-                {consent && <Check size={11} color="#fff" strokeWidth={3} />}
+            {/* Consent checkbox */}
+            <label className="flex items-start gap-3 cursor-pointer">
+              <div onClick={() => setConsent(v => !v)} className={`h-4 w-4 rounded border flex items-center justify-center transition-all mt-0.5 shrink-0 cursor-pointer ${consent ? "bg-primary border-primary text-white" : "border-border bg-card"}`}>
+                {consent && <Check className="h-3 w-3 stroke-[3]" />}
               </div>
-              <span style={{ fontFamily: sans, fontSize: '0.8125rem', color: c.dim, lineHeight: 1.55 }}>
-                I've read the{' '}
-                <Link to="/terms" style={{ color: c.sub, textDecoration: 'underline', textUnderlineOffset: 2 }}>Terms</Link>
-                {' '}and{' '}
-                <Link to="/privacy" style={{ color: c.sub, textDecoration: 'underline', textUnderlineOffset: 2 }}>Privacy Policy</Link>.
-                TradeMentor is a behavioral tool, not investment advice (SEBI IA Reg. 2013).
+              <span className="text-[12px] text-muted-foreground leading-normal">
+                I've read the <Link to="/terms" className="underline hover:text-foreground">Terms</Link> and <Link to="/privacy" className="underline hover:text-foreground">Privacy Policy</Link>. TradeMentor is a behavioral co-pilot, not investment advice.
               </span>
             </label>
 
             {/* CTAs */}
-            <div className="wm-u4" style={{ display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
-              <button onClick={consent ? handleConnect : undefined} disabled={!consent}
-                style={{ display: 'flex', alignItems: 'center', gap: 7, background: consent ? c.primary : c.border2, color: '#fff', border: 'none', cursor: consent ? 'pointer' : 'not-allowed', fontFamily: sans, fontWeight: 700, fontSize: '0.9375rem', padding: '12px 22px', borderRadius: 9, transition: 'opacity 0.15s, transform 0.15s', boxShadow: consent ? `0 4px 16px ${c.primary}40` : 'none', opacity: consent ? 1 : 0.55 }}
-                onMouseEnter={e => { if (consent) { e.currentTarget.style.opacity = '0.9'; e.currentTarget.style.transform = 'translateY(-1px)'; } }}
-                onMouseLeave={e => { e.currentTarget.style.opacity = '1'; e.currentTarget.style.transform = 'translateY(0)'; }}>
-                Connect Zerodha <ArrowRight size={15} />
+            <div className="flex flex-wrap items-center gap-3">
+              <button
+                onClick={consent ? handleConnect : undefined}
+                disabled={!consent}
+                className={`inline-flex items-center justify-center h-12 px-6 rounded-2xl text-[14px] font-semibold gap-2 transition-all ${consent ? "bg-primary text-primary-foreground shadow-lg hover:opacity-90 cursor-pointer" : "bg-muted text-muted-foreground cursor-not-allowed opacity-50"}`}
+              >
+                Connect Zerodha <ArrowRight className="h-4 w-4" />
               </button>
-              <button onClick={handleGuest}
-                style={{ background: 'transparent', border: `1px solid ${c.border2}`, cursor: 'pointer', fontFamily: sans, fontWeight: 600, fontSize: '0.9375rem', color: c.sub, padding: '11px 20px', borderRadius: 9, transition: 'all 0.15s' }}
-                onMouseEnter={e => { e.currentTarget.style.borderColor = c.primary; e.currentTarget.style.color = c.primary; }}
-                onMouseLeave={e => { e.currentTarget.style.borderColor = c.border2; e.currentTarget.style.color = c.sub; }}>
-                Try demo →
+              <button
+                onClick={handleGuest}
+                className="inline-flex items-center justify-center h-12 px-6 rounded-2xl text-[14px] font-semibold border border-border bg-card hover:bg-muted/50 text-foreground transition-all cursor-pointer"
+              >
+                Try demo first
               </button>
             </div>
 
             {/* Trust pills */}
-            <div style={{ display: 'flex', alignItems: 'center', gap: 16, marginTop: '1.5rem', flexWrap: 'wrap' }}>
-              {[['No credentials stored', Lock], ['Read-only access', Eye], ['Free to start', Zap]] .map(([label, Icon]: [string, React.ElementType]) => (
-                <span key={label} style={{ display: 'flex', alignItems: 'center', gap: 5, fontFamily: sans, fontSize: '0.75rem', color: c.dim }}>
-                  <Icon size={12} /> {label}
+            <div className="flex items-center gap-4 flex-wrap">
+              {[['No credentials stored', Lock], ['Read-only access', Eye], ['Free to start', Zap]].map(([label, Icon]: any) => (
+                <span key={label} className="flex items-center gap-1.5 text-[12px] text-muted-foreground">
+                  <Icon className="h-3.5 w-3.5" /> {label}
                 </span>
               ))}
             </div>
           </div>
 
-          {/* Right: product card */}
-          <div className="wm-r0" style={{ display: 'flex', justifyContent: 'center' }}>
-            <ProductCard c={c} />
+          {/* Right side: LiveHeroTerminal */}
+          <div className="w-full relative z-10 lg:pl-4">
+            <LiveHeroTerminal />
           </div>
         </div>
       </section>
@@ -412,56 +462,13 @@ export default function Welcome() {
         </div>
       </div>
 
-      {/* ── HOW IT WORKS ─────────────────────────────────────────────────── */}
-      <section style={section(c.bg)} id="how">
-        <div style={wrap}>
-          <div style={{ textAlign: 'center', marginBottom: '3rem' }}>
-            <SectionLabel c={c}>HOW IT WORKS</SectionLabel>
-            <h2 style={{ fontFamily: sans, fontWeight: 800, fontSize: 'clamp(1.625rem,3vw,2.25rem)', color: c.text, letterSpacing: '-0.025em', margin: '0 0 0.75rem' }}>
-              Up and running in 3 steps.
-            </h2>
-            <p style={{ fontFamily: sans, fontSize: '1rem', color: c.sub, margin: 0 }}>No complex setup. No data entry. Just connect and start seeing yourself clearly.</p>
-          </div>
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(260px,1fr))', gap: 24 }}>
-            {STEPS.map(({ n, title, desc }) => (
-              <div key={n} className="wm-hover" style={{ background: c.card, border: `1px solid ${c.border}`, borderRadius: 12, padding: '1.75rem', boxShadow: c.shadow }}>
-                <div style={{ width: 36, height: 36, borderRadius: 10, background: c.primaryBg, border: `1px solid ${c.primaryBdr}`, display: 'flex', alignItems: 'center', justifyContent: 'center', fontFamily: mono, fontWeight: 600, fontSize: '0.875rem', color: c.primary, marginBottom: '1.125rem' }}>{n}</div>
-                <h3 style={{ fontFamily: sans, fontWeight: 700, fontSize: '1rem', color: c.text, margin: '0 0 0.5rem' }}>{title}</h3>
-                <p style={{ fontFamily: sans, fontSize: '0.875rem', color: c.sub, lineHeight: 1.65, margin: 0 }}>{desc}</p>
-              </div>
-            ))}
-          </div>
-        </div>
-      </section>
+      {/* ── LOSS SPIRAL SIMULATOR ────────────────────────────────────────── */}
+      <LossSpiralSimulator id="how" />
 
-      <Divider c={c} />
-
-      {/* ── FEATURES ─────────────────────────────────────────────────────── */}
-      <section style={section(c.bg2)} id="features">
-        <div style={wrap}>
-          <div style={{ textAlign: 'center', marginBottom: '3rem' }}>
-            <SectionLabel c={c}>FEATURES</SectionLabel>
-            <h2 style={{ fontFamily: sans, fontWeight: 800, fontSize: 'clamp(1.625rem,3vw,2.25rem)', color: c.text, letterSpacing: '-0.025em', margin: '0 0 0.75rem' }}>
-              Everything built for Indian F&O traders.
-            </h2>
-          </div>
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(300px,1fr))', gap: 16 }}>
-            {FEATURES.map(({ icon: Icon, title, desc, accent }) => {
-              const col = accent === 'primary' ? c.primary : (c as any)[accent];
-              const bg  = accent === 'primary' ? c.primaryBg : (c as any)[`${accent}Bg`];
-              return (
-                <div key={title} className="wm-hover" style={{ background: c.card, border: `1px solid ${c.border}`, borderRadius: 12, padding: '1.5rem', boxShadow: c.shadow }}>
-                  <div style={{ width: 38, height: 38, borderRadius: 10, background: bg, display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: '1rem' }}>
-                    <Icon size={17} color={col} />
-                  </div>
-                  <h3 style={{ fontFamily: sans, fontWeight: 700, fontSize: '0.9375rem', color: c.text, margin: '0 0 0.5rem' }}>{title}</h3>
-                  <p style={{ fontFamily: sans, fontSize: '0.84375rem', color: c.sub, lineHeight: 1.65, margin: 0 }}>{desc}</p>
-                </div>
-              );
-            })}
-          </div>
-        </div>
-      </section>
+      {/* ── FEATURE STORIES ──────────────────────────────────────────────── */}
+      <FeatureStory story={alertStory} id="features" />
+      <FeatureStory story={shieldStory} />
+      <FeatureStory story={coachStory} />
 
       <Divider c={c} />
 

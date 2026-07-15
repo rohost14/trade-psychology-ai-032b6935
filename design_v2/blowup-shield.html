@@ -1,529 +1,294 @@
 <!DOCTYPE html>
-<html lang="en" data-theme="dark">
+<html lang="en" data-theme="light">
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Blowup Shield — TradeMentor AI</title>
-  <link rel="stylesheet" href="base.css" />
-  <style>
-    /* ── BLOWUP SHIELD SPECIFIC ──────────────────────────────────── */
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1.0">
+<title>Blowup Shield — TradeMentor</title>
+<link rel="stylesheet" href="base.css">
+<style>
+.app-shell{display:flex;min-height:100vh}
+.sidebar{width:220px;flex-shrink:0;background:var(--bg-card);border-right:1px solid var(--border-subtle);display:flex;flex-direction:column;position:fixed;top:0;left:0;bottom:0;z-index:50}
+.main-content{margin-left:220px;flex:1;display:flex;flex-direction:column;min-height:100vh}
+.sb-logo{display:flex;align-items:center;gap:10px;padding:18px 16px 14px;border-bottom:1px solid var(--border-subtle)}
+.sb-logomark{width:26px;height:26px;border-radius:6px;background:var(--brand);display:flex;align-items:center;justify-content:center;flex-shrink:0}
+.sb-logomark svg{width:13px;height:13px;stroke:#fff;fill:none;stroke-width:2.2;stroke-linecap:round;stroke-linejoin:round}
+.sb-wordmark{font-family:'Geist',sans-serif;font-size:13.5px;font-weight:600;letter-spacing:-.02em;color:var(--text-primary)}
+.sb-wordmark em{font-style:normal;color:var(--brand)}
+.sb-nav{padding:8px;flex:1;display:flex;flex-direction:column;gap:1px;overflow-y:auto}
+.sb-section{font-size:9.5px;font-weight:600;letter-spacing:.09em;text-transform:uppercase;color:var(--text-tertiary);padding:10px 10px 4px;margin-top:4px}
+.sb-item{display:flex;align-items:center;gap:9px;padding:8px 10px;border-radius:7px;border:1px solid transparent;font-size:13px;font-weight:500;color:var(--text-secondary);transition:all .1s;position:relative}
+.sb-item:hover{background:var(--bg-hover);color:var(--text-primary)}
+.sb-item.active{background:var(--brand-bg);color:var(--brand);border-color:var(--brand-border)}
+.sb-item.active::before{content:'';position:absolute;left:-1px;top:7px;bottom:7px;width:2px;border-radius:99px;background:var(--brand)}
+.sb-item svg{width:15px;height:15px;fill:none;stroke:currentColor;stroke-width:1.75;stroke-linecap:round;stroke-linejoin:round;flex-shrink:0}
+.sb-badge{margin-left:auto;background:var(--loss);color:#fff;font-size:10px;font-weight:600;min-width:17px;height:17px;border-radius:99px;display:flex;align-items:center;justify-content:center;padding:0 4px}
+.sb-foot{padding:12px 8px;border-top:1px solid var(--border-subtle);display:flex;align-items:center;gap:9px}
+.sb-avatar{width:28px;height:28px;border-radius:50%;background:var(--brand-bg);border:1px solid var(--brand-border);display:flex;align-items:center;justify-content:center;font-family:'DM Mono',monospace;font-size:10px;font-weight:600;color:var(--brand);flex-shrink:0}
+.sb-uname{font-size:12px;font-weight:500;color:var(--text-primary);line-height:1.2}
+.sb-usub{font-size:10.5px;color:var(--text-tertiary)}
 
-    /* Hero gauge area */
-    .shield-hero {
-      display: grid;
-      grid-template-columns: auto 1fr;
-      gap: 32px;
-      align-items: center;
-      padding: 24px;
-    }
+.top-bar{height:48px;padding:0 22px;border-bottom:1px solid var(--border-subtle);background:var(--bg-card);display:flex;align-items:center;justify-content:space-between;position:sticky;top:0;z-index:40;flex-shrink:0}
+.top-l{display:flex;align-items:center;gap:12px}
+.top-title{font-family:'Geist',sans-serif;font-size:13.5px;font-weight:600;color:var(--text-primary)}
+.top-r{display:flex;align-items:center;gap:6px}
+.icon-btn{width:32px;height:32px;border-radius:7px;border:1px solid var(--border-subtle);background:transparent;display:flex;align-items:center;justify-content:center;color:var(--text-secondary);cursor:pointer}
+.icon-btn svg{width:15px;height:15px;fill:none;stroke:currentColor;stroke-width:1.75;stroke-linecap:round;stroke-linejoin:round}
+.i-sun,.i-moon{display:none}
+[data-theme="light"] .i-sun{display:block}
+[data-theme="dark"] .i-moon{display:block}
 
-    /* SVG ring gauge */
-    .gauge-wrap { position: relative; width: 140px; height: 140px; flex-shrink: 0; }
-    .gauge-svg  { width: 140px; height: 140px; transform: rotate(-90deg); }
-    .gauge-track { fill: none; stroke: var(--border-subtle); stroke-width: 10; }
-    .gauge-fill  { fill: none; stroke-width: 10; stroke-linecap: round; transition: stroke-dashoffset 0.6s ease; }
-    .gauge-fill.safe    { stroke: #22C55E; }
-    .gauge-fill.caution { stroke: #F59E0B; }
-    .gauge-fill.danger  { stroke: #EF4444; }
-    .gauge-center {
-      position: absolute;
-      inset: 0;
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      justify-content: center;
-      text-align: center;
-    }
-    .gauge-pct { font-family: 'DM Mono', monospace; font-size: 26px; font-weight: 500; line-height: 1; }
-    .gauge-sub { font-size: 10px; color: var(--text-tertiary); margin-top: 3px; letter-spacing: 0.04em; }
+.page{padding:16px 22px 20px;flex:1;display:flex;flex-direction:column;gap:14px}
+.card{background:var(--bg-card);border:1px solid var(--border-subtle);border-radius:10px;box-shadow:var(--shadow-card)}
+.card-hdr{padding:11px 16px;border-bottom:1px solid var(--border-subtle);display:flex;align-items:center;justify-content:space-between;gap:8px}
+.card-title{font-family:'Geist',sans-serif;font-size:13px;font-weight:600;color:var(--text-primary)}
 
-    /* Shield hero right side */
-    .shield-hero-stats { display: flex; flex-direction: column; gap: 6px; }
-    .shield-hero-label { font-size: 10px; font-weight: 500; letter-spacing: 0.07em; text-transform: uppercase; color: var(--text-tertiary); margin-bottom: 4px; }
-    .shield-hero-title { font-size: 22px; font-weight: 700; letter-spacing: -0.02em; color: var(--text-primary); margin-bottom: 2px; }
-    .shield-hero-sub   { font-size: 13px; color: var(--text-secondary); margin-bottom: 16px; }
+/* CAUTION banner */
+.state-banner{display:flex;align-items:center;gap:12px;padding:13px 18px;border-radius:10px;border:1.5px solid var(--warning-border);background:var(--warning-bg)}
+.sb-icon{width:36px;height:36px;border-radius:8px;background:var(--warning-bg);border:1px solid var(--warning-border);display:flex;align-items:center;justify-content:center;flex-shrink:0}
+.sb-icon svg{width:18px;height:18px;fill:none;stroke:var(--warning);stroke-width:1.75;stroke-linecap:round;stroke-linejoin:round}
+.sb-body{flex:1}
+.sb-state{font-family:'Geist',sans-serif;font-size:15px;font-weight:700;color:var(--warning);letter-spacing:.01em}
+.sb-desc{font-size:12.5px;color:var(--text-secondary);margin-top:2px;line-height:1.5}
+.sb-action{display:flex;flex-direction:column;align-items:flex-end;gap:5px;flex-shrink:0}
+.state-pill{font-size:10px;font-weight:700;letter-spacing:.07em;text-transform:uppercase;padding:3px 10px;border-radius:99px;background:var(--warning-bg);color:var(--warning);border:1px solid var(--warning-border)}
 
-    .streak-dots { display: flex; gap: 4px; align-items: center; }
-    .streak-dot  { width: 12px; height: 12px; border-radius: 3px; }
+/* Gauge cards */
+.gauges{display:grid;grid-template-columns:repeat(3,1fr);gap:12px}
+.gauge-card{background:var(--bg-card);border:1px solid var(--border-subtle);border-radius:10px;box-shadow:var(--shadow-card);padding:18px 16px}
+.gc-label{font-size:10px;font-weight:600;letter-spacing:.08em;text-transform:uppercase;color:var(--text-tertiary);margin-bottom:12px}
+.gauge-track{width:100%;height:10px;background:var(--neutral-bg);border-radius:99px;overflow:hidden;margin-bottom:8px}
+.gauge-fill{height:100%;border-radius:99px;transition:width .4s}
+.gf-safe{background:var(--profit)}
+.gf-caution{background:var(--warning)}
+.gf-danger{background:var(--loss)}
+.gauge-nums{display:flex;justify-content:space-between;align-items:baseline}
+.gc-used{font-family:'DM Mono',monospace;font-size:20px;font-weight:500;font-variant-numeric:tabular-nums;line-height:1}
+.gc-total{font-family:'DM Mono',monospace;font-size:12px;color:var(--text-tertiary)}
+.gc-pct{font-family:'DM Mono',monospace;font-size:11px;font-weight:600;padding:2px 7px;border-radius:3px}
+.pct-caution{background:var(--warning-bg);color:var(--warning);border:1px solid var(--warning-border)}
+.pct-safe{background:var(--profit-bg);color:var(--profit);border:1px solid var(--profit-border)}
 
-    /* Risk grid */
-    .risk-grid {
-      display: grid;
-      grid-template-columns: repeat(3, 1fr);
-      gap: 12px;
-      margin-bottom: 16px;
-    }
-    .risk-metric {
-      background: var(--bg-card);
-      border: 1px solid var(--border-subtle);
-      border-radius: 10px;
-      padding: 18px;
-      transition: border-color 0.15s;
-    }
-    .risk-metric:hover { border-color: var(--border-default); }
-    .risk-metric-label { font-size: 10px; font-weight: 500; letter-spacing: 0.07em; text-transform: uppercase; color: var(--text-tertiary); margin-bottom: 10px; }
-    .risk-metric-val   { font-family: 'DM Mono', monospace; font-size: 26px; font-weight: 500; letter-spacing: -0.02em; line-height: 1; margin-bottom: 6px; }
-    .risk-metric-of    { font-size: 12px; color: var(--text-tertiary); margin-bottom: 10px; }
-    .risk-metric-note  { font-size: 11px; color: var(--text-secondary); }
+/* Money saved */
+.money-saved{display:grid;grid-template-columns:repeat(3,1fr);gap:12px}
+.ms-card{background:var(--bg-card);border:1px solid var(--border-subtle);border-radius:9px;padding:14px 16px;box-shadow:var(--shadow-card)}
+.ms-lbl{font-size:10px;font-weight:600;letter-spacing:.07em;text-transform:uppercase;color:var(--text-tertiary);margin-bottom:5px}
+.ms-val{font-family:'DM Mono',monospace;font-size:22px;font-weight:500;font-variant-numeric:tabular-nums}
+.ms-sub{font-size:11px;color:var(--text-tertiary);margin-top:2px}
 
-    /* Alert history table */
-    .history-table { width: 100%; border-collapse: collapse; }
-    .history-table th {
-      text-align: left;
-      font-size: 10px;
-      font-weight: 500;
-      letter-spacing: 0.07em;
-      text-transform: uppercase;
-      color: var(--text-tertiary);
-      padding: 0 0 10px;
-      border-bottom: 1px solid var(--border-subtle);
-    }
-    .history-table th:not(:first-child):not(:nth-child(2)) { text-align: right; }
-    .history-table td {
-      padding: 10px 0;
-      border-bottom: 1px solid var(--border-subtle);
-      font-size: 13px;
-    }
-    .history-table tr:last-child td { border-bottom: none; }
-    .history-table tr:hover td { background: var(--bg-hover); }
+/* Alert timeline */
+.timeline{display:flex;flex-direction:column;gap:0;position:relative;padding:14px 16px}
+.tl-item{display:flex;gap:12px;align-items:flex-start;padding:10px 0;border-bottom:1px solid var(--border-subtle)}
+.tl-item:last-child{border-bottom:none}
+.tl-dot{width:8px;height:8px;border-radius:50%;margin-top:4px;flex-shrink:0}
+.td-loss{background:var(--loss)}
+.td-warn{background:var(--warning)}
+.td-info{background:var(--brand)}
+.tl-body{flex:1}
+.tl-title{font-size:12.5px;font-weight:600;color:var(--text-primary)}
+.tl-meta{font-size:11.5px;color:var(--text-secondary);margin-top:2px;line-height:1.5}
+.tl-time{font-family:'DM Mono',monospace;font-size:10.5px;color:var(--text-tertiary);margin-left:auto;white-space:nowrap;padding-top:2px;flex-shrink:0}
 
-    .action-chip {
-      display: inline-flex;
-      align-items: center;
-      gap: 4px;
-      font-size: 10px;
-      font-weight: 600;
-      padding: 2px 8px;
-      border-radius: 99px;
-      letter-spacing: 0.04em;
-    }
-    .action-chip.heeded { background: rgba(34,197,94,0.10); color: #22C55E; border: 1px solid rgba(34,197,94,0.2); }
-    .action-chip.ignored { background: rgba(239,68,68,0.10); color: #EF4444; border: 1px solid rgba(239,68,68,0.2); }
-    .action-chip.skipped { background: var(--neutral-bg); color: var(--text-tertiary); border: 1px solid var(--neutral-border); }
+/* Rules grid */
+.rules-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px;padding:14px 16px}
+.rule-row{display:flex;align-items:center;gap:10px}
+.rule-icon{width:28px;height:28px;border-radius:6px;display:flex;align-items:center;justify-content:center;flex-shrink:0}
+.ri-safe{background:var(--profit-bg);border:1px solid var(--profit-border)}
+.ri-warn{background:var(--warning-bg);border:1px solid var(--warning-border)}
+.ri-safe svg{stroke:var(--profit)}
+.ri-warn svg{stroke:var(--warning)}
+.rule-icon svg{width:13px;height:13px;fill:none;stroke-width:1.75;stroke-linecap:round;stroke-linejoin:round}
+.rule-text{font-size:12px;color:var(--text-secondary);line-height:1.4}
+.rule-text strong{color:var(--text-primary);font-weight:600}
 
-    /* Pattern list */
-    .pattern-row {
-      background: var(--bg-card);
-      border: 1px solid var(--border-subtle);
-      border-radius: 10px;
-      padding: 16px 18px;
-      margin-bottom: 10px;
-      display: grid;
-      grid-template-columns: 1fr auto;
-      gap: 16px;
-      align-items: start;
-      transition: border-color 0.12s;
-    }
-    .pattern-row:hover { border-color: var(--border-default); }
-    .pr-name { font-size: 14px; font-weight: 600; color: var(--text-primary); margin-bottom: 4px; }
-    .pr-desc { font-size: 12px; color: var(--text-secondary); line-height: 1.55; margin-bottom: 8px; }
-    .pr-meta { display: flex; align-items: center; gap: 12px; font-size: 11px; color: var(--text-tertiary); }
-    .pr-stat { display: flex; flex-direction: column; align-items: flex-end; gap: 4px; }
-    .pr-cost { font-family: 'DM Mono', monospace; font-size: 16px; font-weight: 500; }
-    .pr-last { font-size: 10px; color: var(--text-tertiary); text-align: right; }
-
-    /* Money saved */
-    .money-saved-card {
-      background: linear-gradient(135deg, var(--profit-bg) 0%, var(--bg-card) 100%);
-      border: 1px solid var(--profit-border);
-      border-radius: 10px;
-      padding: 20px;
-      display: flex;
-      align-items: center;
-      gap: 20px;
-      margin-bottom: 16px;
-    }
-    .money-saved-icon { font-size: 32px; }
-    .money-saved-body { flex: 1; }
-    .money-saved-label { font-size: 10px; font-weight: 500; letter-spacing: 0.07em; text-transform: uppercase; color: var(--profit); margin-bottom: 4px; }
-    .money-saved-val { font-family: 'DM Mono', monospace; font-size: 32px; font-weight: 500; color: var(--profit); letter-spacing: -0.03em; line-height: 1; margin-bottom: 2px; }
-    .money-saved-sub { font-size: 12px; color: var(--text-secondary); }
-    .money-saved-right { text-align: right; }
-
-    @media (max-width: 900px) {
-      .risk-grid { grid-template-columns: 1fr; }
-      .shield-hero { grid-template-columns: 1fr; }
-      .gauge-wrap { margin: 0 auto; }
-    }
-  </style>
+.section-row{display:grid;grid-template-columns:2fr 1fr;gap:14px}
+</style>
 </head>
 <body>
-<div class="app-layout">
-
-  <!-- SIDEBAR ──────────────────────────────────────────────── -->
+<div class="app-shell">
   <aside class="sidebar">
-    <div class="sidebar-logo">
-      <div class="logo-mark">
-        <svg viewBox="0 0 24 24"><polyline points="3 17 9 11 13 15 21 7"/><polyline points="14 7 21 7 21 14"/></svg>
-      </div>
-      <span class="logo-text">TradeMentor <span>AI</span></span>
+    <div class="sb-logo">
+      <div class="sb-logomark"><svg viewBox="0 0 24 24"><polyline points="22 7 13.5 15.5 8.5 10.5 2 17"/><polyline points="16 7 22 7 22 13"/></svg></div>
+      <div class="sb-wordmark">Trade<em>Mentor</em></div>
     </div>
-
-    <nav class="sidebar-nav">
-      <div class="nav-section-label">Trading</div>
-      <a href="dashboard.html" class="nav-item">
-        <svg class="nav-icon icon-stroke" viewBox="0 0 24 24"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/></svg>
-        Dashboard
-      </a>
-      <a href="analytics.html" class="nav-item">
-        <svg class="nav-icon icon-stroke" viewBox="0 0 24 24"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg>
-        Analytics
-      </a>
-      <a href="#" class="nav-item">
-        <svg class="nav-icon icon-stroke" viewBox="0 0 24 24"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg>
-        Alerts
-        <span class="badge-square" style="margin-left:auto;">3</span>
-      </a>
-
-      <div class="nav-section-label" style="margin-top:12px;">Risk</div>
-      <a href="blowup-shield.html" class="nav-item active">
-        <svg class="nav-icon icon-stroke" viewBox="0 0 24 24"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
-        Blowup Shield
-      </a>
-      <a href="#" class="nav-item">
-        <svg class="nav-icon icon-stroke" viewBox="0 0 24 24"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>
-        My Patterns
-      </a>
-
-      <div class="nav-section-label" style="margin-top:12px;">Tools</div>
-      <a href="#" class="nav-item">
-        <svg class="nav-icon icon-stroke" viewBox="0 0 24 24"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
-        AI Coach
-      </a>
-      <a href="#" class="nav-item">
-        <svg class="nav-icon icon-stroke" viewBox="0 0 24 24"><rect x="2" y="3" width="20" height="14" rx="2" ry="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/></svg>
-        Reports
-      </a>
+    <nav class="sb-nav">
+      <div class="sb-section">Main</div>
+      <a href="dashboard.html" class="sb-item"><svg viewBox="0 0 24 24"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg>Dashboard</a>
+      <a href="analytics.html" class="sb-item"><svg viewBox="0 0 24 24"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg>Analytics</a>
+      <a href="alerts.html" class="sb-item"><svg viewBox="0 0 24 24"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg>Alerts<span class="sb-badge">3</span></a>
+      <a href="my-patterns.html" class="sb-item"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M12 2v3M12 19v3M4.22 4.22l2.12 2.12M17.66 17.66l2.12 2.12M2 12h3M19 12h3M4.22 19.78l2.12-2.12M17.66 6.34l2.12-2.12"/></svg>My Patterns</a>
+      <a href="blowup-shield.html" class="sb-item active"><svg viewBox="0 0 24 24"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>Blowup Shield</a>
+      <a href="chat.html" class="sb-item"><svg viewBox="0 0 24 24"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>AI Coach</a>
+      <div class="sb-section">Records</div>
+      <a href="journal.html" class="sb-item"><svg viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>Journal</a>
+      <a href="reports.html" class="sb-item"><svg viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>Reports</a>
+      <a href="settings.html" class="sb-item"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>Settings</a>
     </nav>
-
-    <div class="sidebar-footer">
-      <div style="display:flex;align-items:center;gap:8px;padding:10px 12px;border-radius:8px;">
-        <div style="width:30px;height:30px;border-radius:50%;background:linear-gradient(135deg,#14B8A6,#0284C7);display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:600;color:#fff;flex-shrink:0;">R</div>
-        <div style="flex:1;min-width:0;">
-          <div style="font-size:12px;font-weight:600;color:var(--text-primary);">Rohit Ostwal</div>
-          <div style="font-size:10px;color:var(--brand);">Zerodha · Pro</div>
-        </div>
-      </div>
+    <div class="sb-foot">
+      <div class="sb-avatar">RS</div>
+      <div><div class="sb-uname">Rohit S.</div><div class="sb-usub">Zerodha · Connected</div></div>
     </div>
   </aside>
 
-  <!-- MAIN ─────────────────────────────────────────────────── -->
-  <main class="main-content">
-
-    <!-- TOP BAR -->
+  <div class="main-content">
     <div class="top-bar">
-      <div style="display:flex;align-items:center;gap:10px;">
-        <span style="font-size:15px;font-weight:600;color:var(--text-primary);letter-spacing:-0.01em;">Blowup Shield</span>
-        <span style="display:flex;align-items:center;gap:5px;background:rgba(34,197,94,0.10);border:1px solid rgba(34,197,94,0.2);border-radius:99px;padding:3px 9px;font-size:11px;font-weight:600;color:#22C55E;letter-spacing:0.04em;">
-          <span style="width:5px;height:5px;border-radius:50%;background:#22C55E;display:inline-block;"></span>
-          Safe Zone
-        </span>
-      </div>
-      <div style="display:flex;align-items:center;gap:8px;">
-        <button class="btn btn-ghost btn-sm">Configure Limits</button>
-        <button class="theme-toggle" onclick="toggleTheme()" title="Toggle theme">
-          <svg id="icon-sun" class="icon-stroke" viewBox="0 0 24 24" style="display:none"><circle cx="12" cy="12" r="5"/><line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/><line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/></svg>
-          <svg id="icon-moon" class="icon-stroke" viewBox="0 0 24 24"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>
+      <div class="top-l"><span class="top-title">Blowup Shield</span><span style="font-size:11.5px;color:var(--text-tertiary)">Risk limits &amp; session protection</span></div>
+      <div class="top-r">
+        <button class="icon-btn" onclick="toggleTheme()">
+          <svg class="i-sun" viewBox="0 0 24 24"><circle cx="12" cy="12" r="5"/><line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/><line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/></svg>
+          <svg class="i-moon" viewBox="0 0 24 24"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>
         </button>
       </div>
     </div>
 
-    <!-- PAGE CONTENT -->
-    <div class="page-content">
+    <div class="page">
 
-      <!-- HERO GAUGE CARD -->
-      <div class="tm-card overflow-hidden" style="margin-bottom:16px;">
-        <div class="shield-hero">
-
-          <!-- Ring gauge -->
-          <div class="gauge-wrap">
-            <svg class="gauge-svg" viewBox="0 0 140 140">
-              <!-- Circumference = 2π × 55 ≈ 345.6 -->
-              <circle class="gauge-track" cx="70" cy="70" r="55"/>
-              <!-- 83% heeded → stroke-dashoffset = 345.6 × (1 - 0.83) = 58.8 -->
-              <circle class="gauge-fill safe" cx="70" cy="70" r="55"
-                      stroke-dasharray="345.6"
-                      stroke-dashoffset="58.8"/>
-            </svg>
-            <div class="gauge-center">
-              <div class="gauge-pct" style="color:#22C55E;">83%</div>
-              <div class="gauge-sub">Alerts heeded</div>
-            </div>
-          </div>
-
-          <!-- Right stats -->
-          <div class="shield-hero-stats">
-            <div class="shield-hero-label">This month — December 2025</div>
-            <div class="shield-hero-title">14-day clean streak 🔥</div>
-            <div class="shield-hero-sub">No blowup days since Nov 28. Your best streak this year: 21 days.</div>
-
-            <div style="display:flex;align-items:center;gap:16px;">
-              <div>
-                <div style="font-size:10px;color:var(--text-tertiary);margin-bottom:3px;">Alerts this month</div>
-                <div style="font-family:'DM Mono',monospace;font-size:20px;font-weight:500;color:var(--text-primary);">18 <span style="font-size:13px;color:var(--text-tertiary);font-weight:400;">total</span></div>
-              </div>
-              <div>
-                <div style="font-size:10px;color:var(--text-tertiary);margin-bottom:3px;">Heeded</div>
-                <div style="font-family:'DM Mono',monospace;font-size:20px;font-weight:500;color:var(--profit);">15 / 18</div>
-              </div>
-              <div>
-                <div style="font-size:10px;color:var(--text-tertiary);margin-bottom:3px;">Ignored (cost)</div>
-                <div style="font-family:'DM Mono',monospace;font-size:20px;font-weight:500;color:var(--loss);">₹−8,400</div>
-              </div>
-            </div>
-
-            <div class="streak-dots" style="margin-top:4px;">
-              <!-- 14 green + 2 red + gap week + greens -->
-              <span style="font-size:10px;color:var(--text-tertiary);margin-right:4px;">Nov 29</span>
-              <span class="streak-dot" style="background:rgba(34,197,94,0.8);"></span>
-              <span class="streak-dot" style="background:rgba(34,197,94,0.8);"></span>
-              <span class="streak-dot" style="background:rgba(34,197,94,0.8);"></span>
-              <span class="streak-dot" style="background:rgba(34,197,94,0.8);"></span>
-              <span class="streak-dot" style="background:rgba(34,197,94,0.8);"></span>
-              <span class="streak-dot" style="background:var(--border-subtle);"></span><!-- weekend -->
-              <span class="streak-dot" style="background:var(--border-subtle);"></span>
-              <span class="streak-dot" style="background:rgba(34,197,94,0.8);"></span>
-              <span class="streak-dot" style="background:rgba(34,197,94,0.8);"></span>
-              <span class="streak-dot" style="background:rgba(34,197,94,0.8);"></span>
-              <span class="streak-dot" style="background:rgba(34,197,94,0.8);"></span>
-              <span class="streak-dot" style="background:rgba(34,197,94,0.8);"></span>
-              <span class="streak-dot" style="background:var(--border-subtle);"></span>
-              <span class="streak-dot" style="background:var(--border-subtle);"></span>
-              <span class="streak-dot" style="background:rgba(34,197,94,0.8);"></span>
-              <span class="streak-dot" style="background:rgba(34,197,94,0.8);"></span>
-              <span class="streak-dot" style="background:rgba(34,197,94,0.8);"></span>
-              <span class="streak-dot" style="background:rgba(34,197,94,0.8);"></span>
-              <span class="streak-dot" style="background:rgba(34,197,94,0.8);"></span>
-              <span style="font-size:10px;color:var(--text-tertiary);margin-left:4px;">Dec 13</span>
-            </div>
-          </div>
-
+      <!-- CAUTION BANNER -->
+      <div class="state-banner">
+        <div class="sb-icon">
+          <svg viewBox="0 0 24 24"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+        </div>
+        <div class="sb-body">
+          <div class="sb-state">CAUTION — Session Risk Elevated</div>
+          <div class="sb-desc">You've used 86% of your daily loss limit and 6 of 7 trades. Historical: sessions with these conditions end profitably only 31% of the time. Consider stopping here today.</div>
+        </div>
+        <div class="sb-action">
+          <span class="state-pill">CAUTION</span>
+          <span style="font-size:11px;color:var(--text-tertiary)">as of 10:51 AM</span>
         </div>
       </div>
 
-      <!-- MONEY SAVED BANNER -->
-      <div class="money-saved-card">
-        <div class="money-saved-icon">💰</div>
-        <div class="money-saved-body">
-          <div class="money-saved-label">Estimated losses prevented this month</div>
-          <div class="money-saved-val">₹42,000</div>
-          <div class="money-saved-sub">Based on historical loss probability when ignoring these patterns × 15 heeded alerts</div>
+      <!-- GAUGE CARDS -->
+      <div class="gauges">
+        <div class="gauge-card">
+          <div class="gc-label">Daily Loss Limit</div>
+          <div class="gauge-track"><div class="gauge-fill gf-caution" style="width:86%"></div></div>
+          <div class="gauge-nums">
+            <div><span class="gc-used" style="color:var(--loss)">&#8722;&#8377;8,600</span><span class="gc-total"> / &#8377;10,000</span></div>
+            <span class="gc-pct pct-caution">86%</span>
+          </div>
+          <div style="margin-top:10px;font-size:11.5px;color:var(--text-tertiary)">&#8377;1,400 remaining before limit</div>
         </div>
-        <div class="money-saved-right">
-          <div style="font-size:10px;color:var(--text-tertiary);margin-bottom:4px;">12-month total</div>
-          <div style="font-family:'DM Mono',monospace;font-size:20px;font-weight:500;color:var(--profit);">₹3.8L</div>
+        <div class="gauge-card">
+          <div class="gc-label">Trade Count</div>
+          <div class="gauge-track"><div class="gauge-fill gf-caution" style="width:86%"></div></div>
+          <div class="gauge-nums">
+            <div><span class="gc-used" style="color:var(--warning)">6</span><span class="gc-total"> / 7 trades</span></div>
+            <span class="gc-pct pct-caution">86%</span>
+          </div>
+          <div style="margin-top:10px;font-size:11.5px;color:var(--text-tertiary)">1 trade left · Win rate on trade 7+: 31%</div>
+        </div>
+        <div class="gauge-card">
+          <div class="gc-label">Consecutive Losses</div>
+          <div class="gauge-track"><div class="gauge-fill gf-safe" style="width:33%"></div></div>
+          <div class="gauge-nums">
+            <div><span class="gc-used" style="color:var(--text-primary)">1</span><span class="gc-total"> / 3 limit</span></div>
+            <span class="gc-pct pct-safe">OK</span>
+          </div>
+          <div style="margin-top:10px;font-size:11.5px;color:var(--text-tertiary)">2 consecutive losses triggers caution</div>
         </div>
       </div>
 
-      <!-- RISK METRICS 3-COL -->
-      <div class="risk-grid">
-
-        <div class="risk-metric">
-          <div class="risk-metric-label">Daily Loss — Today</div>
-          <div class="risk-metric-val" style="color:var(--profit);">₹0</div>
-          <div class="risk-metric-of">of ₹10,000 limit · 0% used</div>
-          <div class="progress-track" style="margin-bottom:10px;">
-            <div class="progress-fill" style="width:0%;background:var(--profit);"></div>
-          </div>
-          <div class="risk-metric-note">Limit resets at EOD. Alert triggers at 70% (₹7,000).</div>
-        </div>
-
-        <div class="risk-metric">
-          <div class="risk-metric-label">Trade Count — Today</div>
-          <div class="risk-metric-val">4</div>
-          <div class="risk-metric-of">of 10 max · 40% used</div>
-          <div class="progress-track" style="margin-bottom:10px;">
-            <div class="progress-fill" style="width:40%;"></div>
-          </div>
-          <div class="risk-metric-note">Alert at 8 trades. Your WR drops sharply above 8.</div>
-        </div>
-
-        <div class="risk-metric">
-          <div class="risk-metric-label">Consecutive Losses</div>
-          <div class="risk-metric-val" style="color:var(--profit);">0</div>
-          <div class="risk-metric-of">in current session · limit: 3</div>
-          <div class="progress-track" style="margin-bottom:10px;">
-            <div class="progress-fill" style="width:0%;background:var(--loss);"></div>
-          </div>
-          <div class="risk-metric-note">After 3 consec. losses, rest probability suggests stepping away.</div>
-        </div>
-
-      </div>
-
-      <!-- 2-COL: History + Patterns -->
-      <div style="display:grid;grid-template-columns:1.2fr 1fr;gap:16px;">
-
-        <!-- Alert history -->
-        <div class="tm-card overflow-hidden">
-          <div style="padding:14px 20px;border-bottom:1px solid var(--border-subtle);display:flex;align-items:center;justify-content:space-between;">
-            <span style="font-size:14px;font-weight:600;color:var(--text-primary);">Alert History</span>
-            <span style="font-size:12px;color:var(--text-tertiary);">Last 30 days</span>
-          </div>
-          <div style="padding:4px 20px 16px;">
-            <table class="history-table">
-              <thead>
-                <tr>
-                  <th>Date</th>
-                  <th>Alert type</th>
-                  <th>Action</th>
-                  <th style="text-align:right;">Est. saved</th>
-                </tr>
-              </thead>
-              <tbody>
-                <tr>
-                  <td style="font-family:'DM Mono',monospace;font-size:11px;color:var(--text-tertiary);">Dec 13</td>
-                  <td>Revenge Trade Risk</td>
-                  <td><span class="action-chip heeded">✓ Heeded</span></td>
-                  <td style="font-family:'DM Mono',monospace;text-align:right;color:var(--profit);">+₹2,800</td>
-                </tr>
-                <tr>
-                  <td style="font-family:'DM Mono',monospace;font-size:11px;color:var(--text-tertiary);">Dec 12</td>
-                  <td>Overtrading Warning</td>
-                  <td><span class="action-chip heeded">✓ Heeded</span></td>
-                  <td style="font-family:'DM Mono',monospace;text-align:right;color:var(--profit);">+₹1,240</td>
-                </tr>
-                <tr>
-                  <td style="font-family:'DM Mono',monospace;font-size:11px;color:var(--text-tertiary);">Dec 11</td>
-                  <td>Daily Loss Limit 70%</td>
-                  <td><span class="action-chip heeded">✓ Heeded</span></td>
-                  <td style="font-family:'DM Mono',monospace;text-align:right;color:var(--profit);">+₹3,200</td>
-                </tr>
-                <tr>
-                  <td style="font-family:'DM Mono',monospace;font-size:11px;color:var(--text-tertiary);">Dec 09</td>
-                  <td>Position Sizing</td>
-                  <td><span class="action-chip ignored">✗ Ignored</span></td>
-                  <td style="font-family:'DM Mono',monospace;text-align:right;color:var(--loss);">−₹4,800</td>
-                </tr>
-                <tr>
-                  <td style="font-family:'DM Mono',monospace;font-size:11px;color:var(--text-tertiary);">Dec 06</td>
-                  <td>Consecutive Losses</td>
-                  <td><span class="action-chip heeded">✓ Heeded</span></td>
-                  <td style="font-family:'DM Mono',monospace;text-align:right;color:var(--profit);">+₹6,400</td>
-                </tr>
-                <tr>
-                  <td style="font-family:'DM Mono',monospace;font-size:11px;color:var(--text-tertiary);">Dec 05</td>
-                  <td>FOMO Entry</td>
-                  <td><span class="action-chip ignored">✗ Ignored</span></td>
-                  <td style="font-family:'DM Mono',monospace;text-align:right;color:var(--loss);">−₹3,600</td>
-                </tr>
-                <tr>
-                  <td style="font-family:'DM Mono',monospace;font-size:11px;color:var(--text-tertiary);">Dec 04</td>
-                  <td>Revenge Trade Risk</td>
-                  <td><span class="action-chip heeded">✓ Heeded</span></td>
-                  <td style="font-family:'DM Mono',monospace;text-align:right;color:var(--profit);">+₹2,100</td>
-                </tr>
-                <tr>
-                  <td style="font-family:'DM Mono',monospace;font-size:11px;color:var(--text-tertiary);">Dec 02</td>
-                  <td>Overtrading Warning</td>
-                  <td><span class="action-chip skipped">— Skipped</span></td>
-                  <td style="font-family:'DM Mono',monospace;text-align:right;color:var(--text-tertiary);">n/a</td>
-                </tr>
-              </tbody>
-            </table>
-          </div>
-        </div>
-
-        <!-- Pattern list -->
+      <!-- MONEY SAVED + TIMELINE -->
+      <div class="section-row">
         <div>
-          <div style="font-size:12px;font-weight:500;letter-spacing:0.06em;text-transform:uppercase;color:var(--text-tertiary);margin-bottom:12px;">Active Behavioral Patterns</div>
-
-          <div class="pattern-row" style="border-left:3px solid var(--loss);">
-            <div>
-              <div style="display:flex;align-items:center;gap:8px;margin-bottom:4px;">
-                <div class="pr-name">Revenge Trading</div>
-                <span class="badge badge-danger">High</span>
-              </div>
-              <div class="pr-desc">Re-entering within 30 min of loss. 44% WR drop in this window.</div>
-              <div class="pr-meta">
-                <span>8 triggers this month</span>
-                <span>Last: 2 days ago</span>
-              </div>
+          <!-- Money saved -->
+          <div class="money-saved" style="margin-bottom:14px">
+            <div class="ms-card">
+              <div class="ms-lbl">Est. saved this week</div>
+              <div class="ms-val" style="color:var(--profit)">+&#8377;6,200</div>
+              <div class="ms-sub">Losses avoided by heeding alerts</div>
             </div>
-            <div class="pr-stat">
-              <div class="pr-cost" style="color:var(--loss);">−₹18,400</div>
-              <div class="pr-last">monthly cost</div>
+            <div class="ms-card">
+              <div class="ms-lbl">Est. saved this month</div>
+              <div class="ms-val" style="color:var(--profit)">+&#8377;18,400</div>
+              <div class="ms-sub">vs trading without the shield</div>
             </div>
-          </div>
-
-          <div class="pattern-row" style="border-left:3px solid var(--warning);">
-            <div>
-              <div style="display:flex;align-items:center;gap:8px;margin-bottom:4px;">
-                <div class="pr-name">Overtrading</div>
-                <span class="badge badge-caution">Medium</span>
-              </div>
-              <div class="pr-desc">Trade count beyond your statistically optimal session.</div>
-              <div class="pr-meta">
-                <span>6 triggers this month</span>
-                <span>Last: 3 days ago</span>
-              </div>
-            </div>
-            <div class="pr-stat">
-              <div class="pr-cost" style="color:var(--loss);">−₹12,800</div>
-              <div class="pr-last">monthly cost</div>
+            <div class="ms-card">
+              <div class="ms-lbl">Alerts heeded</div>
+              <div class="ms-val" style="color:var(--brand)">71%</div>
+              <div class="ms-sub">12 of 17 alerts acknowledged</div>
             </div>
           </div>
 
-          <div class="pattern-row">
-            <div>
-              <div style="display:flex;align-items:center;gap:8px;margin-bottom:4px;">
-                <div class="pr-name">FOMO Entry</div>
-                <span class="badge badge-caution">Medium</span>
+          <!-- Session timeline -->
+          <div class="card">
+            <div class="card-hdr"><span class="card-title">Today's Risk Timeline</span><span style="font-size:11.5px;color:var(--text-tertiary)">Session events</span></div>
+            <div class="timeline">
+              <div class="tl-item">
+                <div class="tl-dot td-loss"></div>
+                <div class="tl-body">
+                  <div class="tl-title">Revenge Trade Risk — BANKNIFTY</div>
+                  <div class="tl-meta">4 min after stop-loss. Pattern detected, limit not triggered. Historical re-entry win rate: 24%.</div>
+                </div>
+                <div class="tl-time">10:47 AM</div>
               </div>
-              <div class="pr-desc">Chasing breakouts after the move already happened.</div>
-              <div class="pr-meta">
-                <span>4 triggers this month</span>
-                <span>Last: 5 days ago</span>
+              <div class="tl-item">
+                <div class="tl-dot td-warn"></div>
+                <div class="tl-body">
+                  <div class="tl-title">State moved to CAUTION</div>
+                  <div class="tl-meta">Daily loss 80% used + 5 trades taken. Risk elevated.</div>
+                </div>
+                <div class="tl-time">10:33 AM</div>
               </div>
-            </div>
-            <div class="pr-stat">
-              <div class="pr-cost" style="color:var(--loss);">−₹7,200</div>
-              <div class="pr-last">monthly cost</div>
+              <div class="tl-item">
+                <div class="tl-dot td-warn"></div>
+                <div class="tl-body">
+                  <div class="tl-title">Trade Count Warning — 5 of 7</div>
+                  <div class="tl-meta">Early warning sent at 70% of trade limit. Acknowledged.</div>
+                </div>
+                <div class="tl-time">09:52 AM</div>
+              </div>
+              <div class="tl-item">
+                <div class="tl-dot td-info"></div>
+                <div class="tl-body">
+                  <div class="tl-title">Session started</div>
+                  <div class="tl-meta">State: SAFE. All limits at 0%.</div>
+                </div>
+                <div class="tl-time">09:15 AM</div>
+              </div>
             </div>
           </div>
-
-          <div class="pattern-row" style="opacity:0.6;">
-            <div>
-              <div style="display:flex;align-items:center;gap:8px;margin-bottom:4px;">
-                <div class="pr-name">No Stop-Loss</div>
-                <span class="badge badge-neutral">Low</span>
-              </div>
-              <div class="pr-desc">Entering without defined exit. 0 triggers this month.</div>
-              <div class="pr-meta">
-                <span>0 triggers</span>
-                <span>Last: 18 days ago</span>
-              </div>
-            </div>
-            <div class="pr-stat">
-              <div class="pr-cost" style="color:var(--text-tertiary);">—</div>
-              <div class="pr-last">this month</div>
-            </div>
-          </div>
-
         </div>
-      </div><!-- /2-col -->
 
-    </div><!-- /page-content -->
-  </main>
+        <!-- Rules panel -->
+        <div class="card" style="height:fit-content">
+          <div class="card-hdr"><span class="card-title">Your Limit Rules</span><a href="settings.html" style="font-size:11.5px;color:var(--brand)">Edit &rarr;</a></div>
+          <div class="rules-grid">
+            <div class="rule-row">
+              <div class="rule-icon ri-warn"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg></div>
+              <div class="rule-text"><strong>Daily Loss</strong><br>Max &#8722;&#8377;10,000</div>
+            </div>
+            <div class="rule-row">
+              <div class="rule-icon ri-warn"><svg viewBox="0 0 24 24"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg></div>
+              <div class="rule-text"><strong>Daily Trades</strong><br>Max 7 trades</div>
+            </div>
+            <div class="rule-row">
+              <div class="rule-icon ri-safe"><svg viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"/></svg></div>
+              <div class="rule-text"><strong>Consec. Losses</strong><br>Alert at 2 · Stop at 3</div>
+            </div>
+            <div class="rule-row">
+              <div class="rule-icon ri-safe"><svg viewBox="0 0 24 24"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg></div>
+              <div class="rule-text"><strong>Early Warning</strong><br>Push at 70% of limits</div>
+            </div>
+            <div class="rule-row">
+              <div class="rule-icon ri-warn"><svg viewBox="0 0 24 24"><rect x="5" y="2" width="14" height="20" rx="2"/><line x1="12" y1="18" x2="12.01" y2="18"/></svg></div>
+              <div class="rule-text"><strong>WhatsApp Guardian</strong><br>Rohit's wife on DANGER</div>
+            </div>
+            <div class="rule-row">
+              <div class="rule-icon ri-safe"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg></div>
+              <div class="rule-text"><strong>Opening Trap</strong><br>Alert first 5 min</div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+    </div>
+  </div>
 </div>
 
 <script>
-  function toggleTheme() {
-    const html = document.documentElement;
-    const next = html.getAttribute('data-theme') === 'dark' ? 'light' : 'dark';
-    html.setAttribute('data-theme', next);
-    localStorage.setItem('tm-theme', next);
-    updateThemeIcon(next);
-    // Update gauge color for light mode
-    const fill = document.querySelector('.gauge-fill');
-    // color stays same, just theme bg changes
-  }
-  function updateThemeIcon(theme) {
-    document.getElementById('icon-sun').style.display  = theme === 'light' ? 'block' : 'none';
-    document.getElementById('icon-moon').style.display = theme === 'dark'  ? 'block' : 'none';
-  }
-  const saved = localStorage.getItem('tm-theme') || 'dark';
-  document.documentElement.setAttribute('data-theme', saved);
-  updateThemeIcon(saved);
+function toggleTheme(){const h=document.documentElement;h.setAttribute('data-theme',h.getAttribute('data-theme')==='dark'?'light':'dark');localStorage.setItem('tm-theme',h.getAttribute('data-theme'))}
+(function(){const t=localStorage.getItem('tm-theme');if(t)document.documentElement.setAttribute('data-theme',t)})();
 </script>
 </body>
 </html>

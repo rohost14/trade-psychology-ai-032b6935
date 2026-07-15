@@ -1,0 +1,1151 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>The Collapsing Trade — Interactive Trading Psychology Experience</title>
+  <meta name="description" content="A scroll-driven NIFTY options trading simulation showcasing the psychological costs of emotional trading.">
+  <link rel="icon" type="image/svg+xml" href="favicon.svg">
+
+  <!-- Fonts -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500;700;800&display=swap" rel="stylesheet">
+
+  <!-- Tailwind v4 Engine -->
+  <script src="https://unpkg.com/@tailwindcss/browser@4"></script>
+  
+  <!-- GSAP & ScrollTrigger -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.2/gsap.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.2/ScrollTrigger.min.js"></script>
+
+  <style type="text/tailwindcss">
+    @theme {
+      --font-sans: 'Plus Jakarta Sans', sans-serif;
+      --font-mono: 'JetBrains Mono', monospace;
+    }
+  </style>
+
+  <style>
+    /* Webkit Scrollbar Styling */
+    ::-webkit-scrollbar {
+      width: 8px;
+    }
+    ::-webkit-scrollbar-track {
+      background: #050505;
+    }
+    ::-webkit-scrollbar-thumb {
+      background: #1a1a1a;
+      border-radius: 99px;
+    }
+    ::-webkit-scrollbar-thumb:hover {
+      background: #2b2b2b;
+    }
+
+    /* Odometer Styles */
+    .odometer-digit-container {
+      position: relative;
+      display: inline-flex;
+      flex-direction: column;
+      height: 1.1em;
+      overflow: hidden;
+      width: 0.6em;
+    }
+    .odometer-digit-strip {
+      display: flex;
+      flex-direction: column;
+      position: absolute;
+      left: 0;
+      right: 0;
+      transition: transform 0.35s cubic-bezier(0.16, 1, 0.3, 1);
+    }
+    .odometer-digit-val {
+      height: 1.1em;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      line-height: 1;
+    }
+
+    /* Heartbeat animation */
+    @keyframes heartbeatPulse {
+      0% { opacity: 0.15; border-color: rgba(239, 68, 68, 0.2); }
+      100% { opacity: 0.9; border-color: rgba(239, 68, 68, 0.7); }
+    }
+    .heartbeat-active {
+      animation: heartbeatPulse var(--heartbeat-speed, 1.5s) infinite alternate ease-in-out;
+      box-shadow: inset 0 0 100px rgba(239, 68, 68, 0.2);
+    }
+  </style>
+</head>
+<body class="bg-[#050505] text-white antialiased overflow-x-hidden">
+
+  <!-- Main Scrollable Track -->
+  <div id="scroll-track" class="relative">
+
+    <!-- Fixed Container to be Pinned by GSAP -->
+    <div id="experience-container" class="w-full h-[100vh] overflow-hidden bg-[#050505] text-white flex flex-col justify-between p-4 md:p-6 relative select-none">
+      
+      <!-- Ambient Grid Overlay -->
+      <div class="absolute inset-0 bg-[radial-gradient(rgba(255,255,255,0.012)_1.5px,transparent_1.5px)] [background-size:16px_16px] pointer-events-none z-10" id="ambient-grid"></div>
+
+      <!-- Terminal Header -->
+      <header class="flex justify-between items-center border-b border-neutral-900 pb-3 z-40 relative bg-[#050505]/80 backdrop-blur-sm">
+        <div class="flex items-center gap-2">
+          <!-- Inline Chart Icon -->
+          <svg class="w-5 h-5 text-[#00C853]" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2.5">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6"/>
+          </svg>
+          <span class="font-bold tracking-tight text-white font-sans text-xs sm:text-sm">
+            TRADEMENTOR TERMINAL <span class="font-mono text-[9px] text-neutral-600 ml-1">V2.4</span>
+          </span>
+        </div>
+        <div class="flex items-center gap-4">
+          <span class="text-[9px] font-mono text-neutral-500 hidden sm:inline">BROKER API: CONNECTED</span>
+          <div class="flex items-center gap-1.5 px-3 py-1 rounded bg-neutral-950 border border-neutral-900 text-[10px] font-mono">
+            <span id="status-icon" class="flex shrink-0 w-2 h-2 rounded-full bg-[#00C853] animate-pulse"></span>
+            <span id="status-text" class="text-neutral-300 font-bold uppercase tracking-wider">Safe Execution</span>
+          </div>
+        </div>
+      </header>
+
+      <!-- Middle Dashboard Layout Grid -->
+      <div class="flex-1 my-4 md:my-6 grid grid-cols-1 lg:grid-cols-12 gap-6 items-stretch min-h-0 relative z-20">
+        
+        <!-- Left Side: Narrative/Instruction Panel (Expands Chart in Panic stages) -->
+        <div id="narrative-panel" class="lg:col-span-4 flex flex-col justify-between bg-[#0a0a0a] border border-neutral-900 p-5 md:p-6 rounded-xl relative overflow-hidden transition-all duration-700 ease-in-out">
+          <!-- Panel Watermark -->
+          <div class="absolute inset-0 bg-[radial-gradient(rgba(255,255,255,0.015)_1.5px,transparent_1.5px)] [background-size:16px_16px] pointer-events-none"></div>
+
+          <div class="space-y-4 relative z-10">
+            <div>
+              <span id="phase-badge" class="text-[9px] font-mono font-bold tracking-widest text-[#00C853] bg-[#00C853]/10 px-2 py-0.5 rounded border border-[#00C853]/15 uppercase">
+                Stage 1: Optimistic Entry
+              </span>
+            </div>
+            
+            <div class="space-y-2">
+              <h2 id="phase-title" class="text-lg md:text-xl font-bold tracking-tight text-white transition-opacity duration-300">
+                Market Open: Clear Strategy
+              </h2>
+              <p id="phase-sub" class="text-[11px] md:text-xs text-neutral-400 leading-relaxed font-sans font-medium transition-opacity duration-300">
+                09:15 AM • The market opens with steady volume. Options position entered at support. Stop-loss defined. WIN probability high.
+              </p>
+            </div>
+          </div>
+
+          <!-- Thought Bubble -->
+          <div class="mt-6 border-t border-neutral-900 pt-4 relative z-10">
+            <span class="text-[8px] font-mono text-neutral-500 uppercase tracking-widest block mb-2">Trader's Mindset</span>
+            <p id="phase-thought" class="text-xs md:text-sm italic text-neutral-300 font-serif leading-relaxed transition-opacity duration-300">
+              "This is the perfect trade. Easiest money of the week."
+            </p>
+          </div>
+        </div>
+
+        <!-- Right Side: The Interactive Candlestick Chart (Spans col-12 in Panic stage) -->
+        <div id="chart-container" class="lg:col-span-8 min-h-[260px] md:min-h-0 relative transition-all duration-700 ease-in-out">
+          <div class="relative w-full h-full border border-neutral-900 rounded-lg overflow-hidden bg-[#050505] flex flex-col">
+            <!-- Ticker details tag -->
+            <div class="absolute top-4 left-4 pointer-events-none select-none z-10 font-mono text-[9px] uppercase tracking-wider text-neutral-600 space-y-0.5">
+              <div class="font-bold text-neutral-400">NIFTY 50 • 5M • NSE</div>
+              <div class="opacity-80">Volume 2.45M</div>
+            </div>
+            <!-- Interactive Canvas -->
+            <canvas id="nifty-chart" class="w-full h-full block flex-1 bg-[#050505]"></canvas>
+          </div>
+        </div>
+
+      </div>
+
+      <!-- Bottom Dashboard Metrics and Greeks HUD -->
+      <footer class="space-y-4 z-40 relative bg-[#050505]/80 backdrop-blur-sm">
+        
+        <!-- P&L and Ticker Clock HUD -->
+        <div class="w-full grid grid-cols-1 md:grid-cols-3 gap-4 md:gap-6 items-center p-4 md:p-5 bg-[#0a0a0a]/90 backdrop-blur-md border border-neutral-900 rounded-xl">
+          <!-- Instrument Details -->
+          <div class="flex flex-col gap-0.5">
+            <span class="text-[9px] font-mono text-neutral-500 uppercase tracking-widest">Instrument</span>
+            <div class="flex items-baseline gap-2">
+              <span class="text-sm md:text-base font-bold tracking-tight text-white">NIFTY 50 INDEX</span>
+              <span id="hud-price" class="text-xs md:text-sm font-mono font-bold text-[#00C853]">22500.00</span>
+            </div>
+          </div>
+
+          <!-- Odometer P&L display -->
+          <div id="hud-pl-box" class="flex flex-col gap-1 p-2 border rounded-lg transition-colors duration-300 bg-[#00C853]/10 border-[#00C853]/20">
+            <span class="text-[8px] font-mono text-neutral-500 uppercase tracking-widest">Unrealized P&L</span>
+            <div id="hud-pl" class="text-lg md:text-2xl font-bold font-mono tracking-tight flex items-center leading-none text-[#00C853]">
+              <!-- Digit strips injected dynamically -->
+            </div>
+          </div>
+
+          <!-- Session clock -->
+          <div class="flex flex-col gap-0.5 md:items-end">
+            <span class="text-[9px] font-mono text-neutral-500 uppercase tracking-widest">Session Time</span>
+            <div class="flex items-center gap-2">
+              <span id="session-clock-dot" class="w-2 h-2 rounded-full bg-red-600 animate-ping"></span>
+              <span id="hud-time" class="text-sm md:text-base font-mono font-bold tracking-tight text-white">09:15 AM</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Option Greeks and Capital Summary -->
+        <div class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-4 p-4 bg-[#080808] border border-neutral-900/60 rounded-xl">
+          <!-- Delta -->
+          <div class="flex flex-col gap-0.5 p-2 bg-neutral-950 border border-neutral-900/40 rounded">
+            <span class="text-[8px] font-mono text-neutral-600 uppercase tracking-widest font-bold">Delta</span>
+            <span id="metric-delta" class="text-xs md:text-sm font-mono font-bold text-white">0.58</span>
+          </div>
+          <!-- Theta -->
+          <div class="flex flex-col gap-0.5 p-2 bg-neutral-950 border border-neutral-900/40 rounded">
+            <span class="text-[8px] font-mono text-neutral-600 uppercase tracking-widest font-bold">Theta</span>
+            <span id="metric-theta" class="text-xs md:text-sm font-mono font-bold text-neutral-300">-8.50</span>
+          </div>
+          <!-- IV -->
+          <div class="flex flex-col gap-0.5 p-2 bg-neutral-950 border border-neutral-900/40 rounded">
+            <span class="text-[8px] font-mono text-neutral-600 uppercase tracking-widest font-bold">Implied Vol (IV)</span>
+            <span id="metric-iv" class="text-xs md:text-sm font-mono font-bold text-neutral-300">13.8%</span>
+          </div>
+          <!-- Position Size -->
+          <div class="flex flex-col gap-0.5 p-2 bg-neutral-950 border border-neutral-900/40 rounded">
+            <span class="text-[8px] font-mono text-neutral-600 uppercase tracking-widest font-bold">Position Size</span>
+            <span id="metric-size" class="text-xs md:text-sm font-mono font-bold text-neutral-300">1,200 Qty</span>
+          </div>
+          <!-- Capital Available -->
+          <div class="flex flex-col gap-0.5 p-2 bg-neutral-950 border border-neutral-900/40 rounded">
+            <span class="text-[8px] font-mono text-neutral-600 uppercase tracking-widest font-bold">Available Funds</span>
+            <span id="metric-funds" class="text-xs md:text-sm font-mono font-bold text-white">₹4,97,650</span>
+          </div>
+          <!-- Margin Shortfall -->
+          <div class="flex flex-col gap-0.5 p-2 bg-neutral-950 border border-neutral-900/40 rounded">
+            <span class="text-[8px] font-mono text-neutral-600 uppercase tracking-widest font-bold">Margin Used</span>
+            <span id="metric-margin" class="text-xs md:text-sm font-mono font-bold text-white">₹3,80,000</span>
+          </div>
+        </div>
+
+      </footer>
+
+      <!-- Heartbeat Border Warning Vignette -->
+      <div id="heartbeat-vignette" class="absolute inset-0 pointer-events-none z-30 transition-opacity duration-300 border-[0px] border-red-600/0 opacity-0"></div>
+
+      <!-- Canvas Spark Particle Layer -->
+      <canvas id="sparks-canvas" class="absolute inset-0 w-full h-full pointer-events-none z-35 bg-transparent"></canvas>
+
+      <!-- Flying Order Tickets Container -->
+      <div id="order-tickets-layer" class="absolute inset-0 pointer-events-none z-32 overflow-hidden bg-transparent">
+        <!-- Tickets dynamically spawned here -->
+      </div>
+
+      <!-- Warning Banners Header Container -->
+      <div class="absolute top-24 left-6 right-6 flex flex-col gap-3 items-center pointer-events-none z-38" id="warning-banners-container">
+        <!-- Banners render here -->
+      </div>
+
+      <!-- Silent Concluding Reflection Overlay -->
+      <div id="silence-screen" class="absolute inset-0 bg-[#050505] z-50 flex flex-col items-center justify-center p-6 text-center transition-opacity duration-1000 ease-in-out pointer-events-none opacity-0">
+        <div class="max-w-[500px] space-y-12">
+          <!-- Closed Info -->
+          <div class="text-[10px] font-mono text-neutral-500 uppercase tracking-widest font-bold" id="silence-time">
+            3:30 PM • MARKET CLOSED
+          </div>
+          <!-- Liquidation Notice -->
+          <div class="bg-red-950/20 border border-red-900/30 text-[#FF1744] font-mono font-extrabold text-[11px] sm:text-xs py-2 px-6 rounded-full inline-block">
+            POSITION AUTO-LIQUIDATED (MTM FAILURE)
+          </div>
+          <!-- Reflection Copy -->
+          <div class="space-y-3 pt-4">
+            <h2 class="text-xl sm:text-2xl font-bold tracking-tight text-white leading-tight font-sans" id="reflection-h2">
+              You didn't stop the loss.
+            </h2>
+            <h3 class="text-lg sm:text-xl font-medium italic text-neutral-400 font-serif" id="reflection-h3">
+              Most traders don't.
+            </h3>
+          </div>
+          <!-- Conversion Call to Action -->
+          <div class="pt-6 space-y-6">
+            <p class="text-xs text-neutral-500 leading-relaxed max-w-[40ch] mx-auto font-medium">
+              TradeMentor intercepts revenge trades, size escalations, and emotional tilts in real time before they wipe out your account.
+            </p>
+            <div class="flex flex-col sm:flex-row items-center justify-center gap-4">
+              <a href="index.html" class="px-6 py-3 rounded-lg bg-[#00C853] text-black font-semibold text-[11px] uppercase tracking-wider hover:bg-[#00e676] active:scale-[0.98] transition-all shadow-lg shadow-[#00C853]/15 border border-[#00C853] w-full sm:w-auto text-center pointer-events-auto">
+                Protect My Capital with TradeMentor
+              </a>
+              <button id="restart-btn" class="px-6 py-3 rounded-lg bg-transparent text-neutral-400 font-semibold text-[11px] uppercase tracking-wider hover:text-white hover:bg-white/5 active:scale-[0.98] transition-all border border-neutral-800 w-full sm:w-auto cursor-pointer pointer-events-auto">
+                Simulate Again
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Scrolling Callout Prompt -->
+      <div id="scroll-prompt" class="absolute bottom-28 left-1/2 -translate-x-1/2 flex flex-col items-center gap-1 text-[9px] font-mono text-neutral-500 animate-pulse pointer-events-none z-50">
+        <span>SCROLL DOWNWARD TO COMMENCE TRADE</span>
+        <div class="w-[1px] h-8 bg-neutral-700 mt-1 animate-bounce"></div>
+      </div>
+
+    </div>
+  </div>
+
+  <script>
+    // Register GSAP ScrollTrigger
+    gsap.registerPlugin(ScrollTrigger);
+
+    // Narratives sequence matching Next.js version
+    const narratives = [
+      {
+        range: [0.0, 0.15],
+        title: "Market Open: Clear Strategy",
+        sub: "09:15 AM • The market opens with steady volume. Options position entered at support. Stop-loss defined. WIN probability high.",
+        thought: "\"This is the perfect trade. Easiest money of the week.\"",
+        phase: "Stage 1: Optimistic Entry"
+      },
+      {
+        range: [0.15, 0.35],
+        title: "Minor Pullback",
+        sub: "10:30 AM • Nifty index drops slightly. A standard market breather. Position is still safe. Stop-loss remains active.",
+        thought: "\"It's just testing support. No need to exit early.\"",
+        phase: "Stage 2: Quiet Hold"
+      },
+      {
+        range: [0.35, 0.55],
+        title: "The Pivot Point",
+        sub: "11:45 AM • Key support level breaks on high volume. Position turns red. The rational play is to execute the stop loss here.",
+        thought: "\"If I sell now, I lock in a loss. I'll wait for a small bounce.\"",
+        phase: "Stage 3: Denial"
+      },
+      {
+        range: [0.55, 0.80],
+        title: "Position Doubled",
+        sub: "01:15 PM • Panic sets in. Market drops further. Instead of cutting, you double the position quantity to average down.",
+        thought: "\"I can't let it expire worthless. One bounce and I break even.\"",
+        phase: "Stage 4: Revenge Averaging"
+      },
+      {
+        range: [0.80, 0.95],
+        title: "Freefall & Margin Calls",
+        sub: "02:30 PM • Panic selling overwhelms the index. The call option is decaying rapidly. Available funds are almost zero.",
+        thought: "\"Oh god. Please bounce. Just a recovery of 50 points.\"",
+        phase: "Stage 5: Capitulation"
+      },
+      {
+        range: [0.95, 1.0],
+        title: "Auto-Liquidation Triggered",
+        sub: "03:15 PM • MTM loss threshold breached. Risk management system initiates automatic market order liquidation.",
+        thought: "\"I watched it slip away for six hours, then lost it in seconds.\"",
+        phase: "Stage 6: Liquidation"
+      }
+    ];
+
+    // Pre-generated NIFTY chart data (80 candles)
+    const generateMockChartData = () => {
+      const data = [];
+      let currentPrice = 22500;
+      const startTime = new Date();
+      startTime.setHours(9, 15, 0);
+
+      for (let i = 0; i < 80; i++) {
+        const timeString = new Date(startTime.getTime() + i * 5 * 60 * 1000).toLocaleTimeString("en-US", {
+          hour: "2-digit",
+          minute: "2-digit",
+          hour12: false
+        });
+
+        const open = currentPrice;
+        let close = currentPrice;
+        let high = currentPrice;
+        let low = currentPrice;
+        let volume = 5000 + Math.random() * 8000;
+
+        if (i < 12) {
+          // Stage 1: sideways upward
+          const change = (Math.random() - 0.45) * 12;
+          close = open + change;
+          high = Math.max(open, close) + Math.random() * 6;
+          low = Math.min(open, close) - Math.random() * 6;
+        } else if (i < 24) {
+          // Stage 2: gentle dip
+          const change = (Math.random() - 0.6) * 15;
+          close = open + change;
+          high = Math.max(open, close) + Math.random() * 8;
+          low = Math.min(open, close) - Math.random() * 8;
+          volume *= 1.2;
+        } else if (i < 36) {
+          // Stage 3: red acceleration
+          const change = (Math.random() - 0.75) * 35;
+          close = open + change;
+          high = Math.max(open, close) + Math.random() * 10;
+          low = Math.min(open, close) - Math.random() * 15;
+          volume *= 1.8;
+        } else if (i < 64) {
+          // Stage 4: steep collapse
+          const change = (Math.random() - 0.88) * 85;
+          close = open + change;
+          high = Math.max(open, close) + Math.random() * 15;
+          low = Math.min(open, close) - Math.random() * 35;
+          volume *= 3.2;
+        } else if (i < 76) {
+          // Stage 5: near vertical drops
+          const change = -120 - Math.random() * 80;
+          close = open + change;
+          high = open + Math.random() * 15;
+          low = close - Math.random() * 50;
+          volume *= 5.5;
+        } else {
+          // Stage 6: final crash & frozen
+          if (i === 77) {
+            close = open - 300;
+            high = open;
+            low = close;
+            volume *= 8;
+          } else {
+            close = open;
+            high = open;
+            low = open;
+            volume = 0;
+          }
+        }
+
+        currentPrice = close;
+        data.push({
+          time: timeString,
+          open,
+          high,
+          low,
+          close,
+          volume,
+          isGreen: close >= open
+        });
+      }
+      return data;
+    };
+
+    const chartData = generateMockChartData();
+
+    // Timeline P&L keyframe nodes for linear interpolation
+    const timelineKeys = [
+      { progress: 0.0, pl: 2350, price: 22500, time: "09:15 AM" },
+      { progress: 0.15, pl: 200, price: 22450, time: "10:30 AM" },
+      { progress: 0.35, pl: -8700, price: 22280, time: "11:45 AM" },
+      { progress: 0.55, pl: -37000, price: 21700, time: "01:15 PM" },
+      { progress: 0.80, pl: -150000, price: 21300, time: "02:30 PM" },
+      { progress: 0.95, pl: -400000, price: 20800, time: "03:15 PM" },
+      { progress: 1.0, pl: -500000, price: 20500, time: "03:30 PM" }
+    ];
+
+    // Interpolate values based on scroll progress
+    const interpolateHUD = (progress) => {
+      let i = 0;
+      for (; i < timelineKeys.length - 1; i++) {
+        if (progress <= timelineKeys[i + 1].progress) break;
+      }
+      const k1 = timelineKeys[i];
+      const k2 = timelineKeys[i + 1];
+      const segmentProgress = (progress - k1.progress) / (k2.progress - k1.progress || 1);
+
+      const pl = k1.pl + (k2.pl - k1.pl) * segmentProgress;
+      const price = k1.price + (k2.price - k1.price) * segmentProgress;
+
+      // Clock Time interpolation
+      const [h1, m1] = k1.time.split(" ")[0].split(":").map(Number);
+      const [h2, m2] = k2.time.split(" ")[0].split(":").map(Number);
+      const isPM1 = k1.time.includes("PM");
+      const isPM2 = k2.time.includes("PM");
+
+      let hours1 = h1 + (isPM1 && h1 !== 12 ? 12 : 0);
+      let hours2 = h2 + (isPM2 && h2 !== 12 ? 12 : 0);
+      if (!isPM1 && h1 === 12) hours1 = 0;
+      if (!isPM2 && h2 === 12) hours2 = 0;
+
+      const totalMin1 = hours1 * 60 + m1;
+      const totalMin2 = hours2 * 60 + m2;
+
+      const currentMin = Math.round(totalMin1 + (totalMin2 - totalMin1) * segmentProgress);
+      const curHours24 = Math.floor(currentMin / 60);
+      const curMin = currentMin % 60;
+
+      const isPM = curHours24 >= 12;
+      const displayHours = curHours24 % 12 === 0 ? 12 : curHours24 % 12;
+      const padMin = curMin.toString().padStart(2, "0");
+      const padHour = displayHours.toString().padStart(2, "0");
+      
+      return {
+        pl,
+        price,
+        time: `${padHour}:${padMin} ${isPM ? "PM" : "AM"}`
+      };
+    };
+
+    // Indian Rupee currency formatter
+    const formatIndianCurrency = (num) => {
+      const isNegative = num < 0;
+      const absNum = Math.floor(Math.abs(num));
+      const str = absNum.toString();
+
+      let lastThree = str.substring(str.length - 3);
+      const otherNumbers = str.substring(0, str.length - 3);
+      if (otherNumbers !== "") {
+        lastThree = "," + lastThree;
+      }
+      const formatted = otherNumbers.replace(/\B(?=(\d{2})+(?!\d))/g, ",") + lastThree;
+      return (isNegative ? "-" : "+") + "₹" + formatted;
+    };
+
+    // State Variables
+    let scrollProgress = 0;
+    const canvas = document.getElementById("nifty-chart");
+    const ctx = canvas.getContext("2d");
+
+    // HTML Elements Cache
+    const phaseBadge = document.getElementById("phase-badge");
+    const phaseTitle = document.getElementById("phase-title");
+    const phaseSub = document.getElementById("phase-sub");
+    const phaseThought = document.getElementById("phase-thought");
+    const narrativePanel = document.getElementById("narrative-panel");
+    const chartContainer = document.getElementById("chart-container");
+    const statusIcon = document.getElementById("status-icon");
+    const statusText = document.getElementById("status-text");
+
+    const hudPrice = document.getElementById("hud-price");
+    const hudTime = document.getElementById("hud-time");
+    const hudPl = document.getElementById("hud-pl");
+    const hudPlBox = document.getElementById("hud-pl-box");
+
+    const metricDelta = document.getElementById("metric-delta");
+    const metricTheta = document.getElementById("metric-theta");
+    const metricIv = document.getElementById("metric-iv");
+    const metricSize = document.getElementById("metric-size");
+    const metricFunds = document.getElementById("metric-funds");
+    const metricMargin = document.getElementById("metric-margin");
+
+    const heartbeatVignette = document.getElementById("heartbeat-vignette");
+    const scrollPrompt = document.getElementById("scroll-prompt");
+    const silenceScreen = document.getElementById("silence-screen");
+
+    // Dynamic Odometer creation
+    const setOdometerContent = (formattedStr) => {
+      hudPl.innerHTML = "";
+      const chars = formattedStr.split("");
+
+      chars.forEach((char) => {
+        const isDigit = /\d/.test(char);
+        if (!isDigit) {
+          const span = document.createElement("span");
+          span.className = "inline-block";
+          span.textContent = char;
+          hudPl.appendChild(span);
+        } else {
+          const container = document.createElement("span");
+          container.className = "odometer-digit-container";
+          
+          const strip = document.createElement("span");
+          strip.className = "odometer-digit-strip";
+
+          for (let val = 0; val < 10; val++) {
+            const digitValDiv = document.createElement("span");
+            digitValDiv.className = "odometer-digit-val";
+            digitValDiv.textContent = val;
+            strip.appendChild(digitValDiv);
+          }
+
+          const digit = parseInt(char);
+          strip.style.transform = `translateY(-${digit * 10}%)`;
+          container.appendChild(strip);
+          hudPl.appendChild(container);
+        }
+      });
+    };
+
+    // Canvas Chart Rendering Logic
+    const drawChart = () => {
+      if (!canvas) return;
+
+      const rect = canvas.getBoundingClientRect();
+      const dpr = window.devicePixelRatio || 1;
+      canvas.width = rect.width * dpr;
+      canvas.height = rect.height * dpr;
+      ctx.scale(dpr, dpr);
+
+      const width = rect.width;
+      const height = rect.height;
+
+      // Layout variables
+      const paddingRight = 65;
+      const paddingBottom = 25;
+      const paddingTop = 20;
+      const chartHeight = height - paddingBottom - paddingTop;
+      const chartWidth = width - paddingRight;
+
+      ctx.clearRect(0, 0, width, height);
+      ctx.fillStyle = "#050505";
+      ctx.fillRect(0, 0, width, height);
+
+      const totalCandles = chartData.length;
+      const maxVisibleCandles = 25;
+      const currentCount = Math.min(
+        totalCandles,
+        Math.floor(8 + scrollProgress * (totalCandles - 8))
+      );
+
+      const visibleData = chartData.slice(0, currentCount);
+      const startIdx = Math.max(0, currentCount - maxVisibleCandles);
+      const renderData = visibleData.slice(startIdx);
+
+      if (renderData.length === 0) return;
+
+      let maxPrice = -Infinity;
+      let minPrice = Infinity;
+      let maxVolume = -Infinity;
+
+      renderData.forEach((d) => {
+        if (d.high > maxPrice) maxPrice = d.high;
+        if (d.low < minPrice) minPrice = d.low;
+        if (d.volume > maxVolume) maxVolume = d.volume;
+      });
+
+      const priceRange = maxPrice - minPrice || 10;
+      maxPrice += priceRange * 0.15;
+      minPrice -= priceRange * 0.15;
+
+      // Gridlines
+      const gridLinesCount = 5;
+      ctx.strokeStyle = "rgba(255, 255, 255, 0.025)";
+      ctx.lineWidth = 1;
+      ctx.font = "9px monospace";
+      ctx.fillStyle = "#555";
+      ctx.textAlign = "left";
+
+      for (let i = 0; i < gridLinesCount; i++) {
+        const yVal = minPrice + (priceRange * i) / (gridLinesCount - 1);
+        const y = paddingTop + chartHeight - (chartHeight * i) / (gridLinesCount - 1);
+
+        ctx.beginPath();
+        ctx.moveTo(0, y);
+        ctx.lineTo(chartWidth, y);
+        ctx.stroke();
+
+        ctx.fillText(Math.round(yVal).toString(), chartWidth + 6, y + 3);
+      }
+
+      // Center zoom effect in panic stages
+      const zoomProgress = Math.max(0, (scrollProgress - 0.5) * 2);
+      const scaleFactor = 1 + zoomProgress * 0.45;
+
+      ctx.save();
+      if (zoomProgress > 0) {
+        const zoomX = chartWidth * 0.8;
+        const zoomY = paddingTop + chartHeight - ((renderData[renderData.length - 1].close - minPrice) / (maxPrice - minPrice)) * chartHeight;
+        ctx.translate(zoomX, zoomY);
+        ctx.scale(scaleFactor, scaleFactor);
+        ctx.translate(-zoomX, -zoomY);
+      }
+
+      // Draw Candles & Volume
+      const candleWidth = chartWidth / maxVisibleCandles;
+      const spacing = candleWidth * 0.25;
+
+      renderData.forEach((candle, index) => {
+        const x = index * candleWidth + spacing;
+        
+        const yOpen = paddingTop + chartHeight - ((candle.open - minPrice) / (maxPrice - minPrice)) * chartHeight;
+        const yClose = paddingTop + chartHeight - ((candle.close - minPrice) / (maxPrice - minPrice)) * chartHeight;
+        const yHigh = paddingTop + chartHeight - ((candle.high - minPrice) / (maxPrice - minPrice)) * chartHeight;
+        const yLow = paddingTop + chartHeight - ((candle.low - minPrice) / (maxPrice - minPrice)) * chartHeight;
+
+        const candleHeight = Math.abs(yOpen - yClose) || 1.2;
+        const candleTop = Math.min(yOpen, yClose);
+        const color = candle.isGreen ? "#00C853" : "#FF1744";
+
+        // Volume
+        const volHeight = (candle.volume / (maxVolume || 1)) * (chartHeight * 0.22);
+        const volY = paddingTop + chartHeight - volHeight;
+        ctx.fillStyle = candle.isGreen ? "rgba(0, 200, 83, 0.06)" : "rgba(255, 23, 68, 0.06)";
+        ctx.fillRect(x, volY, candleWidth - spacing * 2, volHeight);
+
+        // Wick
+        ctx.strokeStyle = color;
+        ctx.lineWidth = 1.2;
+        ctx.beginPath();
+        ctx.moveTo(x + (candleWidth - spacing * 2) / 2, yHigh);
+        ctx.lineTo(x + (candleWidth - spacing * 2) / 2, yLow);
+        ctx.stroke();
+
+        // Body
+        ctx.fillStyle = color;
+        ctx.fillRect(x, candleTop, candleWidth - spacing * 2, candleHeight);
+      });
+
+      ctx.restore();
+
+      // Axis labels
+      ctx.fillStyle = "#555";
+      ctx.textAlign = "center";
+      const timeStep = Math.max(1, Math.floor(renderData.length / 4));
+
+      renderData.forEach((candle, index) => {
+        if (index % timeStep === 0) {
+          const x = index * candleWidth + candleWidth / 2;
+          ctx.fillText(candle.time, x, height - 8);
+        }
+      });
+
+      // Price Ticker Line
+      const latestCandle = renderData[renderData.length - 1];
+      const latestY = paddingTop + chartHeight - ((latestCandle.close - minPrice) / (maxPrice - minPrice)) * chartHeight;
+      const latestColor = latestCandle.isGreen ? "#00C853" : "#FF1744";
+
+      ctx.strokeStyle = latestColor;
+      ctx.lineWidth = 1;
+      ctx.setLineDash([3, 3]);
+      ctx.beginPath();
+      ctx.moveTo(0, latestY);
+      ctx.lineTo(chartWidth, latestY);
+      ctx.stroke();
+      ctx.setLineDash([]);
+
+      // Ticker Price Tag
+      ctx.fillStyle = latestColor;
+      ctx.fillRect(chartWidth, latestY - 8, paddingRight - 4, 16);
+      ctx.fillStyle = "#000";
+      ctx.font = "bold 9px monospace";
+      ctx.textAlign = "center";
+      ctx.fillText(Math.round(latestCandle.close).toString(), chartWidth + (paddingRight - 4) / 2, latestY + 3.5);
+
+      // Screen shake animation logic
+      if (scrollProgress > 0.8 && scrollProgress < 0.95) {
+        const shakeRange = (scrollProgress - 0.8) * 10;
+        const shakeX = (Math.random() - 0.5) * shakeRange;
+        const shakeY = (Math.random() - 0.5) * shakeRange;
+        canvas.style.transform = `translate(${shakeX}px, ${shakeY}px)`;
+      } else {
+        canvas.style.transform = "none";
+      }
+    };
+
+    // Red Hot Sparks Emitters
+    const sparksCanvas = document.getElementById("sparks-canvas");
+    const sCtx = sparksCanvas.getContext("2d");
+    let sparks = [];
+
+    const updateSparksSize = () => {
+      sparksCanvas.width = sparksCanvas.clientWidth;
+      sparksCanvas.height = sparksCanvas.clientHeight;
+    };
+    window.addEventListener("resize", updateSparksSize);
+    updateSparksSize();
+
+    const renderSparksLoop = () => {
+      sCtx.clearRect(0, 0, sparksCanvas.width, sparksCanvas.height);
+
+      if (scrollProgress > 0.7 && scrollProgress < 0.98) {
+        const intensity = (scrollProgress - 0.7) * 4.5;
+        
+        // Spawn sparks
+        if (Math.random() < 0.22 * intensity && sparks.length < 80) {
+          sparks.push({
+            x: Math.random() * sparksCanvas.width,
+            y: sparksCanvas.height + 10,
+            size: 1 + Math.random() * 2.8,
+            speedY: -1.2 - Math.random() * 2.5,
+            speedX: -1.2 + Math.random() * 2.4,
+            alpha: 0.65 + Math.random() * 0.35
+          });
+        }
+
+        sCtx.fillStyle = "#FF1744";
+        sparks.forEach((spark, index) => {
+          spark.y += spark.speedY;
+          spark.x += spark.speedX;
+          spark.alpha -= 0.005;
+
+          sCtx.save();
+          sCtx.globalAlpha = Math.max(0, spark.alpha);
+          sCtx.shadowBlur = 6;
+          sCtx.shadowColor = "#FF1744";
+
+          sCtx.beginPath();
+          sCtx.arc(spark.x, spark.y, spark.size, 0, Math.PI * 2);
+          sCtx.fill();
+          sCtx.restore();
+
+          if (spark.y < -10 || spark.alpha <= 0) {
+            sparks.splice(index, 1);
+          }
+        });
+      } else {
+        sparks = [];
+      }
+      requestAnimationFrame(renderSparksLoop);
+    };
+    renderSparksLoop();
+
+    // Deterministic Floating Sell Order tickets
+    const sellTicketsConfig = Array.from({ length: 25 }).map((_, i) => ({
+      id: i,
+      x: 12 + (i * 26.3) % 75,
+      y: 18 + (i * 35.1) % 65,
+      rot: -12 + (i * 11) % 24,
+      scale: 0.85 + (i * 0.08) % 0.35,
+      trigger: 0.45 + (i * 0.019),
+      qty: 1200 + ((i * 400) % 2400),
+      price: 22400 - (i * 55) % 1500
+    }));
+
+    const updateSellTickets = () => {
+      const parent = document.getElementById("order-tickets-layer");
+      
+      sellTicketsConfig.forEach((ticket) => {
+        let ticketEl = document.getElementById(`sell-ticket-${ticket.id}`);
+        const isVisible = scrollProgress > ticket.trigger && scrollProgress < 0.96;
+
+        if (isVisible) {
+          if (!ticketEl) {
+            ticketEl = document.createElement("div");
+            ticketEl.id = `sell-ticket-${ticket.id}`;
+            ticketEl.className = "absolute bg-[#FF1744] text-black font-mono font-extrabold px-3 py-1.5 text-[10px] rounded border border-red-500 shadow-2xl flex flex-col gap-[1px] transition-all";
+            ticketEl.innerHTML = `
+              <div class="flex justify-between gap-4 border-b border-black/15 pb-0.5 text-[8px] tracking-tight">
+                <span>NSE ORDER</span>
+                <span class="text-red-950 font-sans">LIMIT</span>
+              </div>
+              <div class="flex justify-between items-center gap-4 text-xs font-sans tracking-tight">
+                <span>SELL CE</span>
+                <span>${ticket.qty} Qty</span>
+              </div>
+              <div class="text-[8px] text-right text-red-950 font-sans mt-0.5 font-bold">
+                ₹${ticket.price.toFixed(2)}
+              </div>
+            `;
+            parent.appendChild(ticketEl);
+          }
+
+          // Parallax movement based on scroll progress
+          const drift = (scrollProgress - ticket.trigger) * 150;
+          const currentY = ticket.y + (ticket.id % 2 === 0 ? drift * 0.4 : -drift * 0.4);
+          const currentX = ticket.x + (ticket.id % 3 === 0 ? drift * 0.35 : -drift * 0.35);
+
+          ticketEl.style.left = `${currentX}%`;
+          ticketEl.style.top = `${currentY}%`;
+          ticketEl.style.transform = `rotate(${ticket.rot}deg) scale(${ticket.scale})`;
+          // Fade out near the end
+          ticketEl.style.opacity = Math.max(0, 1 - (scrollProgress - ticket.trigger) * 3.5);
+        } else {
+          if (ticketEl) {
+            ticketEl.remove();
+          }
+        }
+      });
+    };
+
+    // Warning banners generator
+    const updateWarningBanners = () => {
+      const container = document.getElementById("warning-banners-container");
+      container.innerHTML = "";
+
+      const showMtmAlert = scrollProgress > 0.50 && scrollProgress < 0.95;
+      const showMarginWarning = scrollProgress > 0.68 && scrollProgress < 0.95;
+      const showAutoSquareOff = scrollProgress > 0.82 && scrollProgress < 0.95;
+
+      if (showMtmAlert) {
+        const mtmBanner = document.createElement("div");
+        mtmBanner.className = "w-full max-w-xs sm:max-w-sm bg-amber-600/20 border border-amber-500/40 text-amber-500 text-[10px] sm:text-xs font-mono font-bold py-2 px-3 rounded-md shadow-lg flex items-center justify-between backdrop-blur-sm animate-bounce";
+        mtmBanner.innerHTML = `
+          <span class="flex items-center gap-1.5">
+            <span class="w-1.5 h-1.5 rounded-full bg-amber-500 animate-ping"></span>
+            MTM LOSS LIMIT EXCEEDED
+          </span>
+          <span class="opacity-70 text-[8px]">UNREALIZED</span>
+        `;
+        container.appendChild(mtmBanner);
+      }
+
+      if (showMarginWarning) {
+        const marginBanner = document.createElement("div");
+        marginBanner.className = "w-full max-w-xs sm:max-w-sm bg-red-600/20 border border-red-500/40 text-red-500 text-[10px] sm:text-xs font-mono font-bold py-2 px-3 rounded-md shadow-lg flex items-center justify-between backdrop-blur-sm";
+        marginBanner.innerHTML = `
+          <span class="flex items-center gap-1.5">
+            <span class="w-1.5 h-1.5 rounded-full bg-red-500 animate-pulse"></span>
+            MARGIN CALL: SHORTFALL
+          </span>
+          <span class="opacity-70 text-[8px]">FUNDS REQ</span>
+        `;
+        container.appendChild(marginBanner);
+      }
+
+      if (showAutoSquareOff) {
+        const squareBanner = document.createElement("div");
+        squareBanner.className = "w-full max-w-xs sm:max-w-sm bg-red-600 border border-red-500 text-black text-[10px] sm:text-xs font-mono font-extrabold py-2.5 px-3 rounded-md shadow-2xl flex items-center justify-between animate-pulse";
+        squareBanner.innerHTML = `
+          <span class="flex items-center gap-1.5">⚠️ AUTO-LIQUIDATION PENDING</span>
+          <span class="text-[8px] bg-black text-red-500 px-1 py-0.5 rounded font-mono">IMMINENT</span>
+        `;
+        container.appendChild(squareBanner);
+      }
+    };
+
+    // Main dashboard metrics controller
+    const updateMetricsUI = (progress) => {
+      // Delta: 0.58 down to 0.01
+      const deltaVal = Math.max(0.01, 0.58 - (progress * 0.6)).toFixed(2);
+      metricDelta.textContent = deltaVal;
+
+      // Theta: -8.50 to -45.00
+      const thetaVal = (-8.50 - (progress * 36.5)).toFixed(2);
+      metricTheta.textContent = thetaVal;
+
+      // IV: 13.8% to 85.0%
+      const ivVal = (13.8 + (progress * 71.2)).toFixed(1) + "%";
+      metricIv.textContent = ivVal;
+
+      // Position Qty
+      if (progress < 0.55) {
+        metricSize.textContent = "1,200 Qty";
+        metricSize.className = "text-xs md:text-sm font-mono font-bold text-neutral-300";
+      } else if (progress < 0.95) {
+        metricSize.textContent = "2,400 Qty";
+        metricSize.className = "text-xs md:text-sm font-mono font-bold text-amber-500 animate-pulse";
+      } else {
+        metricSize.textContent = "0 Qty";
+        metricSize.className = "text-xs md:text-sm font-mono font-bold text-[#FF1744]";
+      }
+
+      // Available Funds and Margin Shortfall
+      if (progress < 0.55) {
+        metricFunds.textContent = "₹4,97,650";
+        metricFunds.className = "text-xs md:text-sm font-mono font-bold text-white";
+        metricMargin.textContent = "₹3,80,000";
+        metricMargin.className = "text-xs md:text-sm font-mono font-bold text-white";
+      } else if (progress < 0.80) {
+        metricFunds.textContent = "₹1,17,650";
+        metricFunds.className = "text-xs md:text-sm font-mono font-bold text-amber-500";
+        metricMargin.textContent = "₹4,97,650";
+        metricMargin.className = "text-xs md:text-sm font-mono font-bold text-amber-500";
+      } else {
+        metricFunds.textContent = "₹0";
+        metricFunds.className = "text-xs md:text-sm font-mono font-bold text-[#FF1744] font-extrabold";
+        // Calculate margin used (breaching availability)
+        const overshoot = Math.round((progress - 0.8) * 580000);
+        metricMargin.textContent = "₹" + (497650 + overshoot).toLocaleString("en-IN");
+        metricMargin.className = "text-xs md:text-sm font-mono font-bold text-[#FF1744] font-extrabold animate-pulse";
+      }
+    };
+
+    // Sound Context Trigger Logic
+    let soundState = {
+      isNormalPlayed: false,
+      isWarningPlayed: false,
+      isDangerPlayed: false,
+      isSilencePlayed: false
+    };
+
+    const playBeep = (frequency, duration, type, volume) => {
+      try {
+        const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+        const oscillator = audioCtx.createOscillator();
+        const gainNode = audioCtx.createGain();
+        
+        oscillator.connect(gainNode);
+        gainNode.connect(audioCtx.destination);
+        
+        oscillator.type = type || 'sine';
+        oscillator.frequency.value = frequency;
+        
+        gainNode.gain.setValueAtTime(volume || 0.08, audioCtx.currentTime);
+        gainNode.gain.exponentialRampToValueAtTime(0.005, audioCtx.currentTime + duration);
+        
+        oscillator.start();
+        oscillator.stop(audioCtx.currentTime + duration);
+      } catch (e) {
+        console.warn('Audio Context block', e);
+      }
+    };
+
+    const triggerAudioState = (progress) => {
+      if (progress < 0.15 && !soundState.isNormalPlayed) {
+        playBeep(520, 0.2, 'sine', 0.08);
+        soundState.isNormalPlayed = true;
+      }
+      if (progress > 0.35 && progress < 0.65 && !soundState.isWarningPlayed) {
+        playBeep(440, 0.4, 'triangle', 0.1);
+        setTimeout(() => playBeep(380, 0.4, 'triangle', 0.1), 150);
+        soundState.isWarningPlayed = true;
+      }
+      if (progress > 0.70 && progress < 0.95 && !soundState.isDangerPlayed) {
+        playBeep(880, 0.15, 'sawtooth', 0.12);
+        setTimeout(() => playBeep(880, 0.15, 'sawtooth', 0.12), 100);
+        setTimeout(() => playBeep(880, 0.15, 'sawtooth', 0.12), 200);
+        soundState.isDangerPlayed = true;
+      }
+      if (progress >= 0.98 && !soundState.isSilencePlayed) {
+        playBeep(220, 0.8, 'sine', 0.15);
+        soundState.isSilencePlayed = true;
+      }
+
+      // Reset flags when scrolling back up
+      if (progress < 0.90) soundState.isSilencePlayed = false;
+      if (progress < 0.65) soundState.isDangerPlayed = false;
+      if (progress < 0.30) soundState.isWarningPlayed = false;
+      if (progress < 0.05) soundState.isNormalPlayed = false;
+    };
+
+    // Central GSAP ScrollTrigger timeline controller
+    const initScrollTrigger = () => {
+      const scrollTrack = document.getElementById("scroll-track");
+      const experienceContainer = document.getElementById("experience-container");
+
+      const trigger = ScrollTrigger.create({
+        trigger: scrollTrack,
+        start: "top top",
+        end: "+=500%",
+        pin: experienceContainer,
+        scrub: true,
+        onUpdate: (self) => {
+          scrollProgress = self.progress;
+
+          // Hide scroll prompt immediately after scrolling starts
+          if (scrollProgress > 0.02) {
+            scrollPrompt.style.opacity = "0";
+            scrollPrompt.style.pointerEvents = "none";
+          } else {
+            scrollPrompt.style.opacity = "1";
+          }
+
+          // Trigger narrative state swaps
+          const activeNode = narratives.find(
+            (n) => scrollProgress >= n.range[0] && scrollProgress <= n.range[1]
+          ) || narratives[narratives.length - 1];
+
+          phaseBadge.textContent = activeNode.phase;
+          phaseTitle.textContent = activeNode.title;
+          phaseSub.textContent = activeNode.sub;
+          phaseThought.textContent = activeNode.thought;
+
+          // Toggle layout panels in panic state (fade narrative panel out)
+          const isPanicState = scrollProgress > 0.45;
+          if (isPanicState) {
+            narrativePanel.style.opacity = "0";
+            narrativePanel.style.transform = "translateX(-20px)";
+            narrativePanel.style.pointerEvents = "none";
+            narrativePanel.className = "hidden lg:col-span-0";
+            chartContainer.className = "lg:col-span-12 min-h-[260px] md:min-h-0 relative transition-all duration-700 ease-in-out";
+          } else {
+            narrativePanel.style.opacity = "1";
+            narrativePanel.style.transform = "translateX(0)";
+            narrativePanel.style.pointerEvents = "auto";
+            narrativePanel.className = "lg:col-span-4 flex flex-col justify-between bg-[#0a0a0a] border border-neutral-900 p-5 md:p-6 rounded-xl relative overflow-hidden transition-all duration-700 ease-in-out";
+            chartContainer.className = "lg:col-span-8 min-h-[260px] md:min-h-0 relative transition-all duration-700 ease-in-out";
+          }
+
+          // Interpolate P&L and clock time
+          const hudData = interpolateHUD(scrollProgress);
+          hudPrice.textContent = hudData.price.toFixed(2);
+          hudTime.textContent = hudData.time;
+          
+          const plFormatted = formatIndianCurrency(hudData.pl);
+          setOdometerContent(plFormatted);
+
+          // P&L color logic
+          const isWarningPL = hudData.pl < 0 && hudData.pl > -100000;
+          const isDangerPL = hudData.pl <= -100000;
+
+          if (isWarningPL) {
+            hudPlBox.className = "flex flex-col gap-1 p-2 border rounded-lg transition-colors duration-300 bg-amber-500/10 border-amber-500/20";
+            hudPl.className = "text-lg md:text-2xl font-bold font-mono tracking-tight flex items-center leading-none text-amber-500 animate-pulse";
+            
+            // Header stats
+            statusIcon.className = "flex shrink-0 w-2 h-2 rounded-full bg-amber-500 animate-pulse";
+            statusText.textContent = "Loss Accruing";
+            statusText.className = "text-amber-500 font-bold uppercase tracking-wider";
+          } else if (isDangerPL) {
+            hudPlBox.className = "flex flex-col gap-1 p-2 border rounded-lg transition-colors duration-300 bg-[#FF1744]/15 border-[#FF1744]/30";
+            hudPl.className = "text-lg md:text-2xl font-bold font-mono tracking-tight flex items-center leading-none text-[#FF1744] font-extrabold";
+
+            // Header stats
+            statusIcon.className = "flex shrink-0 w-2 h-2 rounded-full bg-[#FF1744] animate-pulse";
+            statusText.textContent = "Risk Limit Breached";
+            statusText.className = "text-[#FF1744] font-bold uppercase tracking-wider";
+          } else {
+            hudPlBox.className = "flex flex-col gap-1 p-2 border rounded-lg transition-colors duration-300 bg-[#00C853]/10 border-[#00C853]/20";
+            hudPl.className = "text-lg md:text-2xl font-bold font-mono tracking-tight flex items-center leading-none text-[#00C853]";
+
+            // Header stats
+            statusIcon.className = "flex shrink-0 w-2 h-2 rounded-full bg-[#00C853] animate-pulse";
+            statusText.textContent = "Safe Execution";
+            statusText.className = "text-neutral-300 font-bold uppercase tracking-wider";
+          }
+
+          // Heartbeat alarm vignetting controls
+          if (scrollProgress > 0.35 && scrollProgress < 0.95) {
+            heartbeatVignette.style.opacity = "1";
+            heartbeatVignette.classList.add("heartbeat-active");
+            // Speeds up from 2.0s down to 0.4s
+            const speed = Math.max(0.4, 2.0 - (scrollProgress - 0.35) * 2.5);
+            heartbeatVignette.style.setProperty("--heartbeat-speed", `${speed}s`);
+            heartbeatVignette.style.borderWidth = "6px";
+          } else {
+            heartbeatVignette.style.opacity = "0";
+            heartbeatVignette.classList.remove("heartbeat-active");
+            heartbeatVignette.style.borderWidth = "0px";
+          }
+
+          // Sound triggers
+          triggerAudioState(scrollProgress);
+
+          // Update dynamic layout indicators (sparks, tickets, warnings)
+          updateSellTickets();
+          updateWarningBanners();
+          updateMetricsUI(scrollProgress);
+          drawChart();
+
+          // Silence screen overlay toggle
+          const isSilenceState = scrollProgress >= 0.98;
+          if (isSilenceState) {
+            silenceScreen.style.opacity = "1";
+            silenceScreen.style.pointerEvents = "auto";
+          } else {
+            silenceScreen.style.opacity = "0";
+            silenceScreen.style.pointerEvents = "none";
+          }
+        }
+      });
+
+      // Restart Button logic
+      document.getElementById("restart-btn").addEventListener("click", () => {
+        gsap.to(window, {
+          duration: 1.5,
+          scrollTo: 0,
+          ease: "power2.inOut"
+        });
+      });
+
+      ScrollTrigger.refresh();
+    };
+
+    // Load initial drawing on render (using safe DOMContentLoaded/load readyState checks)
+    const startSimulator = () => {
+      // Ingest simple scroll-to plugin for smooth scroll restart
+      const script = document.createElement("script");
+      script.src = "https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.2/ScrollToPlugin.min.js";
+      script.onload = () => {
+        initScrollTrigger();
+        setOdometerContent("+₹2,350");
+        drawChart();
+      };
+      document.head.appendChild(script);
+    };
+
+    if (document.readyState === "complete" || document.readyState === "interactive") {
+      startSimulator();
+    } else {
+      window.addEventListener("load", startSimulator);
+    }
+
+    // Resize handlers
+    window.addEventListener("resize", () => {
+      drawChart();
+    });
+
+  </script>
+</body>
+</html>
