@@ -36,6 +36,12 @@ class RiskAlert(Base):
     detected_at = Column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))
     acknowledged_at = Column(DateTime(timezone=True))
 
+    # Feedback loop (migration 069): what the user actually did about this alert.
+    # outcome ∈ ('stopped', 'took_anyway', 'not_useful'); NULL = no feedback yet.
+    # Enables a real "alerts that changed behaviour" metric (vs merely "seen").
+    outcome = Column(String, nullable=True)
+    outcome_at = Column(DateTime(timezone=True), nullable=True)
+
     # Delivery state machine (migration 038)
     delivered_push_at = Column(DateTime(timezone=True), nullable=True)
     delivered_whatsapp_at = Column(DateTime(timezone=True), nullable=True)

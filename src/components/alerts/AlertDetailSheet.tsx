@@ -1,10 +1,18 @@
+import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Clock, X, MessageSquare } from 'lucide-react';
+import { Clock, X, MessageSquare, BellOff, Bell, Hand, ArrowRight, ThumbsDown } from 'lucide-react';
 import { Sheet, SheetContent } from '@/components/ui/sheet';
 import { cn } from '@/lib/utils';
+import { toast } from 'sonner';
 import { AlertNotification, useAlerts } from '@/contexts/AlertContext';
 import { PatternSeverity } from '@/types/patterns';
 import { SEV_DOT, SEV_LABEL, SEV_LABEL_COLOR, SEV_LEFT_BORDER } from '@/lib/alertSeverity';
+
+const OUTCOME_LABEL: Record<string, string> = {
+  stopped:     'You stopped',
+  took_anyway: 'Took it anyway',
+  not_useful:  'Not useful',
+};
 
 const WEEK_MS = 7 * 24 * 60 * 60 * 1000;
 
@@ -160,12 +168,48 @@ interface AlertDetailSheetProps {
 
 export default function AlertDetailSheet({ alert, open, onClose, onAcknowledge }: AlertDetailSheetProps) {
   const navigate = useNavigate();
-  const { alerts: allAlerts } = useAlerts();
+  const {
+    alerts: allAlerts, mutedPatterns, maxMutes,
+    submitAlertFeedback, mutePattern, unmutePattern,
+  } = useAlerts();
+  const [busy, setBusy] = useState(false);
+  const [localOutcome, setLocalOutcome] = useState<string | null>(null);
   if (!alert) return null;
 
   const sev = alert.pattern.severity;
   const backendType = alert.pattern.backend_type;
   const facts = buildFacts(backendType, alert.pattern.details ?? {});
+  const confidence = alert.pattern.confidence;
+  const outcome = localOutcome ?? alert.pattern.outcome ?? null;
+  const isMuted = mutedPatterns.includes(backendType);
+
+  async function handleFeedback(o: 'stopped' | 'took_anyway' | 'not_useful') {
+    if (busy) return;
+    setBusy(true);
+    setLocalOutcome(o);
+    const ok = await submitAlertFeedback(alert!.id, o);
+    setBusy(false);
+    if (ok) onClose();
+    else { setLocalOutcome(null); toast.error('Could not save — try again'); }
+  }
+
+  async function handleToggleMute() {
+    if (busy) return;
+    setBusy(true);
+    try {
+      if (isMuted) {
+        await unmutePattern(backendType);
+        toast.success(`Unmuted ${alert!.pattern.name}`);
+      } else {
+        await mutePattern(backendType);
+        toast.success(`Muted ${alert!.pattern.name} — no more live alerts (still in History)`);
+      }
+    } catch {
+      toast.error(`Mute limit reached (${maxMutes}). Unmute another pattern first.`);
+    } finally {
+      setBusy(false);
+    }
+  }
 
   // Count same pattern type in last 7 days
   const weekCutoff = Date.now() - WEEK_MS;
@@ -205,6 +249,14 @@ export default function AlertDetailSheet({ alert, open, onClose, onAcknowledge }
               {weekCount >= 2 && (
                 <span className="text-[10px] font-semibold text-tm-obs bg-amber-50 dark:bg-amber-900/20 border border-amber-300 dark:border-amber-700/50 rounded px-1.5 py-0.5">
                   {weekCount}× this week
+                </span>
+              )}
+              {confidence != null && confidence > 0 && (
+                <span
+                  className="text-[10px] font-medium text-muted-foreground border border-border rounded px-1.5 py-0.5"
+                  title="How certain the engine is this pattern occurred (independent of severity)"
+                >
+                  {Math.round(confidence)}% confidence
                 </span>
               )}
             </div>
@@ -312,11 +364,12 @@ export default function AlertDetailSheet({ alert, open, onClose, onAcknowledge }
             </p>
           )}
 
-          {/* Trader context benchmark */}
+          {/* Trader context benchmark — clearly framed as a general pattern, not
+              individual advice or a guarantee (SEBI-sensitive copy). */}
           {TRADER_BENCHMARKS[backendType] && (
             <div className="rounded-lg bg-muted/40 px-3 py-3">
               <p className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wide mb-1">
-                Trader context
+                General pattern (not individual advice)
               </p>
               <p className="text-[12px] text-muted-foreground leading-relaxed">
                 {TRADER_BENCHMARKS[backendType]}
@@ -324,29 +377,81 @@ export default function AlertDetailSheet({ alert, open, onClose, onAcknowledge }
             </div>
           )}
 
+          {/* Mute this pattern — suppresses live alerts only; still recorded in History */}
+          <button
+            onClick={handleToggleMute}
+            disabled={busy}
+            className="w-full flex items-center justify-center gap-2 py-2 rounded-lg border border-border text-[12px] text-muted-foreground hover:text-foreground hover:border-foreground/30 transition-colors disabled:opacity-50"
+          >
+            {isMuted ? <Bell className="h-3.5 w-3.5" /> : <BellOff className="h-3.5 w-3.5" />}
+            {isMuted ? `Unmute ${alert.pattern.name}` : `Mute ${alert.pattern.name} (live alerts only)`}
+          </button>
+
         </div>
 
-        {/* Footer */}
-        <div className="px-5 py-4 border-t border-border flex items-center gap-3">
-          {!alert.acknowledged ? (
-            <button
-              onClick={handleAck}
-              className="flex-1 py-2.5 rounded-lg bg-tm-brand text-white text-[13px] font-semibold hover:bg-tm-brand/90 transition-colors"
-            >
-              Mark as reviewed
-            </button>
-          ) : (
-            <div className="flex-1 py-2.5 text-center text-[13px] text-muted-foreground">
-              Reviewed ✓
+        {/* Footer — feedback loop: what did you actually do? */}
+        <div className="px-5 py-4 border-t border-border space-y-2.5">
+          {outcome ? (
+            <div className="flex items-center justify-between">
+              <span className="text-[12px] text-muted-foreground">
+                You said: <span className="font-medium text-foreground">{OUTCOME_LABEL[outcome] ?? outcome}</span>
+              </span>
+              <button
+                onClick={handleAskAI}
+                className="flex items-center gap-1.5 px-3 py-2 rounded-lg border border-border text-[12px] text-muted-foreground hover:text-foreground hover:border-foreground/30 transition-colors"
+              >
+                <MessageSquare className="h-3.5 w-3.5" />
+                Ask AI
+              </button>
             </div>
+          ) : (
+            <>
+              <p className="text-[11px] text-muted-foreground">What did you do?</p>
+              <div className="grid grid-cols-3 gap-2">
+                <button
+                  onClick={() => handleFeedback('stopped')}
+                  disabled={busy}
+                  className="flex flex-col items-center gap-1 py-2 rounded-lg border border-border text-[11px] font-medium text-foreground hover:border-tm-brand hover:text-tm-brand transition-colors disabled:opacity-50"
+                >
+                  <Hand className="h-3.5 w-3.5" />
+                  I stopped
+                </button>
+                <button
+                  onClick={() => handleFeedback('took_anyway')}
+                  disabled={busy}
+                  className="flex flex-col items-center gap-1 py-2 rounded-lg border border-border text-[11px] font-medium text-foreground hover:border-tm-loss hover:text-tm-loss transition-colors disabled:opacity-50"
+                >
+                  <ArrowRight className="h-3.5 w-3.5" />
+                  Took it anyway
+                </button>
+                <button
+                  onClick={() => handleFeedback('not_useful')}
+                  disabled={busy}
+                  className="flex flex-col items-center gap-1 py-2 rounded-lg border border-border text-[11px] font-medium text-muted-foreground hover:border-foreground/40 hover:text-foreground transition-colors disabled:opacity-50"
+                >
+                  <ThumbsDown className="h-3.5 w-3.5" />
+                  Not useful
+                </button>
+              </div>
+              <div className="flex items-center justify-between pt-0.5">
+                {!alert.acknowledged ? (
+                  <button
+                    onClick={handleAck}
+                    className="text-[12px] text-muted-foreground hover:text-foreground transition-colors"
+                  >
+                    Just mark reviewed
+                  </button>
+                ) : <span className="text-[12px] text-muted-foreground">Reviewed ✓</span>}
+                <button
+                  onClick={handleAskAI}
+                  className="flex items-center gap-1.5 text-[12px] text-muted-foreground hover:text-foreground transition-colors"
+                >
+                  <MessageSquare className="h-3.5 w-3.5" />
+                  Ask AI
+                </button>
+              </div>
+            </>
           )}
-          <button
-            onClick={handleAskAI}
-            className="flex items-center gap-1.5 px-4 py-2.5 rounded-lg border border-border text-[13px] text-muted-foreground hover:text-foreground hover:border-foreground/30 transition-colors"
-          >
-            <MessageSquare className="h-3.5 w-3.5" />
-            Ask AI
-          </button>
         </div>
 
       </SheetContent>

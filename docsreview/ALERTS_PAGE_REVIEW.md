@@ -11,6 +11,14 @@
 > - **5.4 "48 hours" copy** — corrected to "last 7 days".
 > Remaining items below (PROD asks, P3 polish, confidence, response-stats surfacing) are unchanged and still open.
 
+> **UPDATE 2 (2026-07-15) — P3 polish + approved PROD features BUILT** (migration 069; needs applying to Supabase):
+> - **P3:** `confidence` now shown as a chip in the detail sheet; `acknowledgeAll` uses a single bulk endpoint (`POST /api/risk/alerts/acknowledge-all`); Live tab relabeled **"Unreviewed"**; `TRADER_BENCHMARKS` reframed "General pattern (not individual advice)".
+> - **PROD — alert-response-stats surfaced:** "You & your alerts" card on the Patterns tab ("you took the trade anyway N times / stopped N"). Endpoint enriched with outcome breakdown.
+> - **PROD — feedback loop:** detail-sheet footer now asks "What did you do?" → I stopped / Took it anyway / Not useful (`POST /api/risk/alerts/{id}/feedback`, sets outcome + acknowledges). "Just mark reviewed" kept as a no-friction escape. May be removed later if it adds friction (per product call).
+> - **PROD — per-pattern mute (cap 3):** "Mute this pattern" toggle in the detail sheet; muted patterns suppress live push (trade_tasks) + toast (AlertContext) but still save to History. Cap of 3 enforced server-side (409 → toast).
+> - **DECIDED NOT built:** real impact quantification (risky/uncertain — if ever added, always a range); pre-trade heads-up (declined); weekly behavioural digest (fold into the existing weekly Reports when that screen is reviewed).
+> - Verified: build OK, no new tsc errors, backend imports clean, behavior_engine 32/32 + notifications pass. The 5 `test_db_schema` errors are migration-069-not-yet-applied on the shared Supabase test DB, not code defects.
+
 ---
 
 ## 1. What this page is, and why it exists

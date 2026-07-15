@@ -29,6 +29,7 @@ from app.models.admin_audit_log import AdminAuditLog
 from app.models.generated_report import GeneratedReport
 from app.models.margin_snapshot import MarginSnapshot
 from app.models.broadcast_log import BroadcastLog, BroadcastReceipt
+from app.models.alert_mute import AlertMute
 
 __all__ = [
     "User",
@@ -63,4 +64,5 @@ __all__ = [
     "MarginSnapshot",
     "BroadcastLog",
     "BroadcastReceipt",
+    "AlertMute",
 ]

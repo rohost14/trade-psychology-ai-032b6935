@@ -43,6 +43,7 @@ COUNTERS = (
     "capital_mismatch_nudges",
     "tilt_recovery_recognitions",
     "behavior_detection_retry_dlq",    # deferred detection lost after retry exhaustion
+    "notifications_muted_suppressed",  # pushes withheld because the pattern is muted
     # ── Real-time ingestion (market-data path observability) ──────────────
     "postbacks_received",              # Zerodha postbacks that passed verification
     "postbacks_rejected_unverified",   # discarded — no secret to verify checksum

@@ -73,6 +73,10 @@ export interface AlertNotification {
     trades_involved: string[];
     frequency_this_week: number;
     frequency_this_month: number;
+    /** 0-100 detection certainty (independent of severity) */
+    confidence?: number | null;
+    /** feedback the user gave: stopped | took_anyway | not_useful */
+    outcome?: string | null;
     /** Raw context dict from behavior_engine — e.g. gap_minutes, prior_loss, streak */
     details: Record<string, unknown>;
   };
@@ -92,10 +96,17 @@ interface AlertContextValue {
   // Resolved trading capital
   capital: number;
 
+  // Muted patterns (backend pattern_type strings) + cap
+  mutedPatterns: string[];
+  maxMutes: number;
+
   // Actions
   acknowledgeAlert: (alertId: string) => void;
   acknowledgeAll: () => void;
   clearAllAlerts: () => void;
+  submitAlertFeedback: (alertId: string, outcome: 'stopped' | 'took_anyway' | 'not_useful') => Promise<boolean>;
+  mutePattern: (patternType: string) => Promise<void>;
+  unmutePattern: (patternType: string) => Promise<void>;
 }
 
 const AlertContext = createContext<AlertContextValue | undefined>(undefined);
@@ -187,6 +198,8 @@ interface BackendAlert {
   detected_at?: string;
   created_at?: string;
   acknowledged_at?: string | null;
+  confidence?: number | null;
+  outcome?: string | null;
   acknowledged?: boolean; // present in demo data and some API responses
 }
 
@@ -217,6 +230,8 @@ function mapBackendAlert(a: BackendAlert): AlertNotification {
       trades_involved:     [],
       frequency_this_week:  0,
       frequency_this_month: 0,
+      confidence:          a.confidence ?? null,
+      outcome:             a.outcome ?? null,
       details:             (a.details as Record<string, unknown>) ?? {},
     },
     shown_at:     detected_at,
@@ -239,8 +254,25 @@ export function AlertProvider({ children }: { children: ReactNode }) {
   const [traderProfile, setTraderProfile] = useState<UserProfileThresholds | null>(null);
   const [capital,       setCapital]       = useState<number>(CAPITAL_FLOOR);
 
+  // Muted patterns (backend pattern_type strings) — suppress real-time toast.
+  // The alert still arrives and is saved; only the live notification is silenced.
+  const [mutedPatterns, setMutedPatterns] = useState<string[]>([]);
+  const [maxMutes,      setMaxMutes]      = useState<number>(3);
+  const mutedRef = useRef<Set<string>>(new Set());
+  mutedRef.current = new Set(mutedPatterns);
+
   // Track IDs already toasted so we never double-toast the same alert
   const toastedIdsRef = useRef<Set<string>>(new Set());
+
+  // Load muted patterns once (used to gate live toasts)
+  useEffect(() => {
+    api.get('/api/risk/mutes')
+      .then(res => {
+        setMutedPatterns(res.data?.muted_patterns ?? []);
+        if (res.data?.max) setMaxMutes(res.data.max);
+      })
+      .catch(() => {}); // not authenticated yet — non-fatal
+  }, []);
 
   // ---------------------------------------------------------------------------
   // Capital resolution: profile.trading_capital → Kite equity.total → floor
@@ -306,6 +338,9 @@ export function AlertProvider({ children }: { children: ReactNode }) {
             // Gate: only toast during market hours — alert still saved to DB.
             const exchange = (rawAlert.details?.exchange as string | undefined) ?? 'NSE';
             if (!isMarketOpen(exchange)) continue;
+
+            // Muted pattern — alert is still saved/visible in history, just no live toast.
+            if (mutedRef.current.has(rawAlert.pattern_type)) continue;
 
             const sev = alert.pattern.severity;
             const label = SEVERITY_LABEL[sev] ?? '⚠️ Alert';
@@ -408,15 +443,48 @@ export function AlertProvider({ children }: { children: ReactNode }) {
     const unacked = alerts.filter(a => !a.acknowledged);
     setAlerts(prev => prev.map(a => ({ ...a, acknowledged: true })));
     try {
-      await Promise.all(
-        unacked.map(a => api.post(`/api/risk/alerts/${a.id}/acknowledge`))
-      );
+      // Single bulk call instead of N parallel POSTs.
+      await api.post('/api/risk/alerts/acknowledge-all');
     } catch {
       setAlerts(prev => prev.map(a =>
         unacked.some(u => u.id === a.id) ? { ...a, acknowledged: false } : a
       ));
     }
   }, [alerts]);
+
+  // Feedback loop: record what the user did about an alert. Also acknowledges it.
+  const submitAlertFeedback = useCallback(
+    async (alertId: string, outcome: 'stopped' | 'took_anyway' | 'not_useful') => {
+      setAlerts(prev => prev.map(a => a.id === alertId ? { ...a, acknowledged: true } : a));
+      try {
+        await api.post(`/api/risk/alerts/${alertId}/feedback`, { outcome });
+        return true;
+      } catch {
+        return false;
+      }
+    }, []);
+
+  // Mute a pattern (backend pattern_type). Enforced cap surfaces as a thrown error
+  // the caller can toast. Optimistic; reverts on failure.
+  const mutePattern = useCallback(async (patternType: string) => {
+    setMutedPatterns(prev => prev.includes(patternType) ? prev : [...prev, patternType]);
+    try {
+      const res = await api.post('/api/risk/mutes', { pattern_type: patternType });
+      if (res.data?.muted_patterns) setMutedPatterns(res.data.muted_patterns);
+    } catch (err: unknown) {
+      setMutedPatterns(prev => prev.filter(p => p !== patternType));
+      throw err;
+    }
+  }, []);
+
+  const unmutePattern = useCallback(async (patternType: string) => {
+    setMutedPatterns(prev => prev.filter(p => p !== patternType));
+    try {
+      await api.delete(`/api/risk/mutes/${encodeURIComponent(patternType)}`);
+    } catch {
+      setMutedPatterns(prev => prev.includes(patternType) ? prev : [...prev, patternType]);
+    }
+  }, []);
 
   const clearAllAlerts = useCallback(() => {
     setAlerts([]);
@@ -437,9 +505,14 @@ export function AlertProvider({ children }: { children: ReactNode }) {
       isLoading,
       traderProfile,
       capital,
+      mutedPatterns,
+      maxMutes,
       acknowledgeAlert,
       acknowledgeAll,
       clearAllAlerts,
+      submitAlertFeedback,
+      mutePattern,
+      unmutePattern,
     }}>
       {children}
     </AlertContext.Provider>

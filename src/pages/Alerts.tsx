@@ -111,6 +111,66 @@ function AlertRow({
   );
 }
 
+// ─── Response-stats card ("You & your alerts") ─────────────────────────────────
+// Surfaces the accountability metric: how the user actually responds to their own
+// alerts. "You took the trade anyway 12 times" is the honest behavioural mirror.
+
+interface ResponseStatRow {
+  pattern: string;
+  total: number;
+  ignored: number;
+  stopped: number;
+  took_anyway: number;
+}
+interface ResponseStats {
+  patterns: ResponseStatRow[];
+  total_ignored: number;
+  total_took_anyway: number;
+  total_stopped: number;
+}
+
+function ResponseStatsCard() {
+  const [stats, setStats] = useState<ResponseStats | null>(null);
+  useEffect(() => {
+    api.get('/api/risk/alert-response-stats', { params: { days: 30 } })
+      .then(res => setStats(res.data))
+      .catch(() => {});
+  }, []);
+
+  if (!stats || stats.patterns.length === 0) return null;
+  // Only worth showing once there's a signal (something ignored or overridden).
+  const top = stats.patterns.filter(p => p.took_anyway > 0 || p.ignored > 0).slice(0, 3);
+  if (top.length === 0) return null;
+
+  return (
+    <div className="tm-card px-4 py-3.5 mb-4">
+      <p className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wide mb-1.5">
+        You &amp; your alerts · last 30 days
+      </p>
+      <p className="text-[13px] text-foreground leading-relaxed mb-3">
+        {stats.total_took_anyway > 0 ? (
+          <>You took the trade anyway <span className="font-semibold text-tm-loss">{stats.total_took_anyway}</span> time{stats.total_took_anyway !== 1 ? 's' : ''} after an alert
+            {stats.total_stopped > 0 && <> · stopped <span className="font-semibold text-tm-profit">{stats.total_stopped}</span></>}.</>
+        ) : (
+          <><span className="font-semibold text-tm-obs">{stats.total_ignored}</span> alert{stats.total_ignored !== 1 ? 's' : ''} you never reviewed.</>
+        )}
+      </p>
+      <div className="space-y-1.5">
+        {top.map(p => (
+          <div key={p.pattern} className="flex items-center justify-between text-[12px]">
+            <span className="text-foreground">{formatPatternName(p.pattern)}</span>
+            <span className="text-muted-foreground font-mono tabular-nums">
+              {p.took_anyway > 0 && <span className="text-tm-loss">{p.took_anyway} took anyway</span>}
+              {p.took_anyway > 0 && p.ignored > 0 && ' · '}
+              {p.ignored > 0 && <span>{p.ignored} ignored</span>}
+            </span>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
 // ─── Live Tab ─────────────────────────────────────────────────────────────────
 
 function AlertSkeleton() {
@@ -229,6 +289,8 @@ function HistoryTab({ onOpen }: { onOpen: (a: AlertNotification) => void }) {
           trades_involved:     [],
           frequency_this_week:  0,
           frequency_this_month: 0,
+          confidence:          a.confidence ?? null,
+          outcome:             a.outcome ?? null,
           details:             a.details ?? {},
         },
         shown_at:     a.detected_at || a.created_at,
@@ -464,9 +526,9 @@ export default function AlertsPage() {
       <Tabs defaultValue="live">
         <TabsList className="w-full justify-start rounded-none bg-transparent border-b border-border p-0 h-auto gap-0 mb-6">
           {([
-            { value: 'live',     label: 'Live',     badge: unacknowledgedCount },
-            { value: 'history',  label: 'History',  badge: 0 },
-            { value: 'patterns', label: 'Patterns', badge: 0 },
+            { value: 'live',     label: 'Unreviewed', badge: unacknowledgedCount },
+            { value: 'history',  label: 'History',    badge: 0 },
+            { value: 'patterns', label: 'Patterns',   badge: 0 },
           ] as const).map(({ value, label, badge }) => (
             <TabsTrigger
               key={value}
@@ -485,7 +547,7 @@ export default function AlertsPage() {
 
         <TabsContent value="live"><LiveTab onOpen={setSelectedAlert} /></TabsContent>
         <TabsContent value="history"><HistoryTab onOpen={setSelectedAlert} /></TabsContent>
-        <TabsContent value="patterns"><PatternsTab /></TabsContent>
+        <TabsContent value="patterns"><ResponseStatsCard /><PatternsTab /></TabsContent>
       </Tabs>
 
       {/* Alert detail sheet */}

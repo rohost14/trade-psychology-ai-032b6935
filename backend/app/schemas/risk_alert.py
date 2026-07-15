@@ -16,6 +16,8 @@ class RiskAlertResponse(RiskAlertBase):
     related_trade_ids: Optional[List[UUID]] = None
     detected_at: datetime
     acknowledged_at: Optional[datetime] = None
+    confidence: Optional[float] = None          # 0-100 detection certainty
+    outcome: Optional[str] = None               # feedback: stopped | took_anyway | not_useful
 
     # Computed aliases for frontend compatibility
     @computed_field

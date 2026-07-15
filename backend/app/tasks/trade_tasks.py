@@ -924,6 +924,28 @@ async def run_risk_detection_async(
                 f"[staleness] {broker_account_id}: {suppressed} danger alert(s) "
                 f"older than push window — saved, not pushed"
             )
+        # Per-pattern mute (migration 069): a muted pattern still saved its RiskAlert
+        # above (visible in History) — only its real-time push is suppressed here.
+        try:
+            from app.models.alert_mute import AlertMute
+            _mrows = await db.execute(
+                select(AlertMute.pattern_type).where(
+                    AlertMute.broker_account_id == broker_account_id
+                )
+            )
+            _muted = {r[0] for r in _mrows.all()}
+            if _muted:
+                _before = len(pushable)
+                pushable = [a for a in pushable if a.pattern_type not in _muted]
+                _muted_n = _before - len(pushable)
+                if _muted_n:
+                    _mincr("notifications_muted_suppressed", _muted_n)
+                    logger.info(
+                        f"[mute] {broker_account_id}: {_muted_n} alert(s) not pushed "
+                        f"(pattern muted) — still saved to history"
+                    )
+        except Exception as _mute_err:
+            logger.debug(f"mute filter skipped: {_mute_err}")
         _mincr("notifications_dispatched", len(pushable))
         from app.services.detector_registry import BY_NAME as _SPECS_N
         guardian_alerts = [a for a in pushable
