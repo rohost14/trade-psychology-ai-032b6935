@@ -228,12 +228,6 @@ export default function AlertDetailSheet({ alert, open, onClose, onAcknowledge }
             {alert.pattern.description}
           </p>
 
-          {(alert.pattern.estimated_cost ?? 0) > 0 && (
-            <p className="text-[12px] text-tm-loss font-mono tabular-nums -mt-2">
-              Est. cost: ₹{(alert.pattern.estimated_cost as number).toLocaleString('en-IN')}
-            </p>
-          )}
-
           {/* Data table */}
           {facts.length > 0 && (
             <div className="rounded-lg border border-border divide-y divide-border">

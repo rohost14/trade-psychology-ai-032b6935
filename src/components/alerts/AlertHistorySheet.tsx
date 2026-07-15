@@ -15,7 +15,7 @@ import { cn } from '@/lib/utils';
 import { format, parseISO, isToday, isYesterday } from 'date-fns';
 import { AlertNotification } from '@/contexts/AlertContext';
 import AlertDetailSheet from '@/components/alerts/AlertDetailSheet';
-import { severityDotClass } from '@/lib/alertSeverity';
+import { severityDotClass, SEV_LABEL, normalizeSeverityStr } from '@/lib/alertSeverity';
 
 interface AlertHistorySheetProps {
   alerts: AlertNotification[];
@@ -67,7 +67,7 @@ export function AlertHistorySheet({
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-2 mb-0.5">
             <span className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
-              {sev}
+              {SEV_LABEL[normalizeSeverityStr(sev)]}
             </span>
             <span className="text-[11px] text-muted-foreground font-mono">
               {formatDate(alert.shown_at)}
@@ -77,11 +77,6 @@ export function AlertHistorySheet({
           <p className="text-[12px] text-muted-foreground mt-0.5 leading-snug line-clamp-2">
             {alert.pattern.description}
           </p>
-          {(alert.pattern.estimated_cost ?? 0) > 0 && (
-            <p className="text-[11px] font-mono text-tm-loss mt-1">
-              Est. cost: ₹{(alert.pattern.estimated_cost as number).toLocaleString('en-IN')}
-            </p>
-          )}
         </div>
 
         {/* Chevron / ack check */}

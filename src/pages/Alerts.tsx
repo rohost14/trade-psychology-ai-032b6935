@@ -9,7 +9,7 @@ import { PatternSeverity } from '@/types/patterns';
 import AlertDetailSheet from '@/components/alerts/AlertDetailSheet';
 import {
   SEV_DOT, SEV_LABEL, SEV_LABEL_COLOR,
-  severityBorderClass, severityRowBg,
+  severityBorderClass, severityRowBg, normalizeSeverityStr,
 } from '@/lib/alertSeverity';
 
 function timeAgo(dateStr: string | undefined): string {
@@ -102,14 +102,6 @@ function AlertRow({
           <div className="flex items-center gap-2 mt-1.5 text-[11px] text-muted-foreground">
             <Clock className="h-3 w-3 flex-shrink-0" />
             <span>{timeAgo(alert.shown_at)}</span>
-            {(alert.pattern.estimated_cost ?? 0) > 0 && (
-              <>
-                <span className="text-muted-foreground/40">·</span>
-                <span className="text-tm-loss font-mono tabular-nums">
-                  ₹{(alert.pattern.estimated_cost as number).toLocaleString('en-IN')} est.
-                </span>
-              </>
-            )}
           </div>
         </div>
 
@@ -192,12 +184,12 @@ function LiveTab({ onOpen }: { onOpen: (a: AlertNotification) => void }) {
 
 // ─── History Tab ──────────────────────────────────────────────────────────────
 
+// Severity vocabulary is the app-wide 3-level scale (danger/caution/positive).
+// The backend's info/critical collapse into caution/danger via normalizeSeverityStr.
 const SEVERITY_OPTIONS = [
-  { value: 'all',      label: 'All' },
-  { value: 'critical', label: 'Critical' },
-  { value: 'high',     label: 'High' },
-  { value: 'medium',   label: 'Caution' },
-  { value: 'low',      label: 'Info' },
+  { value: 'all',     label: 'All' },
+  { value: 'danger',  label: 'Danger' },
+  { value: 'caution', label: 'Caution' },
 ];
 
 const PERIOD_OPTIONS = [
@@ -228,7 +220,7 @@ function HistoryTab({ onOpen }: { onOpen: (a: AlertNotification) => void }) {
           type:                a.pattern_type,
           backend_type:        a.pattern_type,
           name:                formatPatternName(a.pattern_type),
-          severity:            ({'danger':'high','critical':'critical','high':'high','caution':'medium','medium':'medium','low':'low'} as Record<string,PatternSeverity>)[a.severity] ?? 'medium',
+          severity:            normalizeSeverityStr(a.severity),
           description:         a.message,
           detected_at:         a.detected_at || a.created_at,
           insight:             a.details?.insight || '',
@@ -332,13 +324,13 @@ interface PatternSummary {
   type: string;
   name: string;
   count: number;
-  totalCost: number;
   latestAt: string | undefined;
   severities: Record<PatternSeverity, number>;
   worstSeverity: PatternSeverity;
 }
 
-const SEVERITY_ORDER: PatternSeverity[] = ['critical', 'high', 'medium', 'low'];
+// Worst → least severe (index 0 = worst). Matches the app-wide 3-level scale.
+const SEVERITY_ORDER: PatternSeverity[] = ['danger', 'caution', 'positive'];
 
 function PatternsTab() {
   const { alerts, isLoading } = useAlerts();
@@ -351,18 +343,18 @@ function PatternsTab() {
         type: key,
         name: alert.pattern.name,
         count: 0,
-        totalCost: 0,
         latestAt: undefined,
-        severities: { critical: 0, high: 0, medium: 0, low: 0 },
-        worstSeverity: 'low' as PatternSeverity,
+        severities: { danger: 0, caution: 0, positive: 0 },
+        worstSeverity: 'positive' as PatternSeverity,
       };
       existing.count++;
-      existing.totalCost += alert.pattern.estimated_cost ?? 0;
       existing.severities[alert.pattern.severity]++;
       const dt = alert.shown_at;
       if (!existing.latestAt || (dt && dt > existing.latestAt)) existing.latestAt = dt;
       const idx = SEVERITY_ORDER.indexOf(alert.pattern.severity);
-      if (idx < SEVERITY_ORDER.indexOf(existing.worstSeverity)) existing.worstSeverity = alert.pattern.severity;
+      if (idx !== -1 && idx < SEVERITY_ORDER.indexOf(existing.worstSeverity)) {
+        existing.worstSeverity = alert.pattern.severity;
+      }
       map.set(key, existing);
     }
     return Array.from(map.values()).sort((a, b) => b.count - a.count);
@@ -385,7 +377,7 @@ function PatternsTab() {
   return (
     <div className="space-y-2.5">
       <p className="text-[12px] text-muted-foreground">
-        {summaries.length} distinct pattern{summaries.length !== 1 ? 's' : ''} detected in the last 48 hours
+        {summaries.length} distinct pattern{summaries.length !== 1 ? 's' : ''} detected in the last 7 days
       </p>
       {summaries.map(s => (
         <div key={s.type} className={cn(
@@ -417,21 +409,16 @@ function PatternsTab() {
 
           <div className="flex items-center justify-between text-[11px] text-muted-foreground">
             <div className="flex items-center gap-2">
-              {(SEVERITY_ORDER as PatternSeverity[]).map(sev => s.severities[sev] > 0 && (
+              {SEVERITY_ORDER.map(sev => s.severities[sev] > 0 && (
                 <span key={sev} className="flex items-center gap-1">
                   <span className={cn('w-1.5 h-1.5 rounded-full', SEV_DOT[sev])} />
-                  {s.severities[sev]} {sev}
+                  {s.severities[sev]} {SEV_LABEL[sev]}
                 </span>
               ))}
             </div>
-            <div className="flex items-center gap-3">
-              {s.totalCost > 0 && (
-                <span className="text-tm-loss font-mono tabular-nums">₹{s.totalCost.toLocaleString('en-IN')} est.</span>
-              )}
-              {s.latestAt && (
-                <span title={formatIST(s.latestAt)}>Last: {timeAgo(s.latestAt)}</span>
-              )}
-            </div>
+            {s.latestAt && (
+              <span title={formatIST(s.latestAt)}>Last: {timeAgo(s.latestAt)}</span>
+            )}
           </div>
         </div>
       ))}
@@ -446,10 +433,9 @@ export default function AlertsPage() {
   const [selectedAlert, setSelectedAlert] = useState<AlertNotification | null>(null);
 
   const stats = useMemo(() => ({
-    total:    alerts.length,
-    critical: alerts.filter(a => a.pattern.severity === 'critical').length,
-    high:     alerts.filter(a => a.pattern.severity === 'high').length,
-    unacked:  unacknowledgedCount,
+    total:   alerts.length,
+    danger:  alerts.filter(a => a.pattern.severity === 'danger').length,
+    unacked: unacknowledgedCount,
   }), [alerts, unacknowledgedCount]);
 
   return (
@@ -468,7 +454,7 @@ export default function AlertsPage() {
         {stats.total > 0 && (
           <div className="flex items-center gap-3 text-[12px] text-muted-foreground">
             <span>{stats.total} total</span>
-            {stats.critical > 0 && <><span className="text-muted-foreground/40">·</span><span className="text-tm-loss">{stats.critical} critical</span></>}
+            {stats.danger > 0 && <><span className="text-muted-foreground/40">·</span><span className="text-tm-loss">{stats.danger} danger</span></>}
             {stats.unacked > 0 && <><span className="text-muted-foreground/40">·</span><span className="text-tm-obs">{stats.unacked} unread</span></>}
           </div>
         )}
