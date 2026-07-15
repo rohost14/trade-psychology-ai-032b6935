@@ -88,3 +88,7 @@ bun.lockb
 
 # Vite temp files
 *.timestamp-*.mjs
+
+# Next.js build cache (scroll-loss-experience prototype)
+.next/
+scroll-loss-experience/.next/

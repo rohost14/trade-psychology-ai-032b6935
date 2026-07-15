@@ -38,6 +38,8 @@ All findings below were implemented in this session except where noted. Summary:
 | 7.3 no-polling | ✅ FIXED | Removed AlertContext 60s poll and BehaviorRiskBadge 120s timer — both now event-driven. |
 | 5.x PredictiveContextStrip | ⚠ FLAGGED | Rendered on Dashboard despite S36 "killed" note. Left as-is (functional); product decision. |
 
+**Gross-vs-net P&L — DECIDED (2026-07-15):** keep raw P&L only — `(exit − entry) × qty × multiplier`, with NO brokerage / STT / taxes / charges deducted or estimated. Rationale: avoids a per-segment fee model that Indian budgets change every few months. A disclaimer on the app/website states charges/STT are not included. No charge estimator will be built. (Behavioral thresholds therefore run on raw P&L; accept that they slightly under-trigger vs a charges-inclusive number.)
+
 Verified: backend `py_compile` + import smoke all pass; `test_phase2_services` + `test_trade_classifier` (54) and `test_integration` (25/26 — the 1 failure is a pre-existing stale Redis mock, fails identically on baseline) pass; frontend `vite build` succeeds; tsc error count 29 (down from 30 baseline — no new type errors); vitest passes.
 
 ---
