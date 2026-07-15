@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { Search, X, Pencil, CheckCircle2 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { formatPrice, formatCurrencyWithSign } from '@/lib/formatters';
+import { parseSymbol } from '@/lib/symbolParser';
 import type { CompletedTrade } from '@/types/api';
 
 interface ClosedTradesTableProps {
@@ -11,50 +12,7 @@ interface ClosedTradesTableProps {
   onTradeClick?: (trade: CompletedTrade) => void;
 }
 
-// ── Symbol parser ─────────────────────────────────────────────────────────────
-// See OpenPositionsTable.tsx for full format documentation.
-// Two Zerodha option expiry formats:
-//   YYMMM  → index/monthly stock options  e.g. ICICIGI24JUN1640PE
-//   DDMMMYY → stock options with specific date, supports decimal strikes e.g. ADANIPOWER26JUN242.5CE
-
-const INDEX_PREFIXES_CT = ['NIFTY', 'BANKNIFTY', 'FINNIFTY', 'MIDCPNIFTY', 'SENSEX', 'BANKEX'];
-
-function fmtStrikeCT(raw: string): string {
-  const n = parseFloat(raw);
-  return Number.isInteger(n)
-    ? n.toLocaleString('en-IN')
-    : n.toLocaleString('en-IN', { minimumFractionDigits: 1, maximumFractionDigits: 2 });
-}
-
-function parseSymbol(sym: string): { name: string; chip: string; strike: string } {
-  // Weekly index options: 5-digit numeric expiry + 5 or 6-digit strike
-  const mw = sym.match(/^([A-Z]+)\d{5}(\d{5,6})(CE|PE)$/);
-  if (mw) return { name: mw[1], chip: mw[3], strike: parseInt(mw[2], 10).toLocaleString('en-IN') };
-
-  // Stock options: DDMMMYY expiry, decimal-or-integer strike
-  const isIndex = INDEX_PREFIXES_CT.some(p => sym.startsWith(p));
-  if (!isIndex) {
-    const mDD = sym.match(/^([A-Z]+)(\d{2})([A-Z]{3})(\d{2})(\d+(?:\.\d+)?)(CE|PE)$/);
-    if (mDD) {
-      const expYear = parseInt(mDD[4], 10);
-      const strike  = parseFloat(mDD[5]);
-      if (expYear >= 24 && expYear <= 40 && strike > 0) {
-        return { name: mDD[1], chip: mDD[6], strike: fmtStrikeCT(mDD[5]) };
-      }
-    }
-  }
-
-  // Monthly options: YYMMM expiry + integer strike
-  const mm = sym.match(/^([A-Z]+)\d{2}[A-Z]{3}(\d{3,6})(CE|PE)$/);
-  if (mm) return { name: mm[1], chip: mm[3], strike: parseInt(mm[2], 10).toLocaleString('en-IN') };
-
-  // Futures
-  const mf = sym.match(/^([A-Z0-9]+)(?:\d{5}|\d{2}[A-Z]{3}(?:\d{2})?)FUT$/);
-  if (mf) return { name: mf[1], chip: 'FUT', strike: '' };
-
-  // Equity / unknown fallback
-  return { name: sym, chip: 'EQ', strike: '' };
-}
+// Symbol parsing lives in @/lib/symbolParser (shared with OpenPositionsTable).
 
 function chipClass(chip: string) {
   if (chip === 'CE') return 'tm-chip tm-chip-ce';
@@ -211,7 +169,7 @@ export default function ClosedTradesTable({
             {visible.map((trade, i) => {
               const isProfit   = trade.realized_pnl > 0;
               const isJournaled = journaledIds.has(trade.id);
-              const { name, chip, strike } = parseSymbol(trade.tradingsymbol);
+              const { name, chip, sub: strike } = parseSymbol(trade.tradingsymbol);
               const isLast     = i === visible.length - 1;
 
               return (

@@ -18,6 +18,7 @@ import { api } from '@/lib/api';
 import { useBroker } from '@/contexts/BrokerContext';
 import { useAlerts } from '@/contexts/AlertContext';
 import { SEV_DOT, SEV_LABEL_COLOR, SEV_LABEL } from '@/lib/alertSeverity';
+import { journalTradeId } from '@/lib/journalKey';
 
 const ALERT_WINDOW_MS = 20 * 60 * 1000; // ±20 min around trade exit
 
@@ -66,6 +67,10 @@ export interface TradeJournalSheetProps {
   onOpenChange: (open: boolean) => void;
   trade: (Position & { instrument_type?: string; unrealized_pnl?: number }) | Trade | CompletedTrade | null;
   type: 'position' | 'closed';
+  /** Fired only after a successful save — the parent marks the trade journaled. */
+  onSaved?: (tradeId: string) => void;
+  /** Fired only after a successful delete — the parent clears the journaled flag. */
+  onDeleted?: (tradeId: string) => void;
 }
 
 // ── Type guards ───────────────────────────────────────────────────────────────
@@ -95,7 +100,7 @@ function Chip({ label, active, onClick }: { label: string; active: boolean; onCl
 }
 
 // ── Main component ────────────────────────────────────────────────────────────
-export function TradeJournalSheet({ open, onOpenChange, trade, type }: TradeJournalSheetProps) {
+export function TradeJournalSheet({ open, onOpenChange, trade, type, onSaved, onDeleted }: TradeJournalSheetProps) {
   const { account } = useBroker();
   const { alerts } = useAlerts();
 
@@ -134,16 +139,17 @@ export function TradeJournalSheet({ open, onOpenChange, trade, type }: TradeJour
   const loadEntry = async () => {
     if (!trade || !account?.id) return;
     setIsLoading(true);
+    const effId = journalTradeId(String(trade.id), type);
     try {
       const [entryRes, histRes] = await Promise.allSettled([
-        api.get(`/api/journal/trade/${trade.id}`),
+        api.get(`/api/journal/trade/${effId}`),
         api.get('/api/journal/', { params: { symbol: trade.tradingsymbol, limit: 4 } }),
       ]);
       if (entryRes.status === 'fulfilled' && entryRes.value.data.entry) apply(entryRes.value.data.entry);
       else reset();
       if (histRes.status === 'fulfilled') {
         const entries: JournalEntry[] = histRes.value.data.entries ?? histRes.value.data ?? [];
-        setSymbolHistory(entries.filter(e => e.trade_id !== String(trade.id)).slice(0, 3));
+        setSymbolHistory(entries.filter(e => e.trade_id !== effId).slice(0, 3));
       }
     } catch {
       reset();
@@ -170,9 +176,13 @@ export function TradeJournalSheet({ open, onOpenChange, trade, type }: TradeJour
     const pnl   = isPos ? ((trade as Position & { unrealized_pnl?: number }).unrealized_pnl ?? 0)
                 : isCT  ? (trade as CompletedTrade).realized_pnl
                         : (trade as Trade).pnl;
+    const effId = journalTradeId(String(trade.id), type);
     try {
       const res = await api.post('/api/journal/', {
-        trade_id:       trade.id,
+        trade_id:       effId,
+        // For open positions effId is a synthetic per-episode id; source_id carries
+        // the real position id so the backend can verify ownership.
+        source_id:      isPos ? String(trade.id) : undefined,
         emotion_tags:   emotions,
         followed_plan:  followedPlan || undefined,
         exit_reason:    exitReason   || undefined,
@@ -185,6 +195,8 @@ export function TradeJournalSheet({ open, onOpenChange, trade, type }: TradeJour
       setExistingEntry(res.data.entry);
       setHasChanges(false);
       toast.success('Saved');
+      // Mark journaled only now that the save actually succeeded.
+      onSaved?.(effId);
       // Auto-close after save when triggered by auto-prompt
       onOpenChange(false);
     } catch {
@@ -197,9 +209,11 @@ export function TradeJournalSheet({ open, onOpenChange, trade, type }: TradeJour
   const handleDelete = async () => {
     if (!trade || !account?.id) return;
     setIsSaving(true);
+    const effId = journalTradeId(String(trade.id), type);
     try {
-      await api.delete(`/api/journal/trade/${trade.id}`);
+      await api.delete(`/api/journal/trade/${effId}`);
       reset();
+      onDeleted?.(effId);
       toast.success('Entry deleted');
     } catch {
       toast.error('Failed to delete');

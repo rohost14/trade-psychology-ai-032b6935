@@ -8,7 +8,7 @@ interface SessionHeroCardProps {
   stateCfg: typeof STATE_CFG[SessionState];
   sessionPnlDisplay: number;
   realizedPnlDisplay: number;
-  tradeStats: { trades_today: number; win_rate: number; max_drawdown: number; risk_used: number } | null;
+  tradeStats: { trades_today: number; win_rate: number; max_drawdown: number } | null;
   pnlPositive: boolean;
   unreadCount: number;
   acknowledgedTodayCount: number;

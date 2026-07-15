@@ -381,17 +381,15 @@ export function AlertProvider({ children }: { children: ReactNode }) {
     fetchAlerts(false);
   }, [fetchAlerts]);
 
-  // React to WebSocket alert events — refetch and toast new ones
+  // React to WebSocket alert events — refetch and toast new ones.
+  // This is fully event-driven (no polling): live alerts arrive as alert_update
+  // events, and any alerts missed while the socket was down are re-delivered as
+  // replay events on reconnect (WebSocketContext ?since=last_event_id), each of
+  // which updates lastAlertEvent and triggers a refetch here.
   const { lastAlertEvent } = useWebSocketAlerts();
   useEffect(() => {
     if (lastAlertEvent) fetchAlerts(true);
   }, [lastAlertEvent]); // eslint-disable-line react-hooks/exhaustive-deps
-
-  // Fallback poll every 60s — catches alerts if WebSocket event was missed
-  useEffect(() => {
-    const id = setInterval(() => fetchAlerts(true), 60_000);
-    return () => clearInterval(id);
-  }, [fetchAlerts]);
 
 
   // ---------------------------------------------------------------------------

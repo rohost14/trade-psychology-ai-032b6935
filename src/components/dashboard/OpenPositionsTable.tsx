@@ -2,6 +2,8 @@ import { useEffect, useRef, useState } from 'react';
 import { Briefcase, Pencil, CheckCircle2 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { formatPrice, formatNumber, formatCurrencyWithSign } from '@/lib/formatters';
+import { positionJournalTradeId } from '@/lib/journalKey';
+import { parseSymbol } from '@/lib/symbolParser';
 import type { Position } from '@/types/api';
 
 type PositionWithExtras = Position & {
@@ -15,70 +17,35 @@ interface OpenPositionsTableProps {
   isLoading?: boolean;
   journaledIds?: Set<string>;
   onPositionClick?: (position: PositionWithExtras) => void;
+  /** Live-price freshness signals (from WebSocketContext) — drives the LTP status pill. */
+  pricesConnected?: boolean;
+  lastPriceAt?: number | null;
+  tokenExpired?: boolean;
 }
 
-// Parse Zerodha tradingsymbol into display parts.
-//
-// Zerodha uses two different expiry formats depending on instrument type:
-//
-//   YYMMM  (2-digit year + 3-char month BEFORE strike)
-//     → Index monthly options:  NIFTY25MAR23000CE, ICICIGI24JUN1640PE
-//     → Weekly index:           NIFTY25415XXXXXCE (5-digit numeric expiry)
-//
-//   DDMMMYY (day + month + 2-digit year AFTER month, BEFORE strike)
-//     → Stock options with specific-date or weekly expiry: ADANIPOWER26JUN242.5CE
-//     → Strike can be decimal for low-priced stocks (2.5, 7.5, etc.)
-//
-// Disambiguation is needed because both share the \d{2}[A-Z]{3} prefix.
-// Strategy: for non-index symbols, try DDMMMYY first with year-range validation (≥24).
-// Index symbols (NIFTY/BANKNIFTY/etc.) never use DDMMMYY — skip straight to YYMMM.
+// A live tick is expected roughly every second per instrument during market hours.
+// Treat prices as stale if none has arrived in this window.
+const PRICE_STALE_MS = 20_000;
 
-const INDEX_PREFIXES = ['NIFTY', 'BANKNIFTY', 'FINNIFTY', 'MIDCPNIFTY', 'SENSEX', 'BANKEX'];
-
-function fmtStrike(raw: string): string {
-  const n = parseFloat(raw);
-  return Number.isInteger(n)
-    ? n.toLocaleString('en-IN')
-    : n.toLocaleString('en-IN', { minimumFractionDigits: 1, maximumFractionDigits: 2 });
+function PriceStatusPill({ status }: { status: 'live' | 'delayed' | 'paused' }) {
+  const cfg = {
+    live:    { label: 'Live',    dot: 'bg-tm-profit',        text: 'text-tm-profit' },
+    delayed: { label: 'Delayed', dot: 'bg-tm-obs',           text: 'text-tm-obs' },
+    paused:  { label: 'Paused',  dot: 'bg-muted-foreground',  text: 'text-muted-foreground' },
+  }[status];
+  return (
+    <span className={cn('inline-flex items-center gap-1 text-[10px] font-medium', cfg.text)} title={
+      status === 'live' ? 'Live prices streaming' :
+      status === 'delayed' ? 'Live prices delayed — showing last known values' :
+      'Live prices paused — reconnect your broker to resume'
+    }>
+      <span className={cn('w-1.5 h-1.5 rounded-full', cfg.dot, status === 'live' && 'animate-pulse')} />
+      {cfg.label}
+    </span>
+  );
 }
 
-function parseSymbol(sym: string, instrType?: string): { name: string; chip: string; sub: string } {
-  // ── Weekly index options: 5-digit numeric expiry ──────────────────────────
-  // e.g. NIFTY2541524600CE, NIFTY25415100000CE
-  const mw = sym.match(/^([A-Z]+)\d{5}(\d{5,6})(CE|PE)$/);
-  if (mw) return { name: mw[1], chip: mw[3], sub: parseInt(mw[2], 10).toLocaleString('en-IN') };
-
-  // ── Stock options with DDMMMYY expiry (specific date, decimal strikes OK) ─
-  // e.g. ADANIPOWER26JUN242.5CE  →  DD=26, MON=JUN, YY=24, strike=2.5, type=CE
-  // Skip for known index underlyings — they never use this format.
-  const isIndex = INDEX_PREFIXES.some(p => sym.startsWith(p));
-  if (!isIndex) {
-    const mDD = sym.match(/^([A-Z]+)(\d{2})([A-Z]{3})(\d{2})(\d+(?:\.\d+)?)(CE|PE)$/);
-    if (mDD) {
-      const expYear = parseInt(mDD[4], 10);
-      const strike  = parseFloat(mDD[5]);
-      // expYear must be a plausible options year (2024–2040); strike must be positive.
-      // This rejects cases where \d{2}[A-Z]{3}\d{2} accidentally captures two year-digits
-      // from a YYMMM symbol (e.g. ICICIGI24JUN → year parsed as "16" < 24 → falls through).
-      if (expYear >= 24 && expYear <= 40 && strike > 0) {
-        return { name: mDD[1], chip: mDD[6], sub: fmtStrike(mDD[5]) };
-      }
-    }
-  }
-
-  // ── Monthly options: YYMMM expiry ─────────────────────────────────────────
-  // e.g. NIFTY25MAR23000CE, ICICIGI24JUN1640PE, KALYANKJIL24JUN370CE
-  const mm = sym.match(/^([A-Z]+)\d{2}[A-Z]{3}(\d{3,6})(CE|PE)$/);
-  if (mm) return { name: mm[1], chip: mm[3], sub: parseInt(mm[2], 10).toLocaleString('en-IN') };
-
-  // ── Futures ───────────────────────────────────────────────────────────────
-  // e.g. NIFTY25MARFUT, BANKNIFTY25APR25FUT, CRUDEOIL25MARFUT
-  const mf = sym.match(/^([A-Z0-9]+)(?:\d{5}|\d{2}[A-Z]{3}(?:\d{2})?)FUT$/);
-  if (mf) return { name: mf[1], chip: 'FUT', sub: '' };
-
-  // ── Equity / unknown fallback ─────────────────────────────────────────────
-  return { name: sym, chip: instrType && instrType !== 'EQ' ? instrType : 'EQ', sub: '' };
-}
+// Symbol parsing lives in @/lib/symbolParser (shared with ClosedTradesTable).
 
 function chipClass(chip: string) {
   if (chip === 'CE') return 'tm-chip tm-chip-ce';
@@ -120,8 +87,21 @@ function PriceCell({ symbol, staticPrice, livePrice }: {
 
 export default function OpenPositionsTable({
   positions, isLoading, journaledIds = new Set(), onPositionClick,
+  pricesConnected, lastPriceAt, tokenExpired,
 }: OpenPositionsTableProps) {
   const openPositions = positions.filter(p => p.status === 'open');
+
+  // Re-evaluate freshness on a slow tick so 'live' flips to 'delayed' when ticks stop.
+  const [now, setNow] = useState(Date.now());
+  useEffect(() => {
+    const id = setInterval(() => setNow(Date.now()), 5_000);
+    return () => clearInterval(id);
+  }, []);
+
+  const priceStatus: 'live' | 'delayed' | 'paused' =
+    tokenExpired ? 'paused'
+    : pricesConnected && lastPriceAt != null && now - lastPriceAt < PRICE_STALE_MS ? 'live'
+    : 'delayed';
 
   const getLivePnl = (p: PositionWithExtras) => {
     if (p.last_price) {
@@ -163,6 +143,7 @@ export default function OpenPositionsTable({
           <span className="text-[11px] text-muted-foreground font-mono tabular-nums">
             {openPositions.length}
           </span>
+          {openPositions.length > 0 && <PriceStatusPill status={priceStatus} />}
         </div>
         {openPositions.length > 0 && (
           <span className={cn(
@@ -182,7 +163,7 @@ export default function OpenPositionsTable({
               {openPositions.map((pos) => {
                 const livePnl = getLivePnl(pos);
                 const qty = pos.total_quantity;
-                const isJournaled = journaledIds.has(pos.id);
+                const isJournaled = journaledIds.has(positionJournalTradeId(pos.id));
                 const { name, chip, sub } = parseSymbol(pos.tradingsymbol, pos.instrument_type);
                 return (
                   <button
@@ -257,7 +238,7 @@ export default function OpenPositionsTable({
               {openPositions.map((pos, i) => {
                 const livePnl = getLivePnl(pos);
                 const qty = pos.total_quantity;
-                const isJournaled = journaledIds.has(pos.id);
+                const isJournaled = journaledIds.has(positionJournalTradeId(pos.id));
                 const { name, chip, sub } = parseSymbol(pos.tradingsymbol, pos.instrument_type);
                 return (
                   <tr key={pos.id} className={cn(

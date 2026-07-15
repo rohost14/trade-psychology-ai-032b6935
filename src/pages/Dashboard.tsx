@@ -44,7 +44,7 @@ interface RiskStateData {
 export default function Dashboard() {
   const navigate = useNavigate();
   const { isConnected, isLoading: brokerLoading, account, connect, syncTrades, syncStatus, syncError, isTokenExpired } = useBroker();
-  const { lastTradeEvent, lastLtpEvent } = useWebSocket();
+  const { lastTradeEvent, lastLtpEvent, lastLtpAt, isConnected: wsConnected } = useWebSocket();
   const { alerts, isLoading: alertsLoading, acknowledgeAlert } = useAlerts();
 
   const accountId = account?.id;
@@ -66,7 +66,6 @@ export default function Dashboard() {
     trades_today: number;
     win_rate: number;
     max_drawdown: number;
-    risk_used: number;
   } | null>(null);
 
   const [selectedAlert, setSelectedAlert] = useState<AlertNotification | null>(null);
@@ -82,6 +81,14 @@ export default function Dashboard() {
 
   const accountIdRef = useRef(accountId);
   accountIdRef.current = accountId;
+  // Live mirrors of open-state so the 45s auto-prompt timer can read CURRENT values
+  // (its effect closure is stale) and never interrupt an open sheet/prompt.
+  const journalOpenRef = useRef(journalOpen);
+  journalOpenRef.current = journalOpen;
+  const alertOpenRef = useRef<AlertNotification | null>(selectedAlert);
+  alertOpenRef.current = selectedAlert;
+  const capitalPromptRef = useRef(showCapitalPrompt);
+  capitalPromptRef.current = showCapitalPrompt;
   const fetchedForSyncRef = useRef<string | null>(null);
   const seenTradeIdsRef = useRef<Set<string>>(new Set());
   const journalPromptTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -267,7 +274,10 @@ export default function Dashboard() {
     if (!newTrade) return;
     if (journalPromptTimerRef.current) clearTimeout(journalPromptTimerRef.current);
     journalPromptTimerRef.current = setTimeout(() => {
-      if (!journalOpen) {
+      // Read CURRENT open-state via refs (the effect closure is 45s stale). Don't
+      // interrupt the user if any sheet/prompt is already open — auto-prompt only
+      // fires into a clean screen.
+      if (!journalOpenRef.current && !alertOpenRef.current && !capitalPromptRef.current) {
         setSelectedTrade(newTrade);
         setSelectedType('closed');
         setJournalOpen(true);
@@ -282,12 +292,18 @@ export default function Dashboard() {
   useEffect(() => {
     const todayTrades = closedTrades.filter(t => new Date(t.exit_time) >= getISTMidnightUTC());
     const winners = todayTrades.filter(t => t.realized_pnl > 0);
+    const losers = todayTrades.filter(t => t.realized_pnl < 0);
     const realizedPnl = todayTrades.reduce((sum, t) => sum + t.realized_pnl, 0);
     const unrealizedPnl = positions.reduce((sum, p) => sum + (p.unrealized_pnl || 0), 0);
     const sessionPnl = realizedPnl + unrealizedPnl;
 
+    // Drawdown must accumulate in the order trades actually closed — the API list
+    // is not guaranteed to be exit-time ordered, so sort before folding.
+    const drawdownOrdered = [...todayTrades].sort(
+      (a, b) => new Date(a.exit_time).getTime() - new Date(b.exit_time).getTime()
+    );
     let cumPnl = 0, peak = 0, maxDrawdown = 0;
-    for (const trade of todayTrades) {
+    for (const trade of drawdownOrdered) {
       cumPnl += trade.realized_pnl;
       if (cumPnl > peak) peak = cumPnl;
       const drawdown = peak - cumPnl;
@@ -296,9 +312,13 @@ export default function Dashboard() {
 
     setTradeStats({
       trades_today: todayTrades.length,
-      win_rate: todayTrades.length > 0 ? (winners.length / todayTrades.length) * 100 : 0,
+      // Win rate = wins / decided trades. Breakeven trades (pnl == 0) are neither
+      // a win nor a loss, so they're excluded from the denominator rather than
+      // silently counted against the trader.
+      win_rate: (winners.length + losers.length) > 0
+        ? (winners.length / (winners.length + losers.length)) * 100
+        : 0,
       max_drawdown: -maxDrawdown,
-      risk_used: 0,
     });
     setRealizedPnlDisplay(realizedPnl);
     setRiskState(prev => prev ? { ...prev, unrealized_pnl: sessionPnl } : prev);
@@ -354,10 +374,20 @@ export default function Dashboard() {
   };
 
   const handleJournalClose = (open: boolean) => {
-    if (!open && selectedTrade) {
-      setJournaledIds(prev => new Set([...prev, selectedTrade.id]));
-    }
+    // Do NOT mark journaled on close — only a successful save marks it (onSaved below).
     setJournalOpen(open);
+  };
+
+  const handleJournalSaved = (tradeId: string) => {
+    setJournaledIds(prev => new Set([...prev, tradeId]));
+  };
+
+  const handleJournalDeleted = (tradeId: string) => {
+    setJournaledIds(prev => {
+      const next = new Set(prev);
+      next.delete(tradeId);
+      return next;
+    });
   };
 
   // ── Computed values ───────────────────────────────────────────────────────
@@ -579,6 +609,9 @@ export default function Dashboard() {
               isLoading={positionsLoading}
               journaledIds={journaledIds}
               onPositionClick={handlePositionClick}
+              pricesConnected={wsConnected}
+              lastPriceAt={lastLtpAt}
+              tokenExpired={isTokenExpired}
             />
           )}
 
@@ -643,6 +676,8 @@ export default function Dashboard() {
         onOpenChange={handleJournalClose}
         trade={selectedTrade}
         type={selectedType}
+        onSaved={handleJournalSaved}
+        onDeleted={handleJournalDeleted}
       />
     </div>
   );

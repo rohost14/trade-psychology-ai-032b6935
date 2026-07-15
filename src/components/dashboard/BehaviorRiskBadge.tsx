@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom';
 import { Activity } from 'lucide-react';
 import { api } from '@/lib/api';
 import { cn } from '@/lib/utils';
+import { useWebSocket } from '@/contexts/WebSocketContext';
 
 interface Scores {
   behavior_risk: number;
@@ -27,17 +28,18 @@ const BAND_LABELS: Record<string, string> = {
  */
 export function BehaviorRiskBadge() {
   const [scores, setScores] = useState<Scores | null>(null);
+  // Event-driven (no polling): behavior risk only changes when a behavioral event
+  // fires, which arrives as a WebSocket alert_update. Reload on mount and on each
+  // alert event instead of on a timer.
+  const { lastAlertEvent } = useWebSocket();
 
   useEffect(() => {
     let alive = true;
-    const load = () =>
-      api.get('/api/risk/scores')
-        .then(r => { if (alive) setScores(r.data); })
-        .catch(() => {});
-    load();
-    const t = setInterval(load, 120_000);
-    return () => { alive = false; clearInterval(t); };
-  }, []);
+    api.get('/api/risk/scores')
+      .then(r => { if (alive) setScores(r.data); })
+      .catch(() => {});
+    return () => { alive = false; };
+  }, [lastAlertEvent]);
 
   if (!scores) return null;
 

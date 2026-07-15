@@ -46,6 +46,8 @@ interface WebSocketContextValue {
   lastTradeEvent: TradeEvent | null;
   lastAlertEvent: AlertEvent | null;
   lastLtpEvent: LtpEvent | null;
+  /** epoch ms of the most recent live price tick — used to show price freshness */
+  lastLtpAt: number | null;
   isConnected: boolean;
   isReconnecting: boolean;
   subscribeToPositions: () => void;
@@ -56,6 +58,7 @@ const WebSocketContext = createContext<WebSocketContextValue>({
   lastTradeEvent: null,
   lastAlertEvent: null,
   lastLtpEvent: null,
+  lastLtpAt: null,
   isConnected: false,
   isReconnecting: false,
   subscribeToPositions: () => {},
@@ -75,6 +78,7 @@ export function WebSocketProvider({ children }: { children: React.ReactNode }) {
   const [lastTradeEvent, setLastTradeEvent] = useState<TradeEvent | null>(null);
   const [lastAlertEvent, setLastAlertEvent] = useState<AlertEvent | null>(null);
   const [lastLtpEvent, setLastLtpEvent] = useState<LtpEvent | null>(null);
+  const [lastLtpAt, setLastLtpAt] = useState<number | null>(null);
   const [isConnected, setIsConnected] = useState(false);
   const [isReconnecting, setIsReconnecting] = useState(false);
   const hasConnectedRef = useRef(false); // true once we've had a successful auth_ok
@@ -240,6 +244,7 @@ export function WebSocketProvider({ children }: { children: React.ReactNode }) {
                   last_price: msg.data.last_price,
                   instrument_token: msg.data.instrument_token,
                 });
+                setLastLtpAt(Date.now());
               }
               break;
 
@@ -302,6 +307,7 @@ export function WebSocketProvider({ children }: { children: React.ReactNode }) {
       lastTradeEvent,
       lastAlertEvent,
       lastLtpEvent,
+      lastLtpAt,
       isConnected,
       isReconnecting,
       subscribeToPositions,

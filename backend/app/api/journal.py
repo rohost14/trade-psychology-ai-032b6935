@@ -75,6 +75,10 @@ async def embed_journal_entry_async(db: AsyncSession, entry: JournalEntry):
 # Request/Response Models
 class JournalEntryCreate(BaseModel):
     trade_id: Optional[str] = None
+    # For open-position journaling, trade_id is a synthetic per-episode id that does
+    # not exist in any table; source_id carries the real position id so ownership can
+    # be verified. Omitted for closed trades (trade_id is the CompletedTrade id).
+    source_id: Optional[str] = None
     emotion_tags: Optional[List[str]] = None
     # Structured fields (migration 045)
     followed_plan: Optional[str] = None       # 'yes' | 'partially' | 'no'
@@ -230,13 +234,25 @@ async def create_journal_entry(
         # Verify trade ownership — trade must belong to the requesting broker account.
         # The ID can come from completed_trades, positions, or trades table depending
         # on whether the user is journaling a closed trade or open position.
+        #
+        # For open positions, trade_id is a synthetic per-episode id (does not exist
+        # in any table) — ownership is verified against the real position id passed in
+        # source_id. For closed trades, trade_id itself is checked.
         if trade_uuid:
             owned = False
+            source_uuid = None
+            if data.source_id:
+                try:
+                    source_uuid = UUID(data.source_id)
+                except (ValueError, AttributeError):
+                    raise HTTPException(status_code=422, detail="Invalid source_id")
+
+            check_id = source_uuid or trade_uuid
 
             # Check completed_trades first (most common — closed trades)
             ct_check = await db.execute(
                 select(CompletedTrade.id).where(
-                    CompletedTrade.id == trade_uuid,
+                    CompletedTrade.id == check_id,
                     CompletedTrade.broker_account_id == broker_account_id,
                 )
             )
@@ -247,7 +263,7 @@ async def create_journal_entry(
             if not owned:
                 pos_check = await db.execute(
                     select(Position.id).where(
-                        Position.id == trade_uuid,
+                        Position.id == check_id,
                         Position.broker_account_id == broker_account_id,
                     )
                 )
@@ -258,7 +274,7 @@ async def create_journal_entry(
             if not owned:
                 trade_check = await db.execute(
                     select(Trade.id).where(
-                        Trade.id == trade_uuid,
+                        Trade.id == check_id,
                         Trade.broker_account_id == broker_account_id,
                     )
                 )
