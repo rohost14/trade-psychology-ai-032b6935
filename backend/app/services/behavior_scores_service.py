@@ -149,6 +149,9 @@ async def get_today_scores(broker_account_id: UUID, db: AsyncSession) -> Dict:
         select(BehaviorEvent).where(and_(
             BehaviorEvent.broker_account_id == broker_account_id,
             BehaviorEvent.detected_at >= day_start_utc,
+            # Shadow (dark-launched) detector events are evidence only — excluded
+            # from every user-facing score.
+            BehaviorEvent.shadow.is_(False),
         ))
     )
     events = list(result.scalars().all())

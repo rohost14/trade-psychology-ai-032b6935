@@ -48,6 +48,11 @@ class DetectorSpec:
     uses_constitution: bool = False
     uses_position_state: bool = False
     consumes: Tuple[str, ...] = ("session_trades", "completed_trade", "thresholds")
+    # Feature-flag DEFAULT mode (migration 068): off | shadow | canary | on.
+    # A row in the detector_flags table overrides this at runtime. New or
+    # reworked detectors ship as "shadow" here, then promote to "on" once shadow
+    # parity holds — the safe detector-by-detector migration path.
+    default_mode: str = "on"
 
 
 REGISTRY: Tuple[DetectorSpec, ...] = (

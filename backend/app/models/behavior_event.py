@@ -15,7 +15,7 @@ Not to be confused with the legacy `behavioral_events` table
 (models/behavioral_event.py) — frozen since Session 21, kept for old rows.
 """
 import uuid
-from sqlalchemy import Column, String, Numeric, Text, TIMESTAMP, text, ForeignKey, Index
+from sqlalchemy import Column, String, Numeric, Text, TIMESTAMP, text, ForeignKey, Index, Boolean
 from sqlalchemy.dialects.postgresql import UUID, JSONB
 from sqlalchemy.orm import relationship
 
@@ -60,6 +60,13 @@ class BehaviorEvent(Base):
     # DO NOTHING). NULL for events without a trigger trade (death_spiral,
     # position monitor) which carry their own dedup.
     idempotency_key = Column(Text)
+
+    # Feature-flag shadow marker (migration 068). True when the detector that
+    # produced this event was running in shadow/canary-dark mode: the event is
+    # recorded as evidence but must NOT alert and must NOT move any score.
+    # Scoring reads WHERE shadow = false. Distinct from notification suppression,
+    # which still feeds the score.
+    shadow = Column(Boolean, nullable=False, server_default=text("false"), default=False)
 
     detected_at = Column(TIMESTAMP(timezone=True), nullable=False)  # trade time
     created_at = Column(TIMESTAMP(timezone=True), server_default=text("now()"))

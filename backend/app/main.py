@@ -422,6 +422,7 @@ from app.api.admin import users as admin_users, system as admin_system
 from app.api.admin import insights as admin_insights, config_api as admin_config
 from app.api.admin import audit as admin_audit, broadcast as admin_broadcast
 from app.api.admin import tasks as admin_tasks
+from app.api.admin import detector_flags as admin_detector_flags
 app.include_router(admin_auth.router,      prefix="/api/admin/auth", tags=["admin"])
 app.include_router(admin_overview.router,  prefix="/api/admin",      tags=["admin"])
 app.include_router(admin_users.router,     prefix="/api/admin",      tags=["admin"])
@@ -431,4 +432,5 @@ app.include_router(admin_config.router,    prefix="/api/admin",      tags=["admi
 app.include_router(admin_audit.router,     prefix="/api/admin",      tags=["admin"])
 app.include_router(admin_broadcast.router, prefix="/api/admin",      tags=["admin"])
 app.include_router(admin_tasks.router,     prefix="/api/admin",      tags=["admin"])
+app.include_router(admin_detector_flags.router, prefix="/api/admin",  tags=["admin"])
 

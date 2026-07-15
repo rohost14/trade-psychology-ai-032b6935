@@ -154,6 +154,13 @@ class DetectedEvent:
     risk_delta: Decimal = Decimal("0")
     confidence: Optional[float] = None  # 0-100; None → derived from data quality
     suppressed_reason: Optional[str] = None  # e.g. "strategy_group" — event recorded, no alert
+    # Feature-flag shadow marker: set by the engine when the emitting detector is
+    # in shadow/canary-dark mode. Recorded as evidence, but never alerts or scores.
+    shadow: bool = False
+    # Optional detector-supplied idempotency discriminator. When set, it (instead of
+    # context['rule']) disambiguates the BehaviorEvent idempotency key — lets a
+    # detector legitimately emit more than one event for the same trade.
+    discriminator: Optional[str] = None
 
 
 @dataclass
@@ -220,7 +227,11 @@ class BehaviorEngine:
             ctx = await self._load_context(
                 broker_account_id, completed_trade, session, db, profile
             )
-            events = self._run_all_detectors(ctx)
+            # Resolve per-detector feature flags once for this run (registry
+            # defaults + DB overrides, Redis-cached). Drives off/shadow/canary/on.
+            from app.services.detector_flag_service import detector_flags as _detector_flags
+            flags = await _detector_flags.get_flags(db)
+            events = self._run_all_detectors(ctx, flags)
 
             now = datetime.now(timezone.utc)
             # detected_at = the trade's own exit time, never processing time.
@@ -241,7 +252,9 @@ class BehaviorEngine:
             # are recorded below (§1C.8: suppression is notification-layer only).
             alerts = []
             for e in events:
-                if e.severity == "info" or e.suppressed_reason:
+                # info = analytics-only; suppressed = notification withheld;
+                # shadow = dark-launched detector — none of these alert.
+                if e.severity == "info" or e.suppressed_reason or e.shadow:
                     continue
                 alerts.append(RiskAlert(
                     id=uuid4(),  # explicit id so events can link pre-flush
@@ -276,7 +289,7 @@ class BehaviorEngine:
                     # multi-event constitution detector).
                     idempotency_key=(
                         f"{e.event_type}:{completed_trade.id}:"
-                        f"{(e.context or {}).get('rule', '')}"
+                        f"{e.discriminator if e.discriminator is not None else (e.context or {}).get('rule', '')}"
                     ),
                     detector_version=self._detector_version(e.event_type),
                     severity=e.severity,
@@ -290,6 +303,7 @@ class BehaviorEngine:
                     ),
                     input_snapshot=(input_snapshot
                                     if e.severity in ("danger", "critical") else None),
+                    shadow=e.shadow,
                     trigger_completed_trade_id=completed_trade.id,
                     detected_at=trade_time,
                 )
@@ -298,9 +312,11 @@ class BehaviorEngine:
 
             # Suppressed events are recorded as evidence but do not move the
             # risk score (pre-registry behavior: they never reached this sum).
+            # Shadow events (dark-launched detectors) are excluded too — they must
+            # never influence the user-facing score.
             total_delta = sum(
                 RISK_DELTAS.get(e.event_type, Decimal("0"))
-                for e in events if not e.suppressed_reason
+                for e in events if not e.suppressed_reason and not e.shadow
             )
             new_risk = max(Decimal("0"), min(Decimal("100"), risk_before + total_delta))
             state = _behavior_state(new_risk, session.peak_risk_score)
@@ -494,17 +510,31 @@ class BehaviorEngine:
         "direction_instability",   # straddle/strangle legs are CE+PE by design
     })
 
-    def _run_all_detectors(self, ctx: EngineContext) -> List[DetectedEvent]:
+    def _run_all_detectors(
+        self, ctx: EngineContext, flags: Optional[Dict[str, tuple]] = None
+    ) -> List[DetectedEvent]:
         """
         Iterate the Detector Registry (A.1) in declaration order.
+
+        Feature flags (migration 068) gate each detector by its resolved mode:
+          off    → detector method is not called
+          shadow → method runs; its events are tagged shadow=True (recorded as
+                   evidence but never alert and never move any score)
+          on     → live
 
         Suppression (strategy legs, options overlap) marks events with
         suppressed_reason instead of dropping them — the BehaviorEvent is
         always recorded, only the notification is withheld (master §1C.8).
         """
+        from app.services.detector_flag_service import detector_flags, EFFECTIVE_OFF, EFFECTIVE_SHADOW
+
+        flags = flags or {}
         events = []
         _SEV_RANK = {"critical": 0, "danger": 1, "caution": 2, "positive": 3}
         for spec in REGISTRY:
+            mode = detector_flags.resolve(spec.name, ctx.broker_account_id, flags)
+            if mode == EFFECTIVE_OFF:
+                continue
             detector = getattr(self, spec.method, None)
             if detector is None:
                 logger.error(f"[BehaviorEngine] registry method missing: {spec.method}")
@@ -516,6 +546,10 @@ class BehaviorEngine:
                 # constitution_violation returns a list (multiple rules can
                 # breach on one trade); everything else returns a single event.
                 for event in (result if isinstance(result, list) else [result]):
+                    if mode == EFFECTIVE_SHADOW:
+                        # Dark-launched detector: record evidence, but never alert
+                        # or score. Tag every event this method produced.
+                        event.shadow = True
                     if ctx.strategy_group and event.event_type in self._STRATEGY_SUPPRESSED:
                         event.suppressed_reason = f"strategy_group:{ctx.strategy_group.strategy_type}"
                         logger.debug(
