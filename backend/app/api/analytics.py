@@ -18,9 +18,23 @@ from app.models.completed_trade import CompletedTrade
 from app.models.completed_trade_feature import CompletedTradeFeature
 from app.models.journal_entry import JournalEntry
 from app.models.risk_alert import RiskAlert
+from app.models.strategy_group import StrategyGroup, StrategyGroupLeg
 
 router = APIRouter()
 logger = logging.getLogger(__name__)
+
+# IST offset — Zerodha trade timestamps localise to this for hour/weekday buckets.
+_IST = timezone(timedelta(hours=5, minutes=30))
+
+import re as _re_module
+
+
+def _analytics_underlying(sym: str) -> str:
+    """Underlying root of an F&O symbol (NIFTY25MAR23000CE → NIFTY). Best-effort."""
+    if not sym:
+        return sym
+    m = _re_module.match(r'^([A-Z&\-]+?)(?:\d{5}|\d{2}[A-Z]{3})', sym.upper())
+    return m.group(1) if m else sym.upper()
 
 @router.get("/risk-score")
 async def get_weekly_risk_score(
@@ -3249,3 +3263,217 @@ async def get_trade_sequence(
         "baseline_avg_pnl": baseline_avg,
         "sequence": sequence,
     }
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Edge / Leak — where you ACTUALLY make and lose money (factual, sample-gated)
+# ─────────────────────────────────────────────────────────────────────────────
+
+@router.get("/edge-leak")
+async def get_edge_leak(
+    days: int = Query(default=30, ge=1, le=365),
+    broker_account_id: UUID = Depends(get_verified_broker_account_id),
+    db: AsyncSession = Depends(get_db),
+    _limiter: None = Depends(analytics_limiter),
+):
+    """
+    Ranks realized P&L by bucket across several dimensions (underlying, time-of-day,
+    weekday, product, instrument type) and returns the strongest EDGES (most
+    profitable buckets) and LEAKS (most losing buckets).
+
+    Pure fact: each number is the trader's own realized P&L in that bucket — no
+    attribution, no counterfactual, no estimate. Sample-gated (min trades) so a
+    single lucky/unlucky trade never shows up as an "edge" or "leak".
+    """
+    MIN_TRADES = 5
+    _WEEKDAYS = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"]
+    try:
+        cutoff = datetime.now(timezone.utc) - timedelta(days=days)
+        res = await db.execute(
+            select(CompletedTrade).where(and_(
+                CompletedTrade.broker_account_id == broker_account_id,
+                CompletedTrade.exit_time >= cutoff,
+                CompletedTrade.status == "closed",
+                CompletedTrade.realized_pnl.isnot(None),
+                CompletedTrade.entry_time.isnot(None),
+            ))
+        )
+        trades = res.scalars().all()
+        if len(trades) < MIN_TRADES:
+            return {"has_data": False, "period_days": days}
+
+        dims: dict[str, dict] = defaultdict(lambda: defaultdict(lambda: {"trades": 0, "pnl": 0.0, "wins": 0}))
+
+        def _hour_label(h: int) -> str:
+            end = (h + 1) % 24
+            def _fmt(x):
+                ap = "AM" if x < 12 else "PM"
+                hh = x % 12 or 12
+                return f"{hh} {ap}"
+            return f"{_fmt(h)}-{_fmt(end)}"
+
+        def _type_label(sym: str, direction: str) -> str:
+            s = (sym or "").upper()
+            is_long = (direction or "LONG").upper() == "LONG"
+            if s.endswith("CE"): return "Call buys" if is_long else "Call sells"
+            if s.endswith("PE"): return "Put buys" if is_long else "Put sells"
+            if s.endswith("FUT"): return "Futures (long)" if is_long else "Futures (short)"
+            return "Equity"
+
+        for t in trades:
+            pnl = float(t.realized_pnl or 0)
+            win = 1 if pnl > 0 else 0
+            ist = t.entry_time.astimezone(_IST) if t.entry_time else None
+            buckets = [
+                ("Instrument", _analytics_underlying(t.tradingsymbol)),
+                ("Type", _type_label(t.tradingsymbol, t.direction)),
+                ("Product", (t.product or "OTHER")),
+            ]
+            if ist is not None:
+                buckets.append(("Time", _hour_label(ist.hour)))
+                buckets.append(("Day", _WEEKDAYS[ist.weekday()]))
+            for dim, label in buckets:
+                b = dims[dim][label]
+                b["trades"] += 1
+                b["pnl"] += pnl
+                b["wins"] += win
+
+        flat = []
+        for dim, buckets in dims.items():
+            for label, b in buckets.items():
+                if b["trades"] < MIN_TRADES:
+                    continue
+                flat.append({
+                    "dimension": dim,
+                    "label": label,
+                    "trades": b["trades"],
+                    "pnl": round(b["pnl"], 2),
+                    "win_rate": round(b["wins"] / b["trades"] * 100, 1),
+                })
+
+        edges = sorted([f for f in flat if f["pnl"] > 0], key=lambda x: -x["pnl"])[:5]
+        leaks = sorted([f for f in flat if f["pnl"] < 0], key=lambda x: x["pnl"])[:5]
+
+        return {
+            "has_data": bool(edges or leaks),
+            "period_days": days,
+            "min_trades": MIN_TRADES,
+            "edges": edges,
+            "leaks": leaks,
+        }
+    except Exception as e:
+        logger.error(f"edge-leak failed: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail="Internal server error")
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Strategy performance — realized P&L by strategy (multi-leg + single-leg)
+# ─────────────────────────────────────────────────────────────────────────────
+
+_STRATEGY_LABELS = {
+    "straddle_buy": "Straddle (buy)", "straddle_sell": "Straddle (sell)",
+    "strangle_buy": "Strangle (buy)", "strangle_sell": "Strangle (sell)",
+    "bull_call_spread": "Bull call spread", "bear_put_spread": "Bear put spread",
+    "bull_put_spread": "Bull put spread", "bear_call_spread": "Bear call spread",
+    "iron_condor": "Iron condor", "iron_butterfly": "Iron butterfly",
+    "futures_hedge_bullish": "Hedged futures (bullish)",
+    "futures_hedge_bearish": "Hedged futures (bearish)",
+    "calendar_spread": "Calendar spread",
+    "synthetic_long": "Synthetic long", "synthetic_short": "Synthetic short",
+    "multi_leg_unknown": "Other multi-leg",
+}
+
+
+@router.get("/strategy-performance")
+async def get_strategy_performance(
+    days: int = Query(default=30, ge=1, le=365),
+    broker_account_id: UUID = Depends(get_verified_broker_account_id),
+    db: AsyncSession = Depends(get_db),
+    _limiter: None = Depends(analytics_limiter),
+):
+    """
+    Realized P&L grouped by STRATEGY — something brokers don't show.
+
+    Multi-leg strategies (straddle/strangle/spread/iron-condor) come from the
+    StrategyGroup detector. Single-leg trades are bucketed by their own shape
+    (Call/Put buys/sells, Futures long/short, Equity). All figures are the
+    trader's own realized P&L — no estimation.
+    """
+    try:
+        cutoff = datetime.now(timezone.utc) - timedelta(days=days)
+        out: list[dict] = []
+
+        sg_res = await db.execute(
+            select(StrategyGroup).where(and_(
+                StrategyGroup.broker_account_id == broker_account_id,
+                StrategyGroup.status == "closed",
+                StrategyGroup.closed_at.isnot(None),
+                StrategyGroup.closed_at >= cutoff,
+            ))
+        )
+        by_type: dict[str, dict] = defaultdict(lambda: {"trades": 0, "pnl": 0.0, "wins": 0})
+        for g in sg_res.scalars().all():
+            pnl = float(g.net_pnl or 0)
+            b = by_type[g.strategy_type]
+            b["trades"] += 1
+            b["pnl"] += pnl
+            if pnl > 0:
+                b["wins"] += 1
+        for stype, b in by_type.items():
+            out.append({
+                "kind": "multi_leg",
+                "key": stype,
+                "label": _STRATEGY_LABELS.get(stype, stype.replace("_", " ").title()),
+                "trades": b["trades"],
+                "pnl": round(b["pnl"], 2),
+                "win_rate": round(b["wins"] / b["trades"] * 100, 1) if b["trades"] else 0,
+                "avg_pnl": round(b["pnl"] / b["trades"], 2) if b["trades"] else 0,
+            })
+
+        legged = await db.execute(select(StrategyGroupLeg.completed_trade_id))
+        legged_ids = {r[0] for r in legged.all()}
+
+        ct_res = await db.execute(
+            select(CompletedTrade).where(and_(
+                CompletedTrade.broker_account_id == broker_account_id,
+                CompletedTrade.exit_time >= cutoff,
+                CompletedTrade.status == "closed",
+                CompletedTrade.realized_pnl.isnot(None),
+            ))
+        )
+
+        def _single_label(sym: str, direction: str) -> str:
+            s = (sym or "").upper()
+            is_long = (direction or "LONG").upper() == "LONG"
+            if s.endswith("CE"): return "Call buys" if is_long else "Call sells"
+            if s.endswith("PE"): return "Put buys" if is_long else "Put sells"
+            if s.endswith("FUT"): return "Futures (long)" if is_long else "Futures (short)"
+            return "Equity"
+
+        single: dict[str, dict] = defaultdict(lambda: {"trades": 0, "pnl": 0.0, "wins": 0})
+        for t in ct_res.scalars().all():
+            if t.id in legged_ids:
+                continue
+            pnl = float(t.realized_pnl or 0)
+            label = _single_label(t.tradingsymbol, t.direction)
+            b = single[label]
+            b["trades"] += 1
+            b["pnl"] += pnl
+            if pnl > 0:
+                b["wins"] += 1
+        for label, b in single.items():
+            out.append({
+                "kind": "single_leg",
+                "key": label,
+                "label": label,
+                "trades": b["trades"],
+                "pnl": round(b["pnl"], 2),
+                "win_rate": round(b["wins"] / b["trades"] * 100, 1) if b["trades"] else 0,
+                "avg_pnl": round(b["pnl"] / b["trades"], 2) if b["trades"] else 0,
+            })
+
+        out.sort(key=lambda x: -abs(x["pnl"]))
+        return {"has_data": len(out) > 0, "period_days": days, "strategies": out}
+    except Exception as e:
+        logger.error(f"strategy-performance failed: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail="Internal server error")

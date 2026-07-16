@@ -2,12 +2,15 @@ import { Fragment, useState, Suspense, lazy } from 'react';
 import { ErrorBoundary } from '@/components/ErrorBoundary';
 import { Link } from 'react-router-dom';
 import {
-  Link2, BarChart2, Crosshair, Dna, Brain, Calendar, Moon,
+  Link2, BarChart2, Crosshair, Brain, Layers,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import { cn } from '@/lib/utils';
 import { useBroker } from '@/contexts/BrokerContext';
+import ReportCard from '@/components/analytics/ReportCard';
+import EdgeLeakCard from '@/components/analytics/EdgeLeakCard';
+import StrategyCard from '@/components/analytics/StrategyCard';
 import ExportReportButton from '@/components/analytics/ExportReportButton';
 import ComplianceDisclaimer from '@/components/ComplianceDisclaimer';
 import InstrumentPanel from '@/components/analytics/InstrumentPanel';
@@ -38,13 +41,13 @@ const PERIOD_OPTIONS = [
   { label: '90D', days: 90 },
 ] as const;
 
+// Consolidated from 6 tabs → 4 (Overview · Edge · Behaviour · Advanced). The
+// ReportCard hero sits above the tabs as the always-visible front door.
 const TABS = [
   { value: 'overview',  label: 'Overview',   icon: BarChart2, group: 'core' as const },
-  { value: 'edge',      label: 'Edge',        icon: Crosshair, group: 'core' as const },
-  { value: 'dna',       label: 'Trade DNA',   icon: Dna,       group: 'core' as const },
-  { value: 'behavior',  label: 'Behavior',    icon: Brain,     group: 'core' as const },
-  { value: 'sessions',  label: 'Sessions',    icon: Calendar,  group: 'deep' as const },
-  { value: 'btst',      label: 'BTST',        icon: Moon,      group: 'deep' as const },
+  { value: 'edge',      label: 'Edge',       icon: Crosshair, group: 'core' as const },
+  { value: 'behavior',  label: 'Behaviour',  icon: Brain,     group: 'core' as const },
+  { value: 'advanced',  label: 'Advanced',   icon: Layers,    group: 'deep' as const },
 ] as const;
 
 type TabValue = typeof TABS[number]['value'];
@@ -106,6 +109,11 @@ export default function Analytics() {
         </div>
       </div>
 
+      {/* ── Report Card hero — the front door ────────────────────────────────── */}
+      <div className="mb-6">
+        <ReportCard days={days} />
+      </div>
+
       {/* ── Tab Bar ──────────────────────────────────────────────────────────── */}
       <div className="sticky top-0 z-20 bg-background/95 backdrop-blur-sm border-b border-border -mx-4 sm:-mx-6 px-4 sm:px-6 mb-6">
         <div
@@ -146,15 +154,24 @@ export default function Analytics() {
         <Suspense fallback={<TabSkeleton />}>
           {tab === 'overview' && <OverviewTab days={days} />}
           {tab === 'edge'     && (
-            <EdgeTab
-              days={days}
-              onInstrumentClick={u => setInstrumentPanel(u)}
-            />
+            <div className="space-y-5">
+              <EdgeLeakCard days={days} />
+              <StrategyCard days={days} />
+              <EdgeTab days={days} onInstrumentClick={u => setInstrumentPanel(u)} />
+            </div>
           )}
-          {tab === 'dna'      && <TradeDnaTab days={days} />}
-          {tab === 'behavior' && <BehaviorTab days={days} />}
-          {tab === 'sessions' && <SessionsTab days={days} />}
-          {tab === 'btst'     && <BtstTab days={days} />}
+          {tab === 'behavior' && (
+            <div className="space-y-5">
+              <BehaviorTab days={days} />
+              <TradeDnaTab days={days} />
+            </div>
+          )}
+          {tab === 'advanced' && (
+            <div className="space-y-5">
+              <SessionsTab days={days} />
+              <BtstTab days={days} />
+            </div>
+          )}
         </Suspense>
       </ErrorBoundary>
 
