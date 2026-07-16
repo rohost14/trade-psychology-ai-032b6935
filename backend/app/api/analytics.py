@@ -2513,54 +2513,9 @@ async def get_recovery_pattern(
 # 11.11 — VIX Context: India VIX regime + trader's stats
 # ─────────────────────────────────────────────────────────────────────────────
 
-@router.get("/vix-context")
-async def get_vix_context(
-    broker_account_id: UUID = Depends(get_verified_broker_account_id),
-    days_back: int = Query(default=90, ge=1, le=365),
-    db: AsyncSession = Depends(get_db),
-    _limiter: None = Depends(analytics_limiter),
-):
-    """
-    Returns current India VIX + trader's overall win rate as context.
-    VIX per-trade history is not stored, so regime-specific win rates
-    are not computable until we start storing VIX snapshots.
-    """
-    try:
-        from app.services.vix_service import get_india_vix, classify_vix_regime, regime_label
-
-        vix = await get_india_vix()
-        regime = classify_vix_regime(vix) if vix is not None else None
-        label  = regime_label(regime) if regime else None
-
-        cutoff = datetime.now(timezone.utc) - timedelta(days=days_back)
-        res = await db.execute(
-            select(CompletedTrade).where(
-                CompletedTrade.broker_account_id == broker_account_id,
-                CompletedTrade.exit_time >= cutoff,
-                CompletedTrade.status == "closed",
-                CompletedTrade.realized_pnl.isnot(None),
-            )
-        )
-        trades = res.scalars().all()
-
-        overall_wr, trade_count = 0.0, 0
-        if trades:
-            trade_count = len(trades)
-            wins = sum(1 for t in trades if float(t.realized_pnl) > 0)
-            overall_wr = round(wins / trade_count * 100, 1)
-
-        return {
-            "vix":             vix,
-            "regime":          regime,
-            "regime_label":    label,
-            "available":       vix is not None,
-            "overall_win_rate": overall_wr,
-            "trade_count":     trade_count,
-        }
-    except Exception as e:
-        logger.error(f"vix-context failed: {e}")
-        return {"vix": None, "regime": None, "regime_label": None,
-                "available": False, "overall_win_rate": 0, "trade_count": 0}
+# NOTE: /vix-context removed 2026-07-16 — VIX win-rate context was not useful and
+# the regime-specific breakdown was never computable (VIX-per-trade not stored).
+# Its only consumer, VixStrip.tsx, was already orphaned (VIX moved inline to the hero).
 
 
 # ─────────────────────────────────────────────────────────────────────────────

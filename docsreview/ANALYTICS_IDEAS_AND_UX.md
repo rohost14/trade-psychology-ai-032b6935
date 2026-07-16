@@ -2,6 +2,16 @@
 
 *Date: 2026-07-16. A from-the-trader's-seat brainstorm: what more Analytics could do, what to add / improve / modify, and how the UI/UX should evolve (it's currently functional but plain). Discussion doc — nothing implemented. Grounded in what data/services already exist so ideas are feasible, not fantasy.*
 
+> ## DECISIONS (2026-07-16, user)
+> The user's filter for analytics: **only factual/provable, and differentiated from what brokers already give.** No probabilistic attribution, no counterfactuals, no broker-duplicate features.
+> - ❌ **What-if simulator** — REJECTED. "No trader who just lost money comes to see a what-if."
+> - ❌ **Discipline counterfactual** — REJECTED. Can't say for certain a user "ignored" an alert, or attribute an exact ₹ made/lost. No false certainty.
+> - ❌ **Options moneyness / VIX context** — REJECTED as not useful. **`/vix-context` endpoint REMOVED** (its only consumer `VixStrip.tsx` was already orphaned → archived). Note: regime win-rates were never even computable (VIX-per-trade not stored).
+> - ❌ **P&L calendar heatmap** — REJECTED. Every broker already shows one.
+> - ✅ **UI/UX direction (§4)** — AGREED.
+> - Still open (survive the factual/differentiated filter, not yet decided): **"Your Edge / Your Leak" factual ranking** (§A.1) and **setup/strategy performance** (§A.2) — both are pure realized-P&L facts by bucket/strategy, no attribution. Awaiting the user's call on whether to add any new analytics content or just do the UI/UX revamp on existing content.
+> - Other confirmed-dead analytics endpoints available to remove on request: `trading-dna`, `edge-map`, `recovery-pattern`, `options-behavior` (all zero live refs).
+
 ---
 
 ## 0. Who we're building for (frame everything against this)
