@@ -11,6 +11,7 @@ import { useBroker } from '@/contexts/BrokerContext';
 import ReportCard from '@/components/analytics/ReportCard';
 import EdgeLeakCard from '@/components/analytics/EdgeLeakCard';
 import StrategyCard from '@/components/analytics/StrategyCard';
+import TabIntro from '@/components/analytics/TabIntro';
 import ExportReportButton from '@/components/analytics/ExportReportButton';
 import ComplianceDisclaimer from '@/components/ComplianceDisclaimer';
 import InstrumentPanel from '@/components/analytics/InstrumentPanel';
@@ -152,9 +153,15 @@ export default function Analytics() {
         </div>
       }>
         <Suspense fallback={<TabSkeleton />}>
-          {tab === 'overview' && <OverviewTab days={days} />}
+          {tab === 'overview' && (
+            <div className="space-y-5">
+              <TabIntro>The full picture — your P&amp;L, how consistent it is, and where it came from over the period.</TabIntro>
+              <OverviewTab days={days} />
+            </div>
+          )}
           {tab === 'edge'     && (
             <div className="space-y-5">
+              <TabIntro>Where you make money and where it quietly bleeds out — ranked by instrument, time, and setup.</TabIntro>
               <EdgeLeakCard days={days} />
               <StrategyCard days={days} />
               <EdgeTab days={days} onInstrumentClick={u => setInstrumentPanel(u)} />
@@ -162,12 +169,14 @@ export default function Analytics() {
           )}
           {tab === 'behavior' && (
             <div className="space-y-5">
+              <TabIntro>How your habits and emotions shape results — the patterns behind the numbers.</TabIntro>
               <BehaviorTab days={days} />
               <TradeDnaTab days={days} />
             </div>
           )}
           {tab === 'advanced' && (
             <div className="space-y-5">
+              <TabIntro>Deeper cuts — session timing and overnight (BTST) behaviour for when you want to dig in.</TabIntro>
               <SessionsTab days={days} />
               <BtstTab days={days} />
             </div>
