@@ -314,23 +314,6 @@ export default function MyPatterns() {
       .sort((a, b) => b.count - a.count)[0];
   }, [alerts]);
 
-  // All patterns detected last 30 days, sorted by count desc — for breakdown card
-  const patternBreakdown = useMemo(() => {
-    const cutoff = Date.now() - 30 * 24 * 60 * 60 * 1000;
-    const map = new Map<string, { name: string; count: number }>();
-    for (const a of alerts) {
-      if (new Date(a.shown_at ?? 0).getTime() < cutoff) continue;
-      const key = a.pattern.backend_type ?? a.pattern.type;
-      const existing = map.get(key) ?? { name: a.pattern.name, count: 0 };
-      existing.count += 1;
-      map.set(key, existing);
-    }
-    return Array.from(map.entries())
-      .map(([type, d]) => ({ type, ...d }))
-      .sort((a, b) => b.count - a.count)
-      .slice(0, 6);
-  }, [alerts]);
-
   // Specific actionable recommendations derived from real data (not generic strings)
   const specificRecs = useMemo((): string[] => {
     const recs: string[] = [];
@@ -450,6 +433,9 @@ export default function MyPatterns() {
       </div>
 
       <div className="space-y-5">
+        {/* Streak — the hero. This is the number a user comes back for, so it leads. */}
+        <StreakTrackerCard streak={streakData} goalDays={30} />
+
         {/* Behavior Risk headline + drivers (Phase 5, master 1D.9) */}
         <BehaviorScoresCard />
 
@@ -503,43 +489,23 @@ export default function MyPatterns() {
         {/* Pattern Calendar */}
         <PatternCalendar />
 
-        {/* 30-day pattern breakdown */}
-        {patternBreakdown.length > 0 && (
-          <div className="tm-card overflow-hidden">
-            <div className="px-5 py-3.5 border-b border-border">
-              <p className="text-sm font-medium text-foreground">Pattern frequency — last 30 days</p>
-            </div>
-            <div className="divide-y divide-border">
-              {patternBreakdown.map(p => {
-                const maxCount = patternBreakdown[0].count;
-                const barPct = Math.round((p.count / maxCount) * 100);
-                return (
-                  <div key={p.type} className="px-5 py-3 flex items-center gap-3">
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-center justify-between mb-1">
-                        <p className="text-[12px] font-medium text-foreground truncate">{p.name}</p>
-                        <span className="text-[11px] font-mono tabular-nums text-muted-foreground w-8 text-right flex-shrink-0 ml-3">
-                          {p.count}×
-                        </span>
-                      </div>
-                      <div className="h-1 rounded-full bg-muted overflow-hidden">
-                        <div
-                          className="h-full bg-tm-loss/50 rounded-full transition-all"
-                          style={{ width: `${barPct}%` }}
-                        />
-                      </div>
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-          </div>
-        )}
+        <AlertHistoryCard history={alertHistory} />
 
-        {/* Grid */}
-        <div className="grid gap-5 lg:grid-cols-2">
-          <StreakTrackerCard streak={streakData} goalDays={30} />
-          <AlertHistoryCard history={alertHistory} />
+        {/* Pattern frequency lives on the Alerts "Patterns" tab (with the response
+            stats and per-pattern cost) — cross-link instead of recomputing it here. */}
+        <div className="tm-card px-5 py-4 flex items-center justify-between gap-4 flex-wrap">
+          <div>
+            <p className="text-[13px] font-medium text-foreground">Want the full pattern breakdown?</p>
+            <p className="text-[12px] text-muted-foreground mt-0.5">
+              Per-pattern frequency, how often you acted on each alert, and the P&amp;L behind them.
+            </p>
+          </div>
+          <Link
+            to="/alerts"
+            className="text-[12px] font-medium text-tm-brand hover:underline flex-shrink-0"
+          >
+            Open Alerts →
+          </Link>
         </div>
       </div>
     </div>

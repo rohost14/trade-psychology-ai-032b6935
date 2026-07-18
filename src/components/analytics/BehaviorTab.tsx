@@ -5,6 +5,7 @@ import { cn } from '@/lib/utils';
 import { formatCurrencyWithSign } from '@/lib/formatters';
 import { api } from '@/lib/api';
 import { Link } from 'react-router-dom';
+import OptionsBehaviorCard from './OptionsBehaviorCard';
 
 interface BehaviorTabProps { days: number }
 
@@ -90,6 +91,7 @@ export default function BehaviorTab({ days }: BehaviorTabProps) {
   const [metrics, setMetrics]     = useState<RiskMetrics | null>(null);
   const [conditional, setCond]    = useState<ConditionalData | null>(null);
   const [emotions, setEmotions]   = useState<JournalCorrData | null>(null);
+  const [hasOptions, setHasOptions] = useState(false);
   const [loading, setLoading]     = useState(true);
   const [error, setError]         = useState<string | null>(null);
   const [retry, setRetry]         = useState(0);
@@ -242,6 +244,9 @@ export default function BehaviorTab({ days }: BehaviorTabProps) {
         </div>
       )}
 
+      {/* Options-specific behaviour — renders nothing when no options patterns fired */}
+      <OptionsBehaviorCard days={days} onHasData={setHasOptions} />
+
       {/* Emotion Summary */}
       {emotions?.has_data && emotions.data?.length > 0 && (
         <div className="tm-card overflow-hidden">
@@ -279,7 +284,7 @@ export default function BehaviorTab({ days }: BehaviorTabProps) {
         </div>
       )}
 
-      {!patterns.length && !conditional?.has_data && !emotions?.has_data && (
+      {!patterns.length && !conditional?.has_data && !emotions?.has_data && !hasOptions && (
         <div className="tm-card px-5 py-12 text-center text-sm text-muted-foreground">
           No behavioral data available for this period.
         </div>
