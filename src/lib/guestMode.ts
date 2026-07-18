@@ -161,20 +161,6 @@ export function getGuestResponse(url: string, method = 'GET'): unknown | undefin
     // Return NIFTY data for any underlying in demo
     return DEMO_INSTRUMENT_NIFTY;
   }
-  if (path === '/api/analytics/discipline-summary') {
-    return {
-      has_data: true,
-      score: 52,
-      max_score: 100,
-      week_start: new Date(Date.now() - 6 * 86_400_000).toLocaleDateString('en-IN', { day: 'numeric', month: 'short' }),
-      danger_alerts: 3,
-      caution_alerts: 4,
-      trades_this_week: 5,
-      revenge_free_days: 1,
-      weekly_trend: [72, 81, 55, 52],
-      breakdown: { alerts_score: 22, quality_score: 30 },
-    };
-  }
 
   // Behavioral
   if (path === '/api/behavioral/analysis') return DEMO_BEHAVIORAL_ANALYSIS;

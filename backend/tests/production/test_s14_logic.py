@@ -110,16 +110,18 @@ class TestLogicCorrectness:
                 "Analytics overview contains literal 'Infinity' in JSON response."
             )
 
-    def test_analytics_edge_map_no_nan(self, user: httpx.Client):
-        """5.6 Edge map endpoint — no NaN/null that would break ScatterChart."""
-        r = user.get("/api/analytics/edge-map", params={"days_back": 90})
-        assert r.status_code in (200, 404), (
-            f"Edge map endpoint crashed: {r.status_code}. Body: {r.text[:300]}"
+    def test_analytics_edge_leak_no_nan(self, user: httpx.Client):
+        """5.6 Edge/leak endpoint — no NaN/null that would break the rendered bars.
+
+        Replaces the old edge-map test; that endpoint was archived on 2026-07-18.
+        """
+        r = user.get("/api/analytics/edge-leak", params={"days": 90})
+        assert r.status_code == 200, (
+            f"Edge/leak endpoint crashed: {r.status_code}. Body: {r.text[:300]}"
         )
-        if r.status_code == 200:
-            assert "NaN" not in r.text, (
-                "Edge map response contains 'NaN' — will cause recharts ScatterChart warning."
-            )
+        assert "NaN" not in r.text, (
+            "Edge/leak response contains 'NaN' — JS will fail to parse it."
+        )
 
     def test_analytics_expiry_pattern_endpoint(self, user: httpx.Client):
         """5.7 Expiry pattern endpoint responds (not 404)."""

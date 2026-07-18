@@ -64,7 +64,7 @@ class TestEdgeCasesWithAuth:
         """16.1 Analytics endpoints handle zero-trade accounts without NaN or crash."""
         endpoints = [
             ("/api/analytics/overview", "overview"),
-            ("/api/analytics/edge-map", "edge-map"),
+            ("/api/analytics/edge-leak", "edge-leak"),
         ]
         for path, name in endpoints:
             r = user.get(path, params={"days_back": 1, "days": 1})  # Very short window = likely no data
