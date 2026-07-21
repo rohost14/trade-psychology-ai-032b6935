@@ -844,6 +844,34 @@ export const DEMO_PNL_ATTRIBUTION = {
 // ---------------------------------------------------------------------------
 // Analytics: quality-breakdown (TradesTab quality scores)
 // ---------------------------------------------------------------------------
+// Mirrors GET /api/analytics/edge-leak response shape
+export const DEMO_EDGE_LEAK = {
+  has_data: true,
+  period_days: 30,
+  min_trades: 5,
+  edges: [
+    { dimension: 'Time',       label: '9 AM-10 AM',  trades: 5, pnl: 5100,  win_rate: 80 },
+    { dimension: 'Instrument', label: 'BANKNIFTY',   trades: 5, pnl: 4950,  win_rate: 67 },
+    { dimension: 'Type',       label: 'Call buys',   trades: 8, pnl: 3750,  win_rate: 63 },
+  ],
+  leaks: [
+    { dimension: 'Time', label: '2 PM-3 PM', trades: 5, pnl: -14270, win_rate: 0 },
+    { dimension: 'Day',  label: 'Thursday',  trades: 6, pnl: -7410,  win_rate: 33 },
+  ],
+};
+
+// Mirrors GET /api/analytics/strategy-performance response shape
+export const DEMO_STRATEGY_PERFORMANCE = {
+  has_data: true,
+  period_days: 30,
+  strategies: [
+    { kind: 'single_leg', key: 'Call buys', label: 'Call buys', trades: 8, pnl: 3750,  win_rate: 63,  avg_pnl: 469 },
+    { kind: 'single_leg', key: 'Put buys',  label: 'Put buys',  trades: 5, pnl: 4175,  win_rate: 60,  avg_pnl: 835 },
+    { kind: 'single_leg', key: 'Equity',    label: 'Equity',    trades: 2, pnl: -6500, win_rate: 50,  avg_pnl: -3250 },
+    { kind: 'multi_leg',  key: 'straddle_buy', label: 'Straddle (buy)', trades: 1, pnl: -1200, win_rate: 0, avg_pnl: -1200 },
+  ],
+};
+
 // Mirrors GET /api/analytics/quality-breakdown response shape
 // (behavioural quality score 0–8; tiers high 7–8 / mid 5–6 / low 0–4)
 export const DEMO_QUALITY_BREAKDOWN = {

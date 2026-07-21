@@ -11,7 +11,7 @@ import {
   DEMO_RISK_SCORE, DEMO_CRITICAL_TRADES, DEMO_EDGE_CONFIDENCE,
   DEMO_CONDITIONAL_PERFORMANCE, DEMO_OPTIONS_BEHAVIOR, DEMO_BEHAVIORAL_ANALYSIS,
   DEMO_PNL_PERCENT, DEMO_BTST, DEMO_PNL_ATTRIBUTION, DEMO_QUALITY_BREAKDOWN,
-  DEMO_INSTRUMENT_NIFTY,
+  DEMO_INSTRUMENT_NIFTY, DEMO_EDGE_LEAK, DEMO_STRATEGY_PERFORMANCE,
 } from './demoData';
 
 export const GUEST_MODE_KEY = 'tradementor_guest_mode';
@@ -89,7 +89,7 @@ export function getGuestResponse(url: string, method = 'GET'): unknown | undefin
     // Normalize demo data: backend uses flag_reasons, demo uses reasons
     return {
       ...DEMO_CRITICAL_TRADES,
-      trades: DEMO_CRITICAL_TRADES.trades.map((t: any) => ({
+      trades: DEMO_CRITICAL_TRADES.trades.map((t: { reasons?: unknown[]; flag_reasons?: unknown[] }) => ({
         ...t,
         flag_reasons: t.flag_reasons ?? t.reasons ?? [],
       })),
@@ -114,6 +114,8 @@ export function getGuestResponse(url: string, method = 'GET'): unknown | undefin
   if (path === '/api/analytics/btst') return DEMO_BTST;
   if (path === '/api/analytics/pnl-attribution') return DEMO_PNL_ATTRIBUTION;
   if (path === '/api/analytics/quality-breakdown') return DEMO_QUALITY_BREAKDOWN;
+  if (path === '/api/analytics/edge-leak') return DEMO_EDGE_LEAK;
+  if (path === '/api/analytics/strategy-performance') return DEMO_STRATEGY_PERFORMANCE;
   if (path === '/api/analytics/expiry-pattern') {
     return {
       has_data: true,
@@ -289,7 +291,6 @@ export function getGuestResponse(url: string, method = 'GET'): unknown | undefin
   // backend (guest mode has no auth token). Add a specific stub above for any
   // endpoint that should render demo data instead of a blank state.
   if (import.meta.env.DEV) {
-    // eslint-disable-next-line no-console
     console.warn(`[GuestMode] No stub for ${m} ${path} — add one in getGuestResponse() to show demo data`);
   }
   return {};
