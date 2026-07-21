@@ -1116,10 +1116,12 @@ class TradeSyncService:
         closed_positions = pos_result.scalars().all()
 
         # All exchanges: FIFO is now correct.
-        # NSE/BSE repair pass is below; MCX/CDS is log-only.
+        # NSE/BSE repair pass is below; MCX/CDS divergences are logged AND
+        # stored as data_quality_events rows (migration 070).
         FIFO_ACCURATE_EXCHANGES = {"NSE", "BSE", "NFO", "BFO"}
 
         reconciled = 0
+        divergences: list[dict] = []
         for pos in closed_positions:
             exch = (pos.exchange or "").upper()
 
@@ -1157,9 +1159,27 @@ class TradeSyncService:
                         "— possible missing multiplier in mcx_contract_specs.py",
                         pos.tradingsymbol, exch, fifo_total, zerodha_pnl, ratio,
                     )
+                    divergences.append({
+                        "broker_account_id": broker_account_id,
+                        "kind": "fifo_broker_divergence",
+                        "tradingsymbol": pos.tradingsymbol,
+                        "exchange": exch,
+                        "fifo_pnl": round(fifo_total, 4),
+                        "broker_pnl": round(zerodha_pnl, 4),
+                        "ratio": round(ratio, 4),
+                        "details": {"completed_trades": len(cts), "window_hours": 48},
+                    })
+
+        # Persist divergences as data-quality events (migration 070). Runs in
+        # its OWN session so a failure (e.g. migration not applied yet) can
+        # never poison the sync transaction, and the daily unique index +
+        # ON CONFLICT DO NOTHING keeps repeat syncs from duplicating rows.
+        if divergences:
+            await cls._store_data_quality_events(divergences)
 
         # ── Repair pass: fix NSE/BSE CompletedTrades that were incorrectly
         # overwritten by a previous reconciliation run.
+        # (See _store_data_quality_events below for the divergence persistence.)
         # P&L should equal (avg_exit - avg_entry) * total_quantity for LONG,
         # (avg_entry - avg_exit) * total_quantity for SHORT.
         two_days_ago_repair = datetime.now(timezone.utc) - timedelta(hours=48)
@@ -1191,3 +1211,32 @@ class TradeSyncService:
                 reconciled += 1
 
         return reconciled
+
+    @classmethod
+    async def _store_data_quality_events(cls, events: list[dict]) -> None:
+        """
+        Best-effort insert of data-quality events (migration 070).
+
+        Isolated in its own session + transaction on purpose:
+        - a failed INSERT (table missing because the migration is not applied
+          yet, transient DB error) must not abort the caller's sync
+          transaction;
+        - ON CONFLICT DO NOTHING against the daily unique index makes repeat
+          syncs idempotent — one row per (account, kind, symbol, IST day).
+        """
+        try:
+            from sqlalchemy.dialects.postgresql import insert as pg_insert
+            from app.core.database import SessionLocal
+            from app.models.data_quality_event import DataQualityEvent
+
+            async with SessionLocal() as session:
+                await session.execute(
+                    pg_insert(DataQualityEvent.__table__)
+                    .values(events)
+                    .on_conflict_do_nothing()
+                )
+                await session.commit()
+            logger.info("[reconcile] stored %d data-quality event(s)", len(events))
+        except Exception as e:
+            # Observability must never break the sync path.
+            logger.warning("[reconcile] could not store data-quality events: %s", e)

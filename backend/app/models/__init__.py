@@ -30,6 +30,7 @@ from app.models.generated_report import GeneratedReport
 from app.models.margin_snapshot import MarginSnapshot
 from app.models.broadcast_log import BroadcastLog, BroadcastReceipt
 from app.models.alert_mute import AlertMute
+from app.models.data_quality_event import DataQualityEvent
 
 __all__ = [
     "User",
@@ -65,4 +66,5 @@ __all__ = [
     "BroadcastLog",
     "BroadcastReceipt",
     "AlertMute",
+    "DataQualityEvent",
 ]
