@@ -7,7 +7,8 @@ import {
 } from 'recharts';
 import { Skeleton } from '@/components/ui/skeleton';
 import { cn } from '@/lib/utils';
-import { formatCurrencyWithSign, formatCurrency } from '@/lib/formatters';
+import { formatCurrencyWithSign, formatCurrency, formatAxisCurrency } from '@/lib/formatters';
+import type { ChartTooltipProps } from '@/lib/chartTooltip';
 import { api } from '@/lib/api';
 
 interface InstrumentPanelProps {
@@ -62,6 +63,39 @@ const OPT_COLOR: Record<string, string> = {
   FUT: 'tm-chip bg-violet-100 text-violet-700 dark:bg-violet-900/30 dark:text-violet-300',
   EQ:  'tm-chip tm-chip-eq',
 };
+
+// ── Tooltips ──────────────────────────────────────────────────────────────────
+// Named components passed as JSX (`content={<X />}`) — the same pattern the
+// other analytics charts use.
+
+function InstrEquityTooltip({ active, payload }: ChartTooltipProps<{ date: string; cumulative_pnl: number }>) {
+  if (!active || !payload?.length) return null;
+  const d = payload[0].payload;
+  return (
+    <div className="bg-popover border border-border rounded px-2.5 py-1.5 text-xs shadow">
+      <p className="text-muted-foreground">{fmtDate(d.date)}</p>
+      <p className={cn('font-mono tabular-nums font-medium',
+        d.cumulative_pnl >= 0 ? 'text-tm-profit' : 'text-tm-loss')}>
+        {formatCurrencyWithSign(d.cumulative_pnl)}
+      </p>
+    </div>
+  );
+}
+
+function InstrHourTooltip({ active, payload }: ChartTooltipProps<{ label: string; pnl: number; trades: number; win_rate: number }>) {
+  if (!active || !payload?.length) return null;
+  const d = payload[0].payload;
+  return (
+    <div className="bg-popover border border-border rounded px-2.5 py-1.5 text-xs shadow">
+      <p className="text-muted-foreground">{d.label} IST</p>
+      <p className={cn('font-mono tabular-nums font-medium',
+        d.pnl >= 0 ? 'text-tm-profit' : 'text-tm-loss')}>
+        {formatCurrencyWithSign(d.pnl)}
+      </p>
+      <p className="text-muted-foreground">{d.trades}T · {d.win_rate}% WR</p>
+    </div>
+  );
+}
 
 export default function InstrumentPanel({ underlying, days, onClose }: InstrumentPanelProps) {
   const [data, setData]         = useState<InstrumentData | null>(null);
@@ -220,22 +254,8 @@ export default function InstrumentPanel({ underlying, days, onClose }: Instrumen
                             tick={{ fill: 'hsl(var(--muted-foreground))', fontSize: 10 }} interval="preserveStartEnd" />
                           <YAxis axisLine={false} tickLine={false}
                             tick={{ fill: 'hsl(var(--muted-foreground))', fontSize: 10 }}
-                            tickFormatter={(v) => `₹${(v/1000).toFixed(0)}k`} width={40} />
-                          <Tooltip
-                            content={({ active, payload }: any) => {
-                              if (!active || !payload?.length) return null;
-                              const d = payload[0].payload;
-                              return (
-                                <div className="bg-popover border border-border rounded px-2.5 py-1.5 text-xs shadow">
-                                  <p className="text-muted-foreground">{fmtDate(d.date)}</p>
-                                  <p className={cn('font-mono tabular-nums font-medium',
-                                    d.cumulative_pnl >= 0 ? 'text-tm-profit' : 'text-tm-loss')}>
-                                    {formatCurrencyWithSign(d.cumulative_pnl)}
-                                  </p>
-                                </div>
-                              );
-                            }}
-                          />
+                            tickFormatter={formatAxisCurrency} width={52} />
+                          <Tooltip content={<InstrEquityTooltip />} />
                           <ReferenceLine y={0} stroke="hsl(var(--border))" strokeWidth={1.5} />
                           <Area type="monotone" dataKey="cumulative_pnl"
                             stroke={isProfit ? '#16A34A' : '#DC2626'} strokeWidth={1.5}
@@ -262,23 +282,8 @@ export default function InstrumentPanel({ underlying, days, onClose }: Instrumen
                             tick={{ fill: 'hsl(var(--muted-foreground))', fontSize: 10 }} />
                           <YAxis axisLine={false} tickLine={false}
                             tick={{ fill: 'hsl(var(--muted-foreground))', fontSize: 10 }}
-                            tickFormatter={(v) => `₹${(v/1000).toFixed(0)}k`} width={40} />
-                          <Tooltip
-                            content={({ active, payload }: any) => {
-                              if (!active || !payload?.length) return null;
-                              const d = payload[0].payload;
-                              return (
-                                <div className="bg-popover border border-border rounded px-2.5 py-1.5 text-xs shadow">
-                                  <p className="text-muted-foreground">{d.label} IST</p>
-                                  <p className={cn('font-mono tabular-nums font-medium',
-                                    d.pnl >= 0 ? 'text-tm-profit' : 'text-tm-loss')}>
-                                    {formatCurrencyWithSign(d.pnl)}
-                                  </p>
-                                  <p className="text-muted-foreground">{d.trades}T · {d.win_rate}% WR</p>
-                                </div>
-                              );
-                            }}
-                          />
+                            tickFormatter={formatAxisCurrency} width={52} />
+                          <Tooltip content={<InstrHourTooltip />} />
                           <ReferenceLine y={0} stroke="hsl(var(--border))" strokeWidth={1.5} />
                           <Bar dataKey="pnl" radius={[2,2,0,0]}>
                             {data.by_hour.map((entry, i) => (

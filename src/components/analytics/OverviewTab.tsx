@@ -8,7 +8,7 @@ import {
 import { TrendingUp, TrendingDown, RefreshCw, AlertTriangle, CheckCircle2, Activity, ArrowUp, ArrowDown, Minus } from 'lucide-react';
 import { Skeleton } from '@/components/ui/skeleton';
 import { cn } from '@/lib/utils';
-import { formatCurrency, formatCurrencyWithSign } from '@/lib/formatters';
+import { formatCurrency, formatCurrencyWithSign, formatAxisCurrency } from '@/lib/formatters';
 import { extractUnderlying } from '@/lib/symbolClassify';
 import type { ChartTooltipProps } from '@/lib/chartTooltip';
 import { api } from '@/lib/api';
@@ -396,7 +396,7 @@ export default function OverviewTab({ days }: OverviewTabProps) {
                 </defs>
                 <CartesianGrid strokeDasharray="3 3" stroke="rgba(0,0,0,0.06)" vertical={false} />
                 <XAxis dataKey="date" tickFormatter={fmtDate} tick={{ fontSize: 10 }} tickLine={false} axisLine={false} interval="preserveStartEnd" />
-                <YAxis tick={{ fontSize: 10 }} tickLine={false} axisLine={false} tickFormatter={v => formatCurrency(v)} />
+                <YAxis tick={{ fontSize: 10 }} tickLine={false} axisLine={false} width={52} tickFormatter={formatAxisCurrency} />
                 <Tooltip content={<EquityTooltip />} />
                 <ReferenceLine y={0} stroke="rgba(0,0,0,0.12)" strokeDasharray="3 3" />
                 <Area type="monotone" dataKey="cumulative_pnl" stroke={equityColor} strokeWidth={2} fill="url(#eq-grad)" dot={false} activeDot={{ r: 4 }} />
@@ -425,7 +425,7 @@ export default function OverviewTab({ days }: OverviewTabProps) {
               <BarChart data={overview.daily_pnl} margin={{ top: 4, right: 4, left: -16, bottom: 0 }}>
                 <CartesianGrid strokeDasharray="3 3" stroke="rgba(0,0,0,0.06)" vertical={false} />
                 <XAxis dataKey="date" tickFormatter={fmtDate} tick={{ fontSize: 10 }} tickLine={false} axisLine={false} interval="preserveStartEnd" />
-                <YAxis tick={{ fontSize: 10 }} tickLine={false} axisLine={false} tickFormatter={v => formatCurrency(v)} />
+                <YAxis tick={{ fontSize: 10 }} tickLine={false} axisLine={false} width={52} tickFormatter={formatAxisCurrency} />
                 <Tooltip content={<DailyTooltip />} />
                 <ReferenceLine y={0} stroke="rgba(0,0,0,0.15)" />
                 <Bar dataKey="pnl" radius={[2, 2, 0, 0]} maxBarSize={18}>

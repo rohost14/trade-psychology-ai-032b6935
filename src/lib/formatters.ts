@@ -107,6 +107,25 @@ export function formatDateTime(dateString: string): string {
 }
 
 /**
+ * Compact currency for CHART AXIS ticks.
+ *
+ * Full currency ("−₹12,500.00") overflows a recharts YAxis at its default
+ * width and gets clipped to the tail — axis labels rendered as "500.00", and
+ * on signed axes the minus sign was cut off entirely, so a loss tick read as
+ * a gain. Axis ticks need magnitude at a glance, not paise:
+ *   1250 → ₹1.3k · -250000 → -₹2.5L · 0 → ₹0
+ */
+export function formatAxisCurrency(value: number): string {
+  const abs = Math.abs(value);
+  const sign = value < 0 ? '-' : '';
+  if (abs < 1) return '₹0';
+  if (abs >= 1_00_00_000) return `${sign}₹${parseFloat((abs / 1_00_00_000).toFixed(1))}Cr`;
+  if (abs >= 1_00_000)    return `${sign}₹${parseFloat((abs / 1_00_000).toFixed(1))}L`;
+  if (abs >= 1_000)       return `${sign}₹${parseFloat((abs / 1_000).toFixed(1))}k`;
+  return `${sign}₹${Math.round(abs)}`;
+}
+
+/**
  * Format currency in compact Indian notation (L for lakh, Cr for crore).
  * Used for large numbers where space is tight.
  * Examples: ₹1,50,000 → ₹1.5L  |  ₹1,20,00,000 → ₹1.2Cr

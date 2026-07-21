@@ -6,7 +6,7 @@ import {
 } from 'recharts';
 import { Skeleton } from '@/components/ui/skeleton';
 import { cn } from '@/lib/utils';
-import { formatCurrencyWithSign } from '@/lib/formatters';
+import { formatCurrencyWithSign, formatAxisCurrency } from '@/lib/formatters';
 import { api } from '@/lib/api';
 import { useBroker } from '@/contexts/BrokerContext';
 
@@ -157,7 +157,7 @@ export default function BtstTab({ days }: { days: number }) {
                     tick={{ fill: 'hsl(var(--muted-foreground))', fontSize: 11 }} />
                   <YAxis axisLine={false} tickLine={false}
                     tick={{ fill: 'hsl(var(--muted-foreground))', fontSize: 11 }}
-                    tickFormatter={(v) => `₹${(v / 1000).toFixed(0)}k`} width={44} />
+                    tickFormatter={formatAxisCurrency} width={52} />
                   <Tooltip
                     formatter={(v: number) => [formatCurrencyWithSign(v), 'P&L']}
                     contentStyle={{

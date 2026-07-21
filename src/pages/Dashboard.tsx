@@ -406,7 +406,9 @@ export default function Dashboard() {
         severity: normalizeSeverityStr(a.pattern.severity),
         description: a.pattern.description,
         message: a.pattern.description,
-        why_it_matters: a.pattern.insight,
+        // pattern.insight is `unknown` (free-form detail from behavior_engine);
+        // RecentAlertsCard expects a string.
+        why_it_matters: typeof a.pattern.insight === 'string' ? a.pattern.insight : undefined,
         details: a.pattern.details,
         timestamp: a.shown_at,
         acknowledged: a.acknowledged,

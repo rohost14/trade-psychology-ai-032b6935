@@ -6,7 +6,7 @@ import {
 import { RefreshCw, AlertTriangle } from 'lucide-react';
 import { Skeleton } from '@/components/ui/skeleton';
 import { cn } from '@/lib/utils';
-import { formatCurrency, formatCurrencyWithSign } from '@/lib/formatters';
+import { formatCurrencyWithSign, formatAxisCurrency } from '@/lib/formatters';
 import { extractUnderlying, optionType, classifyExpiry } from '@/lib/symbolClassify';
 import type { ChartTooltipProps } from '@/lib/chartTooltip';
 import { api } from '@/lib/api';
@@ -375,7 +375,7 @@ export default function EdgeTab({ days, onInstrumentClick }: EdgeTabProps) {
               <BarChart data={hourBarData} margin={{ top: 4, right: 4, left: -16, bottom: 0 }}>
                 <CartesianGrid strokeDasharray="3 3" stroke="rgba(0,0,0,0.06)" vertical={false} />
                 <XAxis dataKey="label" tick={{ fontSize: 10 }} tickLine={false} axisLine={false} />
-                <YAxis tick={{ fontSize: 10 }} tickLine={false} axisLine={false} tickFormatter={v => formatCurrency(v)} />
+                <YAxis tick={{ fontSize: 10 }} tickLine={false} axisLine={false} width={52} tickFormatter={formatAxisCurrency} />
                 <Tooltip content={<BarTooltip />} />
                 <ReferenceLine y={0} stroke="rgba(0,0,0,0.15)" />
                 <Bar dataKey="avg_pnl" radius={[3, 3, 0, 0]} maxBarSize={36}>
@@ -406,7 +406,7 @@ export default function EdgeTab({ days, onInstrumentClick }: EdgeTabProps) {
               <BarChart data={dowBarData} margin={{ top: 4, right: 4, left: -16, bottom: 0 }}>
                 <CartesianGrid strokeDasharray="3 3" stroke="rgba(0,0,0,0.06)" vertical={false} />
                 <XAxis dataKey="label" tick={{ fontSize: 11 }} tickLine={false} axisLine={false} />
-                <YAxis tick={{ fontSize: 10 }} tickLine={false} axisLine={false} tickFormatter={v => formatCurrency(v)} />
+                <YAxis tick={{ fontSize: 10 }} tickLine={false} axisLine={false} width={52} tickFormatter={formatAxisCurrency} />
                 <Tooltip content={<BarTooltip />} />
                 <ReferenceLine y={0} stroke="rgba(0,0,0,0.15)" />
                 <Bar dataKey="avg_pnl" radius={[3, 3, 0, 0]} maxBarSize={40}>
@@ -437,7 +437,7 @@ export default function EdgeTab({ days, onInstrumentClick }: EdgeTabProps) {
               <BarChart data={sizeData} margin={{ top: 4, right: 4, left: -16, bottom: 0 }}>
                 <CartesianGrid strokeDasharray="3 3" stroke="rgba(0,0,0,0.06)" vertical={false} />
                 <XAxis dataKey="bucket" tick={{ fontSize: 10 }} tickLine={false} axisLine={false} />
-                <YAxis tick={{ fontSize: 10 }} tickLine={false} axisLine={false} tickFormatter={v => formatCurrency(v)} />
+                <YAxis tick={{ fontSize: 10 }} tickLine={false} axisLine={false} width={52} tickFormatter={formatAxisCurrency} />
                 <Tooltip content={<SizeTooltip />} />
                 <Bar dataKey="avg_pnl" radius={[3, 3, 0, 0]} maxBarSize={40}>
                   {sizeData.map((d, i) => (

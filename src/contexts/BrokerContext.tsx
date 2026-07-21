@@ -33,7 +33,9 @@ interface BrokerContextValue {
   lastSyncResult: SyncResult | null;
 
   // Actions
-  connect: () => Promise<void>;
+  // Synchronous: performs a full-page redirect to the OAuth entry point so the
+  // browser carries the oauth_nonce cookie. Nothing to await.
+  connect: () => void;
   disconnect: () => Promise<void>;
   refresh: () => Promise<void>;
   syncTrades: () => Promise<SyncResult | null>;

@@ -17,7 +17,9 @@ export function AiCoachFab() {
 
   if (!isConnected || isGuest) return null;
 
-  const dangerCount = alerts.filter(a => a.severity === 'danger' && !a.acknowledged).length;
+  // Severity lives on the pattern, not the alert wrapper — reading a.severity
+  // was always undefined, so the danger badge never appeared.
+  const dangerCount = alerts.filter(a => a.pattern.severity === 'danger' && !a.acknowledged).length;
   const hasDanger = dangerCount > 0;
 
   return (

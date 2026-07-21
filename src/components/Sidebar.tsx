@@ -213,7 +213,7 @@ export function Sidebar({ collapsed, onToggle }: SidebarProps) {
                 {isTokenExpired
                   ? 'Token expired'
                   : isConnected
-                    ? (account?.display_name || account?.broker_user_id || 'Connected')
+                    ? (account?.broker_user_id || 'Connected')
                     : 'Not connected'
                 }
               </span>

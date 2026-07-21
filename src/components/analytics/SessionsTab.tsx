@@ -6,7 +6,7 @@ import {
 import { RefreshCw, AlertTriangle, Clock } from 'lucide-react';
 import { Skeleton } from '@/components/ui/skeleton';
 import { cn } from '@/lib/utils';
-import { formatCurrencyWithSign } from '@/lib/formatters';
+import { formatCurrencyWithSign, formatAxisCurrency } from '@/lib/formatters';
 import type { ChartTooltipProps } from '@/lib/chartTooltip';
 import { api } from '@/lib/api';
 
@@ -436,7 +436,7 @@ export default function SessionsTab({ days }: SessionsTabProps) {
               <BarChart data={dowRaw} margin={{ top: 4, right: 4, left: -16, bottom: 0 }}>
                 <CartesianGrid strokeDasharray="3 3" stroke="rgba(0,0,0,0.06)" vertical={false} />
                 <XAxis dataKey="day" tick={{ fontSize: 11 }} tickLine={false} axisLine={false} />
-                <YAxis tick={{ fontSize: 10 }} tickLine={false} axisLine={false} tickFormatter={v => formatCurrencyWithSign(v)} />
+                <YAxis tick={{ fontSize: 10 }} tickLine={false} axisLine={false} width={52} tickFormatter={formatAxisCurrency} />
                 <Tooltip content={<DowTooltip />} />
                 <ReferenceLine y={0} stroke="rgba(0,0,0,0.15)" />
                 <Bar dataKey="avg_pnl" radius={[3, 3, 0, 0]} maxBarSize={44}>

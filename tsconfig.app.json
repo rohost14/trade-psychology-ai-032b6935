@@ -27,5 +27,9 @@
       "@/*": ["./src/*"]
     }
   },
-  "include": ["src"]
+  "include": ["src"],
+  /* _archive holds retired, unrouted code kept for reference (project rule:
+     archive, never delete). It is not maintained, so it must not gate the
+     typecheck. */
+  "exclude": ["src/**/_archive/**"]
 }
