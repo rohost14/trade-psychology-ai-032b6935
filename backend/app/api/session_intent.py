@@ -66,6 +66,62 @@ class AcknowledgeRequest(BaseModel):
     max_loss:   Optional[float] = Field(None, gt=0)   # None → use profile default
 
 
+async def _previous_session_summary(
+    broker_account_id: UUID,
+    today: date,
+    profile_max_trades: Optional[int],
+    profile_max_loss: Optional[float],
+    db: AsyncSession,
+) -> Optional[dict]:
+    """
+    Outcome of the most recent PAST session where the user committed an intent
+    (looks back 7 calendar days, so a Monday still sees Friday). Powers the
+    morning-intent context line: "yesterday you kept / broke your limits".
+
+    Limitation: when the past session had no per-session override, TODAY's
+    profile defaults are used as its limits — exact for overrides, approximate
+    if the user changed profile defaults since. Acceptable for a context line.
+    """
+    result = await db.execute(
+        select(TradingSession).where(
+            and_(
+                TradingSession.broker_account_id == broker_account_id,
+                TradingSession.session_date < today,
+                TradingSession.session_date >= today - timedelta(days=7),
+                TradingSession.intent_acknowledged.is_(True),
+            )
+        ).order_by(TradingSession.session_date.desc()).limit(1)
+    )
+    prev = result.scalar_one_or_none()
+    if prev is None:
+        return None
+
+    prev_max_trades = (
+        prev.intent_max_trades if prev.intent_max_trades is not None
+        else profile_max_trades
+    )
+    prev_max_loss = (
+        float(prev.intent_max_loss) if prev.intent_max_loss is not None
+        else profile_max_loss
+    )
+    p_trades = prev.trade_count or 0
+    p_pnl = float(prev.session_pnl) if prev.session_pnl else 0.0
+
+    trades_ok = prev_max_trades is None or p_trades <= prev_max_trades
+    loss_ok   = prev_max_loss   is None or p_pnl    >= -prev_max_loss
+
+    return {
+        "session_date": str(prev.session_date),
+        "trades": p_trades,
+        "pnl": p_pnl,
+        "max_trades": prev_max_trades,
+        "max_loss": prev_max_loss,
+        "trades_ok": trades_ok,
+        "loss_ok": loss_ok,
+        "respected": trades_ok and loss_ok,
+    }
+
+
 @router.post("/acknowledge")
 async def acknowledge_intent(
     body: AcknowledgeRequest,
@@ -122,6 +178,13 @@ async def get_today_intent(
         profile_max_trades = profile.daily_trade_limit if profile else None
         profile_max_loss   = float(profile.daily_loss_limit) if profile and profile.daily_loss_limit else None
 
+        # Previous committed session — morning-intent context line. Must be
+        # available even when today's session row doesn't exist yet (that IS
+        # the pre-market state the morning card renders in).
+        yesterday = await _previous_session_summary(
+            broker_account_id, today, profile_max_trades, profile_max_loss, db
+        )
+
         if not session:
             return {
                 "has_session": False,
@@ -136,6 +199,7 @@ async def get_today_intent(
                     "pnl": 0.0,
                 },
                 "comparison": None,
+                "yesterday": yesterday,
             }
 
         # Effective limits (session override wins over profile default)
@@ -178,6 +242,7 @@ async def get_today_intent(
                 "pnl":    actual_pnl,
             },
             "comparison": comparison,
+            "yesterday": yesterday,
         }
     except Exception as e:
         logger.error(f"get_today_intent failed: {e}")

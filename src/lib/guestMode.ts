@@ -225,6 +225,22 @@ export function getGuestResponse(url: string, method = 'GET'): unknown | undefin
     };
   }
 
+  // Session intent (morning card + EOD comparison) — mirrors /api/session-intent/today
+  if (path.includes('/api/session-intent/today')) {
+    return {
+      has_session: false,
+      intent_acknowledged: false,
+      planned: { max_trades: 5, max_loss: 10000 },
+      actual: { trades: 0, pnl: 0 },
+      comparison: null,
+      yesterday: {
+        session_date: new Date(Date.now() - 86400_000).toISOString().split('T')[0],
+        trades: 4, pnl: -12200, max_trades: 5, max_loss: 10000,
+        trades_ok: true, loss_ok: false, respected: false,
+      },
+    };
+  }
+
   // Journal entries
   if (path.includes('/api/journal')) {
     return { entries: [], total: 0 };

@@ -6,11 +6,24 @@ import { formatCurrency } from '@/lib/formatters';
 import { api } from '@/lib/api';
 import { useBroker } from '@/contexts/BrokerContext';
 
+interface YesterdaySummary {
+  session_date: string;
+  trades: number;
+  pnl: number;
+  max_trades: number | null;
+  max_loss: number | null;
+  trades_ok: boolean;
+  loss_ok: boolean;
+  respected: boolean;
+}
+
 interface IntentData {
   has_session: boolean;
   intent_acknowledged: boolean;
   planned: { max_trades: number | null; max_loss: number | null };
   actual: { trades: number; pnl: number };
+  /** Most recent past committed session (≤7 days back) — null if none */
+  yesterday: YesterdaySummary | null;
 }
 
 interface Props {
@@ -62,7 +75,7 @@ export function MorningIntentCard({ onAcknowledged }: Props) {
   if (data?.intent_acknowledged || done) return null;
 
   // No limits configured — show a subtle nudge to settings
-  if (data && !data.planned.max_trades && !data.planned.max_loss) {
+  if (data && !data.planned?.max_trades && !data.planned?.max_loss) {
     return (
       <div className="rounded-xl border border-amber-200/60 dark:border-amber-800/30 bg-amber-50/60 dark:bg-amber-900/10 px-4 py-3 flex items-center justify-between gap-3 mb-4">
         <div className="flex items-center gap-2.5">
@@ -91,8 +104,8 @@ export function MorningIntentCard({ onAcknowledged }: Props) {
     ? `${Math.ceil(mins / 60)}h ${mins % 60}m`
     : mins > 0 ? `${mins} min` : 'Open now';
 
-  const effectiveTrades = overrideTrades ? parseInt(overrideTrades, 10) : data.planned.max_trades;
-  const effectiveLoss = overrideLoss ? parseFloat(overrideLoss) : data.planned.max_loss;
+  const effectiveTrades = overrideTrades ? parseInt(overrideTrades, 10) : data.planned?.max_trades ?? null;
+  const effectiveLoss = overrideLoss ? parseFloat(overrideLoss) : data.planned?.max_loss ?? null;
 
   async function handleCommit() {
     setSubmitting(true);
@@ -115,6 +128,15 @@ export function MorningIntentCard({ onAcknowledged }: Props) {
   if (effectiveTrades != null) parts.push(`Max ${effectiveTrades} trades`);
   if (effectiveLoss != null) parts.push(`${formatCurrency(effectiveLoss)} loss limit`);
   const intentSummary = parts.join(' · ') || 'Your rules for today';
+
+  // Yesterday-outcome context line — the user's own facts, not generic advice.
+  const y = data.yesterday;
+  const yesterdayLine = !y ? null
+    : y.respected
+      ? `Yesterday you kept your limits — ${y.trades} trade${y.trades !== 1 ? 's' : ''}, ${formatCurrency(Math.abs(y.pnl))} ${y.pnl >= 0 ? 'profit' : 'loss'}.`
+    : !y.loss_ok && y.max_loss != null
+      ? `Yesterday you broke your loss limit — ${formatCurrency(Math.abs(y.pnl))} loss vs the ${formatCurrency(y.max_loss)} cap.`
+      : `Yesterday you exceeded your trade cap — ${y.trades} trades vs a max of ${y.max_trades}.`;
 
   return (
     <div className={cn(
@@ -143,6 +165,17 @@ export function MorningIntentCard({ onAcknowledged }: Props) {
         <p className="text-[11px] text-amber-700/60 dark:text-amber-400/50 mt-1">
           Your plan for today. Tap below to commit.
         </p>
+        {y && yesterdayLine && (
+          <p className={cn(
+            'text-[11.5px] mt-2 flex items-start gap-1.5',
+            y.respected
+              ? 'text-emerald-700 dark:text-emerald-400'
+              : 'text-red-700 dark:text-red-400',
+          )}>
+            <span className="mt-px shrink-0">{y.respected ? '✓' : '✕'}</span>
+            {yesterdayLine}
+          </p>
+        )}
       </div>
 
       {/* ── Override toggle ────────────────────────────────────────────────── */}
@@ -162,7 +195,7 @@ export function MorningIntentCard({ onAcknowledged }: Props) {
               <input
                 type="number"
                 min={1}
-                placeholder={String(data.planned.max_trades ?? '')}
+                placeholder={String(data.planned?.max_trades ?? '')}
                 value={overrideTrades}
                 onChange={e => setOverrideTrades(e.target.value)}
                 className={cn(
@@ -180,7 +213,7 @@ export function MorningIntentCard({ onAcknowledged }: Props) {
               <input
                 type="number"
                 min={0}
-                placeholder={String(data.planned.max_loss ?? '')}
+                placeholder={String(data.planned?.max_loss ?? '')}
                 value={overrideLoss}
                 onChange={e => setOverrideLoss(e.target.value)}
                 className={cn(
