@@ -37,23 +37,36 @@ def _apply_fields(entry: "JournalEntry", data) -> None:
 
 
 async def embed_journal_entry_async(db: AsyncSession, entry: JournalEntry):
-    """Background task to embed a journal entry for RAG."""
+    """Background task to embed a journal entry for RAG.
+
+    Builds content from the CURRENT model fields (migration 045 structured
+    trio replaced the old notes/emotions/lessons columns — referencing those
+    raised AttributeError on every call, so no entry was ever embedded).
+    """
     try:
         content_parts = []
         if entry.notes:
             content_parts.append(f"Notes: {entry.notes}")
-        if entry.emotions:
-            content_parts.append(f"Emotions: {entry.emotions}")
-        if entry.lessons:
-            content_parts.append(f"Lessons: {entry.lessons}")
+        if entry.emotion_tags:
+            content_parts.append(f"Emotions: {', '.join(entry.emotion_tags)}")
+        if entry.followed_plan:
+            content_parts.append(f"Followed plan: {entry.followed_plan}")
+        if entry.deviation_reason:
+            content_parts.append(f"Deviation reason: {entry.deviation_reason}")
+        if entry.exit_reason:
+            content_parts.append(f"Exit reason: {entry.exit_reason}")
+        if entry.setup_quality:
+            content_parts.append(f"Setup quality: {entry.setup_quality}/5")
+        if entry.would_repeat:
+            content_parts.append(f"Would repeat: {entry.would_repeat}")
+        if entry.market_condition:
+            content_parts.append(f"Market condition: {entry.market_condition}")
         if entry.trade_symbol:
             content_parts.append(f"Symbol: {entry.trade_symbol}")
         if entry.trade_type:
             content_parts.append(f"Trade type: {entry.trade_type}")
         if entry.trade_pnl:
             content_parts.append(f"P&L: {entry.trade_pnl}")
-        if entry.emotion_tags:
-            content_parts.append(f"Emotion tags: {', '.join(entry.emotion_tags)}")
 
         content = "\n".join(content_parts)
 
@@ -64,7 +77,7 @@ async def embed_journal_entry_async(db: AsyncSession, entry: JournalEntry):
                 journal_entry_id=entry.id,
                 content=content,
                 entry_date=entry.created_at,
-                mood=entry.emotions[:50] if entry.emotions else None,
+                mood=entry.emotion_tags[0] if entry.emotion_tags else None,
                 tags=entry.emotion_tags
             )
             logger.info(f"Embedded journal entry: {entry.id}")
@@ -302,6 +315,14 @@ async def create_journal_entry(
                 existing.updated_at = datetime.now(timezone.utc)
                 await db.commit()
                 await db.refresh(existing)
+
+                # Keep the RAG embedding in sync — same as the PUT route.
+                try:
+                    await rag_service.delete_embedding(db, existing.id)
+                    await embed_journal_entry_async(db, existing)
+                except Exception as e:
+                    logger.warning(f"Embedding update failed (non-critical): {e}")
+
                 return {"entry": existing.to_dict(), "created": False, "updated": True}
 
         entry = JournalEntry(

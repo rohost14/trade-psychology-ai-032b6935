@@ -350,44 +350,55 @@ export const DEMO_PROFILE = {
 // ---------------------------------------------------------------------------
 // Analytics: overview
 // ---------------------------------------------------------------------------
+// Mirrors the /api/analytics/overview equity_curve item shape:
+// { date, cumulative_pnl, trade_count } — chronological (oldest first).
 const EQUITY_CURVE = (() => {
-  let equity = 100000;
-  const curve = [];
   const pnls = [2100, -800, 1500, 3200, -1200, 4800, -2100, 1800, 2250, -3750,
     -2700, -960, 1850, 2700, 6600, 6500, -3000, 3625, -13000, -2700];
-  for (let i = pnls.length - 1; i >= 0; i--) {
-    equity += pnls[i];
+  let cumulative = 0;
+  const curve = [];
+  for (let i = 0; i < pnls.length; i++) {
+    cumulative += pnls[i];
     const d = new Date();
-    d.setDate(d.getDate() - (pnls.length - 1 - i));
-    curve.push({ date: d.toISOString().split('T')[0], equity: Math.round(equity) });
+    d.setDate(d.getDate() - (pnls.length - 1 - i)); // oldest first, ends today
+    curve.push({
+      date: d.toISOString().split('T')[0],
+      cumulative_pnl: Math.round(cumulative),
+      trade_count: 1 + (i % 3),
+    });
   }
   return curve;
 })();
 
+// Mirrors GET /api/analytics/overview response shape
 export const DEMO_OVERVIEW = {
   has_data: true, period_days: 30,
   kpis: {
-    total_pnl: 7990, trade_count: 15, win_rate: 60,
+    total_pnl: 7990, total_trades: 15, win_rate: 60,
     winners: 9, losers: 6,
     avg_win: 3933, avg_loss: -4635,
     profit_factor: 1.28, expectancy: 533,
     max_win_streak: 4, max_loss_streak: 3,
     current_streak: 2, current_streak_type: 'loss',
-    best_day: { date: daysAgo(12).split('T')[0], pnl: 9300 },
-    worst_day: { date: daysAgo(1).split('T')[0], pnl: -16075 },
+    best_day: { date: daysAgo(12).split('T')[0], pnl: 9300, trades: 2, win_rate: 100 },
+    worst_day: { date: daysAgo(1).split('T')[0], pnl: -16075, trades: 3, win_rate: 33.3 },
+    avg_duration_min: 118,
+    max_drawdown: -23110,
+    win_days: 6, loss_days: 4, trading_days: 10,
+    largest_win: 6600, largest_loss: -13000,
   },
   equity_curve: EQUITY_CURVE,
   daily_pnl: [
-    { date: daysAgo(1).split('T')[0], pnl: -16075 },
-    { date: daysAgo(2).split('T')[0], pnl: 2250 },
-    { date: daysAgo(3).split('T')[0], pnl: 3470 },
-    { date: daysAgo(5).split('T')[0], pnl: 2300 },
-    { date: daysAgo(6).split('T')[0], pnl: -7410 },
-    { date: daysAgo(9).split('T')[0], pnl: 1850 },
-    { date: daysAgo(10).split('T')[0], pnl: 2700 },
-    { date: daysAgo(12).split('T')[0], pnl: 9300 },
-    { date: daysAgo(14).split('T')[0], pnl: 6500 },
-    { date: daysAgo(15).split('T')[0], pnl: -3000 },
+    { date: daysAgo(15).split('T')[0], pnl: -3000,  trades: 1, win_rate: 0 },
+    { date: daysAgo(14).split('T')[0], pnl: 6500,   trades: 1, win_rate: 100 },
+    { date: daysAgo(12).split('T')[0], pnl: 9300,   trades: 2, win_rate: 100 },
+    { date: daysAgo(10).split('T')[0], pnl: 2700,   trades: 1, win_rate: 100 },
+    { date: daysAgo(9).split('T')[0],  pnl: 1850,   trades: 1, win_rate: 100 },
+    { date: daysAgo(6).split('T')[0],  pnl: -7410,  trades: 3, win_rate: 0 },
+    { date: daysAgo(5).split('T')[0],  pnl: 2300,   trades: 1, win_rate: 100 },
+    { date: daysAgo(3).split('T')[0],  pnl: 3470,   trades: 2, win_rate: 50 },
+    { date: daysAgo(2).split('T')[0],  pnl: 2250,   trades: 1, win_rate: 100 },
+    { date: daysAgo(1).split('T')[0],  pnl: -16075, trades: 3, win_rate: 33.3 },
   ],
 };
 
@@ -541,16 +552,24 @@ export const DEMO_PROGRESS = {
 // ---------------------------------------------------------------------------
 // Analytics: risk metrics
 // ---------------------------------------------------------------------------
+// Mirrors GET /api/analytics/risk-metrics response shape
 export const DEMO_RISK_METRICS = {
   has_data: true,
-  max_drawdown: -23110,
-  max_drawdown_pct: -19.3,
+  period_days: 30,
+  max_drawdown: { amount: -23110, start_date: daysAgo(6).split('T')[0], end_date: daysAgo(1).split('T')[0] },
+  drawdown_periods: [],
+  daily_volatility: 7420,
   var_95: -9800,
-  avg_daily_loss: -5500,
-  largest_single_loss: -13000,
   risk_reward_ratio: 0.85,
-  days_in_drawdown: 4,
-  recovery_factor: 0.35,
+  consecutive_max: { wins: 4, losses: 3 },
+  alerts_summary: [
+    { pattern_type: 'revenge_trade',           count: 3, last_detected: daysAgo(1, 14, 40) },
+    { pattern_type: 'overtrading',             count: 2, last_detected: daysAgo(6, 11, 55) },
+    { pattern_type: 'no_stoploss',             count: 2, last_detected: daysAgo(3, 12, 10) },
+    { pattern_type: 'opening_5min_trap',       count: 1, last_detected: daysAgo(6, 9, 18) },
+    { pattern_type: 'consecutive_loss_streak', count: 1, last_detected: daysAgo(1, 15, 5) },
+  ],
+  recent_alerts: [],
 };
 
 // ---------------------------------------------------------------------------
@@ -618,44 +637,77 @@ export const DEMO_CRITICAL_TRADES = {
 // ---------------------------------------------------------------------------
 // Analytics: edge confidence
 // ---------------------------------------------------------------------------
+// Mirrors GET /api/analytics/edge-confidence (Wilson interval) response shape
 export const DEMO_EDGE_CONFIDENCE = {
   has_data: true,
-  overall_edge: 52,
-  confidence: 'moderate',
-  instruments: [
-    { symbol: 'NIFTY options', edge: 68, trades: 7, confidence: 'strong' },
-    { symbol: 'BANKNIFTY options', edge: 71, trades: 3, confidence: 'strong' },
-    { symbol: 'FORTIS options', edge: 95, trades: 2, confidence: 'limited_data' },
-    { symbol: 'SOLARINDS', edge: 38, trades: 2, confidence: 'weak' },
-    { symbol: 'SENSEX options', edge: 0, trades: 1, confidence: 'no_edge' },
-  ],
+  n: 15,
+  wins: 9,
+  observed_win_rate: 60.0,
+  ci_lower: 35.7,
+  ci_upper: 80.2,
+  ci_center: 58.6,
+  verdict: 'too_few',
+  message: 'Only 15 trades — need at least 20 for a reliable reading.',
+  is_reliable: false,
 };
 
 // ---------------------------------------------------------------------------
 // Analytics: conditional performance
 // ---------------------------------------------------------------------------
+// Mirrors GET /api/analytics/conditional-performance response shape
 export const DEMO_CONDITIONAL_PERFORMANCE = {
   has_data: true,
+  total_trades: 15,
+  baseline_win_rate: 60.0,
+  baseline_avg_pnl: 533,
   conditions: [
-    { condition: 'First trade of day', win_rate: 75, avg_pnl: 2850, trades: 8 },
-    { condition: 'After a win', win_rate: 62, avg_pnl: 1200, trades: 8 },
-    { condition: 'After a loss', win_rate: 30, avg_pnl: -4100, trades: 10 },
-    { condition: 'Morning (9–11 AM)', win_rate: 77, avg_pnl: 2680, trades: 9 },
-    { condition: 'Afternoon (2–4 PM)', win_rate: 25, avg_pnl: -6250, trades: 4 },
-    { condition: 'More than 3 trades/day', win_rate: 22, avg_pnl: -3200, trades: 9 },
+    {
+      key: 'after_loss', label: 'After a loss',
+      win_rate: 30.0, avg_pnl: -4100, trade_count: 10, delta_vs_baseline: -30.0,
+      narrative: 'Your win rate drops to 30% after a loss (vs 60% baseline) across 10 trades.',
+    },
+    {
+      key: 'first_30min', label: 'Opening 30 minutes',
+      win_rate: 40.0, avg_pnl: -1850, trade_count: 5, delta_vs_baseline: -20.0,
+      narrative: 'In the opening 30 minutes your win rate drops to 40% (vs 60% baseline) across 5 trades.',
+    },
+    {
+      key: 'expiry_day', label: 'Expiry day',
+      win_rate: 44.4, avg_pnl: -320, trade_count: 9, delta_vs_baseline: -15.6,
+      narrative: 'On expiry days your win rate drops to 44.4% (vs 60% baseline) across 9 trades.',
+    },
+    {
+      key: 'quick_reentry', label: 'Quick re-entry (<20 min)',
+      win_rate: 28.6, avg_pnl: -2870, trade_count: 7, delta_vs_baseline: -31.4,
+      narrative: 'Quick re-entries (<20 min) show win rate drops to 28.6% (vs 60% baseline) across 7 trades.',
+    },
   ],
 };
 
 // ---------------------------------------------------------------------------
 // Analytics: options behavior
 // ---------------------------------------------------------------------------
+// Mirrors GET /api/analytics/options-behavior response shape
+// (old flat ce_pnl/pe_pnl shape crashed OptionsBehaviorCard in guest mode)
 export const DEMO_OPTIONS_BEHAVIOR = {
+  period_days: 30,
   has_data: true,
-  ce_pnl: 8575, pe_pnl: 4175,
-  buy_pnl: 12750, sell_pnl: 0,
-  weekly_pnl: 3475, monthly_pnl: 9275,
-  avg_hold_winner: 97, avg_hold_loser: 185,
-  premium_decay_cost: 2100,
+  direction_confusion: {
+    count: 2,
+    underlying_breakdown: { NIFTY: 2 },
+    avg_flip_minutes: 11.5,
+  },
+  premium_avg_down: {
+    count: 1,
+    total_re_entry_premium: 6750,
+    avg_worst_loss_pct: -34.2,
+  },
+  iv_crush: {
+    count: 1,
+    total_loss: 2700,
+    avg_hold_minutes: 165,
+    avg_loss_pct: -30.4,
+  },
 };
 
 // ---------------------------------------------------------------------------
@@ -755,23 +807,33 @@ export const DEMO_PNL_ATTRIBUTION = {
 // ---------------------------------------------------------------------------
 // Analytics: quality-breakdown (TradesTab quality scores)
 // ---------------------------------------------------------------------------
+// Mirrors GET /api/analytics/quality-breakdown response shape
+// (behavioural quality score 0–8; tiers high 7–8 / mid 5–6 / low 0–4)
 export const DEMO_QUALITY_BREAKDOWN = {
+  has_data: true,
+  avg_score: 5.4,
+  max_score: 8,
+  tiers: {
+    high: { count: 5, avg_pnl: 3634,  win_rate: 100,  total_pnl: 18170 },
+    mid:  { count: 6, avg_pnl: 372,   win_rate: 66.7, total_pnl: 2230 },
+    low:  { count: 4, avg_pnl: -3103, win_rate: 0,    total_pnl: -12410 },
+  },
   per_trade: [
-    { trade_id: 'ct-001', score: 82, tier: 'A' },
-    { trade_id: 'ct-002', score: 38, tier: 'C' },
-    { trade_id: 'ct-003', score: 12, tier: 'F' },
-    { trade_id: 'ct-004', score: 77, tier: 'B' },
-    { trade_id: 'ct-005', score: 85, tier: 'A' },
-    { trade_id: 'ct-006', score: 44, tier: 'C' },
-    { trade_id: 'ct-007', score: 79, tier: 'B' },
-    { trade_id: 'ct-008', score: 18, tier: 'F' },
-    { trade_id: 'ct-009', score: 22, tier: 'F' },
-    { trade_id: 'ct-010', score: 35, tier: 'D' },
-    { trade_id: 'ct-011', score: 76, tier: 'B' },
-    { trade_id: 'ct-012', score: 80, tier: 'A' },
-    { trade_id: 'ct-013', score: 91, tier: 'A' },
-    { trade_id: 'ct-014', score: 72, tier: 'B' },
-    { trade_id: 'ct-015', score: 41, tier: 'D' },
+    { trade_id: 'ct-013', tradingsymbol: 'FORTIS25MAR960CE',      realized_pnl: 6600,   entry_time: daysAgo(12, 10, 0),  exit_time: daysAgo(12, 14, 30), score: 8, tier: 'high' },
+    { trade_id: 'ct-001', tradingsymbol: 'NIFTY2531723200PE',     realized_pnl: 3625,   entry_time: daysAgo(1, 9, 22),   exit_time: daysAgo(1, 10, 47),  score: 7, tier: 'high' },
+    { trade_id: 'ct-005', tradingsymbol: 'FORTIS25MAR960CE',      realized_pnl: 5170,   entry_time: daysAgo(3, 10, 30),  exit_time: daysAgo(3, 13, 15),  score: 7, tier: 'high' },
+    { trade_id: 'ct-012', tradingsymbol: 'BANKNIFTY2531748500PE', realized_pnl: 2700,   entry_time: daysAgo(10, 9, 20),  exit_time: daysAgo(10, 10, 40), score: 7, tier: 'high' },
+    { trade_id: 'ct-011', tradingsymbol: 'NIFTY25MAR23000CE',     realized_pnl: 1850,   entry_time: daysAgo(9, 9, 30),   exit_time: daysAgo(9, 11, 45),  score: 7, tier: 'high' },
+    { trade_id: 'ct-004', tradingsymbol: 'BANKNIFTY2531748500PE', realized_pnl: 2250,   entry_time: daysAgo(2, 9, 18),   exit_time: daysAgo(2, 10, 5),   score: 6, tier: 'mid' },
+    { trade_id: 'ct-007', tradingsymbol: 'NIFTY25MAR23000CE',     realized_pnl: 2300,   entry_time: daysAgo(5, 9, 25),   exit_time: daysAgo(5, 11, 10),  score: 6, tier: 'mid' },
+    { trade_id: 'ct-014', tradingsymbol: 'SOLARINDS',             realized_pnl: 6500,   entry_time: daysAgo(14, 9, 45),  exit_time: daysAgo(14, 12, 20), score: 6, tier: 'mid' },
+    { trade_id: 'ct-006', tradingsymbol: 'SENSEX25MAR75000PE',    realized_pnl: -1700,  entry_time: daysAgo(3, 11, 45),  exit_time: daysAgo(3, 14, 30),  score: 5, tier: 'mid' },
+    { trade_id: 'ct-010', tradingsymbol: 'BANKNIFTY2531749000CE', realized_pnl: -960,   entry_time: daysAgo(6, 11, 15),  exit_time: daysAgo(6, 11, 50),  score: 5, tier: 'mid' },
+    { trade_id: 'ct-015', tradingsymbol: 'NIFTY25MAR23000PE',     realized_pnl: -3000,  entry_time: daysAgo(15, 13, 10), exit_time: daysAgo(15, 14, 55), score: 5, tier: 'mid' },
+    { trade_id: 'ct-002', tradingsymbol: 'SOLARINDS',             realized_pnl: -13000, entry_time: daysAgo(1, 11, 5),   exit_time: daysAgo(1, 14, 22),  score: 4, tier: 'low' },
+    { trade_id: 'ct-003', tradingsymbol: 'NIFTY25MAR23000CE',     realized_pnl: -2700,  entry_time: daysAgo(1, 14, 35),  exit_time: daysAgo(1, 15, 10),  score: 2, tier: 'low' },
+    { trade_id: 'ct-008', tradingsymbol: 'NIFTY2531723200PE',     realized_pnl: -3750,  entry_time: daysAgo(6, 9, 20),   exit_time: daysAgo(6, 9, 48),   score: 3, tier: 'low' },
+    { trade_id: 'ct-009', tradingsymbol: 'NIFTY2531723200CE',     realized_pnl: -2700,  entry_time: daysAgo(6, 10, 5),   exit_time: daysAgo(6, 10, 35),  score: 3, tier: 'low' },
   ],
 };
 

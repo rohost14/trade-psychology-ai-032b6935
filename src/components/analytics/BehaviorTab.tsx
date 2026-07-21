@@ -1,100 +1,109 @@
 import { useState, useEffect } from 'react';
-import { RefreshCw, AlertTriangle, Link as LinkIcon } from 'lucide-react';
+import { RefreshCw, AlertTriangle, Link as LinkIcon, ArrowRight } from 'lucide-react';
 import { Skeleton } from '@/components/ui/skeleton';
 import { cn } from '@/lib/utils';
 import { formatCurrencyWithSign } from '@/lib/formatters';
 import { api } from '@/lib/api';
 import { Link } from 'react-router-dom';
+import { formatPatternName } from '@/contexts/AlertContext';
 import OptionsBehaviorCard from './OptionsBehaviorCard';
 
 interface BehaviorTabProps { days: number }
 
+// Shape of GET /api/analytics/risk-metrics → alerts_summary
 interface PatternRow {
   pattern_type: string;
-  display_name: string;
-  alerts: number;
-  heeded: number;
-  continued: number;
-  heeded_pct: number;
-  post_alert_pnl: number;
+  count: number;
+  last_detected: string | null;
 }
 
 interface RiskMetrics {
   has_data: boolean;
   alerts_summary: PatternRow[];
-  total_alerts: number;
-  total_heeded: number;
-  total_continued: number;
-  estimated_cost_of_ignoring: number;
 }
 
-interface ScenarioResult {
-  trades: number;
+// Shape of GET /api/analytics/conditional-performance
+interface Condition {
+  key: string;
+  label: string;
   win_rate: number;
   avg_pnl: number;
-  baseline_win_rate?: number;
-  baseline_avg_pnl?: number;
+  trade_count: number;
+  delta_vs_baseline: number;
+  narrative: string;
 }
 
 interface ConditionalData {
   has_data: boolean;
-  after_loss: ScenarioResult;
-  first_30min: ScenarioResult;
-  quick_reentry: ScenarioResult;
-  large_position?: ScenarioResult;
+  total_trades: number;
+  baseline_win_rate: number;
+  baseline_avg_pnl: number;
+  conditions: Condition[];
 }
 
+// Shape of GET /api/analytics/journal-correlation → by_emotion
 interface EmotionRow {
-  tag: string; trades: number; avg_pnl: number; baseline_avg_pnl: number;
+  emotion: string;
+  trade_count: number;
+  avg_pnl: number;
+  total_pnl: number;
+  win_rate: number;
 }
 
 interface JournalCorrData {
   has_data: boolean;
-  data: EmotionRow[];
+  total_journaled: number;
+  by_emotion: EmotionRow[];
 }
 
-const SCENARIO_META: Record<string, { label: string; description: string; riskyIfBelow: boolean }> = {
-  after_loss: {
-    label: 'After a Loss',
-    description: 'Win rate on trades entered within 30 min of a losing trade.',
-    riskyIfBelow: true,
-  },
-  first_30min: {
-    label: 'First 30 Minutes',
-    description: 'Performance on trades entered between 9:15–9:45 AM IST.',
-    riskyIfBelow: true,
-  },
-  quick_reentry: {
-    label: 'Quick Re-entry',
-    description: 'Win rate when re-entering the same symbol within 5 minutes of exiting.',
-    riskyIfBelow: true,
-  },
+// Per-condition help copy — the backend narrative carries the numbers; this
+// carries the definition.
+const CONDITION_DESCRIPTIONS: Record<string, string> = {
+  after_loss:     'Trades entered shortly after a losing trade.',
+  first_30min:    'Trades entered between 9:15–9:45 AM IST.',
+  expiry_day:     'Trades taken on an option-expiry day.',
+  large_position: 'Trades sized above 1.5× your average.',
+  quick_reentry:  'Re-entries within 20 minutes of your last round-trip.',
 };
 
 const TAG_COLORS: Record<string, string> = {
-  frustrated: 'bg-red-500/10 text-tm-loss',
-  anxious:    'bg-red-500/10 text-tm-loss',
-  fearful:    'bg-red-500/10 text-tm-loss',
-  angry:      'bg-red-500/10 text-tm-loss',
-  confident:  'bg-green-500/10 text-tm-profit',
-  focused:    'bg-green-500/10 text-tm-profit',
-  calm:       'bg-green-500/10 text-tm-profit',
-  greedy:     'bg-amber-500/10 text-tm-obs',
-  fomo:       'bg-amber-500/10 text-tm-obs',
+  frustrated:    'bg-red-500/10 text-tm-loss',
+  anxious:       'bg-red-500/10 text-tm-loss',
+  fearful:       'bg-red-500/10 text-tm-loss',
+  angry:         'bg-red-500/10 text-tm-loss',
+  revenge:       'bg-red-500/10 text-tm-loss',
+  confident:     'bg-green-500/10 text-tm-profit',
+  focused:       'bg-green-500/10 text-tm-profit',
+  calm:          'bg-green-500/10 text-tm-profit',
+  greedy:        'bg-amber-500/10 text-tm-obs',
+  fomo:          'bg-amber-500/10 text-tm-obs',
+  overconfident: 'bg-amber-500/10 text-tm-obs',
 };
 
 function tagColor(tag: string) {
   return TAG_COLORS[tag.toLowerCase()] ?? 'bg-muted/60 text-foreground';
 }
 
+function timeAgo(dateStr: string | null): string {
+  if (!dateStr) return '—';
+  const diff = Date.now() - new Date(dateStr).getTime();
+  const mins = Math.floor(diff / 60000);
+  const hrs  = Math.floor(mins / 60);
+  const days = Math.floor(hrs / 24);
+  if (mins < 1)  return 'just now';
+  if (mins < 60) return `${mins}m ago`;
+  if (hrs < 24)  return `${hrs}h ago`;
+  return `${days}d ago`;
+}
+
 export default function BehaviorTab({ days }: BehaviorTabProps) {
-  const [metrics, setMetrics]     = useState<RiskMetrics | null>(null);
-  const [conditional, setCond]    = useState<ConditionalData | null>(null);
-  const [emotions, setEmotions]   = useState<JournalCorrData | null>(null);
+  const [metrics, setMetrics]       = useState<RiskMetrics | null>(null);
+  const [conditional, setCond]      = useState<ConditionalData | null>(null);
+  const [emotions, setEmotions]     = useState<JournalCorrData | null>(null);
   const [hasOptions, setHasOptions] = useState(false);
-  const [loading, setLoading]     = useState(true);
-  const [error, setError]         = useState<string | null>(null);
-  const [retry, setRetry]         = useState(0);
+  const [loading, setLoading]       = useState(true);
+  const [error, setError]           = useState<string | null>(null);
+  const [retry, setRetry]           = useState(0);
 
   useEffect(() => {
     let cancelled = false;
@@ -136,111 +145,94 @@ export default function BehaviorTab({ days }: BehaviorTabProps) {
     </div>
   );
 
-  const patterns = (metrics?.alerts_summary ?? []).sort((a, b) => b.post_alert_pnl - a.post_alert_pnl);
-  const maxCost = Math.max(...patterns.map(p => Math.abs(p.post_alert_pnl)), 1);
+  // Pattern frequency, most frequent first
+  const patterns = [...(metrics?.alerts_summary ?? [])].sort((a, b) => b.count - a.count);
+  const maxCount = Math.max(...patterns.map(p => p.count), 1);
+
+  const conditions = conditional?.has_data ? (conditional.conditions ?? []) : [];
+  const baselineWR = conditional?.baseline_win_rate ?? 0;
+
+  const emotionRows = emotions?.has_data ? (emotions.by_emotion ?? []) : [];
 
   return (
     <div className="space-y-5">
 
-      {/* Pattern Cost Table */}
+      {/* Pattern frequency — counts only. Response stats (heeded / took anyway)
+          and the live loop are owned by the Alerts page; cross-link, don't recompute. */}
       {patterns.length > 0 && (
         <div className="tm-card overflow-hidden">
           <div className="px-5 py-3.5 border-b border-border flex items-center justify-between">
-            <p className="font-semibold text-sm">Pattern Cost Breakdown</p>
-            {metrics && metrics.estimated_cost_of_ignoring !== 0 && (
-              <span className="text-xs text-tm-loss font-mono font-semibold">
-                {formatCurrencyWithSign(Math.round(metrics.estimated_cost_of_ignoring))} total ignored cost
-              </span>
-            )}
-          </div>
-
-          {/* Header row */}
-          <div className="grid grid-cols-[1fr_auto_auto_auto] gap-x-4 px-5 py-2 border-b border-border bg-muted/30">
-            {['Pattern', 'Alerts', 'Heeded', 'P&L cost'].map(h => (
-              <span key={h} className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">{h}</span>
-            ))}
+            <p className="font-semibold text-sm">Pattern Frequency</p>
+            <span className="text-xs text-muted-foreground">last {days} days</span>
           </div>
 
           <div className="divide-y divide-border">
-            {patterns.map(p => {
-              const barPct = Math.round(Math.abs(p.post_alert_pnl) / maxCost * 100);
-              const isBad  = p.post_alert_pnl < 0;
-              return (
-                <div key={p.pattern_type} className="px-5 py-3">
-                  <div className="grid grid-cols-[1fr_auto_auto_auto] gap-x-4 items-center mb-1.5">
-                    <span className="text-sm font-medium truncate">{p.display_name}</span>
-                    <span className="text-sm font-mono text-muted-foreground">{p.alerts}</span>
-                    <span className="text-sm font-mono">
-                      <span className={p.heeded_pct >= 50 ? 'text-tm-profit' : 'text-tm-obs'}>
-                        {Math.round(p.heeded_pct)}%
-                      </span>
-                    </span>
-                    <span className={cn('text-sm font-mono font-semibold', isBad ? 'text-tm-loss' : 'text-tm-profit')}>
-                      {formatCurrencyWithSign(Math.round(p.post_alert_pnl))}
-                    </span>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <div className="flex-1 h-1 rounded-full bg-muted/60 overflow-hidden">
-                      <div
-                        className="h-full rounded-full"
-                        style={{ width: `${barPct}%`, backgroundColor: isBad ? '#dc2626' : '#16a34a' }}
-                      />
-                    </div>
-                    <span className="text-[10px] text-muted-foreground w-16 text-right shrink-0">
-                      {p.continued} ignored
-                    </span>
+            {patterns.map(p => (
+              <div key={p.pattern_type} className="px-5 py-3">
+                <div className="flex items-center justify-between gap-4 mb-1.5">
+                  <span className="text-sm font-medium truncate">{formatPatternName(p.pattern_type)}</span>
+                  <div className="flex items-center gap-3 shrink-0">
+                    <span className="text-[11px] text-muted-foreground">last {timeAgo(p.last_detected)}</span>
+                    <span className="text-sm font-mono font-semibold tabular-nums">{p.count}×</span>
                   </div>
                 </div>
-              );
-            })}
+                <div className="h-1 rounded-full bg-muted/60 overflow-hidden">
+                  <div
+                    className="h-full rounded-full bg-tm-obs"
+                    style={{ width: `${Math.round((p.count / maxCount) * 100)}%` }}
+                  />
+                </div>
+              </div>
+            ))}
           </div>
 
-          <p className="px-5 py-3 text-[11px] text-muted-foreground border-t border-border">
-            P&L cost = realized P&L on trades where alert was ignored (continued).
-            Heeded trades avoid this exposure entirely.
-          </p>
+          <Link
+            to="/alerts"
+            className="px-5 py-3 border-t border-border flex items-center justify-between text-[12px] text-tm-brand hover:underline"
+          >
+            <span>How you responded to each alert — stopped, ignored, took anyway</span>
+            <ArrowRight className="h-3.5 w-3.5 shrink-0" />
+          </Link>
         </div>
       )}
 
-      {/* Scenario Cards */}
-      {conditional?.has_data && (
+      {/* Conditional performance — win rate under specific behavioural conditions */}
+      {conditions.length > 0 && (
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-          {Object.entries(SCENARIO_META).map(([key, meta]) => {
-            const s = conditional[key as keyof ConditionalData] as ScenarioResult | undefined;
-            if (!s || s.trades === 0) return null;
-            const baseline = s.baseline_win_rate ?? 0;
-            const delta    = s.win_rate - baseline;
-            const isRisky  = meta.riskyIfBelow ? delta < -5 : delta > 5;
+          {conditions.map(c => {
+            const isRisky = c.delta_vs_baseline < -5;
             return (
               <div
-                key={key}
+                key={c.key}
                 className={cn(
                   'tm-card overflow-hidden border-l-4',
                   isRisky ? 'border-l-tm-loss' : 'border-l-tm-profit',
                 )}
               >
                 <div className="px-4 pt-4 pb-3">
-                  <p className="text-xs text-muted-foreground uppercase tracking-wide mb-2">{meta.label}</p>
+                  <p className="text-xs text-muted-foreground uppercase tracking-wide mb-2">{c.label}</p>
                   <div className="flex items-end gap-2 mb-1">
                     <span className={cn(
                       'text-3xl font-mono font-black tabular-nums',
                       isRisky ? 'text-tm-loss' : 'text-tm-profit',
                     )}>
-                      {Math.round(s.win_rate)}%
+                      {Math.round(c.win_rate)}%
                     </span>
                     <span className="text-sm text-muted-foreground pb-0.5">win rate</span>
                   </div>
-                  {baseline > 0 && (
-                    <p className={cn('text-[12px] font-medium', delta < 0 ? 'text-tm-loss' : 'text-tm-profit')}>
-                      {delta > 0 ? '+' : ''}{delta.toFixed(1)}% vs your baseline ({Math.round(baseline)}%)
-                    </p>
+                  <p className={cn('text-[12px] font-medium', c.delta_vs_baseline < 0 ? 'text-tm-loss' : 'text-tm-profit')}>
+                    {c.delta_vs_baseline > 0 ? '+' : ''}{c.delta_vs_baseline.toFixed(1)}% vs your baseline ({Math.round(baselineWR)}%)
+                  </p>
+                  {CONDITION_DESCRIPTIONS[c.key] && (
+                    <p className="text-[11px] text-muted-foreground mt-2">{CONDITION_DESCRIPTIONS[c.key]}</p>
                   )}
-                  <p className="text-[11px] text-muted-foreground mt-2">{meta.description}</p>
-                  <p className="text-[11px] text-muted-foreground mt-0.5">{s.trades} trades · {formatCurrencyWithSign(Math.round(s.avg_pnl))} avg</p>
+                  <p className="text-[11px] text-muted-foreground mt-0.5">
+                    {c.trade_count} trades · {formatCurrencyWithSign(Math.round(c.avg_pnl))} avg
+                  </p>
                 </div>
               </div>
             );
-          }).filter(Boolean)}
+          })}
         </div>
       )}
 
@@ -248,7 +240,7 @@ export default function BehaviorTab({ days }: BehaviorTabProps) {
       <OptionsBehaviorCard days={days} onHasData={setHasOptions} />
 
       {/* Emotion Summary */}
-      {emotions?.has_data && emotions.data?.length > 0 && (
+      {emotionRows.length > 0 && (
         <div className="tm-card overflow-hidden">
           <div className="px-5 py-3.5 border-b border-border flex items-center justify-between">
             <p className="font-semibold text-sm">Emotion vs P&L (top tags)</p>
@@ -257,34 +249,29 @@ export default function BehaviorTab({ days }: BehaviorTabProps) {
             </Link>
           </div>
           <div className="px-5 py-4 flex flex-wrap gap-2">
-            {emotions.data.slice(0, 8).map(e => {
-              const delta = e.avg_pnl - e.baseline_avg_pnl;
-              return (
-                <div
-                  key={e.tag}
-                  className={cn('flex items-center gap-2 px-3 py-2 rounded-xl border', tagColor(e.tag))}
-                >
-                  <span className="text-sm font-medium capitalize">{e.tag}</span>
-                  <span className="text-[11px] font-mono tabular-nums">
-                    {formatCurrencyWithSign(Math.round(e.avg_pnl))} avg
-                  </span>
-                  {delta !== 0 && (
-                    <span className={cn('text-[10px]', delta >= 0 ? 'text-tm-profit' : 'text-tm-loss')}>
-                      ({delta > 0 ? '+' : ''}{formatCurrencyWithSign(Math.round(delta))})
-                    </span>
-                  )}
-                </div>
-              );
-            })}
+            {emotionRows.slice(0, 8).map(e => (
+              <div
+                key={e.emotion}
+                className={cn('flex items-center gap-2 px-3 py-2 rounded-xl border', tagColor(e.emotion))}
+              >
+                <span className="text-sm font-medium capitalize">{e.emotion}</span>
+                <span className="text-[11px] font-mono tabular-nums">
+                  {formatCurrencyWithSign(Math.round(e.avg_pnl))} avg
+                </span>
+                <span className="text-[10px] text-muted-foreground">
+                  {e.trade_count}× · {Math.round(e.win_rate)}% WR
+                </span>
+              </div>
+            ))}
           </div>
           <p className="px-5 pb-3.5 text-[11px] text-muted-foreground">
-            Based on journal entries tagged within ±20 min of each trade.
-            Full correlation data available in the Journal page.
+            Based on the emotions you tagged when journaling each trade
+            ({emotions?.total_journaled ?? 0} journaled trades in this period).
           </p>
         </div>
       )}
 
-      {!patterns.length && !conditional?.has_data && !emotions?.has_data && !hasOptions && (
+      {!patterns.length && !conditions.length && !emotionRows.length && !hasOptions && (
         <div className="tm-card px-5 py-12 text-center text-sm text-muted-foreground">
           No behavioral data available for this period.
         </div>

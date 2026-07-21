@@ -245,12 +245,15 @@ async def _get_discipline_streaks(account_id: UUID, db: AsyncSession):
     try:
         # Look back 180 days to compute a meaningful best_streak
         cutoff = datetime.now(timezone.utc) - timedelta(days=180)
+        # BehaviorEngine emits 'revenge_trade' (and 'revenge_sizing'), never
+        # 'revenge_trading' — the old filter matched nothing, so the streak was
+        # a constant 180/180.
         result = await db.execute(
             select(RiskAlert.detected_at).where(
                 and_(
                     RiskAlert.broker_account_id == account_id,
                     RiskAlert.detected_at >= cutoff,
-                    RiskAlert.pattern_type == 'revenge_trading'
+                    RiskAlert.pattern_type.in_(("revenge_trade", "revenge_sizing"))
                 )
             ).order_by(RiskAlert.detected_at.asc())
         )
@@ -398,6 +401,19 @@ async def get_analytics_overview(
                 "trade_count": dp["trades"],
             })
 
+        # Max drawdown — peak-to-trough on the daily cumulative P&L curve.
+        # Same convention as /risk-metrics: returned as a negative number (or 0).
+        dd_cumulative = 0.0
+        dd_peak = 0.0
+        max_drawdown = 0.0
+        for dp in daily_pnl:
+            dd_cumulative += dp["pnl"]
+            if dd_cumulative > dd_peak:
+                dd_peak = dd_cumulative
+            dd = dd_cumulative - dd_peak
+            if dd < max_drawdown:
+                max_drawdown = dd
+
         # Avg trade duration
         durations = [t.duration_minutes for t in trades if t.duration_minutes and t.duration_minutes > 0]
         avg_duration_min = round(sum(durations) / len(durations)) if durations else 0
@@ -430,6 +446,7 @@ async def get_analytics_overview(
                 "current_streak": current_streak,
                 "current_streak_type": current_streak_type,
                 "avg_duration_min": avg_duration_min,
+                "max_drawdown": round(max_drawdown, 2),
                 "win_days": win_days,
                 "loss_days": loss_days,
                 "trading_days": len(daily_pnl),
@@ -2524,12 +2541,18 @@ async def get_quality_breakdown(
 
         avg_score = round(_mean([item["score"] for item in scored]), 1)
 
-        # Per-trade scores for the trades tab
+        # Per-trade scores for the trades tab.
+        # Carries the trade context (symbol / P&L / times) so the frontend can
+        # render the trade log and best-trades list without a second query.
         per_trade = [
             {
-                "trade_id":    str(item["trade"].id),
-                "score":       item["score"],
-                "tier":        "high" if item["score"] >= 7 else "mid" if item["score"] >= 5 else "low",
+                "trade_id":      str(item["trade"].id),
+                "tradingsymbol": item["trade"].tradingsymbol,
+                "realized_pnl":  round(float(item["trade"].realized_pnl), 2),
+                "entry_time":    item["trade"].entry_time.isoformat() if item["trade"].entry_time else None,
+                "exit_time":     item["trade"].exit_time.isoformat() if item["trade"].exit_time else None,
+                "score":         item["score"],
+                "tier":          "high" if item["score"] >= 7 else "mid" if item["score"] >= 5 else "low",
             }
             for item in scored
         ]

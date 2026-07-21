@@ -29,10 +29,15 @@ interface OverviewData {
   daily_pnl: { date: string; pnl: number; trades: number; win_rate: number }[];
 }
 
+// Shape of GET /api/analytics/edge-confidence (Wilson interval on win rate)
 interface EdgeData {
   has_data: boolean;
-  win_rate: number; lower_ci: number; upper_ci: number;
-  sample_size: number; is_valid: boolean;
+  n: number;
+  observed_win_rate: number;
+  ci_lower: number;
+  ci_upper: number;
+  verdict: 'too_few' | 'real_edge' | 'losing_edge' | 'inconclusive';
+  message: string;
 }
 
 interface PerfData {
@@ -337,18 +342,30 @@ export default function OverviewTab({ days }: OverviewTabProps) {
       {edge?.has_data && (
         <div className={cn(
           'flex items-start gap-3 px-4 py-3 rounded-xl border text-sm',
-          edge.is_valid ? 'bg-green-500/5 border-green-500/20' : 'bg-amber-500/5 border-amber-500/20',
+          edge.verdict === 'real_edge'
+            ? 'bg-green-500/5 border-green-500/20'
+            : edge.verdict === 'losing_edge'
+            ? 'bg-red-500/5 border-red-500/20'
+            : 'bg-amber-500/5 border-amber-500/20',
         )}>
-          {edge.is_valid
+          {edge.verdict === 'real_edge'
             ? <CheckCircle2 className="h-4 w-4 text-tm-profit mt-0.5 shrink-0" />
-            : <Activity className="h-4 w-4 text-tm-obs mt-0.5 shrink-0" />
+            : <Activity className={cn('h-4 w-4 mt-0.5 shrink-0', edge.verdict === 'losing_edge' ? 'text-tm-loss' : 'text-tm-obs')} />
           }
           <span>
-            <span className={cn('font-medium', edge.is_valid ? 'text-tm-profit' : 'text-tm-obs')}>
-              {edge.is_valid ? 'Statistically valid edge' : 'Edge not yet confirmed'}
+            <span className={cn(
+              'font-medium',
+              edge.verdict === 'real_edge' ? 'text-tm-profit'
+                : edge.verdict === 'losing_edge' ? 'text-tm-loss'
+                : 'text-tm-obs',
+            )}>
+              {edge.verdict === 'real_edge' ? 'Statistically valid edge'
+                : edge.verdict === 'losing_edge' ? 'Statistically losing edge'
+                : edge.verdict === 'too_few' ? 'Not enough trades yet'
+                : 'Edge not yet confirmed'}
             </span>
             <span className="text-muted-foreground ml-1">
-              — {Math.round(edge.win_rate)}% win rate · 95% CI {Math.round(edge.lower_ci)}%–{Math.round(edge.upper_ci)}% · n={edge.sample_size}
+              — {Math.round(edge.observed_win_rate)}% win rate · 95% CI {Math.round(edge.ci_lower)}%–{Math.round(edge.ci_upper)}% · n={edge.n}
             </span>
           </span>
         </div>

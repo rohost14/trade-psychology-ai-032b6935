@@ -6,17 +6,28 @@ import {
 import { RefreshCw, AlertTriangle, Search, TrendingUp, TrendingDown, Shield, AlertCircle } from 'lucide-react';
 import { Skeleton } from '@/components/ui/skeleton';
 import { cn } from '@/lib/utils';
-import { formatCurrency, formatCurrencyWithSign } from '@/lib/formatters';
+import { formatCurrencyWithSign } from '@/lib/formatters';
 import { api } from '@/lib/api';
 
 interface TradeDnaTabProps { days: number }
 
+// Shape of GET /api/analytics/quality-breakdown
+interface TierStats { count: number; avg_pnl: number; win_rate: number; total_pnl: number }
+interface ScoredTrade {
+  trade_id: string;
+  tradingsymbol: string;
+  realized_pnl: number;
+  entry_time: string | null;
+  exit_time: string | null;
+  score: number;
+  tier: 'high' | 'mid' | 'low';
+}
 interface QualityData {
   has_data: boolean;
-  period_days: number;
-  clean: { count: number; avg_pnl: number; win_rate: number } | null;
-  flagged: { count: number; avg_pnl: number; win_rate: number } | null;
-  trades: { id: string; tradingsymbol: string; score: number; realized_pnl: number; entry_time: string; exit_time: string }[];
+  avg_score: number;
+  max_score: number;
+  tiers: { high: TierStats; mid: TierStats; low: TierStats };
+  per_trade: ScoredTrade[];
 }
 
 interface CriticalTrade {
@@ -31,11 +42,13 @@ interface CriticalData {
   trades: CriticalTrade[];
 }
 
+// Shape of GET /api/analytics/pnl-percent — hold-time buckets carry PERCENT
+// returns (avg_pct), not rupees.
 interface PnlPctData {
   has_data: boolean;
-  avg_win_pct: number; avg_loss_pct: number; rr_ratio: number;
-  disposition_ratio: number;
-  by_hold_time: { bucket: string; trades: number; win_rate: number; avg_pnl: number }[];
+  avg_win_pct: number; avg_loss_pct: number; rr_ratio: number | null;
+  disposition_ratio: number | null;
+  by_hold_time: { bucket: string; count: number; avg_pct: number; avg_win_pct: number; avg_loss_pct: number }[];
 }
 
 interface SequenceData {
@@ -45,7 +58,8 @@ interface SequenceData {
   sequence: { ordinal: number; label: string; trade_count: number; win_rate: number; avg_pnl: number; delta_win_rate: number }[];
 }
 
-function fmtTime(s: string) {
+function fmtTime(s: string | null) {
+  if (!s) return '—';
   return new Date(s).toLocaleString('en-IN', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' });
 }
 
@@ -72,10 +86,12 @@ function HoldTooltip({ active, payload }: any) {
   return (
     <div className="bg-popover border border-border rounded-lg px-3 py-2 shadow-lg text-sm">
       <p className="font-medium mb-1">{d.bucket}</p>
-      <p className={cn('font-mono tabular-nums', d.avg_pnl >= 0 ? 'text-tm-profit' : 'text-tm-loss')}>
-        {formatCurrencyWithSign(d.avg_pnl)} avg
+      <p className={cn('font-mono tabular-nums', d.avg_pct >= 0 ? 'text-tm-profit' : 'text-tm-loss')}>
+        {d.avg_pct > 0 ? '+' : ''}{d.avg_pct.toFixed(1)}% avg return
       </p>
-      <p className="text-xs text-muted-foreground">{d.trades} trades · {Math.round(d.win_rate)}% WR</p>
+      <p className="text-xs text-muted-foreground">
+        {d.count} trades · wins {d.avg_win_pct > 0 ? '+' : ''}{d.avg_win_pct.toFixed(1)}% · losses {d.avg_loss_pct.toFixed(1)}%
+      </p>
     </div>
   );
 }
@@ -97,7 +113,7 @@ export default function TradeDnaTab({ days }: TradeDnaTabProps) {
     Promise.allSettled([
       api.get('/api/analytics/quality-breakdown', { params: { days_back: days } }),
       api.get('/api/analytics/critical-trades',   { params: { days } }),
-      api.get('/api/analytics/pnl-percent',       { params: { days } }),
+      api.get('/api/analytics/pnl-percent',       { params: { days_back: days } }),
       api.get('/api/analytics/trade-sequence',    { params: { days } }),
     ]).then(([q, c, p, s]) => {
       if (cancelled) return;
@@ -141,51 +157,57 @@ export default function TradeDnaTab({ days }: TradeDnaTabProps) {
 
   // Worst 5 from critical-trades (already sorted worst-first)
   const worst5 = (critical?.trades ?? []).slice(0, 5);
-  // Best 5 derived from quality breakdown trades sorted by pnl desc
-  const best5  = [...(quality?.trades ?? [])].sort((a, b) => b.realized_pnl - a.realized_pnl).slice(0, 5);
+  // Best 5 derived from quality breakdown per-trade list, sorted by pnl desc
+  const best5  = [...(quality?.per_trade ?? [])]
+    .filter(t => t.realized_pnl > 0)
+    .sort((a, b) => b.realized_pnl - a.realized_pnl)
+    .slice(0, 5);
 
   // Trade log from quality data
-  const allTrades = quality?.trades ?? [];
+  const allTrades = quality?.per_trade ?? [];
   const filtered  = search
     ? allTrades.filter(t => t.tradingsymbol.toLowerCase().includes(search.toLowerCase()))
     : allTrades;
 
+  const tiers = quality?.has_data ? quality.tiers : null;
+
   return (
     <div className="space-y-5">
 
-      {/* Quality Banner */}
-      {quality?.has_data && quality.clean && quality.flagged && (
+      {/* Quality Banner — tiered by behavioural quality score (0–8) */}
+      {quality?.has_data && tiers && (
         <div className="tm-card overflow-hidden">
-          <div className="px-5 py-3.5 border-b border-border">
+          <div className="px-5 py-3.5 border-b border-border flex items-center justify-between">
             <p className="font-semibold text-sm">Trade Quality</p>
+            <span className="text-xs text-muted-foreground">
+              avg score <span className="font-mono font-semibold text-foreground">{quality.avg_score}</span> / {quality.max_score}
+            </span>
           </div>
-          <div className="grid grid-cols-2 divide-x divide-border">
-            <div className="px-5 py-4">
-              <div className="flex items-center gap-2 mb-2">
-                <Shield className="h-4 w-4 text-tm-profit" />
-                <span className="text-sm font-medium text-tm-profit">Clean trades</span>
+          <div className="grid grid-cols-3 divide-x divide-border">
+            {([
+              { key: 'high', label: 'High (7–8)', icon: Shield,      color: 'text-tm-profit', stats: tiers.high },
+              { key: 'mid',  label: 'Mid (5–6)',  icon: AlertCircle, color: 'text-tm-obs',    stats: tiers.mid },
+              { key: 'low',  label: 'Low (0–4)',  icon: AlertCircle, color: 'text-tm-loss',   stats: tiers.low },
+            ] as const).map(({ key, label, icon: Icon, color, stats }) => (
+              <div key={key} className="px-4 py-4">
+                <div className="flex items-center gap-1.5 mb-2">
+                  <Icon className={cn('h-3.5 w-3.5', color)} />
+                  <span className={cn('text-[12px] font-medium', color)}>{label}</span>
+                </div>
+                <p className="text-2xl font-mono font-bold tabular-nums text-foreground">{stats.count}</p>
+                {stats.count > 0 && (
+                  <p className="text-[12px] text-muted-foreground mt-0.5">
+                    Avg {formatCurrencyWithSign(Math.round(stats.avg_pnl))} · {Math.round(stats.win_rate)}% WR
+                  </p>
+                )}
               </div>
-              <p className="text-2xl font-mono font-bold tabular-nums text-foreground">{quality.clean.count}</p>
-              <p className="text-sm text-muted-foreground mt-0.5">
-                Avg {formatCurrencyWithSign(Math.round(quality.clean.avg_pnl))} · {Math.round(quality.clean.win_rate)}% WR
-              </p>
-            </div>
-            <div className="px-5 py-4">
-              <div className="flex items-center gap-2 mb-2">
-                <AlertCircle className="h-4 w-4 text-tm-obs" />
-                <span className="text-sm font-medium text-tm-obs">Flagged trades</span>
-              </div>
-              <p className="text-2xl font-mono font-bold tabular-nums text-foreground">{quality.flagged.count}</p>
-              <p className="text-sm text-muted-foreground mt-0.5">
-                Avg {formatCurrencyWithSign(Math.round(quality.flagged.avg_pnl))} · {Math.round(quality.flagged.win_rate)}% WR
-              </p>
-            </div>
+            ))}
           </div>
-          {quality.clean.avg_pnl > quality.flagged.avg_pnl && (
+          {tiers.high.count > 0 && tiers.low.count > 0 && tiers.high.avg_pnl > tiers.low.avg_pnl && (
             <div className="px-5 py-3 border-t border-border bg-green-500/5">
               <p className="text-[12px] text-tm-profit">
-                Clean trades return {formatCurrencyWithSign(Math.round(quality.clean.avg_pnl - quality.flagged.avg_pnl))} more per trade on average.
-                Ignoring behavioral alerts costs you.
+                Your high-quality trades average {formatCurrencyWithSign(Math.round(tiers.high.avg_pnl - tiers.low.avg_pnl))} more
+                per trade than low-quality ones — your own numbers, same period.
               </p>
             </div>
           )}
@@ -235,7 +257,7 @@ export default function TradeDnaTab({ days }: TradeDnaTabProps) {
               </div>
               <div className="divide-y divide-border">
                 {best5.map(t => (
-                  <div key={t.id} className="px-5 py-3">
+                  <div key={t.trade_id} className="px-5 py-3">
                     <div className="flex items-start justify-between gap-2">
                       <div className="min-w-0">
                         <p className="text-sm font-semibold truncate">{t.tradingsymbol}</p>
@@ -346,8 +368,8 @@ export default function TradeDnaTab({ days }: TradeDnaTabProps) {
         </div>
       )}
 
-      {/* Hold-time breakdown */}
-      {pnlPct?.has_data && pnlPct.by_hold_time && pnlPct.by_hold_time.length > 0 && (
+      {/* Hold-time breakdown — average PERCENT return per bucket */}
+      {pnlPct?.has_data && pnlPct.by_hold_time && pnlPct.by_hold_time.some(b => b.count > 0) && (
         <div className="tm-card overflow-hidden">
           <div className="px-5 py-3.5 border-b border-border">
             <p className="font-semibold text-sm">Hold Time vs Performance</p>
@@ -357,12 +379,12 @@ export default function TradeDnaTab({ days }: TradeDnaTabProps) {
               <BarChart data={pnlPct.by_hold_time} margin={{ top: 4, right: 4, left: -16, bottom: 0 }}>
                 <CartesianGrid strokeDasharray="3 3" stroke="rgba(0,0,0,0.06)" vertical={false} />
                 <XAxis dataKey="bucket" tick={{ fontSize: 10 }} tickLine={false} axisLine={false} />
-                <YAxis tick={{ fontSize: 10 }} tickLine={false} axisLine={false} tickFormatter={v => formatCurrency(v)} />
+                <YAxis tick={{ fontSize: 10 }} tickLine={false} axisLine={false} tickFormatter={v => `${v}%`} />
                 <Tooltip content={<HoldTooltip />} />
                 <ReferenceLine y={0} stroke="rgba(0,0,0,0.15)" />
-                <Bar dataKey="avg_pnl" radius={[3, 3, 0, 0]} maxBarSize={36}>
+                <Bar dataKey="avg_pct" radius={[3, 3, 0, 0]} maxBarSize={36}>
                   {pnlPct.by_hold_time.map((d, i) => (
-                    <Cell key={i} fill={d.avg_pnl >= 0 ? '#16a34a' : '#dc2626'} opacity={0.8} />
+                    <Cell key={i} fill={d.avg_pct >= 0 ? '#16a34a' : '#dc2626'} opacity={0.8} />
                   ))}
                 </Bar>
               </BarChart>
@@ -370,8 +392,11 @@ export default function TradeDnaTab({ days }: TradeDnaTabProps) {
           </div>
           <p className="px-5 pb-3.5 text-[11px] text-muted-foreground">
             {(() => {
-              const best = [...pnlPct.by_hold_time].sort((a, b) => b.avg_pnl - a.avg_pnl)[0];
-              return `Best avg P&L in "${best.bucket}" hold-time bucket (${formatCurrencyWithSign(Math.round(best.avg_pnl))}).`;
+              const withTrades = pnlPct.by_hold_time.filter(b => b.count > 0);
+              const best = [...withTrades].sort((a, b) => b.avg_pct - a.avg_pct)[0];
+              return best
+                ? `Best average return in the "${best.bucket}" hold-time bucket (${best.avg_pct > 0 ? '+' : ''}${best.avg_pct.toFixed(1)}% over ${best.count} trades).`
+                : 'Not enough trades per bucket yet.';
             })()}
           </p>
         </div>
@@ -394,7 +419,7 @@ export default function TradeDnaTab({ days }: TradeDnaTabProps) {
           </div>
           <div className="divide-y divide-border max-h-[400px] overflow-y-auto">
             {filtered.slice(0, 50).map(t => (
-              <div key={t.id} className="px-5 py-2.5 flex items-center justify-between gap-3">
+              <div key={t.trade_id} className="px-5 py-2.5 flex items-center justify-between gap-3">
                 <div className="min-w-0">
                   <p className="text-sm font-medium truncate">{t.tradingsymbol}</p>
                   <p className="text-[11px] text-muted-foreground">{fmtTime(t.entry_time)}</p>
@@ -402,10 +427,10 @@ export default function TradeDnaTab({ days }: TradeDnaTabProps) {
                 <div className="flex items-center gap-3 shrink-0">
                   <span className={cn(
                     'text-[10px] px-1.5 py-0.5 rounded-full font-mono',
-                    t.score >= 6 ? 'bg-green-500/10 text-tm-profit' :
-                    t.score >= 4 ? 'bg-amber-500/10 text-tm-obs' : 'bg-red-500/10 text-tm-loss',
+                    t.tier === 'high' ? 'bg-green-500/10 text-tm-profit' :
+                    t.tier === 'mid'  ? 'bg-amber-500/10 text-tm-obs' : 'bg-red-500/10 text-tm-loss',
                   )}>
-                    {t.score}/8
+                    {t.score}/{quality?.max_score ?? 8}
                   </span>
                   <span className={cn('text-sm font-mono font-semibold', t.realized_pnl >= 0 ? 'text-tm-profit' : 'text-tm-loss')}>
                     {formatCurrencyWithSign(Math.round(t.realized_pnl))}

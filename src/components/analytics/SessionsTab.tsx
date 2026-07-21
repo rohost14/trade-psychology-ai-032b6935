@@ -34,10 +34,23 @@ interface ExpiryData {
   by_expiry_week_dow?: ExpiryWeekDow[];
 }
 
+// Shape of GET /api/analytics/conditional-performance
+interface Condition {
+  key: string;
+  label: string;
+  win_rate: number;
+  avg_pnl: number;
+  trade_count: number;
+  delta_vs_baseline: number;
+  narrative: string;
+}
+
 interface ConditionalData {
   has_data: boolean;
-  first_30min: { trades: number; win_rate: number; avg_pnl: number; baseline_win_rate?: number; baseline_avg_pnl?: number };
-  expiry_day: { trades: number; win_rate: number; avg_pnl: number; baseline_win_rate?: number; baseline_avg_pnl?: number };
+  total_trades: number;
+  baseline_win_rate: number;
+  baseline_avg_pnl: number;
+  conditions: Condition[];
 }
 
 function pnlColorClass(pnl: number) {
@@ -205,8 +218,12 @@ export default function SessionsTab({ days }: SessionsTabProps) {
   );
 
   const calendarMonths = overview?.daily_pnl ? buildCalendar(overview.daily_pnl) : [];
-  const first30   = conditional?.has_data ? conditional.first_30min : null;
-  const expiryDay = conditional?.has_data ? conditional.expiry_day  : null;
+  // conditional-performance returns a `conditions` ARRAY keyed by `key` —
+  // pick the two session-relevant ones (absent when below the sample gate).
+  const conditions = conditional?.has_data ? (conditional.conditions ?? []) : [];
+  const first30    = conditions.find(c => c.key === 'first_30min') ?? null;
+  const expiryDay  = conditions.find(c => c.key === 'expiry_day') ?? null;
+  const baselineWR = conditional?.baseline_win_rate ?? null;
 
   // Expiry week DOW bar data — sort by Mon→Fri
   const dowRaw  = (expiry?.by_expiry_week_dow ?? []).filter(d => DOW_ORDER.includes(d.day));
@@ -244,10 +261,10 @@ export default function SessionsTab({ days }: SessionsTabProps) {
       {(first30 || expiryDay) && (
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
 
-          {first30 && first30.trades > 0 && (
+          {first30 && first30.trade_count > 0 && (
             <div className={cn(
               'tm-card overflow-hidden border-l-4',
-              first30.win_rate < (first30.baseline_win_rate ?? 50) - 5 ? 'border-l-tm-loss' : 'border-l-tm-profit',
+              first30.delta_vs_baseline < -5 ? 'border-l-tm-loss' : 'border-l-tm-profit',
             )}>
               <div className="px-4 pt-4 pb-1 flex items-center gap-2">
                 <Clock className="h-4 w-4 text-muted-foreground" />
@@ -257,24 +274,24 @@ export default function SessionsTab({ days }: SessionsTabProps) {
                 <div className="flex items-end gap-2 my-2">
                   <span className={cn(
                     'text-4xl font-mono font-black tabular-nums',
-                    first30.win_rate >= (first30.baseline_win_rate ?? 50) ? 'text-tm-profit' : 'text-tm-loss',
+                    first30.delta_vs_baseline >= 0 ? 'text-tm-profit' : 'text-tm-loss',
                   )}>
                     {Math.round(first30.win_rate)}%
                   </span>
                   <span className="text-sm text-muted-foreground pb-1">win rate</span>
                 </div>
-                {first30.baseline_win_rate && (
+                {baselineWR != null && (
                   <p className={cn(
                     'text-[12px] font-medium',
-                    first30.win_rate < first30.baseline_win_rate ? 'text-tm-loss' : 'text-tm-profit',
+                    first30.delta_vs_baseline < 0 ? 'text-tm-loss' : 'text-tm-profit',
                   )}>
-                    {(first30.win_rate - first30.baseline_win_rate).toFixed(1)}% vs your overall ({Math.round(first30.baseline_win_rate)}%)
+                    {first30.delta_vs_baseline > 0 ? '+' : ''}{first30.delta_vs_baseline.toFixed(1)}% vs your overall ({Math.round(baselineWR)}%)
                   </p>
                 )}
                 <p className="text-[11px] text-muted-foreground mt-2">
-                  {first30.trades} trades · {formatCurrencyWithSign(Math.round(first30.avg_pnl))} avg P&L
+                  {first30.trade_count} trades · {formatCurrencyWithSign(Math.round(first30.avg_pnl))} avg P&L
                 </p>
-                {first30.win_rate < (first30.baseline_win_rate ?? 50) - 5 && (
+                {first30.delta_vs_baseline < -5 && (
                   <p className="text-[11px] text-tm-loss mt-2">
                     Opening trap: you underperform in the first 30 minutes. Consider waiting for the first candle to close.
                   </p>
@@ -283,10 +300,10 @@ export default function SessionsTab({ days }: SessionsTabProps) {
             </div>
           )}
 
-          {expiryDay && expiryDay.trades > 0 && (
+          {expiryDay && expiryDay.trade_count > 0 && (
             <div className={cn(
               'tm-card overflow-hidden border-l-4',
-              expiryDay.win_rate < (expiryDay.baseline_win_rate ?? 50) - 5 ? 'border-l-tm-loss' : 'border-l-tm-profit',
+              expiryDay.delta_vs_baseline < -5 ? 'border-l-tm-loss' : 'border-l-tm-profit',
             )}>
               <div className="px-4 pt-4 pb-1 flex items-center gap-2">
                 <Clock className="h-4 w-4 text-muted-foreground" />
@@ -296,22 +313,22 @@ export default function SessionsTab({ days }: SessionsTabProps) {
                 <div className="flex items-end gap-2 my-2">
                   <span className={cn(
                     'text-4xl font-mono font-black tabular-nums',
-                    expiryDay.win_rate >= (expiryDay.baseline_win_rate ?? 50) ? 'text-tm-profit' : 'text-tm-loss',
+                    expiryDay.delta_vs_baseline >= 0 ? 'text-tm-profit' : 'text-tm-loss',
                   )}>
                     {Math.round(expiryDay.win_rate)}%
                   </span>
                   <span className="text-sm text-muted-foreground pb-1">win rate</span>
                 </div>
-                {expiryDay.baseline_win_rate && (
+                {baselineWR != null && (
                   <p className={cn(
                     'text-[12px] font-medium',
-                    expiryDay.win_rate < expiryDay.baseline_win_rate ? 'text-tm-loss' : 'text-tm-profit',
+                    expiryDay.delta_vs_baseline < 0 ? 'text-tm-loss' : 'text-tm-profit',
                   )}>
-                    {(expiryDay.win_rate - expiryDay.baseline_win_rate).toFixed(1)}% vs your overall ({Math.round(expiryDay.baseline_win_rate)}%)
+                    {expiryDay.delta_vs_baseline > 0 ? '+' : ''}{expiryDay.delta_vs_baseline.toFixed(1)}% vs your overall ({Math.round(baselineWR)}%)
                   </p>
                 )}
                 <p className="text-[11px] text-muted-foreground mt-2">
-                  {expiryDay.trades} trades · {formatCurrencyWithSign(Math.round(expiryDay.avg_pnl))} avg P&L
+                  {expiryDay.trade_count} trades · {formatCurrencyWithSign(Math.round(expiryDay.avg_pnl))} avg P&L
                 </p>
               </div>
             </div>
