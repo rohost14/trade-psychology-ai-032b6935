@@ -269,13 +269,19 @@ export default function PatternCalendar() {
               </div>
             </div>
 
-            {/* Legend */}
+            {/* Legend — matches the actual day-severity scale */}
             <div className="flex items-center gap-3 mt-3 flex-wrap" style={{ paddingLeft: '28px' }}>
-              <span className="text-[10px] text-muted-foreground">Less</span>
-              {(['clean', 'low', 'medium', 'high', 'critical'] as DaySeverity[]).map(s => (
-                <div key={s} className={cn('w-3.5 h-3.5 rounded-sm', SEVERITY_CELL[s])} title={s} />
+              {([
+                { key: 'clean',   label: 'Clean' },
+                { key: 'caution', label: 'Caution' },
+                { key: 'danger',  label: 'Danger' },
+                { key: 'no_data', label: 'No data' },
+              ] as { key: DaySeverity; label: string }[]).map(({ key, label }) => (
+                <span key={key} className="flex items-center gap-1.5 text-[10px] text-muted-foreground">
+                  <span className={cn('w-3.5 h-3.5 rounded-sm inline-block', SEVERITY_CELL[key])} />
+                  {label}
+                </span>
               ))}
-              <span className="text-[10px] text-muted-foreground">More alerts</span>
             </div>
           </div>
         </div>

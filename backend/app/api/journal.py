@@ -187,7 +187,9 @@ async def get_journal_by_trade(
     """Get journal entry for a specific trade."""
     try:
         t_id = UUID(trade_id)
-
+    except ValueError:
+        raise HTTPException(status_code=422, detail="Invalid trade_id format")
+    try:
         result = await db.execute(
             select(JournalEntry).where(
                 JournalEntry.broker_account_id == broker_account_id,
@@ -214,9 +216,13 @@ async def get_journal_entry(
 ):
     """Get a specific journal entry by ID."""
     try:
+        e_id = UUID(entry_id)
+    except ValueError:
+        raise HTTPException(status_code=422, detail="Invalid entry_id format")
+    try:
         result = await db.execute(
             select(JournalEntry).where(
-                JournalEntry.id == UUID(entry_id),
+                JournalEntry.id == e_id,
                 JournalEntry.broker_account_id == broker_account_id
             )
         )
@@ -359,6 +365,12 @@ async def create_journal_entry(
             "updated": False
         }
 
+    except HTTPException:
+        # Ownership (403) / validation (422) responses must pass through —
+        # the generic handler below was converting them into 500s.
+        raise
+    except ValueError:
+        raise HTTPException(status_code=422, detail="Invalid trade_id format")
     except Exception as e:
         logger.error(f"Failed to create journal entry: {e}")
         await db.rollback()
@@ -374,9 +386,13 @@ async def update_journal_entry(
 ):
     """Update an existing journal entry."""
     try:
+        e_id = UUID(entry_id)
+    except ValueError:
+        raise HTTPException(status_code=422, detail="Invalid entry_id format")
+    try:
         result = await db.execute(
             select(JournalEntry).where(
-                JournalEntry.id == UUID(entry_id),
+                JournalEntry.id == e_id,
                 JournalEntry.broker_account_id == broker_account_id
             )
         )
@@ -415,9 +431,13 @@ async def delete_journal_entry(
 ):
     """Delete a journal entry."""
     try:
+        e_id = UUID(entry_id)
+    except ValueError:
+        raise HTTPException(status_code=422, detail="Invalid entry_id format")
+    try:
         result = await db.execute(
             select(JournalEntry).where(
-                JournalEntry.id == UUID(entry_id),
+                JournalEntry.id == e_id,
                 JournalEntry.broker_account_id == broker_account_id
             )
         )
@@ -455,7 +475,9 @@ async def delete_journal_by_trade(
     """Delete journal entry for a specific trade."""
     try:
         t_id = UUID(trade_id)
-
+    except ValueError:
+        raise HTTPException(status_code=422, detail="Invalid trade_id format")
+    try:
         result = await db.execute(
             delete(JournalEntry).where(
                 JournalEntry.broker_account_id == broker_account_id,

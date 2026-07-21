@@ -491,14 +491,17 @@ function PatternsTab() {
 // ─── Main Page ────────────────────────────────────────────────────────────────
 
 export default function AlertsPage() {
-  const { alerts, unacknowledgedCount, acknowledgeAlert } = useAlerts();
+  const { alerts, acknowledgeAlert } = useAlerts();
   const [selectedAlert, setSelectedAlert] = useState<AlertNotification | null>(null);
 
+  // Page-local unreviewed count over the SAME window the Unreviewed tab lists
+  // (7 days). The context's unacknowledgedCount is today-only (nav badge) —
+  // using it here made the badge read 0 while the list showed older rows.
   const stats = useMemo(() => ({
     total:   alerts.length,
     danger:  alerts.filter(a => a.pattern.severity === 'danger').length,
-    unacked: unacknowledgedCount,
-  }), [alerts, unacknowledgedCount]);
+    unacked: alerts.filter(a => !a.acknowledged).length,
+  }), [alerts]);
 
   return (
     <div className="pb-12">
@@ -506,9 +509,9 @@ export default function AlertsPage() {
       <div className="mb-5 flex items-center justify-between">
         <div className="flex items-center gap-2">
           <h1 className="t-heading-lg text-foreground">Behavioral Alerts</h1>
-          {unacknowledgedCount > 0 && (
+          {stats.unacked > 0 && (
             <span className="bg-tm-loss text-white text-[10px] font-bold px-1.5 py-0.5 rounded-full leading-none">
-              {unacknowledgedCount}
+              {stats.unacked}
             </span>
           )}
         </div>
@@ -526,7 +529,7 @@ export default function AlertsPage() {
       <Tabs defaultValue="live">
         <TabsList className="w-full justify-start rounded-none bg-transparent border-b border-border p-0 h-auto gap-0 mb-6">
           {([
-            { value: 'live',     label: 'Unreviewed', badge: unacknowledgedCount },
+            { value: 'live',     label: 'Unreviewed', badge: stats.unacked },
             { value: 'history',  label: 'History',    badge: 0 },
             { value: 'patterns', label: 'Patterns',   badge: 0 },
           ] as const).map(({ value, label, badge }) => (

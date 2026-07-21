@@ -23,9 +23,12 @@ export default function ExportReportButton({ brokerAccountId }: ExportReportButt
     try {
       setIsExporting(true);
 
-      // Fetch trades
-      const response = await api.get('/api/trades/', {
-        params: { limit: 500 }
+      // Completed trades (full position lifecycle) — the app-wide source of
+      // truth for P&L. Raw fills carry pnl=0/NULL from webhooks and would
+      // export garbage totals.
+      // Backend caps limit at 200 (Query le=200)
+      const response = await api.get('/api/trades/completed', {
+        params: { limit: 200 }
       });
 
       const trades = response.data.trades || [];
@@ -36,25 +39,29 @@ export default function ExportReportButton({ brokerAccountId }: ExportReportButt
 
       // Create CSV content
       const headers = [
-        'Date',
+        'Exit Date',
         'Symbol',
         'Exchange',
-        'Type',
+        'Direction',
         'Quantity',
-        'Price',
+        'Avg Entry',
+        'Avg Exit',
         'P&L',
-        'Status'
+        'Duration (min)',
+        'Product'
       ];
 
       const rows = trades.map((t: any) => [
-        new Date(t.traded_at || t.order_timestamp).toLocaleString(),
+        t.exit_time ? new Date(t.exit_time).toLocaleString('en-IN', { timeZone: 'Asia/Kolkata' }) : '',
         t.tradingsymbol,
         t.exchange,
-        t.transaction_type,
-        t.quantity,
-        t.average_price || t.price,
-        t.pnl || 0,
-        t.status
+        t.direction,
+        t.total_quantity,
+        t.avg_entry_price,
+        t.avg_exit_price,
+        t.realized_pnl ?? 0,
+        t.duration_minutes ?? '',
+        t.product
       ]);
 
       const csvContent = [
@@ -81,7 +88,7 @@ export default function ExportReportButton({ brokerAccountId }: ExportReportButt
 
       // Fetch all analytics data
       const [tradesRes, progressRes, patternsRes] = await Promise.all([
-        api.get('/api/trades/', { params: { limit: 200 } }),
+        api.get('/api/trades/completed', { params: { limit: 200 } }),
         api.get('/api/analytics/progress'),
         api.get('/api/behavioral/analysis', { params: { time_window_days: 30 } })
       ]);
@@ -215,10 +222,10 @@ function generateTextReport(trades: any[], progress: any, patterns: any[]): stri
     lines.push('');
   }
 
-  // Trade Summary
+  // Trade Summary — realized P&L from completed trades (raw, no charges)
   if (trades.length > 0) {
     lines.push('─── TRADE STATISTICS ───');
-    const pnls = trades.map(t => t.pnl || 0);
+    const pnls = trades.map(t => Number(t.realized_pnl) || 0);
     const winners = pnls.filter(p => p > 0);
     const losers = pnls.filter(p => p < 0);
     lines.push(`Total Trades:  ${trades.length}`);

@@ -12,7 +12,9 @@ import { api } from '@/lib/api';
 
 interface Kpis {
   total_pnl: number; total_trades: number; win_rate: number;
-  profit_factor: number; expectancy: number; max_drawdown: number;
+  /** null = no losing trades in the period (infinite PF — best case) */
+  profit_factor: number | null;
+  expectancy: number; max_drawdown: number;
 }
 interface EdgeLeakItem { dimension: string; label: string; trades: number; pnl: number; win_rate: number }
 
@@ -67,12 +69,15 @@ export default function ReportCard({ days }: Props) {
   if (empty || !kpis) return null;
 
   const positive = kpis.total_pnl >= 0;
+  // profit_factor is null when there were NO losing trades — infinite PF,
+  // the strongest possible reading, not a missing one.
   const pf = kpis.profit_factor;
+  const pfStrong = pf === null || pf >= 1.5;
   const verdict =
     kpis.total_trades < 10 ? 'Early days — not enough trades yet to read a clear trend.'
-    : positive && pf >= 1.5 ? 'Profitable with a real edge this period.'
+    : positive && pfStrong ? 'Profitable with a real edge this period.'
     : positive ? 'Net positive, but the edge is thin — protect it.'
-    : pf >= 0.9 ? 'Close to break-even — a small leak is the difference.'
+    : (pf ?? 0) >= 0.9 ? 'Close to break-even — a small leak is the difference.'
     : 'Losing period. The leak below is where to start.';
 
   // One factual focus line, derived from the biggest leak (no attribution).
@@ -111,8 +116,8 @@ export default function ReportCard({ days }: Props) {
           <div>
             <p className="text-[10px] uppercase tracking-wide text-muted-foreground">Profit factor</p>
             <p className={cn('text-lg font-mono font-bold tabular-nums',
-              pf >= 1.5 ? 'text-tm-profit' : pf >= 1 ? 'text-tm-obs' : 'text-tm-loss')}>
-              {pf > 0 ? pf.toFixed(2) : '—'}
+              pf === null || pf >= 1.5 ? 'text-tm-profit' : pf >= 1 ? 'text-tm-obs' : 'text-tm-loss')}>
+              {pf === null ? '∞' : pf > 0 ? pf.toFixed(2) : '—'}
             </p>
           </div>
         </div>

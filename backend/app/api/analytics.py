@@ -13,7 +13,6 @@ from app.api.deps import get_verified_broker_account_id
 from app.services.analytics_service import AnalyticsService
 from app.services.pnl_calculator import pnl_calculator
 from app.core.rate_limiter import analytics_limiter
-from app.models.trade import Trade
 from app.models.completed_trade import CompletedTrade
 from app.models.completed_trade_feature import CompletedTradeFeature
 from app.models.journal_entry import JournalEntry
@@ -35,6 +34,45 @@ def _analytics_underlying(sym: str) -> str:
         return sym
     m = _re_module.match(r'^([A-Z&\-]+?)(?:\d{5}|\d{2}[A-Z]{3})', sym.upper())
     return m.group(1) if m else sym.upper()
+
+
+# F&O structure detection — a bare endswith("CE") check misclassifies equity
+# symbols that happen to end in CE/PE (RELIANCE, HDFCAMC…). An option symbol
+# always has an expiry code + strike between the underlying and the CE/PE tail.
+_FNO_OPT_RE = _re_module.compile(r'(?:\d{5}\d+(?:\.\d+)?|\d{2}[A-Z]{3}(?:\d{2})?\d+(?:\.\d+)?)(CE|PE)$')
+_FNO_FUT_RE = _re_module.compile(r'(?:\d{5}|\d{2}[A-Z]{3}(?:\d{2})?)FUT$')
+
+
+def _instrument_type_of(ct) -> str:
+    """CE / PE / FUT / EQ for a CompletedTrade.
+
+    Prefers the stored instrument_type (populated by instrument_parser at
+    sync time); falls back to structure-aware symbol inference for old rows
+    where the column is empty.
+    """
+    t = (ct.instrument_type or "").upper()
+    if t in ("CE", "PE", "FUT", "EQ"):
+        return t
+    s = (ct.tradingsymbol or "").upper()
+    m = _FNO_OPT_RE.search(s)
+    if m:
+        return m.group(1)
+    if _FNO_FUT_RE.search(s):
+        return "FUT"
+    return "EQ"
+
+
+def _shape_label(ct) -> str:
+    """Human bucket for a single-leg trade: Call/Put buys/sells, Futures, Equity."""
+    itype = _instrument_type_of(ct)
+    is_long = (ct.direction or "LONG").upper() == "LONG"
+    if itype == "CE":
+        return "Call buys" if is_long else "Call sells"
+    if itype == "PE":
+        return "Put buys" if is_long else "Put sells"
+    if itype == "FUT":
+        return "Futures (long)" if is_long else "Futures (short)"
+    return "Equity"
 
 @router.get("/risk-score")
 async def get_weekly_risk_score(
@@ -879,15 +917,19 @@ async def get_journal_correlation(
 ):
     """
     Behavior tab supplement: emotion → P&L correlation from journal entries.
-    Data source: JournalEntry joined with Trade for accurate P&L.
+    Data source: JournalEntry joined with CompletedTrade for accurate P&L.
     """
     try:
         cutoff = datetime.now(timezone.utc) - timedelta(days=days)
 
-        # Join JournalEntry with Trade for accurate, up-to-date P&L
+        # Join on CompletedTrade — journal trade_id IS a CompletedTrade id for
+        # closed trades (the common case). Open-position entries use a synthetic
+        # per-episode id that matches nothing; those fall back to the snapshot
+        # trade_pnl string captured at journaling time. (The old join targeted
+        # the raw Trade fills table, which never matched anything.)
         result = await db.execute(
-            select(JournalEntry, Trade.pnl)
-            .outerjoin(Trade, JournalEntry.trade_id == Trade.id)
+            select(JournalEntry, CompletedTrade.realized_pnl)
+            .outerjoin(CompletedTrade, JournalEntry.trade_id == CompletedTrade.id)
             .where(
                 and_(
                     JournalEntry.broker_account_id == broker_account_id,
@@ -907,14 +949,14 @@ async def get_journal_correlation(
         entry_type_stats: dict[str, dict] = {}
 
         for entry, trade_pnl_from_db in rows:
-            # Prefer fresh P&L from Trade table; fall back to journal snapshot
+            # Prefer fresh P&L from completed_trades; fall back to journal snapshot
             pnl_val = 0
             if trade_pnl_from_db is not None:
                 pnl_val = float(trade_pnl_from_db)
             elif entry.trade_pnl:
                 try:
-                    pnl_val = float(entry.trade_pnl)
-                except (ValueError, TypeError):
+                    pnl_val = float(entry.trade_pnl.replace(",", "").replace("₹", "").replace("+", ""))
+                except (ValueError, TypeError, AttributeError):
                     pass
 
             # Process emotion tags
@@ -2029,16 +2071,9 @@ async def get_instrument_analytics(
         avg_hold = round(sum(t.duration_minutes or 0 for t in trades) / len(trades))
 
         # ── Option type split (CE / PE / FUT / EQ) ────────────────────────
-        def option_type(sym: str) -> str:
-            s = sym.upper()
-            if s.endswith("CE"):  return "CE"
-            if s.endswith("PE"):  return "PE"
-            if "FUT" in s:        return "FUT"
-            return "EQ"
-
         otype_map: dict[str, dict] = {}
         for t in trades:
-            ot = option_type(t.tradingsymbol)
+            ot = _instrument_type_of(t)
             otype_map.setdefault(ot, {"trades": 0, "pnl": 0.0, "wins": 0})
             pnl_v = float(t.realized_pnl or 0)
             otype_map[ot]["trades"] += 1
@@ -2112,7 +2147,7 @@ async def get_instrument_analytics(
                 "realized_pnl": float(t.realized_pnl or 0),
                 "duration_minutes": t.duration_minutes,
                 "exit_time": t.exit_time.isoformat(),
-                "option_type": option_type(t.tradingsymbol),
+                "option_type": _instrument_type_of(t),
             }
             for t in recent
         ]
@@ -2822,21 +2857,13 @@ async def get_edge_leak(
                 return f"{hh} {ap}"
             return f"{_fmt(h)}-{_fmt(end)}"
 
-        def _type_label(sym: str, direction: str) -> str:
-            s = (sym or "").upper()
-            is_long = (direction or "LONG").upper() == "LONG"
-            if s.endswith("CE"): return "Call buys" if is_long else "Call sells"
-            if s.endswith("PE"): return "Put buys" if is_long else "Put sells"
-            if s.endswith("FUT"): return "Futures (long)" if is_long else "Futures (short)"
-            return "Equity"
-
         for t in trades:
             pnl = float(t.realized_pnl or 0)
             win = 1 if pnl > 0 else 0
             ist = t.entry_time.astimezone(_IST) if t.entry_time else None
             buckets = [
                 ("Instrument", _analytics_underlying(t.tradingsymbol)),
-                ("Type", _type_label(t.tradingsymbol, t.direction)),
+                ("Type", _shape_label(t)),
                 ("Product", (t.product or "OTHER")),
             ]
             if ist is not None:
@@ -2940,7 +2967,14 @@ async def get_strategy_performance(
                 "avg_pnl": round(b["pnl"] / b["trades"], 2) if b["trades"] else 0,
             })
 
-        legged = await db.execute(select(StrategyGroupLeg.completed_trade_id))
+        # Only THIS account's legs — the leg table has no account column, so
+        # scope through its parent StrategyGroup (unscoped, this scanned every
+        # account's legs on each request).
+        legged = await db.execute(
+            select(StrategyGroupLeg.completed_trade_id)
+            .join(StrategyGroup, StrategyGroupLeg.strategy_group_id == StrategyGroup.id)
+            .where(StrategyGroup.broker_account_id == broker_account_id)
+        )
         legged_ids = {r[0] for r in legged.all()}
 
         ct_res = await db.execute(
@@ -2952,20 +2986,12 @@ async def get_strategy_performance(
             ))
         )
 
-        def _single_label(sym: str, direction: str) -> str:
-            s = (sym or "").upper()
-            is_long = (direction or "LONG").upper() == "LONG"
-            if s.endswith("CE"): return "Call buys" if is_long else "Call sells"
-            if s.endswith("PE"): return "Put buys" if is_long else "Put sells"
-            if s.endswith("FUT"): return "Futures (long)" if is_long else "Futures (short)"
-            return "Equity"
-
         single: dict[str, dict] = defaultdict(lambda: {"trades": 0, "pnl": 0.0, "wins": 0})
         for t in ct_res.scalars().all():
             if t.id in legged_ids:
                 continue
             pnl = float(t.realized_pnl or 0)
-            label = _single_label(t.tradingsymbol, t.direction)
+            label = _shape_label(t)
             b = single[label]
             b["trades"] += 1
             b["pnl"] += pnl

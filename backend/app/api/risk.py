@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, and_, desc
 from uuid import UUID
@@ -64,7 +64,8 @@ async def get_risk_state(
 @router.get("/alerts", response_model=RiskAlertListResponse)
 async def get_risk_alerts(
     broker_account_id: UUID = Depends(get_verified_broker_account_id),
-    hours: int = 24,
+    # Clamped: largest legit window is the 90-day calendar (2160h) + slack.
+    hours: int = Query(default=24, ge=1, le=2200),
     db: AsyncSession = Depends(get_db)
 ):
     """Get risk alerts for account"""
@@ -127,7 +128,7 @@ async def acknowledge_alert(
 
 @router.post("/alerts/acknowledge-all")
 async def acknowledge_all_alerts(
-    hours: int = 168,
+    hours: int = Query(default=168, ge=1, le=2200),
     broker_account_id: UUID = Depends(get_verified_broker_account_id),
     db: AsyncSession = Depends(get_db),
 ):

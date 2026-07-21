@@ -405,45 +405,82 @@ export const DEMO_OVERVIEW = {
 // ---------------------------------------------------------------------------
 // Analytics: performance
 // ---------------------------------------------------------------------------
+// Mirrors GET /api/analytics/performance response shape
 export const DEMO_PERFORMANCE = {
   has_data: true,
+  period_days: 30,
+  total_trades: 15,
   by_instrument: [
-    { symbol: 'NIFTY options', pnl: 2225, trades: 7, win_rate: 57 },
-    { symbol: 'BANKNIFTY options', pnl: 4950, trades: 3, win_rate: 67 },
-    { symbol: 'FORTIS options', pnl: 11770, trades: 2, win_rate: 100 },
-    { symbol: 'SOLARINDS', pnl: -6500, trades: 2, win_rate: 50 },
-    { symbol: 'SENSEX options', pnl: -1700, trades: 1, win_rate: 0 },
+    { symbol: 'NIFTY25MAR23000CE',     trades: 4, pnl: 3750,   win_rate: 75,  avg_pnl: 938,   avg_duration_min: 78 },
+    { symbol: 'BANKNIFTY2531748500PE', trades: 2, pnl: 4950,   win_rate: 100, avg_pnl: 2475,  avg_duration_min: 64 },
+    { symbol: 'NIFTY2531723200PE',     trades: 2, pnl: -125,   win_rate: 50,  avg_pnl: -63,   avg_duration_min: 57 },
+    { symbol: 'FORTIS25MAR960CE',      trades: 2, pnl: 11770,  win_rate: 100, avg_pnl: 5885,  avg_duration_min: 218 },
+    { symbol: 'SOLARINDS',             trades: 2, pnl: -6500,  win_rate: 50,  avg_pnl: -3250, avg_duration_min: 176 },
+    { symbol: 'NIFTY2531723200CE',     trades: 1, pnl: -2700,  win_rate: 0,   avg_pnl: -2700, avg_duration_min: 30 },
+    { symbol: 'BANKNIFTY2531749000CE', trades: 1, pnl: -960,   win_rate: 0,   avg_pnl: -960,  avg_duration_min: 35 },
+    { symbol: 'SENSEX25MAR75000PE',    trades: 1, pnl: -1700,  win_rate: 0,   avg_pnl: -1700, avg_duration_min: 165 },
   ],
-  by_session: [
-    { hour: 9, label: '09:00', pnl: 5100, trades: 5, win_rate: 80 },
-    { hour: 10, label: '10:00', pnl: 1450, trades: 3, win_rate: 67 },
-    { hour: 11, label: '11:00', pnl: 5210, trades: 3, win_rate: 33 },
-    { hour: 12, label: '12:00', pnl: 0, trades: 0, win_rate: 0 },
-    { hour: 13, label: '13:00', pnl: -2700, trades: 1, win_rate: 0 },
-    { hour: 14, label: '14:00', pnl: -14270, trades: 3, win_rate: 0 },
+  by_direction: {
+    LONG:  { trades: 13, pnl: 9690,  win_rate: 61.5 },
+    SHORT: { trades: 2,  pnl: -1700, win_rate: 50 },
+  },
+  by_product: {
+    MIS:  { trades: 11, pnl: 1490, wins: 6, losses: 5, win_rate: 54.5, avg_pnl: 135 },
+    NRML: { trades: 4,  pnl: 6500, wins: 3, losses: 1, win_rate: 75,   avg_pnl: 1625 },
+  },
+  by_hour: [
+    { hour: 9,  label: '9:00',  trades: 5, pnl: 5100,   win_rate: 80 },
+    { hour: 10, label: '10:00', trades: 3, pnl: 1450,   win_rate: 67 },
+    { hour: 11, label: '11:00', trades: 3, pnl: 5210,   win_rate: 33 },
+    { hour: 13, label: '13:00', trades: 1, pnl: -2700,  win_rate: 0 },
+    { hour: 14, label: '14:00', trades: 3, pnl: -14270, win_rate: 0 },
   ],
-  monthly_pnl: [
-    { month: 'Jan', pnl: 24500 },
-    { month: 'Feb', pnl: -8200 },
-    { month: 'Mar', pnl: 7990 },
+  by_day_of_week: [
+    { day: 0, name: 'Monday',    trades: 3, pnl: 4200,  win_rate: 67 },
+    { day: 1, name: 'Tuesday',   trades: 4, pnl: 6350,  win_rate: 75 },
+    { day: 2, name: 'Wednesday', trades: 3, pnl: 5850,  win_rate: 67 },
+    { day: 3, name: 'Thursday',  trades: 4, pnl: -7410, win_rate: 25 },
+    { day: 4, name: 'Friday',    trades: 1, pnl: -1000, win_rate: 0 },
+  ],
+  size_analysis: [
+    { bucket: 'Small (<0.7x)',    trades: 3, pnl: 2850,  win_rate: 67, avg_pnl: 950 },
+    { bucket: 'Medium (0.7-1.3x)',trades: 9, pnl: 12890, win_rate: 67, avg_pnl: 1432 },
+    { bucket: 'Large (>1.3x)',    trades: 3, pnl: -7750, win_rate: 33, avg_pnl: -2583 },
   ],
 };
 
 // ---------------------------------------------------------------------------
 // Analytics: timing heatmap
 // ---------------------------------------------------------------------------
+// Mirrors GET /api/analytics/timing-heatmap response shape
 export const DEMO_TIMING_HEATMAP = {
   has_data: true,
-  heatmap: Array.from({ length: 5 }, (_, dayIdx) =>
-    Array.from({ length: 14 }, (_, hourIdx) => ({
-      day: ['Mon', 'Tue', 'Wed', 'Thu', 'Fri'][dayIdx],
-      hour: hourIdx + 9,
-      pnl: Math.round((Math.random() - 0.45) * 5000),
-      trades: Math.floor(Math.random() * 4),
-    }))
-  ).flat(),
-  best_hour: 9, worst_hour: 14,
-  best_day: 'Wednesday', worst_day: 'Friday',
+  cells: [
+    { hour: 9,  day: 0, day_name: 'Mon', hour_label: '9:00',  trades: 2, pnl: 3200,  avg_pnl: 1600,  win_rate: 100 },
+    { hour: 10, day: 0, day_name: 'Mon', hour_label: '10:00', trades: 1, pnl: 1000,  avg_pnl: 1000,  win_rate: 100 },
+    { hour: 9,  day: 1, day_name: 'Tue', hour_label: '9:00',  trades: 2, pnl: 1900,  avg_pnl: 950,   win_rate: 50 },
+    { hour: 11, day: 1, day_name: 'Tue', hour_label: '11:00', trades: 2, pnl: 4450,  avg_pnl: 2225,  win_rate: 100 },
+    { hour: 9,  day: 2, day_name: 'Wed', hour_label: '9:00',  trades: 1, pnl: 0,     avg_pnl: 0,     win_rate: 0 },
+    { hour: 10, day: 2, day_name: 'Wed', hour_label: '10:00', trades: 2, pnl: 5850,  avg_pnl: 2925,  win_rate: 100 },
+    { hour: 11, day: 3, day_name: 'Thu', hour_label: '11:00', trades: 1, pnl: 760,   avg_pnl: 760,   win_rate: 100 },
+    { hour: 13, day: 3, day_name: 'Thu', hour_label: '13:00', trades: 1, pnl: -2700, avg_pnl: -2700, win_rate: 0 },
+    { hour: 14, day: 3, day_name: 'Thu', hour_label: '14:00', trades: 2, pnl: -5470, avg_pnl: -2735, win_rate: 0 },
+    { hour: 14, day: 4, day_name: 'Fri', hour_label: '14:00', trades: 1, pnl: -1000, avg_pnl: -1000, win_rate: 0 },
+  ],
+  by_hour: [
+    { hour: 9,  label: '9:00',  trades: 5, pnl: 5100,  win_rate: 60 },
+    { hour: 10, label: '10:00', trades: 3, pnl: 6850,  win_rate: 100 },
+    { hour: 11, label: '11:00', trades: 3, pnl: 5210,  win_rate: 100 },
+    { hour: 13, label: '13:00', trades: 1, pnl: -2700, win_rate: 0 },
+    { hour: 14, label: '14:00', trades: 3, pnl: -6470, win_rate: 0 },
+  ],
+  by_day: [
+    { day: 0, name: 'Mon', trades: 3, pnl: 4200,  win_rate: 100 },
+    { day: 1, name: 'Tue', trades: 4, pnl: 6350,  win_rate: 75 },
+    { day: 2, name: 'Wed', trades: 3, pnl: 5850,  win_rate: 67 },
+    { day: 3, name: 'Thu', trades: 4, pnl: -7410, win_rate: 25 },
+    { day: 4, name: 'Fri', trades: 1, pnl: -1000, win_rate: 0 },
+  ],
 };
 
 // ---------------------------------------------------------------------------

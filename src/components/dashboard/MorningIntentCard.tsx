@@ -113,7 +113,7 @@ export function MorningIntentCard({ onAcknowledged }: Props) {
   // Build a human-readable intent summary
   const parts: string[] = [];
   if (effectiveTrades != null) parts.push(`Max ${effectiveTrades} trades`);
-  if (effectiveLoss != null) parts.push(`₹${formatCurrency(effectiveLoss)} loss limit`);
+  if (effectiveLoss != null) parts.push(`${formatCurrency(effectiveLoss)} loss limit`);
   const intentSummary = parts.join(' · ') || 'Your rules for today';
 
   return (

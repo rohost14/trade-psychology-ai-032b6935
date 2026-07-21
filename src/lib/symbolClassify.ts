@@ -18,11 +18,18 @@ export function extractUnderlying(sym: string): string {
   return sym;
 }
 
-/** CE / PE / FUT / EQ from the symbol suffix. */
+/**
+ * CE / PE / FUT / EQ classification.
+ *
+ * A bare suffix check misclassifies equity symbols that happen to end in
+ * CE/PE (RELIANCE, HDFCAMC…). A real option symbol always has an expiry code
+ * and strike between the underlying and the CE/PE tail, so require that
+ * structure before classifying as an option.
+ */
 export function optionType(sym: string): 'CE' | 'PE' | 'FUT' | 'EQ' {
-  if (sym.endsWith('CE')) return 'CE';
-  if (sym.endsWith('PE')) return 'PE';
-  if (sym.endsWith('FUT')) return 'FUT';
+  const opt = sym.match(/(?:\d{5}\d+(?:\.\d+)?|\d{2}[A-Z]{3}(?:\d{2})?\d+(?:\.\d+)?)(CE|PE)$/);
+  if (opt) return opt[1] as 'CE' | 'PE';
+  if (/(?:\d{5}|\d{2}[A-Z]{3}(?:\d{2})?)FUT$/.test(sym)) return 'FUT';
   return 'EQ';
 }
 

@@ -16,7 +16,9 @@ interface OverviewTabProps { days: number }
 
 interface Kpis {
   total_pnl: number; total_trades: number; win_rate: number;
-  profit_factor: number; expectancy: number;
+  /** null = no losing trades in the period (infinite PF) */
+  profit_factor: number | null;
+  expectancy: number;
   max_drawdown: number; trading_days: number; win_days: number;
   max_win_streak: number; max_loss_streak: number;
   avg_win: number; avg_loss: number; winners: number; losers: number;
@@ -306,10 +308,12 @@ export default function OverviewTab({ days }: OverviewTabProps) {
             />
             <KpiCell
               label="Profit Factor"
-              value={k.profit_factor > 0 ? k.profit_factor.toFixed(2) : '—'}
-              sub={k.profit_factor >= 1.5 ? 'Strong edge' : k.profit_factor >= 1 ? 'Marginal' : 'Losing edge'}
-              color={k.profit_factor >= 1.5 ? 'text-tm-profit' : k.profit_factor >= 1 ? 'text-tm-obs' : 'text-tm-loss'}
-              delta={kP ? { current: k.profit_factor, prev: prevPF, higherIsBetter: true, format: 'number' } : undefined}
+              value={k.profit_factor === null ? '∞' : k.profit_factor > 0 ? k.profit_factor.toFixed(2) : '—'}
+              sub={k.profit_factor === null || k.profit_factor >= 1.5 ? 'Strong edge' : k.profit_factor >= 1 ? 'Marginal' : 'Losing edge'}
+              color={k.profit_factor === null || k.profit_factor >= 1.5 ? 'text-tm-profit' : k.profit_factor >= 1 ? 'text-tm-obs' : 'text-tm-loss'}
+              delta={kP && k.profit_factor !== null && prevPF !== null
+                ? { current: k.profit_factor, prev: prevPF, higherIsBetter: true, format: 'number' }
+                : undefined}
             />
             <KpiCell
               label="Expectancy"
@@ -433,7 +437,7 @@ export default function OverviewTab({ days }: OverviewTabProps) {
           </div>
           {k && (
             <p className="px-5 pb-3.5 text-[11px] text-muted-foreground">
-              Avg win day {formatCurrencyWithSign(Math.round(k.avg_win))} · avg loss day {formatCurrencyWithSign(Math.round(k.avg_loss))}
+              Avg winning trade {formatCurrencyWithSign(Math.round(k.avg_win))} · avg losing trade {formatCurrencyWithSign(Math.round(k.avg_loss))}
             </p>
           )}
         </div>

@@ -19,14 +19,15 @@ interface PerfData {
   has_data: boolean;
   by_instrument: { symbol: string; trades: number; pnl: number; win_rate: number; avg_pnl: number; avg_duration_min: number }[];
   by_hour: { hour: number; label: string; trades: number; pnl: number; win_rate: number }[];
-  by_day_of_week: { day: string; trades: number; pnl: number; win_rate: number }[];
+  // day is the numeric weekday (0=Mon … 6=Sun); name is "Monday"…
+  by_day_of_week: { day: number; name: string; trades: number; pnl: number; win_rate: number }[];
   size_analysis: { bucket: string; trades: number; pnl: number; win_rate: number; avg_pnl: number }[];
 }
 
 interface HeatmapData {
   has_data: boolean;
-  by_hour: { hour: number; trades: number; pnl: number; win_rate: number }[];
-  by_day: { day: string; trades: number; pnl: number; win_rate: number }[];
+  by_hour: { hour: number; label: string; trades: number; pnl: number; win_rate: number }[];
+  by_day: { day: number; name: string; trades: number; pnl: number; win_rate: number }[];
 }
 
 // ── Symbol classification lives in @/lib/symbolClassify (shared with OverviewTab) ──
@@ -189,15 +190,18 @@ export default function EdgeTab({ days, onInstrumentClick }: EdgeTabProps) {
   const bestHour  = [...hourBarData].sort((a, b) => b.avg_pnl - a.avg_pnl)[0];
   const worstHour = [...hourBarData].sort((a, b) => a.avg_pnl - b.avg_pnl)[0];
 
-  // Day-of-week bar data
-  const dowRaw = (perf?.by_day_of_week ?? []).filter(d => DAY_ORDER.includes(d.day));
-  dowRaw.sort((a, b) => DAY_ORDER.indexOf(a.day) - DAY_ORDER.indexOf(b.day));
-  const dowBarData = dowRaw.map(d => ({
-    label: d.day,
-    trades: d.trades,
-    avg_pnl: d.trades > 0 ? Math.round(d.pnl / d.trades) : 0,
-    win_rate: Math.round(d.win_rate),
-  }));
+  // Day-of-week bar data — backend `day` is numeric (0=Mon … 6=Sun); keep
+  // trading weekdays only. (The old filter compared 'Mon'-style strings
+  // against the number, so this chart never rendered.)
+  const dowBarData = (perf?.by_day_of_week ?? [])
+    .filter(d => d.day >= 0 && d.day <= 4)
+    .sort((a, b) => a.day - b.day)
+    .map(d => ({
+      label: d.name?.slice(0, 3) ?? DAY_ORDER[d.day],
+      trades: d.trades,
+      avg_pnl: d.trades > 0 ? Math.round(d.pnl / d.trades) : 0,
+      win_rate: Math.round(d.win_rate),
+    }));
   const bestDow = [...dowBarData].sort((a, b) => b.avg_pnl - a.avg_pnl)[0];
 
   // F&O session windows
