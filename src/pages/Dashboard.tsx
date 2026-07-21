@@ -211,7 +211,7 @@ export default function Dashboard() {
   // Fetch journal entries
   useEffect(() => {
     if (!accountId) return;
-    api.get('/api/journal').then(res => {
+    api.get('/api/journal/').then(res => {
       const entries = res.data?.entries || [];
       const ids = new Set<string>(entries.map((e: any) => e.trade_id).filter(Boolean));
       setJournaledIds(ids);

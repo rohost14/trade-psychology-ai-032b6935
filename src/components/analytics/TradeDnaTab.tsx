@@ -7,6 +7,7 @@ import { RefreshCw, AlertTriangle, Search, TrendingUp, TrendingDown, Shield, Ale
 import { Skeleton } from '@/components/ui/skeleton';
 import { cn } from '@/lib/utils';
 import { formatCurrencyWithSign } from '@/lib/formatters';
+import type { ChartTooltipProps } from '@/lib/chartTooltip';
 import { api } from '@/lib/api';
 
 interface TradeDnaTabProps { days: number }
@@ -63,7 +64,7 @@ function fmtTime(s: string | null) {
   return new Date(s).toLocaleString('en-IN', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' });
 }
 
-function SeqTooltip({ active, payload, baseline }: any) {
+function SeqTooltip({ active, payload, baseline }: ChartTooltipProps<SequenceData['sequence'][number]> & { baseline: number }) {
   if (!active || !payload?.length) return null;
   const d = payload[0].payload;
   return (
@@ -80,7 +81,7 @@ function SeqTooltip({ active, payload, baseline }: any) {
   );
 }
 
-function HoldTooltip({ active, payload }: any) {
+function HoldTooltip({ active, payload }: ChartTooltipProps<PnlPctData['by_hold_time'][number]>) {
   if (!active || !payload?.length) return null;
   const d = payload[0].payload;
   return (

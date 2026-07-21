@@ -10,6 +10,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { cn } from '@/lib/utils';
 import { formatCurrency, formatCurrencyWithSign } from '@/lib/formatters';
 import { extractUnderlying } from '@/lib/symbolClassify';
+import type { ChartTooltipProps } from '@/lib/chartTooltip';
 import { api } from '@/lib/api';
 
 interface OverviewTabProps { days: number }
@@ -73,7 +74,7 @@ const PIE_COLORS = ['#0d9488', '#0891b2', '#7c3aed', '#d97706', '#dc2626', '#6b7
 
 // ── sub-components ───────────────────────────────────────────────────────────
 
-function EquityTooltip({ active, payload }: any) {
+function EquityTooltip({ active, payload }: ChartTooltipProps<OverviewData['equity_curve'][number]>) {
   if (!active || !payload?.length) return null;
   const d = payload[0].payload;
   return (
@@ -87,7 +88,7 @@ function EquityTooltip({ active, payload }: any) {
   );
 }
 
-function DailyTooltip({ active, payload }: any) {
+function DailyTooltip({ active, payload }: ChartTooltipProps<OverviewData['daily_pnl'][number]>) {
   if (!active || !payload?.length) return null;
   const d = payload[0].payload;
   return (
@@ -101,7 +102,7 @@ function DailyTooltip({ active, payload }: any) {
   );
 }
 
-function PieTooltip({ active, payload }: any) {
+function PieTooltip({ active, payload }: ChartTooltipProps<{ name: string; pnl: number; value: number }>) {
   if (!active || !payload?.length) return null;
   const d = payload[0].payload;
   return (
@@ -224,7 +225,7 @@ export default function OverviewTab({ days }: OverviewTabProps) {
       if (ed.status === 'fulfilled') setEdge(ed.value.data);
       if (pf.status === 'fulfilled') setPerf(pf.value.data);
       if (ov.status === 'rejected') {
-        const err = ov.reason as any;
+        const err = ov.reason as { response?: { status?: number } };
         setError(err?.response?.status === 401 ? 'Session expired — reconnect Zerodha.' : 'Failed to load overview data.');
       }
     }).finally(() => { if (!cancelled) setLoading(false); });

@@ -205,13 +205,28 @@ export default function MyPatterns() {
   const fetchStatus = useCallback(async (signal?: AbortSignal) => {
     if (!account?.id) return;
     try {
-      const [statusRes, summaryRes, alertsRes] = await Promise.all([
-        api.get('/api/danger-zone/status', { signal }),
+      // /summary already contains everything /status returns (both run
+      // assess_danger_level server-side) — one call instead of two.
+      const [summaryRes, alertsRes] = await Promise.all([
         api.get('/api/danger-zone/summary', { signal }),
         api.get('/api/risk/alerts', { params: { hours: 720 }, signal }), // 30 days for streak
       ]);
-      setStatus(statusRes.data);
-      setAlertHistory(summaryRes.data.cooldown_history_7d || []);
+      const s = summaryRes.data;
+      setStatus({
+        level: s.current_status.level,
+        intervention: s.current_status.intervention,
+        triggers: s.current_status.triggers ?? [],
+        message: s.current_status.message ?? '',
+        cooldown_active: s.current_status.cooldown_active ?? false,
+        cooldown_remaining_minutes: s.current_status.cooldown_remaining_minutes ?? 0,
+        daily_loss_used_percent: s.metrics.daily_loss_used_percent ?? 0,
+        trade_count_today: s.metrics.trade_count_today ?? 0,
+        consecutive_losses: s.metrics.consecutive_losses ?? 0,
+        patterns_active: s.metrics.patterns_active ?? [],
+        recommendations: s.recommendations ?? [],
+        checked_at: s.checked_at,
+      });
+      setAlertHistory(s.cooldown_history_7d || []);
 
       // Compute streak: consecutive days without a high/critical alert
       const rawAlerts: { detected_at?: string; created_at?: string; severity?: string }[] = alertsRes.data.alerts || [];

@@ -7,6 +7,7 @@ import { RefreshCw, AlertTriangle, Clock } from 'lucide-react';
 import { Skeleton } from '@/components/ui/skeleton';
 import { cn } from '@/lib/utils';
 import { formatCurrencyWithSign } from '@/lib/formatters';
+import type { ChartTooltipProps } from '@/lib/chartTooltip';
 import { api } from '@/lib/api';
 
 interface SessionsTabProps { days: number }
@@ -151,7 +152,7 @@ function CalendarMonth({ year, month, days }: { year: number; month: number; day
   );
 }
 
-function DowTooltip({ active, payload }: any) {
+function DowTooltip({ active, payload }: ChartTooltipProps<ExpiryWeekDow>) {
   if (!active || !payload?.length) return null;
   const d = payload[0].payload;
   return (

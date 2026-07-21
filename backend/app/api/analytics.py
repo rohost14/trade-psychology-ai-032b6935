@@ -25,6 +25,15 @@ logger = logging.getLogger(__name__)
 # IST offset — Zerodha trade timestamps localise to this for hour/weekday buckets.
 _IST = timezone(timedelta(hours=5, minutes=30))
 
+
+def _ist_day(dt) -> str:
+    """IST calendar date (YYYY-MM-DD) for a tz-aware UTC datetime.
+
+    Daily buckets must use the trading calendar (IST), not UTC — a UTC
+    strftime shifts MCX trades between 00:00–05:30 IST onto the previous day.
+    """
+    return dt.astimezone(_IST).strftime("%Y-%m-%d")
+
 import re as _re_module
 
 
@@ -403,10 +412,10 @@ async def get_analytics_overview(
                     break
             current_streak = count
 
-        # Daily aggregation for best/worst day and daily P&L
+        # Daily aggregation for best/worst day and daily P&L (IST calendar days)
         daily_map: dict[str, dict] = {}
         for t in trades:
-            day_str = t.exit_time.strftime("%Y-%m-%d") if t.exit_time else "unknown"
+            day_str = _ist_day(t.exit_time) if t.exit_time else "unknown"
             if day_str not in daily_map:
                 daily_map[day_str] = {"pnl": 0, "trades": 0, "wins": 0}
             pnl_val = float(t.realized_pnl or 0)
@@ -746,10 +755,10 @@ async def get_analytics_risk_metrics(
         winners = [p for p in pnls if p > 0]
         losers = [p for p in pnls if p < 0]
 
-        # --- Daily P&L for volatility and VaR ---
+        # --- Daily P&L for volatility and VaR (IST calendar days) ---
         daily_pnl_map: dict[str, float] = {}
         for t in trades:
-            day_str = t.exit_time.strftime("%Y-%m-%d") if t.exit_time else "unknown"
+            day_str = _ist_day(t.exit_time) if t.exit_time else "unknown"
             daily_pnl_map[day_str] = daily_pnl_map.get(day_str, 0) + float(t.realized_pnl or 0)
 
         daily_pnls = sorted(daily_pnl_map.values())
@@ -1067,10 +1076,10 @@ async def get_ai_insights(
         )
         trade_times = [r[0] for r in result.all() if r[0]]
 
-        # Trades per day distribution
+        # Trades per day distribution (IST calendar days)
         daily_counts: dict[str, int] = {}
         for t in trade_times:
-            d = t.strftime("%Y-%m-%d")
+            d = _ist_day(t)
             daily_counts[d] = daily_counts.get(d, 0) + 1
 
         avg_daily_trades = round(sum(daily_counts.values()) / len(daily_counts), 1) if daily_counts else 0
@@ -1259,10 +1268,10 @@ async def get_ai_summary(
                 peak = max(peak, cumulative)
                 max_dd = min(max_dd, cumulative - peak)
 
-            # Daily vol
+            # Daily vol (IST calendar days)
             daily_map = {}
             for t in trades:
-                ds = t.exit_time.strftime("%Y-%m-%d") if t.exit_time else "x"
+                ds = _ist_day(t.exit_time) if t.exit_time else "x"
                 daily_map[ds] = daily_map.get(ds, 0) + float(t.realized_pnl or 0)
             daily_vals = list(daily_map.values())
             if len(daily_vals) >= 2:

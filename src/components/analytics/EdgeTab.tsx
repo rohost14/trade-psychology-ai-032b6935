@@ -8,6 +8,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { cn } from '@/lib/utils';
 import { formatCurrency, formatCurrencyWithSign } from '@/lib/formatters';
 import { extractUnderlying, optionType, classifyExpiry } from '@/lib/symbolClassify';
+import type { ChartTooltipProps } from '@/lib/chartTooltip';
 import { api } from '@/lib/api';
 
 interface EdgeTabProps {
@@ -79,12 +80,19 @@ function buildSessionWindows(byHour: HeatmapData['by_hour']) {
 
 // ── Tooltips ─────────────────────────────────────────────────────────────────
 
-function BarTooltip({ active, payload, labelKey }: any) {
+interface BarRow {
+  label: string;
+  trades: number;
+  avg_pnl: number;
+  win_rate: number;
+}
+
+function BarTooltip({ active, payload }: ChartTooltipProps<BarRow>) {
   if (!active || !payload?.length) return null;
   const d = payload[0].payload;
   return (
     <div className="bg-popover border border-border rounded-lg px-3 py-2 shadow-lg text-sm">
-      <p className="font-medium mb-1">{d[labelKey ?? 'name']}</p>
+      <p className="font-medium mb-1">{d.label}</p>
       <p className={cn('font-mono tabular-nums', d.avg_pnl >= 0 ? 'text-tm-profit' : 'text-tm-loss')}>
         {formatCurrencyWithSign(d.avg_pnl)} avg
       </p>
@@ -93,7 +101,7 @@ function BarTooltip({ active, payload, labelKey }: any) {
   );
 }
 
-function SizeTooltip({ active, payload }: any) {
+function SizeTooltip({ active, payload }: ChartTooltipProps<PerfData['size_analysis'][number]>) {
   if (!active || !payload?.length) return null;
   const d = payload[0].payload;
   return (
@@ -368,7 +376,7 @@ export default function EdgeTab({ days, onInstrumentClick }: EdgeTabProps) {
                 <CartesianGrid strokeDasharray="3 3" stroke="rgba(0,0,0,0.06)" vertical={false} />
                 <XAxis dataKey="label" tick={{ fontSize: 10 }} tickLine={false} axisLine={false} />
                 <YAxis tick={{ fontSize: 10 }} tickLine={false} axisLine={false} tickFormatter={v => formatCurrency(v)} />
-                <Tooltip content={<BarTooltip labelKey="label" />} />
+                <Tooltip content={<BarTooltip />} />
                 <ReferenceLine y={0} stroke="rgba(0,0,0,0.15)" />
                 <Bar dataKey="avg_pnl" radius={[3, 3, 0, 0]} maxBarSize={36}>
                   {hourBarData.map((d, i) => (
@@ -399,7 +407,7 @@ export default function EdgeTab({ days, onInstrumentClick }: EdgeTabProps) {
                 <CartesianGrid strokeDasharray="3 3" stroke="rgba(0,0,0,0.06)" vertical={false} />
                 <XAxis dataKey="label" tick={{ fontSize: 11 }} tickLine={false} axisLine={false} />
                 <YAxis tick={{ fontSize: 10 }} tickLine={false} axisLine={false} tickFormatter={v => formatCurrency(v)} />
-                <Tooltip content={<BarTooltip labelKey="label" />} />
+                <Tooltip content={<BarTooltip />} />
                 <ReferenceLine y={0} stroke="rgba(0,0,0,0.15)" />
                 <Bar dataKey="avg_pnl" radius={[3, 3, 0, 0]} maxBarSize={40}>
                   {dowBarData.map((d, i) => (
