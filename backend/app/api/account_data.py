@@ -27,7 +27,7 @@ from datetime import datetime, timezone
 from typing import Any
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, File, HTTPException, UploadFile
 from pydantic import BaseModel
 from sqlalchemy import select, delete as sa_delete
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -44,6 +44,9 @@ from app.models.trade import Trade
 from app.models.trading_session import TradingSession
 from app.models.user import User
 from app.models.user_profile import UserProfile
+from app.services.tradebook_import_service import (
+    TradebookParseError, parse_tradebook_csv, to_trade_payload,
+)
 
 router = APIRouter()
 logger = logging.getLogger(__name__)
@@ -51,6 +54,11 @@ logger = logging.getLogger(__name__)
 # Both operations are heavy and must not be scriptable in bulk.
 export_limiter = RateLimiter(max_requests=3, window_seconds=3600)   # 3 exports/hour
 delete_limiter = RateLimiter(max_requests=5, window_seconds=3600)   # 5 attempts/hour
+import_limiter = RateLimiter(max_requests=5, window_seconds=3600)   # 5 imports/hour
+
+# Console tradebooks are small (a 3-year F&O export is a few MB); the cap stops
+# a corrupt or hostile upload from exhausting memory.
+MAX_IMPORT_BYTES = 10 * 1024 * 1024
 
 # Cap rows per collection so a very active account cannot OOM the process.
 # Signalled to the user via `truncated` in the manifest.
@@ -168,6 +176,124 @@ async def export_account_data(
     except Exception as e:
         logger.error(f"Account export failed: {e}", exc_info=True)
         raise HTTPException(status_code=500, detail="Internal server error")
+
+
+@router.post("/import-tradebook")
+async def import_tradebook(
+    file: UploadFile = File(...),
+    broker_account_id: UUID = Depends(get_verified_broker_account_id),
+    db: AsyncSession = Depends(get_db),
+    _limiter: None = Depends(import_limiter),
+):
+    """
+    Import historical trades from a Zerodha Console tradebook CSV.
+
+    Kite Connect only returns the CURRENT day's trades, so this is the only way
+    a new user can arrive with real history. Imported fills go through the same
+    FIFO -> completed_trades -> features pipeline as live sync.
+
+    Deliberately does NOT run the behaviour engine over imported history:
+    back-dated alerts would be noise and would corrupt the alert timeline.
+    Imported data powers analytics and the record lookup only.
+    """
+    filename = (file.filename or "").lower()
+    if not filename.endswith(".csv"):
+        raise HTTPException(
+            status_code=400,
+            detail="Please upload the CSV version of your Console tradebook (Reports → Tradebook → download as CSV).",
+        )
+
+    content = await file.read()
+    if len(content) > MAX_IMPORT_BYTES:
+        raise HTTPException(
+            status_code=413,
+            detail=f"File is larger than {MAX_IMPORT_BYTES // (1024 * 1024)} MB. Split the date range and import in parts.",
+        )
+    if not content.strip():
+        raise HTTPException(status_code=400, detail="The file is empty.")
+
+    try:
+        rows, row_errors, meta = parse_tradebook_csv(content)
+    except TradebookParseError as e:
+        raise HTTPException(status_code=422, detail=str(e))
+    except Exception as e:
+        logger.error(f"Tradebook parse crashed: {e}", exc_info=True)
+        raise HTTPException(status_code=422, detail="Could not read this file as a tradebook CSV.")
+
+    if not rows:
+        return {
+            "imported": 0, "duplicates": 0, "rejected": len(row_errors),
+            "errors": row_errors[:100], "meta": meta,
+            "message": "No usable trades found in this file.",
+        }
+
+    # Insert fills. uq_trades_broker_order (broker_account_id, order_id) makes
+    # this idempotent — re-uploading an overlapping range cannot duplicate.
+    from sqlalchemy.dialects.postgresql import insert as pg_insert
+    from app.models.trade import Trade
+
+    payloads = []
+    for r in rows:
+        p = to_trade_payload(r)
+        p["broker_account_id"] = broker_account_id
+        payloads.append(p)
+
+    imported = 0
+    try:
+        # Chunked so a very large import doesn't build one giant statement.
+        for i in range(0, len(payloads), 1000):
+            chunk = payloads[i:i + 1000]
+            result = await db.execute(
+                pg_insert(Trade.__table__)
+                .values(chunk)
+                .on_conflict_do_nothing(constraint="uq_trades_broker_order")
+            )
+            imported += result.rowcount or 0
+        await db.commit()
+    except Exception as e:
+        await db.rollback()
+        logger.error(f"Tradebook insert failed: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail="Could not save the imported trades.")
+
+    duplicates = len(payloads) - imported
+
+    # Rebuild derived data over the imported window so Analytics lights up.
+    oldest = min(r["timestamp"] for r in rows)
+    days_back = max(1, (datetime.now(timezone.utc) - oldest).days + 1)
+    pipeline_error = None
+    try:
+        from app.services.pnl_calculator import pnl_calculator
+        await pnl_calculator.calculate_and_update_pnl(
+            broker_account_id, db, days_back=min(days_back, 3650)
+        )
+    except Exception as e:
+        # The trades are already committed; a pipeline failure must not lose them.
+        pipeline_error = str(e)[:200]
+        logger.error(f"Post-import pipeline failed: {e}", exc_info=True)
+
+    logger.info(
+        "[tradebook-import] account=%s parsed=%d imported=%d dupes=%d rejected=%d",
+        broker_account_id, len(rows), imported, duplicates, len(row_errors),
+    )
+
+    return {
+        "imported": imported,
+        "duplicates": duplicates,
+        "rejected": len(row_errors),
+        "errors": row_errors[:100],
+        "date_range": {
+            "from": oldest.isoformat(),
+            "to": max(r["timestamp"] for r in rows).isoformat(),
+        },
+        "meta": meta,
+        "pipeline_error": pipeline_error,
+        "message": (
+            f"Imported {imported} trades"
+            + (f", skipped {duplicates} already present" if duplicates else "")
+            + (f", rejected {len(row_errors)} unreadable rows" if row_errors else "")
+            + "."
+        ),
+    }
 
 
 class DeleteAccountRequest(BaseModel):

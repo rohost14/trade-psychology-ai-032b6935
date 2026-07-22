@@ -16,6 +16,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { api } from '@/lib/api';
 import { useBroker } from '@/contexts/BrokerContext';
+import { TradebookImportCard } from '@/components/settings/TradebookImportCard';
 
 export function DangerZoneTab() {
   const { account, exitGuestMode, isGuest } = useBroker();
@@ -100,6 +101,9 @@ export function DangerZoneTab() {
 
   return (
     <div className="space-y-6">
+      {/* ── Import ─────────────────────────────────────────────────────────── */}
+      <TradebookImportCard />
+
       {/* ── Export ─────────────────────────────────────────────────────────── */}
       <div className="tm-card overflow-hidden">
         <div className="px-5 py-3.5 border-b border-border">
