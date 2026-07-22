@@ -4,11 +4,23 @@ interface MaintenanceProps {
   message?: string;
 }
 
+const DEFAULT_MESSAGE = "We're performing scheduled maintenance. Back in a few minutes.";
+
+// /maintenance is public and unauthenticated. Reflecting a caller-supplied
+// ?message= turned it into a phishing surface ("Account suspended, call …") —
+// React escapes it so there is no XSS, but the text is still attacker-chosen.
+// Only a fixed set of known reasons is accepted from the URL now.
+const ALLOWED_REASONS: Record<string, string> = {
+  scheduled: DEFAULT_MESSAGE,
+  deploy: "We're rolling out an update. Back in a few minutes.",
+  broker: "Zerodha's API is unavailable right now. Trading data will resume once it recovers.",
+  incident: "We're investigating an issue. Service will resume shortly.",
+};
+
 const Maintenance = ({ message }: MaintenanceProps) => {
-  const displayMessage =
-    message ||
-    new URLSearchParams(window.location.search).get("message") ||
-    "We're performing scheduled maintenance. Back in a few minutes.";
+  // A prop passed by the app itself is trusted; the query string is not.
+  const reason = new URLSearchParams(window.location.search).get("reason") ?? "";
+  const displayMessage = message || ALLOWED_REASONS[reason] || DEFAULT_MESSAGE;
 
   return (
     <div className="min-h-screen flex flex-col items-center justify-center bg-background text-foreground px-4">

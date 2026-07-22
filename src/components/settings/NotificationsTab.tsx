@@ -26,6 +26,8 @@ interface NotificationsTabProps {
   notificationStatus: NotificationStatus | null;
   account: BrokerAccount | null;
   onTestGuardian: () => void;
+  /** True when the form has edits that have not been saved yet. */
+  isDirty?: boolean;
 }
 
 export function NotificationsTab({
@@ -34,6 +36,7 @@ export function NotificationsTab({
   notificationStatus,
   account,
   onTestGuardian,
+  isDirty = false,
 }: NotificationsTabProps) {
   const [sendingConsent, setSendingConsent] = React.useState(false);
 
@@ -46,8 +49,9 @@ export function NotificationsTab({
       } else {
         toast.error('Failed to send consent — check WhatsApp configuration');
       }
-    } catch (e: any) {
-      toast.error(e?.response?.data?.detail || 'Failed to send consent');
+    } catch (e) {
+      const detail = (e as { response?: { data?: { detail?: unknown } } })?.response?.data?.detail;
+      toast.error(typeof detail === 'string' ? detail : 'Failed to send consent');
     } finally {
       setSendingConsent(false);
     }
@@ -159,6 +163,34 @@ export function NotificationsTab({
               onCheckedChange={(checked) => setProfile({ ...profile, email_enabled: checked })}
             />
           </div>
+
+          {/* Delivery times — read by retention_tasks to decide when each user's
+              reports go out. They were stored and honoured server-side but had
+              no UI, so everyone was stuck on the defaults. */}
+          {(profile.email_enabled || profile.whatsapp_enabled) && (
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label htmlFor="eod-time">Post-market report time</Label>
+                <Input
+                  id="eod-time"
+                  type="time"
+                  value={profile.eod_report_time || '16:00'}
+                  onChange={(e) => setProfile({ ...profile, eod_report_time: e.target.value })}
+                />
+                <p className="text-xs text-muted-foreground">IST. Default 16:00 (23:45 for commodity hours).</p>
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="morning-time">Morning brief time</Label>
+                <Input
+                  id="morning-time"
+                  type="time"
+                  value={profile.morning_brief_time || '08:30'}
+                  onChange={(e) => setProfile({ ...profile, morning_brief_time: e.target.value })}
+                />
+                <p className="text-xs text-muted-foreground">IST. Default 08:30.</p>
+              </div>
+            </div>
+          )}
 
           {profile.email_enabled && account && (
             <div className="p-3 bg-muted/40 rounded-lg flex items-center gap-3">
@@ -295,13 +327,22 @@ export function NotificationsTab({
                 </p>
               </div>
 
+              {/* Both actions run against the SAVED guardian number on the
+                  server, not what is currently typed here — so block them
+                  while there are unsaved edits instead of failing confusingly. */}
+              {isDirty && (
+                <p className="text-[12px] text-tm-obs">
+                  Save your settings first — these send to your saved guardian number.
+                </p>
+              )}
+
               {/* Send consent */}
               {!profile.guardian_confirmed && profile.guardian_phone && (
                 <Button
                   variant="outline"
                   className="w-full"
                   onClick={sendGuardianConsent}
-                  disabled={sendingConsent}
+                  disabled={sendingConsent || isDirty}
                 >
                   <Phone className="h-4 w-4 mr-2" />
                   {sendingConsent ? 'Sending…' : 'Send Consent Request to Guardian'}
@@ -313,6 +354,7 @@ export function NotificationsTab({
                 variant="outline"
                 className="w-full"
                 onClick={onTestGuardian}
+                disabled={isDirty}
               >
                 <Phone className="h-4 w-4 mr-2" />
                 Send Test Message

@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, func, desc
 from datetime import datetime, timedelta, date, timezone
@@ -10,7 +10,9 @@ from app.models.generated_report import GeneratedReport
 from app.models.risk_alert import RiskAlert
 
 from app.core.database import get_db
-from app.api.deps import get_verified_broker_account_id
+from app.api.deps import get_verified_broker_account_id, get_current_user_id
+from app.core.rate_limiter import RateLimiter
+from app.models.user import User
 from app.services.ai_service import ai_service
 from app.services.whatsapp_service import whatsapp_service
 from app.services.daily_reports_service import daily_reports_service
@@ -21,6 +23,12 @@ from uuid import UUID
 
 router = APIRouter()
 logger = logging.getLogger(__name__)
+
+# This module had no rate limiting at all, unlike coach.py. Two routes need it:
+# /whatsapp costs an LLM call plus an outbound message, and /weekly-summary
+# generates 14 daily reports per request (heavy DB work, sequential).
+whatsapp_report_limiter = RateLimiter(max_requests=5, window_seconds=3600)   # 5/hour
+weekly_summary_limiter  = RateLimiter(max_requests=10, window_seconds=300)   # 10/5min
 
 
 # =============================================================================
@@ -237,7 +245,8 @@ async def simulate_prediction(
 @router.get("/weekly-summary")
 async def get_weekly_summary(
     broker_account_id: UUID = Depends(get_verified_broker_account_id),
-    db: AsyncSession = Depends(get_db)
+    db: AsyncSession = Depends(get_db),
+    _limiter: None = Depends(weekly_summary_limiter),
 ):
     """
     Get weekly trading psychology summary.
@@ -370,12 +379,18 @@ def _calculate_improvements(this_week: dict, last_week: dict) -> dict:
 @router.post("/whatsapp")
 async def send_whatsapp_report(
     broker_account_id: UUID = Depends(get_verified_broker_account_id),
-    period_days: int = 2,
-    to_number: Optional[str] = None,
-    db: AsyncSession = Depends(get_db)
+    user_id: UUID = Depends(get_current_user_id),
+    period_days: int = Query(default=2, ge=1, le=30),
+    db: AsyncSession = Depends(get_db),
+    _limiter: None = Depends(whatsapp_report_limiter),
 ):
     """
     Generate and send a WhatsApp report for the last N days.
+
+    The recipient is resolved SERVER-SIDE from the account's confirmed guardian
+    number. It used to come from a caller-supplied `to_number` that was never
+    validated, which made this an open relay: any authenticated user could send
+    LLM-generated messages from our WhatsApp sender to any number, unmetered.
     """
     try:
         # 1. Fetch trades
@@ -429,10 +444,17 @@ async def send_whatsapp_report(
             key_weakness=key_weakness
         )
 
-        # 5. Send Message
-        if not to_number:
+        # 5. Send Message — recipient comes from the stored, consented guardian
+        # number only. Never from the request.
+        user = await db.get(User, user_id)
+        recipient = (user.guardian_phone or "").strip() if user else ""
+        if not recipient:
             raise HTTPException(status_code=400, detail="No guardian phone number configured")
-        recipient = to_number
+        if not (user and user.guardian_confirmed):
+            raise HTTPException(
+                status_code=403,
+                detail="Your guardian has not confirmed consent yet. Send them a consent request from Settings → Notifications.",
+            )
 
         success = await whatsapp_service.send_message(recipient, report_content)
 
@@ -455,8 +477,10 @@ async def send_whatsapp_report(
 async def list_saved_reports(
     broker_account_id: UUID = Depends(get_verified_broker_account_id),
     report_type: Optional[str] = None,
-    limit: int = 30,
-    offset: int = 0,
+    # Bounded at both ends — min(limit, 100) capped the top but let negative
+    # limit/offset reach the driver.
+    limit: int = Query(default=30, ge=1, le=100),
+    offset: int = Query(default=0, ge=0),
     db: AsyncSession = Depends(get_db),
 ):
     """List saved reports, most recent first. Optionally filter by report_type."""
@@ -464,7 +488,7 @@ async def list_saved_reports(
         select(GeneratedReport)
         .where(GeneratedReport.broker_account_id == broker_account_id)
         .order_by(desc(GeneratedReport.report_date), desc(GeneratedReport.generated_at))
-        .limit(min(limit, 100))
+        .limit(limit)
         .offset(offset)
     )
     if report_type:

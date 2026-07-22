@@ -130,10 +130,12 @@ export default function Settings() {
         guardian_phone: profile.guardian_phone,
         guardian_name: profile.guardian_name,
         guardian_alert_threshold: profile.guardian_alert_threshold,
-        guardian_daily_summary: profile.guardian_daily_summary,
         // Was missing from this payload: the Guardian tab let users edit it and
         // reported success, but the value was never sent and silently vanished.
         guardian_loss_limit: profile.guardian_loss_limit,
+        // Read by retention_tasks to schedule each user's report delivery.
+        eod_report_time: profile.eod_report_time,
+        morning_brief_time: profile.morning_brief_time,
       };
 
       await api.put('/api/profile/', payload);
@@ -322,6 +324,7 @@ export default function Settings() {
               notificationStatus={notificationStatus}
               account={account}
               onTestGuardian={handleTestGuardian}
+              isDirty={isDirty}
             />
           </TabsContent>
 
