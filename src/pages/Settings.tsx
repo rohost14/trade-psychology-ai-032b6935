@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { Save, Loader2, User, Bell, Brain } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -12,7 +13,20 @@ import { ProfileTab } from '@/components/settings/ProfileTab';
 import { NotificationsTab } from '@/components/settings/NotificationsTab';
 import { InsightsTab } from '@/components/settings/InsightsTab';
 
+// Rule fields are change-controlled by the Constitution (backend RULE_FIELDS).
+// Tightening applies instantly; loosening returns 409 and must go through
+// My Rules. Friendly labels so the error names what the user actually edited.
+const RULE_FIELD_LABELS: Record<string, string> = {
+  daily_loss_limit:       'Daily loss limit',
+  daily_trade_limit:      'Max trades per day',
+  max_position_size:      'Max position size',
+  cooldown_after_loss:    'Cooldown after a loss',
+  max_consecutive_losses: 'Max consecutive losses',
+  restricted_windows:     'Restricted trading windows',
+};
+
 export default function Settings() {
+  const navigate = useNavigate();
   const { isConnected, isLoading: brokerLoading, account, connect, disconnect } = useBroker();
   const [isConnecting, setIsConnecting] = useState(false);
   const [isDisconnecting, setIsDisconnecting] = useState(false);
@@ -116,14 +130,45 @@ export default function Settings() {
         guardian_name: profile.guardian_name,
         guardian_alert_threshold: profile.guardian_alert_threshold,
         guardian_daily_summary: profile.guardian_daily_summary,
+        // Was missing from this payload: the Guardian tab let users edit it and
+        // reported success, but the value was never sent and silently vanished.
+        guardian_loss_limit: profile.guardian_loss_limit,
       };
 
       await api.put('/api/profile/', payload);
       toast.success('Settings saved successfully');
       setIsDirty(false);
     } catch (error) {
+      const err = error as {
+        response?: { status?: number; data?: { detail?: unknown } };
+      };
+      const detail = err.response?.data?.detail;
+
+      // 409 = Constitution lock. Relaxing a trading rule needs the friction
+      // flow in My Rules; the whole save is rejected server-side, so say that
+      // plainly instead of a generic failure.
+      if (err.response?.status === 409 && typeof detail === 'object' && detail !== null) {
+        const d = detail as { code?: string; loosening_fields?: string[]; message?: string };
+        if (d.code === 'override_required') {
+          const names = (d.loosening_fields ?? [])
+            .map(f => RULE_FIELD_LABELS[f] ?? f.replace(/_/g, ' '))
+            .join(', ');
+          toast.error(
+            names
+              ? `Relaxing ${names} needs confirmation in My Rules`
+              : 'Relaxing a trading rule needs confirmation in My Rules',
+            {
+              description: 'Nothing was saved. Tightening a rule applies instantly; loosening one goes through My Rules.',
+              duration: 10000,
+              action: { label: 'Open My Rules', onClick: () => navigate('/my-rules') },
+            },
+          );
+          return;
+        }
+      }
+
       console.error('Failed to save profile:', error);
-      toast.error('Failed to save settings');
+      toast.error(typeof detail === 'string' ? detail : 'Failed to save settings');
     } finally {
       setIsSaving(false);
     }
@@ -170,8 +215,9 @@ export default function Settings() {
       } else {
         toast.info(`Test dispatched. Guardian: ${guardianStatus ?? 'n/a'} | Push: ${pushStatus ?? 'n/a'}`);
       }
-    } catch (error: any) {
-      if (error?.response?.status === 503) {
+    } catch (error) {
+      const status = (error as { response?: { status?: number } })?.response?.status;
+      if (status === 503) {
         toast.error('WhatsApp not configured — Twilio credentials missing on server');
       } else {
         toast.error('Failed to send test message');

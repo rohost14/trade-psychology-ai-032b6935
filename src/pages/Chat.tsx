@@ -274,30 +274,52 @@ export default function Chat() {
         const reader = response.body.getReader();
         const decoder = new TextDecoder();
         let accumulated = '';
+        // SSE frames do NOT align with network chunks — a "data: {...}" line can
+        // arrive split across two reads. Carry the trailing partial line over to
+        // the next chunk instead of parsing (and silently dropping) both halves.
+        let buffer = '';
+        let streamDone = false;
 
-        while (true) {
+        const handleLine = (line: string) => {
+          const trimmed = line.replace(/\r$/, '');
+          if (!trimmed.startsWith('data: ')) return;
+          const data = trimmed.slice(6).trim();
+          if (data === '[DONE]') {
+            streamDone = true;
+            return;
+          }
+          try {
+            const parsed = JSON.parse(data);
+            const text = parsed.text || '';
+            if (text) {
+              accumulated += text;
+              setMessages((prev) =>
+                prev.map((m) => (m.id === aiMessageId ? { ...m, content: accumulated } : m))
+              );
+            }
+          } catch {
+            // Genuinely malformed frame — skip it.
+          }
+        };
+
+        while (!streamDone) {
           const { done, value } = await reader.read();
           if (done) break;
 
-          const raw = decoder.decode(value, { stream: true });
-          for (const line of raw.split('\n')) {
-            if (!line.startsWith('data: ')) continue;
-            const data = line.slice(6).trim();
-            if (data === '[DONE]') break;
-            try {
-              const parsed = JSON.parse(data);
-              const text = parsed.text || '';
-              if (text) {
-                accumulated += text;
-                setMessages((prev) =>
-                  prev.map((m) => (m.id === aiMessageId ? { ...m, content: accumulated } : m))
-                );
-              }
-            } catch {
-              // Ignore malformed SSE chunks
-            }
+          buffer += decoder.decode(value, { stream: true });
+          const lines = buffer.split('\n');
+          // Last element is either "" (chunk ended on a newline) or an
+          // incomplete line — hold it back until the rest arrives.
+          buffer = lines.pop() ?? '';
+          for (const line of lines) {
+            handleLine(line);
+            if (streamDone) break;
           }
         }
+
+        // Flush any complete line left in the buffer at end-of-stream.
+        buffer += decoder.decode();
+        if (buffer.trim()) handleLine(buffer);
 
         setMessages((prev) =>
           prev.map((m) => (m.id === aiMessageId ? { ...m, isStreaming: false } : m))
@@ -323,7 +345,9 @@ export default function Chat() {
         textareaRef.current?.focus();
       }
     },
-    [account, isLoading, messages]
+    // deepMode selects the model server-side (deep=Sonnet, fast=Haiku). Omitting
+    // it here meant the first send after toggling used the previous mode.
+    [account, isLoading, messages, deepMode]
   );
 
   const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {

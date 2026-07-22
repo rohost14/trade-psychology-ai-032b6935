@@ -85,6 +85,7 @@ export const profileSchema = z.object({
   trading_hours_start: z.string().regex(/^\d{2}:\d{2}$/, 'Use HH:MM format').optional().or(z.undefined()),
   trading_hours_end: z.string().regex(/^\d{2}:\d{2}$/, 'Use HH:MM format').optional().or(z.undefined()),
   guardian_phone: z.string().regex(/^\+\d{10,15}$/, 'Use international format: +919876543210').optional().or(z.literal('')).or(z.undefined()),
+  guardian_loss_limit: z.number().positive('Guardian loss limit must be positive').optional().or(z.undefined()),
   eod_report_time: z.string().regex(/^\d{2}:\d{2}$/, 'Use HH:MM format').optional().or(z.undefined()),
   morning_brief_time: z.string().regex(/^\d{2}:\d{2}$/, 'Use HH:MM format').optional().or(z.undefined()),
 }).passthrough();
