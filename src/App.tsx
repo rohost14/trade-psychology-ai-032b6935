@@ -20,7 +20,7 @@ import Dashboard from "./pages/Dashboard";
 const Welcome       = lazy(() => import("./pages/Welcome"));
 const Analytics     = lazy(() => import("./pages/Analytics"));
 const Alerts        = lazy(() => import("./pages/Alerts"));
-const BlowupShield  = lazy(() => import("./pages/BlowupShield"));
+const MyRecord      = lazy(() => import("./pages/MyRecord"));
 const MyPatterns    = lazy(() => import("./pages/MyPatterns"));
 const Chat          = lazy(() => import("./pages/Chat"));
 const Settings      = lazy(() => import("./pages/Settings"));
@@ -82,7 +82,10 @@ const App = () => (
                     <Route path="dashboard" element={<Dashboard />} />
                     <Route path="analytics" element={<Analytics />} />
                     <Route path="alerts" element={<Alerts />} />
-                    <Route path="blowup-shield" element={<BlowupShield />} />
+                    <Route path="my-record" element={<MyRecord />} />
+                    {/* Blowup Shield was replaced by My Record — keep the old
+                        path working for anyone with it bookmarked. */}
+                    <Route path="blowup-shield" element={<Navigate to="/my-record" replace />} />
                     <Route path="my-patterns" element={<MyPatterns />} />
                     <Route path="chat" element={<Chat />} />
                     <Route path="reports" element={<Reports />} />

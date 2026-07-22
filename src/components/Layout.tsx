@@ -3,7 +3,7 @@ import { Outlet, NavLink, useLocation, useNavigate } from 'react-router-dom';
 import {
   LayoutDashboard, TrendingUp, MessageSquare, Settings,
   Shield, Brain, Bell, BookOpen, ScrollText, X,
-  MoreHorizontal, ChevronRight, Scale,
+  MoreHorizontal, ChevronRight, Scale, Search,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { ThemeToggle } from './ThemeToggle';
@@ -39,7 +39,7 @@ const mobileMoreGroups = [
     label: 'Risk',
     items: [
       { name: 'My Rules',      href: '/my-rules',      icon: Scale },
-      { name: 'Blowup Shield', href: '/blowup-shield', icon: Shield },
+      { name: 'My Record', href: '/my-record', icon: Search },
     ],
   },
   {
@@ -75,7 +75,9 @@ export default function Layout() {
   const toggleSidebar = () => {
     setSidebarCollapsed(prev => {
       const next = !prev;
-      try { localStorage.setItem(SIDEBAR_COLLAPSED_KEY, String(next)); } catch {}
+      // Private mode / disabled storage — the toggle still works, it just
+      // won't be remembered across reloads.
+      try { localStorage.setItem(SIDEBAR_COLLAPSED_KEY, String(next)); } catch { /* non-fatal */ }
       return next;
     });
   };

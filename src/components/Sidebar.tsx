@@ -1,7 +1,7 @@
 import { NavLink, useLocation } from 'react-router-dom';
 import {
   LayoutDashboard, TrendingUp, MessageSquare, Settings,
-  Shield, Brain, Bell, BookOpen, ScrollText, Scale,
+  Shield, Brain, Bell, BookOpen, ScrollText, Scale, Search,
   ChevronLeft, ChevronRight,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
@@ -36,7 +36,7 @@ const sections = [
     group: 'Risk',
     items: [
       { name: 'Alerts',        href: '/alerts',        icon: Bell,   hasBadge: true },
-      { name: 'Blowup Shield', href: '/blowup-shield', icon: Shield, hasBadge: false },
+      { name: 'My Record', href: '/my-record', icon: Search, hasBadge: false },
     ],
   },
 ];

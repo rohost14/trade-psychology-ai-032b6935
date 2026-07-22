@@ -227,6 +227,48 @@ export function getGuestResponse(url: string, method = 'GET'): unknown | undefin
     };
   }
 
+  // My Record — pre-trade personal history lookup
+  if (path === '/api/my-record/search') {
+    return {
+      underlyings: [
+        { underlying: 'NIFTY',     trades: 8, last_traded: new Date(Date.now() - 1 * 86400_000).toISOString() },
+        { underlying: 'BANKNIFTY', trades: 3, last_traded: new Date(Date.now() - 2 * 86400_000).toISOString() },
+        { underlying: 'FORTIS',    trades: 2, last_traded: new Date(Date.now() - 12 * 86400_000).toISOString() },
+      ],
+      symbols: [],
+    };
+  }
+  if (path === '/api/my-record') {
+    return {
+      has_data: true,
+      query: 'NIFTY',
+      period_days: 365,
+      scope: 'underlying',
+      scope_label: 'NIFTY',
+      widened: true,
+      min_sample: 5,
+      underlying: 'NIFTY',
+      overall: { trades: 8, win_rate: 62.5, wins: 5, losses: 3, pnl: 5275, avg_pnl: 659, best: 3625, worst: -3750, enough: true },
+      current_hour: new Date().getHours(),
+      this_hour: { hour: new Date().getHours(), label: '14:00–15:00', trades: 5, win_rate: 20, wins: 1, losses: 4, pnl: -14270, avg_pnl: -2854, enough: true },
+      by_hour: [
+        { hour: 9,  label: '09:00–10:00', trades: 5, win_rate: 80, pnl: 5100,   avg_pnl: 1020,  enough: true },
+        { hour: 11, label: '11:00–12:00', trades: 3, win_rate: 33, pnl: 5210,   avg_pnl: 1737,  enough: false },
+        { hour: 14, label: '14:00–15:00', trades: 5, win_rate: 20, pnl: -14270, avg_pnl: -2854, enough: true },
+      ],
+      best_hour:  { hour: 9,  label: '09:00–10:00', trades: 5, win_rate: 80, pnl: 5100,   avg_pnl: 1020,  enough: true },
+      worst_hour: { hour: 14, label: '14:00–15:00', trades: 5, win_rate: 20, pnl: -14270, avg_pnl: -2854, enough: true },
+      situations: {
+        after_loss:         { trades: 6, win_rate: 33.3, pnl: -8200, avg_pnl: -1367, enough: true },
+        after_2plus_losses: { trades: 3, win_rate: 0,    pnl: -6450, avg_pnl: -2150, enough: false },
+        expiry_day:         { trades: 5, win_rate: 40,   pnl: -1600, avg_pnl: -320,  enough: true },
+        quick_reentry:      { trades: 4, win_rate: 25,   pnl: -5100, avg_pnl: -1275, enough: false },
+      },
+      holding: { longest_minutes: 270, avg_minutes: 94 },
+      verdict: 'Right now is your weakest window on NIFTY: 5 trades, 20% win rate, -₹14,270 net.',
+    };
+  }
+
   // Session intent (morning card + EOD comparison) — mirrors /api/session-intent/today
   if (path.includes('/api/session-intent/today')) {
     return {

@@ -393,6 +393,10 @@ app.include_router(profile.router, prefix="/api/profile", tags=["profile"])
 from app.api import account_data
 app.include_router(account_data.router, prefix="/api/account", tags=["account"])
 
+# "What's my record here?" — pre-trade lookup of the trader's own history
+from app.api import my_record
+app.include_router(my_record.router, prefix="/api/my-record", tags=["my-record"])
+
 from app.api import constitution
 app.include_router(constitution.router, prefix="/api/constitution", tags=["constitution"])
 
@@ -405,8 +409,6 @@ app.include_router(personalization.router, prefix="/api/personalization", tags=[
 from app.api import danger_zone
 app.include_router(danger_zone.router, prefix="/api/danger-zone", tags=["danger-zone"])
 
-from app.api import shield
-app.include_router(shield.router, prefix="/api/shield", tags=["shield"])
 
 from app.api import prometheus_metrics
 app.include_router(prometheus_metrics.router, tags=["monitoring"])
