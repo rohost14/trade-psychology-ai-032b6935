@@ -389,6 +389,10 @@ app.include_router(journal.router, prefix="/api/journal", tags=["journal"])
 from app.api import profile
 app.include_router(profile.router, prefix="/api/profile", tags=["profile"])
 
+# DPDP data rights — user-initiated export and account deletion (Settings → Danger Zone)
+from app.api import account_data
+app.include_router(account_data.router, prefix="/api/account", tags=["account"])
+
 from app.api import constitution
 app.include_router(constitution.router, prefix="/api/constitution", tags=["constitution"])
 

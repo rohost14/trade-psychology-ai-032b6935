@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Save, Loader2, User, Bell, Brain } from 'lucide-react';
+import { Save, Loader2, User, Bell, Brain, ShieldAlert } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
@@ -12,6 +12,7 @@ import { BrokerConnectionCard } from '@/components/settings/BrokerConnectionCard
 import { ProfileTab } from '@/components/settings/ProfileTab';
 import { NotificationsTab } from '@/components/settings/NotificationsTab';
 import { InsightsTab } from '@/components/settings/InsightsTab';
+import { DangerZoneTab } from '@/components/settings/DangerZoneTab';
 
 // Rule fields are change-controlled by the Constitution (backend RULE_FIELDS).
 // Tightening applies instantly; loosening returns 409 and must go through
@@ -304,6 +305,10 @@ export default function Settings() {
               <Brain className="h-4 w-4" />
               Insights
             </TabsTrigger>
+            <TabsTrigger value="danger" className="rounded-none px-3 pb-3 text-sm font-medium text-muted-foreground data-[state=active]:bg-transparent data-[state=active]:text-tm-loss data-[state=active]:border-b-2 data-[state=active]:border-tm-loss transition-colors flex items-center gap-1.5">
+              <ShieldAlert className="h-4 w-4" />
+              Danger Zone
+            </TabsTrigger>
           </TabsList>
 
           <TabsContent value="profile">
@@ -322,6 +327,10 @@ export default function Settings() {
 
           <TabsContent value="insights">
             <InsightsTab />
+          </TabsContent>
+
+          <TabsContent value="danger">
+            <DangerZoneTab />
           </TabsContent>
         </Tabs>
       )}

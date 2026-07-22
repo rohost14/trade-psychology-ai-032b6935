@@ -1,7 +1,7 @@
 import { Link } from 'react-router-dom';
 import { ArrowLeft } from 'lucide-react';
 
-const LAST_UPDATED = '17 March 2026';
+const LAST_UPDATED = '22 July 2026';
 const COMPANY = 'TradeMentor AI';
 const CONTACT_EMAIL = 'privacy@tradementor.ai';
 
@@ -184,16 +184,19 @@ export default function PrivacyPolicy() {
             </p>
             <ul className="list-disc pl-5 space-y-2 text-muted-foreground">
               <li>
-                <strong className="text-foreground">Access</strong> — know what personal data we
-                hold about you
+                <strong className="text-foreground">Access &amp; Portability</strong> — know what
+                personal data we hold about you, and download a complete machine-readable copy
+                at any time from Settings → Danger Zone
               </li>
               <li>
                 <strong className="text-foreground">Correction</strong> — request correction of
                 inaccurate data
               </li>
               <li>
-                <strong className="text-foreground">Erasure</strong> — request deletion of your
-                personal data (available in Settings → Danger Zone, or by email)
+                <strong className="text-foreground">Erasure</strong> — delete your account and all
+                associated data from Settings → Danger Zone. Deletion is immediate, permanent and
+                irreversible, and revokes your broker access token. You may also request it by
+                email. Your trade records held by Zerodha are unaffected.
               </li>
               <li>
                 <strong className="text-foreground">Withdraw Consent</strong> — disconnect your
