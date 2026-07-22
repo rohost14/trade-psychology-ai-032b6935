@@ -1374,8 +1374,16 @@ class BehaviorEngine:
         # Weekly options carry the exact expiry date in the symbol (e.g. NIFTY2532025000CE).
         # Monthly options/futures use last Thursday of the contract month.
         is_expiry_day  = _is_expiry_day(ct.tradingsymbol or "", entry_ist.date())
-        market_open    = entry_ist.replace(hour=9, minute=15, second=0, microsecond=0)
-        market_close   = entry_ist.replace(hour=15, minute=30, second=0, microsecond=0)
+        # Session bounds come from the instrument's OWN exchange. Hardcoding
+        # 09:15/15:30 broke commodity traders: MCX runs 09:00-23:30, so
+        # mins_after_open went negative for morning trades and mins_before_close
+        # was ~450 min negative all evening — both FOMO windows silently never
+        # fired on MCX.
+        from app.core.exchange_constants import get_open_time, get_close_time
+        _exch = (ct.exchange or "NFO").upper()
+        _open_t, _close_t = get_open_time(_exch), get_close_time(_exch)
+        market_open    = entry_ist.replace(hour=_open_t.hour,  minute=_open_t.minute,  second=0, microsecond=0)
+        market_close   = entry_ist.replace(hour=_close_t.hour, minute=_close_t.minute, second=0, microsecond=0)
         mins_after_open  = (entry_ist - market_open).total_seconds() / 60
         mins_before_close = (market_close - entry_ist).total_seconds() / 60
         is_open_window  = 0 <= mins_after_open  <= fomo_open_window_min
@@ -2031,20 +2039,40 @@ class BehaviorEngine:
             return None
 
         entry_ist = ct.entry_time.astimezone(IST)
-        panic_start = entry_ist.replace(hour=15, minute=0, second=0, microsecond=0)
 
-        if entry_ist < panic_start:
-            return None
-
-        # Zerodha squareoff time depends on exchange segment
+        # Zerodha squareoff time depends on exchange segment. This must be
+        # derived from the instrument's own exchange: previously `panic_start`
+        # was a flat 15:00 IST with no commodity branch, so for MCX — which
+        # trades until 23:30 — EVERY evening MIS entry from 15:00 onward was
+        # scored as end-of-session panic. That was hours of false alerts a day
+        # for commodity traders, not a missed signal.
         exchange = (ct.exchange or "").upper()
         if exchange in ("NFO", "BFO"):
             squareoff_total_min = 15 * 60 + 25
             squareoff_str = "15:25"
+            panic_start_min = 15 * 60            # 15:00 — unchanged
+        elif exchange in ("MCX", "CDS", "BCD"):
+            from app.core.exchange_constants import get_close_time
+            _close_t = get_close_time(exchange)
+            # Commodity/currency MIS squares off ~5 min before close.
+            squareoff_total_min = _close_t.hour * 60 + _close_t.minute - 5
+            squareoff_str = f"{squareoff_total_min // 60:02d}:{squareoff_total_min % 60:02d}"
+            # Same 25-minute run-up to squareoff that NFO gets, but anchored to
+            # THIS exchange's close rather than 15:00.
+            panic_start_min = squareoff_total_min - 25
         else:
             # NSE/BSE equity MIS
             squareoff_total_min = 15 * 60 + 15
             squareoff_str = "15:15"
+            panic_start_min = 15 * 60            # 15:00 — unchanged
+
+        panic_start = entry_ist.replace(
+            hour=panic_start_min // 60, minute=panic_start_min % 60,
+            second=0, microsecond=0,
+        )
+
+        if entry_ist < panic_start:
+            return None
 
         # Count all MIS trades entered after 15:00 IST today (include current trade)
         panic_trades = [
