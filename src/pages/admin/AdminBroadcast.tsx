@@ -1,28 +1,12 @@
 import { useState, useEffect, useRef } from 'react';
-import { Send, Users, AlertTriangle, CheckCircle, History, X, ChevronRight, FileText, RefreshCw } from 'lucide-react';
+import { Send, Users, CheckCircle, History, ChevronRight, FileText, RefreshCw } from 'lucide-react';
 import { adminApi } from '@/lib/adminApi';
+import { AdminPage, AdminCard, ErrorBanner, EmptyState, type Accent } from './_ui';
+import { Button } from '@/components/ui/button';
+import { Textarea } from '@/components/ui/textarea';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
+import { cn } from '@/lib/utils';
 
-// ─── Design tokens ────────────────────────────────────────────────────────────
-const T = {
-  bg:       '#09090b',
-  surface:  '#111115',
-  raised:   '#16161d',
-  border:   '#1c1c28',
-  border2:  '#252536',
-  text:     '#f1f0f5',
-  muted:    '#6b6a82',
-  dim:      '#3a3a50',
-  amber:    '#f59e0b',
-  amberBg:  'rgba(245,158,11,0.1)',
-  green:    '#22c55e',
-  greenBg:  'rgba(34,197,94,0.08)',
-  red:      '#ef4444',
-  redBg:    'rgba(239,68,68,0.08)',
-  blue:     '#3b82f6',
-  dm:       "'Inter', 'DM Sans', sans-serif",
-};
-
-// ─── Types ────────────────────────────────────────────────────────────────────
 type SegmentKey = 'connected' | 'all_with_phone' | 'long_inactive' | 'high_alerts';
 type Phase = 'compose' | 'preview' | 'sending' | 'done';
 
@@ -33,221 +17,146 @@ interface BroadcastLog {
 interface Receipt { phone: string; status: string; error: string | null; sent_at: string | null; }
 interface ReceiptDetail { broadcast: BroadcastLog & { message: string }; receipts: Receipt[]; }
 
-// ─── Segment config ───────────────────────────────────────────────────────────
-const SEGMENTS: { value: SegmentKey; label: string; desc: string; color: string; intent: string }[] = [
-  {
-    value:   'connected',
-    label:   'Connected users',
-    desc:    'Zerodha linked + phone on file',
-    color:   T.green,
-    intent:  'Core active base',
-  },
-  {
-    value:   'all_with_phone',
-    label:   'All with phone',
-    desc:    'Everyone who provided a phone number',
-    color:   T.amber,
-    intent:  'Widest reach',
-  },
-  {
-    value:   'long_inactive',
-    label:   'Long inactive',
-    desc:    'Connected, no trade in 14+ days',
-    color:   T.muted,
-    intent:  'Re-engagement',
-  },
-  {
-    value:   'high_alerts',
-    label:   'High alert users',
-    desc:    '>5 behavioral alerts in last 7 days',
-    color:   T.red,
-    intent:  'Intervention',
-  },
+const ACCENT_RGB: Record<Accent, string> = {
+  profit: 'rgb(var(--tm-profit))', loss: 'rgb(var(--tm-loss))',
+  warning: 'rgb(var(--tm-obs))', brand: 'rgb(var(--tm-brand))', muted: 'rgb(var(--muted-foreground))',
+};
+
+const SEGMENTS: { value: SegmentKey; label: string; desc: string; accent: Accent; intent: string }[] = [
+  { value: 'connected',      label: 'Connected users', desc: 'Zerodha linked + phone on file',        accent: 'profit',  intent: 'Core active base' },
+  { value: 'all_with_phone', label: 'All with phone',  desc: 'Everyone who provided a phone number',  accent: 'warning', intent: 'Widest reach' },
+  { value: 'long_inactive',  label: 'Long inactive',   desc: 'Connected, no trade in 14+ days',       accent: 'muted',   intent: 'Re-engagement' },
+  { value: 'high_alerts',    label: 'High alert users', desc: '>5 behavioral alerts in last 7 days',  accent: 'loss',    intent: 'Intervention' },
 ];
 
-// ─── Message templates ────────────────────────────────────────────────────────
 const TEMPLATES: { title: string; category: string; body: string }[] = [
-  {
-    title:    'Market opening nudge',
-    category: 'Daily',
-    body:     'Good morning! 🌅 Markets open in 30 minutes. Remember your plan for today — stick to your trade count limit and position sizing rules. Trade with intention, not impulse.',
-  },
-  {
-    title:    'After-hours reflection',
-    category: 'Daily',
-    body:     "Today's session is closed. Take 5 minutes to review your trades — what went as planned? What didn't? Consistency tomorrow starts with honest reflection today.",
-  },
-  {
-    title:    'Pattern intervention',
-    category: 'Intervention',
-    body:     "We noticed some behavioral patterns in your recent trading that may be costing you money. Open TradeMentor to see your personalized insights and what you can do differently tomorrow.",
-  },
-  {
-    title:    'Weekly performance recap',
-    category: 'Weekly',
-    body:     "Your weekly trading summary is ready! Log in to TradeMentor to review your discipline score, top patterns, and P&L breakdown for the week. Small improvements compound fast.",
-  },
-  {
-    title:    'Welcome back',
-    category: 'Re-engagement',
-    body:     "We haven't seen you trade in a while. Markets change, but your trading psychology is what you can control. Your TradeMentor account is waiting — pick up where you left off.",
-  },
-  {
-    title:    'Risk awareness',
-    category: 'Intervention',
-    body:     "Heads up: our system detected elevated risk in your recent sessions. Please review your loss limits and position sizing before tomorrow's session. Your capital protection matters.",
-  },
-  {
-    title:    'Feature announcement',
-    category: 'Product',
-    body:     "New on TradeMentor: we've upgraded our behavioral analysis engine. Your alerts are now more precise and actionable. Log in to see your updated pattern insights.",
-  },
-  {
-    title:    'Expiry day reminder',
-    category: 'Daily',
-    body:     "Today is expiry day. Historical data shows F&O traders make more impulsive decisions near expiry. Stick to your pre-defined rules — exits included. Trade the plan.",
-  },
+  { title: 'Market opening nudge', category: 'Daily', body: 'Good morning! 🌅 Markets open in 30 minutes. Remember your plan for today — stick to your trade count limit and position sizing rules. Trade with intention, not impulse.' },
+  { title: 'After-hours reflection', category: 'Daily', body: "Today's session is closed. Take 5 minutes to review your trades — what went as planned? What didn't? Consistency tomorrow starts with honest reflection today." },
+  { title: 'Pattern intervention', category: 'Intervention', body: "We noticed some behavioral patterns in your recent trading that may be costing you money. Open TradeMentor to see your personalized insights and what you can do differently tomorrow." },
+  { title: 'Weekly performance recap', category: 'Weekly', body: "Your weekly trading summary is ready! Log in to TradeMentor to review your discipline score, top patterns, and P&L breakdown for the week. Small improvements compound fast." },
+  { title: 'Welcome back', category: 'Re-engagement', body: "We haven't seen you trade in a while. Markets change, but your trading psychology is what you can control. Your TradeMentor account is waiting — pick up where you left off." },
+  { title: 'Risk awareness', category: 'Intervention', body: "Heads up: our system detected elevated risk in your recent sessions. Please review your loss limits and position sizing before tomorrow's session. Your capital protection matters." },
+  { title: 'Feature announcement', category: 'Product', body: "New on TradeMentor: we've upgraded our behavioral analysis engine. Your alerts are now more precise and actionable. Log in to see your updated pattern insights." },
+  { title: 'Expiry day reminder', category: 'Daily', body: "Today is expiry day. Historical data shows F&O traders make more impulsive decisions near expiry. Stick to your pre-defined rules — exits included. Trade the plan." },
 ];
 
-// ─── Utilities ────────────────────────────────────────────────────────────────
-const STATUS_COLOR: Record<string, string> = { sent: T.green, failed: T.red, queued: T.amber };
+const STATUS_ACCENT: Record<string, Accent> = { sent: 'profit', failed: 'loss', queued: 'warning' };
 
 function DeliveryBar({ sent, failed, total }: { sent: number; failed: number; total: number }) {
   if (!total) return null;
-  const sentPct   = Math.round((sent   / total) * 100);
+  const sentPct = Math.round((sent / total) * 100);
   const failedPct = Math.round((failed / total) * 100);
   return (
-    <div style={{ marginTop: 8 }}>
-      <div style={{ display: 'flex', height: 5, borderRadius: 3, overflow: 'hidden', background: T.raised }}>
-        <div style={{ width: `${sentPct}%`,   background: T.green, transition: 'width 0.4s' }} />
-        <div style={{ width: `${failedPct}%`, background: T.red }} />
+    <div className="mt-2">
+      <div className="flex h-[5px] rounded overflow-hidden bg-muted">
+        <div style={{ width: `${sentPct}%`, background: ACCENT_RGB.profit }} className="transition-[width] duration-500" />
+        <div style={{ width: `${failedPct}%`, background: ACCENT_RGB.loss }} />
       </div>
-      <div style={{ display: 'flex', gap: 12, marginTop: 5 }}>
-        <span style={{ fontSize: 11, color: T.green }}>{sent} sent</span>
-        {failed > 0 && <span style={{ fontSize: 11, color: T.red }}>{failed} failed</span>}
-        <span style={{ fontSize: 11, color: T.dim }}>{total} total</span>
+      <div className="flex gap-3 mt-1.5">
+        <span className="text-[11px]" style={{ color: ACCENT_RGB.profit }}>{sent} sent</span>
+        {failed > 0 && <span className="text-[11px]" style={{ color: ACCENT_RGB.loss }}>{failed} failed</span>}
+        <span className="text-[11px] text-muted-foreground/60">{total} total</span>
       </div>
     </div>
   );
 }
 
-// ─── Receipt modal ────────────────────────────────────────────────────────────
 function ReceiptModal({ id, onClose }: { id: string; onClose: () => void }) {
   const [data, setData]       = useState<ReceiptDetail | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError]     = useState('');
 
   useEffect(() => {
-    adminApi.broadcastReceipts(id)
-      .then(setData).catch((e: any) => setError(e.message)).finally(() => setLoading(false));
+    adminApi.broadcastReceipts(id).then(setData)
+      .catch((e: unknown) => setError(e instanceof Error ? e.message : String(e)))
+      .finally(() => setLoading(false));
   }, [id]);
 
   return (
-    <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.75)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 200 }}>
-      <div style={{ width: '90%', maxWidth: 620, maxHeight: '82vh', display: 'flex', flexDirection: 'column', background: T.surface, border: `1px solid ${T.border}`, borderRadius: 14, overflow: 'hidden' }}>
-        {/* Header */}
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '16px 20px', borderBottom: `1px solid ${T.border}`, flexShrink: 0 }}>
-          <h2 style={{ fontSize: 14, fontWeight: 700, color: T.text, margin: 0 }}>Delivery Receipts</h2>
-          <button onClick={onClose} style={{ background: 'none', border: 'none', cursor: 'pointer', color: T.muted, padding: 4 }}>
-            <X size={16} />
-          </button>
-        </div>
-
-        <div style={{ overflowY: 'auto', padding: '16px 20px', flex: 1 }}>
-          {loading && <p style={{ fontSize: 12, color: T.muted }}>Loading…</p>}
-          {error   && <p style={{ fontSize: 12, color: T.red }}>{error}</p>}
+    <Dialog open onOpenChange={o => { if (!o) onClose(); }}>
+      <DialogContent className="max-w-[620px] max-h-[82vh] overflow-hidden flex flex-col">
+        <DialogHeader><DialogTitle>Delivery Receipts</DialogTitle></DialogHeader>
+        <div className="overflow-y-auto flex-1 -mx-6 px-6">
+          {loading && <p className="text-xs text-muted-foreground">Loading…</p>}
+          {error && <p className="text-xs text-[rgb(var(--tm-loss))]">{error}</p>}
           {data && (
             <>
-              <div style={{ marginBottom: 18 }}>
-                <p style={{ fontSize: 12, color: T.muted, margin: '0 0 8px' }}>
-                  <strong style={{ color: T.text }}>{data.broadcast.segment}</strong>
+              <div className="mb-4">
+                <p className="text-xs text-muted-foreground mb-2">
+                  <strong className="text-foreground">{data.broadcast.segment}</strong>
                   {' · '}{data.broadcast.created_by}
                   {' · '}{data.broadcast.created_at ? new Date(data.broadcast.created_at).toLocaleString('en-IN') : '—'}
                 </p>
-                <div style={{ background: T.raised, borderRadius: 8, padding: '10px 14px', borderLeft: `3px solid ${T.amber}`, marginBottom: 10 }}>
-                  <p style={{ fontSize: 12, color: T.text, margin: 0, whiteSpace: 'pre-wrap', lineHeight: 1.6 }}>{data.broadcast.message}</p>
+                <div className="bg-muted rounded-lg px-3.5 py-2.5 border-l-[3px] mb-2.5" style={{ borderLeftColor: ACCENT_RGB.brand }}>
+                  <p className="text-xs text-foreground m-0 whitespace-pre-wrap leading-relaxed">{data.broadcast.message}</p>
                 </div>
                 <DeliveryBar sent={data.broadcast.sent} failed={data.broadcast.failed} total={data.broadcast.total} />
               </div>
-
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
-                {data.receipts.map((r, i) => (
-                  <div key={i} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '8px 12px', borderRadius: 8, background: T.raised, border: `1px solid ${T.border}` }}>
-                    <span style={{ fontSize: 12, fontFamily: "'JetBrains Mono', monospace", color: T.muted }}>{r.phone}</span>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                      {r.error && <span style={{ fontSize: 11, color: T.red, maxWidth: 180, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{r.error}</span>}
-                      {r.sent_at && <span style={{ fontSize: 11, color: T.dim }}>{new Date(r.sent_at).toLocaleTimeString('en-IN')}</span>}
-                      <span style={{ fontSize: 11, fontWeight: 600, padding: '2px 8px', borderRadius: 20, background: `${STATUS_COLOR[r.status] ?? T.muted}22`, color: STATUS_COLOR[r.status] ?? T.muted, border: `1px solid ${STATUS_COLOR[r.status] ?? T.muted}44` }}>
-                        {r.status}
-                      </span>
+              <div className="flex flex-col gap-1 pb-2">
+                {data.receipts.map((r, i) => {
+                  const rgb = ACCENT_RGB[STATUS_ACCENT[r.status] ?? 'muted'];
+                  return (
+                    <div key={i} className="flex items-center justify-between px-3 py-2 rounded-lg bg-muted border border-border">
+                      <span className="text-xs font-mono text-muted-foreground">{r.phone}</span>
+                      <div className="flex items-center gap-2.5">
+                        {r.error && <span className="text-[11px] text-[rgb(var(--tm-loss))] max-w-[180px] overflow-hidden text-ellipsis whitespace-nowrap">{r.error}</span>}
+                        {r.sent_at && <span className="text-[11px] text-muted-foreground/60">{new Date(r.sent_at).toLocaleTimeString('en-IN')}</span>}
+                        <span className="text-[11px] font-semibold px-2 py-0.5 rounded-full border"
+                          style={{ color: rgb, background: `color-mix(in srgb, ${rgb} 13%, transparent)`, borderColor: `color-mix(in srgb, ${rgb} 27%, transparent)` }}>{r.status}</span>
+                      </div>
                     </div>
-                  </div>
-                ))}
-                {data.receipts.length === 0 && <p style={{ color: T.dim, fontSize: 12 }}>No receipts found.</p>}
+                  );
+                })}
+                {data.receipts.length === 0 && <p className="text-muted-foreground/60 text-xs">No receipts found.</p>}
               </div>
             </>
           )}
         </div>
-      </div>
-    </div>
+      </DialogContent>
+    </Dialog>
   );
 }
 
-// ─── Template picker modal ────────────────────────────────────────────────────
 function TemplatePicker({ onSelect, onClose }: { onSelect: (body: string) => void; onClose: () => void }) {
   const categories = Array.from(new Set(TEMPLATES.map(t => t.category)));
   const [activeCat, setActiveCat] = useState(categories[0]);
   const filtered = TEMPLATES.filter(t => t.category === activeCat);
 
   return (
-    <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.75)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 200 }}>
-      <div style={{ width: '90%', maxWidth: 680, maxHeight: '80vh', display: 'flex', flexDirection: 'column', background: T.surface, border: `1px solid ${T.border}`, borderRadius: 14, overflow: 'hidden' }}>
-        {/* Header */}
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '16px 20px', borderBottom: `1px solid ${T.border}`, flexShrink: 0 }}>
-          <div>
-            <h2 style={{ fontSize: 14, fontWeight: 700, color: T.text, margin: 0 }}>Message Templates</h2>
-            <p style={{ fontSize: 11, color: T.dim, marginTop: 3 }}>Select a template to pre-fill your message. You can edit before sending.</p>
-          </div>
-          <button onClick={onClose} style={{ background: 'none', border: 'none', cursor: 'pointer', color: T.muted, padding: 4 }}>
-            <X size={16} />
-          </button>
-        </div>
-
-        {/* Category tabs */}
-        <div style={{ display: 'flex', gap: 4, padding: '12px 20px', borderBottom: `1px solid ${T.border}`, flexShrink: 0, overflowX: 'auto' }}>
+    <Dialog open onOpenChange={o => { if (!o) onClose(); }}>
+      <DialogContent className="max-w-[680px] max-h-[80vh] overflow-hidden flex flex-col">
+        <DialogHeader>
+          <DialogTitle>Message Templates</DialogTitle>
+          <DialogDescription>Select a template to pre-fill your message. You can edit before sending.</DialogDescription>
+        </DialogHeader>
+        <div className="flex gap-1 py-1 overflow-x-auto shrink-0">
           {categories.map(cat => (
             <button key={cat} onClick={() => setActiveCat(cat)}
-              style={{ padding: '5px 12px', borderRadius: 20, border: 'none', cursor: 'pointer', fontFamily: T.dm, fontSize: 12, fontWeight: activeCat === cat ? 600 : 400, background: activeCat === cat ? T.amberBg : T.raised, color: activeCat === cat ? T.amber : T.muted, whiteSpace: 'nowrap' }}>
+              className={cn('px-3 py-1.5 rounded-full text-xs whitespace-nowrap transition-colors',
+                activeCat === cat ? 'font-semibold bg-[rgb(var(--tm-brand))]/10 text-[rgb(var(--tm-brand))]' : 'bg-muted text-muted-foreground hover:text-foreground')}>
               {cat}
             </button>
           ))}
         </div>
-
-        {/* Templates */}
-        <div style={{ overflowY: 'auto', padding: '14px 20px', flex: 1, display: 'flex', flexDirection: 'column', gap: 10 }}>
+        <div className="overflow-y-auto flex-1 flex flex-col gap-2.5 -mx-6 px-6 pb-2">
           {filtered.map(tmpl => (
-            <div key={tmpl.title} style={{ background: T.raised, border: `1px solid ${T.border}`, borderRadius: 10, padding: '14px 16px', cursor: 'pointer' }}
-              onClick={() => { onSelect(tmpl.body); onClose(); }}
-              onMouseEnter={e => (e.currentTarget.style.borderColor = T.amber)}
-              onMouseLeave={e => (e.currentTarget.style.borderColor = T.border)}>
-              <div style={{ fontSize: 13, fontWeight: 600, color: T.text, marginBottom: 6 }}>{tmpl.title}</div>
-              <p style={{ fontSize: 12, color: T.muted, margin: 0, lineHeight: 1.6 }}>{tmpl.body}</p>
-              <div style={{ marginTop: 10, display: 'flex', justifyContent: 'flex-end' }}>
-                <span style={{ fontSize: 11, color: T.amber, fontWeight: 600 }}>Use template →</span>
+            <button key={tmpl.title} onClick={() => { onSelect(tmpl.body); onClose(); }}
+              className="text-left bg-muted border border-border rounded-lg px-4 py-3.5 hover:border-[rgb(var(--tm-brand))] transition-colors">
+              <div className="text-[13px] font-semibold text-foreground mb-1.5">{tmpl.title}</div>
+              <p className="text-xs text-muted-foreground m-0 leading-relaxed">{tmpl.body}</p>
+              <div className="mt-2.5 flex justify-end">
+                <span className="text-[11px] text-[rgb(var(--tm-brand))] font-semibold">Use template →</span>
               </div>
-            </div>
+            </button>
           ))}
         </div>
-      </div>
-    </div>
+      </DialogContent>
+    </Dialog>
   );
 }
 
-// ─── Compose form ─────────────────────────────────────────────────────────────
 function ComposeForm({
-  segment, setSegment, message, setMessage,
-  segmentCounts, countsLoading,
-  onPreview, onOpenTemplates,
+  segment, setSegment, message, setMessage, segmentCounts, countsLoading, onPreview, onOpenTemplates,
 }: {
   segment: SegmentKey; setSegment: (s: SegmentKey) => void;
   message: string; setMessage: (m: string) => void;
@@ -255,86 +164,54 @@ function ComposeForm({
   onPreview: () => void; onOpenTemplates: () => void;
 }) {
   const MAX = 700;
-
   return (
-    <div style={{ background: T.surface, border: `1px solid ${T.border}`, borderRadius: 12, padding: '24px' }}>
+    <AdminCard>
       {/* Segment selector */}
-      <div style={{ marginBottom: 24 }}>
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
-          <label style={{ fontSize: 12, fontWeight: 600, color: T.muted, textTransform: 'uppercase', letterSpacing: '0.07em' }}>Target Segment</label>
-          {countsLoading && <RefreshCw size={11} style={{ color: T.dim, animation: 'spin 1s linear infinite' }} />}
+      <div className="mb-6">
+        <div className="flex justify-between items-center mb-3">
+          <span className="tm-label">Target Segment</span>
+          {countsLoading && <RefreshCw size={11} className="text-muted-foreground/60 animate-spin" />}
         </div>
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
           {SEGMENTS.map(s => {
             const count = segmentCounts?.[s.value];
             const active = segment === s.value;
+            const rgb = ACCENT_RGB[s.accent];
             return (
               <button key={s.value} onClick={() => setSegment(s.value)}
-                style={{
-                  padding: '12px 14px', borderRadius: 10, textAlign: 'left', fontFamily: T.dm,
-                  background: active ? `${s.color}12` : T.raised,
-                  border: `1px solid ${active ? s.color + '50' : T.border}`,
-                  cursor: 'pointer', transition: 'all 0.15s',
-                }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 4 }}>
-                  <span style={{ fontSize: 13, fontWeight: 600, color: active ? s.color : T.text }}>{s.label}</span>
-                  {count !== undefined && (
-                    <span style={{ fontSize: 12, fontWeight: 700, color: s.color, fontVariantNumeric: 'tabular-nums' }}>
-                      {count.toLocaleString('en-IN')}
-                    </span>
-                  )}
+                className={cn('px-3.5 py-3 rounded-lg text-left transition-all border', active ? '' : 'bg-muted border-border hover:border-border')}
+                style={active ? { background: `color-mix(in srgb, ${rgb} 10%, transparent)`, borderColor: `color-mix(in srgb, ${rgb} 45%, transparent)` } : undefined}>
+                <div className="flex justify-between items-start mb-1">
+                  <span className="text-[13px] font-semibold" style={{ color: active ? rgb : 'rgb(var(--text-primary))' }}>{s.label}</span>
+                  {count !== undefined && <span className="text-xs font-bold tabular-nums" style={{ color: rgb }}>{count.toLocaleString('en-IN')}</span>}
                 </div>
-                <div style={{ fontSize: 11, color: T.dim }}>{s.desc}</div>
-                <div style={{ fontSize: 10, color: active ? s.color : T.dim, marginTop: 3, fontWeight: 500 }}>{s.intent}</div>
+                <div className="text-[11px] text-muted-foreground/70">{s.desc}</div>
+                <div className="text-[10px] mt-0.5 font-medium" style={{ color: active ? rgb : 'rgb(var(--muted-foreground))' }}>{s.intent}</div>
               </button>
             );
           })}
         </div>
       </div>
 
-      {/* Message input */}
-      <div style={{ marginBottom: 20 }}>
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
-          <label style={{ fontSize: 12, fontWeight: 600, color: T.muted, textTransform: 'uppercase', letterSpacing: '0.07em' }}>Message</label>
-          <button onClick={onOpenTemplates}
-            style={{ display: 'flex', alignItems: 'center', gap: 5, padding: '4px 10px', borderRadius: 6, background: T.raised, border: `1px solid ${T.border}`, color: T.muted, fontSize: 11, cursor: 'pointer', fontFamily: T.dm }}>
-            <FileText size={11} />
-            Templates
-          </button>
+      {/* Message */}
+      <div className="mb-5">
+        <div className="flex justify-between items-center mb-2">
+          <span className="tm-label">Message</span>
+          <Button variant="outline" size="sm" className="h-7 px-2.5 text-[11px]" onClick={onOpenTemplates}><FileText size={11} /> Templates</Button>
         </div>
-        <textarea
-          value={message}
-          onChange={e => setMessage(e.target.value.slice(0, MAX))}
-          placeholder="Write your message here. Be specific and helpful — this goes directly to users' WhatsApp."
-          rows={6}
-          style={{ width: '100%', padding: '12px', borderRadius: 10, background: T.raised, border: `1px solid ${T.border}`, color: T.text, fontFamily: T.dm, fontSize: 13, outline: 'none', resize: 'vertical', boxSizing: 'border-box', lineHeight: 1.65 }}
-        />
-        <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: 6, alignItems: 'center' }}>
-          <span style={{ fontSize: 11, color: T.dim }}>Plain text only. No HTML or markdown.</span>
-          <span style={{ fontSize: 11, color: message.length > MAX * 0.9 ? T.amber : T.dim, fontVariantNumeric: 'tabular-nums' }}>
-            {message.length}/{MAX}
-          </span>
+        <Textarea value={message} onChange={e => setMessage(e.target.value.slice(0, MAX))} rows={6}
+          placeholder="Write your message here. Be specific and helpful — this goes directly to users' WhatsApp." className="leading-relaxed" />
+        <div className="flex justify-between mt-1.5 items-center">
+          <span className="text-[11px] text-muted-foreground/60">Plain text only. No HTML or markdown.</span>
+          <span className="text-[11px] tabular-nums" style={{ color: message.length > MAX * 0.9 ? ACCENT_RGB.warning : 'rgb(var(--muted-foreground))' }}>{message.length}/{MAX}</span>
         </div>
       </div>
 
-      <button
-        onClick={onPreview} disabled={!message.trim()}
-        style={{
-          display: 'flex', alignItems: 'center', gap: 8, padding: '10px 20px', borderRadius: 10,
-          background: message.trim() ? T.amberBg : T.raised,
-          border: `1px solid ${message.trim() ? 'rgba(245,158,11,0.35)' : T.border}`,
-          color: message.trim() ? T.amber : T.dim,
-          cursor: message.trim() ? 'pointer' : 'not-allowed', fontFamily: T.dm, fontWeight: 600, fontSize: 13,
-        }}
-      >
-        <Users size={14} />
-        Preview recipients
-      </button>
-    </div>
+      <Button onClick={onPreview} disabled={!message.trim()} variant="outline"><Users size={14} /> Preview recipients</Button>
+    </AdminCard>
   );
 }
 
-// ─── Main ─────────────────────────────────────────────────────────────────────
 export default function AdminBroadcast() {
   const [tab,     setTab]     = useState<'compose' | 'history'>('compose');
   const [segment, setSegment] = useState<SegmentKey>('connected');
@@ -354,188 +231,129 @@ export default function AdminBroadcast() {
   const [countsLoading,  setCountsLoading]  = useState(false);
   const countsLoadedRef = useRef(false);
 
-  // Load segment counts once when compose tab is active
+  const loadLogs = async () => {
+    setLogsLoading(true);
+    try { setLogs(await adminApi.broadcastLogs(30)); }
+    catch (e: unknown) { setError(e instanceof Error ? e.message : String(e)); }
+    finally { setLogsLoading(false); }
+  };
+
   useEffect(() => {
     if (tab === 'compose' && !countsLoadedRef.current) {
       countsLoadedRef.current = true;
       setCountsLoading(true);
-      adminApi.broadcastSegmentCounts()
-        .then(setSegmentCounts)
-        .catch(() => {})
-        .finally(() => setCountsLoading(false));
+      adminApi.broadcastSegmentCounts().then(setSegmentCounts).catch(() => {}).finally(() => setCountsLoading(false));
     }
     if (tab === 'history') loadLogs();
-  }, [tab]);
-
-  const loadLogs = async () => {
-    setLogsLoading(true);
-    try { setLogs(await adminApi.broadcastLogs(30)); }
-    catch (e: any) { setError(e.message); }
-    finally { setLogsLoading(false); }
-  };
+  }, [tab]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const runDryRun = async () => {
     setError('');
-    try {
-      const d = await adminApi.broadcast(segment, message, true);
-      setPreview(d);
-      setPhase('preview');
-    } catch (e: any) { setError(e.message); }
+    try { const d = await adminApi.broadcast(segment, message, true); setPreview(d); setPhase('preview'); }
+    catch (e: unknown) { setError(e instanceof Error ? e.message : String(e)); }
   };
 
   const sendBroadcast = async () => {
     setPhase('sending'); setError('');
-    try {
-      const d = await adminApi.broadcast(segment, message, false);
-      setResult(d); setPhase('done');
-    } catch (e: any) { setError(e.message); setPhase('preview'); }
+    try { const d = await adminApi.broadcast(segment, message, false); setResult(d); setPhase('done'); }
+    catch (e: unknown) { setError(e instanceof Error ? e.message : String(e)); setPhase('preview'); }
   };
 
-  const reset = () => {
-    setPhase('compose'); setMessage(''); setPreview(null); setResult(null); setError('');
-  };
-
+  const reset = () => { setPhase('compose'); setMessage(''); setPreview(null); setResult(null); setError(''); };
   const segCfg = SEGMENTS.find(s => s.value === segment)!;
+  const segRgb = ACCENT_RGB[segCfg.accent];
 
   return (
-    <div style={{ padding: '28px 32px', fontFamily: T.dm, maxWidth: 780 }}>
-
-      {/* Header */}
-      <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: 28 }}>
-        <div>
-          <h1 style={{ fontSize: 20, fontWeight: 700, color: T.text, margin: 0, letterSpacing: '-0.02em' }}>Broadcast</h1>
-          <p style={{ fontSize: 12, color: T.dim, marginTop: 4 }}>WhatsApp messages to targeted user segments. Always preview before sending.</p>
-        </div>
-        {/* Tab switcher */}
-        <div style={{ display: 'flex', background: T.raised, borderRadius: 9, padding: 3, border: `1px solid ${T.border}` }}>
+    <AdminPage
+      title="Broadcast"
+      subtitle="WhatsApp messages to targeted user segments. Always preview before sending."
+      maxWidth={820}
+      actions={
+        <div className="flex bg-muted rounded-lg p-0.5 border border-border">
           {(['compose', 'history'] as const).map(t => (
             <button key={t} onClick={() => setTab(t)}
-              style={{ padding: '6px 14px', borderRadius: 7, border: 'none', cursor: 'pointer', fontFamily: T.dm, fontSize: 12, fontWeight: tab === t ? 600 : 400, background: tab === t ? T.amberBg : 'transparent', color: tab === t ? T.amber : T.muted, display: 'flex', alignItems: 'center', gap: 5 }}>
+              className={cn('px-3.5 py-1.5 rounded-md text-xs flex items-center gap-1.5 transition-colors',
+                tab === t ? 'font-semibold bg-[rgb(var(--tm-brand))]/10 text-[rgb(var(--tm-brand))]' : 'text-muted-foreground hover:text-foreground')}>
               {t === 'history' && <History size={12} />}
               {t === 'compose' ? 'Compose' : 'History'}
             </button>
           ))}
         </div>
-      </div>
+      }
+    >
+      <ErrorBanner message={error} />
 
-      {/* Global error */}
-      {error && (
-        <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '10px 14px', borderRadius: 8, background: T.redBg, border: '1px solid rgba(239,68,68,0.18)', marginBottom: 20 }}>
-          <AlertTriangle size={13} style={{ color: T.red }} />
-          <span style={{ fontSize: 12, color: T.red }}>{error}</span>
-        </div>
-      )}
-
-      <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
-
-      {/* ── COMPOSE TAB ──────────────────────────────────────────────── */}
+      {/* COMPOSE */}
       {tab === 'compose' && (
-        <>
-          {phase === 'done' && result ? (
-            <div style={{ background: T.surface, border: `1px solid ${T.border}`, borderRadius: 14, padding: '40px 32px', textAlign: 'center' }}>
-              <CheckCircle size={44} style={{ color: T.green, margin: '0 auto 16px', display: 'block' }} />
-              <h2 style={{ fontSize: 18, fontWeight: 700, color: T.text, marginBottom: 8 }}>Broadcast complete</h2>
-              <div style={{ display: 'flex', justifyContent: 'center', gap: 48, marginBottom: 28 }}>
-                <div><div style={{ fontSize: 32, fontWeight: 700, color: T.green, fontVariantNumeric: 'tabular-nums' }}>{result.sent}</div><div style={{ fontSize: 12, color: T.muted }}>sent</div></div>
-                <div><div style={{ fontSize: 32, fontWeight: 700, color: result.failed > 0 ? T.red : T.muted, fontVariantNumeric: 'tabular-nums' }}>{result.failed}</div><div style={{ fontSize: 12, color: T.muted }}>failed</div></div>
-                <div><div style={{ fontSize: 32, fontWeight: 700, color: T.text, fontVariantNumeric: 'tabular-nums' }}>{result.total}</div><div style={{ fontSize: 12, color: T.muted }}>total</div></div>
+        phase === 'done' && result ? (
+          <AdminCard>
+            <div className="text-center py-8">
+              <CheckCircle size={44} className="mx-auto mb-4 block" style={{ color: ACCENT_RGB.profit }} />
+              <h2 className="text-foreground mb-2">Broadcast complete</h2>
+              <div className="flex justify-center gap-12 mb-7">
+                <div><div className="text-[32px] font-bold tabular-nums" style={{ color: ACCENT_RGB.profit }}>{result.sent}</div><div className="text-xs text-muted-foreground">sent</div></div>
+                <div><div className="text-[32px] font-bold tabular-nums" style={{ color: result.failed > 0 ? ACCENT_RGB.loss : 'rgb(var(--muted-foreground))' }}>{result.failed}</div><div className="text-xs text-muted-foreground">failed</div></div>
+                <div><div className="text-[32px] font-bold tabular-nums text-foreground">{result.total}</div><div className="text-xs text-muted-foreground">total</div></div>
               </div>
-              <div style={{ display: 'flex', gap: 10, justifyContent: 'center' }}>
-                <button onClick={reset} style={{ padding: '9px 20px', borderRadius: 10, background: T.raised, border: `1px solid ${T.border}`, color: T.muted, cursor: 'pointer', fontFamily: T.dm, fontSize: 13 }}>
-                  New broadcast
-                </button>
-                {result.broadcast_id && (
-                  <button onClick={() => setSelectedId(result.broadcast_id!)}
-                    style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '9px 20px', borderRadius: 10, background: T.amberBg, border: '1px solid rgba(245,158,11,0.3)', color: T.amber, cursor: 'pointer', fontFamily: T.dm, fontSize: 13, fontWeight: 600 }}>
-                    <ChevronRight size={13} /> View receipts
-                  </button>
-                )}
+              <div className="flex gap-2.5 justify-center">
+                <Button variant="outline" onClick={reset}>New broadcast</Button>
+                {result.broadcast_id && <Button onClick={() => setSelectedId(result.broadcast_id!)}><ChevronRight size={13} /> View receipts</Button>}
               </div>
             </div>
-
-          ) : phase === 'preview' && preview ? (
-            <div style={{ background: T.surface, border: `1px solid ${T.border}`, borderRadius: 14, padding: '24px' }}>
-              {/* Segment + count summary */}
-              <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 20, padding: '14px 18px', borderRadius: 10, background: `${segCfg.color}10`, border: `1px solid ${segCfg.color}30` }}>
-                <Users size={18} style={{ color: segCfg.color, flexShrink: 0 }} />
-                <div>
-                  <p style={{ fontSize: 15, fontWeight: 700, color: T.text, margin: 0 }}>
-                    Sending to <span style={{ color: segCfg.color }}>{preview.recipient_count.toLocaleString('en-IN')}</span> users
-                  </p>
-                  <p style={{ fontSize: 12, color: T.muted, margin: 0 }}>Segment: {segCfg.label} · {segCfg.intent}</p>
-                </div>
-              </div>
-
-              {/* Message preview */}
-              <div style={{ background: T.raised, borderRadius: 10, padding: '14px 18px', marginBottom: 20, borderLeft: `3px solid ${T.amber}` }}>
-                <p style={{ fontSize: 11, color: T.muted, margin: '0 0 6px', textTransform: 'uppercase', letterSpacing: '0.07em' }}>Message</p>
-                <p style={{ fontSize: 13, color: T.text, margin: 0, lineHeight: 1.65, whiteSpace: 'pre-wrap' }}>{message}</p>
-              </div>
-
-              <p style={{ fontSize: 12, color: T.red, marginBottom: 20 }}>
-                ⚠ Cannot be undone. Messages sent immediately via WhatsApp. No scheduling.
-              </p>
-
-              <div style={{ display: 'flex', gap: 12 }}>
-                <button
-                  onClick={sendBroadcast}
-                  disabled={phase === ('sending' as Phase) || preview.recipient_count === 0}
-                  style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '10px 22px', borderRadius: 10, background: 'linear-gradient(135deg, #f59e0b, #d97706)', color: '#000', border: 'none', fontFamily: T.dm, fontWeight: 700, fontSize: 13, cursor: preview.recipient_count === 0 ? 'not-allowed' : 'pointer', opacity: preview.recipient_count === 0 ? 0.5 : 1 }}>
-                  <Send size={14} />
-                  Send to {preview.recipient_count.toLocaleString('en-IN')} users
-                </button>
-                <button onClick={() => setPhase('compose')}
-                  style={{ padding: '10px 18px', borderRadius: 10, background: 'none', border: `1px solid ${T.border}`, color: T.muted, cursor: 'pointer', fontFamily: T.dm, fontSize: 13 }}>
-                  Edit
-                </button>
+          </AdminCard>
+        ) : phase === 'preview' && preview ? (
+          <AdminCard>
+            <div className="flex items-center gap-3 mb-5 px-4 py-3.5 rounded-lg border"
+              style={{ background: `color-mix(in srgb, ${segRgb} 10%, transparent)`, borderColor: `color-mix(in srgb, ${segRgb} 28%, transparent)` }}>
+              <Users size={18} style={{ color: segRgb }} className="shrink-0" />
+              <div>
+                <p className="text-[15px] font-bold text-foreground m-0">Sending to <span style={{ color: segRgb }}>{preview.recipient_count.toLocaleString('en-IN')}</span> users</p>
+                <p className="text-xs text-muted-foreground m-0">Segment: {segCfg.label} · {segCfg.intent}</p>
               </div>
             </div>
-
-          ) : (
-            <ComposeForm
-              segment={segment} setSegment={setSegment}
-              message={message} setMessage={setMessage}
-              segmentCounts={segmentCounts} countsLoading={countsLoading}
-              onPreview={runDryRun}
-              onOpenTemplates={() => setShowTemplates(true)}
-            />
-          )}
-        </>
+            <div className="bg-muted rounded-lg px-4 py-3.5 mb-5 border-l-[3px]" style={{ borderLeftColor: ACCENT_RGB.brand }}>
+              <p className="tm-label mb-1.5">Message</p>
+              <p className="text-[13px] text-foreground m-0 leading-relaxed whitespace-pre-wrap">{message}</p>
+            </div>
+            <p className="text-xs text-[rgb(var(--tm-loss))] mb-5">⚠ Cannot be undone. Messages sent immediately via WhatsApp. No scheduling.</p>
+            <div className="flex gap-3">
+              <Button onClick={sendBroadcast} disabled={phase === ('sending' as Phase) || preview.recipient_count === 0}>
+                <Send size={14} /> Send to {preview.recipient_count.toLocaleString('en-IN')} users
+              </Button>
+              <Button variant="outline" onClick={() => setPhase('compose')}>Edit</Button>
+            </div>
+          </AdminCard>
+        ) : (
+          <ComposeForm segment={segment} setSegment={setSegment} message={message} setMessage={setMessage}
+            segmentCounts={segmentCounts} countsLoading={countsLoading} onPreview={runDryRun} onOpenTemplates={() => setShowTemplates(true)} />
+        )
       )}
 
-      {/* ── HISTORY TAB ──────────────────────────────────────────────── */}
+      {/* HISTORY */}
       {tab === 'history' && (
         <div>
-          {logsLoading && <p style={{ fontSize: 12, color: T.muted }}>Loading history…</p>}
-          {!logsLoading && logs.length === 0 && (
-            <p style={{ fontSize: 12, color: T.dim }}>No broadcasts sent yet.</p>
-          )}
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+          {logsLoading && <p className="text-xs text-muted-foreground">Loading history…</p>}
+          {!logsLoading && logs.length === 0 && <EmptyState>No broadcasts sent yet.</EmptyState>}
+          <div className="flex flex-col gap-2.5">
             {logs.map(log => {
               const segConf = SEGMENTS.find(s => s.value === log.segment);
+              const rgb = ACCENT_RGB[segConf?.accent ?? 'warning'];
               return (
-                <div key={log.id} style={{ background: T.surface, border: `1px solid ${T.border}`, borderRadius: 12, padding: '14px 18px' }}>
-                  <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 12 }}>
-                    <div style={{ flex: 1, minWidth: 0 }}>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 6 }}>
-                        <span style={{ fontSize: 11, padding: '2px 9px', borderRadius: 20, background: `${segConf?.color ?? T.amber}18`, color: segConf?.color ?? T.amber, border: `1px solid ${segConf?.color ?? T.amber}30`, fontWeight: 600 }}>
-                          {log.segment}
-                        </span>
-                        <span style={{ fontSize: 11, color: T.dim }}>by {log.created_by}</span>
-                        <span style={{ fontSize: 11, color: T.dim }}>
-                          {log.created_at ? new Date(log.created_at).toLocaleString('en-IN') : '—'}
-                        </span>
+                <AdminCard key={log.id} bodyClassName="px-4 py-3.5">
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-2 mb-1.5 flex-wrap">
+                        <span className="text-[11px] px-2 py-0.5 rounded-full font-semibold border"
+                          style={{ color: rgb, background: `color-mix(in srgb, ${rgb} 13%, transparent)`, borderColor: `color-mix(in srgb, ${rgb} 27%, transparent)` }}>{log.segment}</span>
+                        <span className="text-[11px] text-muted-foreground/60">by {log.created_by}</span>
+                        <span className="text-[11px] text-muted-foreground/60">{log.created_at ? new Date(log.created_at).toLocaleString('en-IN') : '—'}</span>
                       </div>
-                      <p style={{ fontSize: 13, color: T.text, margin: '0 0 6px', lineHeight: 1.5 }}>{log.message}</p>
+                      <p className="text-[13px] text-foreground mb-1.5 leading-snug">{log.message}</p>
                       <DeliveryBar sent={log.sent} failed={log.failed} total={log.total} />
                     </div>
-                    <button
-                      onClick={() => setSelectedId(log.id)}
-                      style={{ flexShrink: 0, display: 'flex', alignItems: 'center', gap: 4, padding: '6px 12px', borderRadius: 8, background: T.raised, border: `1px solid ${T.border}`, color: T.muted, cursor: 'pointer', fontFamily: T.dm, fontSize: 12, whiteSpace: 'nowrap' }}>
-                      <ChevronRight size={12} /> Receipts
-                    </button>
+                    <Button variant="outline" size="sm" className="shrink-0" onClick={() => setSelectedId(log.id)}><ChevronRight size={12} /> Receipts</Button>
                   </div>
-                </div>
+                </AdminCard>
               );
             })}
           </div>
@@ -544,6 +362,6 @@ export default function AdminBroadcast() {
 
       {selectedId    && <ReceiptModal id={selectedId} onClose={() => setSelectedId(null)} />}
       {showTemplates && <TemplatePicker onSelect={setMessage} onClose={() => setShowTemplates(false)} />}
-    </div>
+    </AdminPage>
   );
 }
