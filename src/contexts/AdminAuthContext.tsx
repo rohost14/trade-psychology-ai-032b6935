@@ -3,7 +3,14 @@ import { adminApi } from '@/lib/adminApi';
 
 const STORAGE_KEY = 'tm_admin_token';
 
-interface AdminUser { email: string; name: string; role: string; }
+interface AdminUser {
+  email: string;
+  name: string;
+  role: string;
+  must_change_password?: boolean;
+  totp_required?: boolean;
+  has_totp?: boolean;
+}
 interface AdminAuthCtx {
   admin:      AdminUser | null;
   isLoading:  boolean;
@@ -12,6 +19,8 @@ interface AdminAuthCtx {
   login:      (email: string, password: string) => Promise<void>;
   verifyOtp:  (email: string, otp: string) => Promise<void>;
   verifyTotp: (email: string, code: string) => Promise<void>;
+  changePassword: (newPassword: string) => Promise<void>;
+  refresh:    () => Promise<void>;
   logout:     () => void;
 }
 
@@ -23,14 +32,18 @@ export function AdminAuthProvider({ children }: { children: ReactNode }) {
   const [step,         setStep]         = useState<'idle' | 'otp_sent' | 'totp_required'>('idle');
   const [pendingEmail, setPendingEmail] = useState('');
 
+  // Load full identity (incl. IAM flags) from /auth/me after any token is set.
+  const hydrate = async () => {
+    const data = await adminApi.me();
+    setAdmin(data);
+  };
+
   useEffect(() => {
     const token = localStorage.getItem(STORAGE_KEY);
     if (!token) { setIsLoading(false); return; }
-    adminApi.me().then(data => {
-      setAdmin(data);
-    }).catch(() => {
-      localStorage.removeItem(STORAGE_KEY);
-    }).finally(() => setIsLoading(false));
+    hydrate()
+      .catch(() => localStorage.removeItem(STORAGE_KEY))
+      .finally(() => setIsLoading(false));
   }, []);
 
   const login = async (email: string, password: string) => {
@@ -39,7 +52,7 @@ export function AdminAuthProvider({ children }: { children: ReactNode }) {
     if (res.status === 'ok' && res.token) {
       // Dev bypass — JWT returned directly, no 2FA step
       localStorage.setItem(STORAGE_KEY, res.token);
-      setAdmin(res.admin);
+      await hydrate();
       setStep('idle');
       setPendingEmail('');
     } else if (res.status === 'totp_required') {
@@ -50,20 +63,30 @@ export function AdminAuthProvider({ children }: { children: ReactNode }) {
   };
 
   const verifyOtp = async (email: string, otp: string) => {
-    const { token, admin: adminData } = await adminApi.verifyOtp(email, otp);
+    const { token } = await adminApi.verifyOtp(email, otp);
     localStorage.setItem(STORAGE_KEY, token);
-    setAdmin(adminData);
+    await hydrate();
     setStep('idle');
     setPendingEmail('');
   };
 
   const verifyTotp = async (email: string, code: string) => {
-    const { token, admin: adminData } = await adminApi.verifyTotp(email, code);
+    const { token } = await adminApi.verifyTotp(email, code);
     localStorage.setItem(STORAGE_KEY, token);
-    setAdmin(adminData);
+    await hydrate();
     setStep('idle');
     setPendingEmail('');
   };
+
+  // Forced/voluntary password change. Backend returns a fresh token (bumped session
+  // epoch) so THIS session survives while all others are invalidated.
+  const changePassword = async (newPassword: string) => {
+    const { token } = await adminApi.changePassword(newPassword);
+    if (token) localStorage.setItem(STORAGE_KEY, token);
+    await hydrate();
+  };
+
+  const refresh = async () => { await hydrate(); };
 
   const logout = () => {
     localStorage.removeItem(STORAGE_KEY);
@@ -73,7 +96,7 @@ export function AdminAuthProvider({ children }: { children: ReactNode }) {
   };
 
   return (
-    <Ctx.Provider value={{ admin, isLoading, step, pendingEmail, login, verifyOtp, verifyTotp, logout }}>
+    <Ctx.Provider value={{ admin, isLoading, step, pendingEmail, login, verifyOtp, verifyTotp, changePassword, refresh, logout }}>
       {children}
     </Ctx.Provider>
   );

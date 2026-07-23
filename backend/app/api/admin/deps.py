@@ -7,7 +7,10 @@ import logging
 from fastapi import Depends, HTTPException, Request
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from jose import JWTError, jwt
+from sqlalchemy import select
+from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.config import settings
+from app.core.database import get_db
 import redis as redis_lib
 
 logger = logging.getLogger(__name__)
@@ -89,12 +92,22 @@ def _check_ip(request: Request) -> None:
 async def get_current_admin(
     request: Request,
     credentials: HTTPAuthorizationCredentials = Depends(_bearer),
+    db: AsyncSession = Depends(get_db),
 ) -> dict:
     """
-    Validate admin JWT. Returns payload dict with {sub, email, name, role}.
+    Validate admin JWT and reconcile it against the live admin row.
+
+    Returns a payload dict with {sub, email, name, role, is_active, session_epoch,
+    must_change_password, totp_required, jti, exp}. role/name/email/is_active are
+    read FRESH from the DB so a role change or deactivation takes effect immediately
+    (not after the 8h token expiry).
+
     Raises 404 on any failure — admin routes appear to not exist for non-admins.
-    Checks IP allowlist (ADMIN_IP_ALLOWLIST) and Redis blocklist for revoked tokens.
+    Checks: IP allowlist · Redis JTI blocklist · account exists + is_active ·
+    JWT `sv` == row.session_epoch (force-logout / reset bumps the epoch).
     """
+    from app.models.admin_user import AdminUser
+
     _check_ip(request)
     if credentials is None:
         raise HTTPException(status_code=404)
@@ -104,15 +117,36 @@ async def get_current_admin(
             _get_secret(),
             algorithms=["HS256"],
         )
-        admin_id = payload.get("sub")
-        if not admin_id:
-            raise HTTPException(status_code=404)
-        jti = payload.get("jti")
-        if jti and _is_blocklisted(jti):
-            raise HTTPException(status_code=404)
-        return payload
     except JWTError:
         raise HTTPException(status_code=404)
+
+    admin_id = payload.get("sub")
+    if not admin_id:
+        raise HTTPException(status_code=404)
+    jti = payload.get("jti")
+    if jti and _is_blocklisted(jti):
+        raise HTTPException(status_code=404)
+
+    admin = (await db.execute(
+        select(AdminUser).where(AdminUser.id == admin_id)
+    )).scalar_one_or_none()
+    if not admin or not admin.is_active:
+        raise HTTPException(status_code=404)
+
+    # Session-epoch check — a bump on the row invalidates every token issued before it.
+    if int(payload.get("sv", 0)) != int(admin.session_epoch or 0):
+        raise HTTPException(status_code=404)
+
+    # Reconcile identity fields from the live row (role/deactivation are instant).
+    payload["role"]                 = admin.role
+    payload["name"]                 = admin.name
+    payload["email"]                = admin.email
+    payload["is_active"]            = admin.is_active
+    payload["session_epoch"]        = admin.session_epoch
+    payload["must_change_password"] = bool(admin.must_change_password)
+    payload["totp_required"]        = bool(admin.totp_required)
+    payload["has_totp"]             = admin.totp_secret_enc is not None
+    return payload
 
 
 # ── Role-based access ─────────────────────────────────────────────────────────

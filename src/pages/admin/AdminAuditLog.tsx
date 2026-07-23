@@ -17,6 +17,8 @@ const ACTION_ACCENT: Record<string, Accent> = {
   delete: 'loss', erase: 'loss',
   send_message: 'brand', broadcast: 'warning',
   set_maintenance: 'loss', set_announcement: 'warning', set_detector_flag: 'warning',
+  create_admin: 'brand', update_admin: 'warning', force_logout_admin: 'warning',
+  reset_admin_totp: 'warning', reset_admin_password: 'loss', change_password: 'brand',
 };
 const ACCENT_RGB: Record<Accent, string> = {
   profit: 'rgb(var(--tm-profit))', loss: 'rgb(var(--tm-loss))',
@@ -29,6 +31,8 @@ const ACTION_LABELS: Record<string, string> = {
   send_message: 'Send message', broadcast: 'Broadcast',
   set_maintenance: 'Maintenance toggle', set_announcement: 'Announcement set',
   set_detector_flag: 'Detector flag',
+  create_admin: 'Admin created', update_admin: 'Admin updated', force_logout_admin: 'Admin force-logout',
+  reset_admin_totp: 'Admin TOTP reset', reset_admin_password: 'Admin password reset', change_password: 'Password changed',
 };
 
 function DetailChip({ k, v }: { k: string; v: unknown }) {

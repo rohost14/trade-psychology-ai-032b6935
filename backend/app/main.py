@@ -435,6 +435,7 @@ from app.api.admin import audit as admin_audit, broadcast as admin_broadcast
 from app.api.admin import tasks as admin_tasks
 from app.api.admin import detector_flags as admin_detector_flags
 from app.api.admin import data_quality as admin_data_quality
+from app.api.admin import admins as admin_admins
 app.include_router(admin_auth.router,      prefix="/api/admin/auth", tags=["admin"])
 app.include_router(admin_overview.router,  prefix="/api/admin",      tags=["admin"])
 app.include_router(admin_users.router,     prefix="/api/admin",      tags=["admin"])
@@ -446,4 +447,5 @@ app.include_router(admin_broadcast.router, prefix="/api/admin",      tags=["admi
 app.include_router(admin_tasks.router,     prefix="/api/admin",      tags=["admin"])
 app.include_router(admin_detector_flags.router, prefix="/api/admin",  tags=["admin"])
 app.include_router(admin_data_quality.router,   prefix="/api/admin",  tags=["admin"])
+app.include_router(admin_admins.router,          prefix="/api/admin",  tags=["admin"])
 

@@ -2,12 +2,13 @@ import { useEffect } from 'react';
 import { Outlet, NavLink, useNavigate, useLocation } from 'react-router-dom';
 import {
   LayoutDashboard, Users, Activity, BarChart3, Settings,
-  LogOut, ScrollText, Megaphone, Shield,
+  LogOut, ScrollText, Megaphone, Shield, ShieldCheck,
 } from 'lucide-react';
 import { useAdminAuth } from '@/contexts/AdminAuthContext';
 import { adminApi } from '@/lib/adminApi';
 import { cn } from '@/lib/utils';
 import { Spinner } from './_ui';
+import AdminOnboarding from './AdminOnboarding';
 
 const NAV_GROUPS = [
   {
@@ -29,7 +30,8 @@ const NAV_GROUPS = [
   {
     label: 'System',
     items: [
-      { to: '/admin/config', icon: Settings, label: 'Config', roles: ['superadmin'] },
+      { to: '/admin/admins', icon: ShieldCheck, label: 'Admins', roles: ['superadmin'] },
+      { to: '/admin/config', icon: Settings,    label: 'Config', roles: ['superadmin'] },
     ],
   },
 ];
@@ -60,6 +62,12 @@ export default function AdminLayout() {
   );
 
   if (!admin) return null;
+
+  // Forced first-login setup — block the app until temp password is changed and,
+  // if required, an authenticator is enrolled.
+  if (admin.must_change_password || (admin.totp_required && !admin.has_totp)) {
+    return <AdminOnboarding />;
+  }
 
   return (
     <div className="flex min-h-screen bg-background text-foreground">

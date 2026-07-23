@@ -110,6 +110,7 @@ def _make_admin_jwt(admin: AdminUser) -> str:
             "email": admin.email,
             "name":  admin.name,
             "role":  admin.role,
+            "sv":    int(admin.session_epoch or 0),  # session epoch — see deps.get_current_admin
             "exp":   expire,
             "jti":   secrets.token_hex(16),
         },
@@ -393,6 +394,7 @@ async def totp_setup_confirm(
     if not admin:
         raise HTTPException(status_code=404)
     admin.totp_secret_enc = encrypted
+    admin.totp_required = False   # forced-enrolment (if any) satisfied
     await db.commit()
 
     r.delete(f"{TOTP_PENDING_PREFIX}{admin_payload['email']}")
@@ -420,7 +422,54 @@ async def totp_disable(
 
 @router.get("/me")
 async def admin_me(payload: dict = Depends(get_current_admin)):
-    return {"email": payload["email"], "name": payload["name"], "role": payload.get("role", "superadmin")}
+    return {
+        "email": payload["email"],
+        "name":  payload["name"],
+        "role":  payload.get("role", "superadmin"),
+        "must_change_password": payload.get("must_change_password", False),
+        "totp_required":        payload.get("totp_required", False),
+        "has_totp":             payload.get("has_totp", False),
+    }
+
+
+class ChangePasswordRequest(BaseModel):
+    new_password: str
+
+
+@router.post("/change-password")
+async def admin_change_password(
+    body: ChangePasswordRequest,
+    payload: dict = Depends(get_current_admin),
+    db: AsyncSession = Depends(get_db),
+):
+    """Change the current admin's password. Clears the must_change_password flag and
+    bumps session_epoch (invalidating all OTHER sessions), then returns a FRESH token so
+    the caller stays signed in. Used both for the forced first-login change and voluntary
+    rotation."""
+    new_pw = (body.new_password or "").strip()
+    if len(new_pw) < 12:
+        raise HTTPException(status_code=422, detail="Password must be at least 12 characters.")
+
+    result = await db.execute(select(AdminUser).where(AdminUser.id == payload["sub"]))
+    admin = result.scalar_one_or_none()
+    if not admin:
+        raise HTTPException(status_code=404)
+
+    admin.password_hash = _hash_password(new_pw)
+    admin.must_change_password = False
+    admin.session_epoch = (admin.session_epoch or 0) + 1  # invalidate other sessions
+    await db.commit()
+    await db.refresh(admin)
+
+    token = _make_admin_jwt(admin)  # new token carries the bumped sv so THIS session survives
+    logger.info(f"Admin changed password: {admin.email}")
+    try:
+        from app.api.admin.audit_writer import audit
+        await audit(db, admin.email, "change_password", target_type="admin", target_id=str(admin.id))
+    except Exception as _e:
+        logger.warning(f"change_password audit failed: {_e}")
+
+    return {"status": "ok", "token": token}
 
 
 @router.post("/logout")

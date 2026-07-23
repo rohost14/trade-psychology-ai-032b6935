@@ -29,6 +29,8 @@ export const adminApi = {
     req('/auth/totp/verify', { method: 'POST', body: JSON.stringify({ email, otp }) }),
   me:         () => req('/auth/me'),
   logout:     () => req('/auth/logout', { method: 'POST' }),
+  changePassword: (new_password: string) =>
+    req('/auth/change-password', { method: 'POST', body: JSON.stringify({ new_password }) }),
 
   // ── TOTP Management ───────────────────────────────────────────────────────
   totpSetupInit:    () => req('/auth/totp/setup'),
@@ -101,4 +103,14 @@ export const adminApi = {
   broadcastSegmentCounts: () => req('/broadcast/segment-counts'),
   broadcastLogs:     (limit = 20) => req(`/broadcast/logs?limit=${limit}`),
   broadcastReceipts: (id: string)  => req(`/broadcast/logs/${id}/receipts`),
+
+  // ── Admin IAM (superadmin only) ───────────────────────────────────────────
+  admins:            () => req('/admins'),
+  createAdmin:       (body: { email: string; name: string; role: string }) =>
+    req('/admins', { method: 'POST', body: JSON.stringify(body) }),
+  patchAdmin:        (id: string, body: { role?: string; is_active?: boolean }) =>
+    req(`/admins/${id}`, { method: 'PATCH', body: JSON.stringify(body) }),
+  forceLogoutAdmin:  (id: string) => req(`/admins/${id}/force-logout`, { method: 'POST' }),
+  resetAdminTotp:    (id: string) => req(`/admins/${id}/reset-totp`, { method: 'POST' }),
+  resetAdminPassword:(id: string) => req(`/admins/${id}/reset-password`, { method: 'POST' }),
 };
