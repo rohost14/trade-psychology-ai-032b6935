@@ -1,44 +1,41 @@
 import { useEffect, useState, useCallback } from 'react';
 import { ChevronLeft, ChevronRight, Shield } from 'lucide-react';
 import { adminApi } from '@/lib/adminApi';
-
-const C = {
-  text:   '#e2e8f0',
-  muted:  'rgba(226,232,240,0.45)',
-  dim:    'rgba(226,232,240,0.25)',
-  border: 'rgba(255,255,255,0.07)',
-  amber:  '#f59e0b',
-  green:  '#10b981',
-  red:    '#ef4444',
-  orange: '#f97316',
-  dm:     "'DM Sans', sans-serif",
-};
+import { AdminPage, AdminCard, ErrorBanner, LoadingBlock, fmtNum, type Accent } from './_ui';
+import { Button } from '@/components/ui/button';
 
 interface AuditItem {
   id: string; admin_email: string; action: string;
   target_type: string | null; target_id: string | null;
-  details: Record<string, any> | null; created_at: string | null;
+  details: Record<string, unknown> | null; created_at: string | null;
 }
 
-const ACTION_COLORS: Record<string, string> = {
-  login: C.green, logout: C.dim,
-  suspend_user: C.red, unsuspend_user: C.green,
-  send_message: C.amber, broadcast: C.orange,
-  set_maintenance: C.red, set_announcement: C.amber,
+// action → accent token
+const ACTION_ACCENT: Record<string, Accent> = {
+  login: 'profit', admin_login: 'profit', logout: 'muted',
+  suspend_user: 'loss', unsuspend_user: 'profit',
+  delete: 'loss', erase: 'loss',
+  send_message: 'brand', broadcast: 'warning',
+  set_maintenance: 'loss', set_announcement: 'warning', set_detector_flag: 'warning',
+};
+const ACCENT_RGB: Record<Accent, string> = {
+  profit: 'rgb(var(--tm-profit))', loss: 'rgb(var(--tm-loss))',
+  warning: 'rgb(var(--tm-obs))', brand: 'rgb(var(--tm-brand))', muted: 'rgb(var(--muted-foreground))',
 };
 
 const ACTION_LABELS: Record<string, string> = {
-  login: 'Login', logout: 'Logout',
+  login: 'Login', admin_login: 'Login', logout: 'Logout',
   suspend_user: 'Suspend user', unsuspend_user: 'Unsuspend user',
   send_message: 'Send message', broadcast: 'Broadcast',
   set_maintenance: 'Maintenance toggle', set_announcement: 'Announcement set',
+  set_detector_flag: 'Detector flag',
 };
 
-function DetailChip({ k, v }: { k: string; v: any }) {
+function DetailChip({ k, v }: { k: string; v: unknown }) {
   if (v === null || v === undefined) return null;
   return (
-    <span style={{ fontSize: '0.68rem', padding: '0.1rem 0.45rem', borderRadius: 6, background: 'rgba(255,255,255,0.06)', color: C.muted }}>
-      {k}: <span style={{ color: C.text }}>{String(v).slice(0, 60)}</span>
+    <span className="text-[11px] px-1.5 py-0.5 rounded bg-muted text-muted-foreground">
+      {k}: <span className="text-foreground">{String(v).slice(0, 60)}</span>
     </span>
   );
 }
@@ -56,7 +53,7 @@ export default function AdminAuditLog() {
     try {
       const d = await adminApi.auditLog({ page, action: action || undefined });
       setItems(d.items); setTotal(d.total);
-    } catch (e: any) { setError(e.message); }
+    } catch (e: unknown) { setError(e instanceof Error ? e.message : String(e)); }
     finally { setLoading(false); }
   }, [page, action]);
 
@@ -66,87 +63,66 @@ export default function AdminAuditLog() {
   const totalPages = Math.max(1, Math.ceil(total / 50));
 
   return (
-    <div style={{ padding: '2rem', fontFamily: C.dm }}>
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '2rem' }}>
-        <div>
-          <h1 style={{ fontSize: '1.3rem', fontWeight: 700, color: C.text, margin: 0 }}>Audit Log</h1>
-          <p style={{ fontSize: '0.75rem', color: C.dim, marginTop: 4 }}>{total.toLocaleString()} actions recorded</p>
-        </div>
+    <AdminPage
+      title="Audit Log"
+      subtitle={`${fmtNum(total)} actions recorded`}
+      actions={
         <select
           value={action} onChange={e => setAction(e.target.value)}
-          style={{ padding: '0.5rem 0.75rem', borderRadius: 9, background: 'rgba(255,255,255,0.04)', border: `1px solid ${C.border}`, color: C.text, fontFamily: C.dm, fontSize: '0.8rem', outline: 'none' }}
+          className="h-9 px-3 rounded-lg bg-card border border-border text-foreground text-sm outline-none focus-visible:ring-2 focus-visible:ring-ring"
         >
           <option value="">All actions</option>
-          {Object.entries(ACTION_LABELS).map(([v, l]) => (
-            <option key={v} value={v}>{l}</option>
-          ))}
+          {Object.entries(ACTION_LABELS).map(([v, l]) => <option key={v} value={v}>{l}</option>)}
         </select>
-      </div>
+      }
+    >
+      <ErrorBanner message={error} />
 
-      {error && <div style={{ padding: '0.75rem 1rem', borderRadius: 10, background: 'rgba(239,68,68,0.08)', border: '1px solid rgba(239,68,68,0.2)', marginBottom: '1rem', fontSize: '0.8rem', color: C.red }}>{error}</div>}
-
-      <div style={{ background: 'rgba(255,255,255,0.02)', border: `1px solid ${C.border}`, borderRadius: 14, overflow: 'hidden' }}>
-        {loading ? (
-          <div style={{ display: 'flex', justifyContent: 'center', padding: '3rem' }}>
-            <div style={{ width: 24, height: 24, border: `2px solid ${C.amber}`, borderTopColor: 'transparent', borderRadius: '50%', animation: 'spin 0.8s linear infinite' }} />
-            <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
-          </div>
-        ) : items.length === 0 ? (
-          <div style={{ padding: '3rem', textAlign: 'center', fontSize: '0.82rem', color: C.dim }}>No audit entries yet</div>
-        ) : (
-          <div>
-            {items.map((item, i) => {
-              const color = ACTION_COLORS[item.action] || C.muted;
-              const label = ACTION_LABELS[item.action] || item.action;
-              return (
-                <div
-                  key={item.id}
-                  style={{
-                    display: 'flex', alignItems: 'flex-start', gap: 14,
-                    padding: '0.9rem 1.25rem',
-                    borderBottom: i < items.length - 1 ? `1px solid rgba(255,255,255,0.04)` : 'none',
-                  }}
-                >
-                  <div style={{ width: 30, height: 30, borderRadius: 9, background: `${color}15`, border: `1px solid ${color}30`, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, marginTop: 2 }}>
-                    <Shield style={{ width: 13, height: 13, color }} />
-                  </div>
-                  <div style={{ flex: 1, minWidth: 0 }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 4 }}>
-                      <span style={{ fontSize: '0.82rem', fontWeight: 600, color }}>{label}</span>
-                      <span style={{ fontSize: '0.75rem', color: C.muted }}>{item.admin_email}</span>
-                      {item.target_id && item.target_id !== 'global' && (
-                        <span style={{ fontSize: '0.7rem', color: C.dim, fontFamily: 'monospace' }}>{item.target_id.slice(0, 12)}…</span>
-                      )}
-                    </div>
-                    {item.details && (
-                      <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4 }}>
-                        {Object.entries(item.details).slice(0, 4).map(([k, v]) => (
-                          <DetailChip key={k} k={k} v={v} />
-                        ))}
-                      </div>
+      <AdminCard noPadding>
+        {loading ? <LoadingBlock />
+        : items.length === 0 ? <div className="py-12 text-center text-sm text-muted-foreground">No audit entries yet</div>
+        : items.map((item, i) => {
+            const rgb = ACCENT_RGB[ACTION_ACCENT[item.action] ?? 'muted'];
+            const label = ACTION_LABELS[item.action] || item.action;
+            return (
+              <div key={item.id} className={`flex items-start gap-3.5 px-5 py-3.5 ${i < items.length - 1 ? 'border-b border-border' : ''}`}>
+                <div className="w-[30px] h-[30px] rounded-lg flex items-center justify-center shrink-0 mt-0.5 border"
+                     style={{ background: `color-mix(in srgb, ${rgb} 12%, transparent)`, borderColor: `color-mix(in srgb, ${rgb} 25%, transparent)` }}>
+                  <Shield className="w-3.5 h-3.5" style={{ color: rgb }} />
+                </div>
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center gap-2.5 mb-1 flex-wrap">
+                    <span className="text-[13px] font-semibold" style={{ color: rgb }}>{label}</span>
+                    <span className="text-xs text-muted-foreground">{item.admin_email}</span>
+                    {item.target_id && item.target_id !== 'global' && (
+                      <span className="text-[11px] text-muted-foreground/60 font-mono">{item.target_id.slice(0, 12)}…</span>
                     )}
                   </div>
-                  <div style={{ fontSize: '0.7rem', color: C.dim, flexShrink: 0, whiteSpace: 'nowrap' }}>
-                    {item.created_at ? new Date(item.created_at).toLocaleString() : '—'}
-                  </div>
+                  {item.details && (
+                    <div className="flex flex-wrap gap-1">
+                      {Object.entries(item.details).slice(0, 4).map(([k, v]) => <DetailChip key={k} k={k} v={v} />)}
+                    </div>
+                  )}
                 </div>
-              );
-            })}
-          </div>
-        )}
-      </div>
+                <div className="text-[11px] text-muted-foreground/60 shrink-0 whitespace-nowrap">
+                  {item.created_at ? new Date(item.created_at).toLocaleString() : '—'}
+                </div>
+              </div>
+            );
+          })}
+      </AdminCard>
 
       {totalPages > 1 && (
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 12, marginTop: '1.5rem' }}>
-          <button onClick={() => setPage(p => Math.max(1, p - 1))} disabled={page === 1} style={{ padding: '0.4rem 0.6rem', borderRadius: 8, background: 'rgba(255,255,255,0.04)', border: `1px solid ${C.border}`, color: C.muted, cursor: page === 1 ? 'not-allowed' : 'pointer', opacity: page === 1 ? 0.4 : 1 }}>
-            <ChevronLeft style={{ width: 14, height: 14 }} />
-          </button>
-          <span style={{ fontSize: '0.78rem', color: C.muted }}>Page {page} of {totalPages}</span>
-          <button onClick={() => setPage(p => Math.min(totalPages, p + 1))} disabled={page === totalPages} style={{ padding: '0.4rem 0.6rem', borderRadius: 8, background: 'rgba(255,255,255,0.04)', border: `1px solid ${C.border}`, color: C.muted, cursor: page === totalPages ? 'not-allowed' : 'pointer', opacity: page === totalPages ? 0.4 : 1 }}>
-            <ChevronRight style={{ width: 14, height: 14 }} />
-          </button>
+        <div className="flex items-center justify-center gap-3 mt-6">
+          <Button variant="outline" size="icon" className="h-8 w-8" onClick={() => setPage(p => Math.max(1, p - 1))} disabled={page === 1}>
+            <ChevronLeft className="w-3.5 h-3.5" />
+          </Button>
+          <span className="text-[13px] text-muted-foreground">Page {page} of {totalPages}</span>
+          <Button variant="outline" size="icon" className="h-8 w-8" onClick={() => setPage(p => Math.min(totalPages, p + 1))} disabled={page === totalPages}>
+            <ChevronRight className="w-3.5 h-3.5" />
+          </Button>
         </div>
       )}
-    </div>
+    </AdminPage>
   );
 }

@@ -2,6 +2,9 @@ import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Shield, Mail, Lock, KeyRound, Eye, EyeOff, Smartphone } from 'lucide-react';
 import { useAdminAuth } from '@/contexts/AdminAuthContext';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
 
 export default function AdminLogin() {
   const { step, pendingEmail, admin, login, verifyOtp, verifyTotp } = useAdminAuth();
@@ -21,7 +24,7 @@ export default function AdminLogin() {
     e.preventDefault();
     setError(''); setLoading(true);
     try { await login(email, password); }
-    catch (err: any) { setError(err.message || 'Invalid credentials'); }
+    catch (err: unknown) { setError(err instanceof Error ? err.message : 'Invalid credentials'); }
     finally { setLoading(false); }
   };
 
@@ -29,7 +32,7 @@ export default function AdminLogin() {
     e.preventDefault();
     setError(''); setLoading(true);
     try { await verifyOtp(pendingEmail || email, code); }
-    catch (err: any) { setError(err.message || 'Invalid code'); }
+    catch (err: unknown) { setError(err instanceof Error ? err.message : 'Invalid code'); }
     finally { setLoading(false); }
   };
 
@@ -37,127 +40,98 @@ export default function AdminLogin() {
     e.preventDefault();
     setError(''); setLoading(true);
     try { await verifyTotp(pendingEmail || email, code); }
-    catch (err: any) { setError(err.message || 'Invalid authenticator code'); }
+    catch (err: unknown) { setError(err instanceof Error ? err.message : 'Invalid authenticator code'); }
     finally { setLoading(false); }
   };
 
   const isOtp  = step === 'otp_sent';
   const isTotp = step === 'totp_required';
 
-  const subtitle = isTotp
-    ? 'Enter your authenticator code'
-    : isOtp
-    ? `Code sent to ${pendingEmail || email}`
+  const subtitle = isTotp ? 'Enter your authenticator code'
+    : isOtp ? `Code sent to ${pendingEmail || email}`
     : 'Restricted access';
 
+  const codeInput = (
+    <Input
+      type="text" value={code}
+      onChange={e => setCode(e.target.value.replace(/\D/g, '').slice(0, 6))}
+      required placeholder="000000" maxLength={6} autoFocus inputMode="numeric"
+      className="h-14 text-center text-2xl tracking-[0.3em] font-mono"
+    />
+  );
+
   return (
-    <div style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', background: '#04040e' }}>
-      <div style={{ width: '100%', maxWidth: 400, padding: '0 1.5rem' }}>
+    <div className="min-h-screen flex items-center justify-center bg-background text-foreground">
+      <div className="w-full max-w-[400px] px-6">
         {/* Logo */}
-        <div style={{ textAlign: 'center', marginBottom: '2.5rem' }}>
-          <div style={{ width: 52, height: 52, borderRadius: 14, background: 'rgba(245,158,11,0.1)', border: '1px solid rgba(245,158,11,0.25)', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 1rem' }}>
-            <Shield style={{ width: 24, height: 24, color: '#f59e0b' }} />
+        <div className="text-center mb-10">
+          <div className="w-13 h-13 mx-auto mb-4 flex items-center justify-center rounded-2xl bg-[rgb(var(--tm-brand))]/10 border border-[rgb(var(--tm-brand))]/25" style={{ width: 52, height: 52 }}>
+            <Shield className="w-6 h-6 text-[rgb(var(--tm-brand))]" />
           </div>
-          <h1 style={{ fontFamily: "'DM Sans', sans-serif", fontWeight: 700, fontSize: '1.4rem', color: '#fff', marginBottom: 4 }}>TradeMentor Admin</h1>
-          <p style={{ fontFamily: "'DM Sans', sans-serif", fontSize: '0.82rem', color: 'rgba(226,232,240,0.4)' }}>{subtitle}</p>
+          <h1 className="text-foreground">TradeMentor Admin</h1>
+          <p className="mt-1 text-sm text-muted-foreground">{subtitle}</p>
         </div>
 
-        <div style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: 16, padding: '2rem' }}>
-
+        <div className="tm-card p-8">
           {/* Step 1 — email + password */}
           {step === 'idle' && (
-            <form onSubmit={handleLogin} style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-              <div>
-                <label style={{ display: 'block', fontFamily: "'DM Sans', sans-serif", fontSize: '0.78rem', color: 'rgba(226,232,240,0.5)', marginBottom: 6 }}>Email</label>
-                <div style={{ position: 'relative' }}>
-                  <Mail style={{ position: 'absolute', left: 12, top: '50%', transform: 'translateY(-50%)', width: 15, height: 15, color: 'rgba(226,232,240,0.3)' }} />
-                  <input
-                    type="email" value={email} onChange={e => setEmail(e.target.value)} required
-                    placeholder="admin@tradementor.ai"
-                    style={{ width: '100%', padding: '0.7rem 0.75rem 0.7rem 2.4rem', borderRadius: 10, background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.1)', color: '#e2e8f0', fontFamily: "'DM Sans', sans-serif", fontSize: '0.875rem', outline: 'none', boxSizing: 'border-box' }}
-                  />
+            <form onSubmit={handleLogin} className="flex flex-col gap-4">
+              <div className="space-y-1.5">
+                <Label htmlFor="admin-email">Email</Label>
+                <div className="relative">
+                  <Mail className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground pointer-events-none" />
+                  <Input id="admin-email" type="email" value={email} onChange={e => setEmail(e.target.value)} required
+                         placeholder="admin@tradementor.ai" className="pl-9" />
                 </div>
               </div>
-              <div>
-                <label style={{ display: 'block', fontFamily: "'DM Sans', sans-serif", fontSize: '0.78rem', color: 'rgba(226,232,240,0.5)', marginBottom: 6 }}>Password</label>
-                <div style={{ position: 'relative' }}>
-                  <Lock style={{ position: 'absolute', left: 12, top: '50%', transform: 'translateY(-50%)', width: 15, height: 15, color: 'rgba(226,232,240,0.3)' }} />
-                  <input
-                    type={showPwd ? 'text' : 'password'} value={password} onChange={e => setPassword(e.target.value)} required
-                    placeholder="••••••••"
-                    style={{ width: '100%', padding: '0.7rem 2.4rem 0.7rem 2.4rem', borderRadius: 10, background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.1)', color: '#e2e8f0', fontFamily: "'DM Sans', sans-serif", fontSize: '0.875rem', outline: 'none', boxSizing: 'border-box' }}
-                  />
-                  <button type="button" onClick={() => setShowPwd(v => !v)} style={{ position: 'absolute', right: 12, top: '50%', transform: 'translateY(-50%)', background: 'none', border: 'none', cursor: 'pointer', padding: 0 }}>
-                    {showPwd ? <EyeOff style={{ width: 15, height: 15, color: 'rgba(226,232,240,0.3)' }} /> : <Eye style={{ width: 15, height: 15, color: 'rgba(226,232,240,0.3)' }} />}
+              <div className="space-y-1.5">
+                <Label htmlFor="admin-pwd">Password</Label>
+                <div className="relative">
+                  <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground pointer-events-none" />
+                  <Input id="admin-pwd" type={showPwd ? 'text' : 'password'} value={password} onChange={e => setPassword(e.target.value)} required
+                         placeholder="••••••••" className="pl-9 pr-9" />
+                  <button type="button" onClick={() => setShowPwd(v => !v)}
+                          className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground">
+                    {showPwd ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
                   </button>
                 </div>
               </div>
-              {error && <p style={{ fontFamily: "'DM Sans', sans-serif", fontSize: '0.8rem', color: '#ef4444', textAlign: 'center' }}>{error}</p>}
-              <button type="submit" disabled={loading} style={{ marginTop: '0.5rem', padding: '0.8rem', borderRadius: 10, fontFamily: "'DM Sans', sans-serif", fontWeight: 600, fontSize: '0.875rem', cursor: loading ? 'not-allowed' : 'pointer', opacity: loading ? 0.6 : 1, background: 'linear-gradient(135deg, #f59e0b, #d97706)', color: '#000', border: 'none', transition: 'all 0.2s' }}>
-                {loading ? 'Checking…' : 'Continue'}
-              </button>
+              {error && <p className="text-sm text-[rgb(var(--tm-loss))] text-center">{error}</p>}
+              <Button type="submit" disabled={loading} className="mt-1">{loading ? 'Checking…' : 'Continue'}</Button>
             </form>
           )}
 
           {/* Step 2A — email OTP */}
           {isOtp && (
-            <form onSubmit={handleOtp} style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4 }}>
-                <KeyRound style={{ width: 15, height: 15, color: '#f59e0b' }} />
-                <span style={{ fontFamily: "'DM Sans', sans-serif", fontSize: '0.84rem', color: 'rgba(226,232,240,0.55)' }}>Enter the 6-digit code sent to your email</span>
+            <form onSubmit={handleOtp} className="flex flex-col gap-4">
+              <div className="flex items-center gap-2">
+                <KeyRound className="w-4 h-4 text-[rgb(var(--tm-brand))]" />
+                <span className="text-sm text-muted-foreground">Enter the 6-digit code sent to your email</span>
               </div>
-              <div style={{ position: 'relative' }}>
-                <input
-                  type="text" value={code}
-                  onChange={e => setCode(e.target.value.replace(/\D/g, '').slice(0, 6))}
-                  required placeholder="000000" maxLength={6} autoFocus
-                  style={{ width: '100%', padding: '0.7rem 0.75rem', borderRadius: 10, background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.1)', color: '#e2e8f0', fontFamily: "'JetBrains Mono', monospace", fontSize: '1.4rem', textAlign: 'center', letterSpacing: '0.3em', outline: 'none', boxSizing: 'border-box' }}
-                />
-              </div>
-              {error && <p style={{ fontFamily: "'DM Sans', sans-serif", fontSize: '0.8rem', color: '#ef4444', textAlign: 'center' }}>{error}</p>}
-              <button type="submit" disabled={loading || code.length !== 6}
-                style={{ padding: '0.8rem', borderRadius: 10, fontFamily: "'DM Sans', sans-serif", fontWeight: 600, fontSize: '0.875rem', cursor: (loading || code.length !== 6) ? 'not-allowed' : 'pointer', opacity: (loading || code.length !== 6) ? 0.5 : 1, background: 'linear-gradient(135deg, #f59e0b, #d97706)', color: '#000', border: 'none' }}>
-                {loading ? 'Verifying…' : 'Verify & Sign In'}
-              </button>
-              <button type="button" onClick={() => setCode('')}
-                style={{ background: 'none', border: 'none', cursor: 'pointer', fontFamily: "'DM Sans', sans-serif", fontSize: '0.78rem', color: 'rgba(226,232,240,0.35)', textDecoration: 'underline' }}>
-                Back
-              </button>
+              {codeInput}
+              {error && <p className="text-sm text-[rgb(var(--tm-loss))] text-center">{error}</p>}
+              <Button type="submit" disabled={loading || code.length !== 6}>{loading ? 'Verifying…' : 'Verify & Sign In'}</Button>
+              <Button type="button" variant="link" size="sm" onClick={() => setCode('')} className="text-muted-foreground">Back</Button>
             </form>
           )}
 
           {/* Step 2B — TOTP */}
           {isTotp && (
-            <form onSubmit={handleTotp} style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4 }}>
-                <Smartphone style={{ width: 15, height: 15, color: '#f59e0b' }} />
-                <span style={{ fontFamily: "'DM Sans', sans-serif", fontSize: '0.84rem', color: 'rgba(226,232,240,0.55)' }}>Enter your 6-digit authenticator code</span>
+            <form onSubmit={handleTotp} className="flex flex-col gap-4">
+              <div className="flex items-center gap-2">
+                <Smartphone className="w-4 h-4 text-[rgb(var(--tm-brand))]" />
+                <span className="text-sm text-muted-foreground">Enter your 6-digit authenticator code</span>
               </div>
-              <div>
-                <input
-                  type="text" value={code}
-                  onChange={e => setCode(e.target.value.replace(/\D/g, '').slice(0, 6))}
-                  required placeholder="000000" maxLength={6} autoFocus
-                  style={{ width: '100%', padding: '0.7rem 0.75rem', borderRadius: 10, background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.1)', color: '#e2e8f0', fontFamily: "'JetBrains Mono', monospace", fontSize: '1.4rem', textAlign: 'center', letterSpacing: '0.3em', outline: 'none', boxSizing: 'border-box' }}
-                />
-              </div>
-              <p style={{ fontFamily: "'DM Sans', sans-serif", fontSize: '0.73rem', color: 'rgba(226,232,240,0.3)', textAlign: 'center', margin: 0 }}>
-                Open Google Authenticator or Authy and enter the current code
-              </p>
-              {error && <p style={{ fontFamily: "'DM Sans', sans-serif", fontSize: '0.8rem', color: '#ef4444', textAlign: 'center' }}>{error}</p>}
-              <button type="submit" disabled={loading || code.length !== 6}
-                style={{ padding: '0.8rem', borderRadius: 10, fontFamily: "'DM Sans', sans-serif", fontWeight: 600, fontSize: '0.875rem', cursor: (loading || code.length !== 6) ? 'not-allowed' : 'pointer', opacity: (loading || code.length !== 6) ? 0.5 : 1, background: 'linear-gradient(135deg, #f59e0b, #d97706)', color: '#000', border: 'none' }}>
-                {loading ? 'Verifying…' : 'Sign In'}
-              </button>
-              <button type="button" onClick={() => setCode('')}
-                style={{ background: 'none', border: 'none', cursor: 'pointer', fontFamily: "'DM Sans', sans-serif", fontSize: '0.78rem', color: 'rgba(226,232,240,0.35)', textDecoration: 'underline' }}>
-                Back
-              </button>
+              {codeInput}
+              <p className="text-xs text-muted-foreground text-center m-0">Open Google Authenticator or Authy and enter the current code</p>
+              {error && <p className="text-sm text-[rgb(var(--tm-loss))] text-center">{error}</p>}
+              <Button type="submit" disabled={loading || code.length !== 6}>{loading ? 'Verifying…' : 'Sign In'}</Button>
+              <Button type="button" variant="link" size="sm" onClick={() => setCode('')} className="text-muted-foreground">Back</Button>
             </form>
           )}
         </div>
 
-        <p style={{ textAlign: 'center', marginTop: '1.5rem', fontFamily: "'DM Sans', sans-serif", fontSize: '0.72rem', color: 'rgba(226,232,240,0.2)' }}>
+        <p className="text-center mt-6 text-xs text-muted-foreground/60">
           This area is restricted. Unauthorised access is prohibited.
         </p>
       </div>

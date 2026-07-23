@@ -1,18 +1,13 @@
 import { useEffect, useState, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Search, ChevronLeft, ChevronRight, AlertTriangle, Download } from 'lucide-react';
+import { Search, ChevronLeft, ChevronRight, Download } from 'lucide-react';
 import { adminApi } from '@/lib/adminApi';
-
-const C = {
-  text:   '#e2e8f0',
-  muted:  'rgba(226,232,240,0.45)',
-  dim:    'rgba(226,232,240,0.25)',
-  border: 'rgba(255,255,255,0.07)',
-  amber:  '#f59e0b',
-  green:  '#10b981',
-  red:    '#ef4444',
-  dm:     "'DM Sans', sans-serif",
-};
+import { AdminPage, AdminCard, ErrorBanner, fmtNum, Spinner, type Accent } from './_ui';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import {
+  Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
+} from '@/components/ui/table';
 
 // Matches backend /api/admin/users response shape
 interface UserItem {
@@ -26,19 +21,34 @@ interface UserItem {
   user: { id: string | null; email: string | null; guardian_phone: string | null } | null;
 }
 
-const STATUS_COLORS: Record<string, string> = {
-  connected: C.green, guest: C.amber, suspended: C.red, disconnected: C.muted,
+const ACCENT_RGB: Record<Accent, string> = {
+  profit: 'rgb(var(--tm-profit))', loss: 'rgb(var(--tm-loss))',
+  warning: 'rgb(var(--tm-obs))', brand: 'rgb(var(--tm-brand))', muted: 'rgb(var(--muted-foreground))',
+};
+const STATUS_ACCENT: Record<string, Accent> = {
+  connected: 'profit', guest: 'warning', suspended: 'loss', disconnected: 'muted',
+};
+const LIFECYCLE_CFG: Record<string, { accent: Accent; label: string }> = {
+  new:          { accent: 'brand',   label: 'New' },
+  active:       { accent: 'profit',  label: 'Active' },
+  at_risk:      { accent: 'warning', label: 'At Risk' },
+  churned:      { accent: 'loss',    label: 'Churned' },
+  inactive:     { accent: 'muted',   label: 'Inactive' },
+  suspended:    { accent: 'loss',    label: 'Suspended' },
+  disconnected: { accent: 'muted',   label: 'Disconnected' },
 };
 
-const LIFECYCLE_CFG: Record<string, { color: string; label: string }> = {
-  new:          { color: '#3b82f6', label: 'New' },
-  active:       { color: '#22c55e', label: 'Active' },
-  at_risk:      { color: '#f59e0b', label: 'At Risk' },
-  churned:      { color: '#ef4444', label: 'Churned' },
-  inactive:     { color: C.muted,   label: 'Inactive' },
-  suspended:    { color: '#ef4444', label: 'Suspended' },
-  disconnected: { color: C.muted,   label: 'Disconnected' },
-};
+function Pill({ label, accent, capitalize }: { label: string; accent: Accent; capitalize?: boolean }) {
+  const rgb = ACCENT_RGB[accent];
+  return (
+    <span
+      className={`inline-block text-[11px] font-semibold px-2 py-0.5 rounded-full whitespace-nowrap ${capitalize ? 'capitalize' : ''}`}
+      style={{ background: `color-mix(in srgb, ${rgb} 12%, transparent)`, color: rgb, border: `1px solid color-mix(in srgb, ${rgb} 25%, transparent)` }}
+    >
+      {label}
+    </span>
+  );
+}
 
 export default function AdminUsers() {
   const navigate = useNavigate();
@@ -55,7 +65,7 @@ export default function AdminUsers() {
     try {
       const d = await adminApi.users({ search: search || undefined, status: status || undefined, page });
       setItems(d.items); setTotal(d.total);
-    } catch (e: any) { setError(e.message); }
+    } catch (e: unknown) { setError(e instanceof Error ? e.message : String(e)); }
     finally { setLoading(false); }
   }, [search, status, page]);
 
@@ -67,50 +77,34 @@ export default function AdminUsers() {
   const exportCsv = (rows: UserItem[]) => {
     const header = 'account_id,broker_user_id,status,email,phone,joined\n';
     const body = rows.map(u =>
-      [u.account_id, u.broker_user_id, u.status,
-       u.user?.email || '', u.user?.guardian_phone || '',
-       u.created_at ? new Date(u.created_at).toLocaleDateString() : ''
-      ].join(',')
+      [u.account_id, u.broker_user_id, u.status, u.user?.email || '', u.user?.guardian_phone || '',
+       u.created_at ? new Date(u.created_at).toLocaleDateString() : ''].join(',')
     ).join('\n');
     const blob = new Blob([header + body], { type: 'text/csv' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a'); a.href = url;
-    a.download = `tradementor_users_${new Date().toISOString().slice(0,10)}.csv`;
+    a.download = `tradementor_users_${new Date().toISOString().slice(0, 10)}.csv`;
     a.click(); URL.revokeObjectURL(url);
   };
 
-  const displayName = (u: UserItem) =>
-    u.user?.email || u.broker_email || u.broker_user_id || '—';
+  const displayName = (u: UserItem) => u.user?.email || u.broker_email || u.broker_user_id || '—';
+  const cols = ['User / Zerodha ID', 'Status', 'Lifecycle', 'Phone', 'Last Trade', 'Joined'];
 
   return (
-    <div style={{ padding: '2rem', fontFamily: C.dm }}>
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '1.5rem' }}>
-        <div>
-          <h1 style={{ fontSize: '1.3rem', fontWeight: 700, color: C.text, margin: 0 }}>Users</h1>
-          <p style={{ fontSize: '0.78rem', color: C.muted, marginTop: 4 }}>{total.toLocaleString()} total</p>
-        </div>
-        <button
-          onClick={() => exportCsv(items)}
-          style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '0.5rem 1rem', borderRadius: 9, background: 'rgba(255,255,255,0.04)', border: `1px solid ${C.border}`, color: C.muted, fontSize: '0.78rem', cursor: 'pointer', fontFamily: C.dm }}
-        >
-          <Download style={{ width: 13, height: 13 }} />
-          Export CSV
-        </button>
-      </div>
-
+    <AdminPage
+      title="Users"
+      subtitle={`${fmtNum(total)} total`}
+      actions={<Button variant="outline" size="sm" onClick={() => exportCsv(items)}><Download className="w-3.5 h-3.5" /> Export CSV</Button>}
+    >
       {/* Filters */}
-      <div style={{ display: 'flex', gap: 12, marginBottom: '1.5rem' }}>
-        <div style={{ position: 'relative', flex: 1, maxWidth: 320 }}>
-          <Search style={{ position: 'absolute', left: 12, top: '50%', transform: 'translateY(-50%)', width: 14, height: 14, color: C.dim }} />
-          <input
-            value={search} onChange={e => setSearch(e.target.value)}
-            placeholder="Search email, Zerodha ID…"
-            style={{ width: '100%', padding: '0.6rem 0.75rem 0.6rem 2.2rem', borderRadius: 9, background: 'rgba(255,255,255,0.04)', border: `1px solid ${C.border}`, color: C.text, fontFamily: C.dm, fontSize: '0.82rem', outline: 'none', boxSizing: 'border-box' }}
-          />
+      <div className="flex gap-3 mb-5">
+        <div className="relative flex-1 max-w-[320px]">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-muted-foreground pointer-events-none" />
+          <Input value={search} onChange={e => setSearch(e.target.value)} placeholder="Search email, Zerodha ID…" className="pl-9 h-10" />
         </div>
         <select
           value={status} onChange={e => setStatus(e.target.value)}
-          style={{ padding: '0.6rem 0.75rem', borderRadius: 9, background: 'rgba(255,255,255,0.04)', border: `1px solid ${C.border}`, color: C.text, fontFamily: C.dm, fontSize: '0.82rem', outline: 'none' }}
+          className="h-10 px-3 rounded-lg bg-card border border-border text-foreground text-sm outline-none focus-visible:ring-2 focus-visible:ring-ring"
         >
           <option value="">All statuses</option>
           <option value="connected">Connected</option>
@@ -119,81 +113,55 @@ export default function AdminUsers() {
         </select>
       </div>
 
-      {error && (
-        <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '0.75rem 1rem', borderRadius: 10, background: 'rgba(239,68,68,0.08)', border: '1px solid rgba(239,68,68,0.2)', marginBottom: '1rem' }}>
-          <AlertTriangle style={{ width: 14, height: 14, color: C.red }} />
-          <span style={{ fontSize: '0.8rem', color: C.red }}>{error}</span>
-        </div>
-      )}
+      <ErrorBanner message={error} />
 
-      <div style={{ background: 'rgba(255,255,255,0.02)', border: `1px solid ${C.border}`, borderRadius: 14, overflow: 'hidden' }}>
-        <table style={{ width: '100%', borderCollapse: 'collapse' }}>
-          <thead>
-            <tr style={{ borderBottom: `1px solid ${C.border}` }}>
-              {['User / Zerodha ID', 'Status', 'Lifecycle', 'Phone', 'Last Trade', 'Joined'].map(h => (
-                <th key={h} style={{ padding: '0.75rem 1rem', textAlign: 'left', fontSize: '0.72rem', fontWeight: 600, color: C.dim, textTransform: 'uppercase', letterSpacing: '0.06em' }}>{h}</th>
-              ))}
-            </tr>
-          </thead>
-          <tbody>
+      <AdminCard noPadding>
+        <Table>
+          <TableHeader>
+            <TableRow className="hover:bg-transparent">
+              {cols.map(h => <TableHead key={h} className="table-header">{h}</TableHead>)}
+            </TableRow>
+          </TableHeader>
+          <TableBody>
             {loading ? (
-              <tr>
-                <td colSpan={4} style={{ padding: '3rem', textAlign: 'center' }}>
-                  <div style={{ display: 'inline-block', width: 24, height: 24, border: `2px solid ${C.amber}`, borderTopColor: 'transparent', borderRadius: '50%', animation: 'spin 0.8s linear infinite' }} />
-                  <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
-                </td>
-              </tr>
+              <TableRow className="hover:bg-transparent"><TableCell colSpan={cols.length} className="py-12 text-center"><div className="inline-block"><Spinner /></div></TableCell></TableRow>
             ) : items.length === 0 ? (
-              <tr><td colSpan={4} style={{ padding: '3rem', textAlign: 'center', fontSize: '0.82rem', color: C.dim }}>No users found</td></tr>
-            ) : items.map((u, i) => (
-              <tr
-                key={u.account_id}
-                onClick={() => navigate(`/admin/users/${u.account_id}`)}
-                style={{ borderBottom: i < items.length - 1 ? `1px solid rgba(255,255,255,0.04)` : 'none', cursor: 'pointer', transition: 'background 0.12s' }}
-                onMouseEnter={e => (e.currentTarget.style.background = 'rgba(255,255,255,0.03)')}
-                onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}
-              >
-                <td style={{ padding: '0.8rem 1rem' }}>
-                  <div style={{ fontSize: '0.82rem', fontWeight: 500, color: C.text }}>{displayName(u)}</div>
-                  <div style={{ fontSize: '0.7rem', color: C.muted }}>{u.broker_user_id}</div>
-                </td>
-                <td style={{ padding: '0.8rem 1rem' }}>
-                  <span style={{ fontSize: '0.7rem', fontWeight: 600, padding: '0.2rem 0.55rem', borderRadius: 20, background: `${STATUS_COLORS[u.status] || C.muted}18`, color: STATUS_COLORS[u.status] || C.muted, border: `1px solid ${STATUS_COLORS[u.status] || C.muted}30`, textTransform: 'capitalize' }}>{u.status}</span>
-                </td>
-                <td style={{ padding: '0.8rem 1rem' }}>
-                  {(() => {
-                    const lc = LIFECYCLE_CFG[u.lifecycle] || LIFECYCLE_CFG.inactive;
-                    return (
-                      <span style={{ fontSize: '0.68rem', fontWeight: 600, padding: '0.15rem 0.55rem', borderRadius: 20, background: `${lc.color}18`, color: lc.color, whiteSpace: 'nowrap' }}>
-                        {lc.label}
-                      </span>
-                    );
-                  })()}
-                </td>
-                <td style={{ padding: '0.8rem 1rem', fontSize: '0.78rem', color: C.muted }}>{u.user?.guardian_phone || '—'}</td>
-                <td style={{ padding: '0.8rem 1rem', fontSize: '0.75rem', color: C.muted }}>
-                  {u.last_trade_at ? new Date(u.last_trade_at).toLocaleDateString('en-IN', { day: '2-digit', month: 'short' }) : '—'}
-                </td>
-                <td style={{ padding: '0.8rem 1rem', fontSize: '0.75rem', color: C.muted }}>
-                  {u.created_at ? new Date(u.created_at).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: '2-digit' }) : '—'}
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
+              <TableRow className="hover:bg-transparent"><TableCell colSpan={cols.length} className="py-12 text-center text-sm text-muted-foreground">No users found</TableCell></TableRow>
+            ) : items.map(u => {
+              const lc = LIFECYCLE_CFG[u.lifecycle] || LIFECYCLE_CFG.inactive;
+              return (
+                <TableRow key={u.account_id} onClick={() => navigate(`/admin/users/${u.account_id}`)} className="cursor-pointer">
+                  <TableCell>
+                    <div className="text-[13px] font-medium text-foreground">{displayName(u)}</div>
+                    <div className="text-[11px] text-muted-foreground">{u.broker_user_id}</div>
+                  </TableCell>
+                  <TableCell><Pill label={u.status} accent={STATUS_ACCENT[u.status] || 'muted'} capitalize /></TableCell>
+                  <TableCell><Pill label={lc.label} accent={lc.accent} /></TableCell>
+                  <TableCell className="text-[13px] text-muted-foreground">{u.user?.guardian_phone || '—'}</TableCell>
+                  <TableCell className="text-xs text-muted-foreground">
+                    {u.last_trade_at ? new Date(u.last_trade_at).toLocaleDateString('en-IN', { day: '2-digit', month: 'short' }) : '—'}
+                  </TableCell>
+                  <TableCell className="text-xs text-muted-foreground">
+                    {u.created_at ? new Date(u.created_at).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: '2-digit' }) : '—'}
+                  </TableCell>
+                </TableRow>
+              );
+            })}
+          </TableBody>
+        </Table>
+      </AdminCard>
 
       {totalPages > 1 && (
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 12, marginTop: '1.5rem' }}>
-          <button onClick={() => setPage(p => Math.max(1, p - 1))} disabled={page === 1} style={{ padding: '0.4rem 0.6rem', borderRadius: 8, background: 'rgba(255,255,255,0.04)', border: `1px solid ${C.border}`, color: C.muted, cursor: page === 1 ? 'not-allowed' : 'pointer', opacity: page === 1 ? 0.4 : 1 }}>
-            <ChevronLeft style={{ width: 14, height: 14 }} />
-          </button>
-          <span style={{ fontSize: '0.78rem', color: C.muted }}>Page {page} of {totalPages}</span>
-          <button onClick={() => setPage(p => Math.min(totalPages, p + 1))} disabled={page === totalPages} style={{ padding: '0.4rem 0.6rem', borderRadius: 8, background: 'rgba(255,255,255,0.04)', border: `1px solid ${C.border}`, color: C.muted, cursor: page === totalPages ? 'not-allowed' : 'pointer', opacity: page === totalPages ? 0.4 : 1 }}>
-            <ChevronRight style={{ width: 14, height: 14 }} />
-          </button>
+        <div className="flex items-center justify-center gap-3 mt-6">
+          <Button variant="outline" size="icon" className="h-8 w-8" onClick={() => setPage(p => Math.max(1, p - 1))} disabled={page === 1}>
+            <ChevronLeft className="w-3.5 h-3.5" />
+          </Button>
+          <span className="text-[13px] text-muted-foreground">Page {page} of {totalPages}</span>
+          <Button variant="outline" size="icon" className="h-8 w-8" onClick={() => setPage(p => Math.min(totalPages, p + 1))} disabled={page === totalPages}>
+            <ChevronRight className="w-3.5 h-3.5" />
+          </Button>
         </div>
       )}
-    </div>
+    </AdminPage>
   );
 }
