@@ -16,7 +16,7 @@ import string
 import logging
 from datetime import datetime, timezone, timedelta
 
-from fastapi import APIRouter, HTTPException, Depends, Request
+from fastapi import APIRouter, HTTPException, Depends, Request, Response
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from pydantic import BaseModel, EmailStr
 import bcrypt as _bcrypt
@@ -70,6 +70,24 @@ BLOCKLIST_PREFIX = "admin_jti_block:"
 def _redis():
     import redis as redis_lib
     return redis_lib.from_url(settings.REDIS_URL, decode_responses=True)
+
+
+ADMIN_COOKIE = "tm_admin"
+
+
+def _set_admin_cookie(response: Response, token: str) -> None:
+    """Store the admin JWT in an httpOnly cookie (not readable by JS → XSS-safe).
+    dev: SameSite=Lax over http. prod: SameSite=None + Secure (cross-site https)."""
+    secure = settings.ENVIRONMENT != "development"
+    response.set_cookie(
+        key=ADMIN_COOKIE, value=token, httponly=True, secure=secure,
+        samesite="none" if secure else "lax",
+        max_age=settings.ADMIN_JWT_EXPIRE_HOURS * 3600, path="/api/admin",
+    )
+
+
+def _clear_admin_cookie(response: Response) -> None:
+    response.delete_cookie(ADMIN_COOKIE, path="/api/admin")
 
 
 def _assert_verify_unlocked(r, email: str) -> None:
@@ -167,6 +185,7 @@ class TokenResponse(BaseModel):
 @router.post("/login")
 async def admin_login(
     request: Request,
+    response: Response,
     body: LoginRequest,
     db: AsyncSession = Depends(get_db),
     _rl: None = Depends(admin_login_limiter),
@@ -216,6 +235,7 @@ async def admin_login(
         )
         await db.commit()
         token = await _issue_login(admin, request, db, "dev_bypass")
+        _set_admin_cookie(response, token)
         return {"status": "ok", "token": token, "admin": {"email": admin.email, "name": admin.name, "role": admin.role}}
 
     # TOTP path — skip email OTP entirely
@@ -257,6 +277,7 @@ async def admin_login(
 @router.post("/verify", response_model=TokenResponse)
 async def admin_verify_otp(
     request: Request,
+    response: Response,
     body: OTPRequest,
     db: AsyncSession = Depends(get_db),
     _rl: None = Depends(admin_otp_limiter),
@@ -289,6 +310,7 @@ async def admin_verify_otp(
     await db.commit()
 
     token = await _issue_login(admin, request, db, "email_otp")
+    _set_admin_cookie(response, token)
     logger.info(f"Admin login (OTP): {admin.email} role={admin.role}")
     try:
         from app.api.admin.audit_writer import audit
@@ -309,6 +331,7 @@ async def admin_verify_otp(
 @router.post("/totp/verify", response_model=TokenResponse)
 async def admin_verify_totp(
     request: Request,
+    response: Response,
     body: OTPRequest,
     db: AsyncSession = Depends(get_db),
     _rl: None = Depends(admin_otp_limiter),
@@ -347,6 +370,7 @@ async def admin_verify_totp(
     await db.commit()
 
     token = await _issue_login(admin, request, db, "totp")
+    _set_admin_cookie(response, token)
     logger.info(f"Admin login (TOTP): {admin.email} role={admin.role}")
     try:
         from app.api.admin.audit_writer import audit
@@ -457,6 +481,7 @@ class ChangePasswordRequest(BaseModel):
 @router.post("/change-password")
 async def admin_change_password(
     request: Request,
+    response: Response,
     body: ChangePasswordRequest,
     payload: dict = Depends(get_current_admin),
     db: AsyncSession = Depends(get_db),
@@ -493,6 +518,7 @@ async def admin_change_password(
         )
     except Exception:
         pass
+    _set_admin_cookie(response, token)
     logger.info(f"Admin changed password: {admin.email}")
     try:
         from app.api.admin.audit_writer import audit
@@ -505,10 +531,12 @@ async def admin_change_password(
 
 @router.post("/logout")
 async def admin_logout(
+    response: Response,
     credentials: HTTPAuthorizationCredentials = Depends(_bearer_logout),
     payload: dict = Depends(get_current_admin),
 ):
-    """Invalidate current admin JWT server-side via JTI blocklist."""
+    """Invalidate current admin JWT server-side via JTI blocklist + clear the cookie."""
+    _clear_admin_cookie(response)
     jti = payload.get("jti")
     exp = payload.get("exp")
     if jti and exp:

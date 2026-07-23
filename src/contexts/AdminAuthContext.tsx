@@ -1,8 +1,6 @@
 import { createContext, useContext, useState, useEffect, ReactNode } from 'react';
 import { adminApi } from '@/lib/adminApi';
 
-const STORAGE_KEY = 'tm_admin_token';
-
 interface AdminUser {
   email: string;
   name: string;
@@ -32,26 +30,23 @@ export function AdminAuthProvider({ children }: { children: ReactNode }) {
   const [step,         setStep]         = useState<'idle' | 'otp_sent' | 'totp_required'>('idle');
   const [pendingEmail, setPendingEmail] = useState('');
 
-  // Load full identity (incl. IAM flags) from /auth/me after any token is set.
+  // Identity (incl. IAM flags) comes from /auth/me. Auth rides the httpOnly cookie,
+  // so there is no client-side token to store — a successful me() means we're signed in.
   const hydrate = async () => {
     const data = await adminApi.me();
     setAdmin(data);
   };
 
   useEffect(() => {
-    const token = localStorage.getItem(STORAGE_KEY);
-    if (!token) { setIsLoading(false); return; }
-    hydrate()
-      .catch(() => localStorage.removeItem(STORAGE_KEY))
-      .finally(() => setIsLoading(false));
+    // Cookie may already be set (returning visitor) — try to hydrate; 401 just means "not logged in".
+    hydrate().catch(() => {}).finally(() => setIsLoading(false));
   }, []);
 
   const login = async (email: string, password: string) => {
     const res = await adminApi.login(email, password);
     setPendingEmail(email);
-    if (res.status === 'ok' && res.token) {
-      // Dev bypass — JWT returned directly, no 2FA step
-      localStorage.setItem(STORAGE_KEY, res.token);
+    if (res.status === 'ok') {
+      // Dev bypass — cookie already set by the server, no 2FA step.
       await hydrate();
       setStep('idle');
       setPendingEmail('');
@@ -63,33 +58,29 @@ export function AdminAuthProvider({ children }: { children: ReactNode }) {
   };
 
   const verifyOtp = async (email: string, otp: string) => {
-    const { token } = await adminApi.verifyOtp(email, otp);
-    localStorage.setItem(STORAGE_KEY, token);
+    await adminApi.verifyOtp(email, otp);   // sets the httpOnly cookie
     await hydrate();
     setStep('idle');
     setPendingEmail('');
   };
 
   const verifyTotp = async (email: string, code: string) => {
-    const { token } = await adminApi.verifyTotp(email, code);
-    localStorage.setItem(STORAGE_KEY, token);
+    await adminApi.verifyTotp(email, code); // sets the httpOnly cookie
     await hydrate();
     setStep('idle');
     setPendingEmail('');
   };
 
-  // Forced/voluntary password change. Backend returns a fresh token (bumped session
-  // epoch) so THIS session survives while all others are invalidated.
+  // Forced/voluntary password change. Backend rotates the cookie (bumped session epoch)
+  // so THIS session survives while all others are invalidated.
   const changePassword = async (newPassword: string) => {
-    const { token } = await adminApi.changePassword(newPassword);
-    if (token) localStorage.setItem(STORAGE_KEY, token);
+    await adminApi.changePassword(newPassword);
     await hydrate();
   };
 
   const refresh = async () => { await hydrate(); };
 
   const logout = () => {
-    localStorage.removeItem(STORAGE_KEY);
     setAdmin(null);
     setStep('idle');
     setPendingEmail('');

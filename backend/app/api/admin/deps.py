@@ -17,6 +17,7 @@ logger = logging.getLogger(__name__)
 _bearer = HTTPBearer(auto_error=False)
 
 BLOCKLIST_PREFIX = "admin_jti_block:"
+ADMIN_COOKIE = "tm_admin"   # httpOnly cookie holding the admin JWT (preferred over Bearer)
 
 # Module-level Redis connection — reused across requests, not created per-call
 _redis_conn: redis_lib.Redis | None = None
@@ -109,11 +110,13 @@ async def get_current_admin(
     from app.models.admin_user import AdminUser
 
     _check_ip(request)
-    if credentials is None:
+    # Prefer the httpOnly cookie (not XSS-readable); fall back to a Bearer header.
+    raw_token = request.cookies.get(ADMIN_COOKIE) or (credentials.credentials if credentials else None)
+    if not raw_token:
         raise HTTPException(status_code=404)
     try:
         payload = jwt.decode(
-            credentials.credentials,
+            raw_token,
             _get_secret(),
             algorithms=["HS256"],
         )

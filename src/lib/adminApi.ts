@@ -1,14 +1,14 @@
 const BASE = (import.meta.env.VITE_API_URL || 'http://localhost:8000') + '/api/admin';
-const STORAGE_KEY = 'tm_admin_token';
 
-function token() { return localStorage.getItem(STORAGE_KEY); }
-
+// Admin auth rides an httpOnly cookie (set by the backend on login) — NOT localStorage,
+// so the token is not XSS-readable. `credentials: 'include'` sends it cross-origin;
+// the backend CORS config allows credentials for the configured frontend origin.
 async function req(path: string, opts: RequestInit = {}) {
   const res = await fetch(`${BASE}${path}`, {
     ...opts,
+    credentials: 'include',
     headers: {
       'Content-Type': 'application/json',
-      ...(token() ? { Authorization: `Bearer ${token()}` } : {}),
       ...(opts.headers || {}),
     },
   });
