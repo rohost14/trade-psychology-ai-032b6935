@@ -1,371 +1,212 @@
 import { useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { RefreshCw, AlertTriangle, ArrowRight, RotateCcw } from 'lucide-react';
+import { ArrowRight, RotateCcw } from 'lucide-react';
 import { adminApi } from '@/lib/adminApi';
+import {
+  AdminPage, AdminCard, SectionHeader, AreaSparkline,
+  ErrorBanner, LoadingBlock, EmptyState, RefreshButton, fmtNum, type Accent,
+} from './_ui';
+import { cn } from '@/lib/utils';
 
-// ─── Design tokens ────────────────────────────────────────────────────────────
-const T = {
-  bg:       '#09090b',
-  surface:  '#111115',
-  raised:   '#16161d',
-  border:   '#1c1c28',
-  border2:  '#252536',
-  text:     '#f1f0f5',
-  muted:    '#6b6a82',
-  dim:      '#3a3a50',
-  amber:    '#f59e0b',
-  amberBg:  'rgba(245,158,11,0.1)',
-  green:    '#22c55e',
-  greenBg:  'rgba(34,197,94,0.08)',
-  red:      '#ef4444',
-  redBg:    'rgba(239,68,68,0.08)',
-  orange:   '#f97316',
-  blue:     '#3b82f6',
-  dm:       "'Inter', 'DM Sans', sans-serif",
-};
-
-const SEV_COLOR: Record<string, string> = {
-  critical: T.red, high: T.orange, medium: T.amber, low: T.green,
-};
+// severity → accent token (no hex)
+const SEV_ACCENT: Record<string, Accent> = { critical: 'loss', high: 'warning', medium: 'brand', low: 'profit' };
 const SEV_ORDER = ['critical', 'high', 'medium', 'low'];
+const ACCENT_RGB: Record<Accent, string> = {
+  profit: 'rgb(var(--tm-profit))', loss: 'rgb(var(--tm-loss))',
+  warning: 'rgb(var(--tm-obs))', brand: 'rgb(var(--tm-brand))', muted: 'rgb(var(--muted-foreground))',
+};
+const sevRgb = (sev: string) => ACCENT_RGB[SEV_ACCENT[sev] ?? 'muted'] ?? ACCENT_RGB.muted;
 
-// ─── Types ────────────────────────────────────────────────────────────────────
 interface InsightsData {
   period_days: number;
   patterns:   { pattern: string; count: number }[];
   severity:   { severity: string; count: number }[];
   daily:      { date: string; count: number }[];
-  engagement: {
-    pattern: string; total: number; acknowledged: number;
-    rate: number; avg_ack_minutes: number | null;
-  }[];
-  top_users: {
-    account_id: string; broker_user_id: string; email: string;
-    alert_count: number; high_severity: number; last_alert_at: string | null;
-  }[];
-  recurrence: {
-    pattern: string; base_acked: number; recurrence_count: number; rate: number;
-  }[];
+  engagement: { pattern: string; total: number; acknowledged: number; rate: number; avg_ack_minutes: number | null }[];
+  top_users:  { account_id: string; broker_user_id: string; email: string; alert_count: number; high_severity: number; last_alert_at: string | null }[];
+  recurrence: { pattern: string; base_acked: number; recurrence_count: number; rate: number }[];
 }
 
-// ─── Sub-components ───────────────────────────────────────────────────────────
-function SectionHeader({ title, sub }: { title: string; sub?: string }) {
+const PatternLabel = ({ pattern }: { pattern: string }) => (
+  <span className="font-mono text-[11px] text-muted-foreground">{pattern}</span>
+);
+
+function RateBar({ rate, rgb }: { rate: number; rgb: string }) {
   return (
-    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', marginBottom: 18 }}>
-      <span style={{ fontSize: 13, fontWeight: 600, color: T.text, letterSpacing: '-0.01em' }}>{title}</span>
-      {sub && <span style={{ fontSize: 11, color: T.dim }}>{sub}</span>}
+    <div className="flex-1 h-[5px] rounded bg-muted overflow-hidden">
+      <div className="h-full rounded transition-[width] duration-500" style={{ width: `${rate * 100}%`, background: rgb }} />
     </div>
   );
 }
 
-function Card({ children, style }: { children: React.ReactNode; style?: React.CSSProperties }) {
-  return (
-    <div style={{ background: T.surface, border: `1px solid ${T.border}`, borderRadius: 10, padding: '20px 22px', ...style }}>
-      {children}
-    </div>
-  );
-}
-
-function Spinner() {
-  return (
-    <>
-      <div style={{ width: 22, height: 22, border: `2px solid ${T.amber}`, borderTopColor: 'transparent', borderRadius: '50%', animation: 'spin 0.8s linear infinite' }} />
-      <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
-    </>
-  );
-}
-
-function RateBar({ rate, color }: { rate: number; color: string }) {
-  return (
-    <div style={{ flex: 1, height: 5, background: T.raised, borderRadius: 3, overflow: 'hidden' }}>
-      <div style={{ height: '100%', width: `${rate * 100}%`, background: color, borderRadius: 3, transition: 'width 0.5s ease' }} />
-    </div>
-  );
-}
-
-function PatternLabel({ pattern }: { pattern: string }) {
-  return (
-    <span style={{ fontFamily: "'JetBrains Mono', 'Fira Code', monospace", fontSize: 11, color: T.muted }}>
-      {pattern.replace(/_/g, '_')}
-    </span>
-  );
-}
-
-// ─── Section: Top Patterns ────────────────────────────────────────────────────
 function TopPatterns({ patterns }: { patterns: InsightsData['patterns'] }) {
   const max = Math.max(...patterns.map(p => p.count), 1);
   return (
-    <Card>
-      <SectionHeader title="Top Patterns" sub={`${patterns.length} types`} />
-      {patterns.length === 0
-        ? <p style={{ fontSize: 12, color: T.dim }}>No data for this period</p>
-        : (
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 9 }}>
-            {patterns.slice(0, 10).map(({ pattern, count }) => (
-              <div key={pattern} style={{ display: 'grid', gridTemplateColumns: '185px 1fr 36px', gap: 10, alignItems: 'center' }}>
-                <PatternLabel pattern={pattern} />
-                <div style={{ height: 6, background: T.raised, borderRadius: 3, overflow: 'hidden' }}>
-                  <div style={{
-                    height: '100%', width: `${(count / max) * 100}%`,
-                    background: `linear-gradient(90deg, ${T.amber}cc, ${T.amber}55)`,
-                    borderRadius: 3, transition: 'width 0.6s ease',
-                  }} />
-                </div>
-                <span style={{ fontSize: 12, fontWeight: 600, color: T.text, fontVariantNumeric: 'tabular-nums', textAlign: 'right' }}>{count}</span>
+    <AdminCard title="Top Patterns" subtitle={`${patterns.length} types`}>
+      {patterns.length === 0 ? <EmptyState>No data for this period</EmptyState> : (
+        <div className="flex flex-col gap-2.5">
+          {patterns.slice(0, 10).map(({ pattern, count }) => (
+            <div key={pattern} className="grid items-center gap-2.5 [grid-template-columns:185px_1fr_36px]">
+              <PatternLabel pattern={pattern} />
+              <div className="h-1.5 rounded bg-muted overflow-hidden">
+                <div className="h-full rounded transition-[width] duration-500" style={{ width: `${(count / max) * 100}%`, background: 'rgb(var(--tm-brand))' }} />
               </div>
-            ))}
-          </div>
-        )}
-    </Card>
+              <span className="text-xs font-semibold text-foreground tabular-nums text-right">{count}</span>
+            </div>
+          ))}
+        </div>
+      )}
+    </AdminCard>
   );
 }
 
-// ─── Section: Severity Breakdown ──────────────────────────────────────────────
 function SeverityBreakdown({ severity }: { severity: InsightsData['severity'] }) {
   const total = severity.reduce((s, r) => s + r.count, 0);
   const sorted = [...severity].sort((a, b) => SEV_ORDER.indexOf(a.severity) - SEV_ORDER.indexOf(b.severity));
   return (
-    <Card>
-      <SectionHeader title="Severity Breakdown" sub={total ? `${total.toLocaleString('en-IN')} total` : undefined} />
-      {sorted.length === 0
-        ? <p style={{ fontSize: 12, color: T.dim }}>No data</p>
-        : (
-          <>
-            {/* Stacked bar */}
-            <div style={{ display: 'flex', height: 7, borderRadius: 4, overflow: 'hidden', gap: 1, marginBottom: 18 }}>
-              {sorted.map(({ severity: sev, count }) => (
-                <div key={sev} style={{ flex: count, background: SEV_COLOR[sev] || T.muted, minWidth: 2 }}
-                  title={`${sev}: ${count}`} />
-              ))}
-            </div>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-              {sorted.map(({ severity: sev, count }) => {
-                const color = SEV_COLOR[sev] || T.muted;
-                const pct = total > 0 ? Math.round((count / total) * 100) : 0;
-                return (
-                  <div key={sev}>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 5 }}>
-                      <span style={{ fontSize: 12, color, fontWeight: 600, textTransform: 'capitalize' }}>{sev}</span>
-                      <span style={{ fontSize: 12, color: T.muted, fontVariantNumeric: 'tabular-nums' }}>{count.toLocaleString('en-IN')} · {pct}%</span>
-                    </div>
-                    <div style={{ height: 5, background: T.raised, borderRadius: 3, overflow: 'hidden' }}>
-                      <div style={{ height: '100%', width: `${pct}%`, background: color, borderRadius: 3, transition: 'width 0.6s ease' }} />
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-          </>
-        )}
-    </Card>
-  );
-}
-
-// ─── Section: Alert Volume Sparkline ─────────────────────────────────────────
-function AlertVolume({ daily }: { daily: InsightsData['daily'] }) {
-  if (daily.length < 2) return (
-    <Card>
-      <SectionHeader title="Daily Alert Volume" sub="Last 14 days" />
-      <p style={{ fontSize: 12, color: T.dim }}>Not enough data</p>
-    </Card>
-  );
-  const max = Math.max(...daily.map(d => d.count), 1);
-  const W = 600, H = 72, P = 4;
-  const pts = daily.map((d, i) => {
-    const x = P + (i / (daily.length - 1)) * (W - P * 2);
-    const y = H - P - (d.count / max) * (H - P * 2);
-    return `${x},${y}`;
-  });
-  return (
-    <Card>
-      <SectionHeader title="Daily Alert Volume" sub="Last 14 days" />
-      <svg viewBox={`0 0 ${W} ${H}`} style={{ width: '100%', height: 72, display: 'block' }} preserveAspectRatio="none">
-        <defs>
-          <linearGradient id="ag" x1="0" y1="0" x2="0" y2="1">
-            <stop offset="0%" stopColor={T.amber} stopOpacity="0.15" />
-            <stop offset="100%" stopColor={T.amber} stopOpacity="0" />
-          </linearGradient>
-        </defs>
-        <polygon points={`${P},${H} ${pts.join(' ')} ${W - P},${H}`} fill="url(#ag)" />
-        <polyline points={pts.join(' ')} fill="none" stroke={T.amber} strokeWidth="1.5" strokeLinejoin="round" strokeLinecap="round" />
-      </svg>
-      <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: 4 }}>
-        <span style={{ fontSize: 11, color: T.dim }}>{daily[0].date}</span>
-        <span style={{ fontSize: 11, color: T.dim }}>{daily[daily.length - 1].date}</span>
-      </div>
-    </Card>
-  );
-}
-
-// ─── Section: Engagement Rate ─────────────────────────────────────────────────
-function EngagementTable({ rows }: { rows: InsightsData['engagement'] }) {
-  return (
-    <Card style={{ gridColumn: '1 / -1' }}>
-      <SectionHeader
-        title="Alert Engagement Rate"
-        sub="How often traders acknowledge each pattern type"
-      />
-      {rows.length === 0
-        ? <p style={{ fontSize: 12, color: T.dim }}>No alert data for this period</p>
-        : (
-          <div>
-            {/* Header */}
-            <div style={{ display: 'grid', gridTemplateColumns: '185px 1fr 70px 80px 90px 110px', gap: 14, padding: '0 0 8px', borderBottom: `1px solid ${T.border}`, marginBottom: 2 }}>
-              {['Pattern', '', 'Fired', 'Acked', 'Rate', 'Avg Response'].map((h, i) => (
-                <span key={i} style={{ fontSize: 10, fontWeight: 600, color: T.dim, textTransform: 'uppercase', letterSpacing: '0.07em', textAlign: i >= 2 ? 'right' : 'left' }}>{h}</span>
-              ))}
-            </div>
-            {rows.map(row => {
-              const rateColor = row.rate >= 0.6 ? T.green : row.rate >= 0.3 ? T.amber : T.red;
+    <AdminCard title="Severity Breakdown" subtitle={total ? `${fmtNum(total)} total` : undefined}>
+      {sorted.length === 0 ? <EmptyState>No data</EmptyState> : (
+        <>
+          <div className="flex h-[7px] rounded overflow-hidden gap-px mb-4">
+            {sorted.map(({ severity: sev, count }) => (
+              <div key={sev} className="min-w-[2px]" style={{ flex: count, background: sevRgb(sev) }} title={`${sev}: ${count}`} />
+            ))}
+          </div>
+          <div className="flex flex-col gap-3">
+            {sorted.map(({ severity: sev, count }) => {
+              const rgb = sevRgb(sev);
+              const pct = total > 0 ? Math.round((count / total) * 100) : 0;
               return (
-                <div key={row.pattern} style={{
-                  display: 'grid', gridTemplateColumns: '185px 1fr 70px 80px 90px 110px', gap: 14,
-                  alignItems: 'center', padding: '10px 0', borderBottom: `1px solid ${T.border}`,
-                }}>
-                  <PatternLabel pattern={row.pattern} />
-                  <RateBar rate={row.rate} color={rateColor} />
-                  <span style={{ fontSize: 12, color: T.muted, textAlign: 'right', fontVariantNumeric: 'tabular-nums' }}>{row.total.toLocaleString('en-IN')}</span>
-                  <span style={{ fontSize: 12, color: T.text, textAlign: 'right', fontVariantNumeric: 'tabular-nums' }}>{row.acknowledged.toLocaleString('en-IN')}</span>
-                  <span style={{ fontSize: 13, fontWeight: 700, color: rateColor, textAlign: 'right', fontVariantNumeric: 'tabular-nums' }}>
-                    {(row.rate * 100).toFixed(1)}%
-                  </span>
-                  <span style={{ fontSize: 12, color: T.muted, textAlign: 'right', fontVariantNumeric: 'tabular-nums' }}>
-                    {row.avg_ack_minutes != null ? `${row.avg_ack_minutes}m` : '—'}
-                  </span>
+                <div key={sev}>
+                  <div className="flex justify-between mb-1.5">
+                    <span className="text-xs font-semibold capitalize" style={{ color: rgb }}>{sev}</span>
+                    <span className="text-xs text-muted-foreground tabular-nums">{fmtNum(count)} · {pct}%</span>
+                  </div>
+                  <div className="h-[5px] rounded bg-muted overflow-hidden">
+                    <div className="h-full rounded transition-[width] duration-500" style={{ width: `${pct}%`, background: rgb }} />
+                  </div>
                 </div>
               );
             })}
           </div>
-        )}
-    </Card>
+        </>
+      )}
+    </AdminCard>
   );
 }
 
-// ─── Section: Top Impacted Users ─────────────────────────────────────────────
+function EngagementTable({ rows }: { rows: InsightsData['engagement'] }) {
+  const cols = '[grid-template-columns:185px_1fr_70px_80px_90px_110px]';
+  return (
+    <AdminCard className="lg:col-span-2" title="Alert Engagement Rate" subtitle="How often traders acknowledge each pattern type">
+      {rows.length === 0 ? <EmptyState>No alert data for this period</EmptyState> : (
+        <div>
+          <div className={cn('grid gap-3.5 pb-2 border-b border-border', cols)}>
+            {['Pattern', '', 'Fired', 'Acked', 'Rate', 'Avg Response'].map((h, i) => (
+              <span key={i} className={cn('table-header', i >= 2 && 'text-right')}>{h}</span>
+            ))}
+          </div>
+          {rows.map(row => {
+            const rgb = row.rate >= 0.6 ? ACCENT_RGB.profit : row.rate >= 0.3 ? ACCENT_RGB.warning : ACCENT_RGB.loss;
+            return (
+              <div key={row.pattern} className={cn('grid gap-3.5 items-center py-2.5 border-b border-border', cols)}>
+                <PatternLabel pattern={row.pattern} />
+                <RateBar rate={row.rate} rgb={rgb} />
+                <span className="text-xs text-muted-foreground text-right tabular-nums">{fmtNum(row.total)}</span>
+                <span className="text-xs text-foreground text-right tabular-nums">{fmtNum(row.acknowledged)}</span>
+                <span className="text-[13px] font-bold text-right tabular-nums" style={{ color: rgb }}>{(row.rate * 100).toFixed(1)}%</span>
+                <span className="text-xs text-muted-foreground text-right tabular-nums">{row.avg_ack_minutes != null ? `${row.avg_ack_minutes}m` : '—'}</span>
+              </div>
+            );
+          })}
+        </div>
+      )}
+    </AdminCard>
+  );
+}
+
 function TopUsers({ users }: { users: InsightsData['top_users'] }) {
   const navigate = useNavigate();
   return (
-    <Card>
-      <SectionHeader title="Top Impacted Users" sub="By alert count" />
-      {users.length === 0
-        ? <p style={{ fontSize: 12, color: T.dim }}>No users yet</p>
-        : (
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 0 }}>
-            {users.map((u, i) => {
-              const lastAt = u.last_alert_at
-                ? new Date(u.last_alert_at).toLocaleDateString('en-IN', { day: '2-digit', month: 'short' })
-                : '—';
-              const highPct = u.alert_count > 0 ? u.high_severity / u.alert_count : 0;
-              return (
-                <div
-                  key={u.account_id}
-                  onClick={() => navigate(`/admin/users/${u.account_id}`)}
-                  style={{
-                    display: 'grid', gridTemplateColumns: '22px 1fr auto',
-                    gap: 10, alignItems: 'center',
-                    padding: '10px 0',
-                    borderBottom: i < users.length - 1 ? `1px solid ${T.border}` : 'none',
-                    cursor: 'pointer',
-                  }}
-                  onMouseEnter={e => (e.currentTarget.style.opacity = '0.75')}
-                  onMouseLeave={e => (e.currentTarget.style.opacity = '1')}
-                >
-                  {/* Rank */}
-                  <span style={{ fontSize: 11, color: T.dim, fontVariantNumeric: 'tabular-nums', fontWeight: 600 }}>
-                    {i + 1}
-                  </span>
-
-                  {/* Identity + severity bar */}
-                  <div>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4 }}>
-                      <span style={{ fontSize: 12, fontWeight: 600, color: T.text }}>{u.broker_user_id}</span>
-                      <span style={{ fontSize: 11, color: T.dim }}>{u.email !== '—' ? u.email : ''}</span>
-                    </div>
-                    {/* High-severity proportion bar */}
-                    <div style={{ height: 3, background: T.raised, borderRadius: 2, overflow: 'hidden', width: '100%' }}>
-                      <div style={{ height: '100%', width: `${highPct * 100}%`, background: highPct > 0.5 ? T.red : T.orange, borderRadius: 2 }} />
-                    </div>
+    <AdminCard title="Top Impacted Users" subtitle="By alert count">
+      {users.length === 0 ? <EmptyState>No users yet</EmptyState> : (
+        <div className="flex flex-col">
+          {users.map((u, i) => {
+            const lastAt = u.last_alert_at ? new Date(u.last_alert_at).toLocaleDateString('en-IN', { day: '2-digit', month: 'short' }) : '—';
+            const highPct = u.alert_count > 0 ? u.high_severity / u.alert_count : 0;
+            return (
+              <div key={u.account_id} onClick={() => navigate(`/admin/users/${u.account_id}`)}
+                className={cn('grid gap-2.5 items-center py-2.5 cursor-pointer hover:opacity-75 transition-opacity [grid-template-columns:22px_1fr_auto]',
+                  i < users.length - 1 && 'border-b border-border')}>
+                <span className="text-[11px] text-muted-foreground/70 tabular-nums font-semibold">{i + 1}</span>
+                <div>
+                  <div className="flex items-center gap-2 mb-1">
+                    <span className="text-xs font-semibold text-foreground">{u.broker_user_id}</span>
+                    <span className="text-[11px] text-muted-foreground/70">{u.email !== '—' ? u.email : ''}</span>
                   </div>
-
-                  {/* Right side: count + last alert */}
-                  <div style={{ textAlign: 'right' }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 6, justifyContent: 'flex-end' }}>
-                      <span style={{ fontSize: 16, fontWeight: 700, color: T.text, fontVariantNumeric: 'tabular-nums' }}>
-                        {u.alert_count}
+                  <div className="h-[3px] rounded-sm bg-muted overflow-hidden w-full">
+                    <div className="h-full rounded-sm" style={{ width: `${highPct * 100}%`, background: highPct > 0.5 ? ACCENT_RGB.loss : ACCENT_RGB.warning }} />
+                  </div>
+                </div>
+                <div className="text-right">
+                  <div className="flex items-center gap-1.5 justify-end">
+                    <span className="text-base font-bold text-foreground tabular-nums">{u.alert_count}</span>
+                    {u.high_severity > 0 && (
+                      <span className="text-[10px] px-1.5 py-px rounded-full font-semibold"
+                        style={{ background: 'color-mix(in srgb, rgb(var(--tm-loss)) 10%, transparent)', color: 'rgb(var(--tm-loss))' }}>
+                        {u.high_severity} crit/high
                       </span>
-                      {u.high_severity > 0 && (
-                        <span style={{ fontSize: 10, padding: '1px 6px', borderRadius: 10, background: T.redBg, color: T.red, fontWeight: 600 }}>
-                          {u.high_severity} crit/high
-                        </span>
-                      )}
-                      <ArrowRight size={11} style={{ color: T.dim }} />
-                    </div>
-                    <div style={{ fontSize: 11, color: T.dim, marginTop: 2 }}>last {lastAt}</div>
+                    )}
+                    <ArrowRight size={11} className="text-muted-foreground/70" />
                   </div>
+                  <div className="text-[11px] text-muted-foreground/70 mt-0.5">last {lastAt}</div>
                 </div>
-              );
-            })}
-          </div>
-        )}
-    </Card>
+              </div>
+            );
+          })}
+        </div>
+      )}
+    </AdminCard>
   );
 }
 
-// ─── Section: Re-occurrence ───────────────────────────────────────────────────
 function RecurrenceTable({ rows }: { rows: InsightsData['recurrence'] }) {
+  const cols = '[grid-template-columns:185px_1fr_65px_80px]';
   return (
-    <Card>
-      <SectionHeader
-        title="Pattern Re-occurrence"
-        sub="Same pattern fires again after user acknowledges it"
-      />
-      {rows.length === 0
-        ? <p style={{ fontSize: 12, color: T.dim }}>No patterns with both ack + re-occurrence yet</p>
-        : (
-          <div>
-            <div style={{ display: 'grid', gridTemplateColumns: '185px 1fr 65px 80px', gap: 12, padding: '0 0 8px', borderBottom: `1px solid ${T.border}`, marginBottom: 2 }}>
-              {['Pattern', '', 'Acked', 'Re-occurred'].map((h, i) => (
-                <span key={i} style={{ fontSize: 10, fontWeight: 600, color: T.dim, textTransform: 'uppercase', letterSpacing: '0.07em', textAlign: i >= 2 ? 'right' : 'left' }}>{h}</span>
-              ))}
-            </div>
-            {rows.map(row => {
-              const rateColor = row.rate >= 0.6 ? T.red : row.rate >= 0.35 ? T.orange : T.amber;
-              return (
-                <div key={row.pattern} style={{
-                  display: 'grid', gridTemplateColumns: '185px 1fr 65px 80px', gap: 12,
-                  alignItems: 'center', padding: '10px 0', borderBottom: `1px solid ${T.border}`,
-                }}>
-                  <PatternLabel pattern={row.pattern} />
-                  <RateBar rate={row.rate} color={rateColor} />
-                  <span style={{ fontSize: 12, color: T.muted, textAlign: 'right', fontVariantNumeric: 'tabular-nums' }}>
-                    {row.base_acked}
-                  </span>
-                  <div style={{ textAlign: 'right' }}>
-                    <div style={{ fontSize: 13, fontWeight: 700, color: rateColor, fontVariantNumeric: 'tabular-nums' }}>
-                      {(row.rate * 100).toFixed(0)}%
-                    </div>
-                    <div style={{ fontSize: 10, color: T.dim }}>
-                      {row.recurrence_count} users
-                    </div>
-                  </div>
-                </div>
-              );
-            })}
-
-            {/* Interpretation note */}
-            <div style={{ marginTop: 14, display: 'flex', alignItems: 'flex-start', gap: 8, padding: '10px 12px', borderRadius: 8, background: T.raised, border: `1px solid ${T.border2}` }}>
-              <RotateCcw size={12} style={{ color: T.muted, flexShrink: 0, marginTop: 1 }} />
-              <p style={{ fontSize: 11, color: T.dim, margin: 0, lineHeight: 1.5 }}>
-                High re-occurrence means the coaching prompt for that pattern isn't changing behavior. Consider updating the alert message or adding a follow-up nudge.
-              </p>
-            </div>
+    <AdminCard title="Pattern Re-occurrence" subtitle="Same pattern fires again after user acknowledges it">
+      {rows.length === 0 ? <EmptyState>No patterns with both ack + re-occurrence yet</EmptyState> : (
+        <div>
+          <div className={cn('grid gap-3 pb-2 border-b border-border', cols)}>
+            {['Pattern', '', 'Acked', 'Re-occurred'].map((h, i) => (
+              <span key={i} className={cn('table-header', i >= 2 && 'text-right')}>{h}</span>
+            ))}
           </div>
-        )}
-    </Card>
+          {rows.map(row => {
+            const rgb = row.rate >= 0.6 ? ACCENT_RGB.loss : row.rate >= 0.35 ? ACCENT_RGB.warning : ACCENT_RGB.warning;
+            return (
+              <div key={row.pattern} className={cn('grid gap-3 items-center py-2.5 border-b border-border', cols)}>
+                <PatternLabel pattern={row.pattern} />
+                <RateBar rate={row.rate} rgb={rgb} />
+                <span className="text-xs text-muted-foreground text-right tabular-nums">{row.base_acked}</span>
+                <div className="text-right">
+                  <div className="text-[13px] font-bold tabular-nums" style={{ color: rgb }}>{(row.rate * 100).toFixed(0)}%</div>
+                  <div className="text-[10px] text-muted-foreground/70">{row.recurrence_count} users</div>
+                </div>
+              </div>
+            );
+          })}
+          <div className="mt-3.5 flex items-start gap-2 px-3 py-2.5 rounded-lg bg-muted border border-border">
+            <RotateCcw size={12} className="text-muted-foreground shrink-0 mt-0.5" />
+            <p className="text-[11px] text-muted-foreground m-0 leading-relaxed">
+              High re-occurrence means the coaching prompt for that pattern isn't changing behavior. Consider updating the alert message or adding a follow-up nudge.
+            </p>
+          </div>
+        </div>
+      )}
+    </AdminCard>
   );
 }
 
-// ─── Main ─────────────────────────────────────────────────────────────────────
 export default function AdminInsights() {
   const [data, setData]       = useState<InsightsData | null>(null);
   const [days, setDays]       = useState(30);
@@ -378,78 +219,44 @@ export default function AdminInsights() {
     loadingRef.current = true;
     setLoading(true); setError('');
     try { setData(await adminApi.insights(days)); }
-    catch (e: any) { setError(e.message); }
+    catch (e: unknown) { setError(e instanceof Error ? e.message : String(e)); }
     finally { setLoading(false); loadingRef.current = false; }
   };
 
-  useEffect(() => { load(); }, [days]);
+  useEffect(() => { load(); }, [days]); // eslint-disable-line react-hooks/exhaustive-deps
 
   return (
-    <div style={{ padding: '28px 32px', fontFamily: T.dm, maxWidth: 1100 }}>
-
-      {/* Header */}
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 28 }}>
-        <div>
-          <h1 style={{ fontSize: 20, fontWeight: 700, color: T.text, margin: 0, letterSpacing: '-0.02em' }}>Behavioral Insights</h1>
-          <p style={{ fontSize: 12, color: T.dim, marginTop: 4 }}>Pattern intelligence across all users</p>
-        </div>
-        <div style={{ display: 'flex', gap: 10, alignItems: 'center' }}>
-          <select
-            value={days}
-            onChange={e => setDays(Number(e.target.value))}
-            style={{ padding: '6px 10px', borderRadius: 7, background: T.surface, border: `1px solid ${T.border}`, color: T.text, fontFamily: T.dm, fontSize: 12, outline: 'none' }}
-          >
+    <AdminPage
+      title="Behavioral Insights"
+      subtitle="Pattern intelligence across all users"
+      actions={
+        <>
+          <select value={days} onChange={e => setDays(Number(e.target.value))}
+            className="h-9 px-2.5 rounded-lg bg-card border border-border text-foreground text-xs outline-none focus-visible:ring-2 focus-visible:ring-ring">
             <option value={7}>Last 7 days</option>
             <option value={14}>Last 14 days</option>
             <option value={30}>Last 30 days</option>
             <option value={90}>Last 90 days</option>
           </select>
-          <button
-            onClick={load} disabled={loading}
-            style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '6px 10px', borderRadius: 7, background: T.surface, border: `1px solid ${T.border}`, color: T.muted, fontSize: 12, cursor: loading ? 'not-allowed' : 'pointer', fontFamily: T.dm }}
-          >
-            <RefreshCw size={12} style={{ animation: loading ? 'spin 1s linear infinite' : 'none' }} />
-            Refresh
-            <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
-          </button>
-        </div>
-      </div>
-
-      {/* Error */}
-      {error && (
-        <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '10px 14px', borderRadius: 8, background: T.redBg, border: '1px solid rgba(239,68,68,0.18)', marginBottom: 20 }}>
-          <AlertTriangle size={13} style={{ color: T.red }} />
-          <span style={{ fontSize: 12, color: T.red }}>{error}</span>
-        </div>
-      )}
-
-      {/* Loading */}
-      {loading && !data && (
-        <div style={{ display: 'flex', justifyContent: 'center', padding: '56px 0' }}>
-          <Spinner />
-        </div>
-      )}
+          <RefreshButton onClick={load} loading={loading} />
+        </>
+      }
+    >
+      <ErrorBanner message={error} />
+      {loading && !data && <LoadingBlock />}
 
       {data && (
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
-
-          {/* Row 1: Top Patterns + Severity */}
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
           <TopPatterns patterns={data.patterns} />
           <SeverityBreakdown severity={data.severity} />
-
-          {/* Row 2: Daily volume full-width */}
-          <div style={{ gridColumn: '1 / -1' }}>
-            <AlertVolume daily={data.daily} />
-          </div>
-
-          {/* Row 3: Engagement rate full-width table */}
+          <AdminCard className="lg:col-span-2" title="Daily Alert Volume" subtitle="Last 14 days">
+            <AreaSparkline data={data.daily} height={72} />
+          </AdminCard>
           <EngagementTable rows={data.engagement} />
-
-          {/* Row 4: Top impacted users + Re-occurrence */}
           <TopUsers users={data.top_users} />
           <RecurrenceTable rows={data.recurrence} />
         </div>
       )}
-    </div>
+    </AdminPage>
   );
 }

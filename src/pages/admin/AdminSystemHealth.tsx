@@ -1,28 +1,16 @@
 import { useEffect, useState } from 'react';
-import { RefreshCw, AlertTriangle, Clock, Play, ChevronDown, ChevronRight, Circle } from 'lucide-react';
+import { Clock, Play, ChevronDown, ChevronRight } from 'lucide-react';
 import { adminApi } from '@/lib/adminApi';
 import { useAdminAuth } from '@/contexts/AdminAuthContext';
+import { AdminPage, AdminCard, ErrorBanner, LoadingBlock, RefreshButton, type Accent } from './_ui';
+import { Button } from '@/components/ui/button';
+import { cn } from '@/lib/utils';
 
-// ─── Design tokens ────────────────────────────────────────────────────────────
-const T = {
-  bg:       '#09090b',
-  surface:  '#111115',
-  raised:   '#16161d',
-  border:   '#1c1c28',
-  border2:  '#252536',
-  text:     '#f1f0f5',
-  muted:    '#6b6a82',
-  dim:      '#3a3a50',
-  amber:    '#f59e0b',
-  amberBg:  'rgba(245,158,11,0.1)',
-  green:    '#22c55e',
-  greenBg:  'rgba(34,197,94,0.08)',
-  red:      '#ef4444',
-  redBg:    'rgba(239,68,68,0.08)',
-  dm:       "'Inter', 'DM Sans', sans-serif",
+const ACCENT_RGB: Record<Accent, string> = {
+  profit: 'rgb(var(--tm-profit))', loss: 'rgb(var(--tm-loss))',
+  warning: 'rgb(var(--tm-obs))', brand: 'rgb(var(--tm-brand))', muted: 'rgb(var(--muted-foreground))',
 };
 
-// ─── Types ────────────────────────────────────────────────────────────────────
 interface SystemData {
   redis: {
     status: string; version?: string; uptime_days?: number; connected_clients?: number;
@@ -36,205 +24,141 @@ interface SystemData {
   db_pool: { pool_size: number; checked_in: number; checked_out: number; overflow: number } | null;
   config: { maintenance_mode: boolean; environment: string; sentry_enabled: boolean };
 }
-
 interface TaskItem {
   key: string; name: string; schedule: string; status: string;
   triggerable: boolean; last_run_at: string | null; next_run_at: string | null;
 }
-
-interface FailedTask {
-  task_id: string; traceback: string; result: string;
-}
-
+interface FailedTask { task_id: string; traceback: string; result: string; }
 interface TaskData {
-  redis_connected: boolean;
-  tasks: TaskItem[];
-  queue_depths: Record<string, number | null>;
-  failed_tasks: FailedTask[];
-  failed_count: number;
+  redis_connected: boolean; tasks: TaskItem[]; queue_depths: Record<string, number | null>;
+  failed_tasks: FailedTask[]; failed_count: number;
 }
 
-// ─── Sub-components ───────────────────────────────────────────────────────────
-function Card({ children, style }: { children: React.ReactNode; style?: React.CSSProperties }) {
+// ── Small building blocks ────────────────────────────────────────────────────
+function Pill({ ok, text }: { ok: boolean; text: string }) {
+  const rgb = ok ? ACCENT_RGB.profit : ACCENT_RGB.loss;
   return (
-    <div style={{ background: T.surface, border: `1px solid ${T.border}`, borderRadius: 10, padding: '18px 20px', ...style }}>
-      {children}
-    </div>
+    <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full border"
+      style={{ background: `color-mix(in srgb, ${rgb} 10%, transparent)`, borderColor: `color-mix(in srgb, ${rgb} 22%, transparent)` }}>
+      <span className="w-[5px] h-[5px] rounded-full" style={{ background: rgb }} />
+      <span className="text-[11px] font-semibold" style={{ color: rgb }}>{text}</span>
+    </span>
   );
 }
 
-function SectionTitle({ children }: { children: React.ReactNode }) {
-  return <div style={{ fontSize: 12, fontWeight: 600, color: T.muted, textTransform: 'uppercase' as const, letterSpacing: '0.07em', marginBottom: 14 }}>{children}</div>;
+function WarnPill({ text, accent = 'warning' }: { text: string; accent?: Accent }) {
+  const rgb = ACCENT_RGB[accent];
+  return (
+    <span className="inline-flex items-center px-2.5 py-0.5 rounded-full border text-[11px] font-semibold"
+      style={{ background: `color-mix(in srgb, ${rgb} 10%, transparent)`, borderColor: `color-mix(in srgb, ${rgb} 20%, transparent)`, color: rgb }}>{text}</span>
+  );
 }
 
-function MetricRow({ label, value, color, mono }: { label: string; value: string | number | null | undefined; color?: string; mono?: boolean }) {
+function Metric({ label, value, accent, mono }: { label: string; value: string | number | null | undefined; accent?: Accent; mono?: boolean }) {
   if (value === null || value === undefined) return null;
   return (
-    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '7px 0', borderBottom: `1px solid ${T.border}` }}>
-      <span style={{ fontSize: 12, color: T.muted }}>{label}</span>
-      <span style={{ fontSize: 12, fontWeight: 500, color: color || T.text, fontFamily: mono ? "'JetBrains Mono', monospace" : T.dm }}>
-        {String(value)}
-      </span>
+    <div className="flex justify-between items-center py-1.5 border-b border-border last:border-0">
+      <span className="text-xs text-muted-foreground">{label}</span>
+      <span className={cn('text-xs font-medium', mono && 'font-mono')} style={{ color: accent ? ACCENT_RGB[accent] : 'rgb(var(--text-primary))' }}>{String(value)}</span>
     </div>
   );
 }
 
-function StatusPill({ ok, label }: { ok: boolean; label: string }) {
-  return (
-    <div style={{
-      display: 'inline-flex', alignItems: 'center', gap: 5,
-      padding: '3px 10px', borderRadius: 20,
-      background: ok ? T.greenBg : T.redBg,
-      border: `1px solid ${ok ? 'rgba(34,197,94,0.2)' : 'rgba(239,68,68,0.2)'}`,
-    }}>
-      <Circle size={5} fill={ok ? T.green : T.red} style={{ color: ok ? T.green : T.red }} />
-      <span style={{ fontSize: 11, fontWeight: 600, color: ok ? T.green : T.red }}>{label}</span>
-    </div>
-  );
-}
+const CardTitle = ({ children }: { children: React.ReactNode }) => <div className="tm-label mb-3.5">{children}</div>;
 
 function TaskStatusDot({ status }: { status: string }) {
-  const color = status === 'scheduled' ? T.green : status === 'error' ? T.red : T.amber;
-  return <span style={{ display: 'inline-block', width: 7, height: 7, borderRadius: '50%', background: color, boxShadow: `0 0 5px ${color}60`, flexShrink: 0 }} />;
+  const rgb = status === 'scheduled' ? ACCENT_RGB.profit : status === 'error' ? ACCENT_RGB.loss : ACCENT_RGB.warning;
+  return <span className="inline-block w-[7px] h-[7px] rounded-full shrink-0" style={{ background: rgb, boxShadow: `0 0 5px color-mix(in srgb, ${rgb} 38%, transparent)` }} />;
 }
 
-// ─── Failed tasks expandable row ──────────────────────────────────────────────
 function FailedTaskRow({ task }: { task: FailedTask }) {
   const [open, setOpen] = useState(false);
-  const shortId = task.task_id.slice(0, 8);
   return (
-    <div style={{ borderBottom: `1px solid ${T.border}` }}>
-      <button
-        onClick={() => setOpen(o => !o)}
-        style={{
-          width: '100%', display: 'flex', alignItems: 'center', gap: 10,
-          padding: '10px 0', background: 'none', border: 'none', cursor: 'pointer', textAlign: 'left' as const,
-        }}
-      >
-        {open ? <ChevronDown size={12} style={{ color: T.dim, flexShrink: 0 }} /> : <ChevronRight size={12} style={{ color: T.dim, flexShrink: 0 }} />}
-        <span style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 11, color: T.amber }}>{shortId}…</span>
-        <span style={{ fontSize: 12, color: T.muted, flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' as const }}>
+    <div className="border-b border-border">
+      <button onClick={() => setOpen(o => !o)} className="w-full flex items-center gap-2.5 py-2.5 text-left">
+        {open ? <ChevronDown size={12} className="text-muted-foreground/60 shrink-0" /> : <ChevronRight size={12} className="text-muted-foreground/60 shrink-0" />}
+        <span className="font-mono text-[11px] text-[rgb(var(--tm-brand))]">{task.task_id.slice(0, 8)}…</span>
+        <span className="text-xs text-muted-foreground flex-1 overflow-hidden text-ellipsis whitespace-nowrap">
           {task.result || task.traceback.split('\n').pop()?.trim() || 'Unknown error'}
         </span>
       </button>
       {open && (
-        <div style={{
-          margin: '0 0 10px 22px', padding: '10px 14px',
-          borderRadius: 7, background: T.bg,
-          border: `1px solid ${T.border2}`,
-        }}>
-          {task.result && (
-            <p style={{ fontSize: 11, color: T.red, marginBottom: 6, fontFamily: "'JetBrains Mono', monospace", wordBreak: 'break-all' as const }}>
-              {task.result}
-            </p>
-          )}
-          {task.traceback && (
-            <pre style={{ fontSize: 10, color: T.muted, margin: 0, whiteSpace: 'pre-wrap' as const, lineHeight: 1.5, wordBreak: 'break-all' as const }}>
-              {task.traceback}
-            </pre>
-          )}
+        <div className="mb-2.5 ml-[22px] px-3.5 py-2.5 rounded-lg bg-background border border-border">
+          {task.result && <p className="text-[11px] text-[rgb(var(--tm-loss))] mb-1.5 font-mono break-all">{task.result}</p>}
+          {task.traceback && <pre className="text-[10px] text-muted-foreground m-0 whitespace-pre-wrap leading-relaxed break-all">{task.traceback}</pre>}
         </div>
       )}
     </div>
   );
 }
 
-// ─── Beat schedule table ──────────────────────────────────────────────────────
 function BeatScheduleTable({ tasks, canTrigger, triggering, triggerMsg, onTrigger }: {
-  tasks: TaskItem[];
-  canTrigger: boolean;
-  triggering: string | null;
-  triggerMsg: { key: string; ok: boolean; msg: string } | null;
-  onTrigger: (key: string) => void;
+  tasks: TaskItem[]; canTrigger: boolean; triggering: string | null;
+  triggerMsg: { key: string; ok: boolean; msg: string } | null; onTrigger: (key: string) => void;
 }) {
   const noData    = tasks.filter(t => t.status === 'no_data').length;
   const errored   = tasks.filter(t => t.status === 'error').length;
   const scheduled = tasks.filter(t => t.status === 'scheduled').length;
+  const cols = '[grid-template-columns:16px_1fr_160px_140px_140px_80px]';
 
   return (
-    <Card style={{ gridColumn: '1 / -1' }}>
-      {/* Header */}
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-          <Clock size={14} style={{ color: T.amber }} />
-          <span style={{ fontSize: 13, fontWeight: 600, color: T.text }}>Celery Beat Schedule</span>
-          <span style={{ fontSize: 11, color: T.dim }}>{tasks.length} tasks</span>
+    <AdminCard className="lg:col-span-3" noPadding>
+      <div className="p-5">
+        <div className="flex justify-between items-center mb-4">
+          <div className="flex items-center gap-2.5">
+            <Clock size={14} className="text-[rgb(var(--tm-brand))]" />
+            <span className="text-[13px] font-semibold text-foreground">Celery Beat Schedule</span>
+            <span className="text-[11px] text-muted-foreground/70">{tasks.length} tasks</span>
+          </div>
+          <div className="flex gap-2">
+            {scheduled > 0 && <Pill ok text={`${scheduled} scheduled`} />}
+            {noData > 0 && <WarnPill text={`${noData} no data (never run)`} />}
+            {errored > 0 && <Pill ok={false} text={`${errored} error`} />}
+          </div>
         </div>
-        <div style={{ display: 'flex', gap: 8 }}>
-          {scheduled > 0 && <StatusPill ok={true} label={`${scheduled} scheduled`} />}
-          {noData > 0 && (
-            <div style={{ display: 'inline-flex', alignItems: 'center', gap: 5, padding: '3px 10px', borderRadius: 20, background: T.amberBg, border: '1px solid rgba(245,158,11,0.2)' }}>
-              <span style={{ fontSize: 11, fontWeight: 600, color: T.amber }}>{noData} no data (never run)</span>
+
+        {triggerMsg && (
+          <div className="mb-3 px-3 py-1.5 rounded-lg text-xs border"
+            style={{ color: ACCENT_RGB[triggerMsg.ok ? 'profit' : 'loss'],
+                     background: `color-mix(in srgb, ${ACCENT_RGB[triggerMsg.ok ? 'profit' : 'loss']} 8%, transparent)`,
+                     borderColor: `color-mix(in srgb, ${ACCENT_RGB[triggerMsg.ok ? 'profit' : 'loss']} 20%, transparent)` }}>
+            <strong>{triggerMsg.key}</strong>: {triggerMsg.msg}
+          </div>
+        )}
+
+        <div className={cn('grid gap-3 pb-2 border-b border-border', cols)}>
+          {['', 'Task', 'Schedule', 'Last Run', 'Next Run', ''].map((h, i) => <span key={i} className="table-header">{h}</span>)}
+        </div>
+
+        {tasks.map(t => (
+          <div key={t.key} className={cn('grid gap-3 items-center py-2.5 border-b border-border', cols)}>
+            <TaskStatusDot status={t.status} />
+            <div>
+              <span className="text-xs font-medium text-foreground">{t.name}</span>
+              <span className="text-[10px] text-muted-foreground/60 ml-2 font-mono">{t.key}</span>
             </div>
-          )}
-          {errored > 0 && <StatusPill ok={false} label={`${errored} error`} />}
-        </div>
-      </div>
-
-      {triggerMsg && (
-        <div style={{ marginBottom: 12, padding: '7px 12px', borderRadius: 8, background: triggerMsg.ok ? T.greenBg : T.redBg, border: `1px solid ${triggerMsg.ok ? 'rgba(34,197,94,0.2)' : 'rgba(239,68,68,0.2)'}`, fontSize: 12, color: triggerMsg.ok ? T.green : T.red }}>
-          <strong>{triggerMsg.key}</strong>: {triggerMsg.msg}
-        </div>
-      )}
-
-      {/* Table header */}
-      <div style={{ display: 'grid', gridTemplateColumns: '16px 1fr 160px 140px 140px 80px', gap: 12, padding: '0 0 8px', borderBottom: `1px solid ${T.border}`, marginBottom: 2 }}>
-        {['', 'Task', 'Schedule', 'Last Run', 'Next Run', ''].map((h, i) => (
-          <span key={i} style={{ fontSize: 10, fontWeight: 600, color: T.dim, textTransform: 'uppercase' as const, letterSpacing: '0.07em' }}>{h}</span>
+            <span className="text-[11px] text-muted-foreground">{t.schedule}</span>
+            <span className="text-[11px] text-muted-foreground tabular-nums">
+              {t.last_run_at ? new Date(t.last_run_at).toLocaleString('en-IN', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' }) : <span className="text-muted-foreground/60">never</span>}
+            </span>
+            <span className="text-[11px] text-muted-foreground tabular-nums">
+              {t.next_run_at ? new Date(t.next_run_at).toLocaleString('en-IN', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' }) : <span className="text-muted-foreground/60">unknown</span>}
+            </span>
+            <div className="flex justify-end">
+              {canTrigger && t.triggerable ? (
+                <Button size="sm" variant="outline" className="h-7 px-2.5 text-[11px]" onClick={() => onTrigger(t.key)} disabled={triggering === t.key}>
+                  <Play size={9} /> {triggering === t.key ? '…' : 'Run'}
+                </Button>
+              ) : <span className="text-[10px] text-muted-foreground/60">—</span>}
+            </div>
+          </div>
         ))}
       </div>
-
-      {tasks.map(t => (
-        <div key={t.key} style={{ display: 'grid', gridTemplateColumns: '16px 1fr 160px 140px 140px 80px', gap: 12, alignItems: 'center', padding: '10px 0', borderBottom: `1px solid ${T.border}` }}>
-          <TaskStatusDot status={t.status} />
-
-          <div>
-            <span style={{ fontSize: 12, fontWeight: 500, color: T.text }}>{t.name}</span>
-            <span style={{ fontSize: 10, color: T.dim, marginLeft: 8, fontFamily: "'JetBrains Mono', monospace" }}>{t.key}</span>
-          </div>
-
-          <span style={{ fontSize: 11, color: T.muted }}>{t.schedule}</span>
-
-          <span style={{ fontSize: 11, color: T.muted, fontVariantNumeric: 'tabular-nums' }}>
-            {t.last_run_at
-              ? new Date(t.last_run_at).toLocaleString('en-IN', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' })
-              : <span style={{ color: T.dim }}>never</span>}
-          </span>
-
-          <span style={{ fontSize: 11, color: T.muted, fontVariantNumeric: 'tabular-nums' }}>
-            {t.next_run_at
-              ? new Date(t.next_run_at).toLocaleString('en-IN', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' })
-              : <span style={{ color: T.dim }}>unknown</span>}
-          </span>
-
-          <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
-            {canTrigger && t.triggerable ? (
-              <button
-                onClick={() => onTrigger(t.key)}
-                disabled={triggering === t.key}
-                style={{
-                  display: 'flex', alignItems: 'center', gap: 4,
-                  padding: '4px 10px', borderRadius: 6,
-                  background: T.amberBg, border: '1px solid rgba(245,158,11,0.25)',
-                  color: T.amber, fontSize: 11, fontWeight: 600,
-                  cursor: triggering === t.key ? 'not-allowed' : 'pointer',
-                  opacity: triggering === t.key ? 0.5 : 1, fontFamily: T.dm,
-                }}
-              >
-                <Play size={9} />
-                {triggering === t.key ? '…' : 'Run'}
-              </button>
-            ) : (
-              <span style={{ fontSize: 10, color: T.dim }}>—</span>
-            )}
-          </div>
-        </div>
-      ))}
-    </Card>
+    </AdminCard>
   );
 }
 
-// ─── Main ─────────────────────────────────────────────────────────────────────
+// ── Main ─────────────────────────────────────────────────────────────────────
 export default function AdminSystemHealth() {
   const { admin } = useAdminAuth();
   const canTrigger = admin?.role === 'superadmin' || admin?.role === 'ops';
@@ -253,7 +177,7 @@ export default function AdminSystemHealth() {
       const [s, t] = await Promise.all([adminApi.system(), adminApi.tasks()]);
       setSys(s); setTasks(t);
       setTs(new Date().toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' }));
-    } catch (e: any) { setError(e.message); }
+    } catch (e: unknown) { setError(e instanceof Error ? e.message : String(e)); }
     finally { setLoading(false); }
   };
 
@@ -262,220 +186,167 @@ export default function AdminSystemHealth() {
     try {
       const r = await adminApi.triggerTask(key);
       setTriggerMsg({ key, ok: true, msg: `Queued — ID: ${r.celery_id?.slice(0, 8)}…` });
-    } catch (e: any) {
-      setTriggerMsg({ key, ok: false, msg: e.message });
-    } finally { setTriggering(null); }
+    } catch (e: unknown) { setTriggerMsg({ key, ok: false, msg: e instanceof Error ? e.message : String(e) }); }
+    finally { setTriggering(null); }
   };
 
   useEffect(() => { load(); }, []);
 
+  const redisMemAccent = sys?.redis.memory_max_mb && sys?.redis.memory_used_mb
+    ? (sys.redis.memory_used_mb / sys.redis.memory_max_mb > 0.85 ? 'loss' as Accent : undefined) : undefined;
+
   return (
-    <div style={{ padding: '28px 32px', fontFamily: T.dm, maxWidth: 1100 }}>
-
-      {/* Header */}
-      <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: 28 }}>
-        <div>
-          <h1 style={{ fontSize: 20, fontWeight: 700, color: T.text, margin: 0, letterSpacing: '-0.02em' }}>System Health</h1>
-          {ts && <p style={{ fontSize: 12, color: T.dim, marginTop: 4 }}>Last updated {ts} IST</p>}
-        </div>
-        <button onClick={load} disabled={loading} style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '6px 12px', borderRadius: 7, background: T.surface, border: `1px solid ${T.border}`, color: T.muted, fontSize: 12, cursor: loading ? 'not-allowed' : 'pointer', fontFamily: T.dm }}>
-          <RefreshCw size={12} style={{ animation: loading ? 'spin 1s linear infinite' : 'none' }} />
-          Refresh
-          <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
-        </button>
-      </div>
-
-      {error && (
-        <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '10px 14px', borderRadius: 8, background: T.redBg, border: '1px solid rgba(239,68,68,0.18)', marginBottom: 20 }}>
-          <AlertTriangle size={13} style={{ color: T.red }} />
-          <span style={{ fontSize: 12, color: T.red }}>{error}</span>
-        </div>
-      )}
-
-      {loading && !sys && (
-        <div style={{ display: 'flex', justifyContent: 'center', padding: '56px 0' }}>
-          <div style={{ width: 24, height: 24, border: `2px solid ${T.amber}`, borderTopColor: 'transparent', borderRadius: '50%', animation: 'spin 0.8s linear infinite' }} />
-        </div>
-      )}
+    <AdminPage
+      title="System Health"
+      subtitle={ts ? `Last updated ${ts} IST` : undefined}
+      actions={<RefreshButton onClick={load} loading={loading} />}
+    >
+      <ErrorBanner message={error} />
+      {loading && !sys && <LoadingBlock />}
 
       {sys && (
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 14 }}>
-
-          {/* ── Redis ──────────────────────────────────────────────────── */}
-          <Card>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
-              <SectionTitle>Redis</SectionTitle>
-              <StatusPill ok={sys.redis.status === 'ok'} label={sys.redis.status === 'ok' ? 'healthy' : 'error'} />
-            </div>
-            <MetricRow label="Version"      value={sys.redis.version} />
-            <MetricRow label="Uptime"       value={sys.redis.uptime_days !== undefined ? `${sys.redis.uptime_days}d` : undefined} />
-            <MetricRow label="Clients"      value={sys.redis.connected_clients} />
-            <MetricRow label="Memory used"  value={sys.redis.memory_used_mb !== undefined ? `${sys.redis.memory_used_mb} MB` : undefined}
-              color={sys.redis.memory_max_mb && sys.redis.memory_used_mb ? (sys.redis.memory_used_mb / sys.redis.memory_max_mb > 0.85 ? T.red : undefined) : undefined} />
-            <MetricRow label="Memory peak"  value={sys.redis.memory_peak_mb !== undefined ? `${sys.redis.memory_peak_mb} MB` : undefined} />
-            {sys.redis.memory_max_mb ? <MetricRow label="Memory limit" value={`${sys.redis.memory_max_mb} MB`} /> : null}
-            <MetricRow label="Total keys"   value={sys.redis.total_keys} />
-            <MetricRow label="Hit rate"     value={sys.redis.hit_rate_pct != null ? `${sys.redis.hit_rate_pct}%` : 'N/A'}
-              color={sys.redis.hit_rate_pct != null ? (sys.redis.hit_rate_pct > 80 ? T.green : T.amber) : undefined} />
-            <MetricRow label="Evicted"      value={sys.redis.evicted_keys}
-              color={sys.redis.evicted_keys && sys.redis.evicted_keys > 0 ? T.amber : undefined} />
-            <MetricRow label="Ops/sec"      value={sys.redis.ops_per_sec} />
-            {sys.redis.detail && <MetricRow label="Error" value={sys.redis.detail} color={T.red} />}
-          </Card>
-
-          {/* ── Celery + DB pool ───────────────────────────────────────── */}
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
-            <Card>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
-                <SectionTitle>Celery Queues</SectionTitle>
-                <StatusPill ok={sys.celery.status === 'ok'} label={sys.celery.status} />
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-3.5">
+          {/* Redis */}
+          <AdminCard noPadding>
+            <div className="p-5">
+              <div className="flex justify-between items-center mb-4">
+                <CardTitle>Redis</CardTitle>
+                <Pill ok={sys.redis.status === 'ok'} text={sys.redis.status === 'ok' ? 'healthy' : 'error'} />
               </div>
-              <MetricRow label="Default queue" value={sys.celery.queue_depth}
-                color={sys.celery.queue_depth !== undefined && sys.celery.queue_depth > 100 ? T.amber : undefined} />
-              <MetricRow label="AI worker queue" value={sys.celery.ai_queue}
-                color={sys.celery.ai_queue !== undefined && sys.celery.ai_queue > 50 ? T.amber : undefined} />
-              {sys.celery.detail && <MetricRow label="Detail" value={sys.celery.detail} />}
+              <Metric label="Version" value={sys.redis.version} />
+              <Metric label="Uptime" value={sys.redis.uptime_days !== undefined ? `${sys.redis.uptime_days}d` : undefined} />
+              <Metric label="Clients" value={sys.redis.connected_clients} />
+              <Metric label="Memory used" value={sys.redis.memory_used_mb !== undefined ? `${sys.redis.memory_used_mb} MB` : undefined} accent={redisMemAccent} />
+              <Metric label="Memory peak" value={sys.redis.memory_peak_mb !== undefined ? `${sys.redis.memory_peak_mb} MB` : undefined} />
+              {sys.redis.memory_max_mb ? <Metric label="Memory limit" value={`${sys.redis.memory_max_mb} MB`} /> : null}
+              <Metric label="Total keys" value={sys.redis.total_keys} />
+              <Metric label="Hit rate" value={sys.redis.hit_rate_pct != null ? `${sys.redis.hit_rate_pct}%` : 'N/A'}
+                accent={sys.redis.hit_rate_pct != null ? (sys.redis.hit_rate_pct > 80 ? 'profit' : 'warning') : undefined} />
+              <Metric label="Evicted" value={sys.redis.evicted_keys} accent={sys.redis.evicted_keys && sys.redis.evicted_keys > 0 ? 'warning' : undefined} />
+              <Metric label="Ops/sec" value={sys.redis.ops_per_sec} />
+              {sys.redis.detail && <Metric label="Error" value={sys.redis.detail} accent="loss" />}
+            </div>
+          </AdminCard>
 
-              {/* Queue depth visualisation */}
-              {(sys.celery.queue_depth !== undefined || sys.celery.ai_queue !== undefined) && (
-                <div style={{ marginTop: 14 }}>
-                  {[
-                    { label: 'celery', depth: sys.celery.queue_depth ?? 0, warn: 100 },
-                    { label: 'ai_worker', depth: sys.celery.ai_queue ?? 0, warn: 50 },
-                  ].map(({ label, depth, warn }) => (
-                    <div key={label} style={{ marginBottom: 10 }}>
-                      <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 4 }}>
-                        <span style={{ fontSize: 11, color: T.dim, fontFamily: "'JetBrains Mono', monospace" }}>{label}</span>
-                        <span style={{ fontSize: 11, color: depth > warn ? T.amber : T.muted, fontVariantNumeric: 'tabular-nums' }}>{depth}</span>
-                      </div>
-                      <div style={{ height: 4, background: T.raised, borderRadius: 2, overflow: 'hidden' }}>
-                        <div style={{
-                          height: '100%',
-                          width: `${Math.min(depth / warn * 100, 100)}%`,
-                          background: depth > warn ? T.amber : T.green,
-                          borderRadius: 2,
-                        }} />
-                      </div>
-                    </div>
-                  ))}
+          {/* Celery + DB pool */}
+          <div className="flex flex-col gap-3.5">
+            <AdminCard noPadding>
+              <div className="p-5">
+                <div className="flex justify-between items-center mb-4">
+                  <CardTitle>Celery Queues</CardTitle>
+                  <Pill ok={sys.celery.status === 'ok'} text={sys.celery.status} />
                 </div>
-              )}
-            </Card>
+                <Metric label="Default queue" value={sys.celery.queue_depth} accent={sys.celery.queue_depth !== undefined && sys.celery.queue_depth > 100 ? 'warning' : undefined} />
+                <Metric label="AI worker queue" value={sys.celery.ai_queue} accent={sys.celery.ai_queue !== undefined && sys.celery.ai_queue > 50 ? 'warning' : undefined} />
+                {sys.celery.detail && <Metric label="Detail" value={sys.celery.detail} />}
+                {(sys.celery.queue_depth !== undefined || sys.celery.ai_queue !== undefined) && (
+                  <div className="mt-3.5">
+                    {[{ label: 'celery', depth: sys.celery.queue_depth ?? 0, warn: 100 }, { label: 'ai_worker', depth: sys.celery.ai_queue ?? 0, warn: 50 }].map(({ label, depth, warn }) => (
+                      <div key={label} className="mb-2.5">
+                        <div className="flex justify-between mb-1">
+                          <span className="text-[11px] text-muted-foreground/60 font-mono">{label}</span>
+                          <span className="text-[11px] tabular-nums" style={{ color: depth > warn ? ACCENT_RGB.warning : ACCENT_RGB.muted }}>{depth}</span>
+                        </div>
+                        <div className="h-1 rounded-sm bg-muted overflow-hidden">
+                          <div className="h-full rounded-sm" style={{ width: `${Math.min(depth / warn * 100, 100)}%`, background: depth > warn ? ACCENT_RGB.warning : ACCENT_RGB.profit }} />
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            </AdminCard>
 
             {sys.db_pool && (
-              <Card>
-                <SectionTitle>DB Connection Pool</SectionTitle>
-                <MetricRow label="Pool size"   value={sys.db_pool.pool_size} />
-                <MetricRow label="Checked in"  value={sys.db_pool.checked_in} />
-                <MetricRow label="Checked out" value={sys.db_pool.checked_out}
-                  color={sys.db_pool.checked_out > sys.db_pool.pool_size * 0.8 ? T.amber : undefined} />
-                <MetricRow label="Overflow"    value={sys.db_pool.overflow}
-                  color={sys.db_pool.overflow > 0 ? T.amber : undefined} />
-                {/* Pool utilization bar */}
-                <div style={{ marginTop: 12 }}>
-                  <div style={{ height: 5, background: T.raised, borderRadius: 3, overflow: 'hidden' }}>
-                    <div style={{
-                      height: '100%',
-                      width: `${(sys.db_pool.checked_out / (sys.db_pool.pool_size + sys.db_pool.overflow || 1)) * 100}%`,
-                      background: sys.db_pool.checked_out > sys.db_pool.pool_size * 0.8 ? T.amber : T.green,
-                      borderRadius: 3,
-                    }} />
+              <AdminCard noPadding>
+                <div className="p-5">
+                  <CardTitle>DB Connection Pool</CardTitle>
+                  <Metric label="Pool size" value={sys.db_pool.pool_size} />
+                  <Metric label="Checked in" value={sys.db_pool.checked_in} />
+                  <Metric label="Checked out" value={sys.db_pool.checked_out} accent={sys.db_pool.checked_out > sys.db_pool.pool_size * 0.8 ? 'warning' : undefined} />
+                  <Metric label="Overflow" value={sys.db_pool.overflow} accent={sys.db_pool.overflow > 0 ? 'warning' : undefined} />
+                  <div className="mt-3">
+                    <div className="h-[5px] rounded bg-muted overflow-hidden">
+                      <div className="h-full rounded" style={{ width: `${(sys.db_pool.checked_out / (sys.db_pool.pool_size + sys.db_pool.overflow || 1)) * 100}%`, background: sys.db_pool.checked_out > sys.db_pool.pool_size * 0.8 ? ACCENT_RGB.warning : ACCENT_RGB.profit }} />
+                    </div>
+                    <span className="text-[10px] text-muted-foreground/60 mt-1 block">Pool utilisation</span>
                   </div>
-                  <span style={{ fontSize: 10, color: T.dim, marginTop: 4, display: 'block' }}>
-                    Pool utilisation
-                  </span>
                 </div>
-              </Card>
+              </AdminCard>
             )}
           </div>
 
-          {/* ── Config + Integrations ──────────────────────────────────── */}
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
-            <Card>
-              <SectionTitle>Config</SectionTitle>
-              <MetricRow label="Environment"  value={sys.config.environment} />
-              <MetricRow label="Maintenance"  value={sys.config.maintenance_mode ? 'ON' : 'off'}
-                color={sys.config.maintenance_mode ? T.red : T.green} />
-              <MetricRow label="Online users" value={sys.online_users ?? 'N/A'} color={T.green} />
-            </Card>
-
-            <Card>
-              <SectionTitle>Integrations</SectionTitle>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-                {[
-                  { label: 'WhatsApp (Gupshup)', ok: sys.whatsapp.configured },
-                  { label: 'Sentry',             ok: sys.config.sentry_enabled },
-                ].map(({ label, ok }) => (
-                  <div key={label} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '6px 0', borderBottom: `1px solid ${T.border}` }}>
-                    <span style={{ fontSize: 12, color: T.muted }}>{label}</span>
-                    <StatusPill ok={ok} label={ok ? 'enabled' : 'not configured'} />
-                  </div>
-                ))}
+          {/* Config + Integrations + Quick metrics */}
+          <div className="flex flex-col gap-3.5">
+            <AdminCard noPadding>
+              <div className="p-5">
+                <CardTitle>Config</CardTitle>
+                <Metric label="Environment" value={sys.config.environment} />
+                <Metric label="Maintenance" value={sys.config.maintenance_mode ? 'ON' : 'off'} accent={sys.config.maintenance_mode ? 'loss' : 'profit'} />
+                <Metric label="Online users" value={sys.online_users ?? 'N/A'} accent="profit" />
               </div>
-            </Card>
+            </AdminCard>
 
-            {/* Quick metrics */}
-            <Card>
-              <SectionTitle>Quick Metrics</SectionTitle>
-              {tasks && (
-                <>
-                  <MetricRow label="Scheduled tasks"  value={tasks.tasks.filter(t => t.status === 'scheduled').length + ' / ' + tasks.tasks.length} />
-                  <MetricRow label="Never run tasks"  value={tasks.tasks.filter(t => t.status === 'no_data').length}
-                    color={tasks.tasks.filter(t => t.status === 'no_data').length > 0 ? T.amber : undefined} />
-                  <MetricRow label="Failed (result)"  value={tasks.failed_count}
-                    color={tasks.failed_count > 0 ? T.red : T.green} />
-                </>
-              )}
-            </Card>
+            <AdminCard noPadding>
+              <div className="p-5">
+                <CardTitle>Integrations</CardTitle>
+                <div className="flex flex-col gap-2.5">
+                  {[{ label: 'WhatsApp (Gupshup)', ok: sys.whatsapp.configured }, { label: 'Sentry', ok: sys.config.sentry_enabled }].map(({ label, ok }) => (
+                    <div key={label} className="flex justify-between items-center py-1.5 border-b border-border last:border-0">
+                      <span className="text-xs text-muted-foreground">{label}</span>
+                      <Pill ok={ok} text={ok ? 'enabled' : 'not configured'} />
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </AdminCard>
+
+            {tasks && (
+              <AdminCard noPadding>
+                <div className="p-5">
+                  <CardTitle>Quick Metrics</CardTitle>
+                  <Metric label="Scheduled tasks" value={`${tasks.tasks.filter(t => t.status === 'scheduled').length} / ${tasks.tasks.length}`} />
+                  <Metric label="Never run tasks" value={tasks.tasks.filter(t => t.status === 'no_data').length} accent={tasks.tasks.filter(t => t.status === 'no_data').length > 0 ? 'warning' : undefined} />
+                  <Metric label="Failed (result)" value={tasks.failed_count} accent={tasks.failed_count > 0 ? 'loss' : 'profit'} />
+                </div>
+              </AdminCard>
+            )}
           </div>
 
-          {/* ── Beat schedule — full width ─────────────────────────────── */}
+          {/* Beat schedule — full width */}
           {tasks && (
-            <BeatScheduleTable
-              tasks={tasks.tasks}
-              canTrigger={canTrigger}
-              triggering={triggering}
-              triggerMsg={triggerMsg}
-              onTrigger={triggerTask}
-            />
+            <BeatScheduleTable tasks={tasks.tasks} canTrigger={canTrigger} triggering={triggering} triggerMsg={triggerMsg} onTrigger={triggerTask} />
           )}
 
-          {/* ── Failed tasks ───────────────────────────────────────────── */}
+          {/* Failed tasks — full width */}
           {tasks && (
-            <Card style={{ gridColumn: '1 / -1' }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                  <span style={{ fontSize: 13, fontWeight: 600, color: T.text }}>Failed Tasks</span>
-                  <span style={{ fontSize: 11, color: T.dim }}>(scanned last 200 Celery result-backend keys)</span>
-                </div>
-                {tasks.failed_count === 0
-                  ? <StatusPill ok={true} label="0 failures" />
-                  : (
-                    <div style={{ display: 'inline-flex', alignItems: 'center', gap: 5, padding: '3px 10px', borderRadius: 20, background: T.redBg, border: '1px solid rgba(239,68,68,0.2)' }}>
-                      <span style={{ fontSize: 11, fontWeight: 600, color: T.red }}>{tasks.failed_count} failed</span>
-                    </div>
-                  )}
-              </div>
-
-              {tasks.failed_tasks.length === 0 ? (
-                <p style={{ fontSize: 12, color: T.dim, textAlign: 'center', padding: '16px 0' }}>
-                  {tasks.failed_count === 0 ? 'No failures detected in result backend.' : 'Failures detected but no detail available.'}
-                </p>
-              ) : (
-                <div>
-                  <div style={{ display: 'grid', gridTemplateColumns: '22px 100px 1fr', gap: 12, padding: '0 0 8px', borderBottom: `1px solid ${T.border}`, marginBottom: 4 }}>
-                    <span />
-                    {['Task ID', 'Error preview'].map((h, i) => (
-                      <span key={i} style={{ fontSize: 10, fontWeight: 600, color: T.dim, textTransform: 'uppercase' as const, letterSpacing: '0.07em' }}>{h}</span>
-                    ))}
+            <AdminCard className="lg:col-span-3" noPadding>
+              <div className="p-5">
+                <div className="flex justify-between items-center mb-4">
+                  <div className="flex items-center gap-2.5">
+                    <span className="text-[13px] font-semibold text-foreground">Failed Tasks</span>
+                    <span className="text-[11px] text-muted-foreground/70">(scanned last 200 Celery result-backend keys)</span>
                   </div>
-                  {tasks.failed_tasks.map(f => <FailedTaskRow key={f.task_id} task={f} />)}
+                  {tasks.failed_count === 0 ? <Pill ok text="0 failures" /> : <WarnPill text={`${tasks.failed_count} failed`} accent="loss" />}
                 </div>
-              )}
-            </Card>
+                {tasks.failed_tasks.length === 0 ? (
+                  <p className="text-xs text-muted-foreground/70 text-center py-4">
+                    {tasks.failed_count === 0 ? 'No failures detected in result backend.' : 'Failures detected but no detail available.'}
+                  </p>
+                ) : (
+                  <div>
+                    <div className="grid gap-3 pb-2 border-b border-border mb-1 [grid-template-columns:22px_100px_1fr]">
+                      <span />
+                      {['Task ID', 'Error preview'].map((h, i) => <span key={i} className="table-header">{h}</span>)}
+                    </div>
+                    {tasks.failed_tasks.map(f => <FailedTaskRow key={f.task_id} task={f} />)}
+                  </div>
+                )}
+              </div>
+            </AdminCard>
           )}
         </div>
       )}
-    </div>
+    </AdminPage>
   );
 }
