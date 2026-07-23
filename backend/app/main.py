@@ -246,15 +246,20 @@ async def security_headers_middleware(request: Request, call_next):
 
 @app.middleware("http")
 async def maintenance_mode_middleware(request: Request, call_next):
-    """Return 503 for all non-health API requests when MAINTENANCE_MODE is true.
+    """Return 503 for all non-health API requests when maintenance mode is on.
     The /health endpoint always passes through so load balancers can still check.
+    State is read via admin_state (Redis-backed, env fallback) so a runtime toggle
+    applies across all workers, not just the one that served it.
     """
-    if settings.MAINTENANCE_MODE and request.url.path not in ("/health", "/"):
-        return JSONResponse(
-            status_code=503,
-            content={"detail": settings.MAINTENANCE_MESSAGE},
-            headers={"Retry-After": "300"},
-        )
+    if request.url.path not in ("/health", "/"):
+        from app.core.admin_state import get_maintenance
+        enabled, message = await get_maintenance()
+        if enabled:
+            return JSONResponse(
+                status_code=503,
+                content={"detail": message},
+                headers={"Retry-After": "300"},
+            )
     return await call_next(request)
 
 

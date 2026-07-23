@@ -9,7 +9,7 @@ from pydantic import BaseModel, Field
 from typing import Optional
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.api.admin.deps import get_current_admin
+from app.api.admin.deps import get_current_admin, require_role
 from app.api.admin.audit_writer import audit
 from app.core.database import get_db
 from app.services.detector_flag_service import detector_flags, VALID_MODES
@@ -41,10 +41,11 @@ async def list_detector_flags(
 @router.post("/detector-flags")
 async def set_detector_flag(
     body: DetectorFlagRequest,
-    admin: dict = Depends(get_current_admin),
+    admin: dict = Depends(require_role("superadmin")),
     db: AsyncSession = Depends(get_db),
 ):
-    """Set a detector's mode. Validated against VALID_MODES; audited."""
+    """Set a detector's mode. Validated against VALID_MODES; audited. Superadmin only —
+    a detector set to `off` disables that behaviour globally, so this is not a support action."""
     if body.mode not in VALID_MODES:
         raise HTTPException(status_code=422, detail=f"mode must be one of {sorted(VALID_MODES)}")
     try:

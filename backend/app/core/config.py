@@ -94,6 +94,10 @@ class Settings(BaseSettings):
     # IP allowlist for admin panel — comma-separated IPs/CIDRs, empty = no restriction (dev mode)
     # Example: "1.2.3.4,10.0.0.0/8,192.168.1.0/24"
     ADMIN_IP_ALLOWLIST: Optional[str] = None
+    # Honor X-Forwarded-For when resolving the client IP for the admin allowlist. Enable ONLY
+    # behind a trusted proxy/LB that OVERWRITES the header. If the app is directly reachable,
+    # leave False — otherwise a spoofed X-Forwarded-For bypasses ADMIN_IP_ALLOWLIST.
+    ADMIN_TRUST_PROXY_HEADERS: bool = False
     # TOTP issuer name shown in authenticator apps
     ADMIN_TOTP_ISSUER: str = "TradeMentor Admin"
     # Dev bypass — set to 1 in .env to skip OTP/TOTP and return JWT directly on password verify.

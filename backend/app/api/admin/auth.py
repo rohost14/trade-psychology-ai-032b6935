@@ -52,12 +52,47 @@ LOGIN_FAIL_PREFIX  = "admin_fail:"
 LOGIN_FAIL_MAX     = 5
 LOGIN_FAIL_TTL     = 900
 
+# Per-ACCOUNT lockout on the 2nd factor (email OTP / TOTP). The per-IP admin_otp_limiter
+# alone lets a 6-digit code be brute-forced from many IPs; this caps attempts per email.
+VERIFY_FAIL_PREFIX = "admin_vfail:"
+VERIFY_FAIL_MAX    = 5
+VERIFY_FAIL_TTL    = 900
+
+# TOTP replay guard — a code stays valid ~90s (valid_window=1). Once accepted it is marked
+# consumed for this TTL so the same code cannot be replayed (screen-share / phishing proxy).
+TOTP_USED_PREFIX   = "admin_totp_used:"
+TOTP_USED_TTL      = 120
+
 BLOCKLIST_PREFIX = "admin_jti_block:"
 
 
 def _redis():
     import redis as redis_lib
     return redis_lib.from_url(settings.REDIS_URL, decode_responses=True)
+
+
+def _assert_verify_unlocked(r, email: str) -> None:
+    """Raise 429 if this account has hit VERIFY_FAIL_MAX failed 2nd-factor attempts."""
+    key = f"{VERIFY_FAIL_PREFIX}{email}"
+    if int(r.get(key) or 0) >= VERIFY_FAIL_MAX:
+        ttl = r.ttl(key)
+        raise HTTPException(
+            status_code=429,
+            detail=f"Too many attempts. Try again in {ttl}s.",
+            headers={"Retry-After": str(ttl)},
+        )
+
+
+def _record_verify_fail(r, email: str) -> None:
+    key = f"{VERIFY_FAIL_PREFIX}{email}"
+    pipe = r.pipeline()
+    pipe.incr(key)
+    pipe.expire(key, VERIFY_FAIL_TTL)
+    pipe.execute()
+
+
+def _clear_verify_fail(r, email: str) -> None:
+    r.delete(f"{VERIFY_FAIL_PREFIX}{email}")
 
 
 def _make_otp() -> str:
@@ -209,9 +244,12 @@ async def admin_verify_otp(
 ):
     """Step 2 (email OTP path): verify OTP. Returns admin JWT."""
     r = _redis()
+    _assert_verify_unlocked(r, body.email)
     stored_otp = r.get(f"{OTP_PREFIX}{body.email}")
 
-    if not stored_otp or stored_otp != body.otp.strip():
+    submitted = body.otp.strip()
+    if not stored_otp or not secrets.compare_digest(stored_otp, submitted):
+        _record_verify_fail(r, body.email)
         raise HTTPException(status_code=401, detail="Invalid or expired code")
 
     r.delete(f"{OTP_PREFIX}{body.email}")
@@ -222,6 +260,8 @@ async def admin_verify_otp(
     admin = result.scalar_one_or_none()
     if not admin:
         raise HTTPException(status_code=401, detail="Account not found")
+
+    _clear_verify_fail(r, body.email)
 
     await db.execute(
         update(AdminUser).where(AdminUser.id == admin.id)
@@ -255,18 +295,31 @@ async def admin_verify_totp(
     _rl: None = Depends(admin_otp_limiter),
 ):
     """Step 2 (TOTP path): verify 6-digit authenticator code. Returns admin JWT."""
+    r = _redis()
+    _assert_verify_unlocked(r, body.email)
+
     result = await db.execute(
         select(AdminUser).where(AdminUser.email == body.email, AdminUser.is_active == True)
     )
     admin = result.scalar_one_or_none()
     if not admin or not admin.totp_secret_enc:
+        _record_verify_fail(r, body.email)
         raise HTTPException(status_code=401, detail="TOTP not configured for this account")
 
     import pyotp
+    code   = body.otp.strip()
     secret = _decrypt_totp_secret(admin.totp_secret_enc)
     totp   = pyotp.TOTP(secret)
-    if not totp.verify(body.otp.strip(), valid_window=1):
+    if not totp.verify(code, valid_window=1):
+        _record_verify_fail(r, body.email)
         raise HTTPException(status_code=401, detail="Invalid authenticator code")
+
+    # Replay guard — atomically claim this code; if already claimed, reject the replay.
+    if not r.set(f"{TOTP_USED_PREFIX}{admin.id}:{code}", "1", nx=True, ex=TOTP_USED_TTL):
+        _record_verify_fail(r, body.email)
+        raise HTTPException(status_code=401, detail="Authenticator code already used")
+
+    _clear_verify_fail(r, body.email)
 
     await db.execute(
         update(AdminUser).where(AdminUser.id == admin.id)

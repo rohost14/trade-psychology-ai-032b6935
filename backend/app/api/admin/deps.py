@@ -58,9 +58,12 @@ def _parse_allowlist() -> list[str]:
 
 
 def _get_client_ip(request: Request) -> str:
-    xff = request.headers.get("X-Forwarded-For")
-    if xff:
-        return xff.split(",")[0].strip()
+    # Only trust X-Forwarded-For behind a proxy that overwrites it (see ADMIN_TRUST_PROXY_HEADERS).
+    # Otherwise the header is client-controlled and would let anyone spoof an allowlisted IP.
+    if settings.ADMIN_TRUST_PROXY_HEADERS:
+        xff = request.headers.get("X-Forwarded-For")
+        if xff:
+            return xff.split(",")[0].strip()
     return request.client.host if request.client else "0.0.0.0"
 
 
