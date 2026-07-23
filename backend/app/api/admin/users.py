@@ -701,3 +701,57 @@ async def clear_rate_limits(
                 details={"pattern": pattern, "keys_cleared": cleared})
 
     return {"keys_cleared": cleared, "pattern": pattern}
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Read-only impersonation ("view as user")
+# ─────────────────────────────────────────────────────────────────────────────
+@router.post("/users/{account_id}/impersonate")
+async def impersonate_user(
+    account_id: UUID,
+    admin: dict = Depends(require_role("superadmin", "ops")),
+    db: AsyncSession = Depends(get_db),
+):
+    """Mint a short-lived, READ-ONLY user token so an admin can see exactly what a user
+    sees. The token is signed with the normal user SECRET_KEY and carries `imp=True`;
+    a middleware in main.py rejects every non-GET request bearing an impersonation token,
+    so it can never mutate the account. Superadmin/ops only. Audited."""
+    from datetime import timedelta
+    from jose import jwt
+
+    account = (await db.execute(
+        select(BrokerAccount).where(BrokerAccount.id == account_id)
+    )).scalar_one_or_none()
+    if not account:
+        raise HTTPException(status_code=404, detail="Account not found")
+
+    user = (await db.execute(
+        select(User).where(User.id == account.user_id)
+    )).scalar_one_or_none()
+
+    ttl_seconds = 30 * 60
+    now = datetime.now(timezone.utc)
+    token = jwt.encode(
+        {
+            "sub":    str(account.user_id),
+            "bid":    str(account.id),
+            "imp":    True,
+            "imp_by": admin["email"],
+            "iat":    now,
+            "exp":    now + timedelta(seconds=ttl_seconds),
+        },
+        settings.SECRET_KEY,
+        algorithm=settings.ALGORITHM,
+    )
+
+    display = (user.email if user else None) or account.broker_email or account.broker_user_id or "user"
+    await audit(db, admin["email"], "impersonate_user",
+                target_type="user", target_id=str(account_id),
+                details={"display": display, "ttl_seconds": ttl_seconds})
+
+    return {
+        "token":       token,
+        "expires_in":  ttl_seconds,
+        "display":     display,
+        "account_id":  str(account_id),
+    }

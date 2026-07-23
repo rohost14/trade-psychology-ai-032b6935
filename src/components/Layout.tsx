@@ -14,6 +14,7 @@ import { useBroker } from '@/contexts/BrokerContext';
 import { useWebSocket } from '@/contexts/WebSocketContext';
 import { ErrorBoundary } from '@/components/ErrorBoundary';
 import OnboardingGate from '@/components/onboarding/OnboardingGate';
+import ImpersonationBanner from '@/components/ImpersonationBanner';
 import { CommandPalette } from './CommandPalette';
 import { Sidebar } from './Sidebar';
 
@@ -198,6 +199,8 @@ export default function Layout() {
 
         {/* ── Onboarding wizard ───────────────────────────────────────────── */}
         <OnboardingGate />
+
+        <ImpersonationBanner />
 
         {/* ── Main content ────────────────────────────────────────────────── */}
         <main className="flex-1 pb-20 md:pb-8">

@@ -18,6 +18,7 @@ import Layout from "./components/Layout";
 // All other routes are lazy-loaded, splitting the bundle into per-route chunks.
 import Dashboard from "./pages/Dashboard";
 const Welcome       = lazy(() => import("./pages/Welcome"));
+const ImpersonateEntry = lazy(() => import("./pages/ImpersonateEntry"));
 const Analytics     = lazy(() => import("./pages/Analytics"));
 const Alerts        = lazy(() => import("./pages/Alerts"));
 const MyRecord      = lazy(() => import("./pages/MyRecord"));
@@ -94,6 +95,7 @@ const App = () => (
                     <Route path="my-rules" element={<MyRules />} />
                     <Route path="settings" element={<Settings />} />
                   </Route>
+                  <Route path="impersonate" element={<ImpersonateEntry />} />
                   <Route path="welcome" element={<Welcome />} />
                   <Route path="terms" element={<TermsOfService />} />
                   <Route path="privacy" element={<PrivacyPolicy />} />

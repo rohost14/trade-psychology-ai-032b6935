@@ -18,7 +18,7 @@
  */
 
 import { useState, useEffect, useCallback, useRef } from 'react';
-import { AUTH_TOKEN_KEY } from '@/lib/api';
+import { getAuthToken } from '@/lib/api';
 
 interface PriceData {
   last_price: number;
@@ -95,7 +95,7 @@ export function usePriceStream(brokerAccountId?: string): UsePriceStreamReturn {
     }
 
     // Get JWT token for WebSocket authentication
-    const authToken = localStorage.getItem(AUTH_TOKEN_KEY);
+    const authToken = getAuthToken();
     if (!authToken) {
       setError('Not authenticated');
       return;

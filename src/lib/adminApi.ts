@@ -65,6 +65,7 @@ export const adminApi = {
   userPushStatus:    (id: string) => req(`/users/${id}/push-status`),
   userTestPush:      (id: string) => req(`/users/${id}/test-push`, { method: 'POST' }),
   clearUserRateLimit:(id: string) => req(`/users/${id}/rate-limit`, { method: 'DELETE' }),
+  impersonateUser:   (id: string) => req(`/users/${id}/impersonate`, { method: 'POST' }),
 
   exportUsersUrl: (status?: string) => {
     const q = new URLSearchParams({ limit: '1000' });

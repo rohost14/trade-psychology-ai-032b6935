@@ -1,5 +1,5 @@
 import { createContext, useContext, useState, useEffect, useCallback, useRef, ReactNode } from 'react';
-import { api, AUTH_TOKEN_KEY, apiDetailString } from '@/lib/api';
+import { api, AUTH_TOKEN_KEY, apiDetailString, getAuthToken } from '@/lib/api';
 import { isGuestMode, enableGuestMode, disableGuestMode, GUEST_MODE_KEY } from '@/lib/guestMode';
 import { DEMO_ACCOUNT } from '@/lib/demoData';
 import { toast } from 'sonner';
@@ -119,7 +119,7 @@ export function BrokerProvider({ children }: { children: ReactNode }) {
         return;
       }
 
-      const authToken = localStorage.getItem(AUTH_TOKEN_KEY);
+      const authToken = getAuthToken();
       if (!authToken) {
         // No auth token - user hasn't connected yet
         setAccount(null);
@@ -296,7 +296,7 @@ export function BrokerProvider({ children }: { children: ReactNode }) {
 
   // Proactively warn 2 minutes before JWT expires so the user isn't surprised
   useEffect(() => {
-    const token = localStorage.getItem(AUTH_TOKEN_KEY);
+    const token = getAuthToken();
     if (!token) return;
 
     let exp: number | null = null;

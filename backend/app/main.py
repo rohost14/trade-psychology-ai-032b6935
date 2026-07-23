@@ -245,6 +245,29 @@ async def security_headers_middleware(request: Request, call_next):
 
 
 @app.middleware("http")
+async def impersonation_readonly_middleware(request: Request, call_next):
+    """Enforce that admin impersonation tokens (imp=True) can only READ.
+    Any non-safe method carrying an impersonation bearer token is rejected 403 —
+    this is the single choke point that makes 'view as user' truly read-only,
+    independent of which auth dependency a given endpoint uses.
+    """
+    if request.method not in ("GET", "HEAD", "OPTIONS") and request.url.path.startswith("/api/"):
+        auth = request.headers.get("Authorization", "")
+        if auth.startswith("Bearer "):
+            try:
+                from jose import jwt, JWTError
+                payload = jwt.decode(auth[7:], settings.SECRET_KEY, algorithms=[settings.ALGORITHM])
+                if payload.get("imp"):
+                    return JSONResponse(
+                        status_code=403,
+                        content={"detail": "This is a read-only admin view. Changes are not allowed."},
+                    )
+            except Exception:
+                pass  # not a user token (e.g. admin token / invalid) — let normal auth handle it
+    return await call_next(request)
+
+
+@app.middleware("http")
 async def maintenance_mode_middleware(request: Request, call_next):
     """Return 503 for all non-health API requests when maintenance mode is on.
     The /health endpoint always passes through so load balancers can still check.

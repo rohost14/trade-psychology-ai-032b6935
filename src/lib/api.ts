@@ -1,9 +1,17 @@
 import axios, { AxiosRequestConfig, AxiosResponse } from 'axios';
 import { isGuestMode, getGuestResponse } from './guestMode';
+import { getImpersonationToken } from './impersonation';
 
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000';
 
 export const AUTH_TOKEN_KEY = 'tradementor_auth_token';
+
+/** The active bearer token: a per-tab admin impersonation token if present,
+ *  otherwise the user's own session token. Use everywhere instead of reading
+ *  localStorage(AUTH_TOKEN_KEY) directly. */
+export function getAuthToken(): string | null {
+  return getImpersonationToken() || localStorage.getItem(AUTH_TOKEN_KEY);
+}
 
 /** Safely extract a human-readable string from a FastAPI error detail.
  *  FastAPI 422s return detail as an array of Pydantic objects {type,loc,msg,input,ctx}.
@@ -46,7 +54,7 @@ api.interceptors.request.use(
       }
     }
 
-    const token = localStorage.getItem(AUTH_TOKEN_KEY);
+    const token = getAuthToken();
     if (token) {
       config.headers.Authorization = `Bearer ${token}`;
     }
@@ -93,7 +101,7 @@ api.interceptors.response.use(
  * axios interceptor so BrokerContext can react consistently.
  */
 export async function fetchWithAuth(url: string, options: RequestInit = {}): Promise<Response> {
-  const token = localStorage.getItem(AUTH_TOKEN_KEY);
+  const token = getAuthToken();
   const response = await fetch(url, {
     ...options,
     headers: {

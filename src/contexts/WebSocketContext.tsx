@@ -17,7 +17,7 @@
 
 import React, { createContext, useContext, useState, useEffect, useRef, useCallback } from 'react';
 import { useBroker } from './BrokerContext';
-import { api } from '@/lib/api';
+import { api, getAuthToken } from '@/lib/api';
 
 const AUTH_TOKEN_KEY = 'tradementor_auth_token';
 const LAST_EVENT_KEY_PREFIX = 'tradementor_last_event_';  // + account_id
@@ -118,7 +118,7 @@ export function WebSocketProvider({ children }: { children: React.ReactNode }) {
   const connect = useCallback(() => {
     if (!account?.id || isTokenExpired) return;
 
-    const token = localStorage.getItem(AUTH_TOKEN_KEY);
+    const token = getAuthToken();
     if (!token) return;
 
     try {

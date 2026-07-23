@@ -3,7 +3,7 @@ import { useParams, useNavigate } from 'react-router-dom';
 import {
   ArrowLeft, RefreshCw, Ban, CheckCircle, Trash2, Send,
   TrendingUp, TrendingDown, Bell, Smartphone, Monitor,
-  Zap, AlertTriangle, RotateCcw, WifiOff, Circle,
+  Zap, AlertTriangle, RotateCcw, WifiOff, Circle, Eye,
 } from 'lucide-react';
 import { adminApi } from '@/lib/adminApi';
 import { useAdminAuth } from '@/contexts/AdminAuthContext';
@@ -485,6 +485,8 @@ export default function AdminUserDetail() {
   const navigate = useNavigate();
   const { admin: currentAdmin } = useAdminAuth();
   const isSuperadmin = currentAdmin?.role === 'superadmin';
+  const canImpersonate = currentAdmin?.role === 'superadmin' || currentAdmin?.role === 'ops';
+  const [impersonating, setImpersonating] = useState(false);
 
   const [data, setData] = useState<DetailData | null>(null);
   const [loading, setLoading] = useState(true);
@@ -535,6 +537,18 @@ export default function AdminUserDetail() {
     finally { setErasing(false); }
   };
 
+  const handleImpersonate = async () => {
+    if (!id) return;
+    setImpersonating(true);
+    try {
+      const res = await adminApi.impersonateUser(id);
+      const exp = Math.floor(Date.now() / 1000) + (res.expires_in || 1800);
+      const params = new URLSearchParams({ token: res.token, name: res.display || 'user', by: currentAdmin?.email || '', exp: String(exp) });
+      window.open(`/impersonate#${params.toString()}`, '_blank', 'noopener');
+    } catch (e: unknown) { setError(e instanceof Error ? e.message : String(e)); }
+    finally { setImpersonating(false); }
+  };
+
   const handleClearRateLimit = async () => {
     if (!id) return;
     setClearing(true);
@@ -580,6 +594,11 @@ export default function AdminUserDetail() {
             </div>
           </div>
           <div className="flex gap-2 items-center shrink-0 flex-wrap justify-end">
+            {canImpersonate && !isErased && (
+              <Button variant="outline" size="sm" onClick={handleImpersonate} disabled={impersonating} title="Open a read-only view of this user's app in a new tab">
+                {impersonating ? <Spinner size={13} /> : <Eye size={13} />} View as user
+              </Button>
+            )}
             {account.status === 'connected' && (
               <Button variant="outline" size="sm" onClick={handleForceSync} disabled={syncing}>
                 {syncing ? <Spinner size={13} /> : <RefreshCw size={13} />} {syncing ? 'Syncing…' : 'Force Sync'}
