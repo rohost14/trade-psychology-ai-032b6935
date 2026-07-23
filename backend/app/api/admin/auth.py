@@ -28,6 +28,7 @@ from app.core.database import get_db
 from app.core.config import settings
 from app.models.admin_user import AdminUser
 from app.api.admin.deps import get_current_admin, require_role
+from app.api.admin import session_registry
 from app.core.rate_limiter import admin_login_limiter, admin_otp_limiter
 
 _bearer_logout = HTTPBearer(auto_error=False)
@@ -119,6 +120,23 @@ def _make_admin_jwt(admin: AdminUser) -> str:
     )
 
 
+async def _issue_login(admin, request, db, method: str) -> str:
+    """Mint a JWT, register the live session in Redis, and record login history.
+    Registry/history are best-effort and never block issuing the token."""
+    token = _make_admin_jwt(admin)
+    try:
+        p = jwt.decode(token, settings.ADMIN_JWT_SECRET, algorithms=["HS256"])
+        session_registry.register(
+            str(admin.id), p["jti"], int(p["exp"]),
+            session_registry.client_ip(request), session_registry.user_agent(request),
+            int(admin.session_epoch or 0),
+        )
+    except Exception as _e:
+        logger.warning(f"session register skipped: {_e}")
+    await session_registry.record_login(db, admin, request, method)
+    return token
+
+
 def _decrypt_totp_secret(enc: str) -> str:
     from cryptography.fernet import Fernet
     return Fernet(settings.ENCRYPTION_KEY.encode()).decrypt(enc.encode()).decode()
@@ -192,12 +210,12 @@ async def admin_login(
     # Dev bypass — skip all 2FA, return JWT immediately (only in development)
     if settings.ADMIN_DEV_BYPASS and settings.ENVIRONMENT == "development":
         logger.warning(f"ADMIN_DEV_BYPASS active — issuing JWT for {admin.email} without 2FA")
-        token = _make_admin_jwt(admin)
         await db.execute(
             update(AdminUser).where(AdminUser.id == admin.id)
             .values(last_login_at=datetime.now(timezone.utc))
         )
         await db.commit()
+        token = await _issue_login(admin, request, db, "dev_bypass")
         return {"status": "ok", "token": token, "admin": {"email": admin.email, "name": admin.name, "role": admin.role}}
 
     # TOTP path — skip email OTP entirely
@@ -270,7 +288,7 @@ async def admin_verify_otp(
     )
     await db.commit()
 
-    token = _make_admin_jwt(admin)
+    token = await _issue_login(admin, request, db, "email_otp")
     logger.info(f"Admin login (OTP): {admin.email} role={admin.role}")
     try:
         from app.api.admin.audit_writer import audit
@@ -328,7 +346,7 @@ async def admin_verify_totp(
     )
     await db.commit()
 
-    token = _make_admin_jwt(admin)
+    token = await _issue_login(admin, request, db, "totp")
     logger.info(f"Admin login (TOTP): {admin.email} role={admin.role}")
     try:
         from app.api.admin.audit_writer import audit
@@ -438,6 +456,7 @@ class ChangePasswordRequest(BaseModel):
 
 @router.post("/change-password")
 async def admin_change_password(
+    request: Request,
     body: ChangePasswordRequest,
     payload: dict = Depends(get_current_admin),
     db: AsyncSession = Depends(get_db),
@@ -461,7 +480,19 @@ async def admin_change_password(
     await db.commit()
     await db.refresh(admin)
 
+    # Old sessions are already dead (epoch bumped); drop them from the registry and
+    # register the fresh token that this response hands back.
+    session_registry.clear(str(admin.id))
     token = _make_admin_jwt(admin)  # new token carries the bumped sv so THIS session survives
+    try:
+        p = jwt.decode(token, settings.ADMIN_JWT_SECRET, algorithms=["HS256"])
+        session_registry.register(
+            str(admin.id), p["jti"], int(p["exp"]),
+            session_registry.client_ip(request), session_registry.user_agent(request),
+            int(admin.session_epoch or 0),
+        )
+    except Exception:
+        pass
     logger.info(f"Admin changed password: {admin.email}")
     try:
         from app.api.admin.audit_writer import audit
@@ -488,4 +519,5 @@ async def admin_logout(
                 r.setex(f"{BLOCKLIST_PREFIX}{jti}", ttl, "1")
         except Exception as _e:
             logger.warning(f"Logout blocklist write failed (non-fatal): {_e}")
+        session_registry.unregister(payload.get("sub", ""), jti)
     return {"status": "ok"}

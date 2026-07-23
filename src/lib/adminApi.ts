@@ -89,11 +89,16 @@ export const adminApi = {
     req('/config/announcement', { method: 'POST', body: JSON.stringify({ message }) }),
 
   // ── Audit log ─────────────────────────────────────────────────────────────
-  auditLog: (params?: { page?: number; admin_email?: string; action?: string }) => {
+  auditLog: (params?: { page?: number; limit?: number; admin_email?: string; action?: string; target_type?: string; target_id?: string; date_from?: string; date_to?: string }) => {
     const q = new URLSearchParams();
     if (params?.page)        q.set('page', String(params.page));
+    if (params?.limit)       q.set('limit', String(params.limit));
     if (params?.admin_email) q.set('admin_email', params.admin_email);
     if (params?.action)      q.set('action', params.action);
+    if (params?.target_type) q.set('target_type', params.target_type);
+    if (params?.target_id)   q.set('target_id', params.target_id);
+    if (params?.date_from)   q.set('date_from', params.date_from);
+    if (params?.date_to)     q.set('date_to', params.date_to);
     return req(`/audit-log?${q}`);
   },
 
@@ -113,4 +118,7 @@ export const adminApi = {
   forceLogoutAdmin:  (id: string) => req(`/admins/${id}/force-logout`, { method: 'POST' }),
   resetAdminTotp:    (id: string) => req(`/admins/${id}/reset-totp`, { method: 'POST' }),
   resetAdminPassword:(id: string) => req(`/admins/${id}/reset-password`, { method: 'POST' }),
+  adminLoginHistory: (id: string, limit = 50) => req(`/admins/${id}/login-history?limit=${limit}`),
+  adminSessions:     (id: string) => req(`/admins/${id}/sessions`),
+  revokeAdminSession:(id: string, jti: string) => req(`/admins/${id}/sessions/${jti}/revoke`, { method: 'POST' }),
 };

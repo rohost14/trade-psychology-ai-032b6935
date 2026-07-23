@@ -1,5 +1,5 @@
 import { useEffect, useState, useCallback } from 'react';
-import { UserPlus, MoreHorizontal, Copy, Check, ShieldCheck, KeyRound, LogOut, Ban, RotateCcw } from 'lucide-react';
+import { UserPlus, MoreHorizontal, Copy, Check, ShieldCheck, KeyRound, LogOut, Ban, RotateCcw, History, Monitor, XCircle } from 'lucide-react';
 import { adminApi } from '@/lib/adminApi';
 import { useAdminAuth } from '@/contexts/AdminAuthContext';
 import { AdminPage, AdminCard, ErrorBanner, LoadingBlock, Spinner, type Accent } from './_ui';
@@ -51,6 +51,7 @@ export default function AdminAdmins() {
   const [createErr, setCreateErr]     = useState('');
 
   const [tempPw, setTempPw]           = useState<{ email: string; password: string } | null>(null);
+  const [historyFor, setHistoryFor]   = useState<AdminRow | null>(null);
 
   const load = useCallback(async () => {
     setLoading(true); setError('');
@@ -150,6 +151,10 @@ export default function AdminAdmins() {
                             <Button variant="ghost" size="icon" className="h-8 w-8"><MoreHorizontal className="w-4 h-4" /></Button>
                           </DropdownMenuTrigger>
                           <DropdownMenuContent align="end" className="w-52">
+                            <DropdownMenuItem onClick={() => setHistoryFor(r)}>
+                              <History className="w-3.5 h-3.5" /> History & sessions
+                            </DropdownMenuItem>
+                            <DropdownMenuSeparator />
                             <DropdownMenuItem onClick={() => toggleActive(r)}>
                               <Ban className="w-3.5 h-3.5" /> {r.is_active ? 'Deactivate' : 'Reactivate'}
                             </DropdownMenuItem>
@@ -214,7 +219,95 @@ export default function AdminAdmins() {
 
       {/* Temp-password reveal (create + reset) */}
       <TempPasswordDialog data={tempPw} onClose={() => setTempPw(null)} />
+
+      {/* Login history + active sessions */}
+      <HistoryDialog row={historyFor} onClose={() => setHistoryFor(null)} />
     </AdminPage>
+  );
+}
+
+interface LoginEvent { id: string; ip: string | null; user_agent: string | null; method: string; created_at: string | null }
+interface Session { jti: string; ip: string; ua: string; iat: number; expires_in: number | null; is_current: boolean }
+
+function HistoryDialog({ row, onClose }: { row: AdminRow | null; onClose: () => void }) {
+  const [events, setEvents] = useState<LoginEvent[]>([]);
+  const [sessions, setSessions] = useState<Session[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
+  const [busyJti, setBusyJti] = useState<string | null>(null);
+
+  const load = useCallback(async (id: string) => {
+    setLoading(true); setError('');
+    try {
+      const [h, s] = await Promise.all([adminApi.adminLoginHistory(id), adminApi.adminSessions(id)]);
+      setEvents(h.events); setSessions(s.sessions);
+    } catch (e: unknown) { setError(e instanceof Error ? e.message : String(e)); }
+    finally { setLoading(false); }
+  }, []);
+
+  useEffect(() => { if (row) load(row.id); }, [row, load]);
+
+  const revoke = async (jti: string) => {
+    if (!row) return;
+    setBusyJti(jti);
+    try { await adminApi.revokeAdminSession(row.id, jti); await load(row.id); }
+    catch (e: unknown) { setError(e instanceof Error ? e.message : String(e)); }
+    finally { setBusyJti(null); }
+  };
+
+  return (
+    <Dialog open={!!row} onOpenChange={o => { if (!o) onClose(); }}>
+      <DialogContent className="max-w-[560px] max-h-[82vh] overflow-hidden flex flex-col">
+        <DialogHeader>
+          <DialogTitle className="flex items-center gap-2"><History className="w-4 h-4 text-[rgb(var(--tm-brand))]" /> {row?.name}</DialogTitle>
+          <DialogDescription>{row?.email} — login history & active sessions</DialogDescription>
+        </DialogHeader>
+        <div className="overflow-y-auto flex-1 -mx-6 px-6">
+          {loading ? <LoadingBlock /> : (
+            <>
+              {error && <ErrorBanner message={error} />}
+              <div className="tm-label mb-2 flex items-center gap-1.5"><Monitor className="w-3 h-3" /> Active sessions ({sessions.length})</div>
+              <div className="flex flex-col gap-1.5 mb-5">
+                {sessions.length === 0 && <p className="text-xs text-muted-foreground">No live sessions.</p>}
+                {sessions.map(s => (
+                  <div key={s.jti} className="flex items-center gap-2.5 px-3 py-2 rounded-lg bg-muted border border-border">
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-2">
+                        <span className="text-xs font-mono text-foreground">{s.ip || '—'}</span>
+                        {s.is_current && <Pill accent="profit" label="this session" />}
+                      </div>
+                      <div className="text-[11px] text-muted-foreground truncate">{s.ua || 'Unknown device'}</div>
+                    </div>
+                    <span className="text-[11px] text-muted-foreground/60 shrink-0">{new Date(s.iat * 1000).toLocaleString('en-IN')}</span>
+                    {!s.is_current && (
+                      <Button variant="ghost" size="icon" className="h-7 w-7 shrink-0" onClick={() => revoke(s.jti)} disabled={busyJti === s.jti} title="Revoke session">
+                        {busyJti === s.jti ? <Spinner size={12} /> : <XCircle className="w-4 h-4 text-[rgb(var(--tm-loss))]" />}
+                      </Button>
+                    )}
+                  </div>
+                ))}
+              </div>
+              <div className="tm-label mb-2">Login history</div>
+              <div className="flex flex-col gap-1 pb-2">
+                {events.length === 0 && <p className="text-xs text-muted-foreground">No logins recorded.</p>}
+                {events.map(e => (
+                  <div key={e.id} className="flex items-center justify-between px-3 py-2 rounded-lg border border-border">
+                    <div className="min-w-0">
+                      <div className="flex items-center gap-2">
+                        <span className="text-xs font-mono text-foreground">{e.ip || '—'}</span>
+                        <Pill accent={e.method === 'totp' ? 'profit' : e.method === 'dev_bypass' ? 'loss' : 'muted'} label={e.method} />
+                      </div>
+                      <div className="text-[11px] text-muted-foreground truncate max-w-[300px]">{e.user_agent || '—'}</div>
+                    </div>
+                    <span className="text-[11px] text-muted-foreground/60 shrink-0">{e.created_at ? new Date(e.created_at).toLocaleString('en-IN') : '—'}</span>
+                  </div>
+                ))}
+              </div>
+            </>
+          )}
+        </div>
+      </DialogContent>
+    </Dialog>
   );
 }
 

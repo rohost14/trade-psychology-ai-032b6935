@@ -1,8 +1,9 @@
 import { useEffect, useState, useCallback } from 'react';
-import { ChevronLeft, ChevronRight, Shield } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Shield, Download } from 'lucide-react';
 import { adminApi } from '@/lib/adminApi';
 import { AdminPage, AdminCard, ErrorBanner, LoadingBlock, fmtNum, type Accent } from './_ui';
 import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
 
 interface AuditItem {
   id: string; admin_email: string; action: string;
@@ -49,28 +50,67 @@ export default function AdminAuditLog() {
   const [total, setTotal]     = useState(0);
   const [page, setPage]       = useState(1);
   const [action, setAction]   = useState('');
+  const [adminEmail, setAdminEmail] = useState('');
+  const [dateFrom, setDateFrom] = useState('');
+  const [dateTo, setDateTo]     = useState('');
   const [loading, setLoading] = useState(false);
+  const [exporting, setExporting] = useState(false);
   const [error, setError]     = useState('');
+
+  const filters = useCallback(() => ({
+    action:      action || undefined,
+    admin_email: adminEmail || undefined,
+    date_from:   dateFrom || undefined,
+    date_to:     dateTo || undefined,
+  }), [action, adminEmail, dateFrom, dateTo]);
 
   const load = useCallback(async () => {
     setLoading(true); setError('');
     try {
-      const d = await adminApi.auditLog({ page, action: action || undefined });
+      const d = await adminApi.auditLog({ page, ...filters() });
       setItems(d.items); setTotal(d.total);
     } catch (e: unknown) { setError(e instanceof Error ? e.message : String(e)); }
     finally { setLoading(false); }
-  }, [page, action]);
+  }, [page, filters]);
 
   useEffect(() => { load(); }, [load]);
-  useEffect(() => { setPage(1); }, [action]);
+  useEffect(() => { setPage(1); }, [action, adminEmail, dateFrom, dateTo]);
 
   const totalPages = Math.max(1, Math.ceil(total / 50));
+
+  const exportCsv = async () => {
+    setExporting(true); setError('');
+    try {
+      const d = await adminApi.auditLog({ page: 1, limit: 5000, ...filters() });
+      const rows: AuditItem[] = d.items;
+      const esc = (v: unknown) => `"${String(v ?? '').replace(/"/g, '""')}"`;
+      const header = 'time,admin_email,action,target_type,target_id,details\n';
+      const body = rows.map(r => [
+        r.created_at ? new Date(r.created_at).toISOString() : '',
+        r.admin_email, r.action, r.target_type ?? '', r.target_id ?? '',
+        r.details ? JSON.stringify(r.details) : '',
+      ].map(esc).join(',')).join('\n');
+      const blob = new Blob([header + body], { type: 'text/csv' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a'); a.href = url;
+      a.download = `tradementor_audit_${new Date().toISOString().slice(0, 10)}.csv`;
+      a.click(); URL.revokeObjectURL(url);
+    } catch (e: unknown) { setError(e instanceof Error ? e.message : String(e)); }
+    finally { setExporting(false); }
+  };
 
   return (
     <AdminPage
       title="Audit Log"
       subtitle={`${fmtNum(total)} actions recorded`}
       actions={
+        <Button variant="outline" size="sm" onClick={exportCsv} disabled={exporting}>
+          <Download className="w-3.5 h-3.5" /> {exporting ? 'Exporting…' : 'Export CSV'}
+        </Button>
+      }
+    >
+      {/* Filter bar */}
+      <div className="flex flex-wrap gap-2.5 mb-5">
         <select
           value={action} onChange={e => setAction(e.target.value)}
           className="h-9 px-3 rounded-lg bg-card border border-border text-foreground text-sm outline-none focus-visible:ring-2 focus-visible:ring-ring"
@@ -78,8 +118,20 @@ export default function AdminAuditLog() {
           <option value="">All actions</option>
           {Object.entries(ACTION_LABELS).map(([v, l]) => <option key={v} value={v}>{l}</option>)}
         </select>
-      }
-    >
+        <Input value={adminEmail} onChange={e => setAdminEmail(e.target.value)} placeholder="Admin email…" className="h-9 w-[200px]" />
+        <div className="flex items-center gap-1.5">
+          <label className="text-[11px] text-muted-foreground">From</label>
+          <Input type="date" value={dateFrom} onChange={e => setDateFrom(e.target.value)} className="h-9 w-[150px]" />
+        </div>
+        <div className="flex items-center gap-1.5">
+          <label className="text-[11px] text-muted-foreground">To</label>
+          <Input type="date" value={dateTo} onChange={e => setDateTo(e.target.value)} className="h-9 w-[150px]" />
+        </div>
+        {(action || adminEmail || dateFrom || dateTo) && (
+          <Button variant="ghost" size="sm" onClick={() => { setAction(''); setAdminEmail(''); setDateFrom(''); setDateTo(''); }}>Clear</Button>
+        )}
+      </div>
+
       <ErrorBanner message={error} />
 
       <AdminCard noPadding>

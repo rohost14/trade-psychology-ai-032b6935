@@ -24,10 +24,13 @@ from pydantic import BaseModel, EmailStr
 from sqlalchemy import select, func
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.core.config import settings
 from app.core.database import get_db
-from app.api.admin.deps import require_role
+from app.api.admin.deps import require_role, BLOCKLIST_PREFIX, _get_blocklist_redis
 from app.api.admin.audit_writer import audit
+from app.api.admin import session_registry
 from app.models.admin_user import AdminUser
+from app.models.admin_login_event import AdminLoginEvent
 
 router = APIRouter()
 logger = logging.getLogger(__name__)
@@ -78,6 +81,12 @@ async def _active_superadmin_count(db: AsyncSession, exclude_id: str | None = No
 
 def _bump(a: AdminUser) -> None:
     a.session_epoch = (a.session_epoch or 0) + 1
+
+
+def _kill_sessions(admin_id: str) -> None:
+    """Drop all live sessions for an admin from the registry (epoch bump already
+    invalidates their tokens; this keeps the 'active sessions' view truthful)."""
+    session_registry.clear(admin_id)
 
 
 # ── Schemas ──────────────────────────────────────────────────────────────────
@@ -180,6 +189,7 @@ async def patch_admin(
     _bump(target)  # role change / deactivation takes effect on the target immediately
     await db.commit()
     await db.refresh(target)
+    _kill_sessions(admin_id)
 
     await audit(db, admin["email"], "update_admin",
                 target_type="admin", target_id=admin_id, details=changed)
@@ -197,6 +207,7 @@ async def force_logout_admin(
     target = await _get_or_404(db, admin_id)
     _bump(target)
     await db.commit()
+    _kill_sessions(admin_id)
     await audit(db, admin["email"], "force_logout_admin", target_type="admin", target_id=admin_id)
     return {"status": "ok"}
 
@@ -215,6 +226,7 @@ async def reset_admin_totp(
     target.totp_required = True
     _bump(target)
     await db.commit()
+    _kill_sessions(admin_id)
     await audit(db, admin["email"], "reset_admin_totp", target_type="admin", target_id=admin_id)
     return {"status": "ok"}
 
@@ -234,6 +246,65 @@ async def reset_admin_password(
     target.must_change_password = True
     _bump(target)  # kills the target's current sessions
     await db.commit()
+    _kill_sessions(admin_id)
     await audit(db, admin["email"], "reset_admin_password", target_type="admin", target_id=admin_id)
     logger.warning(f"Admin {admin['email']} reset password for {target.email}")
     return {"status": "ok", "temp_password": temp_pw}
+
+
+@router.get("/admins/{admin_id}/login-history")
+async def admin_login_history(
+    admin_id: str,
+    limit: int = 50,
+    _: dict = Depends(require_role("superadmin")),
+    db: AsyncSession = Depends(get_db),
+):
+    """Durable login history for an admin (most recent first)."""
+    limit = max(1, min(limit, 200))
+    rows = (await db.execute(
+        select(AdminLoginEvent)
+        .where(AdminLoginEvent.admin_id == admin_id)
+        .order_by(AdminLoginEvent.created_at.desc())
+        .limit(limit)
+    )).scalars().all()
+    return {"events": [
+        {
+            "id":         str(e.id),
+            "ip":         e.ip,
+            "user_agent": e.user_agent,
+            "method":     e.method,
+            "created_at": e.created_at.isoformat() if e.created_at else None,
+        } for e in rows
+    ]}
+
+
+@router.get("/admins/{admin_id}/sessions")
+async def admin_sessions(
+    admin_id: str,
+    admin: dict = Depends(require_role("superadmin")),
+    db: AsyncSession = Depends(get_db),
+):
+    """Live sessions for an admin from the Redis registry."""
+    await _get_or_404(db, admin_id)
+    current = admin.get("jti") if admin_id == admin.get("sub") else None
+    return {"sessions": session_registry.list_active(admin_id, current_jti=current)}
+
+
+@router.post("/admins/{admin_id}/sessions/{jti}/revoke")
+async def revoke_admin_session(
+    admin_id: str,
+    jti: str,
+    admin: dict = Depends(require_role("superadmin")),
+    db: AsyncSession = Depends(get_db),
+):
+    """Revoke ONE session (blocklist its jti + drop from registry) without touching others."""
+    await _get_or_404(db, admin_id)
+    try:
+        ttl = settings.ADMIN_JWT_EXPIRE_HOURS * 3600  # safe upper bound; token expires anyway
+        _get_blocklist_redis().setex(f"{BLOCKLIST_PREFIX}{jti}", ttl, "1")
+    except Exception as e:
+        logger.warning(f"session revoke blocklist write failed: {e}")
+    session_registry.unregister(admin_id, jti)
+    await audit(db, admin["email"], "revoke_admin_session", target_type="admin", target_id=admin_id,
+                details={"jti": jti[:8]})
+    return {"status": "ok"}
