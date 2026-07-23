@@ -75,6 +75,7 @@ export const adminApi = {
 
   // ── System & Tasks ────────────────────────────────────────────────────────
   system:      () => req('/system'),
+  errorFeed:   (limit = 100) => req(`/error-feed?limit=${limit}`),
   tasks:       () => req('/tasks'),
   triggerTask: (taskKey: string) =>
     req(`/tasks/${taskKey}/trigger`, { method: 'POST' }),

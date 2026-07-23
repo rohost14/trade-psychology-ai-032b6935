@@ -19,6 +19,7 @@ interface SystemData {
     ops_per_sec?: number; detail?: string;
   };
   celery: { status: string; queue_depth?: number; ai_queue?: number; detail?: string };
+  workers?: { online: number | null; names?: string[]; detail?: string };
   online_users: number | null;
   whatsapp: { configured: boolean; provider: string };
   db_pool: { pool_size: number; checked_in: number; checked_out: number; overflow: number } | null;
@@ -28,6 +29,7 @@ interface TaskItem {
   key: string; name: string; schedule: string; status: string;
   triggerable: boolean; last_run_at: string | null; next_run_at: string | null;
 }
+interface ErrorEntry { level: string; logger: string; message: string; ts: number; request_id: string | null; }
 interface FailedTask { task_id: string; traceback: string; result: string; }
 interface TaskData {
   redis_connected: boolean; tasks: TaskItem[]; queue_depths: Record<string, number | null>;
@@ -165,6 +167,8 @@ export default function AdminSystemHealth() {
 
   const [sys,        setSys]        = useState<SystemData | null>(null);
   const [tasks,      setTasks]      = useState<TaskData | null>(null);
+  const [errors,     setErrors]     = useState<ErrorEntry[]>([]);
+  const [errTotal,   setErrTotal]   = useState(0);
   const [loading,    setLoading]    = useState(true);
   const [error,      setError]      = useState('');
   const [ts,         setTs]         = useState('');
@@ -174,8 +178,8 @@ export default function AdminSystemHealth() {
   const load = async () => {
     setLoading(true); setError('');
     try {
-      const [s, t] = await Promise.all([adminApi.system(), adminApi.tasks()]);
-      setSys(s); setTasks(t);
+      const [s, t, e] = await Promise.all([adminApi.system(), adminApi.tasks(), adminApi.errorFeed(100).catch(() => ({ errors: [], total: 0 }))]);
+      setSys(s); setTasks(t); setErrors(e.errors || []); setErrTotal(e.total || 0);
       setTs(new Date().toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' }));
     } catch (e: unknown) { setError(e instanceof Error ? e.message : String(e)); }
     finally { setLoading(false); }
@@ -236,6 +240,8 @@ export default function AdminSystemHealth() {
                   <CardTitle>Celery Queues</CardTitle>
                   <Pill ok={sys.celery.status === 'ok'} text={sys.celery.status} />
                 </div>
+                <Metric label="Workers online" value={sys.workers ? (sys.workers.online ?? 'unknown') : undefined}
+                  accent={sys.workers && sys.workers.online === 0 ? 'loss' : sys.workers && (sys.workers.online ?? 0) > 0 ? 'profit' : undefined} />
                 <Metric label="Default queue" value={sys.celery.queue_depth} accent={sys.celery.queue_depth !== undefined && sys.celery.queue_depth > 100 ? 'warning' : undefined} />
                 <Metric label="AI worker queue" value={sys.celery.ai_queue} accent={sys.celery.ai_queue !== undefined && sys.celery.ai_queue > 50 ? 'warning' : undefined} />
                 {sys.celery.detail && <Metric label="Detail" value={sys.celery.detail} />}
@@ -345,6 +351,36 @@ export default function AdminSystemHealth() {
               </div>
             </AdminCard>
           )}
+
+          {/* Application error feed — full width */}
+          <AdminCard className="lg:col-span-3" noPadding>
+            <div className="p-5">
+              <div className="flex justify-between items-center mb-4">
+                <div className="flex items-center gap-2.5">
+                  <span className="text-[13px] font-semibold text-foreground">Application Errors</span>
+                  <span className="text-[11px] text-muted-foreground/70">recent ERROR/CRITICAL logs</span>
+                </div>
+                {errTotal === 0 ? <Pill ok text="0 errors" /> : <WarnPill text={`${errTotal} buffered`} accent="loss" />}
+              </div>
+              {errors.length === 0 ? (
+                <p className="text-xs text-muted-foreground/70 text-center py-4">No errors in the buffer.</p>
+              ) : (
+                <div className="flex flex-col gap-1 max-h-[380px] overflow-y-auto">
+                  {errors.map((e, i) => (
+                    <div key={i} className="flex items-start gap-2.5 px-3 py-2 rounded-lg border border-border">
+                      <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-full shrink-0 mt-0.5"
+                        style={{ color: ACCENT_RGB[e.level === 'CRITICAL' ? 'loss' : 'warning'], background: `color-mix(in srgb, ${ACCENT_RGB[e.level === 'CRITICAL' ? 'loss' : 'warning']} 12%, transparent)` }}>{e.level}</span>
+                      <div className="flex-1 min-w-0">
+                        <div className="text-[11px] font-mono text-muted-foreground/70">{e.logger}</div>
+                        <div className="text-xs text-foreground break-words whitespace-pre-wrap">{e.message}</div>
+                      </div>
+                      <span className="text-[11px] text-muted-foreground/60 shrink-0 whitespace-nowrap">{new Date(e.ts * 1000).toLocaleTimeString('en-IN')}</span>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          </AdminCard>
         </div>
       )}
     </AdminPage>

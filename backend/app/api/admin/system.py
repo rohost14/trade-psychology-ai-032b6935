@@ -59,6 +59,15 @@ async def get_system_health(_: dict = Depends(get_current_admin)):
     except Exception as e:
         health["celery"] = {"status": "unknown", "detail": str(e)[:120]}
 
+    # ── Celery worker liveness (inspect ping, short timeout) ───────────────
+    try:
+        from app.core.celery_app import celery_app
+        pong = celery_app.control.ping(timeout=1.0) or []
+        workers = [list(entry.keys())[0] for entry in pong if entry]
+        health["workers"] = {"online": len(workers), "names": workers[:20]}
+    except Exception as e:
+        health["workers"] = {"online": None, "detail": str(e)[:120]}
+
     # ── Online users (in-memory WebSocket manager) ─────────────────────────
     try:
         from app.api.websocket import manager
@@ -146,3 +155,10 @@ async def engine_metrics(
     from app.core.metrics import snapshot, health_flags
     snap = snapshot(days=2)
     return {"metrics": snap, "flags": health_flags(snap)}
+
+
+@router.get("/error-feed")
+async def get_error_feed(limit: int = 100, _: dict = Depends(get_current_admin)):
+    """Recent ERROR/CRITICAL application logs (capped Redis ring buffer)."""
+    from app.core.error_feed import read_error_feed, error_feed_count
+    return {"errors": read_error_feed(limit), "total": error_feed_count()}

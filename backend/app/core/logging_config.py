@@ -126,6 +126,16 @@ def setup_logging():
 
     root_logger.addHandler(console_handler)
 
+    # Error feed — ERROR+ records mirrored into a capped Redis list for the admin panel.
+    try:
+        from app.core.error_feed import RedisErrorFeedHandler
+        error_handler = RedisErrorFeedHandler()
+        error_handler.setLevel(logging.ERROR)
+        error_handler.setFormatter(console_handler.formatter)
+        root_logger.addHandler(error_handler)
+    except Exception:
+        pass
+
     # Inject request_id from ContextVar into every log record (works in both
     # HTTP server and Celery workers — the ContextVar is set at task/request start)
     from app.core.request_context import RequestIdFilter

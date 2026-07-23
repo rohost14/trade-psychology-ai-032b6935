@@ -52,6 +52,7 @@ celery_app = Celery(
         "app.tasks.intent_tasks",
         "app.tasks.maintenance_tasks",
         "app.tasks.market_data_tasks",
+        "app.tasks.admin_watchdog_tasks",
     ]
 )
 
@@ -119,6 +120,12 @@ celery_app.conf.update(
     # Beat schedule for periodic tasks (uses crontab)
     #
     beat_schedule={
+        # Admin infra watchdog — DB/Redis/error-spike check; emails superadmins on trouble
+        # (self-cooldown prevents spam). Every 5 minutes.
+        "admin-health-watchdog": {
+            "task": "app.tasks.admin_watchdog_tasks.admin_health_watchdog",
+            "schedule": 300.0,
+        },
         # Fires every 60s. Each user's configured delivery time is checked inside
         # the task — reports only send to users whose time matches the current IST minute.
         # Single Celery beat process means no N× duplication (replaces APScheduler).
