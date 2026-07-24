@@ -16,6 +16,7 @@ COOLDOWN_KEY = "admin:watchdog:cooldown"
 COOLDOWN_SEC = 30 * 60          # at most one alert email per 30 min
 ERROR_SPIKE_WINDOW = 600        # 10 minutes
 ERROR_SPIKE_THRESHOLD = 25      # >25 errors in 10 min = spike
+QUEUE_BACKLOG_THRESHOLD = 2000  # queued Celery tasks that signal workers can't keep up
 
 
 def _sync_redis():
@@ -42,6 +43,17 @@ def _check_redis() -> bool:
     except Exception as e:
         logger.warning(f"[watchdog] Redis check failed: {e}")
         return False
+
+
+def _celery_backlog() -> int:
+    """Total queued tasks across the main + AI-worker queues. A deep, sustained backlog
+    means workers can't keep up (or are wedged) even though this task is running — a total
+    worker outage can't be self-detected from a task that itself runs on a worker."""
+    try:
+        r = _sync_redis()
+        return int(r.llen("celery") or 0) + int(r.llen("ai_worker") or 0)
+    except Exception:
+        return 0
 
 
 def _recent_error_count() -> int:
@@ -112,6 +124,9 @@ def admin_health_watchdog():
         spike = _recent_error_count()
         if spike > ERROR_SPIKE_THRESHOLD:
             problems.append(f"Error spike: {spike} errors in the last 10 minutes.")
+        backlog = _celery_backlog()
+        if backlog > QUEUE_BACKLOG_THRESHOLD:
+            problems.append(f"Celery backlog: {backlog} tasks queued — real-time processing may be delayed.")
 
         if not problems:
             return {"ok": True}
