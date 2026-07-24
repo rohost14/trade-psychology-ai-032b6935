@@ -46,7 +46,7 @@ export default function AdminLayout() {
   }, [admin, isLoading, navigate]);
 
   const handleLogout = async () => {
-    try { await adminApi.logout(); } catch {}
+    try { await adminApi.logout(); } catch { /* ignore */ }
     logout();
     navigate('/admin/login', { replace: true });
   };

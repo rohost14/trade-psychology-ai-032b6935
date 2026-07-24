@@ -52,7 +52,7 @@ export function PredictiveContextStrip({ brokerAccountId }: Props) {
   function dismiss(id: string) {
     setDismissed(prev => {
       const next = new Set([...prev, id]);
-      try { sessionStorage.setItem(SESSION_DISMISSED_KEY, JSON.stringify([...next])); } catch {}
+      try { sessionStorage.setItem(SESSION_DISMISSED_KEY, JSON.stringify([...next])); } catch { /* ignore */ }
       return next;
     });
   }

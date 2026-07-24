@@ -43,7 +43,7 @@ function persistSeenIds(newIds: string[]) {
     newIds.forEach(id => set.add(id));
     const trimmed = [...set].slice(-500);
     localStorage.setItem(SEEN_KEY, JSON.stringify(trimmed));
-  } catch {}
+  } catch { /* ignore */ }
 }
 
 // Profile shape (6 user-declared fields; all others are backend-derived)
