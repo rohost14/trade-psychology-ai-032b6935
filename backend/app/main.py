@@ -75,6 +75,17 @@ async def lifespan(app: FastAPI):
             "WARNING: changing this key will make all stored access tokens undecryptable — users must reconnect."
         ) from e
 
+    # Warm the admin global-settings Redis snapshot from the DB so sync consumers
+    # (kill-switches, signup gate, AI models) read current values immediately. Best-effort.
+    try:
+        from app.services import admin_settings_service as _ss
+        from app.core.database import SessionLocal
+        async with SessionLocal() as _db:
+            await _ss.load_from_db(_db)
+        logger.info("Admin global settings snapshot warmed.")
+    except Exception as _e:
+        logger.warning(f"Admin settings warm skipped (using defaults): {_e}")
+
     # Reconnect KiteTicker for all accounts that had open positions
     # before the server restarted (prevents stale prices after deploys).
     try:

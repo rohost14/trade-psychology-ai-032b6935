@@ -31,8 +31,14 @@ class WhatsAppService:
 
     @property
     def is_configured(self) -> bool:
-        """Check if Twilio is configured and ready to send messages."""
-        return self.client is not None and self.from_number is not None
+        """Configured AND not disabled by the admin global kill-switch."""
+        if self.client is None or self.from_number is None:
+            return False
+        try:
+            from app.services import admin_settings_service as ss
+            return ss.feature_enabled("whatsapp")
+        except Exception:
+            return True  # fail-safe: never disable on a settings-store error
 
     @property
     def provider(self) -> str:

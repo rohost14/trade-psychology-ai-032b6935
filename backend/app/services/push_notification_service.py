@@ -190,6 +190,13 @@ class PushNotificationService:
             logger.warning("Push notifications not configured, skipping")
             return {"sent": 0, "failed": 0, "error": "Not configured"}
 
+        try:
+            from app.services import admin_settings_service as ss
+            if not ss.feature_enabled("push"):
+                return {"sent": 0, "failed": 0, "error": "disabled"}
+        except Exception:
+            pass  # fail-safe: settings-store error must not stop alerts
+
         # Get all active subscriptions for account
         result = await db.execute(
             select(PushSubscription).where(

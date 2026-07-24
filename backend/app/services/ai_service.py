@@ -31,6 +31,23 @@ SEBI_REDIRECT = (
 
 logger = logging.getLogger(__name__)
 
+_MODEL_FALLBACK = {
+    "primary":   "anthropic/claude-3.5-haiku",
+    "deep":      "anthropic/claude-sonnet-4-5",
+    "reasoning": "openai/gpt-4o-mini",
+    "free":      "google/gemini-flash-1.5-8b",
+}
+
+
+def _model(role: str) -> str:
+    """Admin-overridable model id for a role, falling back to the code default."""
+    try:
+        from app.services import admin_settings_service as ss
+        return ss.ai_model(role)
+    except Exception:
+        return _MODEL_FALLBACK[role]
+
+
 class AIService:
     """
     AI service using OpenRouter API for LLM calls.
@@ -46,11 +63,23 @@ class AIService:
         else:
             logger.info(f"AI Service initialized with OpenRouter key (configured={bool(self.api_key)})")
 
-        # Model selection
-        self.primary_model = "anthropic/claude-3.5-haiku"   # fast, cheap — default for chat
-        self.deep_model    = "anthropic/claude-sonnet-4-5"   # deep analysis — user-triggered
-        self.reasoning_model = "openai/gpt-4o-mini"
-        self.free_model = "google/gemini-flash-1.5-8b"
+        # Model selection is dynamic (admin-overridable via global settings) — see properties.
+
+    @property
+    def primary_model(self) -> str:
+        return _model("primary")
+
+    @property
+    def deep_model(self) -> str:
+        return _model("deep")
+
+    @property
+    def reasoning_model(self) -> str:
+        return _model("reasoning")
+
+    @property
+    def free_model(self) -> str:
+        return _model("free")
 
     async def _make_request(
         self,

@@ -334,6 +334,18 @@ async def zerodha_callback(
             user.updated_at = datetime.now(timezone.utc)
             logger.info(f"Found existing user: {user.id}")
         else:
+            # Signup gate (admin global setting) — block brand-new users when registration
+            # is closed/waitlisted. Returning users (the `if user` branch above) are unaffected.
+            from app.services import admin_settings_service as _ss
+            _mode = _ss.signup_mode()
+            if _mode != "open":
+                from urllib.parse import quote
+                _msg = ("Registration is currently closed." if _mode == "closed"
+                        else "We're in limited early access right now — please check back soon.")
+                logger.info(f"Signup blocked (mode={_mode}) for new user {zerodha_email}")
+                return _clear_nonce_cookie(RedirectResponse(
+                    url=f"{frontend_url}/settings?error={quote(_msg)}", status_code=302))
+
             user = User(
                 email=zerodha_email,
                 display_name=zerodha_name,

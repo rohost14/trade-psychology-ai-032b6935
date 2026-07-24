@@ -5,7 +5,7 @@ so they apply across ALL uvicorn workers, not just the one that served the toggl
 Writes are superadmin-only — the frontend hides the Config page from non-superadmins
 (`AdminLayout.tsx`), and the backend now enforces that same policy.
 """
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
 from typing import Optional
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -79,3 +79,42 @@ async def set_announcement(
 async def get_announcement_public():
     """Public endpoint — no auth. Frontend polls this to show announcement banner."""
     return {"announcement": await admin_state.get_announcement()}
+
+
+# ── Global settings — feature kill-switches / signup gate / AI models ───────────
+class GlobalSettingsRequest(BaseModel):
+    updates: dict
+
+
+@router.get("/config/global")
+async def get_global_settings(
+    _: dict = Depends(require_role("superadmin")),
+    db: AsyncSession = Depends(get_db),
+):
+    from app.services import admin_settings_service as ss
+    return {
+        "settings":       await ss.get_effective(db),
+        "signup_modes":   list(ss.SIGNUP_MODES),
+        "model_allowlist": list(ss.MODEL_ALLOWLIST),
+    }
+
+
+@router.post("/config/global")
+async def set_global_settings(
+    body: GlobalSettingsRequest,
+    admin: dict = Depends(require_role("superadmin")),
+    db: AsyncSession = Depends(get_db),
+):
+    from app.services import admin_settings_service as ss
+    from app.api.admin.audit_writer import audit
+    if not body.updates:
+        raise HTTPException(status_code=422, detail="No settings provided")
+    try:
+        settings = await ss.save(db, body.updates, admin["email"])
+    except ValueError as e:
+        raise HTTPException(status_code=422, detail=str(e))
+    await audit(db, admin["email"], "set_global_settings",
+                target_type="config", target_id="global",
+                details={"keys": sorted(body.updates.keys())})
+    logger.warning(f"Admin {admin['email']} updated global settings: {sorted(body.updates.keys())}")
+    return {"settings": settings}

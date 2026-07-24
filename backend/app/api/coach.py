@@ -11,7 +11,7 @@ Key improvements:
 - Hourly + symbol performance analysis for 7-day window questions
 """
 
-from fastapi import APIRouter, BackgroundTasks, Depends
+from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException
 from fastapi.responses import StreamingResponse
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, func
@@ -404,10 +404,26 @@ async def _build_trading_context(
 _COACH_INSIGHT_TTL_MINUTES = 15
 
 
+def _require_ai_coach() -> None:
+    """503 when the admin global kill-switch has disabled the AI coach. Fail-safe: a
+    settings-store error leaves the coach ENABLED."""
+    try:
+        from app.services import admin_settings_service as ss
+        if not ss.feature_enabled("ai_coach"):
+            # 403 (not 503) — 503 is reserved for maintenance mode, which the frontend
+            # interceptor redirects on; a disabled feature must not send users there.
+            raise HTTPException(status_code=403, detail="The AI coach is temporarily unavailable.")
+    except HTTPException:
+        raise
+    except Exception:
+        pass
+
+
 @router.get("/insight")
 async def get_coach_insight(
     broker_account_id: UUID = Depends(get_verified_broker_account_id),
-    db: AsyncSession = Depends(get_db)
+    db: AsyncSession = Depends(get_db),
+    _ai: None = Depends(_require_ai_coach),
 ):
     """
     Return AI coach insight for the current trading session.
@@ -598,7 +614,8 @@ async def chat_with_coach(
     request: ChatRequest,
     broker_account_id: UUID = Depends(get_verified_broker_account_id),
     db: AsyncSession = Depends(get_db),
-    _limiter: None = Depends(coach_limiter)
+    _limiter: None = Depends(coach_limiter),
+    _ai: None = Depends(_require_ai_coach),
 ):
     """
     Chat with AI trading coach.
@@ -825,6 +842,7 @@ async def chat_with_coach_stream(
     broker_account_id: UUID = Depends(get_verified_broker_account_id),
     db: AsyncSession = Depends(get_db),
     _limiter: None = Depends(coach_limiter),
+    _ai: None = Depends(_require_ai_coach),
 ):
     """
     SSE streaming version of /chat.

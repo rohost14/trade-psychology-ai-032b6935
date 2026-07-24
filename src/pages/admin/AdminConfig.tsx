@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
-import { Save, Smartphone, ShieldCheck, ShieldOff } from 'lucide-react';
+import { Save, Smartphone, ShieldCheck, ShieldOff, SlidersHorizontal } from 'lucide-react';
 import { adminApi } from '@/lib/adminApi';
-import { AdminPage, AdminCard, ErrorBanner, LoadingBlock } from './_ui';
+import { AdminPage, AdminCard, ErrorBanner, LoadingBlock, Spinner } from './_ui';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
@@ -154,6 +154,100 @@ export default function AdminConfig() {
           </div>
         )}
       </AdminCard>
+
+      <GlobalSettingsCard />
     </AdminPage>
+  );
+}
+
+interface GlobalSettings {
+  feature_whatsapp: boolean; feature_ai_coach: boolean; feature_push: boolean;
+  signup_mode: string;
+  model_primary: string; model_deep: string; model_reasoning: string; model_free: string;
+}
+
+function GlobalSettingsCard() {
+  const [gs, setGs] = useState<GlobalSettings | null>(null);
+  const [modes, setModes] = useState<string[]>([]);
+  const [models, setModels] = useState<string[]>([]);
+  const [saving, setSaving] = useState(false);
+  const [saved, setSaved] = useState(false);
+  const [err, setErr] = useState('');
+
+  useEffect(() => {
+    adminApi.getGlobalSettings()
+      .then(d => { setGs(d.settings); setModes(d.signup_modes); setModels(d.model_allowlist); })
+      .catch(e => setErr(e instanceof Error ? e.message : String(e)));
+  }, []);
+
+  const set = <K extends keyof GlobalSettings>(k: K, v: GlobalSettings[K]) =>
+    setGs(prev => prev ? { ...prev, [k]: v } : prev);
+
+  const save = async () => {
+    if (!gs) return;
+    setSaving(true); setErr('');
+    try {
+      const d = await adminApi.setGlobalSettings(gs as unknown as Record<string, unknown>);
+      setGs(d.settings);
+      setSaved(true); setTimeout(() => setSaved(false), 2500);
+    } catch (e) { setErr(e instanceof Error ? e.message : String(e)); }
+    finally { setSaving(false); }
+  };
+
+  const selectCls = 'h-9 px-3 rounded-lg bg-card border border-border text-foreground text-sm outline-none focus-visible:ring-2 focus-visible:ring-ring';
+
+  return (
+    <AdminCard className="mt-5"
+      title={<span className="inline-flex items-center gap-2"><SlidersHorizontal className="w-4 h-4 text-[rgb(var(--tm-brand))]" /> Global Settings</span>}
+      subtitle="Runtime controls — take effect without a deploy. Kill-switches fail safe (stay enabled on error).">
+      {!gs ? (err ? <ErrorBanner message={err} /> : <div className="flex justify-center py-4"><Spinner size={18} /></div>) : (
+        <div className="space-y-6">
+          <ErrorBanner message={err} />
+
+          {/* Feature kill-switches */}
+          <div>
+            <div className="tm-label mb-2.5">Feature kill-switches</div>
+            <div className="space-y-2.5">
+              {([['feature_whatsapp', 'WhatsApp delivery'], ['feature_ai_coach', 'AI coach'], ['feature_push', 'Push notifications']] as const).map(([k, label]) => (
+                <div key={k} className="flex items-center justify-between">
+                  <span className="text-[13px] text-foreground">{label}</span>
+                  <Switch checked={gs[k]} onCheckedChange={v => set(k, v)} />
+                </div>
+              ))}
+            </div>
+          </div>
+
+          {/* Signup gate */}
+          <div>
+            <div className="tm-label mb-2">Registration</div>
+            <div className="flex items-center justify-between">
+              <span className="text-[13px] text-muted-foreground">New Zerodha signups (existing users unaffected)</span>
+              <select className={selectCls} value={gs.signup_mode} onChange={e => set('signup_mode', e.target.value)}>
+                {modes.map(m => <option key={m} value={m}>{m}</option>)}
+              </select>
+            </div>
+          </div>
+
+          {/* AI models */}
+          <div>
+            <div className="tm-label mb-2.5">AI models</div>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              {([['model_primary', 'Primary (chat)'], ['model_deep', 'Deep analysis'], ['model_reasoning', 'Reasoning'], ['model_free', 'Free / cheap']] as const).map(([k, label]) => (
+                <div key={k} className="space-y-1">
+                  <Label className="text-[11px]">{label}</Label>
+                  <select className={`${selectCls} w-full`} value={gs[k]} onChange={e => set(k, e.target.value)}>
+                    {models.map(m => <option key={m} value={m}>{m}</option>)}
+                  </select>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          <Button size="sm" onClick={save} disabled={saving}>
+            <Save className="w-3.5 h-3.5" /> {saving ? 'Saving…' : saved ? 'Saved ✓' : 'Save global settings'}
+          </Button>
+        </div>
+      )}
+    </AdminCard>
   );
 }

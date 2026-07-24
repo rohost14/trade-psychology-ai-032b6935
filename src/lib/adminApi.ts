@@ -89,6 +89,9 @@ export const adminApi = {
     req('/config/maintenance', { method: 'POST', body: JSON.stringify({ enabled, message }) }),
   setAnnouncement: (message: string | null) =>
     req('/config/announcement', { method: 'POST', body: JSON.stringify({ message }) }),
+  getGlobalSettings: () => req('/config/global'),
+  setGlobalSettings: (updates: Record<string, unknown>) =>
+    req('/config/global', { method: 'POST', body: JSON.stringify({ updates }) }),
 
   // ── Audit log ─────────────────────────────────────────────────────────────
   auditLog: (params?: { page?: number; limit?: number; admin_email?: string; action?: string; target_type?: string; target_id?: string; date_from?: string; date_to?: string }) => {
