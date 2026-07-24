@@ -1,5 +1,6 @@
 import { Component, ErrorInfo, ReactNode } from 'react';
 import * as Sentry from '@sentry/react';
+import { SUPPORT_EMAIL, supportMailto } from '@/lib/support';
 
 interface Props {
   children: ReactNode;
@@ -52,12 +53,24 @@ export class ErrorBoundary extends Component<Props, State> {
                 Ref: {this.state.eventId}
               </p>
             )}
-            <button
-              onClick={() => window.location.reload()}
-              className="px-4 py-2 bg-primary text-primary-foreground rounded-md text-sm hover:bg-primary/90"
-            >
-              Reload page
-            </button>
+            <div className="flex items-center justify-center gap-3 pt-1">
+              <button
+                onClick={() => window.location.reload()}
+                className="px-4 py-2 bg-primary text-primary-foreground rounded-md text-sm hover:bg-primary/90"
+              >
+                Reload page
+              </button>
+              <a
+                href={supportMailto({ subject: 'TradeMentor — something went wrong', ref: this.state.eventId ?? undefined })}
+                className="px-4 py-2 border border-border rounded-md text-sm text-foreground hover:bg-accent/20"
+              >
+                Contact support
+              </a>
+            </div>
+            <p className="text-xs text-muted-foreground">
+              Still stuck? Email us at{' '}
+              <a href={supportMailto()} className="text-primary underline">{SUPPORT_EMAIL}</a>.
+            </p>
           </div>
         </div>
       );

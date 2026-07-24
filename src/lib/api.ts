@@ -1,8 +1,20 @@
 import axios, { AxiosRequestConfig, AxiosResponse } from 'axios';
+import { toast } from 'sonner';
 import { isGuestMode, getGuestResponse } from './guestMode';
 import { getImpersonationToken } from './impersonation';
 
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000';
+
+// Throttle error toasts so a page firing several failing calls at once shows ONE
+// message, not a stack. 401 (reconnect flow) and 503 (maintenance page) are handled
+// elsewhere and never toast here.
+let _lastErrToastAt = 0;
+function notifyError(message: string) {
+  const now = Date.now();
+  if (now - _lastErrToastAt < 4000) return;
+  _lastErrToastAt = now;
+  toast.error(message);
+}
 
 export const AUTH_TOKEN_KEY = 'tradementor_auth_token';
 
@@ -75,19 +87,27 @@ api.interceptors.response.use(
         window.dispatchEvent(new CustomEvent('tradementor:token-expired', {
           detail: { message: data?.detail || 'Authentication failed' }
         }));
-      }
-
-      if (status === 503) {
+      } else if (status === 503) {
         // Backend maintenance mode — redirect to maintenance page
         const msg = encodeURIComponent(apiDetailString(data?.detail, 'Service temporarily unavailable'));
         window.location.href = `/maintenance?message=${msg}`;
+      } else if (status === 429) {
+        notifyError('Too many requests — please wait a moment and try again.');
+      } else if (status >= 500) {
+        // Server-side failures were previously silent — the user saw a stuck loader.
+        notifyError("Something went wrong on our end. We've been notified — please try again.");
       }
 
       // Log with context for debugging
       console.error(`API Error [${status}]:`, data?.detail || data?.message || error.message);
     } else if (error.code === 'ECONNABORTED') {
+      notifyError('This is taking longer than usual. Check your connection and try again.');
       console.error('API timeout:', error.message);
     } else {
+      // Network error, no response. If we're offline, the OfflineBanner already says so.
+      if (typeof navigator !== 'undefined' && navigator.onLine) {
+        notifyError("Can't reach the server. Check your connection and try again.");
+      }
       console.error('API network error:', error.message);
     }
 

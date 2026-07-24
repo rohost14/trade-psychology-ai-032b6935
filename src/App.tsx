@@ -11,6 +11,7 @@ import { AlertProvider } from "./contexts/AlertContext";
 import { BrokerProvider } from "./contexts/BrokerContext";
 import { WebSocketProvider } from "./contexts/WebSocketContext";
 import { ErrorBoundary } from "./components/ErrorBoundary";
+import OfflineBanner from "./components/OfflineBanner";
 import { AdminAuthProvider } from "./contexts/AdminAuthContext";
 import Layout from "./components/Layout";
 
@@ -64,6 +65,7 @@ const App = () => (
           <TooltipProvider>
             <Toaster />
             <Sonner />
+            <OfflineBanner />
             <BrowserRouter future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
               <Suspense fallback={null}>
                 <Routes>
