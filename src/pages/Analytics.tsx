@@ -2,7 +2,7 @@ import { Fragment, useState, Suspense, lazy } from 'react';
 import { ErrorBoundary } from '@/components/ErrorBoundary';
 import { Link } from 'react-router-dom';
 import {
-  Link2, BarChart2, Crosshair, Brain, Layers,
+  Link2, BarChart2, Crosshair, Brain, Layers, Repeat,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -23,6 +23,7 @@ const TradeDnaTab  = lazy(() => import('@/components/analytics/TradeDnaTab'));
 const BehaviorTab  = lazy(() => import('@/components/analytics/BehaviorTab'));
 const SessionsTab  = lazy(() => import('@/components/analytics/SessionsTab'));
 const BtstTab      = lazy(() => import('@/components/analytics/BtstTab'));
+const HabitsTab    = lazy(() => import('@/components/analytics/HabitsTab'));
 
 function TabSkeleton() {
   return (
@@ -49,6 +50,7 @@ const TABS = [
   { value: 'overview',  label: 'Overview',   icon: BarChart2, group: 'core' as const },
   { value: 'edge',      label: 'Edge',       icon: Crosshair, group: 'core' as const },
   { value: 'behavior',  label: 'Behaviour',  icon: Brain,     group: 'core' as const },
+  { value: 'habits',    label: 'Habits',     icon: Repeat,    group: 'core' as const },
   { value: 'advanced',  label: 'Advanced',   icon: Layers,    group: 'deep' as const },
 ] as const;
 
@@ -175,6 +177,12 @@ export default function Analytics() {
               <TabIntro>How your habits and emotions shape results — the patterns behind the numbers.</TabIntro>
               <BehaviorTab days={days} />
               <TradeDnaTab days={days} />
+            </div>
+          )}
+          {tab === 'habits' && (
+            <div className="space-y-5">
+              <TabIntro>Your tendencies, in plain language — the time-of-day, day-of-week, instrument and after-loss habits hidden in your own trades.</TabIntro>
+              <HabitsTab days={days} />
             </div>
           )}
           {tab === 'advanced' && (

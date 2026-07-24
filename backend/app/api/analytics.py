@@ -3022,3 +3022,30 @@ async def get_strategy_performance(
     except Exception as e:
         logger.error(f"strategy-performance failed: {e}", exc_info=True)
         raise HTTPException(status_code=500, detail="Internal server error")
+
+
+@router.get("/habits")
+async def get_habits(
+    days: int = Query(default=365, ge=1, le=3650),
+    broker_account_id: UUID = Depends(get_verified_broker_account_id),
+    db: AsyncSession = Depends(get_db),
+    _limiter: None = Depends(analytics_limiter),
+):
+    """Habits tab: zero-input behavioural insights (by hour / day-of-week / instrument /
+    after-loss sizing) computed from the trader's own completed rounds. Also returns a
+    compact `summary` used by the post-import recap. Raw P&L, IST buckets, min-sample gated."""
+    try:
+        from app.services.habits_service import build_habits
+        cutoff = datetime.now(timezone.utc) - timedelta(days=days)
+        rows = (await db.execute(
+            select(CompletedTrade).where(
+                and_(
+                    CompletedTrade.broker_account_id == broker_account_id,
+                    CompletedTrade.exit_time >= cutoff,
+                )
+            )
+        )).scalars().all()
+        return build_habits(rows, days)
+    except Exception as e:
+        logger.error(f"habits failed: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail="Internal server error")

@@ -10,6 +10,7 @@ import { isGuestMode } from '@/lib/guestMode';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { TradebookImportCard, type ImportResult } from '@/components/settings/TradebookImportCard';
+import ImportRecap from './ImportRecap';
 
 const DISMISS_KEY = 'tradementor_import_prompt_dismissed';
 const THIN_THRESHOLD = 10;   // fewer than this many completed trades = "thin"
@@ -17,6 +18,7 @@ const THIN_THRESHOLD = 10;   // fewer than this many completed trades = "thin"
 export default function ImportHistoryPrompt() {
   const [show, setShow] = useState(false);
   const [open, setOpen] = useState(false);
+  const [recap, setRecap] = useState(false);
 
   useEffect(() => {
     if (isGuestMode()) return;
@@ -38,11 +40,13 @@ export default function ImportHistoryPrompt() {
 
   const onImported = (r: ImportResult) => {
     if (r.imported > 0) {
-      // History is in — stop nudging and let the fresh analytics take over.
+      // History is in — stop nudging and reveal the recap ("here's what we found").
       localStorage.setItem(DISMISS_KEY, '1');
-      setTimeout(() => { setOpen(false); setShow(false); }, 1200);
+      setRecap(true);
     }
   };
+
+  const closeDialog = () => { setOpen(false); setShow(false); };
 
   if (!show) return null;
 
@@ -66,10 +70,10 @@ export default function ImportHistoryPrompt() {
         </div>
       </div>
 
-      <Dialog open={open} onOpenChange={setOpen}>
+      <Dialog open={open} onOpenChange={(o) => { setOpen(o); if (!o) { setShow(false); setRecap(false); } }}>
         <DialogContent className="max-w-[560px] max-h-[85vh] overflow-y-auto">
-          <DialogHeader><DialogTitle>Import your trading history</DialogTitle></DialogHeader>
-          <TradebookImportCard onImported={onImported} />
+          <DialogHeader><DialogTitle>{recap ? 'Import complete' : 'Import your trading history'}</DialogTitle></DialogHeader>
+          {recap ? <ImportRecap onClose={closeDialog} /> : <TradebookImportCard onImported={onImported} />}
         </DialogContent>
       </Dialog>
     </>
