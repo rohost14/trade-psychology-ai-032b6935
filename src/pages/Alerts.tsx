@@ -2,6 +2,7 @@ import { useState, useMemo, useEffect, useCallback } from 'react';
 import { Bell, BellOff, CheckCheck, Clock, TrendingUp, Shield } from 'lucide-react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Skeleton } from '@/components/ui/skeleton';
+import ErrorState from '@/components/ErrorState';
 import { cn } from '@/lib/utils';
 import { api } from '@/lib/api';
 import { useAlerts, AlertNotification, formatPatternName } from '@/contexts/AlertContext';
@@ -265,9 +266,11 @@ function HistoryTab({ onOpen }: { onOpen: (a: AlertNotification) => void }) {
   const [sevFilter, setSevFilter] = useState('all');
   const [allAlerts, setAllAlerts] = useState<AlertNotification[]>([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<unknown>(null);
 
   const loadHistory = useCallback(async (h: number) => {
     setLoading(true);
+    setError(null);
     try {
       const res = await api.get('/api/risk/alerts', { params: { hours: h } });
       const raw = res.data.alerts ?? [];
@@ -298,7 +301,8 @@ function HistoryTab({ onOpen }: { onOpen: (a: AlertNotification) => void }) {
       }));
       mapped.sort((a, b) => new Date(b.shown_at ?? 0).getTime() - new Date(a.shown_at ?? 0).getTime());
       setAllAlerts(mapped);
-    } catch {
+    } catch (e) {
+      setError(e);           // don't masquerade a failed load as "no alerts"
       setAllAlerts([]);
     } finally {
       setLoading(false);
@@ -362,7 +366,9 @@ function HistoryTab({ onOpen }: { onOpen: (a: AlertNotification) => void }) {
         )}
       </div>
 
-      {loading ? <AlertSkeleton /> : filtered.length === 0 ? (
+      {loading ? <AlertSkeleton /> : error ? (
+        <ErrorState error={error} onRetry={() => loadHistory(hours)} />
+      ) : filtered.length === 0 ? (
         <div className="tm-card flex flex-col items-center justify-center py-12 text-center">
           <BellOff className="h-8 w-8 text-muted-foreground/30 mb-3" />
           <p className="text-sm text-muted-foreground">
