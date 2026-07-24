@@ -9,6 +9,7 @@ import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 import { formatCurrency, formatCurrencyWithSign } from '@/lib/formatters';
 import { Skeleton } from '@/components/ui/skeleton';
+import ErrorState from '@/components/ErrorState';
 import { api } from '@/lib/api';
 import { useBroker } from '@/contexts/BrokerContext';
 
@@ -456,10 +457,12 @@ export default function Reports() {
   const [total, setTotal] = useState(0);
   const [isLoading, setIsLoading] = useState(true);
   const [loadingMore, setLoadingMore] = useState(false);
+  const [error, setError] = useState<unknown>(null);
   const offset = reports.length;
 
   const fetchReports = useCallback(async (type: ReportType, currentOffset: number, append = false) => {
     if (currentOffset === 0) setIsLoading(true); else setLoadingMore(true);
+    setError(null);
     try {
       const params: Record<string, any> = { limit: 20, offset: currentOffset };
       if (type !== 'all') params.report_type = type;
@@ -470,8 +473,8 @@ export default function Reports() {
         setReports(res.data.reports);
       }
       setTotal(res.data.total);
-    } catch {
-      if (!append) setReports([]);
+    } catch (e) {
+      if (!append) { setError(e); setReports([]); }   // don't fake "no reports" on a failed load
     } finally {
       setIsLoading(false);
       setLoadingMore(false);
@@ -556,6 +559,8 @@ export default function Reports() {
         <div className="space-y-3">
           {[1,2,3].map(i => <Skeleton key={i} className="h-16 rounded-xl" />)}
         </div>
+      ) : error ? (
+        <ErrorState error={error} onRetry={() => fetchReports(filter, 0)} />
       ) : reports.length === 0 ? (
         <div className="flex flex-col items-center justify-center min-h-[30vh] rounded-xl border border-border bg-card">
           <FileText className="h-10 w-10 text-muted-foreground/40 mb-3" />

@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom';
 import { Link2, BookOpen, ChevronDown, ChevronUp } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
+import ErrorState from '@/components/ErrorState';
 import { cn } from '@/lib/utils';
 import { api } from '@/lib/api';
 import { useBroker } from '@/contexts/BrokerContext';
@@ -261,6 +262,7 @@ export default function Journal() {
   const [entries, setEntries]       = useState<JournalEntry[]>([]);
   const [loading, setLoading]       = useState(true);
   const [loadingMore, setLoadingMore] = useState(false);
+  const [error, setError]           = useState<unknown>(null);
   const [hasMore, setHasMore]       = useState(false);
   const [offset, setOffset]         = useState(0);
 
@@ -272,7 +274,7 @@ export default function Journal() {
   const fetchEntries = async (reset = false) => {
     if (!account?.id) return;
     const currentOffset = reset ? 0 : offset;
-    if (reset) setLoading(true);
+    if (reset) { setLoading(true); setError(null); }
     else setLoadingMore(true);
 
     try {
@@ -283,8 +285,8 @@ export default function Journal() {
       setEntries(prev => reset ? fetched : [...prev, ...fetched]);
       setHasMore(fetched.length === PAGE_SIZE);
       setOffset(currentOffset + fetched.length);
-    } catch {
-      // non-fatal
+    } catch (e) {
+      if (reset) setError(e);   // don't fake "no entries" on a failed load
     } finally {
       setLoading(false);
       setLoadingMore(false);
@@ -478,6 +480,8 @@ export default function Journal() {
         <div className="space-y-2">
           {[1, 2, 3, 4, 5].map(i => <EntrySkeleton key={i} />)}
         </div>
+      ) : error ? (
+        <ErrorState error={error} onRetry={() => fetchEntries(true)} />
       ) : filtered.length === 0 ? (
         <div className="tm-card flex flex-col items-center justify-center py-16 text-center">
           <BookOpen className="h-10 w-10 text-muted-foreground/30 mb-3" />
