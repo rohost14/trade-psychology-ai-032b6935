@@ -416,8 +416,9 @@ app.include_router(goals.router, prefix="/api/goals", tags=["goals"])
 from app.api import websocket
 app.include_router(websocket.router, prefix="/api", tags=["websocket"])
 
-from app.api import portfolio_radar
-app.include_router(portfolio_radar.router)
+# NOTE: portfolio_radar / guardrails / portfolio_chat routers archived 2026-07-25 —
+# their frontend pages are archived and no live component calls the endpoints. The
+# backend SERVICES + Celery tasks (portfolio_radar_tasks, etc.) remain and are untouched.
 
 from app.api import notifications
 app.include_router(notifications.router, prefix="/api/notifications", tags=["notifications"])
@@ -451,12 +452,6 @@ app.include_router(danger_zone.router, prefix="/api/danger-zone", tags=["danger-
 
 from app.api import prometheus_metrics
 app.include_router(prometheus_metrics.router, tags=["monitoring"])
-
-from app.api import guardrails
-app.include_router(guardrails.router, prefix="/api/guardrails", tags=["guardrails"])
-
-from app.api import portfolio_chat
-app.include_router(portfolio_chat.router, prefix="/api/portfolio-chat", tags=["portfolio-chat"])
 
 from app.api import session_intent
 app.include_router(session_intent.router, prefix="/api/session-intent", tags=["session-intent"])

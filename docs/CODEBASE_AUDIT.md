@@ -25,18 +25,30 @@ This is a **large, mature codebase** — not a prototype. That's the headline: i
 
 ---
 
+## 1a. Cleanup performed + connectivity verified (2026-07-25)
+**Cleanup (git mv → `_archive/`, nothing deleted; verified safe before each move):**
+- Archived 3 dead routers (`portfolio_radar`, `guardrails`, `portfolio_chat`) + removed their `main.py` mounts. `personalization` **KEPT** (found live consumers — see §2). Services untouched (shared with Celery).
+- Archived `vix_service.py` (0 imports).
+- Moved 6 root one-off scripts (`build_dashboard.py`, `patch.py`, `redesign_script.py`, `restore_scale.py`, `upgrade.py`, `upgrade_html.py`) → `_archive/root_oneoff_scripts/`.
+
+**Verification after cleanup (all green):**
+- Backend **boots** — 235 → **224 routes** (−11 dead endpoints); imports resolve; no lingering refs to archived modules.
+- Frontend **typecheck** passes (imports intact).
+- **Frontend→Backend mapping diff:** 108 live FE `api.*` paths vs 204 BE routes → **0 broken mappings.** The 10 "unmatched" were all `guestMode.ts` mock strings (archived shield/portfolio-radar) or non-calls — no live call hits a missing endpoint.
+- **Left intentionally:** `design_v2/`, `prototype_design/`, `scroll-loss-experience/`, `docsreview*/` dirs (docs/separate app — user decision), and `guestMode.ts` stale mocks for archived features (harmless; guest mode never hits the backend, and touching it is risky per the `{}` catch-all crash history).
+
+---
+
 ## 2. Findings by severity
 
-### 🔴 High — Dead / orphaned API surface still mounted
-Frontend pages were archived, but their **backend routers are still mounted in `main.py`** → live endpoints with no consumer = maintenance burden + attack surface + confusion.
-- **`portfolio_radar`** router — mounted (`main.py:419`), frontend `PortfolioRadar` archived.
-- **`personalization`** router — mounted (`main.py:445`), frontend archived.
-- **`guardrails`** router — mounted (`main.py:455`), frontend `Guardrails` archived.
-- **`portfolio_chat`** router — mounted (`main.py:458`), frontend `PortfolioChat` archived.
-→ **Action:** move these `api/*.py` (+ their services) to `_archive/` and remove the `include_router` lines. If any is a shared dependency, confirm before unmounting.
+### ✅ RESOLVED 2026-07-25 — orphaned routers archived (with a correction)
+Original claim: 4 archived-feature routers were dead. **On verification, only 3 were** — `personalization` is **LIVE** (called by `PredictiveContextStrip` on Dashboard + `InsightsTab` in Settings; the *page* was archived, the *endpoints* are used). **Kept.** *(This is exactly the "archived page but live API" mapping nuance — caught before touching it.)*
+- **Archived + unmounted** (only `main.py` imported them; NO live frontend caller): `portfolio_radar`, `guardrails`, `portfolio_chat` → `backend/app/api/_archive/`.
+- **NOT touched:** their **services** (`portfolio_concentration_service`, `position_metrics_service`, `gtt_service`, `ai_personalization_service`, `zerodha_service`) — all shared with **live Celery tasks** (`portfolio_radar_tasks`, `intent_tasks`, `trade_tasks`). Only the unused HTTP routers were removed.
+- **Follow-up (not done):** `portfolio_radar_tasks` (Celery) still runs though its frontend is gone — decide whether to retire it (separate task; touching Celery beat is riskier).
 
-### 🔴 High — Fully dead service
-- **`services/vix_service.py`** — **0 imports** (VIX analytics was rejected/removed per the analytics filter). Orphaned file. → archive it.
+### ✅ RESOLVED 2026-07-25 — dead service archived
+- **`services/vix_service.py`** — 0 imports (VIX rejected). **Archived** → `backend/app/services/_archive/`.
 
 ### 🟠 Medium — Duplicate / possibly-legacy services (49 services is a lot)
 - **`baseline_service.py` (1 importer)** vs **`behavioral_baseline_service.py` (4 importers)** — two baseline services; the first is barely referenced → likely legacy dup. Verify + consolidate.
