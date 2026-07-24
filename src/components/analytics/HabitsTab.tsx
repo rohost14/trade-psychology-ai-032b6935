@@ -4,9 +4,11 @@
  * raw P&L. Cross-links to Edge (instruments) / Advanced (session timing) for the deep charts
  * rather than re-plotting them.
  */
-import { useEffect, useState } from 'react';
 import { TrendingUp, TrendingDown, Clock, CalendarDays, Layers, AlertTriangle } from 'lucide-react';
 import { api } from '@/lib/api';
+import { useFetch } from '@/hooks/useFetch';
+import ErrorState from '@/components/ErrorState';
+import { CardSkeleton } from '@/components/ui/skeletons';
 import SessionLog from './SessionLog';
 
 interface Bucket { key: number | string; label: string; trades: number; net_pnl: number; win_rate: number; }
@@ -69,22 +71,14 @@ function Card({ icon: Icon, title, sub, children }: { icon: React.ElementType; t
 }
 
 export default function HabitsTab({ days }: { days: number }) {
-  const [data, setData] = useState<HabitsData | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState('');
+  // Reference migration to the Phase 2 primitives — the template for the Phase 3 rollout.
+  const { data, loading, error, retry } = useFetch<HabitsData>(
+    () => api.get<HabitsData>(`/api/analytics/habits?days=${days}`).then(r => r.data),
+    [days],
+  );
 
-  useEffect(() => {
-    let cancelled = false;
-    setLoading(true); setError('');
-    api.get<HabitsData>(`/api/analytics/habits?days=${days}`)
-      .then(res => { if (!cancelled) setData(res.data); })
-      .catch(() => { if (!cancelled) setError('Could not load habits.'); })
-      .finally(() => { if (!cancelled) setLoading(false); });
-    return () => { cancelled = true; };
-  }, [days]);
-
-  if (loading) return <div className="py-12 text-center text-sm text-muted-foreground">Reading your trades…</div>;
-  if (error) return <div className="py-12 text-center text-sm text-muted-foreground">{error}</div>;
+  if (loading) return <div className="space-y-5"><CardSkeleton lines={2} /><CardSkeleton lines={4} /><CardSkeleton lines={4} /></div>;
+  if (error) return <ErrorState error={error} onRetry={retry} />;
   if (!data) return null;
 
   if (!data.has_data) {
