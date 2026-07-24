@@ -5,8 +5,9 @@ import {
   ResponsiveContainer, ReferenceLine, Cell,
   PieChart, Pie, Legend,
 } from 'recharts';
-import { TrendingUp, TrendingDown, RefreshCw, AlertTriangle, CheckCircle2, Activity, ArrowUp, ArrowDown, Minus } from 'lucide-react';
+import { TrendingUp, TrendingDown, CheckCircle2, Activity, ArrowUp, ArrowDown, Minus } from 'lucide-react';
 import { Skeleton } from '@/components/ui/skeleton';
+import ErrorState from '@/components/ErrorState';
 import { cn } from '@/lib/utils';
 import { formatCurrency, formatCurrencyWithSign, formatAxisCurrency } from '@/lib/formatters';
 import { extractUnderlying } from '@/lib/symbolClassify';
@@ -206,7 +207,7 @@ export default function OverviewTab({ days }: OverviewTabProps) {
   const [edge, setEdge]           = useState<EdgeData | null>(null);
   const [perf, setPerf]           = useState<PerfData | null>(null);
   const [loading, setLoading]     = useState(true);
-  const [error, setError]         = useState<string | null>(null);
+  const [error, setError]         = useState<unknown>(null);
   const [retry, setRetry]         = useState(0);
 
   useEffect(() => {
@@ -224,10 +225,7 @@ export default function OverviewTab({ days }: OverviewTabProps) {
       if (ovP.status === 'fulfilled') setOvPrev(ovP.value.data);
       if (ed.status === 'fulfilled') setEdge(ed.value.data);
       if (pf.status === 'fulfilled') setPerf(pf.value.data);
-      if (ov.status === 'rejected') {
-        const err = ov.reason as { response?: { status?: number } };
-        setError(err?.response?.status === 401 ? 'Session expired — reconnect Zerodha.' : 'Failed to load overview data.');
-      }
+      if (ov.status === 'rejected') setError(ov.reason);   // raw error → type-aware ErrorState
     }).finally(() => { if (!cancelled) setLoading(false); });
     return () => { cancelled = true; };
   }, [days, retry]);
@@ -245,15 +243,7 @@ export default function OverviewTab({ days }: OverviewTabProps) {
     </div>
   );
 
-  if (error) return (
-    <div className="tm-card flex flex-col items-center py-16 text-center">
-      <AlertTriangle className="h-8 w-8 text-tm-loss mb-3" />
-      <p className="font-medium">{error}</p>
-      <button onClick={() => setRetry(r => r + 1)} className="mt-4 text-sm text-tm-brand hover:underline flex items-center gap-1.5">
-        <RefreshCw className="h-3.5 w-3.5" /> Try again
-      </button>
-    </div>
-  );
+  if (error) return <ErrorState error={error} onRetry={() => setRetry(r => r + 1)} />;
 
   const k  = overview?.kpis;
   const kP = ovPrev?.kpis;

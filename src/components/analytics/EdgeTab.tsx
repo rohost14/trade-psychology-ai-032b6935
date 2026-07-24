@@ -5,6 +5,7 @@ import {
 } from 'recharts';
 import { RefreshCw, AlertTriangle } from 'lucide-react';
 import { Skeleton } from '@/components/ui/skeleton';
+import ErrorState from '@/components/ErrorState';
 import { cn } from '@/lib/utils';
 import { formatCurrencyWithSign, formatAxisCurrency } from '@/lib/formatters';
 import { extractUnderlying, optionType, classifyExpiry } from '@/lib/symbolClassify';
@@ -121,7 +122,7 @@ export default function EdgeTab({ days, onInstrumentClick }: EdgeTabProps) {
   const [perf, setPerf]       = useState<PerfData | null>(null);
   const [heatmap, setHeatmap] = useState<HeatmapData | null>(null);
   const [loading, setLoading] = useState(true);
-  const [error, setError]     = useState<string | null>(null);
+  const [error, setError]     = useState<unknown>(null);
   const [retry, setRetry]     = useState(0);
 
   useEffect(() => {
@@ -135,7 +136,7 @@ export default function EdgeTab({ days, onInstrumentClick }: EdgeTabProps) {
       if (cancelled) return;
       if (pf.status === 'fulfilled') setPerf(pf.value.data);
       if (hm.status === 'fulfilled') setHeatmap(hm.value.data);
-      if (pf.status === 'rejected') setError('Failed to load edge data.');
+      if (pf.status === 'rejected') setError(pf.reason);
     }).finally(() => { if (!cancelled) setLoading(false); });
     return () => { cancelled = true; };
   }, [days, retry]);
@@ -152,15 +153,7 @@ export default function EdgeTab({ days, onInstrumentClick }: EdgeTabProps) {
     </div>
   );
 
-  if (error) return (
-    <div className="tm-card flex flex-col items-center py-16 text-center">
-      <AlertTriangle className="h-8 w-8 text-tm-loss mb-3" />
-      <p className="font-medium">{error}</p>
-      <button onClick={() => setRetry(r => r + 1)} className="mt-4 text-sm text-tm-brand hover:underline flex items-center gap-1.5">
-        <RefreshCw className="h-3.5 w-3.5" /> Try again
-      </button>
-    </div>
-  );
+  if (error) return <ErrorState error={error} onRetry={() => setRetry(r => r + 1)} />;
 
   // CE/PE/FUT split
   const byInstrument = perf?.by_instrument ?? [];

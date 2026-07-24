@@ -5,6 +5,7 @@ import {
 } from 'recharts';
 import { RefreshCw, AlertTriangle, Search, TrendingUp, TrendingDown, Shield, AlertCircle } from 'lucide-react';
 import { Skeleton } from '@/components/ui/skeleton';
+import ErrorState from '@/components/ErrorState';
 import { cn } from '@/lib/utils';
 import { formatCurrencyWithSign } from '@/lib/formatters';
 import type { ChartTooltipProps } from '@/lib/chartTooltip';
@@ -103,7 +104,7 @@ export default function TradeDnaTab({ days }: TradeDnaTabProps) {
   const [pnlPct, setPnlPct]       = useState<PnlPctData | null>(null);
   const [sequence, setSequence]   = useState<SequenceData | null>(null);
   const [loading, setLoading]     = useState(true);
-  const [error, setError]         = useState<string | null>(null);
+  const [error, setError]         = useState<unknown>(null);
   const [retry, setRetry]         = useState(0);
   const [search, setSearch]       = useState('');
 
@@ -126,7 +127,7 @@ export default function TradeDnaTab({ days }: TradeDnaTabProps) {
       }
       if (p.status === 'fulfilled') setPnlPct(p.value.data);
       if (s.status === 'fulfilled') setSequence(s.value.data);
-      if (q.status === 'rejected') setError('Failed to load trade DNA data.');
+      if (q.status === 'rejected') setError(q.reason);
     }).finally(() => { if (!cancelled) setLoading(false); });
     return () => { cancelled = true; };
   }, [days, retry]);
@@ -143,15 +144,7 @@ export default function TradeDnaTab({ days }: TradeDnaTabProps) {
     </div>
   );
 
-  if (error) return (
-    <div className="tm-card flex flex-col items-center py-16 text-center">
-      <AlertTriangle className="h-8 w-8 text-tm-loss mb-3" />
-      <p className="font-medium">{error}</p>
-      <button onClick={() => setRetry(r => r + 1)} className="mt-4 text-sm text-tm-brand hover:underline flex items-center gap-1.5">
-        <RefreshCw className="h-3.5 w-3.5" /> Try again
-      </button>
-    </div>
-  );
+  if (error) return <ErrorState error={error} onRetry={() => setRetry(r => r + 1)} />;
 
   const baseline = sequence?.baseline_win_rate ?? 0;
   const hasSeq   = sequence?.has_data && (sequence.sequence?.length ?? 0) > 1;

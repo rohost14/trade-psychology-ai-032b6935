@@ -153,8 +153,10 @@ export default function Analytics() {
 
       {/* ── Tab Content ──────────────────────────────────────────────────────── */}
       <ErrorBoundary fallback={
-        <div className="py-12 text-center text-sm text-muted-foreground">
-          This tab failed to load. Try refreshing.
+        <div className="tm-card flex flex-col items-center text-center gap-3 py-12 px-4">
+          <p className="text-sm font-medium text-foreground">This tab hit an error</p>
+          <p className="text-xs text-muted-foreground max-w-xs">Something went wrong rendering this view. Reloading usually fixes it.</p>
+          <Button size="sm" variant="outline" onClick={() => window.location.reload()}>Reload</Button>
         </div>
       }>
         <Suspense fallback={<TabSkeleton />}>

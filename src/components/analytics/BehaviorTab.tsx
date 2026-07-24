@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { RefreshCw, AlertTriangle, Link as LinkIcon, ArrowRight } from 'lucide-react';
 import { Skeleton } from '@/components/ui/skeleton';
+import ErrorState from '@/components/ErrorState';
 import { cn } from '@/lib/utils';
 import { formatCurrencyWithSign } from '@/lib/formatters';
 import { api } from '@/lib/api';
@@ -102,7 +103,7 @@ export default function BehaviorTab({ days }: BehaviorTabProps) {
   const [emotions, setEmotions]     = useState<JournalCorrData | null>(null);
   const [hasOptions, setHasOptions] = useState(false);
   const [loading, setLoading]       = useState(true);
-  const [error, setError]           = useState<string | null>(null);
+  const [error, setError]           = useState<unknown>(null);
   const [retry, setRetry]           = useState(0);
 
   useEffect(() => {
@@ -118,7 +119,7 @@ export default function BehaviorTab({ days }: BehaviorTabProps) {
       if (m.status === 'fulfilled') setMetrics(m.value.data);
       if (c.status === 'fulfilled') setCond(c.value.data);
       if (e.status === 'fulfilled') setEmotions(e.value.data);
-      if (m.status === 'rejected') setError('Failed to load behavior data.');
+      if (m.status === 'rejected') setError(m.reason);
     }).finally(() => { if (!cancelled) setLoading(false); });
     return () => { cancelled = true; };
   }, [days, retry]);
@@ -135,15 +136,7 @@ export default function BehaviorTab({ days }: BehaviorTabProps) {
     </div>
   );
 
-  if (error) return (
-    <div className="tm-card flex flex-col items-center py-16 text-center">
-      <AlertTriangle className="h-8 w-8 text-tm-loss mb-3" />
-      <p className="font-medium">{error}</p>
-      <button onClick={() => setRetry(r => r + 1)} className="mt-4 text-sm text-tm-brand hover:underline flex items-center gap-1.5">
-        <RefreshCw className="h-3.5 w-3.5" /> Try again
-      </button>
-    </div>
-  );
+  if (error) return <ErrorState error={error} onRetry={() => setRetry(r => r + 1)} />;
 
   // Pattern frequency, most frequent first
   const patterns = [...(metrics?.alerts_summary ?? [])].sort((a, b) => b.count - a.count);
