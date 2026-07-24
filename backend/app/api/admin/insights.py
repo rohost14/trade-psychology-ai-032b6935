@@ -23,6 +23,12 @@ async def get_behavioral_insights(
     db: AsyncSession = Depends(get_db),
     _: dict = Depends(get_current_admin),
 ):
+    from app.api.admin.cache_util import cache_get, cache_set
+    cache_key = f"admin:cache:insights:{days}"
+    cached = await cache_get(cache_key)
+    if cached is not None:
+        return cached
+
     since = datetime.now(timezone.utc) - timedelta(days=days)
     chart_since = datetime.now(timezone.utc) - timedelta(days=14)
 
@@ -173,7 +179,7 @@ async def get_behavioral_insights(
         })
     recurrence.sort(key=lambda x: x["recurrence_count"], reverse=True)
 
-    return {
+    result = {
         "period_days": days,
         "patterns":   [{"pattern": r.pattern_type, "count": r.count} for r in pattern_rows],
         "severity":   [{"severity": r.severity, "count": r.count} for r in severity_rows],
@@ -182,6 +188,8 @@ async def get_behavioral_insights(
         "top_users":  top_users,
         "recurrence": recurrence,
     }
+    await cache_set(cache_key, result, 120)  # 2 min — insights change slowly
+    return result
 
 
 @router.get("/detector-stats")

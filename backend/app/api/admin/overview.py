@@ -21,11 +21,20 @@ router = APIRouter()
 _IST = ZoneInfo("Asia/Kolkata")
 
 
+_OVERVIEW_CACHE_KEY = "admin:cache:overview"
+_OVERVIEW_TTL = 60  # seconds — admin dashboard tolerates minor staleness
+
+
 @router.get("/overview")
 async def get_overview(
     db: AsyncSession = Depends(get_db),
     _: dict = Depends(get_current_admin),
 ):
+    from app.api.admin.cache_util import cache_get, cache_set
+    cached = await cache_get(_OVERVIEW_CACHE_KEY)
+    if cached is not None:
+        return cached
+
     now = datetime.now(timezone.utc)
 
     # IST midnight so "today" aligns with trading day, not UTC rollover
@@ -190,7 +199,7 @@ async def get_overview(
     except Exception:
         health["redis"] = "error"
 
-    return {
+    result = {
         "users": {
             "total":      total_accounts,
             "connected":  connected,
@@ -226,3 +235,5 @@ async def get_overview(
         "health":        health,
         "daily_signups": daily_signups,
     }
+    await cache_set(_OVERVIEW_CACHE_KEY, result, _OVERVIEW_TTL)
+    return result
