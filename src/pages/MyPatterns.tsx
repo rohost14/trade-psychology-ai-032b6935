@@ -18,6 +18,7 @@ import { useWebSocket } from '@/contexts/WebSocketContext';
 import { BehaviorScoresCard } from '@/components/patterns/BehaviorScoresCard';
 import { StreakTrackerCard } from '@/components/goals/StreakTrackerCard';
 import PatternCalendar from '@/components/patterns/PatternCalendar';
+import BehaviourCostCard from '@/components/patterns/BehaviourCostCard';
 import type { DangerZoneStatus, CooldownRecord } from '@/types/api';
 import type { StreakData, DailyAdherence, StreakMilestone } from '@/types/patterns';
 
@@ -453,6 +454,9 @@ export default function MyPatterns() {
 
         {/* Behavior Risk headline + drivers (Phase 5, master 1D.9) */}
         <BehaviorScoresCard />
+
+        {/* Behaviour → realized money: the factual money story (patterns + own rules) */}
+        <BehaviourCostCard days={90} />
 
         {/* Worst pattern callout */}
         {worstPattern && (

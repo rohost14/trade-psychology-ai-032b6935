@@ -3049,3 +3049,99 @@ async def get_habits(
     except Exception as e:
         logger.error(f"habits failed: {e}", exc_info=True)
         raise HTTPException(status_code=500, detail="Internal server error")
+
+
+@router.get("/behaviour-cost")
+async def get_behaviour_cost(
+    days: int = Query(default=90, ge=1, le=365),
+    broker_account_id: UUID = Depends(get_verified_broker_account_id),
+    db: AsyncSession = Depends(get_db),
+    _limiter: None = Depends(analytics_limiter),
+):
+    """Behaviour → realized money, and constitution adherence → realized money.
+
+    FACTUAL only: the raw realized P&L of the exact completed trades that each behavioural
+    alert (RiskAlert) / rule breach (BehaviorEvent 'constitution_violation', incl. suppressed
+    ones like cooldown) fired on — via the trigger_completed_trade_id the engine already
+    stores. No estimation, no counterfactual. Framed as "realized P&L on flagged trades",
+    never "cost", so it can never be read as causal attribution.
+    P&L is summed over DISTINCT trades (a trade flagged twice is counted once)."""
+    from collections import defaultdict
+    from app.models.behavior_event import BehaviorEvent
+
+    cutoff = datetime.now(timezone.utc) - timedelta(days=days)
+
+    def _aggregate(rows):
+        """rows = [(key, trade_id, realized_pnl)]. Returns (per-key list, distinct-trade totals)."""
+        by_key = defaultdict(lambda: {"count": 0, "trades": {}})
+        all_trades: dict = {}
+        for key, tid, pnl in rows:
+            if not key or tid is None:
+                continue
+            v = float(pnl or 0)
+            g = by_key[key]
+            g["count"] += 1
+            g["trades"][str(tid)] = v      # dedupe realized P&L by trade
+            all_trades[str(tid)] = v
+        out = [
+            {
+                "key": k,
+                "event_count": g["count"],
+                "trade_count": len(g["trades"]),
+                "realized_pnl": round(sum(g["trades"].values()), 2),
+            }
+            for k, g in by_key.items()
+        ]
+        out.sort(key=lambda r: r["realized_pnl"])   # worst (most negative) first
+        totals = {
+            "trade_count": len(all_trades),
+            "realized_pnl": round(sum(all_trades.values()), 2),
+        }
+        return out, totals
+
+    # ── #1 Behaviour → money (user-facing surfaced alerts) ──────────────────────
+    alert_rows = (await db.execute(
+        select(RiskAlert.pattern_type, CompletedTrade.id, CompletedTrade.realized_pnl)
+        .join(CompletedTrade, RiskAlert.trigger_completed_trade_id == CompletedTrade.id)
+        .where(
+            RiskAlert.broker_account_id == broker_account_id,
+            RiskAlert.detected_at >= cutoff,
+            RiskAlert.trigger_completed_trade_id.isnot(None),
+        )
+    )).all()
+    patterns, pattern_totals = _aggregate([(r[0], r[1], r[2]) for r in alert_rows])
+
+    # ── #2 Constitution adherence → money (rules the user set; incl. suppressed) ─
+    rule_rows = (await db.execute(
+        select(
+            BehaviorEvent.evidence["rule"].astext,
+            CompletedTrade.id,
+            CompletedTrade.realized_pnl,
+        )
+        .join(CompletedTrade, BehaviorEvent.trigger_completed_trade_id == CompletedTrade.id)
+        .where(
+            BehaviorEvent.broker_account_id == broker_account_id,
+            BehaviorEvent.detected_at >= cutoff,
+            BehaviorEvent.detector == "constitution_violation",
+            BehaviorEvent.shadow.is_(False),
+            BehaviorEvent.trigger_completed_trade_id.isnot(None),
+        )
+    )).all()
+    rules, rule_totals = _aggregate([(r[0], r[1], r[2]) for r in rule_rows])
+
+    return {
+        "has_data": bool(patterns or rules),
+        "period_days": days,
+        "patterns": [
+            {"pattern_type": r["key"], "alert_count": r["event_count"],
+             "trade_count": r["trade_count"], "realized_pnl": r["realized_pnl"]}
+            for r in patterns
+        ],
+        "pattern_totals": pattern_totals,
+        "rules": [
+            {"rule": r["key"], "breach_count": r["event_count"],
+             "trade_count": r["trade_count"], "realized_pnl": r["realized_pnl"]}
+            for r in rules
+        ],
+        "rule_totals": rule_totals,
+    }
