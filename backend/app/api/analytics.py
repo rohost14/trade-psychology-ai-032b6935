@@ -3145,3 +3145,95 @@ async def get_behaviour_cost(
         ],
         "rule_totals": rule_totals,
     }
+
+
+@router.get("/session-log")
+async def get_session_log(
+    days: int = Query(default=60, ge=7, le=365),
+    broker_account_id: UUID = Depends(get_verified_broker_account_id),
+    db: AsyncSession = Depends(get_db),
+    _limiter: None = Depends(analytics_limiter),
+):
+    """Session tagging: each trading DAY labelled by its dominant behaviour (from the
+    patterns that fired that day) with the day's realized P&L, plus what the worst days
+    share. Built from trading_sessions (already stores per-day pnl/trades/alerts/risk) +
+    behavior_events (which patterns fired). Factual, raw P&L, 0-input."""
+    from collections import defaultdict
+    from sqlalchemy import func as _func
+    from app.models.trading_session import TradingSession
+    from app.models.behavior_event import BehaviorEvent
+
+    from datetime import date as _date, timedelta as _td
+    cutoff_date = (datetime.now(timezone.utc).date() - _td(days=days))
+
+    sessions = (await db.execute(
+        select(TradingSession)
+        .where(
+            TradingSession.broker_account_id == broker_account_id,
+            TradingSession.session_date >= cutoff_date,
+        )
+        .order_by(TradingSession.session_date.desc())
+    )).scalars().all()
+    if not sessions:
+        return {"has_data": False, "period_days": days, "days": [], "insight": None}
+
+    # patterns fired per IST day (exclude shadow + info-only)
+    ist_day = _func.cast(_func.timezone("Asia/Kolkata", BehaviorEvent.detected_at), Date)
+    ev_rows = (await db.execute(
+        select(ist_day.label("d"), BehaviorEvent.detector, _func.count().label("n"))
+        .where(
+            BehaviorEvent.broker_account_id == broker_account_id,
+            BehaviorEvent.detected_at >= (datetime.now(timezone.utc) - _td(days=days + 1)),
+            BehaviorEvent.shadow.is_(False),
+            BehaviorEvent.severity != "info",
+        )
+        .group_by("d", BehaviorEvent.detector)
+    )).all()
+    patterns_by_day: dict = defaultdict(dict)
+    for d, detector, n in ev_rows:
+        patterns_by_day[d][detector] = int(n)
+
+    # dominant-behaviour tag from the day's patterns
+    REVENGE = {"revenge_trade", "rapid_reentry", "post_loss_recovery_bet", "consecutive_loss_streak"}
+    SIZING  = {"size_escalation", "martingale_behaviour"}
+
+    def _tag(pats: dict, alerts_fired: int) -> str:
+        if not pats and not alerts_fired:
+            return "clean"
+        keys = set(pats)
+        if keys & REVENGE:
+            return "revenge"
+        if keys & SIZING:
+            return "size_tilt"
+        if "overtrading" in keys:
+            return "overtrading"
+        return "flagged" if (keys or alerts_fired) else "normal"
+
+    out_days = []
+    for s in sessions:
+        pats = patterns_by_day.get(s.session_date, {})
+        top = sorted(pats.items(), key=lambda kv: -kv[1])[:3]
+        out_days.append({
+            "date":           s.session_date.isoformat(),
+            "pnl":            float(s.session_pnl or 0),
+            "trades":         int(s.trade_count or 0),
+            "alerts":         int(s.alerts_fired or 0),
+            "peak_risk":      float(s.peak_risk_score or 0),
+            "tag":            _tag(pats, int(s.alerts_fired or 0)),
+            "top_patterns":   [k for k, _ in top],
+        })
+
+    # what the worst days share: dominant tag among the 5 worst by P&L (min 3 losing days)
+    losers = sorted([d for d in out_days if d["pnl"] < 0], key=lambda d: d["pnl"])[:5]
+    insight = None
+    if len(losers) >= 3:
+        tag_counts = defaultdict(int)
+        for d in losers:
+            if d["tag"] not in ("clean", "normal"):
+                tag_counts[d["tag"]] += 1
+        if tag_counts:
+            top_tag, cnt = max(tag_counts.items(), key=lambda kv: kv[1])
+            if cnt >= 2:
+                insight = {"tag": top_tag, "count": cnt, "of": len(losers)}
+
+    return {"has_data": True, "period_days": days, "days": out_days, "insight": insight}

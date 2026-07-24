@@ -7,6 +7,7 @@
 import { useEffect, useState } from 'react';
 import { TrendingUp, TrendingDown, Clock, CalendarDays, Layers, AlertTriangle } from 'lucide-react';
 import { api } from '@/lib/api';
+import SessionLog from './SessionLog';
 
 interface Bucket { key: number | string; label: string; trades: number; net_pnl: number; win_rate: number; }
 interface HabitsData {
@@ -106,6 +107,9 @@ export default function HabitsTab({ days }: { days: number }) {
 
   return (
     <div className="space-y-5">
+      {/* Session tagging — your days at a glance */}
+      <SessionLog days={days} />
+
       {/* After-loss size drift — the lead, net-new insight */}
       <Card icon={AlertTriangle} title="After a loss, do you size up?" sub="Average position value on the trade right after a losing one, vs your normal.">
         {als.ratio == null ? (
