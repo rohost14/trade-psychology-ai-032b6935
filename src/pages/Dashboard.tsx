@@ -5,6 +5,7 @@ import { Link2, Loader2, AlertTriangle, RefreshCw, X } from 'lucide-react';
 import { MorningIntentCard } from '@/components/dashboard/MorningIntentCard';
 import { EodComparisonCard } from '@/components/dashboard/EodComparisonCard';
 import { SetupNudgeCard } from '@/components/dashboard/SetupNudgeCard';
+import ImportHistoryPrompt from '@/components/onboarding/ImportHistoryPrompt';
 import { BehaviorRiskBadge } from '@/components/dashboard/BehaviorRiskBadge';
 import RecentAlertsCard from '@/components/dashboard/RecentAlertsCard';
 import AlertDetailSheet from '@/components/alerts/AlertDetailSheet';
@@ -497,6 +498,8 @@ export default function Dashboard() {
 
   return (
     <div className="w-full min-h-screen tm-page-bg">
+
+      <ImportHistoryPrompt />
 
       {/* ── System banners (token / sync / capital) ───────────────────────── */}
       {isTokenExpired && dataLoaded && (

@@ -11,8 +11,10 @@ import {
   Brain,
   Target,
   Clock,
-  Wallet
+  Wallet,
+  Upload,
 } from 'lucide-react';
+import { TradebookImportCard } from '@/components/settings/TradebookImportCard';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -62,6 +64,7 @@ const STEPS = [
   { id: 3, title: 'Preferences', icon: Settings, description: 'Customize your experience' },
   { id: 4, title: 'Risk Limits', icon: Shield, description: 'Protect your capital' },
   { id: 5, title: 'Notifications', icon: Bell, description: 'Stay informed' },
+  { id: 6, title: 'History', icon: Upload, description: 'Import past trades (optional)' },
 ];
 
 const EXPERIENCE_LEVELS = [
@@ -156,8 +159,12 @@ export default function OnboardingWizard({ brokerAccountId, onComplete, onSkip }
   const handleNext = async () => {
     setIsLoading(true);
     try {
-      const stepData = getStepData(currentStep);
-      await api.post(`/api/profile/onboarding/step${currentStep}`, stepData);
+      // Steps 1–5 persist profile data; step 6 (history import) is optional and
+      // saves nothing itself — the import card posts directly when a file is chosen.
+      if (currentStep <= 5) {
+        const stepData = getStepData(currentStep);
+        await api.post(`/api/profile/onboarding/step${currentStep}`, stepData);
+      }
 
       if (currentStep < STEPS.length) {
         setCurrentStep(currentStep + 1);
@@ -602,6 +609,26 @@ export default function OnboardingWizard({ brokerAccountId, onComplete, onSkip }
                       />
                     </div>
                   </div>
+                </div>
+              )}
+
+              {/* Step 6: Import history (optional) */}
+              {currentStep === 6 && (
+                <div className="space-y-4">
+                  <div className="text-center py-2">
+                    <div className="w-16 h-16 bg-tm-brand/10 rounded-full flex items-center justify-center mx-auto mb-3">
+                      <Upload className="h-8 w-8 text-tm-brand" />
+                    </div>
+                    <h3 className="text-lg font-semibold">Start with your real history</h3>
+                    <p className="text-muted-foreground text-sm mt-2 max-w-md mx-auto">
+                      Zerodha only shares <span className="text-foreground font-medium">today's</span> trades with us.
+                      Import your Console tradebook so your Analytics, Edge and Habits are full from day one.
+                    </p>
+                  </div>
+                  <TradebookImportCard />
+                  <p className="text-xs text-muted-foreground text-center">
+                    Optional — you can always do this later in Settings. Click <span className="font-medium">Complete Setup</span> to finish.
+                  </p>
                 </div>
               )}
             </div>

@@ -9,6 +9,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { cn } from '@/lib/utils';
 import { useBroker } from '@/contexts/BrokerContext';
 import ReportCard from '@/components/analytics/ReportCard';
+import ImportHistoryPrompt from '@/components/onboarding/ImportHistoryPrompt';
 import EdgeLeakCard from '@/components/analytics/EdgeLeakCard';
 import StrategyCard from '@/components/analytics/StrategyCard';
 import TabIntro from '@/components/analytics/TabIntro';
@@ -109,6 +110,8 @@ export default function Analytics() {
           {account?.id && <ExportReportButton brokerAccountId={account.id} />}
         </div>
       </div>
+
+      <ImportHistoryPrompt />
 
       {/* ── Report Card hero — the front door ────────────────────────────────── */}
       <div className="mb-6">

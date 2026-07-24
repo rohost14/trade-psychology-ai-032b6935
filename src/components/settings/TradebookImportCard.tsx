@@ -13,9 +13,10 @@ import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 import { api } from '@/lib/api';
 
-interface ImportResult {
+export interface ImportResult {
   imported: number;
   duplicates: number;
+  reconciled?: number;
   rejected: number;
   errors?: { line: number; problems: string[] }[];
   date_range?: { from: string; to: string };
@@ -30,7 +31,7 @@ function fmtDate(iso: string | undefined) {
   });
 }
 
-export function TradebookImportCard() {
+export function TradebookImportCard({ onImported }: { onImported?: (r: ImportResult) => void } = {}) {
   const inputRef = useRef<HTMLInputElement>(null);
   const [isUploading, setIsUploading] = useState(false);
   const [dragOver, setDragOver] = useState(false);
@@ -52,6 +53,7 @@ export function TradebookImportCard() {
         headers: { 'Content-Type': 'multipart/form-data' },
       });
       setResult(res.data);
+      onImported?.(res.data);
       if (res.data.imported > 0) {
         toast.success(`Imported ${res.data.imported} trades`, {
           description: 'Analytics, Edge and My Patterns will now reflect this history.',
