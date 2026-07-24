@@ -178,6 +178,22 @@ async def export_account_data(
         raise HTTPException(status_code=500, detail="Internal server error")
 
 
+def _twin_key(symbol, txn_type, qty, price, ts):
+    """Identity of a fill for reconciling a tradebook row against a live-captured
+    (postback) row that lacks a trade_id: (symbol, side, qty, price~2dp, minute)."""
+    try:
+        minute = ts.replace(second=0, microsecond=0) if ts else None
+    except Exception:
+        minute = None
+    return (
+        (symbol or "").upper(),
+        (txn_type or "").upper(),
+        int(qty or 0),
+        round(float(price), 2) if price is not None else None,
+        minute,
+    )
+
+
 @router.post("/import-tradebook")
 async def import_tradebook(
     file: UploadFile = File(...),
@@ -238,24 +254,58 @@ async def import_tradebook(
         p["broker_account_id"] = broker_account_id
         payloads.append(p)
 
-    imported = 0
+    # Reconcile against POSTBACK-only rows (order_id == kite_order_id — captured live from
+    # a webhook that had no per-fill trade_id, so they key differently from a tradebook
+    # row's trade_id). Without this, re-importing an overlapping range would DUPLICATE
+    # those fills. Match by (symbol, side, qty, price~2dp, minute) and drop the twin.
+    from sqlalchemy import select as _select
+    reconciled = 0
     try:
-        # Chunked so a very large import doesn't build one giant statement.
-        for i in range(0, len(payloads), 1000):
-            chunk = payloads[i:i + 1000]
-            result = await db.execute(
-                pg_insert(Trade.__table__)
-                .values(chunk)
-                .on_conflict_do_nothing(constraint="uq_trades_broker_order")
+        w_lo = min(r["timestamp"] for r in rows)
+        w_hi = max(r["timestamp"] for r in rows)
+        existing = (await db.execute(
+            _select(
+                Trade.tradingsymbol, Trade.transaction_type, Trade.quantity,
+                Trade.price, Trade.order_timestamp,
+            ).where(
+                Trade.broker_account_id == broker_account_id,
+                Trade.order_id == Trade.kite_order_id,
+                Trade.order_timestamp >= w_lo,
+                Trade.order_timestamp <= w_hi,
             )
-            imported += result.rowcount or 0
-        await db.commit()
+        )).all()
+        twins = {_twin_key(sym, txn, qty, price, ts) for sym, txn, qty, price, ts in existing}
+        if twins:
+            kept = [
+                p for p in payloads
+                if _twin_key(p["tradingsymbol"], p["transaction_type"], p["quantity"], p["price"], p["order_timestamp"]) not in twins
+            ]
+            reconciled = len(payloads) - len(kept)
+            payloads = kept
     except Exception as e:
-        await db.rollback()
-        logger.error(f"Tradebook insert failed: {e}", exc_info=True)
-        raise HTTPException(status_code=500, detail="Could not save the imported trades.")
+        logger.warning(f"Tradebook reconcile skipped (non-fatal): {e}")
 
-    duplicates = len(payloads) - imported
+    imported = 0
+    if payloads:
+        try:
+            # Chunked so a very large import doesn't build one giant statement.
+            for i in range(0, len(payloads), 1000):
+                chunk = payloads[i:i + 1000]
+                result = await db.execute(
+                    pg_insert(Trade.__table__)
+                    .values(chunk)
+                    .on_conflict_do_nothing(constraint="uq_trades_broker_order")
+                )
+                imported += result.rowcount or 0
+            await db.commit()
+        except Exception as e:
+            await db.rollback()
+            logger.error(f"Tradebook insert failed: {e}", exc_info=True)
+            raise HTTPException(status_code=500, detail="Could not save the imported trades.")
+
+    # Everything not newly inserted was already present — either by trade_id (constraint)
+    # or as a live postback twin (reconcile).
+    duplicates = (len(payloads) - imported) + reconciled
 
     # Rebuild derived data over the imported window so Analytics lights up.
     oldest = min(r["timestamp"] for r in rows)
@@ -279,6 +329,7 @@ async def import_tradebook(
     return {
         "imported": imported,
         "duplicates": duplicates,
+        "reconciled": reconciled,   # tradebook rows collapsed onto live postback twins
         "rejected": len(row_errors),
         "errors": row_errors[:100],
         "date_range": {
