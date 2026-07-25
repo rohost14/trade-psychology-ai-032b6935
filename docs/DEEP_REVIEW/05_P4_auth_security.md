@@ -12,6 +12,7 @@
 ## 🟠 P1
 
 ### A1 · (refines P0-F3) User-facing per-account rate limiters are non-functional; admin brute-force is NOT · security
+> ✅ **FIXED 2026-07-26** (with F3) — limiter keys off the JWT `bid` for authed endpoints (real per-account limits, no more shared-NAT 429s or XFF bypass); unauthed falls to peer IP, XFF only behind a trusted proxy. Admin path was already safe via per-email lockout. Blocking-Redis (F4) still separate/pending.
 Re-scoping P0-F3 after reading the admin flow:
 - **Admin brute-force is mitigated** — `admin_login` uses a **per-email** `LOGIN_FAIL` counter (5/15min) and 2nd-factor uses a **per-email** `VERIFY_FAIL` counter (5/15min), both **XFF-independent**. So the bypassable per-IP `admin_login_limiter`/`admin_otp_limiter` are only the outer layer; the real caps are per-email and hold. **Downgrade the admin half of F3.**
 - **User endpoints remain broken (P1 stands):** `analytics`/`coach`/`profile`/`reports`/`account_data`/`sync` limiters still key on `X-Forwarded-For`/IP (P0-F3 root cause: `request.state.broker_account_id` never set) → **no effective per-user limit**, false 429s for shared-NAT users, and trivial bypass by rotating XFF. These protect expensive endpoints (analytics recompute, LLM coach) → a single user can hammer them. **Fix per P0-F3** (key off the authenticated dep).

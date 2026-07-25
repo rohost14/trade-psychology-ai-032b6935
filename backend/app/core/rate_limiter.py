@@ -43,16 +43,40 @@ class RateLimiter:
 
     def _default_key(self, request: Request) -> str:
         """
-        Extract rate-limit key from request.
-        Prefers broker_account_id from request.state (set by auth middleware)
-        so limits are per-account, not per-IP. Falls back to IP if not authed.
+        Extract the rate-limit key from the request.
+
+        Prefers the authenticated principal from the JWT bearer so limits are
+        PER-ACCOUNT. (The previous implementation read request.state.broker_account_id,
+        which NO middleware ever set — so every authed endpoint silently fell through
+        to the IP branch, and that branch trusted a client-controlled X-Forwarded-For.
+        Net effect: no real per-user limit, false 429s behind shared NAT, and a trivial
+        XFF-rotation bypass. See deep-review P0-F3 / P4-A1.)
+
+        Falls back to the real peer IP for unauthenticated endpoints, honouring
+        X-Forwarded-For only behind a trusted proxy that overwrites it.
         """
-        account_id = getattr(request.state, "broker_account_id", None)
-        if account_id:
-            return str(account_id)
-        forwarded = request.headers.get("X-Forwarded-For")
-        if forwarded:
-            return forwarded.split(",")[0].strip()
+        from app.core.config import settings
+
+        auth = request.headers.get("Authorization", "")
+        if auth.startswith("Bearer "):
+            try:
+                from jose import jwt
+                payload = jwt.decode(
+                    auth[7:], settings.SECRET_KEY, algorithms=[settings.ALGORITHM]
+                )
+                bid = payload.get("bid")
+                if bid:
+                    return f"acct:{bid}"
+            except Exception:
+                pass  # invalid/expired/foreign token → fall through to IP
+
+        # Unauthenticated (e.g. admin login pre-2FA): key on the real peer IP.
+        # Only trust X-Forwarded-For behind a proxy that overwrites it — otherwise
+        # it is client-controlled and rotating it dodges the limit.
+        if settings.ADMIN_TRUST_PROXY_HEADERS:
+            forwarded = request.headers.get("X-Forwarded-For")
+            if forwarded:
+                return forwarded.split(",")[0].strip()
         return request.client.host if request.client else "unknown"
 
     async def __call__(self, request: Request):

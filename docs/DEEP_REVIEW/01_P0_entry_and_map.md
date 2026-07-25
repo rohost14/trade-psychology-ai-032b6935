@@ -45,6 +45,8 @@
 - **Fix:** call `setup_logging()` in `main.py` lifespan startup (and at Celery worker init). Register the error-feed handler + filter on the **handlers**, not just the root logger (see F11).
 
 ### F3 · Per-account rate limiting silently degrades to per-IP; admin brute-force protection bypassable · category: security
+> ✅ **FIXED 2026-07-26** — `rate_limiter.py._default_key` now derives the key from the **authenticated JWT bearer** (`acct:{bid}`) so authed limiters are genuinely per-account; unauthenticated endpoints key on the **real peer IP** and honour `X-Forwarded-For` only when `ADMIN_TRUST_PROXY_HEADERS` is set (closes the XFF-rotation bypass). Verified: two users behind one IP get distinct keys; spoofed XFF ignored. (Admin brute-force was already capped per-email — see P4-A1 — this closes the outer layer.)
+> ⚠️ **Note:** **F4 (blocking sync Redis on the loop) is unchanged** — this limiter still uses `get_sync_redis()`; the keying bug and the blocking-I/O bug are separate. F4 tracked independently.
 - **Where:** `core/rate_limiter.py` `_default_key()` reads `request.state.broker_account_id`; **grep confirms nothing anywhere sets `request.state.broker_account_id`** (auth is via FastAPI dependency in `deps.py`, which never touches `request.state`).
 - **Problem:** every limiter therefore falls through to `X-Forwarded-For` (first hop) or client IP. Two impacts:
   - **(a) Correctness:** authed limiters (`sync_limiter`, `coach_limiter`, `analytics_limiter`, `profile_put_limiter`, used across `analytics.py` ~30 endpoints, `coach`, `my_record`, `reports`, `account_data`, `zerodha`) group **all users behind a shared NAT/CGNAT IP into one bucket** → false 429s for unrelated users under one carrier/corporate IP.
