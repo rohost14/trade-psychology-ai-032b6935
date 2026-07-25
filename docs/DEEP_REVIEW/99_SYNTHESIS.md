@@ -29,7 +29,7 @@
 | F4 | Blocking **sync Redis on the async event loop** (limiters + error-feed) → throughput collapse. *(Still open — separate from F3; same file.)* | P0 |
 | M1 | P&L **doesn't segregate by product** (MIS+NRML same symbol netted) → wrong P&L / missing CompletedTrades | P1 |
 | M2 | **Flip-opened rounds build no CompletedTrade** live → real-time engine misses flip trades | P1 |
-| M3 | **MCX/CDS unrealized P&L ignores lot multiplier** → commodity open P&L ~100× understated | P1 |
+| M3 | ✅ **FIXED 2026-07-26 (test-first)** — `get_unrealized_pnl` applies the lot multiplier (pure helper + `test_pnl_multiplier.py`, 4 cases RED→GREEN, 140 tests pass). | P1 |
 | N1 | **Redis is a tier-1 SPOF** for the live pipeline (locks + broker), not just cache | P9 |
 | MIG1 | **No migration framework/tracking** (no schema_migrations/Alembic) → drift invisible, unsafe deploys | P8 |
 | CFG1 | 🟢 **RUNTIME-CRITICAL FIXED 2026-07-26** — safe `npm audit fix` upgraded axios→1.18.1 (auth-bypass+SSRF), dompurify→3.4.12 (XSS), react-router→6.30.4 (XSS); verified typecheck+tests+build. ⚠️ 17 high remain = dev/build tooling (esbuild/vite/eslint/next/sharp) needing `--force` majors — deferred. | P10 |

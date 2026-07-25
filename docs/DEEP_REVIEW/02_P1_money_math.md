@@ -26,6 +26,7 @@
 - **Fix:** treat the flip-opened quantity as round B's opening entry (synthesise an OPEN from the FLIP's excess, at `fill_price`). Add a flip fixture to `test_behavior_engine`/ledger tests.
 
 ### M3 · MCX/CDS **unrealized** P&L ignores the lot multiplier · correctness (money-facing)
+> ✅ **FIXED 2026-07-26 (test-first)** — extracted pure `_unrealized_pnl_for_position(qty, entry, current, multiplier)`; `get_unrealized_pnl` now resolves the multiplier via `get_lot_multiplier_or_none` (fallback `Position.multiplier`, else 1) and applies it. New `tests/test_pnl_multiplier.py` (4 cases: NSE=1×, MCX long/short/loss ×100) — RED before, GREEN after; 140 logic tests pass, no regressions.
 - **Where:** `pnl_calculator.get_unrealized_pnl` computes `(current−entry)*qty` with the comment "Kite qty already in units — no multiplier". True for NSE/NFO, **false for MCX/CDS**, where `Position.total_quantity` is in **lots** and `Position.multiplier` is populated but **not applied here**. Called by `api/analytics.py:162`.
 - **Failure:** a CRUDEOIL (×100) open position shows unrealized P&L **≈1/100th** of reality; ZINC ×5000 etc. Commodity/currency traders see grossly understated open P&L wherever this feeds. (Realized path *does* apply the multiplier — so realized vs unrealized are inconsistent for the same instrument.)
 - **Fix:** multiply by `get_lot_multiplier_or_none(exchange, symbol)` (fallback `Position.multiplier`) as the ledger's `_resolve_lot_mult` already does.

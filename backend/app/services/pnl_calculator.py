@@ -25,7 +25,7 @@ from app.models.completed_trade import CompletedTrade
 from app.models.completed_trade_feature import CompletedTradeFeature
 from app.models.incomplete_position import IncompletePosition
 from app.core.market_hours import market_minutes
-from app.services.mcx_contract_specs import get_lot_multiplier
+from app.services.mcx_contract_specs import get_lot_multiplier, get_lot_multiplier_or_none
 from app.services.instrument_parser import is_expiry_day as _instrument_is_expiry_day
 from app.services.position_ledger_service import _compute_pnl_pct
 
@@ -36,6 +36,24 @@ F_AND_O_EXCHANGES = {"NFO", "BFO", "MCX", "CDS"}
 
 # IST offset for feature computation (UTC+5:30)
 IST = timezone(timedelta(hours=5, minutes=30))
+
+
+def _unrealized_pnl_for_position(
+    qty: int, entry_price: float, current_price: float, multiplier: int = 1
+) -> float:
+    """
+    Pure: unrealized P&L for one open position.
+
+    qty > 0 = long, qty < 0 = short. `multiplier` scales lots→units for MCX/CDS
+    (where Kite reports quantity in LOTS); it is 1 for NSE/BSE/NFO/BFO, where Kite
+    already sends the expanded quantity. See M3 (deep-review P1): the multiplier was
+    previously dropped, understating commodity/currency open P&L by ~100×.
+    """
+    if qty > 0:
+        base = (current_price - entry_price) * qty
+    else:
+        base = (entry_price - current_price) * abs(qty)
+    return base * multiplier
 
 
 class PnLCalculator:
@@ -815,12 +833,17 @@ class PnLCalculator:
                 entry = float(pos.average_entry_price)
                 current = float(pos.last_price)
 
-                # Kite qty is already in units — no multiplier needed
-                if qty > 0:  # Long position
-                    pnl = (current - entry) * qty
-                else:  # Short position
-                    pnl = (entry - current) * abs(qty)
+                # MCX/CDS report quantity in LOTS — apply the contract multiplier
+                # (M3). NSE/BSE/NFO/BFO resolve to 1. Untabulated MCX falls back to
+                # Zerodha's own multiplier stored on the Position row, else 1.
+                mult = get_lot_multiplier_or_none(pos.exchange or "", pos.tradingsymbol or "")
+                if mult is None:
+                    try:
+                        mult = int(pos.multiplier) if pos.multiplier else 1
+                    except (TypeError, ValueError):
+                        mult = 1
 
+                pnl = _unrealized_pnl_for_position(qty, entry, current, mult or 1)
                 unrealized[pos.tradingsymbol] = Decimal(str(pnl))
 
         return unrealized
