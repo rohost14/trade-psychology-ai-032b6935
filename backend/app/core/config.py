@@ -4,7 +4,10 @@ from pydantic import Field, model_validator
 
 class Settings(BaseSettings):
     PROJECT_NAME: str = "TradeMentor AI"
-    ENVIRONMENT: str = "development"
+    # Fail-secure default: an unset ENVIRONMENT means production behaviour (Secure
+    # cookies, JSON logging, no SQL echo, no dev-bypass). Dev MUST set
+    # ENVIRONMENT=development explicitly (.env.example already does). Validated below.
+    ENVIRONMENT: str = "production"
 
     # Database - this is the only required one
     DATABASE_URL: str
@@ -69,6 +72,19 @@ class Settings(BaseSettings):
 
     @model_validator(mode="after")
     def _validate_production_settings(self) -> "Settings":
+        # Normalize + validate ENVIRONMENT first. A misspelled value ('prod',
+        # 'Production') would silently disable production behaviour — every consumer
+        # compares against the exact lowercase strings 'development'/'production'.
+        # Reject anything unknown rather than fail open to the wrong mode.
+        _allowed = {"development", "staging", "production"}
+        _env = (self.ENVIRONMENT or "").strip().lower()
+        if _env not in _allowed:
+            raise ValueError(
+                f"ENVIRONMENT must be one of {sorted(_allowed)}, got {self.ENVIRONMENT!r}. "
+                "A wrong value silently disables Secure cookies / JSON logging."
+            )
+        self.ENVIRONMENT = _env
+
         if self.ENVIRONMENT != "development" and "localhost" in self.REDIS_URL:
             raise ValueError(
                 "REDIS_URL is pointing to localhost in a non-development environment. "

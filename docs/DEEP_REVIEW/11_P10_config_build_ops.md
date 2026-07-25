@@ -30,6 +30,7 @@ Secret hygiene + container build are **solid**. Three real production-readiness 
 ## 🟡 P2
 
 ### CFG4 · `ENVIRONMENT` defaults to `"development"` → prod deploy that forgets to set it runs dev-mode silently · security/ops
+> ✅ **FIXED 2026-07-26** — default flipped to **`production`** (fail-secure: an unset ENVIRONMENT now yields Secure cookies + JSON logging + no SQL echo + no dev-bypass). Added a validator that normalizes case and **rejects unknown values** (e.g. `prod`, which would otherwise silently disable prod behaviour). Dev is unaffected — `.env.example`/`.env` set `ENVIRONMENT=development` explicitly. Verified: dev valid, `Production`→`production`, `prod`→rejected, unset→`production`.
 `config.py:7 ENVIRONMENT: str = "development"`. A deployment that doesn't explicitly set `ENVIRONMENT=production` fails **open to dev mode**:
 - **admin cookie `secure = ENVIRONMENT != "development"` → cookie sent over plain HTTP, `SameSite=Lax`** (weaker than the intended `None+Secure`);
 - SQLAlchemy `echo=True` → every query logged (perf + info exposure);
