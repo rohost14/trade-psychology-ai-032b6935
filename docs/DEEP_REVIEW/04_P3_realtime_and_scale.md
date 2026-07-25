@@ -19,7 +19,8 @@ Postback → checksum-verified (per-user secret) → Celery `process_webhook_tra
   3. **Concurrency 100 vs DB pool 15.** 100 greenlets contending for ≤15 connections → `pool_timeout=30s` waits → task stalls/failures at market-open burst (the exact 10k moment).
 - **Status:** prod not deployed yet (owner-confirmed) → **verify at deploy**, but as written this is a **likely-broken 10k blocker**. **Fix:** run asyncio tasks under the **prefork** pool (or `--pool=threads`), size worker concurrency to the DB pool, and scale horizontally (B1). Reconcile Procfile with `celery_app.py`.
 
-### R2 · Confirms E2 — the alert→trade unlink is triggered by `calculate_and_update_pnl` (analytics + import), not only EOD · correctness
+### R2 · Confirms E2 — the alert→trade unlink is triggered by `calculate_and_update_pnl` (import / manual recalc / late-fill replay), NOT EOD · correctness
+> **CORRECTION (P5-C1):** verified no FE caller of `/recalculate-pnl` and **nothing in eod_sync/webhook calls `calculate_and_update_pnl`** — so this is **not** a nightly/EOD event. Triggers = tradebook import + manual recalc + late-fill CT replay. **Severity P2** (latent). My original "not only EOD" phrasing implied EOD runs it — it does not.
 `pnl_calculator.calculate_and_update_pnl` (deletes+recreates CompletedTrades in the window) is called from **`api/analytics.py:137`** (analytics recompute) and **`api/account_data.py:316`** (tradebook import) — plus EOD sync. Because batch uses the deterministic `_stable_ct_id`, the id churn is **bounded to the first batch recompute after live detection** (stable→stable is idempotent), but that first recompute still **NULLs** the live alert's `trigger_completed_trade_id` (FK `ON DELETE SET NULL`). Confirms **P2-E2 / P1-M6**; fix once by giving the live builder `_stable_ct_id`.
 
 ---
