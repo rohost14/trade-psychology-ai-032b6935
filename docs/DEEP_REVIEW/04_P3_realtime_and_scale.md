@@ -12,6 +12,8 @@ Postback → checksum-verified (per-user secret) → Celery `process_webhook_tra
 ## 🔴 P1
 
 ### R1 · Procfile runs Celery `--pool=gevent` but tasks are `asyncio.run()` + asyncpg — an unsupported combo · scale/correctness
+> 🟡 **PARTIALLY FIXED 2026-07-26.** Done: Procfile worker → `--pool=prefork` (removes the unsupported gevent+asyncpg combo), dropped `--concurrency=100` so `celery_app.worker_concurrency=4` is the single source (also resolves **D18** drift), and added a `worker_process_init` handler that disposes the async engine on fork (asyncpg isn't fork-safe). Verified import + signal registration.
+> ⚠️ **STILL OPEN:** tasks still call `asyncio.run()` per task (fresh loop each time) against the **pooled** asyncpg engine — a connection from a prior loop can still be handed to a new loop. Full resolution needs a **NullPool engine in the worker** (or a persistent per-worker loop) **and load validation (P14 Gate 4)**. Not safe to finalize without the load test — deliberately left for that gate.
 - **Where:** `backend/Procfile` → `worker: celery … --pool=gevent --concurrency=100`. Tasks use **`asyncio.run(_process())`** (38 sites across `tasks/*`) driving **async SQLAlchemy + asyncpg**. **No `gevent.monkey.patch_all()`** anywhere (grep clean). This also **contradicts** `celery_app.py`'s `worker_concurrency=4` (prefork) config.
 - **Why it matters (three compounding problems):**
   1. **asyncpg under gevent is unsupported.** Celery's gevent pool monkey-patches the socket layer at worker boot; **asyncpg requires a real asyncio loop with real sockets** and explicitly does not support gevent. This is a known-broken pairing → intermittent hangs / connection faults under load.

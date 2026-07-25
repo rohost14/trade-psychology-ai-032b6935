@@ -293,3 +293,30 @@ def _warn_orphaned_beat_tasks() -> None:
 
 
 _warn_orphaned_beat_tasks()
+
+
+# ── R1: prefork worker DB-engine hygiene ──────────────────────────────────────
+# The worker runs the prefork pool (see Procfile). asyncpg connections are NOT
+# fork-safe, so each forked child must start with a clean async engine rather than
+# inheriting the parent's pooled connections. Dispose on process init so the child
+# lazily rebuilds its own. Best-effort; never blocks worker start.
+#
+# NOTE (deep-review R1, still open): tasks run `asyncio.run()` per call, creating a
+# fresh event loop each time. asyncpg connections are loop-bound, so the pooled
+# engine can still hand a child a connection from a previous loop. Switching off
+# gevent (done) removes the unsupported gevent+asyncpg combo, but the loop-per-task
+# vs connection-pool interaction must be validated under load (P14 Gate 4) and may
+# need a NullPool engine in the worker or a persistent per-worker loop.
+try:
+    from celery.signals import worker_process_init as _worker_process_init
+
+    @_worker_process_init.connect
+    def _dispose_async_engine_on_fork(**_kwargs):
+        try:
+            import asyncio as _aio
+            from app.core.database import engine as _engine
+            _aio.run(_engine.dispose())
+        except Exception:
+            pass
+except Exception:
+    pass

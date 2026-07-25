@@ -17,7 +17,7 @@
 | D15 | 🔴 `PnLCalculator.calculate_trade_pnl_realtime` dead (~90 LOC) | Replaced by PositionLedgerService; zero live callers (P1-M7) | ARCHIVE/remove |
 | D16 | 🟡 Two `is_market_open` (`exchange_constants` no-holidays/zoneinfo vs `market_hours` holidays/pytz) | Divergent on holidays; two tz libs (P1-M10, P0-F7) | Consolidate. DECIDE |
 | D17 | 🟡 `pnl_calculator` docstring L51-55 stale (claims Zerodha-realised overwrite) | Reconcile is log-only+avg-repair now (P1-M4) | Fix comment |
-| D18 | 🟡 Procfile worker `--pool=gevent --concurrency=100` contradicts `celery_app.py` `worker_concurrency=4` (prefork) | Config drift; gevent wrong for asyncio.run tasks (P3-R1) | Reconcile |
+| D18 | ✅ RESOLVED 2026-07-26 (with R1): Procfile → `--pool=prefork`, dropped `--concurrency=100` → `celery_app.worker_concurrency=4` is now the single source | CLOSED |
 | D19 | 🟠 `guardrail_tasks` runs every 60s (consumed `alerts` queue) though feature archived | Compute waste for killed feature (P0-F9 confirm) | DECIDE retire |
 
 ## Prior-audit items (carried forward from CODEBASE_AUDIT.md — re-verify during phases)

@@ -23,7 +23,7 @@
 ### 🔴 P1 — breaks a real path / scale (or unverified-critical)
 | # | Finding | Phase |
 |---|---|---|
-| R1 | Procfile `--pool=gevent` + `asyncio.run()`+**asyncpg** (unsupported) + 100 greenlets vs 15 DB conns → likely-broken worker under load | P3 |
+| R1 | 🟡 **PARTIALLY FIXED 2026-07-26** — worker → `prefork` (removes gevent+asyncpg incompat), concurrency single-sourced from config (=4, resolves D18), engine-dispose-on-fork added. ⚠️ **STILL OPEN:** `asyncio.run()`-per-task vs pooled asyncpg needs NullPool-in-worker (or persistent loop) + **load validation (Gate 4)** — left for the load test. | P3 |
 | F2 | ✅ **FIXED 2026-07-26 (web process)** — `main.py` calls `setup_logging()` at load (before Sentry); error-feed + JSON logs + request-id filter (on handlers, also fixes F11) now active. ⚠️ **PENDING:** Celery workers don't run it (import `celery_app` not `main.py`) → task errors still miss the admin error-feed; scoped follow-up. | P0 |
 | F3/A1 | ✅ **FIXED 2026-07-26** — rate-limiter now keys off the JWT `bid` (per-account) for authed endpoints; unauthed → peer IP, XFF only behind trusted proxy. Closes shared-NAT 429s + XFF-rotation bypass. | P0/P4 |
 | F4 | Blocking **sync Redis on the async event loop** (limiters + error-feed) → throughput collapse. *(Still open — separate from F3; same file.)* | P0 |
