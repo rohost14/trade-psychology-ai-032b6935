@@ -124,6 +124,14 @@ def setup_logging():
     else:
         console_handler.setFormatter(DevelopmentFormatter())
 
+    # Inject request_id from the ContextVar into every record. Attach the filter to
+    # the HANDLERS (not just the root logger): a logger's own filters are not applied
+    # to records that propagate up from child loggers, so a root-logger filter would
+    # miss most app logs. Handler-level filters see everything that reaches the handler.
+    from app.core.request_context import RequestIdFilter
+    request_id_filter = RequestIdFilter()
+    console_handler.addFilter(request_id_filter)
+
     root_logger.addHandler(console_handler)
 
     # Error feed — ERROR+ records mirrored into a capped Redis list for the admin panel.
@@ -132,14 +140,10 @@ def setup_logging():
         error_handler = RedisErrorFeedHandler()
         error_handler.setLevel(logging.ERROR)
         error_handler.setFormatter(console_handler.formatter)
+        error_handler.addFilter(request_id_filter)
         root_logger.addHandler(error_handler)
     except Exception:
         pass
-
-    # Inject request_id from ContextVar into every log record (works in both
-    # HTTP server and Celery workers — the ContextVar is set at task/request start)
-    from app.core.request_context import RequestIdFilter
-    root_logger.addFilter(RequestIdFilter())
 
     # Reduce noise from third-party libraries
     logging.getLogger("httpx").setLevel(logging.WARNING)

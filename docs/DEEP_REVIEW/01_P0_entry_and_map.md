@@ -13,6 +13,7 @@
 ## 🔴 P0 — must fix before production
 
 ### F1 · 9 of 16 scheduled Celery tasks never execute (queue routing vs Procfile) · category: correctness/config
+> ✅ **FIXED 2026-07-26** (commit): Procfile worker now consumes `celery,trades,alerts,reports`; added boot-time regression guard (`CONSUMED_QUEUES` + `_warn_orphaned_beat_tasks` in `celery_app.py`) that logs CRITICAL on any future orphan. Verified orphaned 9→0. Config+logging only; still confirm the actual prod worker `--queues` at deploy.
 - **Where:** `core/celery_app.py` `task_routes` + `beat_schedule` vs `backend/Procfile` `worker: celery … --queues=trades,alerts,reports`.
 - **Problem (verified by exec):** tasks whose module has no `task_routes` entry land on Celery's **default `celery` queue**, which the only worker process **does not consume**. Orphaned beat tasks:
   1. `retention_tasks.dispatch_reports_tick` (every 60s) → **all time-based user report delivery is dead** (daily/scheduled reports never dispatched).
@@ -34,6 +35,8 @@
 ## 🟠 P1 — breaks a common path or at scale
 
 ### F2 · `setup_logging()` is never called → prod logging + admin error-feed both dead · category: correctness/ops
+> ✅ **FIXED 2026-07-26 (FastAPI process)** — `main.py` now calls `setup_logging()` at module load (before `sentry_sdk.init`, so Sentry layers on top). Verified: root logger has StreamHandler + RedisErrorFeedHandler wired, and the `RequestIdFilter` is attached to the **handlers** (also fixes **F11**). Admin error-feed + prod JSON logging + request-id now active in the web process.
+> ⚠️ **PENDING (Celery workers):** workers import `celery_app`, not `main.py`, so `setup_logging()` doesn't run there → **Celery task errors (the pipeline) still don't reach the admin error-feed**, and worker logs aren't JSON. Deliberately deferred: wiring it via a `worker_process_init` signal also lands the error-feed's blocking-Redis-per-error concern in workers — do it as a scoped follow-up.
 - **Where:** `core/logging_config.py:101` defines `setup_logging()`; **grep confirms zero callers** (only a stale reference comment at `main.py:308`). No `logging.basicConfig` anywhere either.
 - **Consequences:**
   - **(a)** Production **JSON structured logging never activates** — root logger has no configured handler, so app logs fall to Python's `lastResort` (WARNING+ to stderr, unformatted). Intended INFO-level operational logs are effectively dropped; log-aggregation expectations (JSONFormatter) are unmet.

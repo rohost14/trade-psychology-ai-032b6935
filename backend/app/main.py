@@ -12,6 +12,13 @@ from sentry_sdk.integrations.logging import LoggingIntegration
 
 logger = logging.getLogger(__name__)
 
+# Configure application logging BEFORE anything else logs or Sentry hooks in.
+# Wires the JSON formatter (prod), the request-id filter, and the Redis error-feed
+# handler that powers the admin System page. Must run before sentry_sdk.init so
+# Sentry's logging integration attaches on top of (not cleared by) our handlers.
+from app.core.logging_config import setup_logging
+setup_logging()
+
 # Sentry — initialise before the app starts so all errors are captured
 # Set SENTRY_DSN in .env. Without DSN, this is a no-op (safe to leave in).
 def _sentry_before_send(event, hint):

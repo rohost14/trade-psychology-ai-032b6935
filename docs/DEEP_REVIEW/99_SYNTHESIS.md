@@ -18,13 +18,13 @@
 ### 🔴 P0 — ship-blockers
 | # | Finding | Phase |
 |---|---|---|
-| F1 | **9/16 scheduled Celery tasks never run** (beat routes to default `celery` queue; Procfile worker consumes only `trades,alerts,reports`) → dead: report dispatch, all intent pushes, **behavior_events partition upkeep** (INSERTs will fail), **MD-token refresh** (ticker dies daily), watchdog. Verify at deploy. | P0 |
+| F1 | ✅ **FIXED 2026-07-26** — **9/16 scheduled Celery tasks never ran** (beat→default `celery` queue; worker consumed only `trades,alerts,reports`). Fix: Procfile worker `--queues=celery,trades,alerts,reports` + boot regression guard in `celery_app.py`. Verified orphaned 9→0. *Still confirm actual prod worker `--queues` at deploy.* | P0 |
 
 ### 🔴 P1 — breaks a real path / scale (or unverified-critical)
 | # | Finding | Phase |
 |---|---|---|
 | R1 | Procfile `--pool=gevent` + `asyncio.run()`+**asyncpg** (unsupported) + 100 greenlets vs 15 DB conns → likely-broken worker under load | P3 |
-| F2 | `setup_logging()` **never called** → no prod JSON logs + **admin error-feed permanently empty** + no request-id | P0 |
+| F2 | ✅ **FIXED 2026-07-26 (web process)** — `main.py` calls `setup_logging()` at load (before Sentry); error-feed + JSON logs + request-id filter (on handlers, also fixes F11) now active. ⚠️ **PENDING:** Celery workers don't run it (import `celery_app` not `main.py`) → task errors still miss the admin error-feed; scoped follow-up. | P0 |
 | F3/A1 | User rate-limiters degrade to per-IP keyed on unvalidated XFF → no per-user limit + shared-NAT 429s (admin path IS mitigated) | P0/P4 |
 | F4 | Blocking **sync Redis on the async event loop** (limiters + error-feed) → throughput collapse | P0 |
 | M1 | P&L **doesn't segregate by product** (MIS+NRML same symbol netted) → wrong P&L / missing CompletedTrades | P1 |
