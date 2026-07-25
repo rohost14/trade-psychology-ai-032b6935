@@ -23,8 +23,8 @@
 |---|---|---|
 | D7 | Archived routers `portfolio_radar` / `guardrails` / `portfolio_chat` (git-mv'd to `api/_archive/`) | main.py mounts removed — confirm no live caller in P6/P7 |
 | D8 | `vix_service.py` archived (0 imports) | confirm in P6 |
-| D9 | `baseline_service.py` (1 importer) vs `behavioral_baseline_service.py` (4) — suspected legacy dup | P2 |
-| D10 | `behavioral_analysis_service.py` (1,887 LOC, 2 importers) vs `behavior_engine.py` — legacy engine? | P2 |
+| D9 | ~~baseline dup~~ **RESOLVED: NOT a dup** — `baseline_service`=profit-factor helpers (personalization); `behavioral_baseline_service`=per-user percentile baselines. Distinct. (P2-E5) | CLOSED (optional rename) |
+| D10 | 🟠 `behavioral_analysis_service.py` (1,887 LOC) = **CONFIRMED live dual engine** — served by `/api/behavioral/analysis`+`/patterns`, consumed by `ExportReportButton.tsx`. Different logic/thresholds than BehaviorEngine v2 → contradictory findings. "single source of truth" claim false. (P2-E1) | DECIDE retire vs document |
 | D11 | Ghost columns: `CompletedTrade.quality_score` (populated by nothing), `risk_alert.outcome` (never written) | P8 |
 | D12 | Root cruft: `AUDIT_FINDINGS.md`, `DESIGN.md`, `design_v2/`, `prototype_design/`, `scroll-loss-experience/`, `docsreview*` | P12/P13 |
 | D13 | `guestMode.ts` stale mocks for archived features | P7 |
