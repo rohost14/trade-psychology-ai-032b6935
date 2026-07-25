@@ -43,4 +43,6 @@
 ## Scripts / tests (seed — full pass in P11)
 | # | Item | Note |
 |---|---|---|
-| DS1 | `backend/scripts/**` (73 files: smoke_*, debug/, db/, validate/, one-offs + `.txt`/`.pyc` artifacts) | classify keep(dev-tool) / dead / secrets-check |
+| DS1 | ✅ P11 classified (no secrets): DEAD→archive = `scripts/debug/*` (19), `smoke_phase*.py` (11); DELETE = `scripts/*.txt` + `*.pyc` (5); GATE = `swap_tables.py` (destructive). KEEP (P14 assets) = `validate/*`, `replay_*`, `simulate_trader_environment`, `reproduce_position_lag`, `db/seed_data` | archive/delete dead |
+| DS2 | 🟡 P12: `scroll-loss-experience/` separate Next.js app w/ committed `.next/` build cache + node_modules; `design_v2/`, `prototype_design/` — 0 build refs, 0 live imports, no secrets | REMOVE from repo |
+| DS3 | ✅ P12: `_archive/*` correctly excluded from typecheck+eslint + 0 live imports (clean isolation) | KEEP as-is |
