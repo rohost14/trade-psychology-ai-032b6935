@@ -27,7 +27,7 @@
   10. `admin_watchdog_tasks.admin_health_watchdog` → infra watchdog dead (the "system can't tell you it's failing" hole reopens).
 - **Why it matters:** a large fraction of the scheduled product surface (reports, all nudges/pushes, live-price token, DB partition upkeep, self-monitoring) silently does nothing in the declared deploy topology. No error — the tasks just queue on `celery` and pile up.
 - **Fix (one of):** add the default queue to the worker (`--queues=celery,trades,alerts,reports`), **or** give every beat task an explicit `task_routes` entry to a consumed queue, **or** run a dedicated worker for the default queue. Then add a startup/CI assertion that every `beat_schedule` task routes to a consumed queue.
-- **Caveat:** this is P0 **if** the Procfile is the real production start command (it is the declared one; Dockerfile defers worker/beat CMD to compose). **Confirm the actual prod worker `--queues` before fixing** — if ops already runs a default-queue worker, downgrade to P2 (fragile-by-default). Either way the config is a latent trap.
+- **Status (confirmed with owner 2026-07-25):** not deployed yet / exact prod worker `--queues` unknown → **F1 stays P0 until verified at deploy time.** The Procfile is the declared topology; if ops later runs a worker that consumes the default `celery` queue, downgrade to P2 (fragile-by-default). Add a deploy-time assertion that every `beat_schedule` task routes to a consumed queue so this can't regress silently.
 
 ---
 
