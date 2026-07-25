@@ -16,6 +16,14 @@
 ## 🟠 P1 — correctness, common real-world paths
 
 ### M1 · Derived P&L does not segregate by product (MIS vs NRML vs MTF) · correctness
+> ⏸️ **DEFERRED 2026-07-26 — NOT safe as a blind fix; needs its own approved, migration-inclusive change + live validation.** Verified `position_ledger` has **no `product` column** (index = account+symbol; `FillData`/`apply_fill` don't carry product). So this is not a code-only tweak — it's a **schema + stateful-keying** change that can't be validated without a test DB + the live ledger flow, and (per MIG1) migrations are applied by hand. Doing it half-way risks orphaning/miscomputing users' **open** positions. **Implementation spec (for an approved change):**
+> 1. **Migration:** add `product` to `position_ledger`; change the working index/uniqueness to `(broker_account_id, tradingsymbol, exchange, product)`; **backfill** existing rows' product from their source `Trade`.
+> 2. **Ledger:** add `product` to `FillData`; thread it through `apply_fill`, `get_position`, `get_net_qty`, `_get_last_entry`, `_apply_fill_with_replay`, `build_completed_trade_on_close`, `_rebuild_completed_trades_after_replay` (every position-key WHERE clause).
+> 3. **Caller:** `trade_tasks.process_webhook_trade` passes `trade.product` into `FillData`.
+> 4. **Batch:** `pnl_calculator._process_symbol_trades` group key `symbol|exchange` → `symbol|exchange|product`.
+> 5. **Overnight backfill:** existence check keyed by product too.
+> 6. **Tests:** MIS+NRML same-symbol held simultaneously → two independent positions + correct per-product P&L (extend `_build_round_ct_fields`-style pure tests + a DB-integration test).
+> **Frequency note:** requires holding NRML + trading MIS on the *same contract* simultaneously — real but lower-frequency than M2/M3. Recommend bundling with the live-validation harness (P14 Gate 3).
 - **Where:** `position_ledger_service` keys positions by `(broker_account_id, tradingsymbol, exchange)`; `pnl_calculator._process_symbol_trades` groups by `f"{symbol}|{exchange}"`; `trade_sync._backfill_overnight_completed_trades` existence-check filters by `(symbol, exit_time)` only. **None include `product`.** By contrast the **Positions table IS keyed per-product** (`trade_sync` L758/797/910 `(symbol, exchange, product)`), and Zerodha holds MIS and NRML as **separate positions**.
 - **Failure:** a trader **long NRML** and **short/scalping MIS** on the **same contract** (common in F&O) has both legs **netted into one position** by the ledger/FIFO → wrong entry/exit matching, wrong per-round P&L attribution, wrong direction/qty, and **missing or mis-built CompletedTrades**. The overnight backfill's product-blind existence check can **skip** a genuine NRML overnight close because an unrelated MIS CompletedTrade exists for that symbol today.
 - **Fix:** include `product` in the ledger/round/backfill keys (map MTF→NRML-like if intended). Requires a ledger key/migration change — scope in the fix pass.

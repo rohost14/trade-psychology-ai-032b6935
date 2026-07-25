@@ -27,7 +27,7 @@
 | F2 | ✅ **FIXED 2026-07-26 (web process)** — `main.py` calls `setup_logging()` at load (before Sentry); error-feed + JSON logs + request-id filter (on handlers, also fixes F11) now active. ⚠️ **PENDING:** Celery workers don't run it (import `celery_app` not `main.py`) → task errors still miss the admin error-feed; scoped follow-up. | P0 |
 | F3/A1 | ✅ **FIXED 2026-07-26** — rate-limiter now keys off the JWT `bid` (per-account) for authed endpoints; unauthed → peer IP, XFF only behind trusted proxy. Closes shared-NAT 429s + XFF-rotation bypass. | P0/P4 |
 | F4 | Blocking **sync Redis on the async event loop** (limiters + error-feed) → throughput collapse. *(Still open — separate from F3; same file.)* | P0 |
-| M1 | P&L **doesn't segregate by product** (MIS+NRML same symbol netted) → wrong P&L / missing CompletedTrades | P1 |
+| M1 | ⏸️ **DEFERRED 2026-07-26** — P&L doesn't segregate by product (MIS+NRML same symbol netted). NOT a blind fix: `position_ledger` has no `product` column → needs a **schema migration + stateful re-keying + backfill + live validation**. Full spec in `02_P1_money_math.md`; bundle with Gate 3. | P1 |
 | M2 | ✅ **FIXED 2026-07-26 (test-first)** — flip-opened rounds now build a CompletedTrade (pure `_build_round_ct_fields` + `test_flip_round.py`, RED→GREEN, 155 tests pass). | P1 |
 | M3 | ✅ **FIXED 2026-07-26 (test-first)** — `get_unrealized_pnl` applies the lot multiplier (pure helper + `test_pnl_multiplier.py`, 4 cases RED→GREEN, 140 tests pass). | P1 |
 | N1 | **Redis is a tier-1 SPOF** for the live pipeline (locks + broker), not just cache | P9 |
