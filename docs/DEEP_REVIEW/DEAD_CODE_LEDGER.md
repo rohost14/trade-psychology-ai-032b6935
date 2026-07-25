@@ -14,6 +14,9 @@
 | D4 | 🔴 `setup_logging()` dead (never called) → error-feed handler + JSON logging + request-id filter all unwired | grep: zero callers (P0-F2) | Wire it up (fix, not delete) |
 | D5 | 🟡 `redis_pool.py` stale comment: "VIX fetches" | vix_service archived earlier | Trivial comment cleanup |
 | D6 | 🟡 Two metrics subsystems (`logging_config.MetricsCollector` vs `core/metrics.py`) | Different purposes; document authority (P0-F13) | KEEP, document |
+| D15 | 🔴 `PnLCalculator.calculate_trade_pnl_realtime` dead (~90 LOC) | Replaced by PositionLedgerService; zero live callers (P1-M7) | ARCHIVE/remove |
+| D16 | 🟡 Two `is_market_open` (`exchange_constants` no-holidays/zoneinfo vs `market_hours` holidays/pytz) | Divergent on holidays; two tz libs (P1-M10, P0-F7) | Consolidate. DECIDE |
+| D17 | 🟡 `pnl_calculator` docstring L51-55 stale (claims Zerodha-realised overwrite) | Reconcile is log-only+avg-repair now (P1-M4) | Fix comment |
 
 ## Prior-audit items (carried forward from CODEBASE_AUDIT.md — re-verify during phases)
 | # | Item | Where verified |
