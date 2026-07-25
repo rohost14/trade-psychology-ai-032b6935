@@ -38,7 +38,9 @@
 | # | Item | Note |
 |---|---|---|
 | DD1 | `CODEBASE_AUDIT.md` says "224 routes / 0 broken mappings" | superseded by this deeper review; keep as history |
-| DD2 | Repo docs "can be stale" (per CLAUDE.md) | P13 marks each correct/stale/wrong/dead vs code |
+| DD2 | 🟠 P13: **CLAUDE.md architecture sections STALE** — describes pre-v2 (8 client-side patterns not 28 backend detectors; "detection client-side in AlertContext"+"estimated costs" false; `money-saved`/blowup endpoints renamed). Loaded every session → misleads. (DOC1) | REFRESH (top doc fix) |
+| DD3 | 🟡 P13: empty cruft dirs `docsreviewscreens/`+`docsreviewsessions/`; `CODEBASE_AUDIT.md` superseded by DEEP_REVIEW; root `AUDIT_FINDINGS.md`/`DESIGN.md` stray (DOC2/D12) | remove/archive |
+| DD4 | 🟡 P13: `docs/architecture/*` (9) partially stale (verify vs code; not line-audited) | verify before trusting |
 
 ## Scripts / tests (seed — full pass in P11)
 | # | Item | Note |
