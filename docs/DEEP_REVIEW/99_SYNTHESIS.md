@@ -32,7 +32,7 @@
 | M3 | **MCX/CDS unrealized P&L ignores lot multiplier** → commodity open P&L ~100× understated | P1 |
 | N1 | **Redis is a tier-1 SPOF** for the live pipeline (locks + broker), not just cache | P9 |
 | MIG1 | **No migration framework/tracking** (no schema_migrations/Alembic) → drift invisible, unsafe deploys | P8 |
-| CFG1 | **HIGH FE dep vulns** — axios (auth-bypass prototype pollution + SSRF), React Router (XSS), **DOMPurify (XSS — the Chat mitigation itself)** | P10 |
+| CFG1 | 🟢 **RUNTIME-CRITICAL FIXED 2026-07-26** — safe `npm audit fix` upgraded axios→1.18.1 (auth-bypass+SSRF), dompurify→3.4.12 (XSS), react-router→6.30.4 (XSS); verified typecheck+tests+build. ⚠️ 17 high remain = dev/build tooling (esbuild/vite/eslint/next/sharp) needing `--force` majors — deferred. | P10 |
 | CFG2 | ✅ **FIXED 2026-07-26** — all 28 backend deps pinned to `==`. (Full transitive lock = scale follow-up; pyotp/qrcode env-drift flagged.) | P10 |
 | CFG3 | ✅ **FIXED 2026-07-26** — `.github/workflows/ci.yml` added (FE typecheck/lint/test/audit + BE py3.11 compile/logic-tests/pip-audit; audits non-blocking until CFG1 clean). | P10 |
 | — | **Live validation never run** vs a real Zerodha account (biggest single unknown) | cross |

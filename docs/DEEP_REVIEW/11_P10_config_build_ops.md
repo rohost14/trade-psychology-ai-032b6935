@@ -12,6 +12,8 @@ Secret hygiene + container build are **solid**. Three real production-readiness 
 ## 🔴 P1
 
 ### CFG1 · Multiple HIGH-severity frontend dependency vulnerabilities — incl. the XSS mitigation itself · security
+> 🟢 **RUNTIME-CRITICAL FIXED 2026-07-26** — `npm audit fix` (safe, non-force) upgraded **axios 1.13.4→1.18.1** (auth-bypass + SSRF), **dompurify 3.3.1→3.4.12** (XSS — the Chat mitigation P7 credited now holds), **react-router-dom 6.30.1→6.30.4** (XSS). Verified: typecheck + 16 FE tests + build all green. Vulns 25→21.
+> ⚠️ **DEFERRED (17 high remain):** all **dev/build tooling** (esbuild/vite, eslint→brace-expansion, next/geist, sharp) needing `--force` **major** bumps → deliberate upgrade + test pass, not runtime-app security. CI `npm audit` stays non-blocking until these are triaged.
 `npm audit` (prod deps) reports several HIGH:
 - **axios (1.0–1.17):** **Authentication Bypass via Prototype Pollution in the `validateStatus` merge**, plus SSRF via NO_PROXY normalization bypass (incl. the 127.0.0.0/8 loopback follow-up). axios is the app's **entire API client** — auth-bypass prototype pollution is serious.
 - **React Router (@remix-run/router ≤1.23.1):** XSS via open redirects.
