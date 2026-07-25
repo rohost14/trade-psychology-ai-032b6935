@@ -13,6 +13,7 @@ Doc hygiene is reasonable — history is correctly quarantined under `docs/archi
 ## 🟡 P2
 
 ### DOC1 · `CLAUDE.md` architecture sections describe the PRE-v2 system · doc-stale (high-impact)
+> ✅ **FIXED 2026-07-26** — rewrote the "Behavioral Pattern Detection" section (single backend engine, 28 detectors, per-CompletedTrade, `AlertContext` fetches-not-detects) + "Key endpoints" (`money-saved`→`behaviour-cost` factual, `/behavioral/` = live-engine summary, added `/my-record/`). No more "detection client-side" / "estimated costs" / old-8-patterns.
 `CLAUDE.md` is the project instruction file loaded every session — its staleness propagates. Verified-wrong claims:
 - **Line 92:** *"Detection runs client-side in `AlertContext` using trades from API… estimated costs."* — **false on two counts:** detection is **backend-only** (BehaviorEngine; `AlertContext` is backend-driven, per its own line 53 which contradicts line 92), and costs are **realized P&L, not "estimated"** (violates the raw-P&L/no-counterfactual rule the same file states elsewhere). *(= FE4.)*
 - **"Behavioral Pattern Detection" section (lines ~84-92):** lists the **old 8 patterns** from the removed frontend `patterns.ts` (`overtrading`, `revenge_trading`, `loss_aversion`, `fomo`, `no_stoploss`, `early_exit`, `winning_streak_overconfidence`, `position_sizing`) — **not** the **28-detector** registry (`detector_registry.py`) of engine v2. Describes a deleted architecture.

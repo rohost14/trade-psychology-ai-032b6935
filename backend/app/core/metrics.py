@@ -49,6 +49,7 @@ COUNTERS = (
     "postbacks_rejected_unverified",   # discarded — no secret to verify checksum
     "order_stream_fills",              # COMPLETE fills ingested via per-user order stream
     "order_stream_started",            # per-user order-update connections opened
+    "engine_analyze_failed",           # BehaviorEngine.analyze() swallowed a failure (E3) — detection lost for that trade
 )
 TIMINGS = (
     "alert_e2e_lag_ms",      # trade exit -> detection persisted (the SLO)
@@ -146,6 +147,8 @@ def health_flags(snap: Dict) -> Dict:
     c = today.get("counters", {})
     t = today.get("timings", {})
     flags = {}
+    if c.get("engine_analyze_failed", 0) > 0:
+        flags["engine_failures"] = f"{c['engine_analyze_failed']} BehaviorEngine.analyze() failures today (detection lost)"
     if c.get("behavior_lock_exhausted", 0) > 0:
         flags["detection_skips"] = f"{c['behavior_lock_exhausted']} lock exhaustions today (requeued)"
     if c.get("behavior_bulk_lock_abort", 0) > 0:

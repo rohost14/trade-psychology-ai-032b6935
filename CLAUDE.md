@@ -75,21 +75,17 @@ Key endpoints:
 - `/api/positions/` - Position tracking
 - `/api/risk/state` - Current risk state (safe/caution/danger)
 - `/api/risk/alerts` - Risk alerts with acknowledge endpoint
-- `/api/analytics/money-saved` - Estimated losses prevented
+- `/api/analytics/behaviour-cost` - Realized P&L of behaviourally-flagged trades (RAW; factual, not "estimated" — replaced the old money-saved endpoint)
 - `/api/webhooks/zerodha/postback` - Real-time order notifications from Zerodha
-- `/api/behavioral/` - Behavioral analysis
+- `/api/behavioral/` - Behavioural summary served from the live engine's RiskAlerts (the legacy dual engine was retired 2026-07)
+- `/api/my-record/` - Pre-trade personal-record lookup (replaced Blowup Shield)
 - `/api/coach/` - AI trading coach
 
 ### Behavioral Pattern Detection
 
-Patterns detected (defined in `src/types/patterns.ts`):
-- `overtrading` - Too many trades in short time window
-- `revenge_trading` - Quick re-entry after loss
-- `loss_aversion` - Holding losers too long / cutting winners early
-- `position_sizing` - Oversized positions relative to capital
-- `fomo`, `no_stoploss`, `early_exit`, `winning_streak_overconfidence`
+**Single engine: the backend `BehaviorEngine` is the ONLY detection engine** (`backend/app/services/behavior_engine.py` + the 28-detector `detector_registry.py`). It runs **per CompletedTrade** on the live postback pipeline and writes `RiskAlert` + `BehaviorEvent`. The old client-side `patternDetector.ts` and the legacy `behavioral_analysis_service` are both gone — `AlertContext` only fetches/refetches backend alerts (it does NOT detect). `src/types/patterns.ts` holds display types, not detection logic.
 
-Detection runs client-side in `AlertContext` using trades from API. Patterns have severity levels (low/medium/high/critical) and estimated costs.
+Detectors (28, declarative in `detector_registry.py`) include: `consecutive_loss_streak`, `revenge_trade`, `overtrading_burst`/`daily_overtrading`, `size_escalation`, `martingale_behaviour`, `session_meltdown`, `fomo_entry`, `no_stoploss`, `early_exit`, `winning_streak_overconfidence`, `constitution_violation`, `post_loss_recovery_bet`, `profit_giveaway`, `expiry_day_overtrading`, and more. Severity vocabulary = `info`/`caution`/`danger`/`critical`. Behaviour→money is **realized P&L of flagged trades** (factual, via `trigger_completed_trade_id`), never a counterfactual "estimated cost".
 
 ## Testing
 

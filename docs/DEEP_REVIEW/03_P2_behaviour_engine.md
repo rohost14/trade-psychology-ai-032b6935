@@ -33,6 +33,7 @@
 ## 🟡 P2
 
 ### E3 · `analyze()` swallows ALL exceptions → silent detection loss · correctness/observability
+> ✅ **FIXED 2026-07-26** — the `analyze()` except block now `metrics.incr("engine_analyze_failed")`; registered in `metrics.COUNTERS` + a `health_flags` alarm (`engine_failures`). Silent detection loss is now visible on the engine-metrics admin page. (Full DLQ/retry for context-load failures remains a larger follow-up.)
 `behavior_engine.py:348` wraps the whole method in `try/except` returning an **empty** `DetectionResult` (no alerts, no events, no score move) on any failure, logging ERROR only. Per-detector failures are caught individually (line 560, good), but a **context-load** failure (profile, session, strategy lookup) drops the entire trade's detection **silently**. Combined with **P0-F2** (prod logging unwired + admin error-feed dead), such losses are invisible in production. **Fix:** increment a failure counter (`metrics.incr("engine_analyze_failed")`) + surface on the engine-metrics admin page; consider a DLQ/retry for context-load failures.
 
 ### E4 · `behavioral_analysis_service` is dead-weight-or-dual — decide · dead-code

@@ -347,6 +347,14 @@ class BehaviorEngine:
 
         except Exception as e:
             logger.error(f"[BehaviorEngine] analyze failed: {e}", exc_info=True)
+            # E3: a swallowed failure here silently drops this trade's detection
+            # (no alerts/events/score). Count it so the loss is visible on the
+            # engine-metrics admin page instead of vanishing. Best-effort.
+            try:
+                from app.core.metrics import incr as _incr
+                _incr("engine_analyze_failed")
+            except Exception:
+                pass
             return DetectionResult(
                 alerts=[],
                 events=[],
