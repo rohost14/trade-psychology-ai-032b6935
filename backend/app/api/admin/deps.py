@@ -88,6 +88,31 @@ def _check_ip(request: Request) -> None:
     raise HTTPException(status_code=404)
 
 
+# ── CSRF defense (A2) ───────────────────────────────────────────────────────────
+def _check_csrf_origin(request: Request) -> None:
+    """Block cross-site state-changing admin requests (deep-review P4-A2).
+
+    The admin JWT rides a SameSite=None cookie (needed for the cross-origin admin
+    panel), so a cross-site POST would otherwise carry it. There is no CSRF token,
+    so for any non-safe method we require the browser-sent `Origin` to be an
+    allowed origin — mirroring the CORS allow-list exactly, so every origin CORS
+    permits still works while a forged cross-site origin is rejected. Safe methods
+    and requests with no Origin (non-browser / same-origin tools) are untouched.
+    """
+    if request.method in ("GET", "HEAD", "OPTIONS"):
+        return
+    origin = request.headers.get("Origin")
+    if not origin:
+        return  # browsers send Origin on the admin panel's cross-origin writes; absence = non-browser
+    import re
+    allowed_exact = set(settings.BACKEND_CORS_ORIGINS or []) | {settings.FRONTEND_URL}
+    regex = settings.BACKEND_CORS_ORIGIN_REGEX
+    if origin in allowed_exact or (regex and re.match(regex, origin)):
+        return
+    logger.warning(f"Admin CSRF block — disallowed Origin on {request.method}: {origin}")
+    raise HTTPException(status_code=403, detail="Cross-origin request blocked")
+
+
 # ── Auth dependency ───────────────────────────────────────────────────────────
 
 async def get_current_admin(
@@ -110,6 +135,7 @@ async def get_current_admin(
     from app.models.admin_user import AdminUser
 
     _check_ip(request)
+    _check_csrf_origin(request)
     # Prefer the httpOnly cookie (not XSS-readable); fall back to a Bearer header.
     raw_token = request.cookies.get(ADMIN_COOKIE) or (credentials.credentials if credentials else None)
     if not raw_token:
