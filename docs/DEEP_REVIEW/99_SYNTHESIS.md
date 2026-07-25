@@ -28,7 +28,7 @@
 | F3/A1 | ✅ **FIXED 2026-07-26** — rate-limiter now keys off the JWT `bid` (per-account) for authed endpoints; unauthed → peer IP, XFF only behind trusted proxy. Closes shared-NAT 429s + XFF-rotation bypass. | P0/P4 |
 | F4 | Blocking **sync Redis on the async event loop** (limiters + error-feed) → throughput collapse. *(Still open — separate from F3; same file.)* | P0 |
 | M1 | P&L **doesn't segregate by product** (MIS+NRML same symbol netted) → wrong P&L / missing CompletedTrades | P1 |
-| M2 | **Flip-opened rounds build no CompletedTrade** live → real-time engine misses flip trades | P1 |
+| M2 | ✅ **FIXED 2026-07-26 (test-first)** — flip-opened rounds now build a CompletedTrade (pure `_build_round_ct_fields` + `test_flip_round.py`, RED→GREEN, 155 tests pass). | P1 |
 | M3 | ✅ **FIXED 2026-07-26 (test-first)** — `get_unrealized_pnl` applies the lot multiplier (pure helper + `test_pnl_multiplier.py`, 4 cases RED→GREEN, 140 tests pass). | P1 |
 | N1 | **Redis is a tier-1 SPOF** for the live pipeline (locks + broker), not just cache | P9 |
 | MIG1 | **No migration framework/tracking** (no schema_migrations/Alembic) → drift invisible, unsafe deploys | P8 |

@@ -477,54 +477,30 @@ class PositionLedgerService:
         )
         all_entries: List[PositionLedger] = list(result.scalars().all())
 
-        # Find the start of the current round: the entry immediately after the
-        # most recent previous CLOSE or FLIP (or the very beginning if none).
+        # Find this round: entries from just after the most recent previous
+        # CLOSE/FLIP up to (and including) the close entry. Bounding the slice at
+        # close_idx (not to the end) keeps it correct when later entries already
+        # exist (the replay-rebuild path), not just in the live call.
+        close_idx = next((i for i, e in enumerate(all_entries) if e.id == close_entry.id), None)
+        if close_idx is None:
+            return None
         round_start_idx = 0
-        for i, entry in enumerate(all_entries):
-            if entry.id == close_entry.id:
-                break
-            if entry.entry_type in ("CLOSE", "FLIP"):
+        for i in range(close_idx):
+            if all_entries[i].entry_type in ("CLOSE", "FLIP"):
                 round_start_idx = i + 1
+        round_entries = all_entries[round_start_idx: close_idx + 1]
 
-        round_entries = all_entries[round_start_idx:]
+        # A FLIP immediately before this round closed the prior round AND opened
+        # this one — pass it so its opened quantity counts as this round's entry
+        # (M2: flip-opened rounds were previously dropped for lacking OPEN fills).
+        preceding = all_entries[round_start_idx - 1] if round_start_idx > 0 else None
+        preceding_flip = preceding if (preceding is not None and preceding.entry_type == "FLIP") else None
 
-        if not round_entries:
+        fields = _build_round_ct_fields(round_entries, preceding_flip)
+        if fields is None:
             return None
 
-        # Separate entry fills (OPEN/INCREASE) from exit fills (DECREASE/CLOSE/FLIP)
-        entry_fills = [e for e in round_entries if e.entry_type in ("OPEN", "INCREASE")]
-        exit_fills = [e for e in round_entries if e.entry_type in ("DECREASE", "CLOSE", "FLIP")]
-
-        if not entry_fills or not exit_fills:
-            return None
-
-        total_entry_qty = sum(abs(e.fill_qty) for e in entry_fills)
-        total_exit_qty = sum(abs(e.fill_qty) for e in exit_fills)
-
-        if total_entry_qty == 0 or total_exit_qty == 0:
-            return None
-
-        # Weighted average prices
-        avg_entry = (
-            sum(Decimal(str(e.fill_price)) * abs(e.fill_qty) for e in entry_fills)
-            / total_entry_qty
-        ).quantize(_PRICE_PRECISION, rounding=ROUND_HALF_UP)
-
-        avg_exit = (
-            sum(Decimal(str(e.fill_price)) * abs(e.fill_qty) for e in exit_fills)
-            / total_exit_qty
-        ).quantize(_PRICE_PRECISION, rounding=ROUND_HALF_UP)
-
-        # Total realized P&L is the sum of all exit-side entries
-        total_pnl = sum(e.realized_pnl for e in exit_fills)
-
-        # Timing
-        entry_time = min(e.occurred_at for e in entry_fills)
-        exit_time = max(e.occurred_at for e in exit_fills)
-        duration = max(0, int((exit_time - entry_time).total_seconds() / 60))
-
-        # Direction from first entry fill
-        direction = "LONG" if entry_fills[0].fill_qty > 0 else "SHORT"
+        duration = max(0, int((fields["exit_time"] - fields["entry_time"]).total_seconds() / 60))
 
         return CTModel(
             # Deterministic id shared with the batch FIFO builder so a later
@@ -532,27 +508,27 @@ class PositionLedgerService:
             id=stable_completed_trade_id(
                 close_entry.broker_account_id,
                 close_entry.tradingsymbol,
-                entry_time,
-                direction,
-                exit_time,
+                fields["entry_time"],
+                fields["direction"],
+                fields["exit_time"],
             ),
             broker_account_id=close_entry.broker_account_id,
             tradingsymbol=close_entry.tradingsymbol,
             exchange=close_entry.exchange,
-            direction=direction,
-            total_quantity=total_entry_qty,
-            num_entries=len(entry_fills),
-            num_exits=len(exit_fills),
-            avg_entry_price=float(avg_entry),
-            avg_exit_price=float(avg_exit),
-            realized_pnl=float(total_pnl),
-            pnl_pct=_compute_pnl_pct(float(avg_entry), float(avg_exit), direction),
-            entry_time=entry_time,
-            exit_time=exit_time,
+            direction=fields["direction"],
+            total_quantity=fields["total_quantity"],
+            num_entries=fields["num_entries"],
+            num_exits=fields["num_exits"],
+            avg_entry_price=float(fields["avg_entry"]),
+            avg_exit_price=float(fields["avg_exit"]),
+            realized_pnl=float(fields["total_pnl"]),
+            pnl_pct=_compute_pnl_pct(float(fields["avg_entry"]), float(fields["avg_exit"]), fields["direction"]),
+            entry_time=fields["entry_time"],
+            exit_time=fields["exit_time"],
             duration_minutes=duration,
             closed_by_flip=(close_entry.entry_type == "FLIP"),
-            entry_trade_ids=[e.fill_order_id for e in entry_fills],
-            exit_trade_ids=[e.fill_order_id for e in exit_fills],
+            entry_trade_ids=fields["entry_trade_ids"],
+            exit_trade_ids=fields["exit_trade_ids"],
             status="closed",
         )
 
@@ -654,6 +630,68 @@ def _compute_pnl_pct(
         return round((avg_exit - avg_entry) / avg_entry * 100, 2)
     else:  # SHORT
         return round((avg_entry - avg_exit) / avg_entry * 100, 2)
+
+
+def _build_round_ct_fields(round_entries, preceding_flip=None):
+    """
+    Pure: aggregate one flat-to-flat round's ledger entries into CompletedTrade
+    field values (no DB). `round_entries` = this round's rows ending at its closing
+    entry. `preceding_flip` = the FLIP that OPENED this round (its close of the prior
+    round doubles as this round's opening) or None for a normally-opened round.
+
+    Fixes M2: a flip-opened round had no OPEN/INCREASE fills, so it returned None and
+    never became a CompletedTrade. The flip's opened quantity is now counted as the
+    round's entry, at the flip fill price. Returns a field dict, or None if insufficient.
+    """
+    entry_items = []  # (qty>0, price:Decimal, occurred_at, order_id)
+    direction = None
+
+    if preceding_flip is not None:
+        opened = abs(preceding_flip.position_qty_after or 0)
+        if opened > 0:
+            price = preceding_flip.avg_entry_price_after
+            if price is None:
+                price = preceding_flip.fill_price
+            entry_items.append(
+                (opened, Decimal(str(price)), preceding_flip.occurred_at, preceding_flip.fill_order_id)
+            )
+            direction = "LONG" if preceding_flip.position_qty_after > 0 else "SHORT"
+
+    for e in round_entries:
+        if e.entry_type in ("OPEN", "INCREASE"):
+            entry_items.append((abs(e.fill_qty), Decimal(str(e.fill_price)), e.occurred_at, e.fill_order_id))
+            if direction is None:
+                direction = "LONG" if e.fill_qty > 0 else "SHORT"
+
+    exit_fills = [e for e in round_entries if e.entry_type in ("DECREASE", "CLOSE", "FLIP")]
+    if not entry_items or not exit_fills:
+        return None
+
+    total_entry_qty = sum(q for q, _, _, _ in entry_items)
+    total_exit_qty = sum(abs(e.fill_qty) for e in exit_fills)
+    if total_entry_qty == 0 or total_exit_qty == 0:
+        return None
+
+    avg_entry = (
+        sum(p * q for q, p, _, _ in entry_items) / total_entry_qty
+    ).quantize(_PRICE_PRECISION, rounding=ROUND_HALF_UP)
+    avg_exit = (
+        sum(Decimal(str(e.fill_price)) * abs(e.fill_qty) for e in exit_fills) / total_exit_qty
+    ).quantize(_PRICE_PRECISION, rounding=ROUND_HALF_UP)
+
+    return {
+        "direction": direction or "LONG",
+        "total_quantity": total_entry_qty,
+        "num_entries": len(entry_items),
+        "num_exits": len(exit_fills),
+        "avg_entry": avg_entry,
+        "avg_exit": avg_exit,
+        "total_pnl": sum(e.realized_pnl for e in exit_fills),
+        "entry_time": min(t for _, _, t, _ in entry_items),
+        "exit_time": max(e.occurred_at for e in exit_fills),
+        "entry_trade_ids": [oid for _, _, _, oid in entry_items],
+        "exit_trade_ids": [e.fill_order_id for e in exit_fills],
+    }
 
 
 def stable_completed_trade_id(
