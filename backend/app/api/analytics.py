@@ -1202,9 +1202,10 @@ async def get_ai_summary(
                 }
             }
         elif tab == "behavior":
-            from app.services.behavioral_analysis_service import BehavioralAnalysisService
-            svc = BehavioralAnalysisService()
-            analysis = await svc.analyze_behavior(broker_account_id, db, days)
+            # Dual-engine retired (E1): use the live engine's summary, not the
+            # archived behavioral_analysis_service.
+            from app.services.behavior_summary import get_behavior_summary
+            analysis = await get_behavior_summary(broker_account_id, db, days)
             tab_data = {
                 "emotional_tax": analysis.get("emotional_tax", 0),
                 "behavior_score": analysis.get("behavior_score"),

@@ -5,7 +5,10 @@ import logging
 
 from app.core.database import get_db
 from app.api.deps import get_verified_broker_account_id
-from app.services.behavioral_analysis_service import BehavioralAnalysisService
+# Dual-engine retired (deep-review E1): the legacy behavioral_analysis_service is
+# archived. These endpoints now derive from the single source of truth — the live
+# BehaviorEngine's stored RiskAlerts — via behavior_summary.
+from app.services.behavior_summary import get_behavior_summary
 from app.services.behavioral_baseline_service import behavioral_baseline_service
 from app.core.trading_defaults import COLD_START_DEFAULTS, UNIVERSAL_FLOORS
 
@@ -18,15 +21,10 @@ async def get_behavioral_analysis(
     time_window_days: int = Query(default=30, ge=1, le=365),
     db: AsyncSession = Depends(get_db)
 ):
-    """Get comprehensive behavioral analysis."""
+    """Behavioral summary (patterns_detected / behavior_score / emotional_tax),
+    sourced from the live engine's RiskAlerts."""
     try:
-        service = BehavioralAnalysisService()
-        analysis = await service.analyze_behavior(
-            broker_account_id,
-            db,
-            time_window_days
-        )
-        return analysis
+        return await get_behavior_summary(broker_account_id, db, time_window_days)
     except Exception as e:
         logger.error(f"Behavioral analysis failed: {e}")
         raise HTTPException(status_code=500, detail="Internal server error")
@@ -36,16 +34,14 @@ async def get_detected_patterns(
     broker_account_id: UUID = Depends(get_verified_broker_account_id),
     db: AsyncSession = Depends(get_db)
 ):
-    """Get list of detected behavioral patterns."""
+    """Get list of detected behavioral patterns (from the live engine's RiskAlerts)."""
     try:
-        service = BehavioralAnalysisService()
-        analysis = await service.analyze_behavior(broker_account_id, db)
-
+        summary = await get_behavior_summary(broker_account_id, db)
         return {
-            "patterns": analysis["patterns_detected"],
-            "behavior_score": analysis["behavior_score"],
-            "top_strength": analysis["top_strength"],
-            "focus_area": analysis["focus_area"]
+            "patterns": summary["patterns_detected"],
+            "behavior_score": summary["behavior_score"],
+            "top_strength": summary["top_strength"],
+            "focus_area": summary["focus_area"],
         }
     except Exception as e:
         logger.error(f"Pattern detection failed: {e}")
@@ -107,17 +103,6 @@ async def get_behavioral_baseline(
         logger.error(f"Baseline endpoint failed: {e}")
         raise HTTPException(status_code=500, detail="Internal server error")
 
-
-@router.get("/trade-tags")
-async def get_trade_tags(
-    broker_account_id: UUID = Depends(get_verified_broker_account_id),
-    db: AsyncSession = Depends(get_db)
-):
-    """Get behavioral tags for all trades."""
-    try:
-        service = BehavioralAnalysisService()
-        tags = await service.tag_trades(broker_account_id, db)
-        return {"trade_tags": tags}
-    except Exception as e:
-        logger.error(f"Trade tagging failed: {e}")
-        raise HTTPException(status_code=500, detail="Internal server error")
+# NOTE: GET /trade-tags removed with the dual-engine retirement (E1) — it was
+# backed only by the archived behavioral_analysis_service and had no live caller.
+# Per-trade behavioural tagging now lives in BehaviorEvent.trigger_completed_trade_id.

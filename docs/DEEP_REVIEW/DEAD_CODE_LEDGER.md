@@ -26,7 +26,7 @@
 | D7 | ✅ CLOSED (P6): archived routers dead; remaining refs = shared Celery tasks/services (`portfolio_radar_tasks`, `position_metrics_service`) in admin/tasks.py, intentionally kept | Guardrail-tasks compute-waste stays as D19/F9 |
 | D8 | ✅ CLOSED (P6): `vix_service.py` 0 live refs (grep clean) — dead | ARCHIVE confirmed |
 | D9 | ~~baseline dup~~ **RESOLVED: NOT a dup** — `baseline_service`=profit-factor helpers (personalization); `behavioral_baseline_service`=per-user percentile baselines. Distinct. (P2-E5) | CLOSED (optional rename) |
-| D10 | 🟠 `behavioral_analysis_service.py` (1,887 LOC) = **CONFIRMED live dual engine** — served by `/api/behavioral/analysis`+`/patterns`, consumed by `ExportReportButton.tsx`. Different logic/thresholds than BehaviorEngine v2 → contradictory findings. "single source of truth" claim false. (P2-E1) | DECIDE retire vs document |
+| D10 | ✅ RETIRED 2026-07-26 (E1): `behavioral_analysis_service.py` → `services/_archive/` (git mv). Both consumers repointed to `behavior_summary` (live engine RiskAlerts). Dead `/trade-tags` route removed. App boots, no live importers. | CLOSED |
 | D11 | ✅ P8: `quality_score` truly dead (only reader = `_archive/analytics_dead_endpoints.py`; no live reader/writer) — drop or leave. `risk_alert.outcome` HAS a writer (`api/risk.py`) but ~0 adoption (MIG2) — not dead, just unused-data | quality_score: DROP candidate |
 | D20 | 🟡 No migration framework/tracking (no schema_migrations/alembic/runner) — manual .sql apply (P8-MIG1) | Adopt Alembic pre-scale |
 | D21 | 🟡 `behavioral_events` (old shadow, 020/040) vs `behavior_events` (live partitioned, 064/067) — confirm old is dead (P8-MIG5) | Verify + drop old |
