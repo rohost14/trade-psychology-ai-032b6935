@@ -33,8 +33,8 @@
 | N1 | **Redis is a tier-1 SPOF** for the live pipeline (locks + broker), not just cache | P9 |
 | MIG1 | **No migration framework/tracking** (no schema_migrations/Alembic) → drift invisible, unsafe deploys | P8 |
 | CFG1 | **HIGH FE dep vulns** — axios (auth-bypass prototype pollution + SSRF), React Router (XSS), **DOMPurify (XSS — the Chat mitigation itself)** | P10 |
-| CFG2 | Backend deps **0/28 pinned** → non-reproducible builds; crypto/jose float | P10 |
-| CFG3 | **No CI** — nothing gates typecheck/lint/test/audit | P10 |
+| CFG2 | ✅ **FIXED 2026-07-26** — all 28 backend deps pinned to `==`. (Full transitive lock = scale follow-up; pyotp/qrcode env-drift flagged.) | P10 |
+| CFG3 | ✅ **FIXED 2026-07-26** — `.github/workflows/ci.yml` added (FE typecheck/lint/test/audit + BE py3.11 compile/logic-tests/pip-audit; audits non-blocking until CFG1 clean). | P10 |
 | — | **Live validation never run** vs a real Zerodha account (biggest single unknown) | cross |
 
 ### 🟠 P2 — quality / latent / correctness-adjacent

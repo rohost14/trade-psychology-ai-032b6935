@@ -1,0 +1,66 @@
+name: CI
+
+# Deep-review P10-CFG3: gate typecheck / lint / tests / dependency audits on every
+# push + PR. Start with audits non-blocking (continue-on-error) so the gate lands
+# without breaking the pipeline on the known-open CFG1 vulns; flip to blocking once
+# `npm audit` / `pip-audit` are clean.
+
+on:
+  push:
+    branches: [main, "**"]
+  pull_request:
+    branches: [main]
+
+jobs:
+  frontend:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: "npm"
+      - run: npm ci
+      - name: Typecheck
+        run: npm run typecheck
+      - name: Lint
+        run: npm run lint
+      - name: Test
+        run: npm run test
+      - name: Audit (high+)
+        run: npm audit --omit=dev --audit-level=high
+        continue-on-error: true   # CFG1 open; flip to blocking once clean
+
+  backend:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: backend
+    env:
+      # Throwaway CI-only secrets (NOT real). Required so app.core.config loads.
+      ENVIRONMENT: development
+      ENCRYPTION_KEY: 1DdYGZsWquY-QonpyjwsjZYObNeVMpVCCz6XUbGaG_0=
+      SECRET_KEY: ci-only-secret-not-used-in-prod-0123456789
+      DATABASE_URL: postgresql+asyncpg://ci:ci@localhost:5432/ci
+      REDIS_URL: redis://localhost:6379/0
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"   # match the Dockerfile runtime (CFG5)
+          cache: "pip"
+      - run: pip install -r requirements.txt
+      - name: Compile-check all modules
+        run: python -m compileall -q app
+      - name: Logic tests (no DB required)
+        run: >
+          python -m pytest -q
+          tests/test_behavior_engine.py
+          tests/test_tradebook_import.py
+          tests/test_session_windows_by_exchange.py
+          tests/test_trade_classifier.py
+          tests/test_import_reconcile.py
+          tests/test_habits_service.py
+      - name: pip-audit
+        run: pip install pip-audit && pip-audit
+        continue-on-error: true   # baseline; flip to blocking once triaged

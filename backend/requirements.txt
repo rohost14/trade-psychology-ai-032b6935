@@ -1,30 +1,37 @@
-fastapi>=0.109.0
-uvicorn[standard]>=0.27.0
-sqlalchemy[asyncio]>=2.0.25
-asyncpg
-pydantic>=2.5.0
-pydantic-settings
-email-validator>=2.0.0
-python-jose[cryptography]
-passlib[bcrypt]
-celery[redis]
-celery-redbeat>=2.2.0
-redis
-httpx
-kiteconnect>=5.0.1
-websockets>=11.0
-twilio>=8.10.0
-python-multipart
-cryptography
-apscheduler>=3.10.4
-python-dateutil
-pytz
-pywebpush
-pyotp>=2.9.0
-qrcode[pil]>=7.4.2
-sentry-sdk[fastapi]>=2.0.0
-prometheus_client>=0.20.0
+# Pinned for reproducible builds (deep-review P10-CFG2, 2026-07-26).
+# Versions = the set the app currently runs + passes tests on. Regenerate a full
+# transitive lock (pip-tools / uv) in CI before scale; this top-level pin is the
+# minimum that stops `pip install` pulling a different version on every build.
+fastapi==0.128.0
+uvicorn[standard]==0.40.0
+sqlalchemy[asyncio]==2.0.46
+asyncpg==0.31.0
+pydantic==2.12.5
+pydantic-settings==2.12.0
+email-validator==2.3.0
+python-jose[cryptography]==3.5.0
+passlib[bcrypt]==1.7.4
+celery[redis]==5.6.2
+celery-redbeat==2.3.3
+redis==6.4.0
+httpx==0.28.1
+kiteconnect==5.0.1
+websockets==15.0.1
+twilio==9.10.0
+python-multipart==0.0.21
+cryptography==46.0.3
+apscheduler==3.11.2
+python-dateutil==2.9.0.post0
+pytz==2025.2
+pywebpush==2.2.0
+# pyotp/qrcode: NOT installed in the current dev venv (env drift — they import
+# lazily in admin TOTP/QR, so a fresh env must install them). Pinned to their
+# declared floors; bump + verify when the TOTP path is exercised.
+pyotp==2.9.0
+qrcode[pil]==7.4.2
+sentry-sdk[fastapi]==2.54.0
+prometheus_client==0.24.1
 
 # Testing
-pytest>=8.0.0
-pytest-asyncio>=0.23.0
+pytest==9.0.2
+pytest-asyncio==1.3.0

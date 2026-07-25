@@ -20,9 +20,12 @@ Secret hygiene + container build are **solid**. Three real production-readiness 
 **Fix:** `npm audit fix` (most have fixes), bump axios + React Router + **DOMPurify** explicitly, re-verify. **Revisit P7's XSS credit** — it's contingent on updating DOMPurify.
 
 ### CFG2 · Backend `requirements.txt` is 0/28 pinned — non-reproducible builds · reproducibility/security
+> ✅ **FIXED 2026-07-26** — all 28 top-level deps pinned to `==` (the versions the app runs + passes tests on). Verified 0/28 unpinned. A full transitive lock (pip-tools/uv) is still the scale-grade follow-up; this is the minimum that stops per-build drift.
+> ⚠️ **New (env drift):** `pyotp` + `qrcode` are declared but **not installed** in the current dev venv (they import lazily in admin TOTP/QR — would fail at runtime). Pinned to their declared floors; CI (`pip install -r`) now installs them fresh so this is caught going forward.
 **Zero** of 28 backend deps have a version (`asyncpg`, `redis`, `httpx`, `celery`, `cryptography`, `python-jose`, `passlib`, `pydantic-settings`, … all bare). `Dockerfile` does `pip install -r requirements.txt` → each image build pulls **whatever is latest that day** → non-reproducible builds, surprise breakages, and **security-sensitive libs (cryptography/jose/passlib) float uncontrolled**. No lockfile, no hashes. (Frontend is fine — `package-lock.json` pins.) **Fix:** pin with a lock (pip-tools / uv / `pip freeze`), add `pip-audit` to CI.
 
 ### CFG3 · No CI — no automated typecheck / lint / test / audit gate · ops
+> ✅ **FIXED 2026-07-26** — added `.github/workflows/ci.yml`: FE job (npm ci → typecheck → lint → test → `npm audit --audit-level=high`) + BE job on **Python 3.11** (matches Docker, addresses CFG5) (pip install pinned reqs → `compileall` → no-DB logic tests → `pip-audit`). Audits start `continue-on-error` (CFG1 vulns open) — flip to blocking once clean. Verified valid YAML + referenced tests exist.
 `.github/` contains only an agent definition; **`.github/workflows/` does not exist**. Nothing enforces `npm run typecheck` / `lint` / `test` / `npm audit` / `pytest` on push. Given CFG1/CFG2, regressions and new vulns land silently. **Fix:** add a CI workflow running FE typecheck+lint+vitest+`npm audit`, BE `python -c "import app.main"`+pytest+`pip-audit`, gate merges. (This is P14-E.)
 
 ---
