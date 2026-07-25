@@ -26,6 +26,7 @@ Earlier docs (P1-M6, P2-E2, P3-R2) said the live-random-id → batch-stable-id c
 ## 🟡 P1→P2 (see C1)
 
 ### Q1 · `behaviour-cost` (flagship "patterns → money") under-counts after any CompletedTrade rebuild · correctness
+> ✅ **FIXED 2026-07-26 (via M6)** — with the live builder now using the shared stable id, the `RiskAlert.trigger_completed_trade_id → CompletedTrade.id` join no longer breaks on rebuild, so behaviour-cost stops dropping flagged trades.
 `GET /behaviour-cost` inner-joins `RiskAlert.trigger_completed_trade_id == CompletedTrade.id` (and the same for the constitution `rule_rows`). When that link is NULLed by a CT rebuild (C1: import / recalc / late-fill replay), those alerts **silently drop out** of the metric (`isnot(None)` filter + inner join). Result: the headline "your patterns cost ₹X" **understates** after an import or replay. The endpoint's design is otherwise **exactly right** (raw realized P&L of DISTINCT flagged trades, deduped by trade, "realized P&L on flagged trades" framing — no counterfactual). Fix = the same `_stable_ct_id` change (removes the churn) or re-point the link on rebuild.
 
 ---

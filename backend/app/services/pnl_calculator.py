@@ -27,7 +27,7 @@ from app.models.incomplete_position import IncompletePosition
 from app.core.market_hours import market_minutes
 from app.services.mcx_contract_specs import get_lot_multiplier, get_lot_multiplier_or_none
 from app.services.instrument_parser import is_expiry_day as _instrument_is_expiry_day
-from app.services.position_ledger_service import _compute_pnl_pct
+from app.services.position_ledger_service import _compute_pnl_pct, stable_completed_trade_id
 
 logger = logging.getLogger(__name__)
 
@@ -413,13 +413,14 @@ class PnLCalculator:
         Generate a deterministic UUID for a CompletedTrade round.
 
         Same round (same broker, symbol, entry time, direction, exit time) always
-        produces the same UUID — so journal trade_id FK links survive re-syncs
-        that delete and recreate CompletedTrade rows.
+        produces the same UUID — so journal trade_id FK links + alert
+        trigger_completed_trade_id survive re-syncs that delete and recreate rows.
+        Delegates to the shared `stable_completed_trade_id` so the batch and live
+        ledger builders can never drift (M6/E2).
         """
-        entry_str = entry_time.isoformat() if entry_time else "none"
-        exit_str = exit_time.isoformat() if exit_time else "none"
-        key = f"{broker_account_id}|{tradingsymbol}|{entry_str}|{direction}|{exit_str}"
-        return uuid_module.uuid5(uuid_module.NAMESPACE_URL, key)
+        return stable_completed_trade_id(
+            broker_account_id, tradingsymbol, entry_time, direction, exit_time
+        )
 
     def _build_completed_trade(
         self,

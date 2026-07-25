@@ -527,6 +527,15 @@ class PositionLedgerService:
         direction = "LONG" if entry_fills[0].fill_qty > 0 else "SHORT"
 
         return CTModel(
+            # Deterministic id shared with the batch FIFO builder so a later
+            # recompute reuses this id instead of churning it (M6/E2).
+            id=stable_completed_trade_id(
+                close_entry.broker_account_id,
+                close_entry.tradingsymbol,
+                entry_time,
+                direction,
+                exit_time,
+            ),
             broker_account_id=close_entry.broker_account_id,
             tradingsymbol=close_entry.tradingsymbol,
             exchange=close_entry.exchange,
@@ -645,6 +654,30 @@ def _compute_pnl_pct(
         return round((avg_exit - avg_entry) / avg_entry * 100, 2)
     else:  # SHORT
         return round((avg_entry - avg_exit) / avg_entry * 100, 2)
+
+
+def stable_completed_trade_id(
+    broker_account_id,
+    tradingsymbol,
+    entry_time,
+    direction: str,
+    exit_time,
+):
+    """
+    Deterministic CompletedTrade id for a flat-to-flat round.
+
+    The SAME logic must be used by both the live ledger builder
+    (build_completed_trade_on_close) and the batch FIFO builder
+    (PnLCalculator._stable_ct_id), so that a batch recompute deletes and recreates
+    a round with the *same* id. Otherwise the live round's random id churns at the
+    first recompute — nulling alert/event `trigger_completed_trade_id`
+    (ON DELETE SET NULL) and under-counting `behaviour-cost`. See deep-review M6/E2.
+    """
+    import uuid as _uuid
+    entry_str = entry_time.isoformat() if entry_time else "none"
+    exit_str = exit_time.isoformat() if exit_time else "none"
+    key = f"{broker_account_id}|{tradingsymbol}|{entry_str}|{direction}|{exit_str}"
+    return _uuid.uuid5(_uuid.NAMESPACE_URL, key)
 
 
 # ------------------------------------------------------------------
