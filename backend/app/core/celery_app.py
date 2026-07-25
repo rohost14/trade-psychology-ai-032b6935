@@ -249,3 +249,47 @@ def configure_for_upstash():
 # Auto-configure for Upstash if URL starts with rediss://
 if settings.REDIS_URL.startswith("rediss://"):
     configure_for_upstash()
+
+
+# ── F1 regression guard ───────────────────────────────────────────────────────
+# The worker (Procfile) consumes exactly these queues. Any beat-scheduled task
+# whose routed queue is NOT in this set would silently never execute — the
+# deep-review P0-F1 bug (report dispatch, intent pushes, behavior_events
+# partition upkeep, market-data token refresh, watchdog all died this way).
+# Keep this in sync with the Procfile `worker --queues=...`. Tasks with no
+# task_routes entry fall through to Celery's default queue, "celery".
+CONSUMED_QUEUES = {"celery", "trades", "alerts", "reports"}
+
+
+def _resolve_task_queue(task_name: str) -> str:
+    """Resolve the queue a task routes to via task_routes globs; default 'celery'."""
+    routes = celery_app.conf.task_routes or {}
+    for pattern, cfg in routes.items():
+        prefix = pattern[:-1] if pattern.endswith("*") else pattern
+        if task_name == pattern or task_name.startswith(prefix):
+            queue = (cfg or {}).get("queue")
+            if queue:
+                return queue
+    return "celery"  # Celery's default queue (task_default_queue is unset)
+
+
+def _warn_orphaned_beat_tasks() -> None:
+    """Log CRITICAL for any beat-scheduled task whose queue no worker consumes.
+    Logging only (never raises) — surfaces the P0-F1 misconfiguration class at boot."""
+    import logging as _logging
+    _log = _logging.getLogger(__name__)
+    orphaned = [
+        f"{name} → {spec.get('task', '')} (queue={_resolve_task_queue(spec.get('task', ''))})"
+        for name, spec in (celery_app.conf.beat_schedule or {}).items()
+        if _resolve_task_queue(spec.get("task", "")) not in CONSUMED_QUEUES
+    ]
+    if orphaned:
+        _log.critical(
+            "[celery] %d scheduled task(s) route to a queue NO worker consumes — "
+            "they will NEVER run. Fix task_routes or the worker --queues. "
+            "Orphaned: %s. Consumed queues: %s",
+            len(orphaned), "; ".join(orphaned), sorted(CONSUMED_QUEUES),
+        )
+
+
+_warn_orphaned_beat_tasks()
