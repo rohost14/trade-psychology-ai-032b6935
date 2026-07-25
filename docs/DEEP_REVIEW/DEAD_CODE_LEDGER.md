@@ -23,8 +23,8 @@
 ## Prior-audit items (carried forward from CODEBASE_AUDIT.md — re-verify during phases)
 | # | Item | Where verified |
 |---|---|---|
-| D7 | Archived routers `portfolio_radar` / `guardrails` / `portfolio_chat` (git-mv'd to `api/_archive/`) | main.py mounts removed — confirm no live caller in P6/P7 |
-| D8 | `vix_service.py` archived (0 imports) | confirm in P6 |
+| D7 | ✅ CLOSED (P6): archived routers dead; remaining refs = shared Celery tasks/services (`portfolio_radar_tasks`, `position_metrics_service`) in admin/tasks.py, intentionally kept | Guardrail-tasks compute-waste stays as D19/F9 |
+| D8 | ✅ CLOSED (P6): `vix_service.py` 0 live refs (grep clean) — dead | ARCHIVE confirmed |
 | D9 | ~~baseline dup~~ **RESOLVED: NOT a dup** — `baseline_service`=profit-factor helpers (personalization); `behavioral_baseline_service`=per-user percentile baselines. Distinct. (P2-E5) | CLOSED (optional rename) |
 | D10 | 🟠 `behavioral_analysis_service.py` (1,887 LOC) = **CONFIRMED live dual engine** — served by `/api/behavioral/analysis`+`/patterns`, consumed by `ExportReportButton.tsx`. Different logic/thresholds than BehaviorEngine v2 → contradictory findings. "single source of truth" claim false. (P2-E1) | DECIDE retire vs document |
 | D11 | Ghost columns: `CompletedTrade.quality_score` (populated by nothing), `risk_alert.outcome` (never written) | P8 |
