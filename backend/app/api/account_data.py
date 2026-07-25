@@ -353,18 +353,30 @@ class DeleteAccountRequest(BaseModel):
     confirmation: str
 
 
+def _redis_purge_patterns(account_id) -> list[str]:
+    """Per-account Redis key patterns to erase on account deletion (DPDP).
+    Pure — returned separately so the exact set is unit-testable. `*` = SCAN glob."""
+    return [
+        # rate limiter — both the legacy shape and the current rl:acct:{bid}:* shape
+        # (F3/A1 re-keyed authed limits to acct:{bid}); TTL-bound but purge anyway.
+        f"rl:{account_id}:*", f"rl:acct:{account_id}:*",
+        f"margin:{account_id}", f"margins:{account_id}",
+        f"dna:{account_id}:*", f"dna_refreshes:{account_id}:*",
+        f"behavior_lock:{account_id}", f"fifo_lock:{account_id}",
+        f"holding_loser_chain:{account_id}", f"radar_debounce:{account_id}",
+        f"ew:{account_id}:*", f"circuit:{account_id}:*",
+        # Event-bus per-account replay stream — holds recent trade/alert payloads
+        # (symbols, P&L, order ids). Was previously NOT purged (DP2).
+        f"stream:{account_id}",
+    ]
+
+
 def _purge_redis_for_account(account_id: UUID) -> int:
     """
     Best-effort removal of per-account Redis keys. All of it is derived cache or
     TTL-bound state, so failure here must never block or fail the erasure.
     """
-    patterns = [
-        f"rl:{account_id}:*", f"margin:{account_id}", f"margins:{account_id}",
-        f"dna:{account_id}:*", f"dna_refreshes:{account_id}:*",
-        f"behavior_lock:{account_id}", f"fifo_lock:{account_id}",
-        f"holding_loser_chain:{account_id}", f"radar_debounce:{account_id}",
-        f"ew:{account_id}:*", f"circuit:{account_id}:*",
-    ]
+    patterns = _redis_purge_patterns(account_id)
     removed = 0
     try:
         from app.core.redis_pool import get_sync_redis

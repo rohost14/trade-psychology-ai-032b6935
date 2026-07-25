@@ -25,6 +25,7 @@ Special attention: **`behavior_events` is partitioned** (migration 067) — conf
 ## 🟡 P2
 
 ### DP2 · Redis purge on account deletion misses the per-account event stream · compliance
+> ✅ **FIXED 2026-07-26 (test-first)** — extracted pure `_redis_purge_patterns`; added `stream:{account_id}` (event-replay stream with trade/alert payloads) **and** `rl:acct:{account_id}:*` (the current rate-limit key shape after F3/A1 — the old `rl:{id}:*` no longer matched). `tests/test_dpdp_purge_patterns.py` verifies both. Erasure now covers the event stream.
 `_purge_redis_for_account` deletes `rl:`, `margin:`, `dna:`, locks, `ew:`, `circuit:` keys, but **not** `stream:{account_id}` (the event-bus **per-account replay stream**, `event_bus.ACCOUNT_STREAM_PREFIX`), which holds recent trade/alert payloads (symbols, P&L, order ids). After erasure this stream survives until MAXLEN (~500 entries) rotates it out. Also not purged: any `metrics:*`/`admin:error_feed` entries referencing the account. **DPDP erasure is therefore incomplete** for the event stream. **Fix:** add `stream:{account_id}` (and audit the full per-account keyspace) to the purge list.
 
 ---

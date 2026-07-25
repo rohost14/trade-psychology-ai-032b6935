@@ -19,6 +19,7 @@ There is **no `schema_migrations` table, no Alembic, no tracked runner** — onl
 - **DP1 can't be verified programmatically** (below) because nothing records what's actually applied.
 - **Unsafe at scale / with a team** — schema changes can't be rolled out or audited reliably.
 **Fix (pre-scale):** adopt Alembic (or a tracked runner with a `schema_migrations` version table) and baseline the current schema. This is a production-readiness item, not just hygiene.
+> 🟡 **PARTIALLY FIXED 2026-07-26** — added a lightweight **tracked runner** `backend/scripts/db/migrate.py` (`schema_migrations` table + `--status`/`--stamp`/`--dry-run`/apply; natural version ordering; each migration in its own transaction). Pure logic unit-tested (`test_migrate_runner.py`); discovers all 72 migrations in order. **USER STEP:** run `python -m scripts.db.migrate --stamp` ONCE on the existing DB to baseline (record 003–074 as applied without re-running), then use it for 074+ onward. **Alembic remains the eventual target** for autogenerate/branching — this ends the "no tracking, apply by hand" problem safely without touching the live schema until run.
 
 ---
 
