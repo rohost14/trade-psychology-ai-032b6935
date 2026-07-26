@@ -92,6 +92,7 @@ jobs:
           tests/test_migrate_runner.py
           tests/test_behavior_summary.py
           tests/test_webhook_checksum.py
+          tests/test_trade_schema_fits.py
       - name: pip-audit
         run: pip install pip-audit && pip-audit
         continue-on-error: true   # baseline; flip to blocking once triaged

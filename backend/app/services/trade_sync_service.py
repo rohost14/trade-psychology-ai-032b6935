@@ -239,6 +239,11 @@ class TradeSyncService:
                 else:
                     logger.info("Instruments up to date, skipping refresh")
             except Exception as e:
+                # CRITICAL: a failed instrument bulk-upsert leaves the session in an
+                # aborted-transaction state. Without this rollback every subsequent
+                # query in the sync cascades InFailedSQLTransactionError ("current
+                # transaction is aborted"). Roll back so the sync can continue.
+                await db.rollback()
                 logger.error(f"Instrument refresh failed (non-fatal): {e}")
                 stats["errors"].append(f"Instrument Refresh: {str(e)}")
 
