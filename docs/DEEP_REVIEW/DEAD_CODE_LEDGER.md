@@ -46,5 +46,5 @@
 | # | Item | Note |
 |---|---|---|
 | DS1 | ✅ P11 classified (no secrets): DEAD→archive = `scripts/debug/*` (19), `smoke_phase*.py` (11); DELETE = `scripts/*.txt` + `*.pyc` (5); GATE = `swap_tables.py` (destructive). KEEP (P14 assets) = `validate/*`, `replay_*`, `simulate_trader_environment`, `reproduce_position_lag`, `db/seed_data` | archive/delete dead |
-| DS2 | 🟡 P12: `scroll-loss-experience/` separate Next.js app w/ committed `.next/` build cache + node_modules; `design_v2/`, `prototype_design/` — 0 build refs, 0 live imports, no secrets | REMOVE from repo |
+| DS2 | ✅ DONE 2026-07-26: `design_v2/` + `prototype_design/` → `_archive/dead_trees/` (git mv); `AUDIT_FINDINGS.md`+`DESIGN.md` → `_archive/stray_docs/`; `scripts/debug/`+`smoke_phase*`+`swap_tables.py` → `scripts/_archive/`. `scroll-loss-experience/` = **untracked** (0 git files) — already not in repo. Verified typecheck+boot+424 tests collect. | CLOSED |
 | DS3 | ✅ P12: `_archive/*` correctly excluded from typecheck+eslint + 0 live imports (clean isolation) | KEEP as-is |
