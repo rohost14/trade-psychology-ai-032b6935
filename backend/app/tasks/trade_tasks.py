@@ -613,12 +613,8 @@ def process_webhook_trade(self, trade_data: Dict[str, Any], broker_account_id: s
                 except Exception as _pm_e:
                     logger.debug(f"Position monitor trigger skipped: {_pm_e}")
 
-                # ── Portfolio concentration analysis for this account ────────
-                try:
-                    from app.tasks.portfolio_radar_tasks import run_portfolio_radar_for_account
-                    run_portfolio_radar_for_account.delay(broker_account_id)
-                except Exception as _pr_e:
-                    logger.debug(f"Portfolio radar trigger skipped: {_pr_e}")
+                # Portfolio-radar trigger removed 2026-07-26 — the task was archived
+                # (broken AlertService integration; routers already archived 2026-07-25).
 
                 return {"success": True, "trade_id": str(trade.id)}
 

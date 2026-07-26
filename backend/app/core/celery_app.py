@@ -46,7 +46,6 @@ celery_app = Celery(
         "app.tasks.checkpoint_tasks",
         "app.tasks.reconciliation_tasks",
         "app.tasks.position_monitor_tasks",
-        "app.tasks.portfolio_radar_tasks",
         "app.tasks.guardrail_tasks",
         "app.tasks.portfolio_sync_tasks",
         "app.tasks.intent_tasks",
@@ -84,7 +83,6 @@ celery_app.conf.update(
         "app.tasks.checkpoint_tasks.*": {"queue": "alerts"},
         "app.tasks.reconciliation_tasks.*": {"queue": "trades"},
         "app.tasks.position_monitor_tasks.*": {"queue": "trades"},
-        "app.tasks.portfolio_radar_tasks.*": {"queue": "trades"},
         "app.tasks.guardrail_tasks.*": {"queue": "alerts"},
         "app.tasks.portfolio_sync_tasks.*": {"queue": "trades"},
     },
@@ -221,11 +219,10 @@ celery_app.conf.update(
             "schedule": crontab(hour=8, minute=45, day_of_week="1-5"),
         },
 
-        # NOTE: position-monitor and portfolio-radar are NOT beat tasks.
-        # They are triggered per-trade fill in trade_tasks.py:
+        # NOTE: position-monitor is NOT a beat task.
+        # It is triggered per-trade fill in trade_tasks.py:
         #   check_position_overexposure    — immediately after every COMPLETE fill
         #   check_holding_loser_scheduled  — 30 min after BUY fill (self-reschedules)
-        #   run_portfolio_radar_for_account — immediately after behavior detection
     },
 )
 

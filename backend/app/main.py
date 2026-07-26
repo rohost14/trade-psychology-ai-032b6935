@@ -440,8 +440,9 @@ from app.api import websocket
 app.include_router(websocket.router, prefix="/api", tags=["websocket"])
 
 # NOTE: portfolio_radar / guardrails / portfolio_chat routers archived 2026-07-25 —
-# their frontend pages are archived and no live component calls the endpoints. The
-# backend SERVICES + Celery tasks (portfolio_radar_tasks, etc.) remain and are untouched.
+# their frontend pages are archived and no live component calls the endpoints.
+# portfolio_radar_tasks was fully archived 2026-07-26 (broken AlertService
+# integration — see app/tasks/_archive/). guardrail_tasks remain registered.
 
 from app.api import notifications
 app.include_router(notifications.router, prefix="/api/notifications", tags=["notifications"])
