@@ -318,5 +318,16 @@ try:
             _aio.run(_engine.dispose())
         except Exception:
             pass
+
+    @_worker_process_init.connect
+    def _setup_worker_logging(**_kwargs):
+        # F2: wire our JSON logging + Redis error-feed handler in each worker child,
+        # so Celery TASK errors reach the admin error-feed (previously only the web
+        # process called setup_logging). Best-effort; runs once per forked child.
+        try:
+            from app.core.logging_config import setup_logging
+            setup_logging()
+        except Exception:
+            pass
 except Exception:
     pass
