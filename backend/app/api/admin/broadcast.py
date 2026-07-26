@@ -172,7 +172,7 @@ async def broadcast_message(
         await db.flush()
 
         try:
-            ok = await whatsapp_service.send_alert(phone, body.message)
+            ok = await whatsapp_service.send_message(phone, body.message)
             if ok:
                 receipt.status = "sent"
                 receipt.sent_at = datetime.now(timezone.utc)

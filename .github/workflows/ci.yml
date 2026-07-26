@@ -78,14 +78,12 @@ jobs:
         # Catches the crash class py_compile CANNOT: undefined names, use-before-
         # assignment, and loop-variable import shadows (the UnboundLocalError family).
         # Only the dangerous categories fail the build; "imported but unused" etc. are
-        # ignored. _archive is dead code. The lone excluded line is a quoted forward-ref
-        # annotation `Optional["CompletedTrade"]` — a pyflakes false positive (not run at runtime).
+        # ignored. _archive is dead code (excluded).
         run: |
           pip install pyflakes
           OUT=$(python -m pyflakes app 2>&1 \
             | grep -v "_archive" \
-            | grep -iE "undefined name|before assignment|shadowed by loop" \
-            | grep -v "position_ledger_service.py.*CompletedTrade" || true)
+            | grep -iE "undefined name|before assignment|shadowed by loop" || true)
           if [ -n "$OUT" ]; then
             echo "$OUT"
             echo "::error::pyflakes found name-scope / undefined-name bugs (crash class)"

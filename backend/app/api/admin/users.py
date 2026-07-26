@@ -274,7 +274,7 @@ async def send_admin_message(
         raise HTTPException(status_code=400, detail="User has no phone number set")
 
     from app.services.whatsapp_service import whatsapp_service
-    success = await whatsapp_service.send_alert(user.guardian_phone, message)
+    success = await whatsapp_service.send_message(user.guardian_phone, message)
 
     await audit(db, admin["email"], "send_message",
                 target_type="user", target_id=str(account_id),

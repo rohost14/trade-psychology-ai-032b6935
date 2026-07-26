@@ -26,7 +26,7 @@ Real-time path (Phase 3 cutover):
 import logging
 from datetime import datetime
 from decimal import Decimal, ROUND_HALF_UP
-from typing import Optional, Tuple, List
+from typing import Optional, Tuple, List, TYPE_CHECKING
 from uuid import UUID
 
 from sqlalchemy import select, and_, update
@@ -35,6 +35,11 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.position_ledger import PositionLedger, ENTRY_TYPES
 from app.services.mcx_contract_specs import get_lot_multiplier_or_none
+
+if TYPE_CHECKING:
+    # Runtime import is local (inside build_completed_trade_on_close); this block
+    # only resolves the quoted "CompletedTrade" return annotation for mypy/pyflakes.
+    from app.models.completed_trade import CompletedTrade
 
 logger = logging.getLogger(__name__)
 
