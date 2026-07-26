@@ -240,7 +240,9 @@ def configure_for_upstash():
         import ssl
         celery_app.conf.update(
             broker_use_ssl={
-                "ssl_cert_reqs": ssl.CERT_NONE   # integer constant, not the string
+                # F6: verify the broker's TLS cert (Upstash presents a valid one).
+                # CERT_NONE disabled verification → MITM-able broker traffic.
+                "ssl_cert_reqs": ssl.CERT_REQUIRED
             }
             # No redis_backend_use_ssl — result backend is disabled
         )

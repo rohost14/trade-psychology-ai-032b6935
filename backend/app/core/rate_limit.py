@@ -46,8 +46,10 @@ def rate_limit(max_calls: int = 10, window_seconds: int = 60) -> Callable:
         account_id: UUID = Depends(get_verified_broker_account_id),
     ) -> None:
         try:
-            from app.core.redis_pool import get_sync_redis
-            r = get_sync_redis()
+            # Async Redis — runs on the event loop; a blocking sync client would
+            # stall every rate-limited request under load (F4).
+            from app.core.redis_pool import get_async_redis
+            r = await get_async_redis()
             key = f"rl:{account_id}:{request.url.path}"
             now = time.time()
             window_start = now - window_seconds
@@ -57,12 +59,11 @@ def rate_limit(max_calls: int = 10, window_seconds: int = 60) -> Callable:
             pipe.zremrangebyscore(key, "-inf", window_start)
             # Count remaining entries
             pipe.zcard(key)
-            # Add this request
-            pipe.zadd(key, {str(now): now})
+            # Add this request (high-precision member avoids burst collisions)
+            pipe.zadd(key, {f"{now:.9f}": now})
             # Set TTL so key self-cleans
             pipe.expire(key, window_seconds + 1)
-            results = pipe.execute()
-            r.close()
+            results = await pipe.execute()
 
             call_count = results[1]
             if call_count >= max_calls:

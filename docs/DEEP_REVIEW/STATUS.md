@@ -9,7 +9,7 @@
 
 ## 01_P0 entry & map
 - ✅ F1 orphaned Celery queues · ✅ F2 logging wired (web **+ worker**) · ✅ F3 rate-limiter per-account
-- ⛔ **F4** blocking sync Redis on the loop (convert to async; load-gated) · ✅ F11 (filter on handlers) · ✅ F12 (VIX comment) · ⬜ F13 (documented) · ⬜ F14 boot P&L repair · ⬜ F10 revocation-on-read · ⬜ F5 dup limiters · ⬜ F6 Celery TLS · ⬜ F7 NSE holidays · ⬜ F8 CORS regex · ⬜ F9 guardrails compute
+- ✅ **F4** limiters → async Redis (error-feed handler stays sync — logging) · ✅ F11 (filter on handlers) · ✅ F12 (VIX comment) · ⬜ F13 (documented) · ⬜ F14 boot P&L repair · ⬜ F10 revocation-on-read · ⬜ F5 dup limiters · ⬜ F6 Celery TLS · ⬜ F7 NSE holidays · ⬜ F8 CORS regex · ⬜ F9 guardrails compute
 
 ## 02_P1 money math
 - ✅ M2 flip rounds · ✅ M3 MCX unrealized · ✅ M6 stable id (+E2/Q1) · ✅ M4 stale docstring
@@ -21,10 +21,10 @@
 
 ## 04_P3 real-time & scale
 - ✅ R1 worker pool (prefork + NullPool) · ✅ R2 (via M6) · R3 postback throttle ⬜ · R4 batch loops ⛔ (fan-out CR1, load-gated)
-- ⛔ R5 blocking Redis (=F4) · ⬜ R6 done (constant-time checksum) · R7 ticker cap ⛔ (infra/CR2)
+- ✅ R5 (=F4, limiters async) · ⬜ R6 done (constant-time checksum) · R7 ticker cap ⛔ (infra/CR2)
 
 ## 05_P4 auth & security
-- ✅ A1 (=F3) · ✅ A2 admin CSRF (Origin check) · ⬜ A3 lockout-DoS · ⛔ A4 admin blocking Redis · ⬜ A5 OAuth email key · ⬜ A6 transient secret · ⬜ A7 dual encrypt paths · ⬜ A8 key rotation (plan)
+- ✅ A1 (=F3) · ✅ A2 admin CSRF (Origin check) · ⬜ A3 lockout-DoS · ⛔ A4 admin blocking Redis · ✅ A5 OAuth null-email guard · ⬜ A6 transient secret · ⬜ A7 dual encrypt paths · ⬜ A8 key rotation (plan)
 
 ## 06_P5 analytics
 - ✅ Q1 (via M6) · ✅ Q4 (via M3) · ⬜ Q2 fake-precision probabilities · ⛔ Q3 uncached aggregation (load-gated) · ⬜ Q5 regex · ⬜ Q6 split analytics.py (large refactor) · C1/C2 corrections applied

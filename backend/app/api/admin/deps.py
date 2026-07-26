@@ -106,7 +106,8 @@ def _check_csrf_origin(request: Request) -> None:
         return  # browsers send Origin on the admin panel's cross-origin writes; absence = non-browser
     import re
     allowed_exact = set(settings.BACKEND_CORS_ORIGINS or []) | {settings.FRONTEND_URL}
-    regex = settings.BACKEND_CORS_ORIGIN_REGEX
+    # F8: only honour the private-IP regex in development (matches the CORS config).
+    regex = settings.BACKEND_CORS_ORIGIN_REGEX if settings.ENVIRONMENT == "development" else None
     if origin in allowed_exact or (regex and re.match(regex, origin)):
         return
     logger.warning(f"Admin CSRF block — disallowed Origin on {request.method}: {origin}")

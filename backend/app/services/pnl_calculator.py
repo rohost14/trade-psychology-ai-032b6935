@@ -267,7 +267,13 @@ class PnLCalculator:
         #   Ref: https://kite.trade/forum/discussion/14531/
         ref_exchange = (sorted_trades[0].exchange or "") if sorted_trades else ""
         ref_symbol   = (sorted_trades[0].tradingsymbol or "") if sorted_trades else ""
-        lot_multiplier = Decimal(str(get_lot_multiplier(ref_exchange, ref_symbol)))
+        # M5: for an untabulated MCX contract, get_lot_multiplier() silently returns 1
+        # (wrong P&L). Use the ledger's resolver, which falls back to Zerodha's own
+        # multiplier stored on the Position row before defaulting to 1.
+        from app.services.position_ledger_service import PositionLedgerService
+        lot_multiplier = await PositionLedgerService._resolve_lot_mult(
+            broker_account_id, ref_exchange, ref_symbol, db
+        )
 
         for trade in sorted_trades:
             qty = trade.filled_quantity or trade.quantity or 0

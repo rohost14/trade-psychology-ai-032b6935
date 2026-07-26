@@ -223,7 +223,11 @@ app = FastAPI(
 app.add_middleware(
     CORSMiddleware,
     allow_origins=settings.BACKEND_CORS_ORIGINS,
-    allow_origin_regex=settings.BACKEND_CORS_ORIGIN_REGEX,
+    # F8: the private-IP regex (192.168.x / 10.x) is a DEV convenience for LAN
+    # testing — never allow those origins in production.
+    allow_origin_regex=(
+        settings.BACKEND_CORS_ORIGIN_REGEX if settings.ENVIRONMENT == "development" else None
+    ),
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],

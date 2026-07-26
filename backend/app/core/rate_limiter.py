@@ -86,16 +86,17 @@ class RateLimiter:
         window_start = now - self.window_seconds
 
         try:
-            from app.core.redis_pool import get_sync_redis
-            r = get_sync_redis()
+            # Async Redis — this runs on the FastAPI event loop, so a blocking sync
+            # client would stall every rate-limited request under load (F4).
+            from app.core.redis_pool import get_async_redis
+            r = await get_async_redis()
             pipe = r.pipeline()
             pipe.zremrangebyscore(redis_key, "-inf", window_start)
             pipe.zcard(redis_key)
             # Use high-precision timestamp as member to avoid collisions under burst traffic
             pipe.zadd(redis_key, {f"{now:.9f}": now})
             pipe.expire(redis_key, self.window_seconds + 1)
-            results = pipe.execute()
-            r.close()
+            results = await pipe.execute()
 
             call_count = results[1]
             if call_count >= self.max_requests:

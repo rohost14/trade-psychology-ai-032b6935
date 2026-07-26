@@ -321,11 +321,17 @@ async def zerodha_callback(
 
         logger.info(f"OAuth success for Zerodha user: {zerodha_user_id}")
 
-        # 3. Find or create the User row (stable identity keyed by email)
-        user_result = await db.execute(
-            select(User).where(User.email == zerodha_email)
-        )
-        user = user_result.scalar_one_or_none()
+        # 3. Find or create the User row (stable identity keyed by email).
+        # A5: guard against a null/blank Zerodha email — `User.email == None` would
+        # match any existing null-email user and mis-merge accounts. With no email,
+        # skip the lookup and create a fresh User (the BrokerAccount below still keys
+        # on the stable broker_user_id).
+        user = None
+        if zerodha_email:
+            user_result = await db.execute(
+                select(User).where(User.email == zerodha_email)
+            )
+            user = user_result.scalar_one_or_none()
 
         if user:
             # Update profile fields that may have changed
