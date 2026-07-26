@@ -43,7 +43,9 @@ def _fill(account_id: str) -> dict:
         "trigger_price": 0.0,
         "order_timestamp": datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S"),
         "exchange_timestamp": datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S"),
-        "tag": f"user_{account_id}",
+        # trades.tag is String(20); real Kite caps tags at 20 chars. Keep the
+        # synthetic tag <=20 so we exercise the real path, not a fake overflow.
+        "tag": f"ld{account_id[:6]}",
         "variety": "regular",
     }
 
