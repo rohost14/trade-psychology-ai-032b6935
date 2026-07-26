@@ -50,8 +50,30 @@ jobs:
           python-version: "3.11"   # match the Dockerfile runtime (CFG5)
           cache: "pip"
       - run: pip install -r requirements.txt
-      - name: Compile-check all modules
+      - name: Compile-check all modules (syntax)
         run: python -m compileall -q app
+      - name: Pyflakes (undefined names / scope shadows)
+        # Catches the crash class py_compile CANNOT: undefined names, use-before-
+        # assignment, and loop-variable import shadows (the UnboundLocalError family).
+        # Only the dangerous categories fail the build; "imported but unused" etc. are
+        # ignored. _archive is dead code. The lone excluded line is a quoted forward-ref
+        # annotation `Optional["CompletedTrade"]` — a pyflakes false positive (not run at runtime).
+        run: |
+          pip install pyflakes
+          OUT=$(python -m pyflakes app 2>&1 \
+            | grep -v "_archive" \
+            | grep -iE "undefined name|before assignment|shadowed by loop" \
+            | grep -v "position_ledger_service.py.*CompletedTrade" || true)
+          if [ -n "$OUT" ]; then
+            echo "$OUT"
+            echo "::error::pyflakes found name-scope / undefined-name bugs (crash class)"
+            exit 1
+          fi
+          echo "pyflakes: dangerous class clean"
+      - name: Import-smoke (every module must import)
+        # Actually imports every module under app/ — catches bad imports like
+        # `from x import NameThatDoesNotExist` that compile fine but crash at run.
+        run: python -m scripts.load.import_smoke
       - name: Logic tests (no DB required)
         run: >
           python -m pytest -q
@@ -61,6 +83,15 @@ jobs:
           tests/test_trade_classifier.py
           tests/test_import_reconcile.py
           tests/test_habits_service.py
+          tests/test_detector_flags.py
+          tests/test_admin_deps.py
+          tests/test_pnl_multiplier.py
+          tests/test_stable_ct_id.py
+          tests/test_flip_round.py
+          tests/test_dpdp_purge_patterns.py
+          tests/test_migrate_runner.py
+          tests/test_behavior_summary.py
+          tests/test_webhook_checksum.py
       - name: pip-audit
         run: pip install pip-audit && pip-audit
         continue-on-error: true   # baseline; flip to blocking once triaged
