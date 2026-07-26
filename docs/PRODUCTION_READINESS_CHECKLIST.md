@@ -57,20 +57,20 @@
 
 ## F. Security (P0/P1)
 - [x] **P0 · Dev — Admin auth hardening** (authz, 2FA lockout, TOTP replay, constant-time OTP, IP allowlist, httpOnly cookie, session-epoch). *Done.*
-- [ ] **P1 · Dev — User-side rate limiting** review (some exists; cover auth/OTP/checkout when built).
+- [~] **P1 · Dev — User-side rate limiting** review. *Deep-review (K/F3/A1): the limiters were silently per-IP on an unvalidated `X-Forwarded-For` (bypassable) — now keyed per-account off the JWT; admin login/OTP have per-email lockout. Blocking-Redis on the loop (F4) still pending.*
 - [ ] **P1 · Ext — Security review / light pen test** before public launch (auth, payments, admin, impersonation surfaces).
-- [ ] **P1 · Dev — Dependency audit** (`npm audit`, `pip-audit`) + a plan to keep current.
+- [~] **P1 · Dev — Dependency audit** (`npm audit`, `pip-audit`). *Deep-review (K/CFG1-3): runtime-critical FE vulns fixed (axios/DOMPurify/react-router), backend deps pinned, CI now runs both audits. 17 build-tooling vulns need `--force` majors; pip-audit baseline in CI.*
 - [ ] **P2 · Dev — Move admin JWT localStorage→cookie: done; revisit user-token storage** when user auth is built.
 
 ## G. Observability & Ops (P1)
-- [x] **P1 · Dev — Sentry (ErrorBoundary), admin error-feed, health watchdog** (DB/Redis/error-spike/queue-backlog → emails superadmins). *Done — wire `SENTRY_DSN` (D).* 
+- [x] **P1 · Dev — Sentry (ErrorBoundary), admin error-feed, health watchdog** (DB/Redis/error-spike/queue-backlog → emails superadmins). *Done — wire `SENTRY_DSN` (D).* ⚠️ **Deep-review correction:** the admin error-feed was in fact **dead** (`setup_logging()` was never called) — **now fixed (K/F2)** for the web process; Celery-worker logging still pending (K).
 - [ ] **P1 · Dev — Uptime / external monitoring** (health endpoint pinged; alert on down).
 - [ ] **P0 · Dev — DB backups + tested restore** (Supabase/managed PG) + documented DR.
 - [ ] **P1 · You — Real support inbox + process.** `SUPPORT_EMAIL` is currently a placeholder (`support@tradementor.ai`) — create the mailbox and swap the constant (`src/lib/support.ts`).
 - [ ] **P2 · You — On-call / incident runbook** (who responds, how).
 
 ## H. QA & Testing (P1 — coverage is thin)
-- [ ] **P1 · Dev — Integration tests in CI** (needs a test Postgres): admin IAM guards (last-superadmin/self-mutation), auth flows, billing webhooks.
+- [~] **P1 · Dev — Integration tests in CI** (needs a test Postgres): admin IAM guards, auth flows, billing webhooks. *Deep-review (K/CFG3): CI pipeline added — FE typecheck/lint/test/audit + BE compile/logic-tests/pip-audit on py3.11. Integration tests still need a CI Postgres; 7 money/engine test files added this pass.*
 - [ ] **P1 · Dev — E2E smoke** (Playwright) on the critical path: connect → dashboard → alert → analytics.
 - [ ] **P1 · Dev — Frontend admin render-smoke** (mock harness like the analytics smoke suite).
 - [ ] **P1 · Dev — Load test harness** (ties to C).
@@ -117,6 +117,39 @@
 - [ ] Admin billing panel (subscriptions, payments, issue refunds, dunning view).
 - [ ] Terms/Privacy versioning + re-consent.
 - [ ] Feature-matrix finalised + downgrade = graceful lock (never data loss).
+
+---
+
+## K. Deep-review fix pass (2026-07-26) — Dev code hardening
+> Outcome of the full line-by-line review (`docs/DEEP_REVIEW/`). All items below are **Dev-owned**,
+> verified (tests/boot/typecheck), each a clean revertible commit. `[x]` done · `[~]` partial · `[ ]` deferred.
+
+### Fixed `[x]`
+- [x] **P0 — Celery queue routing (F1).** 9 of 16 scheduled tasks silently never ran (routed to the default queue the worker didn't consume): report dispatch, all intent pushes, **`behavior_events` partition upkeep** (inserts would have started failing), **market-data token refresh** (ticker dies daily), watchdog. Fixed + boot-time regression guard.
+- [x] **P1 — Prod logging + admin error-feed wired (F2).** `setup_logging()` was defined but never called → JSON logs inactive + error-feed permanently empty. Now called at web-process startup (Celery-worker logging still pending — see partial).
+- [x] **P1 — Rate limiter per-account (F3/A1).** Was silently per-IP on an unvalidated `X-Forwarded-For` (rotate-header bypass). Now keyed off the JWT principal; unauth = real peer IP.
+- [x] **P1 — Money correctness (test-first):** MCX/CDS **unrealized** P&L now applies the lot multiplier (M3, was ~100× understated); **flip-opened rounds** now build a CompletedTrade so the live engine sees them (M2); **stable CompletedTrade id** (M6) → fixes the alert→trade link being nulled on rebuild (E2) and the **behaviour-cost undercount** (Q1).
+- [x] **P1 — Config fail-secure (CFG4).** `ENVIRONMENT` now defaults to `production` (was `development` → insecure cookies/echo if a prod deploy forgot to set it) + value validation.
+- [x] **P1 — Dual detection engine retired (E1).** `/api/behavioral/*` + the analytics behaviour-tab now source from the **single** live engine (RiskAlerts); the contradictory legacy `behavioral_analysis_service` is archived.
+- [x] **P1 — Runtime-critical FE vulns (CFG1).** `axios` (auth-bypass + SSRF), `DOMPurify` (XSS — the Chat sanitiser itself), `react-router` (XSS) upgraded via safe `npm audit fix`.
+- [x] **P1 — Backend deps pinned (CFG2).** 0/28 → 28/28 `==` pins (was non-reproducible builds).
+- [x] **P1 — CI pipeline added (CFG3).** FE typecheck/lint/test/`npm audit` + BE compile/logic-tests/`pip-audit` on py3.11.
+- [x] **P1 — Admin CSRF (A2).** `SameSite=None` cookie with no CSRF token → added an Origin check (mirrors the CORS allow-list) on all state-changing admin routes.
+- [x] **P1 — DPDP erasure completeness (DP2).** Account-delete Redis purge now covers the per-account event-replay stream (held trade/alert payloads) + the current rate-limit key shape.
+- [x] **P2 — Engine failure visibility (E3)** (`engine_analyze_failed` counter + health flag) · **dead-code archived** (dead trees/scripts) · **CLAUDE.md refreshed** (DOC1, described the pre-v2 system) · safe nits: constant-time postback checksum (R6), maintenance-503 no longer over-redirects (FE3), stale docstrings/comments.
+
+### Partial `[~]` (safe part shipped; remainder load-gated or needs a test DB)
+- [~] **Worker pool (R1).** Switched the worker off `gevent` → `prefork` (removes the unsupported gevent+asyncpg combo) + engine-dispose-on-fork. The `asyncio.run()`-per-task vs pooled-asyncpg interaction must be **validated under load** (may need a NullPool engine in the worker) — ties to C.
+- [~] **Logging (F2).** Web process wired; **Celery-worker logging still unwired** → task errors don't yet reach the admin error-feed (wiring it also lands the error-feed's blocking-Redis-per-error concern).
+- [~] **Dependency audit (CFG1).** Runtime-critical fixed; **17 build-tooling vulns** (esbuild/vite/eslint/sharp) need `--force` **major** bumps — a deliberate upgrade+test pass.
+- [~] **Migration tracking (MIG1).** Tracked runner `backend/scripts/db/migrate.py` added (`schema_migrations` + status/stamp/apply). Alembic remains the eventual target. *(Baselining an existing DB is a one-time run — falls under D.)*
+
+### Deferred `[ ]` (needs an approved bigger change / the load test / a decision)
+- [ ] **Product-mixing P&L (M1).** MIS+NRML on the same contract get netted. Needs a **schema migration + stateful re-keying + backfill + live validation** — not safe as a blind change; 6-step spec in `docs/DEEP_REVIEW/02_P1_money_math.md`. Bundle with live validation (B).
+- [ ] **Blocking sync Redis on the event loop (F4/R5/A4).** Convert the rate-limiter + error-feed + admin-auth Redis calls to async; **load-gated** (validate the throughput win under load) — ties to C.
+- [ ] **Analytics per-request caching (Q3).** Uncached heavy 90–180d aggregations; a scale optimisation best sized **with** the load test — ties to C.
+- [ ] **Ticker instrument sharding (R7 / CR2)** + **batch task fan-out (B2 / CR1).** Scale refactors validated by the load test — ties to C.
+- [ ] **Remaining P3 nits** (analytics.py split, dup `is_market_open`, dead-column drops, etc.) — low-value, left for a deliberate pass.
 
 ---
 
