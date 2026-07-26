@@ -44,6 +44,11 @@ class PositionLedger(Base):
     # Instrument
     tradingsymbol: Mapped[str] = mapped_column(String, nullable=False)
     exchange: Mapped[str] = mapped_column(String, nullable=False)
+    # Product (MIS/NRML/MTF) is part of the position KEY: the same symbol held in
+    # two products at once is two independent positions and must not net together
+    # (M1). Nullable for legacy rows written before migration 075; the backfill
+    # sets it from the source trade, and NULL groups with NULL for pre-migration data.
+    product: Mapped[Optional[str]] = mapped_column(String(20), nullable=True)
 
     # Fill details
     entry_type: Mapped[str] = mapped_column(String(10), nullable=False)

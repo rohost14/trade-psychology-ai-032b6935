@@ -269,6 +269,44 @@ class TestPositionLedgerDB:
         assert qty == 0
         assert avg is None
 
+    async def test_same_symbol_two_products_do_not_net(self, db, broker):
+        """M1: the same symbol held in MIS and NRML at once is TWO positions.
+
+        Before M1 these netted into one (account, symbol, exchange) position, so a
+        MIS buy and an NRML buy of the same symbol merged and P&L was wrong.
+        """
+        sym, exch = "NIFTY25JANFUT", "NFO"
+        o1, o2 = f"ORD_{uuid4().hex[:8]}", f"ORD_{uuid4().hex[:8]}"
+
+        mis = FillData(broker.id, sym, exch, o1, 50, Decimal("100"),
+                       now_utc(), f"{o1}:0", product="MIS")
+        nrml = FillData(broker.id, sym, exch, o2, 50, Decimal("200"),
+                        now_utc(), f"{o2}:0", product="NRML")
+        await PositionLedgerService.apply_fill(mis, db)
+        await PositionLedgerService.apply_fill(nrml, db)
+
+        # Each product is its own independent position — NOT netted to (100, 150).
+        qty_mis, avg_mis = await PositionLedgerService.get_position(
+            broker.id, sym, exch, db, product="MIS")
+        qty_nrml, avg_nrml = await PositionLedgerService.get_position(
+            broker.id, sym, exch, db, product="NRML")
+        assert (qty_mis, avg_mis) == (50, Decimal("100"))
+        assert (qty_nrml, avg_nrml) == (50, Decimal("200"))
+
+        # Closing the MIS leg realizes only MIS P&L (50 * (110-100) = 500) and
+        # leaves the NRML position fully intact.
+        o3 = f"ORD_{uuid4().hex[:8]}"
+        close_mis = FillData(broker.id, sym, exch, o3, -50, Decimal("110"),
+                             now_utc(), f"{o3}:0", product="MIS")
+        entry, _ = await PositionLedgerService.apply_fill(close_mis, db)
+        assert entry.entry_type == "CLOSE"
+        assert entry.realized_pnl == Decimal("500")
+
+        assert (await PositionLedgerService.get_position(
+            broker.id, sym, exch, db, product="MIS"))[0] == 0
+        assert (await PositionLedgerService.get_position(
+            broker.id, sym, exch, db, product="NRML"))[0] == 50
+
     async def test_idempotency_same_key_returns_existing(self, db, broker):
         fill = self._make_fill(broker)
         entry1, is_new1 = await PositionLedgerService.apply_fill(fill, db)

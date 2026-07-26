@@ -453,6 +453,7 @@ class TradeSyncService:
                     "order_id": order_key,
                     "tradingsymbol": trade.tradingsymbol or "",
                     "exchange": trade.exchange or "",
+                    "product": trade.product or trade.product_type,   # M1: position key
                     "transaction_type": trade.transaction_type,
                     "qty": qty,
                     "notional": price * qty,   # for weighted-average price
@@ -488,6 +489,7 @@ class TradeSyncService:
                 fill_price=avg_price,
                 occurred_at=g["occurred_at"],
                 idempotency_key=idem_key,
+                product=g["product"],
             )
 
             try:

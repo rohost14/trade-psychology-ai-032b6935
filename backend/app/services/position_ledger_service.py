@@ -53,7 +53,7 @@ class FillData:
     Callers construct this from a Trade or webhook payload.
     """
     __slots__ = (
-        "broker_account_id", "tradingsymbol", "exchange",
+        "broker_account_id", "tradingsymbol", "exchange", "product",
         "fill_order_id", "fill_qty", "fill_price",
         "occurred_at", "idempotency_key", "session_id",
     )
@@ -69,10 +69,12 @@ class FillData:
         occurred_at: datetime,
         idempotency_key: str,    # unique per fill — e.g. "{order_id}:0"
         session_id: Optional[UUID] = None,
+        product: Optional[str] = None,   # MIS/NRML/MTF — part of the position key (M1)
     ):
         self.broker_account_id = broker_account_id
         self.tradingsymbol = tradingsymbol
         self.exchange = exchange
+        self.product = product
         self.fill_order_id = fill_order_id
         self.fill_qty = fill_qty
         self.fill_price = Decimal(str(fill_price))
@@ -113,7 +115,8 @@ class PositionLedgerService:
 
         # Check if this is a late fill (arrived out of timestamp order)
         last_entry = await PositionLedgerService._get_last_entry(
-            fill.broker_account_id, fill.tradingsymbol, fill.exchange, db
+            fill.broker_account_id, fill.tradingsymbol, fill.exchange, db,
+            product=fill.product,
         )
         if last_entry is not None and fill.occurred_at < last_entry.occurred_at:
             logger.warning(
@@ -125,7 +128,8 @@ class PositionLedgerService:
 
         # Normal path: sequential fill, compute against current state
         current_qty, avg_entry_price = await PositionLedgerService.get_position(
-            fill.broker_account_id, fill.tradingsymbol, fill.exchange, db
+            fill.broker_account_id, fill.tradingsymbol, fill.exchange, db,
+            product=fill.product,
         )
         entry_type, new_qty, new_avg_price, realized_pnl = _compute_fill_effect(
             current_qty=current_qty,
@@ -147,6 +151,7 @@ class PositionLedgerService:
             broker_account_id=fill.broker_account_id,
             tradingsymbol=fill.tradingsymbol,
             exchange=fill.exchange,
+            product=fill.product,
             entry_type=entry_type,
             fill_order_id=fill.fill_order_id,
             fill_qty=fill.fill_qty,
@@ -205,6 +210,7 @@ class PositionLedgerService:
                     PositionLedger.broker_account_id == fill.broker_account_id,
                     PositionLedger.tradingsymbol == fill.tradingsymbol,
                     PositionLedger.exchange == fill.exchange,
+                    PositionLedger.product == fill.product,   # M1: replay one product only
                 )
             )
             .order_by(PositionLedger.occurred_at.asc(), PositionLedger.created_at.asc())
@@ -216,6 +222,7 @@ class PositionLedgerService:
             broker_account_id=fill.broker_account_id,
             tradingsymbol=fill.tradingsymbol,
             exchange=fill.exchange,
+            product=fill.product,
             entry_type="OPEN",          # placeholder — will be set during replay
             fill_order_id=fill.fill_order_id,
             fill_qty=fill.fill_qty,
@@ -283,6 +290,7 @@ class PositionLedgerService:
             fill.occurred_at,
             exclude_entry_id=new_entry.id,
             db=db,
+            product=fill.product,
         )
 
         logger.info(
@@ -300,10 +308,12 @@ class PositionLedgerService:
         from_dt: datetime,
         exclude_entry_id,
         db: AsyncSession,
+        product: Optional[str] = None,
     ) -> None:
         """
         Delete and recreate ledger-derived CompletedTrades for a symbol's rounds that
         close at or after `from_dt`, using the (already-recomputed) ledger as truth.
+        Scoped to one product (M1) so a MIS replay never rebuilds NRML rounds.
 
         Called only from _apply_fill_with_replay after an out-of-order fill mutates the
         ledger. Overnight-backfill CompletedTrades (no exit_trade_ids — their entry leg
@@ -320,6 +330,7 @@ class PositionLedgerService:
                     CTModel.broker_account_id == broker_account_id,
                     CTModel.tradingsymbol == tradingsymbol,
                     CTModel.exchange == exchange,
+                    CTModel.product == product,
                     CTModel.exit_time >= from_dt,
                 )
             )
@@ -340,6 +351,7 @@ class PositionLedgerService:
                     PositionLedger.broker_account_id == broker_account_id,
                     PositionLedger.tradingsymbol == tradingsymbol,
                     PositionLedger.exchange == exchange,
+                    PositionLedger.product == product,
                 )
             )
             .order_by(PositionLedger.occurred_at.asc(), PositionLedger.created_at.asc())
@@ -363,11 +375,13 @@ class PositionLedgerService:
         tradingsymbol: str,
         exchange: str,
         db: AsyncSession,
+        product: Optional[str] = None,
     ) -> Tuple[int, Optional[Decimal]]:
         """
         Return (net_qty, avg_entry_price) for the current open position.
 
-        Derived from the most recent ledger entry for this symbol.
+        Derived from the most recent ledger entry for this symbol + product (M1):
+        the same symbol in MIS vs NRML is two independent positions.
         Returns (0, None) if no position.
         """
         result = await db.execute(
@@ -377,6 +391,7 @@ class PositionLedgerService:
                     PositionLedger.broker_account_id == broker_account_id,
                     PositionLedger.tradingsymbol == tradingsymbol,
                     PositionLedger.exchange == exchange,
+                    PositionLedger.product == product,
                 )
             )
             .order_by(PositionLedger.occurred_at.desc(), PositionLedger.created_at.desc())
@@ -476,6 +491,7 @@ class PositionLedgerService:
                     PositionLedger.broker_account_id == close_entry.broker_account_id,
                     PositionLedger.tradingsymbol == close_entry.tradingsymbol,
                     PositionLedger.exchange == close_entry.exchange,
+                    PositionLedger.product == close_entry.product,   # M1: this round's product only
                 )
             )
             .order_by(PositionLedger.occurred_at.asc(), PositionLedger.created_at.asc())
@@ -520,6 +536,7 @@ class PositionLedgerService:
             broker_account_id=close_entry.broker_account_id,
             tradingsymbol=close_entry.tradingsymbol,
             exchange=close_entry.exchange,
+            product=close_entry.product,
             direction=fields["direction"],
             total_quantity=fields["total_quantity"],
             num_entries=fields["num_entries"],
@@ -595,8 +612,9 @@ class PositionLedgerService:
         tradingsymbol: str,
         exchange: str,
         db: AsyncSession,
+        product: Optional[str] = None,
     ) -> Optional[PositionLedger]:
-        """Return the most recent ledger entry for a symbol (by occurred_at DESC)."""
+        """Return the most recent ledger entry for a symbol + product (by occurred_at DESC)."""
         result = await db.execute(
             select(PositionLedger)
             .where(
@@ -604,6 +622,7 @@ class PositionLedgerService:
                     PositionLedger.broker_account_id == broker_account_id,
                     PositionLedger.tradingsymbol == tradingsymbol,
                     PositionLedger.exchange == exchange,
+                    PositionLedger.product == product,
                 )
             )
             .order_by(PositionLedger.occurred_at.desc(), PositionLedger.created_at.desc())

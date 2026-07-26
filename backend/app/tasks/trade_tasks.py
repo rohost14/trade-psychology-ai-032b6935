@@ -446,6 +446,7 @@ def process_webhook_trade(self, trade_data: Dict[str, Any], broker_account_id: s
                                 or datetime.now(timezone.utc)
                             ),
                             idempotency_key=f"{trade.order_id}:ledger",
+                            product=trade.product or trade.product_type,   # M1: position key
                         )
 
                         ledger_entry, is_new = await PositionLedgerService.apply_fill(fill, db)
