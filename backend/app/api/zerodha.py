@@ -161,7 +161,7 @@ async def setup_credentials(
         r.set(
             f"zerodha_creds:{setup_token}",
             _json.dumps({"api_key": request.api_key.strip(), "api_secret": request.api_secret.strip()}),
-            ex=1800  # 30 minutes
+            ex=600  # A6: 10-min TTL (shorter plaintext-secret window); deleted on consume in /callback
         )
     except Exception as e:
         logger.error(f"Redis unavailable for setup-credentials: {e}")
@@ -295,6 +295,12 @@ async def zerodha_callback(
                 _creds = _json.loads(_raw)
                 _personal_api_key = _creds.get("api_key")
                 _personal_api_secret = _creds.get("api_secret")
+                # A6: single-use — remove the plaintext secret immediately on consume
+                # rather than leaving it in Redis for the rest of its TTL.
+                try:
+                    _r2.delete(f"zerodha_creds:{_setup_token}")
+                except Exception:
+                    pass
         except Exception as e:
             logger.warning(f"Could not read setup credentials from Redis: {e}")
 

@@ -68,8 +68,10 @@ BLOCKLIST_PREFIX = "admin_jti_block:"
 
 
 def _redis():
-    import redis as redis_lib
-    return redis_lib.from_url(settings.REDIS_URL, decode_responses=True)
+    # Shared pool — A4: was `redis.from_url(...)` per call, opening a new connection
+    # each time (Upstash connection-count waste). The pool reuses connections.
+    from app.core.redis_pool import get_sync_redis
+    return get_sync_redis()
 
 
 ADMIN_COOKIE = "tm_admin"

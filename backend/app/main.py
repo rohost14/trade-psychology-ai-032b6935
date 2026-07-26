@@ -173,7 +173,15 @@ async def lifespan(app: FastAPI):
         except Exception as e:
             logger.warning(f"[startup repair] P&L repair skipped: {e}")
 
-    _asyncio.create_task(_repair_nse_pnl())
+    # F14: these one-time repairs for OLD bugs (session-33 P&L, pre-055 pnl_pct) ran
+    # on EVERY startup, scanning CompletedTrades into memory each boot. Gate behind a
+    # flag so a normal deploy doesn't re-scan; set RUN_STARTUP_REPAIRS=1 to run them.
+    import os as _os
+    _run_repairs = _os.environ.get("RUN_STARTUP_REPAIRS") == "1"
+    if _run_repairs:
+        _asyncio.create_task(_repair_nse_pnl())
+    else:
+        logger.info("[startup] one-time P&L repair/backfill skipped (RUN_STARTUP_REPAIRS!=1)")
 
     # Backfill pnl_pct for CompletedTrades created before migration 055.
     async def _backfill_pnl_pct():
@@ -208,7 +216,8 @@ async def lifespan(app: FastAPI):
         except Exception as e:
             logger.warning(f"[startup backfill] pnl_pct backfill skipped: {e}")
 
-    _asyncio.create_task(_backfill_pnl_pct())
+    if _run_repairs:
+        _asyncio.create_task(_backfill_pnl_pct())
 
     yield
 

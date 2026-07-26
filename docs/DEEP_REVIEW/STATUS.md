@@ -9,7 +9,7 @@
 
 ## 01_P0 entry & map
 - ✅ F1 orphaned Celery queues · ✅ F2 logging wired (web **+ worker**) · ✅ F3 rate-limiter per-account
-- ✅ **F4** limiters → async Redis (error-feed handler stays sync — logging) · ✅ F11 (filter on handlers) · ✅ F12 (VIX comment) · ⬜ F13 (documented) · ⬜ F14 boot P&L repair · ⬜ F10 revocation-on-read · ⬜ F5 dup limiters · ✅ F6 Celery TLS CERT_REQUIRED · ⬜ F7 NSE holidays · ✅ F8 CORS regex dev-only · ⬜ F9 guardrails compute
+- ✅ **F4** limiters → async Redis (error-feed handler stays sync — logging) · ✅ F11 (filter on handlers) · ✅ F12 (VIX comment) · ⬜ F13 (documented) · ✅ F14 boot repairs gated (RUN_STARTUP_REPAIRS) · ⬜ F10 revocation-on-read · ⬜ F5 dup limiters · ✅ F6 Celery TLS CERT_REQUIRED · ⬜ F7 NSE holidays · ✅ F8 CORS regex dev-only · ⬜ F9 guardrails compute
 
 ## 02_P1 money math
 - ✅ M2 flip rounds · ✅ M3 MCX unrealized · ✅ M6 stable id (+E2/Q1) · ✅ M4 stale docstring
@@ -24,7 +24,7 @@
 - ✅ R5 (=F4, limiters async) · ⬜ R6 done (constant-time checksum) · R7 ticker cap ⛔ (infra/CR2)
 
 ## 05_P4 auth & security
-- ✅ A1 (=F3) · ✅ A2 admin CSRF (Origin check) · ⬜ A3 lockout-DoS · ⛔ A4 admin blocking Redis · ✅ A5 OAuth null-email guard · ⬜ A6 transient secret · ⬜ A7 dual encrypt paths · ⬜ A8 key rotation (plan)
+- ✅ A1 (=F3) · ✅ A2 admin CSRF (Origin check) · ⬜ A3 lockout-DoS · ✅ A4 admin Redis pooled · ✅ A5 OAuth null-email guard · ✅ A6 secret TTL 10min + delete-on-consume · ⬜ A7 dual encrypt paths · ⬜ A8 key rotation (plan)
 
 ## 06_P5 analytics
 - ✅ Q1 (via M6) · ✅ Q4 (via M3) · ⬜ Q2 fake-precision probabilities · ⛔ Q3 uncached aggregation (load-gated) · ⬜ Q5 regex · ⬜ Q6 split analytics.py (large refactor) · C1/C2 corrections applied
@@ -40,7 +40,7 @@
 - ✅ D11 quality_score dead (drop candidate) · ⬜ MIG2 outcome col · ⬜ MIG3 drop quality_score (migration) · ⬜ MIG5 dup event tables · MIG6 drift (needs DB)
 
 ## 10_P9 connections & integrations
-- N1 Redis-SPOF **→ infra (HA plan)** · ⬜ N2 httpx client reuse (mitigated by R1 prefork/NullPool) · ⬜ N3 OpenRouter retry · matrix documented
+- N1 Redis-SPOF **→ infra (HA plan)** · ⬜ N2 httpx client reuse (mitigated by R1 prefork/NullPool) · ✅ N3 OpenRouter bounded retry · matrix documented
 
 ## 11_P10 config/build/ops
 - ✅ CFG2 pin deps · ✅ CFG3 CI · ✅ CFG4 env fail-secure · 🟡 CFG1 runtime-critical vulns fixed; 17 **build-tooling** vulns (build-time only) — `--force` too fragile, needs incremental upgrade · ⬜ CFG5 py 3.14→3.11 dev drift (CI on 3.11)

@@ -112,23 +112,37 @@ class AIService:
         if use_reasoning:
             payload["reasoning"] = {"enabled": True}
 
-        try:
-            async with httpx.AsyncClient(timeout=30.0) as client:
-                response = await client.post(self.base_url, headers=headers, json=payload)
+        # N3: one bounded retry on a transient failure (timeout / 429 / 5xx). A single
+        # blip otherwise fails the whole coach/report response. Non-transient 4xx and
+        # the second failure return None (handled gracefully upstream).
+        import asyncio as _asyncio
+        for _attempt in range(2):
+            try:
+                async with httpx.AsyncClient(timeout=30.0) as client:
+                    response = await client.post(self.base_url, headers=headers, json=payload)
 
-            if response.status_code != 200:
+                if response.status_code == 200:
+                    return response.json()['choices'][0]['message']
+
+                # retry only transient server-side statuses
+                if response.status_code in (429, 500, 502, 503, 504) and _attempt == 0:
+                    logger.warning(f"OpenRouter {response.status_code} — retrying once")
+                    await _asyncio.sleep(0.5)
+                    continue
                 logger.error(f"OpenRouter API error: {response.status_code} - {response.text[:300]}")
                 return None
 
-            result = response.json()
-            return result['choices'][0]['message']
-
-        except httpx.TimeoutException:
-            logger.error("OpenRouter API timeout")
-            return None
-        except Exception as e:
-            logger.error(f"OpenRouter API request failed: {e}")
-            return None
+            except httpx.TimeoutException:
+                if _attempt == 0:
+                    logger.warning("OpenRouter timeout — retrying once")
+                    await _asyncio.sleep(0.5)
+                    continue
+                logger.error("OpenRouter API timeout")
+                return None
+            except Exception as e:
+                logger.error(f"OpenRouter API request failed: {e}")
+                return None
+        return None
     
     async def generate_trading_persona(
         self, 
