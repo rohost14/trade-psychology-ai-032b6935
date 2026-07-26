@@ -40,7 +40,7 @@
 - ✅ D11 quality_score dead (drop candidate) · ⬜ MIG2 outcome col · ⬜ MIG3 drop quality_score (migration) · ⬜ MIG5 dup event tables · MIG6 drift (needs DB)
 
 ## 10_P9 connections & integrations
-- N1 Redis-SPOF **→ infra (HA plan)** · ⬜ N2 httpx client reuse (mitigated by R1 prefork/NullPool) · ✅ N3 OpenRouter bounded retry · matrix documented
+- N1 Redis-SPOF **→ infra (HA plan)** · ✅ N2 httpx fresh-client-per-call (confirmed live by load test, fixed) · ✅ N3 OpenRouter bounded retry · matrix documented
 
 ## 11_P10 config/build/ops
 - ✅ CFG2 pin deps · ✅ CFG3 CI · ✅ CFG4 env fail-secure · 🟡 CFG1 runtime-critical vulns fixed; 17 **build-tooling** vulns (build-time only) — `--force` too fragile, needs incremental upgrade · ⬜ CFG5 py 3.14→3.11 dev drift (CI on 3.11)

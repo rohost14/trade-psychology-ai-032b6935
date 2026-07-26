@@ -171,10 +171,11 @@ class ZerodhaClient(BrokerInterface):
         return data
 
     async def _get_client(self) -> httpx.AsyncClient:
-        """Get or create singleton httpx client."""
-        if not hasattr(self, "_client") or self._client is None or self._client.is_closed:
-            self._client = httpx.AsyncClient(timeout=10.0)
-        return self._client
+        """Fresh httpx client per call — NOT cached (N2). A cached client is bound to
+        the event loop that created it; Celery runs each task in its own asyncio.run()
+        loop, so reusing a cached client raises 'Event loop is closed'. The caller
+        closes it (see _request's finally)."""
+        return httpx.AsyncClient(timeout=10.0)
 
     async def close(self):
         """Close the persistent client."""
@@ -241,12 +242,13 @@ class ZerodhaClient(BrokerInterface):
         except httpx.RequestError as e:
             if broker_account_id:
                 await circuit_breaker.record_failure(broker_account_id)
-            if isinstance(e, httpx.PoolTimeout):
-                await self.close()
-                self._client = httpx.AsyncClient(timeout=10.0)
-                return await self._request(method, url, access_token, data, params, timeout,
-                                           broker_account_id)
             raise KiteNetworkError(f"Network error: {str(e)}")
+        finally:
+            # Close the per-call client (N2) — never reuse it across loops.
+            try:
+                await client.aclose()
+            except Exception:
+                pass
         
 
 

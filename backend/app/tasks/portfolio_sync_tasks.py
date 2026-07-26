@@ -131,7 +131,7 @@ def sync_portfolio_for_account(broker_account_id_str: str):
 async def _sync(broker_account_id_str: str):
     from app.core.database import SessionLocal
     from app.models.broker_account import BrokerAccount
-    from app.services.zerodha_service import ZerodhaService, get_service_for_account
+    from app.services.zerodha_service import get_service_for_account
     from sqlalchemy import select
 
     broker_account_id = UUID(broker_account_id_str)
