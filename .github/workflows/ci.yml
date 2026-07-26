@@ -36,11 +36,33 @@ jobs:
     defaults:
       run:
         working-directory: backend
+    # conftest.py has an autouse `create_tables` fixture that connects to the DB
+    # for EVERY test (it builds the schema via Base.metadata.create_all — no
+    # migrations needed). So the whole suite needs a live Postgres + Redis; we
+    # spin up throwaway service containers rather than pretend any test is "no DB".
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: ci
+          POSTGRES_PASSWORD: ci
+          POSTGRES_DB: ci
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd pg_isready --health-interval 5s
+          --health-timeout 5s --health-retries 10
+      redis:
+        image: redis:7
+        ports: ["6379:6379"]
+        options: >-
+          --health-cmd "redis-cli ping" --health-interval 5s
+          --health-timeout 5s --health-retries 10
     env:
       # Throwaway CI-only secrets (NOT real). Required so app.core.config loads.
       ENVIRONMENT: development
       ENCRYPTION_KEY: 1DdYGZsWquY-QonpyjwsjZYObNeVMpVCCz6XUbGaG_0=
       SECRET_KEY: ci-only-secret-not-used-in-prod-0123456789
+      ADMIN_JWT_SECRET: ci-only-admin-secret-not-used-in-prod-0123456789
       DATABASE_URL: postgresql+asyncpg://ci:ci@localhost:5432/ci
       REDIS_URL: redis://localhost:6379/0
     steps:
@@ -74,25 +96,11 @@ jobs:
         # Actually imports every module under app/ — catches bad imports like
         # `from x import NameThatDoesNotExist` that compile fine but crash at run.
         run: python -m scripts.load.import_smoke
-      - name: Logic tests (no DB required)
-        run: >
-          python -m pytest -q
-          tests/test_behavior_engine.py
-          tests/test_tradebook_import.py
-          tests/test_session_windows_by_exchange.py
-          tests/test_trade_classifier.py
-          tests/test_import_reconcile.py
-          tests/test_habits_service.py
-          tests/test_detector_flags.py
-          tests/test_admin_deps.py
-          tests/test_pnl_multiplier.py
-          tests/test_stable_ct_id.py
-          tests/test_flip_round.py
-          tests/test_dpdp_purge_patterns.py
-          tests/test_migrate_runner.py
-          tests/test_behavior_summary.py
-          tests/test_webhook_checksum.py
-          tests/test_trade_schema_fits.py
+      - name: Tests (real Postgres + Redis; excludes live-server production suite)
+        # Full suite against the service containers: pure logic + schema-fit guard
+        # + DB-backed runtime tests (rollback #4, event replay, auth guards). The
+        # tests/production/* suite needs a running uvicorn, so it's excluded here.
+        run: python -m pytest -q -p no:cacheprovider --ignore=tests/production
       - name: mypy (type / attr-defined)
         # Catches the "wrong method / attribute that doesn't exist" class
         # (e.g. account.get_decrypted_token()) that only surfaced at runtime.
@@ -102,52 +110,3 @@ jobs:
       - name: pip-audit
         run: pip install pip-audit && pip-audit
         continue-on-error: true   # baseline; flip to blocking once triaged
-
-  # DB-backed integration net: spins up throwaway Postgres + Redis service
-  # containers so the tests that need a real DB/transaction (conftest builds the
-  # schema via Base.metadata.create_all — no migrations needed) run on every push.
-  # This is the net that catches the RUNTIME class (missing rollback #4, event
-  # replay, auth guards) that static checks and no-DB unit tests cannot.
-  integration:
-    runs-on: ubuntu-latest
-    defaults:
-      run:
-        working-directory: backend
-    services:
-      postgres:
-        image: postgres:16
-        env:
-          POSTGRES_USER: ci
-          POSTGRES_PASSWORD: ci
-          POSTGRES_DB: ci
-        ports: ["5432:5432"]
-        options: >-
-          --health-cmd pg_isready --health-interval 5s
-          --health-timeout 5s --health-retries 10
-      redis:
-        image: redis:7
-        ports: ["6379:6379"]
-        options: >-
-          --health-cmd "redis-cli ping" --health-interval 5s
-          --health-timeout 5s --health-retries 10
-    env:
-      ENVIRONMENT: development
-      ENCRYPTION_KEY: 1DdYGZsWquY-QonpyjwsjZYObNeVMpVCCz6XUbGaG_0=
-      SECRET_KEY: ci-only-secret-not-used-in-prod-0123456789
-      ADMIN_JWT_SECRET: ci-only-admin-secret-not-used-in-prod-0123456789
-      DATABASE_URL: postgresql+asyncpg://ci:ci@localhost:5432/ci
-      REDIS_URL: redis://localhost:6379/0
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
-        with:
-          python-version: "3.11"
-          cache: "pip"
-      - run: pip install -r requirements.txt
-      - name: DB-backed tests (real Postgres + Redis)
-        run: >
-          python -m pytest -q -p no:cacheprovider
-          tests/test_integration.py
-          tests/test_dashboard_api.py
-          tests/test_db_schema.py
-          tests/test_data_integrity.py
