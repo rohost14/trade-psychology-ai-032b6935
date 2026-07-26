@@ -16,7 +16,7 @@
 | D6 | 🟡 Two metrics subsystems (`logging_config.MetricsCollector` vs `core/metrics.py`) | Different purposes; document authority (P0-F13) | KEEP, document |
 | D15 | 🔴 `PnLCalculator.calculate_trade_pnl_realtime` dead (~90 LOC) | Replaced by PositionLedgerService; zero live callers (P1-M7) | ARCHIVE/remove |
 | D16 | 🟡 Two `is_market_open` (`exchange_constants` no-holidays/zoneinfo vs `market_hours` holidays/pytz) | Divergent on holidays; two tz libs (P1-M10, P0-F7) | Consolidate. DECIDE |
-| D17 | 🟡 `pnl_calculator` docstring L51-55 stale (claims Zerodha-realised overwrite) | Reconcile is log-only+avg-repair now (P1-M4) | Fix comment |
+| D17 | ✅ FIXED 2026-07-26 (M4): `pnl_calculator` class docstring corrected — reconcile is log-only+avg-repair, no Zerodha overwrite; RAW P&L via multiplier | CLOSED |
 | D18 | ✅ RESOLVED 2026-07-26 (with R1): Procfile → `--pool=prefork`, dropped `--concurrency=100` → `celery_app.worker_concurrency=4` is now the single source | CLOSED |
 | D19 | 🟠 `guardrail_tasks` runs every 60s (consumed `alerts` queue) though feature archived | Compute waste for killed feature (P0-F9 confirm) | DECIDE retire |
 

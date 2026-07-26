@@ -46,7 +46,7 @@ def get_sync_redis():
 
 # ── Async pool (FastAPI process) ──────────────────────────────────────────────
 # One pool for the entire FastAPI process. max_connections=50 handles
-# concurrent WebSocket replays, VIX fetches, analytics requests.
+# concurrent WebSocket replays, cache reads, and analytics requests.
 # Created once on first use; never closed (lives for process lifetime).
 _async_pool = None
 

@@ -66,10 +66,12 @@ class PnLCalculator:
     - A round closes ONLY when the position goes to zero
     - Direction flips close the current round and start a new one
 
-    FIFO determines structure only (rounds, direction, timing, entry/exit fills).
-    P&L values are overwritten post-sync by _reconcile_pnl_with_zerodha() which
-    uses Zerodha's authoritative 'realised' field — the only correct source for
-    all exchanges including MCX where the instruments CSV lot_size ≠ contract multiplier.
+    FIFO determines structure (rounds, direction, timing, entry/exit fills) AND the
+    P&L, using the contract multiplier from mcx_contract_specs.py (RAW P&L rule:
+    (exit-entry)*qty*multiplier, no charges). `_reconcile_pnl_with_zerodha()` is now
+    LOG-ONLY for MCX/CDS (records missing-multiplier divergences as data_quality_events)
+    and an avg-based repair pass for NSE/BSE/NFO/BFO — it NO LONGER overwrites P&L with
+    Zerodha's 'realised' field. (This docstring previously claimed the opposite — M4.)
     """
 
     # Cache for lot sizes (used for position sizing alerts only, NOT for P&L)

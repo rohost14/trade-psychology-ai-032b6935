@@ -11,6 +11,12 @@ Counters   metrics:c:{name}:{YYYYMMDD}            -> int
 Timings    metrics:t:{name}:{YYYYMMDD}:sum|cnt|max -> ms aggregates
 
 All writes are best-effort: metrics must never break the pipeline.
+
+NOTE (F13): this is the AUTHORITATIVE metrics store (Redis, durable, cross-process,
+admin engine-metrics page). A second, separate in-memory `MetricsCollector` lives in
+`core/logging_config.py` (per-process, lost on restart) and feeds `prometheus_metrics`
++ a couple of zerodha timings — do not confuse the two; prefer this one for anything
+that must survive a restart or aggregate across workers.
 """
 import logging
 import time

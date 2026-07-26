@@ -296,10 +296,13 @@ async def maintenance_mode_middleware(request: Request, call_next):
         from app.core.admin_state import get_maintenance
         enabled, message = await get_maintenance()
         if enabled:
+            # X-Maintenance-Mode marks THIS 503 as real maintenance so the frontend
+            # only shows the maintenance page for these — not for an incidental 503
+            # from some other dependency (FE3).
             return JSONResponse(
                 status_code=503,
                 content={"detail": message},
-                headers={"Retry-After": "300"},
+                headers={"Retry-After": "300", "X-Maintenance-Mode": "1"},
             )
     return await call_next(request)
 

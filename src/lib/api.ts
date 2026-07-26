@@ -87,8 +87,10 @@ api.interceptors.response.use(
         window.dispatchEvent(new CustomEvent('tradementor:token-expired', {
           detail: { message: data?.detail || 'Authentication failed' }
         }));
-      } else if (status === 503) {
-        // Backend maintenance mode — redirect to maintenance page
+      } else if (status === 503 && error.response.headers?.['x-maintenance-mode'] === '1') {
+        // Real maintenance mode (marked by the backend middleware) — redirect.
+        // A 503 WITHOUT this header is an incidental dependency failure, not
+        // maintenance, so it falls through to the generic 5xx toast below (FE3).
         const msg = encodeURIComponent(apiDetailString(data?.detail, 'Service temporarily unavailable'));
         window.location.href = `/maintenance?message=${msg}`;
       } else if (status === 429) {

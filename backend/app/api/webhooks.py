@@ -2,6 +2,7 @@ from fastapi import APIRouter, Request, HTTPException, Depends
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
 import hashlib
+import hmac
 import logging
 from datetime import datetime
 from uuid import UUID
@@ -42,7 +43,8 @@ def verify_zerodha_checksum(form_data: dict, api_secret: str) -> bool:
         f"{order_id}{order_timestamp}{api_secret}".encode()
     ).hexdigest()
 
-    return checksum == expected_checksum
+    # Constant-time compare — no timing side-channel on the HMAC (R6).
+    return hmac.compare_digest(checksum, expected_checksum)
 
 
 def verify_zerodha_checksum_header(order_id: str, timestamp: str, checksum: str, api_secret: str) -> bool:
@@ -55,7 +57,8 @@ def verify_zerodha_checksum_header(order_id: str, timestamp: str, checksum: str,
         f"{order_id}{timestamp}{api_secret}".encode()
     ).hexdigest()
 
-    return expected == checksum
+    # Constant-time compare — no timing side-channel (R6).
+    return hmac.compare_digest(expected, checksum)
 
 
 def extract_broker_account_id(tag: str) -> Optional[UUID]:
