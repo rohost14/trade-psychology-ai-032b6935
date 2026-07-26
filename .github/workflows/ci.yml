@@ -100,7 +100,14 @@ jobs:
         # Full suite against the service containers: pure logic + schema-fit guard
         # + DB-backed runtime tests (rollback #4, event replay, auth guards). The
         # tests/production/* suite needs a running uvicorn, so it's excluded here.
-        run: python -m pytest -q -p no:cacheprovider --ignore=tests/production
+        # tests/test_db_schema.py is also excluded: it asserts migration-created
+        # indexes (e.g. idx_users_email), but CI builds the schema via conftest's
+        # Base.metadata.create_all (no migrations), so those indexes legitimately
+        # don't exist here — that file only makes sense against a migrated DB.
+        run: >
+          python -m pytest -q -p no:cacheprovider
+          --ignore=tests/production
+          --ignore=tests/test_db_schema.py
       - name: mypy (type / attr-defined)
         # Catches the "wrong method / attribute that doesn't exist" class
         # (e.g. account.get_decrypted_token()) that only surfaced at runtime.
