@@ -434,10 +434,10 @@ class TestEventBusReplay:
                               "data": '{"alert_id":"2"}', "ts": "1700000002000"}),
         ]
 
-        with patch("redis.asyncio.from_url") as mock_from_url:
+        with patch("app.core.event_bus._get_async_redis", new_callable=AsyncMock) as mock_get:
             mock_redis = AsyncMock()
             mock_redis.xread = AsyncMock(return_value=[("stream:abc", mock_events)])
-            mock_from_url.return_value = mock_redis
+            mock_get.return_value = mock_redis
 
             events = await replay_events_for_account("abc", "1699999999-0", limit=50)
 
@@ -450,10 +450,10 @@ class TestEventBusReplay:
         """Redis unavailability must return empty list — never raise."""
         from app.core.event_bus import replay_events_for_account
 
-        with patch("redis.asyncio.from_url") as mock_from_url:
+        with patch("app.core.event_bus._get_async_redis", new_callable=AsyncMock) as mock_get:
             mock_redis = AsyncMock()
             mock_redis.xread = AsyncMock(side_effect=Exception("Redis down"))
-            mock_from_url.return_value = mock_redis
+            mock_get.return_value = mock_redis
 
             events = await replay_events_for_account("abc", "0-0", limit=50)
 
@@ -463,10 +463,10 @@ class TestEventBusReplay:
         """Empty stream returns empty list."""
         from app.core.event_bus import replay_events_for_account
 
-        with patch("redis.asyncio.from_url") as mock_from_url:
+        with patch("app.core.event_bus._get_async_redis", new_callable=AsyncMock) as mock_get:
             mock_redis = AsyncMock()
             mock_redis.xread = AsyncMock(return_value=[])
-            mock_from_url.return_value = mock_redis
+            mock_get.return_value = mock_redis
 
             events = await replay_events_for_account("abc", "0-0")
 

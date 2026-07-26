@@ -301,7 +301,8 @@ class TestAuthenticationGuard:
     async def test_revoked_token_rejected(self, client, db, user):
         """A broker account with token_revoked_at set must be rejected by verified endpoints.
 
-        Uses /api/shield/summary which requires get_verified_broker_account_id.
+        Uses /api/my-record/search which requires get_verified_broker_account_id.
+        (Replaced the removed /api/shield/summary — Blowup Shield → My Record.)
         Commits the revoked broker so the API's separate DB connection can see it.
         """
         revoked_broker = BrokerAccount(
@@ -318,7 +319,7 @@ class TestAuthenticationGuard:
         token = create_access_token(user_id=user.id, broker_account_id=revoked_broker.id)
 
         resp = await client.get(
-            "/api/shield/summary",
+            "/api/my-record/search",
             headers={"Authorization": f"Bearer {token}"},
         )
         assert resp.status_code in (401, 403), (
