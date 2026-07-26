@@ -9,12 +9,12 @@
 
 ## 01_P0 entry & map
 - ✅ F1 orphaned Celery queues · ✅ F2 logging wired (web **+ worker**) · ✅ F3 rate-limiter per-account
-- ✅ **F4** limiters → async Redis (error-feed handler stays sync — logging) · ✅ F11 (filter on handlers) · ✅ F12 (VIX comment) · ⬜ F13 (documented) · ⬜ F14 boot P&L repair · ⬜ F10 revocation-on-read · ⬜ F5 dup limiters · ⬜ F6 Celery TLS · ⬜ F7 NSE holidays · ⬜ F8 CORS regex · ⬜ F9 guardrails compute
+- ✅ **F4** limiters → async Redis (error-feed handler stays sync — logging) · ✅ F11 (filter on handlers) · ✅ F12 (VIX comment) · ⬜ F13 (documented) · ⬜ F14 boot P&L repair · ⬜ F10 revocation-on-read · ⬜ F5 dup limiters · ✅ F6 Celery TLS CERT_REQUIRED · ⬜ F7 NSE holidays · ✅ F8 CORS regex dev-only · ⬜ F9 guardrails compute
 
 ## 02_P1 money math
 - ✅ M2 flip rounds · ✅ M3 MCX unrealized · ✅ M6 stable id (+E2/Q1) · ✅ M4 stale docstring
 - ⏸️ **M1** product-mixing (schema migration + stateful re-key + backfill + live validation — spec'd)
-- ⬜ M5 batch untabulated-MCX · ⬜ M8 days_back window · ⬜ M9 float-before-Decimal · ⬜ M10 dup is_market_open · ⬜ M11 stable-id collision
+- ✅ M5 batch MCX multiplier fallback · ⬜ M8 days_back window · ⬜ M9 float-before-Decimal · ⬜ M10 dup is_market_open · ⬜ M11 stable-id collision
 
 ## 03_P2 behaviour engine
 - ✅ E1 dual engine retired · ✅ E2 (via M6) · ✅ E3 failure counter · E5 (D9 closed) · E9 (inherited P1, now fixed)
@@ -60,8 +60,8 @@
 ---
 
 ## Rollup
-- **Done (code):** ~30 findings incl. every P0 + most P1 (F1/F2/F3/R1 · M2/M3/M6/E1/E2 · CFG1-runtime/CFG2/CFG3/CFG4 · A2 · DP2 · E3 · DOC1 · dead-code · 8 P3 nits).
+- **Done (code):** ~36 findings incl. every P0 + most P1 (F1/F2/F3/F4/F6/F8/R1/R5 · M2/M3/M5/M6/E1/E2 · CFG1-runtime/CFG2/CFG3/CFG4 · A2/A5 · DP2 · E3 · DOC1 · dead-code · 8 P3 nits · + load harness).
 - **Deferred (needs approved bigger change):** M1 (schema + live validation).
-- **Load/DB-gated (code can't finalise without the load test / live DB):** F4/R5/A4 (async Redis), Q3 (cache), R4/B2 fan-out, R7/B5 ticker shard, B1/B3/B4/B6/B7 infra sizing.
+- **Load/DB-gated (code can't finalise without the load test / live DB):** Q3 (cache), R4/B2 fan-out, R7/B5 ticker shard, B1/B3/B4/B6/B7 infra sizing. *(F4/R5 async-Redis limiters now DONE; A4 admin-Redis is the small remainder.)*
 - **Your action (out of code scope):** run the load harness (Gate 4), live-Zerodha validation (Gate 3), DP1 cascade query, MIG1 `--stamp`, N1 Redis HA, business/legal/Ext items.
 - **Left (safe, low-value):** the remaining ⬜ nits.
