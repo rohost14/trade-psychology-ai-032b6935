@@ -44,7 +44,10 @@ async def _seed(accounts: int, trades_per: int) -> None:
                 user_id=user.id,
                 broker_name="zerodha",
                 broker_user_id=f"LD{stamp}{i}",
-                status="connected",
+                # NOT "connected" — so real sync loops (sync_trades/portfolio_sync,
+                # which need a live Zerodha token) skip these tokenless load accounts.
+                # The flood's process_webhook_trade looks up by id regardless of status.
+                status="load_test",
                 api_key="load-test",
             )
             db.add(acct)

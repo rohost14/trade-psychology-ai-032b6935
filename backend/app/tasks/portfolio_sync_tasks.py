@@ -154,7 +154,7 @@ async def _sync(broker_account_id_str: str):
                 logger.warning(f"No active account/token for {broker_account_id}")
                 return
 
-            access_token = account.get_decrypted_token()
+            access_token = account.decrypt_token(account.access_token) if account.access_token else None
             svc = get_service_for_account(account)
 
             # Fetch holdings (equity CNC)
