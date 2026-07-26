@@ -17,6 +17,7 @@ The legacy monitor_open_positions beat task is kept in this file for
 reference but is no longer registered in celery_app.py beat schedule.
 """
 
+import asyncio
 import logging
 from datetime import datetime, timedelta, timezone
 from decimal import Decimal

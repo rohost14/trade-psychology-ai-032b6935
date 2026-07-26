@@ -331,7 +331,9 @@ def process_webhook_trade(self, trade_data: Dict[str, Any], broker_account_id: s
                 # Cache TTL = 60s — serves all fills within same trading minute
                 # from cache, avoiding a REST call per fill during active sessions.
                 try:
-                    from app.models.broker_account import BrokerAccount
+                    # BrokerAccount already imported at module scope (line 23).
+                    # Do NOT re-import here: a local import would make the name
+                    # function-local and break the earlier use at the top of _process.
                     from app.services.zerodha_service import zerodha_client, KiteTokenExpiredError
                     import json as _json
 
@@ -545,7 +547,6 @@ def process_webhook_trade(self, trade_data: Dict[str, Any], broker_account_id: s
                         behavior_lock_acquired = _acquire_lock(redis_client, behavior_lock_key, ttl_seconds=60)
                         if behavior_lock_acquired:
                             break
-                        import asyncio as _asyncio
                         await _asyncio.sleep(2)
 
                     if not behavior_lock_acquired:

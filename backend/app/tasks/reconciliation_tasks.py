@@ -22,6 +22,7 @@ Staggered to respect Kite rate limits:
   All done at 4 AM, no user impact.
 """
 
+import asyncio
 import calendar
 import logging
 from datetime import date, datetime, timezone, timedelta
