@@ -1,6 +1,5 @@
-import { Link2, Link2Off, Shield, AlertTriangle, Loader2, Key } from 'lucide-react';
+import { Link2, Link2Off, Shield, AlertTriangle, Loader2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import ApiKeySetup from '@/components/ApiKeySetup';
 
 interface BrokerAccount {
   id: string;
@@ -109,22 +108,6 @@ export function BrokerConnectionCard({
               )}
               Connect Zerodha Account
             </Button>
-
-            <div className="relative flex items-center gap-3">
-              <div className="flex-1 border-t border-border" />
-              <span className="text-xs text-muted-foreground shrink-0">or</span>
-              <div className="flex-1 border-t border-border" />
-            </div>
-
-            <ApiKeySetup
-              onRedirecting={onRedirecting}
-              trigger={
-                <Button variant="outline" className="w-full gap-2">
-                  <Key className="h-4 w-4" />
-                  Use your own KiteConnect app
-                </Button>
-              }
-            />
           </div>
         )}
       </div>

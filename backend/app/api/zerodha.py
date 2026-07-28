@@ -132,49 +132,17 @@ async def exchange_auth_code(
     return {"token": jwt_token, "broker_account_id": broker_account_id}
 
 
-class SetupCredentialsRequest(BaseModel):
-    api_key: str
-    api_secret: str
-
-
-@router.post("/setup-credentials")
-async def setup_credentials(
-    request: SetupCredentialsRequest,
-    _: None = Depends(general_limiter),
-) -> Any:
-    """
-    Store a user's personal KiteConnect api_key + api_secret in Redis (30-min TTL).
-    Returns a setup_token to pass to /connect so the OAuth flow uses their credentials.
-
-    Use-case: testers before the developer obtains Zerodha multi-user partnership.
-    Each tester creates their own KiteConnect app at developers.zerodha.com and provides
-    their api_key + api_secret here. The JWT redirect URL will be set on their app.
-    """
-    if not request.api_key.strip() or not request.api_secret.strip():
-        raise HTTPException(status_code=422, detail="api_key and api_secret are required")
-
-    setup_token = secrets.token_urlsafe(32)
-    try:
-        from app.core.redis_pool import get_sync_redis
-        r = get_sync_redis()
-        import json as _json
-        r.set(
-            f"zerodha_creds:{setup_token}",
-            _json.dumps({"api_key": request.api_key.strip(), "api_secret": request.api_secret.strip()}),
-            ex=600  # A6: 10-min TTL (shorter plaintext-secret window); deleted on consume in /callback
-        )
-    except Exception as e:
-        logger.error(f"Redis unavailable for setup-credentials: {e}")
-        raise HTTPException(status_code=503, detail="Service temporarily unavailable")
-
-    return {"setup_token": setup_token}
+# BYO-key ("setup-credentials") flow retired 2026-07-29.
+# We are Model A: ONE platform Kite Connect app (ZERODHA_API_KEY) for all users via
+# OAuth. Per-user api_key/secret is not collected. (A standard Kite app is bound to
+# the owner's client id, so multi-user needs Zerodha compliance approval — until then
+# only the app owner's account can log in; that's fine for solo testing.)
 
 
 @router.get("/connect")
 async def connect_zerodha(
     redirect_uri: Optional[str] = None,
     user_id: Optional[str] = None,
-    setup_token: Optional[str] = None,
     db: AsyncSession = Depends(get_db)
 ) -> Any:
     """Redirect browser to Zerodha login, setting an httpOnly cookie to carry the CSRF nonce.
@@ -184,34 +152,13 @@ async def connect_zerodha(
     from request.cookies. SameSite=Lax ensures the cookie is sent on top-level redirects from
     Zerodha back to our callback URL (same host, different origin — Lax allows this).
 
-    If setup_token is provided, uses the user's personal KiteConnect credentials stored in Redis
-    (from POST /setup-credentials). The nonce maps to the setup_token so the callback can
-    look up the credentials.
+    Model A: always uses the single platform Kite Connect app (ZERODHA_API_KEY).
     """
     callback_uri = settings.ZERODHA_REDIRECT_URI or "http://localhost:8000/api/zerodha/callback"
 
-    if setup_token:
-        try:
-            from app.core.redis_pool import get_sync_redis
-            import json as _json
-            r = get_sync_redis()
-            raw = r.get(f"zerodha_creds:{setup_token}")
-            if not raw:
-                raise HTTPException(status_code=400, detail="setup_token expired or invalid — please re-enter credentials")
-            creds = _json.loads(raw)
-        except HTTPException:
-            raise
-        except Exception as e:
-            logger.error(f"Redis error reading setup credentials: {e}")
-            raise HTTPException(status_code=503, detail="Service temporarily unavailable")
-
-        client = ZerodhaClient(api_key=creds["api_key"], api_secret=creds["api_secret"])
-        csrf_nonce = secrets.token_urlsafe(16)
-        _state_value = f"setup:{setup_token}"
-    else:
-        client = zerodha_client
-        csrf_nonce = secrets.token_urlsafe(16)
-        _state_value = "regular"
+    client = zerodha_client
+    csrf_nonce = secrets.token_urlsafe(16)
+    _state_value = "regular"
 
     # Store nonce in Postgres (300s TTL). Works across workers and restarts.
     await _oauth_store_set(db, f"oauth_nonce:{csrf_nonce}", _state_value, 300)
@@ -280,35 +227,11 @@ async def zerodha_callback(
         )
         return _clear_nonce_cookie(resp)
 
-    # ── Resolve per-user credentials (setup flow) ─────────────────────────────
-    _personal_api_key: Optional[str] = None
+    # Model A: all connections use the single platform app. (BYO-key setup flow
+    # retired 2026-07-29; _personal_api_secret kept as None so the account-write
+    # below stores no per-user secret — the platform secret lives in env.)
     _personal_api_secret: Optional[str] = None
-    _is_setup_flow = _stored_value.startswith("setup:")
-    if _is_setup_flow:
-        # stored_value is "setup:<setup_token>"; extract the token to fetch creds
-        _setup_token = _stored_value[len("setup:"):]
-        try:
-            from app.core.redis_pool import get_sync_redis
-            _r2 = get_sync_redis()
-            _raw = _r2.get(f"zerodha_creds:{_setup_token}")
-            if _raw:
-                _creds = _json.loads(_raw)
-                _personal_api_key = _creds.get("api_key")
-                _personal_api_secret = _creds.get("api_secret")
-                # A6: single-use — remove the plaintext secret immediately on consume
-                # rather than leaving it in Redis for the rest of its TTL.
-                try:
-                    _r2.delete(f"zerodha_creds:{_setup_token}")
-                except Exception:
-                    pass
-        except Exception as e:
-            logger.warning(f"Could not read setup credentials from Redis: {e}")
-
-    _active_client = (
-        ZerodhaClient(api_key=_personal_api_key, api_secret=_personal_api_secret)
-        if _personal_api_key and _personal_api_secret
-        else zerodha_client
-    )
+    _active_client = zerodha_client
 
     try:
         # 1. Exchange token
