@@ -429,6 +429,20 @@ class SharedPriceStream(PriceStreamProvider):
             if token:
                 return token, settings.ZERODHA_MD_API_KEY, "dedicated-md-account"
 
+            # Configured but no token → the dedicated feed is DOWN (refresh/TOTP
+            # failed). Do not silently borrow a customer's token without flagging it:
+            # surface a loud error + metric so the admin watchdog alerts on it.
+            logger.error(
+                "[shared_ticker] ZERODHA_MD_* is configured but no market-data token "
+                "is available — the dedicated feed is DOWN, degrading to a user token. "
+                "Check the 8:45 AM refresh task and the TOTP secret."
+            )
+            try:
+                from app.core import metrics
+                metrics.incr("md_token_unavailable")
+            except Exception:
+                pass
+
         # Priority 2: fallback — any connected user's token.
         #
         # CRITICAL: KiteTicker authenticates with a (api_key, access_token) PAIR.

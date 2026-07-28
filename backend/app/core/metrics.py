@@ -56,6 +56,7 @@ COUNTERS = (
     "order_stream_fills",              # COMPLETE fills ingested via per-user order stream
     "order_stream_started",            # per-user order-update connections opened
     "engine_analyze_failed",           # BehaviorEngine.analyze() swallowed a failure (E3) — detection lost for that trade
+    "md_token_unavailable",            # ZERODHA_MD_* configured but dedicated market-data token missing — feed degraded to a user token
 )
 TIMINGS = (
     "alert_e2e_lag_ms",      # trade exit -> detection persisted (the SLO)
@@ -155,6 +156,8 @@ def health_flags(snap: Dict) -> Dict:
     flags = {}
     if c.get("engine_analyze_failed", 0) > 0:
         flags["engine_failures"] = f"{c['engine_analyze_failed']} BehaviorEngine.analyze() failures today (detection lost)"
+    if c.get("md_token_unavailable", 0) > 0:
+        flags["market_data_degraded"] = f"{c['md_token_unavailable']} times the dedicated market-data feed fell back to a user token today (check the 8:45 token refresh / TOTP)"
     if c.get("behavior_lock_exhausted", 0) > 0:
         flags["detection_skips"] = f"{c['behavior_lock_exhausted']} lock exhaustions today (requeued)"
     if c.get("behavior_bulk_lock_abort", 0) > 0:
