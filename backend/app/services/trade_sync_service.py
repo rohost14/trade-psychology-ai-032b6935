@@ -33,6 +33,40 @@ IST = ZoneInfo("Asia/Kolkata")
 # Only sync these product types (user trades MIS/NRML/MTF, not CNC/delivery)
 TRACKED_PRODUCTS = {"MIS", "NRML", "MTF"}
 
+
+async def _refresh_instruments_bg() -> None:
+    """Background instrument-master refresh — runs OFF the /sync request path.
+
+    Uses its own DB session and a Redis single-flight lock so a burst of syncs can't
+    kick off multiple 30-60s refreshes at once. Failures are logged, never raised.
+    """
+    from app.core.database import SessionLocal
+    lock_acquired = False
+    try:
+        from app.core.redis_pool import get_sync_redis
+        r = get_sync_redis()
+        lock_acquired = bool(r.set("instruments:refreshing", "1", ex=600, nx=True))
+        if not lock_acquired:
+            logger.info("[bg] Instrument refresh already in progress — skipping.")
+            return
+    except Exception:
+        lock_acquired = False  # Redis down — proceed anyway (best effort)
+    try:
+        async with SessionLocal() as db:
+            result = await instrument_service.refresh_instruments(db)
+            pnl_calculator.clear_lot_size_cache()
+            logger.info(f"[bg] Instrument refresh complete: {result.get('total', 0)} total.")
+    except Exception as e:
+        logger.error(f"[bg] Instrument refresh failed: {e}")
+    finally:
+        if lock_acquired:
+            try:
+                from app.core.redis_pool import get_sync_redis
+                get_sync_redis().delete("instruments:refreshing")
+            except Exception:
+                pass
+
+
 class TradeSyncService:
     @staticmethod
     async def fetch_orders_from_zerodha(access_token: str) -> List[Dict[str, Any]]:
@@ -231,11 +265,15 @@ class TradeSyncService:
                 last_updated = latest_instrument.scalar_one_or_none()
 
                 if last_updated is None or last_updated < stale_cutoff:
-                    logger.info("Instruments stale or missing — refreshing from Kite")
-                    result = await instrument_service.refresh_instruments(db)
-                    stats["instruments_refreshed"] = result.get("total", 0)
-                    pnl_calculator.clear_lot_size_cache()
-                    logger.info(f"Instruments refreshed: {result.get('total', 0)} total")
+                    # The instrument-master refresh downloads ~113k instruments across 6
+                    # exchanges and bulk-upserts them in 100+ batches — 30-60s. It must
+                    # NOT block the user's /sync request (that was the 30s timeout). Fire
+                    # it as a non-blocking background task (own DB session, single-flight
+                    # via a Redis lock) and let the sync return immediately.
+                    import asyncio
+                    logger.info("Instruments stale — scheduling background refresh (non-blocking).")
+                    asyncio.create_task(_refresh_instruments_bg())
+                    stats["instruments_refreshed"] = "scheduled(bg)"
                 else:
                     logger.info("Instruments up to date, skipping refresh")
             except Exception as e:
