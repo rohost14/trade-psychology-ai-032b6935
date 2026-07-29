@@ -68,6 +68,73 @@ Updated 2026-07-29. Branch `dashboard-production-readiness`, CI green, working t
 
 ---
 
+## 🚀 Launch / Infrastructure / Ops — the "ship it" checklist (mostly NOT done)
+
+> This is the founder checklist beyond code. Recommended stack (matches what the
+> repo already assumes — `Procfile` = web/worker/beat, comments reference Render):
+> **Render** (backend) · **Supabase** (Postgres) · **Upstash** (Redis) ·
+> **Cloudflare Pages/Vercel** (frontend) · **Cloudflare** (DNS/CDN). Avoid raw EC2
+> (ops burden); Cloudflare hosts DNS/CDN only, not the FastAPI app.
+
+### Hosting / deploy
+- [ ] **Backend on Render** — create web + worker + beat services from the Procfile;
+      set env vars (Render env group). NOT set up yet.
+- [ ] **Frontend on Cloudflare Pages / Vercel** — connect git, auto-build React.
+- [ ] Confirm **Supabase** (already used) is on a paid tier for prod (backups, no pausing).
+- [ ] Confirm **Upstash** tier for prod (free tier command cap will throttle at scale).
+- [ ] **Auto-deploy (CD)** — connect GitHub repo → Render/Cloudflare deploy on push to main.
+      (CI already exists + green; CD is the missing half.)
+
+### Domain / DNS / SSL
+- [ ] **Buy a domain** (you don't have one — `tradementor.ai` is only a placeholder in code).
+- [ ] Put **Cloudflare** in front as DNS + CDN + DDoS.
+- [ ] Point app + api subdomains at Render/Pages; **SSL/TLS** auto (Render + Cloudflare).
+- [ ] Set the real domain in `FRONTEND_URL`, `ZERODHA_REDIRECT_URI`, CORS origins.
+
+### Email
+- [ ] **Domain mailbox** (support@, hello@) — Google Workspace or Zoho Mail.
+- [ ] **Transactional email sender** — Resend / Postmark / SES (for receipts once payments,
+      support, admin OTP if used).
+- [ ] **SPF + DKIM + DMARC** DNS records (deliverability — or mail lands in spam).
+- [ ] Replace placeholder `SUPPORT_EMAIL` everywhere.
+
+### Staging environment (you have none)
+- [ ] A **staging Render service** + staging Supabase/Upstash (or Supabase branch DB).
+- [ ] Used for: pre-prod smoke, Gate-3 rehearsal, Gate-4 load test (paid infra).
+
+### Git / CI / CD (you're new to GitHub)
+- [ ] Learn basic git flow (branch → commit → push → PR). CI runs automatically on push.
+- [ ] **CI = DONE & green** (`.github/workflows/ci.yml`).
+- [ ] **CD = NOT done** — wire Render/Cloudflare auto-deploy on merge to `main`.
+- [ ] Branch protection on `main` (require CI green before merge).
+
+### Secrets / config
+- [ ] Move all secrets to Render env groups (never commit `.env`).
+- [ ] **BACK UP `ENCRYPTION_KEY`** in a password manager — if lost, ALL Fernet-encrypted
+      broker data is unrecoverable. Critical.
+- [ ] VAPID keys, `ADMIN_JWT_SECRET`, `SECRET_KEY`, all `ZERODHA_*`, `TWILIO_*`,
+      `OPENROUTER_API_KEY` — set per environment.
+
+### Monitoring / alerting / backups
+- [ ] **Sentry** — already wired (errors). Confirm prod DSN + alert routing.
+- [ ] **Uptime monitor** — UptimeRobot / BetterStack pinging `/health`.
+- [ ] **DB backups** — Supabase auto-backup (paid tier) + verify a restore once.
+- [ ] Redis is ephemeral (fine to lose) — nothing to back up.
+- [ ] Admin **health watchdog** already runs (beat task) — confirm it can notify you.
+- [ ] Log retention / access (Render logs; consider a log drain later).
+
+### Product analytics / support
+- [ ] Product analytics (PostHog / GA4) — see activation, retention, funnels.
+- [ ] Support/feedback channel (email + maybe an in-app widget).
+- [ ] Basic onboarding flow polish (empty-state → first value; Kite = no history).
+
+### Cost planning (rough monthly, verify current)
+- [ ] Render (backend, paid tier for always-on worker/beat) · Supabase (paid) ·
+      Upstash (paid) · domain · Google Workspace · Sentry · **Kite Connect ₹2000/app** ·
+      Twilio WhatsApp · payment-gateway fees. Tally before pricing the product.
+
+---
+
 ## 🧩 Product / Business / Legal — pending (not built, or needs review)
 
 ### Monetization — NOT built (biggest gap for going paid)
