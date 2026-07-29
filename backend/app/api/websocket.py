@@ -158,12 +158,10 @@ async def websocket_prices(
             await websocket.close(code=4001, reason="Token revoked")
             return
     except Exception as e:
+        # Fail-OPEN: the JWT was already verified; this secondary lookup must never
+        # lock out a valid user on a transient error (kept as a safety net even though
+        # the SessionLocal shadow that caused it is now fixed).
         logger.error(f"WS revocation check errored (allowing; JWT already valid): {e!r}")
-        try:
-            from app.core.redis_pool import get_sync_redis
-            get_sync_redis().set("diag:ws_rev_error", f"{type(e).__name__}: {str(e)[:200]}", ex=3600)
-        except Exception:
-            pass
 
     account_id = str(account_uuid)
 
@@ -241,7 +239,9 @@ async def websocket_prices(
                     #        → broadcast_ltp() → ltp_update WebSocket event (live P&L)
                     try:
                         from app.services.price_stream_service import price_stream
-                        from app.core.database import SessionLocal
+                        # SessionLocal is imported at module scope (line 20). A local
+                        # re-import here made it function-local, so the revocation check
+                        # above hit UnboundLocalError and closed every price WS (4001).
                         async with SessionLocal() as db:
                             await price_stream.start_account(UUID(account_id), db)
                     except Exception as e:
