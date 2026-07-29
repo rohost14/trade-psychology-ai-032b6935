@@ -38,7 +38,7 @@ class InstrumentService:
     async def refresh_instruments(
         self,
         db: AsyncSession,
-        exchanges: List[str] = None,
+        exchanges: Optional[List[str]] = None,
     ) -> Dict:
         """
         Download the Kite instrument master per exchange and persist it into the
@@ -208,14 +208,14 @@ class InstrumentService:
                 Instrument.instrument_type == "FUT"
             ).order_by(Instrument.expiry)
         )
-        return result.scalars().all()
+        return list(result.scalars().all())
 
     async def search_instruments(
         self,
         query: str,
-        exchange: str = None,
+        exchange: Optional[str] = None,
         limit: int = 20,
-        db: AsyncSession = None
+        db: Optional[AsyncSession] = None
     ) -> List[Instrument]:
         """Search instruments by symbol or name"""
         stmt = select(Instrument).where(
@@ -227,7 +227,7 @@ class InstrumentService:
 
         stmt = stmt.limit(limit)
         result = await db.execute(stmt)
-        return result.scalars().all()
+        return list(result.scalars().all())
 
     async def cleanup_expired(self, db: AsyncSession) -> int:
         """Remove expired F&O instruments"""

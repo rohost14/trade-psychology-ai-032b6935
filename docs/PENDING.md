@@ -128,6 +128,11 @@ Updated 2026-07-29. Branch `dashboard-production-readiness`, CI green, working t
 - [ ] **Uptime monitor** — UptimeRobot / BetterStack pinging `/health`.
 - [ ] **DB backups** — Supabase auto-backup (paid tier) + verify a restore once.
 - [ ] Redis is ephemeral (fine to lose) — nothing to back up.
+- [ ] **Redis liveness + worker-liveness monitoring (silent-degradation guard) — HIGH.** If Redis or the Celery worker dies in prod, no data/money loss (DB is source of truth, fills are idempotent + recovered by manual/EOD sync reconcile), BUT the real-time pipeline (order-stream fill → `process_webhook_trade` → engine → event-bus → WS) goes silently dark — users get NO live alerts/positions and nobody notices. Add:
+  - [ ] **Redis reachability check** in `/health` (PING with a short timeout) so the uptime monitor catches a Redis outage. Redis also backs OAuth CSRF nonce → a Redis outage can break new logins; verify login fails safe/loud, not hung.
+  - [ ] **Worker heartbeat / liveness alert** — Celery worker down = fills queue but never process. Beat's health watchdog runs *inside* a worker, so it can't report its own worker being dead. Add an independent check (e.g. Celery `inspect ping`, or a "last processed fill" freshness metric during market hours) that pages you.
+  - [ ] **Fail-open on every Redis call in the request path** (deep-review F4 blocking-redis) — a Redis blip must never hang or 500 a user request; degrade to sync-fallback, don't crash.
+  - [ ] Managed Redis with HA/persistence for prod — **not the free tier** (free tier = the 500K-cmd cap that already bit us in dev).
 - [ ] Admin **health watchdog** already runs (beat task) — confirm it can notify you.
 - [ ] Log retention / access (Fly logs; consider a log drain later).
 
