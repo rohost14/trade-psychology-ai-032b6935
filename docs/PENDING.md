@@ -143,6 +143,45 @@ Updated 2026-07-29. Branch `dashboard-production-readiness`, CI green, working t
 
 ---
 
+## 📱 Mobile app (Capacitor → iOS + Android) — NOT started, MAJOR epic
+
+The product is **mobile-first**; today only a React web app exists. Wrapping it native
+with Capacitor is a large body of work with real technical hurdles (not just "wrap and ship").
+
+### Capacitor shell
+- [ ] Add Capacitor (`@capacitor/core`, `/ios`, `/android`), `capacitor.config.ts`, wrap the Vite build. NOT installed.
+- [ ] App icons, splash screen, status bar, **safe-area insets**, Android hardware back-button.
+- [ ] iOS + Android project scaffolding (`ios/`, `android/`).
+
+### The hard technical items (these bite)
+- [ ] **Native push** — current web **VAPID won't work in a native app.** Need **FCM (Android)
+      + APNs (iOS)** via `@capacitor/push-notifications` + Firebase; backend must send to
+      FCM/APNs device tokens (not just web-push subscriptions). Migrate `pushNotifications.ts`.
+- [ ] **OAuth deep-linking** — Zerodha's redirect must return **into the app**, not a browser.
+      Needs a **custom URL scheme + universal links** (iOS `apple-app-site-association`) and
+      **App Links** (Android `assetlinks.json`) hosted on your domain, and `ZERODHA_REDIRECT_URI`
+      pointing at it. This is the trickiest part of a broker OAuth mobile flow.
+- [ ] **Secure token storage** — JWT is in `localStorage` (`BrokerContext.tsx:95`); a webview's
+      localStorage is weak for a fintech. Move to `@capacitor/preferences` / a secure-storage plugin.
+- [ ] **Biometric unlock** (Face ID / fingerprint) — expected for a finance app.
+- [ ] **Forced-update / OTA** — a min-supported-version gate + optional live updates (Capgo/Appflow).
+- [ ] **Mobile crash/analytics** — Sentry mobile SDK + Firebase/PostHog mobile.
+
+### App store / release
+- [ ] **Apple Developer account** ($99/yr) + **Google Play Console** ($25 once).
+- [ ] Store listings — name, icon, **screenshots**, description, keywords (ASO).
+- [ ] **Apple privacy nutrition labels** + **Google Play Data Safety form** (must match real data use).
+- [ ] **App review prep** — Apple/Google scrutinise broker/finance apps; prepare the justification
+      (it's a **read-only mirror/journal — never places trades**, which helps review a lot).
+- [ ] Age rating, EULA (Apple standard or custom), encryption/export-compliance declaration.
+- [ ] Host deep-link association files (`apple-app-site-association`, `assetlinks.json`) on the domain.
+
+> **CDN note:** web frontend/landing → served via CDN (Cloudflare Pages/Vercel, free).
+> API/WebSocket → NOT cacheable, no CDN. Mobile app assets → bundled in the binary, no CDN.
+> OTA update bundles (if used) → via the OTA provider's CDN.
+
+---
+
 ## 🧩 Product / Business / Legal — pending (not built, or needs review)
 
 ### Monetization — NOT built (biggest gap for going paid)
