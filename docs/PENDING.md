@@ -68,6 +68,35 @@ Updated 2026-07-29. Branch `dashboard-production-readiness`, CI green, working t
 
 ---
 
+## 🧩 Product / Business / Legal — pending (not built, or needs review)
+
+### Monetization — NOT built (biggest gap for going paid)
+- **Payment gateway** — Razorpay (India) integration. Nothing exists today.
+- **Subscription plans / tiers**, billing cycle, renewal, upgrade/downgrade.
+- **GST invoicing** (needs business entity + GST reg first).
+- **Paywall / feature-gating** by plan.
+- **Refund / cancellation** flow.
+- Spec exists (not built): `docs/PLATFORM_ROADMAP_AUTH_PAYMENTS.md`.
+
+### Notifications / accountability
+- **WhatsApp** — built on **Twilio** (`whatsapp_service.py`), currently **SAFE MODE (logging only)** — no creds set. To go live: **Twilio WhatsApp Business sender approval + message templates** (the real blocker), then set `TWILIO_*` env. (Memory's "Gupshup" note is stale — code is Twilio.)
+- **Accountability loop** — *partially* built: cooldown / circuit-breaker, alert-response metric, goal-change logging. **Partner-dispatch (alert to an accountability partner) depends on WhatsApp** → blocked until WhatsApp is live.
+- **Push notifications** — built (web push / VAPID), works.
+
+### Legal / compliance — pages exist but NOT vetted
+- **Terms of Service + Privacy Policy pages exist** (`TermsOfService.tsx`, `PrivacyPolicy.tsx`) and a `ComplianceDisclaimer` component is shown on Analytics/Chat — **but they are self-authored placeholders, NOT lawyer-reviewed.** Get them legally reviewed before launch.
+- **SEBI positioning (the big one):** a P&L / behavioural-analytics product must be clearly positioned as a *mirror / journaling tool*, **NOT** investment advice or research-analyst services (which need SEBI registration). Needs a **legal opinion** on positioning + disclaimer wording. `ComplianceDisclaimer` must be vetted.
+- **Privacy Policy must reflect DPDP** — data export/delete already exist (`/api/account/export|delete`); the policy text must match reality + Zerodha data handling.
+- **Grievance / support mechanism** — a named contact + process (consumer/SEBI expectation). Replace placeholder `SUPPORT_EMAIL`.
+
+### Auth (beyond Zerodha OAuth)
+- Currently **Zerodha-OAuth-only by design** (no email/password). Roadmap has an optional email/OTP auth spec (not built) — only needed if you want non-Zerodha onboarding; otherwise skip.
+
+### Onboarding / cold-start (product)
+- **Kite gives no trade history** → new users land empty. Cold-start import surfacing exists (Console CSV import); keep refining the empty-state → first-value flow.
+
+---
+
 ## Hard product constraints (govern all future work)
 1. **Kite gives NO trade history** — today-only; new users start empty; only fix = Console CSV import.
 2. **Zero manual-input adoption** — never design features that need the user to type/tap.
