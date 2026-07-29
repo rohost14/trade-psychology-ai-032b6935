@@ -70,25 +70,33 @@ Updated 2026-07-29. Branch `dashboard-production-readiness`, CI green, working t
 
 ## 🚀 Launch / Infrastructure / Ops — the "ship it" checklist (mostly NOT done)
 
-> This is the founder checklist beyond code. Recommended stack (matches what the
-> repo already assumes — `Procfile` = web/worker/beat, comments reference Render):
-> **Render** (backend) · **Supabase** (Postgres) · **Upstash** (Redis) ·
-> **Cloudflare Pages/Vercel** (frontend) · **Cloudflare** (DNS/CDN). Avoid raw EC2
-> (ops burden); Cloudflare hosts DNS/CDN only, not the FastAPI app.
+> Hosting chosen by REQUIREMENTS (not by what the repo assumes): the app needs an
+> **India region** (real-time, Zerodha + Indian users), **long-lived WebSockets**
+> (shared KiteTicker + fan-out), **always-on background processes** (Celery worker +
+> beat, not serverless), and **low solo-founder ops**.
+>
+> **Recommendation — launch on Fly.io (Mumbai `bom`)**: container-native, great WS,
+> runs always-on worker+beat, India region, cheap, solo-friendly.
+> **Simpler alt:** DigitalOcean App Platform (Bangalore). **Scale/enterprise target:**
+> AWS ECS **Fargate** (Mumbai ap-south-1) — migrate later if needed (containers either way).
+> **Avoid:** Render (Singapore only, spin-down), raw EC2 (ops burden), Cloud Run
+> (awkward for always-on Celery + long-lived WS), Cloudflare Workers (can't run FastAPI/Celery).
+> **Keep:** Supabase (Mumbai) + Upstash. **Frontend:** Cloudflare Pages / Vercel.
 
 ### Hosting / deploy
-- [ ] **Backend on Render** — create web + worker + beat services from the Procfile;
-      set env vars (Render env group). NOT set up yet.
+- [ ] **Backend on Fly.io (Mumbai)** — one app with 3 process groups (web / worker / beat)
+      via `fly.toml`; scale worker independently. NOT set up yet.
 - [ ] **Frontend on Cloudflare Pages / Vercel** — connect git, auto-build React.
-- [ ] Confirm **Supabase** (already used) is on a paid tier for prod (backups, no pausing).
-- [ ] Confirm **Upstash** tier for prod (free tier command cap will throttle at scale).
-- [ ] **Auto-deploy (CD)** — connect GitHub repo → Render/Cloudflare deploy on push to main.
-      (CI already exists + green; CD is the missing half.)
+- [ ] Confirm **Supabase** (already used) is on a paid tier for prod (backups, no pausing),
+      **Mumbai region**.
+- [ ] Confirm **Upstash** tier for prod (free-tier command cap throttles at scale).
+- [ ] **Auto-deploy (CD)** — GitHub → Fly (`flyctl deploy` / GitHub Action) + Cloudflare
+      Pages on push to `main`. (CI already exists + green; CD is the missing half.)
 
 ### Domain / DNS / SSL
 - [ ] **Buy a domain** (you don't have one — `tradementor.ai` is only a placeholder in code).
 - [ ] Put **Cloudflare** in front as DNS + CDN + DDoS.
-- [ ] Point app + api subdomains at Render/Pages; **SSL/TLS** auto (Render + Cloudflare).
+- [ ] Point app + api subdomains at Fly/Pages; **SSL/TLS** auto (Fly certs + Cloudflare).
 - [ ] Set the real domain in `FRONTEND_URL`, `ZERODHA_REDIRECT_URI`, CORS origins.
 
 ### Email
@@ -99,17 +107,17 @@ Updated 2026-07-29. Branch `dashboard-production-readiness`, CI green, working t
 - [ ] Replace placeholder `SUPPORT_EMAIL` everywhere.
 
 ### Staging environment (you have none)
-- [ ] A **staging Render service** + staging Supabase/Upstash (or Supabase branch DB).
+- [ ] A **staging Fly.io app** + staging Supabase/Upstash (or Supabase branch DB).
 - [ ] Used for: pre-prod smoke, Gate-3 rehearsal, Gate-4 load test (paid infra).
 
 ### Git / CI / CD (you're new to GitHub)
 - [ ] Learn basic git flow (branch → commit → push → PR). CI runs automatically on push.
 - [ ] **CI = DONE & green** (`.github/workflows/ci.yml`).
-- [ ] **CD = NOT done** — wire Render/Cloudflare auto-deploy on merge to `main`.
+- [ ] **CD = NOT done** — wire Fly.io + Cloudflare Pages auto-deploy on merge to `main`.
 - [ ] Branch protection on `main` (require CI green before merge).
 
 ### Secrets / config
-- [ ] Move all secrets to Render env groups (never commit `.env`).
+- [ ] Move all secrets to the host's secret store (Fly secrets / env), never commit `.env`.
 - [ ] **BACK UP `ENCRYPTION_KEY`** in a password manager — if lost, ALL Fernet-encrypted
       broker data is unrecoverable. Critical.
 - [ ] VAPID keys, `ADMIN_JWT_SECRET`, `SECRET_KEY`, all `ZERODHA_*`, `TWILIO_*`,
@@ -121,7 +129,7 @@ Updated 2026-07-29. Branch `dashboard-production-readiness`, CI green, working t
 - [ ] **DB backups** — Supabase auto-backup (paid tier) + verify a restore once.
 - [ ] Redis is ephemeral (fine to lose) — nothing to back up.
 - [ ] Admin **health watchdog** already runs (beat task) — confirm it can notify you.
-- [ ] Log retention / access (Render logs; consider a log drain later).
+- [ ] Log retention / access (Fly logs; consider a log drain later).
 
 ### Product analytics / support
 - [ ] Product analytics (PostHog / GA4) — see activation, retention, funnels.
@@ -129,7 +137,7 @@ Updated 2026-07-29. Branch `dashboard-production-readiness`, CI green, working t
 - [ ] Basic onboarding flow polish (empty-state → first value; Kite = no history).
 
 ### Cost planning (rough monthly, verify current)
-- [ ] Render (backend, paid tier for always-on worker/beat) · Supabase (paid) ·
+- [ ] Fly.io (backend: web + always-on worker/beat) · Supabase (paid) ·
       Upstash (paid) · domain · Google Workspace · Sentry · **Kite Connect ₹2000/app** ·
       Twilio WhatsApp · payment-gateway fees. Tally before pricing the product.
 
