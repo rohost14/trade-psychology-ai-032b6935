@@ -293,6 +293,15 @@ svg.lucide {
 
   /* Loading skeleton */
   .skeleton { @apply bg-muted animate-pulse rounded; }
+
+  /* ── Lovable "desk" primitives (ported from calm-trade-clinic) ───────────── */
+  .desk-card  { @apply bg-card border border-border rounded-lg; }
+  .page-shell { @apply w-full mx-auto max-w-[1400px] px-4 sm:px-6 lg:px-8 py-4 sm:py-6 space-y-4 sm:space-y-6 pb-10; }
+  .card-head  { @apply px-4 sm:px-6 h-12 border-b border-border flex items-center justify-between gap-3; }
+  .card-body  { @apply px-4 sm:px-6 py-4; }
+  .t-label    { @apply text-[11px] font-medium uppercase tracking-[0.12em] text-muted-foreground; }
+  .font-display { font-family: 'Geist', 'Inter', system-ui, sans-serif; letter-spacing: -0.025em; }
+  .font-tabular { font-variant-numeric: tabular-nums; }
 }
 
 /* ── Type scale utilities ──────────────────────────────────────────────────── */

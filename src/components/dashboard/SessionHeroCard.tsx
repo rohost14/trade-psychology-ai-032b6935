@@ -1,7 +1,8 @@
+import { useState } from 'react';
 import { cn } from '@/lib/utils';
-import { formatCurrencyWithSign, formatCurrency } from '@/lib/formatters';
-import { STATE_CFG, SessionState } from '@/lib/dashboardUtils';
 import { useCountUp } from '@/hooks/useCountUp';
+import { ChevronDown } from 'lucide-react';
+import { STATE_CFG, SessionState } from '@/lib/dashboardUtils';
 import type { MarginStatus } from '@/types/api';
 
 interface SessionHeroCardProps {
@@ -18,19 +19,17 @@ interface SessionHeroCardProps {
   margins: MarginStatus | null;
 }
 
-function Zone({ label, children, className }: { label: string; children: React.ReactNode; className?: string }) {
-  return (
-    <div className={cn('flex flex-col justify-center px-4 py-3', className)}>
-      <p className="text-[9px] font-medium text-muted-foreground/50 uppercase tracking-[0.08em] mb-1.5 whitespace-nowrap">
-        {label}
-      </p>
-      {children}
-    </div>
-  );
-}
+// Higher value = worse → warn/crit tones. Mirrors the Lovable HeroPanel toneOf.
+const toneOf = (v: number, warn: number, crit: number) =>
+  v >= crit ? 'text-loss' : v >= warn ? 'text-warning' : 'text-profit';
 
+const inr = (n: number) => Math.abs(Math.round(n)).toLocaleString('en-IN');
+
+/**
+ * Compact "Intraday P&L" hero, styled to match the Lovable Dashboard HeroPanel:
+ * one money-truth line + a collapsible 4-stat session rail. Wired to real data.
+ */
 export function SessionHeroCard({
-  stateCfg,
   sessionPnlDisplay,
   realizedPnlDisplay,
   tradeStats,
@@ -38,167 +37,85 @@ export function SessionHeroCard({
   unrealizedTotal,
   dailyLossLimit,
   dailyTradeLimit,
-  margins,
 }: SessionHeroCardProps) {
+  const [open, setOpen] = useState(false);
   const animatedPnl = useCountUp(sessionPnlDisplay, 500);
 
   const tradesToday = tradeStats?.trades_today ?? 0;
   const winRate = tradeStats?.win_rate ?? 0;
   const lossAmt = Math.max(0, -realizedPnlDisplay);
-  const limitPct = dailyLossLimit > 0 ? Math.min(100, Math.round((lossAmt / dailyLossLimit) * 100)) : 0;
-  const tradeRatio = dailyTradeLimit > 0 ? tradesToday / dailyTradeLimit : 0;
-  const marginPct = margins?.equity?.utilization_pct ?? 0;
+  const lossPct = dailyLossLimit > 0 ? (lossAmt / dailyLossLimit) * 100 : 0;
+  const lossRemaining = Math.max(0, dailyLossLimit - lossAmt);
+  const paceRatio = dailyTradeLimit > 0 ? tradesToday / dailyTradeLimit : 0;
 
-  const tradeColor =
-    tradeRatio >= 0.8 ? 'text-tm-loss' : tradeRatio >= 0.6 ? 'text-tm-obs' : 'text-foreground';
-  const lossColor =
-    limitPct >= 80 ? 'text-tm-loss' : limitPct >= 60 ? 'text-tm-obs' : 'text-muted-foreground';
-  const marginColor =
-    marginPct >= 80 ? 'text-tm-loss' : marginPct >= 60 ? 'text-tm-obs' : 'text-muted-foreground';
+  const stats = [
+    { label: 'Trades', value: String(tradesToday), unit: `${paceRatio.toFixed(1)}x pace`, tone: toneOf(paceRatio, 1, 1.5) },
+    { label: 'Loss budget', value: `₹${(lossRemaining / 1000).toFixed(1)}k`, unit: `of ₹${(dailyLossLimit / 1000).toFixed(0)}k`, tone: toneOf(lossPct, 50, 80) },
+    { label: 'Win rate', value: `${Math.round(winRate)}%`, unit: `${tradesToday} trade${tradesToday !== 1 ? 's' : ''}`, tone: 'text-foreground' },
+    {
+      label: unrealizedTotal !== 0 ? 'Unrealized' : 'Realized',
+      value: (() => { const v = unrealizedTotal !== 0 ? unrealizedTotal : realizedPnlDisplay; return `${v >= 0 ? '+' : '−'}₹${inr(v)}`; })(),
+      unit: '',
+      tone: (unrealizedTotal !== 0 ? unrealizedTotal : realizedPnlDisplay) >= 0 ? 'text-profit' : 'text-loss',
+    },
+  ];
 
   return (
-    <div className="border-b border-border bg-card/60 backdrop-blur-sm mb-0">
-
-      {/* ── Desktop: single horizontal row ─────────────────────────────────── */}
-      <div className="hidden md:flex divide-x divide-border">
-        {/* Session P&L — wider zone */}
-        <Zone label="SESSION P&L" className="min-w-[160px] px-5">
-          <span className={cn(
-            'font-black font-mono tabular-nums leading-none',
-            'text-[24px]',
-            pnlPositive ? 'text-tm-profit' : 'text-tm-loss',
-          )}>
-            {formatCurrencyWithSign(Math.round(animatedPnl))}
-          </span>
-          {tradeStats && tradeStats.trades_today > 0 && (
-            <span className="text-[10.5px] text-muted-foreground font-mono mt-1 tabular-nums">
-              {Math.round(winRate)}% win rate · {tradesToday} trade{tradesToday !== 1 ? 's' : ''}
-            </span>
-          )}
-        </Zone>
-
-        {/* Realized */}
-        <Zone label="REALIZED">
-          <span className={cn(
-            'text-[15px] font-semibold font-mono tabular-nums leading-none',
-            realizedPnlDisplay >= 0 ? 'text-tm-profit' : 'text-tm-loss',
-          )}>
-            {formatCurrencyWithSign(Math.round(realizedPnlDisplay))}
-          </span>
-        </Zone>
-
-        {/* Unrealized */}
-        <Zone label="UNREALIZED">
-          <span className={cn(
-            'text-[15px] font-semibold font-mono tabular-nums leading-none',
-            unrealizedTotal > 0 ? 'text-tm-profit' : unrealizedTotal < 0 ? 'text-tm-loss' : 'text-muted-foreground',
-          )}>
-            {unrealizedTotal !== 0 ? formatCurrencyWithSign(Math.round(unrealizedTotal)) : '—'}
-          </span>
-        </Zone>
-
-        {/* Trades */}
-        <Zone label="TRADES">
-          <span className={cn('text-[15px] font-semibold font-mono tabular-nums leading-none', tradeColor)}>
-            {tradesToday}
-            <span className="text-muted-foreground text-[12px] font-normal"> / {dailyTradeLimit}</span>
-          </span>
-        </Zone>
-
-        {/* Risk State */}
-        <Zone label="RISK">
-          <span className={cn(
-            'inline-flex items-center gap-1.5 text-[11px] font-semibold px-2.5 py-1 rounded-full self-start',
-            stateCfg.pill,
-          )}>
-            <span className={cn('w-1.5 h-1.5 rounded-full flex-shrink-0', stateCfg.dot)} />
-            {stateCfg.label}
-          </span>
-        </Zone>
-
-        {/* Daily limit */}
-        <Zone label="LOSS LIMIT">
-          <span className={cn('text-[15px] font-semibold font-mono tabular-nums leading-none', lossColor)}>
-            {limitPct}%
-          </span>
-          <span className="text-[10px] text-muted-foreground mt-1">
-            {formatCurrency(lossAmt)} / {formatCurrency(dailyLossLimit)}
-          </span>
-        </Zone>
-
-        {/* Margin (conditional) */}
-        {margins && (
-          <Zone label="MARGIN">
-            <span className={cn('text-[15px] font-semibold font-mono tabular-nums leading-none', marginColor)}>
-              {marginPct}%
-            </span>
-            <span className="text-[10px] text-muted-foreground mt-1">
-              {formatCurrency(margins.equity?.available ?? 0)} free
-            </span>
-          </Zone>
-        )}
-      </div>
-
-      {/* ── Mobile: 2-row 3-col grid ────────────────────────────────────────── */}
-      <div className="md:hidden">
-        {/* Row 1: P&L | Risk | Trades */}
-        <div className="grid grid-cols-3 divide-x divide-border border-b border-border">
-          <div className="px-4 py-3">
-            <p className="text-[9px] font-medium text-muted-foreground/50 uppercase tracking-[0.08em] mb-1">P&L</p>
-            <span className={cn(
-              'text-[22px] font-black font-mono tabular-nums leading-none block',
-              pnlPositive ? 'text-tm-profit' : 'text-tm-loss',
-            )}>
-              {formatCurrencyWithSign(Math.round(animatedPnl))}
-            </span>
+    <section className="desk-card overflow-hidden">
+      <div className="px-4 sm:px-6 py-4 flex items-center justify-between gap-4">
+        <div className="min-w-0">
+          <div className="flex items-center gap-2">
+            <span className="t-label">Intraday P&amp;L</span>
+            <span className={cn('h-1.5 w-1.5 rounded-full animate-pulse', pnlPositive ? 'bg-profit' : 'bg-loss')} />
           </div>
-          <div className="px-3 py-3 flex flex-col justify-center">
-            <p className="text-[9px] font-medium text-muted-foreground/50 uppercase tracking-[0.08em] mb-1.5">RISK</p>
+          <div className="mt-1 flex items-baseline gap-2 flex-wrap">
             <span className={cn(
-              'inline-flex items-center gap-1 text-[10.5px] font-semibold px-2 py-0.5 rounded-full self-start',
-              stateCfg.pill,
+              'font-display text-[28px] sm:text-[32px] leading-none font-semibold tracking-tight font-tabular',
+              pnlPositive ? 'text-profit' : 'text-loss',
             )}>
-              <span className={cn('w-1.5 h-1.5 rounded-full flex-shrink-0', stateCfg.dot)} />
-              {stateCfg.label}
+              {pnlPositive ? '+' : '−'}₹{inr(animatedPnl)}
             </span>
-          </div>
-          <div className="px-3 py-3 flex flex-col justify-center">
-            <p className="text-[9px] font-medium text-muted-foreground/50 uppercase tracking-[0.08em] mb-1">TRADES</p>
-            <span className={cn('text-[16px] font-semibold font-mono tabular-nums', tradeColor)}>
-              {tradesToday}
-              <span className="text-muted-foreground text-[12px] font-normal"> / {dailyTradeLimit}</span>
-            </span>
+            {tradesToday > 0 && (
+              <span className="text-[12px] font-tabular font-medium text-muted-foreground">
+                {Math.round(winRate)}% win · {tradesToday} trade{tradesToday !== 1 ? 's' : ''}
+              </span>
+            )}
           </div>
         </div>
 
-        {/* Row 2: Realized | Unrealized | Limit */}
-        <div className="grid grid-cols-3 divide-x divide-border">
-          <div className="px-4 py-2.5">
-            <p className="text-[9px] font-medium text-muted-foreground/50 uppercase tracking-[0.07em] mb-1">Realized</p>
-            <span className={cn(
-              'text-[12.5px] font-semibold font-mono tabular-nums',
-              realizedPnlDisplay >= 0 ? 'text-tm-profit' : 'text-tm-loss',
-            )}>
-              {formatCurrencyWithSign(Math.round(realizedPnlDisplay))}
-            </span>
-          </div>
-          <div className="px-3 py-2.5">
-            <p className="text-[9px] font-medium text-muted-foreground/50 uppercase tracking-[0.07em] mb-1">Unrealized</p>
-            <span className={cn(
-              'text-[12.5px] font-semibold font-mono tabular-nums',
-              unrealizedTotal > 0 ? 'text-tm-profit' : unrealizedTotal < 0 ? 'text-tm-loss' : 'text-muted-foreground',
-            )}>
-              {unrealizedTotal !== 0 ? formatCurrencyWithSign(Math.round(unrealizedTotal)) : '—'}
-            </span>
-          </div>
-          <div className="px-3 py-2.5">
-            <p className="text-[9px] font-medium text-muted-foreground/50 uppercase tracking-[0.07em] mb-1">Loss limit</p>
-            <span className={cn('text-[12.5px] font-semibold font-mono tabular-nums', lossColor)}>
-              {limitPct}%
-            </span>
+        <button
+          type="button"
+          onClick={() => setOpen(v => !v)}
+          aria-expanded={open}
+          className="shrink-0 inline-flex items-center gap-1.5 rounded-md border border-border px-2.5 py-1.5 text-[11.5px] font-medium text-muted-foreground hover:text-foreground hover:bg-muted/60 transition-colors"
+        >
+          {open ? 'Hide session stats' : 'Session stats'}
+          <ChevronDown className={cn('h-3.5 w-3.5 transition-transform duration-200', open && 'rotate-180')} />
+        </button>
+      </div>
+
+      {open && (
+        <div className="animate-accordion-down">
+          <p className="px-4 sm:px-6 pb-3 text-[12.5px] leading-snug text-muted-foreground">
+            {lossPct >= 80
+              ? "Most of today's loss budget is already spent."
+              : paceRatio >= 1.5
+              ? 'Trading faster than your usual rhythm today.'
+              : 'Running inside your normal operating range.'}
+          </p>
+          <div className="grid grid-cols-2 sm:grid-cols-4 border-t border-border divide-x divide-y sm:divide-y-0 divide-border">
+            {stats.map(s => (
+              <div key={s.label} className="px-4 sm:px-5 py-2.5">
+                <span className="text-[10px] uppercase tracking-[0.12em] font-medium text-muted-foreground">{s.label}</span>
+                <div className="mt-0.5 flex items-baseline gap-1.5">
+                  <span className={cn('text-[16px] font-semibold font-tabular tracking-tight', s.tone)}>{s.value}</span>
+                  {s.unit && <span className="text-[10.5px] text-muted-foreground font-tabular truncate">{s.unit}</span>}
+                </div>
+              </div>
+            ))}
           </div>
         </div>
-      </div>
-    </div>
+      )}
+    </section>
   );
 }

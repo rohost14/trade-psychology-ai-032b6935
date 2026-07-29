@@ -1,4 +1,4 @@
-import { CheckCircle2, Check, ChevronRight } from 'lucide-react';
+import { ArrowRight, AlertOctagon, AlertTriangle, Info, Bell } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { Skeleton } from '@/components/ui/skeleton';
 import { cn } from '@/lib/utils';
@@ -13,132 +13,111 @@ interface RecentAlertsCardProps {
   loading?: boolean;
 }
 
-function SeverityChip({ sev }: { sev: string }) {
-  const normalized = normalizeSeverityStr(sev);
-  if (normalized === 'danger') {
-    return (
-      <span className="inline-flex items-center text-[9.5px] font-bold px-1.5 py-0.5 rounded bg-red-100 text-red-700 dark:bg-red-900/40 dark:text-red-400 uppercase tracking-[0.06em] shrink-0">
-        High
-      </span>
-    );
-  }
-  if (normalized === 'positive') {
-    return (
-      <span className="inline-flex items-center text-[9.5px] font-bold px-1.5 py-0.5 rounded bg-green-100 text-green-700 dark:bg-green-900/40 dark:text-green-400 uppercase tracking-[0.06em] shrink-0">
-        Good
-      </span>
-    );
-  }
-  return (
-    <span className="inline-flex items-center text-[9.5px] font-bold px-1.5 py-0.5 rounded bg-amber-100 text-amber-700 dark:bg-amber-900/40 dark:text-amber-400 uppercase tracking-[0.06em] shrink-0">
-      Med
-    </span>
-  );
+const MAX_VISIBLE = 4;
+
+// Derive a short category tag (SIZE/PACE/EMOTIONAL/RISK) from the pattern name,
+// mirroring the Lovable alert cards. Falls back to PATTERN.
+function tagFor(pattern: string): string {
+  const p = pattern.toLowerCase();
+  if (/(size|escalat|martingale|averag|qty)/.test(p)) return 'SIZE';
+  if (/(overtrad|burst|pace|re-?entry|reentry|cooldown|rapid|fomo)/.test(p)) return 'PACE';
+  if (/(revenge|loss|streak|meltdown|tilt|recovery|giveaway)/.test(p)) return 'EMOTIONAL';
+  if (/(stop|\bsl\b|constitution|no_stoploss|limit|expiry)/.test(p)) return 'RISK';
+  return 'PATTERN';
 }
 
-function patternWeight(sev: string): string {
-  const normalized = normalizeSeverityStr(sev);
-  if (normalized === 'danger') return 'font-semibold text-foreground';
-  if (normalized === 'caution') return 'font-medium text-foreground/90';
-  return 'font-normal text-muted-foreground';
-}
-
-const unreadCount = (alerts: RecentAlertsCardProps['alerts']) =>
-  alerts.filter(a => !a.acknowledged).length;
-
-export default function RecentAlertsCard({ alerts, onAcknowledge, onOpen, loading }: RecentAlertsCardProps) {
-  const unread = unreadCount(alerts);
+export default function RecentAlertsCard({ alerts, onOpen, onAcknowledge, loading }: RecentAlertsCardProps) {
+  const visible = alerts.slice(0, MAX_VISIBLE);
+  const hasMore = alerts.length > MAX_VISIBLE;
+  const criticalCount = visible.filter(a => normalizeSeverityStr(a.severity) === 'danger').length;
 
   return (
-    <div className="tm-card">
-
-      {/* Header */}
-      <div className="flex items-center justify-between px-5 py-3.5 border-b border-border">
+    <section className="desk-card overflow-hidden">
+      <div className="card-head">
         <div className="flex items-center gap-2.5">
-          {!loading && unread > 0 && (
-            <span className="w-2 h-2 rounded-full bg-tm-obs animate-pulse shrink-0" />
+          <Bell className="h-3.5 w-3.5 text-muted-foreground" strokeWidth={2} />
+          <span className="text-[11px] uppercase tracking-[0.12em] font-medium text-muted-foreground">Live Alerts</span>
+          {!loading && alerts.length > 0 && (
+            <span className="h-1.5 w-1.5 rounded-full bg-loss animate-pulse" />
           )}
-          <span className="tm-label">Behavioral Alerts</span>
-          {!loading && unread > 0 && (
-            <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[10.5px] font-semibold bg-amber-100 text-amber-700 dark:bg-amber-800/40 dark:text-amber-300">
-              {unread} active
+          {criticalCount > 0 && (
+            <span className="h-[18px] min-w-[18px] px-1.5 rounded-full bg-loss/10 text-loss text-[10px] font-semibold flex items-center justify-center font-tabular">
+              {criticalCount}
             </span>
           )}
         </div>
-        {!loading && alerts.length > 4 && (
-          <Link to="/alerts" className="text-[13px] font-medium text-tm-brand hover:underline">
-            View all →
-          </Link>
-        )}
+        <Link to="/alerts" className="text-[11px] text-foreground hover:text-primary font-medium inline-flex items-center gap-1 transition-colors">
+          View all <ArrowRight className="h-3 w-3" />
+        </Link>
       </div>
 
-      {/* Skeleton */}
       {loading ? (
         <div className="divide-y divide-border">
           {[1, 2, 3].map(i => (
-            <div key={i} className="flex items-start gap-4 px-5 py-4">
+            <div key={i} className="px-5 sm:px-6 py-3.5 flex items-start gap-3">
+              <Skeleton className="h-7 w-7 rounded-md shrink-0" />
               <div className="flex-1 space-y-2">
-                <Skeleton className="h-3.5 w-32 rounded" />
-                <Skeleton className="h-3 w-full rounded" />
+                <Skeleton className="h-3.5 w-40" />
+                <Skeleton className="h-3 w-full" />
               </div>
-              <Skeleton className="h-3 w-12 rounded flex-shrink-0" />
             </div>
           ))}
         </div>
-      ) : alerts.length > 0 ? (
-        <div>
-          {alerts.slice(0, 5).map((alert, i) => {
-            const isAcked = alert.acknowledged;
-            return (
-              <button
-                key={alert.id}
-                onClick={() => onOpen ? onOpen(alert.id) : onAcknowledge?.(alert.id)}
-                aria-label={`${alert.pattern}${isAcked ? ', reviewed' : ', tap to review'}`}
-                className={cn(
-                  'w-full flex items-start gap-3 px-5 py-3.5 text-left',
-                  'transition-colors duration-100',
-                  'hover:bg-muted/60 dark:hover:bg-muted/30',
-                  i < Math.min(alerts.length, 5) - 1 ? 'border-b border-border' : '',
-                  isAcked && 'opacity-50',
-                )}
-              >
-                {/* Content */}
-                <div className="flex-1 min-w-0">
-                  <div className="flex items-center gap-2 flex-wrap mb-0.5">
-                    <p className={cn('t-body-sm leading-snug', patternWeight(alert.severity))}>
-                      {alert.pattern}
-                      {isAcked && (
-                        <Check className="inline ml-1.5 h-3 w-3 text-tm-profit align-middle" />
-                      )}
-                    </p>
-                  </div>
-                  <p className="t-caption text-muted-foreground leading-snug">
-                    {alert.description}
-                  </p>
-                </div>
-
-                {/* Right side: chip + time + chevron */}
-                <div className="shrink-0 flex flex-col items-end gap-1 pt-0.5">
-                  <SeverityChip sev={alert.severity} />
-                  <div className="flex items-center gap-1">
-                    <span className="t-mono-sm text-muted-foreground">
-                      {formatRelativeTime(alert.timestamp)}
-                    </span>
-                    <ChevronRight className="w-3.5 h-3.5 text-muted-foreground/50" />
-                  </div>
-                </div>
-              </button>
-            );
-          })}
-
+      ) : alerts.length === 0 ? (
+        <div className="px-5 sm:px-6 py-8 text-center">
+          <p className="text-[13px] font-semibold text-foreground">No live alerts</p>
+          <p className="text-[12px] text-muted-foreground mt-0.5">Behavioural alerts appear here as they fire.</p>
         </div>
       ) : (
-        <div className="py-10 text-center">
-          <CheckCircle2 className="h-8 w-8 text-tm-profit/30 mx-auto mb-2.5" />
-          <p className="text-sm font-medium text-foreground">All clear</p>
-          <p className="text-[13px] text-muted-foreground mt-0.5">No behavioral alerts detected today</p>
+        <div className="divide-y divide-border">
+          {visible.map(alert => {
+            const sev = normalizeSeverityStr(alert.severity);
+            const isCritical = sev === 'danger';
+            const isWarn = sev === 'caution';
+            const borderColor = isCritical ? 'border-l-loss' : isWarn ? 'border-l-warning' : 'border-l-primary';
+            const tagColor = isCritical ? 'text-loss' : isWarn ? 'text-warning' : 'text-primary';
+            const iconBg = isCritical ? 'bg-loss/10 text-loss' : isWarn ? 'bg-warning/10 text-warning' : 'bg-primary/10 text-primary';
+            const SevIcon = isCritical ? AlertOctagon : isWarn ? AlertTriangle : Info;
+
+            return (
+              <div
+                key={alert.id}
+                role="button"
+                tabIndex={0}
+                onClick={() => (onOpen ? onOpen(alert.id) : onAcknowledge?.(alert.id))}
+                onKeyDown={e => (e.key === 'Enter' || e.key === ' ') && (onOpen ? onOpen(alert.id) : onAcknowledge?.(alert.id))}
+                className={cn(
+                  'px-5 sm:px-6 py-3.5 border-l-2 animate-fade-in cursor-pointer transition-colors hover:bg-muted/40 focus:outline-none focus:bg-muted/40',
+                  borderColor,
+                  alert.acknowledged && 'opacity-60',
+                )}
+              >
+                <div className="flex items-start gap-3">
+                  <div className={cn('h-7 w-7 rounded-md flex items-center justify-center shrink-0', iconBg)}>
+                    <SevIcon className="h-3.5 w-3.5" strokeWidth={2.25} />
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <span className="text-[13.5px] font-semibold text-foreground">{alert.pattern}</span>
+                      <span className={cn('text-[10px] font-semibold uppercase tracking-wider', tagColor)}>{tagFor(alert.pattern)}</span>
+                      <span className="text-[10px] text-muted-foreground font-tabular uppercase tracking-wider ml-auto">
+                        {formatRelativeTime(alert.timestamp)}
+                      </span>
+                    </div>
+                    <p className="text-[12.5px] text-muted-foreground mt-1 leading-relaxed line-clamp-2">{alert.description}</p>
+                  </div>
+                </div>
+              </div>
+            );
+          })}
         </div>
       )}
-    </div>
+
+      {hasMore && (
+        <Link to="/alerts" className="flex items-center justify-center gap-1.5 px-6 py-2.5 border-t border-border text-[11px] font-medium text-primary hover:bg-muted/40 transition-colors uppercase tracking-wider">
+          View {alerts.length - MAX_VISIBLE} more <ArrowRight className="h-3 w-3" />
+        </Link>
+      )}
+    </section>
   );
 }
