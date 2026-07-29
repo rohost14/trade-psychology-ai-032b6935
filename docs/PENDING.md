@@ -60,6 +60,7 @@ Updated 2026-07-29. Branch `dashboard-production-readiness`, CI green, working t
 |---|---|---|
 | Model-A key refactor (remove per-user key remnants) | after Zerodha #1 says yes | small code change; I do it then |
 | Ticker cluster (gap #2) | ~2500+ distinct subscribed instruments | scale tier; `PRODUCTION_MARKET_DATA_PLAN.md` §3 |
+| Redis position read-cache in front of the ledger (write-through, Postgres stays truth) | Gate-4 / only after a load test *measures* `get_position` Postgres reads as a real bottleneck | **Latency-only, not correctness.** DO NOT ship blind — it adds a stale-cache failure mode to money-critical P&L. Correct invalidation must cover **every** write path: webhook fill, sync, reconcile, and especially the **out-of-order replay** (which rewrites *past* ledger entries → a naive current-position cache goes wrong). Localized seam (`PositionLedgerService.get_position`), so deferring costs nothing — easy to add when justified + validated. |
 | Gate 4 — 10k load test | paid staging infra | free tier can't; local flood already validated the engine |
 | Stale-price indicator (FE) | dashboard polish | minor UX; illiquid-option LTP freeze |
 | 09:15 thundering-herd tuning | under a real load test | parallelize sequential all-account loops |
