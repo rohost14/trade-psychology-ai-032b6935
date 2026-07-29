@@ -83,16 +83,34 @@ class InstrumentService:
                     "updated_at": now,
                 })
                 if len(batch) >= self._UPSERT_BATCH:
-                    total += await self._upsert_batch(db, batch)
+                    total += await self._safe_upsert(db, batch, exchange, errors)
                     batch = []
 
             if batch:
-                total += await self._upsert_batch(db, batch)
+                total += await self._safe_upsert(db, batch, exchange, errors)
 
             logger.info(f"Upserted instruments for {exchange}")
 
-        await db.commit()
         return {"total": total, "model": "DB upsert", "errors": errors}
+
+    async def _safe_upsert(self, db, batch: List[Dict], exchange: str, errors: List[str]) -> int:
+        """Upsert one batch in its OWN transaction. A failed batch is rolled back and
+        SKIPPED with a SHORT log (never dump the 14k-param SQL — that floods the logs
+        and blows Sentry's payload limit / your Redis budget), so the rest still load."""
+        try:
+            n = await self._upsert_batch(db, batch)
+            await db.commit()
+            return n
+        except Exception as e:
+            try:
+                await db.rollback()
+            except Exception:
+                pass
+            msg = f"{exchange}: instrument batch upsert failed ({type(e).__name__})"
+            if msg not in errors:
+                errors.append(msg)
+            logger.warning(f"[instruments] {msg} — skipped {len(batch)} rows")
+            return 0
 
     async def _upsert_batch(self, db: AsyncSession, rows: List[Dict]) -> int:
         """Bulk INSERT ... ON CONFLICT (instrument_token) DO UPDATE for one batch."""
