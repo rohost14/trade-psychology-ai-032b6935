@@ -65,7 +65,7 @@ export function SessionHeroCard({
       <div className="px-4 sm:px-6 py-4 flex items-center justify-between gap-4">
         <div className="min-w-0">
           <div className="flex items-center gap-2">
-            <span className="t-label">Intraday P&amp;L</span>
+            <span className="t-label">Day P&amp;L</span>
             <span className={cn('h-1.5 w-1.5 rounded-full animate-pulse', pnlPositive ? 'bg-profit' : 'bg-loss')} />
           </div>
           <div className="mt-1 flex items-baseline gap-2 flex-wrap">
@@ -75,11 +75,18 @@ export function SessionHeroCard({
             )}>
               {pnlPositive ? '+' : '−'}₹{inr(animatedPnl)}
             </span>
-            {tradesToday > 0 && (
-              <span className="text-[12px] font-tabular font-medium text-muted-foreground">
-                {Math.round(winRate)}% win · {tradesToday} trade{tradesToday !== 1 ? 's' : ''}
-              </span>
-            )}
+          </div>
+          {/* Booked (closed) + Unrealized (open) always sum to the Day P&L above. */}
+          <div className="mt-1 text-[11.5px] font-tabular text-muted-foreground">
+            Booked{' '}
+            <span className={realizedPnlDisplay >= 0 ? 'text-profit' : 'text-loss'}>
+              {realizedPnlDisplay >= 0 ? '+' : '−'}₹{inr(realizedPnlDisplay)}
+            </span>
+            <span className="text-muted-foreground/40"> · </span>
+            Unrealized{' '}
+            <span className={unrealizedTotal > 0 ? 'text-profit' : unrealizedTotal < 0 ? 'text-loss' : ''}>
+              {unrealizedTotal !== 0 ? `${unrealizedTotal >= 0 ? '+' : '−'}₹${inr(unrealizedTotal)}` : '—'}
+            </span>
           </div>
         </div>
 

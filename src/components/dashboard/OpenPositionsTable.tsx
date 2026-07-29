@@ -133,8 +133,11 @@ export default function OpenPositionsTable({
           )}
         </div>
         {openPositions.length > 0 && (
-          <span className={cn('text-sm font-semibold font-tabular', totalPnl >= 0 ? 'text-profit' : 'text-loss')}>
-            {formatCurrencyWithSign(totalPnl)}
+          <span className="flex items-baseline gap-1.5">
+            <span className="text-[10px] uppercase tracking-wider text-muted-foreground">Unrealized</span>
+            <span className={cn('text-sm font-semibold font-tabular', totalPnl >= 0 ? 'text-profit' : 'text-loss')}>
+              {formatCurrencyWithSign(totalPnl)}
+            </span>
           </span>
         )}
       </div>

@@ -57,6 +57,27 @@ export function getISTMidnightUTC(): Date {
   return new Date(nowIST.getTime() - IST_OFFSET_MS);
 }
 
+/**
+ * Start of the current trading SESSION (09:15 IST), as a UTC Date.
+ * Before today's open it points at the previous trading day, and it skips
+ * weekends — so the dashboard keeps showing (and lets you journal) the last
+ * session's closed trades until the next 09:15, instead of going blank at
+ * midnight. (Exchange holidays aren't special-cased — a rare, harmless edge.)
+ */
+export function getLastSessionStartUTC(): Date {
+  const IST_OFFSET_MS = 5.5 * 60 * 60 * 1000;
+  const OPEN_MIN = 9 * 60 + 15; // 09:15 IST
+  const ist = new Date(Date.now() + IST_OFFSET_MS);
+  const nowMin = ist.getUTCHours() * 60 + ist.getUTCMinutes();
+  ist.setUTCHours(9, 15, 0, 0);
+  if (nowMin < OPEN_MIN) ist.setUTCDate(ist.getUTCDate() - 1);
+  // Skip Sat (6) / Sun (0) back to Friday.
+  while (ist.getUTCDay() === 0 || ist.getUTCDay() === 6) {
+    ist.setUTCDate(ist.getUTCDate() - 1);
+  }
+  return new Date(ist.getTime() - IST_OFFSET_MS);
+}
+
 export function formatTimeAgo(dateStr: string): string {
   const date = new Date(dateStr);
   const now = new Date();

@@ -97,8 +97,11 @@ export default function ClosedTradesTable({
           <span className="text-[11px] text-muted-foreground font-tabular">· {trades.length}</span>
           <span className="hidden sm:inline text-[10px] text-muted-foreground/70 uppercase tracking-wider">· tap a row to journal</span>
         </div>
-        <span className={cn('text-sm font-semibold font-tabular', totalPnl >= 0 ? 'text-profit' : 'text-loss')}>
-          {formatCurrencyWithSign(totalPnl)}
+        <span className="flex items-baseline gap-1.5">
+          <span className="text-[10px] uppercase tracking-wider text-muted-foreground">Booked</span>
+          <span className={cn('text-sm font-semibold font-tabular', totalPnl >= 0 ? 'text-profit' : 'text-loss')}>
+            {formatCurrencyWithSign(totalPnl)}
+          </span>
         </span>
       </div>
 

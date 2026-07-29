@@ -23,7 +23,7 @@ import type { MarginStatus } from '@/types/api';
 import { useAlerts, AlertNotification } from '@/contexts/AlertContext';
 import { useBroker } from '@/contexts/BrokerContext';
 import { useWebSocket } from '@/contexts/WebSocketContext';
-import { STATE_CFG, SessionState, getSessionState, formatTimeAgo, getISTMidnightUTC } from '@/lib/dashboardUtils';
+import { STATE_CFG, SessionState, getSessionState, formatTimeAgo, getLastSessionStartUTC } from '@/lib/dashboardUtils';
 import { normalizeSeverityStr } from '@/lib/alertSeverity';
 
 type PositionWithExtras = Position & { instrument_type: string; unrealized_pnl: number; current_value: number };
@@ -289,7 +289,7 @@ export default function Dashboard() {
 
   // Compute session stats
   useEffect(() => {
-    const todayTrades = closedTrades.filter(t => new Date(t.exit_time) >= getISTMidnightUTC());
+    const todayTrades = closedTrades.filter(t => new Date(t.exit_time) >= getLastSessionStartUTC());
     const winners = todayTrades.filter(t => t.realized_pnl > 0);
     const losers = todayTrades.filter(t => t.realized_pnl < 0);
     const realizedPnl = todayTrades.reduce((sum, t) => sum + t.realized_pnl, 0);
@@ -418,7 +418,7 @@ export default function Dashboard() {
 
   // Today's closed trades only
   const recentTrades = useMemo(() => {
-    return closedTrades.filter(t => new Date(t.exit_time) >= getISTMidnightUTC());
+    return closedTrades.filter(t => new Date(t.exit_time) >= getLastSessionStartUTC());
   }, [closedTrades]);
 
   const unreadCount = mergedAlerts.filter(a => !a.acknowledged).length;
@@ -428,7 +428,7 @@ export default function Dashboard() {
   const stateCfg = STATE_CFG[sessionStateKey];
 
   const unjournaled = recentTrades.filter(t =>
-    new Date(t.exit_time) >= getISTMidnightUTC() && !journaledIds.has(t.id)
+    new Date(t.exit_time) >= getLastSessionStartUTC() && !journaledIds.has(t.id)
   ).length;
 
   const unrealizedTotal = useMemo(() =>
