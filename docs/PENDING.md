@@ -241,6 +241,59 @@ with Capacitor is a large body of work with real technical hurdles (not just "wr
 
 ---
 
+## 📣 Sales / Marketing / GTM (Indian F&O trading-psychology)
+
+> **Compliance guardrail (non-negotiable):** NEVER promise returns, give tips/calls, or
+> imply "make money." Market **discipline / self-awareness / stop-the-bleeding**. SEBI data
+> (~90% of F&O traders lose) is your hook — you sell the mirror, not the tip. This angle is
+> both safe *and* your differentiation.
+
+### Positioning / core message
+- "Your broker shows your P&L. We show you **WHY** you lost." Mirror, not blocker.
+- Hooks from the actual detectors (each is a relatable "you do this"): revenge trading,
+  overtrading, tilt/session meltdown, size escalation, no-stop-loss, martingale, FOMO entry,
+  profit giveaway. Each detector = a content series.
+
+### Where the audience is (Indian retail F&O)
+- **Twitter/X — "FinTwit India"** = the #1 channel for this crowd. Build-in-public, behavioural
+  insight threads, engage/reply to trader-pain tweets, get RT'd by finance creators.
+- **Reddit** — r/IndianStreetBets (degen F&O culture), r/DalalStreetTalks, r/IndianStockMarket.
+  **No ads** — Reddit punishes promo. Give value, answer "how do I stop revenge trading" posts,
+  do an "I built this" / AMA. Authentic only.
+- **Instagram Reels / YouTube Shorts** — short, relatable trader-pain videos.
+- **Telegram** — Indian traders live in TG groups; partner with group admins.
+- **SEO/blog** — rank for "how to stop overtrading / revenge trading / trading discipline India".
+
+### Content angles that work here
+- **Anonymised data stories:** "traders who revenge-trade lose X% more" (from your own engine — factual, powerful, unique to you).
+- **Relatable pain:** "POV: you hit your target, then gave it all back in one trade" (profit_giveaway).
+- **Build-in-public:** the mission (90% lose), the journey, screenshots of the mirror.
+- **Myth-bust:** "It's not your strategy. It's your 3pm tilt." Behaviour > system.
+
+### Reels / Shorts — how to actually make them
+- **Format:** 7–20s, hook in first 1s, one behaviour per video, text-on-screen (most watch muted),
+  trending audio. End with a soft "the app that shows you this → link in bio."
+- **Cheap production:** screen-record the app + CapCut (edit/captions) + Canva (graphics);
+  ElevenLabs (AI voiceover) or HeyGen (AI avatar) if camera-shy. No fancy gear.
+- **Volume > polish:** post daily, test hooks, double down on what lands.
+
+### Tools (incl. Claude/AI)
+- **Claude** — draft tweet threads, reel scripts, blog posts, reply suggestions; **repurpose 1
+  insight → 10 formats** (thread → reel script → short → carousel → blog); build a content calendar.
+- **Video/graphics:** CapCut, Canva, ElevenLabs, HeyGen, OBS (screen record).
+- **Scheduling:** Typefully/Buffer (X), Later (Insta).
+- **Beta/launch:** Product Hunt, a waitlist landing page, a **referral loop** (invite → unlock),
+  early-user testimonials.
+
+### Launch sequence (marketing)
+1. Landing page + waitlist (collect emails pre-launch).
+2. Build-in-public on X during the build (you're already building — share it).
+3. Seed a small closed beta (FinTwit + Reddit volunteers) → testimonials + fix.
+4. Public launch: Product Hunt + coordinated X/Reddit/Reels push + creator partnerships.
+5. Content engine: 1 behaviour/day across X + Reels, driven by Claude repurposing.
+
+---
+
 ## Hard product constraints (govern all future work)
 1. **Kite gives NO trade history** — today-only; new users start empty; only fix = Console CSV import.
 2. **Zero manual-input adoption** — never design features that need the user to type/tap.
