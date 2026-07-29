@@ -28,8 +28,8 @@ export function MarketRail({ title = 'Trading Desk' }: { title?: string }) {
   const { open, closeIn, clock } = useMarketClock();
 
   return (
-    <header className="-mx-4 sm:-mx-6 md:-mx-8 border-b border-border bg-card mb-4">
-      <div className="min-h-12 flex items-center px-4 sm:px-6 md:px-8 gap-3 py-2">
+    <header className="-mx-4 sm:-mx-6 lg:-mx-8 -mt-4 sm:-mt-6 border-b border-border bg-card mb-4">
+      <div className="min-h-12 flex items-center px-4 sm:px-6 lg:px-8 gap-3 py-2">
         <div className="min-w-0 flex items-center gap-2.5">
           <span className="h-5 w-[3px] rounded-full bg-primary shrink-0" aria-hidden />
           <h1 className="text-[14px] font-semibold tracking-tight text-foreground truncate leading-tight">{title}</h1>

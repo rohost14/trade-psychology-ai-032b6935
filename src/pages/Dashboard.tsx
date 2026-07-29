@@ -559,8 +559,8 @@ export default function Dashboard() {
       {/* ── Market status rail (Lovable-style top bar) ───────────────────── */}
       <MarketRail />
 
-      {/* ── Compact session strip (replaces giant hero card) ─────────────── */}
-      <div className="-mx-4 sm:-mx-6 md:-mx-8 mb-4">
+      {/* ── Single-column dashboard: hero · alerts · open · closed ───────── */}
+      <div className="flex flex-col gap-4">
         <SessionHeroCard
           stateCfg={stateCfg}
           sessionPnlDisplay={sessionPnlDisplay}
@@ -574,18 +574,9 @@ export default function Dashboard() {
           dailyTradeLimit={dailyTradeLimit}
           margins={margins}
         />
-      </div>
 
-      {/* New-user setup prompt — self-gates to null once onboarded/dismissed */}
-      <div className="mb-4">
+        {/* New-user setup prompt — self-gates to null once onboarded/dismissed */}
         <SetupNudgeCard />
-      </div>
-
-      {/* ── Single-column dashboard: live alerts · open positions · closed ──
-          Intent moved to Journal, EOD comparison to Reports, the predictive
-          context strip to Analytics → Behaviour, and the Behavior-Risk band
-          removed (My Patterns already surfaces the score). */}
-      <div className="flex flex-col gap-4">
 
         {/* Behavioral alerts */}
         <div aria-live="polite" aria-label="Behavioral alerts">
