@@ -9,7 +9,7 @@ import RecentAlertsCard from '@/components/dashboard/RecentAlertsCard';
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/components/ui/accordion';
 import AlertDetailSheet from '@/components/alerts/AlertDetailSheet';
 import OpenPositionsTable from '@/components/dashboard/OpenPositionsTable';
-import ClosedTradesTable from '@/components/dashboard/ClosedTradesTable';
+import ClosedPositionsCard from '@/components/dashboard/ClosedPositionsCard';
 import { SessionHeroCard } from '@/components/dashboard/SessionHeroCard';
 import { AiCoachFab } from '@/components/dashboard/AiCoachFab';
 import { TradeJournalSheet } from '@/components/dashboard/TradeJournalSheet';
@@ -624,9 +624,9 @@ export default function Dashboard() {
                 </div>
               </AccordionTrigger>
               <AccordionContent className="border-t border-border">
-                <ClosedTradesTable
-                  trades={recentTrades}
-                  isLoading={tradesLoading}
+                <ClosedPositionsCard
+                  sinceIso={getLastSessionStartUTC().toISOString()}
+                  roundTrips={recentTrades}
                   journaledIds={journaledIds}
                   onTradeClick={handleTradeClick}
                 />

@@ -121,6 +121,68 @@ async def list_completed_trades(
     return {"trades": trades, "total": total or 0}
 
 
+@router.get("/closed-summary")
+async def closed_summary(
+    broker_account_id: UUID = Depends(get_verified_broker_account_id),
+    since: Optional[str] = Query(None, description="ISO timestamp — only trades closed at/after this (session window)"),
+    db: AsyncSession = Depends(get_db),
+) -> Any:
+    """
+    Consolidated closed positions — ONE net row per (instrument, product), like the
+    Zerodha positions view. Aggregates the per-round-trip CompletedTrades for DISPLAY
+    only; the round-trips themselves are untouched (the engine + journal still use them).
+    `tradingsymbol` encodes strike+expiry, so grouping by (tradingsymbol, product) keeps
+    different expiries / strikes / products separate. Single indexed GROUP BY — no new
+    load path, no migration.
+    """
+    q = select(
+        CompletedTrade.tradingsymbol,
+        CompletedTrade.exchange,
+        CompletedTrade.instrument_type,
+        CompletedTrade.product,
+        func.count().label("trades"),
+        func.sum(CompletedTrade.realized_pnl).label("net_pnl"),
+        func.sum(CompletedTrade.total_quantity).label("total_qty"),
+        func.min(CompletedTrade.entry_time).label("first_entry"),
+        func.max(CompletedTrade.exit_time).label("last_exit"),
+        func.sum(CompletedTrade.duration_minutes).label("total_hold_min"),
+        (func.sum(CompletedTrade.avg_entry_price * CompletedTrade.total_quantity)
+         / func.nullif(func.sum(CompletedTrade.total_quantity), 0)).label("w_entry"),
+        (func.sum(CompletedTrade.avg_exit_price * CompletedTrade.total_quantity)
+         / func.nullif(func.sum(CompletedTrade.total_quantity), 0)).label("w_exit"),
+    ).where(CompletedTrade.broker_account_id == broker_account_id)
+
+    if since:
+        from datetime import datetime
+        try:
+            dt = datetime.fromisoformat(since.replace("Z", "+00:00"))
+            q = q.where(CompletedTrade.exit_time >= dt)
+        except ValueError:
+            pass
+
+    q = q.group_by(
+        CompletedTrade.tradingsymbol, CompletedTrade.exchange,
+        CompletedTrade.instrument_type, CompletedTrade.product,
+    ).order_by(desc(func.max(CompletedTrade.exit_time)))
+
+    rows = (await db.execute(q)).all()
+    positions = [{
+        "tradingsymbol": r.tradingsymbol,
+        "exchange": r.exchange,
+        "instrument_type": r.instrument_type,
+        "product": r.product,
+        "trades": int(r.trades or 0),
+        "net_pnl": float(r.net_pnl or 0),
+        "total_qty": int(r.total_qty or 0),
+        "first_entry": r.first_entry,
+        "last_exit": r.last_exit,
+        "total_hold_min": int(r.total_hold_min or 0),
+        "avg_entry_price": float(r.w_entry or 0),
+        "avg_exit_price": float(r.w_exit or 0),
+    } for r in rows]
+    return {"positions": positions, "total": len(positions)}
+
+
 @router.get("/incomplete", response_model=IncompletePositionListResponse)
 async def list_incomplete_positions(
     broker_account_id: UUID = Depends(get_verified_broker_account_id),
