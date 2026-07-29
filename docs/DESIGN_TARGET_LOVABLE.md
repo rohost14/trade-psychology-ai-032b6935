@@ -49,5 +49,24 @@ Captured 2026-07-29 by walking the full Lovable preview (landing + all 7 app pag
 4. **Nav renames:** Chat→**AI Mentor**, My Patterns→**Patterns**. Cosmetic; adopt if desired.
 5. Demo/aspirational values in mockup (loss cap ₹10,000, etc.) are cosmetic — real data wires to our engine.
 
+## Dashboard cleanup (CONFIRMED with user 2026-07-29)
+
+Target Dashboard = **single column**, ONLY these, in order:
+1. `SessionHeroCard` (hero stat strip)
+2. `RecentAlertsCard` (live behavioral alerts)
+3. `OpenPositionsTable`
+4. `ClosedTradesTable`
+
+**Kill the 2-column grid** (the sticky 35% right column is the source of the dead whitespace). **No streak card on the Dashboard** (user: explicitly none).
+
+Evicted components + their new homes (confirmed):
+| Component | New home |
+|---|---|
+| `PredictiveContextStrip` (the "Wednesday is a high-loss day / revenge window" AI-analysis cards — user disliked these) | **Analytics** → Timing/Behaviour tab |
+| `MorningIntentCard` (today's intent) | **Journal** |
+| `EodComparisonCard` (EOD summary) | **Reports** |
+| `BehaviorRiskBadge` ("Behavior Risk: Normal" band) | **Remove** (duplicate — My Patterns already shows the behavior-risk score) |
+| `SetupNudgeCard` (new-user setup prompt) | Keep as a **dismissible top banner, shown only to un-onboarded users** |
+
 ## Not a redesign of logic
 This is a **skin + IA** change. The backend engine, detectors, real-time pipeline, and money-truth stay. The mockup's data model (cost-per-pattern, occurrence counts, ignored/listened, trend) maps cleanly onto what the BehaviorEngine + RiskAlerts already produce.
