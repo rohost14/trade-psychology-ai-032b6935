@@ -204,15 +204,26 @@ function LiveTab({ onOpen }: { onOpen: (a: AlertNotification) => void }) {
   if (isLoading) return <AlertSkeleton />;
 
   if (live.length === 0) {
+    // "Nothing left to review" is NOT the same as "you traded well". Only praise a
+    // genuinely clean window (no alerts fired at all). If alerts fired and were merely
+    // acknowledged, stay neutral — praising discipline on a day with danger alerts
+    // contradicts the alert stream and the whole "mirror" premise.
+    const totalFired = alerts.length;
+    const dangerFired = alerts.filter(a => a.pattern.severity === 'danger').length;
+    const cleanWindow = totalFired === 0;
     return (
       <div className="tm-card px-5 py-6 flex items-start gap-4">
         <div className="w-8 h-8 rounded-full bg-teal-50 dark:bg-teal-900/20 flex items-center justify-center flex-shrink-0 mt-0.5">
           <Shield className="h-4 w-4 text-tm-brand" />
         </div>
         <div>
-          <p className="text-[13px] font-semibold text-foreground">Clean session</p>
+          <p className="text-[13px] font-semibold text-foreground">
+            {cleanWindow ? 'Clean session' : 'All caught up'}
+          </p>
           <p className="text-[12px] text-muted-foreground mt-0.5 leading-relaxed">
-            No active behavioral alerts. You're trading with discipline — keep it up.
+            {cleanWindow
+              ? "No active behavioral alerts. You're trading with discipline — keep it up."
+              : `You've reviewed all ${totalFired} alert${totalFired !== 1 ? 's' : ''} from this period${dangerFired > 0 ? ` (${dangerFired} danger)` : ''}. Nothing left to review.`}
           </p>
           <p className="text-[11px] text-muted-foreground/60 mt-2">
             Alerts appear here as they fire. Check History to review past patterns.

@@ -42,3 +42,9 @@ class RiskStateResponse(BaseModel):
     active_patterns: List[str]
     recent_alerts: List[RiskAlertResponse]
     recommendations: List[str]
+    # The user's EFFECTIVE daily limits, resolved from the SAME source the
+    # BehaviorEngine uses (trading_defaults.get_thresholds → profile value, else
+    # 5% of capital). Surfaced so the dashboard hero shows the real limit instead
+    # of a hardcoded placeholder that contradicted the constitution-violation alert.
+    daily_loss_limit: Optional[float] = None
+    daily_trade_limit: Optional[int] = None

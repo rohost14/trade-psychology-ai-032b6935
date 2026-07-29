@@ -11,7 +11,9 @@ from app.api.deps import get_verified_broker_account_id
 from app.models.risk_alert import RiskAlert
 from app.models.alert_mute import AlertMute
 from app.schemas.risk_alert import RiskAlertListResponse, RiskStateResponse
+import logging
 
+logger = logging.getLogger(__name__)
 router = APIRouter()
 
 # A user may silence real-time delivery of at most this many patterns at once.
@@ -54,11 +56,37 @@ async def get_risk_state(
         risk_state = "caution"
         active_patterns = list({a.pattern_type for a in recent_alerts})
 
+    # Resolve the user's EFFECTIVE daily limits from the same source the engine's
+    # constitution / session-meltdown detectors use, so the dashboard hero and the
+    # alert copy agree on ONE limit (was: hero fell back to a hardcoded 25,000 while
+    # the constitution alert used the real profile limit).
+    daily_loss_limit = None
+    daily_trade_limit = None
+    try:
+        from app.models.user_profile import UserProfile
+        from app.core.trading_defaults import get_thresholds
+        prof_result = await db.execute(
+            select(UserProfile).where(UserProfile.broker_account_id == broker_account_id)
+        )
+        profile = prof_result.scalar_one_or_none()
+        th = get_thresholds(profile)
+        loss_limit = th.get("daily_loss_limit")
+        if not loss_limit or loss_limit <= 0:
+            cap = th.get("trading_capital")
+            loss_limit = float(cap) * 0.05 if cap and float(cap) > 0 else None
+        daily_loss_limit = float(loss_limit) if loss_limit else None
+        tl = th.get("daily_trade_limit")
+        daily_trade_limit = int(tl) if tl else None
+    except Exception as _lim_err:  # never let limit resolution break the risk state
+        logger.warning(f"[risk/state] limit resolution failed: {_lim_err}")
+
     return RiskStateResponse(
         risk_state=risk_state,
         active_patterns=active_patterns,
         recent_alerts=recent_alerts,
         recommendations=[],
+        daily_loss_limit=daily_loss_limit,
+        daily_trade_limit=daily_trade_limit,
     )
 
 @router.get("/alerts", response_model=RiskAlertListResponse)

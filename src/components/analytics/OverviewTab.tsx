@@ -526,8 +526,18 @@ export default function OverviewTab({ days }: OverviewTabProps) {
             </div>
             <p className="px-5 pb-3.5 text-[11px] text-muted-foreground">
               {productEntries.length > 0 && (() => {
-                const [best] = productEntries.sort((a, b) => b[1].pnl - a[1].pnl);
-                return `${best[0]} is your strongest product type this period (${formatCurrencyWithSign(Math.round(best[1].pnl))}).`;
+                const sorted = [...productEntries].sort((a, b) => b[1].pnl - a[1].pnl);
+                const [best] = sorted;
+                const pnl = Math.round(best[1].pnl);
+                const amt = formatCurrencyWithSign(pnl);
+                // "Strongest" only makes sense for a positive result. A single or all-negative
+                // product must NOT be labelled strongest — that contradicts the hero's "biggest leak".
+                if (pnl < 0) {
+                  return sorted.length === 1
+                    ? `${best[0]} was your only product type this period (${amt}).`
+                    : `${best[0]} lost the least this period (${amt}); every product was net negative.`;
+                }
+                return `${best[0]} is your strongest product type this period (${amt}).`;
               })()}
             </p>
           </div>
