@@ -80,9 +80,11 @@ export default function ReportCard({ days }: Props) {
     : (pf ?? 0) >= 0.9 ? 'Close to break-even — a small leak is the difference.'
     : 'Losing period. The leak below is where to start.';
 
-  // One factual focus line, derived from the biggest leak (no attribution).
+  // Actionable next-step — NOT a restatement of the leak pillar (which already shows
+  // the label + amount). The old copy repeated "biggest drain is <leak> (<pnl>)",
+  // duplicating the Biggest-leak card. Point at what to review instead.
   const focus = leak
-    ? `Your biggest drain is ${leak.label.toLowerCase()} (${formatCurrencyWithSign(Math.round(leak.pnl))}).`
+    ? `Start with your ${leak.label} trades — the biggest drain to plug.`
     : edge
     ? `Lean into ${edge.label} — your most profitable area.`
     : 'Keep trading to unlock your edge/leak breakdown.';

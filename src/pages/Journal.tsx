@@ -483,17 +483,42 @@ export default function Journal() {
       ) : error ? (
         <ErrorState error={error} onRetry={() => fetchEntries(true)} />
       ) : filtered.length === 0 ? (
-        <div className="tm-card flex flex-col items-center justify-center py-16 text-center">
-          <BookOpen className="h-10 w-10 text-muted-foreground/30 mb-3" />
-          <p className="text-sm font-medium text-foreground">
-            {entries.length === 0 ? 'No journal entries yet' : 'No entries match these filters'}
-          </p>
-          <p className="text-[13px] text-muted-foreground mt-1 max-w-xs">
-            {entries.length === 0
-              ? 'Journal entries are created when you tap the pencil icon on a trade'
-              : 'Try removing a filter to see more entries'}
-          </p>
-        </div>
+        (() => {
+          const hasTagFilters = emotionFilter.length > 0 || !!planFilter;
+          // Distinguish the three empty reasons so the page never looks broken:
+          //   (a) genuinely no entries, (b) entries exist but all fall outside the
+          //   selected time window (was misleading: "19 total" + "no match"),
+          //   (c) an emotion/plan filter is hiding them.
+          const noneAtAll = entries.length === 0;
+          const outsideWindow = !noneAtAll && !hasTagFilters && period > 0;
+          return (
+            <div className="tm-card flex flex-col items-center justify-center py-16 text-center">
+              <BookOpen className="h-10 w-10 text-muted-foreground/30 mb-3" />
+              <p className="text-sm font-medium text-foreground">
+                {noneAtAll
+                  ? 'No journal entries yet'
+                  : outsideWindow
+                    ? `No entries in the last ${period} days`
+                    : 'No entries match these filters'}
+              </p>
+              <p className="text-[13px] text-muted-foreground mt-1 max-w-xs">
+                {noneAtAll
+                  ? 'Journal entries are created when you tap the pencil icon on a trade'
+                  : outsideWindow
+                    ? `Your ${entries.length} entr${entries.length === 1 ? 'y is' : 'ies are'} older than this window.`
+                    : 'Try removing a filter to see more entries'}
+              </p>
+              {outsideWindow && (
+                <button
+                  onClick={() => setPeriod(0)}
+                  className="mt-3 text-[12px] font-medium text-tm-brand hover:underline"
+                >
+                  Show all entries
+                </button>
+              )}
+            </div>
+          );
+        })()
       ) : (
         <div className="space-y-2">
           {filtered.map(entry => (
