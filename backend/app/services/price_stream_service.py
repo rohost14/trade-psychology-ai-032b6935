@@ -51,6 +51,13 @@ logger = logging.getLogger(__name__)
 # KiteTicker sends multiple ticks/second — we throttle here.
 _TICK_THROTTLE_SECONDS = 1.0
 
+# KiteTicker runs on Twisted's GLOBAL reactor, which can be started exactly ONCE
+# per process (a second start raises twisted ReactorNotRestartable and kills the
+# thread). So we start the reactor once and NEVER rebuild the ticker in-process:
+# dropped connections self-heal via KiteTicker's own reconnect on the same reactor;
+# a new market-data token only takes effect on a PROCESS restart.
+_REACTOR_STARTED = False
+
 
 # ─────────────────────────────────────────────────────────────────────────────
 # Abstract interface — the only contract callers depend on
@@ -208,8 +215,22 @@ class ZerodhaTicker:
         self.kws.on_reconnect = self._on_reconnect
         self.kws.on_noreconnect = self._on_noreconnect
 
+        # Guard: the Twisted reactor can only be started once per process. If it was
+        # already started (by an earlier ticker), do NOT start a second one — that
+        # raises ReactorNotRestartable and crashes the thread. The existing ticker
+        # keeps streaming; picking up a new token needs a process restart.
+        global _REACTOR_STARTED
+        if _REACTOR_STARTED:
+            logger.error(
+                f"[ticker:{self.broker_account_id}] Twisted reactor already running in "
+                "this process — refusing to start a second KiteTicker connection "
+                "(ReactorNotRestartable). A new market-data token requires a process restart."
+            )
+            return
+
         # threaded=True: KiteTicker runs its own event loop in a daemon thread.
         await self._loop.run_in_executor(None, lambda: self.kws.connect(threaded=True))
+        _REACTOR_STARTED = True
         logger.info(f"[ticker:{self.broker_account_id}] KiteTicker thread started.")
 
     # ── KiteTicker callbacks (called from KiteTicker thread) ──────────────────
@@ -553,19 +574,26 @@ class SharedPriceStream(PriceStreamProvider):
 
     async def _on_ticker_noreconnect(self) -> None:
         """
-        Fired when KiteTicker exhausts reconnect attempts (token expired).
-        Picks a fresh token from DB and rebuilds the ticker transparently.
+        Fired when KiteTicker exhausts reconnect attempts (token expired / invalid).
+
+        We CANNOT rebuild the ticker here: KiteTicker runs on Twisted's global reactor,
+        which cannot be restarted in-process (ReactorNotRestartable). A fresh token only
+        takes effect after a PROCESS restart. In production the daily 08:45 refresh writes
+        a valid token to Redis before market open, and the process (Fly/supervisor) picks
+        it up on its next start; between refreshes KiteTicker's own reconnect keeps the
+        connection alive. In dev with no valid market-data token this simply stays down —
+        expected, not a crash.
         """
-        logger.warning("[shared_ticker] Ticker noreconnect — rebuilding with new token.")
+        logger.error(
+            "[shared_ticker] Ticker exhausted reconnects (token expired/invalid). "
+            "Cannot rebuild in-process (Twisted reactor is not restartable) — a new token "
+            "needs a PROCESS restart. Set ZERODHA_MD_* for a durable auto-refreshed feed."
+        )
         try:
-            from app.core.database import SessionLocal
-            async with SessionLocal() as db:
-                async with self._ticker_lock:
-                    if self._ticker:
-                        self._ticker.stop()
-                    self._ticker = await self._build_ticker(db)
-        except Exception as e:
-            logger.error(f"[shared_ticker] Rebuild after noreconnect failed: {e}")
+            from app.core import metrics
+            metrics.incr("md_token_unavailable")
+        except Exception:
+            pass
 
     async def _ensure_ticker(self, db) -> Optional[ZerodhaTicker]:
         """
@@ -573,11 +601,13 @@ class SharedPriceStream(PriceStreamProvider):
         Caller must NOT hold _ticker_lock.
         """
         async with self._ticker_lock:
-            if self._ticker and self._ticker._connected:
+            # NEVER rebuild an existing ticker: KiteTicker's Twisted reactor cannot be
+            # restarted in-process (ReactorNotRestartable). If a ticker object exists —
+            # even if it is not currently connected (e.g. mid-reconnect, or a dev token
+            # that 403s) — reuse it. KiteTicker auto-reconnects on the same reactor; new
+            # subscriptions are queued and applied on (re)connect via _on_connect.
+            if self._ticker is not None:
                 return self._ticker
-            # Either no ticker yet, or connection dropped
-            if self._ticker:
-                self._ticker.stop()
             self._ticker = await self._build_ticker(db)
             return self._ticker
 
