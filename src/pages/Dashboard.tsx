@@ -391,10 +391,9 @@ export default function Dashboard() {
 
   // ── Computed values ───────────────────────────────────────────────────────
   const mergedAlerts = useMemo(() => {
-    const IST_OFFSET_MS = 5.5 * 60 * 60 * 1000;
-    const nowIST = new Date(Date.now() + IST_OFFSET_MS);
-    nowIST.setUTCHours(0, 0, 0, 0);
-    const cutoff = nowIST.getTime() - IST_OFFSET_MS;
+    // Same session window as closed trades — so the alert feed doesn't blank out at
+    // calendar midnight; it holds the last session's alerts until the next 09:15.
+    const cutoff = getLastSessionStartUTC().getTime();
     return alerts
       .filter(a => a.shown_at && new Date(a.shown_at).getTime() >= cutoff)
       .map(a => ({
