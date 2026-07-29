@@ -211,6 +211,36 @@ with Capacitor is a large body of work with real technical hurdles (not just "wr
 
 ---
 
+## 🇮🇳 India fintech compliance / corporate (beyond SEBI)
+- [ ] **Company incorporation** (Pvt Ltd) — needed for a business bank account, payment
+      aggregator, GST, contracts. Founder/cap-table basics.
+- [ ] **Business bank account** + **GST registration** (required before Razorpay payout).
+- [ ] **Payment-aggregator KYC** (Razorpay onboarding = business docs + bank).
+- [ ] **DPDP Act** — data-protection compliance: a **grievance officer**, consent, breach
+      process; **data localization** (keep Indian user data in India — Supabase **Mumbai**
+      region helps; verify Upstash region too).
+- [ ] **Trademark** the name + logo.
+- [ ] **Insurance** — cyber-liability / professional-indemnity (handling financial data).
+- [ ] **SEBI positioning legal opinion** (see Legal section) — the gating compliance item.
+
+## 🔐 Security / ops hardening (pre-real-users)
+- [ ] **Penetration test / security review** before handling real accounts at scale
+      (deep-review done internally; external pen-test for launch).
+- [ ] **Incident-response plan** (what to do on breach / outage / token leak).
+- [ ] **Security disclosure policy** (`security.txt` / contact for reports).
+- [ ] **Status page** (uptime/incidents) — BetterStack/Instatus.
+- [ ] Secrets rotation policy; confirm admin IP-allowlist + audit log (both exist) for prod.
+
+## 🧑‍💼 Support / growth / product ops
+- [ ] **Help docs / FAQ / knowledge base.**
+- [ ] **Support channel** (email/ticketing) + in-app bug-report/feedback.
+- [ ] **Onboarding** polish for low-end Android + flaky networks (India reality); offline UX.
+- [ ] Notification-tap **deep-links** (open the right screen from a push).
+- [ ] Product analytics funnels (activation/retention) + a "what's new"/changelog.
+- [ ] Growth: referral loop, landing/marketing site, app-store presence (ASO), social.
+
+---
+
 ## Hard product constraints (govern all future work)
 1. **Kite gives NO trade history** — today-only; new users start empty; only fix = Console CSV import.
 2. **Zero manual-input adoption** — never design features that need the user to type/tap.
