@@ -3,8 +3,10 @@ import { useNavigate } from 'react-router-dom';
 import { Link } from 'react-router-dom';
 import { Link2, Loader2, AlertTriangle, RefreshCw, X } from 'lucide-react';
 import { SetupNudgeCard } from '@/components/dashboard/SetupNudgeCard';
+import { MarketRail } from '@/components/dashboard/MarketRail';
 import ImportHistoryPrompt from '@/components/onboarding/ImportHistoryPrompt';
 import RecentAlertsCard from '@/components/dashboard/RecentAlertsCard';
+import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/components/ui/accordion';
 import AlertDetailSheet from '@/components/alerts/AlertDetailSheet';
 import OpenPositionsTable from '@/components/dashboard/OpenPositionsTable';
 import ClosedTradesTable from '@/components/dashboard/ClosedTradesTable';
@@ -554,6 +556,9 @@ export default function Dashboard() {
         </div>
       )}
 
+      {/* ── Market status rail (Lovable-style top bar) ───────────────────── */}
+      <MarketRail />
+
       {/* ── Compact session strip (replaces giant hero card) ─────────────── */}
       <div className="-mx-4 sm:-mx-6 md:-mx-8 mb-4">
         <SessionHeroCard
@@ -611,7 +616,7 @@ export default function Dashboard() {
           />
         )}
 
-        {/* Today's closed trades */}
+        {/* Today's closed trades — collapsible, Lovable-style */}
         {tradesError && !tradesLoading && closedTrades.length === 0 ? (
           <div className="tm-card p-5 text-center">
             <AlertTriangle className="h-5 w-5 text-tm-loss mx-auto mb-2" />
@@ -619,12 +624,24 @@ export default function Dashboard() {
             <Button onClick={fetchTrades} variant="ghost" size="sm" className="mt-2">Retry</Button>
           </div>
         ) : (
-          <ClosedTradesTable
-            trades={recentTrades}
-            isLoading={tradesLoading}
-            journaledIds={journaledIds}
-            onTradeClick={handleTradeClick}
-          />
+          <Accordion type="single" collapsible defaultValue="closed" className="desk-card">
+            <AccordionItem value="closed" className="border-0">
+              <AccordionTrigger className="px-5 sm:px-6 py-4 hover:no-underline">
+                <div className="flex items-center gap-2.5">
+                  <span className="text-[11px] uppercase tracking-[0.12em] font-medium text-muted-foreground">Closed positions today</span>
+                  <span className="text-[11px] text-muted-foreground">· tap to collapse</span>
+                </div>
+              </AccordionTrigger>
+              <AccordionContent className="border-t border-border">
+                <ClosedTradesTable
+                  trades={recentTrades}
+                  isLoading={tradesLoading}
+                  journaledIds={journaledIds}
+                  onTradeClick={handleTradeClick}
+                />
+              </AccordionContent>
+            </AccordionItem>
+          </Accordion>
         )}
       </div>
 
