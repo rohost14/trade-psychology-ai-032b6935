@@ -12,6 +12,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import ErrorState from '@/components/ErrorState';
 import { api } from '@/lib/api';
 import { useBroker } from '@/contexts/BrokerContext';
+import { EodComparisonCard } from '@/components/dashboard/EodComparisonCard';
 
 // ─── Types ──────────────────────────────────────────────────────────────────
 
@@ -532,6 +533,9 @@ export default function Reports() {
           </p>
         </div>
       </div>
+
+      {/* Today vs last session — moved here from the Dashboard (EOD lives in Reports) */}
+      <EodComparisonCard />
 
       {/* Filter tabs */}
       <div className="flex gap-2 flex-wrap">

@@ -2,17 +2,13 @@ import { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Link } from 'react-router-dom';
 import { Link2, Loader2, AlertTriangle, RefreshCw, X } from 'lucide-react';
-import { MorningIntentCard } from '@/components/dashboard/MorningIntentCard';
-import { EodComparisonCard } from '@/components/dashboard/EodComparisonCard';
 import { SetupNudgeCard } from '@/components/dashboard/SetupNudgeCard';
 import ImportHistoryPrompt from '@/components/onboarding/ImportHistoryPrompt';
-import { BehaviorRiskBadge } from '@/components/dashboard/BehaviorRiskBadge';
 import RecentAlertsCard from '@/components/dashboard/RecentAlertsCard';
 import AlertDetailSheet from '@/components/alerts/AlertDetailSheet';
 import OpenPositionsTable from '@/components/dashboard/OpenPositionsTable';
 import ClosedTradesTable from '@/components/dashboard/ClosedTradesTable';
 import { SessionHeroCard } from '@/components/dashboard/SessionHeroCard';
-import { PredictiveContextStrip } from '@/components/dashboard/PredictiveContextStrip';
 import { AiCoachFab } from '@/components/dashboard/AiCoachFab';
 import { TradeJournalSheet } from '@/components/dashboard/TradeJournalSheet';
 import { Button } from '@/components/ui/button';
@@ -575,93 +571,61 @@ export default function Dashboard() {
         />
       </div>
 
-      {/* ── Behavior Risk band (Phase 5, master Q10 — ambient, not an alert) ── */}
+      {/* New-user setup prompt — self-gates to null once onboarded/dismissed */}
       <div className="mb-4">
-        <BehaviorRiskBadge />
+        <SetupNudgeCard />
       </div>
 
-      {/* ── Main content: mobile=stack, desktop=2-col grid ────────────────── */}
-      <div className="flex flex-col lg:flex-row gap-5 items-start">
+      {/* ── Single-column dashboard: live alerts · open positions · closed ──
+          Intent moved to Journal, EOD comparison to Reports, the predictive
+          context strip to Analytics → Behaviour, and the Behavior-Risk band
+          removed (My Patterns already surfaces the score). */}
+      <div className="flex flex-col gap-4">
 
-        {/* ── LEFT COLUMN (full width mobile, 65% desktop) ────────────────── */}
-        <div className="w-full lg:flex-[65] min-w-0 flex flex-col gap-4">
-
-          {/* Morning Intent — mobile only (shows between strip and alerts) */}
-          <div className="lg:hidden">
-            <MorningIntentCard />
-          </div>
-
-          {/* Behavioral alerts */}
-          <div aria-live="polite" aria-label="Behavioral alerts">
-            <RecentAlertsCard
-              alerts={mergedAlerts}
-              loading={alertsLoading}
-              onAcknowledge={acknowledgeAlert}
-              onOpen={id => setSelectedAlert(alerts.find(a => a.id === id) ?? null)}
-            />
-          </div>
-
-          {/* Open Positions */}
-          {positionsError && !positionsLoading && positions.length === 0 ? (
-            <div className="tm-card p-5 text-center">
-              <AlertTriangle className="h-5 w-5 text-tm-loss mx-auto mb-2" />
-              <p className="text-[13px] text-muted-foreground">{positionsError}</p>
-              <Button onClick={fetchPositions} variant="ghost" size="sm" className="mt-2">Retry</Button>
-            </div>
-          ) : (
-            <OpenPositionsTable
-              positions={positions}
-              isLoading={positionsLoading}
-              journaledIds={journaledIds}
-              onPositionClick={handlePositionClick}
-              pricesConnected={wsConnected}
-              lastPriceAt={lastLtpAt}
-              tokenExpired={isTokenExpired}
-            />
-          )}
-
-          {/* Today's closed trades */}
-          {tradesError && !tradesLoading && closedTrades.length === 0 ? (
-            <div className="tm-card p-5 text-center">
-              <AlertTriangle className="h-5 w-5 text-tm-loss mx-auto mb-2" />
-              <p className="text-[13px] text-muted-foreground">{tradesError}</p>
-              <Button onClick={fetchTrades} variant="ghost" size="sm" className="mt-2">Retry</Button>
-            </div>
-          ) : (
-            <ClosedTradesTable
-              trades={recentTrades}
-              isLoading={tradesLoading}
-              journaledIds={journaledIds}
-              onTradeClick={handleTradeClick}
-            />
-          )}
-
-          {/* EOD comparison — mobile only (full-width below trades) */}
-          <div className="lg:hidden">
-            <EodComparisonCard />
-          </div>
-
-          {/* Setup nudge — mobile only at bottom */}
-          <div className="lg:hidden">
-            <SetupNudgeCard />
-          </div>
+        {/* Behavioral alerts */}
+        <div aria-live="polite" aria-label="Behavioral alerts">
+          <RecentAlertsCard
+            alerts={mergedAlerts}
+            loading={alertsLoading}
+            onAcknowledge={acknowledgeAlert}
+            onOpen={id => setSelectedAlert(alerts.find(a => a.id === id) ?? null)}
+          />
         </div>
 
-        {/* ── RIGHT COLUMN (35% desktop, hidden on mobile) ────────────────── */}
-        <div className="hidden lg:flex lg:flex-[35] min-w-0 flex-col gap-4 sticky top-4">
+        {/* Open Positions */}
+        {positionsError && !positionsLoading && positions.length === 0 ? (
+          <div className="tm-card p-5 text-center">
+            <AlertTriangle className="h-5 w-5 text-tm-loss mx-auto mb-2" />
+            <p className="text-[13px] text-muted-foreground">{positionsError}</p>
+            <Button onClick={fetchPositions} variant="ghost" size="sm" className="mt-2">Retry</Button>
+          </div>
+        ) : (
+          <OpenPositionsTable
+            positions={positions}
+            isLoading={positionsLoading}
+            journaledIds={journaledIds}
+            onPositionClick={handlePositionClick}
+            pricesConnected={wsConnected}
+            lastPriceAt={lastLtpAt}
+            tokenExpired={isTokenExpired}
+          />
+        )}
 
-          {/* Morning Intent — desktop sticky panel */}
-          <MorningIntentCard />
-
-          {/* Predictive context strip */}
-          {accountId && <PredictiveContextStrip brokerAccountId={accountId} />}
-
-          {/* Setup nudge for new users */}
-          <SetupNudgeCard />
-
-          {/* EOD comparison — desktop right column */}
-          <EodComparisonCard />
-        </div>
+        {/* Today's closed trades */}
+        {tradesError && !tradesLoading && closedTrades.length === 0 ? (
+          <div className="tm-card p-5 text-center">
+            <AlertTriangle className="h-5 w-5 text-tm-loss mx-auto mb-2" />
+            <p className="text-[13px] text-muted-foreground">{tradesError}</p>
+            <Button onClick={fetchTrades} variant="ghost" size="sm" className="mt-2">Retry</Button>
+          </div>
+        ) : (
+          <ClosedTradesTable
+            trades={recentTrades}
+            isLoading={tradesLoading}
+            journaledIds={journaledIds}
+            onTradeClick={handleTradeClick}
+          />
+        )}
       </div>
 
       {/* ── AI Coach floating action button ──────────────────────────────── */}

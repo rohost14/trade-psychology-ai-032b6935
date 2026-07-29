@@ -8,6 +8,8 @@ import { api } from '@/lib/api';
 import { Link } from 'react-router-dom';
 import { formatPatternName } from '@/contexts/AlertContext';
 import OptionsBehaviorCard from './OptionsBehaviorCard';
+import { useBroker } from '@/contexts/BrokerContext';
+import { PredictiveContextStrip } from '@/components/dashboard/PredictiveContextStrip';
 
 interface BehaviorTabProps { days: number }
 
@@ -98,6 +100,7 @@ function timeAgo(dateStr: string | null): string {
 }
 
 export default function BehaviorTab({ days }: BehaviorTabProps) {
+  const { account } = useBroker();
   const [metrics, setMetrics]       = useState<RiskMetrics | null>(null);
   const [conditional, setCond]      = useState<ConditionalData | null>(null);
   const [emotions, setEmotions]     = useState<JournalCorrData | null>(null);
@@ -149,6 +152,10 @@ export default function BehaviorTab({ days }: BehaviorTabProps) {
 
   return (
     <div className="space-y-5">
+
+      {/* Predictive risk context (danger hour/day, revenge window, problem symbol).
+          Moved here from the Dashboard — it's behavioural timing analysis. */}
+      {account?.id && <PredictiveContextStrip brokerAccountId={account.id} />}
 
       {/* Pattern frequency — counts only. Response stats (heeded / took anyway)
           and the live loop are owned by the Alerts page; cross-link, don't recompute. */}

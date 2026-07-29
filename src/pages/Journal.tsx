@@ -7,6 +7,7 @@ import ErrorState from '@/components/ErrorState';
 import { cn } from '@/lib/utils';
 import { api } from '@/lib/api';
 import { useBroker } from '@/contexts/BrokerContext';
+import { MorningIntentCard } from '@/components/dashboard/MorningIntentCard';
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 interface JournalEntry {
@@ -378,6 +379,11 @@ export default function Journal() {
             </p>
           )}
         </div>
+      </div>
+
+      {/* Today's intent — moved here from the Dashboard (Journal owns intent) */}
+      <div className="mb-5">
+        <MorningIntentCard />
       </div>
 
       {/* Stats bar */}
