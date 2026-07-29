@@ -386,6 +386,148 @@ class ZerodhaTicker:
 # SharedPriceStream — ONE KiteTicker for all users (current implementation)
 # ─────────────────────────────────────────────────────────────────────────────
 
+class AsyncKiteTicker:
+    """
+    aiohttp-based Kite market-data ticker. Runs entirely in the asyncio event loop —
+    NO Twisted reactor — so it can reconnect with a FRESH token any time Zerodha rotates
+    it (the KiteTicker ReactorNotRestartable problem is gone, and there is no login/restart
+    ritual). Parses LTP-mode binary ticks and reuses the same Redis-LTP write + WS fan-out.
+
+    token_provider: async callable returning (api_key, access_token) or None. Called on
+    every (re)connect, so a fresh login is picked up automatically on the next reconnect.
+    """
+    _WS_ROOT = "wss://ws.kite.trade"
+
+    def __init__(self, token_provider, on_tick_callback):
+        self._token_provider = token_provider
+        self.on_tick_callback = on_tick_callback
+        self._token_to_symbol: Dict[int, str] = {}
+        self.subscribed_tokens: Set[int] = set()
+        self._last_tick_times: Dict[str, float] = {}
+        self._ws = None
+        self._task: Optional[asyncio.Task] = None
+        self._stop = False
+        self._connected = False
+
+    async def start(self) -> None:
+        self._stop = False
+        if self._task is None or self._task.done():
+            self._task = asyncio.create_task(self._run())
+
+    async def _run(self) -> None:
+        import aiohttp, struct, time
+        backoff = 1
+        while not self._stop:
+            picked = await self._token_provider()
+            if not picked:
+                await asyncio.sleep(5)
+                continue
+            api_key, access_token = picked
+            url = f"{self._WS_ROOT}?api_key={api_key}&access_token={access_token}"
+            try:
+                async with aiohttp.ClientSession() as session:
+                    async with session.ws_connect(url, timeout=10, heartbeat=30) as ws:
+                        self._ws = ws
+                        self._connected = True
+                        backoff = 1
+                        logger.info("[async_ticker] Connected to Kite WebSocket.")
+                        if self.subscribed_tokens:
+                            toks = list(self.subscribed_tokens)
+                            await ws.send_json({"a": "subscribe", "v": toks})
+                            await ws.send_json({"a": "mode", "v": ["ltp", toks]})
+                        async for msg in ws:
+                            if self._stop:
+                                break
+                            if msg.type == aiohttp.WSMsgType.BINARY:
+                                await self._handle_binary(msg.data, struct, time)
+                            elif msg.type in (aiohttp.WSMsgType.CLOSED, aiohttp.WSMsgType.ERROR):
+                                break
+            except Exception as e:
+                logger.warning(f"[async_ticker] connection ended: {type(e).__name__}: {e}")
+            self._connected = False
+            self._ws = None
+            if self._stop:
+                break
+            # Reconnect — the token_provider re-reads the CURRENT token, so a rotated /
+            # freshly-logged-in token is picked up automatically here. No restart needed.
+            await asyncio.sleep(min(backoff, 30))
+            backoff = min(backoff * 2, 30)
+        logger.info("[async_ticker] stopped.")
+
+    async def _handle_binary(self, b, struct, time) -> None:
+        if len(b) < 2:
+            return
+        npackets = struct.unpack(">H", b[0:2])[0]
+        i = 2
+        now = time.monotonic()
+        ltp_updates: Dict[int, str] = {}
+        for _ in range(npackets):
+            if i + 2 > len(b):
+                break
+            plen = struct.unpack(">H", b[i:i + 2])[0]
+            i += 2
+            pkt = b[i:i + plen]
+            i += plen
+            if len(pkt) < 8:
+                continue
+            itok = struct.unpack(">I", pkt[0:4])[0]
+            ltp = struct.unpack(">I", pkt[4:8])[0] / 100.0
+            symbol = self._token_to_symbol.get(itok, str(itok))
+            last = self._last_tick_times.get(symbol, 0.0)
+            if (now - last) < _TICK_THROTTLE_SECONDS:
+                continue
+            self._last_tick_times[symbol] = now
+            ltp_updates[itok] = str(ltp)
+            if self.on_tick_callback:
+                try:
+                    await self.on_tick_callback(symbol, {"last_price": ltp, "instrument_token": itok})
+                except Exception:
+                    pass
+        if ltp_updates:
+            try:
+                from app.core.redis_pool import get_sync_redis
+                r = get_sync_redis()
+                pipe = r.pipeline(transaction=False)
+                for tok, price in ltp_updates.items():
+                    pipe.set(f"ltp:{tok}", price, ex=2)
+                pipe.execute()
+            except Exception:
+                pass
+
+    async def subscribe_async(self, token_symbol_map: Dict[int, str]) -> None:
+        for t, s in token_symbol_map.items():
+            self._token_to_symbol[t] = s
+            self.subscribed_tokens.add(t)
+        if self._ws is not None and self._connected:
+            toks = list(token_symbol_map)
+            try:
+                await self._ws.send_json({"a": "subscribe", "v": toks})
+                await self._ws.send_json({"a": "mode", "v": ["ltp", toks]})
+            except Exception:
+                pass
+
+    async def unsubscribe_async(self, tokens) -> None:
+        toks = list(tokens)
+        for t in toks:
+            self.subscribed_tokens.discard(t)
+            self._token_to_symbol.pop(t, None)
+        if self._ws is not None and self._connected and toks:
+            try:
+                await self._ws.send_json({"a": "unsubscribe", "v": toks})
+            except Exception:
+                pass
+
+    async def stop_async(self) -> None:
+        self._stop = True
+        if self._ws is not None:
+            try:
+                await self._ws.close()
+            except Exception:
+                pass
+        if self._task is not None:
+            self._task.cancel()
+
+
 class SharedPriceStream(PriceStreamProvider):
     """
     ONE KiteTicker connection shared across all broker accounts.
@@ -509,43 +651,47 @@ class SharedPriceStream(PriceStreamProvider):
 
     async def _build_ticker(self, db) -> Optional[ZerodhaTicker]:
         """
-        Create and connect a new ZerodhaTicker.
-        Uses dedicated market-data credentials when available; falls back to any user token.
-        Resubscribes all known instruments immediately after connect.
+        Create and start the aiohttp AsyncKiteTicker.
+        The ticker's token_provider re-reads the CURRENT token on every (re)connect, so
+        token rotation / a fresh login is picked up automatically with no reactor restart
+        and no login/restart ritual. Resubscribes all known instruments after connect.
         Caller must hold _ticker_lock.
         """
-        from app.api.websocket import notify_price_update
-
-        picked = await self._pick_access_token(db)
-        if not picked:
-            return None
-
-        access_token, api_key, label = picked
-
-        if not api_key:
-            logger.warning("[shared_ticker] No api_key available — streaming disabled.")
-            return None
-
-        ticker = ZerodhaTicker(
-            api_key=api_key,
-            access_token=access_token,
-            broker_account_id=label,   # str label for logging, not a real UUID
+        ticker = AsyncKiteTicker(
+            token_provider=self._provide_token,
             on_tick_callback=self.broadcast_ltp,
-            on_noreconnect_callback=self._on_ticker_noreconnect,
         )
-        await ticker.connect()
+        await ticker.start()
 
-        # Resubscribe all instruments from previous session (after server restart
-        # or token rebuild — registry is already populated).
+        # Resubscribe all instruments from the registry (after a server restart the
+        # registry is repopulated by restart_all before/around this build).
         async with self._reg_lock:
             if self._token_symbol_map:
-                ticker.subscribe(dict(self._token_symbol_map))
+                await ticker.subscribe_async(dict(self._token_symbol_map))
 
         logger.info(
-            f"[shared_ticker] Built ticker via {label}. "
+            f"[shared_ticker] AsyncKiteTicker started. "
             f"Subscribed to {len(self._token_symbol_map)} instruments."
         )
         return ticker
+
+    async def _provide_token(self):
+        """Token provider for AsyncKiteTicker — returns (api_key, access_token) or None.
+        Called on every (re)connect with a fresh DB session, so the ticker always uses
+        the latest token (the fix for daily token rotation / re-login)."""
+        from app.core.database import SessionLocal
+        try:
+            async with SessionLocal() as db:
+                picked = await self._pick_access_token(db)
+            if not picked:
+                return None
+            access_token, api_key, _label = picked
+            if not api_key or not access_token:
+                return None
+            return api_key, access_token
+        except Exception as e:
+            logger.warning(f"[shared_ticker] token provider failed: {e}")
+            return None
 
     async def broadcast_ltp(self, symbol: str, price_data: dict) -> None:
         """Fan-out a KiteTicker tick to all WebSocket clients holding this instrument."""
@@ -633,7 +779,7 @@ class SharedPriceStream(PriceStreamProvider):
                 self._token_symbol_map[token] = symbol
 
             if self._ticker:
-                self._ticker.subscribe(token_symbol_map)
+                await self._ticker.subscribe_async(token_symbol_map)
 
     async def refresh_subscriptions(self, broker_account_id: UUID, db) -> None:
         """Re-check positions and subscribe to newly opened instruments."""
@@ -660,7 +806,7 @@ class SharedPriceStream(PriceStreamProvider):
                     orphaned.append(token)
 
             if orphaned and self._ticker:
-                self._ticker.unsubscribe(orphaned)
+                await self._ticker.unsubscribe_async(orphaned)
                 logger.info(
                     f"[shared_ticker] Unsubscribed {len(orphaned)} instruments "
                     f"no longer held by any account."
