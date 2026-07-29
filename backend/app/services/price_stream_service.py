@@ -704,6 +704,14 @@ class SharedPriceStream(PriceStreamProvider):
         # Snapshot the holder set — asyncio is single-threaded so this is safe
         # between awaits, and we only hold a list reference after the snapshot.
         account_ids = list(self._token_holders.get(token, set()))
+        # TEMP DIAG (remove later): objective delivery counters readable via memurai-cli.
+        try:
+            from app.core.redis_pool import get_sync_redis
+            _r = get_sync_redis()
+            _r.incr("diag:bcast_called")
+            _r.incr("diag:bcast_holders" if account_ids else "diag:bcast_noholders")
+        except Exception:
+            pass
         if not account_ids:
             return
 

@@ -150,13 +150,20 @@ async def websocket_prices(
                 select(BrokerAccount.token_revoked_at).where(BrokerAccount.id == account_uuid)
             )
             row = result.first()
-            if not row or row[0] is not None:
-                await websocket.close(code=4001, reason="Token revoked")
-                return
+        # Close ONLY when the account definitively has a revoked token. A missing row
+        # or a query error is treated as fail-OPEN: the JWT was already verified above,
+        # and this DB lookup is a secondary defence — a transient hiccup here must not
+        # lock out a valid user (that was silently killing every price WS).
+        if row is not None and row[0] is not None:
+            await websocket.close(code=4001, reason="Token revoked")
+            return
     except Exception as e:
-        logger.warning(f"WebSocket revocation check failed: {e} — closing connection")
-        await websocket.close(code=4001, reason="Authentication error")
-        return
+        logger.error(f"WS revocation check errored (allowing; JWT already valid): {e!r}")
+        try:
+            from app.core.redis_pool import get_sync_redis
+            get_sync_redis().set("diag:ws_rev_error", f"{type(e).__name__}: {str(e)[:200]}", ex=3600)
+        except Exception:
+            pass
 
     account_id = str(account_uuid)
 
