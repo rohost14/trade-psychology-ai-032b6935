@@ -406,12 +406,211 @@ function Panel() {
   );
 }
 
+/* ═══════════════════════════════════════════════════════════════════════════
+   LIGHT SET — 4 and 5, from Tickertape and TradeZella
+   Both references ship LIGHT, which nothing shown so far has been. Palettes
+   are declared locally; nothing leaks.
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+const LIGHT = {
+  '--layer-page': '249 250 252',      // #F9FAFC  page
+  '--layer-surface': '255 255 255',   // #FFFFFF  card
+  '--layer-overlay': '244 246 249',   // #F4F6F9  header tint / hover
+  '--layer-border': '223 227 233',    // #DFE3E9  region edge
+  '--layer-border-subtle': '237 240 244',
+  '--foreground': '23 30 43',         // #171E2B  ink
+  '--muted-foreground': '106 115 130',
+  '--tm-profit': '25 175 85',         // Tickertape #19AF55
+  '--tm-loss': '216 47 68',           // Tickertape #D82F44
+  '--tm-brand': '31 84 205',
+  '--card': 'var(--layer-surface)',
+  '--background': 'var(--layer-page)',
+  '--border': 'var(--layer-border)',
+  '--muted': 'var(--layer-overlay)',
+} as React.CSSProperties;
+
+/** Thirty days of P&L, for the calendar strip TradeZella leads with. */
+const MONTH = [0, 1420, -680, 0, 0, 2100, 940, -1550, 3200, 0, 0, -420, 1180, 760, -2300,
+  0, 0, 890, 2400, -1100, 1600, 320, 0, 0, -890, 1450, 2050, -640, 980, 12480];
+
+function CalendarStrip({ compact }: { compact?: boolean }) {
+  const max = Math.max(...MONTH.map(Math.abs));
+  return (
+    <div>
+      <SectionHead title="Last 30 days" right={
+        <span className="text-[12px] text-muted-foreground font-tabular">
+          18 traded · <span className="text-profit">11 green</span> · <span className="text-loss">7 red</span>
+        </span>} />
+      <div className={cn('grid gap-1', compact ? 'grid-cols-10' : 'grid-cols-15 sm:grid-cols-[repeat(30,minmax(0,1fr))]')}>
+        {MONTH.map((d, i) => {
+          const a = Math.abs(d) / max;
+          return (
+            <div
+              key={i}
+              title={d === 0 ? 'No trades' : sgn(d)}
+              className={cn('h-7 rounded-[3px] border', d === 0 && 'bg-transparent')}
+              style={d === 0
+                ? { borderColor: 'rgb(var(--layer-border-subtle))' }
+                : {
+                    background: `rgb(var(${d > 0 ? '--tm-profit' : '--tm-loss'}) / ${(0.14 + a * 0.7).toFixed(2)})`,
+                    borderColor: 'transparent',
+                  }}
+            />
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// 4 — TICKERTAPE   Light. Their index strip becomes our session strip, their
+//                  pill switcher swaps Open/Closed instead of two tables, and
+//                  the whole thing stays on white with generous gutters.
+// ═══════════════════════════════════════════════════════════════════════════
+function Tickertape() {
+  const [tab, setTab] = useSearchParams();
+  const shown = tab.get('t') ?? 'open';
+  const swap = (t: string) => { const n = new URLSearchParams(tab); n.set('t', t); setTab(n, { replace: true }); };
+
+  return (
+    <div style={LIGHT} className="bg-[rgb(var(--layer-page))] text-foreground -mx-4 sm:-mx-6 lg:-mx-8 px-4 sm:px-6 lg:px-8 py-6 min-h-[85vh]">
+      <div className="max-w-[1040px] space-y-6">
+        {/* index-style strip: the session's headline numbers, side by side */}
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-px bg-[rgb(var(--layer-border))] rounded-lg overflow-hidden border border-[rgb(var(--layer-border))]">
+          {[['Day P&L', sgn(S.pnl), tone(S.pnl), '+2.4%'],
+            ['Booked', sgn(S.booked), tone(S.booked), '9 trades'],
+            ['Open', sgn(S.unrealized), tone(S.unrealized), '3 positions'],
+            ['Behaviour cost', sgn(-6120), 'text-loss', '3 patterns']].map(([l, v, c, sub]) => (
+            <div key={l} className="bg-card px-4 py-3.5">
+              <p className="text-[11.5px] text-muted-foreground">{l}</p>
+              <p className={cn('text-[22px] font-semibold font-tabular tracking-tight mt-1', c)}>{v}</p>
+              <p className="text-[11.5px] text-muted-foreground font-tabular mt-0.5">{sub}</p>
+            </div>
+          ))}
+        </div>
+
+        <CalendarStrip />
+
+        <div>
+          <SectionHead title={`Live alerts · ${ALERTS.length}`} right={
+            <span className="text-[13px] font-semibold font-tabular text-loss">{sgn(-6120)}</span>} />
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+            {ALERTS.map(a => <AlertCard key={a.id} a={a} />)}
+          </div>
+        </div>
+
+        {/* their pill switcher, instead of stacking two tables */}
+        <div>
+          <div className="flex items-center justify-between gap-4 pb-3">
+            <div className="inline-flex rounded-full border border-[rgb(var(--layer-border))] bg-card p-0.5">
+              {[['open', `Open · ${POS.length}`], ['closed', `Closed · ${CLOSED.length}`]].map(([id, label]) => (
+                <button key={id} onClick={() => swap(id)}
+                  className={cn('px-3.5 h-7 rounded-full text-[12.5px] font-medium transition-colors duration-150',
+                    shown === id ? 'bg-[rgb(var(--layer-overlay))] text-foreground' : 'text-muted-foreground hover:text-foreground')}>
+                  {label}
+                </button>
+              ))}
+            </div>
+            <span className={cn('text-[13px] font-semibold font-tabular', tone(shown === 'open' ? 611 : 680))}>
+              {sgn(shown === 'open' ? 611 : 680)}
+            </span>
+          </div>
+          <div className="rounded-lg border border-[rgb(var(--layer-border))] overflow-hidden bg-card">
+            {shown === 'open'
+              ? <DataTable tintHeader cols={['Instrument', 'Qty', 'Avg', 'LTP', 'Chg', 'P&L']} widths="" rows={<PosRows />} />
+              : <DataTable tintHeader cols={['Instrument', 'Qty', 'Hold', 'Net']} widths="" rows={<ClosedRows />} />}
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// 5 — ZELLA   Light, from the direct competitor. Their signature move is the
+//             calendar leading the screen, a metric row beneath it, and
+//             behaviour framed as agents watching specific things. Adds the
+//             calendar and best/worst day, which we do not have today.
+// ═══════════════════════════════════════════════════════════════════════════
+function Zella() {
+  const Metric = ({ label, value, sub, cls }: { label: string; value: string; sub: string; cls?: string }) => (
+    <div className="rounded-lg border border-[rgb(var(--layer-border))] bg-card px-4 py-3">
+      <p className="text-[11.5px] text-muted-foreground">{label}</p>
+      <p className={cn('text-[20px] font-semibold font-tabular tracking-tight mt-1', cls ?? 'text-foreground')}>{value}</p>
+      <p className="text-[11.5px] text-muted-foreground font-tabular mt-0.5">{sub}</p>
+    </div>
+  );
+
+  return (
+    <div style={LIGHT} className="bg-[rgb(var(--layer-page))] text-foreground -mx-4 sm:-mx-6 lg:-mx-8 px-4 sm:px-6 lg:px-8 py-6 min-h-[85vh]">
+      <div className="max-w-[1100px] space-y-6">
+        <div className="flex flex-wrap items-end justify-between gap-6">
+          <div>
+            <p className="t-label">Day P&amp;L</p>
+            <p className={cn('font-display text-[36px] leading-none font-semibold tracking-tight font-tabular mt-1.5', tone(S.pnl))}>{sgn(S.pnl)}</p>
+          </div>
+          <Sparkline data={S.curve} width={150} height={40} className="text-profit hidden sm:block" />
+        </div>
+
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+          <Metric label="Win rate" value={`${S.winRate}%`} sub="9 of 14 green" />
+          <Metric label="Profit factor" value="1.84" sub="gross win ÷ gross loss" />
+          <Metric label="Best day" value="+₹18,200" sub="12 Jul · 6 trades" cls="text-profit" />
+          <Metric label="Worst day" value="−₹11,400" sub="24 Jul · 9 trades" cls="text-loss" />
+        </div>
+
+        <div className="rounded-lg border border-[rgb(var(--layer-border))] bg-card p-4">
+          <CalendarStrip />
+        </div>
+
+        {/* behaviour as watchers, their agent framing */}
+        <div>
+          <SectionHead title="What we caught today" right={
+            <span className="text-[13px] font-semibold font-tabular text-loss">{sgn(-6120)}</span>} />
+          <div className="space-y-2.5">{ALERTS.map(a => <AlertCard key={a.id} a={a} />)}</div>
+        </div>
+
+        <div className="grid grid-cols-1 xl:grid-cols-2 gap-5">
+          <div>
+            <SectionHead title={`Open · ${POS.length}`} right={<span className={cn('text-[13px] font-semibold font-tabular', tone(611))}>{sgn(611)}</span>} />
+            <div className="rounded-lg border border-[rgb(var(--layer-border))] overflow-hidden bg-card">
+              <DataTable tintHeader cols={['Instrument', 'Qty', 'LTP', 'Chg', 'P&L']} widths=""
+                rows={POS.map(p => (
+                  <tr key={p.sym} className="border-t border-[rgb(var(--layer-border-subtle))] hover:bg-[rgb(var(--layer-overlay))]">
+                    <td className="py-2.5 pl-3 pr-3 text-left w-full">
+                      <span className="flex items-center gap-2 min-w-0">
+                        <span className={cn('text-[9px] font-bold px-1 py-0.5 rounded leading-none shrink-0',
+                          p.dir === 'B' ? 'bg-profit/10 text-profit' : 'bg-loss/10 text-loss')}>{p.dir === 'B' ? 'BUY' : 'SELL'}</span>
+                        <span className="truncate">{p.sym}</span>
+                      </span>
+                    </td>
+                    <Td muted>{p.qty}</Td><Td>{p.ltp.toFixed(2)}</Td>
+                    <Td className={tone(p.chg)}>{p.chg > 0 ? '+' : '−'}{Math.abs(p.chg).toFixed(2)}%</Td>
+                    <Td className={cn('font-semibold', tone(p.pnl))}>{sgn(p.pnl)}</Td>
+                  </tr>))} />
+            </div>
+          </div>
+          <div>
+            <SectionHead title={`Closed today · ${CLOSED.length}`} right={<span className={cn('text-[13px] font-semibold font-tabular', tone(680))}>{sgn(680)}</span>} />
+            <div className="rounded-lg border border-[rgb(var(--layer-border))] overflow-hidden bg-card">
+              <DataTable tintHeader cols={['Instrument', 'Qty', 'Hold', 'Net']} widths="" rows={<ClosedRows />} />
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 // ── Shell ──────────────────────────────────────────────────────────────────
 const V: Record<string, { label: string; note: string; el: JSX.Element }> = {
   current: { label: '0 · Current', note: "Today's Dashboard, reproduced. The control.", el: <Current /> },
   tight:   { label: '1 · Tight',   note: 'Content capped at 820. Numbers clustered right. Warm neutrals, third surface level.', el: <Tight /> },
   twoup:   { label: '2 · Two-up',  note: 'Width used, not spanned. Alerts left as cards, data right as tables.', el: <TwoUp /> },
   panel:   { label: '3 · Panel',   note: 'Four surface levels — page, panel, inset, header tint. Most depth.', el: <Panel /> },
+  ticker:  { label: '4 · Tickertape', note: 'Light. Index-style strip, pill switcher for Open/Closed, generous gutters.', el: <Tickertape /> },
+  zella:   { label: '5 · Zella',      note: 'Light, from the competitor. Calendar leads, metric row, best/worst day.', el: <Zella /> },
 };
 const WIDTHS = [
   { id: 'mobile', label: 'iPhone 390', w: 390, h: 780 },
