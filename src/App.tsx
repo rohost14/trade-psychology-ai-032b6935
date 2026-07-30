@@ -23,8 +23,8 @@ const ImpersonateEntry = lazy(() => import("./pages/ImpersonateEntry"));
 const Analytics     = lazy(() => import("./pages/Analytics"));
 const Alerts        = lazy(() => import("./pages/Alerts"));
 const MyRecord      = lazy(() => import("./pages/MyRecord"));
-// TEMPORARY - dashboard variant comparison. Delete with src/pages/DashboardVariants.tsx.
-const DashboardVariants = lazy(() => import("./pages/DashboardVariants"));
+// TEMPORARY - design working copy of Dashboard. Delete with src/pages/_lab/.
+const DashboardLab  = lazy(() => import("./pages/_lab/DashboardLab"));
 const MyPatterns    = lazy(() => import("./pages/MyPatterns"));
 const Chat          = lazy(() => import("./pages/Chat"));
 const Settings      = lazy(() => import("./pages/Settings"));
@@ -89,7 +89,7 @@ const App = () => (
                     <Route path="analytics" element={<Analytics />} />
                     <Route path="alerts" element={<Alerts />} />
                     <Route path="my-record" element={<MyRecord />} />
-                    <Route path="dashboard-variants" element={<DashboardVariants />} />
+                    <Route path="dashboard-lab" element={<DashboardLab />} />
                     {/* Blowup Shield was replaced by My Record — keep the old
                         path working for anyone with it bookmarked. */}
                     <Route path="blowup-shield" element={<Navigate to="/my-record" replace />} />
