@@ -2,6 +2,7 @@ import { ArrowRight, AlertOctagon, AlertTriangle, Info, Bell } from 'lucide-reac
 import { Link } from 'react-router-dom';
 import { Skeleton } from '@/components/ui/skeleton';
 import { cn } from '@/lib/utils';
+import { formatRelativeTime } from '@/lib/formatters';
 import type { Alert } from '@/types/api';
 import { normalizeSeverityStr } from '@/lib/alertSeverity';
 
@@ -23,20 +24,6 @@ function tagFor(pattern: string): string {
   if (/(revenge|loss|streak|meltdown|tilt|recovery|giveaway)/.test(p)) return 'EMOTIONAL';
   if (/(stop|\bsl\b|constitution|no_stoploss|limit|expiry)/.test(p)) return 'RISK';
   return 'PATTERN';
-}
-
-/**
- * "12h", not "about 12 hours ago". A feed row has one job: let the eye land on
- * the pattern name. A nine-character timestamp competing with it does not help,
- * and the long form was wrapping the row on narrow screens.
- */
-function compactAgo(ts: string): string {
-  const mins = Math.floor((Date.now() - new Date(ts).getTime()) / 60000);
-  if (mins < 1) return 'now';
-  if (mins < 60) return `${mins}m`;
-  const hrs = Math.floor(mins / 60);
-  if (hrs < 24) return `${hrs}h`;
-  return `${Math.floor(hrs / 24)}d`;
 }
 
 export default function RecentAlertsCard({ alerts, onOpen, onAcknowledge, loading }: RecentAlertsCardProps) {
@@ -100,7 +87,7 @@ export default function RecentAlertsCard({ alerts, onOpen, onAcknowledge, loadin
                 onClick={() => (onOpen ? onOpen(alert.id) : onAcknowledge?.(alert.id))}
                 onKeyDown={e => (e.key === 'Enter' || e.key === ' ') && (onOpen ? onOpen(alert.id) : onAcknowledge?.(alert.id))}
                 className={cn(
-                  'px-5 sm:px-6 py-3 border-l-2 animate-fade-in cursor-pointer transition-colors hover:bg-muted/40 focus:outline-none focus:bg-muted/40',
+                  'px-5 sm:px-6 py-3.5 border-l-2 animate-fade-in cursor-pointer transition-colors hover:bg-muted/40 focus:outline-none focus:bg-muted/40',
                   borderColor,
                   alert.acknowledged && 'opacity-60',
                 )}
@@ -113,8 +100,8 @@ export default function RecentAlertsCard({ alerts, onOpen, onAcknowledge, loadin
                     <div className="flex items-center gap-2 flex-wrap">
                       <span className="text-[13.5px] font-semibold text-foreground">{alert.pattern}</span>
                       <span className={cn('text-[10px] font-semibold uppercase tracking-wider', tagColor)}>{tagFor(alert.pattern)}</span>
-                      <span className="text-[11px] text-muted-foreground font-tabular ml-auto shrink-0">
-                        {compactAgo(alert.timestamp)}
+                      <span className="text-[10px] text-muted-foreground font-tabular uppercase tracking-wider ml-auto">
+                        {formatRelativeTime(alert.timestamp)}
                       </span>
                     </div>
                     <p className="text-[12.5px] text-muted-foreground mt-1 leading-relaxed line-clamp-2">{alert.description}</p>
