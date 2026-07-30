@@ -474,12 +474,339 @@ function Index() {
   );
 }
 
+/* ═══════════════════════════════════════════════════════════════════════════
+   FREE-HAND SET — J, K, L
+   These ignore the existing token system deliberately. Each commits to its own
+   palette, typeface and temperament, because the research is explicit that
+   avoiding tells produces the next default, not a decision. Colour is declared
+   locally on the variant root so nothing leaks.
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+/** Local theme wrapper. Vars, not classes, so each variant owns its world. */
+function Skin({ vars, className, children }: {
+  vars: Record<string, string>; className?: string; children: React.ReactNode;
+}) {
+  return (
+    <div
+      className={cn('-mx-4 sm:-mx-6 lg:-mx-8 px-4 sm:px-6 lg:px-8 py-7 min-h-[80vh]', className)}
+      style={{ ...vars, background: 'var(--bg)', color: 'var(--ink)' } as React.CSSProperties}
+    >
+      {children}
+    </div>
+  );
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// J — ALMANAC
+// A printed record, not an app. Warm paper, ink, and a serif for the figures
+// because this is a ledger and financial print has used serif for centuries.
+// Georgia specifically: a screen serif by Matthew Carter, and pointedly not
+// one of the display serifs every generated site reaches for.
+// One accent, a deep ink-blue, used for rules and nothing else.
+// ═══════════════════════════════════════════════════════════════════════════
+function Almanac() {
+  const vars = {
+    '--bg': '#FBFAF7', '--ink': '#16150F', '--ink-2': '#57544A', '--ink-3': '#8C887A',
+    '--rule': '#E2DED2', '--rule-2': '#CFC9B8', '--accent': '#1C3A5E',
+    '--up': '#2E6B4F', '--down': '#A63D2F',
+  };
+  const serif = { fontFamily: 'Georgia, "Iowan Old Style", "Times New Roman", serif' };
+  const t = (n: number) => ({ color: n > 0 ? 'var(--up)' : n < 0 ? 'var(--down)' : 'var(--ink-3)' });
+
+  return (
+    <Skin vars={vars}>
+      {/* masthead */}
+      <div className="flex items-baseline justify-between border-b-2 pb-2" style={{ borderColor: 'var(--ink)' }}>
+        <p className="text-[11px] uppercase tracking-[0.2em]" style={{ color: 'var(--ink-2)' }}>Session record</p>
+        <p className="text-[11px] uppercase tracking-[0.2em] font-tabular" style={{ color: 'var(--ink-3)' }}>31 July 2026 · closed</p>
+      </div>
+
+      <div className="grid grid-cols-1 md:grid-cols-[1fr_auto] gap-6 items-end py-7 border-b" style={{ borderColor: 'var(--rule)' }}>
+        <div>
+          <p style={{ ...serif, color: 'var(--up)' }} className="text-[56px] sm:text-[68px] leading-[0.9] font-tabular">
+            {sgn(S.pnl)}
+          </p>
+          <p className="text-[14px] mt-3 font-tabular" style={{ color: 'var(--ink-2)' }}>
+            {sgn(S.booked)} booked · {sgn(S.unrealized)} open · {S.trades} trades · {S.winRate}% won
+          </p>
+        </div>
+        <Sparkline data={S.curve} width={190} height={54} className="hidden md:block" stroke="#2E6B4F" />
+      </div>
+
+      {/* the observation — the one thing worth reading */}
+      <div className="py-6 border-b" style={{ borderColor: 'var(--rule)' }}>
+        <p className="text-[11px] uppercase tracking-[0.2em] mb-2" style={{ color: 'var(--ink-3)' }}>Observation</p>
+        <p style={serif} className="text-[21px] sm:text-[24px] leading-[1.4] max-w-[46ch]">
+          You have entered <span className="font-tabular">14:00</span>, the hour in which you have lost{' '}
+          <span style={{ color: 'var(--down)' }} className="font-tabular">₹14,270</span> across{' '}
+          <span className="font-tabular">23</span> trades.
+        </p>
+      </div>
+
+      {/* findings, numbered like a report */}
+      <div className="py-6 border-b" style={{ borderColor: 'var(--rule)' }}>
+        <div className="flex items-baseline justify-between mb-4">
+          <p className="text-[11px] uppercase tracking-[0.2em]" style={{ color: 'var(--ink-3)' }}>Behaviour today</p>
+          <p className="text-[14px] font-tabular" style={{ color: 'var(--down)' }}>{sgn(-6120)}</p>
+        </div>
+        <ol className="space-y-4">
+          {ALERTS.map((a, i) => (
+            <li key={a.id} className="grid grid-cols-[22px_1fr_auto] gap-x-4 items-baseline">
+              <span style={{ ...serif, color: 'var(--ink-3)' }} className="text-[15px] font-tabular">{i + 1}.</span>
+              <span className="min-w-0">
+                <span className="text-[15px]" style={{ color: 'var(--ink)' }}>{a.name}</span>
+                <span className="block text-[13.5px] leading-relaxed mt-0.5" style={{ color: 'var(--ink-2)' }}>
+                  {a.sym} — {a.line}
+                </span>
+              </span>
+              <span style={{ ...serif, ...t(a.cost) }} className="text-[16px] font-tabular">{sgn(a.cost)}</span>
+            </li>
+          ))}
+        </ol>
+      </div>
+
+      {/* holdings, as a printed table */}
+      <div className="py-6">
+        <p className="text-[11px] uppercase tracking-[0.2em] mb-3" style={{ color: 'var(--ink-3)' }}>Holdings</p>
+        <table className="w-full text-[14px] font-tabular">
+          <thead>
+            <tr className="text-[11px] uppercase tracking-[0.14em]" style={{ color: 'var(--ink-3)' }}>
+              <th className="text-left font-normal pb-2">Instrument</th>
+              <th className="text-right font-normal pb-2 hidden sm:table-cell">Qty</th>
+              <th className="text-right font-normal pb-2">Last</th>
+              <th className="text-right font-normal pb-2">Position</th>
+            </tr>
+          </thead>
+          <tbody>
+            {POS.map(p => (
+              <tr key={p.sym} className="border-t" style={{ borderColor: 'var(--rule)' }}>
+                <td className="py-2.5">{p.sym}</td>
+                <td className="py-2.5 text-right hidden sm:table-cell" style={{ color: 'var(--ink-2)' }}>{p.qty}</td>
+                <td className="py-2.5 text-right" style={{ color: 'var(--ink-2)' }}>{p.ltp.toFixed(2)}</td>
+                <td className="py-2.5 text-right" style={{ ...serif, ...t(p.pnl) }}>{sgn(p.pnl)}</td>
+              </tr>
+            ))}
+            <tr className="border-t-2" style={{ borderColor: 'var(--ink)' }}>
+              <td className="py-2.5 text-[11px] uppercase tracking-[0.14em]" style={{ color: 'var(--ink-3)' }}>Unrealised</td>
+              <td className="hidden sm:table-cell" /><td />
+              <td className="py-2.5 text-right" style={{ ...serif, ...t(611) }}>{sgn(611)}</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </Skin>
+  );
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// K — SIGNAL
+// Dark, but nothing like a terminal. Deep slate ground, enormous light-weight
+// figures (Stripe's font-weight 300 trick at scale), and a warm sand accent
+// against the cool ground — deliberately not the blue-violet every generated
+// dark UI reaches for. Colour appears three times on the whole screen.
+// ═══════════════════════════════════════════════════════════════════════════
+function Signal() {
+  const vars = {
+    '--bg': '#0E1114', '--surface': '#161A1E', '--ink': '#E8E6E1', '--ink-2': '#9A9C9B',
+    '--ink-3': '#63666A', '--rule': '#22262B', '--accent': '#D9A46C',
+    '--up': '#5FA97F', '--down': '#C4685B',
+  };
+  const t = (n: number) => ({ color: n > 0 ? 'var(--up)' : n < 0 ? 'var(--down)' : 'var(--ink-3)' });
+
+  return (
+    <Skin vars={vars}>
+      <div className="max-w-[1100px]">
+        <p className="text-[11px] uppercase tracking-[0.22em]" style={{ color: 'var(--ink-3)' }}>Today</p>
+
+        <div className="flex flex-wrap items-end justify-between gap-8 mt-4 pb-8">
+          <p className="text-[64px] sm:text-[88px] leading-[0.85] font-tabular tracking-[-0.03em]"
+             style={{ fontWeight: 300, color: 'var(--up)' }}>
+            {sgn(S.pnl)}
+          </p>
+          <div className="flex gap-10 font-tabular pb-2">
+            {[['Booked', sgn(S.booked)], ['Open', sgn(S.unrealized)], ['Trades', `${S.trades}`], ['Won', `${S.winRate}%`]].map(([l, v]) => (
+              <div key={l}>
+                <p className="text-[10px] uppercase tracking-[0.18em]" style={{ color: 'var(--ink-3)' }}>{l}</p>
+                <p className="text-[19px] mt-1.5" style={{ fontWeight: 300 }}>{v}</p>
+              </div>
+            ))}
+          </div>
+        </div>
+
+        {/* the single accented moment on the screen */}
+        <div className="flex items-start gap-4 py-5 border-y" style={{ borderColor: 'var(--rule)' }}>
+          <span className="mt-1.5 h-1.5 w-1.5 rounded-full shrink-0" style={{ background: 'var(--accent)' }} />
+          <p className="text-[16px] leading-relaxed max-w-[54ch]" style={{ color: 'var(--ink)' }}>
+            <span style={{ color: 'var(--accent)' }}>14:00 is where you lose.</span>{' '}
+            <span style={{ color: 'var(--ink-2)' }} className="font-tabular">
+              23 trades, 20% won, ₹14,270 down. Your 09:15 hour is where the money is.
+            </span>
+          </p>
+        </div>
+
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-x-14 gap-y-10 pt-9">
+          <section>
+            <div className="flex items-baseline justify-between mb-4">
+              <p className="text-[10px] uppercase tracking-[0.18em]" style={{ color: 'var(--ink-3)' }}>Behaviour · {ALERTS.length}</p>
+              <p className="text-[14px] font-tabular" style={{ color: 'var(--down)' }}>{sgn(-6120)}</p>
+            </div>
+            <div className="space-y-5">
+              {ALERTS.map(a => (
+                <div key={a.id} className="flex items-baseline gap-4">
+                  <span className="text-[12px] font-tabular w-10 shrink-0" style={{ color: 'var(--ink-3)' }}>{a.at}</span>
+                  <span className="min-w-0 flex-1">
+                    <span className="text-[15px]" style={{ fontWeight: 400 }}>{a.name}</span>
+                    <span className="block text-[13px] leading-relaxed mt-0.5" style={{ color: 'var(--ink-2)' }}>{a.line}</span>
+                  </span>
+                  <span className="text-[15px] font-tabular shrink-0" style={{ fontWeight: 300, ...t(a.cost) }}>{sgn(a.cost)}</span>
+                </div>
+              ))}
+            </div>
+          </section>
+
+          <section>
+            <div className="flex items-baseline justify-between mb-4">
+              <p className="text-[10px] uppercase tracking-[0.18em]" style={{ color: 'var(--ink-3)' }}>Open · {POS.length}</p>
+              <p className="text-[14px] font-tabular" style={{ ...t(611) }}>{sgn(611)}</p>
+            </div>
+            <div className="space-y-4 font-tabular">
+              {POS.map(p => (
+                <div key={p.sym} className="flex items-baseline gap-4">
+                  <span className="text-[14px] truncate flex-1 min-w-0">{p.sym}</span>
+                  <span className="text-[13px] hidden sm:block" style={{ color: 'var(--ink-3)' }}>{p.ltp.toFixed(2)}</span>
+                  <span className="text-[15px] w-20 text-right" style={{ fontWeight: 300, ...t(p.pnl) }}>{sgn(p.pnl)}</span>
+                </div>
+              ))}
+            </div>
+            <div className="mt-6 pt-4 border-t" style={{ borderColor: 'var(--rule)' }}>
+              <p className="text-[10px] uppercase tracking-[0.18em] mb-3" style={{ color: 'var(--ink-3)' }}>Closed · {CLOSED.length}</p>
+              <div className="space-y-3 font-tabular">
+                {CLOSED.map(c => (
+                  <div key={c.sym} className="flex items-baseline gap-4">
+                    <span className="text-[14px] truncate flex-1">{c.sym}</span>
+                    <span className="text-[15px] w-20 text-right" style={{ fontWeight: 300, ...t(c.pnl) }}>{sgn(c.pnl)}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </section>
+        </div>
+      </div>
+    </Skin>
+  );
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// L — CASE NOTES
+// The product's actual thesis made visual: a clinical record about you.
+// Numbered findings, evidence beside each, monospace confined to timestamps
+// and identifiers where it belongs. One clay accent for the finding markers.
+// Near-white ground so it reads as a document rather than an interface.
+// ═══════════════════════════════════════════════════════════════════════════
+function CaseNotes() {
+  const vars = {
+    '--bg': '#FCFCFB', '--ink': '#191A18', '--ink-2': '#5A5C58', '--ink-3': '#93958F',
+    '--rule': '#E6E7E3', '--accent': '#9C4A32',
+    '--up': '#2F6B4C', '--down': '#B04A36',
+  };
+  const mono = { fontFamily: '"DM Mono", ui-monospace, monospace' };
+  const t = (n: number) => ({ color: n > 0 ? 'var(--up)' : n < 0 ? 'var(--down)' : 'var(--ink-3)' });
+
+  const Line = ({ k, children }: { k: string; children: React.ReactNode }) => (
+    <div className="grid grid-cols-1 sm:grid-cols-[96px_1fr] gap-x-6 gap-y-1 py-3 border-t" style={{ borderColor: 'var(--rule)' }}>
+      <p className="text-[10.5px] uppercase tracking-[0.16em] sm:pt-0.5" style={{ ...mono, color: 'var(--ink-3)' }}>{k}</p>
+      <div className="min-w-0">{children}</div>
+    </div>
+  );
+
+  return (
+    <Skin vars={vars}>
+      <div className="max-w-[900px]">
+        <div className="flex items-baseline justify-between pb-5">
+          <p className="text-[13px] uppercase tracking-[0.18em]" style={{ ...mono, color: 'var(--ink-2)' }}>Session notes</p>
+          <p className="text-[12px]" style={{ ...mono, color: 'var(--ink-3)' }}>31·07·26 / ZA1234</p>
+        </div>
+
+        <Line k="Net">
+          <div className="flex items-end justify-between gap-6 flex-wrap">
+            <p className="text-[44px] leading-none font-tabular" style={{ fontWeight: 500, color: 'var(--up)' }}>{sgn(S.pnl)}</p>
+            <p className="text-[13px] font-tabular pb-1.5" style={{ color: 'var(--ink-2)' }}>
+              {sgn(S.booked)} booked · {sgn(S.unrealized)} open · {S.trades} trades · {S.winRate}% won
+            </p>
+          </div>
+        </Line>
+
+        <Line k="Now">
+          <p className="text-[15px] leading-relaxed" style={{ color: 'var(--ink)' }}>
+            Entered <span style={mono}>14:00</span> — historically the weakest hour on record.
+          </p>
+          <p className="text-[13px] font-tabular mt-1" style={{ color: 'var(--ink-2)' }}>
+            23 trades · 20% won · <span style={{ color: 'var(--down)' }}>₹14,270</span> cumulative
+          </p>
+        </Line>
+
+        <Line k="Findings">
+          <ol className="space-y-5">
+            {ALERTS.map((a, i) => (
+              <li key={a.id}>
+                <div className="flex items-baseline gap-3">
+                  <span className="text-[11px] shrink-0" style={{ ...mono, color: 'var(--accent)' }}>
+                    {String(i + 1).padStart(2, '0')}
+                  </span>
+                  <span className="text-[15px] flex-1" style={{ color: 'var(--ink)' }}>{a.name}</span>
+                  <span className="text-[11px]" style={{ ...mono, color: 'var(--ink-3)' }}>{a.at}</span>
+                  <span className="text-[15px] font-tabular w-20 text-right" style={{ ...t(a.cost) }}>{sgn(a.cost)}</span>
+                </div>
+                <p className="text-[13px] leading-relaxed mt-1 pl-[26px]" style={{ color: 'var(--ink-2)' }}>
+                  <span style={mono} className="text-[12px]">{a.sym}</span> — {a.line}
+                </p>
+              </li>
+            ))}
+          </ol>
+          <p className="text-[13px] font-tabular mt-5 pt-3 border-t" style={{ borderColor: 'var(--rule)', color: 'var(--ink-2)' }}>
+            Attributed to these findings: <span style={{ color: 'var(--down)' }}>{sgn(-6120)}</span>
+          </p>
+        </Line>
+
+        <Line k="Open">
+          <div className="space-y-2.5 font-tabular">
+            {POS.map(p => (
+              <div key={p.sym} className="flex items-baseline gap-3 text-[14px]">
+                <span style={mono} className="text-[11px] w-4 shrink-0" >{p.dir}</span>
+                <span className="truncate flex-1" style={{ color: 'var(--ink)' }}>{p.sym}</span>
+                <span className="text-[13px] hidden sm:block" style={{ color: 'var(--ink-3)' }}>{p.ltp.toFixed(2)}</span>
+                <span className="w-20 text-right" style={{ ...t(p.pnl) }}>{sgn(p.pnl)}</span>
+              </div>
+            ))}
+          </div>
+        </Line>
+
+        <Line k="Closed">
+          <div className="space-y-2.5 font-tabular">
+            {CLOSED.map(c => (
+              <div key={c.sym} className="flex items-baseline gap-3 text-[14px]">
+                <span className="truncate flex-1" style={{ color: 'var(--ink)' }}>{c.sym}</span>
+                <span style={mono} className="text-[12px]" >{c.hold}</span>
+                <span className="w-20 text-right" style={{ ...t(c.pnl) }}>{sgn(c.pnl)}</span>
+              </div>
+            ))}
+          </div>
+        </Line>
+        <div className="border-t" style={{ borderColor: 'var(--rule)' }} />
+      </div>
+    </Skin>
+  );
+}
+
 // ── Registry ───────────────────────────────────────────────────────────────
 const VARIANTS: Record<string, { label: string; note: string; el: JSX.Element }> = {
   rail:   { label: 'F · Rail',   note: 'C rebuilt — real alert surface, sparklines, numbers over prose.', el: <Rail /> },
   ledger: { label: 'G · Ledger', note: 'One chronological thread. Trades and behaviour interleaved.',     el: <Ledger /> },
   bands:  { label: 'H · Bands',  note: 'Full-bleed horizontal bands, each a different density.',          el: <Bands /> },
   index:  { label: 'I · Index',  note: 'Label column left, values right. Reads like a statement.',        el: <Index /> },
+  almanac: { label: 'J · Almanac',  note: 'Own palette. Printed record — warm paper, ink, Georgia for the figures.', el: <Almanac /> },
+  signal:  { label: 'K · Signal',   note: 'Own palette. Deep slate, weight-300 figures, one warm accent.',           el: <Signal /> },
+  notes:   { label: 'L · Case notes', note: 'Own palette. A clinical record about you. Numbered findings.',          el: <CaseNotes /> },
 };
 
 const WIDTHS = [
