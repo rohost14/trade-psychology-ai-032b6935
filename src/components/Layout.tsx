@@ -1,11 +1,8 @@
 import { useState, useEffect } from 'react';
 import { Outlet, NavLink, useLocation, useNavigate } from 'react-router-dom';
-import {
-  LayoutDashboard, TrendingUp, MessageSquare, Settings,
-  Shield, Brain, Bell, BookOpen, ScrollText, X,
-  MoreHorizontal, ChevronRight, Scale, Search,
-} from 'lucide-react';
+import { Shield, X, MoreHorizontal, ChevronRight } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { NAV_PRIMARY, NAV_GROUPS, NAV_MORE_ITEMS } from '@/lib/navigation';
 import { ThemeToggle } from './ThemeToggle';
 import { AlertHistorySheet } from '@/components/alerts/AlertHistorySheet';
 import TokenExpiredBanner from '@/components/alerts/TokenExpiredBanner';
@@ -18,40 +15,11 @@ import ImpersonationBanner from '@/components/ImpersonationBanner';
 import { CommandPalette } from './CommandPalette';
 import { Sidebar } from './Sidebar';
 
-// 4 primary tabs always visible in mobile bottom nav
-const mobilePrimaryItems = [
-  { name: 'Dashboard', href: '/dashboard', icon: LayoutDashboard },
-  { name: 'Analytics', href: '/analytics', icon: TrendingUp },
-  { name: 'Alerts',    href: '/alerts',    icon: Bell },
-  { name: 'Chat',      href: '/chat',      icon: MessageSquare },
-];
-
-// Overflow items accessible via "More" sheet (grouped)
-const mobileMoreGroups = [
-  {
-    label: 'Insights',
-    items: [
-      { name: 'My Patterns', href: '/my-patterns', icon: Brain },
-      { name: 'Reports',     href: '/reports',     icon: BookOpen },
-      { name: 'Journal',     href: '/journal',     icon: ScrollText },
-    ],
-  },
-  {
-    label: 'Risk',
-    items: [
-      { name: 'My Rules',      href: '/my-rules',      icon: Scale },
-      { name: 'My Record', href: '/my-record', icon: Search },
-    ],
-  },
-  {
-    label: 'Account',
-    items: [
-      { name: 'Settings', href: '/settings', icon: Settings },
-    ],
-  },
-];
-
-const mobileMoreItems = mobileMoreGroups.flatMap(g => g.items);
+// Navigation comes from the one canonical structure (see lib/navigation.ts), so
+// mobile and the desktop sidebar cannot present different groupings. §24.
+const mobilePrimaryItems = NAV_PRIMARY;
+const mobileMoreGroups = NAV_GROUPS;
+const mobileMoreItems = NAV_MORE_ITEMS;
 
 const SIDEBAR_COLLAPSED_KEY = 'tradementor_sidebar_collapsed';
 
@@ -137,8 +105,8 @@ export default function Layout() {
             </div>
             <div className="flex items-center gap-1.5">
               {isWsReconnecting && (
-                <span className="flex items-center gap-1 px-2 py-0.5 rounded-full bg-amber-500/10 text-amber-500 text-[11px] font-medium">
-                  <span className="w-1.5 h-1.5 rounded-full bg-amber-500 animate-pulse" />
+                <span className="flex items-center gap-1 px-2 py-0.5 rounded-full bg-warning/10 text-warning text-[11px] font-medium">
+                  <span className="w-1.5 h-1.5 rounded-full bg-warning animate-pulse" />
                   Reconnecting
                 </span>
               )}
@@ -156,8 +124,8 @@ export default function Layout() {
 
         {/* ── Desktop WS reconnecting banner ──────────────────────────────── */}
         {isWsReconnecting && (
-          <div className="hidden md:flex items-center gap-2 px-5 py-2 bg-amber-500/10 border-b border-amber-500/20 text-amber-600 dark:text-amber-400 text-xs font-medium">
-            <span className="w-1.5 h-1.5 rounded-full bg-amber-500 animate-pulse shrink-0" />
+          <div className="hidden md:flex items-center gap-2 px-5 py-2 bg-warning/10 border-b border-warning/20 text-warning text-[12.5px] font-medium">
+            <span className="w-1.5 h-1.5 rounded-full bg-warning animate-pulse shrink-0" />
             WebSocket disconnected — attempting to reconnect…
           </div>
         )}
@@ -167,21 +135,21 @@ export default function Layout() {
           <div
             role="status"
             aria-live="polite"
-            className="bg-amber-500/10 border-b border-amber-500/20 px-4 py-2 flex items-center justify-between gap-3 text-sm"
+            className="bg-warning/10 border-b border-warning/20 px-4 py-2 flex items-center justify-between gap-3 text-[14px]"
           >
-            <span className="text-amber-700 dark:text-amber-400 font-medium">
+            <span className="text-warning font-medium">
               Demo mode — showing sample data
             </span>
             <div className="flex items-center gap-2">
               <button
                 onClick={connect}
-                className="text-xs font-semibold text-tm-brand underline underline-offset-2 hover:no-underline"
+                className="text-[12.5px] font-semibold text-tm-brand underline underline-offset-2 hover:no-underline"
               >
                 Connect Zerodha
               </button>
               <button
                 onClick={() => { exitGuestMode(); window.location.href = '/welcome'; }}
-                className="text-xs text-muted-foreground hover:text-foreground transition-colors"
+                className="text-[12.5px] text-muted-foreground hover:text-foreground transition-colors duration-150"
               >
                 Exit
               </button>
@@ -240,12 +208,12 @@ export default function Layout() {
                   <div className="relative" aria-hidden="true">
                     <item.icon className="h-5 w-5" />
                     {showBadge && (
-                      <span className="absolute -top-1 -right-1 bg-red-500 text-white text-[9px] font-bold w-3.5 h-3.5 rounded-full flex items-center justify-center leading-none">
+                      <span className="absolute -top-1 -right-1 bg-danger text-danger-foreground text-[10px] font-bold min-w-4 h-4 px-1 rounded-full flex items-center justify-center leading-none font-tabular">
                         {unacknowledgedCount > 9 ? '9+' : unacknowledgedCount}
                       </span>
                     )}
                   </div>
-                  <span aria-hidden="true" className="text-[10px] mt-1 font-medium">{item.name}</span>
+                  <span aria-hidden="true" className="text-[11px] mt-1 font-medium">{item.name}</span>
                 </NavLink>
               );
             })}
@@ -265,7 +233,7 @@ export default function Layout() {
                     <span className="absolute top-0 left-1/2 -translate-x-1/2 w-8 h-0.5 rounded-full bg-tm-brand" />
                   )}
                   <MoreHorizontal className="h-5 w-5" />
-                  <span className="text-[10px] mt-1 font-medium">More</span>
+                  <span className="text-[11px] mt-1 font-medium">More</span>
                 </button>
               );
             })()}
@@ -284,13 +252,13 @@ export default function Layout() {
               role="dialog"
               aria-modal="true"
               aria-label="More navigation"
-              className="md:hidden fixed bottom-0 left-0 right-0 z-[70] bg-card rounded-t-2xl border-t border-border animate-slide-in-up safe-area-inset-bottom"
+              className="md:hidden fixed bottom-0 left-0 right-0 z-[70] bg-card rounded-t-lg border-t border-border animate-slide-in-up safe-area-inset-bottom"
             >
               <div className="flex justify-center pt-3 pb-1" aria-hidden="true">
                 <div className="w-10 h-1 rounded-full bg-muted-foreground/30" />
               </div>
               <div className="flex items-center justify-between px-5 pt-2 pb-3">
-                <span className="text-sm font-semibold text-foreground" id="more-sheet-title">More</span>
+                <span className="text-[17px] font-semibold tracking-tight text-foreground" id="more-sheet-title">More</span>
                 <button
                   onClick={() => setMoreOpen(false)}
                   aria-label="Close navigation menu"
@@ -302,7 +270,7 @@ export default function Layout() {
               <nav aria-labelledby="more-sheet-title" className="px-3 pb-6 space-y-4">
                 {mobileMoreGroups.map((group) => (
                   <div key={group.label}>
-                    <p className="t-overline text-muted-foreground/60 px-4 pb-1">
+                    <p className="t-label px-4 pb-1">
                       {group.label}
                     </p>
                     <div className="space-y-0.5">
@@ -314,7 +282,7 @@ export default function Layout() {
                             onClick={() => { navigate(item.href); setMoreOpen(false); }}
                             aria-current={isActive ? 'page' : undefined}
                             className={cn(
-                              'w-full flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-medium transition-colors',
+                              'w-full flex items-center gap-3 px-4 py-3 rounded-lg text-[14px] font-medium transition-colors duration-150',
                               'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring',
                               isActive
                                 ? 'bg-tm-brand/10 text-tm-brand'

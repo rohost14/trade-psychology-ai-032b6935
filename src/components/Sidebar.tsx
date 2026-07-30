@@ -1,50 +1,16 @@
 import { NavLink, useLocation } from 'react-router-dom';
-import {
-  LayoutDashboard, TrendingUp, MessageSquare, Settings,
-  Shield, Brain, Bell, BookOpen, ScrollText, Scale, Search,
-  ChevronLeft, ChevronRight,
-} from 'lucide-react';
+import { Shield, ChevronLeft, ChevronRight } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useAlerts } from '@/contexts/AlertContext';
 import { useBroker } from '@/contexts/BrokerContext';
 import { ThemeToggle } from './ThemeToggle';
 import { AlertHistorySheet } from '@/components/alerts/AlertHistorySheet';
+import { NAV_SECTIONS } from '@/lib/navigation';
 
 interface SidebarProps {
   collapsed: boolean;
   onToggle: () => void;
 }
-
-const sections = [
-  {
-    group: null,
-    items: [
-      { name: 'Dashboard', href: '/dashboard', icon: LayoutDashboard, hasBadge: false },
-      { name: 'Analytics', href: '/analytics', icon: TrendingUp, hasBadge: false },
-      { name: 'My Rules',  href: '/my-rules',  icon: Scale, hasBadge: false },
-    ],
-  },
-  {
-    group: 'Insights',
-    items: [
-      { name: 'My Patterns', href: '/my-patterns', icon: Brain,       hasBadge: false },
-      { name: 'Reports',     href: '/reports',     icon: BookOpen,    hasBadge: false },
-      { name: 'Journal',     href: '/journal',     icon: ScrollText,  hasBadge: false },
-    ],
-  },
-  {
-    group: 'Risk',
-    items: [
-      { name: 'Alerts',        href: '/alerts',        icon: Bell,   hasBadge: true },
-      { name: 'My Record', href: '/my-record', icon: Search, hasBadge: false },
-    ],
-  },
-];
-
-const bottomItems = [
-  { name: 'Chat',     href: '/chat',     icon: MessageSquare },
-  { name: 'Settings', href: '/settings', icon: Settings },
-];
 
 function NavItem({
   name, href, icon: Icon, hasBadge = false, collapsed, unreadCount,
@@ -69,11 +35,7 @@ function NavItem({
           : 'h-9 px-3 gap-2.5',
         isActive
           ? 'bg-tm-brand/10 text-tm-brand'
-          : [
-              'text-muted-foreground',
-              'hover:bg-black/[0.04] dark:hover:bg-white/[0.05]',
-              'hover:text-foreground',
-            ]
+          : ['text-muted-foreground', 'hover:bg-muted', 'hover:text-foreground']
       )}
     >
       {/* Active left accent bar */}
@@ -87,21 +49,21 @@ function NavItem({
       <Icon className={cn('h-4 w-4 shrink-0', isActive ? 'text-tm-brand' : '')} />
 
       {!collapsed && (
-        <span className={cn('flex-1 text-sm truncate', isActive ? 'font-semibold' : 'font-normal')}>
+        <span className={cn('flex-1 text-[14px] truncate', isActive ? 'font-semibold' : 'font-normal')}>
           {name}
         </span>
       )}
 
-      {/* Badge — expanded: pill; collapsed: dot */}
+      {/* Badge — expanded: pill; collapsed: dot. Tokens, not raw palette red. */}
       {showBadge && !collapsed && (
-        <span className="ml-auto bg-red-500 text-white text-[10px] font-bold min-w-[18px] h-[18px] rounded-full flex items-center justify-center px-1 leading-none animate-badge-pulse">
+        <span className="ml-auto bg-danger text-danger-foreground text-[10px] font-bold min-w-[18px] h-[18px] rounded-full flex items-center justify-center px-1 leading-none font-tabular animate-badge-pulse">
           {unreadCount > 9 ? '9+' : unreadCount}
         </span>
       )}
       {showBadge && collapsed && (
         <span
           aria-label={`${unreadCount} unread alerts`}
-          className="absolute top-0.5 right-0.5 w-2 h-2 rounded-full bg-red-500"
+          className="absolute top-0.5 right-0.5 w-2 h-2 rounded-full bg-danger"
         />
       )}
     </NavLink>
@@ -112,7 +74,8 @@ export function Sidebar({ collapsed, onToggle }: SidebarProps) {
   const { unacknowledgedCount, alerts, acknowledgeAlert, acknowledgeAll, clearAllAlerts } = useAlerts();
   const { isConnected, isTokenExpired, account } = useBroker();
 
-  const borderClass = 'border-black/[0.07] dark:border-white/[0.06]';
+  // Border token rather than black/white alphas — one edge colour per theme (§6).
+  const borderClass = 'border-border';
 
   return (
     <aside
@@ -139,14 +102,14 @@ export function Sidebar({ collapsed, onToggle }: SidebarProps) {
         aria-label="Main navigation"
         className="flex-1 overflow-y-auto overflow-x-hidden py-3 px-2 space-y-4"
       >
-        {sections.map((section, si) => (
-          <div key={si}>
-            {section.group && !collapsed && (
-              <p className="t-overline text-tm-tertiary px-3 pb-1.5 pt-0.5">
-                {section.group}
+        {NAV_SECTIONS.map((section, si) => (
+          <div key={section.label ?? `primary-${si}`}>
+            {section.label && !collapsed && (
+              <p className="t-label px-3 pb-1.5 pt-0.5">
+                {section.label}
               </p>
             )}
-            {section.group && collapsed && <div className="h-px mx-2 bg-border my-1.5" />}
+            {section.label && collapsed && <div className="h-px mx-2 bg-border my-1.5" />}
             <div className="space-y-0.5">
               {section.items.map((item) => (
                 <NavItem
@@ -161,17 +124,10 @@ export function Sidebar({ collapsed, onToggle }: SidebarProps) {
         ))}
       </nav>
 
-      {/* ── Bottom section ─────────────────────────────────────────────────── */}
+      {/* ── Bottom section — utilities and connection status only. Navigation
+             all lives in the nav above, in the canonical order, so desktop and
+             mobile present the same structure. ─────────────────────────────── */}
       <div className={cn('shrink-0 border-t py-2 px-2 space-y-0.5', borderClass)}>
-        {bottomItems.map((item) => (
-          <NavItem
-            key={item.href}
-            {...item}
-            collapsed={collapsed}
-            unreadCount={0}
-          />
-        ))}
-
         {/* Utility buttons row */}
         <div className={cn(
           'flex mt-1',
@@ -192,7 +148,7 @@ export function Sidebar({ collapsed, onToggle }: SidebarProps) {
           <div className={cn(
             'mt-1.5 mx-1 px-2.5 py-2 rounded-lg',
             isTokenExpired
-              ? 'bg-amber-500/10'
+              ? 'bg-warning/10'
               : isConnected
                 ? 'bg-tm-brand/[0.07]'
                 : 'bg-muted'
@@ -200,13 +156,13 @@ export function Sidebar({ collapsed, onToggle }: SidebarProps) {
             <div className="flex items-center gap-2 min-w-0">
               <span className={cn(
                 'w-1.5 h-1.5 rounded-full shrink-0',
-                isTokenExpired ? 'bg-amber-500 animate-pulse'
+                isTokenExpired ? 'bg-warning animate-pulse'
                   : isConnected ? 'bg-tm-brand'
                     : 'bg-muted-foreground'
               )} />
               <span className={cn(
-                'text-xs font-medium truncate',
-                isTokenExpired ? 'text-amber-600 dark:text-amber-400'
+                'text-[12.5px] font-medium truncate',
+                isTokenExpired ? 'text-warning'
                   : isConnected ? 'text-tm-brand'
                     : 'text-muted-foreground'
               )}>
@@ -224,7 +180,7 @@ export function Sidebar({ collapsed, onToggle }: SidebarProps) {
             <span
               className={cn(
                 'w-2 h-2 rounded-full',
-                isTokenExpired ? 'bg-amber-500 animate-pulse'
+                isTokenExpired ? 'bg-warning animate-pulse'
                   : isConnected ? 'bg-tm-brand'
                     : 'bg-muted-foreground/40'
               )}
