@@ -98,6 +98,15 @@ npm run test -- src/path/file   # Run specific file
 
 Test setup in `src/test/setup.ts` mocks `window.matchMedia` for component tests.
 
+## UI / Design
+
+**Before changing anything visual, read `docs/DESIGN_SYSTEM.md`.** It is authoritative and self-contained — colour tokens, the 7-step type scale, spacing, container rules, interaction states, charts, copy voice, and a per-screen specification for all 26 routes. If a value isn't there, add it there first.
+
+- `docs/DESIGN_SYSTEM.md` — the design system + screen specification. Permanent. The target, even where the code is behind it.
+- `docs/DESIGN_MIGRATION.md` — where the code stands against it: current debt, deprecations, Track A (visual, in scope) vs Track B (deferred feature/logic changes), status. **Disposable — delete when its status table is green.**
+
+Two rules that catch most mistakes: containers are the exception, not the default (sections + dividers + edge-to-edge tables); and a failed request is never rendered as an empty state.
+
 ## Key Design Patterns
 
 - Path alias: `@/` maps to `src/` (configured in vite.config.ts and vitest.config.ts)
