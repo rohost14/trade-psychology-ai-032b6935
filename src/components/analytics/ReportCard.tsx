@@ -90,7 +90,9 @@ export default function ReportCard({ days }: Props) {
     : 'Keep trading to unlock your edge/leak breakdown.';
 
   return (
-    <div className="relative overflow-hidden rounded-2xl border border-border bg-gradient-to-br from-card to-muted/30 px-5 py-5 sm:px-6 sm:py-6">
+    // Flat card surface. Was a rounded-2xl gradient panel: both banned (§4) --
+    // the gradient encodes nothing and 16px radius is off the committed scale.
+    <div className="relative overflow-hidden rounded-lg border border-border bg-card px-5 py-5 sm:px-6 sm:py-6">
       <div className="flex flex-col sm:flex-row sm:items-end sm:justify-between gap-4">
         <div className="min-w-0">
           <p className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">

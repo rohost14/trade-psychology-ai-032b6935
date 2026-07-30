@@ -80,6 +80,25 @@ These are consumed by every screen and are themselves built on the old card clas
 - `src/index.css` — 17px → 16px; delete the four dead utilities; retire the gradient and decorative-loop utilities.
 - `src/components/Sidebar.tsx` + `src/components/Layout.tsx` — reconcile nav grouping to the one canonical structure in design doc §24. Desktop currently leaves My Rules ungrouped and has no Account group; mobile puts My Rules under Risk and adds Account. Labels and membership must match.
 
+### Radius consolidation — highest-value single visual fix
+
+Measured 2026-07-30 across `src/**/*.tsx`. The design system specifies three radii (10px cards, 6px chips, full pills). Actual usage:
+
+| Class | Uses | Verdict |
+|---|---|---|
+| `rounded-lg` (10px) | 208 | correct — cards |
+| `rounded-full` | 204 | correct — pills, dots |
+| **`rounded-xl` (12px)** | **136** | **off-scale, remove** |
+| `rounded` (6px) | 91 | correct — chips |
+| `rounded-md` (8px) | 68 | off-scale, fold into 6 or 10 |
+| `rounded-sm` (4px) | 35 | off-scale, fold into 6 |
+| **`rounded-2xl` (16px)** | **18** | **off-scale, remove** |
+| `rounded-none` | 10 | fine where deliberate |
+
+**Seven radii in active use.** `docs/AI_SLOP_TELLS.md` §5 covers why this reads as generated: radius is a taste axis where 0px, 8px and 999px are all defensible positions, and the uncommitted middle is the absence of a decision. Ours is worse than uncommitted — it is seven decisions.
+
+This is mechanical and measurable. Do it per screen alongside the other Track A work rather than as one repo-wide replace, because `rounded-md` on a button and `rounded-md` on a chart placeholder resolve to different targets.
+
 ### Cross-cutting visual debt
 
 - **Hard-coded chart hex** `#16a34a` / `#dc2626` as `Cell fill`, `stroke`, and gradient stops in six files: `OverviewTab`, `EdgeTab`, `TradeDnaTab`, `SessionsTab`, `BtstTab`, `InstrumentPanel`. Also `#0d9488` (a reference line in `TradeDnaTab`) and a six-hex `PIE_COLORS` array in `OverviewTab`. These files use `text-tm-profit` for text right beside the literal — the most mechanically fixable debt in the repo once the colour module exists.

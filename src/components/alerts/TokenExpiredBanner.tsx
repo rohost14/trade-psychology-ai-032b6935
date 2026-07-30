@@ -49,7 +49,10 @@ export default function TokenExpiredBanner({ onReconnect, isReconnecting }: Toke
                 isExiting ? 'animate-slide-out-up' : 'animate-slide-in-down'
             )}
         >
-            <div className="bg-gradient-to-r from-warning/20 via-warning/15 to-warning/10 border-b border-warning/30">
+            {/* Flat warning tint. The horizontal gradient it replaced faded the
+                banner out toward the right, which weakened the one thing it
+                exists to do. Gradients are banned (§4). */}
+            <div className="bg-warning/10 border-b border-warning/30">
                 <div className="container mx-auto px-4 py-3">
                     <div className="flex items-center justify-between gap-4">
                         <div className="flex items-center gap-3">
