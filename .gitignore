@@ -92,3 +92,9 @@ bun.lockb
 # Next.js build cache (scroll-loss-experience prototype)
 .next/
 scroll-loss-experience/.next/
+
+# Impeccable installs three copies of its skill (.claude, .agents, .github).
+# Keep the Claude Code one tracked; the mirrors are ~7MB of duplicate vendor files.
+.agents/
+.github/skills/
+.github/hooks/
