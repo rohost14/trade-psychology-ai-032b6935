@@ -61,72 +61,75 @@ export function SessionHeroCard({
   ];
 
   return (
-    // A top-level screen block, so it takes a surface (§9). Sections are for
-    // sub-blocks within a surface, not for the blocks themselves.
-    <section className="desk-card overflow-hidden">
-      <div className="card-head">
-        <span className="t-label flex items-center gap-2">
+    /**
+     * A COLOUR FIELD, not a card.
+     *
+     * The screen was grey with small green and red numerals on it, and the
+     * brand colour appeared as a 6px dot. That is not restraint, it is
+     * absence. One saturated region anchors the page and everything below it
+     * stays quiet -- which is how calm products get personality without
+     * becoming casinos.
+     *
+     * Depth here comes from figure/ground and scale contrast rather than from
+     * a border: a deep pine field, paper-coloured text on it, the figure at
+     * 44px against 10px labels, and the stat rail sitting in a darker inset
+     * band rather than a row of boxes.
+     */
+    <section className="rounded-lg overflow-hidden bg-tm-brand text-white">
+      {/* field header */}
+      <div className="flex items-center justify-between gap-3 px-4 sm:px-6 h-11 border-b border-white/10">
+        <span className="text-[11px] font-medium uppercase tracking-[0.12em] text-white/70 flex items-center gap-2">
           Day P&amp;L
-          <span className={cn('h-1.5 w-1.5 rounded-full animate-pulse', pnlPositive ? 'bg-profit' : 'bg-loss')} />
+          <span className="h-1.5 w-1.5 rounded-full bg-white/60 animate-pulse" />
         </span>
-
         <button
           type="button"
           onClick={() => setOpen(v => !v)}
           aria-expanded={open}
-          className="shrink-0 inline-flex items-center gap-1.5 rounded-md border border-border px-2.5 py-1.5 text-[11px] font-medium text-muted-foreground transition-colors duration-150 hover:text-foreground hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+          className="shrink-0 inline-flex items-center gap-1.5 rounded-md border border-white/20 px-2.5 py-1.5 text-[11px] font-medium text-white/80 transition-colors duration-150 hover:bg-white/10 hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/40"
         >
           {open ? 'Hide read' : "Today's read"}
           <ChevronDown className={cn('h-3.5 w-3.5 transition-transform duration-200', open && 'rotate-180')} />
         </button>
       </div>
 
-      {/* The number on the left, the session's supporting figures on the right.
-          They used to sit behind a toggle, which left the whole right-hand side
-          of this block empty for one figure and cost a click to see anything. */}
-      <div className="px-4 sm:px-6 py-4 flex flex-wrap items-end justify-between gap-x-8 gap-y-4">
-        <div className="min-w-0">
-          {/* The screen's one primary metric — 30px display (§7). */}
-          <div className="flex items-baseline gap-2 flex-wrap">
-            <span className={cn(
-              'font-display text-[30px] leading-none font-semibold tracking-tight font-tabular',
-              pnlPositive ? 'text-profit' : 'text-loss',
-            )}>
-              {pnlPositive ? '+' : '−'}₹{inr(animatedPnl)}
-            </span>
-          </div>
-          {/* Booked (closed) + Unrealized (open) always sum to the Day P&L above. */}
-          <div className="mt-1 text-[12.5px] font-tabular text-muted-foreground">
-            Booked{' '}
-            <span className={realizedPnlDisplay >= 0 ? 'text-profit' : 'text-loss'}>
-              {realizedPnlDisplay >= 0 ? '+' : '−'}₹{inr(realizedPnlDisplay)}
-            </span>
-            <span className="text-muted-foreground/40"> · </span>
-            Unrealized{' '}
-            <span className={unrealizedTotal > 0 ? 'text-profit' : unrealizedTotal < 0 ? 'text-loss' : ''}>
-              {unrealizedTotal !== 0 ? `${unrealizedTotal >= 0 ? '+' : '−'}₹${inr(unrealizedTotal)}` : '—'}
-            </span>
-          </div>
-        </div>
+      {/* the figure. Scale does the hierarchy: 44px against 10px labels. */}
+      <div className="px-4 sm:px-6 py-5">
+        <span className="font-display text-[44px] sm:text-[52px] leading-none font-semibold tracking-tight font-tabular text-white block">
+          {pnlPositive ? '+' : '−'}₹{inr(animatedPnl)}
+        </span>
+        <p className="mt-2 text-[12.5px] font-tabular text-white/70">
+          Booked {realizedPnlDisplay >= 0 ? '+' : '−'}₹{inr(realizedPnlDisplay)}
+          <span className="text-white/30"> · </span>
+          Unrealized {unrealizedTotal !== 0 ? `${unrealizedTotal >= 0 ? '+' : '−'}₹${inr(unrealizedTotal)}` : 'nothing open'}
+        </p>
+      </div>
 
-        {/* Session figures, inline. Fills the space the number leaves and
-            removes a click to reach them. */}
-        <div className="flex items-end gap-6 sm:gap-8">
-          {stats.map(s => (
-            <div key={s.label}>
-              <span className="text-[10px] uppercase tracking-wider font-medium text-muted-foreground">{s.label}</span>
-              <div className="mt-1 flex items-baseline gap-1.5">
-                <span className={cn('text-[17px] font-semibold font-tabular tracking-tight', s.tone)}>{s.value}</span>
-                {s.unit && <span className="text-[10.5px] text-muted-foreground font-tabular truncate">{s.unit}</span>}
-              </div>
+      {/* inset band — darker than the field, so the rail reads as recessed
+          rather than as four more boxes stacked on top */}
+      <div className="grid grid-cols-2 sm:grid-cols-4 bg-black/15 border-t border-white/10">
+        {stats.map((s, i) => (
+          <div
+            key={s.label}
+            className={cn(
+              'px-4 sm:px-5 py-3',
+              i > 0 && 'border-l border-white/10',
+              i === 2 && 'border-l-0 sm:border-l',
+              i >= 2 && 'border-t border-white/10 sm:border-t-0',
+            )}
+          >
+            <span className="text-[10px] uppercase tracking-wider font-medium text-white/55">{s.label}</span>
+            <div className="mt-1 flex items-baseline gap-1.5">
+              <span className="text-[17px] font-semibold font-tabular tracking-tight text-white">{s.value}</span>
+              {s.unit && <span className="text-[10.5px] text-white/50 font-tabular truncate">{s.unit}</span>}
             </div>
-          ))}
-        </div>
+          </div>
+        ))}
       </div>
 
       {open && (
-        <div className="animate-accordion-down border-t border-border">
-          <p className="px-4 sm:px-6 py-3 text-[12.5px] leading-snug text-muted-foreground">
+        <div className="animate-accordion-down border-t border-white/10 bg-black/10">
+          <p className="px-4 sm:px-6 py-3 text-[12.5px] leading-snug text-white/75">
             {lossPct >= 80
               ? "Most of today's loss budget is already spent."
               : paceRatio >= 1.5
