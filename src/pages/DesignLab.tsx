@@ -1004,6 +1004,130 @@ function Desk() {
   );
 }
 
+// ═// ═// ═// ═// ═// ═// ═// ═// ═// ═// ═// ═// ═// ═// ═// ═// ═// ═// ═// ═// ═// ═// ═// ═// ═// ═// ═// ═// ═// ═// ═// ═// ═// ═// ═
+// W — WORKSPACE (round one, restored verbatim)
+// The baseline to iterate on. Kept as-shipped so changes are visible
+// against it rather than against a moving target.
+// ═// ═// ═// ═// ═// ═// ═// ═// ═// ═// ═// ═// ═// ═// ═// ═// ═// ═// ═// ═// ═// ═// ═// ═// ═// ═// ═// ═// ═// ═// ═// ═// ═// ═// ═
+function WorkspaceOriginal() {
+  const Stat = ({ label, value, sub, cls }: { label: string; value: string; sub?: string; cls?: string }) => (
+    <div>
+      <p className="text-[11px] uppercase tracking-wider text-muted-foreground">{label}</p>
+      <p className={cn('text-[17px] font-semibold font-tabular mt-0.5', cls ?? 'text-foreground')}>{value}</p>
+      {sub && <p className="text-[11.5px] text-muted-foreground font-tabular mt-0.5">{sub}</p>}
+    </div>
+  );
+
+  return (
+    <div className="grid grid-cols-1 lg:grid-cols-[1fr_300px] gap-6 lg:gap-8">
+      {/* main flow */}
+      <div className="space-y-6 min-w-0">
+        <section>
+          <div className="flex items-end justify-between gap-4 flex-wrap">
+            <div>
+              <p className="t-label">Day P&amp;L</p>
+              <p className={cn('font-display text-[34px] leading-none font-semibold tracking-tight font-tabular mt-1.5', tone(S.pnl))}>
+                {sgn(S.pnl)}
+              </p>
+            </div>
+            <div className="grid grid-cols-3 gap-6">
+              <Stat label="Booked" value={sgn(S.booked)} cls={tone(S.booked)} />
+              <Stat label="Open" value={sgn(S.unrealized)} cls={tone(S.unrealized)} />
+              <Stat label="Trades" value={String(S.trades)} sub={`usual ${S.typical}`} />
+            </div>
+          </div>
+        </section>
+
+        <section>
+          <div className="flex items-baseline justify-between mb-3 pb-2 border-b border-border">
+            <p className="t-label">Open positions · {POS.length}</p>
+            <span className={cn('text-[13px] font-semibold font-tabular', tone(611))}>{sgn(611)}</span>
+          </div>
+          <div className="divide-y divide-border/70">
+            {POS.map(p => (
+              <div key={p.sym} className="flex items-center gap-3 py-2.5">
+                <span className={cn('text-[10px] font-semibold w-9 shrink-0', p.dir === 'BUY' ? 'text-profit' : 'text-loss')}>{p.dir}</span>
+                <span className="text-[13.5px] text-foreground truncate flex-1 min-w-0">{p.sym}</span>
+                <span className="text-[12.5px] text-muted-foreground font-tabular hidden sm:block w-14 text-right">{p.qty}</span>
+                <span className="text-[12.5px] text-muted-foreground font-tabular w-16 text-right">{p.ltp.toFixed(2)}</span>
+                <span className={cn('text-[12.5px] font-tabular w-16 text-right', tone(p.chg))}>
+                  {p.chg > 0 ? '+' : '−'}{Math.abs(p.chg).toFixed(2)}%
+                </span>
+                <span className={cn('text-[13.5px] font-semibold font-tabular w-20 text-right', tone(p.pnl))}>{sgn(p.pnl)}</span>
+              </div>
+            ))}
+          </div>
+        </section>
+
+        <section>
+          <div className="flex items-baseline justify-between mb-3 pb-2 border-b border-border">
+            <p className="t-label">Closed today · {CLOSED.length}</p>
+            <span className={cn('text-[13px] font-semibold font-tabular', tone(680))}>{sgn(680)}</span>
+          </div>
+          <div className="divide-y divide-border/70">
+            {CLOSED.map(c => (
+              <div key={c.sym} className="flex items-center gap-3 py-2.5">
+                <span className="text-[13.5px] text-foreground truncate flex-1">{c.sym}</span>
+                <span className="text-[12.5px] text-muted-foreground font-tabular">{c.hold}</span>
+                <span className={cn('text-[13.5px] font-semibold font-tabular w-20 text-right', tone(c.pnl))}>{sgn(c.pnl)}</span>
+              </div>
+            ))}
+          </div>
+        </section>
+      </div>
+
+      {/* context rail */}
+      <aside className="space-y-6 lg:border-l lg:border-border lg:pl-6">
+        <div>
+          <p className="t-label mb-2.5">Right now</p>
+          <p className="text-[13px] text-foreground leading-relaxed">
+            <span className="font-medium">{S.hour}</span> is your weakest hour.
+          </p>
+          <p className="text-[12.5px] text-muted-foreground font-tabular mt-1">
+            {S.hourWin}% win over {S.hourTrades} trades · <span className="text-loss">{sgn(S.hourPnl)}</span>
+          </p>
+        </div>
+
+        <div>
+          <p className="t-label mb-2.5">Loss limit</p>
+          <div className="flex items-baseline gap-2">
+            <span className="text-[20px] font-semibold font-tabular text-foreground">{S.lossUsed}%</span>
+            <span className="text-[12px] text-muted-foreground">used</span>
+          </div>
+          <div className="h-1 bg-muted mt-2 rounded-full overflow-hidden">
+            <div className="h-full bg-warning rounded-full" style={{ width: `${S.lossUsed}%` }} />
+          </div>
+        </div>
+
+        <div>
+          <p className="t-label mb-2.5">Pace</p>
+          <p className="text-[13px] text-foreground">
+            <span className="font-tabular font-medium">{S.trades}</span> trades against a usual{' '}
+            <span className="font-tabular">{S.typical}</span>.
+          </p>
+          <p className="text-[12.5px] text-warning mt-1">Faster than your rhythm.</p>
+        </div>
+
+        <div>
+          <div className="flex items-baseline justify-between mb-2.5">
+            <p className="t-label">Alerts · {ALERTS.length}</p>
+            <span className="text-[12px] font-semibold font-tabular text-loss">{sgn(-6120)}</span>
+          </div>
+          <div className="space-y-2.5">
+            {ALERTS.map(a => (
+              <button key={a.id} className="w-full flex items-center gap-2 text-left group">
+                <Sev s={a.sev} c={cn('h-3.5 w-3.5 shrink-0', a.sev === 'danger' ? 'text-loss' : 'text-warning')} />
+                <span className="text-[13px] text-foreground truncate flex-1 group-hover:text-primary transition-colors">{a.name}</span>
+                <span className={cn('text-[12.5px] font-tabular', tone(a.cost))}>{sgn(a.cost)}</span>
+              </button>
+            ))}
+          </div>
+        </div>
+      </aside>
+    </div>
+  );
+}
+
 // ── Registry ───────────────────────────────────────────────────────────────
 const VARIANTS: Record<string, { label: string; note: string; el: JSX.Element }> = {
   rail:   { label: 'F · Rail',   note: 'C rebuilt — real alert surface, sparklines, numbers over prose.', el: <Rail /> },
@@ -1013,6 +1137,7 @@ const VARIANTS: Record<string, { label: string; note: string; el: JSX.Element }>
   almanac: { label: 'J · Almanac',  note: 'Own palette. Printed record — warm paper, ink, Georgia for the figures.', el: <Almanac /> },
   signal:  { label: 'K · Signal',   note: 'Own palette. Deep slate, weight-300 figures, one warm accent.',           el: <Signal /> },
   notes:   { label: 'L · Case notes', note: 'Own palette. A clinical record about you. Numbered findings.',          el: <CaseNotes /> },
+  workspace: { label: 'W · Workspace', note: 'Round one, restored. The baseline we iterate on.', el: <WorkspaceOriginal /> },
   desk:    { label: 'M · Desk', note: 'Alerts are cards because they arrive. Positions are a Kite table because they stream.', el: <Desk /> },
 };
 
