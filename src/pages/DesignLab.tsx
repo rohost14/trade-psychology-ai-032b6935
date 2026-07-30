@@ -798,6 +798,212 @@ function CaseNotes() {
   );
 }
 
+// ═══════════════════════════════════════════════════════════════════════════
+// M — DESK
+// The brief, taken literally: alerts are discrete events that arrive, so they
+// are cards. Positions are continuous data, so they are a Kite table. Not
+// everything is a card and not everything is flat, because the two kinds of
+// content are not the same kind of thing.
+//
+// Table spec is Kite's, verified from its production CSS: 10px 12px cells,
+// tabular numerals, hover row, a permanent tint on the P&L column, no zebra.
+// Layout is round-one C: main column plus a standing rail.
+// ═══════════════════════════════════════════════════════════════════════════
+function Desk() {
+  /** A live alert. A discrete arrival, so it earns a surface of its own. */
+  const AlertCard = ({ a }: { a: typeof ALERTS[number] }) => (
+    <article
+      className={cn(
+        'group relative rounded-lg border bg-card overflow-hidden transition-colors duration-150',
+        'hover:border-border/80 cursor-pointer',
+        a.sev === 'danger' ? 'border-loss/25' : 'border-warning/25',
+      )}
+    >
+      <span
+        aria-hidden
+        className={cn('absolute inset-y-0 left-0 w-[3px]', a.sev === 'danger' ? 'bg-loss' : 'bg-warning')}
+      />
+      <div className="pl-4 pr-3.5 py-3">
+        <div className="flex items-start gap-2.5">
+          <Sev s={a.sev} c={cn('h-4 w-4 shrink-0 mt-0.5', a.sev === 'danger' ? 'text-loss' : 'text-warning')} />
+          <div className="min-w-0 flex-1">
+            <div className="flex items-baseline gap-2">
+              <h3 className="text-[14px] font-semibold text-foreground">{a.name}</h3>
+              {!a.seen && <span className="h-1.5 w-1.5 rounded-full bg-primary shrink-0" title="Unreviewed" />}
+              <span className="text-[11px] text-muted-foreground font-tabular ml-auto shrink-0">{a.at}</span>
+            </div>
+            <p className="text-[12.5px] text-muted-foreground leading-snug mt-1">{a.line}</p>
+            <div className="flex items-center gap-2 mt-2.5">
+              <span className="text-[10px] font-semibold uppercase tracking-wider px-1.5 py-0.5 rounded bg-muted text-muted-foreground">
+                {a.kind}
+              </span>
+              <span className="text-[11.5px] text-muted-foreground font-tabular truncate">{a.sym}</span>
+              <span className={cn('text-[15px] font-semibold font-tabular ml-auto shrink-0', tone(a.cost))}>
+                {sgn(a.cost)}
+              </span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </article>
+  );
+
+  /** Kite's table, to its published spec. */
+  const Table = ({ title, count, total, children, cols }: {
+    title: string; count: number; total: number; cols: string[]; children: React.ReactNode;
+  }) => (
+    <section>
+      <div className="flex items-baseline justify-between pb-2">
+        <h2 className="t-label">{title} · {count}</h2>
+        <span className={cn('text-[13px] font-semibold font-tabular', tone(total))}>{sgn(total)}</span>
+      </div>
+      <div className="overflow-x-auto">
+        <table className="w-full text-[13px] font-tabular border-t border-border min-w-[420px]">
+          <thead>
+            <tr className="text-[11px] text-muted-foreground">
+              {cols.map((c, i) => (
+                <th
+                  key={c}
+                  className={cn(
+                    'font-normal py-3 px-3 whitespace-nowrap',
+                    i === 0 ? 'text-left pl-0' : 'text-right',
+                    i === cols.length - 1 && PNL_CELL,
+                  )}
+                >
+                  {c}
+                </th>
+              ))}
+            </tr>
+          </thead>
+          <tbody>{children}</tbody>
+        </table>
+      </div>
+    </section>
+  );
+
+  const Cell = ({ children, className, last, muted }: {
+    children: React.ReactNode; className?: string; last?: boolean; muted?: boolean;
+  }) => (
+    <td className={cn('py-2.5 px-3 text-right whitespace-nowrap', last && PNL_CELL, muted && 'text-muted-foreground', className)}>
+      {children}
+    </td>
+  );
+
+  return (
+    <div className="grid grid-cols-1 lg:grid-cols-[minmax(0,1fr)_296px] gap-y-8">
+      <div className="min-w-0 lg:border-r lg:border-border lg:pr-8 space-y-7">
+        {/* session line — quiet, not a hero block */}
+        <div className="flex items-end justify-between gap-6 pb-5 border-b border-border">
+          <div>
+            <p className="t-label">Day P&amp;L</p>
+            <p className={cn('font-display text-[34px] leading-none font-semibold tracking-tight font-tabular mt-1.5', tone(S.pnl))}>
+              {sgn(S.pnl)}
+            </p>
+            <p className="text-[12.5px] text-muted-foreground font-tabular mt-1.5">
+              <span className={tone(S.booked)}>{sgn(S.booked)}</span> booked ·{' '}
+              <span className={tone(S.unrealized)}>{sgn(S.unrealized)}</span> open · {S.trades} trades
+            </p>
+          </div>
+          <Sparkline data={S.curve} width={128} height={38} className="text-profit hidden sm:block shrink-0" />
+        </div>
+
+        {/* live alerts — discrete cards, newest first, they arrive */}
+        <section>
+          <div className="flex items-baseline justify-between pb-3">
+            <h2 className="t-label flex items-center gap-2">
+              Live alerts
+              <span className="h-1.5 w-1.5 rounded-full bg-loss animate-pulse" />
+            </h2>
+            <span className="text-[13px] font-semibold font-tabular text-loss">{sgn(-6120)} today</span>
+          </div>
+          <div className="space-y-2.5">
+            {ALERTS.map(a => <AlertCard key={a.id} a={a} />)}
+          </div>
+          <button className="mt-3 text-[11px] font-medium uppercase tracking-[0.12em] text-primary hover:underline">
+            All alerts →
+          </button>
+        </section>
+
+        {/* positions — Kite table */}
+        <Table title="Open positions" count={POS.length} total={611} cols={['Instrument', 'Qty', 'Avg', 'LTP', 'Chg', 'P&L']}>
+          {POS.map(p => (
+            <tr key={p.sym} className="border-t border-border/60 hover:bg-muted/40 cursor-pointer">
+              <td className="py-2.5 pr-3 text-left">
+                <span className="flex items-center gap-2 min-w-0">
+                  <span className={cn(
+                    'text-[9px] font-bold px-1 py-0.5 rounded leading-none shrink-0',
+                    p.dir === 'B' ? 'bg-profit/10 text-profit' : 'bg-loss/10 text-loss',
+                  )}>
+                    {p.dir === 'B' ? 'BUY' : 'SELL'}
+                  </span>
+                  <span className="text-foreground truncate">{p.sym}</span>
+                </span>
+              </td>
+              <Cell muted>{p.qty}</Cell>
+              <Cell muted>{p.entry.toFixed(2)}</Cell>
+              <Cell>{p.ltp.toFixed(2)}</Cell>
+              <Cell className={tone(p.chg)}>{p.chg > 0 ? '+' : '−'}{Math.abs(p.chg).toFixed(2)}%</Cell>
+              <Cell last className={cn('font-semibold', tone(p.pnl))}>{sgn(p.pnl)}</Cell>
+            </tr>
+          ))}
+        </Table>
+
+        <Table title="Closed today" count={CLOSED.length} total={680} cols={['Instrument', 'Qty', 'Hold', 'Net']}>
+          {CLOSED.map(c => (
+            <tr key={c.sym} className="border-t border-border/60 hover:bg-muted/40 cursor-pointer">
+              <td className="py-2.5 pr-3 text-left text-foreground truncate">{c.sym}</td>
+              <Cell muted>{c.qty}</Cell>
+              <Cell muted>{c.hold}</Cell>
+              <Cell last className={cn('font-semibold', tone(c.pnl))}>{sgn(c.pnl)}</Cell>
+            </tr>
+          ))}
+        </Table>
+      </div>
+
+      {/* standing rail */}
+      <aside className="lg:pl-8 space-y-6">
+        <div>
+          <p className="t-label pb-2">Right now</p>
+          <p className="text-[24px] font-semibold font-tabular text-foreground leading-none">{S.hour}</p>
+          <p className="text-[12.5px] text-muted-foreground mt-1.5">Your weakest hour</p>
+          <p className="text-[12.5px] font-tabular mt-1">
+            <span className="text-muted-foreground">{S.hourWin}% won · {S.hourTrades} trades · </span>
+            <span className={tone(S.hourPnl)}>{sgn(S.hourPnl)}</span>
+          </p>
+        </div>
+
+        <div className="border-t border-border pt-5">
+          <div className="flex items-baseline justify-between">
+            <p className="t-label">Loss limit</p>
+            <span className="text-[13px] font-semibold font-tabular text-foreground">{S.lossUsed}%</span>
+          </div>
+          <div className="h-1 bg-muted mt-2 rounded-full overflow-hidden">
+            <div className="h-full bg-warning" style={{ width: `${S.lossUsed}%` }} />
+          </div>
+          <p className="text-[11.5px] text-muted-foreground font-tabular mt-1.5">₹8,000 of ₹25,000</p>
+        </div>
+
+        <div className="border-t border-border pt-5 grid grid-cols-2 lg:grid-cols-1 gap-5">
+          <div>
+            <div className="flex items-baseline justify-between">
+              <p className="t-label">Pace</p>
+              <span className="text-[13px] font-semibold font-tabular text-warning">{S.trades}/{S.typical}</span>
+            </div>
+            <p className="text-[11.5px] text-muted-foreground mt-1">Faster than usual</p>
+          </div>
+          <div className="lg:border-t lg:border-border lg:pt-5">
+            <div className="flex items-baseline justify-between">
+              <p className="t-label">Win rate</p>
+              <span className="text-[13px] font-semibold font-tabular text-foreground">{S.winRate}%</span>
+            </div>
+            <p className="text-[11.5px] text-muted-foreground mt-1 font-tabular">9 of 14 green</p>
+          </div>
+        </div>
+      </aside>
+    </div>
+  );
+}
+
 // ── Registry ───────────────────────────────────────────────────────────────
 const VARIANTS: Record<string, { label: string; note: string; el: JSX.Element }> = {
   rail:   { label: 'F · Rail',   note: 'C rebuilt — real alert surface, sparklines, numbers over prose.', el: <Rail /> },
@@ -807,6 +1013,7 @@ const VARIANTS: Record<string, { label: string; note: string; el: JSX.Element }>
   almanac: { label: 'J · Almanac',  note: 'Own palette. Printed record — warm paper, ink, Georgia for the figures.', el: <Almanac /> },
   signal:  { label: 'K · Signal',   note: 'Own palette. Deep slate, weight-300 figures, one warm accent.',           el: <Signal /> },
   notes:   { label: 'L · Case notes', note: 'Own palette. A clinical record about you. Numbered findings.',          el: <CaseNotes /> },
+  desk:    { label: 'M · Desk', note: 'Alerts are cards because they arrive. Positions are a Kite table because they stream.', el: <Desk /> },
 };
 
 const WIDTHS = [
