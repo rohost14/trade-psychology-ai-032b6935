@@ -75,8 +75,8 @@ export default function ClosedPositionsCard({ sinceIso, roundTrips, journaledIds
 
   if (rows === null && !error) {
     return (
-      <section>
-        <div className="section-head"><div className="h-4 w-40 bg-muted animate-pulse rounded" /></div>
+      <section className="desk-card overflow-hidden">
+        <div className="card-head"><div className="h-4 w-40 bg-muted animate-pulse rounded" /></div>
         <div className="p-5 space-y-3">{[1, 2, 3].map(i => <Skeleton key={i} className="h-10 rounded" />)}</div>
       </section>
     );
@@ -84,8 +84,8 @@ export default function ClosedPositionsCard({ sinceIso, roundTrips, journaledIds
 
   if (error) {
     return (
-      <section>
-        <div className="section-head"><span className="text-[11px] uppercase tracking-[0.12em] font-medium text-muted-foreground">Closed Positions</span></div>
+      <section className="desk-card overflow-hidden">
+        <div className="card-head"><span className="text-[11px] uppercase tracking-[0.12em] font-medium text-muted-foreground">Closed Positions</span></div>
         <div className="px-5 py-8 text-center text-[13px] text-muted-foreground">Couldn't load closed positions.</div>
       </section>
     );
@@ -99,9 +99,9 @@ export default function ClosedPositionsCard({ sinceIso, roundTrips, journaledIds
       { stat: '3 losses', label: 'in a row is when emotional impairment measurably starts', source: 'Behavioral research' },
     ];
     return (
-      <section>
-        <div className="section-head"><span className="text-[11px] uppercase tracking-[0.12em] font-medium text-muted-foreground">Closed Positions</span></div>
-        <div className="py-8">
+      <section className="desk-card overflow-hidden">
+        <div className="card-head"><span className="text-[11px] uppercase tracking-[0.12em] font-medium text-muted-foreground">Closed Positions</span></div>
+        <div className="px-5 sm:px-6 py-8">
           <p className="text-sm font-medium text-foreground mb-1">Waiting for your first trade</p>
           <p className="text-[13px] text-muted-foreground mb-5">Once you trade, we'll analyze every round — entry to exit — and watch for these patterns in real time.</p>
           <div className="grid grid-cols-2 gap-3">
@@ -121,9 +121,9 @@ export default function ClosedPositionsCard({ sinceIso, roundTrips, journaledIds
   const visible = showAll ? rows : rows.slice(0, CAP);
 
   return (
-    <section>
+    <section className="desk-card overflow-hidden">
       {/* Header */}
-      <div className="py-4 border-b border-border flex items-center justify-between flex-wrap gap-2">
+      <div className="px-4 sm:px-6 py-4 border-b border-border flex items-center justify-between flex-wrap gap-2">
         <div className="flex items-center gap-2.5 flex-wrap">
           <span className="text-[11px] uppercase tracking-[0.12em] font-medium text-muted-foreground">Closed Positions</span>
           <span className="text-[11px] text-muted-foreground font-tabular">· {rows.length} instrument{rows.length !== 1 ? 's' : ''} · {totalTrades} trade{totalTrades !== 1 ? 's' : ''}</span>
@@ -136,7 +136,7 @@ export default function ClosedPositionsCard({ sinceIso, roundTrips, journaledIds
       </div>
 
       {/* Column header */}
-      <div className={cn('hidden sm:grid gap-3 py-3 text-[10px] uppercase tracking-wider font-medium text-muted-foreground border-b border-border', COLS)}>
+      <div className={cn('hidden sm:grid gap-3 px-4 sm:px-6 py-3 text-[10px] uppercase tracking-wider font-medium text-muted-foreground border-b border-border', COLS)}>
         <span>Symbol</span>
         <span className="text-right">Qty</span>
         <span className="text-right">Avg Entry</span>
@@ -164,7 +164,7 @@ export default function ClosedPositionsCard({ sinceIso, roundTrips, journaledIds
                 className={cn('group cursor-pointer transition-colors hover:bg-muted/40 focus:outline-none focus:bg-muted/40', isOpen && 'bg-muted/30')}
               >
                 {/* Desktop */}
-                <div className={cn('hidden sm:grid gap-3 py-3.5 items-center', COLS)}>
+                <div className={cn('hidden sm:grid gap-3 px-4 sm:px-6 py-3.5 items-center', COLS)}>
                   <div className="flex items-center gap-2 min-w-0">
                     <span className="text-sm font-medium text-foreground">{name}</span>
                     {r.product && <span className="text-[10px] font-medium text-muted-foreground uppercase">{r.product}</span>}
@@ -235,3 +235,4 @@ export default function ClosedPositionsCard({ sinceIso, roundTrips, journaledIds
     </section>
   );
 }
+

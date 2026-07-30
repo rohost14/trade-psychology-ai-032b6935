@@ -61,10 +61,10 @@ export function SessionHeroCard({
   ];
 
   return (
-    // A section, not a card (§9) — the session's headline reads as the page's
-    // opening statement, not as one tile among several.
-    <section>
-      <div className="section-head">
+    // A top-level screen block, so it takes a surface (§9). Sections are for
+    // sub-blocks within a surface, not for the blocks themselves.
+    <section className="desk-card overflow-hidden">
+      <div className="card-head">
         <span className="t-label flex items-center gap-2">
           Day P&amp;L
           <span className={cn('h-1.5 w-1.5 rounded-full animate-pulse', pnlPositive ? 'bg-profit' : 'bg-loss')} />
@@ -81,7 +81,7 @@ export function SessionHeroCard({
         </button>
       </div>
 
-      <div className="py-4">
+      <div className="px-4 sm:px-6 py-4">
         <div className="min-w-0">
           {/* The screen's one primary metric — 30px display (§7). */}
           <div className="flex items-baseline gap-2 flex-wrap">
@@ -108,18 +108,19 @@ export function SessionHeroCard({
       </div>
 
       {open && (
-        <div className="animate-accordion-down pb-4">
-          <p className="pb-3 text-[12.5px] leading-snug text-muted-foreground">
+        <div className="animate-accordion-down">
+          <p className="px-4 sm:px-6 pb-3 text-[12.5px] leading-snug text-muted-foreground">
             {lossPct >= 80
               ? "Most of today's loss budget is already spent."
               : paceRatio >= 1.5
               ? 'Trading faster than your usual rhythm today.'
               : 'Running inside your normal operating range.'}
           </p>
-          {/* Hairline metric strip (§17) — the gaps are the separators. */}
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-px bg-border rounded-lg overflow-hidden border border-border">
+          {/* Hairline metric strip (§17) — the gaps are the separators. Sits
+              flush inside the surface, so no border or radius of its own. */}
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-px bg-border border-t border-border">
             {stats.map(s => (
-              <div key={s.label} className="bg-card px-3 py-2.5">
+              <div key={s.label} className="bg-card px-4 sm:px-5 py-2.5">
                 <span className="text-[10px] uppercase tracking-wider font-medium text-muted-foreground">{s.label}</span>
                 <div className="mt-0.5 flex items-baseline gap-1.5">
                   <span className={cn('text-[14px] font-semibold font-tabular tracking-tight', s.tone)}>{s.value}</span>

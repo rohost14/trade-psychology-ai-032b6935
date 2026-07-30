@@ -22,7 +22,7 @@ PURPOSE
   ✓  One primary metric per screen   ✓  Every screen has a first-run state
 
 STRUCTURE
-  ✓  Cards must justify themselves — sections + dividers are the default
+  ✓  Surfaces for a screen's blocks · sections inside them · never nested
   ✓  Tables before charts
   ✓  Density is a feature — no whitespace for its own sake
 
@@ -251,54 +251,96 @@ Density is an explicit goal, not a side effect. The user is an active trader, no
 
 **This is the most consequential rule in this document.**
 
-> **Default: a plain labelled section with a divider. A card must justify itself.**
+> **A screen's top-level blocks take a surface. Sections are for sub-blocks *inside* a surface. Nothing gets a container it hasn't earned, and nothing nests.**
 
-A card around every block is the single clearest signal of a generated dashboard. It also costs real space: each container spends border, radius, and padding to communicate nothing. Sections, dividers, grouping, and tables carry the same structure for free — and let a table run edge to edge, which is how trading software presents rows.
+*Amended, with reason: an earlier draft made a bare section the default at every level, and the first screens built that way were flat and unreadable. Removing the card surface removed the only thing separating one block from the next — a 1px border at the divider contrast is a fine secondary separator inside a surface and useless as the sole structural device, so blocks stopped reading as blocks. Dense is not the same as flat: Kite and Bloomberg are information-dense and still separate surfaces. The rule below keeps what the original was actually after — no container per small thing, no nesting, tables running full width — without discarding the surface that makes a screen scannable.*
 
-### Section anatomy — the default block
+The failure mode at each extreme is real, and they are opposite:
+
+| Too many containers | Too few |
+|---|---|
+| A card per small thing, cards inside cards, a grid of cards standing in for a table | Everything on one plane, separated only by hairlines |
+| Reads as a generated dashboard; spends border, radius and padding to say nothing | Reads as a text dump; nothing groups, nothing scans |
+
+The line between them: **a surface marks a block a trader would name** — "my open positions", "today's P&L" — and everything inside that block is structured with labels, dividers and rows, not with more boxes.
+
+### The two levels
+
+**Surface — a screen's top-level block.** `bg-card`, 1px border, 10px radius, no shadow. Header 44px with a bottom divider. Body padding 16px vertical, 16/24px horizontal.
 
 ```
-LABEL · qualifier                                      right-aligned summary
-──────────────────────────────────────────────────────────────────────────
-content — rows, table, stat line, or chart, full width
+┌────────────────────────────────────────────────┐
+│ LABEL · qualifier            summary value     │  44px header, divider
+├────────────────────────────────────────────────┤
+│ content — rows, table, stats                   │
+└────────────────────────────────────────────────┘
 ```
 
-- Label: Label step (11px uppercase, text secondary). Optional muted qualifier after a `·`.
-- Right-aligned summary value on the same line — the section's total, count, or status. Body step, tabular.
-- A single divider under the header. No box, no background, no radius.
-- Content runs the full content width. Tables have no inset.
+**Section — a sub-block inside a surface.** Label, divider, content. No border, no background, no radius of its own.
 
-### When a card *is* justified
+```
+  LABEL                              summary
+  ──────────────────────────────────────────
+  content
+```
 
-A card earns its border only when at least one is true:
+- Label: Label step (11px uppercase, text secondary), optional muted qualifier after a `·`.
+- Right-aligned summary on the same line — the block's total, count or status. Tabular.
+- A table inside a surface runs the full width **of that surface**. It keeps the surface's horizontal padding; it does not get an additional inset of its own.
+- Hairline groups (`gap-px` over the border colour) sit flush inside a surface — they take a top divider, not a border and radius of their own.
 
-1. **It is a distinct interactive object** in a set the user chooses between — a settings group, a selectable option, a report entry that expands.
-2. **It floats** — modal, sheet, popover, dropdown.
-3. **It is a genuine aside** — content that must read as separate from the page's flow, such as a broker-connection gate or a first-run prompt.
-4. **It is a form group** on a configuration screen, where grouping fields is the whole point (see the Stripe Dashboard reference, §2).
+### Count check
 
-**Never:** a card per data block · a card inside a card · a card whose only purpose is to hold a heading and a number · a grid of cards standing in for a table.
+If a screen has more than roughly four or five surfaces, the screen is doing too much (§25) — the fix is fewer stories, not thinner borders. If a surface contains another surface, one of them is wrong.
+
+**Never:** a card inside a card · a card whose only content is a heading and a number · a grid of cards standing in for a table · a surface per row.
+
+### Beyond the two levels
+
+Some things take a container for a different reason, and they are still surfaces:
+
+1. **A distinct interactive object** in a set the user chooses between — a settings group, a selectable option, a report entry that expands.
+2. **Something that floats** — modal, sheet, popover, dropdown. These keep a shadow (§8).
+3. **A genuine aside** — content that must read as separate from the page's flow, such as a broker-connection gate or a first-run prompt.
+4. **A form group** on a configuration screen, where grouping fields is the whole point (see the Stripe Dashboard reference, §2).
 
 ### Worked example
 
 ```
-BEFORE — card per block                 AFTER — labelled sections
-┌──────────────────────┐                DAY P&L
-│ Day P&L              │                +₹12,480    booked 8,240 · unreal 4,240
-│ +₹12,480             │                ─────────────────────────────────────────
-└──────────────────────┘                LIVE ALERTS                            3
-┌──────────────────────┐                 Revenge trade      NIFTY      −₹2,100
-│ Live Alerts       3  │                 Size escalation    BANKNIFTY  −₹890
-│ • Revenge trade      │                ─────────────────────────────────────────
-│ • Size escalation    │                OPEN POSITIONS            unreal +₹4,240
-└──────────────────────┘                SYMBOL        QTY    LTP     CHG      P&L
-┌──────────────────────┐                NIFTY24C50    50   182.40   +2.1%  +1,240
-│ Open Positions       │                BANKNIFTY25   25   410.20   −0.8%    −890
-│ ...                  │
-└──────────────────────┘
+WRONG — a card per thing          WRONG — everything flat
+┌────────────────────┐            DAY P&L
+│ Day P&L            │            +₹12,480
+│ +₹12,480           │            ─────────────────────────────
+└────────────────────┘            OPEN POSITIONS       +₹4,240
+┌────────┐┌────────┐              SYMBOL   QTY   LTP    CHG
+│ Trades ││ Win %  │              NIFTY24C  50 182.40 +2.1%
+│   14   ││  62%   │
+└────────┘└────────┘              nothing groups; the hairline
+┌────────────────────┐            is doing work it cannot do,
+│ Open Positions     │            and the screen reads as a
+│ ┌────────────────┐ │            wall of text
+│ │ table in a card│ │
+│ └────────────────┘ │
+└────────────────────┘
 
-3 borders, 3 radii, 6 paddings          1 divider each, tables edge to edge
-~40% of vertical space is chrome        same information, ~30% less height
+RIGHT — surfaces for blocks, sections inside them
+┌──────────────────────────────────────────────────┐
+│ DAY P&L                            [session ▾]   │
+│ +₹12,480                                         │
+│ Booked +8,240 · Unrealized +4,240                │
+├──────────┬──────────┬──────────┬─────────────────┤  hairline strip,
+│ TRADES   │ LOSS USED│ WIN RATE │ UNREALIZED      │  flush inside
+│ 14       │ 32%      │ 62%      │ +₹4,240         │
+└──────────┴──────────┴──────────┴─────────────────┘
+┌──────────────────────────────────────────────────┐
+│ OPEN POSITIONS · 2              unreal +₹4,240   │
+│ SYMBOL        QTY     LTP     CHG%          P&L  │
+│ NIFTY24C50     50  182.40   +2.1%       +1,240   │
+│ BANKNIFTY25    25  410.20   −0.8%         −890   │
+└──────────────────────────────────────────────────┘
+
+Two surfaces, not seven. The table runs the surface's full width.
+Blocks read as blocks; the strip needs no border of its own.
 ```
 
 ## 10. Iconography

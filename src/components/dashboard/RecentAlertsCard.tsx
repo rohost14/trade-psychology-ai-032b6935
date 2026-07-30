@@ -32,8 +32,8 @@ export default function RecentAlertsCard({ alerts, onOpen, onAcknowledge, loadin
   const criticalCount = visible.filter(a => normalizeSeverityStr(a.severity) === 'danger').length;
 
   return (
-    <section>
-      <div className="section-head">
+    <section className="desk-card overflow-hidden">
+      <div className="card-head">
         <div className="flex items-center gap-2.5">
           <Bell className="h-3.5 w-3.5 text-muted-foreground" strokeWidth={2} />
           <span className="text-[11px] uppercase tracking-[0.12em] font-medium text-muted-foreground">Live Alerts</span>
@@ -54,7 +54,7 @@ export default function RecentAlertsCard({ alerts, onOpen, onAcknowledge, loadin
       {loading ? (
         <div className="divide-y divide-border">
           {[1, 2, 3].map(i => (
-            <div key={i} className="py-3.5 flex items-start gap-3">
+            <div key={i} className="px-5 sm:px-6 py-3.5 flex items-start gap-3">
               <Skeleton className="h-7 w-7 rounded-md shrink-0" />
               <div className="flex-1 space-y-2">
                 <Skeleton className="h-3.5 w-40" />
@@ -64,7 +64,7 @@ export default function RecentAlertsCard({ alerts, onOpen, onAcknowledge, loadin
           ))}
         </div>
       ) : alerts.length === 0 ? (
-        <div className="py-8 text-center">
+        <div className="px-5 sm:px-6 py-8 text-center">
           <p className="text-[13px] font-semibold text-foreground">No live alerts</p>
           <p className="text-[12px] text-muted-foreground mt-0.5">Behavioural alerts appear here as they fire.</p>
         </div>
@@ -87,7 +87,7 @@ export default function RecentAlertsCard({ alerts, onOpen, onAcknowledge, loadin
                 onClick={() => (onOpen ? onOpen(alert.id) : onAcknowledge?.(alert.id))}
                 onKeyDown={e => (e.key === 'Enter' || e.key === ' ') && (onOpen ? onOpen(alert.id) : onAcknowledge?.(alert.id))}
                 className={cn(
-                  'py-3.5 border-l-2 animate-fade-in cursor-pointer transition-colors hover:bg-muted/40 focus:outline-none focus:bg-muted/40',
+                  'px-5 sm:px-6 py-3.5 border-l-2 animate-fade-in cursor-pointer transition-colors hover:bg-muted/40 focus:outline-none focus:bg-muted/40',
                   borderColor,
                   alert.acknowledged && 'opacity-60',
                 )}
@@ -121,3 +121,4 @@ export default function RecentAlertsCard({ alerts, onOpen, onAcknowledge, loadin
     </section>
   );
 }
+

@@ -78,14 +78,14 @@ function pnlTone(b: Pick<Bucket, 'pnl' | 'enough'>) {
   return 'text-muted-foreground';
 }
 
-/** A section header: label left, optional summary right. */
+/** A block header inside a surface: label left, optional summary right. */
 function SectionHead({ label, icon: Icon, right }: {
   label: string;
   icon?: React.ElementType;
   right?: React.ReactNode;
 }) {
   return (
-    <div className="section-head">
+    <div className="card-head">
       <span className="t-label flex items-center gap-1.5">
         {Icon && <Icon className="h-3.5 w-3.5" />}
         {label}
@@ -94,6 +94,7 @@ function SectionHead({ label, icon: Icon, right }: {
     </div>
   );
 }
+
 
 /** One situation row. Dense, value right-aligned and tabular (§18). */
 function SituationRow({ label, b }: { label: string; b: Bucket }) {
@@ -120,20 +121,18 @@ function WindowStat({ bucket, kind }: { bucket: HourBucket; kind: 'best' | 'wors
   const Icon = isBest ? TrendingUp : TrendingDown;
 
   return (
-    <div>
-      <SectionHead label={isBest ? 'Strongest window' : 'Weakest window'} />
-      <div className="py-4">
-        <div className="flex items-baseline gap-2">
-          <Icon className={cn('h-4 w-4 shrink-0', isBest ? 'text-profit' : 'text-loss')} />
-          <p className="text-[17px] font-semibold tracking-tight text-foreground">{bucket.label}</p>
-        </div>
-        <p className="text-[12.5px] text-muted-foreground mt-1 font-tabular">
-          {bucket.trades} trades · {Math.round(bucket.win_rate ?? 0)}% win ·{' '}
-          <span className={isBest ? 'text-profit' : 'text-loss'}>
-            {formatCurrencyWithSign(Math.round(bucket.pnl))}
-          </span>
-        </p>
+    <div className="px-4 sm:px-6 py-4">
+      <span className="t-label">{isBest ? 'Strongest window' : 'Weakest window'}</span>
+      <div className="flex items-baseline gap-2 mt-1.5">
+        <Icon className={cn('h-4 w-4 shrink-0', isBest ? 'text-profit' : 'text-loss')} />
+        <p className="text-[17px] font-semibold tracking-tight text-foreground">{bucket.label}</p>
       </div>
+      <p className="text-[12.5px] text-muted-foreground mt-1 font-tabular">
+        {bucket.trades} trades · {Math.round(bucket.win_rate ?? 0)}% win ·{' '}
+        <span className={isBest ? 'text-profit' : 'text-loss'}>
+          {formatCurrencyWithSign(Math.round(bucket.pnl))}
+        </span>
+      </p>
     </div>
   );
 }
@@ -277,8 +276,9 @@ export default function MyRecordPage() {
 
       {!loading && data?.has_data && data.overall && (
         <div className="space-y-5">
-          {/* The record — this screen's one primary metric (§26). */}
-          <div>
+          {/* Surface 1 — the record itself: headline, this hour, the two
+              windows. One block, with sub-blocks inside it. */}
+          <section className="desk-card overflow-hidden">
             <SectionHead
               label={`Your record · ${data.scope_label}`}
               right={
@@ -288,7 +288,7 @@ export default function MyRecordPage() {
                 </span>
               }
             />
-            <div className="py-4">
+            <div className="px-4 sm:px-6 py-4">
               <p className={cn(
                 'font-display text-[30px] font-semibold tracking-tight font-tabular',
                 pnlTone(data.overall),
@@ -311,45 +311,48 @@ export default function MyRecordPage() {
                 <p className="text-[14px] text-foreground mt-3">{data.verdict}</p>
               )}
             </div>
-          </div>
 
-          {/* Right now — border keyed to this hour's own record. */}
-          {data.this_hour && (
-            <div className={cn(
-              'border-l-2 pl-4',
-              !data.this_hour.enough ? 'border-l-border'
-                : data.this_hour.avg_pnl >= 0 ? 'border-l-profit' : 'border-l-loss',
-            )}>
-              <SectionHead label={`Right now · ${data.this_hour.label} IST`} icon={Clock} />
-              <div className="py-4">
-                <p className="text-[17px] font-semibold tracking-tight text-foreground font-tabular">
-                  {data.this_hour.trades} trade{data.this_hour.trades !== 1 ? 's' : ''}
-                  {data.this_hour.win_rate !== null && ` · ${Math.round(data.this_hour.win_rate)}% win rate`}
-                  {' · '}
-                  <span className={pnlTone(data.this_hour)}>
-                    {formatCurrencyWithSign(Math.round(data.this_hour.pnl))}
+            {/* Right now — sub-block, keyed to this hour's own record. */}
+            {data.this_hour && (
+              <div className={cn(
+                'border-t border-border border-l-2',
+                !data.this_hour.enough ? 'border-l-border'
+                  : data.this_hour.avg_pnl >= 0 ? 'border-l-profit' : 'border-l-loss',
+              )}>
+                <div className="px-4 sm:px-6 py-4">
+                  <span className="t-label flex items-center gap-1.5">
+                    <Clock className="h-3.5 w-3.5" />
+                    Right now · {data.this_hour.label} IST
                   </span>
-                </p>
-                {!data.this_hour.enough && (
-                  <p className="text-[12.5px] text-muted-foreground mt-1 font-tabular">
-                    Fewer than {data.min_sample} trades in this window — not enough to mean much.
+                  <p className="text-[17px] font-semibold tracking-tight text-foreground font-tabular mt-1.5">
+                    {data.this_hour.trades} trade{data.this_hour.trades !== 1 ? 's' : ''}
+                    {data.this_hour.win_rate !== null && ` · ${Math.round(data.this_hour.win_rate)}% win rate`}
+                    {' · '}
+                    <span className={pnlTone(data.this_hour)}>
+                      {formatCurrencyWithSign(Math.round(data.this_hour.pnl))}
+                    </span>
                   </p>
-                )}
+                  {!data.this_hour.enough && (
+                    <p className="text-[12.5px] text-muted-foreground mt-1 font-tabular">
+                      Fewer than {data.min_sample} trades in this window — not enough to mean much.
+                    </p>
+                  )}
+                </div>
               </div>
-            </div>
-          )}
+            )}
 
-          {/* Strongest / weakest window */}
-          {(data.best_hour || data.worst_hour) && (
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-8">
-              {data.best_hour && <WindowStat bucket={data.best_hour} kind="best" />}
-              {data.worst_hour && <WindowStat bucket={data.worst_hour} kind="worst" />}
-            </div>
-          )}
+            {/* Strongest / weakest window — hairline pair inside the surface. */}
+            {(data.best_hour || data.worst_hour) && (
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-px bg-border border-t border-border">
+                {data.best_hour && <div className="bg-card"><WindowStat bucket={data.best_hour} kind="best" /></div>}
+                {data.worst_hour && <div className="bg-card"><WindowStat bucket={data.worst_hour} kind="worst" /></div>}
+              </div>
+            )}
+          </section>
 
-          {/* Situations — a table, edge to edge (§18). */}
+          {/* Surface 2 — situations. The table runs edge to edge inside it. */}
           {situations.length > 0 && (
-            <div>
+            <section className="desk-card overflow-hidden">
               <SectionHead
                 label="In these situations"
                 right={
@@ -358,33 +361,33 @@ export default function MyRecordPage() {
                   </span>
                 }
               />
-              <div className="divide-y divide-border">
+              <div className="px-4 sm:px-6 divide-y divide-border">
                 {situations.map(([key, b]) => (
                   <SituationRow key={key} label={SITUATION_LABELS[key] ?? key} b={b} />
                 ))}
               </div>
-            </div>
+            </section>
           )}
 
-          {/* Holding */}
+          {/* Surface 3 — holding */}
           {data.holding?.avg_minutes != null && (
-            <div>
+            <section className="desk-card overflow-hidden">
               <SectionHead label="Holding" />
-              <div className="grid grid-cols-2 gap-px bg-border rounded-lg overflow-hidden border border-border mt-3">
-                <div className="bg-card px-3 py-2.5">
+              <div className="grid grid-cols-2 gap-px bg-border">
+                <div className="bg-card px-4 sm:px-6 py-3">
                   <p className="text-[10px] font-medium uppercase tracking-wider text-muted-foreground">Average hold</p>
                   <p className="text-[14px] font-semibold text-foreground font-tabular mt-0.5">
                     {fmtHold(data.holding.avg_minutes)}
                   </p>
                 </div>
-                <div className="bg-card px-3 py-2.5">
+                <div className="bg-card px-4 sm:px-6 py-3">
                   <p className="text-[10px] font-medium uppercase tracking-wider text-muted-foreground">Longest held</p>
                   <p className="text-[14px] font-semibold text-foreground font-tabular mt-0.5">
                     {fmtHold(data.holding.longest_minutes)}
                   </p>
                 </div>
               </div>
-            </div>
+            </section>
           )}
 
           <p className="text-[11px] text-muted-foreground pt-1">
