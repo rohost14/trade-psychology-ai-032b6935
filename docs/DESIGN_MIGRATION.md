@@ -138,6 +138,10 @@ Foundation first, then a small screen to prove it, then the hard ones.
 
 Plus: **`TradeDnaTab` bundles six unrelated stories** in 447 lines (quality tiers, best/worst five, risk-reward + disposition effect, intraday sequence, hold time, and a searchable 50-row trade log). The trade log in particular is a broker feature and fails the differentiation bar.
 
+### Known failing test (pre-existing, not caused by the migration)
+
+`src/test/analyticsTabs.smoke.test.tsx` → "BehaviorTab renders pattern frequency, scenario cards and options card without NaN" fails with `useBroker must be used within BrokerProvider`. `BehaviorTab` imports `components/dashboard/PredictiveContextStrip`, which calls `useBroker`, and the smoke test renders without that provider. Fix the harness (wrap in `BrokerProvider`) or resolve the cross-page import — **do not change the assertion.** Belongs to the Analytics step. Baseline: 15 of 16 frontend tests pass.
+
 ### Logic bugs
 
 - **Two conflicting definitions of "clean day" on the same screen** — `MyPatterns.tsx` excludes `'high'` severity from its streak logic; `PatternCalendar.tsx`'s `worstSeverity()` counts `'high'` as danger.

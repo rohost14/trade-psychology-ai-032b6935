@@ -175,10 +175,10 @@
   }
 
   html {
-    /* Gentle global bump: rem-based Tailwind sizes (text-sm/base, spacing) scale up
-       ~6% for more breathing room. NOTE: arbitrary px classes (text-[11px]) don't
-       scale — those tiny fonts are raised in the per-page reskins. */
-    font-size: 17px;
+    /* 16px. Density is an explicit design goal (DESIGN_SYSTEM.md §8) and a bumped
+       root inflates every rem-based size and spacing step against it. Typography
+       uses the absolute px scale in §7, so it is unaffected either way. */
+    font-size: 16px;
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
     scroll-behavior: smooth;
@@ -193,12 +193,14 @@
   /* Headings keep the display face (Geist); body runs on Inter — matches Lovable. */
   h1, h2, h3, h4, h5 { font-family: 'Geist', 'Inter', system-ui, sans-serif; }
 
-  /* Typography — headings use design system sizes */
-  h1 { font-size: 22px; font-weight: 600; line-height: 1.25; letter-spacing: -0.025em; @apply text-foreground; }
-  h2 { font-size: 16px; font-weight: 600; line-height: 1.35; letter-spacing: -0.015em; @apply text-foreground; }
-  h3 { font-size: 14px; font-weight: 600; line-height: 1.4; letter-spacing: -0.01em; @apply text-foreground; }
-  h4 { @apply text-base font-medium text-foreground; }
-  p  { @apply text-sm text-muted-foreground; }
+  /* Element defaults, aligned to the §7 scale: H1 22 · H2 17 · Body 14 · Small 12.5.
+     Explicit classes still win; these are the fallback so unstyled markup lands
+     on the scale instead of on browser defaults. */
+  h1 { font-size: 22px;   font-weight: 600; line-height: 1.25; letter-spacing: -0.025em; @apply text-foreground; }
+  h2 { font-size: 17px;   font-weight: 600; line-height: 1.35; letter-spacing: -0.015em; @apply text-foreground; }
+  h3 { font-size: 14px;   font-weight: 600; line-height: 1.4;  letter-spacing: -0.01em;  @apply text-foreground; }
+  h4 { font-size: 14px;   font-weight: 500; line-height: 1.4;  @apply text-foreground; }
+  p  { font-size: 12.5px; font-weight: 400; line-height: 1.5;  @apply text-muted-foreground; }
 
   /* Tabular numbers for financial data */
   .tabular-nums {
@@ -227,16 +229,6 @@ svg.lucide {
   .tm-card {
     @apply bg-card rounded-xl overflow-hidden;
     box-shadow: var(--shadow-card);
-  }
-
-  /* Simple stat display */
-  .stat-value {
-    @apply text-2xl font-semibold tabular-nums tracking-tight;
-    font-family: 'DM Mono', monospace;
-  }
-
-  .stat-label {
-    @apply text-sm text-muted-foreground font-medium;
   }
 
   /* Clean table header */
@@ -282,10 +274,7 @@ svg.lucide {
   .bg-warning  { background-color: rgb(var(--tm-obs)); }
 
   /* Simple badge */
-  .badge         { @apply inline-flex items-center px-2.5 py-0.5 rounded text-xs font-medium; }
-  .badge-success { @apply bg-green-50 text-green-700 dark:bg-green-900/30 dark:text-green-400; }
-  .badge-warning { @apply bg-amber-50 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400; }
-  .badge-danger  { @apply bg-red-50 text-red-700 dark:bg-red-900/30 dark:text-red-400; }
+  .badge { @apply inline-flex items-center px-2.5 py-0.5 rounded text-xs font-medium; }
 }
 
 @layer utilities {
@@ -300,31 +289,36 @@ svg.lucide {
   /* Loading skeleton */
   .skeleton { @apply bg-muted animate-pulse rounded; }
 
-  /* ── Lovable "desk" primitives (ported from calm-trade-clinic) ───────────── */
+  /* ── Structural primitives (DESIGN_SYSTEM.md §9, §17) ─────────────────────
+     A plain labelled SECTION is the default block. A card is the exception and
+     must justify itself (§9) — so `.section-head` carries no horizontal inset,
+     letting tables and rows run the full content width.                       */
+  .section-head { @apply h-11 border-b border-border flex items-center justify-between gap-3; }
+
+  /* Card — only where §9 justifies one. Header keeps a horizontal inset so its
+     label aligns with the padded body beneath it.                             */
   .desk-card  { @apply bg-card border border-border rounded-lg; }
-  .page-shell { @apply w-full mx-auto max-w-[1400px] px-4 sm:px-6 lg:px-8 py-4 sm:py-6 space-y-4 sm:space-y-6 pb-10; }
-  .card-head  { @apply px-4 sm:px-6 h-12 border-b border-border flex items-center justify-between gap-3; }
-  .card-body  { @apply px-4 sm:px-6 py-4; }
+  .card-head  { @apply px-4 sm:px-6 h-11 border-b border-border flex items-center justify-between gap-3; }
+
   .t-label    { @apply text-[11px] font-medium uppercase tracking-[0.12em] text-muted-foreground; }
   .font-display { font-family: 'Geist', 'Inter', system-ui, sans-serif; letter-spacing: -0.025em; }
   .font-tabular { font-variant-numeric: tabular-nums; }
 }
 
-/* ── Type scale utilities ──────────────────────────────────────────────────── */
-/* Apply these instead of ad-hoc text-* classes for consistency.               */
+/* ── Type scale utilities ──────────────────────────────────────────────────────
+   DEPRECATED. These are the v1 sizes and do NOT match the scale in
+   DESIGN_SYSTEM.md §7 (Display 30 / H1 22 / H2 17 / Body 14 / Small 12.5 /
+   Label 11 / Micro 10). They stay only until every screen is migrated off them,
+   then this whole block goes. Do not use them in new work.                     */
 
 @layer utilities {
-  /* Display — hero P&L, score numbers */
+  /* Display — v1 28px; §7 says 30px/600 */
   .t-display {
     font-size: 28px; font-weight: 700; line-height: 1.15; letter-spacing: -0.03em;
   }
-  /* Heading LG — page titles */
+  /* Heading LG — v1 20px; §7 H1 says 22px */
   .t-heading-lg {
     font-size: 20px; font-weight: 600; line-height: 1.25; letter-spacing: -0.02em;
-  }
-  /* Heading MD — card titles */
-  .t-heading-md {
-    font-size: 16px; font-weight: 600; line-height: 1.35; letter-spacing: -0.015em;
   }
   /* Heading SM — section headers within cards */
   .t-heading-sm {
@@ -372,29 +366,12 @@ svg.lucide {
 
 /* ── Page backgrounds ───────────────────────────────────────────────────────── */
 
+/* Flat in both themes. The dark variant previously carried two radial gradients;
+   gradients are banned (§4) and a page background must not compete with data.
+   `.landing-bg` is gone with it — Welcome uses inline styles today and gets its
+   marketing surface defined properly when that screen is migrated. */
 .tm-page-bg {
   background: rgb(var(--layer-page));
-}
-
-.dark .tm-page-bg {
-  background:
-    radial-gradient(ellipse 60% 45% at 92% 0%,  rgba(119,133,224,0.12) 0%, transparent 100%),
-    radial-gradient(ellipse 55% 50% at 0% 100%, rgba(119,133,224,0.09) 0%, transparent 100%),
-    hsl(226 22% 11%);
-}
-
-/* ── Landing page hero gradient ──────────────────────────────────────────── */
-.landing-bg {
-  background:
-    radial-gradient(ellipse 60% 40% at 50% 0%, hsl(232 70% 94% / 0.7), transparent),
-    radial-gradient(ellipse 40% 40% at 100% 0%, hsl(280 60% 94% / 0.4), transparent),
-    hsl(230 25% 97%);
-}
-.dark .landing-bg {
-  background:
-    radial-gradient(ellipse 60% 40% at 50% 0%, hsl(232 50% 20% / 0.5), transparent),
-    radial-gradient(ellipse 40% 40% at 100% 0%, hsl(280 40% 18% / 0.3), transparent),
-    hsl(226 22% 11%);
 }
 
 /* ── Elevated surface (sidebar, modals) ─────────────────────────────────────── */
@@ -402,17 +379,6 @@ svg.lucide {
 .tm-elevated {
   background-color: rgb(var(--layer-elevated));
   box-shadow: var(--shadow-elevated);
-}
-
-/* ── AI Coach CTA gradient ──────────────────────────────────────────────────── */
-
-.tm-coach-cta {
-  background: linear-gradient(135deg,
-      rgb(var(--tm-brand)) 0%,
-      color-mix(in srgb, rgb(var(--tm-brand)) 80%, black) 100%);
-  box-shadow:
-    0 4px 20px rgba(var(--tm-brand) / 0.3),
-    0 0 0 1px rgba(var(--tm-brand) / 0.2);
 }
 
 /* ── Animation keyframes ────────────────────────────────────────────────────── */
@@ -466,17 +432,6 @@ svg.lucide {
   to   { opacity: 0; transform: translateY(-10px) scale(0.95); }
 }
 
-@keyframes float {
-  0%, 100% { transform: translateY(-5px) rotate(0deg); }
-  50%       { transform: translateY(5px) rotate(10deg); }
-}
-
-@keyframes zapPulse {
-  0%, 100% { transform: rotate(0deg) scale(1); }
-  33%       { transform: rotate(15deg) scale(1.1); }
-  66%       { transform: rotate(-15deg) scale(1); }
-}
-
 @keyframes pulseScale {
   0%, 100% { transform: scale(1); }
   50%       { transform: scale(1.1); }
@@ -499,8 +454,6 @@ svg.lucide {
   .animate-slide-in-up    { animation: slideInUp    0.35s cubic-bezier(0.16, 1, 0.3, 1) both; }
   .animate-slide-out-up   { animation: slideOutUp   0.25s ease-in forwards; overflow: hidden; }
   .animate-card-exit      { animation: cardExit     0.18s ease-in forwards; pointer-events: none; }
-  .animate-float          { animation: float  4s ease-in-out infinite; }
-  .animate-zap-pulse      { animation: zapPulse 3s ease-in-out infinite; animation-delay: 2s; }
   .animate-pulse-scale    { animation: pulseScale 2s ease-in-out infinite; }
   .animate-badge-pulse    { animation: badgePulse 4s ease-in-out infinite; }
 }
