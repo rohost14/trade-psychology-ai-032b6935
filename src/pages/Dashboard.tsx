@@ -1,7 +1,10 @@
 import { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Link } from 'react-router-dom';
-import { Link2, Loader2, AlertTriangle, RefreshCw, X } from 'lucide-react';
+import { Loader2, AlertTriangle, RefreshCw, X } from 'lucide-react';
+import BrokerGate from '@/components/BrokerGate';
+import ErrorState from '@/components/ErrorState';
+import { Input } from '@/components/ui/input';
 import { SetupNudgeCard } from '@/components/dashboard/SetupNudgeCard';
 import { MarketRail } from '@/components/dashboard/MarketRail';
 import ImportHistoryPrompt from '@/components/onboarding/ImportHistoryPrompt';
@@ -457,83 +460,68 @@ export default function Dashboard() {
 
   if (!isConnected) {
     return (
-      <div className="w-full min-h-[60vh] flex flex-col items-center justify-center animate-fade-in-up">
-        <div className="p-4 rounded-full bg-primary/10 mb-6">
-          <Link2 className="h-12 w-12 text-primary" />
-        </div>
-        <h2 className="text-2xl font-semibold text-foreground mb-2">Connect Your Broker</h2>
-        <p className="text-muted-foreground text-center max-w-md mb-6">
-          Connect your Zerodha account to start monitoring your trading behavior and get personalized insights.
-        </p>
-        <Button size="lg" className="gap-2" onClick={() => connect()}>
-          <Link2 className="h-5 w-5" />
-          Connect Zerodha
-        </Button>
-      </div>
+      <BrokerGate
+        title="Dashboard"
+        unlocks="Connect your Zerodha account to see your live session — open positions, day P&L and behavioural alerts as they fire."
+      />
     );
   }
 
+  // Sync failed with nothing cached to fall back on. Uses the shared error
+  // surface with the specific reason, rather than a bespoke block.
   if (syncStatus === 'error' && !dataLoaded && !positionsLoading && !tradesLoading) {
     return (
-      <div className="w-full min-h-[60vh] flex flex-col items-center justify-center gap-4">
-        <div className="p-4 rounded-full bg-destructive/10">
-          <AlertTriangle className="h-10 w-10 text-destructive" />
-        </div>
-        <div className="text-center">
-          <h2 className="text-lg font-semibold text-foreground">Sync Failed</h2>
-          <p className="text-sm text-muted-foreground mt-1 max-w-md">
-            {syncError || 'Could not sync data from Zerodha. This may be a temporary issue.'}
-          </p>
-        </div>
-        <Button onClick={handleSync} variant="outline" className="gap-2">
-          <RefreshCw className="h-4 w-4" />
-          Retry Sync
-        </Button>
-      </div>
+      <ErrorState
+        error={{ response: { status: 500 } }}
+        message={syncError || 'Could not sync data from Zerodha. This may be a temporary issue.'}
+        onRetry={handleSync}
+      />
     );
   }
 
   return (
-    <div className="w-full min-h-screen tm-page-bg">
+    <div className="w-full">
 
       <ImportHistoryPrompt />
 
-      {/* ── System banners (token / sync / capital) ───────────────────────── */}
+      {/* ── System banners (token / sync / capital) ─────────────────────────
+             Semantic tokens, which already carry both themes — the previous
+             raw amber and red pairs needed a dark: variant for every value. */}
       {isTokenExpired && dataLoaded && (
-        <div className="mb-4 px-3 py-2.5 rounded-lg bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800/30 flex items-center gap-2">
-          <AlertTriangle className="h-3.5 w-3.5 text-amber-600 dark:text-amber-400 shrink-0" />
-          <span className="text-[13px] text-amber-700 dark:text-amber-300">
+        <div className="mb-4 px-3 py-2.5 rounded-lg bg-warning/10 border border-warning/20 flex items-center gap-2">
+          <AlertTriangle className="h-4 w-4 text-warning shrink-0" />
+          <span className="text-[12.5px] text-warning">
             Live sync paused — showing last known data. Analytics and history still work.
           </span>
         </div>
       )}
 
       {showCapitalPrompt && dataLoaded && (
-        <div className="mb-4 px-3 py-2.5 rounded-lg bg-tm-brand/5 border border-tm-brand/20 flex flex-wrap items-center gap-3">
+        <div className="mb-4 px-3 py-2.5 rounded-lg bg-primary/5 border border-primary/20 flex flex-wrap items-center gap-3">
           <div className="flex-1 min-w-0">
-            <p className="text-[13px] font-medium text-foreground">Enable position sizing alerts</p>
-            <p className="text-[12px] text-muted-foreground mt-0.5">
+            <p className="text-[14px] font-medium text-foreground">Enable position sizing alerts</p>
+            <p className="text-[12.5px] text-muted-foreground mt-0.5">
               Add your trading capital to detect oversized positions.
             </p>
           </div>
           <div className="flex items-center gap-2 flex-shrink-0">
-            <span className="text-sm text-muted-foreground">₹</span>
-            <input
+            <span className="text-[14px] text-muted-foreground">₹</span>
+            <Input
               type="number"
               placeholder="e.g. 500000"
               value={capitalInput}
               onChange={e => setCapitalInput(e.target.value)}
               onKeyDown={e => e.key === 'Enter' && handleSaveCapital()}
-              className="w-32 px-2 py-1.5 text-sm bg-background border border-border rounded-lg focus:outline-none focus:ring-1 focus:ring-ring"
+              className="w-32 h-9 text-[14px] font-tabular"
             />
+            <Button onClick={handleSaveCapital} disabled={!capitalInput || capitalSaving}>
+              {capitalSaving ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : 'Save'}
+            </Button>
             <button
-              onClick={handleSaveCapital}
-              disabled={!capitalInput || capitalSaving}
-              className="px-3 py-1.5 text-sm bg-tm-brand text-white rounded-lg hover:bg-tm-brand/90 disabled:opacity-50"
+              onClick={handleDismissCapital}
+              aria-label="Dismiss"
+              className="text-muted-foreground transition-colors duration-150 hover:text-foreground"
             >
-              {capitalSaving ? <Loader2 className="h-3 w-3 animate-spin" /> : 'Save'}
-            </button>
-            <button onClick={handleDismissCapital} className="text-muted-foreground hover:text-foreground">
               <X className="h-4 w-4" />
             </button>
           </div>
@@ -541,15 +529,15 @@ export default function Dashboard() {
       )}
 
       {syncStatus === 'error' && dataLoaded && !isTokenExpired && (
-        <div className="mb-4 px-3 py-2.5 rounded-lg bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800/30 flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            <AlertTriangle className="h-3.5 w-3.5 text-tm-loss shrink-0" />
-            <span className="text-[13px] text-tm-loss">
+        <div className="mb-4 px-3 py-2.5 rounded-lg bg-loss/10 border border-loss/20 flex items-center justify-between gap-3">
+          <div className="flex items-center gap-2 min-w-0">
+            <AlertTriangle className="h-4 w-4 text-loss shrink-0" />
+            <span className="text-[12.5px] text-loss">
               Sync failed: {syncError || 'Could not refresh data'}. Showing cached data.
             </span>
           </div>
-          <Button onClick={handleSync} variant="ghost" size="sm" className="gap-1 text-tm-loss h-7 text-[13px]">
-            <RefreshCw className="h-3 w-3" />
+          <Button onClick={handleSync} variant="ghost" size="sm" className="gap-1 text-loss h-8 text-[12.5px] shrink-0">
+            <RefreshCw className="h-3.5 w-3.5" />
             Retry
           </Button>
         </div>
@@ -558,8 +546,9 @@ export default function Dashboard() {
       {/* ── Market status rail (Lovable-style top bar) ───────────────────── */}
       <MarketRail />
 
-      {/* ── Single-column dashboard: hero · alerts · open · closed ───────── */}
-      <div className="flex flex-col gap-4">
+      {/* ── Single-column dashboard: hero · alerts · open · closed ─────────
+             20px between top-level sections (§8). */}
+      <div className="flex flex-col gap-5">
         <SessionHeroCard
           stateCfg={stateCfg}
           sessionPnlDisplay={sessionPnlDisplay}
@@ -587,13 +576,15 @@ export default function Dashboard() {
           />
         </div>
 
-        {/* Open Positions */}
+        {/* Open Positions — a failed fetch renders as an error, never as an
+            empty table (§14). Uses the shared surface with the real reason. */}
         {positionsError && !positionsLoading && positions.length === 0 ? (
-          <div className="tm-card p-5 text-center">
-            <AlertTriangle className="h-5 w-5 text-tm-loss mx-auto mb-2" />
-            <p className="text-[13px] text-muted-foreground">{positionsError}</p>
-            <Button onClick={fetchPositions} variant="ghost" size="sm" className="mt-2">Retry</Button>
-          </div>
+          <ErrorState
+            error={{ response: { status: 500 } }}
+            message={positionsError}
+            onRetry={fetchPositions}
+            compact
+          />
         ) : (
           <OpenPositionsTable
             positions={positions}
@@ -608,17 +599,18 @@ export default function Dashboard() {
 
         {/* Today's closed trades — collapsible, Lovable-style */}
         {tradesError && !tradesLoading && closedTrades.length === 0 ? (
-          <div className="tm-card p-5 text-center">
-            <AlertTriangle className="h-5 w-5 text-tm-loss mx-auto mb-2" />
-            <p className="text-[13px] text-muted-foreground">{tradesError}</p>
-            <Button onClick={fetchTrades} variant="ghost" size="sm" className="mt-2">Retry</Button>
-          </div>
+          <ErrorState
+            error={{ response: { status: 500 } }}
+            message={tradesError}
+            onRetry={fetchTrades}
+            compact
+          />
         ) : (
           <Accordion type="single" collapsible defaultValue="closed" className="desk-card">
             <AccordionItem value="closed" className="border-0">
               <AccordionTrigger className="px-5 sm:px-6 py-4 hover:no-underline">
                 <div className="flex items-center gap-2.5">
-                  <span className="text-[11px] uppercase tracking-[0.12em] font-medium text-muted-foreground">Closed positions today</span>
+                  <span className="t-label">Closed positions today</span>
                   <span className="text-[11px] text-muted-foreground">· tap to collapse</span>
                 </div>
               </AccordionTrigger>

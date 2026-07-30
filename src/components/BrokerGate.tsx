@@ -11,9 +11,9 @@
  *
  *   if (!isConnected) return <BrokerGate title="My Record" unlocks="…" />;
  */
-import { Link } from 'react-router-dom';
 import { Link2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { useBroker } from '@/contexts/BrokerContext';
 
 export default function BrokerGate({
   title,
@@ -24,6 +24,8 @@ export default function BrokerGate({
   /** One sentence: what connecting gives them on THIS screen. */
   unlocks: string;
 }) {
+  const { connect } = useBroker();
+
   return (
     <div className="w-full pb-12">
       <div className="mb-5">
@@ -38,11 +40,11 @@ export default function BrokerGate({
           Connect your broker
         </h2>
         <p className="text-[14px] text-muted-foreground max-w-sm mb-5">{unlocks}</p>
-        <Button asChild>
-          <Link to="/settings">
-            <Link2 className="h-4 w-4" />
-            Connect Zerodha
-          </Link>
+        {/* Starts the OAuth flow directly — §12, minimum clicks. Sending the
+            user to Settings to find the same button is a wasted hop. */}
+        <Button onClick={() => connect()}>
+          <Link2 className="h-4 w-4" />
+          Connect Zerodha
         </Button>
       </div>
     </div>

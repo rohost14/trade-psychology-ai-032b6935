@@ -48,15 +48,22 @@ function classify(error: unknown): { kind: Kind; icon: React.ElementType; title:
 }
 
 export default function ErrorState({
-  error, onRetry, refId, compact = false, className,
+  error, onRetry, refId, compact = false, className, message: messageOverride,
 }: {
   error: unknown;
   onRetry?: () => void;
   refId?: string;        // Sentry event id, if available
   compact?: boolean;     // inline (card body) vs full block
   className?: string;
+  /**
+   * Replaces the classified sentence when the caller already has a specific,
+   * user-meaningful reason — e.g. a sync failure that names what failed.
+   * The classified title and icon are kept, so the surface stays consistent.
+   */
+  message?: string;
 }) {
-  const { icon: Icon, title, message, showContact } = classify(error);
+  const { icon: Icon, title, message: classified, showContact } = classify(error);
+  const message = messageOverride ?? classified;
 
   // Inline, inside a section or a block that failed on its own. No container —
   // the surrounding section already provides the boundary.

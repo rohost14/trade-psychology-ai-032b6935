@@ -99,39 +99,41 @@ export function SetupNudgeCard() {
   const pct = Math.round((doneCount / steps.length) * 100);
 
   return (
-    <div className="tm-card overflow-hidden mb-4">
-      <div className="px-5 py-3.5 border-b border-border flex items-center justify-between">
+    // A first-run prompt that must read as separate from the session below it
+    // — §9 justification 3, so this one keeps its card.
+    <div className="desk-card overflow-hidden">
+      <div className="card-head">
         <div className="flex items-center gap-2">
-          <span className="text-sm font-medium text-foreground">Finish setup</span>
-          <span className="text-xs text-muted-foreground">{doneCount}/{steps.length}</span>
+          <span className="t-label">Finish setup</span>
+          <span className="text-[11px] text-muted-foreground font-tabular">{doneCount}/{steps.length}</span>
         </div>
         <button
           onClick={dismiss}
-          className="text-muted-foreground hover:text-foreground transition-colors -mr-1 p-1"
-          aria-label="Dismiss"
+          className="text-muted-foreground transition-colors duration-150 hover:text-foreground -mr-1 p-1"
+          aria-label="Dismiss setup checklist"
         >
           <X className="h-4 w-4" />
         </button>
       </div>
 
-      {/* Progress bar */}
-      <div className="h-1 bg-muted">
+      {/* Progress */}
+      <div className="h-0.5 bg-muted">
         <div
-          className="h-full bg-tm-brand transition-all duration-500"
+          className="h-full bg-primary transition-all duration-200"
           style={{ width: `${pct}%` }}
         />
       </div>
 
-      <div className="p-5 space-y-3">
+      <div className="px-4 sm:px-6 py-4 space-y-3">
         {steps.map(step => (
           <div key={step.id} className="flex items-center gap-3">
             {step.done ? (
-              <CheckCircle2 className="h-4 w-4 text-tm-profit shrink-0" />
+              <CheckCircle2 className="h-4 w-4 text-profit shrink-0" />
             ) : (
               <Circle className="h-4 w-4 text-muted-foreground shrink-0" />
             )}
             <span className={cn(
-              'text-sm flex-1',
+              'text-[14px] flex-1',
               step.done ? 'text-muted-foreground line-through' : 'text-foreground'
             )}>
               {step.label}
@@ -139,7 +141,7 @@ export function SetupNudgeCard() {
             {!step.done && step.path && (
               <button
                 onClick={() => navigate(step.path)}
-                className="flex items-center gap-1 text-xs text-tm-brand hover:text-tm-brand/80 transition-colors font-medium shrink-0"
+                className="flex items-center gap-1 text-[11px] font-medium uppercase tracking-[0.12em] text-primary transition-colors duration-150 hover:text-primary/80 shrink-0"
               >
                 {step.cta}
                 <ArrowRight className="h-3 w-3" />

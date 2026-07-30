@@ -31,22 +31,23 @@ export function AiCoachFab() {
         'fixed bottom-[72px] right-4 md:bottom-6 md:right-6 z-40',
         // Size
         'w-14 h-14 rounded-full',
-        // Background: teal gradient
-        'bg-gradient-to-br from-teal-600 to-teal-700',
-        // Shadow
-        'shadow-lg shadow-teal-900/30',
+        // Flat accent. The teal gradient and coloured glow this carried were
+        // hard-coded palette values that bypassed the brand token entirely,
+        // and gradients are banned (§4). It floats, so it keeps a shadow (§8).
+        'bg-primary text-primary-foreground shadow-lg',
         // Interaction
         'flex items-center justify-center',
-        'hover:scale-105 active:scale-95 transition-transform duration-150',
+        'transition-transform duration-150 hover:scale-105 active:scale-95',
+        'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background',
         // Pulse when danger alerts present
         hasDanger && 'animate-pulse-slow',
       )}
     >
-      <Bot className="h-6 w-6 text-white" />
+      <Bot className="h-5 w-5" />
 
       {/* Badge: count of unread danger alerts */}
       {hasDanger && (
-        <span className="absolute -top-1 -right-1 min-w-[18px] h-[18px] px-1 rounded-full bg-tm-loss text-white text-[10px] font-bold flex items-center justify-center leading-none">
+        <span className="absolute -top-1 -right-1 min-w-[18px] h-[18px] px-1 rounded-full bg-danger text-danger-foreground text-[10px] font-bold font-tabular flex items-center justify-center leading-none">
           {dangerCount > 9 ? '9+' : dangerCount}
         </span>
       )}

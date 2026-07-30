@@ -113,17 +113,17 @@ export default function OpenPositionsTable({
 
   if (isLoading) {
     return (
-      <section className="desk-card overflow-hidden">
-        <div className="card-head"><div className="h-4 w-40 bg-muted animate-pulse rounded" /></div>
+      <section>
+        <div className="section-head"><div className="h-4 w-40 bg-muted animate-pulse rounded" /></div>
         <div className="p-5 space-y-3">{[1, 2].map(i => <div key={i} className="h-10 bg-muted animate-pulse rounded" />)}</div>
       </section>
     );
   }
 
   return (
-    <section className="desk-card overflow-hidden">
+    <section>
       {/* Header */}
-      <div className="px-4 sm:px-6 py-4 border-b border-border flex items-center justify-between flex-wrap gap-2">
+      <div className="py-4 border-b border-border flex items-center justify-between flex-wrap gap-2">
         <div className="flex items-center gap-2.5 flex-wrap">
           <span className="text-[11px] uppercase tracking-[0.12em] font-medium text-muted-foreground">Open Positions</span>
           <span className="text-[11px] text-muted-foreground font-tabular">· {openPositions.length}</span>
@@ -145,7 +145,7 @@ export default function OpenPositionsTable({
       {openPositions.length > 0 ? (
         <>
           {/* Column header (desktop) */}
-          <div className={cn('hidden sm:grid gap-3 px-4 sm:px-6 py-3 text-[10px] uppercase tracking-wider font-medium text-muted-foreground border-b border-border', COLS)}>
+          <div className={cn('hidden sm:grid gap-3 py-3 text-[10px] uppercase tracking-wider font-medium text-muted-foreground border-b border-border', COLS)}>
             <span>Symbol</span>
             <span className="text-right">Qty</span>
             <span className="text-right">Entry</span>
@@ -173,7 +173,7 @@ export default function OpenPositionsTable({
                   className="group cursor-pointer transition-colors hover:bg-muted/40 focus:outline-none focus:bg-muted/40"
                 >
                   {/* Desktop row */}
-                  <div className={cn('hidden sm:grid gap-3 px-4 sm:px-6 py-3.5 items-center', COLS)}>
+                  <div className={cn('hidden sm:grid gap-3 py-3.5 items-center', COLS)}>
                     <div className="flex items-center gap-2 min-w-0">
                       <span className="text-sm font-medium text-foreground">{name}</span>
                       <span className={cn('text-[10px] font-semibold px-1.5 py-0.5 rounded', isBuy ? 'text-profit bg-profit/10' : 'text-loss bg-loss/10')}>

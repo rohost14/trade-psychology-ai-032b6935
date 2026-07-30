@@ -61,23 +61,39 @@ export function SessionHeroCard({
   ];
 
   return (
-    <section className="desk-card overflow-hidden">
-      <div className="px-4 sm:px-6 py-4 flex items-center justify-between gap-4">
+    // A section, not a card (§9) — the session's headline reads as the page's
+    // opening statement, not as one tile among several.
+    <section>
+      <div className="section-head">
+        <span className="t-label flex items-center gap-2">
+          Day P&amp;L
+          <span className={cn('h-1.5 w-1.5 rounded-full animate-pulse', pnlPositive ? 'bg-profit' : 'bg-loss')} />
+        </span>
+
+        <button
+          type="button"
+          onClick={() => setOpen(v => !v)}
+          aria-expanded={open}
+          className="shrink-0 inline-flex items-center gap-1.5 rounded-md border border-border px-2.5 py-1.5 text-[11px] font-medium text-muted-foreground transition-colors duration-150 hover:text-foreground hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+        >
+          {open ? 'Hide session stats' : 'Session stats'}
+          <ChevronDown className={cn('h-3.5 w-3.5 transition-transform duration-200', open && 'rotate-180')} />
+        </button>
+      </div>
+
+      <div className="py-4">
         <div className="min-w-0">
-          <div className="flex items-center gap-2">
-            <span className="t-label">Day P&amp;L</span>
-            <span className={cn('h-1.5 w-1.5 rounded-full animate-pulse', pnlPositive ? 'bg-profit' : 'bg-loss')} />
-          </div>
-          <div className="mt-1 flex items-baseline gap-2 flex-wrap">
+          {/* The screen's one primary metric — 30px display (§7). */}
+          <div className="flex items-baseline gap-2 flex-wrap">
             <span className={cn(
-              'font-display text-[28px] sm:text-[32px] leading-none font-semibold tracking-tight font-tabular',
+              'font-display text-[30px] leading-none font-semibold tracking-tight font-tabular',
               pnlPositive ? 'text-profit' : 'text-loss',
             )}>
               {pnlPositive ? '+' : '−'}₹{inr(animatedPnl)}
             </span>
           </div>
           {/* Booked (closed) + Unrealized (open) always sum to the Day P&L above. */}
-          <div className="mt-1 text-[11.5px] font-tabular text-muted-foreground">
+          <div className="mt-1 text-[12.5px] font-tabular text-muted-foreground">
             Booked{' '}
             <span className={realizedPnlDisplay >= 0 ? 'text-profit' : 'text-loss'}>
               {realizedPnlDisplay >= 0 ? '+' : '−'}₹{inr(realizedPnlDisplay)}
@@ -89,34 +105,25 @@ export function SessionHeroCard({
             </span>
           </div>
         </div>
-
-        <button
-          type="button"
-          onClick={() => setOpen(v => !v)}
-          aria-expanded={open}
-          className="shrink-0 inline-flex items-center gap-1.5 rounded-md border border-border px-2.5 py-1.5 text-[11.5px] font-medium text-muted-foreground hover:text-foreground hover:bg-muted/60 transition-colors"
-        >
-          {open ? 'Hide session stats' : 'Session stats'}
-          <ChevronDown className={cn('h-3.5 w-3.5 transition-transform duration-200', open && 'rotate-180')} />
-        </button>
       </div>
 
       {open && (
-        <div className="animate-accordion-down">
-          <p className="px-4 sm:px-6 pb-3 text-[12.5px] leading-snug text-muted-foreground">
+        <div className="animate-accordion-down pb-4">
+          <p className="pb-3 text-[12.5px] leading-snug text-muted-foreground">
             {lossPct >= 80
               ? "Most of today's loss budget is already spent."
               : paceRatio >= 1.5
               ? 'Trading faster than your usual rhythm today.'
               : 'Running inside your normal operating range.'}
           </p>
-          <div className="grid grid-cols-2 sm:grid-cols-4 border-t border-border divide-x divide-y sm:divide-y-0 divide-border">
+          {/* Hairline metric strip (§17) — the gaps are the separators. */}
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-px bg-border rounded-lg overflow-hidden border border-border">
             {stats.map(s => (
-              <div key={s.label} className="px-4 sm:px-5 py-2.5">
-                <span className="text-[10px] uppercase tracking-[0.12em] font-medium text-muted-foreground">{s.label}</span>
+              <div key={s.label} className="bg-card px-3 py-2.5">
+                <span className="text-[10px] uppercase tracking-wider font-medium text-muted-foreground">{s.label}</span>
                 <div className="mt-0.5 flex items-baseline gap-1.5">
-                  <span className={cn('text-[16px] font-semibold font-tabular tracking-tight', s.tone)}>{s.value}</span>
-                  {s.unit && <span className="text-[10.5px] text-muted-foreground font-tabular truncate">{s.unit}</span>}
+                  <span className={cn('text-[14px] font-semibold font-tabular tracking-tight', s.tone)}>{s.value}</span>
+                  {s.unit && <span className="text-[10px] text-muted-foreground font-tabular truncate">{s.unit}</span>}
                 </div>
               </div>
             ))}
