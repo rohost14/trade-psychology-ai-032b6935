@@ -142,6 +142,12 @@ Plus: **`TradeDnaTab` bundles six unrelated stories** in 447 lines (quality tier
 
 `src/test/analyticsTabs.smoke.test.tsx` → "BehaviorTab renders pattern frequency, scenario cards and options card without NaN" fails with `useBroker must be used within BrokerProvider`. `BehaviorTab` imports `components/dashboard/PredictiveContextStrip`, which calls `useBroker`, and the smoke test renders without that provider. Fix the harness (wrap in `BrokerProvider`) or resolve the cross-page import — **do not change the assertion.** Belongs to the Analytics step. Baseline: 15 of 16 frontend tests pass.
 
+### Server-formatted money bypasses the client formatters
+
+Backend-generated prose embeds its own money strings, so it does not follow §21. Found on My Record: the `verdict` sentence renders `-₹14,270` (ASCII hyphen, no paise) directly above a section rendering `−₹14,270.00` from `formatCurrencyWithSign` — the same figure, two formats, adjacent on screen.
+
+Any endpoint returning a human-readable sentence with a number in it is affected; `my-record` verdict is the confirmed case. Options: have the API return the number as a field and let the client compose the sentence (preferred — one formatter, one rule), or match §21 in the backend formatting helper. **Track B**, since it changes API payloads or backend output.
+
 ### Logic bugs
 
 - **Two conflicting definitions of "clean day" on the same screen** — `MyPatterns.tsx` excludes `'high'` severity from its streak logic; `PatternCalendar.tsx`'s `worstSeverity()` counts `'high'` as danger.

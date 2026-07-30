@@ -602,7 +602,10 @@ Equity curve (cumulative, area or line) · time series bars (daily or periodic P
 - **P&L is RAW only:** `(exit − entry) × quantity × multiplier`. Never brokerage, STT, or taxes. Never build a charge estimator. A number the trader can't reproduce from their own contract note is a number they won't trust.
 - **Behaviour → money is realized P&L of flagged trades** — a fact, tied to the specific triggering trade. Never a counterfactual, never "estimated cost", never "money saved".
 - Always show the sign, using a true minus.
-- Rupees in body text: no decimals (`₹1,240`). Prices: two decimals (`182.40`). Percentages: one decimal (`62.5%`).
+- **Money carries paise: two decimals** (`+₹918.75`). Prices likewise (`182.40`). Percentages: one decimal (`62.5%`).
+  *Amended, with reason: an earlier draft of this rule said no decimals for rupees in body text, on density grounds. That is wrong for this product — a figure the trader cannot reconcile against their contract note is a figure they won't trust, and `₹918.75` rounding to `₹919` breaks exactly that. Kite, our primary reference, shows P&L to paise. Density is bought elsewhere (§9), not by discarding precision.*
+- **Compact and axis forms drop decimals** — `₹1.3k`, `₹2.5L`, `₹1.2Cr`. Magnitude at a glance is the job there, and full precision is what overflowed the axis in the first place.
+- **Exactly zero carries no sign** — `₹0.00`, never `+₹0.00` or `−₹0.00`.
 - Large values compact to `L` and `Cr` — Indian conventions, since the audience is Indian F&O traders.
 - Indian digit grouping throughout (`12,48,000`).
 - Every number carries `tabular-nums`. No exceptions.

@@ -1,33 +1,50 @@
 /**
- * Format number as Indian currency (₹)
- * Uses Indian number system: 1,00,00,000 for 1 crore
+ * TRUE MINUS (U+2212), not a hyphen-minus.
+ *
+ * DESIGN_SYSTEM.md §21: always show the sign, using a true minus. A hyphen is
+ * narrower than the plus glyph, so in a tabular column of signed figures the
+ * negatives sit a fraction out of alignment — exactly the comparison this
+ * product exists to make easy. It also renders as a dash rather than an
+ * operator at small sizes.
+ *
+ * Numbers are BUILT from Math.abs() plus this prefix, never handed to Intl
+ * signed, because Intl emits the hyphen form.
  */
-export function formatCurrency(amount: number): string {
-  const absAmount = Math.abs(amount);
-  const formatted = new Intl.NumberFormat('en-IN', {
+const MINUS = '−';
+
+/** Sign prefix for a value: '+', a true minus, or nothing for exactly zero. */
+function signOf(value: number): string {
+  if (value > 0) return '+';
+  if (value < 0) return MINUS;
+  return '';
+}
+
+/** ₹ with Indian grouping (1,00,00,000 for a crore), always from an absolute value. */
+function inr(abs: number, decimals: number): string {
+  return new Intl.NumberFormat('en-IN', {
     style: 'currency',
     currency: 'INR',
-    minimumFractionDigits: 2,
-    maximumFractionDigits: 2,
-  }).format(absAmount);
-  return amount >= 0 ? formatted : `-${formatted}`;
+    minimumFractionDigits: decimals,
+    maximumFractionDigits: decimals,
+  }).format(abs);
 }
 
 /**
- * Format currency with sign (+ or -)
+ * Format number as Indian currency (₹). Negative values carry a true minus.
+ */
+export function formatCurrency(amount: number): string {
+  const formatted = inr(Math.abs(amount), 2);
+  return amount < 0 ? `${MINUS}${formatted}` : formatted;
+}
+
+/**
+ * Format currency with an explicit sign. Exactly zero carries no sign.
+ *
+ * Two decimals are deliberate: paise must reconcile against the contract note,
+ * and ₹918.75 must not read as ₹919. Compact and axis forms drop them.
  */
 export function formatCurrencyWithSign(amount: number): string {
-  const absAmount = Math.abs(amount);
-  const sign = amount > 0 ? '+' : amount < 0 ? '-' : '';
-  // Show 2 decimal places so ₹918.75 doesn't round to ₹919
-  const formatted = new Intl.NumberFormat('en-IN', {
-    style: 'currency',
-    currency: 'INR',
-    minimumFractionDigits: 2,
-    maximumFractionDigits: 2,
-  }).format(absAmount);
-
-  return `${sign}${formatted}`;
+  return `${signOf(amount)}${inr(Math.abs(amount), 2)}`;
 }
 
 /**
@@ -38,23 +55,19 @@ export function formatNumber(num: number): string {
 }
 
 /**
- * Format percentage
+ * Format percentage — one decimal by default (§21), signed, true minus.
+ * Exactly zero carries no sign, matching the currency formatters.
  */
 export function formatPercentage(value: number, decimals: number = 1): string {
-  const sign = value >= 0 ? '+' : '';
-  return `${sign}${value.toFixed(decimals)}%`;
+  return `${signOf(value)}${Math.abs(value).toFixed(decimals)}%`;
 }
 
 /**
- * Format price with 2 decimal places
+ * Format a price. Two decimals always — a price is a quote, not a total (§21).
  */
 export function formatPrice(price: number): string {
-  return new Intl.NumberFormat('en-IN', {
-    style: 'currency',
-    currency: 'INR',
-    minimumFractionDigits: 2,
-    maximumFractionDigits: 2,
-  }).format(price);
+  const formatted = inr(Math.abs(price), 2);
+  return price < 0 ? `${MINUS}${formatted}` : formatted;
 }
 
 /**
@@ -117,7 +130,7 @@ export function formatDateTime(dateString: string): string {
  */
 export function formatAxisCurrency(value: number): string {
   const abs = Math.abs(value);
-  const sign = value < 0 ? '-' : '';
+  const sign = value < 0 ? MINUS : '';
   if (abs < 1) return '₹0';
   if (abs >= 1_00_00_000) return `${sign}₹${parseFloat((abs / 1_00_00_000).toFixed(1))}Cr`;
   if (abs >= 1_00_000)    return `${sign}₹${parseFloat((abs / 1_00_000).toFixed(1))}L`;
@@ -132,7 +145,7 @@ export function formatAxisCurrency(value: number): string {
  */
 export function formatCompactCurrency(amount: number): string {
   const abs = Math.abs(amount);
-  const sign = amount < 0 ? '-' : '';
+  const sign = amount < 0 ? MINUS : '';
   if (abs >= 1_00_00_000) {
     const cr = abs / 1_00_00_000;
     return `${sign}₹${parseFloat(cr.toFixed(2))}Cr`;
@@ -142,11 +155,5 @@ export function formatCompactCurrency(amount: number): string {
     return `${sign}₹${parseFloat(l.toFixed(2))}L`;
   }
   // Below 1L — show 2 decimal places to preserve paise accuracy
-  const formatted = new Intl.NumberFormat('en-IN', {
-    style: 'currency',
-    currency: 'INR',
-    minimumFractionDigits: 2,
-    maximumFractionDigits: 2,
-  }).format(abs);
-  return amount < 0 ? `-${formatted}` : formatted;
+  return `${sign}${inr(abs, 2)}`;
 }
