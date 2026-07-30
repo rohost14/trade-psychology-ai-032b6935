@@ -99,7 +99,7 @@ These are consumed by every screen and are themselves built on the old card clas
 Foundation first, then a small screen to prove it, then the hard ones.
 
 1. Shared work above (including the 16px revert and nav reconciliation)
-2. **My Record** — 9 containers, zero raw palette, already clean. Proves the container-stripping approach cheaply.
+2. **My Record** — 9 containers, zero raw palette, already clean. Proves the container-stripping approach cheaply. **Also add the missing broker gate here** (decided Track A): every other screen gates a not-connected user, this one silently no-ops via an early return, leaving a dead search box. Inconsistent gating costs trust, and shipping a screen known to be broken on a Track-A/B technicality is the wrong call. Copy: *"Connect your broker to view your personal trading record."*
 3. **Dashboard** — the reference screen; closest to target, and clears its two inline error blocks.
 4. **Alerts** — best severity implementation in the app (`src/lib/alertSeverity.ts`) and it should become the canonical source everything else uses.
 5. **My Patterns** — needs `PatternCalendar` re-tokenised.
@@ -160,9 +160,7 @@ Worst first: `SessionLog` collapses loading, error and empty into one blank rend
 
 **Already correct — preserve during the reskin:** `Journal`'s three disambiguated empty reasons · `Alerts` History tab error handling · `MyRecord`'s error-as-data with an honest message · `ClosedPositionsCard`'s separate error and empty states · `MyRules`' `loadFailed` distinct from zero violations.
 
-### Open call
-
-**My Record has no broker gate.** Every other screen gates a not-connected user; this one silently no-ops. Design doc §26 specifies the gate — adding it is arguably Track A, but it changes behaviour for a not-connected user, so it is recorded here.
+*(No open calls. The My Record broker gate was moved to Track A — see §4.)*
 
 ## 6. Definition of done — Track A
 
@@ -204,15 +202,45 @@ A screen is done when all of:
 
 All screens inherit the palette, centring, and Inter already, so nothing looks broken — they are on the old container model, type scale, and colour classes.
 
-## 8. Proposed regression gate
+## 8. Regression gate
 
-A CI grep over `src/` (excluding `_archive/`) failing the build on:
+The gate is the only thing that prevents drift returning once this file is deleted. A grep-based CI check over `src/` (excluding `_archive/`), failing the build on each of the following.
 
-- raw Tailwind palette classes — `(text|bg|border)-(red|green|blue|amber|emerald|teal|orange|yellow|purple|indigo|violet|slate|gray|zinc|stone|neutral)-[0-9]{2,3}`
-- hex literals in classes — `\[#[0-9a-fA-F]{3,6}\]`
-- retired utilities — `tm-card`, `t-mono`, `t-heading-lg`, `tm-label`, `t-display`, `stat-value`, `tm-page-bg`, `tm-coach-cta`
-- gradients — `bg-gradient`, `from-`, `via-`, `to-` as colour stops
-- banned chart forms — `<Pie`, `PieChart`, `RadialBar`
-- sub-10px type — `text-\[[0-9]px\]`
+### Colour
+| Ban | Pattern |
+|---|---|
+| Raw Tailwind palette | `(text\|bg\|border\|ring\|from\|via\|to)-(red\|green\|blue\|amber\|emerald\|teal\|orange\|yellow\|purple\|indigo\|violet\|fuchsia\|pink\|rose\|sky\|cyan\|lime\|slate\|gray\|zinc\|stone\|neutral)-[0-9]{2,3}` |
+| Hex in a class | `\[#[0-9a-fA-F]{3,6}\]` |
+| Hex or rgb in a string literal | `['"\`]#[0-9a-fA-F]{3,6}['"\`]`, `rgb\(` outside `index.css` |
+| Gradients | `bg-gradient`, `bg-\[linear-gradient`, `bg-\[radial-gradient` |
 
-Land this **after** the migration so it can't fail on known debt, and keep it after this file is deleted — it is what stops the debt returning.
+### Type
+| Ban | Pattern |
+|---|---|
+| Rem text sizes used for typography | `text-(xs\|sm\|base\|lg\|xl\|2xl\|3xl\|4xl\|5xl\|6xl)\b` |
+| Sub-10px type | `text-\[[0-9]px\]` |
+| Off-scale px type — anything not 10 / 11 / 12.5 / 14 / 17 / 22 / 30 | `text-\[(?!10px\|11px\|12\.5px\|14px\|17px\|22px\|30px)[0-9.]+px\]` |
+
+### Shape and depth
+| Ban | Pattern |
+|---|---|
+| Off-scale radius | `rounded-(xl\|2xl\|3xl)` |
+| Shadows outside floating layers | `shadow-(sm\|md\|lg\|xl\|2xl)` — allowed only in the sheet/dialog/popover/dropdown primitives |
+
+### Retired utilities
+`tm-card` · `t-mono` · `t-mono-sm` · `t-mono-lg` · `t-mono-display` · `t-heading-lg` · `t-heading-sm` · `t-display` · `tm-label` · `t-overline` · `stat-value` · `stat-label` · `table-header` · `badge-success` · `badge-warning` · `badge-danger` · `tm-page-bg` · `tm-coach-cta` · `page-shell` · `animate-float` · `animate-zap-pulse`
+
+### Charts
+`<Pie` · `PieChart` · `RadialBar` · `RadialBarChart` · `<Cell` with a literal `fill=` string
+
+### Inline style
+`style={{` containing `color`, `background`, `padding`, `margin`, `gap`, `fontSize`, or `borderRadius`.
+
+### Four caveats — the gate needs these or it cannot pass
+
+1. **Shadows are legal on floating layers** (design doc §8) — modal, sheet, popover, dropdown. Allowlist those primitive files rather than banning shadow outright.
+2. **`text-sm` and friends appear inside third-party component primitives.** Either migrate `src/components/ui/*` onto the px scale first, or scope the type rules to exclude that directory. Do not ship a gate that fails on unmigrated library primitives — a gate that always fails gets disabled.
+3. **Inline style is legitimate for computed values** — a proportional bar width, a chart dimension, a transform driven by state. Ban only the static properties listed above; allow `width`, `height`, `transform`, and anything interpolating a variable.
+4. **"No new component variants outside the design system" is not greppable.** That one is a review item, not a CI check — it lives in design doc §28.
+
+Land this **after** the migration so it cannot fail on known debt. Keep it forever after this file is deleted.

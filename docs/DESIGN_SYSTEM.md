@@ -8,6 +8,43 @@ It contains no counts, no file references, and no progress tracking — those li
 
 **Extending the system:** extend it before introducing a new pattern. Add the token, size, or recipe here first, then use it. Don't fork a one-off. See §27.
 
+**This system is meant to be stable, not exhaustive.** Once it is complete it is frozen: a change requires a concrete reason — a new product capability, a demonstrated usability problem, or an inconsistency to resolve — never personal preference. A design system becomes valuable because it stops moving. Adding a rule every week is how it becomes ignored.
+
+---
+
+## 0. Quick reference
+
+The fifteen rules that catch almost every mistake. This is the page to keep open while building; the rest of the document is the detail behind it.
+
+```
+PURPOSE
+  ✓  One screen = one story          ✓  No duplicated metrics across screens
+  ✓  One primary metric per screen   ✓  Every screen has a first-run state
+
+STRUCTURE
+  ✓  Cards must justify themselves — sections + dividers are the default
+  ✓  Tables before charts
+  ✓  Density is a feature — no whitespace for its own sake
+
+TYPE & COLOUR
+  ✓  14px body · 11px labels · 10px floor (table headers only)
+  ✓  Tabular numbers, always
+  ✓  One accent colour + three semantics, desaturated
+
+STATE
+  ✓  Skeleton (content) → Spinner (action) → Error → Empty — four distinct renders
+  ✓  A failed request is NEVER an empty state
+  ✓  Empty states state the cause and the next action
+
+COPY
+  ✓  Evidence, not encouragement — no motivational copy
+  ✓  AI is invisible — no "I noticed…", no AI branding
+```
+
+**Banned outright:** donut · pie · radial gauge · circular progress · gradients · glassmorphism · animated backgrounds · gamification (badges, XP, streaks-as-achievement, trophies, confetti) · invented scores whose formula can't be shown · text below 10px · decorative icons · a second accent colour.
+
+Before opening a PR, run §28.
+
 ---
 
 # Part I — Direction
@@ -849,7 +886,7 @@ Each screen is specified with the same eight fields.
 
 ### 7. Reports — `/reports`
 
-**Responsibility.** `TODO(responsibility)` — to be worded.
+**Responsibility.** Provide periodic summaries that help the trader review what happened after the market, identify the biggest drivers of performance, and understand long-term progress through factual, generated reports.
 
 **Owns.** The periodic written record and its detail.
 **Does not own.** Live data (Dashboard) · interactive period analysis (Analytics).
@@ -877,7 +914,7 @@ Each screen is specified with the same eight fields.
 
 ### 8. Journal — `/journal`
 
-**Responsibility.** `TODO(responsibility)` — to be worded.
+**Responsibility.** Maintain an automatically generated chronological record of every trading session, capturing what happened, why key events occurred, and the behavioural context — without requiring manual journaling.
 
 **Owns.** The per-session log and its entries.
 **Does not own.** Behavioural detection (Alerts) · pattern identification (My Patterns).
@@ -906,7 +943,7 @@ Each screen is specified with the same eight fields.
 
 ### 9. My Rules — `/my-rules`
 
-**Responsibility.** `TODO(responsibility)` — to be worded.
+**Responsibility.** Define, monitor, and enforce the trader's personal risk framework by showing current standing, breaches, and rule changes — while ensuring any weakening of a safeguard is deliberate.
 
 **Owns.** The trader's self-imposed limits, the standing against them today, breaches, and the change history.
 **Does not own.** Behavioural patterns (My Patterns) · alerts raised by a breach (Alerts).
@@ -937,7 +974,7 @@ Each screen is specified with the same eight fields.
 
 ### 10. Settings — `/settings`
 
-**Responsibility.** `TODO(responsibility)` — to be worded.
+**Responsibility.** Manage account configuration, broker connectivity, notifications, preferences, and data ownership — without affecting behavioural analysis or trading workflows.
 
 **Owns.** Broker connection, profile and limits, notification configuration, personalisation, and data rights.
 **Does not own.** Rule semantics (My Rules).
@@ -1008,3 +1045,53 @@ Adding to the system is expected. Doing it locally is not.
 **Adding a screen.** It must have a single responsibility no existing screen owns (§25), a first-run state (§15), and a defined mobile layout (§23). If its responsibility overlaps an existing screen, extend that screen instead.
 
 **The bar for a new surface.** It answers a question the trader actually has · it is factual and provable from their own data · it is differentiated from what their broker already shows · it needs no manual input · it earns its space against everything already competing for the same screen. A feature that fails any of these is not built, however easy it would be.
+
+**The system is frozen once complete.** A change requires a concrete reason — a new product capability, a demonstrated usability problem, or an inconsistency to resolve. Never preference, never a trend, never "while we're in here". Record the reason alongside the change. A system that keeps moving is a system nobody trusts enough to follow.
+
+## 28. Design review checklist
+
+Run this before opening a PR that touches the interface, and again as the reviewer. It is deliberately short enough to actually use.
+
+**Purpose**
+- [ ] Does this screen own exactly one story (§25)?
+- [ ] Is any metric here already owned by another screen?
+
+**Visual**
+- [ ] Does every card justify its existence against the four tests in §9?
+- [ ] Is the density right — could this show more without crowding?
+- [ ] Is the hierarchy obvious at a glance, from type and spacing rather than colour or size inflation?
+- [ ] One primary metric, or none?
+
+**Components**
+- [ ] Did this reuse existing components, or invent local styling?
+- [ ] If something new was added, was it genuinely necessary — and is it specified in §17?
+
+**Data**
+- [ ] Is every number factual, and produced by the engine rather than assembled in the view?
+- [ ] Can every displayed metric be explained to the trader, including how it was derived?
+- [ ] Is P&L raw (§21)?
+
+**States**
+- [ ] First-run state present, naming the real cause?
+- [ ] Empty state distinct from error, stating the cause and one next action?
+- [ ] Error state reachable and honest — no failed request rendering as empty?
+- [ ] Loading state a skeleton matching the final shape, not a spinner?
+
+**Mobile**
+- [ ] Does it stack logically, re-prioritised rather than compressed?
+- [ ] Any horizontal scrolling on a primary table?
+- [ ] Touch targets at least 44px effective?
+- [ ] Is anything reachable only on hover?
+
+**Copy**
+- [ ] Evidence-based, with the data behind every sentence?
+- [ ] No AI personality, no AI branding?
+- [ ] No motivational or congratulatory language?
+
+**Performance**
+- [ ] No layout shift as data arrives — skeletons match final dimensions?
+- [ ] No avoidable re-renders (tooltips and chart children defined outside render, stable keys)?
+
+**Both themes and three widths**
+- [ ] Verified in light and dark?
+- [ ] Verified at 375, 768, and 1440?
