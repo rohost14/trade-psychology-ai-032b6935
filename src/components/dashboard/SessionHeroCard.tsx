@@ -76,12 +76,15 @@ export function SessionHeroCard({
           aria-expanded={open}
           className="shrink-0 inline-flex items-center gap-1.5 rounded-md border border-border px-2.5 py-1.5 text-[11px] font-medium text-muted-foreground transition-colors duration-150 hover:text-foreground hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
         >
-          {open ? 'Hide session stats' : 'Session stats'}
+          {open ? 'Hide read' : "Today's read"}
           <ChevronDown className={cn('h-3.5 w-3.5 transition-transform duration-200', open && 'rotate-180')} />
         </button>
       </div>
 
-      <div className="px-4 sm:px-6 py-4">
+      {/* The number on the left, the session's supporting figures on the right.
+          They used to sit behind a toggle, which left the whole right-hand side
+          of this block empty for one figure and cost a click to see anything. */}
+      <div className="px-4 sm:px-6 py-4 flex flex-wrap items-end justify-between gap-x-8 gap-y-4">
         <div className="min-w-0">
           {/* The screen's one primary metric — 30px display (§7). */}
           <div className="flex items-baseline gap-2 flex-wrap">
@@ -105,30 +108,31 @@ export function SessionHeroCard({
             </span>
           </div>
         </div>
+
+        {/* Session figures, inline. Fills the space the number leaves and
+            removes a click to reach them. */}
+        <div className="flex items-end gap-6 sm:gap-8">
+          {stats.map(s => (
+            <div key={s.label}>
+              <span className="text-[10px] uppercase tracking-wider font-medium text-muted-foreground">{s.label}</span>
+              <div className="mt-1 flex items-baseline gap-1.5">
+                <span className={cn('text-[17px] font-semibold font-tabular tracking-tight', s.tone)}>{s.value}</span>
+                {s.unit && <span className="text-[10.5px] text-muted-foreground font-tabular truncate">{s.unit}</span>}
+              </div>
+            </div>
+          ))}
+        </div>
       </div>
 
       {open && (
-        <div className="animate-accordion-down">
-          <p className="px-4 sm:px-6 pb-3 text-[12.5px] leading-snug text-muted-foreground">
+        <div className="animate-accordion-down border-t border-border">
+          <p className="px-4 sm:px-6 py-3 text-[12.5px] leading-snug text-muted-foreground">
             {lossPct >= 80
               ? "Most of today's loss budget is already spent."
               : paceRatio >= 1.5
               ? 'Trading faster than your usual rhythm today.'
               : 'Running inside your normal operating range.'}
           </p>
-          {/* Hairline metric strip (§17) — the gaps are the separators. Sits
-              flush inside the surface, so no border or radius of its own. */}
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-px bg-border border-t border-border">
-            {stats.map(s => (
-              <div key={s.label} className="bg-card px-4 sm:px-5 py-2.5">
-                <span className="text-[10px] uppercase tracking-wider font-medium text-muted-foreground">{s.label}</span>
-                <div className="mt-0.5 flex items-baseline gap-1.5">
-                  <span className={cn('text-[14px] font-semibold font-tabular tracking-tight', s.tone)}>{s.value}</span>
-                  {s.unit && <span className="text-[10px] text-muted-foreground font-tabular truncate">{s.unit}</span>}
-                </div>
-              </div>
-            ))}
-          </div>
         </div>
       )}
     </section>
