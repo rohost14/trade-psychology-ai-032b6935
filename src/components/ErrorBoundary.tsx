@@ -37,37 +37,39 @@ export class ErrorBoundary extends Component<Props, State> {
       return (
         <div className="min-h-screen flex items-center justify-center bg-background p-8">
           <div className="max-w-lg text-center space-y-4">
-            <h1 className="text-2xl font-semibold text-foreground">Something went wrong</h1>
-            <p className="text-muted-foreground text-sm">
+            <h1 className="text-[22px] font-semibold tracking-tight text-foreground">Something went wrong</h1>
+            <p className="text-[14px] text-muted-foreground">
               An unexpected error occurred. Our team has been notified.
             </p>
             {isDev && this.state.error && (
-              <pre className="text-left text-xs bg-muted p-4 rounded-md overflow-auto max-h-60 text-red-500 font-mono whitespace-pre-wrap">
+              // Dev-only stack trace. `text-loss` rather than a raw palette red.
+              // Monospace is correct here — it's code, not data.
+              <pre className="text-left text-[12.5px] bg-muted p-4 rounded-md overflow-auto max-h-60 text-loss whitespace-pre-wrap font-mono">
                 {String(this.state.error)}
                 {'\n\n'}
                 {this.state.componentStack}
               </pre>
             )}
             {this.state.eventId && (
-              <p className="text-xs text-muted-foreground font-mono">
+              <p className="text-[11px] text-muted-foreground font-tabular">
                 Ref: {this.state.eventId}
               </p>
             )}
             <div className="flex items-center justify-center gap-3 pt-1">
               <button
                 onClick={() => window.location.reload()}
-                className="px-4 py-2 bg-primary text-primary-foreground rounded-md text-sm hover:bg-primary/90"
+                className="inline-flex items-center h-9 px-4 bg-primary text-primary-foreground rounded-md text-[14px] font-medium transition-colors duration-150 hover:bg-primary/90"
               >
                 Reload page
               </button>
               <a
                 href={supportMailto({ subject: 'TradeMentor — something went wrong', ref: this.state.eventId ?? undefined })}
-                className="px-4 py-2 border border-border rounded-md text-sm text-foreground hover:bg-accent/20"
+                className="inline-flex items-center h-9 px-4 border border-border rounded-md text-[14px] font-medium text-foreground transition-colors duration-150 hover:bg-muted"
               >
                 Contact support
               </a>
             </div>
-            <p className="text-xs text-muted-foreground">
+            <p className="text-[12.5px] text-muted-foreground">
               Still stuck? Email us at{' '}
               <a href={supportMailto()} className="text-primary underline">{SUPPORT_EMAIL}</a>.
             </p>

@@ -2,7 +2,11 @@
  * The single error surface for failed data loads. Turns any error (axios or generic) into
  * plain language — what went wrong, why, and what to do — with Retry + Contact support.
  *
- *   {error && <ErrorState error={error} onRetry={retry} />}
+ *   {error && <ErrorState error={error} onRetry={retry} />}          full block
+ *   {error && <ErrorState error={error} onRetry={retry} compact />}  inside a section
+ *
+ * DESIGN_SYSTEM.md §14: loading, empty and error are three distinct renders, and a failed
+ * request is NEVER rendered as an empty state. If a fetch fails, this is what shows.
  *
  * 401 is intentionally NOT special-cased here — it's handled globally (reconnect flow) and
  * rarely reaches a component. Offline/network/timeout show no contact link (it's not our bug).
@@ -54,46 +58,51 @@ export default function ErrorState({
 }) {
   const { icon: Icon, title, message, showContact } = classify(error);
 
+  // Inline, inside a section or a block that failed on its own. No container —
+  // the surrounding section already provides the boundary.
   if (compact) {
     return (
-      <div className={cn('flex flex-col items-center text-center gap-2 py-6 px-4', className)}>
-        <Icon className="h-5 w-5 text-muted-foreground" />
-        <p className="text-[13px] font-medium text-foreground">{title}</p>
-        <p className="text-xs text-muted-foreground max-w-xs">{message}</p>
+      <div className={cn('flex flex-col items-center text-center gap-2 py-6', className)}>
+        <Icon className="h-4 w-4 text-muted-foreground" />
+        <p className="text-[14px] font-medium text-foreground">{title}</p>
+        <p className="text-[12.5px] text-muted-foreground max-w-xs">{message}</p>
         <div className="flex items-center gap-2 mt-1">
           {onRetry && (
             <Button variant="outline" size="sm" onClick={onRetry}><RefreshCw className="h-3.5 w-3.5" /> Retry</Button>
           )}
           {showContact && (
             <a href={supportMailto({ subject: 'TradeMentor — something went wrong', ref: refId })}
-               className="text-xs text-primary underline">Contact support</a>
+               className="text-[12.5px] text-primary underline">Contact support</a>
           )}
         </div>
       </div>
     );
   }
 
+  // Full block — this replaces a screen's content, so it must read as separate
+  // from the page flow. That is §9 justification 3, and the one case where an
+  // error surface earns a card.
   return (
-    <div className={cn('tm-card p-8 flex flex-col items-center text-center gap-3', className)}>
+    <div className={cn('desk-card p-8 flex flex-col items-center text-center gap-3', className)}>
       <div className="w-11 h-11 rounded-full bg-muted flex items-center justify-center">
         <Icon className="h-5 w-5 text-muted-foreground" />
       </div>
       <div>
-        <p className="text-base font-semibold text-foreground">{title}</p>
-        <p className="text-sm text-muted-foreground mt-1 max-w-sm">{message}</p>
+        <p className="text-[17px] font-semibold tracking-tight text-foreground">{title}</p>
+        <p className="text-[14px] text-muted-foreground mt-1 max-w-sm">{message}</p>
       </div>
-      {refId && <p className="text-[11px] text-muted-foreground font-mono">Ref: {refId}</p>}
+      {refId && <p className="text-[11px] text-muted-foreground font-tabular">Ref: {refId}</p>}
       <div className="flex items-center gap-2.5 pt-1">
         {onRetry && (
           <Button onClick={onRetry}><RefreshCw className="h-4 w-4" /> Try again</Button>
         )}
         {showContact && (
           <a href={supportMailto({ subject: 'TradeMentor — something went wrong', ref: refId })}
-             className="px-4 py-2 border border-border rounded-md text-sm text-foreground hover:bg-accent/20">Contact support</a>
+             className="inline-flex items-center h-9 px-4 border border-border rounded-md text-[14px] font-medium text-foreground transition-colors duration-150 hover:bg-muted">Contact support</a>
         )}
       </div>
       {showContact && (
-        <p className="text-xs text-muted-foreground">Still stuck? Email <a href={supportMailto()} className="text-primary underline">{SUPPORT_EMAIL}</a>.</p>
+        <p className="text-[12.5px] text-muted-foreground">Still stuck? Email <a href={supportMailto()} className="text-primary underline">{SUPPORT_EMAIL}</a>.</p>
       )}
     </div>
   );
