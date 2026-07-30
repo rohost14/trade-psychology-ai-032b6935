@@ -175,7 +175,10 @@
   }
 
   html {
-    font-size: 16px;
+    /* Gentle global bump: rem-based Tailwind sizes (text-sm/base, spacing) scale up
+       ~6% for more breathing room. NOTE: arbitrary px classes (text-[11px]) don't
+       scale — those tiny fonts are raised in the per-page reskins. */
+    font-size: 17px;
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
     scroll-behavior: smooth;
