@@ -19,7 +19,6 @@ import { SetupNudgeCard } from './components/SetupNudgeCard';
 import { MarketRail } from './components/MarketRail';
 import ImportHistoryPrompt from '@/components/onboarding/ImportHistoryPrompt';
 import RecentAlertsCard from './components/RecentAlertsCard';
-import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/components/ui/accordion';
 import AlertDetailSheet from '@/components/alerts/AlertDetailSheet';
 import OpenPositionsTable from './components/OpenPositionsTable';
 import ClosedPositionsCard from './components/ClosedPositionsCard';
@@ -607,7 +606,11 @@ export default function DashboardLab() {
           />
         )}
 
-        {/* Today's closed trades — collapsible, Lovable-style */}
+        {/* Today's closed trades. ClosedPositionsCard renders its own titled
+            surface with counts and booked total, and its rows expand
+            individually. It used to be wrapped in a second card with an
+            accordion trigger saying the same thing: a card inside a card, two
+            headers for one block, and a redundant collapse level. */}
         {tradesError && !tradesLoading && closedTrades.length === 0 ? (
           <ErrorState
             error={{ response: { status: 500 } }}
@@ -616,24 +619,12 @@ export default function DashboardLab() {
             compact
           />
         ) : (
-          <Accordion type="single" collapsible defaultValue="closed" className="desk-card">
-            <AccordionItem value="closed" className="border-0">
-              <AccordionTrigger className="px-5 sm:px-6 py-4 hover:no-underline">
-                <div className="flex items-center gap-2.5">
-                  <span className="t-label">Closed positions today</span>
-                  <span className="text-[11px] text-muted-foreground">· tap to collapse</span>
-                </div>
-              </AccordionTrigger>
-              <AccordionContent className="border-t border-border">
-                <ClosedPositionsCard
-                  sinceIso={getLastSessionStartUTC().toISOString()}
-                  roundTrips={recentTrades}
-                  journaledIds={journaledIds}
-                  onTradeClick={handleTradeClick}
-                />
-              </AccordionContent>
-            </AccordionItem>
-          </Accordion>
+          <ClosedPositionsCard
+            sinceIso={getLastSessionStartUTC().toISOString()}
+            roundTrips={recentTrades}
+            journaledIds={journaledIds}
+            onTradeClick={handleTradeClick}
+          />
         )}
       </div>
 
