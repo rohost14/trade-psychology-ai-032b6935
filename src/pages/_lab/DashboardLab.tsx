@@ -87,6 +87,24 @@ export default function DashboardLab() {
   const [selectedType, setSelectedType] = useState<'position' | 'closed'>('position');
 
   const [closedOpen, setClosedOpen] = useState(false);
+  /**
+   * Container treatments for the data regions, switchable so they can be
+   * compared on the same screen with the same data rather than described.
+   *
+   *   card     bordered surface on the page          (what we have)
+   *   well     recessed background + hairline        (contained, no border tax)
+   *   bare     no container at all, label + rule     (edge to edge)
+   *   ruled    heavy rule above, light rules between (structure from lines)
+   *   inset    raised surface, no border, page shows through as the gap
+   */
+  const [shell, setShell] = useState<'card' | 'well' | 'bare' | 'ruled' | 'inset'>('card');
+  const SHELLS = {
+    card:  'rounded-lg border border-border bg-card overflow-hidden',
+    well:  'rounded-lg border border-border bg-muted/30 overflow-hidden',
+    bare:  'overflow-hidden',
+    ruled: 'border-t-2 border-foreground/15 overflow-hidden',
+    inset: 'rounded-lg bg-card overflow-hidden shadow-sm',
+  } as const;
   const [showCapitalPrompt, setShowCapitalPrompt] = useState(false);
   const [capitalInput, setCapitalInput] = useState('');
   const [capitalSaving, setCapitalSaving] = useState(false);
@@ -595,13 +613,32 @@ export default function DashboardLab() {
           />
         </div>
 
+        {/* TEMPORARY treatment switcher — compare containers on one screen */}
+        <div className="flex items-center gap-2 flex-wrap">
+          <span className="t-label">Container</span>
+          <div className="inline-flex rounded-md border border-border bg-card p-0.5">
+            {(Object.keys(SHELLS) as (keyof typeof SHELLS)[]).map(k => (
+              <button
+                key={k}
+                onClick={() => setShell(k)}
+                className={cn(
+                  'px-2.5 h-7 rounded text-[11.5px] font-medium capitalize transition-colors duration-150',
+                  shell === k ? 'bg-muted text-foreground' : 'text-muted-foreground hover:text-foreground',
+                )}
+              >
+                {k}
+              </button>
+            ))}
+          </div>
+        </div>
+
         {/* Open above, closed below and collapsed until asked for. Open
             positions are live and always want to be visible; closed trades are
             reference, so they cost a click rather than a screenful. Both
             headers surface how many entries are still unjournalled, because
             that is the one pending action on this screen and it was invisible
             until you opened a row. */}
-        <section className="rounded-lg border border-border overflow-hidden bg-card">
+        <section className={SHELLS[shell]}>
           {positionsError && !positionsLoading && positions.length === 0 ? (
             <ErrorState error={{ response: { status: 500 } }} message={positionsError} onRetry={fetchPositions} compact />
           ) : (
@@ -617,7 +654,7 @@ export default function DashboardLab() {
           )}
         </section>
 
-        <section className="rounded-lg border border-border overflow-hidden bg-card">
+        <section className={SHELLS[shell]}>
           <button
             type="button"
             onClick={() => setClosedOpen(v => !v)}

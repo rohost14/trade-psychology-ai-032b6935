@@ -32,6 +32,62 @@ export const DEMO_ACCOUNT = {
 // Completed trades — realistic F&O scenarios
 // ---------------------------------------------------------------------------
 export const DEMO_COMPLETED_TRADES: CompletedTrade[] = [
+  // ── Today's session ───────────────────────────────────────────────────────
+  // The Dashboard filters closed trades to the current session window, and
+  // every fixture below used to be dated a day or more back, so Closed
+  // Positions always rendered empty in demo mode. These five sit in today's
+  // session and cover the cases the table has to handle: a win, a loss, a
+  // multi-leg round trip, an equity position and a fast scratch.
+  {
+    id: 'ct-t01', broker_account_id: 'demo-account-id',
+    tradingsymbol: 'NIFTY2580724500CE', exchange: 'NFO', instrument_type: 'CE',
+    direction: 'LONG', total_quantity: 75, num_entries: 1, num_exits: 1,
+    avg_entry_price: 142.1, avg_exit_price: 161.5,
+    entry_time: daysAgo(0, 9, 18), exit_time: daysAgo(0, 9, 40),
+    duration_minutes: 22, realized_pnl: 1455, product: 'NRML',
+    closed_by_flip: false, entry_trade_ids: [], exit_trade_ids: [],
+    status: 'closed', created_at: daysAgo(0, 9, 18),
+  },
+  {
+    id: 'ct-t02', broker_account_id: 'demo-account-id',
+    tradingsymbol: 'BANKNIFTY2580750800CE', exchange: 'NFO', instrument_type: 'CE',
+    direction: 'LONG', total_quantity: 50, num_entries: 2, num_exits: 1,
+    avg_entry_price: 388.4, avg_exit_price: 372.9,
+    entry_time: daysAgo(0, 11, 8), exit_time: daysAgo(0, 12, 12),
+    duration_minutes: 64, realized_pnl: -775, product: 'NRML',
+    closed_by_flip: false, entry_trade_ids: [], exit_trade_ids: [],
+    status: 'closed', created_at: daysAgo(0, 11, 8),
+  },
+  {
+    id: 'ct-t03', broker_account_id: 'demo-account-id',
+    tradingsymbol: 'FINNIFTY2580719800PE', exchange: 'NFO', instrument_type: 'PE',
+    direction: 'SHORT', total_quantity: 40, num_entries: 1, num_exits: 2,
+    avg_entry_price: 96.25, avg_exit_price: 88.4,
+    entry_time: daysAgo(0, 12, 30), exit_time: daysAgo(0, 13, 5),
+    duration_minutes: 35, realized_pnl: 314, product: 'MIS',
+    closed_by_flip: false, entry_trade_ids: [], exit_trade_ids: [],
+    status: 'closed', created_at: daysAgo(0, 12, 30),
+  },
+  {
+    id: 'ct-t04', broker_account_id: 'demo-account-id',
+    tradingsymbol: 'MAXHEALTH', exchange: 'NSE', instrument_type: 'EQ',
+    direction: 'LONG', total_quantity: 2100, num_entries: 2, num_exits: 2,
+    avg_entry_price: 9.31, avg_exit_price: 11.01,
+    entry_time: daysAgo(0, 10, 4), exit_time: daysAgo(0, 12, 43),
+    duration_minutes: 159, realized_pnl: 3570, product: 'NRML',
+    closed_by_flip: false, entry_trade_ids: [], exit_trade_ids: [],
+    status: 'closed', created_at: daysAgo(0, 10, 4),
+  },
+  {
+    id: 'ct-t05', broker_account_id: 'demo-account-id',
+    tradingsymbol: 'SENSEX2580781400PE', exchange: 'BFO', instrument_type: 'PE',
+    direction: 'LONG', total_quantity: 100, num_entries: 1, num_exits: 1,
+    avg_entry_price: 24.12, avg_exit_price: 10.28,
+    entry_time: daysAgo(0, 13, 51), exit_time: daysAgo(0, 14, 7),
+    duration_minutes: 16, realized_pnl: -1384, product: 'NRML',
+    closed_by_flip: false, entry_trade_ids: [], exit_trade_ids: [],
+    status: 'closed', created_at: daysAgo(0, 13, 51),
+  },
   // NIFTY weekly PE (caught a fall, quick profit)
   {
     id: 'ct-001', broker_account_id: 'demo-account-id',
