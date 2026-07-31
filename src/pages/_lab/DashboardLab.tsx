@@ -97,13 +97,27 @@ export default function DashboardLab() {
    *   ruled    heavy rule above, light rules between (structure from lines)
    *   inset    raised surface, no border, page shows through as the gap
    */
-  const [shell, setShell] = useState<'card' | 'well' | 'bare' | 'ruled' | 'inset'>('card');
+  const [shell, setShell] = useState<'card' | 'inset' | 'lifted' | 'edgelit' | 'accent' | 'layered'>('inset');
+  /**
+   * Container treatments, all of which carry depth. Well, bare and ruled are
+   * gone: each removed the surface and left structure to a hairline, which is
+   * the absence of a decision rather than a quieter one.
+   *
+   *   card     bordered surface           the outline does the work
+   *   inset    surface, no border         separation from the page, no outline
+   *   lifted   surface, stronger shadow   reads as raised rather than placed
+   *   edgelit  inner top highlight        a lit top edge plus a drop shadow,
+   *                                       which is how physical panels read
+   *   accent   brand edge on top          personality from a 2px coloured line
+   *   layered  two-tone, header recessed  depth from tonal change, not shadow
+   */
   const SHELLS = {
-    card:  'rounded-lg border border-border bg-card overflow-hidden',
-    well:  'rounded-lg border border-border bg-muted/30 overflow-hidden',
-    bare:  'overflow-hidden',
-    ruled: 'border-t-2 border-foreground/15 overflow-hidden',
-    inset: 'rounded-lg bg-card overflow-hidden shadow-sm',
+    card:    'rounded-lg border border-border bg-card overflow-hidden',
+    inset:   'rounded-lg bg-card overflow-hidden shadow-sm',
+    lifted:  'rounded-lg bg-card overflow-hidden shadow-[0_2px_8px_rgba(0,0,0,0.08),0_8px_24px_rgba(0,0,0,0.06)]',
+    edgelit: 'rounded-lg bg-card overflow-hidden shadow-[inset_0_1px_0_rgba(255,255,255,0.08),0_1px_3px_rgba(0,0,0,0.10),0_6px_16px_rgba(0,0,0,0.06)]',
+    accent:  'rounded-lg bg-card overflow-hidden shadow-sm border-t-2 border-t-primary',
+    layered: 'rounded-lg bg-card overflow-hidden shadow-sm [&>*:first-child]:bg-muted/50 [&>button:first-child]:bg-muted/50',
   } as const;
   const [showCapitalPrompt, setShowCapitalPrompt] = useState(false);
   const [capitalInput, setCapitalInput] = useState('');
@@ -606,6 +620,7 @@ export default function DashboardLab() {
         {/* Behavioral alerts */}
         <div aria-live="polite" aria-label="Behavioral alerts">
           <RecentAlertsCard
+            shellClass={SHELLS[shell]}
             alerts={mergedAlerts}
             loading={alertsLoading}
             onAcknowledge={acknowledgeAlert}
