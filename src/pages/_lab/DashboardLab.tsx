@@ -38,6 +38,49 @@ import { useWebSocket } from '@/contexts/WebSocketContext';
 import { STATE_CFG, SessionState, getSessionState, formatTimeAgo, getLastSessionStartUTC } from '@/lib/dashboardUtils';
 import { normalizeSeverityStr } from '@/lib/alertSeverity';
 
+
+/**
+ * Dark palette on Material's elevation model: depth in dark is a WHITE OVERLAY
+ * percentage, not a shadow. 5% at 1dp, 8% at 2dp, 12% at 8dp. A drop shadow
+ * renders as nothing against a dark ground.
+ *
+ * Base is #101215 rather than pure black -- pure black under white text causes
+ * halation, where text appears to bleed and letters read blurred -- and the
+ * foreground is off-white for the same reason.
+ *
+ * Scoped under .dark on purpose. The previous attempt set these as an inline
+ * style on the root, which applied them in BOTH themes and left light mode
+ * rendering near-white text on a white page. A token that differs per theme
+ * cannot be an inline style.
+ */
+const LAB_DARK_TOKENS = `
+.dark .lab-dark {
+  --layer-page: 16 18 21;
+  --layer-surface: 28 30 33;
+  --layer-overlay: 35 37 40;
+  --layer-elevated: 45 46 49;
+  --layer-border: 48 50 54;
+  --layer-border-subtle: 35 37 40;
+  --foreground: 232 234 237;
+  --muted-foreground: 154 160 166;
+}
+`;
+
+/**
+ * Five arrangements of the same three blocks. These are structural, not
+ * restyled containers -- each one changes what you look at first and how much
+ * of the screen behaviour gets. The earlier six "container treatments" all
+ * looked identical because they were six shadow depths, and a shadow on a dark
+ * ground renders as nothing.
+ */
+const LAYOUTS = {
+  stack: 'Stack',
+  strip: 'Strip',
+  split: 'Split',
+  focus: 'Focus',
+  woven: 'Woven',
+} as const;
+
 type PositionWithExtras = Position & { instrument_type: string; unrealized_pnl: number; current_value: number };
 
 interface RiskStateData {
@@ -97,7 +140,7 @@ export default function DashboardLab() {
    *   ruled    heavy rule above, light rules between (structure from lines)
    *   inset    raised surface, no border, page shows through as the gap
    */
-  const [shell, setShell] = useState<'card' | 'inset' | 'lifted' | 'edgelit' | 'accent' | 'layered'>('inset');
+  const [layout, setLayout] = useState<keyof typeof LAYOUTS>('stack');
   /**
    * Container treatments, all of which carry depth. Well, bare and ruled are
    * gone: each removed the surface and left structure to a hairline, which is
@@ -111,14 +154,6 @@ export default function DashboardLab() {
    *   accent   brand edge on top          personality from a 2px coloured line
    *   layered  two-tone, header recessed  depth from tonal change, not shadow
    */
-  const SHELLS = {
-    card:    'rounded-lg border border-border bg-card overflow-hidden',
-    inset:   'rounded-lg bg-card overflow-hidden shadow-sm dark:shadow-none dark:ring-1 dark:ring-white/[0.07]',
-    lifted:  'rounded-lg bg-card overflow-hidden shadow-[0_2px_8px_rgba(0,0,0,0.08),0_8px_24px_rgba(0,0,0,0.06)] dark:shadow-[0_2px_12px_rgba(0,0,0,0.5)] dark:ring-1 dark:ring-white/[0.09]',
-    edgelit: 'rounded-lg bg-card overflow-hidden shadow-[inset_0_1px_0_rgba(255,255,255,0.08),0_1px_3px_rgba(0,0,0,0.10)] dark:shadow-[inset_0_1px_0_rgba(255,255,255,0.10)] dark:ring-1 dark:ring-white/[0.06]',
-    accent:  'rounded-lg bg-card overflow-hidden shadow-sm border-t-2 border-t-primary dark:shadow-none dark:ring-1 dark:ring-white/[0.07]',
-    layered: 'rounded-lg bg-card overflow-hidden shadow-sm dark:shadow-none dark:ring-1 dark:ring-white/[0.07] [&>*:first-child]:bg-muted/50 [&>button:first-child]:bg-muted/50',
-  } as const;
   const [showCapitalPrompt, setShowCapitalPrompt] = useState(false);
   const [capitalInput, setCapitalInput] = useState('');
   const [capitalSaving, setCapitalSaving] = useState(false);
@@ -528,36 +563,89 @@ export default function DashboardLab() {
     );
   }
 
+  /* The three movable parts. Defined once and placed by the layout switcher,
+     so switching arrangements can never make them drift apart. */
+  const SHELL = 'rounded-lg bg-card overflow-hidden shadow-sm dark:shadow-none';
+
+  const alertsBlock = (
+    <div aria-live="polite" aria-label="Behavioral alerts" key="alerts">
+      <RecentAlertsCard
+        alerts={mergedAlerts}
+        loading={alertsLoading}
+        onAcknowledge={acknowledgeAlert}
+        onOpen={id => setSelectedAlert(alerts.find(a => a.id === id) ?? null)}
+      />
+    </div>
+  );
+
+  const openBlock = (
+    <section className={SHELL} key="open">
+      {positionsError && !positionsLoading && positions.length === 0 ? (
+        <ErrorState error={{ response: { status: 500 } }} message={positionsError} onRetry={fetchPositions} compact />
+      ) : (
+        <OpenPositionsTable
+          positions={positions}
+          isLoading={positionsLoading}
+          journaledIds={journaledIds}
+          onPositionClick={handlePositionClick}
+          pricesConnected={wsConnected}
+          lastPriceAt={lastLtpAt}
+          tokenExpired={isTokenExpired}
+        />
+      )}
+    </section>
+  );
+
+  /* Closed stays collapsed until asked for: open positions are live and always
+     want to be visible, closed trades are reference. Both headers surface the
+     unjournalled count, the one pending action on this screen. */
+  const closedBlock = (
+    <section className={SHELL} key="closed">
+      <button
+        type="button"
+        onClick={() => setClosedOpen(v => !v)}
+        aria-expanded={closedOpen}
+        className="w-full card-head hover:bg-muted/40 transition-colors duration-150 focus-visible:outline-none focus-visible:bg-muted/40"
+      >
+        <span className="flex items-center gap-2.5 min-w-0">
+          <span className="t-label">Closed positions</span>
+          <span className="text-[11px] text-muted-foreground font-tabular">
+            · {recentTrades.length} trade{recentTrades.length !== 1 ? 's' : ''}
+          </span>
+          {closedUnjournalled > 0 && (
+            <span className="inline-flex items-center gap-1 text-[10px] font-semibold uppercase tracking-wider text-primary bg-primary/10 px-1.5 py-0.5 rounded">
+              {closedUnjournalled} to journal
+            </span>
+          )}
+        </span>
+        <span className="flex items-center gap-2.5 shrink-0">
+          <span className={cn('text-[13px] font-semibold font-tabular', realizedPnlDisplay >= 0 ? 'text-profit' : 'text-loss')}>
+            {formatCurrencyWithSign(realizedPnlDisplay)}
+          </span>
+          <ChevronDown className={cn('h-4 w-4 text-muted-foreground transition-transform duration-200', closedOpen && 'rotate-180')} />
+        </span>
+      </button>
+
+      {closedOpen && (
+        <div className="border-t border-border animate-accordion-down">
+          {tradesError && !tradesLoading && closedTrades.length === 0 ? (
+            <ErrorState error={{ response: { status: 500 } }} message={tradesError} onRetry={fetchTrades} compact />
+          ) : (
+            <ClosedPositionsCard
+              sinceIso={getLastSessionStartUTC().toISOString()}
+              roundTrips={recentTrades}
+              journaledIds={journaledIds}
+              onTradeClick={handleTradeClick}
+            />
+          )}
+        </div>
+      )}
+    </section>
+  );
+
   return (
-    <div
-      className="w-full"
-      style={{
-        /**
-         * Dark palette rebuilt on Material's elevation model, where depth in
-         * dark is a WHITE OVERLAY PERCENTAGE rather than a shadow: 1dp is 5%
-         * white, 2dp is 8%, 8dp is 12%, 24dp is 16%. A drop shadow renders as
-         * nothing against a dark ground, which is why every treatment looked
-         * identical here.
-         *
-         * Base is #101215 rather than pure black. Pure black under white text
-         * causes halation, where the text appears to bleed and letters read as
-         * blurred, so Material recommends a dark grey instead. Text is
-         * off-white for the same reason.
-         *
-         * These override only inside the lab; the shipped tokens are untouched.
-         * They apply in light too but are dark-shaped, so the lab is dark-first
-         * until the palette is settled.
-         */
-        ['--layer-page' as string]: '16 18 21',
-        ['--layer-surface' as string]: '28 30 33',
-        ['--layer-overlay' as string]: '35 37 40',
-        ['--layer-elevated' as string]: '45 46 49',
-        ['--layer-border' as string]: '48 50 54',
-        ['--layer-border-subtle' as string]: '35 37 40',
-        ['--foreground' as string]: '232 234 237',
-        ['--muted-foreground' as string]: '154 160 166',
-      } as React.CSSProperties}
-    >
+    <div className="w-full lab-dark">
+      <style>{LAB_DARK_TOKENS}</style>
 
       <ImportHistoryPrompt />
 
@@ -645,98 +733,140 @@ export default function DashboardLab() {
         {/* New-user setup prompt — self-gates to null once onboarded/dismissed */}
         <SetupNudgeCard />
 
-        {/* Behavioral alerts */}
-        <div aria-live="polite" aria-label="Behavioral alerts">
-          <RecentAlertsCard
-            alerts={mergedAlerts}
-            loading={alertsLoading}
-            onAcknowledge={acknowledgeAlert}
-            onOpen={id => setSelectedAlert(alerts.find(a => a.id === id) ?? null)}
-          />
-        </div>
-
-        {/* TEMPORARY treatment switcher — compare containers on one screen */}
+        {/* LAYOUT — structural options, not restyled boxes. Each changes what
+            you see and where you look. */}
         <div className="flex items-center gap-2 flex-wrap">
-          <span className="t-label">Container</span>
+          <span className="t-label">Layout</span>
           <div className="inline-flex rounded-md border border-border bg-card p-0.5">
-            {(Object.keys(SHELLS) as (keyof typeof SHELLS)[]).map(k => (
+            {(Object.keys(LAYOUTS) as (keyof typeof LAYOUTS)[]).map(k => (
               <button
                 key={k}
-                onClick={() => setShell(k)}
+                onClick={() => setLayout(k)}
                 className={cn(
-                  'px-2.5 h-7 rounded text-[11.5px] font-medium capitalize transition-colors duration-150',
-                  shell === k ? 'bg-muted text-foreground' : 'text-muted-foreground hover:text-foreground',
+                  'px-2.5 h-7 rounded text-[11.5px] font-medium transition-colors duration-150',
+                  layout === k ? 'bg-muted text-foreground' : 'text-muted-foreground hover:text-foreground',
                 )}
               >
-                {k}
+                {LAYOUTS[k]}
               </button>
             ))}
           </div>
         </div>
 
-        {/* Open above, closed below and collapsed until asked for. Open
-            positions are live and always want to be visible; closed trades are
-            reference, so they cost a click rather than a screenful. Both
-            headers surface how many entries are still unjournalled, because
-            that is the one pending action on this screen and it was invisible
-            until you opened a row. */}
-        <section className={SHELLS[shell]}>
-          {positionsError && !positionsLoading && positions.length === 0 ? (
-            <ErrorState error={{ response: { status: 500 } }} message={positionsError} onRetry={fetchPositions} compact />
-          ) : (
-            <OpenPositionsTable
-              positions={positions}
-              isLoading={positionsLoading}
-              journaledIds={journaledIds}
-              onPositionClick={handlePositionClick}
-              pricesConnected={wsConnected}
-              lastPriceAt={lastLtpAt}
-              tokenExpired={isTokenExpired}
-            />
-          )}
-        </section>
+        {/* 1 STACK — alerts above, tables below. Today's arrangement. */}
+        {layout === 'stack' && (
+          <>
+            {alertsBlock}
+            {openBlock}
+            {closedBlock}
+          </>
+        )}
 
-        <section className={SHELLS[shell]}>
-          <button
-            type="button"
-            onClick={() => setClosedOpen(v => !v)}
-            aria-expanded={closedOpen}
-            className="w-full card-head hover:bg-muted/40 transition-colors duration-150 focus-visible:outline-none focus-visible:bg-muted/40"
-          >
-            <span className="flex items-center gap-2.5 min-w-0">
-              <span className="t-label">Closed positions</span>
-              <span className="text-[11px] text-muted-foreground font-tabular">
-                · {recentTrades.length} trade{recentTrades.length !== 1 ? 's' : ''}
-              </span>
-              {closedUnjournalled > 0 && (
-                <span className="inline-flex items-center gap-1 text-[10px] font-semibold uppercase tracking-wider text-primary bg-primary/10 px-1.5 py-0.5 rounded">
-                  {closedUnjournalled} to journal
-                </span>
-              )}
-            </span>
-            <span className="flex items-center gap-2.5 shrink-0">
-              <span className={cn('text-[13px] font-semibold font-tabular', realizedPnlDisplay >= 0 ? 'text-profit' : 'text-loss')}>
-                {formatCurrencyWithSign(realizedPnlDisplay)}
-              </span>
-              <ChevronDown className={cn('h-4 w-4 text-muted-foreground transition-transform duration-200', closedOpen && 'rotate-180')} />
-            </span>
-          </button>
-
-          {closedOpen && (
-            <div className="border-t border-border animate-accordion-down">
-              {tradesError && !tradesLoading && closedTrades.length === 0 ? (
-                <ErrorState error={{ response: { status: 500 } }} message={tradesError} onRetry={fetchTrades} compact />
-              ) : (
-                <ClosedPositionsCard
-                  sinceIso={getLastSessionStartUTC().toISOString()}
-                  roundTrips={recentTrades}
-                  journaledIds={journaledIds}
-                  onTradeClick={handleTradeClick}
-                />
-              )}
+        {/* 2 STRIP — alerts as three cards across the top, tables full width
+            beneath. Alerts become a glance rather than a list. */}
+        {layout === 'strip' && (
+          <>
+            <div>
+              <div className="flex items-baseline justify-between pb-2">
+                <span className="t-label">What we caught today</span>
+                <Link to="/alerts" className="text-[11px] font-medium uppercase tracking-wider text-primary">View all →</Link>
+              </div>
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                {mergedAlerts.slice(0, 3).map(a => (
+                  <button
+                    key={a.id}
+                    onClick={() => setSelectedAlert(alerts.find(x => x.id === a.id) ?? null)}
+                    className={cn('text-left rounded-lg border p-3 bg-card hover:bg-muted/40 transition-colors',
+                      normalizeSeverityStr(a.severity) === 'danger' ? 'border-loss/30' : 'border-warning/30')}
+                  >
+                    <span className="text-[13.5px] font-semibold text-foreground block truncate">{a.pattern}</span>
+                    <span className="text-[12px] text-muted-foreground block mt-1 line-clamp-2 leading-snug">{a.description}</span>
+                  </button>
+                ))}
+              </div>
             </div>
-          )}
-        </section>
+            {openBlock}
+            {closedBlock}
+          </>
+        )}
+
+        {/* 3 SPLIT — alerts in a narrow left column, tables right. Behaviour
+            stays in view while you read the numbers. */}
+        {layout === 'split' && (
+          <div className="grid grid-cols-1 lg:grid-cols-[minmax(0,340px)_minmax(0,1fr)] gap-5 items-start">
+            <div className="min-w-0">{alertsBlock}</div>
+            <div className="min-w-0 space-y-5">{openBlock}{closedBlock}</div>
+          </div>
+        )}
+
+        {/* 4 FOCUS — the newest danger alert gets full width and context, the
+            rest collapse to one-liners. One thing to act on, not a feed. */}
+        {layout === 'focus' && (
+          <>
+            {mergedAlerts[0] && (
+              <div className="rounded-lg border border-loss/30 bg-loss/[0.04] p-5">
+                <span className="t-label text-loss">Most urgent</span>
+                <h3 className="text-[19px] font-semibold tracking-tight text-foreground mt-2">{mergedAlerts[0].pattern}</h3>
+                <p className="text-[14px] text-muted-foreground leading-relaxed mt-1.5 max-w-[70ch]">{mergedAlerts[0].description}</p>
+                <button
+                  onClick={() => setSelectedAlert(alerts.find(x => x.id === mergedAlerts[0].id) ?? null)}
+                  className="mt-3 text-[12px] font-medium uppercase tracking-wider text-primary"
+                >
+                  Open →
+                </button>
+              </div>
+            )}
+            {mergedAlerts.length > 1 && (
+              <div className="divide-y divide-border border-y border-border">
+                {mergedAlerts.slice(1, 5).map(a => (
+                  <button
+                    key={a.id}
+                    onClick={() => setSelectedAlert(alerts.find(x => x.id === a.id) ?? null)}
+                    className="w-full flex items-center gap-3 py-2.5 text-left hover:bg-muted/40 transition-colors"
+                  >
+                    <span className={cn('h-1.5 w-1.5 rounded-full shrink-0',
+                      normalizeSeverityStr(a.severity) === 'danger' ? 'bg-loss' : 'bg-warning')} />
+                    <span className="text-[13.5px] text-foreground truncate flex-1">{a.pattern}</span>
+                    <span className="text-[12px] text-muted-foreground truncate hidden sm:block flex-1">{a.description}</span>
+                  </button>
+                ))}
+              </div>
+            )}
+            {openBlock}
+            {closedBlock}
+          </>
+        )}
+
+        {/* 5 INTERLEAVED — tables first, alerts underneath the trades that
+            caused them. The only layout that puts a behavioural finding
+            physically next to its evidence, which is the product's premise. */}
+        {layout === 'woven' && (
+          <>
+            {openBlock}
+            <div>
+              <div className="flex items-baseline justify-between pb-2">
+                <span className="t-label">What these trades triggered</span>
+                <span className="text-[12px] text-muted-foreground font-tabular">{mergedAlerts.length} today</span>
+              </div>
+              <div className="border-t border-border divide-y divide-border">
+                {mergedAlerts.slice(0, 4).map(a => (
+                  <button
+                    key={a.id}
+                    onClick={() => setSelectedAlert(alerts.find(x => x.id === a.id) ?? null)}
+                    className={cn('w-full text-left flex items-start gap-3 py-3 pl-3 border-l-[3px] hover:bg-muted/40 transition-colors',
+                      normalizeSeverityStr(a.severity) === 'danger' ? 'border-l-loss' : 'border-l-warning')}
+                  >
+                    <span className="min-w-0 flex-1">
+                      <span className="text-[13.5px] font-semibold text-foreground">{a.pattern}</span>
+                      <span className="block text-[12.5px] text-muted-foreground leading-snug mt-0.5 line-clamp-2">{a.description}</span>
+                    </span>
+                  </button>
+                ))}
+              </div>
+            </div>
+            {closedBlock}
+          </>
+        )}
       </div>
 
       {/* ── AI Coach floating action button ──────────────────────────────── */}
