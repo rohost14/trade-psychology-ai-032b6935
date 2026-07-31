@@ -111,10 +111,6 @@ export default function OpenPositionsTable({
     return (diff / p.average_entry_price) * 100;
   };
 
-  const unjournalled = openPositions.filter(
-    p => !journaledIds.has(positionJournalTradeId(p.id)),
-  ).length;
-
   const totalPnl = openPositions.reduce((s, p) => s + getLivePnl(p), 0);
 
   if (isLoading) {
@@ -133,13 +129,8 @@ export default function OpenPositionsTable({
           <span className="text-[11px] uppercase tracking-[0.12em] font-medium text-muted-foreground">Open Positions</span>
           <span className="text-[11px] text-muted-foreground font-tabular">· {openPositions.length}</span>
           {openPositions.length > 0 && <PriceStatusPill status={priceStatus} />}
-          {/* A count beats an instruction. "tap a row to journal" told you how
-              without telling you whether you needed to; this says how many are
-              still waiting and disappears when none are. */}
-          {unjournalled > 0 && (
-            <span className="inline-flex items-center gap-1 text-[10px] font-semibold uppercase tracking-wider text-primary bg-primary/10 px-1.5 py-0.5 rounded">
-              {unjournalled} to journal
-            </span>
+          {openPositions.length > 0 && (
+            <span className="hidden sm:inline text-[10px] text-muted-foreground/70 uppercase tracking-wider">· tap a row to journal</span>
           )}
         </div>
         {openPositions.length > 0 && (
