@@ -86,6 +86,7 @@ export default function DashboardLab() {
   const [selectedTrade, setSelectedTrade] = useState<PositionWithExtras | CompletedTrade | null>(null);
   const [selectedType, setSelectedType] = useState<'position' | 'closed'>('position');
 
+  const [posTab, setPosTab] = useState<'open' | 'closed'>('open');
   const [showCapitalPrompt, setShowCapitalPrompt] = useState(false);
   const [capitalInput, setCapitalInput] = useState('');
   const [capitalSaving, setCapitalSaving] = useState(false);
@@ -505,37 +506,6 @@ export default function DashboardLab() {
         </div>
       )}
 
-      {showCapitalPrompt && dataLoaded && (
-        <div className="mb-4 px-3 py-2.5 rounded-lg bg-primary/5 border border-primary/20 flex flex-wrap items-center gap-3">
-          <div className="flex-1 min-w-0">
-            <p className="text-[14px] font-medium text-foreground">Enable position sizing alerts</p>
-            <p className="text-[12.5px] text-muted-foreground mt-0.5">
-              Add your trading capital to detect oversized positions.
-            </p>
-          </div>
-          <div className="flex items-center gap-2 flex-shrink-0">
-            <span className="text-[14px] text-muted-foreground">₹</span>
-            <Input
-              type="number"
-              placeholder="e.g. 500000"
-              value={capitalInput}
-              onChange={e => setCapitalInput(e.target.value)}
-              onKeyDown={e => e.key === 'Enter' && handleSaveCapital()}
-              className="w-32 h-9 text-[14px] font-tabular"
-            />
-            <Button onClick={handleSaveCapital} disabled={!capitalInput || capitalSaving}>
-              {capitalSaving ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : 'Save'}
-            </Button>
-            <button
-              onClick={handleDismissCapital}
-              aria-label="Dismiss"
-              className="text-muted-foreground transition-colors duration-150 hover:text-foreground"
-            >
-              <X className="h-4 w-4" />
-            </button>
-          </div>
-        </div>
-      )}
 
       {syncStatus === 'error' && dataLoaded && !isTokenExpired && (
         <div className="mb-4 px-3 py-2.5 rounded-lg bg-loss/10 border border-loss/20 flex items-center justify-between gap-3">
@@ -572,6 +542,41 @@ export default function DashboardLab() {
           margins={margins}
         />
 
+        {/* Setup nudges sit BELOW the session, not above it. A form asking for
+            trading capital was the first thing on the page, pushing the number
+            the screen exists to show under the fold. */}
+        {showCapitalPrompt && dataLoaded && (
+        <div className="mb-4 px-3 py-2.5 rounded-lg bg-primary/5 border border-primary/20 flex flex-wrap items-center gap-3">
+          <div className="flex-1 min-w-0">
+            <p className="text-[14px] font-medium text-foreground">Enable position sizing alerts</p>
+            <p className="text-[12.5px] text-muted-foreground mt-0.5">
+              Add your trading capital to detect oversized positions.
+            </p>
+          </div>
+          <div className="flex items-center gap-2 flex-shrink-0">
+            <span className="text-[14px] text-muted-foreground">₹</span>
+            <Input
+              type="number"
+              placeholder="e.g. 500000"
+              value={capitalInput}
+              onChange={e => setCapitalInput(e.target.value)}
+              onKeyDown={e => e.key === 'Enter' && handleSaveCapital()}
+              className="w-32 h-9 text-[14px] font-tabular"
+            />
+            <Button onClick={handleSaveCapital} disabled={!capitalInput || capitalSaving}>
+              {capitalSaving ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : 'Save'}
+            </Button>
+            <button
+              onClick={handleDismissCapital}
+              aria-label="Dismiss"
+              className="text-muted-foreground transition-colors duration-150 hover:text-foreground"
+            >
+              <X className="h-4 w-4" />
+            </button>
+          </div>
+        </div>
+      )}
+
         {/* New-user setup prompt — self-gates to null once onboarded/dismissed */}
         <SetupNudgeCard />
 
@@ -585,47 +590,57 @@ export default function DashboardLab() {
           />
         </div>
 
-        {/* Open Positions — a failed fetch renders as an error, never as an
-            empty table (§14). Uses the shared surface with the real reason. */}
-        {positionsError && !positionsLoading && positions.length === 0 ? (
-          <ErrorState
-            error={{ response: { status: 500 } }}
-            message={positionsError}
-            onRetry={fetchPositions}
-            compact
-          />
-        ) : (
-          <OpenPositionsTable
-            positions={positions}
-            isLoading={positionsLoading}
-            journaledIds={journaledIds}
-            onPositionClick={handlePositionClick}
-            pricesConnected={wsConnected}
-            lastPriceAt={lastLtpAt}
-            tokenExpired={isTokenExpired}
-          />
-        )}
+        {/* Positions as one recessed WELL with a tab switcher, rather than two
+            stacked cards or two runs of bare rows. A well is the third option:
+            the region is defined by a background one step down from the page
+            plus a hairline, so it reads as contained data without a card's
+            border-and-padding tax -- and folding Open and Closed into a single
+            switchable region removes a whole block of vertical space. */}
+        <section className="rounded-lg border border-border bg-muted/30 overflow-hidden">
+          <div className="flex items-center justify-between gap-3 px-2 pt-2">
+            <div className="inline-flex rounded-md bg-background/60 p-0.5">
+              {([['open', `Open · ${positions.length}`], ['closed', `Closed · ${recentTrades.length}`]] as const).map(([id, label]) => (
+                <button
+                  key={id}
+                  onClick={() => setPosTab(id as 'open' | 'closed')}
+                  className={cn(
+                    'px-3 h-7 rounded text-[12px] font-medium transition-colors duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring',
+                    posTab === id ? 'bg-card text-foreground shadow-sm' : 'text-muted-foreground hover:text-foreground',
+                  )}
+                >
+                  {label}
+                </button>
+              ))}
+            </div>
+          </div>
 
-        {/* Today's closed trades. ClosedPositionsCard renders its own titled
-            surface with counts and booked total, and its rows expand
-            individually. It used to be wrapped in a second card with an
-            accordion trigger saying the same thing: a card inside a card, two
-            headers for one block, and a redundant collapse level. */}
-        {tradesError && !tradesLoading && closedTrades.length === 0 ? (
-          <ErrorState
-            error={{ response: { status: 500 } }}
-            message={tradesError}
-            onRetry={fetchTrades}
-            compact
-          />
-        ) : (
-          <ClosedPositionsCard
-            sinceIso={getLastSessionStartUTC().toISOString()}
-            roundTrips={recentTrades}
-            journaledIds={journaledIds}
-            onTradeClick={handleTradeClick}
-          />
-        )}
+          <div className="mt-2 bg-card border-t border-border">
+            {posTab === 'open' ? (
+              positionsError && !positionsLoading && positions.length === 0 ? (
+                <ErrorState error={{ response: { status: 500 } }} message={positionsError} onRetry={fetchPositions} compact />
+              ) : (
+                <OpenPositionsTable
+                  positions={positions}
+                  isLoading={positionsLoading}
+                  journaledIds={journaledIds}
+                  onPositionClick={handlePositionClick}
+                  pricesConnected={wsConnected}
+                  lastPriceAt={lastLtpAt}
+                  tokenExpired={isTokenExpired}
+                />
+              )
+            ) : tradesError && !tradesLoading && closedTrades.length === 0 ? (
+              <ErrorState error={{ response: { status: 500 } }} message={tradesError} onRetry={fetchTrades} compact />
+            ) : (
+              <ClosedPositionsCard
+                sinceIso={getLastSessionStartUTC().toISOString()}
+                roundTrips={recentTrades}
+                journaledIds={journaledIds}
+                onTradeClick={handleTradeClick}
+              />
+            )}
+          </div>
+        </section>
       </div>
 
       {/* ── AI Coach floating action button ──────────────────────────────── */}

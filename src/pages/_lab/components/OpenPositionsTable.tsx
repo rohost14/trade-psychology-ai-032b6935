@@ -115,7 +115,7 @@ export default function OpenPositionsTable({
 
   if (isLoading) {
     return (
-      <section className="desk-card overflow-hidden">
+      <section className="overflow-hidden">
         <div className="card-head"><div className="h-4 w-40 bg-muted animate-pulse rounded" /></div>
         <div className="p-5 space-y-3">{[1, 2].map(i => <div key={i} className="h-10 bg-muted animate-pulse rounded" />)}</div>
       </section>
@@ -123,8 +123,7 @@ export default function OpenPositionsTable({
   }
 
   return (
-    <section className="desk-card overflow-hidden">
-      {/* Header */}
+    <section className="overflow-hidden">
       <div className="px-4 sm:px-6 py-4 border-b border-border flex items-center justify-between flex-wrap gap-2">
         <div className="flex items-center gap-2.5 flex-wrap">
           <span className="text-[11px] uppercase tracking-[0.12em] font-medium text-muted-foreground">Open Positions</span>

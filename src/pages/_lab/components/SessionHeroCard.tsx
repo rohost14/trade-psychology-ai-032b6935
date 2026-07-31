@@ -1,6 +1,5 @@
 import { useState } from 'react';
 import { cn } from '@/lib/utils';
-import { useCountUp } from '@/hooks/useCountUp';
 import { ChevronDown } from 'lucide-react';
 import { STATE_CFG, SessionState } from '@/lib/dashboardUtils';
 import type { MarginStatus } from '@/types/api';
@@ -39,7 +38,11 @@ export function SessionHeroCard({
   dailyTradeLimit,
 }: SessionHeroCardProps) {
   const [open, setOpen] = useState(false);
-  const animatedPnl = useCountUp(sessionPnlDisplay, 500);
+  // No count-up on the live figure. Every price tick changes sessionPnlDisplay,
+  // which restarts the animation, and in a live session ticks arrive faster
+  // than the 500ms it needs to land -- so the headline number was permanently
+  // in flight and never equalled Booked plus Unrealized underneath it. It read
+  // as a reconciliation bug because on screen it was one.
 
   const tradesToday = tradeStats?.trades_today ?? 0;
   const winRate = tradeStats?.win_rate ?? 0;
@@ -72,7 +75,7 @@ export function SessionHeroCard({
      * separate it from what follows. The brand accent stays as a short rule
      * above the label rather than a border around everything.
      */
-    <section className="pb-5 border-b border-border">
+    <section className="pb-4 border-b border-border">
       <div className="flex items-center justify-between gap-3 h-9">
         <span className="t-label flex items-center gap-2">
           Day P&amp;L
@@ -89,14 +92,14 @@ export function SessionHeroCard({
         </button>
       </div>
 
-      <div className="mt-3 flex flex-wrap items-end justify-between gap-x-10 gap-y-5">
+      <div className="mt-2 flex flex-wrap items-end justify-between gap-x-10 gap-y-5">
         {/* the figure — scale carries the hierarchy, colour carries direction */}
         <div className="min-w-0">
           <span className={cn(
-            'font-display text-[44px] leading-none font-semibold tracking-tight font-tabular block',
+            'font-display text-[38px] leading-none font-semibold tracking-tight font-tabular block',
             pnlPositive ? 'text-profit' : 'text-loss',
           )}>
-            {pnlPositive ? '+' : '−'}₹{inr(animatedPnl)}
+            {pnlPositive ? '+' : '−'}₹{inr(sessionPnlDisplay)}
           </span>
           <p className="mt-2 text-[12.5px] font-tabular text-muted-foreground">
             Booked{' '}

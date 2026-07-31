@@ -82,7 +82,7 @@ export default function ClosedPositionsCard({ sinceIso, roundTrips, journaledIds
 
   if (rows === null && !error) {
     return (
-      <section className="desk-card overflow-hidden">
+      <section className="overflow-hidden">
         <div className="card-head"><div className="h-4 w-40 bg-muted animate-pulse rounded" /></div>
         <div className="p-5 space-y-3">{[1, 2, 3].map(i => <Skeleton key={i} className="h-10 rounded" />)}</div>
       </section>
@@ -91,7 +91,7 @@ export default function ClosedPositionsCard({ sinceIso, roundTrips, journaledIds
 
   if (error) {
     return (
-      <section className="desk-card overflow-hidden">
+      <section className="overflow-hidden">
         <div className="card-head"><span className="text-[11px] uppercase tracking-[0.12em] font-medium text-muted-foreground">Closed Positions</span></div>
         <div className="px-5 py-8 text-center text-[13px] text-muted-foreground">Couldn't load closed positions.</div>
       </section>
@@ -106,7 +106,7 @@ export default function ClosedPositionsCard({ sinceIso, roundTrips, journaledIds
       { stat: '3 losses', label: 'in a row is when emotional impairment measurably starts', source: 'Behavioral research' },
     ];
     return (
-      <section className="desk-card overflow-hidden">
+      <section className="overflow-hidden">
         <div className="card-head"><span className="text-[11px] uppercase tracking-[0.12em] font-medium text-muted-foreground">Closed Positions</span></div>
         <div className="px-5 sm:px-6 py-8">
           <p className="text-sm font-medium text-foreground mb-1">Waiting for your first trade</p>
@@ -128,8 +128,7 @@ export default function ClosedPositionsCard({ sinceIso, roundTrips, journaledIds
   const visible = showAll ? rows : rows.slice(0, CAP);
 
   return (
-    <section className="desk-card overflow-hidden">
-      {/* Header */}
+    <section className="overflow-hidden">
       <div className="px-4 sm:px-6 py-4 border-b border-border flex items-center justify-between flex-wrap gap-2">
         <div className="flex items-center gap-2.5 flex-wrap">
           <span className="text-[11px] uppercase tracking-[0.12em] font-medium text-muted-foreground">Closed Positions</span>
