@@ -529,7 +529,35 @@ export default function DashboardLab() {
   }
 
   return (
-    <div className="w-full">
+    <div
+      className="w-full"
+      style={{
+        /**
+         * Dark palette rebuilt on Material's elevation model, where depth in
+         * dark is a WHITE OVERLAY PERCENTAGE rather than a shadow: 1dp is 5%
+         * white, 2dp is 8%, 8dp is 12%, 24dp is 16%. A drop shadow renders as
+         * nothing against a dark ground, which is why every treatment looked
+         * identical here.
+         *
+         * Base is #101215 rather than pure black. Pure black under white text
+         * causes halation, where the text appears to bleed and letters read as
+         * blurred, so Material recommends a dark grey instead. Text is
+         * off-white for the same reason.
+         *
+         * These override only inside the lab; the shipped tokens are untouched.
+         * They apply in light too but are dark-shaped, so the lab is dark-first
+         * until the palette is settled.
+         */
+        ['--layer-page' as string]: '16 18 21',
+        ['--layer-surface' as string]: '28 30 33',
+        ['--layer-overlay' as string]: '35 37 40',
+        ['--layer-elevated' as string]: '45 46 49',
+        ['--layer-border' as string]: '48 50 54',
+        ['--layer-border-subtle' as string]: '35 37 40',
+        ['--foreground' as string]: '232 234 237',
+        ['--muted-foreground' as string]: '154 160 166',
+      } as React.CSSProperties}
+    >
 
       <ImportHistoryPrompt />
 
