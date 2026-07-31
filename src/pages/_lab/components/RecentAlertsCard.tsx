@@ -40,12 +40,41 @@ function compactAgo(ts: string): string {
 }
 
 export default function RecentAlertsCard({ alerts, onOpen, onAcknowledge, loading }: RecentAlertsCardProps) {
-  const visible = alerts.slice(0, MAX_VISIBLE);
-  const hasMore = alerts.length > MAX_VISIBLE;
-  const criticalCount = visible.filter(a => normalizeSeverityStr(a.severity) === 'danger').length;
+  /**
+   * Collapse repeats of the same pattern into one row carrying a count.
+   *
+   * The same detector firing twice on the same condition produced two
+   * identical rows minutes apart, which reads as a bug and spends a row
+   * saying nothing new. Repeats keep the newest timestamp, and count as
+   * unreviewed if any occurrence is.
+   *
+   * Danger sorts above caution, because a feed ordered purely by time buries
+   * the thing that matters under the thing that is recent.
+   */
+  const grouped = (() => {
+    const byPattern = new Map<string, { alert: typeof alerts[number]; count: number }>();
+    for (const a of alerts) {
+      const hit = byPattern.get(a.pattern);
+      if (!hit) { byPattern.set(a.pattern, { alert: a, count: 1 }); continue; }
+      hit.count += 1;
+      if (!a.acknowledged) hit.alert = { ...hit.alert, acknowledged: false };
+      if (new Date(a.timestamp) > new Date(hit.alert.timestamp)) {
+        hit.alert = { ...a, acknowledged: hit.alert.acknowledged };
+      }
+    }
+    const rank = (a: typeof alerts[number]) => (normalizeSeverityStr(a.severity) === 'danger' ? 0 : 1);
+    return [...byPattern.values()].sort((x, y) =>
+      rank(x.alert) - rank(y.alert) ||
+      new Date(y.alert.timestamp).getTime() - new Date(x.alert.timestamp).getTime(),
+    );
+  })();
+
+  const visible = grouped.slice(0, MAX_VISIBLE);
+  const hasMore = grouped.length > MAX_VISIBLE;
+  const criticalCount = visible.filter(g => normalizeSeverityStr(g.alert.severity) === 'danger').length;
 
   return (
-    <section className="desk-card overflow-hidden">
+    <section className="rounded-lg border border-border bg-card overflow-hidden">
       <div className="card-head">
         <div className="flex items-center gap-2.5">
           <Bell className="h-3.5 w-3.5 text-loss" strokeWidth={2} />
@@ -85,7 +114,7 @@ export default function RecentAlertsCard({ alerts, onOpen, onAcknowledge, loadin
         </div>
       ) : (
         <div className="divide-y divide-border">
-          {visible.map(alert => {
+          {visible.map(({ alert, count }) => {
             const sev = normalizeSeverityStr(alert.severity);
             const isCritical = sev === 'danger';
             const isWarn = sev === 'caution';
@@ -117,6 +146,11 @@ export default function RecentAlertsCard({ alerts, onOpen, onAcknowledge, loadin
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2 flex-wrap">
                       <span className="text-[14px] font-semibold text-foreground tracking-tight">{alert.pattern}</span>
+                      {count > 1 && (
+                        <span className="text-[10px] font-semibold text-muted-foreground font-tabular bg-muted px-1.5 py-0.5 rounded" title={`Fired ${count} times today`}>
+                          {count}×
+                        </span>
+                      )}
                       <span className={cn(
                         'text-[9.5px] font-bold uppercase tracking-wider px-1.5 py-0.5 rounded',
                         isCritical ? 'bg-loss/10 text-loss' : isWarn ? 'bg-warning/10 text-warning' : 'bg-primary/10 text-primary',
@@ -130,7 +164,10 @@ export default function RecentAlertsCard({ alerts, onOpen, onAcknowledge, loadin
                         {compactAgo(alert.timestamp)}
                       </span>
                     </div>
-                    <p className="text-[12.5px] text-muted-foreground mt-1 leading-relaxed line-clamp-2">{alert.description}</p>
+                    {/* One line, not two. The full text lives in the detail
+                        sheet a click away; two wrapped lines per row turned
+                        four alerts into a screenful. */}
+                    <p className="text-[12.5px] text-muted-foreground mt-0.5 leading-snug truncate">{alert.description}</p>
                   </div>
                 </div>
               </div>
@@ -141,7 +178,7 @@ export default function RecentAlertsCard({ alerts, onOpen, onAcknowledge, loadin
 
       {hasMore && (
         <Link to="/alerts" className="flex items-center justify-center gap-1.5 px-6 py-2.5 border-t border-border text-[11px] font-medium text-primary hover:bg-muted/40 transition-colors uppercase tracking-wider">
-          View {alerts.length - MAX_VISIBLE} more <ArrowRight className="h-3 w-3" />
+          View {grouped.length - MAX_VISIBLE} more <ArrowRight className="h-3 w-3" />
         </Link>
       )}
     </section>

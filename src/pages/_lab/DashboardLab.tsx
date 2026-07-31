@@ -11,7 +11,7 @@
 import { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Link } from 'react-router-dom';
-import { Loader2, AlertTriangle, RefreshCw, X } from 'lucide-react';
+import { Loader2, AlertTriangle, RefreshCw, X, ChevronDown } from 'lucide-react';
 import BrokerGate from '@/components/BrokerGate';
 import ErrorState from '@/components/ErrorState';
 import { Input } from '@/components/ui/input';
@@ -86,7 +86,7 @@ export default function DashboardLab() {
   const [selectedTrade, setSelectedTrade] = useState<PositionWithExtras | CompletedTrade | null>(null);
   const [selectedType, setSelectedType] = useState<'position' | 'closed'>('position');
 
-  const [posTab, setPosTab] = useState<'open' | 'closed'>('open');
+  const [closedOpen, setClosedOpen] = useState(false);
   const [showCapitalPrompt, setShowCapitalPrompt] = useState(false);
   const [capitalInput, setCapitalInput] = useState('');
   const [capitalSaving, setCapitalSaving] = useState(false);
@@ -443,6 +443,13 @@ export default function DashboardLab() {
     new Date(t.exit_time) >= getLastSessionStartUTC() && !journaledIds.has(t.id)
   ).length;
 
+  // How many closed round-trips still have no journal entry. This is the only
+  // pending action on the screen and it was invisible until a row was opened.
+  const closedUnjournalled = useMemo(
+    () => recentTrades.filter(t => !journaledIds.has(t.id)).length,
+    [recentTrades, journaledIds],
+  );
+
   const unrealizedTotal = useMemo(() =>
     positions.reduce((s, p) => {
       if (p.last_price) {
@@ -588,52 +595,56 @@ export default function DashboardLab() {
           />
         </div>
 
-        {/* Positions as one recessed WELL with a tab switcher, rather than two
-            stacked cards or two runs of bare rows. A well is the third option:
-            the region is defined by a background one step down from the page
-            plus a hairline, so it reads as contained data without a card's
-            border-and-padding tax -- and folding Open and Closed into a single
-            switchable region removes a whole block of vertical space. */}
-        <section className="rounded-lg border border-border bg-muted/30 overflow-hidden">
-          {/* Tabs only below lg. A tab hides half the data, and open positions
-              are the live thing -- putting them behind a click during a session
-              is the wrong trade. At desktop both show side by side, which also
-              spends the horizontal space that otherwise reads as stretched. */}
-          <div className="flex items-center justify-between gap-3 px-2 pt-2 lg:hidden">
-            <div className="inline-flex rounded-md bg-background/60 p-0.5">
-              {([['open', `Open · ${positions.length}`], ['closed', `Closed · ${recentTrades.length}`]] as const).map(([id, label]) => (
-                <button
-                  key={id}
-                  onClick={() => setPosTab(id as 'open' | 'closed')}
-                  className={cn(
-                    'px-3 h-7 rounded text-[12px] font-medium transition-colors duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring',
-                    posTab === id ? 'bg-card text-foreground shadow-sm' : 'text-muted-foreground hover:text-foreground',
-                  )}
-                >
-                  {label}
-                </button>
-              ))}
-            </div>
-          </div>
+        {/* Open above, closed below and collapsed until asked for. Open
+            positions are live and always want to be visible; closed trades are
+            reference, so they cost a click rather than a screenful. Both
+            headers surface how many entries are still unjournalled, because
+            that is the one pending action on this screen and it was invisible
+            until you opened a row. */}
+        <section className="rounded-lg border border-border overflow-hidden bg-card">
+          {positionsError && !positionsLoading && positions.length === 0 ? (
+            <ErrorState error={{ response: { status: 500 } }} message={positionsError} onRetry={fetchPositions} compact />
+          ) : (
+            <OpenPositionsTable
+              positions={positions}
+              isLoading={positionsLoading}
+              journaledIds={journaledIds}
+              onPositionClick={handlePositionClick}
+              pricesConnected={wsConnected}
+              lastPriceAt={lastLtpAt}
+              tokenExpired={isTokenExpired}
+            />
+          )}
+        </section>
 
-          {/* desktop: both, side by side */}
-          <div className="hidden lg:grid grid-cols-2 divide-x divide-border bg-card">
-            <div className="min-w-0">
-              {positionsError && !positionsLoading && positions.length === 0 ? (
-                <ErrorState error={{ response: { status: 500 } }} message={positionsError} onRetry={fetchPositions} compact />
-              ) : (
-                <OpenPositionsTable
-                  positions={positions}
-                  isLoading={positionsLoading}
-                  journaledIds={journaledIds}
-                  onPositionClick={handlePositionClick}
-                  pricesConnected={wsConnected}
-                  lastPriceAt={lastLtpAt}
-                  tokenExpired={isTokenExpired}
-                />
+        <section className="rounded-lg border border-border overflow-hidden bg-card">
+          <button
+            type="button"
+            onClick={() => setClosedOpen(v => !v)}
+            aria-expanded={closedOpen}
+            className="w-full card-head hover:bg-muted/40 transition-colors duration-150 focus-visible:outline-none focus-visible:bg-muted/40"
+          >
+            <span className="flex items-center gap-2.5 min-w-0">
+              <span className="t-label">Closed positions</span>
+              <span className="text-[11px] text-muted-foreground font-tabular">
+                · {recentTrades.length} trade{recentTrades.length !== 1 ? 's' : ''}
+              </span>
+              {closedUnjournalled > 0 && (
+                <span className="inline-flex items-center gap-1 text-[10px] font-semibold uppercase tracking-wider text-primary bg-primary/10 px-1.5 py-0.5 rounded">
+                  {closedUnjournalled} to journal
+                </span>
               )}
-            </div>
-            <div className="min-w-0">
+            </span>
+            <span className="flex items-center gap-2.5 shrink-0">
+              <span className={cn('text-[13px] font-semibold font-tabular', realizedPnlDisplay >= 0 ? 'text-profit' : 'text-loss')}>
+                {formatCurrencyWithSign(realizedPnlDisplay)}
+              </span>
+              <ChevronDown className={cn('h-4 w-4 text-muted-foreground transition-transform duration-200', closedOpen && 'rotate-180')} />
+            </span>
+          </button>
+
+          {closedOpen && (
+            <div className="border-t border-border animate-accordion-down">
               {tradesError && !tradesLoading && closedTrades.length === 0 ? (
                 <ErrorState error={{ response: { status: 500 } }} message={tradesError} onRetry={fetchTrades} compact />
               ) : (
@@ -645,35 +656,7 @@ export default function DashboardLab() {
                 />
               )}
             </div>
-          </div>
-
-          {/* below lg: one at a time */}
-          <div className="mt-2 bg-card border-t border-border lg:hidden">
-            {posTab === 'open' ? (
-              positionsError && !positionsLoading && positions.length === 0 ? (
-                <ErrorState error={{ response: { status: 500 } }} message={positionsError} onRetry={fetchPositions} compact />
-              ) : (
-                <OpenPositionsTable
-                  positions={positions}
-                  isLoading={positionsLoading}
-                  journaledIds={journaledIds}
-                  onPositionClick={handlePositionClick}
-                  pricesConnected={wsConnected}
-                  lastPriceAt={lastLtpAt}
-                  tokenExpired={isTokenExpired}
-                />
-              )
-            ) : tradesError && !tradesLoading && closedTrades.length === 0 ? (
-              <ErrorState error={{ response: { status: 500 } }} message={tradesError} onRetry={fetchTrades} compact />
-            ) : (
-              <ClosedPositionsCard
-                sinceIso={getLastSessionStartUTC().toISOString()}
-                roundTrips={recentTrades}
-                journaledIds={journaledIds}
-                onTradeClick={handleTradeClick}
-              />
-            )}
-          </div>
+          )}
         </section>
       </div>
 
