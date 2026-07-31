@@ -99,7 +99,7 @@ describe('Analytics tab render smoke (demo data, backend-shaped)', () => {
   it('SessionsTab renders calendar, opening/expiry cards and expiry comparison without NaN', async () => {
     const { container } = renderWithRouter(<SessionsTab days={30} />);
 
-    expect(await screen.findByText('3-Month P&L Calendar')).toBeInTheDocument();
+    expect(await screen.findByText(/P&L Calendar$/)).toBeInTheDocument();
 
     // conditions[] driven cards
     expect(screen.getByText('Opening 30 Minutes (9:15–9:45)')).toBeInTheDocument();
@@ -118,8 +118,8 @@ describe('Analytics tab render smoke (demo data, backend-shaped)', () => {
     expect(screen.getByText('High (7–8)')).toBeInTheDocument();
     expect(screen.getByText('Low (0–4)')).toBeInTheDocument();
 
-    expect(screen.getByText('Best 5 Trades')).toBeInTheDocument();
-    expect(screen.getByText('Worst 5 Trades')).toBeInTheDocument();
+    expect(screen.getByText(/^Best \d+ Trades?$/)).toBeInTheDocument();
+    expect(screen.getByText(/^Worst \d+ Trades?$/)).toBeInTheDocument();
     expect(screen.getByText('Trade Log')).toBeInTheDocument();
     expect(screen.getByText('Hold Time vs Performance')).toBeInTheDocument();
     expect(screen.getByText('Risk : Reward')).toBeInTheDocument();

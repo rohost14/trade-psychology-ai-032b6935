@@ -89,7 +89,12 @@ export default function HabitsTab({ days }: { days: number }) {
         </div>
         <p className="text-sm font-semibold text-foreground">Habits unlock after {data.min_sample ?? 5} completed trades</p>
         <p className="text-xs text-muted-foreground mt-1">
-          You have {data.sample}. Import your Console tradebook (Settings → or the banner on Dashboard) to see them straight away.
+          {/* `sample` is declared required but arrives undefined whenever the
+              response is partial, which printed the sentence "You have ." to
+              the user. State the count only when there is one. */}
+          {typeof data.sample === 'number' ? `You have ${data.sample} so far. ` : ''}
+          Import your Console tradebook from Settings, or use the banner on the
+          Dashboard, to see them straight away.
         </p>
       </div>
     );

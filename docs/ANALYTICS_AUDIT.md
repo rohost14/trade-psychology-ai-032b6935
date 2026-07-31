@@ -20,13 +20,26 @@ Fix order should be **P0 → P2 → P1**: correctness first, then the structural
 
 | # | Finding | Evidence |
 |---|---|---|
-| **P0-1** | **Two charts on Edge render completely empty** — axes and gridlines paint, zero bars. "Day of Week" and "Position Size vs Performance". Their own captions underneath state the values (`Wed is your best trading day (+₹1,950.00 avg per trade · 67% WR)`), so **the data is present and only the series fails to draw.** | `EdgeTab.tsx:376,407,437` |
+| ~~**P0-1**~~ | ~~Two charts on Edge render completely empty.~~ **RETRACTED 2026-08-01 — not a bug.** See "Retracted" below. | — |
 | **P0-2** | **Habits prints a broken sentence:** `You have . Import your Console tradebook (Settings → or the banner on Dashboard) to see them straight away.` `{data.sample}` resolves empty, and the parenthetical is malformed — the arrow points at nothing. | `HabitsTab.tsx:92` |
 | **P0-3** | **Habits gate contradicts the page.** Habits says *"unlock after 5 completed trades"* while the KPI strip on Overview reports **15 trades** for the same period. Two components disagree about the same fact on one screen. | `HabitsTab.tsx` vs `OverviewTab.tsx` |
 | **P0-4** | **"Worst 5 Trades" renders 4 rows.** The heading is a hardcoded string; the list is `.slice(0, 5)` over whatever exists. Any short list makes the heading a false statement. Same pattern in "Best 5 Trades". | `TradeDnaTab.tsx:153,158,219,250` |
 | **P0-5** | **The 3-month calendar ignores the period selector.** It builds its own three months regardless of 7D/30D/90D, so changing the period visibly does nothing to it. Two of the three months render entirely empty. | `SessionsTab.tsx:81–100` |
 
-**P0-1 is the serious one.** A chart that draws its frame and no data is worse than no chart: it reads as "you have no trades" when the caption directly below says otherwise. The existing smoke test passes because it only asserts headers render and no `NaN` appears — it never asserts that a series drew. That test gap is why this shipped.
+### Retracted: P0-1
+
+**P0-1 was a measurement error, not a defect.** On a clean load, all three Edge charts render their bars correctly.
+
+What happened: recharts animates bars from zero height on mount, over roughly 1.5s. The screenshot was taken immediately after clicking the Edge tab, catching every bar at zero height. The captions underneath are plain text, so they painted instantly — which produced the convincing but false impression of "data present, series missing."
+
+Two follow-on errors made it worse rather than catching it:
+
+- DOM probing looked at `.recharts-bar-rectangle`, which is an empty `<g>` **even on charts that render correctly** — Overview's working Daily P&L reports zero shapes by the same selector. That reading was worthless in both directions and should have been discarded, not built on.
+- Dispatching a synthetic `window.resize` to "test re-layout" mutated the page state mid-diagnosis, so later readings described a page the user would never see.
+
+Worth keeping as a lesson: a first screenshot after a tab switch is not evidence about animated content, and a selector that reports "broken" for a component you can see working is a broken selector, not a broken component. The claimed smoke-test gap ("never asserts a series drew") was downstream of this error and is also withdrawn.
+
+**The remaining four P0s were verified in both code and rendered output and stand as written.**
 
 ---
 

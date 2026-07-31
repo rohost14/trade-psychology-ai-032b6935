@@ -11,7 +11,7 @@ import {
   DEMO_RISK_SCORE, DEMO_CRITICAL_TRADES, DEMO_EDGE_CONFIDENCE,
   DEMO_CONDITIONAL_PERFORMANCE, DEMO_OPTIONS_BEHAVIOR, DEMO_BEHAVIORAL_ANALYSIS,
   DEMO_PNL_PERCENT, DEMO_BTST, DEMO_PNL_ATTRIBUTION, DEMO_QUALITY_BREAKDOWN,
-  DEMO_INSTRUMENT_NIFTY, DEMO_EDGE_LEAK, DEMO_STRATEGY_PERFORMANCE,
+  DEMO_INSTRUMENT_NIFTY, DEMO_EDGE_LEAK, DEMO_STRATEGY_PERFORMANCE, DEMO_HABITS,
 } from './demoData';
 
 export const GUEST_MODE_KEY = 'tradementor_guest_mode';
@@ -80,6 +80,7 @@ export function getGuestResponse(url: string, method = 'GET'): unknown | undefin
 
   // Analytics
   if (path === '/api/analytics/overview') return DEMO_OVERVIEW;
+  if (path === '/api/analytics/habits') return DEMO_HABITS;
   if (path === '/api/analytics/performance') return DEMO_PERFORMANCE;
   if (path === '/api/analytics/timing-heatmap') return DEMO_TIMING_HEATMAP;
   if (path === '/api/analytics/progress') return DEMO_PROGRESS;

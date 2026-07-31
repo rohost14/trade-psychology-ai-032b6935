@@ -216,7 +216,7 @@ export default function TradeDnaTab({ days }: TradeDnaTabProps) {
             <div className="tm-card overflow-hidden">
               <div className="px-5 py-3.5 border-b border-border flex items-center gap-2">
                 <TrendingDown className="h-4 w-4 text-tm-loss" />
-                <p className="font-semibold text-sm">Worst 5 Trades</p>
+                <p className="font-semibold text-sm">Worst {worst5.length} {worst5.length === 1 ? 'Trade' : 'Trades'}</p>
               </div>
               <div className="divide-y divide-border">
                 {worst5.map(t => (
@@ -247,7 +247,7 @@ export default function TradeDnaTab({ days }: TradeDnaTabProps) {
             <div className="tm-card overflow-hidden">
               <div className="px-5 py-3.5 border-b border-border flex items-center gap-2">
                 <TrendingUp className="h-4 w-4 text-tm-profit" />
-                <p className="font-semibold text-sm">Best 5 Trades</p>
+                <p className="font-semibold text-sm">Best {best5.length} {best5.length === 1 ? 'Trade' : 'Trades'}</p>
               </div>
               <div className="divide-y divide-border">
                 {best5.map(t => (

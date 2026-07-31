@@ -68,10 +68,24 @@ function calendarBg(pnl: number, trades: number) {
   return `rgba(220,38,38,${0.1 + intensity * 0.45})`;
 }
 
-const MONTHS_TO_SHOW = 3;
+/**
+ * How many calendar months the selected period actually touches.
+ *
+ * The calendar used to render a fixed three months whatever the page's
+ * 7D/30D/90D selector said, so changing the period visibly did nothing to it
+ * and two of the three months were always empty. Deriving the span from `days`
+ * keeps the control honest: the calendar now shows the months the period
+ * covers and no more.
+ */
+function monthsForPeriod(days: number): number {
+  const today = new Date();
+  const start = new Date(today.getFullYear(), today.getMonth(), today.getDate() - Math.max(0, days - 1));
+  const span = (today.getFullYear() - start.getFullYear()) * 12 + (today.getMonth() - start.getMonth()) + 1;
+  return Math.max(1, span);
+}
 const DOW_ORDER = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri'];
 
-function buildCalendar(dailyPnl: OverviewData['daily_pnl']) {
+function buildCalendar(dailyPnl: OverviewData['daily_pnl'], monthsToShow: number) {
   const byDate: Record<string, { pnl: number; trades: number }> = {};
   for (const d of dailyPnl) {
     byDate[d.date.slice(0, 10)] = { pnl: d.pnl, trades: d.trades };
@@ -80,7 +94,7 @@ function buildCalendar(dailyPnl: OverviewData['daily_pnl']) {
   const today  = new Date();
   const months: { year: number; month: number; days: { date: string; pnl: number; trades: number; isWeekend: boolean }[] }[] = [];
 
-  for (let mo = MONTHS_TO_SHOW - 1; mo >= 0; mo--) {
+  for (let mo = monthsToShow - 1; mo >= 0; mo--) {
     const d = new Date(today.getFullYear(), today.getMonth() - mo, 1);
     const year = d.getFullYear();
     const month = d.getMonth();
@@ -211,7 +225,7 @@ export default function SessionsTab({ days }: SessionsTabProps) {
 
   if (error) return <ErrorState error={error} onRetry={() => setRetry(r => r + 1)} />;
 
-  const calendarMonths = overview?.daily_pnl ? buildCalendar(overview.daily_pnl) : [];
+  const calendarMonths = overview?.daily_pnl ? buildCalendar(overview.daily_pnl, monthsForPeriod(days)) : [];
   // conditional-performance returns a `conditions` ARRAY keyed by `key` —
   // pick the two session-relevant ones (absent when below the sample gate).
   const conditions = conditional?.has_data ? (conditional.conditions ?? []) : [];
@@ -237,7 +251,9 @@ export default function SessionsTab({ days }: SessionsTabProps) {
       {calendarMonths.length > 0 && (
         <div>
           <div className="flex items-center justify-between mb-3">
-            <p className="font-semibold text-sm">3-Month P&L Calendar</p>
+            <p className="font-semibold text-sm">
+              {calendarMonths.length === 1 ? 'P&L Calendar' : `${calendarMonths.length}-Month P&L Calendar`}
+            </p>
             <div className="flex items-center gap-3 text-[10px] text-muted-foreground">
               <div className="flex items-center gap-1"><div className="w-3 h-3 rounded-sm" style={{ backgroundColor: 'rgba(22,163,74,0.5)' }} /> Profit</div>
               <div className="flex items-center gap-1"><div className="w-3 h-3 rounded-sm" style={{ backgroundColor: 'rgba(220,38,38,0.5)' }} /> Loss</div>

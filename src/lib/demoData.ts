@@ -1049,3 +1049,54 @@ export const DEMO_BEHAVIORAL_ANALYSIS = {
   total_behavioral_cost: 45840,
   clean_days_pct: 52,
 };
+
+// ---------------------------------------------------------------------------
+// Analytics: habits
+// ---------------------------------------------------------------------------
+// Mirrors GET /api/analytics/habits. Added because there was no fixture at all,
+// so guest mode fell through to the `{}` catch-all: `has_data` read undefined,
+// the tab rendered its locked state permanently, and it announced a 5-trade
+// unlock gate directly beneath an Overview reporting 15 trades for the same
+// period. Numbers below are consistent with DEMO_OVERVIEW / DEMO_PERFORMANCE.
+export const DEMO_HABITS = {
+  has_data: true,
+  sample: 15,
+  min_sample: 5,
+  by_hour: [
+    { label: '09:00', trades: 5, pnl: 5100,   win_rate: 80 },
+    { label: '10:00', trades: 3, pnl: 1450,   win_rate: 67 },
+    { label: '11:00', trades: 3, pnl: 5210,   win_rate: 33 },
+    { label: '13:00', trades: 1, pnl: -2700,  win_rate: 0  },
+    { label: '14:00', trades: 3, pnl: -14270, win_rate: 0  },
+  ],
+  by_day_of_week: [
+    { label: 'Mon', trades: 3, pnl: 4200,  win_rate: 67 },
+    { label: 'Tue', trades: 4, pnl: 6350,  win_rate: 75 },
+    { label: 'Wed', trades: 3, pnl: 5850,  win_rate: 67 },
+    { label: 'Thu', trades: 4, pnl: -7410, win_rate: 25 },
+    { label: 'Fri', trades: 1, pnl: -1000, win_rate: 0  },
+  ],
+  by_instrument: [
+    { label: 'FORTIS',    trades: 2, pnl: 11770, win_rate: 100 },
+    { label: 'BANKNIFTY', trades: 3, pnl: 3990,  win_rate: 67  },
+    { label: 'NIFTY',     trades: 7, pnl: 925,   win_rate: 57  },
+    { label: 'SENSEX',    trades: 1, pnl: -1700, win_rate: 0   },
+    { label: 'SOLARINDS', trades: 2, pnl: -6500, win_rate: 50  },
+  ],
+  after_loss_size: {
+    overall_avg_notional: 186_000,
+    after_loss_avg_notional: 244_000,
+    ratio: 1.31,
+    after_loss_count: 6,
+    min_bucket: 3,
+  },
+  summary: {
+    total_trades: 15,
+    gross_pnl: 7990,
+    win_rate: 60,
+    worst_hour: '14:00',
+    best_hour: '09:00',
+    worst_instrument: 'SOLARINDS',
+    best_instrument: 'FORTIS',
+  },
+};
