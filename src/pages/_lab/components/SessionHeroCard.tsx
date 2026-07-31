@@ -62,74 +62,84 @@ export function SessionHeroCard({
 
   return (
     /**
-     * A COLOUR FIELD, not a card.
+     * Colour as an ACCENT, not a field.
      *
-     * The screen was grey with small green and red numerals on it, and the
-     * brand colour appeared as a 6px dot. That is not restraint, it is
-     * absence. One saturated region anchors the page and everything below it
-     * stays quiet -- which is how calm products get personality without
-     * becoming casinos.
+     * The previous pass made this a saturated pine slab with white text, which
+     * read as a promotional banner rather than an instrument -- a marketing
+     * hero dropped into a data screen. Wrong intensity, right instinct.
      *
-     * Depth here comes from figure/ground and scale contrast rather than from
-     * a border: a deep pine field, paper-coloured text on it, the figure at
-     * 44px against 10px labels, and the stat rail sitting in a darker inset
-     * band rather than a row of boxes.
+     * Personality comes from three cheap things instead: a 2px brand rule along
+     * the top edge, the figure carried at 44px in its own semantic colour so
+     * the number itself is the hero, and a recessed stat band. Small coloured
+     * area, high impact, nothing shouting.
      */
-    <section className="rounded-lg overflow-hidden bg-tm-brand text-white">
-      {/* field header */}
-      <div className="flex items-center justify-between gap-3 px-4 sm:px-6 h-11 border-b border-white/10">
-        <span className="text-[11px] font-medium uppercase tracking-[0.12em] text-white/70 flex items-center gap-2">
+    <section className="desk-card overflow-hidden">
+      <span aria-hidden className="block h-[2px] bg-tm-brand" />
+
+      <div className="card-head">
+        <span className="t-label flex items-center gap-2">
           Day P&amp;L
-          <span className="h-1.5 w-1.5 rounded-full bg-white/60 animate-pulse" />
+          <span className={cn('h-1.5 w-1.5 rounded-full animate-pulse', pnlPositive ? 'bg-profit' : 'bg-loss')} />
         </span>
         <button
           type="button"
           onClick={() => setOpen(v => !v)}
           aria-expanded={open}
-          className="shrink-0 inline-flex items-center gap-1.5 rounded-md border border-white/20 px-2.5 py-1.5 text-[11px] font-medium text-white/80 transition-colors duration-150 hover:bg-white/10 hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/40"
+          className="shrink-0 inline-flex items-center gap-1.5 rounded-md border border-border px-2.5 py-1.5 text-[11px] font-medium text-muted-foreground transition-colors duration-150 hover:text-foreground hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
         >
           {open ? 'Hide read' : "Today's read"}
           <ChevronDown className={cn('h-3.5 w-3.5 transition-transform duration-200', open && 'rotate-180')} />
         </button>
       </div>
 
-      {/* the figure. Scale does the hierarchy: 44px against 10px labels. */}
+      {/* Scale does the hierarchy: 44px against 10px labels. The figure carries
+          its own direction colour, so up and down are legible before reading. */}
       <div className="px-4 sm:px-6 py-5">
-        <span className="font-display text-[44px] sm:text-[52px] leading-none font-semibold tracking-tight font-tabular text-white block">
+        <span className={cn(
+          'font-display text-[44px] leading-none font-semibold tracking-tight font-tabular block',
+          pnlPositive ? 'text-profit' : 'text-loss',
+        )}>
           {pnlPositive ? '+' : '−'}₹{inr(animatedPnl)}
         </span>
-        <p className="mt-2 text-[12.5px] font-tabular text-white/70">
-          Booked {realizedPnlDisplay >= 0 ? '+' : '−'}₹{inr(realizedPnlDisplay)}
-          <span className="text-white/30"> · </span>
-          Unrealized {unrealizedTotal !== 0 ? `${unrealizedTotal >= 0 ? '+' : '−'}₹${inr(unrealizedTotal)}` : 'nothing open'}
+        <p className="mt-2 text-[12.5px] font-tabular text-muted-foreground">
+          Booked{' '}
+          <span className={realizedPnlDisplay >= 0 ? 'text-profit' : 'text-loss'}>
+            {realizedPnlDisplay >= 0 ? '+' : '−'}₹{inr(realizedPnlDisplay)}
+          </span>
+          <span className="text-muted-foreground/40"> · </span>
+          Unrealized{' '}
+          <span className={unrealizedTotal > 0 ? 'text-profit' : unrealizedTotal < 0 ? 'text-loss' : ''}>
+            {unrealizedTotal !== 0 ? `${unrealizedTotal >= 0 ? '+' : '−'}₹${inr(unrealizedTotal)}` : 'nothing open'}
+          </span>
         </p>
       </div>
 
-      {/* inset band — darker than the field, so the rail reads as recessed
-          rather than as four more boxes stacked on top */}
-      <div className="grid grid-cols-2 sm:grid-cols-4 bg-black/15 border-t border-white/10">
+      {/* Recessed band rather than four more boxes. One step down from the
+          card gives the depth a border cannot. */}
+      <div className="grid grid-cols-2 sm:grid-cols-4 bg-muted/40 border-t border-border">
         {stats.map((s, i) => (
           <div
             key={s.label}
             className={cn(
               'px-4 sm:px-5 py-3',
-              i > 0 && 'border-l border-white/10',
-              i === 2 && 'border-l-0 sm:border-l',
-              i >= 2 && 'border-t border-white/10 sm:border-t-0',
+              i > 0 && 'sm:border-l border-border',
+              i === 1 && 'border-l border-border',
+              i >= 2 && 'border-t sm:border-t-0 border-border',
+              i === 3 && 'border-l border-border',
             )}
           >
-            <span className="text-[10px] uppercase tracking-wider font-medium text-white/55">{s.label}</span>
+            <span className="text-[10px] uppercase tracking-wider font-medium text-muted-foreground">{s.label}</span>
             <div className="mt-1 flex items-baseline gap-1.5">
-              <span className="text-[17px] font-semibold font-tabular tracking-tight text-white">{s.value}</span>
-              {s.unit && <span className="text-[10.5px] text-white/50 font-tabular truncate">{s.unit}</span>}
+              <span className={cn('text-[17px] font-semibold font-tabular tracking-tight', s.tone)}>{s.value}</span>
+              {s.unit && <span className="text-[10.5px] text-muted-foreground font-tabular truncate">{s.unit}</span>}
             </div>
           </div>
         ))}
       </div>
 
       {open && (
-        <div className="animate-accordion-down border-t border-white/10 bg-black/10">
-          <p className="px-4 sm:px-6 py-3 text-[12.5px] leading-snug text-white/75">
+        <div className="animate-accordion-down border-t border-border">
+          <p className="px-4 sm:px-6 py-3 text-[12.5px] leading-snug text-muted-foreground">
             {lossPct >= 80
               ? "Most of today's loss budget is already spent."
               : paceRatio >= 1.5
