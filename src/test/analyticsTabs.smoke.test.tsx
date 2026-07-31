@@ -14,6 +14,7 @@
 import { describe, it, expect, vi } from 'vitest';
 import { render, screen } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
+import { BrokerProvider } from '@/contexts/BrokerContext';
 
 import { getGuestResponse } from '@/lib/guestMode';
 
@@ -27,6 +28,11 @@ vi.mock('@/lib/api', () => ({
     delete: () => Promise.resolve({ data: { success: true } }),
   },
   apiDetailString: (_detail: unknown, fallback: string) => fallback,
+  // BrokerProvider (added to the harness below) reads these two. A partial
+  // module mock is not a partial module — anything the tree imports from
+  // '@/lib/api' has to exist here or the import throws at render.
+  AUTH_TOKEN_KEY: 'tradementor_token',
+  getAuthToken: () => null,
 }));
 
 import OverviewTab from '@/components/analytics/OverviewTab';
@@ -38,8 +44,15 @@ import ReportCard from '@/components/analytics/ReportCard';
 import EdgeLeakCard from '@/components/analytics/EdgeLeakCard';
 import StrategyCard from '@/components/analytics/StrategyCard';
 
+// BrokerProvider as well as the router: BehaviorTab reaches useBroker through a
+// child, and useBroker throws outside a provider rather than degrading. Without
+// it the smoke test fails on the harness rather than on the component.
 function renderWithRouter(ui: React.ReactElement) {
-  return render(<MemoryRouter>{ui}</MemoryRouter>);
+  return render(
+    <MemoryRouter>
+      <BrokerProvider>{ui}</BrokerProvider>
+    </MemoryRouter>,
+  );
 }
 
 describe('Analytics tab render smoke (demo data, backend-shaped)', () => {

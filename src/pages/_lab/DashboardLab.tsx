@@ -15,7 +15,7 @@ import { Loader2, AlertTriangle, RefreshCw, X, ChevronDown } from 'lucide-react'
 import BrokerGate from '@/components/BrokerGate';
 import ErrorState from '@/components/ErrorState';
 import { Input } from '@/components/ui/input';
-import { SetupNudgeCard } from './components/SetupNudgeCard';
+import { SetupNudgeCard } from '@/components/dashboard/SetupNudgeCard';
 import { MarketRail } from './components/MarketRail';
 import ImportHistoryPrompt from '@/components/onboarding/ImportHistoryPrompt';
 import RecentAlertsCard from './components/RecentAlertsCard';
@@ -601,7 +601,7 @@ export default function DashboardLab() {
             headers surface how many entries are still unjournalled, because
             that is the one pending action on this screen and it was invisible
             until you opened a row. */}
-        <section className="rounded-lg border border-border overflow-hidden bg-card">
+        <section className="desk-card overflow-hidden">
           {positionsError && !positionsLoading && positions.length === 0 ? (
             <ErrorState error={{ response: { status: 500 } }} message={positionsError} onRetry={fetchPositions} compact />
           ) : (
@@ -617,7 +617,7 @@ export default function DashboardLab() {
           )}
         </section>
 
-        <section className="rounded-lg border border-border overflow-hidden bg-card">
+        <section className="desk-card overflow-hidden">
           <button
             type="button"
             onClick={() => setClosedOpen(v => !v)}
