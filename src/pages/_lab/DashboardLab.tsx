@@ -113,11 +113,11 @@ export default function DashboardLab() {
    */
   const SHELLS = {
     card:    'rounded-lg border border-border bg-card overflow-hidden',
-    inset:   'rounded-lg bg-card overflow-hidden shadow-sm',
-    lifted:  'rounded-lg bg-card overflow-hidden shadow-[0_2px_8px_rgba(0,0,0,0.08),0_8px_24px_rgba(0,0,0,0.06)]',
-    edgelit: 'rounded-lg bg-card overflow-hidden shadow-[inset_0_1px_0_rgba(255,255,255,0.08),0_1px_3px_rgba(0,0,0,0.10),0_6px_16px_rgba(0,0,0,0.06)]',
-    accent:  'rounded-lg bg-card overflow-hidden shadow-sm border-t-2 border-t-primary',
-    layered: 'rounded-lg bg-card overflow-hidden shadow-sm [&>*:first-child]:bg-muted/50 [&>button:first-child]:bg-muted/50',
+    inset:   'rounded-lg bg-card overflow-hidden shadow-sm dark:shadow-none dark:ring-1 dark:ring-white/[0.07]',
+    lifted:  'rounded-lg bg-card overflow-hidden shadow-[0_2px_8px_rgba(0,0,0,0.08),0_8px_24px_rgba(0,0,0,0.06)] dark:shadow-[0_2px_12px_rgba(0,0,0,0.5)] dark:ring-1 dark:ring-white/[0.09]',
+    edgelit: 'rounded-lg bg-card overflow-hidden shadow-[inset_0_1px_0_rgba(255,255,255,0.08),0_1px_3px_rgba(0,0,0,0.10)] dark:shadow-[inset_0_1px_0_rgba(255,255,255,0.10)] dark:ring-1 dark:ring-white/[0.06]',
+    accent:  'rounded-lg bg-card overflow-hidden shadow-sm border-t-2 border-t-primary dark:shadow-none dark:ring-1 dark:ring-white/[0.07]',
+    layered: 'rounded-lg bg-card overflow-hidden shadow-sm dark:shadow-none dark:ring-1 dark:ring-white/[0.07] [&>*:first-child]:bg-muted/50 [&>button:first-child]:bg-muted/50',
   } as const;
   const [showCapitalPrompt, setShowCapitalPrompt] = useState(false);
   const [capitalInput, setCapitalInput] = useState('');
@@ -620,7 +620,6 @@ export default function DashboardLab() {
         {/* Behavioral alerts */}
         <div aria-live="polite" aria-label="Behavioral alerts">
           <RecentAlertsCard
-            shellClass={SHELLS[shell]}
             alerts={mergedAlerts}
             loading={alertsLoading}
             onAcknowledge={acknowledgeAlert}

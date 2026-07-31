@@ -10,8 +10,6 @@ interface RecentAlertsCardProps {
   onAcknowledge?: (alertId: string) => void;
   onOpen?: (alertId: string) => void;
   loading?: boolean;
-  /** Container treatment, so the whole screen changes together. */
-  shellClass?: string;
 }
 
 const MAX_VISIBLE = 4;
@@ -41,7 +39,7 @@ function compactAgo(ts: string): string {
   return `${Math.floor(hrs / 24)}d`;
 }
 
-export default function RecentAlertsCard({ alerts, onOpen, onAcknowledge, loading, shellClass }: RecentAlertsCardProps) {
+export default function RecentAlertsCard({ alerts, onOpen, onAcknowledge, loading }: RecentAlertsCardProps) {
   /**
    * Collapse repeats of the same pattern into one row carrying a count.
    *
@@ -76,7 +74,7 @@ export default function RecentAlertsCard({ alerts, onOpen, onAcknowledge, loadin
   const criticalCount = visible.filter(g => normalizeSeverityStr(g.alert.severity) === 'danger').length;
 
   return (
-    <section className={shellClass ?? 'rounded-lg border border-border bg-card overflow-hidden'}>
+    <section className="rounded-lg border border-border bg-card overflow-hidden">
       <div className="card-head">
         <div className="flex items-center gap-2.5">
           <Bell className="h-3.5 w-3.5 text-loss" strokeWidth={2} />
@@ -166,10 +164,7 @@ export default function RecentAlertsCard({ alerts, onOpen, onAcknowledge, loadin
                         {compactAgo(alert.timestamp)}
                       </span>
                     </div>
-                    {/* One line, not two. The full text lives in the detail
-                        sheet a click away; two wrapped lines per row turned
-                        four alerts into a screenful. */}
-                    <p className="text-[12.5px] text-muted-foreground mt-0.5 leading-snug truncate">{alert.description}</p>
+                    <p className="text-[12.5px] text-muted-foreground mt-1 leading-relaxed line-clamp-2">{alert.description}</p>
                   </div>
                 </div>
               </div>
