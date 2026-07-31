@@ -24,26 +24,26 @@ function useMarketClock() {
   return { open, closeIn, clock };
 }
 
-export function MarketRail({ title = 'Trading Desk' }: { title?: string }) {
+/**
+ * Inline market status, not a header row.
+ *
+ * This used to be a full-width bar with a 3px accent, a title reading "Trading
+ * Desk" and a clock: a whole row of chrome above the number the page exists to
+ * show, restating what the sidebar already says. The status itself is worth
+ * keeping, so it now rides in the session block's header line instead of
+ * claiming a row of its own.
+ */
+export function MarketRail() {
   const { open, closeIn, clock } = useMarketClock();
 
   return (
-    <header className="-mx-4 sm:-mx-6 lg:-mx-8 -mt-4 sm:-mt-6 border-b border-border bg-card mb-4">
-      <div className="min-h-12 flex items-center px-4 sm:px-6 lg:px-8 gap-3 py-2">
-        <div className="min-w-0 flex items-center gap-2.5">
-          <span className="h-5 w-[3px] rounded-full bg-primary shrink-0" aria-hidden />
-          <h1 className="text-[14px] font-semibold tracking-tight text-foreground truncate leading-tight">{title}</h1>
-        </div>
-
-        <div className="ml-auto flex items-center gap-3 shrink-0">
-          <div className="hidden sm:flex items-center gap-1.5">
-            <span className={`h-1.5 w-1.5 rounded-full ${open ? 'bg-profit animate-pulse' : 'bg-muted-foreground'}`} />
-            <span className="t-label">{open ? 'Market open' : 'Closed'}</span>
-            <span className="text-[11px] font-tabular font-medium text-foreground tabular-nums">{closeIn}</span>
-          </div>
-          <span className="text-[11px] text-muted-foreground font-tabular hidden md:inline">{clock}</span>
-        </div>
-      </div>
-    </header>
+    <span className="flex items-center gap-2.5 shrink-0">
+      <span className="hidden sm:flex items-center gap-1.5">
+        <span className={`h-1.5 w-1.5 rounded-full ${open ? 'bg-profit animate-pulse' : 'bg-muted-foreground'}`} />
+        <span className="t-label">{open ? 'Market open' : 'Closed'}</span>
+        <span className="text-[11px] font-tabular font-medium text-foreground">{closeIn}</span>
+      </span>
+      <span className="text-[11px] text-muted-foreground font-tabular hidden md:inline">{clock}</span>
+    </span>
   );
 }

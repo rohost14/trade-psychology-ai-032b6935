@@ -16,6 +16,8 @@ interface SessionHeroCardProps {
   dailyLossLimit: number;
   dailyTradeLimit: number;
   margins: MarginStatus | null;
+  /** Market status, rendered inline rather than in a row of its own. */
+  marketStatus?: React.ReactNode;
 }
 
 // Higher value = worse → warn/crit tones. Mirrors the Lovable HeroPanel toneOf.
@@ -36,6 +38,7 @@ export function SessionHeroCard({
   unrealizedTotal,
   dailyLossLimit,
   dailyTradeLimit,
+  marketStatus,
 }: SessionHeroCardProps) {
   const [open, setOpen] = useState(false);
   // No count-up on the live figure. Every price tick changes sessionPnlDisplay,
@@ -81,6 +84,8 @@ export function SessionHeroCard({
           Day P&amp;L
           <span className={cn('h-1.5 w-1.5 rounded-full animate-pulse', pnlPositive ? 'bg-profit' : 'bg-loss')} />
         </span>
+        <span className="flex items-center gap-3 shrink-0">
+        {marketStatus}
         <button
           type="button"
           onClick={() => setOpen(v => !v)}
@@ -90,6 +95,7 @@ export function SessionHeroCard({
           {open ? 'Hide read' : "Today's read"}
           <ChevronDown className={cn('h-3.5 w-3.5 transition-transform duration-200', open && 'rotate-180')} />
         </button>
+        </span>
       </div>
 
       <div className="mt-2 flex flex-wrap items-end justify-between gap-x-10 gap-y-5">
