@@ -522,13 +522,11 @@ export default function DashboardLab() {
         </div>
       )}
 
-      {/* ── Market status rail (Lovable-style top bar) ───────────────────── */}
-      <MarketRail />
-
       {/* ── Single-column dashboard: hero · alerts · open · closed ─────────
              20px between top-level sections (§8). */}
       <div className="flex flex-col gap-5">
         <SessionHeroCard
+          marketStatus={<MarketRail />}
           stateCfg={stateCfg}
           sessionPnlDisplay={sessionPnlDisplay}
           realizedPnlDisplay={realizedPnlDisplay}
@@ -597,7 +595,11 @@ export default function DashboardLab() {
             border-and-padding tax -- and folding Open and Closed into a single
             switchable region removes a whole block of vertical space. */}
         <section className="rounded-lg border border-border bg-muted/30 overflow-hidden">
-          <div className="flex items-center justify-between gap-3 px-2 pt-2">
+          {/* Tabs only below lg. A tab hides half the data, and open positions
+              are the live thing -- putting them behind a click during a session
+              is the wrong trade. At desktop both show side by side, which also
+              spends the horizontal space that otherwise reads as stretched. */}
+          <div className="flex items-center justify-between gap-3 px-2 pt-2 lg:hidden">
             <div className="inline-flex rounded-md bg-background/60 p-0.5">
               {([['open', `Open · ${positions.length}`], ['closed', `Closed · ${recentTrades.length}`]] as const).map(([id, label]) => (
                 <button
@@ -614,7 +616,39 @@ export default function DashboardLab() {
             </div>
           </div>
 
-          <div className="mt-2 bg-card border-t border-border">
+          {/* desktop: both, side by side */}
+          <div className="hidden lg:grid grid-cols-2 divide-x divide-border bg-card">
+            <div className="min-w-0">
+              {positionsError && !positionsLoading && positions.length === 0 ? (
+                <ErrorState error={{ response: { status: 500 } }} message={positionsError} onRetry={fetchPositions} compact />
+              ) : (
+                <OpenPositionsTable
+                  positions={positions}
+                  isLoading={positionsLoading}
+                  journaledIds={journaledIds}
+                  onPositionClick={handlePositionClick}
+                  pricesConnected={wsConnected}
+                  lastPriceAt={lastLtpAt}
+                  tokenExpired={isTokenExpired}
+                />
+              )}
+            </div>
+            <div className="min-w-0">
+              {tradesError && !tradesLoading && closedTrades.length === 0 ? (
+                <ErrorState error={{ response: { status: 500 } }} message={tradesError} onRetry={fetchTrades} compact />
+              ) : (
+                <ClosedPositionsCard
+                  sinceIso={getLastSessionStartUTC().toISOString()}
+                  roundTrips={recentTrades}
+                  journaledIds={journaledIds}
+                  onTradeClick={handleTradeClick}
+                />
+              )}
+            </div>
+          </div>
+
+          {/* below lg: one at a time */}
+          <div className="mt-2 bg-card border-t border-border lg:hidden">
             {posTab === 'open' ? (
               positionsError && !positionsLoading && positions.length === 0 ? (
                 <ErrorState error={{ response: { status: 500 } }} message={positionsError} onRetry={fetchPositions} compact />
