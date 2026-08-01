@@ -1,7 +1,18 @@
+/**
+ * Dashboard — "what is happening right now".
+ *
+ * Composition settled in the design lab and ported 2026-08-01:
+ * de-carded session hero (figure left, session stats right, market status
+ * inline rather than a full-width Trading Desk row), full behavioural alert
+ * rows, then open positions above closed. Closed stays collapsed until asked
+ * for -- open positions are live and always want to be visible, closed trades
+ * are reference -- and both headers surface how many entries are still
+ * unjournalled, which is the one pending action on this screen.
+ */
 import { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Link } from 'react-router-dom';
-import { Loader2, AlertTriangle, RefreshCw, X } from 'lucide-react';
+import { Loader2, AlertTriangle, RefreshCw, X, ChevronDown } from 'lucide-react';
 import BrokerGate from '@/components/BrokerGate';
 import ErrorState from '@/components/ErrorState';
 import { Input } from '@/components/ui/input';
@@ -9,7 +20,6 @@ import { SetupNudgeCard } from '@/components/dashboard/SetupNudgeCard';
 import { MarketRail } from '@/components/dashboard/MarketRail';
 import ImportHistoryPrompt from '@/components/onboarding/ImportHistoryPrompt';
 import RecentAlertsCard from '@/components/dashboard/RecentAlertsCard';
-import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/components/ui/accordion';
 import AlertDetailSheet from '@/components/alerts/AlertDetailSheet';
 import OpenPositionsTable from '@/components/dashboard/OpenPositionsTable';
 import ClosedPositionsCard from '@/components/dashboard/ClosedPositionsCard';
@@ -77,6 +87,7 @@ export default function Dashboard() {
   const [selectedTrade, setSelectedTrade] = useState<PositionWithExtras | CompletedTrade | null>(null);
   const [selectedType, setSelectedType] = useState<'position' | 'closed'>('position');
 
+  const [closedOpen, setClosedOpen] = useState(false);
   const [showCapitalPrompt, setShowCapitalPrompt] = useState(false);
   const [capitalInput, setCapitalInput] = useState('');
   const [capitalSaving, setCapitalSaving] = useState(false);
@@ -433,6 +444,13 @@ export default function Dashboard() {
     new Date(t.exit_time) >= getLastSessionStartUTC() && !journaledIds.has(t.id)
   ).length;
 
+  // How many closed round-trips still have no journal entry. This is the only
+  // pending action on the screen and it was invisible until a row was opened.
+  const closedUnjournalled = useMemo(
+    () => recentTrades.filter(t => !journaledIds.has(t.id)).length,
+    [recentTrades, journaledIds],
+  );
+
   const unrealizedTotal = useMemo(() =>
     positions.reduce((s, p) => {
       if (p.last_price) {
@@ -496,7 +514,44 @@ export default function Dashboard() {
         </div>
       )}
 
-      {showCapitalPrompt && dataLoaded && (
+
+      {syncStatus === 'error' && dataLoaded && !isTokenExpired && (
+        <div className="mb-4 px-3 py-2.5 rounded-lg bg-loss/10 border border-loss/20 flex items-center justify-between gap-3">
+          <div className="flex items-center gap-2 min-w-0">
+            <AlertTriangle className="h-4 w-4 text-loss shrink-0" />
+            <span className="text-[12.5px] text-loss">
+              Sync failed: {syncError || 'Could not refresh data'}. Showing cached data.
+            </span>
+          </div>
+          <Button onClick={handleSync} variant="ghost" size="sm" className="gap-1 text-loss h-8 text-[12.5px] shrink-0">
+            <RefreshCw className="h-3.5 w-3.5" />
+            Retry
+          </Button>
+        </div>
+      )}
+
+      {/* ── Single-column dashboard: hero · alerts · open · closed ─────────
+             20px between top-level sections (§8). */}
+      <div className="flex flex-col gap-5">
+        <SessionHeroCard
+          marketStatus={<MarketRail />}
+          stateCfg={stateCfg}
+          sessionPnlDisplay={sessionPnlDisplay}
+          realizedPnlDisplay={realizedPnlDisplay}
+          tradeStats={tradeStats}
+          pnlPositive={pnlPositive}
+          unreadCount={unreadCount}
+          acknowledgedTodayCount={acknowledgedTodayCount}
+          unrealizedTotal={unrealizedTotal}
+          dailyLossLimit={dailyLossLimit}
+          dailyTradeLimit={dailyTradeLimit}
+          margins={margins}
+        />
+
+        {/* Setup nudges sit BELOW the session, not above it. A form asking for
+            trading capital was the first thing on the page, pushing the number
+            the screen exists to show under the fold. */}
+        {showCapitalPrompt && dataLoaded && (
         <div className="mb-4 px-3 py-2.5 rounded-lg bg-primary/5 border border-primary/20 flex flex-wrap items-center gap-3">
           <div className="flex-1 min-w-0">
             <p className="text-[14px] font-medium text-foreground">Enable position sizing alerts</p>
@@ -528,41 +583,6 @@ export default function Dashboard() {
         </div>
       )}
 
-      {syncStatus === 'error' && dataLoaded && !isTokenExpired && (
-        <div className="mb-4 px-3 py-2.5 rounded-lg bg-loss/10 border border-loss/20 flex items-center justify-between gap-3">
-          <div className="flex items-center gap-2 min-w-0">
-            <AlertTriangle className="h-4 w-4 text-loss shrink-0" />
-            <span className="text-[12.5px] text-loss">
-              Sync failed: {syncError || 'Could not refresh data'}. Showing cached data.
-            </span>
-          </div>
-          <Button onClick={handleSync} variant="ghost" size="sm" className="gap-1 text-loss h-8 text-[12.5px] shrink-0">
-            <RefreshCw className="h-3.5 w-3.5" />
-            Retry
-          </Button>
-        </div>
-      )}
-
-      {/* ── Market status rail (Lovable-style top bar) ───────────────────── */}
-      <MarketRail />
-
-      {/* ── Single-column dashboard: hero · alerts · open · closed ─────────
-             20px between top-level sections (§8). */}
-      <div className="flex flex-col gap-5">
-        <SessionHeroCard
-          stateCfg={stateCfg}
-          sessionPnlDisplay={sessionPnlDisplay}
-          realizedPnlDisplay={realizedPnlDisplay}
-          tradeStats={tradeStats}
-          pnlPositive={pnlPositive}
-          unreadCount={unreadCount}
-          acknowledgedTodayCount={acknowledgedTodayCount}
-          unrealizedTotal={unrealizedTotal}
-          dailyLossLimit={dailyLossLimit}
-          dailyTradeLimit={dailyTradeLimit}
-          margins={margins}
-        />
-
         {/* New-user setup prompt — self-gates to null once onboarded/dismissed */}
         <SetupNudgeCard />
 
@@ -576,55 +596,69 @@ export default function Dashboard() {
           />
         </div>
 
-        {/* Open Positions — a failed fetch renders as an error, never as an
-            empty table (§14). Uses the shared surface with the real reason. */}
-        {positionsError && !positionsLoading && positions.length === 0 ? (
-          <ErrorState
-            error={{ response: { status: 500 } }}
-            message={positionsError}
-            onRetry={fetchPositions}
-            compact
-          />
-        ) : (
-          <OpenPositionsTable
-            positions={positions}
-            isLoading={positionsLoading}
-            journaledIds={journaledIds}
-            onPositionClick={handlePositionClick}
-            pricesConnected={wsConnected}
-            lastPriceAt={lastLtpAt}
-            tokenExpired={isTokenExpired}
-          />
-        )}
+        {/* Open above, closed below and collapsed until asked for. Open
+            positions are live and always want to be visible; closed trades are
+            reference, so they cost a click rather than a screenful. Both
+            headers surface how many entries are still unjournalled, because
+            that is the one pending action on this screen and it was invisible
+            until you opened a row. */}
+        <section className="desk-card overflow-hidden">
+          {positionsError && !positionsLoading && positions.length === 0 ? (
+            <ErrorState error={{ response: { status: 500 } }} message={positionsError} onRetry={fetchPositions} compact />
+          ) : (
+            <OpenPositionsTable
+              positions={positions}
+              isLoading={positionsLoading}
+              journaledIds={journaledIds}
+              onPositionClick={handlePositionClick}
+              pricesConnected={wsConnected}
+              lastPriceAt={lastLtpAt}
+              tokenExpired={isTokenExpired}
+            />
+          )}
+        </section>
 
-        {/* Today's closed trades — collapsible, Lovable-style */}
-        {tradesError && !tradesLoading && closedTrades.length === 0 ? (
-          <ErrorState
-            error={{ response: { status: 500 } }}
-            message={tradesError}
-            onRetry={fetchTrades}
-            compact
-          />
-        ) : (
-          <Accordion type="single" collapsible defaultValue="closed" className="desk-card">
-            <AccordionItem value="closed" className="border-0">
-              <AccordionTrigger className="px-5 sm:px-6 py-4 hover:no-underline">
-                <div className="flex items-center gap-2.5">
-                  <span className="t-label">Closed positions today</span>
-                  <span className="text-[11px] text-muted-foreground">· tap to collapse</span>
-                </div>
-              </AccordionTrigger>
-              <AccordionContent className="border-t border-border">
+        <section className="desk-card overflow-hidden">
+          <button
+            type="button"
+            onClick={() => setClosedOpen(v => !v)}
+            aria-expanded={closedOpen}
+            className="w-full card-head hover:bg-muted/40 transition-colors duration-150 focus-visible:outline-none focus-visible:bg-muted/40"
+          >
+            <span className="flex items-center gap-2.5 min-w-0">
+              <span className="t-label">Closed positions</span>
+              <span className="text-[11px] text-muted-foreground font-tabular">
+                · {recentTrades.length} trade{recentTrades.length !== 1 ? 's' : ''}
+              </span>
+              {closedUnjournalled > 0 && (
+                <span className="inline-flex items-center gap-1 text-[10px] font-semibold uppercase tracking-wider text-primary bg-primary/10 px-1.5 py-0.5 rounded">
+                  {closedUnjournalled} to journal
+                </span>
+              )}
+            </span>
+            <span className="flex items-center gap-2.5 shrink-0">
+              <span className={cn('text-[13px] font-semibold font-tabular', realizedPnlDisplay >= 0 ? 'text-profit' : 'text-loss')}>
+                {formatCurrencyWithSign(realizedPnlDisplay)}
+              </span>
+              <ChevronDown className={cn('h-4 w-4 text-muted-foreground transition-transform duration-200', closedOpen && 'rotate-180')} />
+            </span>
+          </button>
+
+          {closedOpen && (
+            <div className="border-t border-border animate-accordion-down">
+              {tradesError && !tradesLoading && closedTrades.length === 0 ? (
+                <ErrorState error={{ response: { status: 500 } }} message={tradesError} onRetry={fetchTrades} compact />
+              ) : (
                 <ClosedPositionsCard
                   sinceIso={getLastSessionStartUTC().toISOString()}
                   roundTrips={recentTrades}
                   journaledIds={journaledIds}
                   onTradeClick={handleTradeClick}
                 />
-              </AccordionContent>
-            </AccordionItem>
-          </Accordion>
-        )}
+              )}
+            </div>
+          )}
+        </section>
       </div>
 
       {/* ── AI Coach floating action button ──────────────────────────────── */}

@@ -76,7 +76,9 @@ function PriceCell({ symbol, staticPrice, livePrice }: {
   );
 }
 
-const COLS = 'grid-cols-[1.4fr_64px_92px_92px_78px_104px_40px]';
+// Symbol capped, spacer takes the slack, figures cluster right. See
+// ClosedPositionsCard for the reasoning.
+const COLS = 'grid-cols-[minmax(150px,320px)_1fr_64px_92px_92px_78px_108px_40px]';
 
 export default function OpenPositionsTable({
   positions, isLoading, journaledIds = new Set(), onPositionClick,
@@ -109,11 +111,15 @@ export default function OpenPositionsTable({
     return (diff / p.average_entry_price) * 100;
   };
 
+  const unjournalled = openPositions.filter(
+    p => !journaledIds.has(positionJournalTradeId(p.id)),
+  ).length;
+
   const totalPnl = openPositions.reduce((s, p) => s + getLivePnl(p), 0);
 
   if (isLoading) {
     return (
-      <section className="desk-card overflow-hidden">
+      <section className="overflow-hidden">
         <div className="card-head"><div className="h-4 w-40 bg-muted animate-pulse rounded" /></div>
         <div className="p-5 space-y-3">{[1, 2].map(i => <div key={i} className="h-10 bg-muted animate-pulse rounded" />)}</div>
       </section>
@@ -121,15 +127,19 @@ export default function OpenPositionsTable({
   }
 
   return (
-    <section className="desk-card overflow-hidden">
-      {/* Header */}
+    <section className="overflow-hidden">
       <div className="px-4 sm:px-6 py-4 border-b border-border flex items-center justify-between flex-wrap gap-2">
         <div className="flex items-center gap-2.5 flex-wrap">
           <span className="text-[11px] uppercase tracking-[0.12em] font-medium text-muted-foreground">Open Positions</span>
           <span className="text-[11px] text-muted-foreground font-tabular">· {openPositions.length}</span>
           {openPositions.length > 0 && <PriceStatusPill status={priceStatus} />}
-          {openPositions.length > 0 && (
-            <span className="hidden sm:inline text-[10px] text-muted-foreground/70 uppercase tracking-wider">· tap a row to journal</span>
+          {/* A count beats an instruction. "tap a row to journal" told you how
+              without telling you whether you needed to; this says how many are
+              still waiting and disappears when none are. */}
+          {unjournalled > 0 && (
+            <span className="inline-flex items-center gap-1 text-[10px] font-semibold uppercase tracking-wider text-primary bg-primary/10 px-1.5 py-0.5 rounded">
+              {unjournalled} to journal
+            </span>
           )}
         </div>
         {openPositions.length > 0 && (
@@ -147,6 +157,7 @@ export default function OpenPositionsTable({
           {/* Column header (desktop) */}
           <div className={cn('hidden sm:grid gap-3 px-4 sm:px-6 py-3 text-[10px] uppercase tracking-wider font-medium text-muted-foreground border-b border-border', COLS)}>
             <span>Symbol</span>
+            <span aria-hidden />
             <span className="text-right">Qty</span>
             <span className="text-right">Entry</span>
             <span className="text-right">LTP</span>
@@ -182,6 +193,7 @@ export default function OpenPositionsTable({
                       {sub && <span className="text-[11px] text-muted-foreground font-tabular truncate">{sub}</span>}
                       {isJournaled && <span title="Journalled" className="ml-1 h-1.5 w-1.5 rounded-full bg-primary" />}
                     </div>
+                    <span aria-hidden />
                     <span className="text-right text-sm font-tabular text-muted-foreground">{formatNumber(Math.abs(qty))}</span>
                     <span className="text-right text-sm font-tabular text-muted-foreground">{formatPrice(pos.average_entry_price)}</span>
                     <span className="text-right text-sm font-tabular text-foreground">

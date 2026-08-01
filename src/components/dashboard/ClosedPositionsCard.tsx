@@ -33,7 +33,14 @@ interface Props {
 }
 
 const CAP = 12;
-const COLS = 'grid-cols-[1.5fr_64px_86px_86px_74px_74px_100px_32px]';
+/**
+ * Symbol capped, then a flexible spacer, then the numeric columns at fixed
+ * widths. Previously the symbol column was 1.5fr, so on a 1240px card it grew
+ * to roughly 640px for about 150px of text -- pushing the first number nearly
+ * 500px away from the name it belongs to. Slack now collects in the spacer,
+ * where there is nothing to read, and the figures stay together as one block.
+ */
+const COLS = 'grid-cols-[minmax(150px,300px)_1fr_64px_88px_88px_72px_76px_104px_32px]';
 
 function formatDuration(mins: number): string {
   if (mins <= 0) return '—';
@@ -75,7 +82,7 @@ export default function ClosedPositionsCard({ sinceIso, roundTrips, journaledIds
 
   if (rows === null && !error) {
     return (
-      <section className="desk-card overflow-hidden">
+      <section className="overflow-hidden">
         <div className="card-head"><div className="h-4 w-40 bg-muted animate-pulse rounded" /></div>
         <div className="p-5 space-y-3">{[1, 2, 3].map(i => <Skeleton key={i} className="h-10 rounded" />)}</div>
       </section>
@@ -84,7 +91,7 @@ export default function ClosedPositionsCard({ sinceIso, roundTrips, journaledIds
 
   if (error) {
     return (
-      <section className="desk-card overflow-hidden">
+      <section className="overflow-hidden">
         <div className="card-head"><span className="text-[11px] uppercase tracking-[0.12em] font-medium text-muted-foreground">Closed Positions</span></div>
         <div className="px-5 py-8 text-center text-[13px] text-muted-foreground">Couldn't load closed positions.</div>
       </section>
@@ -99,7 +106,7 @@ export default function ClosedPositionsCard({ sinceIso, roundTrips, journaledIds
       { stat: '3 losses', label: 'in a row is when emotional impairment measurably starts', source: 'Behavioral research' },
     ];
     return (
-      <section className="desk-card overflow-hidden">
+      <section className="overflow-hidden">
         <div className="card-head"><span className="text-[11px] uppercase tracking-[0.12em] font-medium text-muted-foreground">Closed Positions</span></div>
         <div className="px-5 sm:px-6 py-8">
           <p className="text-sm font-medium text-foreground mb-1">Waiting for your first trade</p>
@@ -121,8 +128,7 @@ export default function ClosedPositionsCard({ sinceIso, roundTrips, journaledIds
   const visible = showAll ? rows : rows.slice(0, CAP);
 
   return (
-    <section className="desk-card overflow-hidden">
-      {/* Header */}
+    <section className="overflow-hidden">
       <div className="px-4 sm:px-6 py-4 border-b border-border flex items-center justify-between flex-wrap gap-2">
         <div className="flex items-center gap-2.5 flex-wrap">
           <span className="text-[11px] uppercase tracking-[0.12em] font-medium text-muted-foreground">Closed Positions</span>
@@ -138,6 +144,7 @@ export default function ClosedPositionsCard({ sinceIso, roundTrips, journaledIds
       {/* Column header */}
       <div className={cn('hidden sm:grid gap-3 px-4 sm:px-6 py-3 text-[10px] uppercase tracking-wider font-medium text-muted-foreground border-b border-border', COLS)}>
         <span>Symbol</span>
+        <span aria-hidden />
         <span className="text-right">Qty</span>
         <span className="text-right">Avg Entry</span>
         <span className="text-right">Avg Exit</span>
@@ -170,6 +177,7 @@ export default function ClosedPositionsCard({ sinceIso, roundTrips, journaledIds
                     {r.product && <span className="text-[10px] font-medium text-muted-foreground uppercase">{r.product}</span>}
                     {r.trades > 1 && <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded bg-muted text-muted-foreground font-tabular">{r.trades}×</span>}
                   </div>
+                  <span aria-hidden />
                   <span className="text-right text-sm font-tabular text-muted-foreground">{r.total_qty}</span>
                   <span className="text-right text-sm font-tabular text-muted-foreground">{formatPrice(r.avg_entry_price)}</span>
                   <span className="text-right text-sm font-tabular text-foreground">{formatPrice(r.avg_exit_price)}</span>

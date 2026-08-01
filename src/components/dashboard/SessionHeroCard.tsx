@@ -1,6 +1,5 @@
 import { useState } from 'react';
 import { cn } from '@/lib/utils';
-import { useCountUp } from '@/hooks/useCountUp';
 import { ChevronDown } from 'lucide-react';
 import { STATE_CFG, SessionState } from '@/lib/dashboardUtils';
 import type { MarginStatus } from '@/types/api';
@@ -17,6 +16,8 @@ interface SessionHeroCardProps {
   dailyLossLimit: number;
   dailyTradeLimit: number;
   margins: MarginStatus | null;
+  /** Market status, rendered inline rather than in a row of its own. */
+  marketStatus?: React.ReactNode;
 }
 
 // Higher value = worse → warn/crit tones. Mirrors the Lovable HeroPanel toneOf.
@@ -37,9 +38,14 @@ export function SessionHeroCard({
   unrealizedTotal,
   dailyLossLimit,
   dailyTradeLimit,
+  marketStatus,
 }: SessionHeroCardProps) {
   const [open, setOpen] = useState(false);
-  const animatedPnl = useCountUp(sessionPnlDisplay, 500);
+  // No count-up on the live figure. Every price tick changes sessionPnlDisplay,
+  // which restarts the animation, and in a live session ticks arrive faster
+  // than the 500ms it needs to land -- so the headline number was permanently
+  // in flight and never equalled Booked plus Unrealized underneath it. It read
+  // as a reconciliation bug because on screen it was one.
 
   const tradesToday = tradeStats?.trades_today ?? 0;
   const winRate = tradeStats?.win_rate ?? 0;
@@ -61,39 +67,47 @@ export function SessionHeroCard({
   ];
 
   return (
-    // A top-level screen block, so it takes a surface (§9). Sections are for
-    // sub-blocks within a surface, not for the blocks themselves.
-    <section className="desk-card overflow-hidden">
-      <div className="card-head">
+    /**
+     * No card. This is the page's opening statement, not one tile among
+     * several -- and the box was what created the dead space: a 44px figure
+     * in a full-width container leaves roughly 900px of nothing to its right,
+     * and putting the stats in a band underneath spent vertical space to
+     * avoid using horizontal space that was already there.
+     *
+     * So: figure left, session figures beside it, one rule underneath to
+     * separate it from what follows. The brand accent stays as a short rule
+     * above the label rather than a border around everything.
+     */
+    <section className="pb-4 border-b border-border">
+      <div className="flex items-center justify-between gap-3 h-9">
         <span className="t-label flex items-center gap-2">
           Day P&amp;L
           <span className={cn('h-1.5 w-1.5 rounded-full animate-pulse', pnlPositive ? 'bg-profit' : 'bg-loss')} />
         </span>
-
+        <span className="flex items-center gap-3 shrink-0">
+        {marketStatus}
         <button
           type="button"
           onClick={() => setOpen(v => !v)}
           aria-expanded={open}
           className="shrink-0 inline-flex items-center gap-1.5 rounded-md border border-border px-2.5 py-1.5 text-[11px] font-medium text-muted-foreground transition-colors duration-150 hover:text-foreground hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
         >
-          {open ? 'Hide session stats' : 'Session stats'}
+          {open ? 'Hide read' : "Today's read"}
           <ChevronDown className={cn('h-3.5 w-3.5 transition-transform duration-200', open && 'rotate-180')} />
         </button>
+        </span>
       </div>
 
-      <div className="px-4 sm:px-6 py-4">
+      <div className="mt-2 flex flex-wrap items-end justify-between gap-x-10 gap-y-5">
+        {/* the figure — scale carries the hierarchy, colour carries direction */}
         <div className="min-w-0">
-          {/* The screen's one primary metric — 30px display (§7). */}
-          <div className="flex items-baseline gap-2 flex-wrap">
-            <span className={cn(
-              'font-display text-[30px] leading-none font-semibold tracking-tight font-tabular',
-              pnlPositive ? 'text-profit' : 'text-loss',
-            )}>
-              {pnlPositive ? '+' : '−'}₹{inr(animatedPnl)}
-            </span>
-          </div>
-          {/* Booked (closed) + Unrealized (open) always sum to the Day P&L above. */}
-          <div className="mt-1 text-[12.5px] font-tabular text-muted-foreground">
+          <span className={cn(
+            'font-display text-[38px] leading-none font-semibold tracking-tight font-tabular block',
+            pnlPositive ? 'text-profit' : 'text-loss',
+          )}>
+            {pnlPositive ? '+' : '−'}₹{inr(sessionPnlDisplay)}
+          </span>
+          <p className="mt-2 text-[12.5px] font-tabular text-muted-foreground">
             Booked{' '}
             <span className={realizedPnlDisplay >= 0 ? 'text-profit' : 'text-loss'}>
               {realizedPnlDisplay >= 0 ? '+' : '−'}₹{inr(realizedPnlDisplay)}
@@ -101,35 +115,33 @@ export function SessionHeroCard({
             <span className="text-muted-foreground/40"> · </span>
             Unrealized{' '}
             <span className={unrealizedTotal > 0 ? 'text-profit' : unrealizedTotal < 0 ? 'text-loss' : ''}>
-              {unrealizedTotal !== 0 ? `${unrealizedTotal >= 0 ? '+' : '−'}₹${inr(unrealizedTotal)}` : '—'}
+              {unrealizedTotal !== 0 ? `${unrealizedTotal >= 0 ? '+' : '−'}₹${inr(unrealizedTotal)}` : 'nothing open'}
             </span>
-          </div>
+          </p>
+        </div>
+
+        {/* session figures, in the space the number leaves rather than beneath it */}
+        <div className="flex items-end gap-8 sm:gap-12">
+          {stats.map(s => (
+            <div key={s.label}>
+              <span className="text-[10px] uppercase tracking-wider font-medium text-muted-foreground whitespace-nowrap">{s.label}</span>
+              <div className="mt-1.5 flex items-baseline gap-1.5">
+                <span className={cn('text-[19px] font-semibold font-tabular tracking-tight', s.tone)}>{s.value}</span>
+                {s.unit && <span className="text-[10.5px] text-muted-foreground font-tabular whitespace-nowrap">{s.unit}</span>}
+              </div>
+            </div>
+          ))}
         </div>
       </div>
 
       {open && (
-        <div className="animate-accordion-down">
-          <p className="px-4 sm:px-6 pb-3 text-[12.5px] leading-snug text-muted-foreground">
-            {lossPct >= 80
-              ? "Most of today's loss budget is already spent."
-              : paceRatio >= 1.5
-              ? 'Trading faster than your usual rhythm today.'
-              : 'Running inside your normal operating range.'}
-          </p>
-          {/* Hairline metric strip (§17) — the gaps are the separators. Sits
-              flush inside the surface, so no border or radius of its own. */}
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-px bg-border border-t border-border">
-            {stats.map(s => (
-              <div key={s.label} className="bg-card px-4 sm:px-5 py-2.5">
-                <span className="text-[10px] uppercase tracking-wider font-medium text-muted-foreground">{s.label}</span>
-                <div className="mt-0.5 flex items-baseline gap-1.5">
-                  <span className={cn('text-[14px] font-semibold font-tabular tracking-tight', s.tone)}>{s.value}</span>
-                  {s.unit && <span className="text-[10px] text-muted-foreground font-tabular truncate">{s.unit}</span>}
-                </div>
-              </div>
-            ))}
-          </div>
-        </div>
+        <p className="mt-4 text-[12.5px] leading-snug text-muted-foreground animate-accordion-down">
+          {lossPct >= 80
+            ? "Most of today's loss budget is already spent."
+            : paceRatio >= 1.5
+            ? 'Trading faster than your usual rhythm today.'
+            : 'Running inside your normal operating range.'}
+        </p>
       )}
     </section>
   );
