@@ -417,13 +417,13 @@ export default function Welcome() {
               <button
                 onClick={consent ? handleConnect : undefined}
                 disabled={!consent}
-                className={`inline-flex items-center justify-center h-12 px-6 rounded-2xl text-[14px] font-semibold gap-2 transition-all ${consent ? "bg-primary text-primary-foreground shadow-lg hover:opacity-90 cursor-pointer" : "bg-muted text-muted-foreground cursor-not-allowed opacity-50"}`}
+                className={`inline-flex items-center justify-center h-12 px-6 rounded-lg text-[14px] font-semibold gap-2 transition-all ${consent ? "bg-primary text-primary-foreground shadow-lg hover:opacity-90 cursor-pointer" : "bg-muted text-muted-foreground cursor-not-allowed opacity-50"}`}
               >
                 Connect Zerodha <ArrowRight className="h-4 w-4" />
               </button>
               <button
                 onClick={handleGuest}
-                className="inline-flex items-center justify-center h-12 px-6 rounded-2xl text-[14px] font-semibold border border-border bg-card hover:bg-muted/50 text-foreground transition-all cursor-pointer"
+                className="inline-flex items-center justify-center h-12 px-6 rounded-lg text-[14px] font-semibold border border-border bg-card hover:bg-muted/50 text-foreground transition-all cursor-pointer"
               >
                 Try demo first
               </button>

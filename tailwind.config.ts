@@ -117,6 +117,19 @@ export default {
         "accordion-up":   "accordion-up 0.2s ease-out",
         "pulse-slow":     "pulse-slow 2.5s ease-in-out infinite",
       },
+      // Linear's scale rather than 500/600/700. 510 and 590 read as "medium"
+      // and "semibold that isn't shouting" — the whole restraint trick, and the
+      // reason Linear and Stripe look calm at the same sizes we use.
+      // Only works because Inter is now loaded as a variable axis (300..700);
+      // against the previous static 400/500/600 these would have snapped back
+      // and silently changed nothing.
+      fontWeight: {
+        light:    "300",
+        normal:   "400",
+        medium:   "510",
+        semibold: "590",
+        bold:     "680",
+      },
       fontFamily: {
         sans: ["Geist", "Inter", "-apple-system", "BlinkMacSystemFont", "Segoe UI", "sans-serif"],
         // DM Mono for ALL financial numbers (₹, %, counts, P&L)

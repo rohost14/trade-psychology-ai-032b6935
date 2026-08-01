@@ -114,7 +114,7 @@ function DayDetail({ day, onClose }: { day: DayData; onClose: () => void }) {
   const label = date.toLocaleDateString('en-IN', { weekday: 'long', day: 'numeric', month: 'long' });
 
   return (
-    <div className="bg-card border border-border rounded-xl p-4 mt-3 animate-fade-in-up">
+    <div className="bg-card border border-border rounded-lg p-4 mt-3 animate-fade-in-up">
       <div className="flex items-center justify-between mb-3">
         <p className="text-sm font-semibold text-foreground">{label}</p>
         <button onClick={onClose} className="text-xs text-muted-foreground hover:text-foreground transition-colors">
@@ -199,7 +199,7 @@ export default function PatternCalendar() {
   };
 
   return (
-    <div className="bg-card rounded-xl border border-border p-5">
+    <div className="bg-card rounded-lg border border-border p-5">
       <div className="flex items-center justify-between mb-4">
         <div className="flex items-center gap-2">
           <Calendar className="h-4 w-4 text-muted-foreground" />

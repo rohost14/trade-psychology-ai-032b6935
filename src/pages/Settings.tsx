@@ -244,9 +244,9 @@ export default function Settings() {
     return (
       <div className="max-w-3xl mx-auto space-y-4 pb-12">
         <Skeleton className="h-8 w-48" />
-        <Skeleton className="h-40 rounded-xl" />
+        <Skeleton className="h-40 rounded-lg" />
         <div className="grid grid-cols-2 gap-4">
-          {[1,2,3,4].map(i => <Skeleton key={i} className="h-32 rounded-xl" />)}
+          {[1,2,3,4].map(i => <Skeleton key={i} className="h-32 rounded-lg" />)}
         </div>
       </div>
     );

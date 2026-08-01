@@ -1,4 +1,4 @@
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=DM+Mono:ital,wght@0,300;0,400;0,500&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300..700&family=DM+Mono:ital,wght@0,300;0,400;0,500&display=swap');
 
 @font-face {
   font-family: 'Geist';
@@ -58,7 +58,13 @@
     --input:               var(--layer-border);
     --ring:                21 91 86;       /* pine-teal */
 
-    --radius: 0.625rem;
+    --radius: 0.5rem;   /* 8px cards -> md 6px, sm 4px chips */
+
+    /* Responsive spacing (Mercury pattern): the TOKEN moves at the breakpoint,
+       not the component. Mobile values here; widened in the media query below. */
+    --gap-section: 20px;
+    --gap-card:    16px;
+    --gap-item:     8px;
 
     /* ── Text hierarchy (3 tiers) ───────────────────────────────────────────── */
     --text-primary:   22 24 29;    /* ink — headings, key data */
@@ -169,6 +175,17 @@
   }
 }
 
+/* Mercury's responsive-spacing pattern: one media query moves the tokens, and
+   every component that consumes them widens at once. No component carries its
+   own breakpoint for spacing. */
+@media (min-width: 640px) {
+  :root {
+    --gap-section: 28px;
+    --gap-card:    20px;
+    --gap-item:    12px;
+  }
+}
+
 @layer base {
   * {
     @apply border-border;
@@ -227,7 +244,7 @@ svg.lucide {
 
   /* tm-card — standard data surface, both themes */
   .tm-card {
-    @apply bg-card rounded-xl overflow-hidden;
+    @apply bg-card rounded-lg overflow-hidden;
     box-shadow: var(--shadow-card);
   }
 

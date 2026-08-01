@@ -279,7 +279,7 @@ export function TradeJournalSheet({ open, onOpenChange, trade, type, onSaved, on
           <div className="flex-1 overflow-y-auto">
 
             {/* ── Trade summary ── */}
-            <div className="mx-5 mt-5 rounded-xl bg-muted/40 border border-border p-4">
+            <div className="mx-5 mt-5 rounded-lg bg-muted/40 border border-border p-4">
               <div className="flex items-center justify-between">
                 <div>
                   <p className="font-mono text-[15px] font-bold text-foreground">{symbol}</p>
@@ -304,7 +304,7 @@ export function TradeJournalSheet({ open, onOpenChange, trade, type, onSaved, on
 
             {/* ── Alerts during this trade ── */}
             {linkedAlerts.length > 0 && (
-              <div className="mx-5 mt-3 rounded-xl border border-amber-200 dark:border-amber-700/40 bg-amber-50/60 dark:bg-amber-900/10 px-4 py-3 space-y-1.5">
+              <div className="mx-5 mt-3 rounded-lg border border-amber-200 dark:border-amber-700/40 bg-amber-50/60 dark:bg-amber-900/10 px-4 py-3 space-y-1.5">
                 <p className="text-[11px] font-semibold text-tm-obs uppercase tracking-wide">
                   Pattern{linkedAlerts.length > 1 ? 's' : ''} detected during this trade
                 </p>
@@ -322,7 +322,7 @@ export function TradeJournalSheet({ open, onOpenChange, trade, type, onSaved, on
 
             {/* ── Symbol history context ── */}
             {symbolHistory.length > 0 && (
-              <div className="mx-5 mt-3 rounded-xl border border-border bg-muted/30 px-4 py-3">
+              <div className="mx-5 mt-3 rounded-lg border border-border bg-muted/30 px-4 py-3">
                 <p className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wide mb-2">
                   Last {symbolHistory.length}× you journaled {symbol}
                 </p>
@@ -378,7 +378,7 @@ export function TradeJournalSheet({ open, onOpenChange, trade, type, onSaved, on
                         type="button"
                         onClick={() => toggleEmotion(e.value)}
                         className={cn(
-                          'w-full flex items-center justify-between px-4 py-2.5 rounded-xl border text-left transition-all',
+                          'w-full flex items-center justify-between px-4 py-2.5 rounded-lg border text-left transition-all',
                           active
                             ? 'bg-teal-50 dark:bg-teal-900/20 border-tm-brand'
                             : 'bg-muted/30 border-transparent hover:border-border',
@@ -404,7 +404,7 @@ export function TradeJournalSheet({ open, onOpenChange, trade, type, onSaved, on
                       type="button"
                       onClick={() => pick(followedPlan, o.value, setFollowedPlan)}
                       className={cn(
-                        'flex-1 flex flex-col items-center gap-0.5 py-2.5 rounded-xl border text-center transition-all',
+                        'flex-1 flex flex-col items-center gap-0.5 py-2.5 rounded-lg border text-center transition-all',
                         followedPlan === o.value
                           ? 'bg-teal-50 dark:bg-teal-900/20 border-tm-brand'
                           : 'bg-muted/30 border-transparent hover:border-border',
@@ -446,7 +446,7 @@ export function TradeJournalSheet({ open, onOpenChange, trade, type, onSaved, on
                       type="button"
                       onClick={() => pick(wouldRepeat, v, setWouldRepeat)}
                       className={cn(
-                        'flex-1 py-2.5 rounded-xl border text-[13px] font-semibold transition-all',
+                        'flex-1 py-2.5 rounded-lg border text-[13px] font-semibold transition-all',
                         wouldRepeat === v
                           ? v === 'yes'
                             ? 'bg-teal-50 dark:bg-teal-900/20 border-tm-brand text-tm-brand'

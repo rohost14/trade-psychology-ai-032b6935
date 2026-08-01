@@ -71,7 +71,7 @@ export default function OptionsBehaviorCard({ days, onHasData }: OptionsBehavior
     // onHasData is a setState fn from the parent — stable, intentionally not a dep
   }, [days]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  if (loading) return <Skeleton className="h-40 rounded-xl" />;
+  if (loading) return <Skeleton className="h-40 rounded-lg" />;
 
   // Nothing detected in the window — stay silent rather than render three zeroes.
   if (!data?.has_data) return null;

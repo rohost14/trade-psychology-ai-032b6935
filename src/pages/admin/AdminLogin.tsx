@@ -65,7 +65,7 @@ export default function AdminLogin() {
       <div className="w-full max-w-[400px] px-6">
         {/* Logo */}
         <div className="text-center mb-10">
-          <div className="w-13 h-13 mx-auto mb-4 flex items-center justify-center rounded-2xl bg-[rgb(var(--tm-brand))]/10 border border-[rgb(var(--tm-brand))]/25" style={{ width: 52, height: 52 }}>
+          <div className="w-13 h-13 mx-auto mb-4 flex items-center justify-center rounded-lg bg-[rgb(var(--tm-brand))]/10 border border-[rgb(var(--tm-brand))]/25" style={{ width: 52, height: 52 }}>
             <Shield className="w-6 h-6 text-[rgb(var(--tm-brand))]" />
           </div>
           <h1 className="text-foreground">TradeMentor Admin</h1>

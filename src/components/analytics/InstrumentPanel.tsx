@@ -145,10 +145,10 @@ export default function InstrumentPanel({ underlying, days, onClose }: Instrumen
           {isLoading ? (
             <div className="p-5 space-y-4">
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                {[1,2,3,4].map(i => <Skeleton key={i} className="h-20 rounded-xl" />)}
+                {[1,2,3,4].map(i => <Skeleton key={i} className="h-20 rounded-lg" />)}
               </div>
-              <Skeleton className="h-[180px] rounded-xl" />
-              <Skeleton className="h-[120px] rounded-xl" />
+              <Skeleton className="h-[180px] rounded-lg" />
+              <Skeleton className="h-[120px] rounded-lg" />
             </div>
           ) : !data?.has_data ? (
             <div className="flex flex-col items-center justify-center h-64">

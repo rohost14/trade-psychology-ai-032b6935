@@ -142,7 +142,7 @@ const LossSpiralSimulator = ({ id }: { id?: string }) => {
           </div>
 
           {/* Right — simulator */}
-          <div className="rounded-2xl border border-border bg-card overflow-hidden shadow-[0_30px_80px_-30px_hsl(226_28%_30%/0.25)]">
+          <div className="rounded-lg border border-border bg-card overflow-hidden shadow-[0_30px_80px_-30px_hsl(226_28%_30%/0.25)]">
             {/* Headline P&L */}
             <div className="px-5 pt-5 pb-4 border-b border-border bg-loss-muted/50">
               <div className="flex items-center justify-between">

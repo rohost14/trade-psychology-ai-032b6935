@@ -581,7 +581,7 @@ export default function AdminUserDetail() {
       {/* Header card */}
       <div className="tm-card mb-4 border-t-2" style={{ borderTopColor: ACCENT_RGB.brand }}>
         <div className="p-6 flex items-start gap-4">
-          <div className="w-12 h-12 rounded-xl shrink-0 flex items-center justify-center text-[17px] font-bold bg-[rgb(var(--tm-brand))]/10 border border-[rgb(var(--tm-brand))]/20 text-[rgb(var(--tm-brand))]">{initials}</div>
+          <div className="w-12 h-12 rounded-lg shrink-0 flex items-center justify-center text-[17px] font-bold bg-[rgb(var(--tm-brand))]/10 border border-[rgb(var(--tm-brand))]/20 text-[rgb(var(--tm-brand))]">{initials}</div>
           <div className="flex-1 min-w-0">
             <div className="flex items-center gap-2.5 flex-wrap mb-1.5">
               <h1 className="text-foreground m-0">{displayName}</h1>

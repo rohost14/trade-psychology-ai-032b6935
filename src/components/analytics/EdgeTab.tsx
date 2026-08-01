@@ -145,12 +145,12 @@ export default function EdgeTab({ days, onInstrumentClick }: EdgeTabProps) {
   if (loading) return (
     <div className="space-y-4 animate-pulse">
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-        <Skeleton className="h-24 rounded-xl" />
-        <Skeleton className="h-24 rounded-xl" />
+        <Skeleton className="h-24 rounded-lg" />
+        <Skeleton className="h-24 rounded-lg" />
       </div>
-      <Skeleton className="h-[260px] rounded-xl" />
-      <Skeleton className="h-[200px] rounded-xl" />
-      <Skeleton className="h-[200px] rounded-xl" />
+      <Skeleton className="h-[260px] rounded-lg" />
+      <Skeleton className="h-[200px] rounded-lg" />
+      <Skeleton className="h-[200px] rounded-lg" />
     </div>
   );
 

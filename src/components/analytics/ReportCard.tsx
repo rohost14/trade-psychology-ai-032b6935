@@ -65,7 +65,7 @@ export default function ReportCard({ days }: Props) {
     return () => { cancelled = true; };
   }, [days]);
 
-  if (loading) return <Skeleton className="h-40 rounded-2xl" />;
+  if (loading) return <Skeleton className="h-40 rounded-lg" />;
   if (empty || !kpis) return null;
 
   const positive = kpis.total_pnl >= 0;
@@ -90,7 +90,7 @@ export default function ReportCard({ days }: Props) {
     : 'Keep trading to unlock your edge/leak breakdown.';
 
   return (
-    // Flat card surface. Was a rounded-2xl gradient panel: both banned (§4) --
+    // Flat card surface. Was a rounded-lg gradient panel: both banned (§4) --
     // the gradient encodes nothing and 16px radius is off the committed scale.
     <div className="relative overflow-hidden rounded-lg border border-border bg-card px-5 py-5 sm:px-6 sm:py-6">
       <div className="flex flex-col sm:flex-row sm:items-end sm:justify-between gap-4">

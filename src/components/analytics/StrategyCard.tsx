@@ -33,7 +33,7 @@ export default function StrategyCard({ days }: Props) {
     return () => { cancelled = true; };
   }, [days]);
 
-  if (loading) return <Skeleton className="h-52 rounded-xl" />;
+  if (loading) return <Skeleton className="h-52 rounded-lg" />;
   if (!data?.has_data) return null;
 
   const rows = data.strategies.filter(s => s.trades > 0);

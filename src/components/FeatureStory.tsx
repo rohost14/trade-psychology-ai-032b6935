@@ -37,7 +37,7 @@ export const FeatureStory = ({ story, id }: { story: Story; id?: string }) => (
 
 /* Visual: Alert feed mock */
 export const AlertFeedMock = () => (
-  <div className="relative rounded-2xl border border-border bg-card p-5 lg:p-6 shadow-sm">
+  <div className="relative rounded-lg border border-border bg-card p-5 lg:p-6 shadow-sm">
     <div className="flex items-center justify-between mb-4">
       <span className="text-[13px] font-semibold text-foreground">Live behavioral feed</span>
       <span className="flex items-center gap-1.5 text-[11px] text-muted-foreground">
@@ -77,7 +77,7 @@ export const AlertFeedMock = () => (
 
 /* Visual: Shield circuit breaker mock */
 export const ShieldMock = () => (
-  <div className="relative rounded-2xl border border-border bg-card p-5 lg:p-6 shadow-sm overflow-hidden">
+  <div className="relative rounded-lg border border-border bg-card p-5 lg:p-6 shadow-sm overflow-hidden">
     <div className="flex items-center justify-between mb-4">
       <span className="text-[13px] font-semibold text-foreground flex items-center gap-1.5">
         <Shield className="h-4 w-4 text-loss" />
@@ -86,14 +86,14 @@ export const ShieldMock = () => (
       <span className="text-[10px] uppercase tracking-wider text-loss font-bold bg-loss/10 px-2 py-0.5 rounded">Active</span>
     </div>
     <div className="space-y-4">
-      <div className="p-4 bg-muted/40 rounded-xl border border-border flex items-center justify-between">
+      <div className="p-4 bg-muted/40 rounded-lg border border-border flex items-center justify-between">
         <div>
           <h4 className="text-sm font-semibold text-foreground">Daily Loss Limit</h4>
           <p className="text-xs text-muted-foreground mt-0.5">Threshold: −₹10,000</p>
         </div>
         <span className="text-sm font-mono text-loss font-bold">−₹9,820 hit</span>
       </div>
-      <div className="p-4 bg-loss/5 rounded-xl border border-loss/20">
+      <div className="p-4 bg-loss/5 rounded-lg border border-loss/20">
         <h4 className="text-xs font-semibold text-loss uppercase tracking-wider">Accountability Dispatch</h4>
         <p className="text-[12.5px] text-muted-foreground mt-1 leading-snug">
           "Rahul has crossed daily risk threshold. Cooldown period suggested."
@@ -109,7 +109,7 @@ export const ShieldMock = () => (
 
 /* Visual: Coach psychology mock */
 export const CoachMock = () => (
-  <div className="relative rounded-2xl border border-border bg-card p-5 lg:p-6 shadow-sm">
+  <div className="relative rounded-lg border border-border bg-card p-5 lg:p-6 shadow-sm">
     <div className="flex items-center justify-between mb-4">
       <span className="text-[13px] font-semibold text-foreground flex items-center gap-1.5">
         <Brain className="h-4 w-4 text-primary" />
@@ -118,10 +118,10 @@ export const CoachMock = () => (
       <span className="text-[11px] text-muted-foreground font-mono">Friday analysis</span>
     </div>
     <div className="space-y-3">
-      <div className="p-4 bg-muted/40 rounded-xl border border-border">
+      <div className="p-4 bg-muted/40 rounded-lg border border-border">
         <p className="text-[13px] text-muted-foreground italic">"Why did I lose ₹14,000 on RELIANCE today?"</p>
       </div>
-      <div className="p-4 bg-primary/5 rounded-xl border border-primary/20">
+      <div className="p-4 bg-primary/5 rounded-lg border border-primary/20">
         <p className="text-[12.5px] text-foreground leading-relaxed">
           <strong>Coach:</strong> You entered RELIANCE 3 times within 8 minutes of a stop-out. Historical analysis shows your win rate drops to <strong>14%</strong> on such quick re-entries, costing you an average of <strong>₹8,400 per incident</strong>. You are trying to force a recovery rather than executing a setup.
         </p>

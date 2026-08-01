@@ -126,7 +126,7 @@ export function TradebookImportCard({ onImported }: { onImported?: (r: ImportRes
             if (f) upload(f);
           }}
           className={cn(
-            'rounded-xl border-2 border-dashed px-5 py-8 text-center transition-colors',
+            'rounded-lg border-2 border-dashed px-5 py-8 text-center transition-colors',
             dragOver ? 'border-tm-brand bg-tm-brand/5' : 'border-border',
             isUploading && 'opacity-60 pointer-events-none',
           )}

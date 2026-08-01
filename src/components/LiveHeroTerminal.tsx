@@ -95,7 +95,7 @@ const LiveHeroTerminal = () => {
   return (
     <div className="relative">
       {/* Terminal card */}
-      <div className="rounded-2xl border border-border bg-card overflow-hidden shadow-[0_30px_80px_-30px_hsl(226_28%_30%/0.25)]">
+      <div className="rounded-lg border border-border bg-card overflow-hidden shadow-[0_30px_80px_-30px_hsl(226_28%_30%/0.25)]">
         {/* Title bar */}
         <div className="flex items-center justify-between px-4 py-2.5 border-b border-border bg-muted/40">
           <div className="flex items-center gap-2">
@@ -218,7 +218,7 @@ const LiveHeroTerminal = () => {
       </div>
 
       {/* Floating "saved" pill */}
-      <div className="hidden sm:flex absolute -right-4 -bottom-5 items-center gap-3 bg-background border border-border rounded-xl px-4 py-2.5 shadow-[0_18px_50px_-20px_hsl(226_28%_30%/0.35)]">
+      <div className="hidden sm:flex absolute -right-4 -bottom-5 items-center gap-3 bg-background border border-border rounded-lg px-4 py-2.5 shadow-[0_18px_50px_-20px_hsl(226_28%_30%/0.35)]">
         <div className="h-8 w-8 rounded-lg bg-profit/12 text-profit flex items-center justify-center">
           <Bell className="h-4 w-4" />
         </div>

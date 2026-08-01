@@ -153,8 +153,8 @@ export default function MyRules() {
     return (
       <div className="max-w-3xl mx-auto space-y-4 pb-12">
         <Skeleton className="h-8 w-48" />
-        <Skeleton className="h-64 rounded-xl" />
-        <Skeleton className="h-40 rounded-xl" />
+        <Skeleton className="h-64 rounded-lg" />
+        <Skeleton className="h-40 rounded-lg" />
       </div>
     );
   }

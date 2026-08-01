@@ -113,16 +113,16 @@ export default function SessionsTab({ days }: SessionsTabProps) {
   if (loading) return (
     <div className="space-y-4 animate-pulse">
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-        <Skeleton className="h-[220px] rounded-xl" />
-        <Skeleton className="h-[220px] rounded-xl" />
-        <Skeleton className="h-[220px] rounded-xl" />
+        <Skeleton className="h-[220px] rounded-lg" />
+        <Skeleton className="h-[220px] rounded-lg" />
+        <Skeleton className="h-[220px] rounded-lg" />
       </div>
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-        <Skeleton className="h-28 rounded-xl" />
-        <Skeleton className="h-28 rounded-xl" />
+        <Skeleton className="h-28 rounded-lg" />
+        <Skeleton className="h-28 rounded-lg" />
       </div>
-      <Skeleton className="h-[200px] rounded-xl" />
-      <Skeleton className="h-[180px] rounded-xl" />
+      <Skeleton className="h-[200px] rounded-lg" />
+      <Skeleton className="h-[180px] rounded-lg" />
     </div>
   );
 

@@ -26,7 +26,7 @@ interface DataCardProps {
  * └─────────────────────────────────────────┘
  *
  * Rules:
- * - Always rounded-xl (12px)
+ * - Always rounded-lg (12px)
  * - Always overflow-hidden
  * - Always shadow-card via .tm-card
  * - Header border-b uses border-border

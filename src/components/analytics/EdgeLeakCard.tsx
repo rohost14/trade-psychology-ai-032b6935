@@ -66,7 +66,7 @@ export default function EdgeLeakCard({ days }: Props) {
     return () => { cancelled = true; };
   }, [days]);
 
-  if (loading) return <Skeleton className="h-56 rounded-xl" />;
+  if (loading) return <Skeleton className="h-56 rounded-lg" />;
   if (!data?.has_data) return null;
 
   return (

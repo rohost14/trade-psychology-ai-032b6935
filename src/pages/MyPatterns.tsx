@@ -399,10 +399,10 @@ export default function MyPatterns() {
     return (
       <div className="w-full space-y-4 pb-12">
         <Skeleton className="h-8 w-48" />
-        <Skeleton className="h-40 rounded-xl" />
+        <Skeleton className="h-40 rounded-lg" />
         <div className="grid grid-cols-2 gap-4">
-          <Skeleton className="h-56 rounded-xl" />
-          <Skeleton className="h-56 rounded-xl" />
+          <Skeleton className="h-56 rounded-lg" />
+          <Skeleton className="h-56 rounded-lg" />
         </div>
       </div>
     );

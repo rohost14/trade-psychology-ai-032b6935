@@ -129,13 +129,13 @@ export default function BehaviorTab({ days }: BehaviorTabProps) {
 
   if (loading) return (
     <div className="space-y-4 animate-pulse">
-      <Skeleton className="h-[200px] rounded-xl" />
+      <Skeleton className="h-[200px] rounded-lg" />
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-        <Skeleton className="h-32 rounded-xl" />
-        <Skeleton className="h-32 rounded-xl" />
-        <Skeleton className="h-32 rounded-xl" />
+        <Skeleton className="h-32 rounded-lg" />
+        <Skeleton className="h-32 rounded-lg" />
+        <Skeleton className="h-32 rounded-lg" />
       </div>
-      <Skeleton className="h-24 rounded-xl" />
+      <Skeleton className="h-24 rounded-lg" />
     </div>
   );
 
@@ -252,7 +252,7 @@ export default function BehaviorTab({ days }: BehaviorTabProps) {
             {emotionRows.slice(0, 8).map(e => (
               <div
                 key={e.emotion}
-                className={cn('flex items-center gap-2 px-3 py-2 rounded-xl border', tagColor(e.emotion))}
+                className={cn('flex items-center gap-2 px-3 py-2 rounded-lg border', tagColor(e.emotion))}
               >
                 <span className="text-sm font-medium capitalize">{e.emotion}</span>
                 <span className="text-[11px] font-mono tabular-nums">

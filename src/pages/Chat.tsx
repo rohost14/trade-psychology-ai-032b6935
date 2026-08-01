@@ -510,7 +510,7 @@ export default function Chat() {
                   >
                     {/* AI avatar */}
                     {message.role === 'assistant' && (
-                      <div className="w-8 h-8 rounded-xl bg-teal-50 dark:bg-teal-900/20 border border-tm-brand/20 flex-shrink-0 flex items-center justify-center mt-0.5">
+                      <div className="w-8 h-8 rounded-lg bg-teal-50 dark:bg-teal-900/20 border border-tm-brand/20 flex-shrink-0 flex items-center justify-center mt-0.5">
                         <Bot className="h-4 w-4 text-tm-brand" />
                       </div>
                     )}
@@ -526,7 +526,7 @@ export default function Chat() {
                       {/* Bubble */}
                       <div
                         className={cn(
-                          'px-4 py-3 rounded-2xl text-sm leading-relaxed shadow-sm',
+                          'px-4 py-3 rounded-lg text-sm leading-relaxed shadow-sm',
                           message.role === 'user'
                             ? 'bg-tm-brand text-white rounded-tr-sm'
                             : 'bg-card border border-zinc-200 dark:border-zinc-700 text-foreground rounded-tl-sm'
@@ -591,7 +591,7 @@ export default function Chat() {
 
                     {/* User avatar */}
                     {message.role === 'user' && (
-                      <div className="w-8 h-8 rounded-xl bg-secondary border border-border flex-shrink-0 flex items-center justify-center mt-0.5">
+                      <div className="w-8 h-8 rounded-lg bg-secondary border border-border flex-shrink-0 flex items-center justify-center mt-0.5">
                         <User className="h-4 w-4 text-muted-foreground" />
                       </div>
                     )}
@@ -601,10 +601,10 @@ export default function Chat() {
               {/* Stand-alone typing indicator (only before first stream chunk arrives) */}
               {isLoading && messages[messages.length - 1]?.role !== 'assistant' && (
                 <div className="flex gap-3 justify-start">
-                  <div className="w-8 h-8 rounded-xl bg-primary/10 border border-primary/20 flex-shrink-0 flex items-center justify-center">
+                  <div className="w-8 h-8 rounded-lg bg-primary/10 border border-primary/20 flex-shrink-0 flex items-center justify-center">
                     <Bot className="h-4 w-4 text-primary" />
                   </div>
-                  <div className="bg-muted border border-border px-4 py-3 rounded-2xl rounded-tl-sm">
+                  <div className="bg-muted border border-border px-4 py-3 rounded-lg rounded-tl-sm">
                     <div className="flex gap-1.5 items-center h-4">
                       <span className="w-1.5 h-1.5 bg-muted-foreground/40 rounded-full animate-bounce" />
                       <span className="w-1.5 h-1.5 bg-muted-foreground/40 rounded-full animate-bounce [animation-delay:0.15s]" />
@@ -648,7 +648,7 @@ export default function Chat() {
               placeholder="Ask about your trading patterns…"
               aria-label="Message to AI coach"
               rows={1}
-              className="flex-1 px-4 py-2.5 bg-muted rounded-xl text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring resize-none overflow-y-auto min-h-[42px] max-h-[160px] leading-relaxed disabled:opacity-60"
+              className="flex-1 px-4 py-2.5 bg-muted rounded-lg text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring resize-none overflow-y-auto min-h-[42px] max-h-[160px] leading-relaxed disabled:opacity-60"
               disabled={isLoading}
             />
             <button
@@ -658,7 +658,7 @@ export default function Chat() {
               aria-label={deepMode ? 'Deep analysis on — click to switch to fast mode' : 'Fast mode — click for deep analysis'}
               title={deepMode ? 'Deep Analysis (Sonnet) — slower, more thorough' : 'Fast Mode (Haiku) — quick responses'}
               className={cn(
-                'h-[42px] w-[42px] rounded-xl flex-shrink-0 flex items-center justify-center transition-colors border',
+                'h-[42px] w-[42px] rounded-lg flex-shrink-0 flex items-center justify-center transition-colors border',
                 deepMode
                   ? 'bg-tm-brand/10 border-tm-brand/40 text-tm-brand'
                   : 'bg-muted border-transparent text-muted-foreground hover:text-foreground'
@@ -671,7 +671,7 @@ export default function Chat() {
               disabled={!input.trim() || isLoading}
               size="icon"
               aria-label={isLoading ? 'Sending…' : 'Send message'}
-              className="h-[42px] w-[42px] rounded-xl flex-shrink-0 shadow-sm"
+              className="h-[42px] w-[42px] rounded-lg flex-shrink-0 shadow-sm"
             >
               {isLoading ? (
                 <RefreshCw className="h-4 w-4 animate-spin" aria-hidden="true" />

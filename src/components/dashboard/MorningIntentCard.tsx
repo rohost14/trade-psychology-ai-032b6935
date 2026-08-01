@@ -77,7 +77,7 @@ export function MorningIntentCard({ onAcknowledged }: Props) {
   // No limits configured — show a subtle nudge to settings
   if (data && !data.planned?.max_trades && !data.planned?.max_loss) {
     return (
-      <div className="rounded-xl border border-amber-200/60 dark:border-amber-800/30 bg-amber-50/60 dark:bg-amber-900/10 px-4 py-3 flex items-center justify-between gap-3 mb-4">
+      <div className="rounded-lg border border-amber-200/60 dark:border-amber-800/30 bg-amber-50/60 dark:bg-amber-900/10 px-4 py-3 flex items-center justify-between gap-3 mb-4">
         <div className="flex items-center gap-2.5">
           <Pencil className="h-3.5 w-3.5 text-amber-600 dark:text-amber-400 shrink-0" />
           <div>
@@ -140,7 +140,7 @@ export function MorningIntentCard({ onAcknowledged }: Props) {
 
   return (
     <div className={cn(
-      'rounded-xl border mb-4 overflow-hidden',
+      'rounded-lg border mb-4 overflow-hidden',
       'bg-amber-50 dark:bg-amber-900/[0.12]',
       'border-amber-200/70 dark:border-amber-700/30',
     )}>
@@ -236,7 +236,7 @@ export function MorningIntentCard({ onAcknowledged }: Props) {
           onClick={handleCommit}
           disabled={submitting}
           className={cn(
-            'w-full h-10 rounded-xl font-semibold text-[13px] transition-all',
+            'w-full h-10 rounded-lg font-semibold text-[13px] transition-all',
             'bg-amber-500 hover:bg-amber-600 text-white',
             'active:scale-[0.98] disabled:opacity-60 disabled:cursor-not-allowed',
             'flex items-center justify-center gap-2',

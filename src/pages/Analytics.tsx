@@ -28,12 +28,12 @@ const HabitsTab    = lazy(() => import('@/components/analytics/HabitsTab'));
 function TabSkeleton() {
   return (
     <div className="space-y-4 pt-2 animate-pulse">
-      <Skeleton className="h-16 rounded-xl" />
-      <Skeleton className="h-[260px] rounded-xl" />
+      <Skeleton className="h-16 rounded-lg" />
+      <Skeleton className="h-[260px] rounded-lg" />
       <div className="grid grid-cols-2 md:grid-cols-4 gap-px">
         {[1,2,3,4].map(i => <Skeleton key={i} className="h-20" />)}
       </div>
-      <Skeleton className="h-[200px] rounded-xl" />
+      <Skeleton className="h-[200px] rounded-lg" />
     </div>
   );
 }

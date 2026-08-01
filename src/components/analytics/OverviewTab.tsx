@@ -234,13 +234,13 @@ export default function OverviewTab({ days }: OverviewTabProps) {
 
   if (loading) return (
     <div className="space-y-4 animate-pulse">
-      <Skeleton className="h-20 rounded-xl" />
-      <Skeleton className="h-8 rounded-xl" />
-      <Skeleton className="h-[240px] rounded-xl" />
-      <Skeleton className="h-[160px] rounded-xl" />
+      <Skeleton className="h-20 rounded-lg" />
+      <Skeleton className="h-8 rounded-lg" />
+      <Skeleton className="h-[240px] rounded-lg" />
+      <Skeleton className="h-[160px] rounded-lg" />
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-        <Skeleton className="h-[200px] rounded-xl" />
-        <Skeleton className="h-[200px] rounded-xl" />
+        <Skeleton className="h-[200px] rounded-lg" />
+        <Skeleton className="h-[200px] rounded-lg" />
       </div>
     </div>
   );
@@ -338,7 +338,7 @@ export default function OverviewTab({ days }: OverviewTabProps) {
       {/* ── Edge Confidence Banner ────────────────────────────────────────────── */}
       {edge?.has_data && (
         <div className={cn(
-          'flex items-start gap-3 px-4 py-3 rounded-xl border text-sm',
+          'flex items-start gap-3 px-4 py-3 rounded-lg border text-sm',
           edge.verdict === 'real_edge'
             ? 'bg-green-500/5 border-green-500/20'
             : edge.verdict === 'losing_edge'

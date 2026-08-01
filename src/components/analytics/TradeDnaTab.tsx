@@ -136,13 +136,13 @@ export default function TradeDnaTab({ days }: TradeDnaTabProps) {
 
   if (loading) return (
     <div className="space-y-4 animate-pulse">
-      <Skeleton className="h-24 rounded-xl" />
+      <Skeleton className="h-24 rounded-lg" />
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-        <Skeleton className="h-[220px] rounded-xl" />
-        <Skeleton className="h-[220px] rounded-xl" />
+        <Skeleton className="h-[220px] rounded-lg" />
+        <Skeleton className="h-[220px] rounded-lg" />
       </div>
-      <Skeleton className="h-[200px] rounded-xl" />
-      <Skeleton className="h-[180px] rounded-xl" />
+      <Skeleton className="h-[200px] rounded-lg" />
+      <Skeleton className="h-[180px] rounded-lg" />
     </div>
   );
 

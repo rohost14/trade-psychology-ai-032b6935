@@ -561,12 +561,12 @@ export default function Reports() {
       {/* Content */}
       {isLoading ? (
         <div className="space-y-3">
-          {[1,2,3].map(i => <Skeleton key={i} className="h-16 rounded-xl" />)}
+          {[1,2,3].map(i => <Skeleton key={i} className="h-16 rounded-lg" />)}
         </div>
       ) : error ? (
         <ErrorState error={error} onRetry={() => fetchReports(filter, 0)} />
       ) : reports.length === 0 ? (
-        <div className="flex flex-col items-center justify-center min-h-[30vh] rounded-xl border border-border bg-card">
+        <div className="flex flex-col items-center justify-center min-h-[30vh] rounded-lg border border-border bg-card">
           <FileText className="h-10 w-10 text-muted-foreground/40 mb-3" />
           <p className="font-medium text-foreground">No reports yet</p>
           <p className="text-sm text-muted-foreground mt-1">

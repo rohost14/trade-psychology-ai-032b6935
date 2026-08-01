@@ -14,7 +14,7 @@ const NotFound = () => {
   return (
     <div className="min-h-screen flex items-center justify-center bg-background text-foreground px-6">
       <div className="w-full max-w-md text-center">
-        <div className="w-14 h-14 mx-auto mb-5 rounded-2xl bg-[rgb(var(--tm-brand))]/10 flex items-center justify-center">
+        <div className="w-14 h-14 mx-auto mb-5 rounded-lg bg-[rgb(var(--tm-brand))]/10 flex items-center justify-center">
           <Compass className="h-7 w-7 text-[rgb(var(--tm-brand))]" />
         </div>
 
