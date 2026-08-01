@@ -7,6 +7,7 @@ import {
 } from 'recharts';
 import { Skeleton } from '@/components/ui/skeleton';
 import { cn } from '@/lib/utils';
+import { useChartColors } from '@/hooks/useChartColors';
 import { formatCurrencyWithSign, formatCurrency, formatAxisCurrency } from '@/lib/formatters';
 import type { ChartTooltipProps } from '@/lib/chartTooltip';
 import { api } from '@/lib/api';
@@ -98,6 +99,7 @@ function InstrHourTooltip({ active, payload }: ChartTooltipProps<{ label: string
 }
 
 export default function InstrumentPanel({ underlying, days, onClose }: InstrumentPanelProps) {
+  const c = useChartColors();
   const [data, setData]         = useState<InstrumentData | null>(null);
   const [isLoading, setIsLoading] = useState(true);
 
@@ -245,8 +247,8 @@ export default function InstrumentPanel({ underlying, days, onClose }: Instrumen
                         <AreaChart data={data.equity_curve}>
                           <defs>
                             <linearGradient id="instrGrad" x1="0" y1="0" x2="0" y2="1">
-                              <stop offset="5%"  stopColor={isProfit ? '#16A34A' : '#DC2626'} stopOpacity={0.18} />
-                              <stop offset="95%" stopColor={isProfit ? '#16A34A' : '#DC2626'} stopOpacity={0} />
+                              <stop offset="5%"  stopColor={isProfit ? c.profit : c.loss} stopOpacity={0.18} />
+                              <stop offset="95%" stopColor={isProfit ? c.profit : c.loss} stopOpacity={0} />
                             </linearGradient>
                           </defs>
                           <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" strokeOpacity={0.5} vertical={false} />
@@ -258,7 +260,7 @@ export default function InstrumentPanel({ underlying, days, onClose }: Instrumen
                           <Tooltip content={<InstrEquityTooltip />} />
                           <ReferenceLine y={0} stroke="hsl(var(--border))" strokeWidth={1.5} />
                           <Area type="monotone" dataKey="cumulative_pnl"
-                            stroke={isProfit ? '#16A34A' : '#DC2626'} strokeWidth={1.5}
+                            stroke={isProfit ? c.profit : c.loss} strokeWidth={1.5}
                             fill="url(#instrGrad)" />
                         </AreaChart>
                       </ResponsiveContainer>
@@ -287,7 +289,7 @@ export default function InstrumentPanel({ underlying, days, onClose }: Instrumen
                           <ReferenceLine y={0} stroke="hsl(var(--border))" strokeWidth={1.5} />
                           <Bar dataKey="pnl" radius={[2,2,0,0]}>
                             {data.by_hour.map((entry, i) => (
-                              <Cell key={i} fill={entry.pnl >= 0 ? '#16A34A' : '#DC2626'} />
+                              <Cell key={i} fill={c.forValue(entry.pnl)} />
                             ))}
                           </Bar>
                         </BarChart>

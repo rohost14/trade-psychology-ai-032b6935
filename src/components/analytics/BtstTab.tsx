@@ -6,6 +6,7 @@ import {
 } from 'recharts';
 import { Skeleton } from '@/components/ui/skeleton';
 import { cn } from '@/lib/utils';
+import { useChartColors } from '@/hooks/useChartColors';
 import { formatCurrencyWithSign, formatAxisCurrency } from '@/lib/formatters';
 import { api } from '@/lib/api';
 import { useBroker } from '@/contexts/BrokerContext';
@@ -45,6 +46,7 @@ function fmtHold(min: number | null): string {
 }
 
 export default function BtstTab({ days }: { days: number }) {
+  const c = useChartColors();
   const { account } = useBroker();
   const [data, setData] = useState<BTSTData | null>(null);
   const [loading, setLoading] = useState(true);
@@ -167,7 +169,7 @@ export default function BtstTab({ days }: { days: number }) {
                   />
                   <Bar dataKey="pnl" radius={[3, 3, 0, 0]}>
                     {monthlyPnl.map((entry, i) => (
-                      <Cell key={i} fill={entry.pnl >= 0 ? '#16A34A' : '#DC2626'} />
+                      <Cell key={i} fill={c.forValue(entry.pnl)} />
                     ))}
                   </Bar>
                 </BarChart>

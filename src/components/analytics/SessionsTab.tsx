@@ -7,6 +7,7 @@ import { RefreshCw, AlertTriangle, Clock } from 'lucide-react';
 import { Skeleton } from '@/components/ui/skeleton';
 import ErrorState from '@/components/ErrorState';
 import { cn } from '@/lib/utils';
+import { useChartColors } from '@/hooks/useChartColors';
 import { formatCurrencyWithSign, formatAxisCurrency } from '@/lib/formatters';
 import type { ChartTooltipProps } from '@/lib/chartTooltip';
 import { api } from '@/lib/api';
@@ -64,8 +65,9 @@ function pnlColorClass(pnl: number) {
 function calendarBg(pnl: number, trades: number) {
   if (trades === 0) return '';
   const intensity = Math.min(1, Math.abs(pnl) / 5000);
-  if (pnl > 0) return `rgba(22,163,74,${0.1 + intensity * 0.45})`;
-  return `rgba(220,38,38,${0.1 + intensity * 0.45})`;
+  // Colours passed in: this is a module-level helper, so it cannot call a hook.
+  if (pnl > 0) return `rgb(var(--tm-profit) / ${0.1 + intensity * 0.45})`;
+  return `rgb(var(--tm-loss) / ${0.1 + intensity * 0.45})`;
 }
 
 /**
@@ -182,6 +184,7 @@ function DowTooltip({ active, payload }: ChartTooltipProps<ExpiryWeekDow>) {
 }
 
 export default function SessionsTab({ days }: SessionsTabProps) {
+  const c = useChartColors();
   const [overview, setOverview]   = useState<OverviewData | null>(null);
   const [expiry, setExpiry]       = useState<ExpiryData | null>(null);
   const [conditional, setCond]    = useState<ConditionalData | null>(null);
@@ -255,8 +258,8 @@ export default function SessionsTab({ days }: SessionsTabProps) {
               {calendarMonths.length === 1 ? 'P&L Calendar' : `${calendarMonths.length}-Month P&L Calendar`}
             </p>
             <div className="flex items-center gap-3 text-[10px] text-muted-foreground">
-              <div className="flex items-center gap-1"><div className="w-3 h-3 rounded-sm" style={{ backgroundColor: 'rgba(22,163,74,0.5)' }} /> Profit</div>
-              <div className="flex items-center gap-1"><div className="w-3 h-3 rounded-sm" style={{ backgroundColor: 'rgba(220,38,38,0.5)' }} /> Loss</div>
+              <div className="flex items-center gap-1"><div className="w-3 h-3 rounded-sm" style={{ backgroundColor: 'rgb(var(--tm-profit) / 0.5)' }} /> Profit</div>
+              <div className="flex items-center gap-1"><div className="w-3 h-3 rounded-sm" style={{ backgroundColor: 'rgb(var(--tm-loss) / 0.5)' }} /> Loss</div>
             </div>
           </div>
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
@@ -450,7 +453,7 @@ export default function SessionsTab({ days }: SessionsTabProps) {
                 <ReferenceLine y={0} stroke="rgba(0,0,0,0.15)" />
                 <Bar dataKey="avg_pnl" radius={[3, 3, 0, 0]} maxBarSize={44}>
                   {dowRaw.map((d, i) => (
-                    <Cell key={i} fill={d.avg_pnl >= 0 ? '#16a34a' : '#dc2626'} opacity={0.8} />
+                    <Cell key={i} fill={c.forValue(d.avg_pnl)} opacity={0.8} />
                   ))}
                 </Bar>
               </BarChart>

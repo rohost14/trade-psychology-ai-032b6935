@@ -7,6 +7,7 @@ import { RefreshCw, AlertTriangle, Search, TrendingUp, TrendingDown, Shield, Ale
 import { Skeleton } from '@/components/ui/skeleton';
 import ErrorState from '@/components/ErrorState';
 import { cn } from '@/lib/utils';
+import { useChartColors } from '@/hooks/useChartColors';
 import { formatCurrencyWithSign } from '@/lib/formatters';
 import type { ChartTooltipProps } from '@/lib/chartTooltip';
 import { api } from '@/lib/api';
@@ -99,6 +100,7 @@ function HoldTooltip({ active, payload }: ChartTooltipProps<PnlPctData['by_hold_
 }
 
 export default function TradeDnaTab({ days }: TradeDnaTabProps) {
+  const c = useChartColors();
   const [quality, setQuality]     = useState<QualityData | null>(null);
   const [critical, setCritical]   = useState<CriticalData | null>(null);
   const [pnlPct, setPnlPct]       = useState<PnlPctData | null>(null);
@@ -343,10 +345,10 @@ export default function TradeDnaTab({ days }: TradeDnaTabProps) {
                 <XAxis dataKey="label" tick={{ fontSize: 10 }} tickLine={false} axisLine={false} />
                 <YAxis tick={{ fontSize: 10 }} tickLine={false} axisLine={false} unit="%" domain={[0, 100]} />
                 <Tooltip content={<SeqTooltip baseline={baseline} />} />
-                <ReferenceLine y={baseline} stroke="#0d9488" strokeDasharray="4 4" label={{ value: `Baseline ${baseline}%`, position: 'insideTopRight', fontSize: 10, fill: '#0d9488' }} />
+                <ReferenceLine y={baseline} stroke="#0d9488" strokeDasharray="4 4" label={{ value: `Baseline ${baseline}%`, position: 'insideTopRight', fontSize: 10, fill: c.primary }} />
                 <Bar dataKey="win_rate" radius={[3, 3, 0, 0]} maxBarSize={40}>
                   {sequence!.sequence.map((d, i) => (
-                    <Cell key={i} fill={d.win_rate >= baseline ? '#16a34a' : '#dc2626'} opacity={0.8} />
+                    <Cell key={i} fill={d.win_rate >= baseline ? c.profit : c.loss} opacity={0.8} />
                   ))}
                 </Bar>
               </BarChart>
@@ -378,7 +380,7 @@ export default function TradeDnaTab({ days }: TradeDnaTabProps) {
                 <ReferenceLine y={0} stroke="rgba(0,0,0,0.15)" />
                 <Bar dataKey="avg_pct" radius={[3, 3, 0, 0]} maxBarSize={36}>
                   {pnlPct.by_hold_time.map((d, i) => (
-                    <Cell key={i} fill={d.avg_pct >= 0 ? '#16a34a' : '#dc2626'} opacity={0.8} />
+                    <Cell key={i} fill={c.forValue(d.avg_pct)} opacity={0.8} />
                   ))}
                 </Bar>
               </BarChart>

@@ -146,7 +146,7 @@ export default function AnalyticsLab() {
               <button
                 role="tab"
                 aria-selected={tab === value}
-                onClick={() => setTab(value)}
+                onClick={() => { setTab(value); window.scrollTo({ top: 0, behavior: 'smooth' }); }}
                 className={cn(
                   'flex items-center gap-1.5 px-3.5 py-2.5 text-[13px] font-medium border-b-2 transition-colors -mb-px whitespace-nowrap shrink-0',
                   tab === value

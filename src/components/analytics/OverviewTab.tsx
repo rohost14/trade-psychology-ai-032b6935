@@ -9,6 +9,7 @@ import { TrendingUp, TrendingDown, CheckCircle2, Activity, ArrowUp, ArrowDown, M
 import { Skeleton } from '@/components/ui/skeleton';
 import ErrorState from '@/components/ErrorState';
 import { cn } from '@/lib/utils';
+import { useChartColors } from '@/hooks/useChartColors';
 import { formatCurrency, formatCurrencyWithSign, formatAxisCurrency } from '@/lib/formatters';
 import { extractUnderlying } from '@/lib/symbolClassify';
 import type { ChartTooltipProps } from '@/lib/chartTooltip';
@@ -202,6 +203,7 @@ function PnlHeroCell({
 // ── main component ───────────────────────────────────────────────────────────
 
 export default function OverviewTab({ days }: OverviewTabProps) {
+  const c = useChartColors();
   const [overview, setOverview]   = useState<OverviewData | null>(null);
   const [ovPrev, setOvPrev]       = useState<OverviewData | null>(null);
   const [edge, setEdge]           = useState<EdgeData | null>(null);
@@ -261,7 +263,7 @@ export default function OverviewTab({ days }: OverviewTabProps) {
 
   const winDaysPct = k && k.trading_days > 0 ? Math.round(k.win_days / k.trading_days * 100) : 0;
   const lastPnl    = overview?.equity_curve?.at(-1)?.cumulative_pnl ?? 0;
-  const equityColor = lastPnl >= 0 ? '#16a34a' : '#dc2626';
+  const equityColor = c.forValue(lastPnl);
 
   // P&L attribution donut
   const pieData = perf?.by_instrument ? buildPieData(perf.by_instrument) : [];
@@ -385,7 +387,7 @@ export default function OverviewTab({ days }: OverviewTabProps) {
                   </linearGradient>
                 </defs>
                 <CartesianGrid strokeDasharray="3 3" stroke="rgba(0,0,0,0.06)" vertical={false} />
-                <XAxis dataKey="date" tickFormatter={fmtDate} tick={{ fontSize: 10 }} tickLine={false} axisLine={false} interval="preserveStartEnd" />
+                <XAxis dataKey="date" tickFormatter={fmtDate} tick={{ fontSize: 10 }} tickLine={false} axisLine={false} interval="preserveStartEnd" minTickGap={44} />
                 <YAxis tick={{ fontSize: 10 }} tickLine={false} axisLine={false} width={52} tickFormatter={formatAxisCurrency} />
                 <Tooltip content={<EquityTooltip />} />
                 <ReferenceLine y={0} stroke="rgba(0,0,0,0.12)" strokeDasharray="3 3" />
@@ -414,13 +416,13 @@ export default function OverviewTab({ days }: OverviewTabProps) {
             <ResponsiveContainer width="100%" height={160}>
               <BarChart data={overview.daily_pnl} margin={{ top: 4, right: 4, left: -16, bottom: 0 }}>
                 <CartesianGrid strokeDasharray="3 3" stroke="rgba(0,0,0,0.06)" vertical={false} />
-                <XAxis dataKey="date" tickFormatter={fmtDate} tick={{ fontSize: 10 }} tickLine={false} axisLine={false} interval="preserveStartEnd" />
+                <XAxis dataKey="date" tickFormatter={fmtDate} tick={{ fontSize: 10 }} tickLine={false} axisLine={false} interval="preserveStartEnd" minTickGap={44} />
                 <YAxis tick={{ fontSize: 10 }} tickLine={false} axisLine={false} width={52} tickFormatter={formatAxisCurrency} />
                 <Tooltip content={<DailyTooltip />} />
                 <ReferenceLine y={0} stroke="rgba(0,0,0,0.15)" />
                 <Bar dataKey="pnl" radius={[2, 2, 0, 0]} maxBarSize={18}>
                   {overview.daily_pnl.map((d, i) => (
-                    <Cell key={i} fill={d.pnl >= 0 ? '#16a34a' : '#dc2626'} opacity={0.8} />
+                    <Cell key={i} fill={c.forValue(d.pnl)} opacity={0.8} />
                   ))}
                 </Bar>
               </BarChart>

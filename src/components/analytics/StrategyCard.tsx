@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { Layers } from 'lucide-react';
 import { Skeleton } from '@/components/ui/skeleton';
 import { cn } from '@/lib/utils';
+import { useChartColors } from '@/hooks/useChartColors';
 import { formatCurrencyWithSign } from '@/lib/formatters';
 import { api } from '@/lib/api';
 
@@ -18,6 +19,7 @@ interface Data { has_data: boolean; strategies: Strat[] }
 interface Props { days: number }
 
 export default function StrategyCard({ days }: Props) {
+  const c = useChartColors();
   const [data, setData] = useState<Data | null>(null);
   const [loading, setLoading] = useState(true);
 
@@ -64,7 +66,7 @@ export default function StrategyCard({ days }: Props) {
               </div>
               <div className="flex items-center gap-2">
                 <div className="flex-1 h-1 rounded-full bg-muted/60 overflow-hidden">
-                  <div className="h-full rounded-full" style={{ width: `${barPct}%`, backgroundColor: good ? '#16a34a' : '#dc2626' }} />
+                  <div className="h-full rounded-full" style={{ width: `${barPct}%`, backgroundColor: good ? c.profit : c.loss }} />
                 </div>
                 <span className="text-[10px] text-muted-foreground w-28 text-right shrink-0">
                   {s.trades} trades · {Math.round(s.win_rate)}% WR

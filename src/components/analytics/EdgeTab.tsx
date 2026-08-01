@@ -7,6 +7,7 @@ import { RefreshCw, AlertTriangle } from 'lucide-react';
 import { Skeleton } from '@/components/ui/skeleton';
 import ErrorState from '@/components/ErrorState';
 import { cn } from '@/lib/utils';
+import { useChartColors } from '@/hooks/useChartColors';
 import { formatCurrencyWithSign, formatAxisCurrency } from '@/lib/formatters';
 import { extractUnderlying, optionType, classifyExpiry } from '@/lib/symbolClassify';
 import type { ChartTooltipProps } from '@/lib/chartTooltip';
@@ -55,7 +56,6 @@ function groupByUnderlying(instruments: PerfData['by_instrument']) {
     .slice(0, 10);
 }
 
-function pnlColor(v: number) { return v >= 0 ? '#16a34a' : '#dc2626'; }
 
 const DAY_ORDER = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri'];
 
@@ -119,6 +119,7 @@ function SizeTooltip({ active, payload }: ChartTooltipProps<PerfData['size_analy
 // ── Component ─────────────────────────────────────────────────────────────────
 
 export default function EdgeTab({ days, onInstrumentClick }: EdgeTabProps) {
+  const c = useChartColors();
   const [perf, setPerf]       = useState<PerfData | null>(null);
   const [heatmap, setHeatmap] = useState<HeatmapData | null>(null);
   const [loading, setLoading] = useState(true);
@@ -303,11 +304,20 @@ export default function EdgeTab({ days, onInstrumentClick }: EdgeTabProps) {
                       </div>
                     </div>
                     <div className="flex items-center gap-2">
-                      <div className="flex-1 h-1 rounded-full bg-muted/60 overflow-hidden">
-                        <div
-                          className="h-full rounded-full"
-                          style={{ width: `${barPct}%`, backgroundColor: pnlColor(g.pnl) }}
-                        />
+                      {/* Diverging from a centre baseline. Every bar used to grow
+                          rightward from a shared left origin, so a bigger loss drew
+                          a longer bar and read as "more". */}
+                      <div className="flex-1 h-1 flex items-center" aria-hidden>
+                        <div className="w-1/2 flex justify-end">
+                          {g.pnl < 0 && (
+                            <div className="h-1 rounded-l-full" style={{ width: `${barPct}%`, backgroundColor: c.loss }} />
+                          )}
+                        </div>
+                        <div className="w-1/2">
+                          {g.pnl >= 0 && (
+                            <div className="h-1 rounded-r-full" style={{ width: `${barPct}%`, backgroundColor: c.profit }} />
+                          )}
+                        </div>
                       </div>
                       <span className="text-[10px] text-muted-foreground w-10 text-right font-mono shrink-0">
                         {g.win_rate}% WR
@@ -373,7 +383,7 @@ export default function EdgeTab({ days, onInstrumentClick }: EdgeTabProps) {
                 <ReferenceLine y={0} stroke="rgba(0,0,0,0.15)" />
                 <Bar dataKey="avg_pnl" radius={[3, 3, 0, 0]} maxBarSize={36}>
                   {hourBarData.map((d, i) => (
-                    <Cell key={i} fill={d.avg_pnl >= 0 ? '#16a34a' : '#dc2626'} opacity={0.8} />
+                    <Cell key={i} fill={c.forValue(d.avg_pnl)} opacity={0.8} />
                   ))}
                 </Bar>
               </BarChart>
@@ -404,7 +414,7 @@ export default function EdgeTab({ days, onInstrumentClick }: EdgeTabProps) {
                 <ReferenceLine y={0} stroke="rgba(0,0,0,0.15)" />
                 <Bar dataKey="avg_pnl" radius={[3, 3, 0, 0]} maxBarSize={40}>
                   {dowBarData.map((d, i) => (
-                    <Cell key={i} fill={d.avg_pnl >= 0 ? '#16a34a' : '#dc2626'} opacity={0.8} />
+                    <Cell key={i} fill={c.forValue(d.avg_pnl)} opacity={0.8} />
                   ))}
                 </Bar>
               </BarChart>
@@ -434,7 +444,7 @@ export default function EdgeTab({ days, onInstrumentClick }: EdgeTabProps) {
                 <Tooltip content={<SizeTooltip />} />
                 <Bar dataKey="avg_pnl" radius={[3, 3, 0, 0]} maxBarSize={40}>
                   {sizeData.map((d, i) => (
-                    <Cell key={i} fill={d.avg_pnl >= 0 ? '#16a34a' : '#dc2626'} opacity={0.8} />
+                    <Cell key={i} fill={c.forValue(d.avg_pnl)} opacity={0.8} />
                   ))}
                 </Bar>
               </BarChart>
