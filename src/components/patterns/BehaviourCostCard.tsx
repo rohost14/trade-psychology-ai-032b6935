@@ -23,14 +23,24 @@ const PATTERN_LABEL: Record<string, string> = {
   post_loss_recovery_bet: 'Recovery bet after a loss', no_stoploss: 'No stop-loss',
   fomo_entry: 'FOMO entry', chasing_entry: 'Chasing entries', direction_instability: 'Flip-flopping direction',
   cooldown_violation: 'Cooldown ignored', winning_streak_overconfidence: 'Overconfidence on a streak',
+  early_exit: 'Cutting winners early', profit_giveaway: 'Giving profit back',
+  session_meltdown: 'Session meltdown', daily_overtrading: 'Overtrading (daily)',
+  overtrading_burst: 'Overtrading burst', expiry_day_overtrading: 'Expiry-day overtrading',
+  constitution_violation: 'Own rule broken',
 };
 const RULE_LABEL: Record<string, string> = {
   cooldown_after_loss: 'Cooldown after a loss', daily_trade_limit: 'Daily trade limit',
   max_consecutive_losses: 'Consecutive-loss stop', restricted_windows: 'Restricted time windows',
   daily_loss_limit: 'Daily loss limit', max_position_size: 'Max position size',
 };
-const labelPattern = (k?: string) => (k && PATTERN_LABEL[k]) || (k ? k.replace(/_/g, ' ') : '—');
-const labelRule = (k?: string) => (k && RULE_LABEL[k]) || (k ? k.replace(/_/g, ' ') : '—');
+// Sentence-case the fallback so a detector missing from the map above still
+// reads as a label rather than a database key.
+const humanise = (k: string) => {
+  const words = k.replace(/_/g, ' ');
+  return words.charAt(0).toUpperCase() + words.slice(1);
+};
+const labelPattern = (k?: string) => (k && PATTERN_LABEL[k]) || (k ? humanise(k) : '—');
+const labelRule = (k?: string) => (k && RULE_LABEL[k]) || (k ? humanise(k) : '—');
 
 // U+2212 minus, not an ASCII hyphen — matches every other money figure in the
 // app. Visible here because these rows are now the first thing on Analytics.
@@ -56,7 +66,9 @@ function Section({ title, totals, unitLabel, rows, label }: {
             <div key={i} className="flex items-center justify-between py-1.5 border-b border-border last:border-0">
               <div className="min-w-0">
                 <span className="text-[13px] font-medium text-foreground">{label(r.pattern_type ?? r.rule)}</span>
-                <span className="text-[11px] text-muted-foreground ml-2">{count} {unitLabel} · {r.trade_count} trades</span>
+                <span className="text-[11px] text-muted-foreground ml-2">
+                  {count} {count === 1 ? unitLabel.replace(/e?s$/, '') : unitLabel} · {r.trade_count} trade{r.trade_count !== 1 ? 's' : ''}
+                </span>
               </div>
               <span className={`text-[13px] font-semibold tabular-nums shrink-0 ${pnlClass(r.realized_pnl)}`}>{inr(r.realized_pnl)}</span>
             </div>

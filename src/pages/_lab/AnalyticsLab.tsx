@@ -19,6 +19,7 @@ import { cn } from '@/lib/utils';
 import { useBroker } from '@/contexts/BrokerContext';
 import ReportCard from '@/components/analytics/ReportCard';
 import BehaviourCostCard from '@/components/patterns/BehaviourCostCard';
+import PnlCalendar from './analytics/PnlCalendar';
 import { OVERVIEW_VARIANTS, type OverviewVariant } from './analytics/OverviewLab';
 import ImportHistoryPrompt from '@/components/onboarding/ImportHistoryPrompt';
 import EdgeLeakCard from '@/components/analytics/EdgeLeakCard';
@@ -31,7 +32,7 @@ const OverviewTab  = lazy(() => import('./analytics/OverviewLab'));
 const EdgeTab      = lazy(() => import('@/components/analytics/EdgeTab'));
 const TradeDnaTab  = lazy(() => import('@/components/analytics/TradeDnaTab'));
 const BehaviorTab  = lazy(() => import('@/components/analytics/BehaviorTab'));
-const SessionsTab  = lazy(() => import('@/components/analytics/SessionsTab'));
+const SessionsTab  = lazy(() => import('./analytics/SessionsLab'));
 const BtstTab      = lazy(() => import('@/components/analytics/BtstTab'));
 const HabitsTab    = lazy(() => import('@/components/analytics/HabitsTab'));
 
@@ -188,6 +189,9 @@ export default function AnalyticsLab() {
                   how often, ranked by money. Realized P&L of the exact flagged
                   trades -- never an estimate. */}
               <BehaviourCostCard days={days} />
+              {/* Promoted out of Advanced: "when do I trade well" is the central
+                  question for a behavioural product, not an advanced one. */}
+              <PnlCalendar days={days} />
               <BehaviorTab days={days} />
               <TradeDnaTab days={days} />
             </div>

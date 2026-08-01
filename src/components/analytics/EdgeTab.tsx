@@ -143,7 +143,7 @@ export default function EdgeTab({ days, onInstrumentClick }: EdgeTabProps) {
 
   if (loading) return (
     <div className="space-y-4 animate-pulse">
-      <div className="grid grid-cols-2 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
         <Skeleton className="h-24 rounded-xl" />
         <Skeleton className="h-24 rounded-xl" />
       </div>
@@ -222,7 +222,7 @@ export default function EdgeTab({ days, onInstrumentClick }: EdgeTabProps) {
           <div className="px-5 py-3.5 border-b border-border">
             <p className="font-semibold text-sm">Options P&L Split</p>
           </div>
-          <div className="grid grid-cols-3 divide-x divide-border">
+          <div className="grid grid-cols-1 sm:grid-cols-3 divide-y sm:divide-y-0 sm:divide-x divide-border">
             {[
               { label: 'CALLS (CE)', trades: ceTrades, pnl: cePnl },
               { label: 'PUTS (PE)',  trades: peTrades,  pnl: pePnl },
@@ -251,7 +251,7 @@ export default function EdgeTab({ days, onInstrumentClick }: EdgeTabProps) {
           <div className="px-5 py-3.5 border-b border-border">
             <p className="font-semibold text-sm">Weekly vs Monthly Options</p>
           </div>
-          <div className="grid grid-cols-2 divide-x divide-border">
+          <div className="grid grid-cols-1 sm:grid-cols-2 divide-y sm:divide-y-0 sm:divide-x divide-border">
             {[
               { label: 'Weekly Expiry', trades: wTrades, pnl: wPnl, wr: wWR },
               { label: 'Monthly Expiry', trades: mTrades, pnl: mPnl, wr: mWR },

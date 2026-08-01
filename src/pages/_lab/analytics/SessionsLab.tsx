@@ -1,3 +1,7 @@
+/**
+ * DESIGN LAB — SessionsTab with the P&L calendar removed, because the calendar
+ * has been promoted to the Behaviour tab. Everything else is the original.
+ */
 import { useState, useEffect } from 'react';
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip,
@@ -61,111 +65,10 @@ function pnlColorClass(pnl: number) {
   return 'text-muted-foreground';
 }
 
-function calendarBg(pnl: number, trades: number) {
-  if (trades === 0) return '';
-  const intensity = Math.min(1, Math.abs(pnl) / 5000);
-  if (pnl > 0) return `rgba(22,163,74,${0.1 + intensity * 0.45})`;
-  return `rgba(220,38,38,${0.1 + intensity * 0.45})`;
-}
 
-/**
- * How many calendar months the selected period actually touches.
- *
- * The calendar used to render a fixed three months whatever the page's
- * 7D/30D/90D selector said, so changing the period visibly did nothing to it
- * and two of the three months were always empty. Deriving the span from `days`
- * keeps the control honest: the calendar now shows the months the period
- * covers and no more.
- */
-function monthsForPeriod(days: number): number {
-  const today = new Date();
-  const start = new Date(today.getFullYear(), today.getMonth(), today.getDate() - Math.max(0, days - 1));
-  const span = (today.getFullYear() - start.getFullYear()) * 12 + (today.getMonth() - start.getMonth()) + 1;
-  return Math.max(1, span);
-}
 const DOW_ORDER = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri'];
 
-function buildCalendar(dailyPnl: OverviewData['daily_pnl'], monthsToShow: number) {
-  const byDate: Record<string, { pnl: number; trades: number }> = {};
-  for (const d of dailyPnl) {
-    byDate[d.date.slice(0, 10)] = { pnl: d.pnl, trades: d.trades };
-  }
 
-  const today  = new Date();
-  const months: { year: number; month: number; days: { date: string; pnl: number; trades: number; isWeekend: boolean }[] }[] = [];
-
-  for (let mo = monthsToShow - 1; mo >= 0; mo--) {
-    const d = new Date(today.getFullYear(), today.getMonth() - mo, 1);
-    const year = d.getFullYear();
-    const month = d.getMonth();
-    const daysInMonth = new Date(year, month + 1, 0).getDate();
-    const days = [];
-    for (let day = 1; day <= daysInMonth; day++) {
-      const dateStr = `${year}-${String(month + 1).padStart(2,'0')}-${String(day).padStart(2,'0')}`;
-      const dow = new Date(year, month, day).getDay();
-      const isWeekend = dow === 0 || dow === 6;
-      days.push({
-        date: dateStr,
-        pnl: byDate[dateStr]?.pnl ?? 0,
-        trades: byDate[dateStr]?.trades ?? 0,
-        isWeekend,
-      });
-    }
-    months.push({ year, month, days });
-  }
-  return months;
-}
-
-function CalendarMonth({ year, month, days }: { year: number; month: number; days: { date: string; pnl: number; trades: number; isWeekend: boolean }[] }) {
-  const firstDow = new Date(year, month, 1).getDay();
-  const blanks   = firstDow === 0 ? 6 : firstDow - 1; // Mon-first grid
-  const monthName = new Date(year, month, 1).toLocaleString('en-IN', { month: 'long', year: 'numeric' });
-  const tradingDays = days.filter(d => d.trades > 0);
-  const profitDays  = tradingDays.filter(d => d.pnl > 0).length;
-
-  return (
-    <div className="tm-card overflow-hidden">
-      <div className="px-4 py-3 border-b border-border flex items-center justify-between">
-        <p className="font-semibold text-sm">{monthName}</p>
-        {tradingDays.length > 0 && (
-          <span className="text-xs text-muted-foreground">
-            {profitDays}/{tradingDays.length} profitable
-          </span>
-        )}
-      </div>
-      <div className="p-3">
-        {/* Day headers */}
-        <div className="grid grid-cols-7 mb-1">
-          {['M','T','W','T','F','S','S'].map((d, i) => (
-            <div key={i} className="text-center text-[9px] text-muted-foreground py-1">{d}</div>
-          ))}
-        </div>
-        {/* Day cells — min-h-[36px] ensures readable on mobile 390px */}
-        <div className="grid grid-cols-7 gap-px">
-          {Array.from({ length: blanks }).map((_, i) => <div key={`b${i}`} className="min-h-[36px]" />)}
-          {days.map(d => (
-            <div
-              key={d.date}
-              className={cn(
-                'min-h-[36px] rounded-sm flex flex-col items-center justify-center',
-                d.isWeekend ? 'opacity-25' : '',
-              )}
-              style={{ backgroundColor: d.trades > 0 ? calendarBg(d.pnl, d.trades) : undefined }}
-              title={d.trades > 0 ? `${d.date}: ${formatCurrencyWithSign(Math.round(d.pnl))} · ${d.trades} trades` : d.date}
-            >
-              <span className="text-[10px] text-muted-foreground leading-none">{parseInt(d.date.slice(8))}</span>
-              {d.trades > 0 && (
-                <span className={cn('text-[8px] font-mono leading-none mt-0.5', pnlColorClass(d.pnl))}>
-                  {d.pnl >= 0 ? '+' : ''}{Math.round(d.pnl / 1000)}k
-                </span>
-              )}
-            </div>
-          ))}
-        </div>
-      </div>
-    </div>
-  );
-}
 
 function DowTooltip({ active, payload }: ChartTooltipProps<ExpiryWeekDow>) {
   if (!active || !payload?.length) return null;
@@ -224,8 +127,6 @@ export default function SessionsTab({ days }: SessionsTabProps) {
   );
 
   if (error) return <ErrorState error={error} onRetry={() => setRetry(r => r + 1)} />;
-
-  const calendarMonths = overview?.daily_pnl ? buildCalendar(overview.daily_pnl, monthsForPeriod(days)) : [];
   // conditional-performance returns a `conditions` ARRAY keyed by `key` —
   // pick the two session-relevant ones (absent when below the sample gate).
   const conditions = conditional?.has_data ? (conditional.conditions ?? []) : [];
@@ -247,26 +148,9 @@ export default function SessionsTab({ days }: SessionsTabProps) {
   return (
     <div className="space-y-5">
 
-      {/* P&L Calendar */}
-      {calendarMonths.length > 0 && (
-        <div>
-          <div className="flex items-center justify-between mb-3">
-            <p className="font-semibold text-sm">
-              {calendarMonths.length === 1 ? 'P&L Calendar' : `${calendarMonths.length}-Month P&L Calendar`}
-            </p>
-            <div className="flex items-center gap-3 text-[10px] text-muted-foreground">
-              <div className="flex items-center gap-1"><div className="w-3 h-3 rounded-sm" style={{ backgroundColor: 'rgba(22,163,74,0.5)' }} /> Profit</div>
-              <div className="flex items-center gap-1"><div className="w-3 h-3 rounded-sm" style={{ backgroundColor: 'rgba(220,38,38,0.5)' }} /> Loss</div>
-            </div>
-          </div>
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            {calendarMonths.map(m => (
-              <CalendarMonth key={`${m.year}-${m.month}`} year={m.year} month={m.month} days={m.days} />
-            ))}
-          </div>
-        </div>
-      )}
-
+      {/* The P&L calendar was here. It is now the second block on Behaviour --
+          see _lab/analytics/PnlCalendar.tsx. Rendering it in both places would
+          recompute the same story twice, which the page-ownership rule forbids. */}
       {/* Opening Trap + Expiry Day */}
       {(first30 || expiryDay) && (
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">

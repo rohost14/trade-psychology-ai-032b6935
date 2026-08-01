@@ -142,7 +142,7 @@ export default function InstrumentPanel({ underlying, days, onClose }: Instrumen
         <div className="flex-1 overflow-y-auto">
           {isLoading ? (
             <div className="p-5 space-y-4">
-              <div className="grid grid-cols-2 gap-3">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 {[1,2,3,4].map(i => <Skeleton key={i} className="h-20 rounded-xl" />)}
               </div>
               <Skeleton className="h-[180px] rounded-xl" />
@@ -157,7 +157,7 @@ export default function InstrumentPanel({ underlying, days, onClose }: Instrumen
             <div className="p-5 space-y-4">
 
               {/* KPI grid */}
-              <div className="grid grid-cols-2 gap-px bg-border rounded-lg overflow-hidden">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-px bg-border rounded-lg overflow-hidden">
                 <div className="bg-card px-4 py-3">
                   <p className="text-xs text-muted-foreground mb-1">Total P&L</p>
                   <p className={cn('text-xl font-bold font-mono tabular-nums',

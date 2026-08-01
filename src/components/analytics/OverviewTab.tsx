@@ -546,7 +546,7 @@ export default function OverviewTab({ days }: OverviewTabProps) {
 
       {/* ── Streak summary ─────────────────────────────────────────────────────── */}
       {k && (k.max_win_streak > 1 || k.max_loss_streak > 1) && (
-        <div className="grid grid-cols-2 gap-4">
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
           <div className="tm-card p-4 flex items-center gap-3">
             <TrendingUp className="h-5 w-5 text-tm-profit shrink-0" />
             <div>

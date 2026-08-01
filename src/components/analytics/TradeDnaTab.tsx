@@ -135,7 +135,7 @@ export default function TradeDnaTab({ days }: TradeDnaTabProps) {
   if (loading) return (
     <div className="space-y-4 animate-pulse">
       <Skeleton className="h-24 rounded-xl" />
-      <div className="grid grid-cols-2 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
         <Skeleton className="h-[220px] rounded-xl" />
         <Skeleton className="h-[220px] rounded-xl" />
       </div>
@@ -177,7 +177,7 @@ export default function TradeDnaTab({ days }: TradeDnaTabProps) {
               avg score <span className="font-mono font-semibold text-foreground">{quality.avg_score}</span> / {quality.max_score}
             </span>
           </div>
-          <div className="grid grid-cols-3 divide-x divide-border">
+          <div className="grid grid-cols-1 sm:grid-cols-3 divide-y sm:divide-y-0 sm:divide-x divide-border">
             {([
               { key: 'high', label: 'High (7–8)', icon: Shield,      color: 'text-tm-profit', stats: tiers.high },
               { key: 'mid',  label: 'Mid (5–6)',  icon: AlertCircle, color: 'text-tm-obs',    stats: tiers.mid },
