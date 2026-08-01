@@ -25,6 +25,7 @@ const Alerts        = lazy(() => import("./pages/Alerts"));
 const MyRecord      = lazy(() => import("./pages/MyRecord"));
 // TEMPORARY - design working copy of Dashboard. Delete with src/pages/_lab/.
 const DashboardLab  = lazy(() => import("./pages/_lab/DashboardLab"));
+const AnalyticsLab  = lazy(() => import("./pages/_lab/AnalyticsLab"));
 const MyPatterns    = lazy(() => import("./pages/MyPatterns"));
 const Chat          = lazy(() => import("./pages/Chat"));
 const Settings      = lazy(() => import("./pages/Settings"));
@@ -90,6 +91,7 @@ const App = () => (
                     <Route path="alerts" element={<Alerts />} />
                     <Route path="my-record" element={<MyRecord />} />
                     <Route path="dashboard-lab" element={<DashboardLab />} />
+                    <Route path="analytics-lab" element={<AnalyticsLab />} />
                     {/* Blowup Shield was replaced by My Record — keep the old
                         path working for anyone with it bookmarked. */}
                     <Route path="blowup-shield" element={<Navigate to="/my-record" replace />} />
