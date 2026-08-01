@@ -1126,3 +1126,22 @@ export const DEMO_BEHAVIOUR_COST = {
   ],
   rule_totals: { trade_count: 8, realized_pnl: -10310 },
 };
+
+// Mirrors GET /api/risk/alert-response-stats — how the trader actually responds
+// to their own alerts. Missing fixture crashed the Alerts Patterns tab.
+export const DEMO_ALERT_RESPONSE_STATS = {
+  total_took_anyway: 12,
+  total_stopped: 3,
+  total_ignored: 40,
+  patterns: [
+    { pattern: 'revenge_trade',   total: 9, ignored: 6, stopped: 1, took_anyway: 5 },
+    { pattern: 'size_escalation', total: 7, ignored: 5, stopped: 1, took_anyway: 4 },
+    { pattern: 'no_stoploss',     total: 6, ignored: 4, stopped: 1, took_anyway: 3 },
+  ],
+};
+
+// Mirrors GET /api/risk/scores. Missing fixture crashed My Patterns.
+export const DEMO_RISK_SCORES = {
+  behavior_risk: 42,
+  drivers: { tilt: 55, risk: 38, discipline: 30, strategy: 22 },
+};

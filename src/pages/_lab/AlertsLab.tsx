@@ -167,7 +167,9 @@ function ResponseStatsCard() {
       .catch(() => {});
   }, []);
 
-  if (!stats || stats.patterns.length === 0) return null;
+  // Same trap as BehaviorScoresCard: {} is truthy, so this used to reach
+  // `stats.patterns.length` on undefined and take the whole tab down.
+  if (!stats?.patterns?.length) return null;
   // Only worth showing once there's a signal (something ignored or overridden).
   const top = stats.patterns.filter(p => p.took_anyway > 0 || p.ignored > 0).slice(0, 3);
   if (top.length === 0) return null;

@@ -36,7 +36,9 @@ export function BehaviorScoresCard() {
     api.get('/api/risk/scores').then(r => setScores(r.data)).catch(() => {});
   }, []);
 
-  if (!scores) return null;
+  // Not `!scores`: an unmocked GET resolves to {} in guest mode, which is
+  // truthy, so the object check passed and `scores.drivers.tilt` threw.
+  if (!scores?.drivers || typeof scores.behavior_risk !== 'number') return null;
 
   const headlineColor =
     scores.behavior_risk >= 80 ? 'text-tm-loss' :
