@@ -1,3 +1,16 @@
+/**
+ * Analytics — post-market review: what behaviours cost money over time.
+ *
+ * Behaviour is the landing tab, not Overview. Everything on Overview — P&L,
+ * win rate, profit factor, equity curve — a trader already has in Zerodha
+ * Console, free, from the same account; leading with it meant opening on our
+ * least differentiated screen while the analysis only this app can do sat
+ * three tabs deep. docs/design/02_WEB_SCREENS.md already specified this, and
+ * the shipped page had been contradicting it.
+ *
+ * Behaviour reads: the one leak worth acting on and the rule that constrains
+ * it, then the same leaks ranked by realized money, then when they happened.
+ */
 import { Fragment, useState, Suspense, lazy } from 'react';
 import { ErrorBoundary } from '@/components/ErrorBoundary';
 import { Link } from 'react-router-dom';
@@ -9,10 +22,12 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { cn } from '@/lib/utils';
 import { useBroker } from '@/contexts/BrokerContext';
 import ReportCard from '@/components/analytics/ReportCard';
+import BehaviourCostCard from '@/components/patterns/BehaviourCostCard';
+import PnlCalendar from '@/components/analytics/PnlCalendar';
+import BehaviourLead from '@/components/analytics/BehaviourLead';
 import ImportHistoryPrompt from '@/components/onboarding/ImportHistoryPrompt';
 import EdgeLeakCard from '@/components/analytics/EdgeLeakCard';
 import StrategyCard from '@/components/analytics/StrategyCard';
-import TabIntro from '@/components/analytics/TabIntro';
 import ExportReportButton from '@/components/analytics/ExportReportButton';
 import ComplianceDisclaimer from '@/components/ComplianceDisclaimer';
 import InstrumentPanel from '@/components/analytics/InstrumentPanel';
@@ -47,10 +62,10 @@ const PERIOD_OPTIONS = [
 // Consolidated from 6 tabs → 4 (Overview · Edge · Behaviour · Advanced). The
 // ReportCard hero sits above the tabs as the always-visible front door.
 const TABS = [
-  { value: 'overview',  label: 'Overview',   icon: BarChart2, group: 'core' as const },
-  { value: 'edge',      label: 'Edge',       icon: Crosshair, group: 'core' as const },
   { value: 'behavior',  label: 'Behaviour',  icon: Brain,     group: 'core' as const },
   { value: 'habits',    label: 'Habits',     icon: Repeat,    group: 'core' as const },
+  { value: 'edge',      label: 'Edge',       icon: Crosshair, group: 'core' as const },
+  { value: 'overview',  label: 'Overview',   icon: BarChart2, group: 'core' as const },
   { value: 'advanced',  label: 'Advanced',   icon: Layers,    group: 'deep' as const },
 ] as const;
 
@@ -59,7 +74,7 @@ type TabValue = typeof TABS[number]['value'];
 export default function Analytics() {
   const { isConnected, isLoading: brokerLoading, account } = useBroker();
   const [days, setDays] = useState(30);
-  const [tab, setTab]   = useState<TabValue>('overview');
+  const [tab, setTab]   = useState<TabValue>('behavior');
   const [instrumentPanel, setInstrumentPanel] = useState<string | null>(null);
 
   if (!brokerLoading && !isConnected) {
@@ -135,7 +150,7 @@ export default function Analytics() {
               <button
                 role="tab"
                 aria-selected={tab === value}
-                onClick={() => setTab(value)}
+                onClick={() => { setTab(value); window.scrollTo({ top: 0, behavior: 'smooth' }); }}
                 className={cn(
                   'flex items-center gap-1.5 px-3.5 py-2.5 text-[13px] font-medium border-b-2 transition-colors -mb-px whitespace-nowrap shrink-0',
                   tab === value
@@ -162,13 +177,11 @@ export default function Analytics() {
         <Suspense fallback={<TabSkeleton />}>
           {tab === 'overview' && (
             <div className="space-y-5">
-              <TabIntro>The full picture — your P&amp;L, how consistent it is, and where it came from over the period.</TabIntro>
               <OverviewTab days={days} />
             </div>
           )}
           {tab === 'edge'     && (
             <div className="space-y-5">
-              <TabIntro>Where you make money and where it quietly bleeds out — ranked by instrument, time, and setup.</TabIntro>
               <EdgeLeakCard days={days} />
               <StrategyCard days={days} />
               <EdgeTab days={days} onInstrumentClick={u => setInstrumentPanel(u)} />
@@ -176,20 +189,28 @@ export default function Analytics() {
           )}
           {tab === 'behavior' && (
             <div className="space-y-5">
-              <TabIntro>How your habits and emotions shape results — the patterns behind the numbers.</TabIntro>
+              {/* First thing on the first tab: which behaviours ran money down,
+                  how often, ranked by money. Realized P&L of the exact flagged
+                  trades -- never an estimate. */}
+              {/* One dominant region, then supporting detail. Four equal cards
+                  stacked is the sparse-feeling failure; unequal regions with one
+                  dominant is not. (DESIGN_REFERENCES §4) */}
+              <BehaviourLead days={days} />
+              <BehaviourCostCard days={days} />
+              {/* Promoted out of Advanced: "when do I trade well" is the central
+                  question for a behavioural product, not an advanced one. */}
+              <PnlCalendar days={days} />
               <BehaviorTab days={days} />
               <TradeDnaTab days={days} />
             </div>
           )}
           {tab === 'habits' && (
             <div className="space-y-5">
-              <TabIntro>Your tendencies, in plain language — the time-of-day, day-of-week, instrument and after-loss habits hidden in your own trades.</TabIntro>
               <HabitsTab days={days} />
             </div>
           )}
           {tab === 'advanced' && (
             <div className="space-y-5">
-              <TabIntro>Deeper cuts — session timing and overnight (BTST) behaviour for when you want to dig in.</TabIntro>
               <SessionsTab days={days} />
               <BtstTab days={days} />
             </div>

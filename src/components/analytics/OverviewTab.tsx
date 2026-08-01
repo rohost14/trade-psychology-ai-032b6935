@@ -1,9 +1,27 @@
+/**
+ * Analytics → Overview. The period summary, and deliberately no longer the
+ * landing tab: everything on it is available in Zerodha Console already, while
+ * Behaviour carries the analysis only this app can do.
+ *
+ * Three things it no longer does, all settled in the design lab:
+ *  - It does not restate the ReportCard hero. P&L, win rate and profit factor
+ *    sit directly above it, so the KPI strip carries only what the hero does
+ *    not say: expectancy, win days, drawdown.
+ *  - No attribution donut. It was a five-hue rainbow whose colours carried no
+ *    meaning, above a legend colouring the same rows green and red by sign --
+ *    two colour systems in one card -- and the legend already said everything
+ *    the donut did. It is a ranked table with bars from a centre baseline, so
+ *    a loss extends left rather than drawing a longer bar rightward.
+ *  - No streak cards; the equity-curve caption already states both streaks.
+ *
+ * Chart colour comes from useChartColors(), never a hex literal, so it follows
+ * the theme instead of being wrong in one of the two by construction.
+ */
 import { useState, useEffect } from 'react';
 import {
   AreaChart, Area, BarChart, Bar,
   XAxis, YAxis, CartesianGrid, Tooltip,
   ResponsiveContainer, ReferenceLine, Cell,
-  PieChart, Pie, Legend,
 } from 'recharts';
 import { TrendingUp, TrendingDown, CheckCircle2, Activity, ArrowUp, ArrowDown, Minus } from 'lucide-react';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -72,7 +90,6 @@ function buildPieData(instruments: PerfData['by_instrument']) {
   return result;
 }
 
-const PIE_COLORS = ['#0d9488', '#0891b2', '#7c3aed', '#d97706', '#dc2626', '#6b7280'];
 
 // ── sub-components ───────────────────────────────────────────────────────────
 
@@ -100,19 +117,6 @@ function DailyTooltip({ active, payload }: ChartTooltipProps<OverviewData['daily
         {formatCurrencyWithSign(d.pnl)}
       </p>
       <p className="text-xs text-muted-foreground">{d.trades} trades · {d.win_rate}% WR</p>
-    </div>
-  );
-}
-
-function PieTooltip({ active, payload }: ChartTooltipProps<{ name: string; pnl: number; value: number }>) {
-  if (!active || !payload?.length) return null;
-  const d = payload[0].payload;
-  return (
-    <div className="bg-popover border border-border rounded-lg px-3 py-2 shadow-lg text-sm">
-      <p className="font-medium mb-1">{d.name}</p>
-      <p className={cn('font-mono tabular-nums', d.pnl >= 0 ? 'text-tm-profit' : 'text-tm-loss')}>
-        {formatCurrencyWithSign(Math.round(d.pnl))}
-      </p>
     </div>
   );
 }
@@ -203,7 +207,6 @@ function PnlHeroCell({
 // ── main component ───────────────────────────────────────────────────────────
 
 export default function OverviewTab({ days }: OverviewTabProps) {
-  const c = useChartColors();
   const [overview, setOverview]   = useState<OverviewData | null>(null);
   const [ovPrev, setOvPrev]       = useState<OverviewData | null>(null);
   const [edge, setEdge]           = useState<EdgeData | null>(null);
@@ -211,6 +214,9 @@ export default function OverviewTab({ days }: OverviewTabProps) {
   const [loading, setLoading]     = useState(true);
   const [error, setError]         = useState<unknown>(null);
   const [retry, setRetry]         = useState(0);
+  // Must sit with the other hooks: everything below the fetch has early
+  // returns for loading and error, so a hook placed there runs conditionally.
+  const c = useChartColors();
 
   useEffect(() => {
     let cancelled = false;
@@ -263,7 +269,7 @@ export default function OverviewTab({ days }: OverviewTabProps) {
 
   const winDaysPct = k && k.trading_days > 0 ? Math.round(k.win_days / k.trading_days * 100) : 0;
   const lastPnl    = overview?.equity_curve?.at(-1)?.cumulative_pnl ?? 0;
-  const equityColor = c.forValue(lastPnl);
+  const equityColor = lastPnl >= 0 ? '#16a34a' : '#dc2626';
 
   // P&L attribution donut
   const pieData = perf?.by_instrument ? buildPieData(perf.by_instrument) : [];
@@ -278,63 +284,46 @@ export default function OverviewTab({ days }: OverviewTabProps) {
     ? Math.round(Math.abs(topUnderlying?.pnl ?? 0) / Math.max(pieData.reduce((s, d) => s + d.value, 0), 1) * 100)
     : 0;
 
-  return (
-    <div className="space-y-5">
+  /* ---- blocks: defined once, placed by the variant --------------------- */
 
-      {/* ── KPI Strip ────────────────────────────────────────────────────────── */}
-      {k ? (
-        <div className="tm-card overflow-hidden">
-          {/* Mobile: 2-col grid. P&L spans full width. Desktop: 6 equal cols */}
-          <div className="grid grid-cols-2 md:grid-cols-6 divide-y md:divide-y-0 divide-x divide-border">
-            <PnlHeroCell
-              value={formatCurrencyWithSign(Math.round(k.total_pnl))}
-              color={k.total_pnl >= 0 ? 'text-tm-profit' : 'text-tm-loss'}
-              sub={`${k.total_trades} trades`}
-              delta={{ current: k.total_pnl, prev: prevPnl, higherIsBetter: true, format: 'currency' }}
-            />
-            <KpiCell
-              label="Win Rate"
-              value={`${Math.round(k.win_rate)}%`}
-              sub={`${k.winners}W · ${k.losers}L`}
-              color={k.win_rate >= 50 ? 'text-tm-profit' : 'text-tm-loss'}
-              delta={{ current: k.win_rate, prev: prevWR, higherIsBetter: true, format: 'percent' }}
-            />
-            <KpiCell
-              label="Profit Factor"
-              value={k.profit_factor === null ? '∞' : k.profit_factor > 0 ? k.profit_factor.toFixed(2) : '—'}
-              sub={k.profit_factor === null || k.profit_factor >= 1.5 ? 'Strong edge' : k.profit_factor >= 1 ? 'Marginal' : 'Losing edge'}
-              color={k.profit_factor === null || k.profit_factor >= 1.5 ? 'text-tm-profit' : k.profit_factor >= 1 ? 'text-tm-obs' : 'text-tm-loss'}
-              delta={kP && k.profit_factor !== null && prevPF !== null
-                ? { current: k.profit_factor, prev: prevPF, higherIsBetter: true, format: 'number' }
-                : undefined}
-            />
-            <KpiCell
-              label="Expectancy"
-              value={k.expectancy != null ? formatCurrencyWithSign(Math.round(k.expectancy)) : '—'}
-              sub="per trade"
-              color={k.expectancy >= 0 ? 'text-tm-profit' : 'text-tm-loss'}
-              delta={kP ? { current: k.expectancy, prev: prevExp, higherIsBetter: true, format: 'currency' } : undefined}
-            />
-            <KpiCell
-              label="Win Days"
-              value={`${winDaysPct}%`}
-              sub={`${k.win_days} / ${k.trading_days} days`}
-              color={winDaysPct >= 55 ? 'text-tm-profit' : 'text-foreground'}
-            />
-            <KpiCell
-              label="Max Drawdown"
-              value={formatCurrency(Math.abs(Math.round(k.max_drawdown)))}
-              sub="peak-to-trough"
-              color="text-tm-loss"
-            />
-          </div>
-        </div>
-      ) : (
-        <div className="tm-card px-5 py-10 text-center text-sm text-muted-foreground">
-          No trade data for this period.
-        </div>
-      )}
+  /* P&L, win rate and profit factor are deliberately absent -- the ReportCard
+     hero immediately above states all three, and printing them again 400px
+     later was the page's most visible duplication. What is left is what the
+     hero does NOT already say. */
+  const kpiBlock = k ? (
+    <div className="tm-card overflow-hidden">
+      <div className="grid grid-cols-1 sm:grid-cols-3 divide-y sm:divide-y-0 sm:divide-x divide-border">
+        <KpiCell
+          label="Expectancy"
+          value={k.expectancy != null ? formatCurrencyWithSign(Math.round(k.expectancy)) : '—'}
+          sub="per trade"
+          color={k.expectancy >= 0 ? 'text-tm-profit' : 'text-tm-loss'}
+          delta={kP ? { current: k.expectancy, prev: prevExp, higherIsBetter: true, format: 'currency' } : undefined}
+        />
+        <KpiCell
+          label="Win Days"
+          value={`${winDaysPct}%`}
+          sub={`${k.win_days} / ${k.trading_days} days`}
+          color={winDaysPct >= 55 ? 'text-tm-profit' : 'text-foreground'}
+        />
+        {/* Drawdown is negative by definition, so colouring it red encodes
+            nothing. Left neutral; the label carries the meaning. */}
+        <KpiCell
+          label="Max Drawdown"
+          value={formatCurrency(Math.abs(Math.round(k.max_drawdown)))}
+          sub="peak-to-trough"
+          color="text-foreground"
+        />
+      </div>
+    </div>
+  ) : (
+    <div className="tm-card px-5 py-10 text-center text-sm text-muted-foreground">
+      No trade data for this period.
+    </div>
+  );
 
+  const edgeBlock = (
+    <>
       {/* ── Edge Confidence Banner ────────────────────────────────────────────── */}
       {edge?.has_data && (
         <div className={cn(
@@ -368,6 +357,11 @@ export default function OverviewTab({ days }: OverviewTabProps) {
         </div>
       )}
 
+    </>
+  );
+
+  const equityBlock = (
+    <>
       {/* ── Equity Curve ──────────────────────────────────────────────────────── */}
       {overview?.equity_curve && overview.equity_curve.length > 1 && (
         <div className="tm-card overflow-hidden">
@@ -386,8 +380,8 @@ export default function OverviewTab({ days }: OverviewTabProps) {
                     <stop offset="95%" stopColor={equityColor} stopOpacity={0.01} />
                   </linearGradient>
                 </defs>
-                <CartesianGrid strokeDasharray="3 3" stroke="rgba(0,0,0,0.06)" vertical={false} />
-                <XAxis dataKey="date" tickFormatter={fmtDate} tick={{ fontSize: 10 }} tickLine={false} axisLine={false} interval="preserveStartEnd" minTickGap={44} />
+                <CartesianGrid strokeDasharray="3 3" {...{ stroke: c.grid }} vertical={false} />
+                <XAxis dataKey="date" tickFormatter={fmtDate} tick={{ fontSize: 10 }} tickLine={false} axisLine={false} interval="preserveStartEnd" />
                 <YAxis tick={{ fontSize: 10 }} tickLine={false} axisLine={false} width={52} tickFormatter={formatAxisCurrency} />
                 <Tooltip content={<EquityTooltip />} />
                 <ReferenceLine y={0} stroke="rgba(0,0,0,0.12)" strokeDasharray="3 3" />
@@ -405,6 +399,11 @@ export default function OverviewTab({ days }: OverviewTabProps) {
         </div>
       )}
 
+    </>
+  );
+
+  const dailyBlock = (
+    <>
       {/* ── Daily P&L ─────────────────────────────────────────────────────────── */}
       {overview?.daily_pnl && overview.daily_pnl.length > 0 && (
         <div className="tm-card overflow-hidden">
@@ -415,11 +414,11 @@ export default function OverviewTab({ days }: OverviewTabProps) {
           <div className="p-4">
             <ResponsiveContainer width="100%" height={160}>
               <BarChart data={overview.daily_pnl} margin={{ top: 4, right: 4, left: -16, bottom: 0 }}>
-                <CartesianGrid strokeDasharray="3 3" stroke="rgba(0,0,0,0.06)" vertical={false} />
-                <XAxis dataKey="date" tickFormatter={fmtDate} tick={{ fontSize: 10 }} tickLine={false} axisLine={false} interval="preserveStartEnd" minTickGap={44} />
+                <CartesianGrid strokeDasharray="3 3" {...{ stroke: c.grid }} vertical={false} />
+                <XAxis dataKey="date" tickFormatter={fmtDate} tick={{ fontSize: 10 }} tickLine={false} axisLine={false} interval="preserveStartEnd" />
                 <YAxis tick={{ fontSize: 10 }} tickLine={false} axisLine={false} width={52} tickFormatter={formatAxisCurrency} />
                 <Tooltip content={<DailyTooltip />} />
-                <ReferenceLine y={0} stroke="rgba(0,0,0,0.15)" />
+                <ReferenceLine y={0} {...{ stroke: c.axis }} />
                 <Bar dataKey="pnl" radius={[2, 2, 0, 0]} maxBarSize={18}>
                   {overview.daily_pnl.map((d, i) => (
                     <Cell key={i} fill={c.forValue(d.pnl)} opacity={0.8} />
@@ -436,67 +435,59 @@ export default function OverviewTab({ days }: OverviewTabProps) {
         </div>
       )}
 
-      {/* ── P&L Attribution + Product Mix ─────────────────────────────────────── */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+    </>
+  );
 
-        {/* P&L Attribution Donut */}
-        {pieData.length > 1 && (
-          <div className="tm-card overflow-hidden">
-            <div className="px-5 py-3.5 border-b border-border">
-              <p className="font-semibold text-sm">P&L Attribution</p>
-            </div>
-            <div className="p-4">
-              <ResponsiveContainer width="100%" height={200}>
-                <PieChart>
-                  <Pie
-                    data={pieData}
-                    cx="50%"
-                    cy="50%"
-                    innerRadius={55}
-                    outerRadius={80}
-                    paddingAngle={2}
-                    dataKey="value"
-                  >
-                    {pieData.map((_, i) => (
-                      <Cell key={i} fill={PIE_COLORS[i % PIE_COLORS.length]} opacity={0.85} />
-                    ))}
-                  </Pie>
-                  <Tooltip content={<PieTooltip />} />
-                </PieChart>
-              </ResponsiveContainer>
-              <div className="space-y-1.5 mt-1">
-                {pieData.map((d, i) => {
-                  const totalAbs = pieData.reduce((s, x) => s + x.value, 0);
-                  const pct = totalAbs > 0 ? Math.round(d.value / totalAbs * 100) : 0;
-                  return (
-                    <div key={d.name} className="flex items-center justify-between text-[12px]">
-                      <div className="flex items-center gap-2">
-                        <div className="w-2 h-2 rounded-full shrink-0" style={{ backgroundColor: PIE_COLORS[i % PIE_COLORS.length] }} />
-                        <span className="font-medium">{d.name}</span>
-                      </div>
-                      <div className="flex items-center gap-3">
-                        <span className="text-muted-foreground font-mono">{pct}%</span>
-                        <span className={cn('font-mono font-semibold', d.pnl >= 0 ? 'text-tm-profit' : 'text-tm-loss')}>
-                          {formatCurrencyWithSign(Math.round(d.pnl))}
-                        </span>
-                      </div>
-                    </div>
-                  );
-                })}
+  /* The donut, replaced. Rank plus a proportional bar answers "where did the
+     money come from" better than five arbitrary hues, and the bar runs from a
+     centre baseline so a loss extends left -- under the old shared left origin
+     a bigger loss drew a longer bar and read as "more". */
+  const attributionBlock = pieData.length > 1 ? (
+    <div className="tm-card overflow-hidden">
+      <div className="px-5 py-3.5 border-b border-border">
+        <p className="font-semibold text-sm">Where the P&amp;L came from</p>
+      </div>
+      <div className="divide-y divide-border">
+        {pieData.map((d, i) => {
+          const maxAbs = Math.max(...pieData.map(x => Math.abs(x.pnl)), 1);
+          const width = (Math.abs(d.pnl) / maxAbs) * 100;
+          const positive = d.pnl >= 0;
+          return (
+            <div key={d.name} className="px-5 py-2.5">
+              <div className="flex items-baseline justify-between gap-3">
+                <span className="text-[13px] font-medium truncate">
+                  <span className="text-muted-foreground font-tabular mr-2">{i + 1}</span>
+                  {d.name}
+                </span>
+                <span className={cn('text-[13px] font-semibold font-tabular shrink-0', positive ? 'text-tm-profit' : 'text-tm-loss')}>
+                  {formatCurrencyWithSign(Math.round(d.pnl))}
+                </span>
+              </div>
+              <div className="mt-1.5 h-1 w-full flex items-center" aria-hidden>
+                <div className="w-1/2 flex justify-end">
+                  {!positive && <div className="h-1 rounded-l-sm bg-tm-loss/70" style={{ width: `${width}%` }} />}
+                </div>
+                <div className="w-1/2">
+                  {positive && <div className="h-1 rounded-r-sm bg-tm-profit/70" style={{ width: `${width}%` }} />}
+                </div>
               </div>
             </div>
-            {topUnderlying && (
-              <p className="px-5 pb-3.5 text-[11px] text-muted-foreground">
-                {topPct >= 60
-                  ? `${topUnderlying.name} drives ${topPct}% of your P&L — high concentration. Consider diversifying.`
-                  : `P&L spread across instruments. ${topUnderlying.name} leads at ${topPct}%.`
-                }
-              </p>
-            )}
-          </div>
-        )}
+          );
+        })}
+      </div>
+      {topUnderlying && (
+        <p className="px-5 py-3 text-[11px] text-muted-foreground border-t border-border">
+          {topPct >= 60
+            ? `${topUnderlying.name} drives ${topPct}% of your P&L — high concentration.`
+            : `P&L spread across instruments. ${topUnderlying.name} leads at ${topPct}%.`}
+        </p>
+      )}
+    </div>
+  ) : null;
 
-        {/* Product Mix */}
+  const productMixBlock = (
+    <>
+{/* Product Mix */}
         {productEntries.length > 0 && (
           <div className="tm-card overflow-hidden">
             <div className="px-5 py-3.5 border-b border-border">
@@ -544,28 +535,20 @@ export default function OverviewTab({ days }: OverviewTabProps) {
             </p>
           </div>
         )}
+    </>
+  );
+
+
+  return (
+    <div className="space-y-5">
+      {kpiBlock}
+      {edgeBlock}
+      {equityBlock}
+      {dailyBlock}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 items-start">
+        {attributionBlock}
+        {productMixBlock}
       </div>
-
-      {/* ── Streak summary ─────────────────────────────────────────────────────── */}
-      {k && (k.max_win_streak > 1 || k.max_loss_streak > 1) && (
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-          <div className="tm-card p-4 flex items-center gap-3">
-            <TrendingUp className="h-5 w-5 text-tm-profit shrink-0" />
-            <div>
-              <p className="text-[11px] text-muted-foreground">Longest win streak</p>
-              <p className="text-2xl font-mono font-bold text-tm-profit">{k.max_win_streak}</p>
-            </div>
-          </div>
-          <div className="tm-card p-4 flex items-center gap-3">
-            <TrendingDown className="h-5 w-5 text-tm-loss shrink-0" />
-            <div>
-              <p className="text-[11px] text-muted-foreground">Longest loss streak</p>
-              <p className="text-2xl font-mono font-bold text-tm-loss">{k.max_loss_streak}</p>
-            </div>
-          </div>
-        </div>
-      )}
-
     </div>
   );
 }

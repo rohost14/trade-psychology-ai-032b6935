@@ -1,11 +1,5 @@
-/**
- * Behaviour → your money. The raw realized P&L of the exact completed trades that each
- * behavioural alert / broken personal rule fired on (via the trigger_completed_trade_id the
- * engine already stores). FACTUAL — deliberately framed as "realized P&L on flagged trades",
- * never "cost", so it can't be read as a causal claim that the behaviour caused the loss.
- */
 import { useEffect, useState } from 'react';
-import { AlertTriangle, Scale, Info } from 'lucide-react';
+import { Scale } from 'lucide-react';
 import { api } from '@/lib/api';
 
 interface Row { pattern_type?: string; rule?: string; alert_count?: number; breach_count?: number; trade_count: number; realized_pnl: number; }
@@ -63,14 +57,18 @@ function Section({ title, totals, unitLabel, rows, label }: {
         {rows.map((r, i) => {
           const count = r.alert_count ?? r.breach_count ?? 0;
           return (
-            <div key={i} className="flex items-center justify-between py-1.5 border-b border-border last:border-0">
-              <div className="min-w-0">
+            <div key={i} className="flex items-stretch justify-between border-b border-border last:border-0 min-h-[44px] sm:min-h-[40px]">
+              <div className="min-w-0 flex flex-col justify-center py-2.5 pr-3">
                 <span className="text-[13px] font-medium text-foreground">{label(r.pattern_type ?? r.rule)}</span>
                 <span className="text-[11px] text-muted-foreground ml-2">
                   {count} {count === 1 ? unitLabel.replace(/e?s$/, '') : unitLabel} · {r.trade_count} trade{r.trade_count !== 1 ? 's' : ''}
                 </span>
               </div>
-              <span className={`text-[13px] font-semibold tabular-nums shrink-0 ${pnlClass(r.realized_pnl)}`}>{inr(r.realized_pnl)}</span>
+              {/* Permanent tint on the money column, Kite-style — the region
+                  that matters is separated, rather than every row striped. */}
+              <span className={`flex items-center justify-end text-[13px] font-semibold tabular-nums shrink-0 w-[116px] px-3 -my-px bg-muted/40 ${pnlClass(r.realized_pnl)}`}>
+                {inr(r.realized_pnl)}
+              </span>
             </div>
           );
         })}
@@ -100,7 +98,7 @@ export default function BehaviourCostCard({ days = 90 }: { days?: number }) {
     <div className="tm-card overflow-hidden">
       <div className="px-5 py-3.5 border-b border-border">
         <p className="text-sm font-semibold text-foreground flex items-center gap-2">
-          <AlertTriangle className="h-4 w-4 text-tm-obs" /> Behaviour → your money
+Behaviour → your money
         </p>
         <p className="text-xs text-muted-foreground mt-0.5">
           Realized P&amp;L on the exact trades we flagged. A fact — not a claim the behaviour caused it.
@@ -132,10 +130,7 @@ export default function BehaviourCostCard({ days = 90 }: { days?: number }) {
           </div>
         )}
 
-        <div className="flex items-start gap-2 text-[11px] text-muted-foreground bg-muted/40 rounded-lg px-3 py-2">
-          <Info className="h-3.5 w-3.5 shrink-0 mt-0.5" />
-          <span>These are the realized results of the specific trades where each pattern or rule-break was detected. We don't estimate what "would have" happened — this is what did.</span>
-        </div>
+
       </div>
     </div>
   );

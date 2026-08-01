@@ -40,6 +40,8 @@ import BehaviorTab from '@/components/analytics/BehaviorTab';
 import SessionsTab from '@/components/analytics/SessionsTab';
 import TradeDnaTab from '@/components/analytics/TradeDnaTab';
 import EdgeTab from '@/components/analytics/EdgeTab';
+import BehaviourLead from '@/components/analytics/BehaviourLead';
+import PnlCalendar from '@/components/analytics/PnlCalendar';
 import ReportCard from '@/components/analytics/ReportCard';
 import EdgeLeakCard from '@/components/analytics/EdgeLeakCard';
 import StrategyCard from '@/components/analytics/StrategyCard';
@@ -59,10 +61,13 @@ describe('Analytics tab render smoke (demo data, backend-shaped)', () => {
   it('OverviewTab renders KPIs, edge banner and charts without NaN', async () => {
     const { container } = renderWithRouter(<OverviewTab days={30} />);
 
-    // KPI strip (waits out the loading skeleton)
-    expect(await screen.findByText('Win Rate')).toBeInTheDocument();
-    expect(screen.getByText('Profit Factor')).toBeInTheDocument();
+    // KPI strip carries only what the ReportCard hero above does NOT state.
+    // Win rate and profit factor were removed on purpose -- the hero has them,
+    // and printing them twice 400px apart was the page's worst duplication.
+    expect(await screen.findByText('Expectancy')).toBeInTheDocument();
+    expect(screen.getByText('Win Days')).toBeInTheDocument();
     expect(screen.getByText('Max Drawdown')).toBeInTheDocument();
+    expect(screen.queryByText('Win Rate')).not.toBeInTheDocument();
 
     // Edge-confidence banner — demo verdict is 'too_few'
     expect(screen.getByText('Not enough trades yet')).toBeInTheDocument();
@@ -71,6 +76,9 @@ describe('Analytics tab render smoke (demo data, backend-shaped)', () => {
     expect(screen.getByText('Equity Curve')).toBeInTheDocument();
     expect(screen.getByText('Daily P&L')).toBeInTheDocument();
     expect(screen.getByText('Product Mix')).toBeInTheDocument();
+
+    // Attribution is a ranked table now, not a donut (§20 bans donut/pie).
+    expect(screen.getByText('Where the P&L came from')).toBeInTheDocument();
 
     expect(container.textContent).not.toContain('NaN');
   });
@@ -99,10 +107,10 @@ describe('Analytics tab render smoke (demo data, backend-shaped)', () => {
   it('SessionsTab renders calendar, opening/expiry cards and expiry comparison without NaN', async () => {
     const { container } = renderWithRouter(<SessionsTab days={30} />);
 
-    expect(await screen.findByText(/P&L Calendar$/)).toBeInTheDocument();
+    // The P&L calendar moved to the Behaviour tab; SessionsTab keeps the
+    // session-window analysis only.
+    expect(await screen.findByText('Opening 30 Minutes (9:15–9:45)')).toBeInTheDocument();
 
-    // conditions[] driven cards
-    expect(screen.getByText('Opening 30 Minutes (9:15–9:45)')).toBeInTheDocument();
     expect(screen.getByText('Expiry Day Trades')).toBeInTheDocument();
 
     expect(screen.getByText('Expiry vs Non-Expiry Performance')).toBeInTheDocument();
@@ -168,6 +176,35 @@ describe('Analytics tab render smoke (demo data, backend-shaped)', () => {
     expect(await screen.findByText('Where you make money')).toBeInTheDocument();
     expect(screen.getByText('Where you lose money')).toBeInTheDocument();
     expect(screen.getByText('Thursday')).toBeInTheDocument();
+
+    expect(container.textContent).not.toContain('NaN');
+  });
+
+  it('BehaviourLead states the leak, the money and one action', async () => {
+    const { container } = renderWithRouter(<BehaviourLead days={30} />);
+
+    // The whole point of this block: a plain-language sentence carrying the
+    // number, plus one concrete action. A correlation with no action is the
+    // documented failure state for reflection products.
+    expect(await screen.findByText(/Your biggest leak/i)).toBeInTheDocument();
+    expect(screen.getByText(/revenge trades/i)).toBeInTheDocument();
+    expect(screen.getByText('−₹13,000')).toBeInTheDocument();
+
+    const action = screen.getByRole('link', { name: /cooldown after a loss/i });
+    expect(action).toHaveAttribute('href', '/my-rules');
+
+    // True minus, never an ASCII hyphen, on any money figure.
+    expect(container.textContent).not.toMatch(/-₹/);
+    expect(container.textContent).not.toContain('NaN');
+  });
+
+  it('PnlCalendar renders the months the period covers', async () => {
+    const { container } = renderWithRouter(<PnlCalendar days={30} />);
+
+    expect(await screen.findByText('When you trade well')).toBeInTheDocument();
+    // 30 days back from today spans this month and the previous one.
+    expect(screen.getAllByText(/^(January|February|March|April|May|June|July|August|September|October|November|December) \d{4}$/).length)
+      .toBeGreaterThanOrEqual(1);
 
     expect(container.textContent).not.toContain('NaN');
   });
