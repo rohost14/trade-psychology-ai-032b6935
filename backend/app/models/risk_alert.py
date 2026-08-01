@@ -39,6 +39,13 @@ class RiskAlert(Base):
     # Feedback loop (migration 069): what the user actually did about this alert.
     # outcome ∈ ('stopped', 'took_anyway', 'not_useful'); NULL = no feedback yet.
     # Enables a real "alerts that changed behaviour" metric (vs merely "seen").
+    # Migration 076. 'post' = raised after the trade closed (everything to
+    # date); 'live' = raised while the position was still open, so it carries
+    # no realized money yet. trigger_position_id lets the post-hoc engine merge
+    # its finding into an existing live row instead of duplicating it.
+    lifecycle = Column(String, nullable=False, default="post", server_default="post")
+    trigger_position_id = Column(UUID(as_uuid=True), nullable=True)
+
     outcome = Column(String, nullable=True)
     outcome_at = Column(DateTime(timezone=True), nullable=True)
 
