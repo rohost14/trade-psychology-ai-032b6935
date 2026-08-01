@@ -18,8 +18,9 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { cn } from '@/lib/utils';
 import { useBroker } from '@/contexts/BrokerContext';
 import ReportCard from '@/components/analytics/ReportCard';
-import BehaviourCostCard from '@/components/patterns/BehaviourCostCard';
+import BehaviourCostCard from './analytics/BehaviourCostLab';
 import PnlCalendar from './analytics/PnlCalendar';
+import BehaviourLead from './analytics/BehaviourLead';
 import { OVERVIEW_VARIANTS, type OverviewVariant } from './analytics/OverviewLab';
 import ImportHistoryPrompt from '@/components/onboarding/ImportHistoryPrompt';
 import EdgeLeakCard from '@/components/analytics/EdgeLeakCard';
@@ -188,6 +189,10 @@ export default function AnalyticsLab() {
               {/* First thing on the first tab: which behaviours ran money down,
                   how often, ranked by money. Realized P&L of the exact flagged
                   trades -- never an estimate. */}
+              {/* One dominant region, then supporting detail. Four equal cards
+                  stacked is the sparse-feeling failure; unequal regions with one
+                  dominant is not. (DESIGN_REFERENCES §4) */}
+              <BehaviourLead days={days} />
               <BehaviourCostCard days={days} />
               {/* Promoted out of Advanced: "when do I trade well" is the central
                   question for a behavioural product, not an advanced one. */}
