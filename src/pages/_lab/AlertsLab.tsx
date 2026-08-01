@@ -72,22 +72,146 @@ function buildWeekCounts(alertList: AlertNotification[]): Record<string, number>
   return counts;
 }
 
+
+type Outcome = 'stopped' | 'took_anyway' | 'not_useful';
+
+const OUTCOME_LABEL: Record<Outcome, string> = {
+  stopped: 'I stood down',
+  took_anyway: 'Took it anyway',
+  not_useful: 'Not useful',
+};
+
+/**
+ * One-tap response on the alert itself.
+ *
+ * Deliberately no confirm step and no text field: the measured evidence is 55
+ * alerts and 0 outcomes recorded, and the product constraint is that any
+ * feature needing typed input will not be used. Optimistic, because the value
+ * is the habit of answering, not the write.
+ *
+ * "Took it anyway" is not scolded. The charter is mirror-not-blocker, so the
+ * honest answer has to be as easy to give as the flattering one.
+ */
+function AlertResponse({ alertId, current }: { alertId: string; current?: Outcome | null }) {
+  const [saved, setSaved] = useState<Outcome | null>(current ?? null);
+  const [pending, setPending] = useState<Outcome | null>(null);
+
+  const send = (outcome: Outcome) => (e: React.MouseEvent) => {
+    e.stopPropagation();          // the whole row is a button; do not open the sheet
+    if (saved === outcome) return;
+    setPending(outcome);
+    setSaved(outcome);            // optimistic
+    api.post(`/api/risk/alerts/${alertId}/feedback`, { outcome })
+      .catch(() => setSaved(current ?? null))
+      .finally(() => setPending(null));
+  };
+
+  if (saved) {
+    return (
+      <div className="flex items-center gap-2 mt-2.5">
+        <span className="text-[11px] text-muted-foreground">
+          You said: <span className="text-foreground font-medium">{OUTCOME_LABEL[saved]}</span>
+        </span>
+        <button
+          onClick={send(saved === 'stopped' ? 'took_anyway' : 'stopped')}
+          className="text-[11px] text-muted-foreground underline underline-offset-2 hover:text-foreground"
+        >
+          change
+        </button>
+      </div>
+    );
+  }
+
+  return (
+    <div className="flex items-center gap-2 mt-2.5 flex-wrap">
+      <span className="text-[11px] text-muted-foreground mr-0.5">What did you do?</span>
+      {(['stopped', 'took_anyway'] as Outcome[]).map(o => (
+        <button
+          key={o}
+          onClick={send(o)}
+          disabled={pending !== null}
+          className={cn(
+            'h-7 px-2.5 rounded-md text-[11.5px] font-medium border transition-colors',
+            'border-border text-foreground hover:bg-muted',
+            'disabled:opacity-50',
+          )}
+        >
+          {OUTCOME_LABEL[o]}
+        </button>
+      ))}
+      <button
+        onClick={send('not_useful')}
+        disabled={pending !== null}
+        className="h-7 px-2 text-[11.5px] text-muted-foreground hover:text-foreground disabled:opacity-50"
+      >
+        Not useful
+      </button>
+    </div>
+  );
+}
+
+
+interface RecordRow { pattern_type?: string; alert_count?: number; trade_count: number; realized_pnl: number }
+
+/** pattern_type -> that pattern's realized record, fetched once for the page. */
+function usePatternRecord() {
+  const [byPattern, setByPattern] = useState<Record<string, RecordRow>>({});
+  useEffect(() => {
+    api.get<{ patterns?: RecordRow[] }>('/api/analytics/behaviour-cost', { params: { days: 90 } })
+      .then(r => {
+        const map: Record<string, RecordRow> = {};
+        for (const row of r.data?.patterns ?? []) {
+          if (row.pattern_type) map[row.pattern_type] = row;
+        }
+        setByPattern(map);
+      })
+      .catch(() => {});
+  }, []);
+  return byPattern;
+}
+
+const recordInr = (n: number) =>
+  (n < 0 ? '\u2212' : '+') + '\u20b9' + Math.abs(Math.round(n)).toLocaleString('en-IN');
+
+/**
+ * "Last 3 times: -Rs13,000." Shown only when the pattern has actually repeated,
+ * because a record of one is not a record.
+ */
+function PatternRecord({ row }: { row?: RecordRow }) {
+  if (!row || (row.alert_count ?? 0) < 2) return null;
+  const losing = row.realized_pnl < 0;
+  return (
+    <p className="text-[11.5px] text-muted-foreground mt-1.5">
+      Your record: <span className="text-foreground font-medium">{row.alert_count} times</span> in 90 days,{' '}
+      <span className={cn('font-medium font-tabular', losing ? 'text-tm-loss' : 'text-tm-profit')}>
+        {recordInr(row.realized_pnl)}
+      </span>{' '}
+      realized on those trades.
+    </p>
+  );
+}
+
 // ─── Alert row ────────────────────────────────────────────────────────────────
 
 function AlertRow({
   alert,
   onOpen,
   weekCount = 0,
+  record,
 }: {
   alert: AlertNotification;
   onOpen: (alert: AlertNotification) => void;
   weekCount?: number;
+  record?: RecordRow;
 }) {
   const sev = alert.pattern.severity;
 
   return (
-    <button
+    <div
+      role="button"
+      tabIndex={0}
       onClick={() => onOpen(alert)}
+      onKeyDown={e => (e.key === 'Enter' || e.key === ' ') && onOpen(alert)}
       aria-label={`${alert.pattern.name} - ${SEV_LABEL[sev]}${alert.acknowledged ? ', reviewed' : ', unreviewed'}`}
       className={cn(
         // No coloured edge, no tinted row. On a page that is entirely alerts,
@@ -133,11 +257,17 @@ function AlertRow({
             <Clock className="h-3 w-3 flex-shrink-0" />
             <span>{timeAgo(alert.shown_at)}</span>
           </div>
+
+          {/* Their own tape, on the row that fired. */}
+          <PatternRecord row={record} />
+
+          {/* The loop. Without this the page is a log of things already done. */}
+          <AlertResponse alertId={alert.id} current={alert.pattern.outcome as Outcome | undefined} />
         </div>
 
         <span className="text-muted-foreground/40 text-[11px] flex-shrink-0 mt-0.5">›</span>
       </div>
-    </button>
+    </div>
   );
 }
 
@@ -223,6 +353,7 @@ function AlertSkeleton() {
 }
 
 function LiveTab({ onOpen }: { onOpen: (a: AlertNotification) => void }) {
+  const patternRecord = usePatternRecord();
   const { alerts, isLoading, acknowledgeAll } = useAlerts();
   const weekCounts = useMemo(() => buildWeekCounts(alerts), [alerts]);
   const live = useMemo(
@@ -280,7 +411,13 @@ function LiveTab({ onOpen }: { onOpen: (a: AlertNotification) => void }) {
       </div>
       <div className="tm-card overflow-hidden">
         {live.map(alert => (
-          <AlertRow key={alert.id} alert={alert} onOpen={onOpen} weekCount={weekCounts[alert.pattern.type ?? alert.pattern.backend_type] ?? 0} />
+          <AlertRow
+            key={alert.id}
+            alert={alert}
+            onOpen={onOpen}
+            weekCount={weekCounts[alert.pattern.type ?? alert.pattern.backend_type] ?? 0}
+            record={patternRecord[alert.pattern.backend_type ?? alert.pattern.type ?? '']}
+          />
         ))}
       </div>
     </div>
@@ -304,6 +441,7 @@ const PERIOD_OPTIONS = [
 ] as const;
 
 function HistoryTab({ onOpen }: { onOpen: (a: AlertNotification) => void }) {
+  const patternRecord = usePatternRecord();
   // History has its own data source — loads independently of AlertContext
   // so users can see alerts beyond the 7-day live window.
   const [hours, setHours] = useState(168);
@@ -422,7 +560,13 @@ function HistoryTab({ onOpen }: { onOpen: (a: AlertNotification) => void }) {
       ) : (
         <div className="tm-card overflow-hidden">
           {filtered.map(alert => (
-            <AlertRow key={alert.id} alert={alert} onOpen={onOpen} weekCount={weekCounts[alert.pattern.type ?? alert.pattern.backend_type] ?? 0} />
+            <AlertRow
+              key={alert.id}
+              alert={alert}
+              onOpen={onOpen}
+              weekCount={weekCounts[alert.pattern.type ?? alert.pattern.backend_type] ?? 0}
+              record={patternRecord[alert.pattern.backend_type ?? alert.pattern.type ?? '']}
+            />
           ))}
         </div>
       )}
