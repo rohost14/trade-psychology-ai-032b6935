@@ -22,9 +22,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { cn } from '@/lib/utils';
 import { useBroker } from '@/contexts/BrokerContext';
 import ReportCard from '@/components/analytics/ReportCard';
-import BehaviourCostCard from '@/components/patterns/BehaviourCostCard';
 import PnlCalendar from '@/components/analytics/PnlCalendar';
-import BehaviourLead from '@/components/analytics/BehaviourLead';
 import ImportHistoryPrompt from '@/components/onboarding/ImportHistoryPrompt';
 import EdgeLeakCard from '@/components/analytics/EdgeLeakCard';
 import StrategyCard from '@/components/analytics/StrategyCard';
@@ -62,7 +60,6 @@ const PERIOD_OPTIONS = [
 // Consolidated from 6 tabs → 4 (Overview · Edge · Behaviour · Advanced). The
 // ReportCard hero sits above the tabs as the always-visible front door.
 const TABS = [
-  { value: 'behavior',  label: 'Behaviour',  icon: Brain,     group: 'core' as const },
   { value: 'habits',    label: 'Habits',     icon: Repeat,    group: 'core' as const },
   { value: 'edge',      label: 'Edge',       icon: Crosshair, group: 'core' as const },
   { value: 'overview',  label: 'Overview',   icon: BarChart2, group: 'core' as const },
@@ -74,7 +71,7 @@ type TabValue = typeof TABS[number]['value'];
 export default function Analytics() {
   const { isConnected, isLoading: brokerLoading, account } = useBroker();
   const [days, setDays] = useState(30);
-  const [tab, setTab]   = useState<TabValue>('behavior');
+  const [tab, setTab]   = useState<TabValue>('habits');
   const [instrumentPanel, setInstrumentPanel] = useState<string | null>(null);
 
   if (!brokerLoading && !isConnected) {
@@ -187,31 +184,20 @@ export default function Analytics() {
               <EdgeTab days={days} onInstrumentClick={u => setInstrumentPanel(u)} />
             </div>
           )}
-          {tab === 'behavior' && (
-            <div className="space-y-5">
-              {/* First thing on the first tab: which behaviours ran money down,
-                  how often, ranked by money. Realized P&L of the exact flagged
-                  trades -- never an estimate. */}
-              {/* One dominant region, then supporting detail. Four equal cards
-                  stacked is the sparse-feeling failure; unequal regions with one
-                  dominant is not. (DESIGN_REFERENCES §4) */}
-              <BehaviourLead days={days} />
-              <BehaviourCostCard days={days} />
-              {/* Promoted out of Advanced: "when do I trade well" is the central
-                  question for a behavioural product, not an advanced one. */}
-              <PnlCalendar days={days} />
-              <BehaviorTab days={days} />
-              <TradeDnaTab days={days} />
-            </div>
-          )}
           {tab === 'habits' && (
             <div className="space-y-5">
               <HabitsTab days={days} />
+              {/* Conditional performance, options behaviour and emotion-vs-P&L:
+                  trade- and journal-derived tendencies. The alert-derived half
+                  of this tab moved to Alerts with the rest of the patterns. */}
+              <BehaviorTab days={days} />
             </div>
           )}
           {tab === 'advanced' && (
             <div className="space-y-5">
+              <PnlCalendar days={days} />
               <SessionsTab days={days} />
+              <TradeDnaTab days={days} />
               <BtstTab days={days} />
             </div>
           )}

@@ -18,6 +18,12 @@
 import { useState, useMemo, useEffect, useCallback } from 'react';
 import { Bell, BellOff, CheckCheck, Clock, TrendingUp, Shield } from 'lucide-react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+// Merged in from My Patterns. BehaviorScoresCard is deliberately absent: its
+// quality_score is populated by no service, so it is a number that never moves.
+import BehaviourLead from '@/components/analytics/BehaviourLead';
+import BehaviourCostCard from '@/components/patterns/BehaviourCostCard';
+import PatternFrequencyCard from '@/components/patterns/PatternFrequencyCard';
+import PatternCalendar from '@/components/patterns/PatternCalendar';
 import { Skeleton } from '@/components/ui/skeleton';
 import ErrorState from '@/components/ErrorState';
 import { cn } from '@/lib/utils';
@@ -592,7 +598,37 @@ export default function AlertsPage() {
 
         <TabsContent value="live"><LiveTab onOpen={setSelectedAlert} /></TabsContent>
         <TabsContent value="history"><HistoryTab onOpen={setSelectedAlert} /></TabsContent>
-        <TabsContent value="patterns"><ResponseStatsCard /><PatternsTab /></TabsContent>
+        <TabsContent value="patterns">
+          <div className="space-y-5">
+            {/* One dominant region first: the leak worth acting on, and the
+                rule that constrains it. Everything below supports it. */}
+            <BehaviourLead days={30} />
+
+            {/* What keeps repeating -- counts and recency, no money. Analytics
+                owns quantified cost; this page owns the loop and the
+                repetition, so neither recomputes the other's story. */}
+            <PatternFrequencyCard days={30} />
+
+            {/* How you actually responded: the accountability half of the loop. */}
+            <ResponseStatsCard />
+
+            {/* Behaviour to realized money, kept here now that patterns live on
+                this page rather than in Analytics. */}
+            <BehaviourCostCard days={90} />
+
+            {/* When the patterns fired, as a calendar. */}
+            <PatternCalendar />
+
+            {/* TODO(streak): the streak card still lives on My Patterns. Its
+                derivation is ~100 lines inside that page (danger-zone summary
+                plus 30 days of alerts -> daily_status -> current/longest streak
+                and milestones). It needs lifting into a self-contained
+                component both pages can use; copying it here would fork logic
+                that then drifts, which is the exact failure this merge exists
+                to end. */}
+            <PatternsTab />
+          </div>
+        </TabsContent>
       </Tabs>
 
       {/* Alert detail sheet */}

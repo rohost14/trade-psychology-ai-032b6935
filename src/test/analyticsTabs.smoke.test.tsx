@@ -83,23 +83,20 @@ describe('Analytics tab render smoke (demo data, backend-shaped)', () => {
     expect(container.textContent).not.toContain('NaN');
   });
 
-  it('BehaviorTab renders pattern frequency, scenario cards and options card without NaN', async () => {
+  it('BehaviorTab renders the tendency cards it still owns, without NaN', async () => {
     const { container } = renderWithRouter(<BehaviorTab days={30} />);
 
-    expect(await screen.findByText('Pattern Frequency')).toBeInTheDocument();
-    // formatPatternName('revenge_trade') from the demo alerts_summary
-    expect(screen.getByText('Revenge Trade')).toBeInTheDocument();
+    // Pattern frequency moved to Alerts with the rest of the alert-derived
+    // blocks; BehaviorTab keeps the trade- and journal-derived tendencies.
+    expect(await screen.findByText('After a loss')).toBeInTheDocument();
+    expect(screen.queryByText('Pattern Frequency')).not.toBeInTheDocument();
 
     // Conditional-performance cards (conditions[] array consumption)
-    expect(screen.getByText('After a loss')).toBeInTheDocument();
     expect(screen.getByText('Opening 30 minutes')).toBeInTheDocument();
 
     // Options behaviour card (crashed in guest mode before the shape fix).
     // It fetches on its own timeline — await its render separately.
     expect(await screen.findByText('Options behaviour')).toBeInTheDocument();
-
-    // Cross-link to Alerts, not a recomputed response-stats table
-    expect(screen.getByText(/How you responded to each alert/)).toBeInTheDocument();
 
     expect(container.textContent).not.toContain('NaN');
   });

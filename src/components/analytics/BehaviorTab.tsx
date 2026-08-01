@@ -1,12 +1,11 @@
 import { useState, useEffect } from 'react';
+import { Link } from 'react-router-dom';
 import { RefreshCw, AlertTriangle, Link as LinkIcon, ArrowRight } from 'lucide-react';
 import { Skeleton } from '@/components/ui/skeleton';
 import ErrorState from '@/components/ErrorState';
 import { cn } from '@/lib/utils';
 import { formatCurrencyWithSign } from '@/lib/formatters';
 import { api } from '@/lib/api';
-import { Link } from 'react-router-dom';
-import { formatPatternName } from '@/contexts/AlertContext';
 import OptionsBehaviorCard from './OptionsBehaviorCard';
 import { useBroker } from '@/contexts/BrokerContext';
 import { PredictiveContextStrip } from '@/components/dashboard/PredictiveContextStrip';
@@ -152,49 +151,6 @@ export default function BehaviorTab({ days }: BehaviorTabProps) {
 
   return (
     <div className="space-y-5">
-
-      {/* Predictive risk context (danger hour/day, revenge window, problem symbol).
-          Moved here from the Dashboard — it's behavioural timing analysis. */}
-      {account?.id && <PredictiveContextStrip brokerAccountId={account.id} />}
-
-      {/* Pattern frequency — counts only. Response stats (heeded / took anyway)
-          and the live loop are owned by the Alerts page; cross-link, don't recompute. */}
-      {patterns.length > 0 && (
-        <div className="tm-card overflow-hidden">
-          <div className="px-5 py-3.5 border-b border-border flex items-center justify-between">
-            <p className="font-semibold text-sm">Pattern Frequency</p>
-            <span className="text-xs text-muted-foreground">last {days} days</span>
-          </div>
-
-          <div className="divide-y divide-border">
-            {patterns.map(p => (
-              <div key={p.pattern_type} className="px-5 py-3">
-                <div className="flex items-center justify-between gap-4 mb-1.5">
-                  <span className="text-sm font-medium truncate">{formatPatternName(p.pattern_type)}</span>
-                  <div className="flex items-center gap-3 shrink-0">
-                    <span className="text-[11px] text-muted-foreground">last {timeAgo(p.last_detected)}</span>
-                    <span className="text-sm font-mono font-semibold tabular-nums">{p.count}×</span>
-                  </div>
-                </div>
-                <div className="h-1 rounded-full bg-muted/60 overflow-hidden">
-                  <div
-                    className="h-full rounded-full bg-tm-obs"
-                    style={{ width: `${Math.round((p.count / maxCount) * 100)}%` }}
-                  />
-                </div>
-              </div>
-            ))}
-          </div>
-
-          <Link
-            to="/alerts"
-            className="px-5 py-3 border-t border-border flex items-center justify-between text-[12px] text-tm-brand hover:underline"
-          >
-            <span>How you responded to each alert — stopped, ignored, took anyway</span>
-            <ArrowRight className="h-3.5 w-3.5 shrink-0" />
-          </Link>
-        </div>
-      )}
 
       {/* Conditional performance — win rate under specific behavioural conditions */}
       {conditions.length > 0 && (
