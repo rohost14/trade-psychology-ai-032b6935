@@ -1100,3 +1100,29 @@ export const DEMO_HABITS = {
     best_instrument: 'FORTIS',
   },
 };
+
+// ---------------------------------------------------------------------------
+// Analytics: behaviour → realized money
+// ---------------------------------------------------------------------------
+// Mirrors GET /api/analytics/behaviour-cost. FACTUAL framing throughout: these
+// are the raw realized P&L of the exact completed trades each alert or rule
+// breach fired on, never an estimate or a counterfactual. Added because there
+// was no fixture, so the ranked cost leak rendered nothing in demo.
+// Pattern P&L sums to the −₹14,270 the 2 PM-3 PM leak already reports.
+export const DEMO_BEHAVIOUR_COST = {
+  has_data: true,
+  patterns: [
+    { pattern_type: 'revenge_trade',   alert_count: 3, trade_count: 3, realized_pnl: -13000 },
+    { pattern_type: 'size_escalation', alert_count: 2, trade_count: 2, realized_pnl: -6450  },
+    { pattern_type: 'overtrading',     alert_count: 2, trade_count: 4, realized_pnl: -3750  },
+    { pattern_type: 'no_stoploss',     alert_count: 2, trade_count: 2, realized_pnl: -1700  },
+    { pattern_type: 'early_exit',      alert_count: 1, trade_count: 1, realized_pnl: 820    },
+  ],
+  pattern_totals: { trade_count: 12, realized_pnl: -24080 },
+  rules: [
+    { rule: 'max_trades_per_day',  breach_count: 2, trade_count: 3, realized_pnl: -4610 },
+    { rule: 'daily_loss_limit',    breach_count: 1, trade_count: 2, realized_pnl: -3000 },
+    { rule: 'cooldown_after_loss', breach_count: 3, trade_count: 3, realized_pnl: -2700 },
+  ],
+  rule_totals: { trade_count: 8, realized_pnl: -10310 },
+};

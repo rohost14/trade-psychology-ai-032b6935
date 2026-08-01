@@ -32,7 +32,9 @@ const RULE_LABEL: Record<string, string> = {
 const labelPattern = (k?: string) => (k && PATTERN_LABEL[k]) || (k ? k.replace(/_/g, ' ') : '—');
 const labelRule = (k?: string) => (k && RULE_LABEL[k]) || (k ? k.replace(/_/g, ' ') : '—');
 
-const inr = (n: number) => (n < 0 ? '-' : '') + '₹' + Math.abs(Math.round(n)).toLocaleString('en-IN');
+// U+2212 minus, not an ASCII hyphen — matches every other money figure in the
+// app. Visible here because these rows are now the first thing on Analytics.
+const inr = (n: number) => (n < 0 ? '−' : '') + '₹' + Math.abs(Math.round(n)).toLocaleString('en-IN');
 const pnlClass = (n: number) => (n >= 0 ? 'text-tm-profit' : 'text-tm-loss');
 
 function Section({ title, totals, unitLabel, rows, label }: {
