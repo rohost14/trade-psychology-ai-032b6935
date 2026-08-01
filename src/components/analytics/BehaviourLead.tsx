@@ -92,9 +92,6 @@ export default function BehaviourLead({ days }: { days: number }) {
 
   return (
     <section className="rounded-lg border border-border bg-card overflow-hidden">
-      {/* Semantic colour as a 2px edge, not a filled panel — the references all
-          use a low-alpha tint of the hue, never a full-strength fill. */}
-      <div className="h-0.5 w-full bg-tm-loss/70" />
 
       <div className="px-5 sm:px-6 py-5">
         <span className="text-[11px] font-medium uppercase tracking-[0.12em] text-muted-foreground">

@@ -152,10 +152,7 @@ export default function SessionsTab({ days }: SessionsTabProps) {
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
 
           {first30 && first30.trade_count > 0 && (
-            <div className={cn(
-              'tm-card overflow-hidden border-l-4',
-              first30.delta_vs_baseline < -5 ? 'border-l-tm-loss' : 'border-l-tm-profit',
-            )}>
+            <div className="tm-card overflow-hidden">
               <div className="px-4 pt-4 pb-1 flex items-center gap-2">
                 <Clock className="h-4 w-4 text-muted-foreground" />
                 <p className="text-xs text-muted-foreground uppercase tracking-wide">Opening 30 Minutes (9:15–9:45)</p>
@@ -191,10 +188,7 @@ export default function SessionsTab({ days }: SessionsTabProps) {
           )}
 
           {expiryDay && expiryDay.trade_count > 0 && (
-            <div className={cn(
-              'tm-card overflow-hidden border-l-4',
-              expiryDay.delta_vs_baseline < -5 ? 'border-l-tm-loss' : 'border-l-tm-profit',
-            )}>
+            <div className="tm-card overflow-hidden">
               <div className="px-4 pt-4 pb-1 flex items-center gap-2">
                 <Clock className="h-4 w-4 text-muted-foreground" />
                 <p className="text-xs text-muted-foreground uppercase tracking-wide">Expiry Day Trades</p>

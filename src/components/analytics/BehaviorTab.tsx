@@ -204,10 +204,7 @@ export default function BehaviorTab({ days }: BehaviorTabProps) {
             return (
               <div
                 key={c.key}
-                className={cn(
-                  'tm-card overflow-hidden border-l-4',
-                  isRisky ? 'border-l-tm-loss' : 'border-l-tm-profit',
-                )}
+                className="tm-card overflow-hidden"
               >
                 <div className="px-4 pt-4 pb-3">
                   <p className="text-xs text-muted-foreground uppercase tracking-wide mb-2">{c.label}</p>
