@@ -23,7 +23,6 @@ const NAV_COMMANDS = [
   { name: 'Alerts',           href: '/alerts',          icon: Bell },
   { name: 'My Rules',         href: '/my-rules',        icon: Scale },
   { name: 'Blowup Shield',    href: '/blowup-shield',   icon: Shield },
-  { name: 'My Patterns',      href: '/my-patterns',     icon: Brain },
   { name: 'Reports',          href: '/reports',         icon: BookOpen },
   { name: 'Chat',             href: '/chat',            icon: MessageSquare },
   { name: 'Settings',         href: '/settings',        icon: Settings },

@@ -1,6 +1,32 @@
+/**
+ * Alerts — the behavioural loop, and where patterns live.
+ *
+ * Merged with My Patterns 2026-08-01 (docs/ALERTS_PATTERNS_MERGE.md). After
+ * Analytics took quantified cost, My Patterns held a duplicate of that card, an
+ * alert-history block belonging here, a behaviour score backed by a constant,
+ * and one genuine asset in the calendar. Not a page — so its content came here.
+ *
+ * Two things make this a loop rather than a log:
+ *  - every alert can be answered in one tap (POST /api/risk/alerts/{id}/feedback,
+ *    which existed all along and nothing called — the real reason the record
+ *    read 55 alerts and 0 outcomes), and
+ *  - every row carries the trader's own record with that pattern, from the same
+ *    factual source Analytics uses.
+ *
+ * No coloured left edge and no tinted row. That treatment belongs to live
+ * alerts on the Dashboard; on a page that is entirely alerts every row would
+ * carry it, which distinguishes nothing. Severity is a dot, a chip, and order.
+ */
 import { useState, useMemo, useEffect, useCallback } from 'react';
 import { Bell, BellOff, CheckCheck, Clock, TrendingUp, Shield } from 'lucide-react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+// Merged in from My Patterns. BehaviorScoresCard is deliberately absent: its
+// quality_score is populated by no service, so it is a number that never moves.
+import BehaviourLead from '@/components/analytics/BehaviourLead';
+import BehaviourCostCard from '@/components/patterns/BehaviourCostCard';
+import PatternFrequencyCard from '@/components/patterns/PatternFrequencyCard';
+import PatternCalendar from '@/components/patterns/PatternCalendar';
+import CleanDayStreak from '@/components/patterns/CleanDayStreak';
 import { Skeleton } from '@/components/ui/skeleton';
 import ErrorState from '@/components/ErrorState';
 import { cn } from '@/lib/utils';
@@ -49,29 +75,157 @@ function buildWeekCounts(alertList: AlertNotification[]): Record<string, number>
   return counts;
 }
 
+
+type Outcome = 'stopped' | 'took_anyway' | 'not_useful';
+
+const OUTCOME_LABEL: Record<Outcome, string> = {
+  stopped: 'I stood down',
+  took_anyway: 'Took it anyway',
+  not_useful: 'Not useful',
+};
+
+/**
+ * One-tap response on the alert itself.
+ *
+ * Deliberately no confirm step and no text field: the measured evidence is 55
+ * alerts and 0 outcomes recorded, and the product constraint is that any
+ * feature needing typed input will not be used. Optimistic, because the value
+ * is the habit of answering, not the write.
+ *
+ * "Took it anyway" is not scolded. The charter is mirror-not-blocker, so the
+ * honest answer has to be as easy to give as the flattering one.
+ */
+function AlertResponse({ alertId, current }: { alertId: string; current?: Outcome | null }) {
+  const [saved, setSaved] = useState<Outcome | null>(current ?? null);
+  const [pending, setPending] = useState<Outcome | null>(null);
+
+  const send = (outcome: Outcome) => (e: React.MouseEvent) => {
+    e.stopPropagation();          // the whole row is a button; do not open the sheet
+    if (saved === outcome) return;
+    setPending(outcome);
+    setSaved(outcome);            // optimistic
+    api.post(`/api/risk/alerts/${alertId}/feedback`, { outcome })
+      .catch(() => setSaved(current ?? null))
+      .finally(() => setPending(null));
+  };
+
+  if (saved) {
+    return (
+      <div className="flex items-center gap-2 mt-2.5">
+        <span className="text-[11px] text-muted-foreground">
+          You said: <span className="text-foreground font-medium">{OUTCOME_LABEL[saved]}</span>
+        </span>
+        <button
+          onClick={send(saved === 'stopped' ? 'took_anyway' : 'stopped')}
+          className="text-[11px] text-muted-foreground underline underline-offset-2 hover:text-foreground"
+        >
+          change
+        </button>
+      </div>
+    );
+  }
+
+  return (
+    <div className="flex items-center gap-2 mt-2.5 flex-wrap">
+      <span className="text-[11px] text-muted-foreground mr-0.5">What did you do?</span>
+      {(['stopped', 'took_anyway'] as Outcome[]).map(o => (
+        <button
+          key={o}
+          onClick={send(o)}
+          disabled={pending !== null}
+          className={cn(
+            'h-7 px-2.5 rounded-md text-[11.5px] font-medium border transition-colors',
+            'border-border text-foreground hover:bg-muted',
+            'disabled:opacity-50',
+          )}
+        >
+          {OUTCOME_LABEL[o]}
+        </button>
+      ))}
+      <button
+        onClick={send('not_useful')}
+        disabled={pending !== null}
+        className="h-7 px-2 text-[11.5px] text-muted-foreground hover:text-foreground disabled:opacity-50"
+      >
+        Not useful
+      </button>
+    </div>
+  );
+}
+
+
+interface RecordRow { pattern_type?: string; alert_count?: number; trade_count: number; realized_pnl: number }
+
+/** pattern_type -> that pattern's realized record, fetched once for the page. */
+function usePatternRecord() {
+  const [byPattern, setByPattern] = useState<Record<string, RecordRow>>({});
+  useEffect(() => {
+    api.get<{ patterns?: RecordRow[] }>('/api/analytics/behaviour-cost', { params: { days: 90 } })
+      .then(r => {
+        const map: Record<string, RecordRow> = {};
+        for (const row of r.data?.patterns ?? []) {
+          if (row.pattern_type) map[row.pattern_type] = row;
+        }
+        setByPattern(map);
+      })
+      .catch(() => {});
+  }, []);
+  return byPattern;
+}
+
+const recordInr = (n: number) =>
+  (n < 0 ? '\u2212' : '+') + '\u20b9' + Math.abs(Math.round(n)).toLocaleString('en-IN');
+
+/**
+ * "Last 3 times: -Rs13,000." Shown only when the pattern has actually repeated,
+ * because a record of one is not a record.
+ */
+function PatternRecord({ row }: { row?: RecordRow }) {
+  if (!row || (row.alert_count ?? 0) < 2) return null;
+  const losing = row.realized_pnl < 0;
+  return (
+    <p className="text-[11.5px] text-muted-foreground mt-1.5">
+      Your record: <span className="text-foreground font-medium">{row.alert_count} times</span> in 90 days,{' '}
+      <span className={cn('font-medium font-tabular', losing ? 'text-tm-loss' : 'text-tm-profit')}>
+        {recordInr(row.realized_pnl)}
+      </span>{' '}
+      realized on those trades.
+    </p>
+  );
+}
+
 // ─── Alert row ────────────────────────────────────────────────────────────────
 
 function AlertRow({
   alert,
   onOpen,
   weekCount = 0,
+  record,
 }: {
   alert: AlertNotification;
   onOpen: (alert: AlertNotification) => void;
   weekCount?: number;
+  record?: RecordRow;
 }) {
   const sev = alert.pattern.severity;
 
   return (
-    <button
+    <div
+      role="button"
+      tabIndex={0}
       onClick={() => onOpen(alert)}
+      onKeyDown={e => (e.key === 'Enter' || e.key === ' ') && onOpen(alert)}
       aria-label={`${alert.pattern.name} - ${SEV_LABEL[sev]}${alert.acknowledged ? ', reviewed' : ', unreviewed'}`}
       className={cn(
-        'tm-card w-full text-left border-l-[3px] transition-colors',
-        severityBorderClass(sev),
-        severityRowBg(sev),
-        'hover:brightness-[0.97] dark:hover:brightness-105',
-        alert.acknowledged && 'opacity-60',
+        // No coloured edge, no tinted row. On a page that is entirely alerts,
+        // every row would carry both, so neither distinguishes anything -- it
+        // just reads as severity theatre. Severity is the dot, the category
+        // chip and the order. Rows are separated by a hairline, and the whole
+        // list is one surface rather than a stack of cards.
+        'w-full text-left px-4 py-3.5 min-h-[44px] transition-colors',
+        'border-b border-border last:border-b-0',
+        'hover:bg-muted/40 focus-visible:outline-none focus-visible:bg-muted/40',
+        alert.acknowledged && 'opacity-55',
       )}
     >
       <div className="flex items-start gap-3 px-4 py-4">
@@ -79,18 +233,20 @@ function AlertRow({
 
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-2 flex-wrap mb-1">
-            <span className="text-[13px] font-semibold text-foreground">{alert.pattern.name}</span>
-            <span className={cn('text-[10px] font-semibold uppercase tracking-wide', SEV_LABEL_COLOR[sev])}>
+            <span className="text-[13px] font-medium text-foreground">{alert.pattern.name}</span>
+            {/* The category is the primary scan target, GitHub-inbox style:
+                a reason label lets dozens of rows be triaged in seconds. */}
+            <span className={cn('text-[10px] font-semibold uppercase tracking-wider', SEV_LABEL_COLOR[sev])}>
               {SEV_LABEL[sev]}
             </span>
             {weekCount >= 2 && (
-              <span className="text-[10px] font-semibold text-tm-obs bg-amber-50 dark:bg-amber-900/20 border border-amber-300 dark:border-amber-700/50 rounded px-1.5 py-0.5">
+              <span className="text-[10px] font-semibold text-tm-obs bg-tm-obs/10 rounded px-1.5 py-0.5">
                 {weekCount}× this week
               </span>
             )}
-            {alert.acknowledged && (
-              <span className="text-[10px] text-muted-foreground border border-border rounded px-1.5 py-0.5">
-                Reviewed
+            {!alert.acknowledged && (
+              <span className="text-[10px] font-medium text-primary bg-primary/10 rounded px-1.5 py-0.5">
+                New
               </span>
             )}
           </div>
@@ -104,11 +260,17 @@ function AlertRow({
             <Clock className="h-3 w-3 flex-shrink-0" />
             <span>{timeAgo(alert.shown_at)}</span>
           </div>
+
+          {/* Their own tape, on the row that fired. */}
+          <PatternRecord row={record} />
+
+          {/* The loop. Without this the page is a log of things already done. */}
+          <AlertResponse alertId={alert.id} current={alert.pattern.outcome as Outcome | undefined} />
         </div>
 
         <span className="text-muted-foreground/40 text-[11px] flex-shrink-0 mt-0.5">›</span>
       </div>
-    </button>
+    </div>
   );
 }
 
@@ -138,7 +300,9 @@ function ResponseStatsCard() {
       .catch(() => {});
   }, []);
 
-  if (!stats || stats.patterns.length === 0) return null;
+  // Same trap as BehaviorScoresCard: {} is truthy, so this used to reach
+  // `stats.patterns.length` on undefined and take the whole tab down.
+  if (!stats?.patterns?.length) return null;
   // Only worth showing once there's a signal (something ignored or overridden).
   const top = stats.patterns.filter(p => p.took_anyway > 0 || p.ignored > 0).slice(0, 3);
   if (top.length === 0) return null;
@@ -192,6 +356,7 @@ function AlertSkeleton() {
 }
 
 function LiveTab({ onOpen }: { onOpen: (a: AlertNotification) => void }) {
+  const patternRecord = usePatternRecord();
   const { alerts, isLoading, acknowledgeAll } = useAlerts();
   const weekCounts = useMemo(() => buildWeekCounts(alerts), [alerts]);
   const live = useMemo(
@@ -247,9 +412,17 @@ function LiveTab({ onOpen }: { onOpen: (a: AlertNotification) => void }) {
           Mark all reviewed
         </button>
       </div>
-      {live.map(alert => (
-        <AlertRow key={alert.id} alert={alert} onOpen={onOpen} weekCount={weekCounts[alert.pattern.type ?? alert.pattern.backend_type] ?? 0} />
-      ))}
+      <div className="tm-card overflow-hidden">
+        {live.map(alert => (
+          <AlertRow
+            key={alert.id}
+            alert={alert}
+            onOpen={onOpen}
+            weekCount={weekCounts[alert.pattern.type ?? alert.pattern.backend_type] ?? 0}
+            record={patternRecord[alert.pattern.backend_type ?? alert.pattern.type ?? '']}
+          />
+        ))}
+      </div>
     </div>
   );
 }
@@ -271,6 +444,7 @@ const PERIOD_OPTIONS = [
 ] as const;
 
 function HistoryTab({ onOpen }: { onOpen: (a: AlertNotification) => void }) {
+  const patternRecord = usePatternRecord();
   // History has its own data source — loads independently of AlertContext
   // so users can see alerts beyond the 7-day live window.
   const [hours, setHours] = useState(168);
@@ -387,9 +561,15 @@ function HistoryTab({ onOpen }: { onOpen: (a: AlertNotification) => void }) {
           </p>
         </div>
       ) : (
-        <div className="space-y-2">
+        <div className="tm-card overflow-hidden">
           {filtered.map(alert => (
-            <AlertRow key={alert.id} alert={alert} onOpen={onOpen} weekCount={weekCounts[alert.pattern.type ?? alert.pattern.backend_type] ?? 0} />
+            <AlertRow
+              key={alert.id}
+              alert={alert}
+              onOpen={onOpen}
+              weekCount={weekCounts[alert.pattern.type ?? alert.pattern.backend_type] ?? 0}
+              record={patternRecord[alert.pattern.backend_type ?? alert.pattern.type ?? '']}
+            />
           ))}
         </div>
       )}
@@ -567,7 +747,33 @@ export default function AlertsPage() {
 
         <TabsContent value="live"><LiveTab onOpen={setSelectedAlert} /></TabsContent>
         <TabsContent value="history"><HistoryTab onOpen={setSelectedAlert} /></TabsContent>
-        <TabsContent value="patterns"><ResponseStatsCard /><PatternsTab /></TabsContent>
+        <TabsContent value="patterns">
+          <div className="space-y-5">
+            {/* One dominant region first: the leak worth acting on, and the
+                rule that constrains it. Everything below supports it. */}
+            <BehaviourLead days={30} />
+
+            {/* What keeps repeating -- counts and recency, no money. Analytics
+                owns quantified cost; this page owns the loop and the
+                repetition, so neither recomputes the other's story. */}
+            <PatternFrequencyCard days={30} />
+
+            {/* How you actually responded: the accountability half of the loop. */}
+            <ResponseStatsCard />
+
+            {/* Behaviour to realized money, kept here now that patterns live on
+                this page rather than in Analytics. */}
+            <BehaviourCostCard days={90} />
+
+            {/* When the patterns fired, as a calendar. */}
+            <PatternCalendar />
+            {/* Consecutive clean days. Now self-contained, so it can live on
+                this page without forking MyPatterns' derivation. */}
+            <CleanDayStreak />
+
+            <PatternsTab />
+          </div>
+        </TabsContent>
       </Tabs>
 
       {/* Alert detail sheet */}

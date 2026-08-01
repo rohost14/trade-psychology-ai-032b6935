@@ -17,7 +17,7 @@ describe('canonical navigation (DESIGN_SYSTEM.md §24)', () => {
 
   it('groups are Insights, Risk, Account — in order, with the specified members', () => {
     expect(NAV_GROUPS.map(g => g.label)).toEqual(['Insights', 'Risk', 'Account']);
-    expect(NAV_GROUPS[0].items.map(i => i.name)).toEqual(['My Patterns', 'Reports', 'Journal']);
+    expect(NAV_GROUPS[0].items.map(i => i.name)).toEqual(['Reports', 'Journal']);
     expect(NAV_GROUPS[1].items.map(i => i.name)).toEqual(['My Rules', 'My Record']);
     expect(NAV_GROUPS[2].items.map(i => i.name)).toEqual(['Settings']);
   });
@@ -27,20 +27,21 @@ describe('canonical navigation (DESIGN_SYSTEM.md §24)', () => {
     expect(NAV_SECTIONS[0].items).toBe(NAV_PRIMARY);
   });
 
-  it('covers all ten in-app screens exactly once', () => {
+  it('covers all nine in-app screens exactly once', () => {
     const all = NAV_SECTIONS.flatMap(s => s.items.map(i => i.href));
 
     expect(new Set(all).size).toBe(all.length); // no duplicates
     expect(all.sort()).toEqual([
+      // My Patterns merged into Alerts 2026-08-01; /my-patterns now redirects.
       '/alerts', '/analytics', '/chat', '/dashboard', '/journal',
-      '/my-patterns', '/my-record', '/my-rules', '/reports', '/settings',
+      '/my-record', '/my-rules', '/reports', '/settings',
     ]);
   });
 
   it('mobile "More" carries exactly the non-primary screens', () => {
     const primary = new Set(NAV_PRIMARY.map(i => i.href));
 
-    expect(NAV_MORE_ITEMS).toHaveLength(6);
+    expect(NAV_MORE_ITEMS).toHaveLength(5);   // was 6 before My Patterns merged into Alerts
     expect(NAV_MORE_ITEMS.some(i => primary.has(i.href))).toBe(false);
   });
 

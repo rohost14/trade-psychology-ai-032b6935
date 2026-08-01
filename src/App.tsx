@@ -22,10 +22,7 @@ const Welcome       = lazy(() => import("./pages/Welcome"));
 const ImpersonateEntry = lazy(() => import("./pages/ImpersonateEntry"));
 const Analytics     = lazy(() => import("./pages/Analytics"));
 const Alerts        = lazy(() => import("./pages/Alerts"));
-// TEMPORARY - design working copy. Delete with src/pages/_lab/.
-const AlertsLab     = lazy(() => import("./pages/_lab/AlertsLab"));
 const MyRecord      = lazy(() => import("./pages/MyRecord"));
-const MyPatterns    = lazy(() => import("./pages/MyPatterns"));
 const Chat          = lazy(() => import("./pages/Chat"));
 const Settings      = lazy(() => import("./pages/Settings"));
 const Reports           = lazy(() => import("./pages/Reports"));
@@ -88,13 +85,13 @@ const App = () => (
                     <Route path="dashboard" element={<Dashboard />} />
                     <Route path="analytics" element={<Analytics />} />
                     <Route path="alerts" element={<Alerts />} />
-                    <Route path="alerts-lab" element={<AlertsLab />} />
                     <Route path="my-record" element={<MyRecord />} />
 
                     {/* Blowup Shield was replaced by My Record — keep the old
                         path working for anyone with it bookmarked. */}
                     <Route path="blowup-shield" element={<Navigate to="/my-record" replace />} />
-                    <Route path="my-patterns" element={<MyPatterns />} />
+                    {/* Merged into Alerts 2026-08-01. Redirect, not 404: the URL may be bookmarked. */}
+                    <Route path="my-patterns" element={<Navigate to="/alerts" replace />} />
                     <Route path="chat" element={<Chat />} />
                     <Route path="reports" element={<Reports />} />
                     <Route path="journal" element={<Journal />} />

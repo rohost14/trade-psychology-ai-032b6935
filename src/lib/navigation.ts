@@ -42,7 +42,6 @@ export const NAV_GROUPS: NavGroup[] = [
   {
     label: 'Insights',
     items: [
-      { name: 'My Patterns', href: '/my-patterns', icon: Brain },
       { name: 'Reports',     href: '/reports',     icon: BookOpen },
       { name: 'Journal',      href: '/journal',     icon: ScrollText },
     ],

@@ -696,7 +696,6 @@ Equity curve (cumulative, area or line) · time series bars (daily or periodic P
 | 1 | Dashboard | `/dashboard` |
 | 2 | Analytics | `/analytics` |
 | 3 | Alerts | `/alerts` |
-| 4 | My Patterns | `/my-patterns` |
 | 5 | My Record | `/my-record` |
 | 6 | Chat | `/chat` |
 | 7 | Reports | `/reports` |
@@ -716,7 +715,7 @@ One canonical structure, identical on both platforms. Desktop shows it as a side
 | Group | Screens |
 |---|---|
 | *(primary)* | Dashboard · Analytics · Alerts · Chat |
-| Insights | My Patterns · Reports · Journal |
+| Insights | Reports · Journal |
 | Risk | My Rules · My Record |
 | Account | Settings |
 
@@ -731,7 +730,7 @@ The mobile bottom bar carries the four primaries plus More. Grouping and labels 
 | What is happening right now | Dashboard | — |
 | What behaviour was detected, and the response record | Alerts | show the newest few (Dashboard) |
 | What behaviours cost money over time | Analytics | link |
-| Which habits define this trader | My Patterns | link |
+| Which habits define this trader | Alerts → Patterns | link |
 | What happened last time I traded this setup | My Record | — |
 | Explain and answer using real history | Chat | — |
 | The written periodic record | Reports | link |
@@ -751,7 +750,7 @@ Each screen is specified with the same eight fields.
 **Responsibility.** What is happening right now. The only screen a trader keeps open during market hours.
 
 **Owns.** Live session P&L · open positions and live risk · today's closed round-trips · the newest behavioural alerts.
-**Does not own.** Alert history or response statistics (Alerts) · long-term cost (Analytics) · the habit scorecard (My Patterns) · anything requiring a period selector.
+**Does not own.** Alert history or response statistics (Alerts) · long-term cost (Analytics) · the habit scorecard (Alerts → Patterns) · anything requiring a period selector.
 
 **Primary metric.** Day P&L, at Display size. The only 30px number on the screen.
 
@@ -786,7 +785,7 @@ Each screen is specified with the same eight fields.
 **Responsibility.** What behaviours cost money over time — the quantified evidence, over 7, 30, or 90 days.
 
 **Owns.** All period-based cost attribution, edge analysis, and behavioural cost quantification.
-**Does not own.** Live session data (Dashboard) · the alert response loop (Alerts) · the at-a-glance habit scorecard (My Patterns).
+**Does not own.** Live session data (Dashboard) · the alert response loop (Alerts) · the at-a-glance habit scorecard (Alerts → Patterns).
 
 **Primary metric.** Net P&L for the selected period, at Display size, inside the verdict block.
 
@@ -816,7 +815,7 @@ Each screen is specified with the same eight fields.
 **Responsibility.** What behaviour was detected — and whether the trader acted on it.
 
 **Owns.** The full alert record, severity presentation, per-pattern frequency, and the response statistics.
-**Does not own.** Behavioural cost in money over a period (Analytics) · the habit scorecard (My Patterns).
+**Does not own.** Behavioural cost in money over a period (Analytics) · the habit scorecard (Alerts → Patterns).
 
 **Primary metric.** None. Counts appear inline in the header; nothing on this screen earns Display size.
 
@@ -840,7 +839,11 @@ Each screen is specified with the same eight fields.
 
 ---
 
-### 4. My Patterns — `/my-patterns`
+### 4. My Patterns — MERGED INTO ALERTS 2026-08-01
+
+> Merged; `/my-patterns` redirects to `/alerts`. Rationale in `docs/ALERTS_PATTERNS_MERGE.md`. Retained below for the ownership notes until the Alerts section absorbs them.
+
+#### (former) `/my-patterns`
 
 **Responsibility.** Which habits define this trader — the at-a-glance scorecard.
 
