@@ -11,7 +11,6 @@ import { cn } from '@/lib/utils';
 import { api } from '@/lib/api';
 import { useBroker } from '@/contexts/BrokerContext';
 import { MorningIntentCard } from '@/components/dashboard/MorningIntentCard';
-import MoodPayoffTable from '@/components/journal/MoodPayoffTable';
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 interface JournalEntry {
@@ -35,6 +34,7 @@ interface JournalEntry {
 
 // ── Display maps ──────────────────────────────────────────────────────────────
 import { formatCurrencyWhole } from '@/lib/formatters';
+import DayEntrySheet from '@/components/journal/DayEntrySheet';
 
 const EMOTION_LABELS: Record<string, string> = {
   calm: 'Calm', fomo: 'FOMO', revenge: 'Revenge',
@@ -116,12 +116,13 @@ function fmtDate(dateStr: string): string {
 function EntryCard({ entry }: { entry: JournalEntry }) {
   const [expanded, setExpanded] = useState(false);
   const pnl = parsePnl(entry.trade_pnl);
+  const isDay = entry.entry_type !== 'trade';
   const pnlStr = fmtPnl(entry.trade_pnl);
   const hasNotes = !!entry.notes?.trim();
   const hasExtra = !!(entry.market_condition || entry.setup_quality || entry.would_repeat || entry.deviation_reason);
 
   return (
-    <div className="tm-card overflow-hidden">
+    <div className="border-b border-border last:border-b-0">
       {/* Main row */}
       <button
         type="button"
@@ -135,6 +136,11 @@ function EntryCard({ entry }: { entry: JournalEntry }) {
         {/* Symbol + P&L */}
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-2 flex-wrap mb-1.5">
+            {/* Day-level and trade-level entries were indistinguishable in this
+                list, which was exactly the question it could not answer. */}
+            <span className="text-[10px] uppercase tracking-wider text-muted-foreground border border-border rounded px-1.5 py-0.5 shrink-0">
+              {isDay ? 'Day' : 'Trade'}
+            </span>
             {entry.trade_symbol && (
               <span className="text-[13px] font-semibold font-mono text-foreground">
                 {entry.trade_symbol}
@@ -278,6 +284,7 @@ export default function JournalLab() {
   const [emotionFilter, setEmotionFilter] = useState<string[]>([]);
   const [planFilter, setPlanFilter] = useState('');
   const [search, setSearch]         = useState('');
+  const [dayEntryOpen, setDayEntryOpen] = useState(false);
 
   const fetchEntries = async (reset = false) => {
     if (!account?.id) return;
@@ -306,6 +313,13 @@ export default function JournalLab() {
   }, [account?.id]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Client-side filter
+  // A day-level entry carries no trade. Everything written from the Dashboard
+  // sheet is attached to one, so entry_type distinguishes the two.
+  const todayEntry = useMemo(() => {
+    const today = new Date().toISOString().slice(0, 10);
+    return entries.find(e => e.entry_type !== 'trade' && (e.created_at ?? '').slice(0, 10) === today) ?? null;
+  }, [entries]);
+
   const filtered = useMemo(() => {
     const cutoff = period > 0
       ? Date.now() - period * 24 * 60 * 60 * 1000
@@ -426,13 +440,33 @@ export default function JournalLab() {
         </div>
       )}
 
-      {/* The answer nothing else can give, and the reason a mood tag is worth
-          one tap. */}
-      {!loading && entries.length > 0 && (
-        <div className="mb-6">
-          <MoodPayoffTable entries={entries} />
+      <DayEntrySheet
+        open={dayEntryOpen}
+        onOpenChange={setDayEntryOpen}
+        existing={todayEntry}
+        onSaved={() => fetchEntries(true)}
+      />
+
+      {/* Write one. There was no way to create a journal entry from this page
+          at all -- every entry here came from the Dashboard trade sheet, so the
+          page could only ever be read. Day-level entries have no other home. */}
+      <div className="flex items-center justify-between gap-3 mb-4 pb-3 border-b border-border">
+        <div className="min-w-0">
+          <h2 className="text-[15px] font-medium text-foreground">Today</h2>
+          <p className="text-[12.5px] text-muted-foreground mt-0.5">
+            {todayEntry
+              ? 'Written. Tap to edit.'
+              : 'Nothing written yet — how you are trading today, and what you plan to do about it.'}
+          </p>
         </div>
-      )}
+        <button
+          type="button"
+          onClick={() => setDayEntryOpen(true)}
+          className="h-9 px-3.5 rounded-md bg-primary text-primary-foreground text-[13px] font-medium shrink-0 transition-colors hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+        >
+          {todayEntry ? 'Edit today' : 'Write today'}
+        </button>
+      </div>
 
       {/* One filter row and a search box. There were three rows and thirteen
           controls here, above a list of four; search answers more of them than
@@ -514,7 +548,7 @@ export default function JournalLab() {
           );
         })()
       ) : (
-        <div className="space-y-2">
+        <div className="tm-card overflow-hidden">
           {filtered.map(entry => (
             <EntryCard key={entry.id} entry={entry} />
           ))}
