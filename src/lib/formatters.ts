@@ -48,6 +48,15 @@ export function formatCurrencyWithSign(amount: number): string {
 }
 
 /**
+ * Signed rupees with no paise. For period totals and summary figures, where two
+ * decimals are noise: nobody reads a 30-day P&L to the paisa, and the extra
+ * width pushes columns into wrapping. Live per-trade money keeps its decimals.
+ */
+export function formatCurrencyWhole(amount: number): string {
+  return `${signOf(amount)}${inr(Math.abs(Math.round(amount)), 0)}`;
+}
+
+/**
  * Format number with Indian grouping (lakhs, crores)
  */
 export function formatNumber(num: number): string {
