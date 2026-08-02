@@ -116,6 +116,65 @@ function fmtDate(dateStr: string): string {
 }
 
 // ── Entry card ────────────────────────────────────────────────────────────────
+
+interface DayGroup {
+  date: string;
+  day: JournalEntry | null;
+  trades: JournalEntry[];
+  pnl: number;
+}
+
+/** Fold entries into days: the day entry heads the group, trades sit under it. */
+function groupByDay(entries: JournalEntry[]): DayGroup[] {
+  const byDate = new Map<string, DayGroup>();
+
+  for (const e of entries) {
+    const date = (e.created_at ?? '').slice(0, 10);
+    if (!date) continue;
+    if (!byDate.has(date)) byDate.set(date, { date, day: null, trades: [], pnl: 0 });
+    const g = byDate.get(date)!;
+
+    if (e.entry_type !== 'trade') {
+      g.day = e;
+    } else {
+      g.trades.push(e);
+      const v = e.trade_pnl != null ? Number(e.trade_pnl) : 0;
+      if (Number.isFinite(v)) g.pnl += v;
+    }
+  }
+
+  return [...byDate.values()].sort((a, b) => (a.date < b.date ? 1 : -1));
+}
+
+function dayLabel(date: string) {
+  const [y, m, d] = date.split('-').map(Number);
+  return new Date(y, m - 1, d).toLocaleDateString('en-IN', {
+    weekday: 'short', day: 'numeric', month: 'short',
+  });
+}
+
+/**
+ * Did the day match its intent?
+ *
+ * Computed, never asked. The trader wrote what they meant to do; the engine
+ * already knows what they did. Comparing the two is the whole mirror premise
+ * applied to intent, and it is what makes writing one worth the ten seconds.
+ *
+ * Deliberately narrow: only plan-adherence recorded on the day's own trades.
+ * No language parsing of the intent text -- guessing at whether "only A+
+ * setups" was honoured would be exactly the counterfactual the charter bans.
+ */
+function intentOutcome(g: DayGroup): { kept: number; broke: number } | null {
+  if (!g.day || g.trades.length === 0) return null;
+  let kept = 0, broke = 0;
+  for (const t of g.trades) {
+    if (t.followed_plan === 'yes') kept++;
+    else if (t.followed_plan === 'no' || t.followed_plan === 'partial') broke++;
+  }
+  if (kept + broke === 0) return null;
+  return { kept, broke };
+}
+
 function EntryCard({ entry }: { entry: JournalEntry }) {
   const [expanded, setExpanded] = useState(false);
   const pnl = parsePnl(entry.trade_pnl);
@@ -576,10 +635,65 @@ export default function JournalLab() {
           );
         })()
       ) : (
-        <div className="tm-card overflow-hidden">
-          {filtered.map(entry => (
-            <EntryCard key={entry.id} entry={entry} />
-          ))}
+        <div className="space-y-5">
+          {groupByDay(filtered).map(g => {
+            const outcome = intentOutcome(g);
+            return (
+              <section key={g.date}>
+                {/* Day header: the date, what the day cost or made, and -- when
+                    an intent was written and trades followed -- whether they
+                    matched it. */}
+                <div className="flex items-baseline justify-between gap-3 pb-2 border-b border-border">
+                  <div className="min-w-0">
+                    <span className="text-[13.5px] font-medium text-foreground">{dayLabel(g.date)}</span>
+                    {g.trades.length > 0 && (
+                      <span className="text-[11.5px] text-muted-foreground ml-2 font-tabular">
+                        {g.trades.length} trade{g.trades.length !== 1 ? 's' : ''}
+                      </span>
+                    )}
+                  </div>
+                  {g.trades.length > 0 && (
+                    <span className={cn(
+                      'text-[13px] font-medium font-tabular shrink-0',
+                      g.pnl >= 0 ? 'text-tm-profit' : 'text-tm-loss',
+                    )}>
+                      {formatCurrencyWhole(g.pnl)}
+                    </span>
+                  )}
+                </div>
+
+                {g.day && (
+                  <div className="py-3 border-b border-border">
+                    {g.day.notes && (
+                      <p className="text-[13px] text-foreground leading-snug">
+                        <span className="text-muted-foreground">Intent: </span>{g.day.notes}
+                      </p>
+                    )}
+                    {g.day.lessons && (
+                      <p className="text-[13px] text-foreground leading-snug mt-1">
+                        <span className="text-tm-obs">Lesson: </span>{g.day.lessons}
+                      </p>
+                    )}
+                    {outcome && (
+                      <p className="text-[12px] text-muted-foreground mt-1.5">
+                        {outcome.broke === 0
+                          ? `Every trade that day matched your plan.`
+                          : `${outcome.kept} of ${outcome.kept + outcome.broke} trades matched it.`}
+                      </p>
+                    )}
+                  </div>
+                )}
+
+                {g.trades.length > 0 && (
+                  <div>
+                    {g.trades.map(entry => (
+                      <EntryCard key={entry.id} entry={entry} />
+                    ))}
+                  </div>
+                )}
+              </section>
+            );
+          })}
 
           {/* Load more — only when no active filters (filtered view may not show new data) */}
           {hasMore && emotionFilter.length === 0 && !planFilter && (
