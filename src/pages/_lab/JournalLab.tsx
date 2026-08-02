@@ -635,62 +635,65 @@ export default function JournalLab() {
           );
         })()
       ) : (
-        <div className="space-y-5">
+        <div className="space-y-6">
           {groupByDay(filtered).map(g => {
             const outcome = intentOutcome(g);
             return (
-              <section key={g.date}>
-                {/* Day header: the date, what the day cost or made, and -- when
-                    an intent was written and trades followed -- whether they
-                    matched it. */}
-                <div className="flex items-baseline justify-between gap-3 pb-2 border-b border-border">
-                  <div className="min-w-0">
-                    <span className="text-[13.5px] font-medium text-foreground">{dayLabel(g.date)}</span>
+              <section key={g.date} className="grid grid-cols-1 sm:grid-cols-[104px_minmax(0,1fr)] gap-x-5">
+                {/* Date lives in a left gutter rather than a full-width header
+                    row. The header was spending a whole row on a date and a
+                    number while the right two-thirds sat empty; this uses the
+                    horizontal space that was already there and gives every day
+                    back that vertical space. Collapses to an inline header
+                    below sm, where a 104px gutter would eat the content. */}
+                <div className="sm:text-right sm:pt-3 sm:sticky sm:top-2 sm:self-start">
+                  <div className="flex sm:block items-baseline gap-2 pb-1 sm:pb-0 border-b sm:border-b-0 border-border">
+                    <span className="text-[13px] font-medium text-foreground whitespace-nowrap">
+                      {dayLabel(g.date)}
+                    </span>
                     {g.trades.length > 0 && (
-                      <span className="text-[11.5px] text-muted-foreground ml-2 font-tabular">
-                        {g.trades.length} trade{g.trades.length !== 1 ? 's' : ''}
-                      </span>
+                      <>
+                        <span className={cn(
+                          'text-[12.5px] font-medium font-tabular sm:block sm:mt-0.5',
+                          g.pnl >= 0 ? 'text-tm-profit' : 'text-tm-loss',
+                        )}>
+                          {formatCurrencyWhole(g.pnl)}
+                        </span>
+                        <span className="text-[11px] text-muted-foreground font-tabular sm:block sm:mt-0.5">
+                          {g.trades.length} trade{g.trades.length !== 1 ? 's' : ''}
+                        </span>
+                      </>
                     )}
                   </div>
-                  {g.trades.length > 0 && (
-                    <span className={cn(
-                      'text-[13px] font-medium font-tabular shrink-0',
-                      g.pnl >= 0 ? 'text-tm-profit' : 'text-tm-loss',
-                    )}>
-                      {formatCurrencyWhole(g.pnl)}
-                    </span>
-                  )}
                 </div>
 
-                {g.day && (
-                  <div className="py-3 border-b border-border">
-                    {g.day.notes && (
-                      <p className="text-[13px] text-foreground leading-snug">
-                        <span className="text-muted-foreground">Intent: </span>{g.day.notes}
-                      </p>
-                    )}
-                    {g.day.lessons && (
-                      <p className="text-[13px] text-foreground leading-snug mt-1">
-                        <span className="text-tm-obs">Lesson: </span>{g.day.lessons}
-                      </p>
-                    )}
-                    {outcome && (
-                      <p className="text-[12px] text-muted-foreground mt-1.5">
-                        {outcome.broke === 0
-                          ? `Every trade that day matched your plan.`
-                          : `${outcome.kept} of ${outcome.kept + outcome.broke} trades matched it.`}
-                      </p>
-                    )}
-                  </div>
-                )}
+                <div className="min-w-0 sm:border-l sm:border-border sm:pl-5">
+                  {g.day && (
+                    <div className="py-3 border-b border-border">
+                      {g.day.notes && (
+                        <p className="text-[13px] text-foreground leading-snug">
+                          <span className="text-muted-foreground">Intent: </span>{g.day.notes}
+                        </p>
+                      )}
+                      {g.day.lessons && (
+                        <p className="text-[13px] text-foreground leading-snug mt-1">
+                          <span className="text-tm-obs">Lesson: </span>{g.day.lessons}
+                        </p>
+                      )}
+                      {outcome && (
+                        <p className="text-[12px] text-muted-foreground mt-1.5">
+                          {outcome.broke === 0
+                            ? 'Every trade that day matched your plan.'
+                            : `${outcome.kept} of ${outcome.kept + outcome.broke} trades matched it.`}
+                        </p>
+                      )}
+                    </div>
+                  )}
 
-                {g.trades.length > 0 && (
-                  <div>
-                    {g.trades.map(entry => (
-                      <EntryCard key={entry.id} entry={entry} />
-                    ))}
-                  </div>
-                )}
+                  {g.trades.map(entry => (
+                    <EntryCard key={entry.id} entry={entry} />
+                  ))}
+                </div>
               </section>
             );
           })}
