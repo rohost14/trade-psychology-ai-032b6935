@@ -11,6 +11,7 @@ import { cn } from '@/lib/utils';
 import { api } from '@/lib/api';
 import { useBroker } from '@/contexts/BrokerContext';
 import { MorningIntentCard } from '@/components/dashboard/MorningIntentCard';
+import MoodPayoffTable from '@/components/journal/MoodPayoffTable';
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 interface JournalEntry {
@@ -33,6 +34,8 @@ interface JournalEntry {
 }
 
 // ── Display maps ──────────────────────────────────────────────────────────────
+import { formatCurrencyWhole } from '@/lib/formatters';
+
 const EMOTION_LABELS: Record<string, string> = {
   calm: 'Calm', fomo: 'FOMO', revenge: 'Revenge',
   anxious: 'Anxious', overconfident: 'Overconfident',
@@ -274,6 +277,7 @@ export default function JournalLab() {
   const [period, setPeriod]         = useState(30);
   const [emotionFilter, setEmotionFilter] = useState<string[]>([]);
   const [planFilter, setPlanFilter] = useState('');
+  const [search, setSearch]         = useState('');
 
   const fetchEntries = async (reset = false) => {
     if (!account?.id) return;
@@ -311,9 +315,14 @@ export default function JournalLab() {
       if (period > 0 && new Date(e.created_at).getTime() < cutoff) return false;
       if (emotionFilter.length > 0 && !emotionFilter.some(f => e.emotion_tags.includes(f))) return false;
       if (planFilter && e.followed_plan !== planFilter) return false;
+      if (search.trim()) {
+        // Notes and symbol are what a trader actually remembers an entry by.
+        const hay = `${e.notes ?? ''} ${e.trade_symbol ?? ''} ${e.deviation_reason ?? ''}`.toLowerCase();
+        if (!hay.includes(search.trim().toLowerCase())) return false;
+      }
       return true;
     });
-  }, [entries, period, emotionFilter, planFilter]);
+  }, [entries, period, emotionFilter, planFilter, search]);
 
   // Emotion filter toggle
   const toggleEmotion = (e: string) =>
@@ -389,103 +398,79 @@ export default function JournalLab() {
         <MorningIntentCard />
       </div>
 
-      {/* Stats bar */}
+      {/* Session summary. A hairline strip, not three equal cards -- the gaps
+          are the separators. */}
       {!loading && stats && (
-        <div className="grid grid-cols-3 gap-3 mb-5">
-          <div className="tm-card px-4 py-3 text-center">
+        <div className="grid grid-cols-3 divide-x divide-border border-y border-border mb-6">
+          <div className="px-4 py-3">
+            <span className="t-label">P&amp;L journalled</span>
             <div className={cn(
-              'text-[17px] font-bold font-mono tabular-nums',
+              'text-[17px] font-medium font-tabular mt-0.5',
               stats.total >= 0 ? 'text-tm-profit' : 'text-tm-loss',
             )}>
-              {stats.total >= 0 ? '+' : '−'}₹{Math.abs(stats.total).toLocaleString('en-IN', { maximumFractionDigits: 0 })}
+              {formatCurrencyWhole(stats.total)}
             </div>
-            <div className="text-[10px] text-muted-foreground mt-0.5">P&L (journaled)</div>
           </div>
-          <div className="tm-card px-4 py-3 text-center">
-            <div className="text-[17px] font-bold font-mono tabular-nums text-foreground">
+          <div className="px-4 py-3">
+            <span className="t-label">Followed plan</span>
+            <div className="text-[17px] font-medium font-tabular mt-0.5 text-foreground">
               {stats.count > 0 ? Math.round((stats.followed / stats.count) * 100) : 0}%
             </div>
-            <div className="text-[10px] text-muted-foreground mt-0.5">Followed plan</div>
           </div>
-          <div className="tm-card px-4 py-3 text-center">
-            <div className="text-[17px] font-bold font-mono tabular-nums text-foreground capitalize">
-              {stats.topEmotion ? (EMOTION_LABELS[stats.topEmotion] ?? stats.topEmotion) : '—'}
+          <div className="px-4 py-3">
+            <span className="t-label">Entries</span>
+            <div className="text-[17px] font-medium font-tabular mt-0.5 text-foreground">
+              {stats.count}
             </div>
-            <div className="text-[10px] text-muted-foreground mt-0.5">Top emotion</div>
           </div>
         </div>
       )}
 
-      {/* Filters */}
-      <div className="space-y-2.5 mb-5">
-        {/* Period */}
-        <div className="flex items-center gap-1.5">
-          {PERIOD_OPTIONS.map(opt => (
-            <button
-              key={opt.label}
-              onClick={() => setPeriod(opt.days)}
-              className={cn(
-                'px-3 py-1.5 rounded-lg text-[12px] font-medium transition-colors border',
-                period === opt.days
-                  ? 'bg-tm-brand text-white border-tm-brand'
-                  : 'border-border text-muted-foreground hover:text-foreground hover:border-foreground/30',
-              )}
-            >
-              {opt.label}
-            </button>
-          ))}
+      {/* The answer nothing else can give, and the reason a mood tag is worth
+          one tap. */}
+      {!loading && entries.length > 0 && (
+        <div className="mb-6">
+          <MoodPayoffTable entries={entries} />
         </div>
+      )}
 
-        {/* Emotion filter */}
-        <div className="flex flex-wrap items-center gap-1.5">
-          {EMOTION_FILTERS.map(e => (
-            <button
-              key={e}
-              onClick={() => toggleEmotion(e)}
-              className={cn(
-                'px-2.5 py-1 rounded text-[11px] font-medium transition-all border',
-                emotionFilter.includes(e)
-                  ? (EMOTION_COLORS[e] ?? '') + ' border-current'
-                  : 'border-border text-muted-foreground hover:border-foreground/30',
-              )}
-            >
-              {EMOTION_LABELS[e]}
-            </button>
-          ))}
-        </div>
-
-        {/* Plan filter */}
-        <div className="flex items-center gap-1.5">
+      {/* One filter row and a search box. There were three rows and thirteen
+          controls here, above a list of four; search answers more of them than
+          any of the chips did. */}
+      <div className="flex items-center gap-2 flex-wrap mb-4">
+        <input
+          type="search"
+          value={search}
+          onChange={e => setSearch(e.target.value)}
+          placeholder="Search entries"
+          className="h-8 px-3 rounded-md border border-border bg-card text-[13px] text-foreground placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring w-full sm:w-56"
+        />
+        <div className="flex items-center gap-1.5 flex-wrap">
           <button
-            onClick={() => setPlanFilter('')}
+            onClick={() => setEmotionFilter([])}
             className={cn(
-              'px-2.5 py-1 rounded text-[11px] font-medium transition-colors border',
-              planFilter === ''
-                ? 'bg-foreground/10 text-foreground border-foreground/20'
-                : 'border-border text-muted-foreground hover:border-foreground/30',
+              'h-8 px-3 rounded-md text-[12.5px] font-medium border transition-colors',
+              emotionFilter.length === 0 ? 'bg-muted text-foreground border-border' : 'text-muted-foreground border-border hover:text-foreground',
             )}
           >
             All
           </button>
-          {PLAN_FILTERS.map(opt => (
+          {EMOTION_FILTERS.map(v => ({ value: v, label: EMOTION_LABELS[v] ?? v })).map(em => (
             <button
-              key={opt.value}
-              onClick={() => setPlanFilter(prev => prev === opt.value ? '' : opt.value)}
+              key={em.value}
+              onClick={() => setEmotionFilter(prev => prev.includes(em.value) ? prev.filter(v => v !== em.value) : [...prev, em.value])}
               className={cn(
-                'px-2.5 py-1 rounded text-[11px] font-medium transition-colors border',
-                planFilter === opt.value
-                  ? 'bg-foreground/10 text-foreground border-foreground/20'
-                  : 'border-border text-muted-foreground hover:border-foreground/30',
+                'h-8 px-3 rounded-md text-[12.5px] font-medium border transition-colors',
+                emotionFilter.includes(em.value) ? 'bg-muted text-foreground border-border' : 'text-muted-foreground border-border hover:text-foreground',
               )}
             >
-              {opt.label}
+              {em.label}
             </button>
           ))}
         </div>
       </div>
 
-      {/* Entry list */}
-      {loading ? (
+      {loading && entries.length === 0 ? (
         <div className="space-y-2">
           {[1, 2, 3, 4, 5].map(i => <EntrySkeleton key={i} />)}
         </div>
