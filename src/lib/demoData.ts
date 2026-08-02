@@ -1192,8 +1192,19 @@ export const DEMO_SAVED_REPORTS = {
 // the same trades as DEMO_RISK_ALERTS, so an entry and the alert that prompted
 // it describe the same event.
 export const DEMO_JOURNAL_ENTRIES = {
-  total: 4,
+  total: 5,
   entries: [
+    // Today's day-level entry, so the Today block renders written rather than
+    // only ever showing its empty prompt.
+    {
+      id: 'je-000', trade_id: null, emotion_tags: ['focused'],
+      followed_plan: null, deviation_reason: null, exit_reason: null,
+      setup_quality: null, would_repeat: null, market_condition: 'choppy',
+      notes: 'Only A+ breakouts. Nothing before 10am.',
+      lessons: 'Five minutes off the screen after any stopout.',
+      trade_symbol: null, trade_type: null, trade_pnl: null,
+      entry_type: 'day', created_at: daysAgo(0, 8, 50), updated_at: daysAgo(0, 8, 50),
+    },
     {
       id: 'je-001', trade_id: 'ct-t01', emotion_tags: ['revenge', 'anxious'],
       followed_plan: 'no', deviation_reason: 'Re-entered 25 min after the SOLARINDS loss',

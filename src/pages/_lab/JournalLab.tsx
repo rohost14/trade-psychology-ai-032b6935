@@ -24,6 +24,8 @@ interface JournalEntry {
   would_repeat: string | null;
   market_condition: string | null;
   notes: string | null;
+  /** Day-entry lesson. Present in the backend schema, missing from this type. */
+  lessons?: string | null;
   trade_symbol: string | null;
   trade_type: string | null;
   trade_pnl: string | null;
@@ -453,11 +455,32 @@ export default function JournalLab() {
       <div className="flex items-center justify-between gap-3 mb-4 pb-3 border-b border-border">
         <div className="min-w-0">
           <h2 className="text-[15px] font-medium text-foreground">Today</h2>
-          <p className="text-[12.5px] text-muted-foreground mt-0.5">
-            {todayEntry
-              ? 'Written. Tap to edit.'
-              : 'Nothing written yet — how you are trading today, and what you plan to do about it.'}
-          </p>
+          {todayEntry ? (
+            /* Read it without opening it. An intent you have to click to see is
+               an intent you will not re-read mid-session, which is the only
+               moment it is worth anything. */
+            <div className="mt-1.5 space-y-1">
+              {todayEntry.notes && (
+                <p className="text-[13px] text-foreground leading-snug">
+                  <span className="text-muted-foreground">Intent: </span>{todayEntry.notes}
+                </p>
+              )}
+              {todayEntry.lessons && (
+                <p className="text-[13px] text-foreground leading-snug">
+                  <span className="text-tm-obs">Lesson: </span>{todayEntry.lessons}
+                </p>
+              )}
+              {!todayEntry.notes && !todayEntry.lessons && (
+                <p className="text-[12.5px] text-muted-foreground">
+                  Mood recorded. Add an intent when you have one.
+                </p>
+              )}
+            </div>
+          ) : (
+            <p className="text-[12.5px] text-muted-foreground mt-0.5">
+              Nothing written yet — how you are trading today, and what you plan to do about it.
+            </p>
+          )}
         </div>
         <button
           type="button"

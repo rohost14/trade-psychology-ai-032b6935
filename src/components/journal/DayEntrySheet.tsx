@@ -34,7 +34,10 @@ const MARKET_LABEL: Record<string, string> = {
 interface Props {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  existing?: { id: string; emotion_tags: string[]; notes: string | null; market_condition: string | null } | null;
+  existing?: {
+    id: string; emotion_tags: string[]; notes: string | null;
+    market_condition: string | null; lessons?: string | null;
+  } | null;
   onSaved?: () => void;
 }
 
@@ -68,7 +71,11 @@ function ChipRow({ options, labels, value, onChange }: {
 export default function DayEntrySheet({ open, onOpenChange, existing, onSaved }: Props) {
   const [mood, setMood] = useState<string | null>(existing?.emotion_tags?.[0] ?? null);
   const [market, setMarket] = useState<string | null>(existing?.market_condition ?? null);
-  const [notes, setNotes] = useState(existing?.notes ?? '');
+  // Field mapping, deliberate and worth stating: the backend schema has
+  // `notes` and `lessons` but no `intent`, so intent rides on `notes` for a day
+  // entry rather than adding a column for one string. Lesson uses `lessons`.
+  const [intent, setIntent] = useState(existing?.notes ?? '');
+  const [lesson, setLesson] = useState(existing?.lessons ?? '');
   const [saving, setSaving] = useState(false);
 
   const save = async () => {
@@ -78,7 +85,8 @@ export default function DayEntrySheet({ open, onOpenChange, existing, onSaved }:
         entry_type: 'day',
         emotion_tags: mood ? [mood] : [],
         market_condition: market,
-        notes: notes.trim() || null,
+        notes: intent.trim() || null,
+        lessons: lesson.trim() || null,
       };
       if (existing?.id) {
         await api.put(`/api/journal/${existing.id}`, body);
@@ -121,22 +129,40 @@ export default function DayEntrySheet({ open, onOpenChange, existing, onSaved }:
             </div>
           </div>
 
+          {/* The two fields that make a day entry worth having. Intent is the
+              only place a plan exists before the session, and without it
+              "you deviated from your plan" has nothing to compare against.
+              Lesson is what you would tell yourself tomorrow. */}
           <div>
-            <span className="t-label">Anything worth remembering</span>
+            <span className="t-label">Intent</span>
             <p className="text-[12px] text-muted-foreground mt-1 mb-2">
-              Optional. A mood on its own is a complete entry.
+              What you will and will not trade today.
             </p>
             <textarea
-              value={notes}
-              onChange={e => setNotes(e.target.value)}
-              rows={5}
-              placeholder="Your plan, or what you noticed…"
+              value={intent}
+              onChange={e => setIntent(e.target.value)}
+              rows={3}
+              placeholder="e.g. Only A+ setups. Skip the first 15 minutes."
+              className="w-full rounded-md border border-border bg-card px-3 py-2 text-[13.5px] text-foreground placeholder:text-muted-foreground resize-y focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+            />
+          </div>
+
+          <div>
+            <span className="t-label">Lesson</span>
+            <p className="text-[12px] text-muted-foreground mt-1 mb-2">
+              Optional. A mood on its own is still a complete entry.
+            </p>
+            <textarea
+              value={lesson}
+              onChange={e => setLesson(e.target.value)}
+              rows={3}
+              placeholder="e.g. One loss ends the day when I am tired."
               className="w-full rounded-md border border-border bg-card px-3 py-2 text-[13.5px] text-foreground placeholder:text-muted-foreground resize-y focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
             />
           </div>
 
           <div className="flex items-center gap-2 pt-1">
-            <Button onClick={save} disabled={saving || (!mood && !market && !notes.trim())}>
+            <Button onClick={save} disabled={saving || (!mood && !market && !intent.trim() && !lesson.trim())}>
               {saving ? 'Saving…' : 'Save'}
             </Button>
             <Button variant="ghost" onClick={() => onOpenChange(false)}>Cancel</Button>
