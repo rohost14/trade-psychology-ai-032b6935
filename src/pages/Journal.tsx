@@ -21,6 +21,8 @@ interface JournalEntry {
   would_repeat: string | null;
   market_condition: string | null;
   notes: string | null;
+  /** Day-entry lesson. Present in the backend schema, missing from this type. */
+  lessons?: string | null;
   trade_symbol: string | null;
   trade_type: string | null;
   trade_pnl: string | null;
@@ -30,6 +32,10 @@ interface JournalEntry {
 }
 
 // ── Display maps ──────────────────────────────────────────────────────────────
+import { formatCurrencyWhole } from '@/lib/formatters';
+import DayEntrySheet from '@/components/journal/DayEntrySheet';
+import LessonLibrary from '@/components/journal/LessonLibrary';
+
 const EMOTION_LABELS: Record<string, string> = {
   calm: 'Calm', fomo: 'FOMO', revenge: 'Revenge',
   anxious: 'Anxious', overconfident: 'Overconfident',
@@ -107,15 +113,75 @@ function fmtDate(dateStr: string): string {
 }
 
 // ── Entry card ────────────────────────────────────────────────────────────────
+
+interface DayGroup {
+  date: string;
+  day: JournalEntry | null;
+  trades: JournalEntry[];
+  pnl: number;
+}
+
+/** Fold entries into days: the day entry heads the group, trades sit under it. */
+function groupByDay(entries: JournalEntry[]): DayGroup[] {
+  const byDate = new Map<string, DayGroup>();
+
+  for (const e of entries) {
+    const date = (e.created_at ?? '').slice(0, 10);
+    if (!date) continue;
+    if (!byDate.has(date)) byDate.set(date, { date, day: null, trades: [], pnl: 0 });
+    const g = byDate.get(date)!;
+
+    if (e.entry_type !== 'trade') {
+      g.day = e;
+    } else {
+      g.trades.push(e);
+      const v = e.trade_pnl != null ? Number(e.trade_pnl) : 0;
+      if (Number.isFinite(v)) g.pnl += v;
+    }
+  }
+
+  return [...byDate.values()].sort((a, b) => (a.date < b.date ? 1 : -1));
+}
+
+function dayLabel(date: string) {
+  const [y, m, d] = date.split('-').map(Number);
+  return new Date(y, m - 1, d).toLocaleDateString('en-IN', {
+    weekday: 'short', day: 'numeric', month: 'short',
+  });
+}
+
+/**
+ * Did the day match its intent?
+ *
+ * Computed, never asked. The trader wrote what they meant to do; the engine
+ * already knows what they did. Comparing the two is the whole mirror premise
+ * applied to intent, and it is what makes writing one worth the ten seconds.
+ *
+ * Deliberately narrow: only plan-adherence recorded on the day's own trades.
+ * No language parsing of the intent text -- guessing at whether "only A+
+ * setups" was honoured would be exactly the counterfactual the charter bans.
+ */
+function intentOutcome(g: DayGroup): { kept: number; broke: number } | null {
+  if (!g.day || g.trades.length === 0) return null;
+  let kept = 0, broke = 0;
+  for (const t of g.trades) {
+    if (t.followed_plan === 'yes') kept++;
+    else if (t.followed_plan === 'no' || t.followed_plan === 'partial') broke++;
+  }
+  if (kept + broke === 0) return null;
+  return { kept, broke };
+}
+
 function EntryCard({ entry }: { entry: JournalEntry }) {
   const [expanded, setExpanded] = useState(false);
   const pnl = parsePnl(entry.trade_pnl);
+  const isDay = entry.entry_type !== 'trade';
   const pnlStr = fmtPnl(entry.trade_pnl);
   const hasNotes = !!entry.notes?.trim();
   const hasExtra = !!(entry.market_condition || entry.setup_quality || entry.would_repeat || entry.deviation_reason);
 
   return (
-    <div className="tm-card overflow-hidden">
+    <div className="border-b border-border last:border-b-0 px-1">
       {/* Main row */}
       <button
         type="button"
@@ -129,6 +195,11 @@ function EntryCard({ entry }: { entry: JournalEntry }) {
         {/* Symbol + P&L */}
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-2 flex-wrap mb-1.5">
+            {/* Day-level and trade-level entries were indistinguishable in this
+                list, which was exactly the question it could not answer. */}
+            <span className="text-[10px] uppercase tracking-wider text-muted-foreground border border-border rounded px-1.5 py-0.5 shrink-0">
+              {isDay ? 'Day' : 'Trade'}
+            </span>
             {entry.trade_symbol && (
               <span className="text-[13px] font-semibold font-mono text-foreground">
                 {entry.trade_symbol}
@@ -195,7 +266,7 @@ function EntryCard({ entry }: { entry: JournalEntry }) {
 
           {/* Extra fields grid */}
           {hasExtra && (
-            <div className="grid grid-cols-2 gap-x-6 gap-y-1.5">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-1.5">
               {entry.would_repeat && (
                 <div>
                   <span className="text-[10px] text-muted-foreground uppercase tracking-wide">Would repeat</span>
@@ -271,6 +342,8 @@ export default function Journal() {
   const [period, setPeriod]         = useState(30);
   const [emotionFilter, setEmotionFilter] = useState<string[]>([]);
   const [planFilter, setPlanFilter] = useState('');
+  const [search, setSearch]         = useState('');
+  const [dayEntryOpen, setDayEntryOpen] = useState(false);
 
   const fetchEntries = async (reset = false) => {
     if (!account?.id) return;
@@ -299,6 +372,13 @@ export default function Journal() {
   }, [account?.id]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Client-side filter
+  // A day-level entry carries no trade. Everything written from the Dashboard
+  // sheet is attached to one, so entry_type distinguishes the two.
+  const todayEntry = useMemo(() => {
+    const today = new Date().toISOString().slice(0, 10);
+    return entries.find(e => e.entry_type !== 'trade' && (e.created_at ?? '').slice(0, 10) === today) ?? null;
+  }, [entries]);
+
   const filtered = useMemo(() => {
     const cutoff = period > 0
       ? Date.now() - period * 24 * 60 * 60 * 1000
@@ -308,9 +388,14 @@ export default function Journal() {
       if (period > 0 && new Date(e.created_at).getTime() < cutoff) return false;
       if (emotionFilter.length > 0 && !emotionFilter.some(f => e.emotion_tags.includes(f))) return false;
       if (planFilter && e.followed_plan !== planFilter) return false;
+      if (search.trim()) {
+        // Notes and symbol are what a trader actually remembers an entry by.
+        const hay = `${e.notes ?? ''} ${e.trade_symbol ?? ''} ${e.deviation_reason ?? ''}`.toLowerCase();
+        if (!hay.includes(search.trim().toLowerCase())) return false;
+      }
       return true;
     });
-  }, [entries, period, emotionFilter, planFilter]);
+  }, [entries, period, emotionFilter, planFilter, search]);
 
   // Emotion filter toggle
   const toggleEmotion = (e: string) =>
@@ -386,103 +471,124 @@ export default function Journal() {
         <MorningIntentCard />
       </div>
 
-      {/* Stats bar */}
+      {/* Session summary. A hairline strip, not three equal cards -- the gaps
+          are the separators. */}
       {!loading && stats && (
-        <div className="grid grid-cols-3 gap-3 mb-5">
-          <div className="tm-card px-4 py-3 text-center">
+        <div className="grid grid-cols-1 sm:grid-cols-3 divide-y sm:divide-y-0 sm:divide-x divide-border border-y border-border mb-6">
+          <div className="px-4 py-3">
+            <span className="t-label">P&amp;L journalled</span>
             <div className={cn(
-              'text-[17px] font-bold font-mono tabular-nums',
+              'text-[17px] font-medium font-tabular mt-0.5',
               stats.total >= 0 ? 'text-tm-profit' : 'text-tm-loss',
             )}>
-              {stats.total >= 0 ? '+' : '−'}₹{Math.abs(stats.total).toLocaleString('en-IN', { maximumFractionDigits: 0 })}
+              {formatCurrencyWhole(stats.total)}
             </div>
-            <div className="text-[10px] text-muted-foreground mt-0.5">P&L (journaled)</div>
           </div>
-          <div className="tm-card px-4 py-3 text-center">
-            <div className="text-[17px] font-bold font-mono tabular-nums text-foreground">
+          <div className="px-4 py-3">
+            <span className="t-label">Followed plan</span>
+            <div className="text-[17px] font-medium font-tabular mt-0.5 text-foreground">
               {stats.count > 0 ? Math.round((stats.followed / stats.count) * 100) : 0}%
             </div>
-            <div className="text-[10px] text-muted-foreground mt-0.5">Followed plan</div>
           </div>
-          <div className="tm-card px-4 py-3 text-center">
-            <div className="text-[17px] font-bold font-mono tabular-nums text-foreground capitalize">
-              {stats.topEmotion ? (EMOTION_LABELS[stats.topEmotion] ?? stats.topEmotion) : '—'}
+          <div className="px-4 py-3">
+            <span className="t-label">Entries</span>
+            <div className="text-[17px] font-medium font-tabular mt-0.5 text-foreground">
+              {stats.count}
             </div>
-            <div className="text-[10px] text-muted-foreground mt-0.5">Top emotion</div>
           </div>
         </div>
       )}
 
-      {/* Filters */}
-      <div className="space-y-2.5 mb-5">
-        {/* Period */}
-        <div className="flex items-center gap-1.5">
-          {PERIOD_OPTIONS.map(opt => (
-            <button
-              key={opt.label}
-              onClick={() => setPeriod(opt.days)}
-              className={cn(
-                'px-3 py-1.5 rounded-lg text-[12px] font-medium transition-colors border',
-                period === opt.days
-                  ? 'bg-tm-brand text-white border-tm-brand'
-                  : 'border-border text-muted-foreground hover:text-foreground hover:border-foreground/30',
-              )}
-            >
-              {opt.label}
-            </button>
-          ))}
-        </div>
+      <DayEntrySheet
+        open={dayEntryOpen}
+        onOpenChange={setDayEntryOpen}
+        existing={todayEntry}
+        onSaved={() => fetchEntries(true)}
+      />
 
-        {/* Emotion filter */}
-        <div className="flex flex-wrap items-center gap-1.5">
-          {EMOTION_FILTERS.map(e => (
-            <button
-              key={e}
-              onClick={() => toggleEmotion(e)}
-              className={cn(
-                'px-2.5 py-1 rounded text-[11px] font-medium transition-all border',
-                emotionFilter.includes(e)
-                  ? (EMOTION_COLORS[e] ?? '') + ' border-current'
-                  : 'border-border text-muted-foreground hover:border-foreground/30',
+      {/* Write one. There was no way to create a journal entry from this page
+          at all -- every entry here came from the Dashboard trade sheet, so the
+          page could only ever be read. Day-level entries have no other home. */}
+      <div className="tm-card px-4 py-3.5 flex items-center justify-between gap-3 mb-4">
+        <div className="min-w-0">
+          <h2 className="text-[15px] font-medium text-foreground">Today</h2>
+          {todayEntry ? (
+            /* Read it without opening it. An intent you have to click to see is
+               an intent you will not re-read mid-session, which is the only
+               moment it is worth anything. */
+            <div className="mt-1.5 space-y-1">
+              {todayEntry.notes && (
+                <p className="text-[13px] text-foreground leading-snug">
+                  <span className="text-muted-foreground">Intent: </span>{todayEntry.notes}
+                </p>
               )}
-            >
-              {EMOTION_LABELS[e]}
-            </button>
-          ))}
+              {todayEntry.lessons && (
+                <p className="text-[13px] text-foreground leading-snug">
+                  <span className="text-tm-obs">Lesson: </span>{todayEntry.lessons}
+                </p>
+              )}
+              {!todayEntry.notes && !todayEntry.lessons && (
+                <p className="text-[12.5px] text-muted-foreground">
+                  Mood recorded. Add an intent when you have one.
+                </p>
+              )}
+            </div>
+          ) : (
+            <p className="text-[12.5px] text-muted-foreground mt-0.5">
+              Nothing written yet — how you are trading today, and what you plan to do about it.
+            </p>
+          )}
         </div>
+        <button
+          type="button"
+          onClick={() => setDayEntryOpen(true)}
+          className="h-9 px-3.5 rounded-md bg-primary text-primary-foreground text-[13px] font-medium shrink-0 transition-colors hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+        >
+          {todayEntry ? 'Edit today' : 'Write today'}
+        </button>
+      </div>
 
-        {/* Plan filter */}
-        <div className="flex items-center gap-1.5">
+      {/* Collected lessons. A lesson written into one day's entry scrolls away
+          with it, so writing one has no payoff; this is the payoff. */}
+      {!loading && <LessonLibrary entries={entries} />}
+
+      {/* One filter row and a search box. There were three rows and thirteen
+          controls here, above a list of four; search answers more of them than
+          any of the chips did. */}
+      <div className="flex items-center gap-2 flex-wrap mb-4">
+        <input
+          type="search"
+          value={search}
+          onChange={e => setSearch(e.target.value)}
+          placeholder="Search entries"
+          className="h-8 px-3 rounded-md border border-border bg-card text-[13px] text-foreground placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring w-full sm:w-56"
+        />
+        <div className="flex items-center gap-1.5 flex-wrap">
           <button
-            onClick={() => setPlanFilter('')}
+            onClick={() => setEmotionFilter([])}
             className={cn(
-              'px-2.5 py-1 rounded text-[11px] font-medium transition-colors border',
-              planFilter === ''
-                ? 'bg-foreground/10 text-foreground border-foreground/20'
-                : 'border-border text-muted-foreground hover:border-foreground/30',
+              'h-8 px-3 rounded-md text-[12.5px] font-medium border transition-colors',
+              emotionFilter.length === 0 ? 'bg-muted text-foreground border-border' : 'text-muted-foreground border-border hover:text-foreground',
             )}
           >
             All
           </button>
-          {PLAN_FILTERS.map(opt => (
+          {EMOTION_FILTERS.map(v => ({ value: v, label: EMOTION_LABELS[v] ?? v })).map(em => (
             <button
-              key={opt.value}
-              onClick={() => setPlanFilter(prev => prev === opt.value ? '' : opt.value)}
+              key={em.value}
+              onClick={() => setEmotionFilter(prev => prev.includes(em.value) ? prev.filter(v => v !== em.value) : [...prev, em.value])}
               className={cn(
-                'px-2.5 py-1 rounded text-[11px] font-medium transition-colors border',
-                planFilter === opt.value
-                  ? 'bg-foreground/10 text-foreground border-foreground/20'
-                  : 'border-border text-muted-foreground hover:border-foreground/30',
+                'h-8 px-3 rounded-md text-[12.5px] font-medium border transition-colors',
+                emotionFilter.includes(em.value) ? 'bg-muted text-foreground border-border' : 'text-muted-foreground border-border hover:text-foreground',
               )}
             >
-              {opt.label}
+              {em.label}
             </button>
           ))}
         </div>
       </div>
 
-      {/* Entry list */}
-      {loading ? (
+      {loading && entries.length === 0 ? (
         <div className="space-y-2">
           {[1, 2, 3, 4, 5].map(i => <EntrySkeleton key={i} />)}
         </div>
@@ -526,10 +632,68 @@ export default function Journal() {
           );
         })()
       ) : (
-        <div className="space-y-2">
-          {filtered.map(entry => (
-            <EntryCard key={entry.id} entry={entry} />
-          ))}
+        <div className="space-y-6">
+          {groupByDay(filtered).map(g => {
+            const outcome = intentOutcome(g);
+            return (
+              <section key={g.date} className="grid grid-cols-1 sm:grid-cols-[104px_minmax(0,1fr)] gap-x-5">
+                {/* Date lives in a left gutter rather than a full-width header
+                    row. The header was spending a whole row on a date and a
+                    number while the right two-thirds sat empty; this uses the
+                    horizontal space that was already there and gives every day
+                    back that vertical space. Collapses to an inline header
+                    below sm, where a 104px gutter would eat the content. */}
+                <div className="sm:text-right sm:pt-3 sm:sticky sm:top-2 sm:self-start">
+                  <div className="flex sm:block items-baseline gap-2 pb-1 sm:pb-0 border-b sm:border-b-0 border-border">
+                    <span className="text-[13px] font-medium text-foreground whitespace-nowrap">
+                      {dayLabel(g.date)}
+                    </span>
+                    {g.trades.length > 0 && (
+                      <>
+                        <span className={cn(
+                          'text-[12.5px] font-medium font-tabular sm:block sm:mt-0.5',
+                          g.pnl >= 0 ? 'text-tm-profit' : 'text-tm-loss',
+                        )}>
+                          {formatCurrencyWhole(g.pnl)}
+                        </span>
+                        <span className="text-[11px] text-muted-foreground font-tabular sm:block sm:mt-0.5">
+                          {g.trades.length} trade{g.trades.length !== 1 ? 's' : ''}
+                        </span>
+                      </>
+                    )}
+                  </div>
+                </div>
+
+                <div className="min-w-0 tm-card overflow-hidden">
+                  {g.day && (
+                    <div className="px-4 py-3 border-b border-border bg-muted/40">
+                      {g.day.notes && (
+                        <p className="text-[13px] text-foreground leading-snug">
+                          <span className="text-muted-foreground">Intent: </span>{g.day.notes}
+                        </p>
+                      )}
+                      {g.day.lessons && (
+                        <p className="text-[13px] text-foreground leading-snug mt-1">
+                          <span className="text-tm-obs">Lesson: </span>{g.day.lessons}
+                        </p>
+                      )}
+                      {outcome && (
+                        <p className="text-[12px] text-muted-foreground mt-1.5">
+                          {outcome.broke === 0
+                            ? 'Every trade that day matched your plan.'
+                            : `${outcome.kept} of ${outcome.kept + outcome.broke} trades matched it.`}
+                        </p>
+                      )}
+                    </div>
+                  )}
+
+                  {g.trades.map(entry => (
+                    <EntryCard key={entry.id} entry={entry} />
+                  ))}
+                </div>
+              </section>
+            );
+          })}
 
           {/* Load more — only when no active filters (filtered view may not show new data) */}
           {hasMore && emotionFilter.length === 0 && !planFilter && (

@@ -18,7 +18,6 @@ import Layout from "./components/Layout";
 // Eagerly load Dashboard — it's the first screen after login.
 // All other routes are lazy-loaded, splitting the bundle into per-route chunks.
 import Dashboard from "./pages/Dashboard";
-const DashboardLab  = lazy(() => import("./pages/_lab/DashboardLab"));
 const Welcome       = lazy(() => import("./pages/Welcome"));
 const ImpersonateEntry = lazy(() => import("./pages/ImpersonateEntry"));
 const Analytics     = lazy(() => import("./pages/Analytics"));
@@ -28,7 +27,6 @@ const Chat          = lazy(() => import("./pages/Chat"));
 const Settings      = lazy(() => import("./pages/Settings"));
 const Reports           = lazy(() => import("./pages/Reports"));
 const Journal           = lazy(() => import("./pages/Journal"));
-const JournalLab    = lazy(() => import("./pages/_lab/JournalLab"));
 const MyRules           = lazy(() => import("./pages/MyRules"));
 const TermsOfService = lazy(() => import("./pages/TermsOfService"));
 const PrivacyPolicy  = lazy(() => import("./pages/PrivacyPolicy"));
@@ -85,7 +83,6 @@ const App = () => (
                       }
                     />
                     <Route path="dashboard" element={<Dashboard />} />
-                    <Route path="dashboard-lab" element={<DashboardLab />} />
                     <Route path="analytics" element={<Analytics />} />
                     <Route path="alerts" element={<Alerts />} />
                     <Route path="my-record" element={<MyRecord />} />
@@ -98,7 +95,6 @@ const App = () => (
                     <Route path="chat" element={<Chat />} />
                     <Route path="reports" element={<Reports />} />
                     <Route path="journal" element={<Journal />} />
-                    <Route path="journal-lab" element={<JournalLab />} />
                     <Route path="my-rules" element={<MyRules />} />
                     <Route path="settings" element={<Settings />} />
                   </Route>

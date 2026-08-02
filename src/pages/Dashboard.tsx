@@ -17,6 +17,7 @@ import BrokerGate from '@/components/BrokerGate';
 import ErrorState from '@/components/ErrorState';
 import { Input } from '@/components/ui/input';
 import { SetupNudgeCard } from '@/components/dashboard/SetupNudgeCard';
+import { TodayIntentStrip } from '@/components/dashboard/TodayIntentStrip';
 import { MarketRail } from '@/components/dashboard/MarketRail';
 import ImportHistoryPrompt from '@/components/onboarding/ImportHistoryPrompt';
 import RecentAlertsCard from '@/components/dashboard/RecentAlertsCard';
@@ -585,6 +586,11 @@ export default function Dashboard() {
 
         {/* New-user setup prompt — self-gates to null once onboarded/dismissed */}
         <SetupNudgeCard />
+
+        {/* One line, opening the same sheet Journal uses. The Dashboard was
+            where entries got written and the only place that never showed one
+            back, which is why the two read as separate apps. */}
+        <TodayIntentStrip />
 
         {/* Behavioral alerts */}
         <div aria-live="polite" aria-label="Behavioral alerts">
