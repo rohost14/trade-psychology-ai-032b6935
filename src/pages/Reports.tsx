@@ -7,7 +7,7 @@ import {
 import { Link } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
-import { formatCurrency, formatCurrencyWithSign } from '@/lib/formatters';
+import { formatCurrency, formatCurrencyWithSign, formatCurrencyWhole } from '@/lib/formatters';
 import { Skeleton } from '@/components/ui/skeleton';
 import ErrorState from '@/components/ErrorState';
 import { api } from '@/lib/api';
@@ -38,25 +38,10 @@ interface ReportDetail extends ReportSummary {
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
-const TYPE_META: Record<string, { label: string; icon: React.ComponentType<any>; color: string; bg: string }> = {
-  morning_briefing: {
-    label: 'Morning Brief',
-    icon: Sunrise,
-    color: 'text-tm-obs',
-    bg: 'bg-amber-50 dark:bg-amber-900/20 border-amber-200 dark:border-amber-800',
-  },
-  post_market: {
-    label: 'End of Day',
-    icon: BarChart2,
-    color: 'text-blue-600 dark:text-blue-400',
-    bg: 'bg-blue-50 dark:bg-blue-900/20 border-blue-200 dark:border-blue-800',
-  },
-  weekly_summary: {
-    label: 'Weekly Summary',
-    icon: CalendarDays,
-    color: 'text-violet-600 dark:text-violet-400',
-    bg: 'bg-violet-50 dark:bg-violet-900/20 border-violet-200 dark:border-violet-800',
-  },
+const TYPE_META: Record<string, { label: string; icon: React.ComponentType<any> }> = {
+  morning_briefing: { label: 'Morning brief', icon: Sunrise },
+  post_market:      { label: 'End of day',    icon: BarChart2 },
+  weekly_summary:   { label: 'Weekly',        icon: CalendarDays },
 };
 
 function formatDate(iso: string) {
@@ -85,7 +70,7 @@ function PostMarketDetail({ data }: { data: Record<string, any> }) {
       {/* Stats row */}
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
         {[
-          { label: 'P&L', value: formatCurrency(s.total_pnl ?? 0), color: s.total_pnl >= 0 ? 'text-tm-profit' : 'text-tm-loss' },
+          { label: 'P&L', value: formatCurrencyWhole((s.total_pnl ?? 0)), color: s.total_pnl >= 0 ? 'text-tm-profit' : 'text-tm-loss' },
           { label: 'Trades', value: s.total_trades ?? 0, color: 'text-foreground' },
           { label: 'Win Rate', value: `${s.win_rate ?? 0}%`, color: 'text-foreground' },
           { label: 'Profit Factor', value: s.profit_factor ?? '—', color: 'text-foreground' },
@@ -107,7 +92,7 @@ function PostMarketDetail({ data }: { data: Record<string, any> }) {
                 <span className="text-base">{entry.emoji}</span>
                 <span className="font-medium text-foreground">{entry.symbol}</span>
                 <span className={cn('font-mono tabular-nums', entry.pnl >= 0 ? 'text-tm-profit' : 'text-tm-loss')}>
-                  {entry.pnl >= 0 ? '+' : ''}{formatCurrency(entry.pnl)}
+                  {formatCurrencyWhole((entry.pnl))}
                 </span>
               </div>
             ))}
@@ -123,7 +108,7 @@ function PostMarketDetail({ data }: { data: Record<string, any> }) {
             {patterns.map((p: any, i: number) => (
               <span key={i} className={cn(
                 'inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-[11px] font-medium border',
-                p.severity === 'danger' ? 'bg-red-50 dark:bg-red-900/20 text-red-700 dark:text-red-400 border-red-200 dark:border-red-800' :
+                p.severity === 'danger' ? 'bg-red-50 dark:bg-red-900/20 text-tm-loss border-red-200 dark:border-red-800' :
                   'bg-orange-50 dark:bg-orange-900/20 text-orange-700 dark:text-orange-400 border-orange-200 dark:border-orange-800'
               )}>
                 <AlertTriangle className="h-3 w-3" />
@@ -142,8 +127,8 @@ function PostMarketDetail({ data }: { data: Record<string, any> }) {
             {lessons.slice(0, 3).map((l: any, i: number) => (
               <div key={i} className={cn(
                 'flex gap-3 rounded-lg p-3 text-sm border',
-                l.type === 'positive' ? 'bg-green-50 dark:bg-green-900/10 border-green-200 dark:border-green-800' :
-                  l.type === 'warning' ? 'bg-amber-50 dark:bg-amber-900/10 border-amber-200 dark:border-amber-800' :
+                l.type === 'positive' ? 'bg-tm-profit/10 border-tm-profit/20' :
+                  l.type === 'warning' ? 'bg-tm-obs/10 border-tm-obs/20' :
                     'bg-muted/40 border-border'
               )}>
                 <Lightbulb className="h-4 w-4 mt-0.5 shrink-0 text-muted-foreground" />
@@ -197,8 +182,8 @@ function MorningBriefDetail({ data }: { data: Record<string, any> }) {
         <div className={cn(
           'rounded-lg border p-3 text-sm',
           dayWarning.is_danger_day
-            ? 'bg-red-50 dark:bg-red-900/10 border-red-200 dark:border-red-800 text-red-800 dark:text-red-300'
-            : 'bg-green-50 dark:bg-green-900/10 border-green-200 dark:border-green-800 text-green-800 dark:text-green-300'
+            ? 'bg-tm-loss/10 border-tm-loss/20 text-red-800 dark:text-red-300'
+            : 'bg-tm-profit/10 border-tm-profit/20 text-green-800 dark:text-green-300'
         )}>
           {dayWarning.message}
         </div>
@@ -221,7 +206,7 @@ function MorningBriefDetail({ data }: { data: Record<string, any> }) {
               <div key={label} className="bg-muted/40 rounded-lg p-3">
                 <p className="text-[10px] uppercase tracking-widest text-muted-foreground mb-1">{label}</p>
                 <p className={cn('text-xl font-bold font-mono tabular-nums', (d.total_pnl ?? 0) >= 0 ? 'text-tm-profit' : 'text-tm-loss')}>
-                  {formatCurrency(d.total_pnl ?? 0)}
+                  {formatCurrencyWhole((d.total_pnl ?? 0))}
                 </p>
                 <p className="text-xs text-muted-foreground mt-0.5">{d.win_rate}% win rate · {d.trade_count} trades</p>
               </div>
@@ -243,8 +228,8 @@ function MorningBriefDetail({ data }: { data: Record<string, any> }) {
             {watchOuts.map((wo: any, i: number) => (
               <div key={i} className={cn(
                 'flex gap-2 rounded-lg border p-2.5 text-sm',
-                wo.severity === 'high' ? 'bg-red-50 dark:bg-red-900/10 border-red-200 dark:border-red-800' :
-                  wo.severity === 'medium' ? 'bg-amber-50 dark:bg-amber-900/10 border-amber-200 dark:border-amber-800' :
+                wo.severity === 'high' ? 'bg-tm-loss/10 border-tm-loss/20' :
+                  wo.severity === 'medium' ? 'bg-tm-obs/10 border-tm-obs/20' :
                     'bg-muted/40 border-border'
               )}>
                 <span className="text-base">{wo.icon}</span>
@@ -288,7 +273,7 @@ function WeeklySummaryDetail({ data }: { data: Record<string, any> }) {
           <div key={label} className="bg-muted/40 rounded-lg p-4 space-y-2">
             <p className="text-xs font-semibold uppercase tracking-widest text-muted-foreground">{label}</p>
             <p className={cn('text-2xl font-bold font-mono tabular-nums', (stats.total_pnl ?? 0) >= 0 ? 'text-tm-profit' : 'text-tm-loss')}>
-              {formatCurrency(stats.total_pnl ?? 0)}
+              {formatCurrencyWhole((stats.total_pnl ?? 0))}
             </p>
             <div className="flex gap-4 text-xs text-muted-foreground">
               <span>{stats.total_trades ?? 0} trades</span>
@@ -354,16 +339,16 @@ function ReportCard({ report }: { report: ReportSummary }) {
   }, [expanded, detail, report.id]);
 
   return (
-    <div className="tm-card overflow-hidden animate-fade-in-up">
+    <div className="border-b border-border last:border-b-0">
       {/* Header row */}
       <button
         onClick={handleExpand}
         className="w-full px-5 py-4 flex items-start gap-4 text-left hover:bg-muted/60 transition-colors"
       >
         {/* Type badge */}
-        <div className={cn('flex items-center gap-1.5 rounded-lg border px-2.5 py-1.5 shrink-0', meta.bg)}>
-          <Icon className={cn('h-3.5 w-3.5', meta.color)} />
-          <span className={cn('text-[11px] font-semibold', meta.color)}>{meta.label}</span>
+        <div className="flex items-center gap-1.5 rounded-md border border-border px-2 py-1 shrink-0 text-muted-foreground">
+          <Icon className={cn('h-3.5 w-3.5', 'text-muted-foreground')} />
+          <span className={cn('text-[11px] font-semibold', 'text-muted-foreground')}>{meta.label}</span>
         </div>
 
         {/* Date + time */}
@@ -379,7 +364,7 @@ function ReportCard({ report }: { report: ReportSummary }) {
               <div className="text-right">
                 <p className="text-[10px] text-muted-foreground">P&L</p>
                 <p className={cn('text-base font-bold font-mono tabular-nums', report.total_pnl >= 0 ? 'text-tm-profit' : 'text-tm-loss')}>
-                  {formatCurrency(report.total_pnl)}
+                  {formatCurrencyWhole((report.total_pnl))}
                 </p>
               </div>
               <div className="text-right">
@@ -404,7 +389,7 @@ function ReportCard({ report }: { report: ReportSummary }) {
             <div className="text-right">
               <p className="text-[10px] text-muted-foreground">Week P&L</p>
               <p className={cn('text-base font-bold font-mono tabular-nums', report.total_pnl >= 0 ? 'text-tm-profit' : 'text-tm-loss')}>
-                {formatCurrency(report.total_pnl)}
+                {formatCurrencyWhole((report.total_pnl))}
               </p>
             </div>
           )}
@@ -529,7 +514,6 @@ export default function Reports() {
         <div>
           <h1 className="t-heading-lg text-foreground">Reports</h1>
           <p className="text-sm text-muted-foreground mt-0.5">
-            Morning briefs, EOD reports, and weekly summaries
           </p>
         </div>
       </div>
@@ -544,10 +528,10 @@ export default function Reports() {
             key={tab.value}
             onClick={() => setFilter(tab.value)}
             className={cn(
-              'px-4 py-1.5 rounded-full text-xs font-medium transition-all border',
+              'h-8 px-3 rounded-md text-[12.5px] font-medium transition-colors border',
               filter === tab.value
-                ? 'bg-foreground text-background border-foreground'
-                : 'bg-transparent text-muted-foreground border-border hover:border-foreground hover:text-foreground'
+                ? 'bg-muted text-foreground border-border'
+                : 'bg-transparent text-muted-foreground border-border hover:text-foreground'
             )}
           >
             {tab.label}
@@ -584,7 +568,7 @@ export default function Reports() {
                 </p>
                 <div className="flex-1 h-px bg-border" />
               </div>
-              <div className="space-y-2">
+              <div className="tm-card overflow-hidden">
                 {grouped[date].map(r => (
                   <ReportCard key={r.id} report={r} />
                 ))}

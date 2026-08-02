@@ -1183,3 +1183,51 @@ export const DEMO_SAVED_REPORTS = {
     },
   ],
 };
+
+// ---------------------------------------------------------------------------
+// Journal entries
+// ---------------------------------------------------------------------------
+// The guest stub deliberately returned an empty list, so the page could only
+// ever be seen in its empty state. These mirror GET /api/journal and reference
+// the same trades as DEMO_RISK_ALERTS, so an entry and the alert that prompted
+// it describe the same event.
+export const DEMO_JOURNAL_ENTRIES = {
+  total: 4,
+  entries: [
+    {
+      id: 'je-001', trade_id: 'ct-t01', emotion_tags: ['revenge', 'anxious'],
+      followed_plan: 'no', deviation_reason: 'Re-entered 25 min after the SOLARINDS loss',
+      exit_reason: 'stopped_out', setup_quality: 3, would_repeat: 'no',
+      market_condition: 'choppy',
+      notes: 'Took NIFTY23000CE straight after the big loss. Knew it was wrong while placing it.',
+      trade_symbol: 'NIFTY23000CE', trade_type: 'MIS', trade_pnl: '-2700',
+      entry_type: 'trade', created_at: daysAgo(0, 14, 40), updated_at: daysAgo(0, 14, 40),
+    },
+    {
+      id: 'je-002', trade_id: 'ct-t02', emotion_tags: ['calm'],
+      followed_plan: 'yes', deviation_reason: null,
+      exit_reason: 'target_hit', setup_quality: 8, would_repeat: 'yes',
+      market_condition: 'trending',
+      notes: 'Waited for the retest, sized normally, took the target without moving it.',
+      trade_symbol: 'FORTIS25MAR960CE', trade_type: 'NRML', trade_pnl: '6600',
+      entry_type: 'trade', created_at: daysAgo(1, 10, 15), updated_at: daysAgo(1, 10, 15),
+    },
+    {
+      id: 'je-003', trade_id: 'ct-t03', emotion_tags: ['fomo'],
+      followed_plan: 'partial', deviation_reason: 'Entered late, chased the move',
+      exit_reason: 'manual', setup_quality: 4, would_repeat: 'no',
+      market_condition: 'volatile',
+      notes: 'Saw it running and jumped in without waiting for a pullback.',
+      trade_symbol: 'BANKNIFTY2531748500CE', trade_type: 'MIS', trade_pnl: '2700',
+      entry_type: 'trade', created_at: daysAgo(2, 9, 25), updated_at: daysAgo(2, 9, 25),
+    },
+    {
+      id: 'je-004', trade_id: null, emotion_tags: ['overconfident'],
+      followed_plan: null, deviation_reason: null, exit_reason: null,
+      setup_quality: null, would_repeat: null, market_condition: null,
+      notes: 'Three green days running. Watch the size tomorrow — that is usually when it slips.',
+      trade_symbol: null, trade_type: null, trade_pnl: null,
+      entry_type: 'note', created_at: daysAgo(3, 16, 5), updated_at: daysAgo(3, 16, 5),
+    },
+  ],
+};

@@ -26,9 +26,8 @@ const MyRecord      = lazy(() => import("./pages/MyRecord"));
 const Chat          = lazy(() => import("./pages/Chat"));
 const Settings      = lazy(() => import("./pages/Settings"));
 const Reports           = lazy(() => import("./pages/Reports"));
-// TEMPORARY - design working copy. Delete with src/pages/_lab/.
-const ReportsLab    = lazy(() => import("./pages/_lab/ReportsLab"));
 const Journal           = lazy(() => import("./pages/Journal"));
+const JournalLab    = lazy(() => import("./pages/_lab/JournalLab"));
 const MyRules           = lazy(() => import("./pages/MyRules"));
 const TermsOfService = lazy(() => import("./pages/TermsOfService"));
 const PrivacyPolicy  = lazy(() => import("./pages/PrivacyPolicy"));
@@ -96,8 +95,8 @@ const App = () => (
                     <Route path="my-patterns" element={<Navigate to="/alerts" replace />} />
                     <Route path="chat" element={<Chat />} />
                     <Route path="reports" element={<Reports />} />
-                    <Route path="reports-lab" element={<ReportsLab />} />
                     <Route path="journal" element={<Journal />} />
+                    <Route path="journal-lab" element={<JournalLab />} />
                     <Route path="my-rules" element={<MyRules />} />
                     <Route path="settings" element={<Settings />} />
                   </Route>
