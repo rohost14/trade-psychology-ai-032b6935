@@ -37,6 +37,7 @@ interface JournalEntry {
 // ── Display maps ──────────────────────────────────────────────────────────────
 import { formatCurrencyWhole } from '@/lib/formatters';
 import DayEntrySheet from '@/components/journal/DayEntrySheet';
+import LessonLibrary from '@/components/journal/LessonLibrary';
 
 const EMOTION_LABELS: Record<string, string> = {
   calm: 'Calm', fomo: 'FOMO', revenge: 'Revenge',
@@ -490,6 +491,10 @@ export default function JournalLab() {
           {todayEntry ? 'Edit today' : 'Write today'}
         </button>
       </div>
+
+      {/* Collected lessons. A lesson written into one day's entry scrolls away
+          with it, so writing one has no payoff; this is the payoff. */}
+      {!loading && <LessonLibrary entries={entries} />}
 
       {/* One filter row and a search box. There were three rows and thirteen
           controls here, above a list of four; search answers more of them than
