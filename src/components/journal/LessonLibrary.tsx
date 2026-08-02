@@ -55,8 +55,8 @@ export default function LessonLibrary({ entries }: { entries: Entry[] }) {
   if (lessons.length === 0) return null;
 
   return (
-    <section className="mb-6">
-      <div className="flex items-baseline justify-between gap-3 pb-2 border-b border-border">
+    <section className="tm-card px-4 py-3.5 mb-6">
+      <div className="flex items-baseline justify-between gap-3 pb-2 border-b border-border -mx-4 px-4">
         <h2 className="text-[15px] font-medium text-foreground">Lessons you have written</h2>
         <span className="text-[11px] text-muted-foreground font-tabular shrink-0">{lessons.length}</span>
       </div>

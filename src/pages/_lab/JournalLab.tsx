@@ -184,7 +184,7 @@ function EntryCard({ entry }: { entry: JournalEntry }) {
   const hasExtra = !!(entry.market_condition || entry.setup_quality || entry.would_repeat || entry.deviation_reason);
 
   return (
-    <div className="border-b border-border last:border-b-0">
+    <div className="border-b border-border last:border-b-0 px-1">
       {/* Main row */}
       <button
         type="button"
@@ -512,7 +512,7 @@ export default function JournalLab() {
       {/* Write one. There was no way to create a journal entry from this page
           at all -- every entry here came from the Dashboard trade sheet, so the
           page could only ever be read. Day-level entries have no other home. */}
-      <div className="flex items-center justify-between gap-3 mb-4 pb-3 border-b border-border">
+      <div className="tm-card px-4 py-3.5 flex items-center justify-between gap-3 mb-4">
         <div className="min-w-0">
           <h2 className="text-[15px] font-medium text-foreground">Today</h2>
           {todayEntry ? (
@@ -667,9 +667,9 @@ export default function JournalLab() {
                   </div>
                 </div>
 
-                <div className="min-w-0 sm:border-l sm:border-border sm:pl-5">
+                <div className="min-w-0 tm-card overflow-hidden">
                   {g.day && (
-                    <div className="py-3 border-b border-border">
+                    <div className="px-4 py-3 border-b border-border bg-muted/40">
                       {g.day.notes && (
                         <p className="text-[13px] text-foreground leading-snug">
                           <span className="text-muted-foreground">Intent: </span>{g.day.notes}
