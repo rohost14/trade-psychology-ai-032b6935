@@ -1145,3 +1145,41 @@ export const DEMO_RISK_SCORES = {
   behavior_risk: 42,
   drivers: { tilt: 55, risk: 38, discipline: 30, strategy: 22 },
 };
+
+// ---------------------------------------------------------------------------
+// Reports: saved morning briefs, EOD reports and weekly summaries
+// ---------------------------------------------------------------------------
+// Mirrors GET /api/reports/saved. Added because there was no fixture, so the
+// page rendered "No reports yet" in demo — a misleading empty state rather
+// than a crash, which is the harder version of the same bug. Figures line up
+// with DEMO_OVERVIEW so the two screens do not contradict each other.
+export const DEMO_SAVED_REPORTS = {
+  total: 5,
+  reports: [
+    {
+      id: 'rep-001', report_type: 'post_market', report_date: daysAgo(0, 15, 40).slice(0, 10),
+      generated_at: daysAgo(0, 15, 40), sent_via: 'whatsapp',
+      total_pnl: -8455, total_trades: 8, win_rate: 50,
+    },
+    {
+      id: 'rep-002', report_type: 'morning_briefing', report_date: daysAgo(0, 8, 45).slice(0, 10),
+      generated_at: daysAgo(0, 8, 45), sent_via: 'whatsapp',
+      readiness_score: 62, watch_out_count: 2,
+    },
+    {
+      id: 'rep-003', report_type: 'weekly_summary', report_date: daysAgo(2, 18, 0).slice(0, 10),
+      generated_at: daysAgo(2, 18, 0), sent_via: null,
+      total_pnl: 7990, total_trades: 15, win_rate: 60,
+    },
+    {
+      id: 'rep-004', report_type: 'post_market', report_date: daysAgo(3, 15, 40).slice(0, 10),
+      generated_at: daysAgo(3, 15, 40), sent_via: 'whatsapp',
+      total_pnl: 3625, total_trades: 4, win_rate: 75,
+    },
+    {
+      id: 'rep-005', report_type: 'morning_briefing', report_date: daysAgo(3, 8, 45).slice(0, 10),
+      generated_at: daysAgo(3, 8, 45), sent_via: 'whatsapp',
+      readiness_score: 78, watch_out_count: 1,
+    },
+  ],
+};
