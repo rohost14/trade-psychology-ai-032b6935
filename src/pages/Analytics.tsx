@@ -100,9 +100,9 @@ export default function Analytics() {
     <div className="w-full pb-12">
 
       {/* ── Page Header ──────────────────────────────────────────────────────── */}
-      <div className="mb-4 flex items-center justify-between gap-3">
+      <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
         <h1 className="t-heading-lg text-foreground">Analytics</h1>
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-3 flex-wrap">
           <div className="flex items-center gap-0.5 p-0.5 bg-muted rounded-lg">
             {PERIOD_OPTIONS.map(opt => (
               <button

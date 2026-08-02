@@ -121,7 +121,7 @@ export function SessionHeroCard({
         </div>
 
         {/* session figures, in the space the number leaves rather than beneath it */}
-        <div className="flex items-end gap-8 sm:gap-12">
+        <div className="flex flex-wrap items-end gap-x-8 gap-y-4 sm:gap-x-12">
           {stats.map(s => (
             <div key={s.label}>
               <span className="text-[10px] uppercase tracking-wider font-medium text-muted-foreground whitespace-nowrap">{s.label}</span>
