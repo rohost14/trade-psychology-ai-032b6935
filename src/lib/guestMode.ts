@@ -12,6 +12,7 @@ import {
   DEMO_CONDITIONAL_PERFORMANCE, DEMO_OPTIONS_BEHAVIOR, DEMO_BEHAVIORAL_ANALYSIS,
   DEMO_PNL_PERCENT, DEMO_BTST, DEMO_PNL_ATTRIBUTION, DEMO_QUALITY_BREAKDOWN,
   DEMO_INSTRUMENT_NIFTY, DEMO_EDGE_LEAK, DEMO_STRATEGY_PERFORMANCE, DEMO_HABITS, DEMO_BEHAVIOUR_COST, DEMO_ALERT_RESPONSE_STATS, DEMO_RISK_SCORES, DEMO_SAVED_REPORTS, DEMO_JOURNAL_ENTRIES,
+  DEMO_CONSTITUTION, DEMO_CONSTITUTION_STATUS, DEMO_CONSTITUTION_VIOLATIONS, DEMO_CONSTITUTION_HISTORY,
 } from './demoData';
 
 export const GUEST_MODE_KEY = 'tradementor_guest_mode';
@@ -84,6 +85,10 @@ export function getGuestResponse(url: string, method = 'GET'): unknown | undefin
   if (path === '/api/risk/alert-response-stats') return DEMO_ALERT_RESPONSE_STATS;
   if (path === '/api/risk/scores') return DEMO_RISK_SCORES;
   if (path === '/api/reports/saved') return DEMO_SAVED_REPORTS;
+  if (path === '/api/constitution/status') return DEMO_CONSTITUTION_STATUS;
+  if (path === '/api/constitution/violations') return DEMO_CONSTITUTION_VIOLATIONS;
+  if (path === '/api/constitution/history') return DEMO_CONSTITUTION_HISTORY;
+  if (path.startsWith('/api/constitution')) return DEMO_CONSTITUTION;
   if (path === '/api/analytics/behaviour-cost') return DEMO_BEHAVIOUR_COST;
   if (path === '/api/analytics/performance') return DEMO_PERFORMANCE;
   if (path === '/api/analytics/timing-heatmap') return DEMO_TIMING_HEATMAP;

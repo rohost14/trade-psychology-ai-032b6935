@@ -1244,3 +1244,60 @@ export const DEMO_JOURNAL_ENTRIES = {
     },
   ],
 };
+
+// ---------------------------------------------------------------------------
+// My Rules — the trading constitution
+// ---------------------------------------------------------------------------
+// Mirrors the four /api/constitution/* endpoints. Added because none were
+// stubbed, so the page rendered "Could not load your rules. Connect your broker
+// and complete onboarding first." — a failure message shown to a demo user who
+// has no broker to connect. Limits line up with DEMO_RISK_STATE.
+export const DEMO_CONSTITUTION = {
+  rules: {
+    daily_loss_limit: 25000,
+    daily_trade_limit: 5,
+    max_position_size: 200000,
+    cooldown_after_loss: 15,
+    max_consecutive_losses: 3,
+    restricted_windows: ['09:15-09:30'],
+  },
+  pending: null,
+  accepted_at: daysAgo(21, 19, 30),
+};
+
+export const DEMO_CONSTITUTION_STATUS = {
+  status: [
+    { rule: 'daily_loss',            current: 8455, limit: 25000, ratio: 0.34 },
+    { rule: 'daily_trades',          current: 9,    limit: 5,     ratio: 1.8  },
+    { rule: 'max_position_size',     current: 186000, limit: 200000, ratio: 0.93 },
+    { rule: 'cooldown_after_loss',   active: true,  remaining_min: 7, limit_min: 15 },
+    { rule: 'max_consecutive_losses', current: 2,   limit: 3,     ratio: 0.67 },
+    { rule: 'restricted_windows',    windows: ['09:15-09:30'] },
+  ],
+};
+
+export const DEMO_CONSTITUTION_VIOLATIONS = {
+  today: [
+    { rule: 'daily_trade_limit',   severity: 'danger',  message: '9 trades today against a limit of 5.',            detected_at: daysAgo(0, 14, 22) },
+    { rule: 'cooldown_after_loss', severity: 'caution', message: 'Re-entered 6 min after a loss; cooldown is 15.',   detected_at: daysAgo(0, 13, 40) },
+  ],
+  total: 11,
+  by_rule: {
+    daily_trade_limit: 5,
+    cooldown_after_loss: 4,
+    max_position_size: 2,
+  },
+};
+
+export const DEMO_CONSTITUTION_HISTORY = {
+  history: [
+    {
+      changed_at: daysAgo(4, 20, 10), change_type: 'tighten',
+      changes: { daily_trade_limit: { old: 8, new: 5 } },
+    },
+    {
+      changed_at: daysAgo(12, 21, 5), change_type: 'loosen',
+      changes: { daily_loss_limit: { old: 20000, new: 25000 } },
+    },
+  ],
+};
