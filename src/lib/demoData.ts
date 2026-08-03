@@ -1301,3 +1301,26 @@ export const DEMO_CONSTITUTION_HISTORY = {
     },
   ],
 };
+
+// Mirrors GET /api/constitution/effective — declared vs enforced, with the
+// reason they differ. Deliberately includes an overridden rule: the trader
+// declared 50 trades a day, their own baseline says 6, so 6 is enforced. That
+// is the case the old page displayed as "50" with nothing said about it.
+export const DEMO_CONSTITUTION_EFFECTIVE = {
+  has_baseline: true,
+  rules: {
+    daily_trade_limit:      { declared: 50,     effective: 6,      source: 'learned',  overridden: true  },
+    cooldown_after_loss:    { declared: 15,     effective: 15,     source: 'declared', overridden: false },
+    daily_loss_limit:       { declared: 25000,  effective: 25000,  source: 'declared', overridden: false },
+    max_position_size:      { declared: 200000, effective: 200000, source: 'declared', overridden: false },
+    max_consecutive_losses: { declared: null,   effective: 3,      source: 'default',  overridden: false },
+  },
+  ungoverned: {
+    burst_trades_per_30min_caution: 4,
+    burst_trades_per_30min_danger: 7,
+    consecutive_loss_caution: 3,
+    consecutive_loss_danger: 5,
+    revenge_window_caution_min: 12,
+    daily_trade_danger: 9,
+  },
+};
