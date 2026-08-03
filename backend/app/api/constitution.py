@@ -129,6 +129,93 @@ async def generate_recommended(
     }
 
 
+# ---------------------------------------------------------------------------
+# Effective thresholds
+# ---------------------------------------------------------------------------
+
+#: Declared rule -> the threshold key the engine actually enforces for it.
+#: Two names for one concept exist in the codebase (daily_trade_limit on the
+#: profile, daily_trades in the status payload); this map is the single place
+#: that relationship is written down.
+_RULE_TO_THRESHOLD = {
+    "daily_trade_limit":      "daily_trade_limit",
+    "cooldown_after_loss":    "revenge_window_min",
+    "daily_loss_limit":       "daily_loss_limit",
+    "max_position_size":      "max_position_size",
+    "max_consecutive_losses": "max_consecutive_losses",
+}
+
+#: Thresholds the engine enforces that no rule can set. Surfaced so the rules
+#: page can stop implying these limits do not exist.
+_UNGOVERNED = (
+    "burst_trades_per_30min_caution",
+    "burst_trades_per_30min_danger",
+    "consecutive_loss_caution",
+    "consecutive_loss_danger",
+    "revenge_window_caution_min",
+    "daily_trade_danger",
+)
+
+
+@router.get("/effective")
+async def get_effective_thresholds(
+    broker_account_id: UUID = Depends(get_verified_broker_account_id),
+    db: AsyncSession = Depends(get_db),
+):
+    """
+    What the engine ACTUALLY enforces, and where each number came from.
+
+    Why this exists: a declared rule is applied only when it is more
+    restrictive than the threshold already in force. Set daily_trade_limit to
+    50 while your own trading averages 6 and the engine enforces 6 -- correct
+    behaviour, deliberately chosen so a stale value cannot silently disable
+    alerts, but until now the rules page displayed 50 and nothing said
+    otherwise. The page was reporting a rule that was not the one being
+    applied.
+
+    `source` per rule:
+      declared  the user's value is the one in force
+      learned   their own trading produced a tighter value, which wins
+      default   no rule set; a research default is in force
+    """
+    from app.core.trading_defaults import get_thresholds
+
+    profile = await _get_profile(broker_account_id, db)
+    declared = ConstitutionService.snapshot(profile)
+    effective = get_thresholds(profile)
+
+    has_baseline = bool((getattr(profile, "detected_patterns", None) or {}).get("baseline"))
+
+    rules: Dict[str, Any] = {}
+    for rule, key in _RULE_TO_THRESHOLD.items():
+        want = declared.get(rule)
+        got = effective.get(key)
+
+        if want is None:
+            source = "default" if got is not None else "unset"
+        elif got is None or want == got:
+            source = "declared"
+        else:
+            # The engine resolved to something other than what was declared,
+            # which by construction means it resolved to something tighter.
+            source = "learned" if has_baseline else "declared"
+
+        rules[rule] = {
+            "declared": want,
+            "effective": got,
+            "source": source,
+            "overridden": source == "learned",
+        }
+
+    return {
+        "rules": rules,
+        # Enforced, and not settable by anyone. Named so the page can show them
+        # as limits that exist rather than leaving them invisible.
+        "ungoverned": {k: effective.get(k) for k in _UNGOVERNED if effective.get(k) is not None},
+        "has_baseline": has_baseline,
+    }
+
+
 @router.get("/status")
 async def constitution_status(
     broker_account_id: UUID = Depends(get_verified_broker_account_id),
