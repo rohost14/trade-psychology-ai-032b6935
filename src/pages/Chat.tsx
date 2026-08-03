@@ -3,7 +3,6 @@ import {
   Send,
   Bot,
   User,
-  Sparkles,
   Link2,
   Trash2,
   RefreshCw,
@@ -383,15 +382,15 @@ export default function Chat() {
     return (
       <div className="max-w-3xl mx-auto h-[calc(100dvh-8rem)]">
         <div className="mb-5">
-          <h1 className="t-heading-lg text-foreground">AI Coach</h1>
+          <h1 className="t-heading-lg text-foreground">Chat</h1>
         </div>
         <div className="tm-card flex flex-col items-center justify-center min-h-[50vh] text-center py-16">
-          <div className="p-4 rounded-full bg-teal-50 dark:bg-teal-900/20 mb-5">
+          <div className="p-4 rounded-full bg-tm-brand/10 mb-5">
             <Link2 className="h-10 w-10 text-tm-brand" />
           </div>
           <h2 className="text-base font-semibold text-foreground mb-1">Connect Your Broker</h2>
           <p className="text-sm text-muted-foreground max-w-sm mb-5">
-            Connect your Zerodha account to chat with your AI trading coach.
+            Connect your Zerodha account to ask questions about your own trading.
           </p>
           <Link to="/settings">
             <Button size="sm" className="gap-2 bg-tm-brand hover:bg-tm-brand/90 text-white">
@@ -409,9 +408,8 @@ export default function Chat() {
       {/* Header */}
       <div className="mb-4 flex items-center justify-between">
         <div>
-          <h1 className="t-heading-lg text-foreground">AI Coach</h1>
+          <h1 className="t-heading-lg text-foreground">Chat</h1>
           <p className="text-sm text-muted-foreground">
-            Personalized guidance from your real trading data
           </p>
         </div>
         {messages.length > 0 && (
@@ -460,10 +458,10 @@ export default function Chat() {
               className={cn(
                 'ml-auto px-2 py-0.5 rounded-full font-medium flex items-center gap-1',
                 snapshot.risk_state === 'safe'
-                  ? 'bg-teal-50 dark:bg-teal-900/20 text-tm-brand'
+                  ? 'bg-tm-brand/10 text-tm-brand'
                   : snapshot.risk_state === 'caution'
-                    ? 'bg-amber-50 dark:bg-amber-900/20 text-tm-obs'
-                    : 'bg-red-50 dark:bg-red-900/20 text-tm-loss'
+                    ? 'bg-tm-obs/10  text-tm-obs'
+                    : 'bg-tm-loss/10  text-tm-loss'
               )}
             >
               <Shield className="h-3 w-3" />
@@ -475,22 +473,19 @@ export default function Chat() {
         {/* Messages Area */}
         <div className="flex-1 overflow-y-auto p-4 space-y-4">
           {messages.length === 0 ? (
-            <div className="flex flex-col items-center justify-center h-full text-center px-4">
-              <div className="p-4 rounded-full bg-teal-50 dark:bg-teal-900/20 mb-5">
-                <Sparkles className="h-10 w-10 text-tm-brand" />
-              </div>
-              <h3 className="text-lg font-semibold text-foreground mb-2">
-                Ask your AI Trading Coach
+            <div className="flex flex-col justify-center h-full px-1 max-w-xl mx-auto">
+              <h3 className="text-[17px] font-medium text-foreground mb-1.5">
+                Ask about your own trading
               </h3>
-              <p className="text-sm text-muted-foreground mb-6 max-w-sm">
-                I have access to your real trades, P&L, patterns, and journal. Ask me anything.
+              <p className="text-[13px] text-muted-foreground mb-5 leading-relaxed">
+                Answers come from your trades, P&amp;L, patterns and journal — not from the market.
               </p>
-              <div className="flex flex-wrap gap-2 justify-center max-w-lg">
+              <div className="flex flex-col items-stretch gap-px bg-border border-y border-border">
                 {INITIAL_CHIPS.map((question, index) => (
                   <button
                     key={index}
                     onClick={() => handleSend(question)}
-                    className="px-3 py-2 text-sm bg-muted hover:bg-teal-50 dark:hover:bg-teal-900/10 text-foreground hover:text-tm-brand rounded-lg transition-all border border-border hover:border-tm-brand/30 hover:shadow-sm"
+                    className="text-left px-3 py-2.5 min-h-[44px] sm:min-h-0 text-[13.5px] bg-card text-foreground hover:bg-muted transition-colors"
                   >
                     {question}
                   </button>
@@ -510,7 +505,7 @@ export default function Chat() {
                   >
                     {/* AI avatar */}
                     {message.role === 'assistant' && (
-                      <div className="w-8 h-8 rounded-lg bg-teal-50 dark:bg-teal-900/20 border border-tm-brand/20 flex-shrink-0 flex items-center justify-center mt-0.5">
+                      <div className="w-8 h-8 rounded-lg bg-tm-brand/10 border border-tm-brand/20 flex-shrink-0 flex items-center justify-center mt-0.5">
                         <Bot className="h-4 w-4 text-tm-brand" />
                       </div>
                     )}
@@ -628,7 +623,7 @@ export default function Chat() {
                   key={`${lastAIMessage.id}-${idx}`}
                   onClick={() => handleSend(chip)}
                   disabled={isLoading}
-                  className="px-3 py-1.5 text-xs bg-muted hover:bg-teal-50 dark:hover:bg-teal-900/10 text-muted-foreground hover:text-tm-brand rounded-full transition-all border border-border hover:border-tm-brand/30 whitespace-nowrap disabled:opacity-40 disabled:cursor-not-allowed flex-shrink-0"
+                  className="px-3 py-1.5 text-xs bg-muted hover:bg-tm-brand/10 text-muted-foreground hover:text-tm-brand rounded-full transition-all border border-border hover:border-tm-brand/30 whitespace-nowrap disabled:opacity-40 disabled:cursor-not-allowed flex-shrink-0"
                 >
                   {chip}
                 </button>
@@ -646,7 +641,7 @@ export default function Chat() {
               onChange={(e) => setInput(e.target.value)}
               onKeyDown={handleKeyDown}
               placeholder="Ask about your trading patterns…"
-              aria-label="Message to AI coach"
+              aria-label="Your question"
               rows={1}
               className="flex-1 px-4 py-2.5 bg-muted rounded-lg text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring resize-none overflow-y-auto min-h-[42px] max-h-[160px] leading-relaxed disabled:opacity-60"
               disabled={isLoading}

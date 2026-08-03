@@ -24,7 +24,6 @@ const Analytics     = lazy(() => import("./pages/Analytics"));
 const Alerts        = lazy(() => import("./pages/Alerts"));
 const MyRecord      = lazy(() => import("./pages/MyRecord"));
 const Chat          = lazy(() => import("./pages/Chat"));
-const ChatLab       = lazy(() => import("./pages/_lab/ChatLab"));
 const Settings      = lazy(() => import("./pages/Settings"));
 const Reports           = lazy(() => import("./pages/Reports"));
 const Journal           = lazy(() => import("./pages/Journal"));
@@ -94,7 +93,6 @@ const App = () => (
                     {/* Merged into Alerts 2026-08-01. Redirect, not 404: the URL may be bookmarked. */}
                     <Route path="my-patterns" element={<Navigate to="/alerts" replace />} />
                     <Route path="chat" element={<Chat />} />
-                    <Route path="chat-lab" element={<ChatLab />} />
                     <Route path="reports" element={<Reports />} />
                     <Route path="journal" element={<Journal />} />
                     <Route path="my-rules" element={<MyRules />} />
