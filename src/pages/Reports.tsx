@@ -77,7 +77,7 @@ function PostMarketDetail({ data }: { data: Record<string, any> }) {
         ].map(stat => (
           <div key={stat.label} className="bg-muted/40 rounded-lg p-3">
             <p className="text-[10px] uppercase tracking-widest text-muted-foreground mb-1">{stat.label}</p>
-            <p className={cn('text-xl font-bold font-mono tabular-nums', stat.color)}>{stat.value}</p>
+            <p className={cn('text-[20px] font-bold font-mono tabular-nums', stat.color)}>{stat.value}</p>
           </div>
         ))}
       </div>
@@ -85,11 +85,11 @@ function PostMarketDetail({ data }: { data: Record<string, any> }) {
       {/* Emotional journey */}
       {journey.timeline?.length > 0 && (
         <div>
-          <p className="text-xs font-medium text-muted-foreground mb-2">Emotional Journey</p>
+          <p className="text-[12px] font-medium text-muted-foreground mb-2">Emotional Journey</p>
           <div className="flex flex-wrap gap-2">
             {journey.timeline.map((entry: any, i: number) => (
-              <div key={i} className="flex items-center gap-1.5 bg-muted/40 rounded-lg px-2.5 py-1.5 text-xs">
-                <span className="text-base">{entry.emoji}</span>
+              <div key={i} className="flex items-center gap-1.5 bg-muted/40 rounded-lg px-2.5 py-1.5 text-[12px]">
+                <span className="text-[16px]">{entry.emoji}</span>
                 <span className="font-medium text-foreground">{entry.symbol}</span>
                 <span className={cn('font-mono tabular-nums', entry.pnl >= 0 ? 'text-tm-profit' : 'text-tm-loss')}>
                   {formatCurrencyWhole((entry.pnl))}
@@ -103,7 +103,7 @@ function PostMarketDetail({ data }: { data: Record<string, any> }) {
       {/* Patterns */}
       {patterns.length > 0 && (
         <div>
-          <p className="text-xs font-medium text-muted-foreground mb-2">Patterns Detected</p>
+          <p className="text-[12px] font-medium text-muted-foreground mb-2">Patterns Detected</p>
           <div className="flex flex-wrap gap-2">
             {patterns.map((p: any, i: number) => (
               <span key={i} className={cn(
@@ -122,11 +122,11 @@ function PostMarketDetail({ data }: { data: Record<string, any> }) {
       {/* Lessons */}
       {lessons.length > 0 && (
         <div>
-          <p className="text-xs font-medium text-muted-foreground mb-2">Key Lessons</p>
+          <p className="text-[12px] font-medium text-muted-foreground mb-2">Key Lessons</p>
           <div className="space-y-2">
             {lessons.slice(0, 3).map((l: any, i: number) => (
               <div key={i} className={cn(
-                'flex gap-3 rounded-lg p-3 text-sm border',
+                'flex gap-3 rounded-lg p-3 text-[14px] border',
                 l.type === 'positive' ? 'bg-tm-profit/10 border-tm-profit/20' :
                   l.type === 'warning' ? 'bg-tm-obs/10 border-tm-obs/20' :
                     'bg-muted/40 border-border'
@@ -144,11 +144,11 @@ function PostMarketDetail({ data }: { data: Record<string, any> }) {
         <div className="rounded-lg border border-tm-brand/20 bg-teal-50/50 dark:bg-teal-900/10 p-4">
           <div className="flex items-center gap-2 mb-2">
             <Target className="h-4 w-4 text-tm-brand" />
-            <p className="text-xs font-semibold text-tm-brand uppercase tracking-widest">Tomorrow's Focus</p>
+            <p className="text-[12px] font-semibold text-tm-brand uppercase tracking-widest">Tomorrow's Focus</p>
           </div>
-          <p className="text-sm font-semibold text-foreground">{tomorrow.primary}</p>
-          {tomorrow.rule && <p className="text-xs text-muted-foreground mt-1">Rule: {tomorrow.rule}</p>}
-          {tomorrow.affirmation && <p className="text-xs italic text-muted-foreground mt-1">"{tomorrow.affirmation}"</p>}
+          <p className="text-[14px] font-semibold text-foreground">{tomorrow.primary}</p>
+          {tomorrow.rule && <p className="text-[12px] text-muted-foreground mt-1">Rule: {tomorrow.rule}</p>}
+          {tomorrow.affirmation && <p className="text-[12px] italic text-muted-foreground mt-1">"{tomorrow.affirmation}"</p>}
         </div>
       )}
     </div>
@@ -172,15 +172,15 @@ function MorningBriefDetail({ data }: { data: Record<string, any> }) {
       <div className="flex items-center gap-6">
         <div>
           <p className="text-[10px] uppercase tracking-widest text-muted-foreground mb-1">Readiness</p>
-          <p className={cn('text-4xl font-bold font-mono tabular-nums', scoreColor)}>{readiness.score ?? '—'}<span className="text-lg">/100</span></p>
+          <p className={cn('text-4xl font-bold font-mono tabular-nums', scoreColor)}>{readiness.score ?? '—'}<span className="text-[18px]">/100</span></p>
         </div>
-        <div className="flex-1 text-sm text-muted-foreground">{readiness.message}</div>
+        <div className="flex-1 text-[14px] text-muted-foreground">{readiness.message}</div>
       </div>
 
       {/* Day warning */}
       {dayWarning && (
         <div className={cn(
-          'rounded-lg border p-3 text-sm',
+          'rounded-lg border p-3 text-[14px]',
           dayWarning.is_danger_day
             ? 'bg-tm-loss/10 border-tm-loss/20 text-red-800 dark:text-red-300'
             : 'bg-tm-profit/10 border-tm-profit/20 text-green-800 dark:text-green-300'
@@ -191,13 +191,13 @@ function MorningBriefDetail({ data }: { data: Record<string, any> }) {
 
       {/* Recent summary */}
       {recent.has_recent_trades && (
-        <div className="text-sm text-muted-foreground bg-muted/40 rounded-lg p-3">{recent.message}</div>
+        <div className="text-[14px] text-muted-foreground bg-muted/40 rounded-lg p-3">{recent.message}</div>
       )}
 
       {/* Trend stats */}
       {trend && (trend.seven_day?.has_data || trend.thirty_day?.has_data) && (
         <div>
-          <p className="text-xs font-medium text-muted-foreground mb-2">Rolling Performance</p>
+          <p className="text-[12px] font-medium text-muted-foreground mb-2">Rolling Performance</p>
           <div className="grid grid-cols-2 gap-3">
             {[
               { label: '7-Day', data: trend.seven_day },
@@ -205,15 +205,15 @@ function MorningBriefDetail({ data }: { data: Record<string, any> }) {
             ].map(({ label, data: d }) => d?.has_data ? (
               <div key={label} className="bg-muted/40 rounded-lg p-3">
                 <p className="text-[10px] uppercase tracking-widest text-muted-foreground mb-1">{label}</p>
-                <p className={cn('text-xl font-bold font-mono tabular-nums', (d.total_pnl ?? 0) >= 0 ? 'text-tm-profit' : 'text-tm-loss')}>
+                <p className={cn('text-[20px] font-bold font-mono tabular-nums', (d.total_pnl ?? 0) >= 0 ? 'text-tm-profit' : 'text-tm-loss')}>
                   {formatCurrencyWhole((d.total_pnl ?? 0))}
                 </p>
-                <p className="text-xs text-muted-foreground mt-0.5">{d.win_rate}% win rate · {d.trade_count} trades</p>
+                <p className="text-[12px] text-muted-foreground mt-0.5">{d.win_rate}% win rate · {d.trade_count} trades</p>
               </div>
             ) : null)}
           </div>
           {trend.trend && (
-            <p className={cn('text-xs mt-2', trend.trend === 'improving' ? 'text-tm-profit' : trend.trend === 'declining' ? 'text-tm-obs' : 'text-muted-foreground')}>
+            <p className={cn('text-[12px] mt-2', trend.trend === 'improving' ? 'text-tm-profit' : trend.trend === 'declining' ? 'text-tm-obs' : 'text-muted-foreground')}>
               {trend.trend === 'improving' ? '↑ Win rate improving vs 30-day average' : trend.trend === 'declining' ? '↓ Win rate declining vs 30-day average' : '→ Win rate stable vs 30-day average'}
             </p>
           )}
@@ -223,16 +223,16 @@ function MorningBriefDetail({ data }: { data: Record<string, any> }) {
       {/* Watch-outs */}
       {watchOuts.length > 0 && (
         <div>
-          <p className="text-xs font-medium text-muted-foreground mb-2">Watch-Outs</p>
+          <p className="text-[12px] font-medium text-muted-foreground mb-2">Watch-Outs</p>
           <div className="space-y-2">
             {watchOuts.map((wo: any, i: number) => (
               <div key={i} className={cn(
-                'flex gap-2 rounded-lg border p-2.5 text-sm',
+                'flex gap-2 rounded-lg border p-2.5 text-[14px]',
                 wo.severity === 'high' ? 'bg-tm-loss/10 border-tm-loss/20' :
                   wo.severity === 'medium' ? 'bg-tm-obs/10 border-tm-obs/20' :
                     'bg-muted/40 border-border'
               )}>
-                <span className="text-base">{wo.icon}</span>
+                <span className="text-[16px]">{wo.icon}</span>
                 <p className="text-foreground">{wo.message}</p>
               </div>
             ))}
@@ -243,10 +243,10 @@ function MorningBriefDetail({ data }: { data: Record<string, any> }) {
       {/* Checklist */}
       {checklist.length > 0 && (
         <div>
-          <p className="text-xs font-medium text-muted-foreground mb-2">Mental Checklist</p>
+          <p className="text-[12px] font-medium text-muted-foreground mb-2">Mental Checklist</p>
           <div className="space-y-1.5">
             {checklist.map((item: any, i: number) => (
-              <div key={i} className="flex items-start gap-2 text-sm text-foreground">
+              <div key={i} className="flex items-start gap-2 text-[14px] text-foreground">
                 <CheckCircle2 className="h-4 w-4 mt-0.5 shrink-0 text-muted-foreground" />
                 {item.item}
               </div>
@@ -271,11 +271,11 @@ function WeeklySummaryDetail({ data }: { data: Record<string, any> }) {
           { label: 'Last Week', stats: lw },
         ].map(({ label, stats }) => (
           <div key={label} className="bg-muted/40 rounded-lg p-4 space-y-2">
-            <p className="text-xs font-semibold uppercase tracking-widest text-muted-foreground">{label}</p>
-            <p className={cn('text-2xl font-bold font-mono tabular-nums', (stats.total_pnl ?? 0) >= 0 ? 'text-tm-profit' : 'text-tm-loss')}>
+            <p className="text-[12px] font-semibold uppercase tracking-widest text-muted-foreground">{label}</p>
+            <p className={cn('text-[24px] font-bold font-mono tabular-nums', (stats.total_pnl ?? 0) >= 0 ? 'text-tm-profit' : 'text-tm-loss')}>
               {formatCurrencyWhole((stats.total_pnl ?? 0))}
             </p>
-            <div className="flex gap-4 text-xs text-muted-foreground">
+            <div className="flex gap-4 text-[12px] text-muted-foreground">
               <span>{stats.total_trades ?? 0} trades</span>
               <span>{stats.win_rate ?? 0}% win rate</span>
               <span>{stats.danger_alerts ?? 0} alerts</span>
@@ -286,22 +286,22 @@ function WeeklySummaryDetail({ data }: { data: Record<string, any> }) {
 
       {Object.keys(imp).length > 0 && (
         <div>
-          <p className="text-xs font-medium text-muted-foreground mb-2">Week-over-Week</p>
+          <p className="text-[12px] font-medium text-muted-foreground mb-2">Week-over-Week</p>
           <div className="space-y-1.5">
             {imp.pnl && (
-              <div className="flex items-center gap-2 text-sm">
+              <div className="flex items-center gap-2 text-[14px]">
                 {imp.pnl.improved ? <TrendingUp className="h-4 w-4 text-tm-profit" /> : <TrendingDown className="h-4 w-4 text-tm-loss" />}
                 <span className="text-foreground">P&L {imp.pnl.improved ? 'up' : 'down'} {formatCurrency(Math.abs(imp.pnl.change))} vs last week</span>
               </div>
             )}
             {imp.win_rate && (
-              <div className="flex items-center gap-2 text-sm">
+              <div className="flex items-center gap-2 text-[14px]">
                 {imp.win_rate.improved ? <TrendingUp className="h-4 w-4 text-tm-profit" /> : <TrendingDown className="h-4 w-4 text-tm-loss" />}
                 <span className="text-foreground">Win rate {imp.win_rate.improved ? '+' : ''}{imp.win_rate.change}pp vs last week</span>
               </div>
             )}
             {imp.danger_alerts && (
-              <div className="flex items-center gap-2 text-sm">
+              <div className="flex items-center gap-2 text-[14px]">
                 {imp.danger_alerts.improved ? <Shield className="h-4 w-4 text-tm-profit" /> : <AlertTriangle className="h-4 w-4 text-tm-obs" />}
                 <span className="text-foreground">{imp.danger_alerts.message}</span>
               </div>
@@ -353,8 +353,8 @@ function ReportCard({ report }: { report: ReportSummary }) {
 
         {/* Date + time */}
         <div className="flex-1 min-w-0">
-          <p className="text-sm font-semibold text-foreground">{formatDate(report.report_date)}</p>
-          <p className="text-xs text-muted-foreground mt-0.5">Generated {formatTime(report.generated_at)}{report.sent_via ? ' · sent via WhatsApp' : ''}</p>
+          <p className="text-[14px] font-semibold text-foreground">{formatDate(report.report_date)}</p>
+          <p className="text-[12px] text-muted-foreground mt-0.5">Generated {formatTime(report.generated_at)}{report.sent_via ? ' · sent via WhatsApp' : ''}</p>
         </div>
 
         {/* Preview metrics */}
@@ -363,13 +363,13 @@ function ReportCard({ report }: { report: ReportSummary }) {
             <>
               <div className="text-right">
                 <p className="text-[10px] text-muted-foreground">P&L</p>
-                <p className={cn('text-base font-bold font-mono tabular-nums', report.total_pnl >= 0 ? 'text-tm-profit' : 'text-tm-loss')}>
+                <p className={cn('text-[16px] font-bold font-mono tabular-nums', report.total_pnl >= 0 ? 'text-tm-profit' : 'text-tm-loss')}>
                   {formatCurrencyWhole((report.total_pnl))}
                 </p>
               </div>
               <div className="text-right">
                 <p className="text-[10px] text-muted-foreground">Win Rate</p>
-                <p className="text-base font-bold font-mono tabular-nums text-foreground">{report.win_rate ?? 0}%</p>
+                <p className="text-[16px] font-bold font-mono tabular-nums text-foreground">{report.win_rate ?? 0}%</p>
               </div>
             </>
           )}
@@ -377,7 +377,7 @@ function ReportCard({ report }: { report: ReportSummary }) {
             <div className="text-right">
               <p className="text-[10px] text-muted-foreground">Readiness</p>
               <p className={cn(
-                'text-base font-bold font-mono tabular-nums',
+                'text-[16px] font-bold font-mono tabular-nums',
                 report.readiness_score >= 80 ? 'text-tm-profit' :
                   report.readiness_score >= 60 ? 'text-tm-obs' : 'text-tm-loss'
               )}>
@@ -388,7 +388,7 @@ function ReportCard({ report }: { report: ReportSummary }) {
           {report.report_type === 'weekly_summary' && report.total_pnl !== undefined && (
             <div className="text-right">
               <p className="text-[10px] text-muted-foreground">Week P&L</p>
-              <p className={cn('text-base font-bold font-mono tabular-nums', report.total_pnl >= 0 ? 'text-tm-profit' : 'text-tm-loss')}>
+              <p className={cn('text-[16px] font-bold font-mono tabular-nums', report.total_pnl >= 0 ? 'text-tm-profit' : 'text-tm-loss')}>
                 {formatCurrencyWhole((report.total_pnl))}
               </p>
             </div>
@@ -492,8 +492,8 @@ export default function Reports() {
           <div className="p-4 rounded-full bg-teal-50 dark:bg-teal-900/20 mb-5">
             <Link2 className="h-10 w-10 text-tm-brand" />
           </div>
-          <h2 className="text-base font-semibold text-foreground mb-1">Connect Your Broker</h2>
-          <p className="text-sm text-muted-foreground text-center max-w-sm mb-5">
+          <h2 className="text-[16px] font-semibold text-foreground mb-1">Connect Your Broker</h2>
+          <p className="text-[14px] text-muted-foreground text-center max-w-sm mb-5">
             Connect your Zerodha account to view your saved reports.
           </p>
           <Link to="/settings">
@@ -513,7 +513,7 @@ export default function Reports() {
       <div className="flex items-start justify-between">
         <div>
           <h1 className="t-heading-lg text-foreground">Reports</h1>
-          <p className="text-sm text-muted-foreground mt-0.5">
+          <p className="text-[14px] text-muted-foreground mt-0.5">
           </p>
         </div>
       </div>
@@ -538,7 +538,7 @@ export default function Reports() {
           </button>
         ))}
         {total > 0 && (
-          <span className="ml-auto text-xs text-muted-foreground self-center">{total} report{total !== 1 ? 's' : ''}</span>
+          <span className="ml-auto text-[12px] text-muted-foreground self-center">{total} report{total !== 1 ? 's' : ''}</span>
         )}
       </div>
 
@@ -553,7 +553,7 @@ export default function Reports() {
         <div className="flex flex-col items-center justify-center min-h-[30vh] rounded-lg border border-border bg-card">
           <FileText className="h-10 w-10 text-muted-foreground/40 mb-3" />
           <p className="font-medium text-foreground">No reports yet</p>
-          <p className="text-sm text-muted-foreground mt-1">
+          <p className="text-[14px] text-muted-foreground mt-1">
             Reports are saved automatically when your daily briefs are sent
           </p>
         </div>
@@ -563,7 +563,7 @@ export default function Reports() {
             <div key={date}>
               {/* Date separator */}
               <div className="flex items-center gap-3 mb-3">
-                <p className="text-xs font-semibold text-muted-foreground uppercase tracking-widest whitespace-nowrap">
+                <p className="text-[12px] font-semibold text-muted-foreground uppercase tracking-widest whitespace-nowrap">
                   {formatDate(date)}
                 </p>
                 <div className="flex-1 h-px bg-border" />
@@ -582,7 +582,7 @@ export default function Reports() {
               <button
                 onClick={handleLoadMore}
                 disabled={loadingMore}
-                className="flex items-center gap-2 px-5 py-2 rounded-full border border-border text-sm text-muted-foreground hover:text-foreground hover:border-foreground transition-colors disabled:opacity-50"
+                className="flex items-center gap-2 px-5 py-2 rounded-full border border-border text-[14px] text-muted-foreground hover:text-foreground hover:border-foreground transition-colors disabled:opacity-50"
               >
                 {loadingMore ? <span className="h-4 w-4 animate-spin inline-block border-2 border-current border-t-transparent rounded-full" /> : null}
                 Load more ({total - reports.length} remaining)

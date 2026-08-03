@@ -41,11 +41,15 @@ const EMOTION_LABELS: Record<string, string> = {
   anxious: 'Anxious', overconfident: 'Overconfident',
 };
 const EMOTION_COLORS: Record<string, string> = {
-  calm: 'bg-emerald-50 text-emerald-700 dark:bg-emerald-900/20 dark:text-emerald-400',
-  fomo: 'bg-amber-50 text-amber-700 dark:bg-amber-900/20 dark:text-amber-400',
-  revenge: 'bg-red-50 text-red-700 dark:bg-red-900/20 dark:text-red-400',
-  anxious: 'bg-orange-50 text-orange-700 dark:bg-orange-900/20 dark:text-orange-400',
-  overconfident: 'bg-purple-50 text-purple-700 dark:bg-purple-900/20 dark:text-purple-400',
+  // Three semantic tokens, not five hues. Calm reads as the good state, revenge
+  // and anxious as the costly ones, fomo as caution. Overconfident takes the
+  // neutral treatment: it was the fifth colour in a vocabulary that has three,
+  // and inventing a hue for it is how a palette turns into a rainbow.
+  calm:          'bg-tm-profit/10 text-tm-profit',
+  fomo:          'bg-tm-obs/10 text-tm-obs',
+  revenge:       'bg-tm-loss/10 text-tm-loss',
+  anxious:       'bg-tm-loss/10 text-tm-loss',
+  overconfident: 'bg-muted text-muted-foreground',
 };
 const PLAN_LABELS: Record<string, string> = {
   yes: 'Followed plan', partially: 'Partial', no: 'Deviated',
