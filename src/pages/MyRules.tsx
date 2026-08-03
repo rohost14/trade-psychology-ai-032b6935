@@ -8,6 +8,7 @@ import {
 } from '@/components/ui/dialog';
 import { toast } from 'sonner';
 import { api } from '@/lib/api';
+import EnforcedRules from '@/components/rules/EnforcedRules';
 import { formatCurrency } from '@/lib/formatters';
 import { cn } from '@/lib/utils';
 
@@ -64,7 +65,7 @@ const RULE_LABELS: Record<string, string> = {
 function ratioColor(ratio: number | null | undefined): string {
   if (ratio == null) return 'bg-muted';
   if (ratio >= 1) return 'bg-tm-loss';
-  if (ratio >= 0.8) return 'bg-amber-500';
+  if (ratio >= 0.8) return 'bg-tm-obs';
   return 'bg-tm-profit';
 }
 
@@ -196,9 +197,9 @@ export default function MyRules() {
 
       {/* Pending loosening banner */}
       {pending && Object.keys(pending).filter(k => !k.startsWith('_')).length > 0 && (
-        <div className="flex items-start gap-2.5 rounded-lg border border-amber-500/30 bg-amber-500/10 px-4 py-3">
-          <Clock className="h-4 w-4 text-amber-600 dark:text-amber-400 mt-0.5 shrink-0" />
-          <p className="text-sm text-amber-700 dark:text-amber-400">
+        <div className="flex items-start gap-2.5 rounded-lg border border-tm-obs/30 bg-tm-obs/10 px-4 py-3">
+          <Clock className="h-4 w-4 text-tm-obs mt-0.5 shrink-0" />
+          <p className="text-sm text-tm-obs">
             Relaxed rules pending. They apply next session:
             {' '}
             <span className="font-medium">
@@ -211,75 +212,7 @@ export default function MyRules() {
         </div>
       )}
 
-      {/* Active rules + today's progress */}
-      <div className="tm-card overflow-hidden">
-        <div className="px-5 py-3.5 border-b border-border flex items-center justify-between">
-          <h2 className="text-sm font-semibold text-foreground">Today vs your rules</h2>
-          {acceptedAt && (
-            <span className="text-[11px] text-muted-foreground">
-              Accepted {new Date(acceptedAt).toLocaleDateString('en-IN')}
-            </span>
-          )}
-        </div>
-        <div className="p-5 space-y-4">
-          {numericStatus.map((s) => {
-            const isLoss = s.rule === 'daily_loss';
-            const currentDisplay = isLoss ? formatCurrency(s.current || 0) : String(s.current ?? 0);
-            const limitDisplay = s.limit == null
-              ? 'no rule set'
-              : isLoss ? formatCurrency(s.limit) : String(s.limit);
-            const pct = s.ratio != null ? Math.min(s.ratio * 100, 100) : 0;
-            return (
-              <div key={s.rule}>
-                <div className="flex items-baseline justify-between mb-1.5">
-                  <span className="text-sm text-foreground">{RULE_LABELS[s.rule] || s.rule}</span>
-                  <span className={cn(
-                    'text-sm font-mono',
-                    s.ratio != null && s.ratio >= 1 ? 'text-tm-loss font-semibold' : 'text-muted-foreground'
-                  )}>
-                    {currentDisplay} / {limitDisplay}
-                    {s.ratio != null && ` (${Math.round(s.ratio * 100)}%)`}
-                  </span>
-                </div>
-                {s.limit != null && (
-                  <div className="h-1.5 rounded-full bg-muted overflow-hidden">
-                    <div
-                      className={cn('h-full rounded-full transition-all', ratioColor(s.ratio))}
-                      style={{ width: `${pct}%` }}
-                    />
-                  </div>
-                )}
-              </div>
-            );
-          })}
-
-          {/* Cooldown */}
-          <div className="flex items-center justify-between pt-1">
-            <span className="text-sm text-foreground">{RULE_LABELS.cooldown}</span>
-            {cooldownStatus?.limit_min == null ? (
-              <span className="text-sm text-muted-foreground font-mono">no rule set</span>
-            ) : cooldownStatus.active ? (
-              <span className="text-sm font-medium text-amber-600 dark:text-amber-400">
-                Active: {cooldownStatus.remaining_min} min remaining
-              </span>
-            ) : (
-              <span className="text-sm text-muted-foreground font-mono">
-                {cooldownStatus.limit_min} min · not active
-              </span>
-            )}
-          </div>
-
-          {/* Restricted windows */}
-          <div className="flex items-center justify-between">
-            <span className="text-sm text-foreground">{RULE_LABELS.restricted_windows}</span>
-            <span className="text-sm text-muted-foreground font-mono">
-              {windowStatus?.windows && windowStatus.windows.length > 0
-                ? windowStatus.windows.join(', ') + ' IST'
-                : 'none set'}
-            </span>
-          </div>
-        </div>
-      </div>
+      <EnforcedRules status={status} />
 
       {/* Violations */}
       <div className="tm-card overflow-hidden">
@@ -303,7 +236,7 @@ export default function MyRules() {
                   <span className={cn(
                     'mt-1 h-2 w-2 rounded-full shrink-0',
                     v.severity === 'critical' ? 'bg-tm-loss' :
-                    v.severity === 'danger' ? 'bg-tm-loss/70' : 'bg-amber-500'
+                    v.severity === 'danger' ? 'bg-tm-loss/70' : 'bg-tm-obs'
                   )} />
                   <div className="min-w-0">
                     <p className="text-sm text-foreground">{v.message}</p>

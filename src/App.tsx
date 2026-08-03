@@ -28,7 +28,6 @@ const Settings      = lazy(() => import("./pages/Settings"));
 const Reports           = lazy(() => import("./pages/Reports"));
 const Journal           = lazy(() => import("./pages/Journal"));
 const MyRules           = lazy(() => import("./pages/MyRules"));
-const MyRulesLab    = lazy(() => import("./pages/_lab/MyRulesLab"));
 const TermsOfService = lazy(() => import("./pages/TermsOfService"));
 const PrivacyPolicy  = lazy(() => import("./pages/PrivacyPolicy"));
 const Maintenance   = lazy(() => import("./pages/Maintenance"));
@@ -97,7 +96,6 @@ const App = () => (
                     <Route path="reports" element={<Reports />} />
                     <Route path="journal" element={<Journal />} />
                     <Route path="my-rules" element={<MyRules />} />
-                    <Route path="my-rules-lab" element={<MyRulesLab />} />
                     <Route path="settings" element={<Settings />} />
                   </Route>
                   <Route path="impersonate" element={<ImpersonateEntry />} />
