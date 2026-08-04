@@ -163,9 +163,9 @@ function sev(c: C, key: string) {
 
 // ── sub-components ───────────────────────────────────────────────────────────
 
-function Navbar({ c, isDark, onToggleTheme, consent, onConnect, onGuest, scrolled }: {
+function Navbar({ c, isDark, onToggleTheme, onConnect, onGuest, scrolled }: {
   c: C; isDark: boolean; onToggleTheme: () => void;
-  consent: boolean; onConnect: () => void; onGuest: () => void; scrolled: boolean;
+  onConnect: () => void; onGuest: () => void; scrolled: boolean;
 }) {
   return (
     <header style={{
@@ -208,9 +208,9 @@ function Navbar({ c, isDark, onToggleTheme, consent, onConnect, onGuest, scrolle
           <button onClick={onGuest} style={{ fontFamily: 'Plus Jakarta Sans,sans-serif', fontSize: '0.8125rem', fontWeight: 500, color: c.sub, background: 'transparent', border: 'none', cursor: 'pointer', padding: '6px 10px' }}>
             Try demo
           </button>
-          <button onClick={consent ? onConnect : undefined} disabled={!consent}
-            style={{ fontFamily: 'Plus Jakarta Sans,sans-serif', fontSize: '0.8125rem', fontWeight: 600, color: '#fff', background: consent ? c.primary : c.dim, border: 'none', cursor: consent ? 'pointer' : 'not-allowed', padding: '7px 16px', borderRadius: 8, transition: 'opacity 0.15s, transform 0.15s', opacity: consent ? 1 : 0.6 }}
-            onMouseEnter={e => { if (consent) e.currentTarget.style.opacity = '0.88'; }}
+          <button onClick={onConnect}
+            style={{ fontFamily: 'Plus Jakarta Sans,sans-serif', fontSize: '0.8125rem', fontWeight: 600, color: '#fff', background: c.primary, border: 'none', cursor: 'pointer', padding: '7px 16px', borderRadius: 8, transition: 'opacity 0.15s, transform 0.15s' }}
+            onMouseEnter={e => { e.currentTarget.style.opacity = '0.88'; }}
             onMouseLeave={e => { e.currentTarget.style.opacity = '1'; }}>
             Connect Zerodha
           </button>
@@ -298,7 +298,6 @@ export default function Welcome() {
   const c = isDark ? DARK : LIGHT;
 
   const [scrolled,  setScrolled]  = useState(false);
-  const [consent,   setConsent]   = useState(false);
   const [billing,   setBilling]   = useState<'monthly' | 'yearly'>('monthly');
   const [openFaq,   setOpenFaq]   = useState<number | null>(null);
 
@@ -320,7 +319,13 @@ export default function Welcome() {
     return () => window.removeEventListener('scroll', fn);
   }, []);
 
-  const handleConnect = () => { if (consent) connectBroker(); };
+  // Pressing this IS the acceptance — clickwrap by action, the pattern every
+  // broker-connected Indian app uses (Sensibull, Streak, smallcase). The agreement
+  // line sits directly under each CTA. It is recorded server-side in the OAuth
+  // callback; the old checkbox lived in React state, reset on every page load, and
+  // — because Kite tokens expire daily — made the user re-tick it every day while
+  // persisting nothing.
+  const handleConnect = () => { connectBroker(); };
   const handleGuest   = () => { enterGuestMode(); navigate('/dashboard'); };
   const toggleTheme   = () => setTheme(isDark ? 'light' : 'dark');
 
@@ -371,7 +376,7 @@ export default function Welcome() {
 
   return (
     <div style={{ background: c.bg, color: c.text, fontFamily: sans, minHeight: '100vh' }}>
-      <Navbar c={c} isDark={isDark} onToggleTheme={toggleTheme} consent={consent} onConnect={handleConnect} onGuest={handleGuest} scrolled={scrolled} />
+      <Navbar c={c} isDark={isDark} onToggleTheme={toggleTheme} onConnect={handleConnect} onGuest={handleGuest} scrolled={scrolled} />
 
       {/* ── HERO ─────────────────────────────────────────────────────────── */}
       <section className="relative overflow-hidden border-b border-border/60 bg-background min-h-[calc(100dvh-70px)] flex items-center">
@@ -402,22 +407,11 @@ export default function Welcome() {
               The seven seconds between getting stopped out and clicking buy again. That's where the month dies — not in your chart setup. TradeMentor sits in those seven seconds and refuses to let you punch yourself in the face.
             </p>
 
-            {/* Consent checkbox */}
-            <label className="flex items-start gap-3 cursor-pointer">
-              <div onClick={() => setConsent(v => !v)} className={`h-4 w-4 rounded border flex items-center justify-center transition-all mt-0.5 shrink-0 cursor-pointer ${consent ? "bg-primary border-primary text-white" : "border-border bg-card"}`}>
-                {consent && <Check className="h-3 w-3 stroke-[3]" />}
-              </div>
-              <span className="text-[12px] text-muted-foreground leading-normal">
-                I've read the <Link to="/terms" className="underline hover:text-foreground">Terms</Link> and <Link to="/privacy" className="underline hover:text-foreground">Privacy Policy</Link>. TradeMentor is a behavioral co-pilot, not investment advice.
-              </span>
-            </label>
-
             {/* CTAs */}
             <div className="flex flex-wrap items-center gap-3">
               <button
-                onClick={consent ? handleConnect : undefined}
-                disabled={!consent}
-                className={`inline-flex items-center justify-center h-12 px-6 rounded-lg text-[14px] font-semibold gap-2 transition-all ${consent ? "bg-primary text-primary-foreground shadow-lg hover:opacity-90 cursor-pointer" : "bg-muted text-muted-foreground cursor-not-allowed opacity-50"}`}
+                onClick={handleConnect}
+                className="inline-flex items-center justify-center h-12 px-6 rounded-lg text-[14px] font-semibold gap-2 transition-all bg-primary text-primary-foreground shadow-lg hover:opacity-90 cursor-pointer"
               >
                 Connect Zerodha <ArrowRight className="h-4 w-4" />
               </button>
@@ -428,6 +422,17 @@ export default function Welcome() {
                 Try demo first
               </button>
             </div>
+
+            {/* Agreement — pressing the button above IS the acceptance. No
+                checkbox: it used to reset every page load, so with Kite's daily
+                token expiry the user re-ticked it daily and nothing was stored.
+                Acceptance is now recorded server-side in the OAuth callback. */}
+            <p className="text-[12px] text-muted-foreground leading-normal max-w-[540px]">
+              By connecting, you agree to our{' '}
+              <Link to="/terms" className="underline hover:text-foreground">Terms</Link> and{' '}
+              <Link to="/privacy" className="underline hover:text-foreground">Privacy Policy</Link>.
+              TradeMentor is a behavioural mirror, not investment advice.
+            </p>
 
             {/* Trust pills */}
             <div className="flex items-center gap-4 flex-wrap">
@@ -601,7 +606,7 @@ export default function Welcome() {
                     </li>
                   ))}
                 </ul>
-                <button onClick={consent ? handleConnect : () => setConsent(true)}
+                <button onClick={handleConnect}
                   style={{ width: '100%', padding: '11px', borderRadius: 9, cursor: 'pointer', fontFamily: sans, fontWeight: 700, fontSize: '0.875rem', transition: 'all 0.15s',
                     background: highlight ? c.primary : 'transparent',
                     color: highlight ? '#fff' : c.text,
@@ -656,7 +661,7 @@ export default function Welcome() {
             Free forever. Connects to Zerodha in 90 seconds. No commitment required.
           </p>
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 12, flexWrap: 'wrap' }}>
-            <button onClick={consent ? handleConnect : () => { setConsent(true); }}
+            <button onClick={handleConnect}
               style={{ display: 'flex', alignItems: 'center', gap: 8, background: c.primary, color: '#fff', border: 'none', cursor: 'pointer', fontFamily: sans, fontWeight: 700, fontSize: '1rem', padding: '13px 26px', borderRadius: 10, boxShadow: `0 4px 16px ${c.primary}40`, transition: 'all 0.15s' }}
               onMouseEnter={e => { e.currentTarget.style.opacity = '0.9'; e.currentTarget.style.transform = 'translateY(-1px)'; }}
               onMouseLeave={e => { e.currentTarget.style.opacity = '1'; e.currentTarget.style.transform = 'translateY(0)'; }}>
@@ -669,6 +674,14 @@ export default function Welcome() {
               Try demo first
             </button>
           </div>
+          {/* Same agreement line as the hero — every Connect CTA carries it, so
+              whichever one the user presses, the acceptance is informed. */}
+          <p style={{ fontFamily: sans, fontSize: '0.75rem', color: c.dim, margin: '1.25rem auto 0', maxWidth: 520, lineHeight: 1.6 }}>
+            By connecting, you agree to our{' '}
+            <Link to="/terms" style={{ color: c.sub, textDecoration: 'underline' }}>Terms</Link> and{' '}
+            <Link to="/privacy" style={{ color: c.sub, textDecoration: 'underline' }}>Privacy Policy</Link>.
+            TradeMentor is a behavioural mirror, not investment advice.
+          </p>
         </div>
       </section>
 

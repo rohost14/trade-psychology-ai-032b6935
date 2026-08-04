@@ -40,6 +40,16 @@ class User(Base):
     guardian_confirmed_at: Mapped[Optional[datetime]] = mapped_column(TIMESTAMP(timezone=True), nullable=True)
     guardian_loss_limit:   Mapped[Optional[float]]    = mapped_column(Numeric(15, 4), nullable=True)
 
+    # Terms acceptance (migration 078). Stamped in the Zerodha OAuth callback the
+    # first time a user connects — pressing the button IS the acceptance — and
+    # again via POST /api/legal/accept when the terms change under them. NULL means
+    # a user who predates this column; they are stamped on their next login.
+    # See app/core/legal.py for when to bump the version.
+    terms_accepted_at: Mapped[Optional[datetime]] = mapped_column(
+        TIMESTAMP(timezone=True), nullable=True
+    )
+    terms_version: Mapped[Optional[str]] = mapped_column(String(20), nullable=True)
+
     created_at: Mapped[datetime] = mapped_column(
         TIMESTAMP(timezone=True), server_default=text("now()"), nullable=False
     )

@@ -14,6 +14,27 @@ import ImportRecap from './ImportRecap';
 
 const DISMISS_KEY = 'tradementor_import_prompt_dismissed';
 const THIN_THRESHOLD = 10;   // fewer than this many completed trades = "thin"
+const SNOOZE_DAYS = 30;
+
+/**
+ * Dismissal snoozes for 30 days; it does not kill the prompt forever.
+ *
+ * The X used to write a permanent flag, so one stray click meant the user never
+ * saw the import nudge again — on a product where Kite returns no history and
+ * Analytics is empty until you import. People routinely decide to import months
+ * after first seeing the offer. Importing also stops the prompt for good on its
+ * own (see onImported), so the only thing being snoozed is a "not now".
+ *
+ * The legacy value was the string '1'. Anything unparseable is treated as expired,
+ * which un-sticks users who permanently dismissed it under the old behaviour.
+ */
+function isSnoozed(): boolean {
+  const raw = localStorage.getItem(DISMISS_KEY);
+  if (!raw) return false;
+  if (raw === 'permanent') return true;      // written after a successful import
+  const until = Number(raw);
+  return Number.isFinite(until) && until > Date.now();
+}
 
 export default function ImportHistoryPrompt() {
   const [show, setShow] = useState(false);
@@ -22,7 +43,7 @@ export default function ImportHistoryPrompt() {
 
   useEffect(() => {
     if (isGuestMode()) return;
-    if (localStorage.getItem(DISMISS_KEY)) return;
+    if (isSnoozed()) return;
     let cancelled = false;
     api.get('/api/trades/completed?limit=1')
       .then(res => {
@@ -34,14 +55,15 @@ export default function ImportHistoryPrompt() {
   }, []);
 
   const dismiss = () => {
-    localStorage.setItem(DISMISS_KEY, '1');
+    localStorage.setItem(DISMISS_KEY, String(Date.now() + SNOOZE_DAYS * 86_400_000));
     setShow(false);
   };
 
   const onImported = (r: ImportResult) => {
     if (r.imported > 0) {
-      // History is in — stop nudging and reveal the recap ("here's what we found").
-      localStorage.setItem(DISMISS_KEY, '1');
+      // History is in — the offer is answered, so this one IS permanent (unlike a
+      // dismissal, which only snoozes). Reveal the recap: "here's what we found".
+      localStorage.setItem(DISMISS_KEY, 'permanent');
       setRecap(true);
     }
   };

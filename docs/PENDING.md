@@ -5,11 +5,19 @@ Updated 2026-08-04. Branch `dashboard-production-readiness`, CI green, working t
 
 ---
 
-## 🔴 Apply this migration — the entry-price fix is inert without it
+## 🔴 Apply migration 078 — the app cannot write users without it
 
-**`backend/migrations/077_position_entry_price_source.sql`** — one additive nullable
-column (`positions.entry_price_source`). Until it is applied, `sync_positions` will fail
-to write positions at all (the model now selects the column), so this is not optional.
+**`backend/migrations/078_terms_acceptance.sql`** — two additive nullable columns
+(`users.terms_accepted_at`, `users.terms_version`). Until applied, **every user INSERT
+fails** (the model selects the columns), so OAuth login for a new user breaks and 131
+backend tests error. Not optional.
+
+Why: the landing page gated its Connect button behind a React `useState` checkbox that
+reset on every page load — so with Kite's daily token expiry the user re-ticked it every
+day, and nothing was ever persisted. Acceptance is now stamped in the OAuth callback
+(pressing the button IS the acceptance) and re-confirmed only when the terms change.
+
+**077 (`positions.entry_price_source`) — ✅ applied 2026-08-04.**
 
 Why it exists: `positions.average_entry_price` mirrored Kite's `average_price`, which is
 the day-CUMULATIVE buy average and still includes fills from rounds that already closed —

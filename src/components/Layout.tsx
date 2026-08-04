@@ -11,6 +11,7 @@ import { useBroker } from '@/contexts/BrokerContext';
 import { useWebSocket } from '@/contexts/WebSocketContext';
 import { ErrorBoundary } from '@/components/ErrorBoundary';
 import OnboardingGate from '@/components/onboarding/OnboardingGate';
+import TermsUpdateGate from '@/components/legal/TermsUpdateGate';
 import ImpersonationBanner from '@/components/ImpersonationBanner';
 import { CommandPalette } from './CommandPalette';
 import { Sidebar } from './Sidebar';
@@ -167,6 +168,9 @@ export default function Layout() {
 
         {/* ── Onboarding wizard ───────────────────────────────────────────── */}
         <OnboardingGate />
+
+        {/* Only fires when the Terms changed since this user accepted them. */}
+        <TermsUpdateGate />
 
         <ImpersonationBanner />
 

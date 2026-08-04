@@ -15,6 +15,7 @@ from pydantic import BaseModel
 from fastapi.responses import RedirectResponse
 from cryptography.fernet import Fernet
 from app.core.config import settings
+from app.core.legal import CURRENT_TERMS_VERSION
 import secrets
 
 logger = logging.getLogger(__name__)
@@ -267,6 +268,13 @@ async def zerodha_callback(
             user.display_name = user.display_name or zerodha_name
             user.avatar_url = user.avatar_url or zerodha_avatar
             user.updated_at = datetime.now(timezone.utc)
+            # Stamp acceptance only if we have none — pressing Connect carries the
+            # agreement line on the landing page, so this is a genuine clickwrap.
+            # Never overwrite an existing (possibly older) version: that is the
+            # signal the re-acceptance interstitial keys off.
+            if user.terms_accepted_at is None:
+                user.terms_accepted_at = datetime.now(timezone.utc)
+                user.terms_version = CURRENT_TERMS_VERSION
             logger.info(f"Found existing user: {user.id}")
         else:
             # Signup gate (admin global setting) — block brand-new users when registration
@@ -285,6 +293,10 @@ async def zerodha_callback(
                 email=zerodha_email,
                 display_name=zerodha_name,
                 avatar_url=zerodha_avatar,
+                # Clickwrap by action: the button they just pressed carried the
+                # Terms/Privacy line. This is the acceptance record.
+                terms_accepted_at=datetime.now(timezone.utc),
+                terms_version=CURRENT_TERMS_VERSION,
             )
             db.add(user)
             await db.flush()  # get user.id before linking broker_account

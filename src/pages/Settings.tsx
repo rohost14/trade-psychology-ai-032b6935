@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
-import { useNavigate } from 'react-router-dom';
-import { Save, Loader2, User, Bell, Brain, ShieldAlert } from 'lucide-react';
+import { useNavigate, useSearchParams } from 'react-router-dom';
+import { Save, Loader2, User, Bell, Brain, Database, ShieldAlert } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
@@ -12,6 +12,7 @@ import { BrokerConnectionCard } from '@/components/settings/BrokerConnectionCard
 import { ProfileTab } from '@/components/settings/ProfileTab';
 import { NotificationsTab } from '@/components/settings/NotificationsTab';
 import { InsightsTab } from '@/components/settings/InsightsTab';
+import { DataTab } from '@/components/settings/DataTab';
 import { DangerZoneTab } from '@/components/settings/DangerZoneTab';
 
 // Rule fields are change-controlled by the Constitution (backend RULE_FIELDS).
@@ -26,8 +27,15 @@ const RULE_FIELD_LABELS: Record<string, string> = {
   restricted_windows:     'Restricted trading windows',
 };
 
+// Deep-linkable tabs. Anything else in ?tab= falls back to profile rather than
+// rendering an empty panel — the value arrives from a URL, so it is user input.
+const TABS = ['profile', 'notifications', 'insights', 'data', 'danger'] as const;
+
 export default function Settings() {
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
+  const requestedTab = searchParams.get('tab');
+  const initialTab = TABS.includes(requestedTab as typeof TABS[number]) ? requestedTab! : 'profile';
   const { isConnected, isLoading: brokerLoading, account, connect, disconnect } = useBroker();
   const [isConnecting, setIsConnecting] = useState(false);
   const [isDisconnecting, setIsDisconnecting] = useState(false);
@@ -293,7 +301,7 @@ export default function Settings() {
 
       {/* Only show other settings if connected */}
       {isConnected && (
-        <Tabs defaultValue="profile" className="space-y-5">
+        <Tabs defaultValue={initialTab} className="space-y-5">
           <TabsList className="inline-flex h-auto bg-transparent p-0 gap-1 border-b border-border w-full rounded-none">
             <TabsTrigger value="profile" className="rounded-none px-3 pb-3 text-sm font-medium text-muted-foreground data-[state=active]:bg-transparent data-[state=active]:text-foreground data-[state=active]:border-b-2 data-[state=active]:border-tm-brand transition-colors flex items-center gap-1.5">
               <User className="h-4 w-4" />
@@ -306,6 +314,10 @@ export default function Settings() {
             <TabsTrigger value="insights" className="rounded-none px-3 pb-3 text-sm font-medium text-muted-foreground data-[state=active]:bg-transparent data-[state=active]:text-foreground data-[state=active]:border-b-2 data-[state=active]:border-tm-brand transition-colors flex items-center gap-1.5">
               <Brain className="h-4 w-4" />
               Insights
+            </TabsTrigger>
+            <TabsTrigger value="data" className="rounded-none px-3 pb-3 text-sm font-medium text-muted-foreground data-[state=active]:bg-transparent data-[state=active]:text-foreground data-[state=active]:border-b-2 data-[state=active]:border-tm-brand transition-colors flex items-center gap-1.5">
+              <Database className="h-4 w-4" />
+              Data
             </TabsTrigger>
             <TabsTrigger value="danger" className="rounded-none px-3 pb-3 text-sm font-medium text-muted-foreground data-[state=active]:bg-transparent data-[state=active]:text-tm-loss data-[state=active]:border-b-2 data-[state=active]:border-tm-loss transition-colors flex items-center gap-1.5">
               <ShieldAlert className="h-4 w-4" />
@@ -330,6 +342,10 @@ export default function Settings() {
 
           <TabsContent value="insights">
             <InsightsTab />
+          </TabsContent>
+
+          <TabsContent value="data">
+            <DataTab />
           </TabsContent>
 
           <TabsContent value="danger">

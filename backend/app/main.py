@@ -424,6 +424,9 @@ app.include_router(alerts.router, prefix="/api/alerts", tags=["alerts"])
 app.include_router(settings_api.router, prefix="/api/settings", tags=["settings"])
 app.include_router(analytics.router, prefix="/api/analytics", tags=["analytics"])
 
+from app.api import legal
+app.include_router(legal.router, prefix="/api/legal", tags=["legal"])
+
 from app.api import behavioral
 app.include_router(behavioral.router, prefix="/api/behavioral", tags=["behavioral"])
 

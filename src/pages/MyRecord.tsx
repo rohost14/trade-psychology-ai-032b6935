@@ -12,6 +12,7 @@
  * situations table runs edge to edge.
  */
 import { useCallback, useEffect, useRef, useState } from 'react';
+import { Link } from 'react-router-dom';
 import { Clock, Search, TrendingDown, TrendingUp, Info } from 'lucide-react';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Input } from '@/components/ui/input';
@@ -237,10 +238,17 @@ export default function MyRecordPage() {
             ))}
           </div>
         ) : (
-          // Cold start states the actual cause, not "no data" (§15).
+          // Cold start states the actual cause, not "no data" (§15), and links
+          // straight to the import rather than describing where to find it.
           <p className="text-[12.5px] text-muted-foreground mt-3">
-            No completed trades yet. Kite doesn't provide historical trades — import your Console
-            tradebook from Settings → Danger Zone to bring in your history.
+            No completed trades yet. Kite doesn't provide historical trades —{' '}
+            <Link
+              to="/settings?tab=data"
+              className="text-primary underline underline-offset-2 hover:opacity-80"
+            >
+              import your Console tradebook
+            </Link>{' '}
+            to bring in your history.
           </p>
         )}
       </div>
