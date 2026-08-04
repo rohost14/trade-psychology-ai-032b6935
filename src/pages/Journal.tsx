@@ -6,6 +6,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import ErrorState from '@/components/ErrorState';
 import { cn } from '@/lib/utils';
 import { api } from '@/lib/api';
+import { useApiInfiniteQuery } from '@/hooks/useApiInfiniteQuery';
 import { useBroker } from '@/contexts/BrokerContext';
 import { MorningIntentCard } from '@/components/dashboard/MorningIntentCard';
 
@@ -335,12 +336,27 @@ const PAGE_SIZE = 50;
 export default function Journal() {
   const { isConnected, isLoading: brokerLoading, account } = useBroker();
 
-  const [entries, setEntries]       = useState<JournalEntry[]>([]);
-  const [loading, setLoading]       = useState(true);
-  const [loadingMore, setLoadingMore] = useState(false);
-  const [error, setError]           = useState<unknown>(null);
-  const [hasMore, setHasMore]       = useState(false);
-  const [offset, setOffset]         = useState(0);
+  const journalQ = useApiInfiniteQuery<{ entries: JournalEntry[] }, JournalEntry>(
+    ['journal', account?.id],
+    '/api/journal/',
+    {
+      pageSize: PAGE_SIZE,
+      getItems: page => page.entries ?? [],
+      enabled: Boolean(account?.id),
+    },
+  );
+
+  // Pages are kept, so paging through the list and coming back restores every
+  // page instead of starting again at the first.
+  const entries = journalQ.items;
+  const loading = journalQ.isPending;
+  const loadingMore = journalQ.isFetchingNextPage;
+  const hasMore = journalQ.hasNextPage;
+  // Still never fake "no entries" on a failed load — the error wins over the
+  // empty state below.
+  const error = journalQ.error;
+
+  const fetchEntries = () => journalQ.refetch();
 
   // Filters
   const [period, setPeriod]         = useState(30);
@@ -348,32 +364,6 @@ export default function Journal() {
   const [planFilter, setPlanFilter] = useState('');
   const [search, setSearch]         = useState('');
   const [dayEntryOpen, setDayEntryOpen] = useState(false);
-
-  const fetchEntries = async (reset = false) => {
-    if (!account?.id) return;
-    const currentOffset = reset ? 0 : offset;
-    if (reset) { setLoading(true); setError(null); }
-    else setLoadingMore(true);
-
-    try {
-      const res = await api.get('/api/journal/', {
-        params: { limit: PAGE_SIZE, offset: currentOffset },
-      });
-      const fetched: JournalEntry[] = res.data.entries ?? [];
-      setEntries(prev => reset ? fetched : [...prev, ...fetched]);
-      setHasMore(fetched.length === PAGE_SIZE);
-      setOffset(currentOffset + fetched.length);
-    } catch (e) {
-      if (reset) setError(e);   // don't fake "no entries" on a failed load
-    } finally {
-      setLoading(false);
-      setLoadingMore(false);
-    }
-  };
-
-  useEffect(() => {
-    if (account?.id) fetchEntries(true);
-  }, [account?.id]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Client-side filter
   // A day-level entry carries no trade. Everything written from the Dashboard
@@ -507,7 +497,7 @@ export default function Journal() {
         open={dayEntryOpen}
         onOpenChange={setDayEntryOpen}
         existing={todayEntry}
-        onSaved={() => fetchEntries(true)}
+        onSaved={() => fetchEntries()}
       />
 
       {/* Write one. There was no way to create a journal entry from this page
@@ -597,7 +587,7 @@ export default function Journal() {
           {[1, 2, 3, 4, 5].map(i => <EntrySkeleton key={i} />)}
         </div>
       ) : error ? (
-        <ErrorState error={error} onRetry={() => fetchEntries(true)} />
+        <ErrorState error={error} onRetry={() => fetchEntries()} />
       ) : filtered.length === 0 ? (
         (() => {
           const hasTagFilters = emotionFilter.length > 0 || !!planFilter;
@@ -702,7 +692,7 @@ export default function Journal() {
           {/* Load more — only when no active filters (filtered view may not show new data) */}
           {hasMore && emotionFilter.length === 0 && !planFilter && (
             <button
-              onClick={() => fetchEntries(false)}
+              onClick={() => journalQ.fetchNextPage()}
               disabled={loadingMore}
               className="w-full py-3 text-[13px] text-muted-foreground hover:text-foreground transition-colors disabled:opacity-50"
             >

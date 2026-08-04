@@ -11,6 +11,7 @@ import { formatCurrency, formatCurrencyWithSign, formatCurrencyWhole } from '@/l
 import { Skeleton } from '@/components/ui/skeleton';
 import ErrorState from '@/components/ErrorState';
 import { api } from '@/lib/api';
+import { useApiInfiniteQuery } from '@/hooks/useApiInfiniteQuery';
 import { useBroker } from '@/contexts/BrokerContext';
 import { EodComparisonCard } from '@/components/dashboard/EodComparisonCard';
 
@@ -439,41 +440,29 @@ const FILTER_TABS: { value: ReportType; label: string }[] = [
 export default function Reports() {
   const { isConnected } = useBroker();
   const [filter, setFilter] = useState<ReportType>('all');
-  const [reports, setReports] = useState<ReportSummary[]>([]);
-  const [total, setTotal] = useState(0);
-  const [isLoading, setIsLoading] = useState(true);
-  const [loadingMore, setLoadingMore] = useState(false);
-  const [error, setError] = useState<unknown>(null);
-  const offset = reports.length;
+  // The filter is part of the key, so switching back to a filter you already
+  // viewed reads its cached pages instead of starting over at page one.
+  const reportsQ = useApiInfiniteQuery<
+    { reports: ReportSummary[]; total: number },
+    ReportSummary
+  >(
+    ['reports', 'saved'],
+    '/api/reports/saved',
+    {
+      pageSize: 20,
+      getItems: page => page.reports ?? [],
+      params: filter !== 'all' ? { report_type: filter } : undefined,
+    },
+  );
 
-  const fetchReports = useCallback(async (type: ReportType, currentOffset: number, append = false) => {
-    if (currentOffset === 0) setIsLoading(true); else setLoadingMore(true);
-    setError(null);
-    try {
-      const params: Record<string, any> = { limit: 20, offset: currentOffset };
-      if (type !== 'all') params.report_type = type;
-      const res = await api.get('/api/reports/saved', { params });
-      if (append) {
-        setReports(prev => [...prev, ...res.data.reports]);
-      } else {
-        setReports(res.data.reports);
-      }
-      setTotal(res.data.total);
-    } catch (e) {
-      if (!append) { setError(e); setReports([]); }   // don't fake "no reports" on a failed load
-    } finally {
-      setIsLoading(false);
-      setLoadingMore(false);
-    }
-  }, []);
+  const reports = reportsQ.items;
+  const total = reportsQ.data?.pages[0]?.total ?? 0;
+  const isLoading = reportsQ.isPending;
+  const loadingMore = reportsQ.isFetchingNextPage;
+  // Still never fake "no reports" on a failed load.
+  const error = reportsQ.error;
 
-  useEffect(() => {
-    fetchReports(filter, 0, false);
-  }, [filter, fetchReports]);
-
-  const handleLoadMore = () => {
-    fetchReports(filter, offset, true);
-  };
+  const handleLoadMore = () => reportsQ.fetchNextPage();
 
   // Group reports by date
   const grouped: Record<string, ReportSummary[]> = {};
@@ -548,7 +537,7 @@ export default function Reports() {
           {[1,2,3].map(i => <Skeleton key={i} className="h-16 rounded-lg" />)}
         </div>
       ) : error ? (
-        <ErrorState error={error} onRetry={() => fetchReports(filter, 0)} />
+        <ErrorState error={error} onRetry={() => reportsQ.refetch()} />
       ) : reports.length === 0 ? (
         <div className="flex flex-col items-center justify-center min-h-[30vh] rounded-lg border border-border bg-card">
           <FileText className="h-10 w-10 text-muted-foreground/40 mb-3" />
@@ -577,7 +566,7 @@ export default function Reports() {
           ))}
 
           {/* Load more */}
-          {reports.length < total && (
+          {reportsQ.hasNextPage && (
             <div className="flex justify-center pt-2">
               <button
                 onClick={handleLoadMore}
