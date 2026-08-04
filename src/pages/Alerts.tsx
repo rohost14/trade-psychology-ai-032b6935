@@ -31,6 +31,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import ErrorState from '@/components/ErrorState';
 import { cn } from '@/lib/utils';
 import { api } from '@/lib/api';
+import { useApiQuery } from '@/hooks/useApiQuery';
 import { useAlerts, AlertNotification, formatPatternName } from '@/contexts/AlertContext';
 import { PatternSeverity } from '@/types/patterns';
 import AlertDetailSheet from '@/components/alerts/AlertDetailSheet';
@@ -293,15 +294,20 @@ interface ResponseStats {
 }
 
 function ResponseStatsCard() {
-  const [stats, setStats] = useState<ResponseStats | null>(null);
-  useEffect(() => {
-    api.get('/api/risk/alert-response-stats', { params: { days: 30 } })
-      .then(res => setStats(res.data))
-      .catch(() => {});
-  }, []);
+  const { data: stats } = useApiQuery<ResponseStats>(
+    ['risk', 'alert-response-stats'],
+    '/api/risk/alert-response-stats',
+    { params: { days: 30 } },
+  );
 
   // Same trap as BehaviorScoresCard: {} is truthy, so this used to reach
-  // `stats.patterns.length` on undefined and take the whole tab down.
+  // `stats.patterns.length` on undefined and take the whole tab down. The
+  // optional chain is the guard — never `if (!stats)`, because guest mode
+  // answers an unmocked GET with {}.
+  //
+  // No error branch on purpose: this is a supplementary card above the alert
+  // list. If it cannot load, showing nothing is right; an error block here would
+  // sit on top of a working page and imply the alerts below are broken too.
   if (!stats?.patterns?.length) return null;
   // Only worth showing once there's a signal (something ignored or overridden).
   const top = stats.patterns.filter(p => p.took_anyway > 0 || p.ignored > 0).slice(0, 3);
@@ -449,19 +455,27 @@ function HistoryTab({ onOpen }: { onOpen: (a: AlertNotification) => void }) {
   // so users can see alerts beyond the 7-day live window.
   const [hours, setHours] = useState(168);
   const [sevFilter, setSevFilter] = useState('all');
-  const [allAlerts, setAllAlerts] = useState<AlertNotification[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<unknown>(null);
+  // History is a SEPARATE data source from AlertContext on purpose: the context
+  // holds the live 7-day window fed by the WebSocket, this reads further back.
+  // Only this historical read is cached — the live alert stream stays entirely
+  // on the socket, because a cache in front of it would be a second source of
+  // truth for the same alerts.
+  const historyQ = useApiQuery<{ alerts: unknown[] }>(
+    ['risk', 'alerts', 'history'],
+    '/api/risk/alerts',
+    { params: { hours } },
+  );
 
-  const loadHistory = useCallback(async (h: number) => {
-    setLoading(true);
-    setError(null);
-    try {
-      const res = await api.get('/api/risk/alerts', { params: { hours: h } });
-      const raw = res.data.alerts ?? [];
-      // Use the same shape AlertContext uses — map raw to AlertNotification
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const mapped: AlertNotification[] = raw.map((a: any) => ({
+  const loading = historyQ.isPending;
+  const error = historyQ.error;
+
+  const allAlerts = useMemo<AlertNotification[]>(() => {
+    // Never fall back to [] on failure — the error branch above owns that case,
+    // and an empty list here would render "no alerts in this period".
+    const raw = historyQ.data?.alerts ?? [];
+    // Use the same shape AlertContext uses — map raw to AlertNotification
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const mapped: AlertNotification[] = raw.map((a: any) => ({
         id: String(a.id),
         pattern: {
           id:                  String(a.id),
@@ -484,17 +498,9 @@ function HistoryTab({ onOpen }: { onOpen: (a: AlertNotification) => void }) {
         shown_at:     a.detected_at || a.created_at,
         acknowledged: a.acknowledged ?? (a.acknowledged_at != null),
       }));
-      mapped.sort((a, b) => new Date(b.shown_at ?? 0).getTime() - new Date(a.shown_at ?? 0).getTime());
-      setAllAlerts(mapped);
-    } catch (e) {
-      setError(e);           // don't masquerade a failed load as "no alerts"
-      setAllAlerts([]);
-    } finally {
-      setLoading(false);
-    }
-  }, []);
-
-  useEffect(() => { loadHistory(hours); }, [hours, loadHistory]);
+    mapped.sort((a, b) => new Date(b.shown_at ?? 0).getTime() - new Date(a.shown_at ?? 0).getTime());
+    return mapped;
+  }, [historyQ.data]);
 
   const weekCounts = useMemo(() => buildWeekCounts(allAlerts), [allAlerts]);
   const filtered = useMemo(
@@ -552,7 +558,7 @@ function HistoryTab({ onOpen }: { onOpen: (a: AlertNotification) => void }) {
       </div>
 
       {loading ? <AlertSkeleton /> : error ? (
-        <ErrorState error={error} onRetry={() => loadHistory(hours)} />
+        <ErrorState error={error} onRetry={() => historyQ.refetch()} />
       ) : filtered.length === 0 ? (
         <div className="tm-card flex flex-col items-center justify-center py-12 text-center">
           <BellOff className="h-8 w-8 text-muted-foreground/30 mb-3" />
