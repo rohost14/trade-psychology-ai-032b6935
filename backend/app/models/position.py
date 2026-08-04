@@ -21,9 +21,15 @@ class Position(Base):
     instrument_type = Column(String(20))
     product = Column(String(20))
     segment = Column(String(20), nullable=True)
+    # Precision below mirrors the live Postgres column types EXACTLY. These used to
+    # be declared Numeric(15, 4) while the database held 2dp, so a 4-decimal value
+    # was silently rounded on write and the model told you otherwise. Two decimals
+    # is the intended precision here — NSE/NFO ticks are 0.05, so a fill price is
+    # exact at 2dp. tests/test_numeric_precision.py fails if the two drift apart
+    # again; change the column and the model together, never one alone.
     total_quantity = Column(Integer)
-    average_entry_price = Column(Numeric(15, 4))
-    average_exit_price = Column(Numeric(15, 4))
+    average_entry_price = Column(Numeric(10, 2))
+    average_exit_price = Column(Numeric(10, 2))
 
     # Where average_entry_price came from: 'ledger' = cost of the current open round,
     # derived from PositionLedger; 'broker' = Kite's day-cumulative average, which
@@ -36,20 +42,20 @@ class Position(Base):
     multiplier = Column(Numeric(10, 4), default=1)
 
     # P&L fields from Zerodha
-    realized_pnl = Column(Numeric(15, 4))
-    unrealized_pnl = Column(Numeric(15, 4))
-    pnl = Column(Numeric(15, 4))
-    day_pnl = Column(Numeric(15, 4))
+    realized_pnl = Column(Numeric(12, 2))
+    unrealized_pnl = Column(Numeric(12, 2))
+    pnl = Column(Numeric(12, 2))
+    day_pnl = Column(Numeric(12, 2))
     m2m = Column(Numeric(15, 4))
 
     # Price fields
-    last_price = Column(Numeric(15, 4))
-    close_price = Column(Numeric(15, 4))
+    last_price = Column(Numeric(12, 2))
+    close_price = Column(Numeric(12, 2))
 
     # Value fields
-    value = Column(Numeric(15, 4))
-    buy_value = Column(Numeric(15, 4))
-    sell_value = Column(Numeric(15, 4))
+    value = Column(Numeric(14, 2))
+    buy_value = Column(Numeric(14, 2))
+    sell_value = Column(Numeric(14, 2))
 
     # Day trading fields
     day_buy_quantity = Column(Integer, default=0)

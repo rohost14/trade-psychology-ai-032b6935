@@ -39,11 +39,14 @@ class Trade(Base):
     pending_quantity: Mapped[int] = mapped_column(Integer, default=0)
     cancelled_quantity: Mapped[int] = mapped_column(Integer, default=0)
 
-    # Prices
-    price: Mapped[float] = mapped_column(Numeric(15, 4), nullable=True)
-    trigger_price: Mapped[float] = mapped_column(Numeric(15, 4), nullable=True)
-    average_price: Mapped[float] = mapped_column(Numeric(15, 4), nullable=True)
-    market_protection: Mapped[Optional[float]] = mapped_column(Numeric(15, 4), nullable=True)
+    # Prices — precision mirrors the live Postgres columns exactly (2dp), which is
+    # what the exchange gives us: NSE/NFO tick sizes are 0.05. These were declared
+    # Numeric(15, 4) against 2dp columns, so the model claimed a precision the
+    # database never stored. tests/test_numeric_precision.py guards the pair.
+    price: Mapped[float] = mapped_column(Numeric(10, 2), nullable=True)
+    trigger_price: Mapped[float] = mapped_column(Numeric(10, 2), nullable=True)
+    average_price: Mapped[float] = mapped_column(Numeric(10, 2), nullable=True)
+    market_protection: Mapped[Optional[float]] = mapped_column(Numeric(10, 2), nullable=True)
 
     # Status
     status: Mapped[str] = mapped_column(String)
@@ -58,7 +61,7 @@ class Trade(Base):
     segment: Mapped[Optional[str]] = mapped_column(String(20), nullable=True)
 
     # Financials
-    pnl: Mapped[float] = mapped_column(Numeric(15, 4), nullable=True)
+    pnl: Mapped[float] = mapped_column(Numeric(10, 2), nullable=True)
 
     # Timestamps
     order_timestamp: Mapped[datetime] = mapped_column(TIMESTAMP(timezone=True), nullable=True)
