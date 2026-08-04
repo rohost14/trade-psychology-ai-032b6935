@@ -14,11 +14,43 @@
 | D4 | 🔴 `setup_logging()` dead (never called) → error-feed handler + JSON logging + request-id filter all unwired | grep: zero callers (P0-F2) | Wire it up (fix, not delete) |
 | D5 | 🟡 `redis_pool.py` stale comment: "VIX fetches" | vix_service archived earlier | Trivial comment cleanup |
 | D6 | 🟡 Two metrics subsystems (`logging_config.MetricsCollector` vs `core/metrics.py`) | Different purposes; document authority (P0-F13) | KEEP, document |
-| D15 | 🔴 `PnLCalculator.calculate_trade_pnl_realtime` dead (~90 LOC) | Replaced by PositionLedgerService; zero live callers (P1-M7) | ARCHIVE/remove |
+| D15 | ✅ CLOSED 2026-08-04: `PnLCalculator.calculate_trade_pnl_realtime` (96 LOC) removed → `services/_archive/dead_pnl_and_checksum.py`. Zero callers re-verified; it also still used the retired oldest-lot FIFO cost basis and replayed every prior trade per fill. Removal cleared the stale `opposite_side` pyflakes warning and the now-unused `get_lot_multiplier` import. | CLOSED |
+| D22 | ✅ CLOSED 2026-08-04: `ZerodhaClient.validate_postback_checksum` — a **third** copy of postback verification, zero callers. Live path uses `api/webhooks.py::verify_zerodha_checksum` / `verify_zerodha_checksum_header`, both `hmac.compare_digest`; the dead copy used a plain `==`. Archived to `services/_archive/dead_pnl_and_checksum.py`. | CLOSED |
 | D16 | 🟡 Two `is_market_open` (`exchange_constants` no-holidays/zoneinfo vs `market_hours` holidays/pytz) | Divergent on holidays; two tz libs (P1-M10, P0-F7) | Consolidate. DECIDE |
 | D17 | ✅ FIXED 2026-07-26 (M4): `pnl_calculator` class docstring corrected — reconcile is log-only+avg-repair, no Zerodha overwrite; RAW P&L via multiplier | CLOSED |
 | D18 | ✅ RESOLVED 2026-07-26 (with R1): Procfile → `--pool=prefork`, dropped `--concurrency=100` → `celery_app.worker_concurrency=4` is now the single source | CLOSED |
 | D19 | 🟠 `guardrail_tasks` runs every 60s (consumed `alerts` queue) though feature archived | Compute waste for killed feature (P0-F9 confirm) | DECIDE retire |
+
+## Zero-caller scan — 2026-08-04 (mechanical, NOT yet triaged)
+
+Ran an AST scan over `backend/app` (excluding `_archive`), counting every textual
+reference to each function/method across `backend/` and `src/`. Framework entrypoints
+(FastAPI routes, Celery tasks, fixtures, properties, validators) excluded. **36 hits.**
+Two were verified and actioned (D15, D22). **The remaining 34 are UNTRIAGED — do not
+bulk-remove them.** Three known trap categories:
+
+- **Parked feature code, not dead.** `live_position_engine.merge_live_alert_on_close`
+  is part of `LivePositionEngine`, which `docs/PENDING.md` records as done/applied/
+  tested and deliberately wired to nothing pending Zerodha approval + Gate 3.
+- **Comment mentions inflate the count.** `calculate_trade_pnl_realtime` scored 3 hits
+  and was still dead — two were prose in other files' comments. The reverse also
+  happens, so the count is a starting point, not a verdict.
+- **Dynamic dispatch / re-export.** Anything reached via `getattr`, a registry, or an
+  `__init__.py` re-export will read as zero-caller and is not.
+
+| Area | Candidates |
+|---|---|
+| `core/market_hours.py` | `is_high_risk_window`, `get_trading_session`, `get_allowed_trading_hours`, `classify_segment_from_symbol` |
+| `core/logging_config.py` | `ContextLogger.clear_context`, `MetricsCollector.record_api_call`, `MetricsCollector.record_error` — plausibly downstream of D4 (`setup_logging` never called) |
+| `core/celery_app.py` | `_dispose_async_engine_on_fork`, `_setup_worker_logging` — **check for signal registration before touching** |
+| `services/instrument_service.py` | `get_instrument_by_token`, `get_option_chain`, `get_futures`, `cleanup_expired` |
+| `services/email_service.py` | `format_eod_email`, `format_morning_email` — vs `retention_service._format_eod_report` / `_format_morning_brief`, also zero-caller. Two pairs of formatters, all four unreferenced: likely one real duplication |
+| `api/websocket.py` | `notify_trade_update`, `notify_risk_alert` |
+| `services/zerodha_service.py` | `get_order_trades` |
+| Others | `redis_pool.get_sync_redis_optional`, `ai_service.generate_trading_persona`, `behavioral_baseline_service.get_current_baseline`, `broker_interface.BrokerFactory.get_supported_brokers`, `cooldown_service.end_cooldown`, `detector_registry.spec_for`, `gtt_service.get_discipline_summary`, `notification_rate_limiter.set_user_config`, `order_analytics_service.get_daily_order_summary`, `portfolio_concentration_service.analyse_and_alert`, `price_stream_service.AsyncKiteTicker.stop_async`, `price_stream_service.SharedPriceStream._on_ticker_noreconnect`, `retention_service._format_eod_report`, `retention_service._format_morning_brief`, `token_manager.get_token_expiry_estimate`, `trade_sync_service.fetch_orders_from_zerodha` |
+
+Reproduce: the scan script is throwaway; re-derive with an AST walk + identifier
+Counter rather than trusting this list once the code has moved on.
 
 ## Prior-audit items (carried forward from CODEBASE_AUDIT.md — re-verify during phases)
 | # | Item | Where verified |

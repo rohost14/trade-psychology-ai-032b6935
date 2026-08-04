@@ -38,7 +38,7 @@ from app.models.completed_trade import CompletedTrade
 from app.models.completed_trade_feature import CompletedTradeFeature
 from app.models.incomplete_position import IncompletePosition
 from app.core.market_hours import market_minutes
-from app.services.mcx_contract_specs import get_lot_multiplier, get_lot_multiplier_or_none
+from app.services.mcx_contract_specs import get_lot_multiplier_or_none
 from app.services.instrument_parser import is_expiry_day as _instrument_is_expiry_day
 from app.services.position_ledger_service import (
     _compute_fill_effect,
@@ -766,101 +766,12 @@ class PnLCalculator:
             pnl_per_unit=round(pnl_per_unit, 4),
         )
 
-    # ------------------------------------------------------------------
-    # REALTIME P&L — for webhook single-trade calculation
-    # ------------------------------------------------------------------
-
-    async def calculate_trade_pnl_realtime(
-        self,
-        trade: Trade,
-        db: AsyncSession
-    ) -> Optional[Decimal]:
-        """
-        Calculate P&L for a single trade in real-time (webhook flow).
-        Replays prior trades to build opening queue, then matches.
-
-        Does NOT create CompletedTrades — that happens in batch FIFO.
-        """
-        trade_qty = trade.filled_quantity or trade.quantity or 0
-        trade_price = float(trade.average_price or trade.price or 0)
-        lot_multiplier = Decimal(str(get_lot_multiplier(
-            trade.exchange or "", trade.tradingsymbol or ""
-        )))
-
-        if trade.transaction_type == "SELL":
-            opposite_side = "BUY"
-        else:
-            opposite_side = "SELL"
-
-        # Find all completed trades for this symbol before this trade
-        result = await db.execute(
-            select(Trade).where(
-                and_(
-                    Trade.broker_account_id == trade.broker_account_id,
-                    Trade.tradingsymbol == trade.tradingsymbol,
-                    Trade.exchange == trade.exchange,
-                    Trade.status == "COMPLETE",
-                    Trade.order_timestamp < trade.order_timestamp
-                )
-            ).order_by(Trade.order_timestamp.asc())
-        )
-        prior_trades = result.scalars().all()
-
-        if not prior_trades:
-            return None  # First trade for this symbol, must be opening
-
-        # Replay prior trades to find the current open position
-        opening_queue: List[Dict] = []
-        for pt in prior_trades:
-            pt_qty = pt.filled_quantity or pt.quantity or 0
-            pt_price = float(pt.average_price or pt.price or 0)
-            pt_side = pt.transaction_type
-
-            if pt_qty <= 0:
-                continue
-
-            if not opening_queue or pt_side == opening_queue[0]["side"]:
-                opening_queue.append({
-                    "remaining_qty": pt_qty, "price": pt_price, "side": pt_side
-                })
-            else:
-                remaining = pt_qty
-                while remaining > 0 and opening_queue:
-                    match_qty = min(opening_queue[0]["remaining_qty"], remaining)
-                    opening_queue[0]["remaining_qty"] -= match_qty
-                    remaining -= match_qty
-                    if opening_queue[0]["remaining_qty"] <= 0:
-                        opening_queue.pop(0)
-                if remaining > 0:
-                    opening_queue.append({
-                        "remaining_qty": remaining, "price": pt_price, "side": pt_side
-                    })
-
-        # Check if the current trade is closing (opposite to queue head)
-        if not opening_queue or trade.transaction_type == opening_queue[0]["side"]:
-            return None  # Opening trade, no P&L
-
-        # Closing trade — match against the opening queue
-        total_pnl = Decimal("0")
-        remaining_close_qty = trade_qty
-
-        while remaining_close_qty > 0 and opening_queue:
-            opening = opening_queue[0]
-            match_qty = min(opening["remaining_qty"], remaining_close_qty)
-
-            if opening["side"] == "BUY":
-                match_pnl = Decimal(str((trade_price - opening["price"]) * match_qty)) * lot_multiplier
-            else:
-                match_pnl = Decimal(str((opening["price"] - trade_price) * match_qty)) * lot_multiplier
-
-            total_pnl += match_pnl
-            opening["remaining_qty"] -= match_qty
-            remaining_close_qty -= match_qty
-
-            if opening["remaining_qty"] <= 0:
-                opening_queue.pop(0)
-
-        return total_pnl if (trade_qty - remaining_close_qty) > 0 else None
+    # calculate_trade_pnl_realtime removed 2026-08-04 - the per-webhook P&L path,
+    # superseded by PositionLedger at the Phase 3 cutover and left behind, so this
+    # file carried two FIFO matchers. Zero callers. It also still used the retired
+    # oldest-lot (FIFO) cost basis, and replayed every prior trade for the symbol on
+    # each fill - the exact cost the append-only ledger exists to avoid.
+    # Verbatim copy: services/_archive/dead_pnl_and_checksum.py
 
     # ------------------------------------------------------------------
     # UNREALIZED P&L — for open positions

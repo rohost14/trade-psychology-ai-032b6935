@@ -590,20 +590,11 @@ class ZerodhaClient(BrokerInterface):
             # Network error etc. — don't assume token is invalid
             return True
 
-    def validate_postback_checksum(self, payload: Dict, checksum: str) -> bool:
-        """
-        Validate Kite postback checksum for webhook security.
-
-        Kite sends: SHA-256(order_id + order_timestamp + api_secret)
-        """
-        order_id = payload.get("order_id", "")
-        timestamp = payload.get("order_timestamp", "")
-
-        expected = hashlib.sha256(
-            f"{order_id}{timestamp}{self.api_secret}".encode()
-        ).hexdigest()
-
-        return expected == checksum
+    # validate_postback_checksum removed 2026-08-04 — a third, unused copy of the
+    # postback verification. The live webhook uses verify_zerodha_checksum /
+    # verify_zerodha_checksum_header in api/webhooks.py, both of which use
+    # hmac.compare_digest; this one used a plain ==.
+    # Verbatim copy: services/_archive/dead_pnl_and_checksum.py
 
 
 # Singleton instance — used directly by existing routes (backward-compatible).
