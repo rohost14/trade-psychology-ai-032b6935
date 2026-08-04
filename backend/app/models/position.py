@@ -25,6 +25,11 @@ class Position(Base):
     average_entry_price = Column(Numeric(15, 4))
     average_exit_price = Column(Numeric(15, 4))
 
+    # Where average_entry_price came from: 'ledger' = cost of the current open round,
+    # derived from PositionLedger; 'broker' = Kite's day-cumulative average, which
+    # still includes fills from rounds that already closed. See migration 077.
+    entry_price_source = Column(String(10))
+
     # Kite-specific fields
     instrument_token = Column(BigInteger, nullable=True)
     overnight_quantity = Column(Integer, default=0)

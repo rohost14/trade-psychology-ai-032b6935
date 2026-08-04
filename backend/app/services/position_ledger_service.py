@@ -26,10 +26,10 @@ Real-time path (Phase 3 cutover):
 import logging
 from datetime import datetime
 from decimal import Decimal, ROUND_HALF_UP
-from typing import Optional, Tuple, List, TYPE_CHECKING
+from typing import Optional, Tuple, List, Dict, TYPE_CHECKING
 from uuid import UUID
 
-from sqlalchemy import select, and_, update
+from sqlalchemy import select, and_, text, update
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -81,6 +81,38 @@ class FillData:
         self.occurred_at = occurred_at
         self.idempotency_key = idempotency_key
         self.session_id = session_id
+
+
+class LedgerPositionState:
+    """
+    Snapshot of one position key as the ledger currently sees it.
+
+    Returned by get_position_states_bulk. `avg_entry_price` is the cost of the
+    CURRENT open round only — unlike the broker's day-cumulative average, which
+    still carries fills from rounds that have already closed.
+    """
+    __slots__ = (
+        "tradingsymbol", "exchange", "product",
+        "qty", "avg_entry_price", "round_started_at", "last_entry_type",
+    )
+
+    def __init__(
+        self,
+        tradingsymbol: str,
+        exchange: Optional[str],
+        product: Optional[str],
+        qty: int,
+        avg_entry_price: Optional[Decimal],
+        round_started_at: Optional[datetime],
+        last_entry_type: Optional[str],
+    ):
+        self.tradingsymbol = tradingsymbol
+        self.exchange = exchange
+        self.product = product
+        self.qty = qty
+        self.avg_entry_price = avg_entry_price
+        self.round_started_at = round_started_at
+        self.last_entry_type = last_entry_type
 
 
 class PositionLedgerService:
@@ -428,6 +460,93 @@ class PositionLedgerService:
         )
         last_entry = result.scalar_one_or_none()
         return last_entry.position_qty_after if last_entry else 0
+
+    @staticmethod
+    async def get_position_states_bulk(
+        broker_account_id: UUID,
+        db: AsyncSession,
+    ) -> Dict[Tuple[str, Optional[str], Optional[str]], "LedgerPositionState"]:
+        """
+        Return the current ledger state for EVERY position key of one account,
+        in a single query, keyed by (tradingsymbol, exchange, product).
+
+        Why this exists: `positions.average_entry_price` is a mirror of Kite's
+        `average_price`, which is the day-CUMULATIVE buy average — it still includes
+        fills belonging to rounds that already closed. Buy 1 @9.00, sell 1 @8.85,
+        buy 3 @9.41 leaves Kite reporting 9.3075 for a position whose real cost is
+        9.41. The ledger already models this correctly (a CLOSE resets the average),
+        so trade_sync_service overwrites the broker figure from here.
+
+        Per key this returns the latest entry's net qty and average, plus the start
+        time of the CURRENT round — the round boundary is what makes the number
+        different from the broker's, and it also fixes hold duration on a position
+        that closed and reopened in the same session.
+
+        Raw SQL because it needs a window function: `round_idx` counts the CLOSE/FLIP
+        entries strictly BEFORE each row, which numbers the flat-to-flat rounds. A
+        CLOSE therefore belongs to the round it terminates and the next fill starts a
+        new one — the same segmentation `_build_round_ct_fields` applies.
+        """
+        sql = text("""
+            WITH marked AS (
+                SELECT
+                    tradingsymbol, exchange, product, entry_type,
+                    position_qty_after, avg_entry_price_after, occurred_at, created_at,
+                    COALESCE(SUM(CASE WHEN entry_type IN ('CLOSE','FLIP') THEN 1 ELSE 0 END) OVER (
+                        PARTITION BY tradingsymbol, exchange, product
+                        ORDER BY occurred_at, created_at
+                        ROWS BETWEEN UNBOUNDED PRECEDING AND 1 PRECEDING
+                    ), 0) AS round_idx
+                FROM position_ledger
+                WHERE broker_account_id = :account_id
+            ),
+            latest AS (
+                SELECT DISTINCT ON (tradingsymbol, exchange, product)
+                    tradingsymbol, exchange, product, entry_type,
+                    position_qty_after, avg_entry_price_after, occurred_at, round_idx
+                FROM marked
+                ORDER BY tradingsymbol, exchange, product, occurred_at DESC, created_at DESC
+            ),
+            round_start AS (
+                SELECT tradingsymbol, exchange, product, round_idx,
+                       MIN(occurred_at) AS started_at
+                FROM marked
+                GROUP BY tradingsymbol, exchange, product, round_idx
+            )
+            SELECT l.tradingsymbol, l.exchange, l.product, l.entry_type,
+                   l.position_qty_after, l.avg_entry_price_after,
+                   l.occurred_at AS last_occurred_at,
+                   rs.started_at  AS round_started_at
+            FROM latest l
+            JOIN round_start rs
+              ON  rs.tradingsymbol = l.tradingsymbol
+              AND rs.exchange IS NOT DISTINCT FROM l.exchange
+              AND rs.product  IS NOT DISTINCT FROM l.product
+              AND rs.round_idx = l.round_idx
+        """)
+
+        result = await db.execute(sql, {"account_id": str(broker_account_id)})
+
+        states: Dict[Tuple[str, Optional[str], Optional[str]], LedgerPositionState] = {}
+        for row in result.mappings():
+            round_started_at = row["round_started_at"]
+            # A FLIP closes the previous round AND opens the current one, so it is
+            # grouped with the round it terminated. When the newest entry IS the flip,
+            # the current round began at the flip itself, not at the older round's open.
+            if row["entry_type"] == "FLIP":
+                round_started_at = row["last_occurred_at"]
+
+            avg = row["avg_entry_price_after"]
+            states[(row["tradingsymbol"], row["exchange"], row["product"])] = LedgerPositionState(
+                tradingsymbol=row["tradingsymbol"],
+                exchange=row["exchange"],
+                product=row["product"],
+                qty=int(row["position_qty_after"] or 0),
+                avg_entry_price=Decimal(str(avg)) if avg is not None else None,
+                round_started_at=round_started_at,
+                last_entry_type=row["entry_type"],
+            )
+        return states
 
     # ------------------------------------------------------------------
     # Read: realized P&L for a time range

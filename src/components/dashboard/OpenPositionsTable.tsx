@@ -76,6 +76,16 @@ function PriceCell({ symbol, staticPrice, livePrice }: {
   );
 }
 
+// Kite's positions screen shows a day-cumulative buy average: after a round-trip
+// and a re-entry in the same contract it still blends the lots you already closed.
+// We show the cost of what you actually hold, so the two numbers differ on purpose
+// and the difference needs saying out loud rather than looking like a bug.
+function entryTooltip(source?: string | null) {
+  return source === 'ledger'
+    ? 'What the lots you hold right now cost you. Kite blends every buy of the day, including lots you have already closed, so its figure can differ.'
+    : 'Average entry price as reported by your broker.';
+}
+
 // Symbol capped, spacer takes the slack, figures cluster right. See
 // ClosedPositionsCard for the reasoning.
 const COLS = 'grid-cols-[minmax(150px,320px)_1fr_64px_92px_92px_78px_108px_40px]';
@@ -195,7 +205,12 @@ export default function OpenPositionsTable({
                     </div>
                     <span aria-hidden />
                     <span className="text-right text-sm font-tabular text-muted-foreground">{formatNumber(Math.abs(qty))}</span>
-                    <span className="text-right text-sm font-tabular text-muted-foreground">{formatPrice(pos.average_entry_price)}</span>
+                    <span
+                      className="text-right text-sm font-tabular text-muted-foreground cursor-help"
+                      title={entryTooltip(pos.entry_price_source)}
+                    >
+                      {formatPrice(pos.average_entry_price)}
+                    </span>
                     <span className="text-right text-sm font-tabular text-foreground">
                       <PriceCell symbol={pos.tradingsymbol} staticPrice={pos.last_price || pos.average_entry_price} livePrice={pos.last_price || undefined} />
                     </span>
@@ -228,7 +243,13 @@ export default function OpenPositionsTable({
                       </div>
                     </div>
                     <div className="flex items-center justify-between mt-2 text-[11px] text-muted-foreground font-tabular">
-                      <span>{formatNumber(Math.abs(qty))} qty · Entry {formatPrice(pos.average_entry_price)} · LTP {formatPrice(pos.last_price || pos.average_entry_price)}</span>
+                      <span>
+                        {formatNumber(Math.abs(qty))} qty ·{' '}
+                        <span title={entryTooltip(pos.entry_price_source)}>
+                          Entry {formatPrice(pos.average_entry_price)}
+                        </span>{' '}
+                        · LTP {formatPrice(pos.last_price || pos.average_entry_price)}
+                      </span>
                       <span className={cn('font-medium', chgPct >= 0 ? 'text-profit' : 'text-loss')}>{chgPct >= 0 ? '+' : ''}{chgPct.toFixed(2)}%</span>
                     </div>
                     <p className="text-[10.5px] text-primary mt-2 flex items-center gap-1">

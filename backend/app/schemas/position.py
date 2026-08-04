@@ -11,6 +11,9 @@ class PositionBase(BaseModel):
     total_quantity: Optional[int] = None
     average_entry_price: Optional[Decimal] = None
     average_exit_price: Optional[Decimal] = None
+    # 'ledger' = cost of the currently open round; 'broker' = Kite's day-cumulative
+    # average. Drives the Entry-column tooltip on the dashboard.
+    entry_price_source: Optional[str] = None
 
     # Kite-specific fields
     instrument_token: Optional[int] = None

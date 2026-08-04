@@ -13,6 +13,12 @@ export interface Position {
   total_quantity: number;
   average_entry_price: number;
   average_exit_price: number | null;
+  /**
+   * Where average_entry_price came from. 'ledger' = cost of the currently open
+   * round; 'broker' = Kite's day-cumulative average, which still includes fills
+   * from rounds that already closed. Drives the Entry-column tooltip.
+   */
+  entry_price_source?: 'ledger' | 'broker' | null;
   realized_pnl: number;
   unrealized_pnl: number;
   // Backend returns `value`; frontend maps `last_price * qty` to `current_value` at fetch boundary

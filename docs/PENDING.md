@@ -1,7 +1,22 @@
 # PENDING — single source of truth
 
-Updated 2026-07-29. Branch `dashboard-production-readiness`, CI green, working tree clean.
+Updated 2026-08-04. Branch `dashboard-production-readiness`, CI green, working tree clean.
 **Nothing is code-blocking.** Everything below is your action or Zerodha/business.
+
+---
+
+## 🔴 Apply this migration — the entry-price fix is inert without it
+
+**`backend/migrations/077_position_entry_price_source.sql`** — one additive nullable
+column (`positions.entry_price_source`). Until it is applied, `sync_positions` will fail
+to write positions at all (the model now selects the column), so this is not optional.
+
+Why it exists: `positions.average_entry_price` mirrored Kite's `average_price`, which is
+the day-CUMULATIVE buy average and still includes fills from rounds that already closed —
+buy 1 @9.00, sell 1 @8.85, buy 3 @9.41 reported 9.3075 for a position that cost 9.41.
+Unrealized P&L was wrong by `(true − blended) × open qty` for as long as the position
+stayed open, and the dashboard's day total disagreed with Kite's own. Now derived from
+PositionLedger, which resets its average on a CLOSE. (075 and 076 are already applied.)
 
 ---
 
@@ -59,6 +74,7 @@ Updated 2026-07-29. Branch `dashboard-production-readiness`, CI green, working t
 | Item | When / trigger | Notes |
 |---|---|---|
 | **Live (pre-close) alerts — wire `LivePositionEngine` to the postback** | after Zerodha #1, and after Gate 3 | Engine + migration 076 + 9 tests are **done and applied**; nothing calls it. Spec: `docs/LIVE_ALERTS_SPEC.md`. Blocked deliberately: needs `GET /orders` **and** `GET /gtt/triggers` (a GTT stop-loss is invisible to `/orders`, so skipping it would tell a trader "no stop-loss" while their stop sits there — the one false positive that destroys trust). Also unvalidated: the postback path has never been watched during a live session. |
+| **S1 — two P&L conventions for the same fills** | next time `pnl_calculator` is touched, or if a per-fill figure is ever shown to a user | **Found during the entry-price RCA (2026-08-04). Not urgent: round totals are unaffected.** `PositionLedger` realizes P&L on **weighted-average cost** (a `DECREASE` keeps `current_avg_price`, `position_ledger_service.py`), while the batch `pnl_calculator` matches strictly **FIFO** (`opening_queue`). Over a complete flat-to-flat round both produce an identical total, so `CompletedTrade.realized_pnl` — and therefore every screen — agrees today. They differ only in how P&L is *split across* intermediate partial exits: per-fill `Trade.pnl`, and `get_realized_pnl(from, to)` for a window that cuts a round in half. Example: buy 3 @9, buy 3 @10, sell 3 @11 → ledger says 4.5, FIFO says 6. **Recommended resolution: move `pnl_calculator` to weighted-average, i.e. make the ledger's convention the single one.** Kite's own `realised` on a net position is weighted-average, so that choice makes our per-fill numbers match what the trader sees in their broker — FIFO is the outlier here, and "our number differs from Kite" is the one discrepancy that costs trust. Low risk to defer: `pnl_calculator` is admin-backfill-only now, so the divergence can only surface if someone runs a historical recompute over a window that splits a round. |
 | Model-A key refactor (remove per-user key remnants) | after Zerodha #1 says yes | small code change; I do it then |
 | Ticker cluster (gap #2) | ~2500+ distinct subscribed instruments | scale tier; `PRODUCTION_MARKET_DATA_PLAN.md` §3 |
 | Redis position read-cache in front of the ledger (write-through, Postgres stays truth) | Gate-4 / only after a load test *measures* `get_position` Postgres reads as a real bottleneck | **Latency-only, not correctness.** DO NOT ship blind — it adds a stale-cache failure mode to money-critical P&L. Correct invalidation must cover **every** write path: webhook fill, sync, reconcile, and especially the **out-of-order replay** (which rewrites *past* ledger entries → a naive current-position cache goes wrong). Localized seam (`PositionLedgerService.get_position`), so deferring costs nothing — easy to add when justified + validated. |

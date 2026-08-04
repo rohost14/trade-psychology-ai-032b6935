@@ -34,6 +34,64 @@ IST = ZoneInfo("Asia/Kolkata")
 TRACKED_PRODUCTS = {"MIS", "NRML", "MTF"}
 
 
+def _as_utc(dt: Optional[datetime]) -> Optional[datetime]:
+    """Normalise to UTC-aware. Naive values are IST — Zerodha sends them that way."""
+    if dt is None:
+        return None
+    if dt.tzinfo is None:
+        return dt.replace(tzinfo=IST).astimezone(timezone.utc)
+    return dt.astimezone(timezone.utc)
+
+
+def resolve_entry_price(
+    broker_avg: Optional[float],
+    broker_qty: int,
+    ledger_state,                                   # LedgerPositionState | None
+    stored_first_entry_time: Optional[datetime],
+) -> tuple:
+    """
+    Decide the entry price to display for one open position.
+
+    Pure — no DB, no I/O — so the rules below are directly testable.
+
+    Kite's `average_price` on a net position is the day-CUMULATIVE buy average and
+    still includes fills from rounds that already closed: buy 1 @9.00, sell 1 @8.85,
+    buy 3 @9.41 reports 9.3075 for a position that actually cost 9.41. PositionLedger
+    resets its running average on CLOSE, so it holds the right number.
+
+    The ledger is only trusted when its net quantity agrees with the broker's. A
+    disagreement means we are missing fills (position carried from before the ledger
+    existed, a dropped webhook), and a confidently-wrong price is worse than the
+    broker's blended one — so we fall back AND report the mismatch.
+
+    Returns (avg_price, source, first_entry_time_or_None, qty_mismatch) where
+    first_entry_time is set only when it needs moving forward.
+    """
+    if ledger_state is None:
+        # No ledger history for this key — overnight carry from before the ledger,
+        # or the account's first sync. Expected, not a data-quality problem.
+        return broker_avg, "broker", None, False
+
+    if ledger_state.qty != broker_qty:
+        return broker_avg, "broker", None, True
+
+    if ledger_state.avg_entry_price is None:
+        return broker_avg, "broker", None, False
+
+    # A position that closed and reopened still carries the ORIGINAL entry time,
+    # because sync_positions only ever backfilled a NULL. Hold duration was then
+    # measured from a leg the trader no longer holds, which feeds holding-loser
+    # detection. Move it forward to the current round's opening fill.
+    new_first_entry_time = None
+    round_start = _as_utc(ledger_state.round_started_at)
+    if round_start is not None:
+        stored = _as_utc(stored_first_entry_time)
+        if stored is None or stored < round_start:
+            new_first_entry_time = ledger_state.round_started_at
+
+    return float(ledger_state.avg_entry_price), "ledger", new_first_entry_time, False
+
+
 async def _refresh_instruments_bg() -> None:
     """Background instrument-master refresh — runs OFF the /sync request path.
 
@@ -354,6 +412,16 @@ class TradeSyncService:
             except Exception as e:
                 logger.error(f"Ledger replay failed: {e}", exc_info=True)
                 stats["errors"].append(f"Ledger Replay: {str(e)}")
+
+            # 4a. The replay above can have added fills that step 2's entry-price pass
+            # never saw, so redo it. Idempotent — it recomputes the same values from
+            # whatever the ledger now holds.
+            try:
+                stats["entry_price_sources"] = await cls.apply_ledger_entry_prices(
+                    broker_account_id, db
+                )
+            except Exception as e:
+                logger.warning(f"[entry-price] post-replay pass failed: {e}", exc_info=True)
 
             # 4b. Backfill CompletedTrades for cross-day positions PositionLedger missed.
             # Overnight holds have entry fills from yesterday — those entries are in the
@@ -961,11 +1029,118 @@ class TradeSyncService:
                         continue
                     stats["overnight_closed"].append(pos)
 
+            # Broker snapshot is in. Now correct the entry price of every open row
+            # from the ledger — Kite's average_price blends rounds that already closed.
+            try:
+                await cls.apply_ledger_entry_prices(broker_account_id, db)
+            except Exception as e:
+                # Never fail a position sync over this: the broker figure is already
+                # written and is a usable, if blended, fallback.
+                logger.warning(f"[entry-price] ledger pass failed: {e}", exc_info=True)
+
         except Exception as e:
             logger.error(f"Error fetching positions: {e}")
             stats["errors"].append(f"Positions Fetch: {str(e)}")
 
         return stats
+
+    @classmethod
+    async def apply_ledger_entry_prices(
+        cls,
+        broker_account_id: uuid.UUID,
+        db: AsyncSession,
+    ) -> Dict[str, int]:
+        """
+        Overwrite `positions.average_entry_price` with the cost of the currently
+        open round, taken from PositionLedger, wherever the ledger can be trusted.
+
+        Runs twice per full sync on purpose:
+          - at the end of sync_positions, so every caller of it (including the
+            webhook fallback) gets corrected prices;
+          - again after replay_missed_fills_into_ledger, because that step can add
+            fills the first pass had not yet seen.
+        Both passes are idempotent — the second simply recomputes the same values.
+
+        It is deliberately NOT implemented by reordering the sync pipeline. Moving
+        the ledger replay ahead of sync_positions would leave _resolve_lot_mult
+        without the Position row it falls back to for untabulated MCX contracts.
+
+        Returns counts: {'ledger': n, 'broker': n, 'mismatch': n}.
+        """
+        from app.services.position_ledger_service import PositionLedgerService
+
+        # Position rows may have been added/updated in this transaction but not yet
+        # flushed; the SELECT below must see them.
+        await db.flush()
+
+        result = await db.execute(
+            select(Position).where(
+                Position.broker_account_id == broker_account_id,
+                Position.status == "open",
+            )
+        )
+        positions = list(result.scalars().all())
+        if not positions:
+            return {"ledger": 0, "broker": 0, "mismatch": 0}
+
+        states = await PositionLedgerService.get_position_states_bulk(broker_account_id, db)
+
+        counts = {"ledger": 0, "broker": 0, "mismatch": 0}
+        dq_events: List[Dict[str, Any]] = []
+
+        for pos in positions:
+            qty = int(pos.total_quantity or 0)
+            if qty == 0:
+                continue
+
+            state = states.get((pos.tradingsymbol, pos.exchange, pos.product))
+            broker_avg = float(pos.average_entry_price) if pos.average_entry_price is not None else None
+
+            avg, source, new_first_entry, mismatch = resolve_entry_price(
+                broker_avg, qty, state, pos.first_entry_time
+            )
+
+            if source == "ledger" and avg is not None:
+                pos.average_entry_price = avg
+            pos.entry_price_source = source
+            if new_first_entry is not None:
+                pos.first_entry_time = new_first_entry
+            counts[source] += 1
+
+            if mismatch:
+                counts["mismatch"] += 1
+                logger.warning(
+                    "[entry-price] ledger/broker quantity mismatch for %s %s/%s: "
+                    "ledger=%s broker=%s — using the broker's blended average",
+                    pos.tradingsymbol, pos.exchange, pos.product,
+                    state.qty if state else None, qty,
+                )
+                dq_events.append({
+                    "broker_account_id": broker_account_id,
+                    "kind": "ledger_broker_qty_mismatch",
+                    "tradingsymbol": pos.tradingsymbol,
+                    "exchange": pos.exchange,
+                    "details": {
+                        "ledger_qty": state.qty if state else None,
+                        "broker_qty": qty,
+                        "product": pos.product,
+                        "broker_avg_price": broker_avg,
+                        "last_entry_type": state.last_entry_type if state else None,
+                    },
+                })
+
+        await db.flush()
+
+        if dq_events:
+            # Own session, best-effort — observability must not break the sync.
+            await cls._store_data_quality_events(dq_events)
+
+        if counts["ledger"] or counts["mismatch"]:
+            logger.info(
+                "[entry-price] %d from ledger, %d from broker (%d quantity mismatches)",
+                counts["ledger"], counts["broker"], counts["mismatch"],
+            )
+        return counts
 
     @classmethod
     async def _backfill_overnight_completed_trades(
