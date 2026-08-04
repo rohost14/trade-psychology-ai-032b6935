@@ -1,69 +1,63 @@
 import { useState, useEffect, useRef } from 'react';
 import { Link } from 'react-router-dom';
-import { ArrowUpRight, CaretDown, Lightning, Eye, Prohibit, ChartLineDown, Timer, Coins } from '@phosphor-icons/react';
+import { ArrowRight, CaretDown } from '@phosphor-icons/react';
 import { cn } from '@/lib/utils';
 
 /**
  * DESIGN LAB — landing page. Route: /landing-lab
  *
- * Built from ui-ux-pro-max --design-system output for
- * "fintech trading behaviour analytics landing page india premium trust".
+ * This one does not invent a structure. It copies the Lovable TradeMentor
+ * landing page section for section, because that is what was asked for and
+ * because five attempts at synthesising one failed.
  *
- * WHAT THE TOOL RETURNED, AND WHAT IT DIAGNOSED
- *   Style      Bento Box Grid: modular cards, asymmetric grid, varied spans,
- *              negative space, hover scale 1.02, rounded-xl.
- *   Colors     Background #0F172A, primary gold #F59E0B, accent purple #8B5CF6,
- *              foreground #F8FAFC, muted #272F42, border #334155.
- *              Its own note: "Gold trust + purple tech".
- *   Effects    varied grid spans, rounded-xl, subtle shadows, hover scale,
- *              smooth transitions.
- *   AVOID      "Muted colors + Low energy".
+ * WHAT WAS READ OFF THE REFERENCE (measured, not guessed):
+ *   ground        white, with alternating tinted bands
+ *   font          Inter
+ *   hero h1       50px
+ *   section h2    34px
+ *   section order nav · hero · "EVER DONE THIS?" · how it works · what you get ·
+ *                 rules · journal-vs-alarm · pricing · FAQ · close
  *
- * That last line is the diagnosis of every previous attempt on this page. They
- * were muted and low energy by construction, because they inherited the app's
- * calm operational palette. This one does not: the landing page gets its own
- * dark slate ground, gold and purple, and a bento grid.
+ * THE MOVE I HAD MISSED: "EVER DONE THIS?" is a numbered list of six specific,
+ * uncomfortable behaviours. It makes the reader identify themselves before
+ * anything is sold, and it is the strongest section on their page. Nothing I
+ * built had an equivalent.
  *
- * FONT: the tool recommends Calistoga + Inter. The font stack is fixed by the
- * brief, so Geist display + Inter body stays. Inter already matches its body
- * recommendation.
+ * SECOND THING COPIED: every section heading is a sentence with a point of
+ * view, not a label. "A journal is a post-mortem. This is a smoke alarm." My
+ * versions used category names.
  *
- * Colours are declared locally here on purpose. The app's tokens are the
- * Operate palette; this page is Persuade and deliberately does not inherit them.
+ * Uppercase eyebrows are used per section here, which the taste skill caps.
+ * The reference uses them and the reference is the brief.
+ *
+ * Content is ours and stays truthful: no invented testimonials, no per-pattern
+ * costs nothing computes, no blocking, no prediction.
  */
 
 const EASE = 'cubic-bezier(0.32,0.72,0,1)';
 
-const C = {
-  bg: '#0F172A',
-  surface: '#161F35',
-  surfaceHi: '#1B2540',
-  border: '#334155',
-  fg: '#F8FAFC',
-  muted: '#94A3B8',
-  gold: '#F59E0B',
-  goldSoft: '#FBBF24',
-  purple: '#8B5CF6',
-  loss: '#F87171',
-  profit: '#34D399',
-};
-
-const DETECTIONS = [
-  { icon: Lightning,      pattern: 'Revenge trade',   line: 'Re-entered NIFTY CE 3× in 18 minutes after a loss.', money: '−₹14,200', tone: C.loss },
-  { icon: ChartLineDown,  pattern: 'Size escalation', line: 'BANKNIFTY 45500 PE at 100 lots, 4× your average.',   money: '−₹6,450',  tone: C.loss },
-  { icon: Timer,          pattern: 'Early exit',      line: 'Cut NIFTY CE at +₹820. It ran to +₹2,100.',          money: '+₹820',    tone: C.profit },
+const EVER_DONE: string[] = [
+  'Added to a trade that was already losing.',
+  'Took five trades to win back one loss.',
+  'Doubled the quantity right after a bad trade.',
+  'Moved the stop-loss instead of taking the stop.',
+  'Kept trading after you had already hit your limit for the day.',
+  'Felt like the next trade had to be the one that fixed it.',
 ];
 
-const REFUSALS = [
-  { icon: Prohibit, t: 'Never blocks',   d: 'No order cancelled, delayed or locked. You decide what comes next.' },
-  { icon: Eye,      t: 'Never predicts', d: 'No forecast, no probability. Only what your own record already shows.' },
-  { icon: Coins,    t: 'Never guesses',  d: 'Realized P&L of those exact trades. Reconcilable against your contract note.' },
+const HOW: [string, string][] = [
+  ['It learns how you trade', 'Your last 90 days of orders, read once. Average size, usual pace, how you behave after a stop-out. Your normal, not an average trader’s.'],
+  ['It watches the fills', 'Every order that completes is checked against that baseline, in the session, not at the end of the month.'],
+  ['It tells you what just happened', 'On screen and on WhatsApp: the behaviour, the money it has already cost you, and your record with it.'],
 ];
 
-const STEPS: [string, string][] = [
-  ['Connect Zerodha', 'One OAuth redirect, read-only. No order permission, so it cannot act on your account.'],
-  ['It learns your normal', 'Pace, size and re-entry timing come from your own history, not an average trader.'],
-  ['It tells you, that session', 'On screen and on WhatsApp: what fired, what it cost, your record with it.'],
+const GET: [string, string][] = [
+  ['Live behaviour alerts', 'Size spikes, fast re-entries, missing stops, loss streaks. Each alert carries the rupee figure that habit has already charged you.'],
+  ['Cost leaks', 'Your P&L split by behaviour instead of by scrip. The line most traders have never seen.'],
+  ['Your own record', 'Before you size up after a loss, what happened the last six times you did.'],
+  ['Your rules, enforced honestly', 'Set a limit and the app tells you when your own trading is already tighter than it.'],
+  ['A journal that fills itself', 'Every trade already logged. Add a mood in one tap, or nothing at all.'],
+  ['Session reports', 'Morning brief, end of day, weekly. On WhatsApp if you want them.'],
 ];
 
 const FAQ: [string, string][] = [
@@ -89,49 +83,35 @@ function Reveal({ children, delay = 0, className }: { children: React.ReactNode;
   return (
     <div ref={ref} style={{ transitionDelay: `${delay}ms`, transitionTimingFunction: EASE }}
       className={cn('transition-[opacity,transform] duration-700 motion-reduce:transition-none',
-        shown ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-6', className)}>
+        shown ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-5', className)}>
       {children}
     </div>
   );
 }
 
-/** Bento cell. Varied spans are set by the caller. Hover scale 1.02 per spec. */
-function Cell({ children, className, span, glow }: { children: React.ReactNode; className?: string; span?: string; glow?: string }) {
+function Eyebrow({ children }: { children: React.ReactNode }) {
+  return <span className="block text-[11px] font-semibold uppercase tracking-[0.18em] text-neutral-400">{children}</span>;
+}
+
+/** h2 at 34px, sentence with a point of view. Colour set explicitly because
+ *  index.css applies text-foreground to headings globally. */
+function H2({ children, className }: { children: React.ReactNode; className?: string }) {
   return (
-    <div
-      style={{ background: C.surface, borderColor: C.border, transitionTimingFunction: EASE }}
-      className={cn(
-        'group relative rounded-2xl border p-6 sm:p-7 overflow-hidden',
-        'transition-transform duration-300 hover:scale-[1.02] cursor-default',
-        span, className,
-      )}
-    >
-      {glow && (
-        <div aria-hidden className="pointer-events-none absolute -top-24 -right-20 w-64 h-64 rounded-full blur-3xl opacity-40 transition-opacity duration-500 group-hover:opacity-60"
-          style={{ background: glow }} />
-      )}
-      <div className="relative">{children}</div>
-    </div>
+    <h2 style={{ color: '#141618' }}
+      className={cn('font-display text-[27px] sm:text-[34px] leading-[1.12] tracking-[-0.03em] font-semibold mt-4 max-w-[24ch] text-balance', className)}>
+      {children}
+    </h2>
   );
 }
 
-function Cta({ variant = 'gold' }: { variant?: 'gold' | 'outline' }) {
-  const gold = variant === 'gold';
+function Cta({ light = false }: { light?: boolean }) {
   return (
-    <Link to="/settings" style={{
-      background: gold ? C.gold : 'transparent',
-      color: gold ? '#0F172A' : C.fg,
-      borderColor: gold ? 'transparent' : C.border,
-      transitionTimingFunction: EASE,
-      boxShadow: gold ? '0 8px 30px -8px rgba(245,158,11,0.55)' : 'none',
-    }}
-      className="group inline-flex items-center gap-3 rounded-full border pl-6 pr-1.5 h-[52px] text-[15px] font-semibold cursor-pointer transition-all duration-300 hover:scale-[1.03] active:scale-[0.98] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-offset-[#0F172A]"
-    >
-      Connect Zerodha
-      <span style={{ background: gold ? 'rgba(15,23,42,0.14)' : 'rgba(248,250,252,0.10)', transitionTimingFunction: EASE }}
-        className="grid place-items-center w-10 h-10 rounded-full transition-transform duration-300 group-hover:translate-x-1 group-hover:-translate-y-0.5">
-        <ArrowUpRight size={17} weight="bold" />
-      </span>
+    <Link to="/settings" style={{ transitionTimingFunction: EASE }}
+      className={cn('group inline-flex items-center gap-2.5 rounded-lg px-6 h-[52px] text-[15px] font-semibold cursor-pointer transition-all duration-300',
+        'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2',
+        light ? 'bg-white text-[#141618] hover:bg-neutral-100' : 'bg-[#155B56] text-white hover:bg-[#11463F]')}>
+      See it on my trades
+      <ArrowRight size={17} weight="bold" className="transition-transform duration-300 group-hover:translate-x-1" />
     </Link>
   );
 }
@@ -139,239 +119,281 @@ function Cta({ variant = 'gold' }: { variant?: 'gold' | 'outline' }) {
 function FaqRow({ q, a }: { q: string; a: string }) {
   const [open, setOpen] = useState(false);
   return (
-    <div style={{ borderColor: C.border }} className="border-b last:border-b-0">
+    <div className="border-b border-neutral-200 last:border-b-0">
       <button type="button" onClick={() => setOpen(v => !v)} aria-expanded={open}
         className="w-full flex items-start justify-between gap-6 py-5 text-left min-h-[44px] cursor-pointer">
-        <span style={{ color: C.fg }} className="text-[16.5px] leading-snug text-pretty">{q}</span>
-        <span style={{ background: C.surfaceHi, transitionTimingFunction: EASE }}
-          className={cn('grid place-items-center w-8 h-8 rounded-full shrink-0 transition-transform duration-300', open && 'rotate-180')}>
-          <CaretDown size={14} weight="bold" color={C.muted} />
-        </span>
+        <span style={{ color: '#141618' }} className="text-[16.5px] font-medium leading-snug text-pretty">{q}</span>
+        <CaretDown size={16} weight="bold"
+          style={{ transitionTimingFunction: EASE }}
+          className={cn('mt-1 shrink-0 text-neutral-400 transition-transform duration-300', open && 'rotate-180')} />
       </button>
-      {open && <p style={{ color: C.muted }} className="text-[15px] leading-relaxed pb-5 max-w-[62ch] text-pretty">{a}</p>}
+      {open && <p className="text-[15px] text-neutral-600 leading-relaxed pb-5 max-w-[64ch] text-pretty">{a}</p>}
     </div>
   );
 }
 
 export default function LandingLab() {
   return (
-    <div style={{ background: C.bg, color: C.fg }} className="min-h-[100dvh] antialiased overflow-x-hidden">
+    <div style={{ background: '#FFFFFF', color: '#141618' }} className="min-h-[100dvh] antialiased overflow-x-hidden">
 
-      {/* Nav */}
-      <header className="sticky top-0 z-40 pt-5 px-4 pointer-events-none">
-        <div className="mx-auto w-max pointer-events-auto">
-          <div style={{ background: 'rgba(22,31,53,0.72)', borderColor: C.border }}
-            className="flex items-center gap-1 rounded-full border backdrop-blur-xl pl-5 pr-1.5 py-1.5">
-            <span className="text-[14px] font-semibold tracking-[-0.01em]">TradeMentor</span>
-            <span style={{ background: C.border }} className="hidden sm:block w-px h-4 mx-3" />
-            <a href="#how" style={{ color: C.muted }} className="hidden sm:block text-[13px] hover:text-white transition-colors px-2.5 cursor-pointer">How it works</a>
-            <a href="#price" style={{ color: C.muted }} className="hidden sm:block text-[13px] hover:text-white transition-colors px-2.5 cursor-pointer">Price</a>
-            <Link to="/settings" style={{ background: C.gold, color: '#0F172A' }}
-              className="ml-2 rounded-full px-4 py-2 text-[13px] font-semibold cursor-pointer transition-transform duration-300 hover:scale-[1.04]">
-              Sign in
+      {/* NAV */}
+      <header className="border-b border-neutral-200">
+        <div className="max-w-[1140px] mx-auto px-5 sm:px-8 h-16 flex items-center gap-8">
+          <span className="text-[15px] font-bold tracking-[-0.01em]">TradeMentor</span>
+          <nav className="hidden md:flex items-center gap-7">
+            {[['#ever', 'What it catches'], ['#how', 'How it works'], ['#get', 'Features'], ['#price', 'Pricing']].map(([h, l]) => (
+              <a key={l} href={h} className="text-[13.5px] text-neutral-600 hover:text-[#141618] transition-colors cursor-pointer">{l}</a>
+            ))}
+          </nav>
+          <div className="ml-auto flex items-center gap-4">
+            <Link to="/settings" className="hidden sm:block text-[13.5px] font-medium text-neutral-600 hover:text-[#141618] transition-colors cursor-pointer">Log in</Link>
+            <Link to="/settings" className="rounded-lg bg-[#155B56] text-white px-4 py-2.5 text-[13.5px] font-semibold hover:bg-[#11463F] transition-colors cursor-pointer">
+              See it on my trades
             </Link>
           </div>
         </div>
       </header>
 
-      <main className="max-w-[1200px] mx-auto px-5 sm:px-8">
-
-        {/* HERO */}
-        <section className="relative pt-16 sm:pt-24 pb-14">
-          <div aria-hidden className="pointer-events-none absolute inset-0 overflow-hidden">
-            <div className="absolute -top-40 left-1/4 w-[36rem] h-[36rem] rounded-full blur-3xl opacity-25" style={{ background: C.gold }} />
-            <div className="absolute -top-24 right-0 w-[30rem] h-[30rem] rounded-full blur-3xl opacity-20" style={{ background: C.purple }} />
+      {/* 1. HERO — 50px claim, product surface on the right */}
+      <section className="max-w-[1140px] mx-auto px-5 sm:px-8 py-16 sm:py-24 grid grid-cols-1 lg:grid-cols-[minmax(0,1fr)_minmax(0,1.05fr)] gap-12 lg:gap-14 items-center">
+        <Reveal>
+          <span className="inline-flex items-center gap-2 rounded-full border border-neutral-200 px-3 py-1 text-[12px] font-medium text-neutral-600">
+            <span className="w-1.5 h-1.5 rounded-full bg-[#155B56]" />
+            For Indian F&amp;O and intraday traders
+          </span>
+          <h1 style={{ color: '#141618' }}
+            className="font-display text-[38px] sm:text-[50px] leading-[1.04] tracking-[-0.035em] font-bold mt-6 text-balance">
+            Most losing days are made of
+            <span className="text-[#155B56]"> 3 bad trades.</span>
+          </h1>
+          <p className="text-[17px] leading-[1.6] text-neutral-600 mt-6 max-w-[46ch] text-pretty">
+            TradeMentor watches your live orders and tells you the moment you start
+            repeating the habit that usually wrecks your day, while the day can
+            still be saved.
+          </p>
+          <div className="flex flex-wrap items-center gap-4 mt-8">
+            <Cta />
+            <a href="#ever" className="text-[14px] font-medium text-neutral-600 hover:text-[#141618] transition-colors cursor-pointer">
+              First, show me what it catches
+            </a>
           </div>
+          <p className="text-[12.5px] text-neutral-500 mt-5">Read-only order data. We can never place or cancel a trade.</p>
+        </Reveal>
 
-          <Reveal className="relative text-center">
-            <span style={{ background: C.surface, borderColor: C.border, color: C.muted }}
-              className="inline-flex items-center gap-2 rounded-full border px-4 py-1.5 text-[12px] font-medium">
-              <span style={{ background: C.gold }} className="w-1.5 h-1.5 rounded-full" />
-              For Indian F&amp;O and intraday traders
-            </span>
-
-            <h1 style={{ color: C.fg }} className="font-display text-[46px] sm:text-[72px] leading-[0.97] tracking-[-0.045em] font-bold mt-7 text-balance max-w-[16ch] mx-auto">
-              Your worst days are
-              <span style={{ color: C.gold }}> not bad luck.</span>
-            </h1>
-
-            <p style={{ color: C.muted }} className="text-[18px] leading-[1.6] mt-6 max-w-[54ch] mx-auto text-pretty">
-              They have a shape. A loss, a faster re-entry, a bigger position.
-              TradeMentor reads that sequence back to you while the session is
-              still running.
-            </p>
-
-            <div className="flex flex-wrap items-center justify-center gap-4 mt-9">
-              <Cta />
-              <span style={{ color: C.muted }} className="text-[13px]">Read-only. It cannot place a trade.</span>
+        <Reveal delay={120}>
+          <div className="rounded-2xl border border-neutral-200 bg-white shadow-[0_2px_8px_-2px_rgba(20,22,24,0.06),0_28px_60px_-28px_rgba(20,22,24,0.22)] overflow-hidden">
+            <div className="px-5 py-3 border-b border-neutral-200 bg-neutral-50 flex items-center gap-2">
+              <span className="w-2.5 h-2.5 rounded-full bg-neutral-300" />
+              <span className="w-2.5 h-2.5 rounded-full bg-neutral-300" />
+              <span className="w-2.5 h-2.5 rounded-full bg-neutral-300" />
+              <span className="ml-2 text-[11px] text-neutral-500">TRADEMENTOR.APP / DASHBOARD</span>
             </div>
-          </Reveal>
-        </section>
-
-        {/* BENTO: asymmetric spans, the core of the recommended style. */}
-        <section className="pb-24 sm:pb-32 grid grid-cols-1 md:grid-cols-6 gap-4 auto-rows-[minmax(0,auto)]">
-
-          {/* Big cell: the live surface. */}
-          <Reveal className="md:col-span-4">
-            <Cell span="h-full" glow={C.gold}>
-              <div className="flex items-baseline justify-between">
-                <span style={{ color: C.muted }} className="text-[10px] uppercase tracking-[0.2em]">Day P&amp;L</span>
-                <span style={{ color: C.muted }} className="inline-flex items-center gap-1.5 text-[11px]">
-                  <span style={{ background: C.profit }} className="w-1.5 h-1.5 rounded-full animate-pulse" /> live
-                </span>
-              </div>
-              <div style={{ color: C.loss }} className="font-display text-[52px] leading-none font-bold tracking-[-0.045em] font-tabular mt-3">
-                −₹8,455
-              </div>
-              <p style={{ color: C.muted }} className="text-[13px] font-tabular mt-3">
-                Booked <span style={{ color: C.loss }}>−₹8,895</span> · Unrealized <span style={{ color: C.profit }}>+₹440</span>
-              </p>
-
-              <div className="mt-6 space-y-2.5">
-                {DETECTIONS.map(d => (
-                  <div key={d.pattern} style={{ background: C.surfaceHi, borderColor: C.border }}
-                    className="rounded-xl border px-4 py-3.5 flex items-start gap-3.5">
-                    <span style={{ background: `${d.tone}1F` }} className="grid place-items-center w-9 h-9 rounded-lg shrink-0">
-                      <d.icon size={17} weight="bold" color={d.tone} />
-                    </span>
-                    <div className="min-w-0 flex-1">
-                      <div className="flex items-baseline justify-between gap-3">
-                        <span style={{ color: C.muted }} className="text-[10px] font-semibold uppercase tracking-[0.16em]">{d.pattern}</span>
-                        <span style={{ color: d.tone }} className="text-[14px] font-bold font-tabular shrink-0">{d.money}</span>
-                      </div>
-                      <p className="text-[13.5px] leading-snug mt-1 text-pretty">{d.line}</p>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </Cell>
-          </Reveal>
-
-          {/* Tall stack: two smaller cells. */}
-          <Reveal delay={80} className="md:col-span-2 flex flex-col gap-4">
-            <Cell glow={C.purple} className="flex-1">
-              <span style={{ color: C.purple }} className="font-display text-[44px] leading-none font-bold tracking-[-0.04em]">28</span>
-              <p className="text-[15px] font-semibold mt-3">behaviours detected</p>
-              <p style={{ color: C.muted }} className="text-[13.5px] leading-relaxed mt-1.5">
-                Each one calibrated to your own history, not to an average trader.
-              </p>
-            </Cell>
-            <Cell className="flex-1">
-              <span style={{ color: C.goldSoft }} className="font-display text-[28px] leading-none font-bold tracking-[-0.03em]">Read-only</span>
-              <p className="text-[15px] font-semibold mt-3">it cannot place a trade</p>
-              <p style={{ color: C.muted }} className="text-[13.5px] leading-relaxed mt-1.5">
-                The Zerodha connection has no order permission at all.
-              </p>
-            </Cell>
-          </Reveal>
-
-          {/* Wide statement cell. */}
-          <Reveal delay={140} className="md:col-span-6">
-            <Cell glow={C.gold}>
-              <p className="font-display text-[24px] sm:text-[34px] leading-[1.2] tracking-[-0.035em] font-bold max-w-[30ch] text-balance">
-                Every figure is the realized P&amp;L of the exact trades that fired the alert.
-                <span style={{ color: C.muted }}> Not a guess at what a habit costs you.</span>
-              </p>
-            </Cell>
-          </Reveal>
-
-          {/* Three refusal cells. */}
-          {REFUSALS.map((r, i) => (
-            <Reveal key={r.t} delay={180 + i * 70} className="md:col-span-2">
-              <Cell span="h-full" glow={i === 1 ? C.purple : undefined}>
-                <span style={{ background: `${C.gold}1A` }} className="grid place-items-center w-11 h-11 rounded-xl">
-                  <r.icon size={20} weight="bold" color={C.gold} />
-                </span>
-                <p className="font-display text-[19px] font-bold tracking-[-0.02em] mt-5">{r.t}</p>
-                <p style={{ color: C.muted }} className="text-[14px] leading-relaxed mt-2 text-pretty">{r.d}</p>
-              </Cell>
-            </Reveal>
-          ))}
-        </section>
-
-        {/* STEPS */}
-        <section id="how" className="py-20 sm:py-28 scroll-mt-24">
-          <Reveal>
-            <h2 style={{ color: C.fg }} className="font-display text-[32px] sm:text-[44px] leading-[1.05] tracking-[-0.04em] font-bold max-w-[16ch] text-balance">
-              Ninety seconds to
-              <span style={{ color: C.gold }}> set up.</span>
-            </h2>
-          </Reveal>
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mt-12">
-            {STEPS.map(([t, d], i) => (
-              <Reveal key={t} delay={i * 80}>
-                <Cell span="h-full">
-                  <span style={{ background: `${C.purple}1F`, color: C.purple }}
-                    className="grid place-items-center w-11 h-11 rounded-xl font-display text-[16px] font-bold font-tabular">
-                    {i + 1}
+            <div className="p-5">
+              <div className="rounded-xl border border-neutral-200 p-5">
+                <div className="flex items-center justify-between">
+                  <span className="text-[10.5px] font-semibold uppercase tracking-[0.16em] text-neutral-500">Intraday P&amp;L</span>
+                  <span className="inline-flex items-center gap-1.5 text-[11px] text-neutral-500">
+                    <span className="w-1.5 h-1.5 rounded-full bg-[#2E7D32]" /> LIVE
                   </span>
-                  <p className="font-display text-[19px] font-bold tracking-[-0.02em] mt-5">{t}</p>
-                  <p style={{ color: C.muted }} className="text-[14px] leading-relaxed mt-2 text-pretty">{d}</p>
-                </Cell>
+                </div>
+                <div className="font-display text-[34px] leading-none font-bold tracking-[-0.035em] font-tabular text-[#C0392B] mt-3">−₹3,247</div>
+                <p className="text-[12.5px] text-neutral-500 mt-2">today · 3 open</p>
+                <div className="grid grid-cols-3 gap-3 mt-5">
+                  {[['TILT', '62'], ['PACE', '1.8×'], ['BUDGET', '₹6.8k']].map(([l, v]) => (
+                    <div key={l}>
+                      <div className="flex items-baseline justify-between">
+                        <span className="text-[9.5px] font-semibold uppercase tracking-[0.14em] text-neutral-500">{l}</span>
+                        <span className="text-[12.5px] font-bold font-tabular">{v}</span>
+                      </div>
+                      <div className="h-1 rounded-full bg-neutral-200 mt-1.5 overflow-hidden">
+                        <div className="h-full rounded-full bg-neutral-400" style={{ width: l === 'TILT' ? '62%' : l === 'PACE' ? '80%' : '45%' }} />
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              <div className="rounded-xl border border-[#C0392B]/20 bg-[#C0392B]/[0.04] p-5 mt-4">
+                <div className="flex items-center gap-2">
+                  <span className="text-[14px] font-bold text-[#C0392B]">Overtrading pace</span>
+                  <span className="rounded bg-[#C0392B]/10 px-1.5 py-0.5 text-[9.5px] font-bold uppercase tracking-wider text-[#C0392B]">Pace</span>
+                </div>
+                <p className="text-[13px] text-neutral-700 mt-2">7 trades in 22 min · 2.1× your normal pace.</p>
+                <p className="text-[13px] text-[#C0392B] mt-1.5">This pattern has cost you −₹9,200 across 8 trades.</p>
+              </div>
+
+              <p className="text-[10.5px] font-semibold uppercase tracking-[0.14em] text-neutral-500 mt-5">
+                Observation only · you decide the next click
+              </p>
+            </div>
+          </div>
+        </Reveal>
+      </section>
+
+      {/* 2. EVER DONE THIS — the self-recognition list */}
+      <section id="ever" className="bg-neutral-50 border-y border-neutral-200 scroll-mt-16">
+        <div className="max-w-[1140px] mx-auto px-5 sm:px-8 py-20 sm:py-28">
+          <Reveal><Eyebrow>Ever done this?</Eyebrow></Reveal>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-x-14 gap-y-0 mt-8">
+            {EVER_DONE.map((t, i) => (
+              <Reveal key={t} delay={i * 60}>
+                <div className="flex items-baseline gap-5 py-5 border-b border-neutral-200">
+                  <span className="font-display text-[13px] font-bold font-tabular text-neutral-400 shrink-0">
+                    {String(i + 1).padStart(2, '0')}
+                  </span>
+                  <span className="text-[17px] leading-snug text-pretty">{t}</span>
+                </div>
               </Reveal>
             ))}
           </div>
-        </section>
+          <Reveal delay={120}>
+            <p className="text-[17px] text-neutral-600 mt-10 max-w-[52ch] text-pretty">
+              None of these are strategy problems. They happen in the twenty minutes
+              after something goes wrong, and they are visible in your order log
+              long before they are visible to you.
+            </p>
+          </Reveal>
+        </div>
+      </section>
 
-        {/* PRICE */}
-        <section id="price" className="py-20 sm:py-28 scroll-mt-24">
+      {/* 3. HOW IT WORKS */}
+      <section id="how" className="scroll-mt-16">
+        <div className="max-w-[1140px] mx-auto px-5 sm:px-8 py-20 sm:py-28">
           <Reveal>
-            <Cell glow={C.gold} className="!p-0">
-              <div className="px-7 sm:px-12 py-12 grid grid-cols-1 sm:grid-cols-[auto_minmax(0,1fr)] gap-x-14 gap-y-8 items-center">
-                <div>
-                  <div className="flex items-baseline gap-2">
-                    <span style={{ color: C.gold }} className="font-display text-[60px] leading-none font-bold tracking-[-0.05em] font-tabular">₹499</span>
-                    <span style={{ color: C.muted }} className="text-[15px]">/ mo</span>
-                  </div>
-                  <p style={{ color: C.muted }} className="text-[13px] mt-3">One plan. No tiers.</p>
+            <Eyebrow>How it works</Eyebrow>
+            <H2>We don&rsquo;t predict your trades. We recognise your habits.</H2>
+            <p className="text-[17px] text-neutral-600 mt-5 max-w-[58ch] text-pretty">
+              The alert lands after the order fills, early enough that the next
+              three do not follow it.
+            </p>
+          </Reveal>
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-10 mt-14">
+            {HOW.map(([t, d], i) => (
+              <Reveal key={t} delay={i * 80}>
+                <span className="font-display text-[13px] font-bold font-tabular text-neutral-400">{String(i + 1).padStart(2, '0')}</span>
+                <p className="text-[18px] font-semibold mt-3">{t}</p>
+                <p className="text-[15px] text-neutral-600 leading-relaxed mt-2.5 text-pretty">{d}</p>
+              </Reveal>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      {/* 4. WHAT YOU GET */}
+      <section id="get" className="bg-neutral-50 border-y border-neutral-200 scroll-mt-16">
+        <div className="max-w-[1140px] mx-auto px-5 sm:px-8 py-20 sm:py-28">
+          <Reveal>
+            <Eyebrow>What you get</Eyebrow>
+            <H2>Six things, all pointed at the same problem.</H2>
+          </Reveal>
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-5 mt-14">
+            {GET.map(([t, d], i) => (
+              <Reveal key={t} delay={i * 60}>
+                <div className="h-full rounded-xl border border-neutral-200 bg-white p-6">
+                  <p className="text-[16.5px] font-semibold">{t}</p>
+                  <p className="text-[14.5px] text-neutral-600 leading-relaxed mt-2.5 text-pretty">{d}</p>
                 </div>
-                <div>
-                  <p style={{ color: C.muted }} className="text-[16px] leading-relaxed max-w-[44ch] text-pretty">
-                    Every detector, the full history, WhatsApp alerts and data export.
-                    Cancel from Settings in one click, with no email and no retention
-                    offer.
-                  </p>
-                  <div className="mt-8"><Cta variant="outline" /></div>
+              </Reveal>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      {/* 5. JOURNAL VS ALARM */}
+      <section>
+        <div className="max-w-[1140px] mx-auto px-5 sm:px-8 py-20 sm:py-28 grid grid-cols-1 lg:grid-cols-2 gap-12 lg:gap-20 items-center">
+          <Reveal>
+            <Eyebrow>Versus a journal</Eyebrow>
+            <H2>A journal is a post-mortem. This is a smoke alarm.</H2>
+            <p className="text-[17px] text-neutral-600 mt-5 max-w-[46ch] text-pretty">
+              A journal tells you on Sunday what went wrong on Tuesday. Useful, and
+              too late to change Tuesday. This one speaks while the session is
+              still open.
+            </p>
+          </Reveal>
+          <Reveal delay={90}>
+            <div className="rounded-xl border border-neutral-200 overflow-hidden">
+              {[
+                ['Journal', 'You write it, afterwards', 'Sunday evening'],
+                ['TradeMentor', 'It writes itself, from your orders', 'Twenty seconds after the fill'],
+              ].map(([a, b, c], i) => (
+                <div key={a} className={cn('px-6 py-5', i === 0 ? 'bg-neutral-50 border-b border-neutral-200' : 'bg-white')}>
+                  <p className={cn('text-[15px] font-semibold', i === 1 && 'text-[#155B56]')}>{a}</p>
+                  <p className="text-[14px] text-neutral-600 mt-1.5">{b}</p>
+                  <p className="text-[12.5px] text-neutral-500 mt-1">{c}</p>
                 </div>
+              ))}
+            </div>
+          </Reveal>
+        </div>
+      </section>
+
+      {/* 6. PRICING */}
+      <section id="price" className="bg-neutral-50 border-y border-neutral-200 scroll-mt-16">
+        <div className="max-w-[1140px] mx-auto px-5 sm:px-8 py-20 sm:py-28">
+          <Reveal>
+            <Eyebrow>Pricing</Eyebrow>
+            <H2>Cheaper than one revenge trade.</H2>
+          </Reveal>
+          <Reveal delay={80}>
+            <div className="rounded-2xl border border-neutral-200 bg-white p-8 sm:p-12 mt-12 grid grid-cols-1 sm:grid-cols-[auto_minmax(0,1fr)] gap-x-14 gap-y-8 items-center">
+              <div>
+                <div className="flex items-baseline gap-2">
+                  <span className="font-display text-[52px] leading-none font-bold tracking-[-0.045em] font-tabular">₹499</span>
+                  <span className="text-[15px] text-neutral-500">/ month</span>
+                </div>
+                <p className="text-[13px] text-neutral-500 mt-3">One plan. No tiers.</p>
               </div>
-            </Cell>
+              <div>
+                <p className="text-[16px] text-neutral-600 leading-relaxed max-w-[46ch] text-pretty">
+                  Every detector, the full history, WhatsApp alerts and data export.
+                  Cancel from Settings in one click, with no email and no retention
+                  offer.
+                </p>
+                <div className="mt-7"><Cta /></div>
+              </div>
+            </div>
           </Reveal>
-        </section>
+        </div>
+      </section>
 
-        {/* FAQ */}
-        <section className="py-20 sm:py-28 max-w-[820px] mx-auto">
+      {/* 7. FAQ */}
+      <section>
+        <div className="max-w-[820px] mx-auto px-5 sm:px-8 py-20 sm:py-28">
           <Reveal>
-            <h2 style={{ color: C.fg }} className="font-display text-[30px] sm:text-[38px] leading-[1.08] tracking-[-0.04em] font-bold text-balance">
-              Before you connect.
-            </h2>
+            <Eyebrow>Questions</Eyebrow>
+            <H2>The ones traders actually ask.</H2>
           </Reveal>
-          <Reveal delay={70} className="mt-9">
+          <Reveal delay={70} className="mt-10">
             <div>{FAQ.map(([q, a]) => <FaqRow key={q} q={q} a={a} />)}</div>
           </Reveal>
-        </section>
+        </div>
+      </section>
 
-        {/* CLOSE */}
-        <section className="py-24 sm:py-32 text-center">
+      {/* 8. CLOSE */}
+      <section style={{ background: '#141618' }}>
+        <div className="max-w-[1140px] mx-auto px-5 sm:px-8 py-24 sm:py-32 text-center">
           <Reveal>
-            <h2 style={{ color: C.fg }} className="font-display text-[34px] sm:text-[52px] leading-[1.05] tracking-[-0.048em] font-bold max-w-[19ch] mx-auto text-balance">
-              You already have the data.
-              <span style={{ color: C.muted }}> Nobody reads it back to you.</span>
+            <h2 style={{ color: '#FFFFFF' }} className="font-display text-[30px] sm:text-[44px] leading-[1.1] tracking-[-0.035em] font-bold max-w-[22ch] mx-auto text-balance">
+              Tomorrow morning, something will go wrong.
+              <span className="text-white/50"> Be the first to know.</span>
             </h2>
-            <div className="mt-11 flex justify-center"><Cta /></div>
+            <div className="mt-10 flex justify-center"><Cta light /></div>
+            <p className="text-[12.5px] text-white/40 mt-6">Read-only. We can never place or cancel a trade.</p>
           </Reveal>
-        </section>
-      </main>
+        </div>
+      </section>
 
-      <footer style={{ borderColor: C.border }} className="border-t">
-        <div className="max-w-[1200px] mx-auto px-5 sm:px-8 py-12">
+      <footer className="border-t border-neutral-200">
+        <div className="max-w-[1140px] mx-auto px-5 sm:px-8 py-12">
           <div className="flex flex-col sm:flex-row sm:items-center gap-5">
-            <span style={{ color: C.muted }} className="text-[13px]">© {new Date().getFullYear()} TradeMentor</span>
+            <span className="text-[13px] text-neutral-500">© {new Date().getFullYear()} TradeMentor</span>
             <div className="flex items-center gap-7 sm:ml-auto">
-              <Link to="/terms" style={{ color: C.muted }} className="text-[13px] hover:text-white transition-colors cursor-pointer">Terms</Link>
-              <Link to="/privacy" style={{ color: C.muted }} className="text-[13px] hover:text-white transition-colors cursor-pointer">Privacy</Link>
+              <Link to="/terms" className="text-[13px] text-neutral-500 hover:text-[#141618] transition-colors cursor-pointer">Terms</Link>
+              <Link to="/privacy" className="text-[13px] text-neutral-500 hover:text-[#141618] transition-colors cursor-pointer">Privacy</Link>
             </div>
           </div>
-          <p style={{ color: C.muted }} className="text-[12px] leading-relaxed mt-8 max-w-[76ch] opacity-80 text-pretty">
+          <p className="text-[12px] text-neutral-500 leading-relaxed mt-8 max-w-[78ch] text-pretty">
             TradeMentor analyses your trading behaviour, not the market. It is not a
             SEBI-registered Investment Adviser or Research Analyst, and nothing here is
             advice to buy, sell or hold any security. Derivatives trading carries a risk
