@@ -45,33 +45,7 @@ import {
   Lock, Timer, Check,
 } from 'lucide-react';
 
-// ── Tokens ────────────────────────────────────────────────────────────────────
-const T = {
-  ground: '#F5F6F8',
-  surface: '#FFFFFF',
-  ink: '#2D3142',
-  body: '#4B5060',
-  muted: '#9AA0AE',
-  faint: '#C4C8D2',
-  line: '#EDEFF3',
-  indigo: '#5A5BE0',
-  indigoTint: '#EEEEFC',
-  green: '#10B981',
-  greenTint: '#E6F7F1',
-  red: '#F4425F',
-  redTint: '#FDE9ED',
-  amber: '#F59E0B',
-  amberTint: '#FEF3E2',
-  orange: '#FF5A1F',
-};
-
-const CARD: React.CSSProperties = {
-  background: T.surface,
-  borderRadius: 22,
-  boxShadow: '0 4px 24px rgba(45,49,66,0.06)',
-};
-
-const FONT = "'Poppins', 'Geist', system-ui, sans-serif";
+import { T, TONE, CARD, FONT, type Tone } from './softPrecisionTheme';
 
 // ── Shared atoms ──────────────────────────────────────────────────────────────
 
@@ -89,17 +63,11 @@ function Label({ children, style }: { children: React.ReactNode; style?: React.C
 
 /** Tinted container + full-strength content. Used for every status chip. */
 function Pill({ tone, children, solid = false }: {
-  tone: 'green' | 'red' | 'amber' | 'indigo' | 'grey';
+  tone: Tone;
   children: React.ReactNode;
   solid?: boolean;
 }) {
-  const map = {
-    green:  [T.greenTint, T.green],
-    red:    [T.redTint, T.red],
-    amber:  [T.amberTint, T.amber],
-    indigo: [T.indigoTint, T.indigo],
-    grey:   ['#F1F2F6', T.muted],
-  }[tone];
+  const map = TONE[tone];
   return (
     <span style={{
       display: 'inline-flex', alignItems: 'center', gap: 5,
@@ -115,14 +83,11 @@ function Pill({ tone, children, solid = false }: {
 
 /** Rounded-square tinted tile. Never a bare icon — always the tile. */
 function IconTile({ tone, size = 40, children }: {
-  tone: 'green' | 'red' | 'amber' | 'indigo' | 'grey';
+  tone: Tone;
   size?: number;
   children: React.ReactNode;
 }) {
-  const bg = {
-    green: T.greenTint, red: T.redTint, amber: T.amberTint,
-    indigo: T.indigoTint, grey: '#F1F2F6',
-  }[tone];
+  const [bg] = TONE[tone];
   return (
     <span style={{
       width: size, height: size, borderRadius: size * 0.35, background: bg,
@@ -179,7 +144,7 @@ function SectionHead({ title, action }: { title: string; action?: string }) {
   return (
     <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', margin: '0 0 12px' }}>
       <h2 style={{ margin: 0, fontSize: 19, fontWeight: 700, color: T.ink, letterSpacing: '-0.02em' }}>{title}</h2>
-      {action && <span style={{ fontSize: 13, fontWeight: 600, color: T.indigo }}>{action}</span>}
+      {action && <span style={{ fontSize: 13, fontWeight: 600, color: T.accent }}>{action}</span>}
     </div>
   );
 }
@@ -227,15 +192,15 @@ function BottomNav({ active, raised }: { active: string; raised?: boolean }) {
           }}>
             {on ? (
               <span style={{
-                width: 34, height: 34, borderRadius: 999, background: T.indigoTint,
+                width: 34, height: 34, borderRadius: 999, background: T.accentTint,
                 display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
               }}>
-                <Icon size={19} color={T.indigo} />
+                <Icon size={19} color={T.accent} />
               </span>
             ) : (
               <Icon size={19} color={T.faint} style={{ marginTop: 7 }} />
             )}
-            <span style={{ fontSize: 10.5, fontWeight: on ? 600 : 500, color: on ? T.indigo : T.muted }}>
+            <span style={{ fontSize: 10.5, fontWeight: on ? 600 : 500, color: on ? T.accent : T.muted }}>
               {label}
             </span>
           </div>
@@ -253,8 +218,8 @@ function DashboardScreen() {
     { sym: 'BANKNIFTY', tag: 'OPT', qty: '250', pnl: '-₹1,240.00', up: false },
   ];
   const insights = [
-    { Icon: AlertTriangle, tone: 'amber' as const, title: 'RSI Divergence on NIFTY', body: 'Momentum weakening, watch for reversal.', ago: '12m ago' },
-    { Icon: Brain, tone: 'indigo' as const, title: 'Discipline Streak: 4 Days', body: 'You resisted 3 impulsive entries today.', ago: '2h ago' },
+    { Icon: AlertTriangle, tone: 'down' as const, title: 'RSI Divergence on NIFTY', body: 'Momentum weakening, watch for reversal.', ago: '12m ago' },
+    { Icon: Brain, tone: 'accent' as const, title: 'Discipline Streak: 4 Days', body: 'You resisted 3 impulsive entries today.', ago: '2h ago' },
   ];
 
   return (
@@ -284,7 +249,7 @@ function DashboardScreen() {
           <Bell size={19} color={T.ink} />
           <span style={{
             position: 'absolute', top: 11, right: 12, width: 7, height: 7,
-            borderRadius: 999, background: T.red,
+            borderRadius: 999, background: T.down,
           }} />
         </span>
       </div>
@@ -292,21 +257,21 @@ function DashboardScreen() {
       {/* Hero — the only gradient in the set, and it carries the state */}
       <div style={{
         borderRadius: 24, padding: '26px 20px 24px', textAlign: 'center', marginBottom: 30,
-        background: `linear-gradient(160deg, ${T.greenTint} 0%, #F4FBF8 55%, #FFFFFF 100%)`,
-        border: '1px solid #E4F4EE',
+        background: `linear-gradient(160deg, ${T.accentTint} 0%, #F7F7FE 55%, #FFFFFF 100%)`,
+        border: `1px solid ${T.accentTint}`,
       }}>
         <span style={{
           width: 62, height: 62, borderRadius: 999, background: T.surface, marginBottom: 14,
           display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
-          boxShadow: '0 4px 14px rgba(16,185,129,0.16)',
+          boxShadow: '0 4px 14px rgba(74,70,214,0.14)',
         }}>
-          <ShieldCheck size={28} color={T.green} />
+          <ShieldCheck size={28} color={T.accent} />
         </span>
         <h2 style={{ margin: '0 0 10px', fontSize: 27, fontWeight: 700, color: T.ink, letterSpacing: '-0.03em' }}>
           State: Secure
         </h2>
-        <Pill tone="green">
-          <span style={{ width: 6, height: 6, borderRadius: 999, background: T.green }} />
+        <Pill tone="accent">
+          <span style={{ width: 6, height: 6, borderRadius: 999, background: T.accent }} />
           Risk Guardian Active
         </Pill>
         <p style={{ margin: '12px 0 0', fontSize: 12.5, color: T.muted }}>0 active emotional triggers</p>
@@ -317,7 +282,7 @@ function DashboardScreen() {
         {insights.map(({ Icon, tone, title, body, ago }) => (
           <div key={title} style={{ ...CARD, padding: 16, display: 'flex', gap: 13, alignItems: 'flex-start' }}>
             <IconTile tone={tone}>
-              <Icon size={18} color={tone === 'amber' ? T.amber : T.indigo} />
+              <Icon size={18} color={TONE[tone][1]} />
             </IconTile>
             <div style={{ flex: 1, minWidth: 0 }}>
               <p style={{ margin: 0, fontSize: 14.5, fontWeight: 650, color: T.ink }}>{title}</p>
@@ -357,7 +322,7 @@ function DashboardScreen() {
             </span>
             <span style={{
               textAlign: 'right', fontSize: 14.5, fontWeight: 700,
-              color: p.up ? T.green : T.red, fontVariantNumeric: 'tabular-nums',
+              color: p.up ? T.up : T.down, fontVariantNumeric: 'tabular-nums',
             }}>
               {p.pnl}
             </span>
@@ -428,8 +393,8 @@ function AnalyticsScreen() {
           {tabs.map((t, i) => (
             <span key={t} style={{
               fontSize: 13.5, fontWeight: i === 0 ? 700 : 500,
-              color: i === 0 ? T.indigo : T.muted, paddingBottom: 10,
-              borderBottom: i === 0 ? `2.5px solid ${T.indigo}` : '2.5px solid transparent',
+              color: i === 0 ? T.accent : T.muted, paddingBottom: 10,
+              borderBottom: i === 0 ? `2.5px solid ${T.accent}` : '2.5px solid transparent',
             }}>
               {t}
             </span>
@@ -443,12 +408,12 @@ function AnalyticsScreen() {
               <span style={{ fontSize: 30, fontWeight: 700, color: T.ink, letterSpacing: '-0.03em', fontVariantNumeric: 'tabular-nums' }}>
                 ₹24,502
               </span>
-              <Pill tone="green">+12.4%</Pill>
+              <Pill tone="accent">+12.4%</Pill>
             </div>
           </div>
           <div style={{ textAlign: 'right' }}>
             <Label>Discipline Score</Label>
-            <p style={{ margin: '6px 0 0', fontSize: 26, fontWeight: 700, color: T.indigo, fontVariantNumeric: 'tabular-nums' }}>
+            <p style={{ margin: '6px 0 0', fontSize: 26, fontWeight: 700, color: T.accent, fontVariantNumeric: 'tabular-nums' }}>
               84<span style={{ fontSize: 14, color: T.muted }}>/100</span>
             </p>
           </div>
@@ -460,13 +425,13 @@ function AnalyticsScreen() {
           <AreaChart data={CURVE} margin={{ top: 6, right: 18, left: 18, bottom: 0 }}>
             <defs>
               <linearGradient id="sp-curve" x1="0" y1="0" x2="0" y2="1">
-                <stop offset="0%" stopColor={T.indigo} stopOpacity={0.22} />
-                <stop offset="100%" stopColor={T.indigo} stopOpacity={0} />
+                <stop offset="0%" stopColor={T.accent} stopOpacity={0.22} />
+                <stop offset="100%" stopColor={T.accent} stopOpacity={0} />
               </linearGradient>
             </defs>
             <XAxis dataKey="d" axisLine={false} tickLine={false}
               tick={{ fill: T.faint, fontSize: 10.5, fontWeight: 600 }} interval={0} />
-            <Area type="monotone" dataKey="v" stroke={T.indigo} strokeWidth={2.6}
+            <Area type="monotone" dataKey="v" stroke={T.accent} strokeWidth={2.6}
               fill="url(#sp-curve)" dot={false} />
           </AreaChart>
         </ResponsiveContainer>
@@ -476,16 +441,16 @@ function AnalyticsScreen() {
         {/* Gradient hairline down the left — the one place a stroke is allowed */}
         <div style={{
           borderRadius: 20, padding: 2, marginBottom: 28,
-          background: `linear-gradient(150deg, ${T.indigo}, #C084FC 45%, #FB923C)`,
+          background: `linear-gradient(150deg, ${T.accent}, #C084FC 45%, #FB923C)`,
         }}>
           <div style={{ background: T.surface, borderRadius: 18, padding: 16, display: 'flex', gap: 13 }}>
-            <IconTile tone="indigo"><Sparkles size={17} color={T.indigo} /></IconTile>
+            <IconTile tone="accent"><Sparkles size={17} color={T.accent} /></IconTile>
             <div style={{ flex: 1 }}>
               <p style={{ margin: 0, fontSize: 14.5, fontWeight: 700, color: T.ink }}>AI Coach Insight</p>
               <p style={{ margin: '4px 0 0', fontSize: 13, color: T.body, lineHeight: 1.55 }}>
                 You hesitated on <strong style={{ color: T.ink }}>3 entries</strong> this week, costing approx{' '}
-                <strong style={{ color: T.red }}>₹12k</strong>. However, your discipline score is up{' '}
-                <strong style={{ color: T.green }}>15%</strong> from last week.
+                <strong style={{ color: T.down }}>₹12k</strong>. However, your discipline score is up{' '}
+                <strong style={{ color: T.up }}>15%</strong> from last week.
               </p>
             </div>
           </div>
@@ -496,15 +461,15 @@ function AnalyticsScreen() {
             signal the row scrolls, which is why the scrollbar itself is hidden. */}
         <div className="sp-scroll" style={{ display: 'flex', gap: 12, overflowX: 'auto', paddingBottom: 6, marginBottom: 26 }}>
           {[
-            { Icon: AlertTriangle, tone: 'red' as const, sev: 'HIGH SEVERITY', name: 'Hesitation', body: 'Missed entry points due to fear.', freq: '4x', cost: '-₹12,400' },
-            { Icon: RefreshCw, tone: 'amber' as const, sev: 'MED SEVERITY', name: 'Over-trading', body: 'Taking trades outside plan.', freq: '2x', cost: '-₹6,100' },
+            { Icon: AlertTriangle, tone: 'down' as const, sev: 'HIGH SEVERITY', name: 'Hesitation', body: 'Missed entry points due to fear.', freq: '4x', cost: '-₹12,400' },
+            { Icon: RefreshCw, tone: 'down' as const, sev: 'MED SEVERITY', name: 'Over-trading', body: 'Taking trades outside plan.', freq: '2x', cost: '-₹6,100' },
           ].map(p => (
             <div key={p.name} style={{ ...CARD, padding: 16, minWidth: 232, flexShrink: 0 }}>
               <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: 14 }}>
                 <IconTile tone={p.tone}>
-                  <p.Icon size={17} color={p.tone === 'red' ? T.red : T.amber} />
+                  <p.Icon size={17} color={TONE[p.tone][1]} />
                 </IconTile>
-                <Pill tone={p.tone}>{p.sev}</Pill>
+                <Pill tone={p.tone} solid={p.sev.startsWith('HIGH')}>{p.sev}</Pill>
               </div>
               <p style={{ margin: 0, fontSize: 17, fontWeight: 700, color: T.ink }}>{p.name}</p>
               <p style={{ margin: '3px 0 16px', fontSize: 12.5, color: T.muted }}>{p.body}</p>
@@ -512,7 +477,7 @@ function AnalyticsScreen() {
                 <div><Label>Freq</Label><p style={{ margin: '3px 0 0', fontSize: 15, fontWeight: 650, color: T.ink }}>{p.freq}</p></div>
                 <div style={{ textAlign: 'right' }}>
                   <Label>Est. Cost</Label>
-                  <p style={{ margin: '3px 0 0', fontSize: 15, fontWeight: 700, color: T.red, fontVariantNumeric: 'tabular-nums' }}>{p.cost}</p>
+                  <p style={{ margin: '3px 0 0', fontSize: 15, fontWeight: 700, color: T.down, fontVariantNumeric: 'tabular-nums' }}>{p.cost}</p>
                 </div>
               </div>
             </div>
@@ -521,10 +486,10 @@ function AnalyticsScreen() {
 
         <SectionHead title="Performance Stats" />
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
-          <Stat label="◐ Win Rate" value="58%" sub={<span style={{ color: T.green }}>↗ +2% vs avg</span>} />
+          <Stat label="◐ Win Rate" value="58%" sub={<span style={{ color: T.up }}>↗ +2% vs avg</span>} />
           <Stat label="⧗ Profit Factor" value="1.84" sub="Target: >2.0" />
-          <Stat label="↑ Avg Winner" value="+₹4,200" valueColor={T.green} />
-          <Stat label="↓ Avg Loser" value="-₹2,100" valueColor={T.red} />
+          <Stat label="↑ Avg Winner" value="+₹4,200" valueColor={T.up} />
+          <Stat label="↓ Avg Loser" value="-₹2,100" valueColor={T.down} />
         </div>
       </div>
     </div>
@@ -554,19 +519,19 @@ function PatternsScreen() {
       </div>
 
       <div style={{
-        background: T.redTint, borderRadius: 16, padding: '13px 16px', marginBottom: 20,
+        background: T.downTint, borderRadius: 16, padding: '13px 16px', marginBottom: 20,
         display: 'flex', alignItems: 'center', gap: 12,
       }}>
-        <IconTile tone="red" size={34}><AlertTriangle size={16} color={T.red} /></IconTile>
+        <IconTile tone="down" size={34}><AlertTriangle size={16} color={T.down} /></IconTile>
         <div style={{ flex: 1 }}>
-          <p style={{ margin: 0, fontSize: 10.5, fontWeight: 700, letterSpacing: '0.08em', color: T.red }}>
+          <p style={{ margin: 0, fontSize: 10.5, fontWeight: 700, letterSpacing: '0.08em', color: T.down }}>
             ACTIVE PATTERN DETECTED
           </p>
           <p style={{ margin: '2px 0 0', fontSize: 14, fontWeight: 600, color: T.ink }}>
             Tilt Trading • High Severity
           </p>
         </div>
-        <span style={{ fontSize: 12.5, fontWeight: 600, color: T.red, textDecoration: 'underline' }}>Details</span>
+        <span style={{ fontSize: 12.5, fontWeight: 600, color: T.down, textDecoration: 'underline' }}>Details</span>
       </div>
 
       <div style={{ ...CARD, padding: 20, marginBottom: 18 }}>
@@ -578,7 +543,7 @@ function PatternsScreen() {
           <span style={{ fontSize: 33, fontWeight: 700, color: T.ink, letterSpacing: '-0.03em', fontVariantNumeric: 'tabular-nums' }}>
             ₹45,200
           </span>
-          <Pill tone="red">+12% vs last month</Pill>
+          <Pill tone="down">+12% vs last month</Pill>
         </div>
         <p style={{ margin: 0, fontSize: 13, color: T.muted, lineHeight: 1.55 }}>
           These are losses attributed to psychology (fear, greed, tilt), not strategy failure.
@@ -586,7 +551,7 @@ function PatternsScreen() {
         <div style={{ height: 1, background: T.line, margin: '18px 0' }} />
         <button style={{
           width: '100%', height: 54, borderRadius: 999, border: 'none', cursor: 'pointer',
-          background: T.indigo, color: '#fff', fontSize: 15.5, fontWeight: 650, fontFamily: FONT,
+          background: T.accent, color: '#fff', fontSize: 15.5, fontWeight: 650, fontFamily: FONT,
           display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 9,
           boxShadow: '0 8px 20px rgba(90,91,224,0.28)',
         }}>
@@ -595,16 +560,16 @@ function PatternsScreen() {
       </div>
 
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 10, marginBottom: 18 }}>
-        <Stat label="Loss Rate" value="12%" sub={<span style={{ color: T.green }}>↓ 2%</span>} />
+        <Stat label="Loss Rate" value="12%" sub={<span style={{ color: T.accent }}>↓ 2%</span>} />
         <Stat label="Trades" value="42" sub="Last 30d" />
-        <Stat label="Streak" value="3 Days" sub={<span style={{ color: T.green }}>Disciplined</span>} />
+        <Stat label="Streak" value="3 Days" sub={<span style={{ color: T.accent }}>Disciplined</span>} />
       </div>
 
       <div style={{ ...CARD, padding: 20, marginBottom: 22 }}>
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16 }}>
           <h3 style={{ margin: 0, fontSize: 16.5, fontWeight: 700, color: T.ink }}>30-Day Consistency</h3>
           <div style={{ display: 'flex', gap: 12 }}>
-            {[['Good', T.green], ['Impulsive', T.red]].map(([l, c]) => (
+            {[['Good', T.accent], ['Impulsive', T.down]].map(([l, c]) => (
               <span key={l} style={{ display: 'inline-flex', alignItems: 'center', gap: 5, fontSize: 10.5, fontWeight: 600, color: T.muted }}>
                 <span style={{ width: 7, height: 7, borderRadius: 999, background: c as string }} /> {l}
               </span>
@@ -623,9 +588,9 @@ function PatternsScreen() {
               aspectRatio: '1', borderRadius: 999, display: 'flex', alignItems: 'center',
               justifyContent: 'center', fontSize: 12.5, fontWeight: 650,
             };
-            if (d.s === 'g') return <span key={i} style={{ ...style, background: T.green, color: '#fff' }}>{d.n}</span>;
-            if (d.s === 'b') return <span key={i} style={{ ...style, background: T.red, color: '#fff' }}>{d.n}</span>;
-            if (d.s === 't') return <span key={i} style={{ ...style, background: T.indigo, color: '#fff', boxShadow: `0 0 0 4px ${T.indigoTint}` }}>{d.n}</span>;
+            if (d.s === 'g') return <span key={i} style={{ ...style, background: T.accent, color: '#fff' }}>{d.n}</span>;
+            if (d.s === 'b') return <span key={i} style={{ ...style, background: T.down, color: '#fff' }}>{d.n}</span>;
+            if (d.s === 't') return <span key={i} style={{ ...style, background: T.accentDeep, color: '#fff', boxShadow: `0 0 0 4px ${T.accentTint}` }}>{d.n}</span>;
             if (d.s === 'x') return <span key={i} style={{ ...style, border: `1px dashed ${T.faint}`, color: T.faint }}>{d.n}</span>;
             return <span key={i} style={{ ...style, border: `1px solid ${T.line}`, color: T.faint }}>{d.n}</span>;
           })}
@@ -635,15 +600,15 @@ function PatternsScreen() {
       <SectionHead title="Recurring Triggers" action="View All" />
       <div style={{ display: 'grid', gap: 12 }}>
         {[
-          { Icon: Zap, tone: 'amber' as const, name: 'Revenge Trading', sev: 'MED SEVERITY', body: 'Triggered after a loss >2% within 5 mins.', freq: '3x this month', cost: '₹12,400' },
-          { Icon: Hourglass, tone: 'indigo' as const, name: 'Hesitation', sev: 'LOW SEVERITY', body: 'Missed entry points due to over-analysis.', freq: '5x this month', cost: '~₹8,000 (Missed)' },
+          { Icon: Zap, tone: 'down' as const, name: 'Revenge Trading', sev: 'MED SEVERITY', body: 'Triggered after a loss >2% within 5 mins.', freq: '3x this month', cost: '₹12,400' },
+          { Icon: Hourglass, tone: 'neutral' as const, name: 'Hesitation', sev: 'LOW SEVERITY', body: 'Missed entry points due to over-analysis.', freq: '5x this month', cost: '~₹8,000 (Missed)' },
         ].map(t => (
           <div key={t.name} style={{ ...CARD, padding: 16, display: 'flex', gap: 13 }}>
-            <IconTile tone={t.tone}><t.Icon size={18} color={t.tone === 'amber' ? T.amber : T.indigo} /></IconTile>
+            <IconTile tone={t.tone}><t.Icon size={18} color={TONE[t.tone][1]} /></IconTile>
             <div style={{ flex: 1, minWidth: 0 }}>
               <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8 }}>
                 <p style={{ margin: 0, fontSize: 15, fontWeight: 700, color: T.ink }}>{t.name}</p>
-                <Pill tone={t.tone === 'amber' ? 'amber' : 'grey'}>{t.sev}</Pill>
+                <Pill tone={t.tone} solid={t.sev.startsWith('HIGH')}>{t.sev}</Pill>
               </div>
               <p style={{ margin: '4px 0 10px', fontSize: 12.5, color: T.muted }}>{t.body}</p>
               <div style={{ display: 'flex', gap: 18, fontSize: 11.5, color: T.muted }}>
@@ -669,19 +634,19 @@ function ShieldScreen() {
           </h1>
           <p style={{ margin: '2px 0 0', fontSize: 13.5, color: T.muted }}>Risk Intervention Protocol</p>
         </div>
-        <Pill tone="red">
-          <span style={{ width: 6, height: 6, borderRadius: 999, background: T.red }} /> HIGH RISK
+        <Pill tone="down">
+          <span style={{ width: 6, height: 6, borderRadius: 999, background: T.down }} /> HIGH RISK
         </Pill>
       </div>
 
       <div style={{ display: 'flex', justifyContent: 'center', marginBottom: 30 }}>
-        <Ring pct={84} size={244} stroke={17} color={T.red}>
+        <Ring pct={84} size={244} stroke={17} color={T.down}>
           <span style={{
             width: 96, height: 96, borderRadius: 999, background: T.surface, marginBottom: 8,
             display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
             boxShadow: '0 4px 18px rgba(45,49,66,0.08)',
           }}>
-            <Lock size={30} color={T.red} />
+            <Lock size={30} color={T.down} />
           </span>
           <span style={{ fontSize: 42, fontWeight: 700, color: T.ink, letterSpacing: '-0.04em', lineHeight: 1 }}>
             84<span style={{ fontSize: 20, color: T.faint }}>/100</span>
@@ -692,9 +657,9 @@ function ShieldScreen() {
 
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 11, marginBottom: 26 }}>
         {[
-          { l: 'Tilt', v: 75, c: T.amber },
-          { l: 'Fatigue', v: 20, c: T.green },
-          { l: 'Volat.', v: 90, c: T.red },
+          { l: 'Tilt', v: 75, c: T.down },
+          { l: 'Fatigue', v: 20, c: T.accent },
+          { l: 'Volat.', v: 90, c: T.down },
         ].map(m => (
           <div key={m.l} style={{ ...CARD, padding: '16px 8px 14px', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 9 }}>
             <Ring pct={m.v} size={62} stroke={6} color={m.c}>
@@ -710,8 +675,8 @@ function ShieldScreen() {
         <h3 style={{ margin: 0, fontSize: 16.5, fontWeight: 700, color: T.ink }}>Active Patterns</h3>
       </div>
       <div style={{ display: 'flex', flexWrap: 'wrap', gap: 9, marginBottom: 24 }}>
-        <Pill tone="red" solid><AlertTriangle size={13} /> Revenge Trading</Pill>
-        <Pill tone="red" solid><TrendingUp size={13} /> Over-leveraging</Pill>
+        <Pill tone="down" solid><AlertTriangle size={13} /> Revenge Trading</Pill>
+        <Pill tone="down" solid><TrendingUp size={13} /> Over-leveraging</Pill>
         {['FOMO', 'Hesitation', 'Confirmation Bias'].map(p => (
           <span key={p} style={{
             fontSize: 12.5, fontWeight: 500, color: T.muted, padding: '7px 15px',
@@ -723,7 +688,7 @@ function ShieldScreen() {
       </div>
 
       <div style={{ ...CARD, padding: 18, display: 'flex', gap: 13, marginBottom: 26 }}>
-        <IconTile tone="indigo" size={44}><Sparkles size={19} color={T.indigo} /></IconTile>
+        <IconTile tone="accent" size={44}><Sparkles size={19} color={T.accent} /></IconTile>
         <div style={{ flex: 1 }}>
           <p style={{ margin: 0, fontSize: 15.5, fontWeight: 700, color: T.ink }}>Coach Insight</p>
           <p style={{ margin: '4px 0 0', fontSize: 13, color: T.muted, lineHeight: 1.6 }}>
@@ -735,7 +700,7 @@ function ShieldScreen() {
 
       <button style={{
         width: '100%', height: 62, borderRadius: 999, border: 'none', cursor: 'pointer',
-        background: `linear-gradient(100deg, ${T.red}, #E11D48)`, color: '#fff',
+        background: `linear-gradient(100deg, ${T.down}, #E11D48)`, color: '#fff',
         fontSize: 15.5, fontWeight: 700, letterSpacing: '0.02em', fontFamily: FONT,
         display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 10,
         boxShadow: '0 10px 26px rgba(244,66,95,0.34)',
@@ -764,11 +729,11 @@ function ChatScreen() {
         <ArrowLeft size={21} color={T.ink} />
         <div style={{ textAlign: 'center' }}>
           <p style={{ margin: 0, fontSize: 17.5, fontWeight: 700, color: T.ink, display: 'flex', alignItems: 'center', gap: 8 }}>
-            AI Coach <span style={{ width: 8, height: 8, borderRadius: 999, background: T.green }} />
+            AI Coach <span style={{ width: 8, height: 8, borderRadius: 999, background: T.accent }} />
           </p>
           <p style={{ margin: '1px 0 0', fontSize: 12, color: T.muted }}>Session Active • 12m</p>
         </div>
-        <span style={{ fontSize: 14.5, fontWeight: 650, color: T.red }}>End</span>
+        <span style={{ fontSize: 14.5, fontWeight: 650, color: T.down }}>End</span>
       </div>
 
       <div style={{ flex: 1, overflowY: 'auto', padding: '20px 16px' }}>
@@ -783,7 +748,7 @@ function ChatScreen() {
 
         <p style={{ margin: '0 0 7px 44px', fontSize: 11.5, color: T.muted }}>Coach</p>
         <div style={{ display: 'flex', alignItems: 'flex-end', gap: 9, marginBottom: 20 }}>
-          <IconTile tone="indigo" size={34}><Brain size={16} color={T.indigo} /></IconTile>
+          <IconTile tone="accent" size={34}><Brain size={16} color={T.accent} /></IconTile>
           <div style={{
             background: T.surface, borderRadius: 20, borderBottomLeftRadius: 6, padding: '15px 17px',
             boxShadow: '0 2px 14px rgba(45,49,66,0.06)', maxWidth: 300,
@@ -811,7 +776,7 @@ function ChatScreen() {
 
         <p style={{ margin: '0 0 7px 44px', fontSize: 11.5, color: T.muted }}>Coach</p>
         <div style={{ display: 'flex', alignItems: 'flex-end', gap: 9 }}>
-          <IconTile tone="indigo" size={34}><Brain size={16} color={T.indigo} /></IconTile>
+          <IconTile tone="accent" size={34}><Brain size={16} color={T.accent} /></IconTile>
           <div style={{
             background: T.surface, borderRadius: 20, borderBottomLeftRadius: 6, padding: '15px 17px',
             boxShadow: '0 2px 14px rgba(45,49,66,0.06)', maxWidth: 300,
@@ -821,7 +786,7 @@ function ChatScreen() {
           }}>
             <p style={{ margin: 0, fontSize: 14.5, color: T.muted, lineHeight: 1.55 }}>
               That thought pattern aligns with{' '}
-              <span style={{ color: T.red, fontWeight: 600 }}>Revenge Trading</span>. Chasing…
+              <span style={{ color: T.down, fontWeight: 600 }}>Revenge Trading</span>. Chasing…
             </p>
           </div>
         </div>
@@ -830,8 +795,8 @@ function ChatScreen() {
       <div style={{ padding: '12px 16px 14px', background: T.surface, borderTop: `1px solid ${T.line}` }}>
         <div style={{ display: 'flex', gap: 10, marginBottom: 12 }}>
           {[
-            { Icon: Brain, label: 'Start Breathing Exercise', c: T.indigo },
-            { Icon: History, label: 'Review Last Loss', c: T.red },
+            { Icon: Brain, label: 'Start Breathing Exercise', c: T.accent },
+            { Icon: History, label: 'Review Last Loss', c: T.down },
           ].map(a => (
             <span key={a.label} style={{
               flex: 1, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 7,
@@ -849,7 +814,7 @@ function ChatScreen() {
           <Mic size={19} color={T.muted} />
           <span style={{ flex: 1, fontSize: 14.5, color: T.faint }}>Type or vent…</span>
           <span style={{
-            width: 44, height: 44, borderRadius: 999, background: T.indigo,
+            width: 44, height: 44, borderRadius: 999, background: T.accent,
             display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
           }}>
             <Send size={18} color="#fff" />
@@ -862,12 +827,12 @@ function ChatScreen() {
 
 // ── 6. Settings ───────────────────────────────────────────────────────────────
 
-function Toggle({ on, tone = 'indigo' }: { on: boolean; tone?: 'indigo' | 'green' }) {
+function Toggle({ on, tone = 'accent' }: { on: boolean; tone?: 'accent' }) {
   return (
     <span style={{
       width: 50, height: 29, borderRadius: 999, padding: 3, display: 'inline-flex',
       justifyContent: on ? 'flex-end' : 'flex-start', alignItems: 'center',
-      background: on ? (tone === 'green' ? T.green : T.indigo) : '#DFE2E8',
+      background: on ? T.accent : '#DFE2E8',
     }}>
       <span style={{ width: 23, height: 23, borderRadius: 999, background: '#fff' }} />
     </span>
@@ -921,15 +886,15 @@ function SettingsScreen() {
         <Label style={{ display: 'block', marginBottom: 9 }}>Account &amp; API</Label>
         <div style={{ ...CARD, overflow: 'hidden', marginBottom: 24 }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 13, padding: '15px 17px', borderBottom: `1px solid ${T.line}` }}>
-            <IconTile tone="amber" size={38}><Link2 size={17} color={T.orange} /></IconTile>
+            <IconTile tone="accent" size={38}><Link2 size={17} color={T.accent} /></IconTile>
             <div style={{ flex: 1 }}>
               <p style={{ margin: 0, fontSize: 14.5, fontWeight: 600, color: T.ink }}>Zerodha Kite</p>
-              <p style={{ margin: '2px 0 0', fontSize: 12.5, color: T.green, fontWeight: 600 }}>● Connected</p>
+              <p style={{ margin: '2px 0 0', fontSize: 12.5, color: T.accent, fontWeight: 600 }}>● Connected</p>
             </div>
             <ChevronRight size={18} color={T.faint} />
           </div>
           <div style={{ display: 'flex', alignItems: 'center', gap: 13, padding: '15px 17px' }}>
-            <IconTile tone="grey" size={38}><Wallet size={17} color={T.body} /></IconTile>
+            <IconTile tone="neutral" size={38}><Wallet size={17} color={T.body} /></IconTile>
             <p style={{ margin: 0, flex: 1, fontSize: 14.5, fontWeight: 600, color: T.ink }}>Total Capital</p>
             <span style={{ fontSize: 15, fontWeight: 650, color: T.ink, fontVariantNumeric: 'tabular-nums' }}>
               <span style={{ color: T.muted, marginRight: 8 }}>₹</span>5,00,000
@@ -940,7 +905,7 @@ function SettingsScreen() {
         <Label style={{ display: 'block', marginBottom: 9 }}>Risk Parameters</Label>
         <div style={{ ...CARD, overflow: 'hidden', marginBottom: 24 }}>
           <Row title="Max Daily Loss" sub="Hard stop percentage"
-            right={<Pill tone="indigo">5 %</Pill>} />
+            right={<Pill tone="accent">5 %</Pill>} />
           <Row title="Cooldown Period"
             right={<span style={{ display: 'inline-flex', alignItems: 'center', gap: 7, fontSize: 14, color: T.body }}>
               15 Minutes <ChevronsUpDown size={15} color={T.faint} />
@@ -949,12 +914,12 @@ function SettingsScreen() {
         </div>
 
         <div style={{ display: 'flex', alignItems: 'center', gap: 7, marginBottom: 9 }}>
-          <Shield size={13} color={T.red} />
-          <Label style={{ color: T.red }}>Guardian Protocols</Label>
+          <Shield size={13} color={T.down} />
+          <Label style={{ color: T.down }}>Guardian Protocols</Label>
         </div>
         <div style={{
           borderRadius: 22, overflow: 'hidden', marginBottom: 24,
-          background: '#FFF7F8', border: `1px solid ${T.redTint}`,
+          background: '#FFF7F8', border: `1px solid ${T.downTint}`,
         }}>
           <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 12, padding: '16px 17px' }}>
             <div style={{ flex: 1 }}>
@@ -963,13 +928,13 @@ function SettingsScreen() {
                 Automatically message your accountability partner if daily loss exceeds 5%.
               </p>
             </div>
-            <Toggle on tone="green" />
+            <Toggle on tone="accent" />
           </div>
           <div style={{
             display: 'flex', alignItems: 'center', gap: 12, padding: '14px 17px',
-            borderTop: `1px solid ${T.redTint}`, background: 'rgba(255,255,255,0.6)',
+            borderTop: `1px solid ${T.downTint}`, background: 'rgba(255,255,255,0.6)',
           }}>
-            <IconTile tone="green" size={36}><MessageSquare size={16} color={T.green} /></IconTile>
+            <IconTile tone="accent" size={36}><MessageSquare size={16} color={T.accent} /></IconTile>
             <p style={{ margin: 0, flex: 1, fontSize: 14, fontWeight: 600, color: T.ink }}>Partner Number</p>
             <span style={{ fontSize: 14, color: T.body, fontVariantNumeric: 'tabular-nums' }}>+91 98765 43210</span>
           </div>
@@ -978,7 +943,7 @@ function SettingsScreen() {
         <Label style={{ display: 'block', marginBottom: 9 }}>App Preferences</Label>
         <div style={{ ...CARD, overflow: 'hidden', marginBottom: 26 }}>
           <Row title="Appearance"
-            right={<span style={{ display: 'inline-flex', alignItems: 'center', gap: 6, fontSize: 14, color: T.indigo, fontWeight: 600 }}>
+            right={<span style={{ display: 'inline-flex', alignItems: 'center', gap: 6, fontSize: 14, color: T.accent, fontWeight: 600 }}>
               Light <ChevronRight size={16} />
             </span>} />
           <Row title="FaceID Required" right={<Toggle on={false} />} last />
@@ -988,7 +953,7 @@ function SettingsScreen() {
           Soft Precision v1.0.2
         </p>
         <p style={{
-          margin: 0, textAlign: 'center', fontSize: 14.5, fontWeight: 650, color: T.red,
+          margin: 0, textAlign: 'center', fontSize: 14.5, fontWeight: 650, color: T.down,
           display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8,
         }}>
           <LogOut size={17} /> Log Out
@@ -1009,7 +974,7 @@ function BrokerScreen() {
           {[0, 1, 2].map(i => (
             <span key={i} style={{
               width: 8, height: 8, borderRadius: 999,
-              background: i === 0 ? T.indigo : '#DFE2E8',
+              background: i === 0 ? T.accent : '#DFE2E8',
             }} />
           ))}
         </div>
@@ -1076,10 +1041,10 @@ function BrokerScreen() {
         ].map(([t, s], i, arr) => (
           <div key={t} style={{ display: 'flex', gap: 12, marginBottom: i === arr.length - 1 ? 0 : 16 }}>
             <span style={{
-              width: 22, height: 22, borderRadius: 999, background: T.greenTint, flexShrink: 0, marginTop: 2,
+              width: 22, height: 22, borderRadius: 999, background: T.accentTint, flexShrink: 0, marginTop: 2,
               display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
             }}>
-              <Check size={13} color={T.green} strokeWidth={3} />
+              <Check size={13} color={T.accent} strokeWidth={3} />
             </span>
             <div>
               <p style={{ margin: 0, fontSize: 14.5, fontWeight: 650, color: T.ink }}>{t}</p>
@@ -1091,9 +1056,9 @@ function BrokerScreen() {
 
       <button style={{
         width: '100%', height: 60, borderRadius: 999, border: 'none', cursor: 'pointer',
-        background: T.orange, color: '#fff', fontSize: 16.5, fontWeight: 650, fontFamily: FONT,
+        background: T.accent, color: '#fff', fontSize: 16.5, fontWeight: 650, fontFamily: FONT,
         display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 12,
-        boxShadow: '0 10px 26px rgba(255,90,31,0.3)', margin: '30px 0 14px',
+        boxShadow: '0 10px 26px rgba(74,70,214,0.28)', margin: '30px 0 14px',
       }}>
         <span style={{ width: 21, height: 21, borderRadius: 4, background: '#fff' }} />
         Authorize with Kite

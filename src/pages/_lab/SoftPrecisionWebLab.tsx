@@ -37,32 +37,7 @@ import {
   Settings as SettingsIcon, Shield, ShieldCheck, Sparkles, Wallet, Zap,
 } from 'lucide-react';
 
-// ── Tokens (identical to the mobile study — same language, different spend) ────
-const T = {
-  ground: '#F5F6F8',
-  surface: '#FFFFFF',
-  ink: '#2D3142',
-  body: '#4B5060',
-  muted: '#9AA0AE',
-  faint: '#C4C8D2',
-  line: '#EAECF1',
-  indigo: '#5A5BE0',
-  indigoTint: '#EEEEFC',
-  green: '#10B981',
-  greenTint: '#E6F7F1',
-  red: '#F4425F',
-  redTint: '#FDE9ED',
-  amber: '#F59E0B',
-  amberTint: '#FEF3E2',
-};
-
-const CARD: React.CSSProperties = {
-  background: T.surface,
-  borderRadius: 20,
-  boxShadow: '0 4px 24px rgba(45,49,66,0.06)',
-};
-
-const FONT = "'Poppins', 'Geist', system-ui, sans-serif";
+import { T, TONE, CARD, FONT, type Tone } from './softPrecisionTheme';
 
 // ── Atoms ─────────────────────────────────────────────────────────────────────
 
@@ -77,17 +52,21 @@ function Label({ children, style }: { children: React.ReactNode; style?: React.C
   );
 }
 
-function Pill({ tone, children }: {
-  tone: 'green' | 'red' | 'amber' | 'indigo' | 'grey';
-  children: React.ReactNode;
+/**
+ * `solid` is what makes three severity levels readable from one hue. Without it,
+ * HIGH and MED both render as a red tint and become indistinguishable — which is
+ * exactly the failure that made amber feel necessary in the first place. Solid,
+ * tint, neutral is three clear strengths and still only one colour.
+ */
+function Pill({ tone, children, solid = false }: {
+  tone: Tone; children: React.ReactNode; solid?: boolean;
 }) {
-  const [bg, fg] = {
-    green: [T.greenTint, T.green], red: [T.redTint, T.red], amber: [T.amberTint, T.amber],
-    indigo: [T.indigoTint, T.indigo], grey: ['#F1F2F6', T.muted],
-  }[tone];
+  const [bg, fg] = TONE[tone];
   return (
     <span style={{
-      display: 'inline-flex', alignItems: 'center', gap: 5, background: bg, color: fg,
+      display: 'inline-flex', alignItems: 'center', gap: 5,
+      background: solid ? fg : bg,
+      color: solid ? '#fff' : fg,
       fontSize: 11, fontWeight: 600, padding: '4px 10px', borderRadius: 999, whiteSpace: 'nowrap',
     }}>
       {children}
@@ -96,11 +75,9 @@ function Pill({ tone, children }: {
 }
 
 function IconTile({ tone, size = 38, children }: {
-  tone: 'green' | 'red' | 'amber' | 'indigo' | 'grey'; size?: number; children: React.ReactNode;
+  tone: Tone; size?: number; children: React.ReactNode;
 }) {
-  const bg = {
-    green: T.greenTint, red: T.redTint, amber: T.amberTint, indigo: T.indigoTint, grey: '#F1F2F6',
-  }[tone];
+  const [bg] = TONE[tone];
   return (
     <span style={{
       width: size, height: size, borderRadius: size * 0.35, background: bg, flexShrink: 0,
@@ -149,7 +126,7 @@ function Section({ title, action, children, style }: {
           {title}
         </h2>
         {action && (
-          <span style={{ fontSize: 12.5, fontWeight: 600, color: T.indigo, cursor: 'pointer' }}>
+          <span style={{ fontSize: 12.5, fontWeight: 600, color: T.accent, cursor: 'pointer' }}>
             {action}
           </span>
         )}
@@ -219,10 +196,10 @@ function Sidebar({ active, onSelect }: { active: string; onSelect: (k: string) =
               display: 'flex', alignItems: 'center', gap: 11, padding: '10px 12px',
               borderRadius: 11, border: 'none', cursor: 'pointer', textAlign: 'left',
               fontFamily: FONT, fontSize: 13.5, fontWeight: on ? 650 : 500,
-              background: on ? T.indigoTint : 'transparent',
-              color: on ? T.indigo : T.body,
+              background: on ? T.accentTint : 'transparent',
+              color: on ? T.accent : T.body,
             }}>
-              <Icon size={17} color={on ? T.indigo : T.faint} />
+              <Icon size={17} color={on ? T.accent : T.faint} />
               {label}
             </button>
           );
@@ -232,11 +209,11 @@ function Sidebar({ active, onSelect }: { active: string; onSelect: (k: string) =
       {/* CARD, at the bottom of a flat nav — it is a discrete status object */}
       <div style={{
         marginTop: 'auto', borderRadius: 16, padding: '14px 15px',
-        background: `linear-gradient(155deg, ${T.greenTint}, #F6FCFA)`,
-        border: '1px solid #E2F3EC',
+        background: `linear-gradient(155deg, ${T.accentTint}, #FAFAFE)`,
+        border: `1px solid ${T.accentTint}`,
       }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 6 }}>
-          <ShieldCheck size={16} color={T.green} />
+          <ShieldCheck size={16} color={T.accent} />
           <span style={{ fontSize: 13, fontWeight: 650, color: T.ink }}>Guardian Active</span>
         </div>
         <p style={{ margin: 0, fontSize: 11.5, color: T.muted, lineHeight: 1.5 }}>
@@ -273,7 +250,7 @@ function TopBar({ title, sub }: { title: string; sub: string }) {
           display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
         }}>
           <Bell size={17} color={T.body} />
-          <span style={{ position: 'absolute', top: 9, right: 10, width: 6, height: 6, borderRadius: 999, background: T.red }} />
+          <span style={{ position: 'absolute', top: 9, right: 10, width: 6, height: 6, borderRadius: 999, background: T.down }} />
         </span>
       </div>
     </div>
@@ -301,12 +278,12 @@ function DashboardScreen() {
 
       {/* CARDS — four separable metrics, each with one hero number */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 16, marginBottom: 30 }}>
-        <MetricCard label="Session P&L" value="+₹3,720" valueColor={T.green}
-          sub={<span style={{ color: T.green }}>↗ +2.1% today</span>} Icon={Wallet} />
+        <MetricCard label="Session P&L" value="+₹3,720" valueColor={T.up}
+          sub={<span style={{ color: T.up }}>↗ +2.1% today</span>} Icon={Wallet} />
         <MetricCard label="Open Positions" value="3" sub="2 long · 1 short" Icon={Layers} />
         <MetricCard label="Margin Used" value="65%" sub="₹3,25,000 of ₹5,00,000" Icon={Gauge} />
-        <MetricCard label="Discipline" value="84/100" valueColor={T.indigo}
-          sub={<span style={{ color: T.green }}>↗ +6 this week</span>} Icon={ShieldCheck} />
+        <MetricCard label="Discipline" value="84/100" valueColor={T.accent}
+          sub={<span style={{ color: T.up }}>↗ +6 this week</span>} Icon={ShieldCheck} />
       </div>
 
       <div style={{ display: 'grid', gridTemplateColumns: '1.55fr 1fr', gap: 26, marginBottom: 30 }}>
@@ -343,7 +320,7 @@ function DashboardScreen() {
               <span style={{ textAlign: 'right', fontSize: 13, color: T.body, fontVariantNumeric: 'tabular-nums' }}>{p.ltp}</span>
               <span style={{
                 textAlign: 'right', fontSize: 13.5, fontWeight: 700,
-                color: p.up ? T.green : T.red, fontVariantNumeric: 'tabular-nums',
+                color: p.up ? T.up : T.down, fontVariantNumeric: 'tabular-nums',
               }}>
                 {p.pnl}
               </span>
@@ -364,13 +341,13 @@ function DashboardScreen() {
               <AreaChart data={EQUITY} margin={{ top: 12, right: 14, left: 14, bottom: 0 }}>
                 <defs>
                   <linearGradient id="spw-eq" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="0%" stopColor={T.indigo} stopOpacity={0.2} />
-                    <stop offset="100%" stopColor={T.indigo} stopOpacity={0} />
+                    <stop offset="0%" stopColor={T.accent} stopOpacity={0.2} />
+                    <stop offset="100%" stopColor={T.accent} stopOpacity={0} />
                   </linearGradient>
                 </defs>
                 <XAxis dataKey="d" axisLine={false} tickLine={false} interval={0}
                   tick={{ fill: T.faint, fontSize: 10.5, fontWeight: 600 }} />
-                <Area type="monotone" dataKey="v" stroke={T.indigo} strokeWidth={2.4}
+                <Area type="monotone" dataKey="v" stroke={T.accent} strokeWidth={2.4}
                   fill="url(#spw-eq)" dot={false} />
               </AreaChart>
             </ResponsiveContainer>
@@ -382,16 +359,16 @@ function DashboardScreen() {
         {/* FLAT — a list you scan down */}
         <Section title="Live insights" action="View all">
           {[
-            { Icon: AlertTriangle, tone: 'amber' as const, t: 'RSI Divergence on NIFTY', b: 'Momentum weakening, watch for reversal.', ago: '12m' },
-            { Icon: Brain, tone: 'indigo' as const, t: 'Discipline Streak: 4 Days', b: 'You resisted 3 impulsive entries today.', ago: '2h' },
-            { Icon: Zap, tone: 'red' as const, t: 'Size escalation detected', b: 'Last entry was 2.4× your median size.', ago: '3h' },
+            { Icon: AlertTriangle, tone: 'down' as const, t: 'RSI Divergence on NIFTY', b: 'Momentum weakening, watch for reversal.', ago: '12m' },
+            { Icon: Brain, tone: 'accent' as const, t: 'Discipline Streak: 4 Days', b: 'You resisted 3 impulsive entries today.', ago: '2h' },
+            { Icon: Zap, tone: 'down' as const, t: 'Size escalation detected', b: 'Last entry was 2.4× your median size.', ago: '3h' },
           ].map(i => (
             <div key={i.t} style={{
               display: 'flex', gap: 13, alignItems: 'flex-start', padding: '14px 2px',
               borderBottom: `1px solid ${T.line}`,
             }}>
               <IconTile tone={i.tone} size={34}>
-                <i.Icon size={16} color={{ amber: T.amber, indigo: T.indigo, red: T.red }[i.tone]} />
+                <i.Icon size={16} color={{ down: T.down, accent: T.accent }[i.tone]} />
               </IconTile>
               <div style={{ flex: 1, minWidth: 0 }}>
                 <p style={{ margin: 0, fontSize: 13.5, fontWeight: 650, color: T.ink }}>{i.t}</p>
@@ -405,12 +382,12 @@ function DashboardScreen() {
         {/* CARD — a single insight, and the one gradient on the screen */}
         <div style={{
           borderRadius: 20, padding: 2,
-          background: `linear-gradient(140deg, ${T.indigo}, #C084FC 50%, #FB923C)`,
+          background: `linear-gradient(140deg, ${T.accent}, #C084FC 50%, #FB923C)`,
           alignSelf: 'start',
         }}>
           <div style={{ background: T.surface, borderRadius: 18, padding: 20 }}>
             <div style={{ display: 'flex', gap: 13, marginBottom: 14 }}>
-              <IconTile tone="indigo"><Sparkles size={17} color={T.indigo} /></IconTile>
+              <IconTile tone="accent"><Sparkles size={17} color={T.accent} /></IconTile>
               <div>
                 <p style={{ margin: 0, fontSize: 14.5, fontWeight: 700, color: T.ink }}>AI Coach Insight</p>
                 <Label>Updated 4 minutes ago</Label>
@@ -418,13 +395,13 @@ function DashboardScreen() {
             </div>
             <p style={{ margin: 0, fontSize: 13.5, color: T.body, lineHeight: 1.65 }}>
               You hesitated on <strong style={{ color: T.ink }}>3 entries</strong> this week, costing approx{' '}
-              <strong style={{ color: T.red }}>₹12k</strong>. Your discipline score is still up{' '}
-              <strong style={{ color: T.green }}>15%</strong> — the hesitation is costing you upside, not
+              <strong style={{ color: T.down }}>₹12k</strong>. Your discipline score is still up{' '}
+              <strong style={{ color: T.up }}>15%</strong> — the hesitation is costing you upside, not
               causing losses.
             </p>
             <button style={{
               marginTop: 18, height: 44, width: '100%', borderRadius: 999, border: 'none', cursor: 'pointer',
-              background: T.indigo, color: '#fff', fontFamily: FONT, fontSize: 13.5, fontWeight: 650,
+              background: T.accent, color: '#fff', fontFamily: FONT, fontSize: 13.5, fontWeight: 650,
               display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8,
             }}>
               Ask the coach <ArrowRight size={16} />
@@ -449,10 +426,10 @@ function AnalyticsScreen() {
       <TopBar title="Analytics" sub="Last 30 days · 42 completed trades" />
 
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 16, marginBottom: 30 }}>
-        <MetricCard label="Cumulative P&L" value="₹24,502" valueColor={T.green} sub="+12.4% vs previous" />
+        <MetricCard label="Cumulative P&L" value="₹24,502" valueColor={T.up} sub="+12.4% vs previous" />
         <MetricCard label="Win Rate" value="58%" sub="+2% vs your average" />
         <MetricCard label="Profit Factor" value="1.84" sub="Target > 2.0" />
-        <MetricCard label="Emotional Tax" value="₹45,200" valueColor={T.red} sub="Losses from psychology" />
+        <MetricCard label="Emotional Tax" value="₹45,200" valueColor={T.down} sub="Losses from psychology" />
       </div>
 
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 26, marginBottom: 30 }}>
@@ -470,7 +447,7 @@ function AnalyticsScreen() {
                   tick={{ fill: T.faint, fontSize: 10.5 }}
                   tickFormatter={(v: number) => `${v / 1000}k`} />
                 <Bar dataKey="v" radius={[6, 6, 0, 0]}>
-                  {BY_DAY.map((e, i) => <Cell key={i} fill={e.v >= 0 ? T.green : T.red} />)}
+                  {BY_DAY.map((e, i) => <Cell key={i} fill={e.v >= 0 ? T.up : T.down} />)}
                 </Bar>
               </BarChart>
             </ResponsiveContainer>
@@ -503,7 +480,7 @@ function AnalyticsScreen() {
               <span style={{ textAlign: 'right', fontSize: 13, color: T.body, fontVariantNumeric: 'tabular-nums' }}>{r.w}%</span>
               <span style={{
                 textAlign: 'right', fontSize: 13.5, fontWeight: 700,
-                color: r.up ? T.green : T.red, fontVariantNumeric: 'tabular-nums',
+                color: r.up ? T.up : T.down, fontVariantNumeric: 'tabular-nums',
               }}>
                 {r.p}
               </span>
@@ -516,16 +493,16 @@ function AnalyticsScreen() {
       <div style={{ marginBottom: 12 }}><Label>Behavioural patterns</Label></div>
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 16 }}>
         {[
-          { Icon: AlertTriangle, tone: 'red' as const, sev: 'HIGH', name: 'Hesitation', body: 'Missed entry points due to fear.', freq: '4×', cost: '-₹12,400' },
-          { Icon: RefreshCw, tone: 'amber' as const, sev: 'MED', name: 'Over-trading', body: 'Trades taken outside your plan.', freq: '2×', cost: '-₹6,100' },
-          { Icon: Hourglass, tone: 'indigo' as const, sev: 'LOW', name: 'Late exits', body: 'Held winners past your target.', freq: '5×', cost: '-₹3,300' },
+          { Icon: AlertTriangle, tone: 'down' as const, sev: 'HIGH', name: 'Hesitation', body: 'Missed entry points due to fear.', freq: '4×', cost: '-₹12,400' },
+          { Icon: RefreshCw, tone: 'down' as const, sev: 'MED', name: 'Over-trading', body: 'Trades taken outside your plan.', freq: '2×', cost: '-₹6,100' },
+          { Icon: Hourglass, tone: 'neutral' as const, sev: 'LOW', name: 'Late exits', body: 'Held winners past your target.', freq: '5×', cost: '-₹3,300' },
         ].map(p => (
           <div key={p.name} style={{ ...CARD, padding: 20 }}>
             <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: 14 }}>
               <IconTile tone={p.tone}>
-                <p.Icon size={17} color={{ red: T.red, amber: T.amber, indigo: T.indigo }[p.tone]} />
+                <p.Icon size={17} color={{ down: T.down, accent: T.accent }[p.tone]} />
               </IconTile>
-              <Pill tone={p.tone}>{p.sev} SEVERITY</Pill>
+              <Pill tone={p.tone} solid={p.sev === 'HIGH'}>{p.sev} SEVERITY</Pill>
             </div>
             <p style={{ margin: 0, fontSize: 16.5, fontWeight: 700, color: T.ink }}>{p.name}</p>
             <p style={{ margin: '3px 0 18px', fontSize: 12.5, color: T.muted }}>{p.body}</p>
@@ -533,7 +510,7 @@ function AnalyticsScreen() {
               <div><Label>Frequency</Label><p style={{ margin: '3px 0 0', fontSize: 15, fontWeight: 650, color: T.ink }}>{p.freq}</p></div>
               <div style={{ textAlign: 'right' }}>
                 <Label>Cost</Label>
-                <p style={{ margin: '3px 0 0', fontSize: 15, fontWeight: 700, color: T.red, fontVariantNumeric: 'tabular-nums' }}>{p.cost}</p>
+                <p style={{ margin: '3px 0 0', fontSize: 15, fontWeight: 700, color: T.down, fontVariantNumeric: 'tabular-nums' }}>{p.cost}</p>
               </div>
             </div>
           </div>
@@ -559,16 +536,16 @@ function PatternsScreen() {
       {/* CARD — a single alarming verdict deserves its own surface */}
       <div style={{
         borderRadius: 20, padding: '18px 22px', marginBottom: 26,
-        background: T.redTint, display: 'flex', alignItems: 'center', gap: 16,
+        background: T.downTint, display: 'flex', alignItems: 'center', gap: 16,
       }}>
-        <IconTile tone="red" size={44}><AlertTriangle size={20} color={T.red} /></IconTile>
+        <IconTile tone="down" size={44}><AlertTriangle size={20} color={T.down} /></IconTile>
         <div style={{ flex: 1 }}>
-          <Label style={{ color: T.red }}>Active pattern detected</Label>
+          <Label style={{ color: T.down }}>Active pattern detected</Label>
           <p style={{ margin: '3px 0 0', fontSize: 16, fontWeight: 700, color: T.ink }}>
             Tilt Trading · High Severity
           </p>
         </div>
-        <span style={{ fontSize: 13, fontWeight: 650, color: T.red, textDecoration: 'underline', cursor: 'pointer' }}>
+        <span style={{ fontSize: 13, fontWeight: 650, color: T.down, textDecoration: 'underline', cursor: 'pointer' }}>
           Details
         </span>
       </div>
@@ -581,7 +558,7 @@ function PatternsScreen() {
             <span style={{ fontSize: 36, fontWeight: 700, color: T.ink, letterSpacing: '-0.035em', fontVariantNumeric: 'tabular-nums' }}>
               ₹45,200
             </span>
-            <Pill tone="red">+12% vs last month</Pill>
+            <Pill tone="down">+12% vs last month</Pill>
           </div>
           <p style={{ margin: 0, fontSize: 13, color: T.muted, lineHeight: 1.6 }}>
             Losses attributed to psychology — fear, greed, tilt — rather than strategy failure.
@@ -601,7 +578,7 @@ function PatternsScreen() {
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 18 }}>
             <p style={{ margin: 0, fontSize: 15, fontWeight: 700, color: T.ink }}>30-day consistency</p>
             <div style={{ display: 'flex', gap: 14 }}>
-              {[['Disciplined', T.green], ['Impulsive', T.red]].map(([l, c]) => (
+              {[['Disciplined', T.accent], ['Impulsive', T.down]].map(([l, c]) => (
                 <span key={l} style={{ display: 'inline-flex', alignItems: 'center', gap: 6, fontSize: 11, color: T.muted }}>
                   <span style={{ width: 7, height: 7, borderRadius: 999, background: c as string }} /> {l}
                 </span>
@@ -620,8 +597,8 @@ function PatternsScreen() {
                 justifyContent: 'center', fontSize: 11.5, fontWeight: 650, maxHeight: 38,
               };
               if (!d) return <span key={i} style={{ ...base, border: `1px solid ${T.line}` }} />;
-              if (d.s === 'g') return <span key={i} style={{ ...base, background: T.green, color: '#fff' }}>{d.n}</span>;
-              if (d.s === 'b') return <span key={i} style={{ ...base, background: T.red, color: '#fff' }}>{d.n}</span>;
+              if (d.s === 'g') return <span key={i} style={{ ...base, background: T.accent, color: '#fff' }}>{d.n}</span>;
+              if (d.s === 'b') return <span key={i} style={{ ...base, background: T.down, color: '#fff' }}>{d.n}</span>;
               return <span key={i} style={{ ...base, border: `1px solid ${T.line}`, color: T.faint }}>{d.n}</span>;
             })}
           </div>
@@ -631,24 +608,29 @@ function PatternsScreen() {
       {/* FLAT — triggers are a list you read down and compare */}
       <Section title="Recurring triggers" action="View all">
         {[
-          { Icon: Zap, tone: 'amber' as const, name: 'Revenge Trading', sev: 'MED', body: 'Triggered after a loss >2% within 5 minutes.', freq: '3× this month', cost: '₹12,400' },
-          { Icon: Hourglass, tone: 'indigo' as const, name: 'Hesitation', sev: 'LOW', body: 'Missed entry points due to over-analysis.', freq: '5× this month', cost: '~₹8,000 missed' },
-          { Icon: RefreshCw, tone: 'red' as const, name: 'Size escalation', sev: 'HIGH', body: 'Position size grows after consecutive losses.', freq: '2× this month', cost: '₹18,600' },
+          { Icon: Zap, tone: 'down' as const, name: 'Revenge Trading', sev: 'MED', body: 'Triggered after a loss >2% within 5 minutes.', freq: '3× this month', cost: '₹12,400' },
+          { Icon: Hourglass, tone: 'neutral' as const, name: 'Hesitation', sev: 'LOW', body: 'Missed entry points due to over-analysis.', freq: '5× this month', cost: '~₹8,000 missed' },
+          { Icon: RefreshCw, tone: 'down' as const, name: 'Size escalation', sev: 'HIGH', body: 'Position size grows after consecutive losses.', freq: '2× this month', cost: '₹18,600' },
         ].map(t => (
           <div key={t.name} style={{
             display: 'grid', gridTemplateColumns: '34px 1.5fr 1fr 140px 110px', gap: 14,
             alignItems: 'center', padding: '15px 2px', borderBottom: `1px solid ${T.line}`,
           }}>
             <IconTile tone={t.tone} size={34}>
-              <t.Icon size={16} color={{ amber: T.amber, indigo: T.indigo, red: T.red }[t.tone]} />
+              <t.Icon size={16} color={{ down: T.down, accent: T.accent }[t.tone]} />
             </IconTile>
             <div>
               <p style={{ margin: 0, fontSize: 13.5, fontWeight: 650, color: T.ink }}>{t.name}</p>
               <p style={{ margin: '2px 0 0', fontSize: 12.5, color: T.muted }}>{t.body}</p>
             </div>
-            <Pill tone={t.tone}>{t.sev} SEVERITY</Pill>
+            {/* justifySelf, because a grid item stretches to fill its column by
+                default — the pill was spanning the whole cell and reading as a
+                progress bar rather than a label. */}
+            <span style={{ justifySelf: 'start' }}>
+              <Pill tone={t.tone} solid={t.sev === 'HIGH'}>{t.sev} SEVERITY</Pill>
+            </span>
             <span style={{ fontSize: 12.5, color: T.muted }}>{t.freq}</span>
-            <span style={{ textAlign: 'right', fontSize: 13.5, fontWeight: 700, color: T.red, fontVariantNumeric: 'tabular-nums' }}>
+            <span style={{ textAlign: 'right', fontSize: 13.5, fontWeight: 700, color: T.down, fontVariantNumeric: 'tabular-nums' }}>
               {t.cost}
             </span>
           </div>
@@ -670,9 +652,9 @@ function ShieldScreen() {
         <div style={{ ...CARD, padding: 28, display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
           <div style={{ alignSelf: 'stretch', display: 'flex', justifyContent: 'space-between', marginBottom: 18 }}>
             <Label>Risk score</Label>
-            <Pill tone="red">● HIGH RISK</Pill>
+            <Pill tone="down">● HIGH RISK</Pill>
           </div>
-          <Ring pct={84} size={210} stroke={16} color={T.red}>
+          <Ring pct={84} size={210} stroke={16} color={T.down}>
             <span style={{ fontSize: 44, fontWeight: 700, color: T.ink, letterSpacing: '-0.04em', lineHeight: 1 }}>
               84<span style={{ fontSize: 19, color: T.faint }}>/100</span>
             </span>
@@ -680,7 +662,7 @@ function ShieldScreen() {
           </Ring>
           <button style={{
             marginTop: 26, width: '100%', height: 52, borderRadius: 999, border: 'none', cursor: 'pointer',
-            background: `linear-gradient(100deg, ${T.red}, #E11D48)`, color: '#fff',
+            background: `linear-gradient(100deg, ${T.down}, #E11D48)`, color: '#fff',
             fontFamily: FONT, fontSize: 14, fontWeight: 700, letterSpacing: '0.02em',
             boxShadow: '0 8px 22px rgba(244,66,95,0.3)',
           }}>
@@ -692,9 +674,9 @@ function ShieldScreen() {
           {/* CARDS — three independent gauges */}
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3,1fr)', gap: 16, marginBottom: 26 }}>
             {[
-              { l: 'Tilt', v: 75, c: T.amber },
-              { l: 'Fatigue', v: 20, c: T.green },
-              { l: 'Volatility', v: 90, c: T.red },
+              { l: 'Tilt', v: 75, c: T.down },
+              { l: 'Fatigue', v: 20, c: T.accent },
+              { l: 'Volatility', v: 90, c: T.down },
             ].map(m => (
               <div key={m.l} style={{ ...CARD, padding: '20px 16px', display: 'flex', alignItems: 'center', gap: 16 }}>
                 <Ring pct={m.v} size={62} stroke={6} color={m.c}>
@@ -719,7 +701,7 @@ function ShieldScreen() {
               ].map(([p, on]) => (
                 <span key={p as string} style={{
                   fontSize: 12.5, fontWeight: on ? 650 : 500, padding: '8px 15px', borderRadius: 999,
-                  background: on ? T.red : T.surface,
+                  background: on ? T.down : T.surface,
                   color: on ? '#fff' : T.muted,
                   border: on ? 'none' : `1px solid ${T.line}`,
                 }}>
@@ -731,7 +713,7 @@ function ShieldScreen() {
 
           {/* CARD */}
           <div style={{ ...CARD, padding: 20, display: 'flex', gap: 14 }}>
-            <IconTile tone="indigo" size={42}><Sparkles size={18} color={T.indigo} /></IconTile>
+            <IconTile tone="accent" size={42}><Sparkles size={18} color={T.accent} /></IconTile>
             <div>
               <p style={{ margin: 0, fontSize: 14.5, fontWeight: 700, color: T.ink }}>Coach Insight</p>
               <p style={{ margin: '4px 0 0', fontSize: 13, color: T.muted, lineHeight: 1.6 }}>
@@ -748,12 +730,12 @@ function ShieldScreen() {
 
 // ── Settings ──────────────────────────────────────────────────────────────────
 
-function Toggle({ on, tone = 'indigo' }: { on: boolean; tone?: 'indigo' | 'green' }) {
+function Toggle({ on, tone = 'accent' }: { on: boolean; tone?: 'accent' }) {
   return (
     <span style={{
       width: 46, height: 27, borderRadius: 999, padding: 3, display: 'inline-flex',
       justifyContent: on ? 'flex-end' : 'flex-start', alignItems: 'center', flexShrink: 0,
-      background: on ? (tone === 'green' ? T.green : T.indigo) : '#DFE2E8',
+      background: on ? T.accent : '#DFE2E8',
     }}>
       <span style={{ width: 21, height: 21, borderRadius: 999, background: '#fff' }} />
     </span>
@@ -784,7 +766,7 @@ function SettingsScreen() {
         <div style={{ display: 'grid', gap: 30 }}>
           {/* FLAT — settings are rows you scan, the textbook case for no boxes */}
           <Section title="Risk parameters">
-            <SettingRow title="Max daily loss" sub="Hard stop percentage" right={<Pill tone="indigo">5 %</Pill>} />
+            <SettingRow title="Max daily loss" sub="Hard stop percentage" right={<Pill tone="accent">5 %</Pill>} />
             <SettingRow title="Cooldown period" sub="Enforced pause after a loss"
               right={<span style={{ fontSize: 13.5, color: T.body }}>15 minutes</span>} />
             <SettingRow title="Auto-close positions" sub="Close everything if the max loss is hit"
@@ -795,7 +777,7 @@ function SettingsScreen() {
 
           <Section title="App preferences">
             <SettingRow title="Appearance"
-              right={<span style={{ display: 'inline-flex', alignItems: 'center', gap: 6, fontSize: 13.5, fontWeight: 600, color: T.indigo }}>
+              right={<span style={{ display: 'inline-flex', alignItems: 'center', gap: 6, fontSize: 13.5, fontWeight: 600, color: T.accent }}>
                 Light <ChevronRight size={15} />
               </span>} />
             <SettingRow title="Biometric unlock" sub="Require Face ID on open" right={<Toggle on={false} />} />
@@ -808,10 +790,10 @@ function SettingsScreen() {
           <div style={{ ...CARD, padding: 20 }}>
             <Label>Account &amp; API</Label>
             <div style={{ display: 'flex', alignItems: 'center', gap: 13, margin: '14px 0 0' }}>
-              <IconTile tone="amber" size={42}><Link2 size={18} color="#FF5A1F" /></IconTile>
+              <IconTile tone="accent" size={42}><Link2 size={18} color={T.accent} /></IconTile>
               <div style={{ flex: 1 }}>
                 <p style={{ margin: 0, fontSize: 14, fontWeight: 650, color: T.ink }}>Zerodha Kite</p>
-                <p style={{ margin: '2px 0 0', fontSize: 12.5, fontWeight: 600, color: T.green }}>● Connected</p>
+                <p style={{ margin: '2px 0 0', fontSize: 12.5, fontWeight: 600, color: T.accent }}>● Connected</p>
               </div>
               <ChevronRight size={17} color={T.faint} />
             </div>
@@ -823,11 +805,11 @@ function SettingsScreen() {
 
           {/* CARD — tinted, because it is the one dangerous thing on the page */}
           <div style={{
-            borderRadius: 20, padding: 20, background: '#FFF7F8', border: `1px solid ${T.redTint}`,
+            borderRadius: 20, padding: 20, background: '#FFF7F8', border: `1px solid ${T.downTint}`,
           }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 14 }}>
-              <Shield size={14} color={T.red} />
-              <Label style={{ color: T.red }}>Guardian protocols</Label>
+              <Shield size={14} color={T.down} />
+              <Label style={{ color: T.down }}>Guardian protocols</Label>
             </div>
             <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 14 }}>
               <div>
@@ -836,13 +818,13 @@ function SettingsScreen() {
                   Messages your accountability partner if daily loss exceeds 5%.
                 </p>
               </div>
-              <Toggle on tone="green" />
+              <Toggle on tone="accent" />
             </div>
             <div style={{
               display: 'flex', alignItems: 'center', gap: 11, marginTop: 16, paddingTop: 14,
-              borderTop: `1px solid ${T.redTint}`,
+              borderTop: `1px solid ${T.downTint}`,
             }}>
-              <IconTile tone="green" size={34}><MessageSquare size={15} color={T.green} /></IconTile>
+              <IconTile tone="accent" size={34}><MessageSquare size={15} color={T.accent} /></IconTile>
               <span style={{ flex: 1, fontSize: 13, fontWeight: 600, color: T.ink }}>Partner number</span>
               <span style={{ fontSize: 13, color: T.body, fontVariantNumeric: 'tabular-nums' }}>+91 98765 43210</span>
             </div>
@@ -886,9 +868,9 @@ export default function SoftPrecisionWebLab() {
               intent of just becomes a screenshot. */}
           <div style={{
             display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap',
-            padding: '10px 14px', borderRadius: 12, background: T.indigoTint, marginBottom: 22,
+            padding: '10px 14px', borderRadius: 12, background: T.accentTint, marginBottom: 22,
           }}>
-            <span style={{ fontSize: 11.5, fontWeight: 700, color: T.indigo, letterSpacing: '0.06em', textTransform: 'uppercase' }}>
+            <span style={{ fontSize: 11.5, fontWeight: 700, color: T.accent, letterSpacing: '0.06em', textTransform: 'uppercase' }}>
               Design study
             </span>
             <span style={{ fontSize: 12.5, color: T.body }}>
