@@ -518,6 +518,17 @@ def process_webhook_trade(self, trade_data: Dict[str, Any], broker_account_id: s
                                 logger.debug(f"GTT tracking skipped: {_gtt_e}")
 
                         await db.commit()
+
+                        # The account's analytics just changed. Bump its cache
+                        # generation so every previously cached response for it
+                        # becomes unreachable — a trader who closes a position and
+                        # opens Analytics must not be shown the pre-trade numbers.
+                        # After the commit, so a rolled-back pipeline cannot
+                        # invalidate a cache that was in fact still correct.
+                        if _closed_ct_id is not None:
+                            from app.core.response_cache import bump_account_version_sync
+                            bump_account_version_sync(account_id)
+
                         logger.info(
                             f"[ledger] {ledger_entry.entry_type} {trade.tradingsymbol} "
                             f"qty={signed_qty:+d} @ {trade.average_price}"

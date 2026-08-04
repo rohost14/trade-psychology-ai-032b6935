@@ -130,6 +130,25 @@ async def lifespan(app: FastAPI):
     except Exception as e:
         logger.error(f"Event subscriber failed to start: {e}")
 
+    # Multi-instance only. One instance wins a Redis lease and is the sole owner of
+    # the KiteTicker; it publishes ticks and every instance forwards them to its own
+    # WebSocket clients. Without this, a second instance opens a SECOND ticker —
+    # duplicate ticks and split subscription state. Off by default: on one instance
+    # it changes nothing except Redis traffic. See services/ticker_lease.py.
+    _ticker_lease_tasks = []
+    if settings.PRICE_STREAM_MULTI_INSTANCE:
+        try:
+            import asyncio as _asyncio
+            from app.services import ticker_lease
+
+            _ticker_lease_tasks = [
+                _asyncio.create_task(ticker_lease.run_lease_loop()),
+                _asyncio.create_task(ticker_lease.run_tick_subscriber()),
+            ]
+            logger.info("Ticker lease + tick subscriber started (multi-instance mode).")
+        except Exception as e:
+            logger.error(f"Ticker lease failed to start: {e}")
+
     # One-time repair: fix CompletedTrades whose realized_pnl was overwritten by the
     # reconciliation bug introduced in session 33 (49ba0b8).  For NSE/NFO instruments
     # the FIFO engine is authoritative; Zerodha's pos.pnl diverges because it spans
@@ -223,6 +242,18 @@ async def lifespan(app: FastAPI):
 
     # Shutdown logic
     logger.info("Shutting down...")
+
+    # Hand the ticker lease back explicitly. Without this the next instance waits a
+    # full LEASE_TTL before it can take over, which is a gap in the live price feed
+    # on every deploy — exactly when a restart is most likely.
+    if _ticker_lease_tasks:
+        try:
+            from app.services import ticker_lease
+            await ticker_lease.release()
+            for _t in _ticker_lease_tasks:
+                _t.cancel()
+        except Exception as e:
+            logger.warning(f"Ticker lease shutdown failed (lease will expire): {e}")
 
 app = FastAPI(
     title=settings.PROJECT_NAME,

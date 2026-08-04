@@ -10,6 +10,7 @@ import math
 
 from app.core.database import get_db
 from app.api.deps import get_verified_broker_account_id
+from app.core.response_cache import cached_analytics
 from app.services.analytics_service import AnalyticsService
 from app.services.pnl_calculator import pnl_calculator
 from app.core.rate_limiter import analytics_limiter
@@ -335,6 +336,7 @@ async def _get_discipline_streaks(account_id: UUID, db: AsyncSession):
 
 
 @router.get("/overview")
+@cached_analytics(ttl=180)
 async def get_analytics_overview(
     days: int = Query(default=30, ge=1, le=365),
     broker_account_id: UUID = Depends(get_verified_broker_account_id),
@@ -509,6 +511,7 @@ async def get_analytics_overview(
 
 
 @router.get("/performance")
+@cached_analytics(ttl=180)
 async def get_analytics_performance(
     days: int = Query(default=30, ge=1, le=365),
     broker_account_id: UUID = Depends(get_verified_broker_account_id),
@@ -722,6 +725,7 @@ async def get_analytics_performance(
 
 
 @router.get("/risk-metrics")
+@cached_analytics(ttl=180)
 async def get_analytics_risk_metrics(
     days: int = Query(default=30, ge=1, le=365),
     broker_account_id: UUID = Depends(get_verified_broker_account_id),
@@ -1350,6 +1354,7 @@ def _days_between(start_str: str | None, end_str: str | None) -> int:
 
 
 @router.get("/edge-confidence")
+@cached_analytics(ttl=180)
 async def get_edge_confidence(
     days: int = Query(default=30, ge=1, le=365),
     broker_account_id: UUID = Depends(get_verified_broker_account_id),
@@ -1664,6 +1669,7 @@ async def get_critical_trades(
 
 
 @router.get("/timing-heatmap")
+@cached_analytics(ttl=300)
 async def get_timing_heatmap(
     days: int = Query(default=30, ge=1, le=365),
     broker_account_id: UUID = Depends(get_verified_broker_account_id),
@@ -2620,6 +2626,7 @@ async def get_quality_breakdown(
 
 
 @router.get("/expiry-pattern")
+@cached_analytics(ttl=300)
 async def get_expiry_pattern(
     days: int = Query(default=90, ge=7, le=365),
     broker_account_id: UUID = Depends(get_verified_broker_account_id),
@@ -2743,6 +2750,7 @@ async def get_expiry_pattern(
 
 
 @router.get("/trade-sequence")
+@cached_analytics(ttl=300)
 async def get_trade_sequence(
     days: int = Query(default=90, ge=7, le=365),
     broker_account_id: UUID = Depends(get_verified_broker_account_id),
@@ -2825,6 +2833,7 @@ async def get_trade_sequence(
 # ─────────────────────────────────────────────────────────────────────────────
 
 @router.get("/edge-leak")
+@cached_analytics(ttl=180)
 async def get_edge_leak(
     days: int = Query(default=30, ge=1, le=365),
     broker_account_id: UUID = Depends(get_verified_broker_account_id),
@@ -2932,6 +2941,7 @@ _STRATEGY_LABELS = {
 
 
 @router.get("/strategy-performance")
+@cached_analytics(ttl=180)
 async def get_strategy_performance(
     days: int = Query(default=30, ge=1, le=365),
     broker_account_id: UUID = Depends(get_verified_broker_account_id),
@@ -3026,6 +3036,7 @@ async def get_strategy_performance(
 
 
 @router.get("/habits")
+@cached_analytics(ttl=300)
 async def get_habits(
     days: int = Query(default=365, ge=1, le=3650),
     broker_account_id: UUID = Depends(get_verified_broker_account_id),
@@ -3053,6 +3064,7 @@ async def get_habits(
 
 
 @router.get("/behaviour-cost")
+@cached_analytics(ttl=300)
 async def get_behaviour_cost(
     days: int = Query(default=90, ge=1, le=365),
     broker_account_id: UUID = Depends(get_verified_broker_account_id),
@@ -3149,6 +3161,7 @@ async def get_behaviour_cost(
 
 
 @router.get("/session-log")
+@cached_analytics(ttl=300)
 async def get_session_log(
     days: int = Query(default=60, ge=7, le=365),
     broker_account_id: UUID = Depends(get_verified_broker_account_id),

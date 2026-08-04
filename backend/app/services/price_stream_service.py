@@ -702,13 +702,63 @@ class SharedPriceStream(PriceStreamProvider):
             logger.warning(f"[shared_ticker] token provider failed: {e}")
             return None
 
-    async def broadcast_ltp(self, symbol: str, price_data: dict) -> None:
-        """Fan-out a KiteTicker tick to all WebSocket clients holding this instrument."""
-        from app.api.websocket import manager
+    @staticmethod
+    def _multi_instance() -> bool:
+        try:
+            from app.core.config import settings
+            return bool(settings.PRICE_STREAM_MULTI_INSTANCE)
+        except Exception:
+            return False
 
+    def _may_own_ticker(self) -> bool:
+        """Single-instance: always. Multi-instance: only while holding the lease."""
+        if not self._multi_instance():
+            return True
+        from app.services import ticker_lease
+        return ticker_lease.is_owner()
+
+    async def broadcast_ltp(self, symbol: str, price_data: dict) -> None:
+        """
+        Handle a tick produced by THIS process's ticker.
+
+        Single instance: fan out locally, exactly as before.
+        Multi-instance: publish to Redis so every instance can serve its own
+        WebSocket clients — this process holds the ticker but not necessarily the
+        clients. Publishing is fire-and-forget on purpose; a tick that misses its
+        window is worthless, so there is nothing here worth retrying or storing.
+        """
         token = price_data.get("instrument_token")
         if token is None:
             return
+
+        if self._multi_instance():
+            try:
+                import json
+                from app.core.redis_pool import get_async_redis
+                from app.services.ticker_lease import TICK_CHANNEL
+
+                r = await get_async_redis()
+                await r.publish(TICK_CHANNEL, json.dumps({
+                    "symbol": symbol,
+                    "last_price": price_data.get("last_price"),
+                    "instrument_token": token,
+                }))
+            except Exception as e:
+                logger.debug(f"[shared_ticker] tick publish failed: {e}")
+            return
+
+        await self.deliver_ltp_locally(symbol, price_data.get("last_price"), token)
+
+    async def deliver_ltp_locally(self, symbol: str, last_price, token: int) -> None:
+        """
+        Send a tick to this process's own WebSocket clients holding the instrument.
+
+        Called directly by broadcast_ltp on a single instance, and by the pub/sub
+        subscriber on every instance in multi-instance mode. The routing map
+        (_token_holders) is local bookkeeping built when an account registers here,
+        so each instance naturally reaches only its own clients.
+        """
+        from app.api.websocket import manager
 
         # Snapshot the holder set — asyncio is single-threaded so this is safe
         # between awaits, and we only hold a list reference after the snapshot.
@@ -720,7 +770,7 @@ class SharedPriceStream(PriceStreamProvider):
             "type": "ltp_update",
             "data": {
                 "symbol": symbol,
-                "last_price": price_data.get("last_price"),
+                "last_price": last_price,
                 "instrument_token": token,
             },
         }
@@ -754,7 +804,14 @@ class SharedPriceStream(PriceStreamProvider):
         """
         Return existing connected ticker, or build a new one.
         Caller must NOT hold _ticker_lock.
+
+        In multi-instance mode only the lease holder opens a ticker. Everyone else
+        returns None and gets its ticks from the pub/sub channel instead — two
+        instances each running their own KiteTicker is the split brain this avoids.
         """
+        if not self._may_own_ticker():
+            return None
+
         async with self._ticker_lock:
             # NEVER rebuild an existing ticker: KiteTicker's Twisted reactor cannot be
             # restarted in-process (ReactorNotRestartable). If a ticker object exists —

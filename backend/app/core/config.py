@@ -60,6 +60,19 @@ class Settings(BaseSettings):
     # Optional: Separate Celery broker URL (defaults to REDIS_URL)
     CELERY_BROKER_URL: Optional[str] = None
 
+    # Turn ON only when running MORE THAN ONE backend instance.
+    #
+    # SharedPriceStream keeps its ticker and subscription state in process memory,
+    # so two instances means two KiteTicker connections and duplicate ticks — a real
+    # split brain. With this enabled, one instance wins a Redis lease and is the only
+    # one that opens a ticker; it republishes ticks on a pub/sub channel and every
+    # instance forwards them to its own WebSocket clients. See services/ticker_lease.py.
+    #
+    # Left OFF by default because on a single instance it changes nothing except cost:
+    # tick fan-out through Redis is billions of commands a month at scale, and on a
+    # per-command plan (Upstash) that is the bill, not a rounding error.
+    PRICE_STREAM_MULTI_INSTANCE: bool = False
+
     # SMTP — only used for admin panel OTP. Not used for user report delivery.
     SMTP_HOST: Optional[str] = None
     SMTP_PORT: int = 587
