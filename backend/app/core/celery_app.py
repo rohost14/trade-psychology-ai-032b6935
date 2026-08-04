@@ -76,6 +76,18 @@ celery_app.conf.update(
     worker_heartbeat=60,
 
     # Task routing
+    #
+    # NOTE the `bulk` queue. It has no route entry because nothing is routed there
+    # by name — the EOD dispatcher sends to it explicitly per call
+    # (sync_trades_for_account.apply_async(..., queue="bulk")). The same task is
+    # latency-sensitive when a user presses Sync and pure batch when the 15:35 job
+    # fans it out, so the queue is chosen at dispatch, not by task name.
+    #
+    # Why it exists: process_webhook_trade — the live path that produces real-time
+    # behavioural alerts — runs on `trades`. When the EOD job queued thousands of
+    # syncs onto that same queue, every live fill's alert waited behind the batch.
+    # Alerts stopped being live at exactly the moment the market closed.
+    # The worker must consume `bulk` (see Procfile) or EOD syncs will never run.
     task_routes={
         "app.tasks.trade_tasks.*": {"queue": "trades"},
         "app.tasks.alert_tasks.*": {"queue": "alerts"},

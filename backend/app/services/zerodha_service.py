@@ -51,12 +51,58 @@ class KiteNetworkError(KiteAPIError):
 # Rate Limiter
 # =============================================================================
 
+# Sliding-window rate limit, evaluated atomically inside Redis.
+#
+# Returns 0 when a slot was claimed, otherwise the milliseconds to wait until the
+# oldest entry falls out of the window. Doing the check and the claim in one script
+# removes a real race: the previous check-then-add let two workers both observe
+# count < limit and both claim, which is how you exceed Kite's limit and get the
+# platform API key banned.
+_RATE_LIMIT_LUA = """
+local key    = KEYS[1]
+local now    = tonumber(ARGV[1])
+local window = tonumber(ARGV[2])
+local limit  = tonumber(ARGV[3])
+local member = ARGV[4]
+
+redis.call('ZREMRANGEBYSCORE', key, '-inf', now - window)
+if redis.call('ZCARD', key) < limit then
+    redis.call('ZADD', key, now, member)
+    redis.call('EXPIRE', key, 2)
+    return 0
+end
+
+local oldest = redis.call('ZRANGE', key, 0, 0, 'WITHSCORES')
+local wait_ms = math.ceil((tonumber(oldest[2]) + window - now) * 1000)
+if wait_ms < 1 then wait_ms = 1 end
+return wait_ms
+"""
+
+_RATE_LIMIT_KEY = "kite_api_rate"
+_RATE_LIMIT_WINDOW = 1.0
+
+
 class RateLimiter:
     """
     Redis-backed global rate limiter for Kite API (3 req/sec per API key).
-    Shared across all Celery/uvicorn workers — prevents multi-worker bursts
-    from exceeding Zerodha's limit and getting the API key banned.
-    Falls back to in-process throttle if Redis is unavailable.
+
+    Shared across all Celery/uvicorn workers. This matters more than it looks:
+    under Model A there is ONE platform API key for every user, so this limiter is
+    the single gate in front of all Kite REST traffic on the platform.
+
+    Three things this had to fix (see eod_sync_all_accounts for the context):
+
+      - It opened a NEW Redis connection per attempt via redis.from_url, bypassing
+        the shared pool, and used a SYNC client inside async code — blocking the
+        event loop on every acquire.
+      - It polled every 100ms while saturated. With a large fan-out, thousands of
+        waiters each polling 10×/sec is ~100k Redis ops/sec of pure backoff, which
+        takes the Redis instance down. It now sleeps exactly until a slot frees.
+      - Check-then-claim was not atomic, so concurrent workers could both claim the
+        last slot. The Lua script above makes it one operation.
+
+    Falls back to an in-process throttle if Redis is unavailable — correct on a
+    single worker, and better than failing the call.
     """
 
     def __init__(self, calls_per_second: float = 3.0):
@@ -64,33 +110,34 @@ class RateLimiter:
         self._fallback_interval = 1.0 / calls_per_second
         self._fallback_last = 0.0
         self._fallback_lock = asyncio.Lock()
+        self._script = None
 
     async def acquire(self):
         """Block until a Kite API slot is available (global across all workers)."""
         try:
-            import redis as redis_lib
-            from app.core.config import settings as _settings
+            from app.core.redis_pool import get_async_redis
+
+            r = await get_async_redis()
+            if self._script is None:
+                # sha1 is computed locally at registration; the call itself uses
+                # EVALSHA with an automatic EVAL fallback on NOSCRIPT.
+                self._script = r.register_script(_RATE_LIMIT_LUA)
 
             while True:
                 now = time.time()
-                window_start = now - 1.0
-                member = f"{now:.9f}"
-
-                r = redis_lib.from_url(_settings.REDIS_URL, socket_connect_timeout=1)
-                pipe = r.pipeline()
-                pipe.zremrangebyscore("kite_api_rate", "-inf", window_start)
-                pipe.zcard("kite_api_rate")
-                results = pipe.execute()
-                call_count = results[1]
-
-                if call_count < self.max_calls:
-                    r.zadd("kite_api_rate", {member: now})
-                    r.expire("kite_api_rate", 2)
-                    r.close()
+                # Pass the current client explicitly — get_async_redis() hands back a
+                # fresh wrapper over the shared pool each call, so the script must not
+                # hold the one it happened to be registered with.
+                wait_ms = await self._script(
+                    keys=[_RATE_LIMIT_KEY],
+                    args=[now, _RATE_LIMIT_WINDOW, self.max_calls, f"{now:.9f}"],
+                    client=r,
+                )
+                if int(wait_ms) == 0:
                     return
-
-                r.close()
-                await asyncio.sleep(0.1)
+                # Sleep until the oldest call leaves the window instead of polling.
+                # Capped so a clock skew or a stuck entry cannot park a worker.
+                await asyncio.sleep(min(int(wait_ms) / 1000.0, _RATE_LIMIT_WINDOW))
 
         except Exception:
             # Redis unavailable — fall back to in-process throttle (single-worker safe)

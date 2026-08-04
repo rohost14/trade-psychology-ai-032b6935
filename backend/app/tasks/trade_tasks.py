@@ -1364,47 +1364,113 @@ def send_danger_alert(self, broker_account_id: str, alert_id: str):
         raise self.retry(exc=exc, countdown=min(2 ** self.request.retries * 30, 300))
 
 
-@celery_app.task
-def eod_sync_all_accounts():
-    """
-    End-of-day sync for all connected broker accounts.
+# EOD fan-out sizing. See eod_sync_all_accounts for why these exist.
+EOD_CHUNK_SIZE = 100          # accounts queued per dispatcher pass
+EOD_CHUNK_INTERVAL = 30       # seconds between passes
 
-    Scheduled at 3:35 PM IST (Monday–Friday) — 5 minutes after NSE/NFO/BSE/BFO close.
+
+@celery_app.task
+def eod_sync_all_accounts(after_id: str | None = None, _queued_so_far: int = 0):
+    """
+    End-of-day sync — dispatches in bounded chunks, not all at once.
+
+    Scheduled at 3:35 PM IST (Monday–Friday), 5 minutes after NSE/NFO/BSE/BFO close.
     This is the ONLY periodic sync. No polling during the day.
 
-    Purpose:
-      - Ensure all today's fills are in DB (catches any missed webhooks)
-      - Create CompletedTrades for cross-day positions (overnight holds closed today)
-        using kite.positions()["net"] data, which expires at end of day
-      - Feed accurate EOD state into behavioral analysis and daily reports
+    Two changes from the original fan-out, both about what happens at scale:
 
-    Not triggered by Celery Beat alone — also called explicitly when needed
-    (e.g., MCX accounts that trade past 15:30).
+    1. ONLY ACCOUNTS THAT TRADED TODAY. It used to sync every *connected* account.
+       Most users do not trade on most days, so the overwhelming majority of those
+       syncs fetched nothing. The whole purpose is catching fills the webhook
+       missed, and an account with no fills today has none to catch.
+
+    2. CHUNKED, SELF-RESCHEDULING DISPATCH. It used to queue every account in one
+       loop. Kite's REST limit is 3 req/s per API key, and under Model A that one
+       key is shared by every user — so the work is rate-bound no matter how many
+       workers exist. Queueing 10k tasks at once did not make it faster; it made
+       every one of them sit inside RateLimiter.acquire(), whose backoff polls
+       Redis every 100ms. Ten thousand waiters is ~100k Redis ops/sec of pure
+       backoff — enough to take the Redis instance down. The queue depth was the
+       outage, not the latency.
+
+       Chunking keeps a bounded number of tasks in flight and constant memory in
+       the dispatcher. Celery `countdown=` on 10k individual tasks was NOT used —
+       ETA tasks are held in worker memory, which trades one blowup for another.
+
+    Cursor-based on account id so a mid-run worker restart resumes rather than
+    restarting the whole fan-out. Call with no arguments; it re-queues itself.
+
+    The body lives in eod_dispatch_chunk() so it can be awaited directly in tests —
+    this wrapper's asyncio.run() cannot nest inside an existing event loop.
     """
-    import asyncio
-
-    async def _sync_all():
-        async with SessionLocal() as db:
-            result = await db.execute(
-                select(BrokerAccount).where(
-                    BrokerAccount.status == "connected",
-                    BrokerAccount.access_token.isnot(None),
-                )
-            )
-            accounts = result.scalars().all()
-            logger.info(f"[EOD sync] Starting for {len(accounts)} connected account(s)")
-
-            for account in accounts:
-                try:
-                    sync_trades_for_account.delay(str(account.id))
-                    logger.info(f"[EOD sync] Queued sync for account {account.id}")
-                except Exception as e:
-                    logger.error(f"[EOD sync] Failed to queue {account.id}: {e}")
-
-            return {"queued": len(accounts)}
-
     import asyncio as _asyncio
-    return _asyncio.run(_sync_all())
+    return _asyncio.run(eod_dispatch_chunk(after_id, _queued_so_far))
+
+
+async def eod_dispatch_chunk(after_id: str | None = None, queued_so_far: int = 0) -> dict:
+    """One pass of the EOD fan-out. See eod_sync_all_accounts for the rationale."""
+    from zoneinfo import ZoneInfo as _ZI
+
+    # "Traded today" is measured in IST — the trading day, not UTC midnight.
+    today_ist = datetime.now(_ZI("Asia/Kolkata")).date()
+    today_start_utc = datetime.combine(
+        today_ist, datetime.min.time()
+    ).replace(tzinfo=timezone.utc) - timedelta(hours=5, minutes=30)
+
+    async with SessionLocal() as db:
+        traded_today = (
+            select(Trade.broker_account_id)
+            .where(Trade.order_timestamp >= today_start_utc)
+            .distinct()
+            .scalar_subquery()
+        )
+
+        stmt = (
+            select(BrokerAccount)
+            .where(
+                BrokerAccount.status == "connected",
+                BrokerAccount.access_token.isnot(None),
+                BrokerAccount.id.in_(traded_today),
+            )
+            .order_by(BrokerAccount.id)
+            .limit(EOD_CHUNK_SIZE)
+        )
+        if after_id:
+            stmt = stmt.where(BrokerAccount.id > UUID(after_id))
+
+        accounts = (await db.execute(stmt)).scalars().all()
+
+    if not accounts:
+        logger.info(f"[EOD sync] Complete — {queued_so_far} account(s) queued")
+        return {"queued": queued_so_far, "done": True}
+
+    queued = 0
+    for account in accounts:
+        try:
+            # queue="bulk", NOT the default "trades". process_webhook_trade runs
+            # on "trades" and produces live alerts; a batch of EOD syncs on the
+            # same queue puts every live fill behind the backlog right when the
+            # market closes. Same task, different queue, chosen at dispatch.
+            sync_trades_for_account.apply_async(
+                args=[str(account.id)], queue="bulk"
+            )
+            queued += 1
+        except Exception as e:
+            logger.error(f"[EOD sync] Failed to queue {account.id}: {e}")
+
+    last_id = str(accounts[-1].id)
+    total = queued_so_far + queued
+    logger.info(
+        f"[EOD sync] Queued {queued} account(s) (total {total}); "
+        f"next chunk in {EOD_CHUNK_INTERVAL}s"
+    )
+
+    # Re-queue the dispatcher for the next chunk. Only ever one in flight.
+    eod_sync_all_accounts.apply_async(
+        kwargs={"after_id": last_id, "_queued_so_far": total},
+        countdown=EOD_CHUNK_INTERVAL,
+    )
+    return {"queued": total, "done": False}
 
 
 @celery_app.task(name="app.tasks.trade_tasks.run_behavior_detection_retry",

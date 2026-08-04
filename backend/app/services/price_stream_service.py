@@ -366,7 +366,12 @@ class ZerodhaTicker:
         """Unsubscribe from instrument tokens."""
         self.subscribed_tokens -= set(tokens)
         for t in tokens:
-            self._token_to_symbol.pop(t, None)
+            # Drop the tick-time entry with the token it belongs to. It is keyed by
+            # SYMBOL, so it has to be resolved before _token_to_symbol forgets the
+            # mapping — otherwise the entry is stranded until the ticker resets.
+            symbol = self._token_to_symbol.pop(t, None)
+            if symbol:
+                self._last_tick_times.pop(symbol, None)
         if self.kws and self._connected:
             self.kws.unsubscribe(tokens)
 
@@ -510,7 +515,11 @@ class AsyncKiteTicker:
         toks = list(tokens)
         for t in toks:
             self.subscribed_tokens.discard(t)
-            self._token_to_symbol.pop(t, None)
+            # Same ordering as the sync path: resolve the symbol before dropping
+            # the mapping, or the symbol-keyed tick-time entry is stranded.
+            symbol = self._token_to_symbol.pop(t, None)
+            if symbol:
+                self._last_tick_times.pop(symbol, None)
         if self._ws is not None and self._connected and toks:
             try:
                 await self._ws.send_json({"a": "unsubscribe", "v": toks})

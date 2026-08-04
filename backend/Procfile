@@ -1,3 +1,7 @@
 web: uvicorn app.main:app --host 0.0.0.0 --port ${PORT:-8000} --timeout-keep-alive 120
-worker: CELERY_WORKER=1 celery -A app.core.celery_app worker --pool=prefork --queues=celery,trades,alerts,reports --loglevel=INFO
+# `bulk` carries the EOD fan-out. It is listed LAST on purpose: Celery drains queues
+# in the order given, so live work on trades/alerts is picked up ahead of batch syncs.
+# On a single worker this is enough. Once EOD volume grows, run a SECOND worker
+# process with --queues=bulk only, so a backlog can never delay live alerts at all.
+worker: CELERY_WORKER=1 celery -A app.core.celery_app worker --pool=prefork --queues=celery,trades,alerts,reports,bulk --loglevel=INFO
 beat: CELERY_WORKER=1 celery -A app.core.celery_app beat --scheduler=redbeat.RedBeatScheduler --loglevel=INFO

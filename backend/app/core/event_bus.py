@@ -17,10 +17,20 @@ Architecture:
     Redis fails → Celery still processes (publish_event is fail-silent).
 
   Multi-instance scaling (when using multiple backend processes):
-    Each FastAPI instance runs its own start_event_subscriber() reading the same global stream.
-    WebSocket connections are sticky to one instance (use sticky sessions on load balancer).
-    Each instance dispatches only to its local WebSocket connections; ignores others silently.
-    No pub/sub needed — Redis Streams fan-out handles it.
+    Each FastAPI instance runs its own start_event_subscriber() reading the same global
+    stream, and dispatches to whichever clients it happens to hold locally. Because
+    EVERY instance sees EVERY event, a client connected to any instance gets its own
+    events. Sticky sessions are therefore NOT required for correctness here — an
+    earlier version of this note claimed they were, which was wrong and made the
+    deployment look more fragile than it is. They are still worth having so a
+    reconnecting client resumes replay against the same cursor.
+
+    The cost of that fan-out is that every instance reads every event (N× read
+    amplification), which is the thing consumer groups would fix — see below.
+
+    NOT covered by this: the KiteTicker in price_stream_service, whose subscription
+    state is per-process in-memory. Two instances means two tickers and duplicate
+    ticks. That is a genuine split brain and needs an owner lease, not this bus.
 
   At 50+ users:
     Replace per-call sync connection with ConnectionPool (already done — see _get_sync_redis).
