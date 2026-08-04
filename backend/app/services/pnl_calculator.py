@@ -1,10 +1,23 @@
 """
 P&L Calculator Service
 
-Calculates realized P&L by matching BUY and SELL trades using FIFO.
-Creates CompletedTrade records for flat-to-flat position lifecycles.
-Detects incomplete positions (sync gaps).
-Computes ML features post-FIFO in a separate pass.
+Matches BUY and SELL trades to build CompletedTrade records for flat-to-flat
+position lifecycles, detects incomplete positions (sync gaps), and computes ML
+features in a separate pass.
+
+Two different things are going on, and conflating them was S1:
+  - ROUND STRUCTURE is FIFO. Fills drain an opening queue; when it empties the
+    position is flat and a round closes; an over-close is a direction flip.
+  - COST BASIS is the WEIGHTED AVERAGE of the open position, via the ledger's
+    `_compute_fill_effect` — literally the same function the live engine calls,
+    so both engines split a partial exit identically.
+
+That second point used to be FIFO here and weighted-average in the ledger. Round
+totals agreed under either convention, so no screen disagreed, but per-fill
+`Trade.pnl` did. Weighted average wins because Kite's positions payload carries
+only aggregates and no fill sequence — the `realised` a trader sees there cannot
+be FIFO, and matching the screen they compare against beats FIFO purity.
+(Zerodha Console's tax P&L report IS FIFO. Different surface, not this one.)
 
 DATA PIPELINE ONLY — this service NEVER emits behavioral signals.
 """
@@ -27,7 +40,11 @@ from app.models.incomplete_position import IncompletePosition
 from app.core.market_hours import market_minutes
 from app.services.mcx_contract_specs import get_lot_multiplier, get_lot_multiplier_or_none
 from app.services.instrument_parser import is_expiry_day as _instrument_is_expiry_day
-from app.services.position_ledger_service import _compute_pnl_pct, stable_completed_trade_id
+from app.services.position_ledger_service import (
+    _compute_fill_effect,
+    _compute_pnl_pct,
+    stable_completed_trade_id,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -223,7 +240,7 @@ class PnLCalculator:
         }
 
     # ------------------------------------------------------------------
-    # FIFO MATCHER — flat-to-flat round accumulator
+    # MATCHER — FIFO round structure, weighted-average cost basis
     # ------------------------------------------------------------------
 
     async def _process_symbol_trades(
@@ -233,12 +250,16 @@ class PnLCalculator:
         broker_account_id: UUID = None
     ) -> Tuple[int, Decimal, int]:
         """
-        Process trades for a single symbol using FIFO matching with
-        flat-to-flat round accumulator.
+        Process one symbol's trades into flat-to-flat rounds.
 
-        Creates CompletedTrade when opening_queue empties (position flat).
-        Handles direction flips (closed_by_flip = True).
-        Detects incomplete positions post-FIFO.
+        Round structure is FIFO: a CompletedTrade is created when opening_queue
+        empties (position flat), and an over-close is a direction flip
+        (closed_by_flip = True). Incomplete positions are detected afterwards.
+
+        Realized P&L is charged against the WEIGHTED AVERAGE cost of the open
+        position, not the oldest lot — see the module docstring for why, and note
+        that it comes from the ledger's `_compute_fill_effect` so the batch and
+        live paths cannot drift apart again.
 
         Returns:
             Tuple of (trades_updated, total_pnl, completed_trades_count)
@@ -275,6 +296,28 @@ class PnLCalculator:
             broker_account_id, ref_exchange, ref_symbol, db
         )
 
+        # Cost basis: weighted average, computed by the SAME function the live
+        # ledger uses (S1). This module used to realize P&L against the oldest
+        # open lot (strict FIFO) while the ledger charged it against the running
+        # average, so the two engines split a partial exit differently — buy 3 @9,
+        # buy 3 @10, sell 3 @11 gave 6 here and 4.5 there. Round totals always
+        # agreed, so nothing on screen disagreed, but per-fill `Trade.pnl` and any
+        # window that cut a round in half did.
+        #
+        # Weighted average is the convention to keep: Kite's positions payload
+        # carries only aggregates (buy_quantity / buy_value / sell_*) and no fill
+        # sequence, so the `realised` a trader sees on that screen cannot be FIFO.
+        # Matching the screen they compare against beats FIFO purity. (Zerodha
+        # Console's tax P&L report IS FIFO — a different surface, not this one.)
+        #
+        # `opening_queue` below is still drained FIFO, but now ONLY to track round
+        # structure: when it empties the position is flat, and an over-close is a
+        # flip. That is identical under either convention, and keeping the running
+        # average in its own state is what makes a partial exit leave the remaining
+        # position's cost basis unchanged — draining the queue would not.
+        running_qty = 0
+        running_avg: Optional[Decimal] = None
+
         for trade in sorted_trades:
             qty = trade.filled_quantity or trade.quantity or 0
             price = float(trade.average_price or trade.price or 0)
@@ -283,6 +326,18 @@ class PnLCalculator:
 
             if qty <= 0 or price <= 0:
                 continue
+
+            # Advance the weighted-average position state. This is the sole source
+            # of the realized figure below; the queue no longer computes P&L.
+            signed_qty = qty if side == "BUY" else -qty
+            _, running_qty, running_avg, fill_realized = _compute_fill_effect(
+                current_qty=running_qty,
+                current_avg_price=running_avg,
+                fill_qty=signed_qty,
+                fill_price=Decimal(str(price)),
+            )
+            if lot_multiplier != 1 and fill_realized:
+                fill_realized = fill_realized * lot_multiplier
 
             # --- Opening fill: same side as queue head, or queue empty ---
             if not opening_queue or side == opening_queue[0]["side"]:
@@ -305,22 +360,15 @@ class PnLCalculator:
                 continue
 
             # --- Closing fill: opposite side to queue head ---
-            trade_pnl = Decimal("0")
+            # P&L comes from the weighted-average state computed above. The loop
+            # only drains the queue so "flat" and "flip" are still detected.
+            trade_pnl = fill_realized
             remaining_close_qty = qty
 
             while remaining_close_qty > 0 and opening_queue:
                 opening = opening_queue[0]
                 match_qty = min(opening["remaining_qty"], remaining_close_qty)
 
-                # P&L = price_diff * qty * lot_multiplier
-                # For NSE/BSE F&O: lot_multiplier = 1 (Kite sends units already)
-                # For MCX/CDS: lot_multiplier = lot_size (Kite sends lots, not units)
-                if opening["side"] == "BUY":
-                    match_pnl = Decimal(str((price - opening["price"]) * match_qty)) * lot_multiplier
-                else:
-                    match_pnl = Decimal(str((opening["price"] - price) * match_qty)) * lot_multiplier
-
-                trade_pnl += match_pnl
                 opening["remaining_qty"] -= match_qty
                 remaining_close_qty -= match_qty
 

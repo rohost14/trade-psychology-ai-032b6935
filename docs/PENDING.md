@@ -35,6 +35,15 @@ PositionLedger, which resets its average on a CLOSE. (075 and 076 are already ap
   silent degradation.
 - **Model A auth** — BYO-key flow retired; one platform Kite Connect app (`ZERODHA_API_KEY`)
   via OAuth for all users.
+- **Open-position entry price** — was Kite's day-cumulative blend, now the cost of the
+  currently open round from `PositionLedger`. Migration 077 **applied**.
+- **Numeric precision drift** — 16 money columns on `positions`/`trades` declared
+  `Numeric(15, 4)` against 2dp database columns (so CI tested a schema prod does not
+  have). Models now mirror the DB at 2dp; `tests/test_numeric_precision.py` guards it.
+- **S1 — one P&L convention** — `pnl_calculator` charged partial exits FIFO while the
+  ledger used the weighted average. Both now call the ledger's `_compute_fill_effect`,
+  so the batch and live paths cannot drift. Round totals were, and remain, identical;
+  what changed is the per-fill split, which now matches the Kite positions screen.
 - Docs: `PRODUCTION_MARKET_DATA_PLAN.md`, this file.
 
 ---
@@ -75,7 +84,6 @@ PositionLedger, which resets its average on a CLOSE. (075 and 076 are already ap
 |---|---|---|
 | **Live (pre-close) alerts — wire `LivePositionEngine` to the postback** | after Zerodha #1, and after Gate 3 | Engine + migration 076 + 9 tests are **done and applied**; nothing calls it. Spec: `docs/LIVE_ALERTS_SPEC.md`. Blocked deliberately: needs `GET /orders` **and** `GET /gtt/triggers` (a GTT stop-loss is invisible to `/orders`, so skipping it would tell a trader "no stop-loss" while their stop sits there — the one false positive that destroys trust). Also unvalidated: the postback path has never been watched during a live session. |
 | `completed_trades.pnl_pct` type mismatch | whenever that column is next touched | Model declares `Numeric(8, 2)`, database has `double precision`. Harmless — it is a display percentage, not money, and every consumer already wraps it in `float()`. Aligning the model to `Float` would flip the value returned from `Decimal` to `float` everywhere, which is a wider change than the drift justifies. Allow-listed in `tests/test_numeric_precision.py`; the 16 **money** columns that had drifted are now aligned at 2dp. |
-| **S1 — two P&L conventions for the same fills** | next time `pnl_calculator` is touched, or if a per-fill figure is ever shown to a user | **Found during the entry-price RCA (2026-08-04). Not urgent: round totals are unaffected.** `PositionLedger` realizes P&L on **weighted-average cost** (a `DECREASE` keeps `current_avg_price`, `position_ledger_service.py`), while the batch `pnl_calculator` matches strictly **FIFO** (`opening_queue`). Over a complete flat-to-flat round both produce an identical total, so `CompletedTrade.realized_pnl` — and therefore every screen — agrees today. They differ only in how P&L is *split across* intermediate partial exits: per-fill `Trade.pnl`, and `get_realized_pnl(from, to)` for a window that cuts a round in half. Example: buy 3 @9, buy 3 @10, sell 3 @11 → ledger says 4.5, FIFO says 6. **Recommended resolution: move `pnl_calculator` to weighted-average, i.e. make the ledger's convention the single one.** Kite's own `realised` on a net position is weighted-average, so that choice makes our per-fill numbers match what the trader sees in their broker — FIFO is the outlier here, and "our number differs from Kite" is the one discrepancy that costs trust. Low risk to defer: `pnl_calculator` is admin-backfill-only now, so the divergence can only surface if someone runs a historical recompute over a window that splits a round. |
 | Model-A key refactor (remove per-user key remnants) | after Zerodha #1 says yes | small code change; I do it then |
 | Ticker cluster (gap #2) | ~2500+ distinct subscribed instruments | scale tier; `PRODUCTION_MARKET_DATA_PLAN.md` §3 |
 | Redis position read-cache in front of the ledger (write-through, Postgres stays truth) | Gate-4 / only after a load test *measures* `get_position` Postgres reads as a real bottleneck | **Latency-only, not correctness.** DO NOT ship blind — it adds a stale-cache failure mode to money-critical P&L. Correct invalidation must cover **every** write path: webhook fill, sync, reconcile, and especially the **out-of-order replay** (which rewrites *past* ledger entries → a naive current-position cache goes wrong). Localized seam (`PositionLedgerService.get_position`), so deferring costs nothing — easy to add when justified + validated. |
