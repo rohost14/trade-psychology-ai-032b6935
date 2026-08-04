@@ -1,0 +1,130 @@
+<!-- @dsCard group="Patterns" name="Voice" subtitle="How the product speaks when the news is bad" -->
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Evidence — Voice</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Source+Serif+4:opsz,wght@8..60,400;8..60,600&family=Inter:wght@400;500;600&family=DM+Mono:wght@400;500&display=swap">
+<style>
+  :root { --paper:#FAF9F7; --raised:#FFF; --ink:#17171A; --ink2:#4A4A52; --ink3:#85858F;
+    --ink4:#B8B8C0; --rule:#E5E3DE; --accent:#2E4A7D; --accent-t:#ECEFF6;
+    --up:#1A7F5A; --up-t:#E8F2EE; --down:#A32A3C; --down-t:#F7EAEC; }
+  * { box-sizing:border-box; }
+  body { margin:0; background:var(--paper); color:var(--ink);
+    font:400 14px/1.6 Inter,system-ui,sans-serif; padding:48px; }
+  h1 { font:600 34px/1.15 'Source Serif 4',serif; margin:0 0 10px; letter-spacing:-.015em; }
+  .lede { color:var(--ink2); max-width:68ch; margin:0 0 40px; font-size:15px; }
+  h2 { font:600 12px/1 Inter,sans-serif; letter-spacing:.1em; text-transform:uppercase;
+    color:var(--ink3); margin:42px 0 18px; padding-bottom:10px; border-bottom:1px solid var(--rule); }
+  .pair { display:grid; grid-template-columns:1fr 1fr; gap:18px; margin-bottom:16px; }
+  .c { border-radius:8px; padding:16px 18px; font-size:13.5px; line-height:1.6; }
+  .no { background:var(--down-t); }
+  .yes { background:var(--up-t); }
+  .c b { display:block; font:600 10.5px/1 Inter,sans-serif; letter-spacing:.09em;
+    text-transform:uppercase; margin-bottom:9px; }
+  .no b { color:var(--down); } .yes b { color:var(--up); }
+  .why { font-size:12.5px; color:var(--ink2); margin:10px 0 26px; max-width:74ch; line-height:1.6; }
+  .why i { color:var(--ink); font-style:normal; font-weight:500; }
+  .note { background:var(--raised); border:1px solid var(--rule); border-left:3px solid var(--accent);
+    border-radius:0 8px 8px 0; padding:16px 18px; margin:20px 0 0; max-width:74ch;
+    font-size:13.5px; color:var(--ink2); }
+  .note b { color:var(--ink); font-weight:600; }
+  .verdict { background:var(--raised); border:1px solid var(--rule); border-radius:8px;
+    padding:26px 28px; max-width:600px; }
+  .v-t { font:600 27px/1.25 'Source Serif 4',serif; letter-spacing:-.015em; margin:10px 0 0; }
+  .lbl { font:600 10.5px/1 Inter,sans-serif; letter-spacing:.09em; text-transform:uppercase; color:var(--ink3); }
+  ul { margin:0; padding-left:18px; }
+  li { font-size:13.5px; color:var(--ink2); margin-bottom:9px; line-height:1.6; }
+  li b { color:var(--ink); font-weight:600; }
+</style>
+</head>
+<body>
+
+<h1>Voice</h1>
+<p class="lede">
+  This product tells people uncomfortable things about themselves. The whole design
+  positioning collapses if the writing gets it wrong — so the copy rules are part of the
+  system, not a content guideline kept somewhere else.
+</p>
+
+<h2>Three rules</h2>
+<ul>
+  <li><b>State, do not judge.</b> The product reports what happened. It is a mirror, and a
+    mirror that editorialises is a critic.</li>
+  <li><b>Never console, never congratulate.</b> Both signal that the reader&rsquo;s feelings are
+    being managed, which is the fastest way to lose their trust in the numbers.</li>
+  <li><b>Attribute to behaviour, never to character.</b> &ldquo;You entered three trades in
+    ten minutes&rdquo; is observable. &ldquo;You are impulsive&rdquo; is a verdict on a person
+    and cannot be evidenced.</li>
+</ul>
+
+<h2>Reporting a loss</h2>
+<div class="pair">
+  <div class="c no"><b>Not this</b>
+    Ouch — tough day out there! 😔 Don&rsquo;t worry, everyone has these. Tomorrow is a fresh start!</div>
+  <div class="c yes"><b>This</b>
+    You lost ₹12,400 today. ₹8,900 of it came from three trades taken within eleven minutes
+    of a loss.</div>
+</div>
+<p class="why">The first manages a feeling and reports nothing. The second is
+  <i>specific, attributable and useful</i> — and it respects the reader enough to let them
+  have their own reaction to it.</p>
+
+<h2>Naming a pattern</h2>
+<div class="pair">
+  <div class="c no"><b>Not this</b>
+    You&rsquo;re a revenge trader. This is destroying your account.</div>
+  <div class="c yes"><b>This</b>
+    Revenge trading — entering within five minutes of a loss greater than 2%. Three times
+    this month, costing ₹12,400.</div>
+</div>
+<p class="why">The pattern gets a <i>definition</i> and a <i>measurement</i>. That turns an
+  accusation into a finding the reader can check, disagree with, or act on.</p>
+
+<h2>Delivering good news</h2>
+<div class="pair">
+  <div class="c no"><b>Not this</b>
+    Amazing work! 🎉 You&rsquo;re crushing it — keep up the great discipline!</div>
+  <div class="c yes"><b>This</b>
+    Four sessions without an impulsive entry. Your previous best was two.</div>
+</div>
+<p class="why">Praise is as much of a distortion as scolding. The fact is the reward; if
+  the streak is genuinely good, <i>saying the number</i> already says so.</p>
+
+<h2>When something fails</h2>
+<div class="pair">
+  <div class="c no"><b>Not this</b>
+    Error 500: Internal server error. Something went wrong.</div>
+  <div class="c yes"><b>This</b>
+    We couldn&rsquo;t load your rules. They are still saved and still being enforced — this is
+    only a display problem.</div>
+</div>
+<p class="why">Say <i>what happened</i>, <i>whose problem it is</i>, and <i>what is safe</i>.
+  A trader who thinks their loss limits vanished will do something about it, and that
+  something is worse than the outage.</p>
+
+<h2>The verdict form</h2>
+<div class="verdict">
+  <div class="lbl">This week</div>
+  <p class="v-t">Your losses were not from bad setups. They were from what you did after one.</p>
+  <p style="font-size:14px;color:var(--ink2);margin:14px 0 0;line-height:1.65;max-width:52ch">
+    Trades taken more than thirty minutes after a loss won 61% of the time. Trades taken
+    within five minutes won 22%.
+  </p>
+</div>
+<div class="note">
+  <b>One sentence, in the serif, then the evidence underneath in the sans.</b> The claim is
+  allowed to be pointed because the numbers under it are doing the arguing. A verdict with
+  no figures beneath it is an opinion, and this product does not have opinions.
+</div>
+
+<h2>Words this product does not use</h2>
+<p class="why" style="margin-bottom:0">
+  <i>should, must, stop, don&rsquo;t, avoid</i> — instruction. The philosophy is mirror, not blocker.<br>
+  <i>could have, would have, missed out</i> — counterfactuals. The product reports what happened, not what might have.<br>
+  <i>guarantee, proven, always, never</i> — overclaiming about a market.<br>
+  <i>oops, whoops, uh-oh, no worries</i> — softening bad news is the failure this whole system is designed against.
+</p>
+
+</body>
+</html>

@@ -1,0 +1,150 @@
+<!-- @dsCard group="Patterns" name="States" subtitle="Loading, empty, error, offline, success — the ones that get skipped" -->
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Evidence — States</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Source+Serif+4:opsz,wght@8..60,600&family=Inter:wght@400;500;600&family=DM+Mono:wght@400;500&display=swap">
+<style>
+  :root { --paper:#FAF9F7; --raised:#FFF; --ink:#17171A; --ink2:#4A4A52; --ink3:#85858F;
+    --ink4:#B8B8C0; --rule:#E5E3DE; --accent:#2E4A7D; --accent-t:#ECEFF6;
+    --up:#1A7F5A; --up-t:#E8F2EE; --down:#A32A3C; --down-t:#F7EAEC; }
+  * { box-sizing:border-box; }
+  body { margin:0; background:var(--paper); color:var(--ink);
+    font:400 14px/1.6 Inter,system-ui,sans-serif; padding:48px; }
+  h1 { font:600 34px/1.15 'Source Serif 4',serif; margin:0 0 10px; letter-spacing:-.015em; }
+  .lede { color:var(--ink2); max-width:68ch; margin:0 0 40px; font-size:15px; }
+  h2 { font:600 12px/1 Inter,sans-serif; letter-spacing:.1em; text-transform:uppercase;
+    color:var(--ink3); margin:42px 0 18px; padding-bottom:10px; border-bottom:1px solid var(--rule); }
+  .panel { background:var(--raised); border:1px solid var(--rule); border-radius:8px;
+    padding:30px 26px; max-width:520px; }
+  .center { text-align:center; }
+  .ico { width:44px; height:44px; border-radius:8px; display:inline-flex; align-items:center;
+    justify-content:center; font-size:18px; margin-bottom:14px; }
+  .t { font:600 16px/1.35 Inter,sans-serif; margin:0 0 7px; }
+  .b { font-size:13.5px; color:var(--ink2); margin:0 auto; max-width:44ch; line-height:1.6; }
+  .btn { font:500 13.5px/1 Inter,sans-serif; border-radius:4px; border:1px solid transparent;
+    height:38px; padding:0 18px; display:inline-flex; align-items:center; gap:8px;
+    cursor:pointer; margin-top:18px; }
+  .primary { background:var(--accent); color:#fff; }
+  .secondary { background:var(--raised); color:var(--ink); border-color:var(--rule); }
+  .sk { background:linear-gradient(90deg,#EFEEEA 25%,#F6F5F2 37%,#EFEEEA 63%);
+    background-size:400% 100%; animation:sh 1.4s ease infinite; border-radius:4px; }
+  @keyframes sh { 0%{background-position:100% 50%} 100%{background-position:0 50%} }
+  .two { display:grid; grid-template-columns:1fr 1fr; gap:26px; align-items:start; }
+  .note { background:var(--raised); border:1px solid var(--rule); border-left:3px solid var(--accent);
+    border-radius:0 8px 8px 0; padding:16px 18px; margin:20px 0 0; max-width:74ch;
+    font-size:13.5px; color:var(--ink2); }
+  .note b { color:var(--ink); font-weight:600; }
+  .bad { border-left-color:var(--down); }
+  .toast { display:inline-flex; align-items:center; gap:11px; background:var(--ink); color:#fff;
+    border-radius:6px; padding:13px 17px; font-size:13.5px; box-shadow:0 8px 28px rgba(23,23,26,.16); }
+  .banner { display:flex; align-items:center; gap:11px; background:var(--down); color:#fff;
+    padding:11px 18px; font:500 13px/1 Inter,sans-serif; border-radius:6px; }
+</style>
+</head>
+<body>
+
+<h1>States</h1>
+<p class="lede">
+  Loading, empty, error, offline and success. These are where a product actually feels
+  unfinished, and they are always the screens a design leaves out. Specified here as
+  first-class components so they cannot be improvised.
+</p>
+
+<h2>Loading — skeleton, not a spinner</h2>
+<div class="panel">
+  <div class="sk" style="height:11px;width:120px;margin-bottom:18px"></div>
+  <div class="sk" style="height:30px;width:180px;margin-bottom:24px"></div>
+  <div class="sk" style="height:12px;width:100%;margin-bottom:9px"></div>
+  <div class="sk" style="height:12px;width:82%;margin-bottom:9px"></div>
+  <div class="sk" style="height:12px;width:64%"></div>
+</div>
+<div class="note">
+  <b>Content loads as a skeleton; an action loads as a spinner.</b> A skeleton says
+  &ldquo;something specific is arriving and it will be shaped like this&rdquo;, which keeps
+  the layout from jumping when it lands. Skeletons take the shape of the real content —
+  never a grey box standing in for a whole page.
+</div>
+
+<h2>Empty — the cause, not the absence</h2>
+<div class="two">
+  <div class="panel center">
+    <span class="ico" style="background:var(--accent-t);color:var(--accent)">▤</span>
+    <p class="t">No completed trades yet</p>
+    <p class="b">Kite only shares today&rsquo;s trades, so your history starts empty. Import your
+      Console tradebook and Analytics fills in immediately.</p>
+    <button class="btn primary">Import tradebook</button>
+  </div>
+  <div>
+    <p style="font-size:13.5px;color:var(--ink2);line-height:1.7;margin:0">
+      An empty state has three obligations: say <b>what is missing</b>, say <b>why</b>, and
+      offer <b>the one action</b> that fixes it.
+    </p>
+    <p style="font-size:13.5px;color:var(--ink2);line-height:1.7;margin:14px 0 0">
+      &ldquo;No data&rdquo; meets none of them. It reads as a dead end and leaves the reader
+      to guess whether the app is broken, whether they did something wrong, or whether
+      this is simply how it starts.
+    </p>
+  </div>
+</div>
+
+<h2>Error — what happened, whose problem, what next</h2>
+<div class="two">
+  <div class="panel center">
+    <span class="ico" style="background:var(--down-t);color:var(--down)">!</span>
+    <p class="t">We couldn&rsquo;t load your rules</p>
+    <p class="b">They are still saved and the engine is still enforcing them — this is only a
+      display problem. Try again rather than re-entering them.</p>
+    <div><button class="btn primary">Try again</button>
+      <button class="btn secondary" style="margin-left:8px">Contact support</button></div>
+  </div>
+  <div>
+    <p style="font-size:13.5px;color:var(--ink2);line-height:1.7;margin:0">
+      Never a status code, never a stack, never &ldquo;something went wrong&rdquo;. The reader
+      needs to know whether their <i>data</i> is affected or only their <i>view</i> — and here
+      it is only the view, so the copy says so before offering the retry.
+    </p>
+    <div class="note bad" style="margin-top:16px">
+      <b>A failed request is never drawn as an empty state.</b> Rendering &ldquo;no trades
+      yet&rdquo; after a request failed tells a trader with years of history that they have
+      none. It is the single most damaging mistake in this whole set.
+    </div>
+  </div>
+</div>
+
+<h2>Offline &amp; degraded</h2>
+<div style="margin-bottom:16px"><span class="banner">
+  ⚠ You&rsquo;re offline — showing last known data. We&rsquo;ll reconnect automatically.</span></div>
+<div><span class="toast">
+  <span style="color:#E5697C">●</span> Live prices paused — reconnect your broker to resume.</span></div>
+<div class="note">
+  Offline is a <b>persistent banner</b>, not a toast: the condition lasts, so the message
+  must too. A toast is for something that has just happened and is now finished.
+</div>
+
+<h2>Success</h2>
+<div class="two">
+  <div>
+    <span class="toast"><span style="color:#3FBF8C">✓</span> Rules tightened. Effective immediately.</span>
+    <p style="font-size:13px;color:var(--ink2);margin:14px 0 0;line-height:1.6">
+      Success is a toast that names <i>what</i> changed and <i>when it applies</i>. &ldquo;Saved&rdquo;
+      alone makes the reader go and check.
+    </p>
+  </div>
+  <div class="panel" style="padding:20px 22px">
+    <div style="display:flex;gap:13px">
+      <span class="ico" style="background:var(--up-t);color:var(--up);margin:0;width:38px;height:38px">✓</span>
+      <div><p class="t" style="font-size:14.5px">Imported 1,284 trades</p>
+        <p class="b" style="margin:0;text-align:left">Spanning 14 March to 4 August. Analytics, Edge and
+          Habits are populated. No alerts were raised for back-dated trades.</p></div>
+    </div>
+  </div>
+</div>
+<div class="note">
+  The larger form is for a success worth <b>reviewing</b> rather than acknowledging — an
+  import that changed a lot deserves a receipt, not a toast that vanishes in four seconds.
+</div>
+
+</body>
+</html>

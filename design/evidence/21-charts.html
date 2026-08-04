@@ -1,0 +1,150 @@
+<!-- @dsCard group="Patterns" name="Charts" subtitle="Axes, series colour, and what not to plot" -->
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Evidence — Charts</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Source+Serif+4:opsz,wght@8..60,600&family=Inter:wght@400;500;600&family=DM+Mono:wght@400;500&display=swap">
+<style>
+  :root { --paper:#FAF9F7; --raised:#FFF; --ink:#17171A; --ink2:#4A4A52; --ink3:#85858F;
+    --ink4:#B8B8C0; --rule:#E5E3DE; --accent:#2E4A7D; --accent-t:#ECEFF6;
+    --up:#1A7F5A; --up-t:#E8F2EE; --down:#A32A3C; --down-t:#F7EAEC; }
+  * { box-sizing:border-box; }
+  body { margin:0; background:var(--paper); color:var(--ink);
+    font:400 14px/1.6 Inter,system-ui,sans-serif; padding:48px; }
+  h1 { font:600 34px/1.15 'Source Serif 4',serif; margin:0 0 10px; letter-spacing:-.015em; }
+  .lede { color:var(--ink2); max-width:68ch; margin:0 0 40px; font-size:15px; }
+  h2 { font:600 12px/1 Inter,sans-serif; letter-spacing:.1em; text-transform:uppercase;
+    color:var(--ink3); margin:42px 0 18px; padding-bottom:10px; border-bottom:1px solid var(--rule); }
+  .card { background:var(--raised); border:1px solid var(--rule); border-radius:8px; padding:20px 22px; }
+  .lbl { font:600 10.5px/1 Inter,sans-serif; letter-spacing:.09em; text-transform:uppercase; color:var(--ink3); }
+  .two { display:grid; grid-template-columns:1fr 1fr; gap:24px; align-items:start; }
+  .tick { font:400 10.5px/1 'DM Mono',monospace; fill:#B8B8C0; }
+  .axl { font:500 10.5px/1 Inter,sans-serif; fill:#85858F; }
+  .note { background:var(--raised); border:1px solid var(--rule); border-left:3px solid var(--accent);
+    border-radius:0 8px 8px 0; padding:16px 18px; margin:20px 0 0; max-width:74ch;
+    font-size:13.5px; color:var(--ink2); }
+  .note b { color:var(--ink); font-weight:600; }
+  .bad { border-left-color:var(--down); }
+  .tip { display:inline-block; background:var(--ink); color:#fff; border-radius:6px;
+    padding:10px 13px; font-size:12.5px; box-shadow:0 8px 24px rgba(23,23,26,.18); }
+  .tip .k { font:600 10.5px/1 Inter,sans-serif; letter-spacing:.08em; text-transform:uppercase;
+    color:#9A9AA4; display:block; margin-bottom:6px; }
+  .tip .v { font:500 15px/1 'DM Mono',monospace; }
+  .swatches { display:flex; gap:10px; flex-wrap:wrap; }
+  .sw { display:inline-flex; align-items:center; gap:7px; font-size:12.5px; color:var(--ink2); }
+  .sw i { width:22px; height:4px; border-radius:2px; display:inline-block; }
+</style>
+</head>
+<body>
+
+<h1>Charts</h1>
+<p class="lede">
+  A chart here is a figure that happens to have a shape. It follows the same rules as the
+  rest of the system: monospaced ticks, hairline grid, and colour reserved for money.
+</p>
+
+<h2>Equity curve</h2>
+<div class="card" style="max-width:620px">
+  <div class="lbl">Cumulative P&amp;L · last 30 days</div>
+  <p style="font:500 27px/1 'DM Mono',monospace;margin:10px 0 18px;letter-spacing:-.02em">₹24,502</p>
+  <svg width="100%" viewBox="0 0 560 170" preserveAspectRatio="none" style="display:block">
+    <defs>
+      <linearGradient id="g" x1="0" y1="0" x2="0" y2="1">
+        <stop offset="0%" stop-color="#2E4A7D" stop-opacity=".16"/>
+        <stop offset="100%" stop-color="#2E4A7D" stop-opacity="0"/>
+      </linearGradient>
+    </defs>
+    <line x1="0" y1="132" x2="560" y2="132" stroke="#E5E3DE"/>
+    <line x1="0" y1="88" x2="560" y2="88" stroke="#E5E3DE" stroke-dasharray="2 4"/>
+    <line x1="0" y1="44" x2="560" y2="44" stroke="#E5E3DE" stroke-dasharray="2 4"/>
+    <path d="M0,120 C60,116 90,118 130,96 C170,74 200,44 250,52 C300,60 320,74 370,60 C420,46 470,30 560,18 L560,150 L0,150 Z" fill="url(#g)"/>
+    <path d="M0,120 C60,116 90,118 130,96 C170,74 200,44 250,52 C300,60 320,74 370,60 C420,46 470,30 560,18"
+      fill="none" stroke="#2E4A7D" stroke-width="2.2" stroke-linecap="round"/>
+    <text class="tick" x="0" y="166">6 Jul</text>
+    <text class="tick" x="252" y="166">20 Jul</text>
+    <text class="tick" x="512" y="166">4 Aug</text>
+  </svg>
+</div>
+<div class="note">
+  <b>The line is accent, not green.</b> An equity curve is a shape over time, not a single
+  gain — colouring it green would spend the money colour on something that is up today and
+  down tomorrow. Green and red are reserved for figures that are definitively one or the other.
+</div>
+
+<h2>Signed bars</h2>
+<div class="two">
+  <div class="card">
+    <div class="lbl">P&amp;L by weekday</div>
+    <svg width="100%" viewBox="0 0 380 190" style="display:block;margin-top:14px">
+      <line x1="34" y1="112" x2="380" y2="112" stroke="#D9D6D0"/>
+      <text class="tick" x="0" y="48">9k</text>
+      <text class="tick" x="0" y="82">3k</text>
+      <text class="tick" x="0" y="116">0</text>
+      <text class="tick" x="-2" y="150">−3k</text>
+      <rect x="48"  y="70"  width="46" height="42" rx="3" fill="#1A7F5A"/>
+      <rect x="118" y="112" width="46" height="20" rx="3" fill="#A32A3C"/>
+      <rect x="188" y="52"  width="46" height="60" rx="3" fill="#1A7F5A"/>
+      <rect x="258" y="112" width="46" height="10" rx="3" fill="#A32A3C"/>
+      <rect x="328" y="40"  width="46" height="72" rx="3" fill="#1A7F5A"/>
+      <text class="axl" x="59"  y="176">Mon</text>
+      <text class="axl" x="131" y="176">Tue</text>
+      <text class="axl" x="199" y="176">Wed</text>
+      <text class="axl" x="271" y="176">Thu</text>
+      <text class="axl" x="345" y="176">Fri</text>
+    </svg>
+  </div>
+  <div>
+    <p style="font-size:13.5px;color:var(--ink2);line-height:1.7;margin:0">
+      Here the colour <b>is</b> earned — each bar is a settled figure that is either a gain
+      or a loss, so up and down apply directly.
+    </p>
+    <p style="font-size:13.5px;color:var(--ink2);line-height:1.7;margin:14px 0 0">
+      The zero line is solid and slightly darker than the grid. It is the only reference
+      that matters on a signed chart, and a reader should never have to work out which
+      gridline it is.
+    </p>
+    <div class="swatches" style="margin-top:18px">
+      <span class="sw"><i style="background:#1A7F5A"></i> gain</span>
+      <span class="sw"><i style="background:#A32A3C"></i> loss</span>
+      <span class="sw"><i style="background:#2E4A7D"></i> neutral series</span>
+      <span class="sw"><i style="background:#B8B8C0"></i> comparison / previous</span>
+    </div>
+  </div>
+</div>
+
+<h2>Axes &amp; grid</h2>
+<p class="lede" style="margin-bottom:0">
+  <b>Ticks are monospaced</b> so the y-axis has a fixed width and the plot does not shift
+  when values change.<br>
+  <b>Grid is dashed hairline</b> at <span style="font-family:'DM Mono',monospace">#E5E3DE</span>,
+  horizontal only. Vertical gridlines imply the x-axis is continuous when it is usually categorical.<br>
+  <b>Currency is abbreviated on axes</b> (<span style="font-family:'DM Mono',monospace">3k</span>,
+  <span style="font-family:'DM Mono',monospace">9k</span>) but never in a figure the reader
+  might reconcile against their broker.<br>
+  <b>No axis lines</b> except zero. The ticks are enough.
+</p>
+
+<h2>Tooltip</h2>
+<div class="tip">
+  <span class="k">Wednesday · 12 trades</span>
+  <span class="v" style="color:#3FBF8C">+₹6,400</span>
+  <div style="color:#B4B4BC;margin-top:5px">58% win rate · +₹533 average</div>
+</div>
+<div class="note">
+  Dark on light — a tooltip is a layer above the page, and inverting is the cheapest way to
+  say so without a heavy shadow. Money colours are the <b>dark-theme</b> variants here,
+  because the surface is dark even though the page is not.
+</div>
+
+<h2>What not to plot</h2>
+<div class="note bad">
+  <b>No pie or donut for P&amp;L composition.</b> Angles are read badly and losses are negative
+  — a negative slice is meaningless. Use a signed bar.<br><br>
+  <b>No dual y-axes.</b> Two scales on one plot let any two series be made to look correlated.<br><br>
+  <b>No projections, no counterfactuals.</b> This product shows what happened. A dotted line
+  into the future is a different product, and one this system will not draw.
+</div>
+
+</body>
+</html>

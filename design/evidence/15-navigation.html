@@ -1,0 +1,149 @@
+<!-- @dsCard group="Components" name="Navigation" subtitle="Sidebar, bottom bar, tabs — one structure, two shapes" -->
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Evidence — Navigation</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Source+Serif+4:opsz,wght@8..60,600&family=Inter:wght@400;500;600&family=DM+Mono:wght@400;500&display=swap">
+<style>
+  :root { --paper:#FAF9F7; --raised:#FFF; --ink:#17171A; --ink2:#4A4A52; --ink3:#85858F;
+    --ink4:#B8B8C0; --rule:#E5E3DE; --accent:#2E4A7D; --accent-t:#ECEFF6; --down:#A32A3C; }
+  * { box-sizing:border-box; }
+  body { margin:0; background:var(--paper); color:var(--ink);
+    font:400 14px/1.6 Inter,system-ui,sans-serif; padding:48px; }
+  h1 { font:600 34px/1.15 'Source Serif 4',serif; margin:0 0 10px; letter-spacing:-.015em; }
+  .lede { color:var(--ink2); max-width:66ch; margin:0 0 40px; font-size:15px; }
+  h2 { font:600 12px/1 Inter,sans-serif; letter-spacing:.1em; text-transform:uppercase;
+    color:var(--ink3); margin:42px 0 18px; padding-bottom:10px; border-bottom:1px solid var(--rule); }
+  .two { display:grid; grid-template-columns:auto 1fr; gap:34px; align-items:start; }
+  .side { width:226px; background:var(--raised); border:1px solid var(--rule); border-radius:8px;
+    padding:16px 10px; }
+  .brand { display:flex; align-items:center; gap:10px; padding:4px 8px 16px;
+    border-bottom:1px solid var(--rule); margin-bottom:12px; }
+  .mark { width:32px; height:32px; border-radius:6px; background:var(--ink); color:#fff;
+    display:flex; align-items:center; justify-content:center; font:600 14px/1 'Source Serif 4',serif; }
+  .nav-i { display:flex; align-items:center; gap:11px; padding:9px 11px; border-radius:4px;
+    font:500 13.5px/1 Inter,sans-serif; color:var(--ink2); }
+  .nav-i .ic { width:16px; text-align:center; color:var(--ink4); font-size:13px; }
+  .nav-i.on { background:var(--accent-t); color:var(--accent); font-weight:600; }
+  .nav-i.on .ic { color:var(--accent); }
+  .nav-i .badge { margin-left:auto; font:500 10.5px/1 'DM Mono',monospace; background:var(--down);
+    color:#fff; border-radius:999px; padding:3px 6px; }
+  .grp { font:600 10px/1 Inter,sans-serif; letter-spacing:.1em; text-transform:uppercase;
+    color:var(--ink4); padding:16px 11px 7px; }
+  .phone { width:300px; border:1px solid var(--rule); border-radius:8px; overflow:hidden;
+    background:var(--raised); }
+  .bar { display:flex; justify-content:space-around; padding:9px 4px 10px; border-top:1px solid var(--rule); }
+  .bi { display:flex; flex-direction:column; align-items:center; gap:4px; width:58px; }
+  .bi .ic { font-size:15px; color:var(--ink4); }
+  .bi .lb { font:500 10px/1 Inter,sans-serif; color:var(--ink3); }
+  .bi.on .ic, .bi.on .lb { color:var(--accent); }
+  .bi.on .lb { font-weight:600; }
+  .tabs { display:flex; gap:26px; border-bottom:1px solid var(--rule); }
+  .tab { font:500 13.5px/1 Inter,sans-serif; color:var(--ink3); padding:0 0 11px;
+    border-bottom:2px solid transparent; }
+  .tab.on { color:var(--ink); font-weight:600; border-bottom-color:var(--ink); }
+  .crumb { font-size:12.5px; color:var(--ink3); }
+  .crumb b { color:var(--ink); font-weight:500; }
+  .note { background:var(--raised); border:1px solid var(--rule); border-left:3px solid var(--accent);
+    border-radius:0 8px 8px 0; padding:16px 18px; margin:20px 0 0; max-width:74ch;
+    font-size:13.5px; color:var(--ink2); }
+  .note b { color:var(--ink); font-weight:600; }
+  .cap { font:400 11px/1 'DM Mono',monospace; color:var(--ink3); margin:12px 0 0; }
+</style>
+</head>
+<body>
+
+<h1>Navigation</h1>
+<p class="lede">
+  One structure rendered two ways. Desktop gets a sidebar, mobile gets the same primary
+  items in a bottom bar with the rest behind &ldquo;More&rdquo;. The grouping and the labels
+  never differ between them — a screen that lives under <i>Risk</i> on one device cannot
+  live somewhere else on the other.
+</p>
+
+<h2>Sidebar — desktop</h2>
+<div class="two">
+  <div class="side">
+    <div class="brand">
+      <span class="mark">E</span>
+      <div><div style="font:600 13.5px/1.2 Inter,sans-serif">TradeMentor</div>
+        <div style="font:400 11px/1.2 'DM Mono',monospace;color:var(--ink3)">Tue, 5 Aug</div></div>
+    </div>
+    <div class="nav-i on"><span class="ic">▦</span> Dashboard</div>
+    <div class="nav-i"><span class="ic">◫</span> Analytics</div>
+    <div class="nav-i"><span class="ic">◉</span> Alerts <span class="badge">3</span></div>
+    <div class="nav-i"><span class="ic">◈</span> Coach</div>
+    <div class="grp">Insights</div>
+    <div class="nav-i"><span class="ic">▤</span> Reports</div>
+    <div class="nav-i"><span class="ic">✎</span> Journal</div>
+    <div class="grp">Risk</div>
+    <div class="nav-i"><span class="ic">⚖</span> My rules</div>
+    <div class="nav-i"><span class="ic">⌕</span> My record</div>
+  </div>
+  <div>
+    <p style="font-size:13.5px;color:var(--ink2);line-height:1.7;margin:0 0 16px;max-width:52ch">
+      Four primary items, then labelled groups. The active state is an accent tint with a
+      4px radius — not a pill, not a left bar. It reads as &ldquo;selected&rdquo; without
+      becoming the loudest thing in the sidebar.
+    </p>
+    <p style="font-size:13.5px;color:var(--ink2);line-height:1.7;margin:0;max-width:52ch">
+      The alert count is the only place a solid red appears in navigation, and it is a
+      count of things that already happened — not a decoration.
+    </p>
+    <div class="note" style="margin-top:20px">
+      <b>Nine items, four at the top.</b> Past roughly seven, a flat list stops being scanned
+      and starts being searched. Groups restore that by turning nine items into three sets
+      of two or three.
+    </div>
+  </div>
+</div>
+
+<h2>Bottom bar — mobile</h2>
+<div class="two">
+  <div class="phone">
+    <div style="padding:26px 18px;color:var(--ink4);font-size:12.5px;text-align:center">
+      screen content
+    </div>
+    <div class="bar">
+      <div class="bi on"><span class="ic">▦</span><span class="lb">Dashboard</span></div>
+      <div class="bi"><span class="ic">◫</span><span class="lb">Analytics</span></div>
+      <div class="bi"><span class="ic">◉</span><span class="lb">Alerts</span></div>
+      <div class="bi"><span class="ic">◈</span><span class="lb">Coach</span></div>
+      <div class="bi"><span class="ic">⋯</span><span class="lb">More</span></div>
+    </div>
+  </div>
+  <div>
+    <p style="font-size:13.5px;color:var(--ink2);line-height:1.7;margin:0;max-width:52ch">
+      The same four primary items, plus <i>More</i> for the two labelled groups. No raised
+      centre button: a floating action button implies one dominant action per screen, and
+      this product&rsquo;s screens are for reading rather than doing.
+    </p>
+    <p style="font-size:13.5px;color:var(--ink2);line-height:1.7;margin:14px 0 0;max-width:52ch">
+      Every target is at least 44px tall including its label, and the bar sits inside the
+      safe area so the last row of content is never under a home indicator.
+    </p>
+  </div>
+</div>
+
+<h2>Tabs — within a screen</h2>
+<div class="tabs">
+  <span class="tab on">Overview</span><span class="tab">Edge</span>
+  <span class="tab">Behaviour</span><span class="tab">Habits</span><span class="tab">Advanced</span>
+</div>
+<p class="cap">ink underline, not accent</p>
+<div class="note">
+  Tabs underline in <b>ink</b> while the sidebar highlights in <b>accent</b>. They are
+  different kinds of movement — the sidebar changes where you are, tabs change what you
+  are looking at in the same place — and using one colour for both loses that distinction.
+</div>
+
+<h2>Breadcrumb</h2>
+<p class="crumb">Analytics &nbsp;›&nbsp; Behaviour &nbsp;›&nbsp; <b>Revenge trading</b></p>
+<p style="font-size:13px;color:var(--ink2);max-width:60ch;margin:8px 0 0">
+  Only on screens reached by drilling in. Never at the top level, where it would be a
+  breadcrumb of length one — which tells the reader nothing and costs a row.
+</p>
+
+</body>
+</html>

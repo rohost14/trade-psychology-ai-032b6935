@@ -1,0 +1,106 @@
+<!-- @dsCard group="Foundations" name="Typography" subtitle="Serif verdicts, sans interface, mono figures" -->
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Evidence — Typography</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Source+Serif+4:opsz,wght@8..60,400;8..60,600&family=Inter:wght@400;500;600&family=DM+Mono:wght@400;500&display=swap">
+<style>
+  :root { --paper:#FAF9F7; --raised:#FFF; --ink:#17171A; --ink2:#4A4A52; --ink3:#85858F;
+    --rule:#E5E3DE; --accent:#2E4A7D; --up:#1A7F5A; --down:#A32A3C; }
+  * { box-sizing:border-box; }
+  body { margin:0; background:var(--paper); color:var(--ink);
+    font:400 14px/1.6 Inter,system-ui,sans-serif; padding:48px; }
+  h1 { font:600 34px/1.15 'Source Serif 4',serif; margin:0 0 10px; letter-spacing:-.015em; }
+  .lede { color:var(--ink2); max-width:64ch; margin:0 0 40px; font-size:15px; }
+  h2 { font:600 12px/1 Inter,sans-serif; letter-spacing:.1em; text-transform:uppercase;
+    color:var(--ink3); margin:44px 0 20px; padding-bottom:10px; border-bottom:1px solid var(--rule); }
+  .spec { display:grid; grid-template-columns:132px 1fr; gap:22px; align-items:baseline;
+    padding:16px 0; border-bottom:1px solid var(--rule); }
+  .spec:last-child { border-bottom:0; }
+  .key { font:400 11px/1.5 'DM Mono',monospace; color:var(--ink3); }
+  .roles { display:grid; grid-template-columns:repeat(3,1fr); gap:16px; margin-bottom:8px; }
+  .role { background:var(--raised); border:1px solid var(--rule); border-radius:8px; padding:22px 20px; }
+  .role .n { font-size:26px; margin-bottom:10px; }
+  .role h3 { font:600 13px/1 Inter,sans-serif; margin:0 0 6px; }
+  .role p { margin:0; font-size:12.5px; color:var(--ink2); line-height:1.55; }
+  .note { background:var(--raised); border:1px solid var(--rule); border-left:3px solid var(--accent);
+    border-radius:0 8px 8px 0; padding:16px 18px; margin:22px 0 0; max-width:72ch; font-size:13.5px; color:var(--ink2); }
+  .note b { color:var(--ink); font-weight:600; }
+  table { width:100%; border-collapse:collapse; max-width:560px; }
+  td, th { text-align:left; padding:9px 0; border-bottom:1px solid var(--rule); font-size:13px; }
+  th { font:600 10.5px/1 Inter,sans-serif; letter-spacing:.09em; text-transform:uppercase; color:var(--ink3); }
+  td.n { text-align:right; font:500 14px/1 'DM Mono',monospace; }
+</style>
+</head>
+<body>
+
+<h1>Typography</h1>
+<p class="lede">
+  Three faces, each with a job it does not share. The serif is the reason this reads
+  as a written record rather than a dashboard — a verdict set at 40px in Source Serif
+  says <i>considered</i>, which is the entire positioning of the product.
+</p>
+
+<div class="roles">
+  <div class="role">
+    <div class="n" style="font-family:'Source Serif 4',serif;font-weight:600">Aa</div>
+    <h3>Source Serif 4 — display</h3>
+    <p>Page titles and verdicts only. Never body, never UI chrome. Its scarcity is what gives it weight.</p>
+  </div>
+  <div class="role">
+    <div class="n" style="font-family:Inter,sans-serif;font-weight:600">Aa</div>
+    <h3>Inter — interface</h3>
+    <p>Everything else. Chosen for density and legibility at 12–14px, where most of a trading interface actually lives.</p>
+  </div>
+  <div class="role">
+    <div class="n" style="font-family:'DM Mono',monospace;font-weight:500">123</div>
+    <h3>DM Mono — figures</h3>
+    <p>Every number, without exception. Tabular by default, so columns of money align with no extra work.</p>
+  </div>
+</div>
+
+<div class="note">
+  <b>Two of these three are already in the app.</b> Inter and DM Mono ship today; only
+  the serif is new. That is deliberate — a design system whose adoption begins with
+  three font swaps is a design system that does not get adopted.
+</div>
+
+<h2>Scale</h2>
+<div class="spec"><div class="key">display / 40<br>Source Serif · 600</div>
+  <div style="font:600 40px/1.1 'Source Serif 4',serif;letter-spacing:-.02em">You traded your plan</div></div>
+<div class="spec"><div class="key">title / 27<br>Source Serif · 600</div>
+  <div style="font:600 27px/1.2 'Source Serif 4',serif;letter-spacing:-.015em">Psychology audit</div></div>
+<div class="spec"><div class="key">heading / 17<br>Inter · 600</div>
+  <div style="font:600 17px/1.35 Inter,sans-serif">Open positions</div></div>
+<div class="spec"><div class="key">body / 14<br>Inter · 400</div>
+  <div style="font:400 14px/1.6 Inter,sans-serif;max-width:56ch;color:var(--ink2)">These are losses attributed to psychology — fear, greed, tilt — rather than to strategy failure.</div></div>
+<div class="spec"><div class="key">small / 12.5<br>Inter · 400</div>
+  <div style="font:400 12.5px/1.5 Inter,sans-serif;color:var(--ink2)">Triggered after a loss greater than 2% within five minutes.</div></div>
+<div class="spec"><div class="key">label / 10.5<br>Inter · 600 · .09em</div>
+  <div style="font:600 10.5px/1 Inter,sans-serif;letter-spacing:.09em;text-transform:uppercase;color:var(--ink3)">Emotional tax paid</div></div>
+
+<h2>Figures</h2>
+<div class="spec"><div class="key">figure-xl / 38</div>
+  <div style="font:500 38px/1 'DM Mono',monospace;letter-spacing:-.02em">₹45,200</div></div>
+<div class="spec"><div class="key">figure-lg / 26</div>
+  <div style="font:500 26px/1 'DM Mono',monospace"><span style="color:var(--up)">+₹4,200.50</span></div></div>
+<div class="spec"><div class="key">figure / 14</div>
+  <div style="font:500 14px/1 'DM Mono',monospace"><span style="color:var(--down)">−₹1,240.00</span></div></div>
+
+<h2>Why tabular matters</h2>
+<table>
+  <tr><th>Underlying</th><th style="text-align:right">Trades</th><th style="text-align:right">Net P&amp;L</th></tr>
+  <tr><td>NIFTY</td><td class="n">18</td><td class="n" style="color:var(--up)">+₹14,200</td></tr>
+  <tr><td>BANKNIFTY</td><td class="n">14</td><td class="n" style="color:var(--up)">+₹6,900</td></tr>
+  <tr><td>FINNIFTY</td><td class="n">6</td><td class="n" style="color:var(--down)">−₹2,400</td></tr>
+  <tr><td>RELIANCE</td><td class="n">4</td><td class="n" style="color:var(--up)">+₹5,800</td></tr>
+</table>
+<div class="note">
+  Decimal points line up because the figures are monospaced, not because anything was
+  padded. A proportional face would leave that column ragged and the reader would have
+  to compare digit by digit instead of by eye — which is the whole point of a table.
+</div>
+
+</body>
+</html>

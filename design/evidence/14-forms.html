@@ -1,0 +1,149 @@
+<!-- @dsCard group="Components" name="Forms & controls" subtitle="Inputs, toggles, and the settings row" -->
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Evidence — Forms &amp; controls</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Source+Serif+4:opsz,wght@8..60,600&family=Inter:wght@400;500;600&family=DM+Mono:wght@400;500&display=swap">
+<style>
+  :root { --paper:#FAF9F7; --raised:#FFF; --ink:#17171A; --ink2:#4A4A52; --ink3:#85858F;
+    --ink4:#B8B8C0; --rule:#E5E3DE; --accent:#2E4A7D; --accent-t:#ECEFF6;
+    --up:#1A7F5A; --down:#A32A3C; --down-t:#F7EAEC; }
+  * { box-sizing:border-box; }
+  body { margin:0; background:var(--paper); color:var(--ink);
+    font:400 14px/1.6 Inter,system-ui,sans-serif; padding:48px; }
+  h1 { font:600 34px/1.15 'Source Serif 4',serif; margin:0 0 10px; letter-spacing:-.015em; }
+  .lede { color:var(--ink2); max-width:66ch; margin:0 0 40px; font-size:15px; }
+  h2 { font:600 12px/1 Inter,sans-serif; letter-spacing:.1em; text-transform:uppercase;
+    color:var(--ink3); margin:42px 0 18px; padding-bottom:10px; border-bottom:1px solid var(--rule); }
+  .field { max-width:340px; margin-bottom:20px; }
+  .flabel { display:block; font:500 12.5px/1 Inter,sans-serif; margin-bottom:7px; }
+  .hint { font-size:12px; color:var(--ink3); margin:6px 0 0; }
+  .err { font-size:12px; color:var(--down); margin:6px 0 0; }
+  input, select { width:100%; height:38px; border:1px solid var(--rule); border-radius:4px;
+    background:var(--raised); padding:0 12px; font:400 13.5px/1 Inter,sans-serif; color:var(--ink); }
+  input.mono { font-family:'DM Mono',monospace; font-weight:500; }
+  input:focus { outline:2px solid var(--accent); outline-offset:1px; border-color:var(--accent); }
+  input.invalid { border-color:var(--down); background:#FFFBFB; }
+  input:disabled { background:#F2F1EE; color:var(--ink4); cursor:not-allowed; }
+  .row { display:flex; gap:20px; flex-wrap:wrap; align-items:flex-start; }
+  .toggle { width:44px; height:26px; border-radius:999px; padding:3px; display:inline-flex;
+    align-items:center; flex-shrink:0; }
+  .toggle .knob { width:20px; height:20px; border-radius:999px; background:#fff;
+    box-shadow:0 1px 2px rgba(0,0,0,.18); }
+  .on { background:var(--accent); justify-content:flex-end; }
+  .off { background:#DCDAD5; justify-content:flex-start; }
+  .seg { display:inline-flex; border:1px solid var(--rule); border-radius:4px; overflow:hidden;
+    background:var(--raised); }
+  .seg span { font:500 12.5px/1 Inter,sans-serif; padding:9px 15px; color:var(--ink2); cursor:pointer; }
+  .seg span.sel { background:var(--ink); color:#fff; }
+  .check { width:18px; height:18px; border-radius:3px; border:1px solid var(--rule);
+    background:var(--raised); display:inline-flex; align-items:center; justify-content:center;
+    color:#fff; font-size:11px; }
+  .check.on { background:var(--accent); border-color:var(--accent); }
+  .set-row { display:flex; align-items:center; justify-content:space-between; gap:24px;
+    padding:16px 0; border-bottom:1px solid var(--rule); max-width:640px; }
+  .set-row:last-child { border-bottom:0; }
+  .set-t { font:600 13.5px/1.4 Inter,sans-serif; margin:0; }
+  .set-s { font-size:12.5px; color:var(--ink3); margin:2px 0 0; }
+  .val { font:500 13.5px/1 'DM Mono',monospace; color:var(--ink2); }
+  .note { background:var(--raised); border:1px solid var(--rule); border-left:3px solid var(--accent);
+    border-radius:0 8px 8px 0; padding:16px 18px; margin:20px 0 0; max-width:74ch;
+    font-size:13.5px; color:var(--ink2); }
+  .note b { color:var(--ink); font-weight:600; }
+  .danger-note { border-left-color:var(--down); }
+</style>
+</head>
+<body>
+
+<h1>Forms &amp; controls</h1>
+<p class="lede">
+  This product asks for very little input by design — a trader who has to type is a
+  trader who stops using it. So there are few controls, and the ones that exist are
+  mostly about limits the reader sets once and then lives with.
+</p>
+
+<h2>Text input</h2>
+<div class="row">
+  <div class="field">
+    <label class="flabel">Daily loss limit</label>
+    <input class="mono" value="₹25,000">
+    <p class="hint">The session stops when this is hit.</p>
+  </div>
+  <div class="field">
+    <label class="flabel">Daily loss limit</label>
+    <input class="mono invalid" value="₹0">
+    <p class="err">Must be at least ₹1,000. A limit of zero would stop you before your first trade.</p>
+  </div>
+  <div class="field">
+    <label class="flabel">Broker</label>
+    <input value="Zerodha Kite" disabled>
+    <p class="hint">Set when you connected. Disconnect to change it.</p>
+  </div>
+</div>
+<div class="note">
+  <b>Errors say what to do.</b> &ldquo;Invalid input&rdquo; is a scolding; &ldquo;must be at
+  least ₹1,000, a limit of zero would stop you before your first trade&rdquo; is an
+  instruction. Money inputs are monospaced so a mistyped digit is visible.
+</div>
+
+<h2>Toggle</h2>
+<div class="row" style="align-items:center">
+  <span class="toggle on"><span class="knob"></span></span>
+  <span class="toggle off"><span class="knob"></span></span>
+  <span style="font-size:13px;color:var(--ink2);max-width:44ch">
+    Accent when on — never green. A toggle being on is a state, not a gain, and green
+    is spent entirely on money.</span>
+</div>
+
+<h2>Segmented &amp; checkbox</h2>
+<div class="row" style="align-items:center;margin-bottom:18px">
+  <div class="seg"><span class="sel">7D</span><span>30D</span><span>90D</span><span>All</span></div>
+  <div class="seg"><span>Light</span><span class="sel">Dark</span><span>System</span></div>
+</div>
+<div class="row" style="align-items:center">
+  <span style="display:inline-flex;align-items:center;gap:9px;font-size:13.5px">
+    <span class="check on">✓</span> Weekly report email</span>
+  <span style="display:inline-flex;align-items:center;gap:9px;font-size:13.5px;color:var(--ink2)">
+    <span class="check"></span> Push notifications</span>
+</div>
+
+<h2>Settings row</h2>
+<div class="set-row">
+  <div><p class="set-t">Max daily loss</p><p class="set-s">Hard stop percentage</p></div>
+  <span class="val">5 %</span>
+</div>
+<div class="set-row">
+  <div><p class="set-t">Cooldown period</p><p class="set-s">Enforced pause after a loss</p></div>
+  <span class="val">15 minutes</span>
+</div>
+<div class="set-row">
+  <div><p class="set-t">Auto-close positions</p><p class="set-s">Close everything if the max loss is hit</p></div>
+  <span class="toggle on"><span class="knob"></span></span>
+</div>
+<div class="note">
+  Settings are <b>rows on the page, not cards</b>. They are a list the reader scans for the
+  one thing they came to change; boxing each one triples the vertical space and makes
+  scanning slower.
+</div>
+
+<h2>Destructive</h2>
+<div style="max-width:560px;background:var(--raised);border:1px solid var(--down-t);
+  border-left:3px solid var(--down); border-radius:0 8px 8px 0; padding:20px 22px">
+  <p style="font:600 14px/1.4 Inter,sans-serif;margin:0 0 6px">Delete your account</p>
+  <p style="font-size:13px;color:var(--ink2);margin:0 0 16px;line-height:1.6">
+    This removes your profile, rules, trades and journal permanently. Your records at
+    Zerodha are unaffected. Export your data first if you want a copy.</p>
+  <label class="flabel">Type your Zerodha user ID <span style="font-family:'DM Mono',monospace">QA1234</span> to confirm</label>
+  <input placeholder="QA1234" style="margin-bottom:14px">
+  <button style="font:500 13.5px/1 Inter,sans-serif;background:var(--down);color:#fff;
+    border:0;border-radius:4px;height:38px;padding:0 18px;cursor:pointer">Permanently delete</button>
+</div>
+<div class="note danger-note">
+  <b>Irreversible actions are gated by typing, not by a second click.</b> A confirm dialog
+  is muscle memory after the third time; typing your own broker ID cannot be done by
+  accident. The state of the input is the gate — the button stays disabled until it matches.
+</div>
+
+</body>
+</html>

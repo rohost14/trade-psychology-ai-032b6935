@@ -1,0 +1,142 @@
+<!-- @dsCard group="Components" name="Tables & lists" subtitle="Density, alignment, and rows that stay comparable" -->
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Evidence — Tables &amp; lists</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Source+Serif+4:opsz,wght@8..60,600&family=Inter:wght@400;500;600&family=DM+Mono:wght@400;500&display=swap">
+<style>
+  :root { --paper:#FAF9F7; --raised:#FFF; --ink:#17171A; --ink2:#4A4A52; --ink3:#85858F;
+    --ink4:#B8B8C0; --rule:#E5E3DE; --accent:#2E4A7D; --accent-t:#ECEFF6;
+    --up:#1A7F5A; --up-t:#E8F2EE; --down:#A32A3C; --down-t:#F7EAEC; }
+  * { box-sizing:border-box; }
+  body { margin:0; background:var(--paper); color:var(--ink);
+    font:400 14px/1.6 Inter,system-ui,sans-serif; padding:48px; }
+  h1 { font:600 34px/1.15 'Source Serif 4',serif; margin:0 0 10px; letter-spacing:-.015em; }
+  .lede { color:var(--ink2); max-width:66ch; margin:0 0 40px; font-size:15px; }
+  h2 { font:600 12px/1 Inter,sans-serif; letter-spacing:.1em; text-transform:uppercase;
+    color:var(--ink3); margin:42px 0 18px; padding-bottom:10px; border-bottom:1px solid var(--rule); }
+  .sec-head { display:flex; align-items:baseline; justify-content:space-between;
+    padding-bottom:11px; border-bottom:1px solid var(--rule); }
+  .sec-head h3 { font:600 15px/1 Inter,sans-serif; margin:0; }
+  .sec-head a { font:600 12.5px/1 Inter,sans-serif; color:var(--accent); text-decoration:none; }
+  table { width:100%; border-collapse:collapse; }
+  th { font:600 10.5px/1 Inter,sans-serif; letter-spacing:.09em; text-transform:uppercase;
+    color:var(--ink3); text-align:left; padding:11px 0; border-bottom:1px solid var(--rule); }
+  td { padding:13px 0; border-bottom:1px solid var(--rule); font-size:13.5px; }
+  tr:last-child td { border-bottom:0; }
+  td.n, th.n { text-align:right; }
+  td.n { font:500 13.5px/1 'DM Mono',monospace; }
+  .tag { font:500 10px/1 Inter,sans-serif; background:#F0EEEA; color:var(--ink3);
+    padding:3px 6px; border-radius:2px; letter-spacing:.05em; margin-left:7px; }
+  tr.hov td { background:#F4F2EE; }
+  .list-row { display:grid; grid-template-columns:36px 1fr auto; gap:14px; align-items:flex-start;
+    padding:15px 0; border-bottom:1px solid var(--rule); }
+  .tile { width:36px; height:36px; border-radius:6px; display:flex; align-items:center;
+    justify-content:center; font:600 13px/1 Inter,sans-serif; }
+  .t-title { font:600 13.5px/1.4 Inter,sans-serif; margin:0; }
+  .t-body { font-size:12.5px; color:var(--ink2); margin:3px 0 0; line-height:1.5; }
+  .ago { font:400 11.5px/1 'DM Mono',monospace; color:var(--ink4); white-space:nowrap; }
+  .note { background:var(--raised); border:1px solid var(--rule); border-left:3px solid var(--accent);
+    border-radius:0 8px 8px 0; padding:16px 18px; margin:20px 0 0; max-width:74ch;
+    font-size:13.5px; color:var(--ink2); }
+  .note b { color:var(--ink); font-weight:600; }
+  .two { display:grid; grid-template-columns:1fr 1fr; gap:24px; }
+  .box { border:1px dashed var(--ink4); border-radius:8px; padding:18px; }
+  .box h4 { font:600 10.5px/1 Inter,sans-serif; letter-spacing:.08em; text-transform:uppercase;
+    margin:0 0 14px; }
+  .bad h4 { color:var(--down); } .good h4 { color:var(--up); }
+  .fake-card { background:var(--raised); border:1px solid var(--rule); border-radius:8px;
+    padding:12px 14px; margin-bottom:8px; display:flex; justify-content:space-between; font-size:13px; }
+</style>
+</head>
+<body>
+
+<h1>Tables &amp; lists</h1>
+<p class="lede">
+  A table exists so figures can be compared down a column. Every decision here protects
+  that: right-aligned monospaced numbers, hairlines instead of boxes, and no fill on a
+  row unless the reader is pointing at it.
+</p>
+
+<h2>Data table</h2>
+<div class="sec-head"><h3>Open positions</h3><a href="#">View all</a></div>
+<table>
+  <tr><th>Symbol</th><th class="n">Qty</th><th class="n">Entry</th><th class="n">LTP</th>
+    <th class="n">Chg %</th><th class="n">P&amp;L</th></tr>
+  <tr><td>NIFTY 50<span class="tag">FUT</span></td><td class="n">500</td>
+    <td class="n" style="color:var(--ink3)">22,140.00</td><td class="n">22,148.40</td>
+    <td class="n" style="color:var(--up)">+0.04%</td><td class="n" style="color:var(--up)">+₹4,200.50</td></tr>
+  <tr class="hov"><td>BANKNIFTY<span class="tag">OPT</span></td><td class="n">250</td>
+    <td class="n" style="color:var(--ink3)">486.20</td><td class="n">481.24</td>
+    <td class="n" style="color:var(--down)">−1.02%</td><td class="n" style="color:var(--down)">−₹1,240.00</td></tr>
+  <tr><td>RELIANCE<span class="tag">FUT</span></td><td class="n">100</td>
+    <td class="n" style="color:var(--ink3)">2,904.00</td><td class="n">2,911.60</td>
+    <td class="n" style="color:var(--up)">+0.26%</td><td class="n" style="color:var(--up)">+₹760.00</td></tr>
+</table>
+<div class="note">
+  <b>No zebra striping.</b> Alternating fills add a rhythm the data does not have and make
+  every row look like a container. Hairlines and 13px vertical padding separate rows
+  perfectly well; the only fill is hover, and it means &ldquo;you are here&rdquo;.
+</div>
+
+<h2>Never this</h2>
+<div class="two">
+  <div class="box bad">
+    <h4>✕ Card per row</h4>
+    <div class="fake-card"><span>NIFTY 50</span><span style="font-family:'DM Mono';color:var(--up)">+₹4,200</span></div>
+    <div class="fake-card"><span>BANKNIFTY</span><span style="font-family:'DM Mono';color:var(--down)">−₹1,240</span></div>
+    <div class="fake-card"><span>RELIANCE</span><span style="font-family:'DM Mono';color:var(--up)">+₹760</span></div>
+    <p style="font-size:12.5px;color:var(--ink2);margin:12px 0 0;line-height:1.55">
+      Each row now has a border, a shadow and a gutter between it and the next. The eye
+      has to cross three visual edges to compare two numbers that are eight pixels apart.</p>
+  </div>
+  <div class="box good">
+    <h4>✓ Rows on one surface</h4>
+    <table style="margin-top:-6px">
+      <tr><td>NIFTY 50</td><td class="n" style="color:var(--up)">+₹4,200</td></tr>
+      <tr><td>BANKNIFTY</td><td class="n" style="color:var(--down)">−₹1,240</td></tr>
+      <tr><td>RELIANCE</td><td class="n" style="color:var(--up)">+₹760</td></tr>
+    </table>
+    <p style="font-size:12.5px;color:var(--ink2);margin:12px 0 0;line-height:1.55">
+      One surface, three hairlines. The column reads as a column, which is the only
+      reason to put these three things near each other at all.</p>
+  </div>
+</div>
+
+<h2>Object list</h2>
+<div class="sec-head"><h3>Live insights</h3><a href="#">View all</a></div>
+<div class="list-row">
+  <span class="tile" style="background:var(--down-t);color:var(--down)">!</span>
+  <div><p class="t-title">Size escalation detected</p>
+    <p class="t-body">Your last entry was 2.4× your median position size for NIFTY.</p></div>
+  <span class="ago">12m</span>
+</div>
+<div class="list-row">
+  <span class="tile" style="background:var(--accent-t);color:var(--accent)">◆</span>
+  <div><p class="t-title">Discipline streak: 4 days</p>
+    <p class="t-body">You have resisted three impulsive entries today.</p></div>
+  <span class="ago">2h</span>
+</div>
+<div class="list-row" style="border-bottom:0">
+  <span class="tile" style="background:#F0EEEA;color:var(--ink3)">•</span>
+  <div><p class="t-title">Cooldown completed</p>
+    <p class="t-body">Fifteen minutes elapsed after your 11:04 loss.</p></div>
+  <span class="ago">3h</span>
+</div>
+<div class="note">
+  A list row carries a <b>tile, a title, a sentence and a timestamp</b> — in that order,
+  always. The tile&rsquo;s tone is the only colour in the row, so severity is readable from
+  the left edge without reading a word.
+</div>
+
+<h2>Density</h2>
+<p class="lede" style="margin-bottom:0">
+  <b>comfortable</b> · 13px padding — the default, and what every example above uses.<br>
+  <b>compact</b> · 8px padding — for a log of more than about thirty rows, where scrolling
+  costs more than breathing room buys.<br>
+  Never mix the two in one view. Two densities on a screen reads as two systems.
+</p>
+
+</body>
+</html>

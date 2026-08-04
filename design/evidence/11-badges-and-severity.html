@@ -1,0 +1,131 @@
+<!-- @dsCard group="Components" name="Badges & severity" subtitle="Three levels from one hue, not three colours" -->
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Evidence — Badges &amp; severity</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Source+Serif+4:opsz,wght@8..60,600&family=Inter:wght@400;500;600&family=DM+Mono:wght@400;500&display=swap">
+<style>
+  :root { --paper:#FAF9F7; --raised:#FFF; --ink:#17171A; --ink2:#4A4A52; --ink3:#85858F;
+    --ink4:#B8B8C0; --rule:#E5E3DE; --accent:#2E4A7D; --accent-t:#ECEFF6;
+    --up:#1A7F5A; --up-t:#E8F2EE; --down:#A32A3C; --down-t:#F7EAEC; }
+  * { box-sizing:border-box; }
+  body { margin:0; background:var(--paper); color:var(--ink);
+    font:400 14px/1.6 Inter,system-ui,sans-serif; padding:48px; }
+  h1 { font:600 34px/1.15 'Source Serif 4',serif; margin:0 0 10px; letter-spacing:-.015em; }
+  .lede { color:var(--ink2); max-width:66ch; margin:0 0 40px; font-size:15px; }
+  h2 { font:600 12px/1 Inter,sans-serif; letter-spacing:.1em; text-transform:uppercase;
+    color:var(--ink3); margin:42px 0 18px; padding-bottom:10px; border-bottom:1px solid var(--rule); }
+  .row { display:flex; align-items:center; gap:12px; flex-wrap:wrap; margin-bottom:16px; }
+  .pill { display:inline-flex; align-items:center; gap:6px; border-radius:999px;
+    font:600 11px/1 Inter,sans-serif; padding:6px 12px; letter-spacing:.02em; }
+  .tag { display:inline-flex; align-items:center; border-radius:2px;
+    font:500 10px/1 Inter,sans-serif; padding:4px 7px; letter-spacing:.06em;
+    background:#F0EEEA; color:var(--ink3); text-transform:uppercase; }
+  .dot { width:6px; height:6px; border-radius:999px; }
+  .cap { font:400 11px/1 'DM Mono',monospace; color:var(--ink3); width:74px; flex-shrink:0; }
+  .grid3 { display:grid; grid-template-columns:repeat(3,1fr); gap:16px; }
+  .lvl { background:var(--raised); border:1px solid var(--rule); border-radius:8px; padding:20px; }
+  .lvl h4 { font:600 13px/1 Inter,sans-serif; margin:14px 0 6px; }
+  .lvl p { margin:0; font-size:12.5px; color:var(--ink2); line-height:1.55; }
+  .note { background:var(--raised); border:1px solid var(--rule); border-left:3px solid var(--accent);
+    border-radius:0 8px 8px 0; padding:16px 18px; margin:20px 0 0; max-width:74ch;
+    font-size:13.5px; color:var(--ink2); }
+  .note b { color:var(--ink); font-weight:600; }
+  .bad { border-left-color:var(--down); }
+  .tile { width:38px; height:38px; border-radius:6px; display:inline-flex;
+    align-items:center; justify-content:center; font:600 13px/1 Inter,sans-serif; }
+</style>
+</head>
+<body>
+
+<h1>Badges &amp; severity</h1>
+<p class="lede">
+  Severity has three levels and the system has one colour for risk. Those two facts are
+  reconciled by <b>strength, not hue</b> — solid, tint, neutral. Reaching for a fourth
+  colour to fill the middle is what makes an interface feel busy.
+</p>
+
+<h2>Severity — the three strengths</h2>
+<div class="grid3">
+  <div class="lvl">
+    <span class="pill" style="background:var(--down);color:#fff">HIGH SEVERITY</span>
+    <h4>Solid</h4>
+    <p>Costing real money now, and the reader should act. Reserved — if everything is
+      high, the fill stops meaning anything.</p>
+  </div>
+  <div class="lvl">
+    <span class="pill" style="background:var(--down-t);color:var(--down)">MED SEVERITY</span>
+    <h4>Tint</h4>
+    <p>Same hue, quieter. Present and worth reading, not worth interrupting for.</p>
+  </div>
+  <div class="lvl">
+    <span class="pill" style="background:#F0EEEA;color:var(--ink3)">LOW SEVERITY</span>
+    <h4>Neutral</h4>
+    <p>Recorded so the pattern is visible over time. Deliberately recedes — a low-severity
+      badge in colour is a lie about its importance.</p>
+  </div>
+</div>
+
+<div class="note bad">
+  <b>Why not amber for medium?</b> Because an amber badge and a red badge sitting in one
+  list read as two different <i>topics</i>, not two intensities of one. Three strengths of
+  a single hue keep them on the same axis, which is what severity actually is.
+</div>
+
+<h2>Money</h2>
+<div class="row">
+  <span class="cap">gain</span>
+  <span class="pill" style="background:var(--up-t);color:var(--up)">+12.4%</span>
+  <span class="pill" style="background:var(--up-t);color:var(--up)">↗ +₹4,200</span>
+  <span class="pill" style="background:var(--up);color:#fff">BEST DAY</span>
+</div>
+<div class="row">
+  <span class="cap">loss</span>
+  <span class="pill" style="background:var(--down-t);color:var(--down)">−8.1%</span>
+  <span class="pill" style="background:var(--down-t);color:var(--down)">↘ −₹1,240</span>
+  <span class="pill" style="background:var(--down);color:#fff">WORST DAY</span>
+</div>
+
+<h2>Status</h2>
+<div class="row">
+  <span class="cap">state</span>
+  <span class="pill" style="background:var(--accent-t);color:var(--accent)">
+    <span class="dot" style="background:var(--accent)"></span> Connected</span>
+  <span class="pill" style="background:var(--accent-t);color:var(--accent)">
+    <span class="dot" style="background:var(--accent)"></span> Guardian active</span>
+  <span class="pill" style="background:#F0EEEA;color:var(--ink3)">
+    <span class="dot" style="background:var(--ink4)"></span> Disconnected</span>
+</div>
+<div class="note">
+  <b>Status is accent, never green.</b> &ldquo;Connected&rdquo; in green would put the same
+  colour on a system state and on a profit — and once green means two things, the reader
+  can no longer find their P&amp;L by scanning for it.
+</div>
+
+<h2>Tags</h2>
+<div class="row">
+  <span class="cap">instrument</span>
+  <span class="tag">FUT</span><span class="tag">OPT</span>
+  <span class="tag">MIS</span><span class="tag">NRML</span><span class="tag">CNC</span>
+</div>
+<p style="font-size:13px;color:var(--ink2);max-width:64ch;margin:0">
+  Square-ish, grey, uppercase — a classification, not a judgement. Deliberately the
+  dullest element in the system so it never competes with a figure sitting beside it.
+</p>
+
+<h2>Icon tiles</h2>
+<div class="row">
+  <span class="cap">tones</span>
+  <span class="tile" style="background:var(--accent-t);color:var(--accent)">◆</span>
+  <span class="tile" style="background:var(--up-t);color:var(--up)">↗</span>
+  <span class="tile" style="background:var(--down-t);color:var(--down)">!</span>
+  <span class="tile" style="background:#F0EEEA;color:var(--ink3)">•</span>
+</div>
+<p style="font-size:13px;color:var(--ink2);max-width:64ch;margin:0">
+  Tint behind, full strength in front — the same pairing as every pill. An icon never
+  appears bare on the ground; the tile is what gives a row its anchor.
+</p>
+
+</body>
+</html>

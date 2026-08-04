@@ -1,0 +1,138 @@
+<!-- @dsCard group="Components" name="Figures & metrics" subtitle="The label/number pair, and how money is written" -->
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Evidence — Figures &amp; metrics</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Source+Serif+4:opsz,wght@8..60,600&family=Inter:wght@400;500;600&family=DM+Mono:wght@400;500&display=swap">
+<style>
+  :root { --paper:#FAF9F7; --raised:#FFF; --ink:#17171A; --ink2:#4A4A52; --ink3:#85858F;
+    --ink4:#B8B8C0; --rule:#E5E3DE; --accent:#2E4A7D; --accent-t:#ECEFF6;
+    --up:#1A7F5A; --up-t:#E8F2EE; --down:#A32A3C; --down-t:#F7EAEC; }
+  * { box-sizing:border-box; }
+  body { margin:0; background:var(--paper); color:var(--ink);
+    font:400 14px/1.6 Inter,system-ui,sans-serif; padding:48px; }
+  h1 { font:600 34px/1.15 'Source Serif 4',serif; margin:0 0 10px; letter-spacing:-.015em; }
+  .lede { color:var(--ink2); max-width:66ch; margin:0 0 40px; font-size:15px; }
+  h2 { font:600 12px/1 Inter,sans-serif; letter-spacing:.1em; text-transform:uppercase;
+    color:var(--ink3); margin:42px 0 18px; padding-bottom:10px; border-bottom:1px solid var(--rule); }
+  .lbl { font:600 10.5px/1 Inter,sans-serif; letter-spacing:.09em; text-transform:uppercase; color:var(--ink3); }
+  .card { background:var(--raised); border:1px solid var(--rule); border-radius:8px; padding:18px 20px; }
+  .fig-lg { font:500 27px/1 'DM Mono',monospace; letter-spacing:-.02em; margin:10px 0 0; }
+  .sub { font-size:12px; color:var(--ink2); margin:6px 0 0; }
+  .grid4 { display:grid; grid-template-columns:repeat(4,1fr); gap:16px; }
+  .grid2 { display:grid; grid-template-columns:1fr 1fr; gap:26px; align-items:start; }
+  .flat .m + .m { border-top:1px solid var(--rule); margin-top:16px; padding-top:16px; }
+  .note { background:var(--raised); border:1px solid var(--rule); border-left:3px solid var(--accent);
+    border-radius:0 8px 8px 0; padding:16px 18px; margin:20px 0 0; max-width:74ch;
+    font-size:13.5px; color:var(--ink2); }
+  .note b { color:var(--ink); font-weight:600; }
+  .hero { background:var(--raised); border:1px solid var(--rule); border-radius:8px; padding:30px 32px; }
+  .verdict { font:600 33px/1.15 'Source Serif 4',serif; letter-spacing:-.02em; margin:12px 0 0; }
+  table { width:100%; border-collapse:collapse; }
+  th { font:600 10.5px/1 Inter,sans-serif; letter-spacing:.09em; text-transform:uppercase;
+    color:var(--ink3); text-align:left; padding:0 0 10px; border-bottom:1px solid var(--rule); }
+  td { padding:11px 0; border-bottom:1px solid var(--rule); font-size:13px; }
+  td.n { text-align:right; font:500 13.5px/1 'DM Mono',monospace; }
+  .do, .dont { border-radius:8px; padding:16px 18px; font-size:13px; line-height:1.6; }
+  .do { background:var(--up-t); }
+  .dont { background:var(--down-t); }
+  .do b, .dont b { display:block; font:600 10.5px/1 Inter,sans-serif;
+    letter-spacing:.09em; text-transform:uppercase; margin-bottom:9px; }
+  .do b { color:var(--up); } .dont b { color:var(--down); }
+  .mono { font-family:'DM Mono',monospace; }
+</style>
+</head>
+<body>
+
+<h1>Figures &amp; metrics</h1>
+<p class="lede">
+  The most repeated unit in the whole system is a small grey label above a large
+  monospaced number. Learn that pair and most of the interface is already designed.
+</p>
+
+<h2>The pair</h2>
+<div class="grid4">
+  <div class="card"><div class="lbl">Session P&amp;L</div>
+    <p class="fig-lg" style="color:var(--up)">+₹3,720</p><p class="sub">+2.1% today</p></div>
+  <div class="card"><div class="lbl">Open positions</div>
+    <p class="fig-lg">3</p><p class="sub">2 long · 1 short</p></div>
+  <div class="card"><div class="lbl">Margin used</div>
+    <p class="fig-lg">65%</p><p class="sub">₹3,25,000 of ₹5,00,000</p></div>
+  <div class="card"><div class="lbl">Emotional tax</div>
+    <p class="fig-lg" style="color:var(--down)">₹45,200</p><p class="sub">Last 30 days</p></div>
+</div>
+
+<h2>The same pair without containers</h2>
+<div class="grid2">
+  <div class="card flat" style="padding:22px 24px">
+    <div class="m"><div class="lbl">Win rate</div><p class="fig-lg">58%</p></div>
+    <div class="m"><div class="lbl">Profit factor</div><p class="fig-lg">1.84</p></div>
+    <div class="m"><div class="lbl">Average winner</div><p class="fig-lg" style="color:var(--up)">+₹4,200</p></div>
+  </div>
+  <p style="font-size:13.5px;color:var(--ink2);line-height:1.65;margin:0">
+    Four boxes in a row is a summary. Three figures stacked behind hairlines is a
+    <i>reading</i>. Use the grid when the metrics are independent, and the stack when they
+    belong to one story and the reader is meant to take them in order.
+  </p>
+</div>
+
+<h2>Verdict</h2>
+<div class="hero">
+  <div class="lbl">This week</div>
+  <p class="verdict">You followed your plan on 9 of 12 trades.</p>
+  <p style="font-size:14px;color:var(--ink2);margin:12px 0 0;max-width:58ch;line-height:1.6">
+    The three you did not were all after a loss, and together they cost
+    <span class="mono" style="color:var(--down);font-weight:500">₹12,400</span>.
+  </p>
+</div>
+<div class="note">
+  <b>The serif exists for this.</b> A verdict is a sentence, not a metric, and setting it in
+  the display face is what separates &ldquo;here is your data&rdquo; from &ldquo;here is what
+  happened&rdquo;. Used once per screen at most.
+</div>
+
+<h2>How money is written</h2>
+<div class="grid2">
+  <div class="do">
+    <b>Do</b>
+    <span class="mono">+₹4,200.50</span> — sign always shown on a change.<br>
+    <span class="mono">−₹1,240.00</span> — a true minus sign, not a hyphen.<br>
+    <span class="mono">₹1,45,000</span> — Indian grouping: 1,45,000 not 145,000.<br>
+    <span class="mono">₹45,200</span> — paise dropped on period totals.<br>
+    <span class="mono">₹4,200.50</span> — paise kept on a single trade.
+  </div>
+  <div class="dont">
+    <b>Don&rsquo;t</b>
+    <span class="mono">4200.5</span> — unformatted, unsigned, unreadable at a glance.<br>
+    <span class="mono">₹4.2k</span> — never abbreviate money the reader might reconcile.<br>
+    <span class="mono">(1,240)</span> — accounting parentheses. This is not a ledger for accountants.<br>
+    <span class="mono">₹0</span> in green — zero is not a gain. Zero is ink.
+  </div>
+</div>
+
+<h2>In a table</h2>
+<table>
+  <tr><th>Symbol</th><th style="text-align:right">Qty</th><th style="text-align:right">Entry</th>
+    <th style="text-align:right">LTP</th><th style="text-align:right">P&amp;L</th></tr>
+  <tr><td>NIFTY 50 <span style="font:500 10px/1 Inter;background:#F0EEEA;color:var(--ink3);
+    padding:3px 6px;border-radius:2px;letter-spacing:.05em">FUT</span></td>
+    <td class="n">500</td><td class="n" style="color:var(--ink3)">22,140.00</td>
+    <td class="n">22,148.40</td><td class="n" style="color:var(--up)">+₹4,200.50</td></tr>
+  <tr><td>BANKNIFTY <span style="font:500 10px/1 Inter;background:#F0EEEA;color:var(--ink3);
+    padding:3px 6px;border-radius:2px;letter-spacing:.05em">OPT</span></td>
+    <td class="n">250</td><td class="n" style="color:var(--ink3)">486.20</td>
+    <td class="n">481.24</td><td class="n" style="color:var(--down)">−₹1,240.00</td></tr>
+  <tr><td>RELIANCE <span style="font:500 10px/1 Inter;background:#F0EEEA;color:var(--ink3);
+    padding:3px 6px;border-radius:2px;letter-spacing:.05em">FUT</span></td>
+    <td class="n">100</td><td class="n" style="color:var(--ink3)">2,904.00</td>
+    <td class="n">2,911.60</td><td class="n" style="color:var(--up)">+₹760.00</td></tr>
+</table>
+<div class="note">
+  Entry price is deliberately <b>muted</b> and LTP is full ink. Both are prices, but only
+  one is moving — greying the static one lets the eye travel straight from symbol to what
+  changed, which is the only reason anyone opens this table.
+</div>
+
+</body>
+</html>

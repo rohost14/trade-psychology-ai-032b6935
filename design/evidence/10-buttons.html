@@ -1,0 +1,118 @@
+<!-- @dsCard group="Components" name="Buttons" subtitle="Four ranks, three sizes, every state" -->
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Evidence — Buttons</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Source+Serif+4:opsz,wght@8..60,600&family=Inter:wght@400;500;600&family=DM+Mono:wght@400;500&display=swap">
+<style>
+  :root { --paper:#FAF9F7; --raised:#FFF; --ink:#17171A; --ink2:#4A4A52; --ink3:#85858F;
+    --ink4:#B8B8C0; --rule:#E5E3DE; --accent:#2E4A7D; --accent-d:#233A63; --down:#A32A3C; --down-d:#8A2233; }
+  * { box-sizing:border-box; }
+  body { margin:0; background:var(--paper); color:var(--ink);
+    font:400 14px/1.6 Inter,system-ui,sans-serif; padding:48px; }
+  h1 { font:600 34px/1.15 'Source Serif 4',serif; margin:0 0 10px; letter-spacing:-.015em; }
+  .lede { color:var(--ink2); max-width:64ch; margin:0 0 40px; font-size:15px; }
+  h2 { font:600 12px/1 Inter,sans-serif; letter-spacing:.1em; text-transform:uppercase;
+    color:var(--ink3); margin:42px 0 18px; padding-bottom:10px; border-bottom:1px solid var(--rule); }
+  .row { display:flex; align-items:center; gap:14px; flex-wrap:wrap; margin-bottom:14px; }
+  .btn { font:500 13.5px/1 Inter,sans-serif; border-radius:4px; border:1px solid transparent;
+    height:38px; padding:0 18px; display:inline-flex; align-items:center; gap:8px; cursor:pointer; }
+  .primary { background:var(--accent); color:#fff; }
+  .primary:hover { background:var(--accent-d); }
+  .secondary { background:var(--raised); color:var(--ink); border-color:var(--rule); }
+  .secondary:hover { background:#F2F1EE; }
+  .quiet { background:transparent; color:var(--ink2); }
+  .quiet:hover { background:#F0EEEA; color:var(--ink); }
+  .danger { background:var(--down); color:#fff; }
+  .danger:hover { background:var(--down-d); }
+  .sm { height:30px; padding:0 13px; font-size:12.5px; }
+  .lg { height:46px; padding:0 24px; font-size:14.5px; }
+  .disabled { opacity:.42; cursor:not-allowed; }
+  .focus { outline:2px solid var(--accent); outline-offset:2px; }
+  .cap { font:400 11px/1 'DM Mono',monospace; color:var(--ink3); width:96px; flex-shrink:0; }
+  .grid { display:grid; grid-template-columns:110px 1fr; gap:14px 20px; align-items:center; }
+  .g-lbl { font:400 11px/1.4 'DM Mono',monospace; color:var(--ink3); }
+  .note { background:var(--raised); border:1px solid var(--rule); border-left:3px solid var(--accent);
+    border-radius:0 8px 8px 0; padding:16px 18px; margin:20px 0 0; max-width:72ch;
+    font-size:13.5px; color:var(--ink2); }
+  .note b { color:var(--ink); font-weight:600; }
+  .spin { width:14px; height:14px; border:2px solid rgba(255,255,255,.35);
+    border-top-color:#fff; border-radius:999px; animation:s .7s linear infinite; }
+  @keyframes s { to { transform:rotate(360deg); } }
+</style>
+</head>
+<body>
+
+<h1>Buttons</h1>
+<p class="lede">
+  Four ranks. The rank is chosen by consequence, not by how much attention the button
+  wants — which is why there is exactly one primary per view.
+</p>
+
+<h2>Ranks</h2>
+<div class="grid">
+  <div class="g-lbl">primary</div>
+  <div class="row"><button class="btn primary">Connect broker</button>
+    <span style="font-size:12.5px;color:var(--ink2)">The one action this view exists for. Never two on a screen.</span></div>
+
+  <div class="g-lbl">secondary</div>
+  <div class="row"><button class="btn secondary">Export</button>
+    <span style="font-size:12.5px;color:var(--ink2)">A real alternative the reader might reasonably take.</span></div>
+
+  <div class="g-lbl">quiet</div>
+  <div class="row"><button class="btn quiet">Cancel</button>
+    <span style="font-size:12.5px;color:var(--ink2)">Dismissal and retreat. Carries no border so it never competes.</span></div>
+
+  <div class="g-lbl">danger</div>
+  <div class="row"><button class="btn danger">Delete account</button>
+    <span style="font-size:12.5px;color:var(--ink2)">Irreversible only. Not &ldquo;important&rdquo; — <i>irreversible</i>.</span></div>
+</div>
+
+<h2>Sizes</h2>
+<div class="row">
+  <span class="cap">sm · 30</span><button class="btn primary sm">Acknowledge</button>
+  <button class="btn secondary sm">Snooze</button>
+</div>
+<div class="row">
+  <span class="cap">md · 38</span><button class="btn primary">Acknowledge</button>
+  <button class="btn secondary">Snooze</button>
+</div>
+<div class="row">
+  <span class="cap">lg · 46</span><button class="btn primary lg">Acknowledge</button>
+  <button class="btn secondary lg">Snooze</button>
+</div>
+
+<h2>States</h2>
+<div class="grid">
+  <div class="g-lbl">default</div><div class="row"><button class="btn primary">Save changes</button></div>
+  <div class="g-lbl">hover</div><div class="row"><button class="btn primary" style="background:var(--accent-d)">Save changes</button></div>
+  <div class="g-lbl">focus</div><div class="row"><button class="btn primary focus">Save changes</button></div>
+  <div class="g-lbl">loading</div><div class="row"><button class="btn primary"><span class="spin"></span> Saving…</button></div>
+  <div class="g-lbl">disabled</div><div class="row"><button class="btn primary disabled">Save changes</button></div>
+</div>
+
+<div class="note">
+  <b>Loading keeps the label.</b> &ldquo;Saving…&rdquo; rather than a bare spinner, because
+  a spinner alone drops the one piece of information the reader wants: what is happening
+  and whether it is the thing they asked for.
+</div>
+
+<h2>Touch targets</h2>
+<div class="row" style="align-items:flex-end">
+  <div style="text-align:center">
+    <div style="width:44px;height:44px;border:1px dashed var(--ink4);border-radius:4px;
+      display:flex;align-items:center;justify-content:center">
+      <span style="width:16px;height:16px;background:var(--ink3);border-radius:2px"></span>
+    </div>
+    <div style="font:400 11px/1.6 'DM Mono',monospace;color:var(--ink3)">44 × 44 min</div>
+  </div>
+  <p style="font-size:13px;color:var(--ink2);max-width:46ch;margin:0">
+    An icon button&rsquo;s <i>hit area</i> is 44px even when the icon is 16px. Pad it and pull
+    the padding back with a negative margin so the layout does not move — the target grows,
+    the design does not.
+  </p>
+</div>
+
+</body>
+</html>

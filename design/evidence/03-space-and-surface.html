@@ -1,0 +1,130 @@
+<!-- @dsCard group="Foundations" name="Space & surface" subtitle="4px base, small radii, and when a container is allowed" -->
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Evidence — Space &amp; surface</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Source+Serif+4:opsz,wght@8..60,400;8..60,600&family=Inter:wght@400;500;600&family=DM+Mono:wght@400;500&display=swap">
+<style>
+  :root { --paper:#FAF9F7; --raised:#FFF; --ink:#17171A; --ink2:#4A4A52; --ink3:#85858F;
+    --ink4:#B8B8C0; --rule:#E5E3DE; --accent:#2E4A7D; --up:#1A7F5A; --down:#A32A3C; }
+  * { box-sizing:border-box; }
+  body { margin:0; background:var(--paper); color:var(--ink);
+    font:400 14px/1.6 Inter,system-ui,sans-serif; padding:48px; }
+  h1 { font:600 34px/1.15 'Source Serif 4',serif; margin:0 0 10px; letter-spacing:-.015em; }
+  .lede { color:var(--ink2); max-width:64ch; margin:0 0 40px; font-size:15px; }
+  h2 { font:600 12px/1 Inter,sans-serif; letter-spacing:.1em; text-transform:uppercase;
+    color:var(--ink3); margin:44px 0 18px; padding-bottom:10px; border-bottom:1px solid var(--rule); }
+  .steps { display:flex; align-items:flex-end; gap:14px; flex-wrap:wrap; }
+  .step { text-align:center; }
+  .bar { background:var(--accent); border-radius:2px; }
+  .step .v { font:400 11px/1 'DM Mono',monospace; color:var(--ink3); margin-top:9px; }
+  .radii { display:flex; gap:18px; flex-wrap:wrap; }
+  .rad { text-align:center; }
+  .rad .box { width:80px; height:80px; background:var(--raised); border:1px solid var(--rule); }
+  .rad .v { font:400 11px/1.5 'DM Mono',monospace; color:var(--ink3); margin-top:9px; }
+  .rad .u { font-size:11px; color:var(--ink2); }
+  .two { display:grid; grid-template-columns:1fr 1fr; gap:26px; align-items:start; }
+  .demo { background:var(--paper); border:1px dashed var(--ink4); border-radius:8px; padding:20px; }
+  .demo h4 { font:600 11px/1 Inter,sans-serif; letter-spacing:.08em; text-transform:uppercase;
+    margin:0 0 14px; color:var(--ink3); }
+  .card { background:var(--raised); border:1px solid var(--rule); border-radius:8px; padding:18px 20px; }
+  .lbl { font:600 10.5px/1 Inter,sans-serif; letter-spacing:.09em; text-transform:uppercase; color:var(--ink3); }
+  .fig { font:500 26px/1 'DM Mono',monospace; margin:10px 0 0; }
+  .sec-h { display:flex; justify-content:space-between; align-items:baseline;
+    padding-bottom:10px; border-bottom:1px solid var(--rule); }
+  .sec-h h5 { font:600 14px/1 Inter,sans-serif; margin:0; }
+  .row { display:grid; grid-template-columns:1fr 70px 100px; align-items:center;
+    padding:12px 0; border-bottom:1px solid var(--rule); font-size:13px; }
+  .n { text-align:right; font:500 13px/1 'DM Mono',monospace; }
+  .verdict { padding:14px 0 0; }
+  .note { background:var(--raised); border:1px solid var(--rule); border-left:3px solid var(--accent);
+    border-radius:0 8px 8px 0; padding:16px 18px; margin:20px 0 0; max-width:72ch;
+    font-size:13.5px; color:var(--ink2); }
+  .note b { color:var(--ink); font-weight:600; }
+  .elev { display:flex; gap:20px; flex-wrap:wrap; }
+  .e { width:180px; height:96px; background:var(--raised); border-radius:8px; padding:14px;
+    font:400 11px/1.4 'DM Mono',monospace; color:var(--ink3); }
+</style>
+</head>
+<body>
+
+<h1>Space &amp; surface</h1>
+<p class="lede">
+  A 4px base, deliberately small radii, and one rule about containers that decides
+  most layout arguments before they start.
+</p>
+
+<h2>Spacing steps</h2>
+<div class="steps">
+  <div class="step"><div class="bar" style="width:22px;height:4px"></div><div class="v">4</div></div>
+  <div class="step"><div class="bar" style="width:22px;height:8px"></div><div class="v">8</div></div>
+  <div class="step"><div class="bar" style="width:22px;height:12px"></div><div class="v">12</div></div>
+  <div class="step"><div class="bar" style="width:22px;height:16px"></div><div class="v">16</div></div>
+  <div class="step"><div class="bar" style="width:22px;height:24px"></div><div class="v">24</div></div>
+  <div class="step"><div class="bar" style="width:22px;height:32px"></div><div class="v">32</div></div>
+  <div class="step"><div class="bar" style="width:22px;height:48px"></div><div class="v">48</div></div>
+  <div class="step"><div class="bar" style="width:22px;height:64px"></div><div class="v">64</div></div>
+</div>
+
+<h2>Radii</h2>
+<div class="radii">
+  <div class="rad"><div class="box" style="border-radius:2px"></div><div class="v">2</div><div class="u">chips, tags</div></div>
+  <div class="rad"><div class="box" style="border-radius:4px"></div><div class="v">4</div><div class="u">buttons, inputs</div></div>
+  <div class="rad"><div class="box" style="border-radius:8px"></div><div class="v">8</div><div class="u">cards, sheets</div></div>
+  <div class="rad"><div class="box" style="border-radius:999px"></div><div class="v">999</div><div class="u">pills only</div></div>
+</div>
+<div class="note">
+  <b>Small on purpose.</b> Large radii read friendly, and this system is not trying to
+  be friendly — it is trying to be trusted. 8px is the largest a container gets; the
+  full pill is reserved for badges, where the shape is doing semantic work rather than
+  decorative work.
+</div>
+
+<h2>Elevation</h2>
+<div class="elev">
+  <div class="e" style="border:1px solid var(--rule)">flat<br>1px rule, no shadow<br><br>default</div>
+  <div class="e" style="box-shadow:0 1px 2px rgba(23,23,26,.05),0 2px 8px rgba(23,23,26,.04)">raised<br>cards, popovers</div>
+  <div class="e" style="box-shadow:0 8px 28px rgba(23,23,26,.10)">lifted<br>modals, sheets</div>
+</div>
+<div class="note">
+  Only three levels, and the default is <b>flat with a hairline</b>. A shadow here means
+  &ldquo;this floats above the page&rdquo;, so if everything has one, nothing does.
+</div>
+
+<h2>The container rule</h2>
+<p class="lede" style="margin-bottom:20px">
+  <b>A container has to earn itself.</b> Give one to a thing that is separable — a single
+  metric, one verdict, one alert. Withhold it from a set the reader scans and compares.
+</p>
+<div class="two">
+  <div class="demo">
+    <h4>Earned — a discrete object</h4>
+    <div class="card">
+      <div class="lbl">Emotional tax paid</div>
+      <p class="fig">₹45,200</p>
+      <p style="margin:8px 0 0;font-size:12.5px;color:var(--ink2);line-height:1.5">
+        Losses attributed to psychology rather than to strategy.</p>
+    </div>
+    <p style="font-size:12px;color:var(--ink2);margin:14px 0 0;line-height:1.55">
+      One figure, one meaning. Nothing on the screen competes with it, so the surface
+      helps rather than clutters.</p>
+  </div>
+  <div class="demo">
+    <h4>Not earned — a set you compare</h4>
+    <div class="sec-h"><h5>Open positions</h5>
+      <span style="font-size:12px;color:var(--accent)">View all</span></div>
+    <div class="row"><span>NIFTY 50</span><span class="n">500</span>
+      <span class="n" style="color:var(--up)">+₹4,200</span></div>
+    <div class="row"><span>BANKNIFTY</span><span class="n">250</span>
+      <span class="n" style="color:var(--down)">−₹1,240</span></div>
+    <div class="row" style="border-bottom:0"><span>RELIANCE</span><span class="n">100</span>
+      <span class="n" style="color:var(--up)">+₹760</span></div>
+    <p style="font-size:12px;color:var(--ink2);margin:14px 0 0;line-height:1.55">
+      Boxing each row would put a border between figures the reader is trying to compare.
+      Hairlines separate; boxes isolate.</p>
+  </div>
+</div>
+
+</body>
+</html>
