@@ -1,4 +1,3 @@
-import { useState, useEffect } from 'react';
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip,
   ResponsiveContainer, Cell, ReferenceLine,
@@ -9,7 +8,7 @@ import ErrorState from '@/components/ErrorState';
 import { cn } from '@/lib/utils';
 import { formatCurrencyWithSign, formatAxisCurrency } from '@/lib/formatters';
 import type { ChartTooltipProps } from '@/lib/chartTooltip';
-import { api } from '@/lib/api';
+import { useApiQuery } from '@/hooks/useApiQuery';
 
 interface SessionsTabProps { days: number }
 
@@ -81,30 +80,26 @@ function DowTooltip({ active, payload }: ChartTooltipProps<ExpiryWeekDow>) {
 }
 
 export default function SessionsTab({ days }: SessionsTabProps) {
-  const [overview, setOverview]   = useState<OverviewData | null>(null);
-  const [expiry, setExpiry]       = useState<ExpiryData | null>(null);
-  const [conditional, setCond]    = useState<ConditionalData | null>(null);
-  const [loading, setLoading]     = useState(true);
-  const [error, setError]         = useState<unknown>(null);
-  const [retry, setRetry]         = useState(0);
+  // Both /overview and /conditional-performance are shared with other tabs. Note
+  // this one asks for a FIXED 90 days regardless of the page's range — the
+  // calendar below always shows a quarter — so it is a different cache entry from
+  // OverviewTab's, which is exactly what including params in the key gives us.
+  const overviewQ = useApiQuery<OverviewData>(
+    ['analytics', 'overview'], '/api/analytics/overview', { params: { days: 90 } },
+  );
+  const expiryQ = useApiQuery<ExpiryData>(
+    ['analytics', 'expiry-pattern'], '/api/analytics/expiry-pattern', { params: { days } },
+  );
+  const conditionalQ = useApiQuery<ConditionalData>(
+    ['analytics', 'conditional-performance'], '/api/analytics/conditional-performance', { params: { days } },
+  );
 
-  useEffect(() => {
-    let cancelled = false;
-    setLoading(true);
-    setError(null);
-    Promise.allSettled([
-      api.get('/api/analytics/overview',                { params: { days: 90 } }),
-      api.get('/api/analytics/expiry-pattern',          { params: { days } }),
-      api.get('/api/analytics/conditional-performance', { params: { days } }),
-    ]).then(([ov, ex, co]) => {
-      if (cancelled) return;
-      if (ov.status === 'fulfilled') setOverview(ov.value.data);
-      if (ex.status === 'fulfilled') setExpiry(ex.value.data);
-      if (co.status === 'fulfilled') setCond(co.value.data);
-      if (ov.status === 'rejected') setError(ov.reason);
-    }).finally(() => { if (!cancelled) setLoading(false); });
-    return () => { cancelled = true; };
-  }, [days, retry]);
+  const overview = overviewQ.data ?? null;
+  const expiry = expiryQ.data ?? null;
+  const conditional = conditionalQ.data ?? null;
+
+  const loading = overviewQ.isPending;
+  const error = overviewQ.error;
 
   if (loading) return (
     <div className="space-y-4 animate-pulse">
@@ -122,7 +117,7 @@ export default function SessionsTab({ days }: SessionsTabProps) {
     </div>
   );
 
-  if (error) return <ErrorState error={error} onRetry={() => setRetry(r => r + 1)} />;
+  if (error) return <ErrorState error={error} onRetry={() => overviewQ.refetch()} />;
   // conditional-performance returns a `conditions` ARRAY keyed by `key` —
   // pick the two session-relevant ones (absent when below the sample gate).
   const conditions = conditional?.has_data ? (conditional.conditions ?? []) : [];

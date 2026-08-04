@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip,
   ResponsiveContainer, Cell, ReferenceLine,
@@ -10,7 +10,7 @@ import { cn } from '@/lib/utils';
 import { useChartColors } from '@/hooks/useChartColors';
 import { formatCurrencyWithSign } from '@/lib/formatters';
 import type { ChartTooltipProps } from '@/lib/chartTooltip';
-import { api } from '@/lib/api';
+import { useApiQuery } from '@/hooks/useApiQuery';
 
 interface TradeDnaTabProps { days: number }
 
@@ -101,38 +101,32 @@ function HoldTooltip({ active, payload }: ChartTooltipProps<PnlPctData['by_hold_
 
 export default function TradeDnaTab({ days }: TradeDnaTabProps) {
   const c = useChartColors();
-  const [quality, setQuality]     = useState<QualityData | null>(null);
-  const [critical, setCritical]   = useState<CriticalData | null>(null);
-  const [pnlPct, setPnlPct]       = useState<PnlPctData | null>(null);
-  const [sequence, setSequence]   = useState<SequenceData | null>(null);
-  const [loading, setLoading]     = useState(true);
-  const [error, setError]         = useState<unknown>(null);
-  const [retry, setRetry]         = useState(0);
-  const [search, setSearch]       = useState('');
+  // Note the param names differ per endpoint — quality-breakdown and pnl-percent
+  // take days_back, the other two take days. Those go into the cache key exactly
+  // as sent, so the entries stay distinct.
+  const qualityQ = useApiQuery<QualityData>(
+    ['analytics', 'quality-breakdown'], '/api/analytics/quality-breakdown', { params: { days_back: days } },
+  );
+  const criticalQ = useApiQuery<CriticalData>(
+    ['analytics', 'critical-trades'], '/api/analytics/critical-trades', { params: { days } },
+  );
+  const pnlPctQ = useApiQuery<PnlPctData>(
+    ['analytics', 'pnl-percent'], '/api/analytics/pnl-percent', { params: { days_back: days } },
+  );
+  const sequenceQ = useApiQuery<SequenceData>(
+    ['analytics', 'trade-sequence'], '/api/analytics/trade-sequence', { params: { days } },
+  );
 
-  useEffect(() => {
-    let cancelled = false;
-    setLoading(true);
-    setError(null);
-    Promise.allSettled([
-      api.get('/api/analytics/quality-breakdown', { params: { days_back: days } }),
-      api.get('/api/analytics/critical-trades',   { params: { days } }),
-      api.get('/api/analytics/pnl-percent',       { params: { days_back: days } }),
-      api.get('/api/analytics/trade-sequence',    { params: { days } }),
-    ]).then(([q, c, p, s]) => {
-      if (cancelled) return;
-      if (q.status === 'fulfilled') setQuality(q.value.data);
-      if (c.status === 'fulfilled') {
-        const d = c.value.data;
-        // API returns trades sorted worst-first; derive best_5 from quality breakdown below
-        setCritical(d);
-      }
-      if (p.status === 'fulfilled') setPnlPct(p.value.data);
-      if (s.status === 'fulfilled') setSequence(s.value.data);
-      if (q.status === 'rejected') setError(q.reason);
-    }).finally(() => { if (!cancelled) setLoading(false); });
-    return () => { cancelled = true; };
-  }, [days, retry]);
+  const quality = qualityQ.data ?? null;
+  // API returns trades sorted worst-first; best_5 is derived from quality below.
+  const critical = criticalQ.data ?? null;
+  const pnlPct = pnlPctQ.data ?? null;
+  const sequence = sequenceQ.data ?? null;
+
+  const loading = qualityQ.isPending;
+  const error = qualityQ.error;
+
+  const [search, setSearch] = useState('');
 
   if (loading) return (
     <div className="space-y-4 animate-pulse">
@@ -146,7 +140,7 @@ export default function TradeDnaTab({ days }: TradeDnaTabProps) {
     </div>
   );
 
-  if (error) return <ErrorState error={error} onRetry={() => setRetry(r => r + 1)} />;
+  if (error) return <ErrorState error={error} onRetry={() => qualityQ.refetch()} />;
 
   const baseline = sequence?.baseline_win_rate ?? 0;
   const hasSeq   = sequence?.has_data && (sequence.sequence?.length ?? 0) > 1;

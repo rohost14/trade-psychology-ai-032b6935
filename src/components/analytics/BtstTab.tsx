@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { Moon } from 'lucide-react';
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid,
@@ -8,7 +8,8 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { cn } from '@/lib/utils';
 import { useChartColors } from '@/hooks/useChartColors';
 import { formatCurrencyWithSign, formatAxisCurrency } from '@/lib/formatters';
-import { api } from '@/lib/api';
+import ErrorState from '@/components/ErrorState';
+import { useApiQuery } from '@/hooks/useApiQuery';
 import { useBroker } from '@/contexts/BrokerContext';
 
 interface BTSTTrade {
@@ -48,20 +49,16 @@ function fmtHold(min: number | null): string {
 export default function BtstTab({ days }: { days: number }) {
   const c = useChartColors();
   const { account } = useBroker();
-  const [data, setData] = useState<BTSTData | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [showAll, setShowAll] = useState(false);
+  const btstQ = useApiQuery<BTSTData>(
+    ['analytics', 'btst'], '/api/analytics/btst',
+    { params: { days }, enabled: Boolean(account?.id) },
+  );
 
-  useEffect(() => {
-    if (!account?.id) return;
-    setLoading(true);
-    setData(null);
-    let cancelled = false;
-    api.get('/api/analytics/btst', { params: { days } })
-      .then(r => { if (!cancelled) { setData(r.data); setLoading(false); } })
-      .catch(() => { if (!cancelled) setLoading(false); });
-    return () => { cancelled = true; };
-  }, [days, account?.id]);
+  const data = btstQ.data ?? null;
+  const loading = btstQ.isPending;
+  const error = btstQ.error;
+
+  const [showAll, setShowAll] = useState(false);
 
   if (loading) {
     return (
@@ -73,6 +70,12 @@ export default function BtstTab({ days }: { days: number }) {
       </div>
     );
   }
+
+  // Checked BEFORE the no-data branch. The fetch used to swallow its error
+  // entirely — `.catch(() => setLoading(false))` — so a failed request fell
+  // through to "No BTST trades in the last N days". That is a confident, wrong
+  // answer: the trader may have plenty, we just could not load them.
+  if (error) return <ErrorState error={error} onRetry={() => btstQ.refetch()} />;
 
   if (!data?.has_data) {
     return (

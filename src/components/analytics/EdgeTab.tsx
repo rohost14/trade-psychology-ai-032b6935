@@ -1,4 +1,3 @@
-import { useState, useEffect } from 'react';
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip,
   ResponsiveContainer, Cell, ReferenceLine,
@@ -11,7 +10,7 @@ import { useChartColors } from '@/hooks/useChartColors';
 import { formatCurrencyWithSign, formatAxisCurrency } from '@/lib/formatters';
 import { extractUnderlying, optionType, classifyExpiry } from '@/lib/symbolClassify';
 import type { ChartTooltipProps } from '@/lib/chartTooltip';
-import { api } from '@/lib/api';
+import { useApiQuery } from '@/hooks/useApiQuery';
 
 interface EdgeTabProps {
   days: number;
@@ -120,27 +119,21 @@ function SizeTooltip({ active, payload }: ChartTooltipProps<PerfData['size_analy
 
 export default function EdgeTab({ days, onInstrumentClick }: EdgeTabProps) {
   const c = useChartColors();
-  const [perf, setPerf]       = useState<PerfData | null>(null);
-  const [heatmap, setHeatmap] = useState<HeatmapData | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [error, setError]     = useState<unknown>(null);
-  const [retry, setRetry]     = useState(0);
+  // /performance is shared with OverviewTab — same key, fetched once between them.
+  const perfQ = useApiQuery<PerfData>(
+    ['analytics', 'performance'], '/api/analytics/performance', { params: { days } },
+  );
+  const heatmapQ = useApiQuery<HeatmapData>(
+    ['analytics', 'timing-heatmap'], '/api/analytics/timing-heatmap', { params: { days } },
+  );
 
-  useEffect(() => {
-    let cancelled = false;
-    setLoading(true);
-    setError(null);
-    Promise.allSettled([
-      api.get('/api/analytics/performance',    { params: { days } }),
-      api.get('/api/analytics/timing-heatmap', { params: { days } }),
-    ]).then(([pf, hm]) => {
-      if (cancelled) return;
-      if (pf.status === 'fulfilled') setPerf(pf.value.data);
-      if (hm.status === 'fulfilled') setHeatmap(hm.value.data);
-      if (pf.status === 'rejected') setError(pf.reason);
-    }).finally(() => { if (!cancelled) setLoading(false); });
-    return () => { cancelled = true; };
-  }, [days, retry]);
+  const perf = perfQ.data ?? null;
+  const heatmap = heatmapQ.data ?? null;
+
+  // Only /performance gates the tab, as before: a failed heatmap drops that chart
+  // rather than the whole page.
+  const loading = perfQ.isPending;
+  const error = perfQ.error;
 
   if (loading) return (
     <div className="space-y-4 animate-pulse">
@@ -154,7 +147,7 @@ export default function EdgeTab({ days, onInstrumentClick }: EdgeTabProps) {
     </div>
   );
 
-  if (error) return <ErrorState error={error} onRetry={() => setRetry(r => r + 1)} />;
+  if (error) return <ErrorState error={error} onRetry={() => perfQ.refetch()} />;
 
   // CE/PE/FUT split
   const byInstrument = perf?.by_instrument ?? [];

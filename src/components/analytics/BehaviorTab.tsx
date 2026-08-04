@@ -1,11 +1,11 @@
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { RefreshCw, AlertTriangle, Link as LinkIcon, ArrowRight } from 'lucide-react';
 import { Skeleton } from '@/components/ui/skeleton';
 import ErrorState from '@/components/ErrorState';
 import { cn } from '@/lib/utils';
 import { formatCurrencyWithSign } from '@/lib/formatters';
-import { api } from '@/lib/api';
+import { useApiQuery } from '@/hooks/useApiQuery';
 import OptionsBehaviorCard from './OptionsBehaviorCard';
 import { useBroker } from '@/contexts/BrokerContext';
 import { PredictiveContextStrip } from '@/components/dashboard/PredictiveContextStrip';
@@ -100,31 +100,27 @@ function timeAgo(dateStr: string | null): string {
 
 export default function BehaviorTab({ days }: BehaviorTabProps) {
   const { account } = useBroker();
-  const [metrics, setMetrics]       = useState<RiskMetrics | null>(null);
-  const [conditional, setCond]      = useState<ConditionalData | null>(null);
-  const [emotions, setEmotions]     = useState<JournalCorrData | null>(null);
-  const [hasOptions, setHasOptions] = useState(false);
-  const [loading, setLoading]       = useState(true);
-  const [error, setError]           = useState<unknown>(null);
-  const [retry, setRetry]           = useState(0);
+  // conditional-performance is shared with SessionsTab — same key, one request.
+  const metricsQ = useApiQuery<RiskMetrics>(
+    ['analytics', 'risk-metrics'], '/api/analytics/risk-metrics', { params: { days } },
+  );
+  const conditionalQ = useApiQuery<ConditionalData>(
+    ['analytics', 'conditional-performance'], '/api/analytics/conditional-performance', { params: { days } },
+  );
+  const emotionsQ = useApiQuery<JournalCorrData>(
+    ['analytics', 'journal-correlation'], '/api/analytics/journal-correlation', { params: { days } },
+  );
 
-  useEffect(() => {
-    let cancelled = false;
-    setLoading(true);
-    setError(null);
-    Promise.allSettled([
-      api.get('/api/analytics/risk-metrics',            { params: { days } }),
-      api.get('/api/analytics/conditional-performance', { params: { days } }),
-      api.get('/api/analytics/journal-correlation',     { params: { days } }),
-    ]).then(([m, c, e]) => {
-      if (cancelled) return;
-      if (m.status === 'fulfilled') setMetrics(m.value.data);
-      if (c.status === 'fulfilled') setCond(c.value.data);
-      if (e.status === 'fulfilled') setEmotions(e.value.data);
-      if (m.status === 'rejected') setError(m.reason);
-    }).finally(() => { if (!cancelled) setLoading(false); });
-    return () => { cancelled = true; };
-  }, [days, retry]);
+  const metrics = metricsQ.data ?? null;
+  const conditional = conditionalQ.data ?? null;
+  const emotions = emotionsQ.data ?? null;
+
+  // Only risk-metrics gates the tab, as with the previous allSettled: a failed
+  // conditional or journal-correlation call drops that section, not the page.
+  const loading = metricsQ.isPending;
+  const error = metricsQ.error;
+
+  const [hasOptions, setHasOptions] = useState(false);
 
   if (loading) return (
     <div className="space-y-4 animate-pulse">
@@ -138,7 +134,7 @@ export default function BehaviorTab({ days }: BehaviorTabProps) {
     </div>
   );
 
-  if (error) return <ErrorState error={error} onRetry={() => setRetry(r => r + 1)} />;
+  if (error) return <ErrorState error={error} onRetry={() => metricsQ.refetch()} />;
 
   // Only the COUNT is used, to decide whether this tab has anything to show.
   // There used to be a sorted `patterns` array and a `maxCount` here, both fully
