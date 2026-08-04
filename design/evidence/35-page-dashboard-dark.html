@@ -1,0 +1,231 @@
+<!-- @dsCard group="Pages" name="Dashboard — dark" subtitle="The same page in dark, specified rather than inverted" -->
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Evidence — Dashboard, dark</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Source+Serif+4:opsz,wght@8..60,400;8..60,600&family=Inter:wght@400;500;600&family=DM+Mono:wght@400;500&display=swap">
+<style>
+  :root { --paper:#1B1B22; --raised:#24242E; --inset:#16161C;
+    --ink:#F2F0EA; --ink2:#B9B5AC; --ink3:#8A857C; --ink4:#5E5A54; --rule:#33333F;
+    --accent:#8AA4DC; --accent-t:#252B3A; --up:#3FBF8C; --up-t:#1B2E29;
+    --down:#E5697C; --down-t:#33222A; }
+  * { box-sizing:border-box; }
+  body { margin:0; background:var(--paper); color:var(--ink);
+    font:400 14px/1.6 Inter,system-ui,sans-serif; display:flex; min-height:100vh; }
+
+  aside { width:228px; flex-shrink:0; background:var(--raised); border-right:1px solid var(--rule);
+    padding:18px 11px; display:flex; flex-direction:column; }
+  .brand { display:flex; align-items:center; gap:10px; padding:4px 8px 15px;
+    border-bottom:1px solid var(--rule); margin-bottom:12px; }
+  .mark { width:32px; height:32px; border-radius:6px; background:var(--ink); color:#1B1B22;
+    display:flex; align-items:center; justify-content:center; font:600 15px/1 'Source Serif 4',serif; }
+  .nav-i { display:flex; align-items:center; gap:11px; padding:9px 11px; border-radius:4px;
+    font:500 13.5px/1 Inter,sans-serif; color:var(--ink2); }
+  .nav-i .ic { width:15px; text-align:center; color:var(--ink4); font-size:12px; }
+  .nav-i.on { background:var(--accent-t); color:var(--accent); font-weight:600; }
+  .nav-i.on .ic { color:var(--accent); }
+  .nav-i .bdg { margin-left:auto; font:500 10px/1 'DM Mono',monospace; background:var(--down);
+    color:#20141A; border-radius:999px; padding:3px 6px; }
+  .grp { font:600 10px/1 Inter,sans-serif; letter-spacing:.1em; text-transform:uppercase;
+    color:var(--ink4); padding:16px 11px 7px; }
+  .sidefoot { margin-top:auto; background:var(--inset); border-radius:6px; padding:12px 13px; }
+
+  main { flex:1; min-width:0; padding:24px 32px 56px; }
+  .top { display:flex; align-items:flex-end; justify-content:space-between;
+    padding-bottom:18px; border-bottom:1px solid var(--rule); margin-bottom:26px; }
+  h1 { font:600 27px/1.2 'Source Serif 4',serif; margin:0; letter-spacing:-.015em; }
+  .sub { font-size:13px; color:var(--ink3); margin:3px 0 0; }
+  .chip { display:inline-flex; align-items:center; gap:7px; height:34px; padding:0 13px;
+    border:1px solid var(--rule); border-radius:4px; background:var(--raised);
+    font-size:12.5px; color:var(--ink2); }
+  .dot { width:6px; height:6px; border-radius:999px; }
+
+  .lbl { font:600 10.5px/1 Inter,sans-serif; letter-spacing:.09em;
+    text-transform:uppercase; color:var(--ink3); }
+  .card { background:var(--raised); border:1px solid var(--rule); border-radius:8px; padding:17px 19px; }
+  .fig { font:500 26px/1 'DM Mono',monospace; letter-spacing:-.02em; margin:11px 0 0; }
+  .fsub { font-size:12px; color:var(--ink3); margin:5px 0 0; }
+  .m4 { display:grid; grid-template-columns:repeat(4,1fr); gap:15px; margin-bottom:28px; }
+  .verdict { background:var(--raised); border:1px solid var(--rule); border-radius:8px;
+    padding:24px 26px; margin-bottom:28px; }
+  .v-t { font:600 25px/1.3 'Source Serif 4',serif; letter-spacing:-.015em; margin:9px 0 0; max-width:34ch; }
+  .cols { display:grid; grid-template-columns:1.6fr 1fr; gap:30px; margin-bottom:30px; }
+  .sec-h { display:flex; align-items:baseline; justify-content:space-between;
+    padding-bottom:11px; border-bottom:1px solid var(--rule); }
+  .sec-h h2 { font:600 14.5px/1 Inter,sans-serif; margin:0; }
+  .sec-h a { font:600 12.5px/1 Inter,sans-serif; color:var(--accent); text-decoration:none; }
+  table { width:100%; border-collapse:collapse; }
+  th { font:600 10.5px/1 Inter,sans-serif; letter-spacing:.09em; text-transform:uppercase;
+    color:var(--ink3); text-align:left; padding:11px 0; border-bottom:1px solid var(--rule); }
+  td { padding:13px 0; border-bottom:1px solid var(--rule); font-size:13.5px; }
+  tr:last-child td { border-bottom:0; }
+  th.n, td.n { text-align:right; }
+  td.n { font:500 13.5px/1 'DM Mono',monospace; }
+  .tag { font:500 10px/1 Inter,sans-serif; background:var(--inset); color:var(--ink3);
+    padding:3px 6px; border-radius:2px; letter-spacing:.05em; margin-left:7px; }
+  .list-row { display:grid; grid-template-columns:34px 1fr auto; gap:13px;
+    align-items:flex-start; padding:14px 0; border-bottom:1px solid var(--rule); }
+  .tile { width:34px; height:34px; border-radius:6px; display:flex; align-items:center;
+    justify-content:center; font:600 13px/1 Inter,sans-serif; }
+  .lt { font:600 13px/1.4 Inter,sans-serif; margin:0; }
+  .lb { font-size:12.5px; color:var(--ink2); margin:3px 0 0; line-height:1.5; }
+  .ago { font:400 11px/1 'DM Mono',monospace; color:var(--ink4); }
+  .btn { font:500 13px/1 Inter,sans-serif; border-radius:4px; border:1px solid transparent;
+    height:36px; padding:0 16px; display:inline-flex; align-items:center; cursor:pointer; }
+  .primary { background:var(--accent); color:#141821; }
+  .quiet { background:transparent; color:var(--ink2); border-color:var(--rule); }
+</style>
+</head>
+<body>
+
+<aside>
+  <div class="brand"><span class="mark">E</span>
+    <div><div style="font:600 13.5px/1.2 Inter,sans-serif">TradeMentor</div>
+      <div style="font:400 10.5px/1.3 'DM Mono',monospace;color:var(--ink3)">Tue, 5 Aug</div></div></div>
+  <div class="nav-i on"><span class="ic">▦</span> Dashboard</div>
+  <div class="nav-i"><span class="ic">◫</span> Analytics</div>
+  <div class="nav-i"><span class="ic">◉</span> Alerts <span class="bdg">3</span></div>
+  <div class="nav-i"><span class="ic">◈</span> Coach</div>
+  <div class="grp">Insights</div>
+  <div class="nav-i"><span class="ic">▤</span> Reports</div>
+  <div class="nav-i"><span class="ic">✎</span> Journal</div>
+  <div class="grp">Risk</div>
+  <div class="nav-i"><span class="ic">⚖</span> My rules</div>
+  <div class="nav-i"><span class="ic">⌕</span> My record</div>
+  <div class="sidefoot">
+    <div style="display:flex;align-items:center;gap:7px;margin-bottom:5px">
+      <span class="dot" style="background:var(--accent)"></span>
+      <span style="font:600 12px/1 Inter,sans-serif">Guardian active</span></div>
+    <p style="margin:0;font-size:11.5px;color:var(--ink3);line-height:1.45">
+      Loss limit ₹25,000 · 14% used</p>
+  </div>
+</aside>
+
+<main>
+  <div class="top">
+    <div><h1>Dashboard</h1><p class="sub">Session open · 09:15–15:30 IST</p></div>
+    <div style="display:flex;gap:9px">
+      <span class="chip"><span class="dot" style="background:var(--up)"></span> Live prices</span>
+      <span class="chip">Zerodha Kite · connected</span>
+    </div>
+  </div>
+
+  <div class="m4">
+    <div class="card"><div class="lbl">Session P&amp;L</div>
+      <p class="fig" style="color:var(--up)">+₹3,720</p><p class="fsub">Realised ₹2,960 · open ₹760</p></div>
+    <div class="card"><div class="lbl">Trades today</div>
+      <p class="fig">6</p><p class="fsub">of 10 daily limit</p></div>
+    <div class="card"><div class="lbl">Loss budget used</div>
+      <p class="fig">14%</p>
+      <div style="height:4px;background:var(--inset);border-radius:2px;margin-top:11px;overflow:hidden">
+        <div style="width:14%;height:100%;background:var(--ink2)"></div></div></div>
+    <div class="card"><div class="lbl">Open exposure</div>
+      <p class="fig">₹3.25L</p><p class="fsub">65% of capital</p></div>
+  </div>
+
+  <div class="verdict">
+    <div class="lbl">So far today</div>
+    <p class="v-t">You have stayed inside every rule you set.</p>
+    <p style="font-size:13.5px;color:var(--ink2);margin:12px 0 0;max-width:62ch;line-height:1.65">
+      Six trades, none within five minutes of a loss, and no position above your
+      <span style="font-family:'DM Mono',monospace;font-weight:500">₹1,00,000</span> size limit.
+      The last two sessions both broke the cooldown rule.
+    </p>
+  </div>
+
+  <div class="cols">
+    <section>
+      <div class="sec-h"><h2>Open positions</h2><a href="#">View all</a></div>
+      <table>
+        <tr><th>Symbol</th><th class="n">Qty</th><th class="n">Entry</th>
+          <th class="n">LTP</th><th class="n">Chg</th><th class="n">P&amp;L</th></tr>
+        <tr><td>NIFTY 50<span class="tag">FUT</span></td><td class="n">500</td>
+          <td class="n" style="color:var(--ink3)">22,140.00</td><td class="n">22,148.40</td>
+          <td class="n" style="color:var(--up)">+0.04%</td>
+          <td class="n" style="color:var(--up)">+₹4,200.50</td></tr>
+        <tr><td>BANKNIFTY<span class="tag">OPT</span></td><td class="n">250</td>
+          <td class="n" style="color:var(--ink3)">486.20</td><td class="n">481.24</td>
+          <td class="n" style="color:var(--down)">−1.02%</td>
+          <td class="n" style="color:var(--down)">−₹1,240.00</td></tr>
+        <tr><td>RELIANCE<span class="tag">FUT</span></td><td class="n">100</td>
+          <td class="n" style="color:var(--ink3)">2,904.00</td><td class="n">2,911.60</td>
+          <td class="n" style="color:var(--up)">+0.26%</td>
+          <td class="n" style="color:var(--up)">+₹760.00</td></tr>
+      </table>
+    </section>
+
+    <div class="card" style="padding:17px 8px 12px">
+      <div style="padding:0 12px"><div class="lbl">Today</div>
+        <p class="fig" style="font-size:22px;margin:9px 0 12px">+₹3,720</p></div>
+      <svg width="100%" viewBox="0 0 300 130" preserveAspectRatio="none" style="display:block">
+        <defs><linearGradient id="g" x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0%" stop-color="#8AA4DC" stop-opacity=".22"/>
+          <stop offset="100%" stop-color="#8AA4DC" stop-opacity="0"/></linearGradient></defs>
+        <line x1="0" y1="96" x2="300" y2="96" stroke="#33333F" stroke-dasharray="2 4"/>
+        <line x1="0" y1="60" x2="300" y2="60" stroke="#33333F" stroke-dasharray="2 4"/>
+        <path d="M0,88 C40,84 60,92 90,70 C120,48 140,58 175,50 C210,42 240,30 300,22 L300,120 L0,120 Z" fill="url(#g)"/>
+        <path d="M0,88 C40,84 60,92 90,70 C120,48 140,58 175,50 C210,42 240,30 300,22"
+          fill="none" stroke="#8AA4DC" stroke-width="2" stroke-linecap="round"/>
+      </svg>
+      <div style="display:flex;justify-content:space-between;padding:8px 12px 0;
+        font:400 10.5px/1 'DM Mono',monospace;color:var(--ink4)">
+        <span>09:15</span><span>12:00</span><span>15:30</span></div>
+    </div>
+  </div>
+
+  <div class="cols">
+    <section>
+      <div class="sec-h"><h2>Today&rsquo;s alerts</h2><a href="#">All alerts</a></div>
+      <div class="list-row">
+        <span class="tile" style="background:var(--down-t);color:var(--down)">!</span>
+        <div><p class="lt">Size escalation</p>
+          <p class="lb">Your BANKNIFTY entry was 2.4× your median size for that instrument.</p></div>
+        <span class="ago">11:04</span>
+      </div>
+      <div class="list-row">
+        <span class="tile" style="background:var(--accent-t);color:var(--accent)">◆</span>
+        <div><p class="lt">Cooldown honoured</p>
+          <p class="lb">You waited 22 minutes after the 10:41 loss. Your rule is 15.</p></div>
+        <span class="ago">11:03</span>
+      </div>
+      <div class="list-row" style="border-bottom:0">
+        <span class="tile" style="background:var(--inset);color:var(--ink3)">•</span>
+        <div><p class="lt">Session opened</p>
+          <p class="lb">Rules loaded — loss limit ₹25,000, 10 trades, 15-minute cooldown.</p></div>
+        <span class="ago">09:15</span>
+      </div>
+    </section>
+
+    <div class="card">
+      <div style="display:flex;gap:12px;margin-bottom:13px">
+        <span class="tile" style="background:var(--accent-t);color:var(--accent)">◈</span>
+        <div><p style="font:600 13.5px/1.3 Inter,sans-serif;margin:0">Coach</p>
+          <div class="lbl" style="font-size:10px">4 minutes ago</div></div>
+      </div>
+      <p style="font-size:13.5px;color:var(--ink2);margin:0;line-height:1.65">
+        Your size escalation at 11:04 followed a loss by nine minutes. That is the same
+        sequence as the three trades that cost you
+        <span style="font-family:'DM Mono',monospace;font-weight:500;color:var(--down)">₹12,400</span>
+        last week.</p>
+      <div style="display:flex;gap:8px;margin-top:16px">
+        <button class="btn primary">Ask about this</button>
+        <button class="btn quiet">Journal it</button>
+      </div>
+    </div>
+  </div>
+
+  <div style="background:var(--raised);border:1px solid var(--rule);border-left:3px solid var(--accent);
+    border-radius:0 8px 8px 0;padding:16px 18px;max-width:76ch;font-size:13.5px;color:var(--ink2)">
+    <b style="color:var(--ink);font-weight:600">What dark changes.</b>
+    The ground lifts to <span style="font-family:'DM Mono',monospace">#1B1B22</span> so cards have
+    something to sit against, and the step to the raised surface widens because shadow does
+    almost no work here. Both money colours are lifted — oxblood goes muddy and forest green
+    disappears against a dark ground. The accent inverts from a deep navy to a light one, and
+    anything solid in accent or in <i>down</i> takes <b>dark text</b>: white on
+    <span style="font-family:'DM Mono',monospace">#E5697C</span> fails contrast.
+  </div>
+</main>
+
+</body>
+</html>

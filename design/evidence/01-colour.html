@@ -1,4 +1,4 @@
-<!-- @dsCard group="Foundations" name="Colour" subtitle="Three hues, one job each — light and dark" -->
+<!-- @dsCard group="Foundations" name="Colour" subtitle="Warm paper, three ground levels, three hues" -->
 <!doctype html>
 <html lang="en">
 <head>
@@ -7,123 +7,171 @@
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Source+Serif+4:opsz,wght@8..60,400;8..60,600&family=Inter:wght@400;500;600&family=DM+Mono:wght@400;500&display=swap">
 <style>
   :root {
-    --paper:#FAF9F7; --raised:#FFF; --ink:#17171A; --ink2:#4A4A52; --ink3:#85858F;
-    --ink4:#B8B8C0; --rule:#E5E3DE; --accent:#2E4A7D; --up:#1A7F5A; --down:#A32A3C;
+    --paper:#F6F3ED; --raised:#FFFDFA; --inset:#EEEAE1;
+    --ink:#1A1815; --ink2:#4E4A44; --ink3:#8A857C; --ink4:#BAB4A8; --rule:#E2DCD0;
+    --accent:#2E4A7D; --accent-t:#E8ECF4;
+    --up:#1A7F5A; --up-t:#E4F0EA; --down:#A32A3C; --down-t:#F7E9E9;
   }
   * { box-sizing:border-box; }
   body { margin:0; background:var(--paper); color:var(--ink);
-    font:400 14px/1.6 Inter, system-ui, sans-serif; padding:48px; }
-  h1 { font:600 34px/1.15 'Source Serif 4', serif; margin:0 0 10px; letter-spacing:-.015em; }
-  .lede { color:var(--ink2); max-width:62ch; margin:0 0 40px; font-size:15px; }
+    font:400 14px/1.6 Inter,system-ui,sans-serif; padding:48px; }
+  h1 { font:600 34px/1.15 'Source Serif 4',serif; margin:0 0 10px; letter-spacing:-.015em; }
+  .lede { color:var(--ink2); max-width:64ch; margin:0 0 40px; font-size:15px; }
   h2 { font:600 12px/1 Inter,sans-serif; letter-spacing:.1em; text-transform:uppercase;
     color:var(--ink3); margin:44px 0 16px; padding-bottom:10px; border-bottom:1px solid var(--rule); }
-  .grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(190px,1fr)); gap:16px; }
+  .grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(196px,1fr)); gap:16px; }
   .sw { border:1px solid var(--rule); border-radius:8px; overflow:hidden; background:var(--raised); }
-  .chip { height:78px; }
+  .chip { height:76px; }
   .meta { padding:11px 13px; }
   .tok { font:500 12.5px/1 Inter,sans-serif; }
   .hex { font:400 11.5px/1 'DM Mono',monospace; color:var(--ink3); margin-top:5px; }
   .job { font-size:11.5px; color:var(--ink2); margin-top:7px; line-height:1.45; }
   .note { background:var(--raised); border:1px solid var(--rule); border-left:3px solid var(--accent);
-    border-radius:0 8px 8px 0; padding:16px 18px; margin:18px 0 0; max-width:70ch; }
-  .note b { font-weight:600; }
-  .pair { display:grid; grid-template-columns:1fr 1fr; gap:0; border:1px solid var(--rule);
-    border-radius:8px; overflow:hidden; max-width:640px; }
-  .pane { padding:26px 22px; }
+    border-radius:0 8px 8px 0; padding:16px 18px; margin:18px 0 0; max-width:72ch;
+    font-size:13.5px; color:var(--ink2); }
+  .note b { color:var(--ink); font-weight:600; }
+  .depth { display:flex; gap:0; border-radius:10px; overflow:hidden; border:1px solid var(--rule); max-width:660px; }
+  .d { flex:1; padding:24px 20px; }
+  .d .n { font:500 12px/1 Inter,sans-serif; margin-bottom:5px; }
+  .d .h { font:400 11px/1 'DM Mono',monospace; color:var(--ink3); }
+  .pair { display:grid; grid-template-columns:1fr 1fr; border:1px solid var(--rule);
+    border-radius:10px; overflow:hidden; max-width:700px; }
+  .pane { padding:26px 24px; }
   .pane.l { background:var(--paper); }
-  .pane.d { background:#131317; }
-  .pane .lbl { font:500 10.5px/1 Inter,sans-serif; letter-spacing:.09em; text-transform:uppercase;
-    color:var(--ink3); margin-bottom:14px; }
-  .pane.d .lbl { color:#7C7C87; }
-  .row { display:flex; align-items:baseline; justify-content:space-between; padding:8px 0; }
+  .pane.d2 { background:#1B1B22; }
+  .lbl { font:600 10.5px/1 Inter,sans-serif; letter-spacing:.09em; text-transform:uppercase;
+    color:var(--ink3); margin-bottom:16px; display:block; }
+  .card-demo { border-radius:8px; padding:16px 18px; margin-bottom:12px; }
+  .row { display:flex; align-items:baseline; justify-content:space-between; padding:9px 0; }
   .row + .row { border-top:1px solid var(--rule); }
-  .pane.d .row + .row { border-top-color:#2A2A32; }
-  .num { font:500 17px/1 'DM Mono',monospace; }
-  .cap { font-size:12px; color:var(--ink3); }
-  .pane.d .cap { color:#7C7C87; }
+  .pane.d2 .row + .row { border-top-color:#33333F; }
+  .num { font:500 16px/1 'DM Mono',monospace; }
+  .cap { font-size:12.5px; color:var(--ink3); }
+  .pill { display:inline-flex; align-items:center; gap:5px; border-radius:999px;
+    font:600 10.5px/1 Inter,sans-serif; padding:5px 10px; }
 </style>
 </head>
 <body>
 
 <h1>Colour</h1>
 <p class="lede">
-  Three hues. Each does exactly one job, and none of them is decorative. The
-  discipline that matters most: <b>green means money gained and nothing else</b> —
-  the moment it also means &ldquo;connected&rdquo; or &ldquo;all fine&rdquo;, a trader
-  can no longer find their P&amp;L by colour alone.
+  The ground is <b>warm paper</b>, not off-white grey. That single change is what makes
+  the system read as a written record rather than a default web application — and it is
+  what oxblood and forest green were chosen against.
 </p>
+
+<h2>Three ground levels</h2>
+<div class="depth">
+  <div class="d" style="background:#EEEAE1"><div class="n">inset</div><div class="h">#EEEAE1</div>
+    <p style="font-size:11.5px;color:var(--ink2);margin:8px 0 0;line-height:1.45">Wells, table headers, anything pressed into the page.</p></div>
+  <div class="d" style="background:#F6F3ED"><div class="n">paper</div><div class="h">#F6F3ED</div>
+    <p style="font-size:11.5px;color:var(--ink2);margin:8px 0 0;line-height:1.45">The ground. Everything sits on this.</p></div>
+  <div class="d" style="background:#FFFDFA"><div class="n">raised</div><div class="h">#FFFDFA</div>
+    <p style="font-size:11.5px;color:var(--ink2);margin:8px 0 0;line-height:1.45">A surface that has earned separation. Warm white, never pure.</p></div>
+</div>
+<div class="note">
+  <b>Three levels, so depth comes from the ground rather than from shadow.</b> Two levels —
+  a grey page and a white card — is the arrangement every web app already has, and it is
+  why a two-level system reads as basic no matter how good the type is. The third level
+  lets a table header or an inset well recede without needing a border to say so.
+</div>
 
 <h2>Semantic</h2>
 <div class="grid">
   <div class="sw"><div class="chip" style="background:#2E4A7D"></div>
     <div class="meta"><div class="tok">accent</div><div class="hex">#2E4A7D</div>
-      <div class="job">Everything that is not money. Brand, navigation, active state, links, the coach.</div></div></div>
+      <div class="job">Everything that is not money. Brand, navigation, active state, links.</div></div></div>
   <div class="sw"><div class="chip" style="background:#1A7F5A"></div>
     <div class="meta"><div class="tok">up</div><div class="hex">#1A7F5A</div>
-      <div class="job">Money gained. Never a status, never a success toast, never a toggle.</div></div></div>
+      <div class="job">Money gained. Never a status, never a toggle, never a success toast.</div></div></div>
   <div class="sw"><div class="chip" style="background:#A32A3C"></div>
     <div class="meta"><div class="tok">down</div><div class="hex">#A32A3C</div>
-      <div class="job">Money lost, and risk. Oxblood, not crimson — serious without reading as emergency.</div></div></div>
+      <div class="job">Money lost, and risk. Oxblood on cream is a ledger; crimson on white is an alarm.</div></div></div>
 </div>
 
-<h2>Ink &amp; ground</h2>
+<h2>Ink</h2>
 <div class="grid">
-  <div class="sw"><div class="chip" style="background:#FAF9F7;border-bottom:1px solid #E5E3DE"></div>
-    <div class="meta"><div class="tok">paper</div><div class="hex">#FAF9F7</div>
-      <div class="job">The ground. Warm, never pure white — white is reserved for surfaces that rise off it.</div></div></div>
-  <div class="sw"><div class="chip" style="background:#FFFFFF;border-bottom:1px solid #E5E3DE"></div>
-    <div class="meta"><div class="tok">raised</div><div class="hex">#FFFFFF</div>
-      <div class="job">A surface that has earned separation.</div></div></div>
-  <div class="sw"><div class="chip" style="background:#17171A"></div>
-    <div class="meta"><div class="tok">ink</div><div class="hex">#17171A</div>
-      <div class="job">Headings and primary text.</div></div></div>
-  <div class="sw"><div class="chip" style="background:#4A4A52"></div>
-    <div class="meta"><div class="tok">ink-2</div><div class="hex">#4A4A52</div>
-      <div class="job">Body copy.</div></div></div>
-  <div class="sw"><div class="chip" style="background:#85858F"></div>
-    <div class="meta"><div class="tok">ink-3</div><div class="hex">#85858F</div>
-      <div class="job">Labels, captions, secondary figures.</div></div></div>
-  <div class="sw"><div class="chip" style="background:#E5E3DE"></div>
-    <div class="meta"><div class="tok">rule</div><div class="hex">#E5E3DE</div>
-      <div class="job">Hairlines. Warm, so it belongs to the paper rather than sitting on it.</div></div></div>
+  <div class="sw"><div class="chip" style="background:#1A1815"></div>
+    <div class="meta"><div class="tok">ink</div><div class="hex">#1A1815</div>
+      <div class="job">Warm near-black. A neutral black on cream looks like a printing error.</div></div></div>
+  <div class="sw"><div class="chip" style="background:#4E4A44"></div>
+    <div class="meta"><div class="tok">ink-2</div><div class="hex">#4E4A44</div><div class="job">Body copy.</div></div></div>
+  <div class="sw"><div class="chip" style="background:#8A857C"></div>
+    <div class="meta"><div class="tok">ink-3</div><div class="hex">#8A857C</div><div class="job">Labels, captions, muted figures.</div></div></div>
+  <div class="sw"><div class="chip" style="background:#BAB4A8"></div>
+    <div class="meta"><div class="tok">ink-4</div><div class="hex">#BAB4A8</div><div class="job">Disabled, axis ticks, timestamps.</div></div></div>
+  <div class="sw"><div class="chip" style="background:#E2DCD0"></div>
+    <div class="meta"><div class="tok">rule</div><div class="hex">#E2DCD0</div>
+      <div class="job">Hairlines. Warm, so it belongs to the paper rather than lying on top of it.</div></div></div>
 </div>
 
 <h2>Tints</h2>
-<p class="lede" style="margin-bottom:16px">
-  Each hue has one tint, used for the container while the full value carries the mark
-  or the text inside it. That pairing is what every chip, badge and icon tile is made of.
-</p>
 <div class="grid">
-  <div class="sw"><div class="chip" style="background:#ECEFF6"></div>
-    <div class="meta"><div class="tok">accent-tint</div><div class="hex">#ECEFF6</div></div></div>
-  <div class="sw"><div class="chip" style="background:#E8F2EE"></div>
-    <div class="meta"><div class="tok">up-tint</div><div class="hex">#E8F2EE</div></div></div>
-  <div class="sw"><div class="chip" style="background:#F7EAEC"></div>
-    <div class="meta"><div class="tok">down-tint</div><div class="hex">#F7EAEC</div></div></div>
+  <div class="sw"><div class="chip" style="background:#E8ECF4"></div>
+    <div class="meta"><div class="tok">accent-tint</div><div class="hex">#E8ECF4</div></div></div>
+  <div class="sw"><div class="chip" style="background:#E4F0EA"></div>
+    <div class="meta"><div class="tok">up-tint</div><div class="hex">#E4F0EA</div></div></div>
+  <div class="sw"><div class="chip" style="background:#F7E9E9"></div>
+    <div class="meta"><div class="tok">down-tint</div><div class="hex">#F7E9E9</div></div></div>
 </div>
 
-<h2>Light and dark, side by side</h2>
+<h2>Light and dark</h2>
 <div class="pair">
   <div class="pane l">
-    <div class="lbl">Light</div>
-    <div class="row"><span class="cap">NIFTY 50</span><span class="num" style="color:#1A7F5A">+₹4,200.50</span></div>
-    <div class="row"><span class="cap">BANKNIFTY</span><span class="num" style="color:#A32A3C">−₹1,240.00</span></div>
-    <div class="row"><span class="cap">Session</span><span class="num" style="color:#17171A">₹2,960.50</span></div>
+    <span class="lbl">Light</span>
+    <div class="card-demo" style="background:#FFFDFA;border:1px solid #E2DCD0">
+      <div class="row" style="padding-top:0"><span class="cap">NIFTY 50</span>
+        <span class="num" style="color:#1A7F5A">+₹4,200.50</span></div>
+      <div class="row"><span class="cap">BANKNIFTY</span>
+        <span class="num" style="color:#A32A3C">−₹1,240.00</span></div>
+      <div class="row" style="padding-bottom:0"><span class="cap">Session</span>
+        <span class="num">₹2,960.50</span></div>
+    </div>
+    <span class="pill" style="background:#E8ECF4;color:#2E4A7D">● Connected</span>
+    <span class="pill" style="background:#A32A3C;color:#fff;margin-left:6px">HIGH SEVERITY</span>
   </div>
-  <div class="pane d">
-    <div class="lbl">Dark</div>
-    <div class="row"><span class="cap">NIFTY 50</span><span class="num" style="color:#3FBF8C">+₹4,200.50</span></div>
-    <div class="row"><span class="cap">BANKNIFTY</span><span class="num" style="color:#E5697C">−₹1,240.00</span></div>
-    <div class="row"><span class="cap">Session</span><span class="num" style="color:#F2F1EE">₹2,960.50</span></div>
+  <div class="pane d2">
+    <span class="lbl" style="color:#8A857C">Dark</span>
+    <div class="card-demo" style="background:#24242E;border:1px solid #33333F">
+      <div class="row" style="padding-top:0"><span class="cap" style="color:#8A857C">NIFTY 50</span>
+        <span class="num" style="color:#3FBF8C">+₹4,200.50</span></div>
+      <div class="row"><span class="cap" style="color:#8A857C">BANKNIFTY</span>
+        <span class="num" style="color:#E5697C">−₹1,240.00</span></div>
+      <div class="row" style="padding-bottom:0"><span class="cap" style="color:#8A857C">Session</span>
+        <span class="num" style="color:#F2F0EA">₹2,960.50</span></div>
+    </div>
+    <span class="pill" style="background:#252B3A;color:#8AA4DC">● Connected</span>
+    <span class="pill" style="background:#E5697C;color:#20141A;margin-left:6px">HIGH SEVERITY</span>
   </div>
+</div>
+
+<h2>Dark tokens</h2>
+<div class="grid">
+  <div class="sw"><div class="chip" style="background:#16161C"></div>
+    <div class="meta"><div class="tok">inset</div><div class="hex">#16161C</div></div></div>
+  <div class="sw"><div class="chip" style="background:#1B1B22"></div>
+    <div class="meta"><div class="tok">paper</div><div class="hex">#1B1B22</div>
+      <div class="job">Lifted from near-black. A true void gives the eye nothing to rest against.</div></div></div>
+  <div class="sw"><div class="chip" style="background:#24242E"></div>
+    <div class="meta"><div class="tok">raised</div><div class="hex">#24242E</div>
+      <div class="job">A wider step from the ground than in light, because shadow does almost no work here.</div></div></div>
+  <div class="sw"><div class="chip" style="background:#33333F"></div>
+    <div class="meta"><div class="tok">rule</div><div class="hex">#33333F</div></div></div>
+  <div class="sw"><div class="chip" style="background:#8AA4DC"></div>
+    <div class="meta"><div class="tok">accent</div><div class="hex">#8AA4DC</div></div></div>
+  <div class="sw"><div class="chip" style="background:#3FBF8C"></div>
+    <div class="meta"><div class="tok">up</div><div class="hex">#3FBF8C</div></div></div>
+  <div class="sw"><div class="chip" style="background:#E5697C"></div>
+    <div class="meta"><div class="tok">down</div><div class="hex">#E5697C</div></div></div>
 </div>
 
 <div class="note">
-  <b>Dark is specified, not derived.</b> A straight inversion turns oxblood muddy and
-  makes forest green vanish against a dark ground. Both money colours are lifted and
-  desaturated for dark — <code style="font-family:'DM Mono',monospace">#3FBF8C</code> and
-  <code style="font-family:'DM Mono',monospace">#E5697C</code> — so a loss stays readable
-  without becoming the brightest thing on the screen.
+  <b>Dark is specified, not inverted.</b> Oxblood goes muddy and forest green disappears
+  against a dark ground, so both money colours are lifted and desaturated. The ground
+  itself sits at <code style="font-family:'DM Mono',monospace">#1B1B22</code> rather than
+  near-black: a true void has no surface for the eye to rest on, and every card starts to
+  glow. Note also that a solid severity pill in dark takes <b>dark text</b> — white on
+  <code style="font-family:'DM Mono',monospace">#E5697C</code> fails contrast.
 </div>
 
 </body>

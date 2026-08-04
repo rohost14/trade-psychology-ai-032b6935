@@ -1,0 +1,249 @@
+<!-- @dsCard group="Pages" name="Analytics" subtitle="Behaviour and edge — desktop, end to end" -->
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Evidence — Analytics</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Source+Serif+4:opsz,wght@8..60,400;8..60,600&family=Inter:wght@400;500;600&family=DM+Mono:wght@400;500&display=swap">
+<style>
+  :root { --paper:#F6F3ED; --raised:#FFFDFA; --inset:#EEEAE1;
+    --ink:#1A1815; --ink2:#4E4A44; --ink3:#8A857C; --ink4:#BAB4A8; --rule:#E2DCD0;
+    --accent:#2E4A7D; --accent-t:#E8ECF4; --up:#1A7F5A; --up-t:#E4F0EA;
+    --down:#A32A3C; --down-t:#F7E9E9; }
+  * { box-sizing:border-box; }
+  body { margin:0; background:var(--paper); color:var(--ink);
+    font:400 14px/1.6 Inter,system-ui,sans-serif; display:flex; min-height:100vh; }
+  aside { width:228px; flex-shrink:0; background:var(--raised); border-right:1px solid var(--rule);
+    padding:18px 11px; }
+  .brand { display:flex; align-items:center; gap:10px; padding:4px 8px 15px;
+    border-bottom:1px solid var(--rule); margin-bottom:12px; }
+  .mark { width:32px; height:32px; border-radius:6px; background:var(--ink); color:#FFFDFA;
+    display:flex; align-items:center; justify-content:center; font:600 15px/1 'Source Serif 4',serif; }
+  .nav-i { display:flex; align-items:center; gap:11px; padding:9px 11px; border-radius:4px;
+    font:500 13.5px/1 Inter,sans-serif; color:var(--ink2); }
+  .nav-i .ic { width:15px; text-align:center; color:var(--ink4); font-size:12px; }
+  .nav-i.on { background:var(--accent-t); color:var(--accent); font-weight:600; }
+  .nav-i.on .ic { color:var(--accent); }
+  .grp { font:600 10px/1 Inter,sans-serif; letter-spacing:.1em; text-transform:uppercase;
+    color:var(--ink4); padding:16px 11px 7px; }
+
+  main { flex:1; min-width:0; padding:24px 32px 56px; }
+  .top { display:flex; align-items:flex-end; justify-content:space-between;
+    padding-bottom:16px; border-bottom:1px solid var(--rule); }
+  h1 { font:600 27px/1.2 'Source Serif 4',serif; margin:0; letter-spacing:-.015em; }
+  .sub { font-size:13px; color:var(--ink3); margin:3px 0 0; }
+  .seg { display:inline-flex; border:1px solid var(--rule); border-radius:4px;
+    overflow:hidden; background:var(--raised); }
+  .seg span { font:500 12.5px/1 Inter,sans-serif; padding:9px 14px; color:var(--ink2); }
+  .seg span.sel { background:var(--ink); color:#FFFDFA; }
+  .tabs { display:flex; gap:24px; border-bottom:1px solid var(--rule); margin:0 0 26px; }
+  .tab { font:500 13.5px/1 Inter,sans-serif; color:var(--ink3); padding:14px 0 11px;
+    border-bottom:2px solid transparent; }
+  .tab.on { color:var(--ink); font-weight:600; border-bottom-color:var(--ink); }
+
+  .lbl { font:600 10.5px/1 Inter,sans-serif; letter-spacing:.09em;
+    text-transform:uppercase; color:var(--ink3); }
+  .card { background:var(--raised); border:1px solid var(--rule); border-radius:8px; padding:17px 19px; }
+  .fig { font:500 26px/1 'DM Mono',monospace; letter-spacing:-.02em; margin:11px 0 0; }
+  .fsub { font-size:12px; color:var(--ink3); margin:5px 0 0; }
+  .m4 { display:grid; grid-template-columns:repeat(4,1fr); gap:15px; margin-bottom:28px; }
+  .verdict { background:var(--raised); border:1px solid var(--rule); border-radius:8px;
+    padding:24px 26px; margin-bottom:28px; }
+  .v-t { font:600 25px/1.3 'Source Serif 4',serif; letter-spacing:-.015em; margin:9px 0 0; max-width:40ch; }
+  .cols { display:grid; grid-template-columns:1fr 1fr; gap:30px; margin-bottom:30px; }
+  .sec-h { display:flex; align-items:baseline; justify-content:space-between;
+    padding-bottom:11px; border-bottom:1px solid var(--rule); }
+  .sec-h h2 { font:600 14.5px/1 Inter,sans-serif; margin:0; }
+  .sec-h a { font:600 12.5px/1 Inter,sans-serif; color:var(--accent); text-decoration:none; }
+  table { width:100%; border-collapse:collapse; }
+  th { font:600 10.5px/1 Inter,sans-serif; letter-spacing:.09em; text-transform:uppercase;
+    color:var(--ink3); text-align:left; padding:11px 0; border-bottom:1px solid var(--rule); }
+  td { padding:12px 0; border-bottom:1px solid var(--rule); font-size:13.5px; }
+  tr:last-child td { border-bottom:0; }
+  th.n, td.n { text-align:right; }
+  td.n { font:500 13.5px/1 'DM Mono',monospace; }
+  .pill { display:inline-flex; align-items:center; gap:5px; border-radius:999px;
+    font:600 10.5px/1 Inter,sans-serif; padding:5px 10px; }
+  .p3 { display:grid; grid-template-columns:repeat(3,1fr); gap:15px; }
+  .tile { width:34px; height:34px; border-radius:6px; display:flex; align-items:center;
+    justify-content:center; font:600 13px/1 Inter,sans-serif; }
+  .tick { font:400 10.5px/1 'DM Mono',monospace; fill:#BAB4A8; }
+  .axl { font:500 10.5px/1 Inter,sans-serif; fill:#8A857C; }
+</style>
+</head>
+<body>
+
+<aside>
+  <div class="brand"><span class="mark">E</span>
+    <div><div style="font:600 13.5px/1.2 Inter,sans-serif">TradeMentor</div>
+      <div style="font:400 10.5px/1.3 'DM Mono',monospace;color:var(--ink3)">Tue, 5 Aug</div></div></div>
+  <div class="nav-i"><span class="ic">▦</span> Dashboard</div>
+  <div class="nav-i on"><span class="ic">◫</span> Analytics</div>
+  <div class="nav-i"><span class="ic">◉</span> Alerts</div>
+  <div class="nav-i"><span class="ic">◈</span> Coach</div>
+  <div class="grp">Insights</div>
+  <div class="nav-i"><span class="ic">▤</span> Reports</div>
+  <div class="nav-i"><span class="ic">✎</span> Journal</div>
+  <div class="grp">Risk</div>
+  <div class="nav-i"><span class="ic">⚖</span> My rules</div>
+  <div class="nav-i"><span class="ic">⌕</span> My record</div>
+</aside>
+
+<main>
+  <div class="top">
+    <div><h1>Analytics</h1><p class="sub">42 completed trades · 6 Jul – 5 Aug</p></div>
+    <div class="seg"><span>7D</span><span class="sel">30D</span><span>90D</span><span>All</span></div>
+  </div>
+  <div class="tabs">
+    <span class="tab on">Overview</span><span class="tab">Edge</span>
+    <span class="tab">Behaviour</span><span class="tab">Habits</span><span class="tab">Advanced</span>
+  </div>
+
+  <div class="m4">
+    <div class="card"><div class="lbl">Net P&amp;L</div>
+      <p class="fig" style="color:var(--up)">+₹24,502</p><p class="fsub">+12.4% vs previous 30 days</p></div>
+    <div class="card"><div class="lbl">Win rate</div>
+      <p class="fig">58%</p><p class="fsub">24 winners · 18 losers</p></div>
+    <div class="card"><div class="lbl">Profit factor</div>
+      <p class="fig">1.84</p><p class="fsub">Gross profit ÷ gross loss</p></div>
+    <div class="card"><div class="lbl">Behaviour cost</div>
+      <p class="fig" style="color:var(--down)">−₹45,200</p><p class="fsub">Realised P&amp;L of flagged trades</p></div>
+  </div>
+
+  <div class="verdict">
+    <div class="lbl">The month</div>
+    <p class="v-t">Your losses were not from bad setups. They were from what you did after one.</p>
+    <p style="font-size:13.5px;color:var(--ink2);margin:12px 0 0;max-width:66ch;line-height:1.65">
+      Trades entered more than thirty minutes after a loss won
+      <span style="font-family:'DM Mono',monospace;font-weight:500;color:var(--up)">61%</span>
+      of the time. Trades entered within five minutes won
+      <span style="font-family:'DM Mono',monospace;font-weight:500;color:var(--down)">22%</span>.
+      Same instruments, same sizes, same setups.
+    </p>
+  </div>
+
+  <div class="cols">
+    <div class="card" style="padding:17px 10px 12px">
+      <div style="padding:0 10px"><div class="lbl">Cumulative P&amp;L</div></div>
+      <svg width="100%" viewBox="0 0 420 190" preserveAspectRatio="none" style="display:block;margin-top:12px">
+        <defs><linearGradient id="g" x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0%" stop-color="#2E4A7D" stop-opacity=".14"/>
+          <stop offset="100%" stop-color="#2E4A7D" stop-opacity="0"/></linearGradient></defs>
+        <line x1="0" y1="150" x2="420" y2="150" stroke="#E2DCD0"/>
+        <line x1="0" y1="100" x2="420" y2="100" stroke="#E2DCD0" stroke-dasharray="2 4"/>
+        <line x1="0" y1="50" x2="420" y2="50" stroke="#E2DCD0" stroke-dasharray="2 4"/>
+        <path d="M0,138 C50,132 74,136 108,110 C142,84 168,52 200,60 C232,68 260,84 300,68 C340,52 372,32 420,20 L420,168 L0,168 Z" fill="url(#g)"/>
+        <path d="M0,138 C50,132 74,136 108,110 C142,84 168,52 200,60 C232,68 260,84 300,68 C340,52 372,32 420,20"
+          fill="none" stroke="#2E4A7D" stroke-width="2.2" stroke-linecap="round"/>
+        <text class="tick" x="0" y="184">6 Jul</text>
+        <text class="tick" x="186" y="184">20 Jul</text>
+        <text class="tick" x="378" y="184">5 Aug</text>
+      </svg>
+    </div>
+
+    <section>
+      <div class="sec-h"><h2>By instrument</h2><a href="#">Full breakdown</a></div>
+      <table>
+        <tr><th>Underlying</th><th class="n">Trades</th><th class="n">Win rate</th><th class="n">Net P&amp;L</th></tr>
+        <tr><td>NIFTY</td><td class="n">18</td><td class="n">61%</td>
+          <td class="n" style="color:var(--up)">+₹14,200</td></tr>
+        <tr><td>BANKNIFTY</td><td class="n">14</td><td class="n">50%</td>
+          <td class="n" style="color:var(--up)">+₹6,900</td></tr>
+        <tr><td>FINNIFTY</td><td class="n">6</td><td class="n">33%</td>
+          <td class="n" style="color:var(--down)">−₹2,400</td></tr>
+        <tr><td>RELIANCE</td><td class="n">4</td><td class="n">75%</td>
+          <td class="n" style="color:var(--up)">+₹5,800</td></tr>
+      </table>
+    </section>
+  </div>
+
+  <div class="sec-h" style="margin-bottom:16px"><h2>Behavioural patterns</h2>
+    <a href="#">All 28 detectors</a></div>
+  <div class="p3" style="margin-bottom:30px">
+    <div class="card">
+      <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:14px">
+        <span class="tile" style="background:var(--down-t);color:var(--down)">!</span>
+        <span class="pill" style="background:var(--down);color:#FFFDFA">HIGH SEVERITY</span></div>
+      <p style="font:600 16px/1.3 Inter,sans-serif;margin:0">Revenge trading</p>
+      <p style="font-size:12.5px;color:var(--ink2);margin:4px 0 16px;line-height:1.5">
+        Entering within five minutes of a loss greater than 2%.</p>
+      <div style="display:flex;justify-content:space-between;align-items:flex-end;
+        padding-top:14px;border-top:1px solid var(--rule)">
+        <div><div class="lbl">Occurrences</div>
+          <p style="font:500 15px/1 'DM Mono',monospace;margin:5px 0 0">3</p></div>
+        <div style="text-align:right"><div class="lbl">Realised</div>
+          <p style="font:500 15px/1 'DM Mono',monospace;margin:5px 0 0;color:var(--down)">−₹12,400</p></div>
+      </div>
+    </div>
+    <div class="card">
+      <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:14px">
+        <span class="tile" style="background:var(--down-t);color:var(--down)">↗</span>
+        <span class="pill" style="background:var(--down-t);color:var(--down)">MED SEVERITY</span></div>
+      <p style="font:600 16px/1.3 Inter,sans-serif;margin:0">Size escalation</p>
+      <p style="font-size:12.5px;color:var(--ink2);margin:4px 0 16px;line-height:1.5">
+        Position size growing after consecutive losses.</p>
+      <div style="display:flex;justify-content:space-between;align-items:flex-end;
+        padding-top:14px;border-top:1px solid var(--rule)">
+        <div><div class="lbl">Occurrences</div>
+          <p style="font:500 15px/1 'DM Mono',monospace;margin:5px 0 0">2</p></div>
+        <div style="text-align:right"><div class="lbl">Realised</div>
+          <p style="font:500 15px/1 'DM Mono',monospace;margin:5px 0 0;color:var(--down)">−₹18,600</p></div>
+      </div>
+    </div>
+    <div class="card">
+      <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:14px">
+        <span class="tile" style="background:var(--inset);color:var(--ink3)">⌛</span>
+        <span class="pill" style="background:var(--inset);color:var(--ink3)">LOW SEVERITY</span></div>
+      <p style="font:600 16px/1.3 Inter,sans-serif;margin:0">Early exit</p>
+      <p style="font-size:12.5px;color:var(--ink2);margin:4px 0 16px;line-height:1.5">
+        Closing a winner before your stated target.</p>
+      <div style="display:flex;justify-content:space-between;align-items:flex-end;
+        padding-top:14px;border-top:1px solid var(--rule)">
+        <div><div class="lbl">Occurrences</div>
+          <p style="font:500 15px/1 'DM Mono',monospace;margin:5px 0 0">5</p></div>
+        <div style="text-align:right"><div class="lbl">Realised</div>
+          <p style="font:500 15px/1 'DM Mono',monospace;margin:5px 0 0;color:var(--up)">+₹3,300</p></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="cols">
+    <div class="card" style="padding:17px 10px 12px">
+      <div style="padding:0 10px"><div class="lbl">P&amp;L by weekday</div></div>
+      <svg width="100%" viewBox="0 0 420 190" style="display:block;margin-top:12px">
+        <line x1="38" y1="118" x2="420" y2="118" stroke="#CFC8BA"/>
+        <text class="tick" x="0" y="52">9k</text><text class="tick" x="0" y="88">3k</text>
+        <text class="tick" x="4" y="122">0</text><text class="tick" x="-2" y="156">−3k</text>
+        <rect x="54"  y="74"  width="52" height="44" rx="3" fill="#1A7F5A"/>
+        <rect x="132" y="118" width="52" height="22" rx="3" fill="#A32A3C"/>
+        <rect x="210" y="54"  width="52" height="64" rx="3" fill="#1A7F5A"/>
+        <rect x="288" y="118" width="52" height="11" rx="3" fill="#A32A3C"/>
+        <rect x="366" y="42"  width="52" height="76" rx="3" fill="#1A7F5A"/>
+        <text class="axl" x="66"  y="178">Mon</text><text class="axl" x="146" y="178">Tue</text>
+        <text class="axl" x="222" y="178">Wed</text><text class="axl" x="300" y="178">Thu</text>
+        <text class="axl" x="382" y="178">Fri</text>
+      </svg>
+    </div>
+
+    <section>
+      <div class="sec-h"><h2>Entry timing after a loss</h2></div>
+      <table>
+        <tr><th>Gap</th><th class="n">Trades</th><th class="n">Win rate</th><th class="n">Avg P&amp;L</th></tr>
+        <tr><td>Under 5 minutes</td><td class="n">9</td>
+          <td class="n" style="color:var(--down)">22%</td>
+          <td class="n" style="color:var(--down)">−₹1,378</td></tr>
+        <tr><td>5–30 minutes</td><td class="n">11</td><td class="n">45%</td>
+          <td class="n" style="color:var(--down)">−₹210</td></tr>
+        <tr><td>Over 30 minutes</td><td class="n">18</td>
+          <td class="n" style="color:var(--up)">61%</td>
+          <td class="n" style="color:var(--up)">+₹1,640</td></tr>
+      </table>
+      <p style="font-size:11.5px;color:var(--ink4);margin:12px 0 0">
+        Realised P&amp;L of trades that actually happened. No estimate of what a different
+        decision would have returned.</p>
+    </section>
+  </div>
+</main>
+
+</body>
+</html>

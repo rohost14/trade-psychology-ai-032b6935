@@ -70,24 +70,36 @@ adoption starts with three font swaps is a design system that does not get adopt
 
 ## Colour
 
-Light is the primary theme; dark is specified rather than derived, because a
-straight inversion makes oxblood muddy and forest green disappear.
+The ground is **warm paper**, not off-white grey. That single change is what makes
+the system read as a written record rather than a default web application — and it
+is what oxblood and forest green were chosen against.
+
+**Three ground levels, not two.** A grey page and a white card is the arrangement
+every web app already has, and it is why a two-level system reads as basic no
+matter how good the type is. The third level lets a table header or an inset well
+recede without needing a border to say so.
 
 | Token | Light | Dark | Meaning |
 |---|---|---|---|
-| `paper` | `#FAF9F7` | `#131317` | The ground. Warm off-white, never pure |
-| `raised` | `#FFFFFF` | `#1B1B21` | A surface that has earned separation |
-| `ink` | `#17171A` | `#F2F1EE` | Primary text, headings |
-| `ink-2` | `#4A4A52` | `#B4B4BC` | Body |
-| `ink-3` | `#85858F` | `#7C7C87` | Labels, secondary |
-| `ink-4` | `#B8B8C0` | `#5A5A64` | Disabled, axis ticks |
-| `rule` | `#E5E3DE` | `#2A2A32` | Hairlines. Warm in light, cool in dark |
-| `accent` | `#2E4A7D` | `#7C97D4` | Everything that is not money |
+| `inset` | `#EEEAE1` | `#16161C` | Wells, table headers, anything pressed in |
+| `paper` | `#F6F3ED` | `#1B1B22` | The ground |
+| `raised` | `#FFFDFA` | `#24242E` | A surface that has earned separation |
+| `ink` | `#1A1815` | `#F2F0EA` | Headings, primary text. Warm near-black |
+| `ink-2` | `#4E4A44` | `#B9B5AC` | Body |
+| `ink-3` | `#8A857C` | `#8A857C` | Labels, secondary |
+| `ink-4` | `#BAB4A8` | `#5E5A54` | Disabled, axis ticks, timestamps |
+| `rule` | `#E2DCD0` | `#33333F` | Hairlines |
+| `accent` | `#2E4A7D` | `#8AA4DC` | Everything that is not money |
 | `up` | `#1A7F5A` | `#3FBF8C` | Money gained. Nothing else |
 | `down` | `#A32A3C` | `#E5697C` | Money lost, and risk |
 
 **Green means money and only money.** The moment it also means "connected" or
 "fine", a trader can no longer find their P&L by colour alone.
+
+**Dark is specified, not inverted.** The ground sits at `#1B1B22` rather than
+near-black — a true void gives the eye no surface to rest against and every card
+starts to glow. Both money colours are lifted and desaturated. Anything solid in
+`accent` or `down` takes **dark text**: white on `#E5697C` fails contrast.
 
 ---
 
