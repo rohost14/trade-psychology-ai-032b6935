@@ -21,6 +21,7 @@ import { formatCurrencyWithSign } from '@/lib/formatters';
 import { api } from '@/lib/api';
 import { useBroker } from '@/contexts/BrokerContext';
 import BrokerGate from '@/components/BrokerGate';
+import ErrorState from '@/components/ErrorState';
 
 interface Bucket {
   trades: number;
@@ -145,39 +146,54 @@ export default function MyRecordPage() {
   const [data, setData] = useState<RecordData | null>(null);
   const [loading, setLoading] = useState(false);
   const [searching, setSearching] = useState(false);
+  const [searchError, setSearchError] = useState<unknown>(null);
+  const [lookupError, setLookupError] = useState<unknown>(null);
+  const [lastSymbol, setLastSymbol] = useState<string | null>(null);
   const debounce = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // Seed with the instruments they actually trade, so the page is useful before
   // they type anything.
+  const loadSuggestions = useCallback(async (q: string) => {
+    setSearchError(null);
+    try {
+      const r = await api.get('/api/my-record/search', { params: { q } });
+      setHits(r.data?.underlyings ?? []);
+    } catch (err) {
+      // NOT setHits([]). An empty chip list renders the cold-start message —
+      // "no completed trades yet, import your tradebook" — which is a confident,
+      // wrong answer when the request simply failed. The trader has history; we
+      // just could not fetch it.
+      setSearchError(err);
+    }
+  }, []);
+
   useEffect(() => {
     if (!account?.id) return;
     setSearching(true);
-    api.get('/api/my-record/search', { params: { q: '' } })
-      .then(r => setHits(r.data?.underlyings ?? []))
-      .catch(() => setHits([]))
-      .finally(() => setSearching(false));
-  }, [account?.id]);
+    loadSuggestions('').finally(() => setSearching(false));
+  }, [account?.id, loadSuggestions]);
 
   useEffect(() => {
     if (!account?.id) return;
     if (debounce.current) clearTimeout(debounce.current);
-    debounce.current = setTimeout(() => {
-      api.get('/api/my-record/search', { params: { q: query } })
-        .then(r => setHits(r.data?.underlyings ?? []))
-        .catch(() => {});
-    }, 250);
+    debounce.current = setTimeout(() => { loadSuggestions(query); }, 250);
     return () => { if (debounce.current) clearTimeout(debounce.current); };
-  }, [query, account?.id]);
+  }, [query, account?.id, loadSuggestions]);
 
   const lookup = useCallback(async (symbol: string) => {
     setLoading(true);
+    setLookupError(null);
+    setLastSymbol(symbol);
     try {
       const res = await api.get('/api/my-record', { params: { symbol } });
       setData(res.data);
-    } catch {
-      // Error-as-data: the API's own contract carries the message, so a failure
-      // still reads as a failure rather than as "no record".
-      setData({ has_data: false, query: symbol, message: 'Could not load your record.' });
+    } catch (err) {
+      // Was: a fabricated has_data:false payload carrying "Could not load your
+      // record." That renders through the same path as a genuine no-history
+      // answer, gives no cause and no retry, and is indistinguishable from "you
+      // have never traded this".
+      setData(null);
+      setLookupError(err);
     } finally {
       setLoading(false);
     }
@@ -237,6 +253,16 @@ export default function MyRecordPage() {
               </button>
             ))}
           </div>
+        ) : searchError ? (
+          // Checked BEFORE the cold-start message below. Reaching that message on
+          // a failed request tells a trader with years of history that they have
+          // none, and sends them off to import data they already have.
+          <ErrorState
+            error={searchError}
+            onRetry={() => loadSuggestions(query)}
+            compact
+            message="We couldn't load your instruments. Your history is intact — this is only a display problem."
+          />
         ) : (
           // Cold start states the actual cause, not "no data" (§15), and links
           // straight to the import rather than describing where to find it.
@@ -252,6 +278,15 @@ export default function MyRecordPage() {
           </p>
         )}
       </div>
+
+      {lookupError && !loading && (
+        <ErrorState
+          error={lookupError}
+          onRetry={() => lastSymbol && lookup(lastSymbol)}
+          message={`We couldn't load your record for ${lastSymbol ?? 'that instrument'}. This doesn't mean you haven't traded it.`}
+          className="mt-4"
+        />
+      )}
 
       {loading && (
         <div className="space-y-5">

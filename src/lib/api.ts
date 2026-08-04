@@ -75,10 +75,55 @@ api.interceptors.request.use(
   (error) => Promise.reject(error)
 );
 
+/**
+ * Retry ONE time on a transient failure before surfacing anything to the user.
+ *
+ * On Indian mobile a single dropped request is routine, and today every one of them
+ * becomes a visible error the user has to react to. One silent retry removes most
+ * of those without the user ever knowing there was a problem.
+ *
+ * ONLY GET. Retrying a POST/PUT/PATCH/DELETE can double-submit — a second journal
+ * entry, a second tradebook import, a second acknowledgement. The request may well
+ * have reached the server and succeeded; it was the RESPONSE that was lost, and
+ * from here those two cases are indistinguishable. A visible error on a write is
+ * far cheaper than silent duplicate data.
+ *
+ * Only transient causes: no response at all (network dropped), a timeout, or a
+ * gateway-class 502/503/504. A 4xx is a real answer and retrying it just wastes
+ * time; a plain 500 is usually deterministic and would fail again identically.
+ */
+const RETRY_DELAY_MS = 600;
+const RETRYABLE_STATUSES = new Set([502, 503, 504]);
+
+function isRetryable(error: any): boolean {
+  const method = (error?.config?.method || '').toLowerCase();
+  if (method !== 'get') return false;
+  if (error?.config?._retried) return false;
+
+  // Offline is not transient — the OfflineBanner already explains it, and a retry
+  // just burns a round trip while the user has no connection at all.
+  if (typeof navigator !== 'undefined' && !navigator.onLine) return false;
+
+  if (error?.code === 'ECONNABORTED') return true;         // timeout
+  if (!error?.response) return true;                        // network / DNS / reset
+  return RETRYABLE_STATUSES.has(error.response.status);     // gateway-class only
+}
+
+/** Exported for tests only — the rule is what's worth pinning, not the interceptor. */
+export const __isRetryableForTest = isRetryable;
+
 // Response interceptor: detect auth failures and provide better error info
 api.interceptors.response.use(
   (response) => response,
-  (error) => {
+  async (error) => {
+    if (isRetryable(error)) {
+      error.config._retried = true;
+      await new Promise(resolve => setTimeout(resolve, RETRY_DELAY_MS));
+      // If this succeeds the caller never learns anything went wrong. If it fails
+      // again it falls through to the normal handling below on the second pass.
+      return api(error.config);
+    }
+
     if (error.response) {
       const { status, data } = error.response;
 

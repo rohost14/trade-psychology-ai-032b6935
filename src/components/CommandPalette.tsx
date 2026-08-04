@@ -46,7 +46,18 @@ export function CommandPalette({ open, onOpenChange }: CommandPaletteProps) {
     <CommandDialog open={open} onOpenChange={onOpenChange}>
       <CommandInput placeholder="Go to page, run action…" />
       <CommandList>
-        <CommandEmpty>No results.</CommandEmpty>
+        {/* "No results." is a dead end — it reports a fact and leaves the user to
+            guess what this box can even do. Naming the two things it searches
+            turns the empty state into the answer. */}
+        <CommandEmpty>
+          <div className="py-5 px-4 text-center">
+            <p className="text-[13px] font-medium text-foreground">Nothing matches that</p>
+            <p className="text-[12px] text-muted-foreground mt-1">
+              Try a page name — Dashboard, Analytics, Alerts, Journal — or an action
+              like &ldquo;sync&rdquo; or &ldquo;acknowledge&rdquo;.
+            </p>
+          </div>
+        </CommandEmpty>
 
         <CommandGroup heading="Navigate">
           {NAV_COMMANDS.map(cmd => (

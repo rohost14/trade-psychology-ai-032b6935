@@ -8,6 +8,7 @@ import {
 } from '@/components/ui/dialog';
 import { toast } from 'sonner';
 import { api } from '@/lib/api';
+import ErrorState from '@/components/ErrorState';
 import EnforcedRules from '@/components/rules/EnforcedRules';
 import { formatCurrency } from '@/lib/formatters';
 import { cn } from '@/lib/utils';
@@ -79,7 +80,9 @@ export default function MyRules() {
   const [byRule, setByRule] = useState<Record<string, number>>({});
   const [history, setHistory] = useState<HistoryRow[]>([]);
   const [isLoading, setIsLoading] = useState(true);
-  const [loadFailed, setLoadFailed] = useState(false);
+  // The error object itself, not a boolean — ErrorState classifies offline vs
+  // timeout vs server, and a bare flag throws that away.
+  const [loadError, setLoadError] = useState<unknown>(null);
 
   // Edit state
   const [editing, setEditing] = useState(false);
@@ -90,7 +93,7 @@ export default function MyRules() {
 
   const load = useCallback(async () => {
     setIsLoading(true);
-    setLoadFailed(false);
+    setLoadError(null);
     try {
       const [cRes, sRes, vRes, hRes] = await Promise.all([
         api.get('/api/constitution/'),
@@ -108,7 +111,7 @@ export default function MyRules() {
       setHistory(hRes.data.history || []);
     } catch (err) {
       console.error('Failed to load constitution:', err);
-      setLoadFailed(true);
+      setLoadError(err);
     } finally {
       setIsLoading(false);
     }
@@ -160,13 +163,31 @@ export default function MyRules() {
     );
   }
 
-  if (loadFailed || !rules) {
+  // A failed request and "you have no rules yet" are different situations with
+  // different fixes. These used to share one message that told the user to
+  // complete onboarding — so a 500 sent an already-onboarded trader off to redo
+  // setup they had finished, while their real rules sat safe on the server.
+  if (loadError) {
+    return (
+      <div className="max-w-3xl mx-auto pb-12">
+        <ErrorState
+          error={loadError}
+          onRetry={load}
+          message="We couldn't load your rules. They're still saved and the engine is still enforcing them — this is only a display problem."
+        />
+      </div>
+    );
+  }
+
+  if (!rules) {
     return (
       <div className="max-w-3xl mx-auto pb-12">
         <div className="tm-card overflow-hidden p-8 text-center">
           <Scale className="h-8 w-8 mx-auto text-muted-foreground mb-3" />
-          <p className="text-sm text-muted-foreground">
-            Could not load your rules. Connect your broker and complete onboarding first.
+          <p className="text-sm font-medium text-foreground">No rules set yet</p>
+          <p className="text-[13px] text-muted-foreground mt-1 max-w-sm mx-auto">
+            Your trading constitution is created during onboarding. Complete it and your
+            limits will appear here.
           </p>
         </div>
       </div>

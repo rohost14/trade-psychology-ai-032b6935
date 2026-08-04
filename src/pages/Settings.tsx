@@ -12,6 +12,7 @@ import { BrokerConnectionCard } from '@/components/settings/BrokerConnectionCard
 import { ProfileTab } from '@/components/settings/ProfileTab';
 import { NotificationsTab } from '@/components/settings/NotificationsTab';
 import { InsightsTab } from '@/components/settings/InsightsTab';
+import ErrorState from '@/components/ErrorState';
 import { DataTab } from '@/components/settings/DataTab';
 import { DangerZoneTab } from '@/components/settings/DangerZoneTab';
 
@@ -42,6 +43,7 @@ export default function Settings() {
   const [isSaving, setIsSaving] = useState(false);
   const [isDirty, setIsDirty] = useState(false);
   const [isLoadingProfile, setIsLoadingProfile] = useState(false);
+  const [profileError, setProfileError] = useState<unknown>(null);
   const [notificationStatus, setNotificationStatus] = useState<NotificationStatus | null>(null);
 
   const [profile, setProfile] = useState<UserProfile>({
@@ -71,13 +73,20 @@ export default function Settings() {
   const fetchProfile = useCallback(async () => {
     if (!account?.id) return;
     setIsLoadingProfile(true);
+    setProfileError(null);
     try {
       const response = await api.get('/api/profile/');
       if (response.data?.profile) {
         setProfile(prev => ({ ...prev, ...response.data.profile }));
       }
     } catch (error) {
+      // This used to be a console.error and nothing else. The form then rendered
+      // its hardcoded defaults — a 25,000 loss limit, 10 trades — which look like
+      // real saved settings. Pressing Save would have written those defaults over
+      // the trader's actual rules. The form must not be shown at all if we could
+      // not load what is currently saved.
       console.error('Failed to fetch profile:', error);
+      setProfileError(error);
     } finally {
       setIsLoadingProfile(false);
       setIsDirty(false);
@@ -270,7 +279,11 @@ export default function Settings() {
             Manage your broker, profile, and preferences
           </p>
         </div>
-        {isConnected && (
+        {/* Hidden while the profile failed to load — the form below is hidden too,
+            so Save would be writing the component's hardcoded defaults over the
+            trader's real rules. Hiding the form without hiding Save leaves exactly
+            that trap one click away. */}
+        {isConnected && !profileError && (
           <div className="flex items-center gap-3">
             {isDirty && !isSaving && (
               <span className="text-[11px] text-muted-foreground">Unsaved changes</span>
@@ -299,8 +312,20 @@ export default function Settings() {
         onRedirecting={() => setIsConnecting(true)}
       />
 
+      {/* A failed profile load must NOT fall through to the form. The form's
+          initial state is a set of hardcoded defaults; rendering them after a
+          failed load makes invented numbers look like saved settings, and Save
+          would then overwrite the trader's real rules with them. */}
+      {isConnected && profileError && (
+        <ErrorState
+          error={profileError}
+          onRetry={fetchProfile}
+          message="We couldn't load your saved settings. They haven't changed — this is only a display problem. Try again rather than re-entering them, so you don't overwrite what's already saved."
+        />
+      )}
+
       {/* Only show other settings if connected */}
-      {isConnected && (
+      {isConnected && !profileError && (
         <Tabs defaultValue={initialTab} className="space-y-5">
           <TabsList className="inline-flex h-auto bg-transparent p-0 gap-1 border-b border-border w-full rounded-none">
             <TabsTrigger value="profile" className="rounded-none px-3 pb-3 text-sm font-medium text-muted-foreground data-[state=active]:bg-transparent data-[state=active]:text-foreground data-[state=active]:border-b-2 data-[state=active]:border-tm-brand transition-colors flex items-center gap-1.5">

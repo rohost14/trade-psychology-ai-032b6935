@@ -40,6 +40,28 @@ interface Snapshot {
   risk_state: 'safe' | 'caution' | 'danger';
 }
 
+/**
+ * Turn a failed coach stream into a sentence worth reading.
+ *
+ * The reply arrives over `fetchWithAuth`, not axios, so ErrorState's classifier
+ * does not apply — this is a fetch/Response failure, not an AxiosError. Same
+ * principle though: say what happened, whose problem it is, and what to do. Never
+ * surface a status code or a stack.
+ */
+function chatErrorMessage(error: unknown): string {
+  if (typeof navigator !== 'undefined' && !navigator.onLine) {
+    return "*You're offline, so I couldn't finish that. Ask again once you're back — your conversation is saved.*";
+  }
+  const status = (error as { status?: number })?.status;
+  if (status === 429) {
+    return '*Too many questions in a row. Give it a minute and ask again.*';
+  }
+  if (status === 403) {
+    return '*The coach is switched off for now. Nothing is wrong with your account.*';
+  }
+  return "*I couldn't finish that answer — the coach is having trouble right now. Your trades and alerts are unaffected. Try asking again in a moment.*";
+}
+
 const INITIAL_CHIPS = [
   "What's my biggest trading mistake?",
   "What patterns are hurting my P&L the most?",
@@ -333,7 +355,12 @@ export default function Chat() {
               ? {
                   ...m,
                   isStreaming: false,
-                  content: m.content || 'Sorry, I had trouble processing that. Please try again.',
+                  // "Sorry, I had trouble processing that" told the user nothing:
+                  // not what failed, not whose fault it was, not what to do. Being
+                  // offline and the coach being down need different reactions from
+                  // the reader, so they get different sentences. A partly-streamed
+                  // reply keeps what arrived and appends the reason.
+                  content: (m.content ? m.content + '\n\n' : '') + chatErrorMessage(error),
                 }
               : m
           )
