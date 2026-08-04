@@ -14,6 +14,7 @@
 import { describe, it, expect, vi } from 'vitest';
 import { render, screen } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { BrokerProvider } from '@/contexts/BrokerContext';
 
 import { getGuestResponse } from '@/lib/guestMode';
@@ -49,11 +50,23 @@ import StrategyCard from '@/components/analytics/StrategyCard';
 // BrokerProvider as well as the router: BehaviorTab reaches useBroker through a
 // child, and useBroker throws outside a provider rather than degrading. Without
 // it the smoke test fails on the harness rather than on the component.
+//
+// QueryClientProvider for the tabs on useApiQuery — useQuery throws outside one.
+// A FRESH client per render, with retries off and gc immediate: a client shared
+// between tests would let one test's cached response satisfy the next one's
+// query, so a component that had stopped fetching entirely would still pass.
 function renderWithRouter(ui: React.ReactElement) {
+  const queryClient = new QueryClient({
+    defaultOptions: {
+      queries: { retry: false, gcTime: 0, staleTime: 0 },
+    },
+  });
   return render(
-    <MemoryRouter>
-      <BrokerProvider>{ui}</BrokerProvider>
-    </MemoryRouter>,
+    <QueryClientProvider client={queryClient}>
+      <MemoryRouter>
+        <BrokerProvider>{ui}</BrokerProvider>
+      </MemoryRouter>
+    </QueryClientProvider>,
   );
 }
 

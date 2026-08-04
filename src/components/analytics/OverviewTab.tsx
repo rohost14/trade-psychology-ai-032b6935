@@ -31,7 +31,7 @@ import { useChartColors } from '@/hooks/useChartColors';
 import { formatCurrency, formatCurrencyWithSign, formatAxisCurrency } from '@/lib/formatters';
 import { extractUnderlying } from '@/lib/symbolClassify';
 import type { ChartTooltipProps } from '@/lib/chartTooltip';
-import { api } from '@/lib/api';
+import { useApiQuery } from '@/hooks/useApiQuery';
 
 interface OverviewTabProps { days: number }
 
@@ -207,36 +207,37 @@ function PnlHeroCell({
 // ── main component ───────────────────────────────────────────────────────────
 
 export default function OverviewTab({ days }: OverviewTabProps) {
-  const [overview, setOverview]   = useState<OverviewData | null>(null);
-  const [ovPrev, setOvPrev]       = useState<OverviewData | null>(null);
-  const [edge, setEdge]           = useState<EdgeData | null>(null);
-  const [perf, setPerf]           = useState<PerfData | null>(null);
-  const [loading, setLoading]     = useState(true);
-  const [error, setError]         = useState<unknown>(null);
-  const [retry, setRetry]         = useState(0);
-  // Must sit with the other hooks: everything below the fetch has early
-  // returns for loading and error, so a hook placed there runs conditionally.
-  const c = useChartColors();
+  // Four cached reads. The keys are shared, which matters here: /overview is also
+  // fetched by SessionsTab, so switching between the two tabs now reuses the
+  // cached result instead of re-querying. The double-window call is a second,
+  // legitimately different request (days * 2) used for the previous-period delta.
+  const overviewQ = useApiQuery<OverviewData>(
+    ['analytics', 'overview'], '/api/analytics/overview', { params: { days } },
+  );
+  const overviewPrevQ = useApiQuery<OverviewData>(
+    ['analytics', 'overview'], '/api/analytics/overview', { params: { days: days * 2 } },
+  );
+  const edgeQ = useApiQuery<EdgeData>(
+    ['analytics', 'edge-confidence'], '/api/analytics/edge-confidence', { params: { days } },
+  );
+  const perfQ = useApiQuery<PerfData>(
+    ['analytics', 'performance'], '/api/analytics/performance', { params: { days } },
+  );
 
-  useEffect(() => {
-    let cancelled = false;
-    setLoading(true);
-    setError(null);
-    Promise.allSettled([
-      api.get('/api/analytics/overview', { params: { days } }),
-      api.get('/api/analytics/overview', { params: { days: days * 2 } }),
-      api.get('/api/analytics/edge-confidence', { params: { days } }),
-      api.get('/api/analytics/performance', { params: { days } }),
-    ]).then(([ov, ovP, ed, pf]) => {
-      if (cancelled) return;
-      if (ov.status === 'fulfilled') setOverview(ov.value.data);
-      if (ovP.status === 'fulfilled') setOvPrev(ovP.value.data);
-      if (ed.status === 'fulfilled') setEdge(ed.value.data);
-      if (pf.status === 'fulfilled') setPerf(pf.value.data);
-      if (ov.status === 'rejected') setError(ov.reason);   // raw error → type-aware ErrorState
-    }).finally(() => { if (!cancelled) setLoading(false); });
-    return () => { cancelled = true; };
-  }, [days, retry]);
+  const overview = overviewQ.data ?? null;
+  const ovPrev = overviewPrevQ.data ?? null;
+  const edge = edgeQ.data ?? null;
+  const perf = perfQ.data ?? null;
+
+  // Only the primary overview gates the tab, matching the previous allSettled
+  // behaviour: a failed edge or performance call degrades that section rather
+  // than blanking the whole page.
+  const loading = overviewQ.isPending;
+  const error = overviewQ.error;
+
+  // Must sit with the other hooks: everything below has early returns for loading
+  // and error, so a hook placed there would run conditionally.
+  const c = useChartColors();
 
   if (loading) return (
     <div className="space-y-4 animate-pulse">
@@ -251,7 +252,7 @@ export default function OverviewTab({ days }: OverviewTabProps) {
     </div>
   );
 
-  if (error) return <ErrorState error={error} onRetry={() => setRetry(r => r + 1)} />;
+  if (error) return <ErrorState error={error} onRetry={() => overviewQ.refetch()} />;
 
   const k  = overview?.kpis;
   const kP = ovPrev?.kpis;
