@@ -267,7 +267,14 @@ export default function AlertDetailSheet({ alert, open, onClose, onAcknowledge }
               <span>{formatIST(alert.shown_at)}</span>
             </div>
           </div>
-          <button onClick={onClose} className="p-1.5 rounded-lg hover:bg-muted transition-colors flex-shrink-0">
+          {/* 28px → 44px. This is the close button on a sheet a trader opens
+              mid-session on a phone; missing it and mis-tapping something behind
+              it is the worst moment for it to happen. */}
+          <button
+            onClick={onClose}
+            className="h-11 w-11 -m-2 flex items-center justify-center rounded-lg hover:bg-muted transition-colors flex-shrink-0"
+            aria-label="Close"
+          >
             <X className="h-4 w-4 text-muted-foreground" />
           </button>
         </div>

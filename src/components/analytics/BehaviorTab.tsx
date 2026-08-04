@@ -140,9 +140,11 @@ export default function BehaviorTab({ days }: BehaviorTabProps) {
 
   if (error) return <ErrorState error={error} onRetry={() => setRetry(r => r + 1)} />;
 
-  // Pattern frequency, most frequent first
-  const patterns = [...(metrics?.alerts_summary ?? [])].sort((a, b) => b.count - a.count);
-  const maxCount = Math.max(...patterns.map(p => p.count), 1);
+  // Only the COUNT is used, to decide whether this tab has anything to show.
+  // There used to be a sorted `patterns` array and a `maxCount` here, both fully
+  // computed and neither ever rendered — a leftover from a frequency bar that was
+  // removed. Sorting a list nobody reads is just work.
+  const patternCount = metrics?.alerts_summary?.length ?? 0;
 
   const conditions = conditional?.has_data ? (conditional.conditions ?? []) : [];
   const baselineWR = conditional?.baseline_win_rate ?? 0;
@@ -224,7 +226,7 @@ export default function BehaviorTab({ days }: BehaviorTabProps) {
         </div>
       )}
 
-      {!patterns.length && !conditions.length && !emotionRows.length && !hasOptions && (
+      {!patternCount && !conditions.length && !emotionRows.length && !hasOptions && (
         <div className="tm-card px-5 py-12 text-center text-sm text-muted-foreground">
           No behavioral data available for this period.
         </div>

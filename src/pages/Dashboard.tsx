@@ -573,10 +573,12 @@ export default function Dashboard() {
             <Button onClick={handleSaveCapital} disabled={!capitalInput || capitalSaving}>
               {capitalSaving ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : 'Save'}
             </Button>
+            {/* 16px icon with no padding was a 16px tap target. Padded to 44px,
+                negative margin keeps the row's spacing as it was. */}
             <button
               onClick={handleDismissCapital}
               aria-label="Dismiss"
-              className="text-muted-foreground transition-colors duration-150 hover:text-foreground"
+              className="h-11 w-11 -m-3.5 flex items-center justify-center text-muted-foreground transition-colors duration-150 hover:text-foreground"
             >
               <X className="h-4 w-4" />
             </button>

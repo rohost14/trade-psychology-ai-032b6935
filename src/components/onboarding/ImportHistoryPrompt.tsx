@@ -86,7 +86,15 @@ export default function ImportHistoryPrompt() {
             </p>
           </div>
           <Button size="sm" className="shrink-0" onClick={() => setOpen(true)}>Import history</Button>
-          <button onClick={dismiss} className="shrink-0 text-muted-foreground hover:text-foreground p-1" aria-label="Dismiss">
+          {/* 44px hit area on a 16px icon. The negative margin cancels the extra
+              padding so the row looks identical — this buys touch accuracy, not
+              visual weight. It was 24px, which is a mis-tap on a phone, and after
+              the snooze change a mis-tap now costs 30 days of not seeing this. */}
+          <button
+            onClick={dismiss}
+            className="shrink-0 h-11 w-11 -m-2.5 flex items-center justify-center text-muted-foreground hover:text-foreground"
+            aria-label="Dismiss"
+          >
             <X className="w-4 h-4" />
           </button>
         </div>

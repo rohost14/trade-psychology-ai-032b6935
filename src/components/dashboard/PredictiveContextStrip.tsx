@@ -161,9 +161,12 @@ export function PredictiveContextStrip({ brokerAccountId }: Props) {
               </span>
               <span className="text-xs text-muted-foreground">{item.detail}</span>
             </div>
+            {/* Was a bare 14px icon — the smallest tap target in the app, well
+                under the 24px WCAG floor. Padded to 44px with a matching negative
+                margin so the row is unchanged visually. */}
             <button
               onClick={() => dismiss(item.id)}
-              className="text-muted-foreground/50 hover:text-muted-foreground transition-colors shrink-0 mt-0.5 -mr-1"
+              className="text-muted-foreground/50 hover:text-muted-foreground transition-colors shrink-0 h-11 w-11 -m-3.5 flex items-center justify-center"
               aria-label="Dismiss"
             >
               <X className="h-3.5 w-3.5" />
