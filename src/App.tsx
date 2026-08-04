@@ -21,6 +21,7 @@ import Dashboard from "./pages/Dashboard";
 const Welcome       = lazy(() => import("./pages/Welcome"));
 const LandingLab    = lazy(() => import("./pages/_lab/LandingLab"));
 const SoftPrecisionLab = lazy(() => import("./pages/_lab/SoftPrecisionLab"));
+const SoftPrecisionWebLab = lazy(() => import("./pages/_lab/SoftPrecisionWebLab"));
 const ImpersonateEntry = lazy(() => import("./pages/ImpersonateEntry"));
 const Analytics     = lazy(() => import("./pages/Analytics"));
 const Alerts        = lazy(() => import("./pages/Alerts"));
@@ -120,6 +121,7 @@ const App = () => (
                   <Route path="welcome" element={<Welcome />} />
                   <Route path="landing-lab" element={<LandingLab />} />
                   <Route path="soft-lab" element={<SoftPrecisionLab />} />
+                  <Route path="soft-web-lab" element={<SoftPrecisionWebLab />} />
                   <Route path="terms" element={<TermsOfService />} />
                   <Route path="privacy" element={<PrivacyPolicy />} />
                   <Route path="maintenance" element={<Maintenance />} />
