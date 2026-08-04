@@ -19,7 +19,7 @@ Architecture (current — SharedPriceStream):
   instrument — no per-user routing needed.
 
   ZerodhaTicker (ONE, shared)
-    ↓ on_ticks → Redis LTP cache (ltp:{token}, TTL=2s)
+    ↓ on_ticks → Redis LTP cache (single hash `ltp:all`, one write per tick batch)
     ↓ on_ticks → notify_price_update(symbol, price_data)
   ConnectionManager.broadcast_price(instrument)
     ↓ fans out to all account_id WebSockets subscribed to that instrument
@@ -288,15 +288,14 @@ class ZerodhaTicker:
             if self.on_tick_callback:
                 ws_updates.append((symbol, price_data))
 
-        # 1. Batch-write all LTP prices in a single Redis pipeline.
+        # 1. Write the whole batch as ONE hash write. This used to be one SET per
+        # instrument inside a pipeline — a pipeline saves round-trips, not commands,
+        # and a per-command Redis plan bills each one. See core/ltp_cache.py.
         if ltp_updates:
             try:
+                from app.core.ltp_cache import write_batch
                 from app.core.redis_pool import get_sync_redis
-                r = get_sync_redis()
-                pipe = r.pipeline(transaction=False)
-                for token, price in ltp_updates.items():
-                    pipe.set(f"ltp:{token}", price, ex=2)
-                pipe.execute()
+                write_batch(get_sync_redis(), ltp_updates)
             except Exception:
                 pass
 
@@ -488,14 +487,12 @@ class AsyncKiteTicker:
                     await self.on_tick_callback(symbol, {"last_price": ltp, "instrument_token": itok})
                 except Exception:
                     pass
+        # One hash write for the whole batch — see core/ltp_cache.py.
         if ltp_updates:
             try:
+                from app.core.ltp_cache import write_batch
                 from app.core.redis_pool import get_sync_redis
-                r = get_sync_redis()
-                pipe = r.pipeline(transaction=False)
-                for tok, price in ltp_updates.items():
-                    pipe.set(f"ltp:{tok}", price, ex=2)
-                pipe.execute()
+                write_batch(get_sync_redis(), ltp_updates)
             except Exception:
                 pass
 
@@ -1042,15 +1039,15 @@ price_stream: PriceStreamProvider = SharedPriceStream()
 def get_cached_ltp(instrument_token: int) -> Optional[float]:
     """
     Read last traded price from Redis cache.
-    Returns None if cache miss (price not yet received or TTL expired).
+    Returns None if the price is missing or older than 2 seconds.
 
-    TTL is 2 seconds — treat as unavailable if stale.
-    Used by position monitor and P&L calculations during market hours.
+    Used by position monitor and P&L calculations during market hours. Staleness is
+    now decided by a timestamp stored with the price rather than a per-key TTL — the
+    cache is one hash so the whole batch costs a single write. Same semantics.
     """
     try:
+        from app.core.ltp_cache import read
         from app.core.redis_pool import get_sync_redis
-        r = get_sync_redis()
-        val = r.get(f"ltp:{instrument_token}")
-        return float(val) if val is not None else None
+        return read(get_sync_redis(), instrument_token)
     except Exception:
         return None

@@ -45,8 +45,11 @@ def _is_market_hours() -> bool:
 
 
 def _get_cached_ltp(r, instrument_token: int) -> float | None:
-    val = r.get(f"ltp:{instrument_token}")
-    return float(val) if val else None
+    # Shared reader — the cache is one hash keyed by token, with the write timestamp
+    # stored alongside each price. Reading it by hand here is how the format drifts
+    # apart from the writer. See core/ltp_cache.py.
+    from app.core.ltp_cache import read
+    return read(r, instrument_token)
 
 
 @celery_app.task(name="app.tasks.guardrail_tasks.check_guardrail_rules")

@@ -52,6 +52,15 @@ PositionLedger, which resets its average on a CLOSE. (075 and 076 are already ap
   ledger used the weighted average. Both now call the ledger's `_compute_fill_effect`,
   so the batch and live paths cannot drift. Round totals were, and remain, identical;
   what changed is the per-fill split, which now matches the Kite positions screen.
+- **LTP cache batched** — was one Redis `SET` per instrument per tick (a pipeline saves
+  round-trips, not commands, and Upstash bills per command): ~1.2 BILLION commands/month
+  at 10k users, purely to cache prices. Now one hash write per tick batch, ~1000× fewer.
+  Staleness moved from a per-key TTL to a timestamp stored with the price, so an
+  instrument that stops trading still goes quiet instead of serving a frozen number.
+- **Analytics caching** — 21 of ~28 GET endpoints now use `@cached_analytics`, invalidated
+  by a per-account version stamp bumped on every CompletedTrade. The live ones
+  (`/unrealized-pnl`, `/risk-score`, `/dashboard-stats`, `/progress`) are deliberately
+  NOT cached, and the two LLM ones already cache in `UserProfile.ai_cache`.
 - Docs: `PRODUCTION_MARKET_DATA_PLAN.md`, this file.
 
 ---
@@ -96,7 +105,7 @@ PositionLedger, which resets its average on a CLOSE. (075 and 076 are already ap
 | **Turn on `PRICE_STREAM_MULTI_INSTANCE`** | the day you run a SECOND backend instance | Code is done and tested, defaulted OFF. One instance wins a Redis lease and is the only one that opens a KiteTicker; it publishes ticks to a pub/sub channel and every instance forwards them to its own WebSocket clients. Without it, a second instance opens a second ticker — duplicate ticks and split subscription state. **On a per-command Redis plan this is the bill, not a rounding error:** ~2-3k instruments ticking once a second is roughly 5 billion commands/month. That number, not the licence, is the real argument for moving off Upstash to Valkey. Alerts already fan out correctly across instances (every instance reads the whole global stream), so only the ticker needed this. |
 | Ticker cluster (gap #2) | ~2500+ distinct subscribed instruments | scale tier; `PRODUCTION_MARKET_DATA_PLAN.md` §3 |
 | Second Celery worker for `bulk` | when the EOD backlog grows | Today one worker consumes `celery,trades,alerts,reports,bulk` with `bulk` last, so live work drains first. A dedicated `--queues=bulk` worker makes it impossible for a backlog to delay live alerts at all. |
-| Cache the remaining analytics endpoints | when a page feels slow under load | 12 of ~28 GET endpoints now use `@cached_analytics`. The mechanism (per-account version stamp, bumped on every CompletedTrade) is in `core/response_cache.py`; adding one is a single decorator line. The rest were left alone deliberately rather than swept in bulk. |
+| Throttle tick pushes to the browser | with real users to measure against | Prices are pushed as fast as they arrive. Nobody can read a P&L figure changing at 1 Hz, so coalescing to ~3/sec per instrument cuts browser render load and message volume with no perceptible difference. Cheap, but wants real usage to tune. |
 | Redis position read-cache in front of the ledger (write-through, Postgres stays truth) | Gate-4 / only after a load test *measures* `get_position` Postgres reads as a real bottleneck | **Latency-only, not correctness.** DO NOT ship blind — it adds a stale-cache failure mode to money-critical P&L. Correct invalidation must cover **every** write path: webhook fill, sync, reconcile, and especially the **out-of-order replay** (which rewrites *past* ledger entries → a naive current-position cache goes wrong). Localized seam (`PositionLedgerService.get_position`), so deferring costs nothing — easy to add when justified + validated. |
 | Gate 4 — 10k load test | paid staging infra | free tier can't; local flood already validated the engine |
 | Stale-price indicator (FE) | dashboard polish | minor UX; illiquid-option LTP freeze |

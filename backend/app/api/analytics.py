@@ -922,6 +922,7 @@ async def get_analytics_risk_metrics(
 
 
 @router.get("/journal-correlation")
+@cached_analytics(ttl=300)
 async def get_journal_correlation(
     days: int = 90,
     broker_account_id: UUID = Depends(get_verified_broker_account_id),
@@ -1421,6 +1422,7 @@ async def get_edge_confidence(
 
 
 @router.get("/conditional-performance")
+@cached_analytics(ttl=180)
 async def get_conditional_performance(
     days: int = Query(default=30, ge=1, le=365),
     broker_account_id: UUID = Depends(get_verified_broker_account_id),
@@ -1555,6 +1557,7 @@ async def get_conditional_performance(
 
 
 @router.get("/critical-trades")
+@cached_analytics(ttl=180)
 async def get_critical_trades(
     days: int = Query(default=30, ge=1, le=365),
     broker_account_id: UUID = Depends(get_verified_broker_account_id),
@@ -1778,6 +1781,7 @@ async def get_timing_heatmap(
 
 
 @router.get("/options-behavior")
+@cached_analytics(ttl=180)
 async def get_options_behavior(
     days: int = Query(default=30, ge=1, le=365),
     broker_account_id: UUID = Depends(get_verified_broker_account_id),
@@ -1896,6 +1900,7 @@ async def get_options_behavior(
 
 
 @router.get("/btst")
+@cached_analytics(ttl=300)
 async def get_btst_analytics(
     days: int = 90,
     broker_account_id: UUID = Depends(get_verified_broker_account_id),
@@ -2042,6 +2047,7 @@ async def get_btst_analytics(
 
 
 @router.get("/instrument")
+@cached_analytics(ttl=180)
 async def get_instrument_analytics(
     underlying: str,
     days: int = Query(default=30, ge=1, le=365),
@@ -2195,6 +2201,7 @@ async def get_instrument_analytics(
 # ─────────────────────────────────────────────────────────────────────────────
 
 @router.get("/pnl-percent")
+@cached_analytics(ttl=180)
 async def get_pnl_percent(
     broker_account_id: UUID = Depends(get_verified_broker_account_id),
     days_back: int = Query(default=30, ge=1, le=365),
@@ -2316,6 +2323,7 @@ async def get_pnl_percent(
 # ─────────────────────────────────────────────────────────────────────────────
 
 @router.get("/pnl-attribution")
+@cached_analytics(ttl=180)
 async def get_pnl_attribution(
     broker_account_id: UUID = Depends(get_verified_broker_account_id),
     days_back: int = Query(default=90, ge=1, le=365),
@@ -2399,6 +2407,7 @@ async def get_pnl_attribution(
 # ─────────────────────────────────────────────────────────────────────────────
 
 @router.get("/quality-breakdown")
+@cached_analytics(ttl=180)
 async def get_quality_breakdown(
     broker_account_id: UUID = Depends(get_verified_broker_account_id),
     days_back: int = Query(default=90, ge=1, le=365),
