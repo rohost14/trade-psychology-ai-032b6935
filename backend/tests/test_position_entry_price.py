@@ -222,6 +222,14 @@ class TestApplyLedgerEntryPrices:
         assert pos.first_entry_time.hour == 9 and pos.first_entry_time.minute == 41
 
     async def test_quantity_mismatch_keeps_the_broker_price(self, db, broker):
+        """
+        A missing fill must NOT let the ledger overwrite the price.
+
+        The mismatch also emits a data-quality event, which cannot be asserted
+        here: _store_data_quality_events writes through its own session by design
+        (observability must never poison the sync transaction), so it cannot see
+        this test's uncommitted broker fixture and logs an FK warning instead.
+        """
         symbol = f"MAXH_{uuid4().hex[:6]}"
         await self._fill(db, broker, 1, "9.00", 15, symbol)
 
@@ -229,7 +237,7 @@ class TestApplyLedgerEntryPrices:
             broker_account_id=broker.id,
             tradingsymbol=symbol, exchange="NFO", product="MIS",
             total_quantity=3,                     # broker says 3, ledger knows 1
-            average_entry_price=Decimal("9.3075"),
+            average_entry_price=Decimal("9.31"),
             status="open",
         ))
         await db.flush()
@@ -244,8 +252,34 @@ class TestApplyLedgerEntryPrices:
                 Position.tradingsymbol == symbol,
             )
         )).scalar_one()
-        assert float(pos.average_entry_price) == 9.3075
+        assert float(pos.average_entry_price) == 9.31
         assert pos.entry_price_source == "broker"
+
+    async def test_positions_price_column_only_holds_two_decimals(self, db, broker):
+        """
+        Schema drift, pinned deliberately: Position.average_entry_price is declared
+        Numeric(15, 4) on the model but the live column is numeric(10, 2), so a
+        4-decimal average is rounded on write.
+
+        It does not change the outcome of the entry-price fix — the broker's blended
+        figure would be rounded identically — but it does mean this table cannot
+        represent a multi-tranche fill average exactly. The ledger and
+        completed_trades, which are the P&L source of truth, are genuinely 4dp.
+
+        If the column is ever widened to match the model, this test should fail;
+        update it then rather than deleting it.
+        """
+        symbol = f"PREC_{uuid4().hex[:6]}"
+        pos = Position(
+            broker_account_id=broker.id,
+            tradingsymbol=symbol, exchange="NFO", product="MIS",
+            total_quantity=3, average_entry_price=Decimal("9.3075"), status="open",
+        )
+        db.add(pos)
+        await db.flush()
+        await db.refresh(pos)          # read back what Postgres actually stored
+
+        assert float(pos.average_entry_price) == 9.31
 
     async def test_position_with_no_ledger_history_falls_back(self, db, broker):
         symbol = f"CARRY_{uuid4().hex[:6]}"
