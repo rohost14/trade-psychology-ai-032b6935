@@ -18,10 +18,10 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { Input } from '@/components/ui/input';
 import { cn } from '@/lib/utils';
 import { formatCurrencyWithSign } from '@/lib/formatters';
-import { api } from '@/lib/api';
 import { useBroker } from '@/contexts/BrokerContext';
 import BrokerGate from '@/components/BrokerGate';
 import ErrorState from '@/components/ErrorState';
+import { useApiQuery } from '@/hooks/useApiQuery';
 
 interface Bucket {
   trades: number;
@@ -142,62 +142,47 @@ function WindowStat({ bucket, kind }: { bucket: HourBucket; kind: 'best' | 'wors
 export default function MyRecordPage() {
   const { account, isConnected, isLoading: brokerLoading } = useBroker();
   const [query, setQuery] = useState('');
-  const [hits, setHits] = useState<SearchHit[]>([]);
-  const [data, setData] = useState<RecordData | null>(null);
-  const [loading, setLoading] = useState(false);
-  const [searching, setSearching] = useState(false);
-  const [searchError, setSearchError] = useState<unknown>(null);
-  const [lookupError, setLookupError] = useState<unknown>(null);
-  const [lastSymbol, setLastSymbol] = useState<string | null>(null);
+  // hits and data now come from the queries below, not local state.
+  const [debouncedQuery, setDebouncedQuery] = useState('');
+  const [selectedSymbol, setSelectedSymbol] = useState<string | null>(null);
   const debounce = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  // Seed with the instruments they actually trade, so the page is useful before
-  // they type anything.
-  const loadSuggestions = useCallback(async (q: string) => {
-    setSearchError(null);
-    try {
-      const r = await api.get('/api/my-record/search', { params: { q } });
-      setHits(r.data?.underlyings ?? []);
-    } catch (err) {
-      // NOT setHits([]). An empty chip list renders the cold-start message —
-      // "no completed trades yet, import your tradebook" — which is a confident,
-      // wrong answer when the request simply failed. The trader has history; we
-      // just could not fetch it.
-      setSearchError(err);
-    }
-  }, []);
-
+  // Debounce the keystrokes, then let the query cache handle the rest. Typing
+  // "NIFTY" and deleting back to "NIF" now reads the cached result instead of
+  // re-querying, and — because each request carries an abort signal — a superseded
+  // search is cancelled rather than allowed to land after a newer one. That race
+  // was previously live: type fast enough and an older response could overwrite a
+  // newer one, leaving results that did not match the box.
   useEffect(() => {
-    if (!account?.id) return;
-    setSearching(true);
-    loadSuggestions('').finally(() => setSearching(false));
-  }, [account?.id, loadSuggestions]);
-
-  useEffect(() => {
-    if (!account?.id) return;
     if (debounce.current) clearTimeout(debounce.current);
-    debounce.current = setTimeout(() => { loadSuggestions(query); }, 250);
+    debounce.current = setTimeout(() => setDebouncedQuery(query), 250);
     return () => { if (debounce.current) clearTimeout(debounce.current); };
-  }, [query, account?.id, loadSuggestions]);
+  }, [query]);
 
-  const lookup = useCallback(async (symbol: string) => {
-    setLoading(true);
-    setLookupError(null);
-    setLastSymbol(symbol);
-    try {
-      const res = await api.get('/api/my-record', { params: { symbol } });
-      setData(res.data);
-    } catch (err) {
-      // Was: a fabricated has_data:false payload carrying "Could not load your
-      // record." That renders through the same path as a genuine no-history
-      // answer, gives no cause and no retry, and is indistinguishable from "you
-      // have never traded this".
-      setData(null);
-      setLookupError(err);
-    } finally {
-      setLoading(false);
-    }
-  }, []);
+  const searchQuery = useApiQuery<{ underlyings: SearchHit[] }>(
+    ['my-record', 'search'],
+    '/api/my-record/search',
+    { params: { q: debouncedQuery }, enabled: Boolean(account?.id) },
+  );
+
+  // NOT `?? []` on failure. An empty chip list renders the cold-start message —
+  // "no completed trades yet, import your tradebook" — which is a confident, wrong
+  // answer when the request merely failed. Kept separate so the error branch wins.
+  const hits = searchQuery.data?.underlyings ?? [];
+  const searching = searchQuery.isPending;
+  const searchError = searchQuery.error;
+
+  const recordQuery = useApiQuery<RecordData>(
+    ['my-record', 'lookup'],
+    '/api/my-record',
+    { params: { symbol: selectedSymbol ?? undefined }, enabled: Boolean(selectedSymbol) },
+  );
+
+  const data = recordQuery.data ?? null;
+  const loading = Boolean(selectedSymbol) && recordQuery.isPending;
+  const lookupError = recordQuery.error;
+
+  const lookup = useCallback((symbol: string) => setSelectedSymbol(symbol), []);
 
   const situations = data?.situations
     ? Object.entries(data.situations).filter(([, b]) => b.trades > 0)
@@ -259,7 +244,7 @@ export default function MyRecordPage() {
           // none, and sends them off to import data they already have.
           <ErrorState
             error={searchError}
-            onRetry={() => loadSuggestions(query)}
+            onRetry={() => searchQuery.refetch()}
             compact
             message="We couldn't load your instruments. Your history is intact — this is only a display problem."
           />
@@ -282,8 +267,8 @@ export default function MyRecordPage() {
       {lookupError && !loading && (
         <ErrorState
           error={lookupError}
-          onRetry={() => lastSymbol && lookup(lastSymbol)}
-          message={`We couldn't load your record for ${lastSymbol ?? 'that instrument'}. This doesn't mean you haven't traded it.`}
+          onRetry={() => recordQuery.refetch()}
+          message={`We couldn't load your record for ${selectedSymbol ?? 'that instrument'}. This doesn't mean you haven't traded it.`}
           className="mt-4"
         />
       )}

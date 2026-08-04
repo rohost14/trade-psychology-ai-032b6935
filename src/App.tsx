@@ -50,7 +50,23 @@ const AdminAdmins     = lazy(() => import("./pages/admin/AdminAdmins"));
 const queryClient = new QueryClient({
   defaultOptions: {
     queries: {
-      staleTime: 5 * 60 * 1000,
+      // Fresh for 30s. Deliberately short: a trader who just closed a position and
+      // opens Analytics must not read minutes-old numbers. The cost of refetching
+      // often is low because the BACKEND cache answers most of them instantly and
+      // is invalidated the moment a CompletedTrade lands (core/response_cache.py).
+      // Meanwhile React Query serves the cached copy immediately and refreshes
+      // behind it, so the user never sees a blank skeleton on back-navigation.
+      staleTime: 30 * 1000,
+
+      // Keep results in memory well past staleTime so returning to a page is
+      // instant. This is what makes Dashboard -> Analytics -> Dashboard stop
+      // re-rendering skeletons for data we had seconds ago.
+      gcTime: 10 * 60 * 1000,
+
+      // The axios interceptor already retries transient GETs once. React Query's
+      // default is THREE more, so a genuine outage would fire six requests and
+      // delay the error the user needs to see by several seconds.
+      retry: false,
     },
   },
 });

@@ -13,6 +13,8 @@ import { ProfileTab } from '@/components/settings/ProfileTab';
 import { NotificationsTab } from '@/components/settings/NotificationsTab';
 import { InsightsTab } from '@/components/settings/InsightsTab';
 import ErrorState from '@/components/ErrorState';
+import { useQueryClient } from '@tanstack/react-query';
+import { useApiQuery } from '@/hooks/useApiQuery';
 import { DataTab } from '@/components/settings/DataTab';
 import { DangerZoneTab } from '@/components/settings/DangerZoneTab';
 
@@ -42,9 +44,9 @@ export default function Settings() {
   const [isDisconnecting, setIsDisconnecting] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [isDirty, setIsDirty] = useState(false);
-  const [isLoadingProfile, setIsLoadingProfile] = useState(false);
-  const [profileError, setProfileError] = useState<unknown>(null);
+  // isLoadingProfile and profileError now come from the query below, not local state.
   const [notificationStatus, setNotificationStatus] = useState<NotificationStatus | null>(null);
+  const queryClient = useQueryClient();
 
   const [profile, setProfile] = useState<UserProfile>({
     experience_level: 'intermediate',
@@ -70,45 +72,39 @@ export default function Settings() {
     setIsDirty(true);
   }, []);
 
-  const fetchProfile = useCallback(async () => {
-    if (!account?.id) return;
-    setIsLoadingProfile(true);
-    setProfileError(null);
-    try {
-      const response = await api.get('/api/profile/');
-      if (response.data?.profile) {
-        setProfile(prev => ({ ...prev, ...response.data.profile }));
-      }
-    } catch (error) {
-      // This used to be a console.error and nothing else. The form then rendered
-      // its hardcoded defaults — a 25,000 loss limit, 10 trades — which look like
-      // real saved settings. Pressing Save would have written those defaults over
-      // the trader's actual rules. The form must not be shown at all if we could
-      // not load what is currently saved.
-      console.error('Failed to fetch profile:', error);
-      setProfileError(error);
-    } finally {
-      setIsLoadingProfile(false);
-      setIsDirty(false);
-    }
-  }, [account?.id]);
+  const profileQuery = useApiQuery<{ profile?: Partial<UserProfile> }>(
+    ['profile', account?.id],
+    '/api/profile/',
+    { enabled: Boolean(isConnected && account?.id) },
+  );
 
-  const fetchNotificationStatus = useCallback(async () => {
-    if (!account?.id) return;
-    try {
-      const response = await api.get('/api/profile/notification-status');
-      setNotificationStatus(response.data);
-    } catch {
-      // Endpoint may not exist yet — silently ignore
-    }
-  }, [account?.id]);
+  const notificationQuery = useApiQuery<NotificationStatus>(
+    ['profile', 'notification-status', account?.id],
+    '/api/profile/notification-status',
+    { enabled: Boolean(isConnected && account?.id) },
+  );
+
+  const isLoadingProfile = profileQuery.isPending;
+  // The form must never fall through to its hardcoded defaults after a failed
+  // load — those look exactly like saved settings, and Save would write them over
+  // the trader's real rules. Both the form and the Save button check this.
+  const profileError = profileQuery.error;
+
+  // Seed the editable draft from the server value. Guarded on isDirty: React Query
+  // refetches in the background when the data goes stale or the tab regains focus,
+  // and without this guard that refetch would silently discard whatever the user
+  // was in the middle of typing.
+  const serverProfile = profileQuery.data?.profile;
+  useEffect(() => {
+    if (!serverProfile || isDirty) return;
+    setProfile(prev => ({ ...prev, ...serverProfile }));
+  }, [serverProfile, isDirty]);
 
   useEffect(() => {
-    if (isConnected && account?.id) {
-      fetchProfile();
-      fetchNotificationStatus();
-    }
-  }, [isConnected, account?.id, fetchProfile, fetchNotificationStatus]);
+    if (notificationQuery.data) setNotificationStatus(notificationQuery.data);
+  }, [notificationQuery.data]);
+
+  const fetchProfile = useCallback(() => { profileQuery.refetch(); }, [profileQuery]);
 
   const handleSaveProfile = async () => {
     if (!account?.id) return;
@@ -157,6 +153,13 @@ export default function Settings() {
 
       await api.put('/api/profile/', payload);
       toast.success('Settings saved successfully');
+
+      // Refetch BEFORE clearing the dirty flag, and await it. The seeding effect
+      // re-applies the server value the moment isDirty goes false; if the cache
+      // still held the pre-save copy at that instant, the form would visibly
+      // revert to the old values right after saying "saved". invalidateQueries
+      // resolves once the refetch lands, so the order here is load-bearing.
+      await queryClient.invalidateQueries({ queryKey: ['profile'] });
       setIsDirty(false);
     } catch (error) {
       const err = error as {

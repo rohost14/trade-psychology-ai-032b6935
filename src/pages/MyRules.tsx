@@ -7,7 +7,9 @@ import {
   Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle,
 } from '@/components/ui/dialog';
 import { toast } from 'sonner';
+import { useQueryClient } from '@tanstack/react-query';
 import { api } from '@/lib/api';
+import { useApiQuery } from '@/hooks/useApiQuery';
 import ErrorState from '@/components/ErrorState';
 import EnforcedRules from '@/components/rules/EnforcedRules';
 import { formatCurrency } from '@/lib/formatters';
@@ -49,6 +51,18 @@ interface HistoryRow {
   override: boolean;
 }
 
+interface ConstitutionResponse {
+  rules: Rules | null;
+  pending: Record<string, unknown> | null;
+  accepted_at: string | null;
+}
+
+interface ViolationsResponse {
+  today: Violation[];
+  total: number;
+  by_rule: Record<string, number>;
+}
+
 const RULE_LABELS: Record<string, string> = {
   daily_loss: 'Daily loss limit',
   daily_loss_limit: 'Daily loss limit',
@@ -71,18 +85,40 @@ function ratioColor(ratio: number | null | undefined): string {
 }
 
 export default function MyRules() {
-  const [rules, setRules] = useState<Rules | null>(null);
-  const [pending, setPending] = useState<Record<string, unknown> | null>(null);
-  const [acceptedAt, setAcceptedAt] = useState<string | null>(null);
-  const [status, setStatus] = useState<StatusRow[]>([]);
-  const [violationsToday, setViolationsToday] = useState<Violation[]>([]);
-  const [violations30d, setViolations30d] = useState(0);
-  const [byRule, setByRule] = useState<Record<string, number>>({});
-  const [history, setHistory] = useState<HistoryRow[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
-  // The error object itself, not a boolean — ErrorState classifies offline vs
-  // timeout vs server, and a bare flag throws that away.
-  const [loadError, setLoadError] = useState<unknown>(null);
+  // Four independent reads, cached and deduped. Previously one Promise.all behind
+  // eight useState calls: any single failure blanked the whole page, and leaving
+  // and returning re-ran all four.
+  const constitution = useApiQuery<ConstitutionResponse>(['constitution'], '/api/constitution/');
+  const statusQ = useApiQuery<{ status: StatusRow[] }>(['constitution', 'status'], '/api/constitution/status');
+  const violationsQ = useApiQuery<ViolationsResponse>(
+    ['constitution', 'violations'], '/api/constitution/violations', { params: { days: 30 } },
+  );
+  const historyQ = useApiQuery<{ history: HistoryRow[] }>(
+    ['constitution', 'history'], '/api/constitution/history', { params: { limit: 20 } },
+  );
+
+  const rules = constitution.data?.rules ?? null;
+  const pending = constitution.data?.pending ?? null;
+  const acceptedAt = constitution.data?.accepted_at ?? null;
+  const status = statusQ.data?.status ?? [];
+  const violationsToday = violationsQ.data?.today ?? [];
+  const violations30d = violationsQ.data?.total ?? 0;
+  const byRule = violationsQ.data?.by_rule ?? {};
+  const history = historyQ.data?.history ?? [];
+
+  // Only the constitution itself gates the page. The other three enrich it, and a
+  // failed violations feed should not hide the rules a trader came here to read.
+  const isLoading = constitution.isPending;
+  const loadError = constitution.error;
+
+  // All four queries are keyed under 'constitution', so one invalidation refreshes
+  // the set. Calling .refetch() on each would work too, but the query objects are
+  // new every render, which makes any useCallback around them pointless.
+  const queryClient = useQueryClient();
+  const load = useCallback(
+    () => { queryClient.invalidateQueries({ queryKey: ['constitution'] }); },
+    [queryClient],
+  );
 
   // Edit state
   const [editing, setEditing] = useState(false);
@@ -90,34 +126,6 @@ export default function MyRules() {
   const [isSaving, setIsSaving] = useState(false);
   const [overrideFields, setOverrideFields] = useState<string[] | null>(null);
   const [showHistory, setShowHistory] = useState(false);
-
-  const load = useCallback(async () => {
-    setIsLoading(true);
-    setLoadError(null);
-    try {
-      const [cRes, sRes, vRes, hRes] = await Promise.all([
-        api.get('/api/constitution/'),
-        api.get('/api/constitution/status'),
-        api.get('/api/constitution/violations', { params: { days: 30 } }),
-        api.get('/api/constitution/history', { params: { limit: 20 } }),
-      ]);
-      setRules(cRes.data.rules);
-      setPending(cRes.data.pending);
-      setAcceptedAt(cRes.data.accepted_at);
-      setStatus(sRes.data.status || []);
-      setViolationsToday(vRes.data.today || []);
-      setViolations30d(vRes.data.total || 0);
-      setByRule(vRes.data.by_rule || {});
-      setHistory(hRes.data.history || []);
-    } catch (err) {
-      console.error('Failed to load constitution:', err);
-      setLoadError(err);
-    } finally {
-      setIsLoading(false);
-    }
-  }, []);
-
-  useEffect(() => { load(); }, [load]);
 
   const startEdit = () => {
     if (!rules) return;
