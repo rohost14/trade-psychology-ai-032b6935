@@ -108,6 +108,12 @@ describe('Analytics tab render smoke (demo data, backend-shaped)', () => {
     const { container } = renderWithRouter(<HabitsTab days={30} />);
 
     expect(await screen.findByText('After a loss, do you size up?')).toBeInTheDocument();
+
+    // SessionLog renders inside this tab and returns null unless has_data is
+    // true, so it disappeared silently while /api/analytics/session-log had no
+    // guest fixture. Asserting its header is what keeps that from recurring.
+    expect(await screen.findByText('Your trading days')).toBeInTheDocument();
+
     expect(screen.getByText('Time of day')).toBeInTheDocument();
     expect(screen.getByText('Day of week')).toBeInTheDocument();
     expect(screen.getByText('By instrument')).toBeInTheDocument();

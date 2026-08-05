@@ -1113,6 +1113,42 @@ export const DEMO_HABITS = {
 };
 
 // ---------------------------------------------------------------------------
+// Analytics: session log
+// ---------------------------------------------------------------------------
+// Mirrors GET /api/analytics/session-log. SessionLog renders INSIDE the Habits
+// tab, so with no fixture it fell through to the `{}` catch-all: `has_data` read
+// undefined and the component returned null. It vanished silently rather than
+// erroring, which is the failure mode that makes this bug class hard to notice.
+//
+// Days reconcile exactly with DEMO_HABITS.by_day_of_week, because the two render
+// on the same screen: Mon +4,200/3 · Tue +6,350/4 · Wed +5,850/3 (−2,700 and
+// +8,550) · Thu −7,410/4 · Fri −1,000/1. Totals 15 trades and +₹7,990, matching
+// DEMO_HABITS.summary. The 5 Aug day also matches DEMO_JOURNAL_ENTRIES.
+//
+// `insight` is not hand-written — it is what the endpoint's own rule produces
+// from these days: the three losing days are −7,410 (revenge), −2,700 (revenge)
+// and −1,000 (overtrading), so revenge wins 2 of 3.
+export const DEMO_SESSION_LOG = {
+  has_data: true,
+  period_days: 60,
+  days: [
+    { date: '2026-08-05', pnl: -2700, trades: 1, alerts: 2, peak_risk: 68,
+      tag: 'revenge',     top_patterns: ['revenge_trade', 'no_stoploss'] },
+    { date: '2026-08-04', pnl: 6350,  trades: 4, alerts: 1, peak_risk: 34,
+      tag: 'flagged',     top_patterns: ['early_exit'] },
+    { date: '2026-08-03', pnl: 4200,  trades: 3, alerts: 0, peak_risk: 12,
+      tag: 'clean',       top_patterns: [] },
+    { date: '2026-07-31', pnl: -1000, trades: 1, alerts: 1, peak_risk: 41,
+      tag: 'overtrading', top_patterns: ['overtrading'] },
+    { date: '2026-07-30', pnl: -7410, trades: 4, alerts: 5, peak_risk: 82,
+      tag: 'revenge',     top_patterns: ['revenge_trade', 'size_escalation', 'consecutive_loss_streak'] },
+    { date: '2026-07-29', pnl: 8550,  trades: 2, alerts: 0, peak_risk: 9,
+      tag: 'clean',       top_patterns: [] },
+  ],
+  insight: { tag: 'revenge', count: 2, of: 3 },
+};
+
+// ---------------------------------------------------------------------------
 // Analytics: behaviour → realized money
 // ---------------------------------------------------------------------------
 // Mirrors GET /api/analytics/behaviour-cost. FACTUAL framing throughout: these
