@@ -1,0 +1,305 @@
+<!DOCTYPE html>
+
+<html class="dark" lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>TradeMentor AI Dashboard</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;700&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+        tailwind.config = {
+          darkMode: "class",
+          theme: {
+            extend: {
+              "colors": {
+                      "tertiary": "#ffb3af",
+                      "secondary-container": "#00761f",
+                      "surface": "#131313",
+                      "secondary-fixed": "#94f990",
+                      "primary-fixed-dim": "#a5c8ff",
+                      "on-error": "#690005",
+                      "surface-container-low": "#1c1b1b",
+                      "secondary-fixed-dim": "#78dc77",
+                      "surface-container-high": "#2a2a2a",
+                      "inverse-surface": "#e5e2e1",
+                      "surface-bright": "#3a3939",
+                      "inverse-on-surface": "#313030",
+                      "tertiary-fixed-dim": "#ffb3af",
+                      "background": "#131313",
+                      "on-error-container": "#ffdad6",
+                      "surface-tint": "#a5c8ff",
+                      "primary": "#a5c8ff",
+                      "tertiary-fixed": "#ffdad7",
+                      "error-container": "#93000a",
+                      "outline-variant": "#414751",
+                      "on-background": "#e5e2e1",
+                      "error": "#ffb4ab",
+                      "outline": "#8b919d",
+                      "on-primary-fixed": "#001c3a",
+                      "on-surface": "#e5e2e1",
+                      "on-secondary-fixed-variant": "#005313",
+                      "on-surface-variant": "#c1c6d3",
+                      "on-tertiary": "#68000e",
+                      "tertiary-container": "#f55e5d",
+                      "on-primary-container": "#002a53",
+                      "on-tertiary-fixed": "#410005",
+                      "on-secondary": "#00390a",
+                      "on-primary": "#00315f",
+                      "surface-container": "#201f1f",
+                      "on-primary-fixed-variant": "#004786",
+                      "secondary": "#78dc77",
+                      "surface-container-lowest": "#0e0e0e",
+                      "surface-container-highest": "#353534",
+                      "primary-fixed": "#d4e3ff",
+                      "primary-container": "#5092e7",
+                      "inverse-primary": "#005faf",
+                      "surface-variant": "#353534",
+                      "surface-dim": "#131313",
+                      "on-secondary-container": "#95fb92",
+                      "on-tertiary-fixed-variant": "#8e101c",
+                      "on-tertiary-container": "#5c000b",
+                      "on-secondary-fixed": "#002204"
+              },
+              "borderRadius": {
+                      "DEFAULT": "0.125rem",
+                      "lg": "0.25rem",
+                      "xl": "0.5rem",
+                      "full": "0.75rem"
+              },
+              "spacing": {
+                      "stack-space": "4px",
+                      "internal-padding-tight": "8px",
+                      "internal-padding-base": "12px",
+                      "element-gap": "16px",
+                      "container-margin": "24px"
+              },
+              "fontFamily": {
+                      "data-mono": ["Inter"],
+                      "display-lg": ["Inter"],
+                      "label-caps": ["Inter"],
+                      "body-md": ["Inter"],
+                      "title-sm": ["Inter"],
+                      "body-sm": ["Inter"],
+                      "headline-md": ["Inter"]
+              },
+              "fontSize": {
+                      "data-mono": ["14px", {"lineHeight": "20px", "fontWeight": "500"}],
+                      "display-lg": ["32px", {"lineHeight": "40px", "letterSpacing": "-0.02em", "fontWeight": "500"}],
+                      "label-caps": ["11px", {"lineHeight": "16px", "letterSpacing": "0.05em", "fontWeight": "500"}],
+                      "body-md": ["14px", {"lineHeight": "20px", "fontWeight": "400"}],
+                      "title-sm": ["18px", {"lineHeight": "24px", "fontWeight": "500"}],
+                      "body-sm": ["13px", {"lineHeight": "18px", "fontWeight": "400"}],
+                      "headline-md": ["24px", {"lineHeight": "32px", "letterSpacing": "-0.01em", "fontWeight": "500"}]
+              }
+            }
+          }
+        }
+    </script>
+<style>
+        .tabular-nums { font-variant-numeric: tabular-nums; }
+    </style>
+</head>
+<body class="bg-background text-on-background font-body-md antialiased overflow-hidden flex h-screen">
+<!-- SideNavBar from JSON -->
+<nav class="hidden md:flex bg-surface-container-lowest text-primary flex-col h-full p-internal-padding-base h-screen w-64 border-r border-outline-variant flex-shrink-0">
+<!-- Header -->
+<div class="flex items-center gap-3 mb-8 px-4">
+<span class="material-symbols-outlined text-3xl" style="font-variation-settings: 'FILL' 1;">insights</span>
+<div>
+<h1 class="font-headline-md text-headline-md text-primary font-bold">TradeMentor AI</h1>
+<p class="font-label-caps text-label-caps text-on-surface-variant uppercase tracking-wider">Precision Trading</p>
+</div>
+</div>
+<!-- Navigation Links -->
+<div class="flex flex-col gap-1 flex-grow overflow-y-auto">
+<a class="flex items-center gap-3 px-4 py-2 bg-secondary-container text-on-secondary-container rounded-lg font-bold transition-transform active:scale-95" href="#">
+<span class="material-symbols-outlined text-[20px]">dashboard</span>
+                Dashboard
+            </a>
+<a class="flex items-center gap-3 px-4 py-2 text-on-surface-variant hover:bg-surface-container-high hover:text-on-surface rounded-lg transition-colors duration-150 active:scale-95" href="#">
+<span class="material-symbols-outlined text-[20px]">analytics</span>
+                Analytics
+            </a>
+<a class="flex items-center gap-3 px-4 py-2 text-on-surface-variant hover:bg-surface-container-high hover:text-on-surface rounded-lg transition-colors duration-150 active:scale-95 justify-between" href="#">
+<div class="flex items-center gap-3">
+<span class="material-symbols-outlined text-[20px]">notifications</span>
+                    Alerts
+                </div>
+<span class="bg-error-container text-on-error px-2 py-0.5 rounded-full font-label-caps text-[10px]">3</span>
+</a>
+<a class="flex items-center gap-3 px-4 py-2 text-on-surface-variant hover:bg-surface-container-high hover:text-on-surface rounded-lg transition-colors duration-150 active:scale-95" href="#">
+<span class="material-symbols-outlined text-[20px]">forum</span>
+                Chat
+            </a>
+<a class="flex items-center gap-3 px-4 py-2 text-on-surface-variant hover:bg-surface-container-high hover:text-on-surface rounded-lg transition-colors duration-150 active:scale-95" href="#">
+<span class="material-symbols-outlined text-[20px]">description</span>
+                Reports
+            </a>
+<a class="flex items-center gap-3 px-4 py-2 text-on-surface-variant hover:bg-surface-container-high hover:text-on-surface rounded-lg transition-colors duration-150 active:scale-95" href="#">
+<span class="material-symbols-outlined text-[20px]">menu_book</span>
+                Journal
+            </a>
+<a class="flex items-center gap-3 px-4 py-2 text-on-surface-variant hover:bg-surface-container-high hover:text-on-surface rounded-lg transition-colors duration-150 active:scale-95" href="#">
+<span class="material-symbols-outlined text-[20px]">gavel</span>
+                My Rules
+            </a>
+<a class="flex items-center gap-3 px-4 py-2 text-on-surface-variant hover:bg-surface-container-high hover:text-on-surface rounded-lg transition-colors duration-150 active:scale-95" href="#">
+<span class="material-symbols-outlined text-[20px]">history</span>
+                My Record
+            </a>
+<a class="flex items-center gap-3 px-4 py-2 text-on-surface-variant hover:bg-surface-container-high hover:text-on-surface rounded-lg transition-colors duration-150 active:scale-95" href="#">
+<span class="material-symbols-outlined text-[20px]">settings</span>
+                Settings
+            </a>
+</div>
+<!-- Footer -->
+<div class="mt-auto pt-4 border-t border-outline-variant">
+<a class="flex items-center gap-3 px-4 py-2 text-on-surface-variant hover:bg-surface-container-high hover:text-on-surface rounded-lg transition-colors duration-150" href="#">
+<span class="material-symbols-outlined text-[20px]">account_circle</span>
+<div class="flex flex-col">
+<span class="font-data-mono text-sm">ZA1234</span>
+<span class="font-label-caps text-[10px]">Account</span>
+</div>
+</a>
+</div>
+</nav>
+<!-- Main Content Canvas -->
+<main class="flex-1 overflow-y-auto bg-surface p-container-margin flex flex-col gap-8">
+<!-- Top Nav Mobile Fallback (Hidden on Desktop) -->
+<div class="md:hidden flex justify-between items-center bg-surface border-b border-outline-variant h-12 w-full mb-4 shrink-0">
+<span class="font-title-sm text-title-sm text-on-surface font-bold pl-4">TradeMentor AI</span>
+<div class="flex pr-4 gap-4">
+<span class="material-symbols-outlined text-on-surface cursor-pointer hover:text-primary transition-colors">notifications</span>
+<span class="material-symbols-outlined text-on-surface cursor-pointer hover:text-primary transition-colors">menu</span>
+</div>
+</div>
+<!-- Hero Section (Bare) -->
+<section class="flex flex-col gap-stack-space items-start">
+<div class="flex items-center gap-3 mb-2">
+<span class="font-label-caps text-label-caps text-on-surface-variant tracking-widest uppercase">Day P&amp;L</span>
+<span class="bg-surface-container-highest px-2 py-0.5 rounded text-[10px] font-mono text-on-surface-variant">CLOSED · 13:43</span>
+</div>
+<h2 class="font-display-lg text-display-lg text-error tabular-nums">-₹8,455</h2>
+<p class="font-body-sm text-body-sm text-on-surface-variant tabular-nums">Booked -₹8,895 · Unrealized <span class="text-secondary">+₹440</span></p>
+</section>
+<!-- Metrics Row -->
+<section class="grid grid-cols-1 md:grid-cols-4 gap-element-gap">
+<div class="bg-surface-container p-internal-padding-base rounded border border-outline-variant flex flex-col gap-1">
+<span class="font-label-caps text-label-caps text-on-surface-variant uppercase">Trades</span>
+<div class="flex items-baseline gap-2">
+<span class="font-title-sm text-title-sm text-on-surface tabular-nums">8</span>
+<span class="font-body-sm text-body-sm text-on-surface-variant">(0.8x pace)</span>
+</div>
+</div>
+<div class="bg-surface-container p-internal-padding-base rounded border border-outline-variant flex flex-col gap-1">
+<span class="font-label-caps text-label-caps text-on-surface-variant uppercase">Loss Budget</span>
+<div class="flex items-baseline gap-2">
+<span class="font-title-sm text-title-sm text-on-surface tabular-nums">₹16.1k</span>
+<span class="font-body-sm text-body-sm text-on-surface-variant">of ₹25k</span>
+</div>
+<!-- Mini Progress Bar -->
+<div class="w-full bg-surface-container-highest h-1 mt-1 rounded overflow-hidden">
+<div class="bg-tertiary-container h-full" style="width: 64%"></div>
+</div>
+</div>
+<div class="bg-surface-container p-internal-padding-base rounded border border-outline-variant flex flex-col gap-1">
+<span class="font-label-caps text-label-caps text-on-surface-variant uppercase">Win Rate</span>
+<div class="flex items-baseline gap-2">
+<span class="font-title-sm text-title-sm text-on-surface tabular-nums">50%</span>
+<span class="font-body-sm text-body-sm text-on-surface-variant">(8 trades)</span>
+</div>
+</div>
+<div class="bg-surface-container p-internal-padding-base rounded border border-outline-variant flex flex-col gap-1">
+<span class="font-label-caps text-label-caps text-on-surface-variant uppercase">Unrealized</span>
+<div class="flex items-baseline gap-2">
+<span class="font-title-sm text-title-sm text-secondary tabular-nums">+₹440</span>
+</div>
+</div>
+</section>
+<!-- Insights Bento Grid Area -->
+<div class="grid grid-cols-1 lg:grid-cols-3 gap-element-gap">
+<!-- What We Caught Today -->
+<section class="lg:col-span-2 flex flex-col gap-4">
+<div class="flex justify-between items-end border-b border-outline-variant pb-2">
+<div class="flex items-center gap-2">
+<h3 class="font-title-sm text-title-sm text-on-surface font-medium">What we caught today</h3>
+<span class="bg-surface-container-highest text-on-surface-variant px-2 py-0.5 rounded font-label-caps text-[10px]">3</span>
+</div>
+<a class="text-primary hover:text-primary-fixed-dim font-body-sm transition-colors" href="#">View all</a>
+</div>
+<div class="flex flex-col gap-stack-space">
+<!-- Insight 1 -->
+<div class="bg-surface-container p-internal-padding-base rounded border border-outline-variant flex flex-col gap-2 hover:bg-[#2a2a2a] hover:border-primary transition-colors cursor-pointer group">
+<div class="flex justify-between items-start">
+<div class="flex items-center gap-2">
+<span class="bg-error-container text-on-error px-2 py-0.5 rounded font-label-caps text-[10px] uppercase border border-error/20">Danger</span>
+<span class="font-title-sm text-title-sm text-on-surface group-hover:text-primary transition-colors">Size Escalation</span>
+</div>
+<span class="font-label-caps text-on-surface-variant text-[10px]">now</span>
+</div>
+<p class="font-body-sm text-body-sm text-on-surface-variant">BANKNIFTY 45500 PE entry at 100 lots — 4x your average size — 8 min after ₹2,600 loss. Win rate on oversized entries: 28% vs 60% baseline.</p>
+</div>
+<!-- Insight 2 -->
+<div class="bg-surface-container p-internal-padding-base rounded border border-outline-variant flex flex-col gap-2 hover:bg-[#2a2a2a] hover:border-primary transition-colors cursor-pointer group">
+<div class="flex justify-between items-start">
+<div class="flex items-center gap-2">
+<span class="bg-surface-bright text-tertiary-fixed-dim px-2 py-0.5 rounded font-label-caps text-[10px] uppercase border border-tertiary-fixed-dim/30">Caution</span>
+<span class="font-title-sm text-title-sm text-on-surface group-hover:text-primary transition-colors">Early Exit</span>
+</div>
+<span class="font-label-caps text-on-surface-variant text-[10px]">now</span>
+</div>
+<p class="font-body-sm text-body-sm text-on-surface-variant">NIFTY CE exited at +₹820 after 8 min. Position continued to +₹2,100. You exit 42% early on average.</p>
+</div>
+<!-- Insight 3 -->
+<div class="bg-surface-container p-internal-padding-base rounded border border-outline-variant flex flex-col gap-2 hover:bg-[#2a2a2a] hover:border-primary transition-colors cursor-pointer group">
+<div class="flex justify-between items-start">
+<div class="flex items-center gap-2">
+<span class="bg-error-container text-on-error px-2 py-0.5 rounded font-label-caps text-[10px] uppercase border border-error/20">Danger</span>
+<span class="font-title-sm text-title-sm text-on-surface group-hover:text-primary transition-colors">No Stop-Loss</span>
+</div>
+<span class="font-label-caps text-on-surface-variant text-[10px]">now</span>
+</div>
+<p class="font-body-sm text-body-sm text-on-surface-variant">FINNIFTY 19800 CE open 47 min with no stop-loss. Unrealised loss: <span class="text-error font-mono">₹3,200</span>. Positions without stop-loss average 3x larger final loss for you.</p>
+</div>
+</div>
+</section>
+<!-- Open Positions -->
+<section class="lg:col-span-1 flex flex-col gap-4">
+<div class="flex justify-between items-end border-b border-outline-variant pb-2">
+<h3 class="font-title-sm text-title-sm text-on-surface font-medium">Open positions</h3>
+</div>
+<div class="w-full overflow-x-auto">
+<table class="w-full text-left border-collapse">
+<thead>
+<tr class="border-b border-outline-variant">
+<th class="py-2 pr-4 font-label-caps text-label-caps text-on-surface-variant uppercase font-medium">Symbol</th>
+<th class="py-2 px-2 font-label-caps text-label-caps text-on-surface-variant uppercase font-medium text-right">Qty</th>
+<th class="py-2 pl-4 font-label-caps text-label-caps text-on-surface-variant uppercase font-medium text-right">P&amp;L</th>
+</tr>
+</thead>
+<tbody class="font-data-mono text-data-mono tabular-nums">
+<tr class="border-b border-outline-variant hover:bg-[#252525] transition-colors group cursor-pointer">
+<td class="py-3 pr-4 flex flex-col gap-1">
+<span class="text-on-surface group-hover:text-primary transition-colors">FINNIFTY 19800 CE</span>
+<span class="font-label-caps text-[10px] text-on-surface-variant">NRML · 143.20</span>
+</td>
+<td class="py-3 px-2 text-right text-on-surface">40</td>
+<td class="py-3 pl-4 text-right text-error">-₹3,200</td>
+</tr>
+<tr class="border-b border-outline-variant hover:bg-[#252525] transition-colors group cursor-pointer">
+<td class="py-3 pr-4 flex flex-col gap-1">
+<span class="text-on-surface group-hover:text-primary transition-colors">BANKNIFTY 45500 PE</span>
+<span class="font-label-caps text-[10px] text-on-surface-variant">MIS · 284.50</span>
+</td>
+<td class="py-3 px-2 text-right text-on-surface">15</td>
+<td class="py-3 pl-4 text-right text-secondary">+₹3,640</td>
+</tr>
+</tbody>
+</table>
+</div>
+</section>
+</div>
+</main>
+</body></html>
