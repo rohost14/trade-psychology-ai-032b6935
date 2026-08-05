@@ -1,0 +1,224 @@
+<!-- @dsCard group="Foundations" name="Colour, type, severity" subtitle="Every token taken from the running app" viewport-width="1440" -->
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Mirror — Foundations</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=DM+Mono:wght@300;400;500&display=swap">
+<style>
+  :root{ --sidebar:#101114; --page:#121316; --surface:#191B1F; --overlay:#232529;
+    --border:#2A2C32; --divider:#1E2024; --ink:#EEECE8; --ink2:#939698; --ink3:#646670;
+    --brand:#59C0B4; --profit:#47B88E; --loss:#CF6559; --caution:#D39145; }
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--page);color:var(--ink);
+    font:400 13.5px/1.6 Inter,system-ui,sans-serif;padding:32px 40px 56px}
+  h1{font:600 26px/1.2 Inter,sans-serif;margin:0 0 4px;letter-spacing:-.02em}
+  .sub{color:var(--ink2);font-size:13.5px;margin:0 0 34px;max-width:78ch}
+  h2{font:600 12px/1 Inter,sans-serif;letter-spacing:.1em;text-transform:uppercase;
+    color:var(--ink3);margin:44px 0 0;padding-bottom:11px;border-bottom:1px solid var(--border)}
+  .n{color:var(--ink2);font-size:13px;margin:14px 0 0;max-width:80ch;line-height:1.7}
+  .n b{color:var(--ink);font-weight:600}
+
+  /* colour */
+  .sw-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(168px,1fr));gap:1px;
+    background:var(--border);border:1px solid var(--border);margin-top:20px}
+  .sw{background:var(--page);padding:0}
+  .chip{height:64px}
+  .sw-m{padding:10px 12px 12px}
+  .sw-n{font:600 12px/1 Inter,sans-serif}
+  .sw-h{font:400 11px/1 'DM Mono',monospace;color:var(--ink3);margin-top:5px}
+  .sw-u{font-size:11.5px;color:var(--ink2);margin-top:6px;line-height:1.4}
+
+  /* type */
+  .t-row{display:grid;grid-template-columns:104px 128px 1fr;gap:20px;align-items:baseline;
+    padding:16px 0;border-bottom:1px solid var(--divider)}
+  .t-k{font:600 10.5px/1 Inter,sans-serif;letter-spacing:.09em;text-transform:uppercase;color:var(--ink3)}
+  .t-s{font:400 11.5px/1 'DM Mono',monospace;color:var(--ink3)}
+  .mono{font-family:'DM Mono',monospace;font-variant-numeric:tabular-nums}
+
+  /* severity */
+  .sev{display:grid;grid-template-columns:96px 1fr;gap:18px;align-items:center;
+    padding:14px 0 14px 0;border-bottom:1px solid var(--divider)}
+  .sev-l{display:flex;align-items:center;gap:9px;font:600 12.5px/1 Inter,sans-serif}
+  .dot{width:8px;height:8px;border-radius:999px;flex-shrink:0}
+  .bd{font:700 9.5px/1 Inter,sans-serif;letter-spacing:.08em;padding:4px 6px;border-radius:3px}
+  .demo{border-left:3px solid transparent;padding:12px 0 12px 15px;background:var(--surface)}
+  .demo.rail-loss{border-left-color:var(--loss)}
+  .demo.flat{background:transparent;padding-left:18px}
+  .demo p{margin:0;font-size:12.5px;color:var(--ink2)}
+  .demo .h{font:600 13px/1 Inter,sans-serif;color:var(--ink);margin-bottom:6px;
+    display:flex;align-items:center;gap:9px}
+
+  /* spacing */
+  .sp{display:flex;gap:14px;align-items:flex-end;margin-top:20px;flex-wrap:wrap}
+  .sp i{display:block;background:var(--brand);opacity:.75;height:26px}
+  .sp span{font:400 10.5px/1 'DM Mono',monospace;color:var(--ink3);display:block;
+    text-align:center;margin-top:7px}
+  .rad{display:flex;gap:16px;margin-top:20px}
+  .rad div{width:74px;height:56px;background:var(--overlay);border:1px solid var(--border);
+    display:flex;align-items:flex-end;justify-content:center;padding-bottom:7px;
+    font:400 10.5px/1 'DM Mono',monospace;color:var(--ink3)}
+</style>
+</head>
+<body>
+
+<h1>Foundations</h1>
+<p class="sub">Nothing here is new. Every value is the one already in
+  <span class="mono" style="color:var(--ink)">src/index.css</span> — this sheet exists so the
+  screens that follow can be checked against it, and so the two places the system departs from
+  the shipping code are visible rather than accidental.</p>
+
+<h2>Colour · dark</h2>
+<div class="sw-grid">
+  <div class="sw"><div class="chip" style="background:#101114"></div><div class="sw-m">
+    <div class="sw-n">sidebar</div><div class="sw-h">#101114</div>
+    <div class="sw-u">Nav. The one surface below the page</div></div></div>
+  <div class="sw"><div class="chip" style="background:#121316"></div><div class="sw-m">
+    <div class="sw-n">page</div><div class="sw-h">#121316</div>
+    <div class="sw-u">The ground</div></div></div>
+  <div class="sw"><div class="chip" style="background:#191B1F"></div><div class="sw-m">
+    <div class="sw-n">surface</div><div class="sw-h">#191B1F</div>
+    <div class="sw-u">A card that earned itself</div></div></div>
+  <div class="sw"><div class="chip" style="background:#232529"></div><div class="sw-m">
+    <div class="sw-n">overlay</div><div class="sw-h">#232529</div>
+    <div class="sw-u">Hover rows, wells, inputs</div></div></div>
+  <div class="sw"><div class="chip" style="background:#2A2C32"></div><div class="sw-m">
+    <div class="sw-n">border</div><div class="sw-h">#2A2C32</div>
+    <div class="sw-u">Card edges, section rules</div></div></div>
+  <div class="sw"><div class="chip" style="background:#1E2024"></div><div class="sw-m">
+    <div class="sw-n">divider</div><div class="sw-h">#1E2024</div>
+    <div class="sw-u">Row hairlines inside a list</div></div></div>
+  <div class="sw"><div class="chip" style="background:#EEECE8"></div><div class="sw-m">
+    <div class="sw-n">ink</div><div class="sw-h">#EEECE8</div>
+    <div class="sw-u">Headings and figures</div></div></div>
+  <div class="sw"><div class="chip" style="background:#939698"></div><div class="sw-m">
+    <div class="sw-n">ink-2</div><div class="sw-h">#939698</div>
+    <div class="sw-u">Body, labels</div></div></div>
+  <div class="sw"><div class="chip" style="background:#646670"></div><div class="sw-m">
+    <div class="sw-n">ink-3</div><div class="sw-h">#646670</div>
+    <div class="sw-u">Timestamps, axis ticks</div></div></div>
+  <div class="sw"><div class="chip" style="background:#59C0B4"></div><div class="sw-m">
+    <div class="sw-n">brand</div><div class="sw-h">#59C0B4</div>
+    <div class="sw-u">Active nav, links, anything not money</div></div></div>
+  <div class="sw"><div class="chip" style="background:#47B88E"></div><div class="sw-m">
+    <div class="sw-n">profit</div><div class="sw-h">#47B88E</div>
+    <div class="sw-u">Money gained. Nothing else</div></div></div>
+  <div class="sw"><div class="chip" style="background:#CF6559"></div><div class="sw-m">
+    <div class="sw-n">loss</div><div class="sw-h">#CF6559</div>
+    <div class="sw-u">Money lost, danger</div></div></div>
+  <div class="sw"><div class="chip" style="background:#D39145"></div><div class="sw-m">
+    <div class="sw-n">caution</div><div class="sw-h">#D39145</div>
+    <div class="sw-u">Caution severity only</div></div></div>
+</div>
+<p class="n"><b>Brand teal is not a money colour and profit green is not a UI colour.</b>
+  They sit close enough in hue that the separation has to be enforced by rule rather than by
+  eye: the moment teal also means &ldquo;up&rdquo;, a trader can no longer find their P&amp;L by
+  colour alone on a page that has nine teal links on it.</p>
+
+<h2>Colour · light</h2>
+<div class="sw-grid">
+  <div class="sw"><div class="chip" style="background:#F7F7F6"></div><div class="sw-m">
+    <div class="sw-n">sidebar</div><div class="sw-h">#F7F7F6</div>
+    <div class="sw-u">CHANGE — flips with the theme</div></div></div>
+  <div class="sw"><div class="chip" style="background:#F6F5F3"></div><div class="sw-m">
+    <div class="sw-n">page</div><div class="sw-h">#F6F5F3</div><div class="sw-u">The ground</div></div></div>
+  <div class="sw"><div class="chip" style="background:#FFFFFF"></div><div class="sw-m">
+    <div class="sw-n">surface</div><div class="sw-h">#FFFFFF</div><div class="sw-u">Cards</div></div></div>
+  <div class="sw"><div class="chip" style="background:#F0EFED"></div><div class="sw-m">
+    <div class="sw-n">overlay</div><div class="sw-h">#F0EFED</div><div class="sw-u">Hover, wells</div></div></div>
+  <div class="sw"><div class="chip" style="background:#DCDAD6"></div><div class="sw-m">
+    <div class="sw-n">border</div><div class="sw-h">#DCDAD6</div><div class="sw-u">Card edges</div></div></div>
+  <div class="sw"><div class="chip" style="background:#EDEBE8"></div><div class="sw-m">
+    <div class="sw-n">divider</div><div class="sw-h">#EDEBE8</div><div class="sw-u">Row hairlines</div></div></div>
+  <div class="sw"><div class="chip" style="background:#16181D"></div><div class="sw-m">
+    <div class="sw-n">ink</div><div class="sw-h">#16181D</div><div class="sw-u">Cool, not warm</div></div></div>
+  <div class="sw"><div class="chip" style="background:#60646C"></div><div class="sw-m">
+    <div class="sw-n">ink-2</div><div class="sw-h">#60646C</div><div class="sw-u">Body</div></div></div>
+  <div class="sw"><div class="chip" style="background:#96969F"></div><div class="sw-m">
+    <div class="sw-n">ink-3</div><div class="sw-h">#96969F</div><div class="sw-u">Metadata</div></div></div>
+  <div class="sw"><div class="chip" style="background:#155B56"></div><div class="sw-m">
+    <div class="sw-n">brand</div><div class="sw-h">#155B56</div><div class="sw-u">Pine teal</div></div></div>
+  <div class="sw"><div class="chip" style="background:#226D4F"></div><div class="sw-m">
+    <div class="sw-n">profit</div><div class="sw-h">#226D4F</div><div class="sw-u">Money gained</div></div></div>
+  <div class="sw"><div class="chip" style="background:#AF3A31"></div><div class="sw-m">
+    <div class="sw-n">loss</div><div class="sw-h">#AF3A31</div><div class="sw-u">Money lost</div></div></div>
+  <div class="sw"><div class="chip" style="background:#B16B1B"></div><div class="sw-m">
+    <div class="sw-n">caution</div><div class="sw-h">#B16B1B</div><div class="sw-u">Caution</div></div></div>
+</div>
+<p class="n"><b>Light is re-specified, not inverted.</b> The shipping app leaves the sidebar at
+  <span class="mono">#101114</span> while the page goes to paper — the result reads as a
+  half-applied theme rather than a decision. Ink also moves cool: warm paper under warm ink is
+  what makes a light mode look like a draft.</p>
+
+<h2>Type</h2>
+<div class="t-row"><span class="t-k">hero</span><span class="t-s">40 / 1.0 · mono 500</span>
+  <span class="mono" style="font-size:40px;font-weight:500;letter-spacing:-.03em;color:var(--loss)">&minus;₹8,455</span></div>
+<div class="t-row"><span class="t-k">fig-l</span><span class="t-s">26 / 1.0 · mono 500</span>
+  <span class="mono" style="font-size:26px;font-weight:500;letter-spacing:-.02em">₹16.1k</span></div>
+<div class="t-row"><span class="t-k">fig</span><span class="t-s">15 / 1.0 · mono 500</span>
+  <span class="mono" style="font-size:15px;font-weight:500;color:var(--profit)">+₹440.00</span></div>
+<div class="t-row"><span class="t-k">title</span><span class="t-s">19 / 1.25 · Inter 600</span>
+  <span style="font:600 19px/1.25 Inter,sans-serif;letter-spacing:-.015em">Behavioral Alerts</span></div>
+<div class="t-row"><span class="t-k">body</span><span class="t-s">13.5 / 1.6 · Inter 400</span>
+  <span style="color:var(--ink2)">BANKNIFTY 45500 PE entry at 100 lots — 4&times; your average size.</span></div>
+<div class="t-row"><span class="t-k">sm</span><span class="t-s">12 / 1.45 · Inter 400</span>
+  <span style="font-size:12px;color:var(--ink3)">Booked &minus;₹8,895 · Unrealized +₹440</span></div>
+<div class="t-row" style="border-bottom:0"><span class="t-k">label</span>
+  <span class="t-s">10.5 / 1 · 600 · .09em caps</span>
+  <span style="font:600 10.5px/1 Inter,sans-serif;letter-spacing:.09em;text-transform:uppercase;color:var(--ink3)">Loss budget</span></div>
+<p class="n"><b>Every figure is DM Mono with tabular numerals.</b> Not for flavour — a column of
+  P&amp;L where <span class="mono">₹1,240</span> and <span class="mono">₹18,900</span> do not
+  align on the comma is a column a trader has to read twice.</p>
+
+<h2>Severity</h2>
+<div class="sev">
+  <div class="sev-l"><span class="dot" style="background:var(--loss)"></span>critical</div>
+  <div class="demo rail-loss"><div class="h">Daily loss limit breached
+    <span class="bd" style="background:var(--loss);color:#121316">CRITICAL</span></div>
+    <p>Solid badge, coral rail. Reserved for a rule that is already broken.</p></div>
+</div>
+<div class="sev">
+  <div class="sev-l"><span class="dot" style="background:var(--loss)"></span>danger</div>
+  <div class="demo rail-loss"><div class="h">Size Escalation
+    <span class="bd" style="background:rgba(207,101,89,.14);color:var(--loss)">DANGER</span></div>
+    <p>Transparent badge, coral rail. Money is at risk right now.</p></div>
+</div>
+<div class="sev">
+  <div class="sev-l"><span class="dot" style="background:var(--caution)"></span>caution</div>
+  <div class="demo flat"><div class="h">Early Exit
+    <span class="bd" style="background:rgba(211,145,69,.14);color:var(--caution)">CAUTION</span></div>
+    <p>No rail. A pattern worth knowing, not worth interrupting for.</p></div>
+</div>
+<div class="sev" style="border-bottom:0">
+  <div class="sev-l"><span class="dot" style="background:var(--brand)"></span>info</div>
+  <div class="demo flat"><div class="h">Cooldown honoured
+    <span class="bd" style="background:rgba(89,192,180,.14);color:var(--brand)">INFO</span></div>
+    <p>Teal. Something went right, or something changed. Never money.</p></div>
+</div>
+<p class="n"><b>The rail is a rule, not an accent.</b> The shipping Dashboard draws a coral rail
+  on the first alert in the list only, which a trader reads as &ldquo;most recent&rdquo; rather than
+  &ldquo;most serious&rdquo;. Here it means danger-or-worse on every surface, or it is not drawn.</p>
+
+<h2>Scale</h2>
+<div class="sp">
+  <div><i style="width:4px"></i><span>4</span></div>
+  <div><i style="width:8px"></i><span>8</span></div>
+  <div><i style="width:12px"></i><span>12</span></div>
+  <div><i style="width:16px"></i><span>16</span></div>
+  <div><i style="width:20px"></i><span>20</span></div>
+  <div><i style="width:24px"></i><span>24</span></div>
+  <div><i style="width:32px"></i><span>32</span></div>
+  <div><i style="width:48px"></i><span>48</span></div>
+</div>
+<div class="rad">
+  <div style="border-radius:3px">3 · chips</div>
+  <div style="border-radius:6px">6 · inputs</div>
+  <div style="border-radius:8px">8 · cards</div>
+  <div style="border-radius:999px">999 · pills</div>
+</div>
+<p class="n">Page padding <span class="mono">24px 32px</span>. Sidebar <span class="mono">244px</span>,
+  fixed. Content takes whatever is left — <b>there is no max-width anywhere in this system</b>,
+  which is the single largest difference between these screens and a generic dashboard kit.</p>
+
+</body>
+</html>

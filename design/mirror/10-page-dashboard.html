@@ -1,0 +1,287 @@
+<!-- @dsCard group="Pages" name="Dashboard" subtitle="Full width, session open — the real route at real density" viewport-width="1600" -->
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Mirror — Dashboard</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=DM+Mono:wght@300;400;500&display=swap">
+<style>
+  :root{ --sidebar:#101114; --page:#121316; --surface:#191B1F; --overlay:#232529;
+    --border:#2A2C32; --divider:#1E2024; --ink:#EEECE8; --ink2:#939698; --ink3:#646670;
+    --brand:#59C0B4; --profit:#47B88E; --loss:#CF6559; --caution:#D39145; }
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--page);color:var(--ink);
+    font:400 13.5px/1.6 Inter,system-ui,sans-serif;display:flex;min-height:100vh}
+  .mono{font-family:'DM Mono',monospace;font-variant-numeric:tabular-nums}
+
+  /* ── sidebar ───────────────────────────────────────────── */
+  aside{width:244px;flex-shrink:0;background:var(--sidebar);border-right:1px solid var(--divider);
+    display:flex;flex-direction:column;padding:0 12px 14px;position:sticky;top:0;height:100vh;overflow-y:auto}
+  .brand{display:flex;align-items:center;gap:10px;height:64px;padding:0 8px;
+    font:600 16px/1 Inter,sans-serif;letter-spacing:-.01em}
+  .brand svg{color:var(--brand)}
+  .nav{display:flex;align-items:center;gap:12px;height:38px;padding:0 12px;border-radius:6px;
+    font:500 13.5px/1 Inter,sans-serif;color:var(--ink2);margin-bottom:2px;position:relative}
+  .nav .ic{width:16px;height:16px;flex-shrink:0;color:var(--ink3)}
+  .nav.on{background:rgba(89,192,180,.10);color:var(--brand);font-weight:600}
+  .nav.on .ic{color:var(--brand)}
+  .nav.on:before{content:"";position:absolute;left:-12px;top:9px;bottom:9px;width:3px;
+    background:var(--brand);border-radius:0 2px 2px 0}
+  .nav .bdg{margin-left:auto;font:500 10.5px/1 'DM Mono',monospace;background:var(--loss);
+    color:#121316;border-radius:999px;padding:3px 6px}
+  .grp{font:600 10px/1 Inter,sans-serif;letter-spacing:.11em;text-transform:uppercase;
+    color:var(--ink3);padding:20px 12px 8px}
+  .side-b{margin-top:auto;padding-top:14px}
+  .acct{display:flex;align-items:center;gap:9px;height:40px;padding:0 12px;border-radius:6px;
+    background:var(--overlay);font:500 12.5px/1 'DM Mono',monospace;margin-top:12px}
+  .acct i{width:7px;height:7px;border-radius:999px;background:var(--profit)}
+
+  /* ── page ──────────────────────────────────────────────── */
+  main{flex:1;min-width:0}
+  .wrap{padding:22px 32px 56px}
+
+  /* hero */
+  .hero{display:flex;align-items:flex-start;justify-content:space-between;gap:48px;
+    padding-bottom:22px;border-bottom:1px solid var(--border)}
+  .lbl{font:600 10.5px/1 Inter,sans-serif;letter-spacing:.09em;text-transform:uppercase;color:var(--ink3)}
+  .hero .lbl{display:flex;align-items:center;gap:8px}
+  .live{width:7px;height:7px;border-radius:999px;background:var(--loss)}
+  .pnl{font:500 40px/1 'DM Mono',monospace;letter-spacing:-.03em;margin:14px 0 0;color:var(--loss)}
+  .pnl-s{font-size:12.5px;color:var(--ink3);margin:9px 0 0}
+  .pnl-s b{color:var(--ink2);font-weight:500}
+
+  .hero-r{text-align:right;flex-shrink:0}
+  .status{display:flex;align-items:center;justify-content:flex-end;gap:12px;
+    font:400 11.5px/1 'DM Mono',monospace;color:var(--ink3)}
+  .status .st{display:flex;align-items:center;gap:7px;letter-spacing:.06em;text-transform:uppercase;
+    font-family:Inter,sans-serif;font-weight:600;font-size:10.5px}
+  .status .st i{width:6px;height:6px;border-radius:999px;background:var(--ink3)}
+  .sel{border:1px solid var(--border);background:var(--surface);border-radius:6px;height:30px;
+    padding:0 11px;color:var(--ink2);font:500 12px/28px Inter,sans-serif;display:inline-block}
+  .metrics{display:flex;gap:40px;justify-content:flex-end;margin-top:26px}
+  .met{text-align:right;min-width:96px}
+  .met .f{font:500 22px/1 'DM Mono',monospace;margin:11px 0 0;letter-spacing:-.02em}
+  .met .u{font:400 11.5px/1 'DM Mono',monospace;color:var(--ink3);margin-left:6px}
+
+  /* thin promo strip */
+  .strip{display:flex;align-items:center;gap:14px;margin-top:18px;padding:11px 14px;
+    background:var(--surface);border:1px solid var(--border);border-radius:8px}
+  .strip p{margin:0;font-size:12.5px;color:var(--ink2)}
+  .strip b{color:var(--ink);font-weight:600}
+  .inp{background:var(--overlay);border:1px solid var(--border);border-radius:6px;height:32px;
+    width:150px;padding:0 10px;color:var(--ink3);font:400 12.5px/30px 'DM Mono',monospace;
+    margin-left:auto}
+  .btn{border:0;border-radius:6px;height:32px;padding:0 15px;cursor:pointer;
+    font:600 12.5px/1 Inter,sans-serif;background:var(--brand);color:#101114}
+  .btn.q{background:transparent;border:1px solid var(--border);color:var(--ink2)}
+  .x{color:var(--ink3);font-size:16px;padding:0 4px}
+
+  /* intent */
+  .intent{display:flex;align-items:center;justify-content:space-between;
+    padding:15px 0;margin-top:6px;border-bottom:1px solid var(--divider)}
+  .intent p{margin:0;font-size:13px;color:var(--ink3)}
+  .lnk{color:var(--brand);font-weight:600;font-size:12.5px;text-decoration:none;margin-left:20px}
+  .lnk.m{color:var(--ink3);font-weight:500}
+
+  /* section */
+  .sec{margin-top:32px}
+  .sec-h{display:flex;align-items:center;gap:11px;padding-bottom:12px;
+    border-bottom:1px solid var(--border)}
+  .sec-h h2{font:600 10.5px/1 Inter,sans-serif;letter-spacing:.09em;text-transform:uppercase;
+    color:var(--ink2);margin:0;display:flex;align-items:center;gap:9px}
+  .sec-h .ct{font:500 10.5px/1 'DM Mono',monospace;background:rgba(207,101,89,.14);color:var(--loss);
+    border-radius:999px;padding:4px 7px}
+  .sec-h .sp{margin-left:auto;display:flex;align-items:center;gap:16px}
+  .tag{font:600 9.5px/1 Inter,sans-serif;letter-spacing:.07em;color:var(--ink3);
+    border:1px solid var(--border);border-radius:3px;padding:4px 6px}
+
+  /* alert rows — full width, edge to edge */
+  .arow{display:grid;grid-template-columns:1fr 62px;gap:20px;padding:15px 0 15px 15px;
+    border-bottom:1px solid var(--divider);border-left:3px solid transparent}
+  .arow.danger{border-left-color:var(--loss)}
+  .a-h{display:flex;align-items:center;gap:10px}
+  .a-t{font:600 13.5px/1 Inter,sans-serif;margin:0}
+  .bd{font:700 9.5px/1 Inter,sans-serif;letter-spacing:.08em;padding:4px 6px;border-radius:3px}
+  .new{width:6px;height:6px;border-radius:999px;background:var(--brand)}
+  .a-b{font-size:13px;color:var(--ink2);margin:7px 0 0;line-height:1.55}
+  .a-b .num{color:var(--ink);font-weight:500;font-family:'DM Mono',monospace}
+  .when{font:400 11.5px/1 'DM Mono',monospace;color:var(--ink3);text-align:right;padding-top:2px}
+  .more{display:flex;align-items:center;justify-content:center;gap:8px;padding:15px 0 0;
+    font:600 11px/1 Inter,sans-serif;letter-spacing:.09em;text-transform:uppercase;color:var(--brand)}
+
+  /* positions table */
+  thead th{font:600 10px/1 Inter,sans-serif;letter-spacing:.09em;text-transform:uppercase;
+    color:var(--ink3);text-align:right;padding:14px 16px 11px;border-bottom:1px solid var(--divider)}
+  thead th:first-child{text-align:left;padding-left:0}
+  thead th:last-child{padding-right:0}
+  table{width:100%;border-collapse:collapse}
+  tbody td{padding:15px 16px;border-bottom:1px solid var(--divider);text-align:right;
+    font:500 14px/1 'DM Mono',monospace;font-variant-numeric:tabular-nums}
+  tbody td:first-child{text-align:left;padding-left:0}
+  tbody td:last-child{padding-right:0}
+  tbody tr:last-child td{border-bottom:0}
+  .sym{font:600 13.5px/1.3 Inter,sans-serif;letter-spacing:-.005em}
+  .sym span{display:block;font:400 11.5px/1 'DM Mono',monospace;color:var(--ink3);margin-top:6px}
+  .pr{font:600 10px/1 Inter,sans-serif;letter-spacing:.06em;color:var(--ink3);
+    background:var(--overlay);border-radius:3px;padding:3px 5px;margin-left:8px;vertical-align:1px}
+</style>
+</head>
+<body>
+
+<aside>
+  <div class="brand">
+    <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2 4 6v6c0 5 3.4 9.4 8 10 4.6-.6 8-5 8-10V6z"/></svg>
+    TradeMentor</div>
+  <div class="nav on"><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/></svg>Dashboard</div>
+  <div class="nav"><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 17l6-6 4 4 7-7"/><path d="M14 8h6v6"/></svg>Analytics</div>
+  <div class="nav"><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 8a6 6 0 1 0-12 0c0 7-3 8-3 8h18s-3-1-3-8"/><path d="M13.7 21a2 2 0 0 1-3.4 0"/></svg>Alerts<span class="bdg">3</span></div>
+  <div class="nav"><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>Chat</div>
+  <div class="grp">Insights</div>
+  <div class="nav"><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M2 4h7a3 3 0 0 1 3 3v13a2.5 2.5 0 0 0-2.5-2.5H2z"/><path d="M22 4h-7a3 3 0 0 0-3 3v13a2.5 2.5 0 0 1 2.5-2.5H22z"/></svg>Reports</div>
+  <div class="nav"><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/></svg>Journal</div>
+  <div class="grp">Risk</div>
+  <div class="nav"><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 3v18"/><path d="M5 7h14"/><path d="M5 7 2 14h6z"/><path d="M19 7l-3 7h6z"/></svg>My Rules</div>
+  <div class="nav"><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4.3-4.3"/></svg>My Record</div>
+  <div class="grp">Account</div>
+  <div class="nav"><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.9l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-2.9 1.2 2 2 0 1 1-4 0 1.7 1.7 0 0 0-2.9-1.2l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1A1.7 1.7 0 0 0 3 15a2 2 0 1 1 0-4 1.7 1.7 0 0 0 1.5-2.6l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1A1.7 1.7 0 0 0 10 4.6a2 2 0 1 1 4 0 1.7 1.7 0 0 0 2.9 1.2l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1A1.7 1.7 0 0 0 21 11a2 2 0 1 1 0 4z"/></svg>Settings</div>
+  <div class="side-b">
+    <div class="acct"><i></i>ZA1234</div>
+  </div>
+</aside>
+
+<main>
+<div class="wrap">
+
+  <div class="hero">
+    <div>
+      <div class="lbl"><span class="live"></span>Day P&amp;L</div>
+      <p class="pnl">&minus;₹8,455</p>
+      <p class="pnl-s">Booked <b class="mono" style="color:var(--loss)">&minus;₹8,895</b>
+        &nbsp;·&nbsp; Unrealized <b class="mono" style="color:var(--profit)">+₹440</b></p>
+    </div>
+    <div class="hero-r">
+      <div class="status">
+        <span class="st"><i></i>Closed</span>
+        <span>13:43</span><span style="color:#3B3D45">|</span><span>01:47:26</span>
+        <span class="sel">Today&rsquo;s read &nbsp;⌄</span>
+      </div>
+      <div class="metrics">
+        <div class="met"><div class="lbl">Trades</div>
+          <p class="f">8<span class="u">0.8&times; pace</span></p></div>
+        <div class="met"><div class="lbl">Loss budget</div>
+          <p class="f">₹16.1k<span class="u">of ₹25k</span></p></div>
+        <div class="met"><div class="lbl">Win rate</div>
+          <p class="f">50%<span class="u">8 trades</span></p></div>
+        <div class="met"><div class="lbl">Unrealized</div>
+          <p class="f" style="color:var(--profit)">+₹440</p></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="strip">
+    <p><b>Enable position sizing alerts.</b> Add your trading capital to detect oversized positions.</p>
+    <span class="inp">₹ &nbsp;500000</span>
+    <button class="btn">Save</button>
+    <span class="x">&times;</span>
+  </div>
+
+  <div class="intent">
+    <p>No intent set for today.</p>
+    <div><a class="lnk" href="#">Set intent</a><a class="lnk m" href="#">Journal</a></div>
+  </div>
+
+  <section class="sec">
+    <div class="sec-h">
+      <h2>What we caught today <span class="ct">3</span></h2>
+      <div class="sp"><span class="tag">LIVE</span>
+        <a class="lnk" href="#">View all &rarr;</a></div>
+    </div>
+
+    <div class="arow danger">
+      <div>
+        <div class="a-h"><p class="a-t">Size Escalation</p>
+          <span class="bd" style="background:rgba(207,101,89,.14);color:var(--loss)">DANGER</span>
+          <span class="new"></span></div>
+        <p class="a-b">BANKNIFTY 45500 PE entry at <span class="num">100</span> lots —
+          <span class="num">4&times;</span> your average size — <span class="num">8 min</span>
+          after <span class="num">₹2,600</span> loss. Win rate on oversized entries:
+          <span class="num">28%</span> vs <span class="num">60%</span> baseline.</p>
+      </div>
+      <div class="when">now</div>
+    </div>
+
+    <div class="arow">
+      <div>
+        <div class="a-h"><p class="a-t">Early Exit</p>
+          <span class="bd" style="background:rgba(211,145,69,.14);color:var(--caution)">CAUTION</span>
+          <span class="new"></span></div>
+        <p class="a-b">NIFTY CE exited at <span class="num">+₹820</span> after
+          <span class="num">8 min</span>. Position continued to <span class="num">+₹2,100</span>.
+          You exit <span class="num">42%</span> early on average —
+          <span class="num">₹7,680</span> in unrealised gains left behind this month.</p>
+      </div>
+      <div class="when">now</div>
+    </div>
+
+    <div class="arow danger">
+      <div>
+        <div class="a-h"><p class="a-t">No Stop-Loss</p>
+          <span class="bd" style="background:rgba(207,101,89,.14);color:var(--loss)">DANGER</span>
+          <span class="new"></span></div>
+        <p class="a-b">FINNIFTY 19800 CE open <span class="num">47 min</span> with no stop-loss.
+          Unrealised loss: <span class="num">₹3,200</span>. Positions without stop-loss average
+          <span class="num">3&times;</span> larger final loss for you.</p>
+      </div>
+      <div class="when">now</div>
+    </div>
+
+    <div class="arow danger" style="border-bottom:0">
+      <div>
+        <div class="a-h"><p class="a-t">Revenge Trade</p>
+          <span class="bd" style="background:rgba(207,101,89,.14);color:var(--loss)">DANGER</span></div>
+        <p class="a-b">NIFTY23000CE entry came <span class="num">25 min</span> after
+          <span class="num">₹13,000</span> loss on SOLARINDS. Re-entering under active loss stress.</p>
+      </div>
+      <div class="when">11h</div>
+    </div>
+
+    <div class="more">View 3 more &rarr;</div>
+  </section>
+
+  <section class="sec">
+    <div class="sec-h">
+      <h2>Open positions <span class="ct" style="background:var(--overlay);color:var(--ink2)">2</span></h2>
+      <div class="sp">
+        <span class="tag">DELAYED</span>
+        <span class="tag">2 TO JOURNAL</span>
+        <span class="lbl">Unrealized</span>
+        <span class="mono" style="font-size:15px;font-weight:500;color:var(--profit)">+₹440.00</span>
+      </div>
+    </div>
+
+    <table>
+      <thead><tr><th>Symbol</th><th>Qty</th><th>Entry</th><th>LTP</th><th>Chg %</th><th>P&amp;L</th></tr></thead>
+      <tbody>
+        <tr>
+          <td><span class="sym">FINNIFTY 19800 CE<span class="pr">NRML</span>
+            <span>Opened 13:04 · 47 min</span></span></td>
+          <td>40</td><td>172.40</td><td>168.20</td>
+          <td style="color:var(--loss)">&minus;2.44%</td>
+          <td style="color:var(--loss)">&minus;₹3,200.00</td>
+        </tr>
+        <tr>
+          <td><span class="sym">BANKNIFTY 45500 PE<span class="pr">MIS</span>
+            <span>Opened 13:35 · 16 min</span></span></td>
+          <td>100</td><td>214.80</td><td>218.44</td>
+          <td style="color:var(--profit)">+1.69%</td>
+          <td style="color:var(--profit)">+₹3,640.00</td>
+        </tr>
+      </tbody>
+    </table>
+  </section>
+
+</div>
+</main>
+
+</body>
+</html>
