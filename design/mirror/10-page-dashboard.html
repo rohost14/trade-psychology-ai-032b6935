@@ -1,4 +1,4 @@
-<!-- @dsCard group="Pages" name="Dashboard" subtitle="One canvas, flat sections, inset metric wells" viewport-width="1500" -->
+<!-- @dsCard group="Pages" name="Dashboard" subtitle="Ink rail, state band, flat sections in one canvas" viewport-width="1500" -->
 <!doctype html>
 <html lang="en">
 <head>
@@ -15,6 +15,9 @@
     --loss:#C2372B; --loss-text:#A62B21; --loss-tint:#FCEEEC; --loss-edge:#EFC0BA;
     --caution:#96600C; --caution-text:#8F5A0B; --caution-tint:#FDF4E6;
     --hover:#F5F8FA; --pressed:#EDF1F5; --selected:#E4F3F1;
+    --rail:#111820; --rail-2:#1A232D; --rail-ink:#E8EDF2; --rail-ink-2:#8FA0B2;
+    --rail-ink-3:#6B7C8E; --rail-label:#7B8B9C; --rail-accent:#3FBFA8;
+    --state-down:linear-gradient(180deg,#FBEAE6 0%,#FFFFFF 100%);
     --sh-2:0 0 2px rgba(15,23,36,.12), 0 1px 2px rgba(15,23,36,.14);
     --sh-4:0 0 2px rgba(15,23,36,.12), 0 2px 4px rgba(15,23,36,.14);
     --sh-8:0 0 2px rgba(15,23,36,.12), 0 4px 8px rgba(15,23,36,.14);
@@ -25,51 +28,39 @@
     font:400 13.5px/20px Inter,system-ui,sans-serif;padding:20px 24px}
   .mono{font-family:'DM Mono',monospace;font-variant-numeric:tabular-nums}
   .lbl{font:600 10px/14px Inter,sans-serif;letter-spacing:.09em;text-transform:uppercase;color:var(--ink-3)}
-
-  /* ONE canvas holds the whole app */
   .shell{max-width:1440px;margin:0 auto;background:var(--canvas);border:1px solid var(--edge);
     border-radius:12px;box-shadow:var(--sh-4);display:flex;overflow:hidden;min-height:calc(100vh - 40px)}
 
-  aside{width:244px;flex-shrink:0;border-right:1px solid var(--rule);
-    display:flex;flex-direction:column;padding:0 10px 12px}
+  /* ── ink rail ── */
+  aside{width:244px;flex-shrink:0;background:var(--rail);display:flex;flex-direction:column;
+    padding:0 10px 12px}
   .brand{display:flex;align-items:center;gap:10px;height:60px;padding:0 10px;
-    font:600 16px/20px Inter,sans-serif;letter-spacing:-.01em}
-  .brand svg{color:var(--brand)}
+    font:600 16px/20px Inter,sans-serif;letter-spacing:-.01em;color:var(--rail-ink)}
+  .brand svg{color:var(--rail-accent)}
   .nav{display:flex;align-items:center;gap:10px;height:36px;padding:0 10px;border-radius:6px;
-    font:500 13.5px/20px Inter,sans-serif;color:var(--ink-2);margin-bottom:2px;
+    font:500 13.5px/20px Inter,sans-serif;color:var(--rail-ink-2);margin-bottom:2px;
     transition:background-color var(--dur-fast) var(--ease-enter)}
-  .nav .ic{width:16px;height:16px;flex-shrink:0;color:var(--ink-3)}
-  .nav:hover{background:var(--hover)}
-  .nav.on{background:var(--selected);color:var(--brand-text);font-weight:600}
-  .nav.on .ic{color:var(--brand)}
+  .nav .ic{width:16px;height:16px;flex-shrink:0;color:var(--rail-ink-3)}
+  .nav:hover{background:rgba(255,255,255,.055)}
+  .nav.on{background:var(--rail-2);color:#fff;font-weight:600}
+  .nav.on .ic{color:var(--rail-accent)}
   .nav .bdg{margin-left:auto;font:500 10px/14px 'DM Mono',monospace;background:var(--loss);
     color:#fff;border-radius:999px;padding:2px 6px}
   .grp{font:600 10px/14px Inter,sans-serif;letter-spacing:.09em;text-transform:uppercase;
-    color:var(--ink-3);padding:16px 10px 6px}
+    color:var(--rail-label);padding:16px 10px 6px}
   .side-b{margin-top:auto;padding-top:12px}
   .acct{display:flex;align-items:center;gap:8px;height:36px;padding:0 10px;border-radius:6px;
-    background:var(--inset);font:500 12px/16px 'DM Mono',monospace}
-  .acct i{width:6px;height:6px;border-radius:999px;background:var(--profit)}
+    background:var(--rail-2);color:var(--rail-ink-2);font:500 12px/16px 'DM Mono',monospace}
+  .acct i{width:6px;height:6px;border-radius:999px;background:var(--rail-accent)}
 
   main{flex:1;min-width:0}
 
-  /* bands and sections — flat, divided by rules. No borders, no shadows. */
-  .band{padding:20px 24px;border-bottom:1px solid var(--rule)}
-  .section{padding:16px 24px 4px;border-bottom:1px solid var(--rule)}
-  .section:last-child{border-bottom:0}
-  .sec-h{display:flex;align-items:center;gap:10px;padding-bottom:10px}
-  .sec-h h2{font:600 14px/20px Inter,sans-serif;margin:0}
-  .ct{font:500 10px/14px 'DM Mono',monospace;background:var(--loss-tint);color:var(--loss-text);
-    border-radius:999px;padding:2px 7px}
-  .ct.q{background:var(--inset);color:var(--ink-2)}
-  .sp{margin-left:auto;display:flex;align-items:center;gap:12px}
-  .tag{font:600 10px/14px Inter,sans-serif;letter-spacing:.06em;color:var(--ink-3);
-    background:var(--inset);border-radius:4px;padding:2px 6px}
-  .lnk{color:var(--brand-text);font-weight:600;font-size:12px;text-decoration:none}
-
-  /* hero */
+  /* ── state band ── */
+  .band{padding:20px 24px;border-bottom:1px solid var(--rule);position:relative}
+  .band.state{background:var(--state-down);border-bottom-color:var(--loss-edge)}
+  .band.state:before{content:"";position:absolute;left:0;right:0;top:0;height:3px;background:var(--loss)}
   .hero{display:flex;align-items:flex-start;justify-content:space-between;gap:32px}
-  .hero .h-l .lbl{display:flex;align-items:center;gap:6px}
+  .hero .h-l .lbl{display:flex;align-items:center;gap:6px;color:var(--loss-text)}
   .live{width:6px;height:6px;border-radius:999px;background:var(--loss)}
   .pnl{font:500 40px/48px 'DM Mono',monospace;letter-spacing:-.03em;margin:6px 0 0;color:var(--loss-text)}
   .pnl-s{font-size:12px;line-height:16px;color:var(--ink-3);margin:6px 0 0}
@@ -81,15 +72,27 @@
   .st i{width:6px;height:6px;border-radius:999px;background:var(--ink-3)}
   .sel{border:1px solid var(--stroke-strong);background:var(--canvas);border-radius:6px;height:30px;
     padding:0 10px;color:var(--ink-2);font:500 12px/28px Inter,sans-serif;display:inline-block}
-  /* metric wells — inset, not cards */
   .metrics{display:flex;gap:8px;justify-content:flex-end;margin-top:16px}
-  .met{background:var(--inset);border-radius:8px;padding:10px 14px;text-align:right;min-width:126px}
+  .met{background:rgba(255,255,255,.72);border:1px solid #F0DCD8;border-radius:8px;
+    padding:10px 14px;text-align:right;min-width:126px}
   .met .f{font:500 22px/28px 'DM Mono',monospace;margin:4px 0 0;letter-spacing:-.02em}
   .met .u{font:400 11.5px/16px 'DM Mono',monospace;color:var(--ink-3);margin-left:6px}
 
-  /* single-row sections */
-  .line{display:flex;align-items:center;justify-content:space-between;gap:16px;
-    padding:12px 0 16px}
+  .section{padding:16px 24px 4px;border-bottom:1px solid var(--rule)}
+  .section:last-child{border-bottom:0}
+  .sec-h{display:flex;align-items:center;gap:10px;padding-bottom:10px}
+  .sec-h h2{font:600 14px/20px Inter,sans-serif;margin:0}
+  .sec-ic{width:22px;height:22px;border-radius:6px;display:flex;align-items:center;
+    justify-content:center;flex-shrink:0;font-size:12px}
+  .ct{font:500 10px/14px 'DM Mono',monospace;background:var(--loss-tint);color:var(--loss-text);
+    border-radius:999px;padding:2px 7px}
+  .ct.q{background:var(--inset);color:var(--ink-2)}
+  .sp{margin-left:auto;display:flex;align-items:center;gap:12px}
+  .tag{font:600 10px/14px Inter,sans-serif;letter-spacing:.06em;color:var(--ink-3);
+    background:var(--inset);border-radius:4px;padding:2px 6px}
+  .lnk{color:var(--brand-text);font-weight:600;font-size:12px;text-decoration:none}
+
+  .line{display:flex;align-items:center;justify-content:space-between;gap:16px;padding:12px 0 16px}
   .line p{margin:0;font-size:13px;color:var(--ink-2)}
   .line b{color:var(--ink);font-weight:600}
   .inp{background:var(--inset);border:1px solid var(--stroke-strong);border-radius:6px;height:32px;
@@ -98,13 +101,13 @@
     font:600 12px/16px Inter,sans-serif;background:var(--brand);color:#fff}
   .btn.q{background:transparent;border:1px solid var(--stroke-strong);color:var(--ink-2)}
 
-  /* alert rows */
   .arow{display:grid;grid-template-columns:1fr 56px;gap:16px;padding:12px 8px 12px 13px;
     margin:0 -8px;border-bottom:1px solid var(--rule);border-left:3px solid transparent;
     border-radius:0 6px 6px 0;transition:background-color var(--dur-fast) var(--ease-enter)}
   .arow:hover{background:var(--hover)}
   .arow:last-of-type{border-bottom:0}
   .arow.danger{border-left-color:var(--loss)}
+  .arow.caution{border-left-color:var(--caution)}
   .a-h{display:flex;align-items:center;gap:8px}
   .a-t{font:600 13.5px/20px Inter,sans-serif;margin:0}
   .dot{width:8px;height:8px;border-radius:999px;flex-shrink:0}
@@ -118,10 +121,9 @@
     font:600 11px/16px Inter,sans-serif;letter-spacing:.08em;text-transform:uppercase;
     color:var(--brand-text);text-decoration:none}
 
-  /* table */
   table{width:100%;border-collapse:collapse;margin:0 -24px;width:calc(100% + 48px)}
   thead th{font:600 10px/14px Inter,sans-serif;letter-spacing:.09em;text-transform:uppercase;
-    color:var(--ink-3);text-align:right;padding:8px 12px;background:var(--inset)}
+    color:var(--brand-text);text-align:right;padding:8px 12px;background:var(--brand-tint)}
   thead th:first-child{text-align:left;padding-left:24px}
   thead th:last-child{padding-right:24px}
   tbody td{padding:12px;border-bottom:1px solid var(--rule);text-align:right;
@@ -136,7 +138,6 @@
   .pr{font:600 10px/14px Inter,sans-serif;letter-spacing:.06em;color:var(--ink-3);
     background:var(--inset);border-radius:2px;padding:2px 5px;margin-left:6px;vertical-align:1px}
 
-  /* the one card on the page */
   .callout{background:var(--canvas);border:1px solid var(--edge);border-left:3px solid var(--brand);
     border-radius:8px;box-shadow:var(--sh-8);padding:14px 16px;margin:16px 0 20px;
     font-size:13px;line-height:22px;color:var(--ink-2);max-width:100ch}
@@ -167,10 +168,10 @@
 
 <main>
 
-  <div class="band">
+  <div class="band state">
     <div class="hero">
       <div class="h-l">
-        <div class="lbl"><span class="live"></span>Day P&amp;L</div>
+        <div class="lbl"><span class="live"></span>Day P&amp;L · down day</div>
         <p class="pnl">&minus;₹8,455</p>
         <p class="pnl-s">Booked <span class="mono" style="color:var(--loss-text);font-weight:500">&minus;₹8,895</span>
           &nbsp;·&nbsp; Unrealized <span class="mono" style="color:var(--profit-text);font-weight:500">+₹440</span></p>
@@ -178,16 +179,13 @@
       <div class="hero-r">
         <div class="status">
           <span class="st"><i></i>Closed</span>
-          <span>13:43</span><span style="color:var(--edge)">|</span><span>01:47:26</span>
+          <span>13:43</span><span style="color:var(--loss-edge)">|</span><span>01:47:26</span>
           <span class="sel">Today&rsquo;s read &nbsp;⌄</span>
         </div>
         <div class="metrics">
-          <div class="met"><div class="lbl">Trades</div>
-            <p class="f">8<span class="u">0.8&times;</span></p></div>
-          <div class="met"><div class="lbl">Loss budget</div>
-            <p class="f">₹16.1k<span class="u">of ₹25k</span></p></div>
-          <div class="met"><div class="lbl">Win rate</div>
-            <p class="f">50%<span class="u">8 trades</span></p></div>
+          <div class="met"><div class="lbl">Trades</div><p class="f">8<span class="u">0.8&times;</span></p></div>
+          <div class="met"><div class="lbl">Loss budget</div><p class="f">₹16.1k<span class="u">of ₹25k</span></p></div>
+          <div class="met"><div class="lbl">Win rate</div><p class="f">50%<span class="u">8 trades</span></p></div>
           <div class="met"><div class="lbl">Unrealized</div>
             <p class="f" style="color:var(--profit-text)">+₹440</p></div>
         </div>
@@ -218,6 +216,8 @@
 
   <div class="section">
     <div class="sec-h">
+      <span class="sec-ic" style="background:var(--loss-tint);color:var(--loss-text)">
+        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M18 8a6 6 0 1 0-12 0c0 7-3 8-3 8h18s-3-1-3-8"/><path d="M13.7 21a2 2 0 0 1-3.4 0"/></svg></span>
       <h2>What we caught today</h2><span class="ct">3</span>
       <div class="sp"><span class="tag">LIVE</span><a class="lnk" href="#">View all &rarr;</a></div>
     </div>
@@ -226,7 +226,7 @@
       <div>
         <div class="a-h"><span class="dot" style="background:var(--loss)"></span>
           <p class="a-t">Size Escalation</p>
-          <span class="bd" style="background:var(--loss-tint);color:var(--loss-text)">DANGER</span>
+          <span class="bd" style="background:var(--loss);color:#fff">DANGER</span>
           <span class="new">New</span></div>
         <p class="a-b">BANKNIFTY 45500 PE entry at <span class="num">100</span> lots —
           <span class="num">4&times;</span> your average size — <span class="num">8 min</span>
@@ -236,7 +236,7 @@
       <div class="when">now</div>
     </div>
 
-    <div class="arow">
+    <div class="arow caution">
       <div>
         <div class="a-h"><span class="dot" style="background:var(--caution)"></span>
           <p class="a-t">Early Exit</p>
@@ -254,7 +254,7 @@
       <div>
         <div class="a-h"><span class="dot" style="background:var(--loss)"></span>
           <p class="a-t">No Stop-Loss</p>
-          <span class="bd" style="background:var(--loss-tint);color:var(--loss-text)">DANGER</span>
+          <span class="bd" style="background:var(--loss);color:#fff">DANGER</span>
           <span class="new">New</span></div>
         <p class="a-b">FINNIFTY 19800 CE open <span class="num">47 min</span> with no stop-loss.
           Unrealised loss: <span class="num">₹3,200</span>. Positions without stop-loss average
@@ -267,7 +267,7 @@
       <div>
         <div class="a-h"><span class="dot" style="background:var(--loss)"></span>
           <p class="a-t">Revenge Trade</p>
-          <span class="bd" style="background:var(--loss-tint);color:var(--loss-text)">DANGER</span></div>
+          <span class="bd" style="background:var(--loss);color:#fff">DANGER</span></div>
         <p class="a-b">NIFTY23000CE entry came <span class="num">25 min</span> after
           <span class="num">₹13,000</span> loss on SOLARINDS. Re-entering under active loss stress.</p>
       </div>
@@ -279,6 +279,8 @@
 
   <div class="section" style="padding-bottom:0">
     <div class="sec-h">
+      <span class="sec-ic" style="background:var(--brand-tint);color:var(--brand-text)">
+        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M3 10h18"/></svg></span>
       <h2>Open positions</h2><span class="ct q">2</span>
       <div class="sp">
         <span class="tag">DELAYED</span><span class="tag">2 TO JOURNAL</span>
@@ -307,11 +309,11 @@
     </table>
 
     <div class="callout">
-      <b>One card on this page, and this is it.</b> Everything above is a flat section on the
-      canvas, separated by a hairline and titled by a section header — the depth comes from the
-      canvas edge and from the metric wells being <em>darker</em> than the surface, not from
-      wrapping each block in its own border. A card is what interrupts, so if a page grows a third
-      one, one of them was really a section.
+      <b>Three colour fields, and none of them is decoration.</b> The rail is chrome — it holds no
+      data, so it can carry weight without competing with a figure. The band is a direct read of
+      state and flips green on an up day. The table header is brand, because it is the largest
+      neutral area on the page and it labels rather than states. Everything between them is still a
+      flat section on the canvas.
     </div>
   </div>
 

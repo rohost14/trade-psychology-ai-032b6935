@@ -15,6 +15,10 @@
     --loss:#C2372B; --loss-text:#A62B21; --loss-tint:#FCEEEC;
     --caution:#96600C; --caution-text:#8F5A0B; --caution-tint:#FDF4E6;
     --hover:#F5F8FA; --selected:#E4F3F1;
+    --rail:#111820; --rail-2:#1A232D; --rail-ink:#E8EDF2; --rail-ink-2:#8FA0B2;
+    --rail-ink-3:#6B7C8E; --rail-label:#7B8B9C; --rail-accent:#3FBFA8;
+    --state-down:linear-gradient(180deg,#FBEAE6 0%,#FFFFFF 100%);
+    --state-up:linear-gradient(180deg,#E4F4EC 0%,#FFFFFF 100%);
     --sh-2:0 0 2px rgba(15,23,36,.12), 0 1px 2px rgba(15,23,36,.14);
     --sh-4:0 0 2px rgba(15,23,36,.12), 0 2px 4px rgba(15,23,36,.14);
     --sh-8:0 0 2px rgba(15,23,36,.12), 0 4px 8px rgba(15,23,36,.14);
@@ -27,26 +31,28 @@
   .lbl{font:600 10px/14px Inter,sans-serif;letter-spacing:.09em;text-transform:uppercase;color:var(--ink-3)}
   .shell{max-width:1440px;margin:0 auto;background:var(--canvas);border:1px solid var(--edge);
     border-radius:12px;box-shadow:var(--sh-4);display:flex;overflow:hidden;min-height:calc(100vh - 40px)}
-  aside{width:244px;flex-shrink:0;border-right:1px solid var(--rule);
+  aside{width:244px;flex-shrink:0;background:var(--rail);
     display:flex;flex-direction:column;padding:0 10px 12px}
   .brand{display:flex;align-items:center;gap:10px;height:60px;padding:0 10px;
-    font:600 16px/20px Inter,sans-serif;letter-spacing:-.01em}
-  .brand svg{color:var(--brand)}
+    font:600 16px/20px Inter,sans-serif;letter-spacing:-.01em;color:var(--rail-ink)}
+  .brand svg{color:var(--rail-accent)}
   .nav{display:flex;align-items:center;gap:10px;height:36px;padding:0 10px;border-radius:6px;
-    font:500 13.5px/20px Inter,sans-serif;color:var(--ink-2);margin-bottom:2px;
+    font:500 13.5px/20px Inter,sans-serif;color:var(--rail-ink-2);margin-bottom:2px;
     transition:background-color var(--dur-fast) var(--ease-enter)}
-  .nav .ic{width:16px;height:16px;flex-shrink:0;color:var(--ink-3)}
-  .nav:hover{background:var(--hover)}
-  .nav.on{background:var(--selected);color:var(--brand-text);font-weight:600}
-  .nav.on .ic{color:var(--brand)}
+  .nav .ic{width:16px;height:16px;flex-shrink:0;color:var(--rail-ink-3)}
+  .nav:hover{background:rgba(255,255,255,.055)}
+  .nav.on{background:var(--rail-2);color:#fff;font-weight:600}
+  .nav.on .ic{color:var(--rail-accent)}
   .nav .bdg{margin-left:auto;font:500 10px/14px 'DM Mono',monospace;background:var(--loss);
     color:#fff;border-radius:999px;padding:2px 6px}
   .grp{font:600 10px/14px Inter,sans-serif;letter-spacing:.09em;text-transform:uppercase;
-    color:var(--ink-3);padding:16px 10px 6px}
+    color:var(--rail-label);padding:16px 10px 6px}
   .side-b{margin-top:auto;padding-top:12px}
   .acct{display:flex;align-items:center;gap:8px;height:36px;padding:0 10px;border-radius:6px;
-    background:var(--inset);font:500 12px/16px 'DM Mono',monospace}
-  .acct i{width:6px;height:6px;border-radius:999px;background:var(--profit)}
+    background:var(--rail-2);color:var(--rail-ink-2);font:500 12px/16px 'DM Mono',monospace}
+  .acct i{width:6px;height:6px;border-radius:999px;background:var(--rail-accent)}
+  .sec-ic{width:22px;height:22px;border-radius:6px;display:flex;align-items:center;
+    justify-content:center;flex-shrink:0;font-size:12px;font-weight:600}
   main{flex:1;min-width:0}
 
   .band{padding:20px 24px;border-bottom:1px solid var(--rule);
@@ -131,7 +137,7 @@
   </div>
 
   <div class="section">
-    <div class="sec-h"><h2>Your rules</h2><span class="r">Declared · enforced · today</span></div>
+    <div class="sec-h"><span class="sec-ic" style="background:var(--brand-tint);color:var(--brand-text)"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M12 3v18"/><path d="M5 7h14"/><path d="M5 7 2 14h6z"/><path d="M19 7l-3 7h6z"/></svg></span><h2>Your rules</h2><span class="r">Declared · enforced · today</span></div>
 
     <div class="rrow">
       <div><p class="rn">Trades per day</p><p class="rd">Hard cap on entries this session</p></div>
@@ -191,7 +197,7 @@
   </div>
 
   <div class="section">
-    <div class="sec-h"><h2>Rule violations</h2><span class="r">11 in last 30 days</span></div>
+    <div class="sec-h"><span class="sec-ic" style="background:var(--loss-tint);color:var(--loss-text)"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M12 9v4M12 17h.01"/><path d="M10.3 3.9 1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0z"/></svg></span><h2>Rule violations</h2><span class="r">11 in last 30 days</span></div>
     <div class="vrow danger">
       <div><p class="vt">9 trades today against a limit of 6.</p>
         <p class="vm">Max trades per day · 14:22 · today</p></div>

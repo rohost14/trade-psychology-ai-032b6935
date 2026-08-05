@@ -37,6 +37,54 @@ error, a popover. If a page has more than two, one of them is wrong.
 
 ---
 
+## Revision 4 — colour (option C, chosen 2026-08-05)
+
+Rev 3 was **about 2% chromatic**: four badges, six figures, one nav item. Removing the
+cards removed every tinted surface — the accidental cost of that fix — and the brand
+never appeared above 13px, so teal read as a link colour rather than an identity.
+
+Four changes, none decorative. **Every coloured field is either chrome that holds no
+data, or a direct read of state.**
+
+**1 · Ink rail.** The sidebar is `#111820` with a `#3FBFA8` accent. It is the one large
+colour field on screen and it holds no data, so it carries weight without competing with
+a figure. It also restores the dark scheme deliberately, rather than as the half-applied
+artefact the shipping app produces in light mode.
+
+| Rail token | Value | Contrast on rail |
+|---|---|---|
+| `rail` | `#111820` | ground |
+| `rail-2` | `#1A232D` | selected item |
+| `rail-ink` | `#E8EDF2` | 15.1:1 |
+| `rail-ink-2` | `#8FA0B2` | 6.7:1 — nav items |
+| `rail-ink-3` | `#6B7C8E` | 4.2:1 — icons only, never text |
+| `rail-label` | `#7B8B9C` | 5.1:1 — group labels |
+| `rail-accent` | `#3FBFA8` | 7.9:1 |
+
+**2 · State band.** The hero is tinted by what the session actually is, and flips on an
+up day. A losing session previously announced itself with one coral figure; now the band
+carries it and the answer arrives before any reading.
+
+```css
+--state-down: linear-gradient(180deg, #FBEAE6 0%, #FFFFFF 100%);  /* + 3px loss rule */
+--state-up:   linear-gradient(180deg, #E4F4EC 0%, #FFFFFF 100%);  /* + 3px profit rule */
+--state-flat: linear-gradient(180deg, #EEF3F8 0%, #FFFFFF 100%);  /* pre-open, no rule */
+```
+
+The wash is weak and a **3px top rule does the actual work** — a saturated field would be
+the colour-field hero already rejected once. Strengthened from the first proposal, where
+up-day and down-day were nearly indistinguishable and the tint therefore earned nothing.
+
+**3 · Section icons.** Every section header takes a 22px tinted icon — brand for neutral
+sections, status colour where the section has a state. This is what puts the palette at a
+readable size instead of only at 10px.
+
+**4 · Solid `DANGER`.** The worst severity takes the solid fill; caution and info stay
+tinted. This is the reason the four-token status ramp exists. Table headers move from grey
+`inset` to `brand-tint`, which is the largest single neutral area on most screens.
+
+---
+
 ## Layers
 
 **DEVIATION from Fluent's numbering.** Fluent uses `colorNeutralBackground1..6`, where

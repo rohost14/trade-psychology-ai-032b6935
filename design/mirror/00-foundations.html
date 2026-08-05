@@ -188,6 +188,68 @@
   </div>
 
   <div class="sec">
+    <p class="sh">Colour fields</p>
+    <p class="sd">Three large chromatic areas, and none is decoration. Each is either chrome that
+      holds no data, or a direct read of state.</p>
+    <div style="display:grid;grid-template-columns:260px 1fr;gap:16px;align-items:stretch">
+      <div style="background:#111820;border-radius:8px;padding:16px 18px">
+        <div class="lbl" style="color:#7B8B9C">1 · Ink rail</div>
+        <p style="font:600 14px/20px Inter,sans-serif;color:#E8EDF2;margin:6px 0 0">Chrome</p>
+        <p style="font-size:12px;line-height:18px;color:#8FA0B2;margin:7px 0 0">
+          Holds no data, so it can carry weight without competing with a figure.</p>
+        <div style="display:flex;gap:6px;margin-top:12px;flex-wrap:wrap">
+          <span style="background:#1A232D;color:#fff;border-radius:4px;padding:4px 8px;
+            font:400 10.5px/14px 'DM Mono',monospace">#1A232D</span>
+          <span style="background:#3FBFA8;color:#0B2F2A;border-radius:4px;padding:4px 8px;
+            font:400 10.5px/14px 'DM Mono',monospace">#3FBFA8</span>
+        </div>
+      </div>
+      <div style="border:1px solid var(--rule);border-radius:8px;overflow:hidden">
+        <div style="background:linear-gradient(180deg,#FBEAE6 0%,#FFFFFF 100%);
+          border-top:3px solid var(--loss);padding:14px 18px">
+          <div class="lbl" style="color:var(--loss-text)">2 · State band · down day</div>
+          <p class="mono" style="font-size:26px;line-height:32px;font-weight:500;
+            color:var(--loss-text);margin:4px 0 0;letter-spacing:-.02em">&minus;₹8,455</p>
+        </div>
+        <div style="background:linear-gradient(180deg,#E4F4EC 0%,#FFFFFF 100%);
+          border-top:3px solid var(--profit);padding:14px 18px">
+          <div class="lbl" style="color:var(--profit-text)">up day</div>
+          <p class="mono" style="font-size:26px;line-height:32px;font-weight:500;
+            color:var(--profit-text);margin:4px 0 0;letter-spacing:-.02em">+₹6,350</p>
+        </div>
+      </div>
+    </div>
+    <div style="margin-top:16px;border:1px solid var(--rule);border-radius:8px;overflow:hidden">
+      <div class="lbl" style="padding:10px 14px;background:var(--brand-tint);color:var(--brand-text)">
+        3 · Section icons &amp; table headers</div>
+      <div style="padding:14px;display:flex;gap:18px;align-items:center;flex-wrap:wrap">
+        <span style="display:inline-flex;align-items:center;gap:9px;font:600 14px/20px Inter,sans-serif">
+          <span style="width:22px;height:22px;border-radius:6px;background:var(--brand-tint);
+            color:var(--brand-text);display:flex;align-items:center;justify-content:center">◧</span>
+          Open positions</span>
+        <span style="display:inline-flex;align-items:center;gap:9px;font:600 14px/20px Inter,sans-serif">
+          <span style="width:22px;height:22px;border-radius:6px;background:var(--loss-tint);
+            color:var(--loss-text);display:flex;align-items:center;justify-content:center">!</span>
+          What we caught today</span>
+        <span class="bd" style="background:var(--loss);color:#fff;font:600 10px/14px Inter,sans-serif;
+          letter-spacing:.08em;padding:3px 7px;border-radius:2px">DANGER</span>
+        <span class="bd" style="background:var(--caution-tint);color:var(--caution-text);
+          font:600 10px/14px Inter,sans-serif;letter-spacing:.08em;padding:3px 7px;border-radius:2px">CAUTION</span>
+      </div>
+    </div>
+    <p class="n"><b>The state band flips with the session, so the tint is information.</b>
+      A losing day previously announced itself with one coral figure; now the band carries it and
+      the answer arrives before any reading. The wash is weak and the <b>3px top rule does the
+      actual work</b> — a saturated field would be the colour-field hero already rejected once.
+      <br><br>
+      <b>Section icons put the palette at 22px instead of only at 10px.</b> That was the real
+      source of the flatness: the brand existed on the page but never above 13px, so teal read as a
+      link colour rather than an identity. Table headers move from grey <code>inset</code> to
+      <code>brand-tint</code>, which is the largest single neutral area on most screens, and
+      <b>solid <code>DANGER</code></b> gives the worst severity a weight the others do not have.</p>
+  </div>
+
+  <div class="sec">
     <p class="sh">Elevation</p>
     <p class="sd">Two layers, ambient + key. Blur equals the token number; key y-offset is half of
       it; ambient stays small because it is a contact shadow, not a glow.</p>
