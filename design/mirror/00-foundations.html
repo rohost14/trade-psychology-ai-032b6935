@@ -1,288 +1,389 @@
-<!-- @dsCard group="Foundations" name="Colour, depth, type" subtitle="Cool neutrals, a three-level elevation ladder, and the card-vs-hairline rule" viewport-width="1440" -->
+<!-- @dsCard group="Foundations" name="Layers, elevation, colour, type" subtitle="One canvas, flat sections — plus the Fluent-derived shadow and status ramps" viewport-width="1440" -->
 <!doctype html>
 <html lang="en">
 <head>
 <meta charset="utf-8">
 <title>Mirror — Foundations</title>
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=DM+Mono:wght@300;400;500&display=swap">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=DM+Mono:wght@400;500&display=swap">
 <style>
-  :root{ --page:#EEF1F5; --surface:#FFFFFF; --inset:#E4E9F0; --sidebar:#FFFFFF;
-    --border:#D6DEE8; --divider:#E8EDF3; --ink:#0F1724; --ink2:#4A5768; --ink3:#7C8899;
-    --brand:#0E7A6E; --brand-t:#E2F2EF; --profit:#12795B; --profit-t:#E3F3EE;
-    --loss:#C2372B; --loss-t:#FBE9E7; --caution:#A96A0C; --caution-t:#FBF0DF;
-    --sh1:0 1px 2px rgba(15,23,36,.05), 0 1px 3px rgba(15,23,36,.06);
-    --sh2:0 2px 4px rgba(15,23,36,.04), 0 8px 20px rgba(15,23,36,.08); }
+  :root{
+    --ground:#EEF1F5; --canvas:#FFFFFF; --inset:#E9EDF3; --inset-2:#DFE5EC;
+    --rule:#E3E8EF; --edge:#D3DBE4; --stroke-strong:#5E6B7A;
+    --ink:#0F1724; --ink-2:#4A5768; --ink-3:#647285;
+    --brand:#0E7A6E; --brand-text:#0B6155; --brand-tint:#E4F3F1; --brand-edge:#B4DDD7;
+    --profit:#12795B; --profit-text:#0E6249; --profit-tint:#E7F4EF; --profit-edge:#B9DFD0;
+    --loss:#C2372B; --loss-text:#A62B21; --loss-tint:#FCEEEC; --loss-edge:#EFC0BA;
+    --caution:#96600C; --caution-text:#8F5A0B; --caution-tint:#FDF4E6; --caution-edge:#EBD8B4;
+    --hover:#F5F8FA; --pressed:#EDF1F5; --selected:#E4F3F1;
+    --sh-2:0 0 2px rgba(15,23,36,.12), 0 1px 2px rgba(15,23,36,.14);
+    --sh-4:0 0 2px rgba(15,23,36,.12), 0 2px 4px rgba(15,23,36,.14);
+    --sh-8:0 0 2px rgba(15,23,36,.12), 0 4px 8px rgba(15,23,36,.14);
+    --sh-16:0 0 2px rgba(15,23,36,.12), 0 8px 16px rgba(15,23,36,.14);
+    --sh-28:0 0 8px rgba(15,23,36,.12), 0 14px 28px rgba(15,23,36,.14);
+    --sh-64:0 0 8px rgba(15,23,36,.12), 0 32px 64px rgba(15,23,36,.14);
+    --dur-fast:150ms; --dur-normal:200ms; --dur-gentle:250ms;
+    --ease-enter:cubic-bezier(0,0,0,1); --ease-exit:cubic-bezier(1,0,1,1);
+  }
   *{box-sizing:border-box}
-  body{margin:0;background:var(--page);color:var(--ink);
-    font:400 13.5px/1.6 Inter,system-ui,sans-serif;padding:32px 40px 64px}
+  body{margin:0;background:var(--ground);color:var(--ink);
+    font:400 13.5px/20px Inter,system-ui,sans-serif;padding:20px 24px 48px}
   .mono{font-family:'DM Mono',monospace;font-variant-numeric:tabular-nums}
-  h1{font:600 26px/1.2 Inter,sans-serif;margin:0 0 5px;letter-spacing:-.02em}
-  .sub{color:var(--ink2);font-size:13.5px;margin:0 0 34px;max-width:82ch}
-  h2{font:600 12px/1 Inter,sans-serif;letter-spacing:.1em;text-transform:uppercase;
-    color:var(--ink3);margin:46px 0 18px}
-  .n{color:var(--ink2);font-size:13px;margin:16px 0 0;max-width:88ch;line-height:1.7}
+  .canvas{background:var(--canvas);border:1px solid var(--edge);border-radius:12px;
+    box-shadow:var(--sh-4);max-width:1440px;margin:0 auto;overflow:hidden}
+  .band{padding:24px 28px;border-bottom:1px solid var(--rule)}
+  h1{font:600 20px/28px Inter,sans-serif;margin:0;letter-spacing:-.01em}
+  .sub{color:var(--ink-2);margin:8px 0 0;max-width:84ch}
+  .sec{padding:24px 28px;border-bottom:1px solid var(--rule)}
+  .sec:last-child{border-bottom:0}
+  .sh{font:600 14px/20px Inter,sans-serif;margin:0 0 4px}
+  .sd{font:400 12px/16px Inter,sans-serif;color:var(--ink-3);margin:0 0 20px;max-width:88ch}
+  .n{color:var(--ink-2);font-size:13px;margin:20px 0 0;max-width:92ch;line-height:22px}
   .n b{color:var(--ink);font-weight:600}
-  .card{background:var(--surface);border:1px solid var(--border);border-radius:10px;box-shadow:var(--sh1)}
-  .lbl{font:600 10.5px/1 Inter,sans-serif;letter-spacing:.09em;text-transform:uppercase;color:var(--ink3)}
+  .lbl{font:600 10px/14px Inter,sans-serif;letter-spacing:.09em;text-transform:uppercase;color:var(--ink-3)}
+  code{font:400 12px/16px 'DM Mono',monospace;background:var(--inset);
+    border-radius:4px;padding:2px 5px;color:var(--ink)}
 
-  /* depth ladder */
-  .ladder{display:grid;grid-template-columns:repeat(3,1fr);gap:16px}
-  .lv{padding:20px 22px 22px;border-radius:10px}
-  .lv .t{font:600 14px/1 Inter,sans-serif;margin:9px 0 0}
-  .lv .d{font-size:12.5px;color:var(--ink2);margin:8px 0 0;line-height:1.55}
-  .lv .h{font:400 11px/1 'DM Mono',monospace;color:var(--ink3);margin-top:11px}
-  .demo-ground{background:var(--page);border:1px dashed #C3CDDA;border-radius:12px;padding:20px}
+  /* layers demo */
+  .lay{background:var(--ground);border-radius:12px;padding:20px;display:grid;
+    grid-template-columns:repeat(4,1fr);gap:16px}
+  .lv{border-radius:8px;padding:16px}
+  .lv .t{font:600 13.5px/20px Inter,sans-serif;margin:6px 0 0}
+  .lv .d{font:400 12px/16px Inter,sans-serif;color:var(--ink-2);margin:6px 0 0}
+  .lv .h{font:400 11px/14px 'DM Mono',monospace;color:var(--ink-3);margin-top:10px}
+
+  /* elevation */
+  .elev{display:grid;grid-template-columns:repeat(6,1fr);gap:16px}
+  .el{background:var(--canvas);border-radius:8px;height:76px;display:flex;
+    align-items:center;justify-content:center;font:500 12px/16px 'DM Mono',monospace}
+  .eu{display:grid;grid-template-columns:110px 1fr;gap:14px;padding:9px 0;
+    border-bottom:1px solid var(--rule);font-size:12.5px;color:var(--ink-2)}
+  .eu:last-child{border-bottom:0}
+
+  /* composition */
+  .two{display:grid;grid-template-columns:1fr 1fr;gap:20px;align-items:start}
+  .demo-g{background:var(--ground);border-radius:10px;padding:14px}
+  .demo-c{background:var(--canvas);border:1px solid var(--edge);border-radius:10px;
+    box-shadow:var(--sh-4);overflow:hidden}
+  .dsec{padding:12px 14px;border-bottom:1px solid var(--rule)}
+  .dsec:last-child{border-bottom:0}
+  .dsh{font:600 12.5px/18px Inter,sans-serif;margin:0 0 8px}
+  .drow{display:flex;justify-content:space-between;align-items:center;padding:8px 0;
+    border-bottom:1px solid var(--rule);font-size:12.5px}
+  .drow:last-child{border-bottom:0}
+  .badcard{background:var(--canvas);border:1px solid var(--edge);border-radius:10px;
+    box-shadow:var(--sh-4);padding:11px 13px;margin-bottom:10px;
+    display:flex;justify-content:space-between;font-size:12.5px}
 
   /* swatches */
-  .sw-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(172px,1fr));gap:14px}
-  .sw{background:var(--surface);border:1px solid var(--border);border-radius:10px;
-    overflow:hidden;box-shadow:var(--sh1)}
-  .chip{height:60px;border-bottom:1px solid var(--divider)}
-  .sw-m{padding:11px 13px 13px}
-  .sw-n{font:600 12px/1 Inter,sans-serif}
-  .sw-h{font:400 11px/1 'DM Mono',monospace;color:var(--ink3);margin-top:6px}
-  .sw-u{font-size:11.5px;color:var(--ink2);margin-top:7px;line-height:1.4}
+  .sw{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:12px}
+  .s{border:1px solid var(--rule);border-radius:8px;overflow:hidden}
+  .s .c{height:52px}
+  .s .m{padding:9px 11px}
+  .s .nm{font:600 12px/16px Inter,sans-serif}
+  .s .hx{font:400 11px/14px 'DM Mono',monospace;color:var(--ink-3);margin-top:4px}
 
-  /* card vs hairline */
-  .two{display:grid;grid-template-columns:1fr 1fr;gap:18px;align-items:start}
-  .ch{padding:14px 18px;border-bottom:1px solid var(--divider);font:600 14px/1.2 Inter,sans-serif}
-  .cb{padding:4px 18px 6px}
-  .row{display:flex;align-items:center;justify-content:space-between;
-    padding:13px 0;border-bottom:1px solid var(--divider)}
-  .row:last-child{border-bottom:0}
-  .row .s{font:600 13px/1 Inter,sans-serif}
-  .row .m{font:400 11.5px/1 'DM Mono',monospace;color:var(--ink3);margin-top:6px}
-  .bad{background:var(--page);border:1px solid var(--border);border-radius:10px;
-    padding:13px 15px;margin-bottom:10px}
+  table{width:100%;border-collapse:collapse}
+  th{font:600 10px/14px Inter,sans-serif;letter-spacing:.09em;text-transform:uppercase;
+    color:var(--ink-3);text-align:left;padding:9px 12px;background:var(--inset);
+    border-bottom:1px solid var(--edge)}
+  td{padding:11px 12px;border-bottom:1px solid var(--rule);font-size:12.5px;vertical-align:middle}
+  tr:last-child td{border-bottom:0}
+  .chipdemo{display:inline-flex;align-items:center;border-radius:2px;padding:2px 6px;
+    font:600 10px/14px Inter,sans-serif;letter-spacing:.08em}
 
-  /* type */
-  .t-row{display:grid;grid-template-columns:96px 132px 1fr;gap:20px;align-items:baseline;
-    padding:15px 18px;border-bottom:1px solid var(--divider)}
-  .t-row:last-child{border-bottom:0}
-  .t-k{font:600 10.5px/1 Inter,sans-serif;letter-spacing:.09em;text-transform:uppercase;color:var(--ink3)}
-  .t-s{font:400 11.5px/1 'DM Mono',monospace;color:var(--ink3)}
+  /* states */
+  .st{display:flex;gap:0;border:1px solid var(--rule);border-radius:8px;overflow:hidden}
+  .st div{flex:1;padding:16px 14px;font:500 12.5px/18px Inter,sans-serif;
+    border-right:1px solid var(--rule)}
+  .st div:last-child{border-right:0}
+  .ring{outline:2px solid var(--brand);outline-offset:2px}
 
-  /* severity */
-  .sev{display:grid;grid-template-columns:92px 1fr;gap:18px;align-items:center;
-    padding:14px 18px;border-bottom:1px solid var(--divider)}
-  .sev:last-child{border-bottom:0}
-  .sev-l{display:flex;align-items:center;gap:9px;font:600 12.5px/1 Inter,sans-serif}
-  .dot{width:8px;height:8px;border-radius:999px;flex-shrink:0}
-  .bd{font:700 9.5px/1 Inter,sans-serif;letter-spacing:.08em;padding:5px 7px;border-radius:4px}
-  .sd{border-left:3px solid transparent;padding:11px 0 11px 15px}
-  .sd.rail{border-left-color:var(--loss)}
-  .sd p{margin:0;font-size:12.5px;color:var(--ink2)}
-  .sd .h{font:600 13px/1 Inter,sans-serif;color:var(--ink);margin-bottom:7px;
-    display:flex;align-items:center;gap:9px}
-
-  .sp{display:flex;gap:14px;align-items:flex-end;flex-wrap:wrap;padding:18px 20px}
-  .sp i{display:block;background:var(--brand);height:26px;border-radius:2px}
-  .sp span{font:400 10.5px/1 'DM Mono',monospace;color:var(--ink3);display:block;
-    text-align:center;margin-top:8px}
-  .rad{display:flex;gap:16px;padding:0 20px 20px}
-  .rad div{width:78px;height:56px;background:var(--inset);border:1px solid var(--border);
-    display:flex;align-items:flex-end;justify-content:center;padding-bottom:7px;
-    font:400 10.5px/1 'DM Mono',monospace;color:var(--ink3)}
+  /* spacing */
+  .sp{display:flex;gap:12px;align-items:flex-end;flex-wrap:wrap}
+  .sp i{display:block;background:var(--brand);height:24px;border-radius:2px}
+  .sp span{font:400 10px/14px 'DM Mono',monospace;color:var(--ink-3);display:block;
+    text-align:center;margin-top:7px}
+  .sp .nudge i{background:var(--caution)}
 </style>
 </head>
 <body>
+<div class="canvas">
 
-<h1>Foundations</h1>
-<p class="sub">Light, cool, and layered. Two things drive every choice below: the neutral ramp
-  carries <b>no warmth at all</b>, and content sits on surfaces that are visibly <b>above</b> the
-  page rather than the same colour as it.</p>
-
-<h2>Depth — the three levels</h2>
-<div class="demo-ground">
-  <div class="ladder">
-    <div class="lv" style="background:var(--page);border:1px solid var(--border)">
-      <div class="lbl">Level 0</div><p class="t">Ground</p>
-      <p class="d">The page. Never holds content directly — it exists to be the thing cards sit on.</p>
-      <p class="h">#EEF1F5</p>
-    </div>
-    <div class="lv" style="background:var(--surface);border:1px solid var(--border);box-shadow:var(--sh1)">
-      <div class="lbl">Level 1</div><p class="t">Surface</p>
-      <p class="d">Cards. Border <em>and</em> shadow, always both — never one alone.</p>
-      <p class="h">#FFFFFF · --sh1</p>
-    </div>
-    <div class="lv" style="background:var(--inset);border:1px solid var(--border)">
-      <div class="lbl">Level 2</div><p class="t">Inset</p>
-      <p class="d">Wells, table headers, chart tracks, input fields. Pressed into the surface.</p>
-      <p class="h">#E4E9F0</p>
-    </div>
+  <div class="band">
+    <h1>Foundations</h1>
+    <p class="sub">Light, cool, layered. Token <em>structure</em> follows Fluent 2 where Fluent 2
+      is genuinely better — two-layer shadows, four-token status ramps, half-step spacing. Token
+      <em>values</em> are ours.</p>
   </div>
-</div>
-<p class="n"><b>Ground to surface is a 12-point luminance step, plus a border, plus a shadow.</b>
-  The shipping app steps <span class="mono">#F6F5F3</span> to <span class="mono">#FFFFFF</span> —
-  four points, no shadow — which is exactly why its cards disappear into the page. Three signals
-  rather than one, because any single one is invisible on a dim laptop panel viewed at an angle.
-  <br><br>
-  Shadows are <b>blue-black</b>, <span class="mono">rgba(15,23,36,…)</span>, never neutral black:
-  a grey shadow on a cool page turns the card edge muddy.</p>
 
-<h2>Cards and hairlines</h2>
-<div class="two">
-  <div>
-    <div class="lbl" style="margin-bottom:10px;color:var(--profit)">Correct — one card, hairline rows</div>
-    <div class="card">
-      <div class="ch">Open positions</div>
-      <div class="cb">
-        <div class="row"><div><div class="s">FINNIFTY 19800 CE</div>
-          <div class="m">40 · entry 172.40</div></div>
-          <div class="mono" style="color:var(--loss);font-weight:500">&minus;₹3,200.00</div></div>
-        <div class="row"><div><div class="s">BANKNIFTY 45500 PE</div>
-          <div class="m">100 · entry 214.80</div></div>
-          <div class="mono" style="color:var(--profit);font-weight:500">+₹3,640.00</div></div>
-        <div class="row"><div><div class="s">NIFTY 23000 CE</div>
-          <div class="m">50 · entry 118.05</div></div>
-          <div class="mono" style="color:var(--profit);font-weight:500">+₹820.00</div></div>
+  <div class="sec">
+    <p class="sh">Layers</p>
+    <p class="sd">Four, named by role rather than lightness — so a dark theme is a value swap, not
+      a redesign.</p>
+    <div class="lay">
+      <div class="lv" style="background:var(--ground);border:1px solid var(--edge)">
+        <div class="lbl">Ground</div><p class="t">Page margin</p>
+        <p class="d">Shows around the canvas. Never holds content.</p><p class="h">#EEF1F5</p></div>
+      <div class="lv" style="background:var(--canvas);box-shadow:var(--sh-4)">
+        <div class="lbl">Canvas</div><p class="t">The one surface</p>
+        <p class="d">Holds the whole page. Radius 12, <code>--sh-4</code>.</p><p class="h">#FFFFFF</p></div>
+      <div class="lv" style="background:var(--inset)">
+        <div class="lbl">Inset</div><p class="t">Pressed in</p>
+        <p class="d">Wells, table headers, chart tracks, inputs.</p><p class="h">#E9EDF3</p></div>
+      <div class="lv" style="background:var(--canvas);box-shadow:var(--sh-8)">
+        <div class="lbl">Raised</div><p class="t">Interrupts</p>
+        <p class="d">Callouts, popovers, menus. Rare.</p><p class="h">#FFFFFF · --sh-8</p></div>
+    </div>
+    <p class="n"><b>Depth is carried by the canvas edge and by insets going darker — not by
+      bordering every block.</b> One clear step off the ground for the whole page, then structure
+      inside it.</p>
+  </div>
+
+  <div class="sec">
+    <p class="sh">Composition — one canvas, flat sections</p>
+    <p class="sd">The correction to the previous revision, which gave every block a border and a
+      shadow.</p>
+    <div class="two">
+      <div>
+        <div class="lbl" style="color:var(--profit-text);margin-bottom:10px">Correct — sections inside one canvas</div>
+        <div class="demo-g">
+          <div class="demo-c">
+            <div class="dsec"><p class="dsh">Open positions</p>
+              <div class="drow"><span>FINNIFTY 19800 CE</span>
+                <span class="mono" style="color:var(--loss-text)">&minus;₹3,200.00</span></div>
+              <div class="drow"><span>BANKNIFTY 45500 PE</span>
+                <span class="mono" style="color:var(--profit-text)">+₹3,640.00</span></div>
+            </div>
+            <div class="dsec"><p class="dsh">What we caught today</p>
+              <div class="drow"><span>Size Escalation</span>
+                <span class="mono" style="color:var(--ink-3)">11:04</span></div>
+              <div class="drow"><span>Early Exit</span>
+                <span class="mono" style="color:var(--ink-3)">10:52</span></div>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div>
+        <div class="lbl" style="color:var(--loss-text);margin-bottom:10px">Wrong — a card per block</div>
+        <div class="demo-g">
+          <div class="badcard"><span>FINNIFTY 19800 CE</span>
+            <span class="mono" style="color:var(--loss-text)">&minus;₹3,200.00</span></div>
+          <div class="badcard"><span>BANKNIFTY 45500 PE</span>
+            <span class="mono" style="color:var(--profit-text)">+₹3,640.00</span></div>
+          <div class="badcard"><span>Size Escalation</span>
+            <span class="mono" style="color:var(--ink-3)">11:04</span></div>
+          <div class="badcard" style="margin-bottom:0"><span>Early Exit</span>
+            <span class="mono" style="color:var(--ink-3)">10:52</span></div>
+        </div>
       </div>
     </div>
+    <p class="n"><b>When everything is elevated, nothing is.</b> On the right, four equal
+      containers destroy both hierarchies at once — you cannot tell that two rows are positions and
+      two are alerts, and you cannot tell where either group ends. On the left the canvas says
+      &ldquo;this is the page&rdquo;, a section header says &ldquo;this is the subject&rdquo;, and a
+      hairline says &ldquo;here is the next row&rdquo;.
+      <br><br>
+      <b>A card is now reserved for something that must interrupt</b> — a callout, an empty state,
+      an error, a popover. More than two on a page means one of them is wrong.</p>
   </div>
-  <div>
-    <div class="lbl" style="margin-bottom:10px;color:var(--loss)">Wrong — a card per row</div>
-    <div>
-      <div class="bad"><div style="display:flex;justify-content:space-between;align-items:center">
-        <div><div class="s">FINNIFTY 19800 CE</div><div class="m">40 · entry 172.40</div></div>
-        <div class="mono" style="color:var(--loss);font-weight:500">&minus;₹3,200.00</div></div></div>
-      <div class="bad"><div style="display:flex;justify-content:space-between;align-items:center">
-        <div><div class="s">BANKNIFTY 45500 PE</div><div class="m">100 · entry 214.80</div></div>
-        <div class="mono" style="color:var(--profit);font-weight:500">+₹3,640.00</div></div></div>
-      <div class="bad"><div style="display:flex;justify-content:space-between;align-items:center">
-        <div><div class="s">NIFTY 23000 CE</div><div class="m">50 · entry 118.05</div></div>
-        <div class="mono" style="color:var(--profit);font-weight:500">+₹820.00</div></div></div>
+
+  <div class="sec">
+    <p class="sh">Elevation</p>
+    <p class="sd">Two layers, ambient + key. Blur equals the token number; key y-offset is half of
+      it; ambient stays small because it is a contact shadow, not a glow.</p>
+    <div class="elev">
+      <div class="el" style="box-shadow:var(--sh-2)">sh-2</div>
+      <div class="el" style="box-shadow:var(--sh-4)">sh-4</div>
+      <div class="el" style="box-shadow:var(--sh-8)">sh-8</div>
+      <div class="el" style="box-shadow:var(--sh-16)">sh-16</div>
+      <div class="el" style="box-shadow:var(--sh-28)">sh-28</div>
+      <div class="el" style="box-shadow:var(--sh-64)">sh-64</div>
     </div>
+    <div style="margin-top:20px">
+      <div class="eu"><code>--sh-2</code><span>Rows that lift on hover; segmented-control thumb</span></div>
+      <div class="eu"><code>--sh-4</code><span><b style="color:var(--ink)">The canvas.</b> Nothing else</span></div>
+      <div class="eu"><code>--sh-8</code><span>Callouts, dropdowns, context menus</span></div>
+      <div class="eu"><code>--sh-16</code><span>Tooltips, hover cards</span></div>
+      <div class="eu"><code>--sh-28</code><span>Popovers over a scrolled page</span></div>
+      <div class="eu"><code>--sh-64</code><span>Dialogs, side panels</span></div>
+    </div>
+    <p class="n"><b>Dark keeps identical geometry and doubles both alphas</b> —
+      <code>.12&rarr;.24</code>, <code>.14&rarr;.28</code>. That is the entire dark elevation story,
+      and it is why the previous revision had none: it tuned opacity by eye per theme instead of
+      deriving it. Shadow colour is blue-black <code>rgba(15,23,36,…)</code>, never neutral black —
+      a grey shadow on a cool page turns the edge muddy.</p>
   </div>
-</div>
-<p class="n"><b>A card wraps a subject. Hairlines divide repetition inside it.</b>
-  On the right, three containers of equal weight say the rows are three separate ideas, the eye has
-  to cross a boundary for every position, and there is nothing left to mark where the section itself
-  ends. On the left one card says &ldquo;these belong together&rdquo; and
-  <span class="mono">1px #E8EDF3</span> says &ldquo;and here is the next one&rdquo;.
-  <br><br>
-  If a card ever needs to go inside a card, it should be a hairline group or an inset well instead.</p>
 
-<h2>Colour</h2>
-<div class="sw-grid">
-  <div class="sw"><div class="chip" style="background:#EEF1F5"></div><div class="sw-m">
-    <div class="sw-n">page</div><div class="sw-h">#EEF1F5</div>
-    <div class="sw-u">Ground. Cool, never warm</div></div></div>
-  <div class="sw"><div class="chip" style="background:#FFFFFF"></div><div class="sw-m">
-    <div class="sw-n">surface</div><div class="sw-h">#FFFFFF</div>
-    <div class="sw-u">Cards, sidebar</div></div></div>
-  <div class="sw"><div class="chip" style="background:#E4E9F0"></div><div class="sw-m">
-    <div class="sw-n">inset</div><div class="sw-h">#E4E9F0</div>
-    <div class="sw-u">Wells, table headers, tracks</div></div></div>
-  <div class="sw"><div class="chip" style="background:#D6DEE8"></div><div class="sw-m">
-    <div class="sw-n">border</div><div class="sw-h">#D6DEE8</div>
-    <div class="sw-u">Card edges</div></div></div>
-  <div class="sw"><div class="chip" style="background:#E8EDF3"></div><div class="sw-m">
-    <div class="sw-n">divider</div><div class="sw-h">#E8EDF3</div>
-    <div class="sw-u">Row hairlines</div></div></div>
-  <div class="sw"><div class="chip" style="background:#0F1724"></div><div class="sw-m">
-    <div class="sw-n">ink</div><div class="sw-h">#0F1724</div>
-    <div class="sw-u">Headings, figures</div></div></div>
-  <div class="sw"><div class="chip" style="background:#4A5768"></div><div class="sw-m">
-    <div class="sw-n">ink-2</div><div class="sw-h">#4A5768</div>
-    <div class="sw-u">Body</div></div></div>
-  <div class="sw"><div class="chip" style="background:#7C8899"></div><div class="sw-m">
-    <div class="sw-n">ink-3</div><div class="sw-h">#7C8899</div>
-    <div class="sw-u">Labels, timestamps, axis</div></div></div>
-  <div class="sw"><div class="chip" style="background:#0E7A6E"></div><div class="sw-m">
-    <div class="sw-n">brand</div><div class="sw-h">#0E7A6E</div>
-    <div class="sw-u">Nav, links, anything not money</div></div></div>
-  <div class="sw"><div class="chip" style="background:#12795B"></div><div class="sw-m">
-    <div class="sw-n">profit</div><div class="sw-h">#12795B</div>
-    <div class="sw-u">Money gained. Nothing else</div></div></div>
-  <div class="sw"><div class="chip" style="background:#C2372B"></div><div class="sw-m">
-    <div class="sw-n">loss</div><div class="sw-h">#C2372B</div>
-    <div class="sw-u">Money lost, danger</div></div></div>
-  <div class="sw"><div class="chip" style="background:#A96A0C"></div><div class="sw-m">
-    <div class="sw-n">caution</div><div class="sw-h">#A96A0C</div>
-    <div class="sw-u">Caution severity only</div></div></div>
-</div>
-<p class="n"><b>No warm grey anywhere.</b> The old ramp was built on warm paper, which under warm
-  ink reads as stationery — the single biggest reason the previous light theme looked unfinished.
-  Every neutral here carries a blue cast, so white cards read as brighter than the page rather than
-  merely different from it.
-  <br><br>
-  <b>Brand teal and profit green are close in hue and must never swap jobs.</b> Green is money.
-  Teal is everything that is not money. The moment teal also means &ldquo;up&rdquo;, P&amp;L stops
-  being findable by colour on a page carrying nine teal links.</p>
+  <div class="sec">
+    <p class="sh">Neutrals</p>
+    <p class="sd">Every value carries a blue cast. No warm grey, no beige.</p>
+    <div class="sw">
+      <div class="s"><div class="c" style="background:#EEF1F5"></div>
+        <div class="m"><div class="nm">ground</div><div class="hx">#EEF1F5</div></div></div>
+      <div class="s"><div class="c" style="background:#FFFFFF"></div>
+        <div class="m"><div class="nm">canvas</div><div class="hx">#FFFFFF</div></div></div>
+      <div class="s"><div class="c" style="background:#E9EDF3"></div>
+        <div class="m"><div class="nm">inset</div><div class="hx">#E9EDF3</div></div></div>
+      <div class="s"><div class="c" style="background:#E3E8EF"></div>
+        <div class="m"><div class="nm">rule</div><div class="hx">#E3E8EF</div></div></div>
+      <div class="s"><div class="c" style="background:#D3DBE4"></div>
+        <div class="m"><div class="nm">edge</div><div class="hx">#D3DBE4</div></div></div>
+      <div class="s"><div class="c" style="background:#5E6B7A"></div>
+        <div class="m"><div class="nm">stroke-strong</div><div class="hx">#5E6B7A · 5.4:1</div></div></div>
+      <div class="s"><div class="c" style="background:#0F1724"></div>
+        <div class="m"><div class="nm">ink</div><div class="hx">#0F1724 · 16.9:1</div></div></div>
+      <div class="s"><div class="c" style="background:#4A5768"></div>
+        <div class="m"><div class="nm">ink-2</div><div class="hx">#4A5768 · 7.9:1</div></div></div>
+      <div class="s"><div class="c" style="background:#647285"></div>
+        <div class="m"><div class="nm">ink-3</div><div class="hx">#647285 · 4.9:1</div></div></div>
+    </div>
+    <p class="n"><b><code>stroke-strong</code> is an accessibility fix, not a style choice.</b>
+      The previous revision drew input and search borders in <code>#D6DEE8</code> — about
+      <b>1.3:1</b> against white, which fails WCAG 2.1 SC 1.4.11 (non-text contrast, 3:1) for
+      interactive controls. Decorative hairlines can stay light because they carry no state;
+      anything a user can focus or type into takes <code>stroke-strong</code>.
+      <br><br>
+      <code>ink-3</code> at <b>4.9:1</b> is the floor. Nothing lighter carries text, which rules out
+      the &ldquo;subtle timestamp&rdquo; grey every dashboard reaches for.</p>
+  </div>
 
-<h2>Type</h2>
-<div class="card">
-  <div class="t-row"><span class="t-k">hero</span><span class="t-s">40 / 1.0 · mono 500</span>
-    <span class="mono" style="font-size:40px;font-weight:500;letter-spacing:-.03em;color:var(--loss)">&minus;₹8,455</span></div>
-  <div class="t-row"><span class="t-k">fig-l</span><span class="t-s">26 / 1.0 · mono 500</span>
-    <span class="mono" style="font-size:26px;font-weight:500;letter-spacing:-.02em">₹16.1k</span></div>
-  <div class="t-row"><span class="t-k">fig</span><span class="t-s">15 / 1.0 · mono 500</span>
-    <span class="mono" style="font-size:15px;font-weight:500;color:var(--profit)">+₹440.00</span></div>
-  <div class="t-row"><span class="t-k">title</span><span class="t-s">19 / 1.25 · Inter 600</span>
-    <span style="font:600 19px/1.25 Inter,sans-serif;letter-spacing:-.015em">Behavioral Alerts</span></div>
-  <div class="t-row"><span class="t-k">card</span><span class="t-s">14 / 1.2 · Inter 600</span>
-    <span style="font:600 14px/1.2 Inter,sans-serif">Open positions</span></div>
-  <div class="t-row"><span class="t-k">body</span><span class="t-s">13.5 / 1.6 · Inter 400</span>
-    <span style="color:var(--ink2)">BANKNIFTY 45500 PE entry at 100 lots — 4&times; your average size.</span></div>
-  <div class="t-row"><span class="t-k">label</span><span class="t-s">10.5 / 1 · 600 · .09em caps</span>
-    <span class="lbl">Loss budget</span></div>
-</div>
-<p class="n"><b>Every figure is DM Mono with tabular numerals.</b> Not decoration — a column where
-  <span class="mono">₹1,240</span> and <span class="mono">₹18,900</span> do not align on the comma
-  is a column a trader reads twice.</p>
+  <div class="sec">
+    <p class="sh">Status — four tokens each</p>
+    <p class="sd">A colour that works as a solid fill fails as text on white. One value cannot do
+      both jobs.</p>
+    <table>
+      <thead><tr><th style="width:90px">Role</th><th>Solid · white text</th><th>Text on light</th>
+        <th>Tint</th><th>Edge</th><th style="width:190px">In use</th></tr></thead>
+      <tbody>
+        <tr><td><b>brand</b></td>
+          <td><span class="chipdemo" style="background:var(--brand);color:#fff">#0E7A6E</span></td>
+          <td><span class="mono" style="color:var(--brand-text)">#0B6155 · 7.5:1</span></td>
+          <td><span class="chipdemo" style="background:var(--brand-tint);color:var(--brand-text)">#E4F3F1</span></td>
+          <td><span class="mono" style="color:var(--ink-3)">#B4DDD7</span></td>
+          <td><span class="chipdemo" style="background:var(--brand-tint);color:var(--brand-text)">INFO</span></td></tr>
+        <tr><td><b>profit</b></td>
+          <td><span class="chipdemo" style="background:var(--profit);color:#fff">#12795B</span></td>
+          <td><span class="mono" style="color:var(--profit-text)">#0E6249 · 7.5:1</span></td>
+          <td><span class="chipdemo" style="background:var(--profit-tint);color:var(--profit-text)">#E7F4EF</span></td>
+          <td><span class="mono" style="color:var(--ink-3)">#B9DFD0</span></td>
+          <td><span class="mono" style="color:var(--profit-text)">+₹3,640.00</span></td></tr>
+        <tr><td><b>loss</b></td>
+          <td><span class="chipdemo" style="background:var(--loss);color:#fff">#C2372B · 5.4:1</span></td>
+          <td><span class="mono" style="color:var(--loss-text)">#A62B21 · 7.0:1</span></td>
+          <td><span class="chipdemo" style="background:var(--loss-tint);color:var(--loss-text)">#FCEEEC</span></td>
+          <td><span class="mono" style="color:var(--ink-3)">#EFC0BA</span></td>
+          <td><span class="chipdemo" style="background:var(--loss-tint);color:var(--loss-text)">DANGER</span>
+            &nbsp;<span class="chipdemo" style="background:var(--loss);color:#fff">CRITICAL</span></td></tr>
+        <tr><td><b>caution</b></td>
+          <td><span class="chipdemo" style="background:var(--caution);color:#fff">#96600C · 5.3:1</span></td>
+          <td><span class="mono" style="color:var(--caution-text)">#8F5A0B · 5.8:1</span></td>
+          <td><span class="chipdemo" style="background:var(--caution-tint);color:var(--caution-text)">#FDF4E6</span></td>
+          <td><span class="mono" style="color:var(--ink-3)">#EBD8B4</span></td>
+          <td><span class="chipdemo" style="background:var(--caution-tint);color:var(--caution-text)">CAUTION</span></td></tr>
+      </tbody>
+    </table>
+    <p class="n"><b>Caution&rsquo;s solid is darkened from its display hue</b> so white text on it
+      clears 4.5:1. The badge type is 10px, so the large-text exemption does not apply — the
+      obvious amber would have shipped a failing contrast on the one label that means
+      &ldquo;pay attention&rdquo;.
+      <br><br>
+      <b>Green means money and only money.</b> Brand teal and profit green are close enough in hue
+      that the separation has to be a rule: the moment teal also means &ldquo;up&rdquo;, P&amp;L
+      stops being findable by colour on a page carrying nine teal links.</p>
+  </div>
 
-<h2>Severity</h2>
-<div class="card">
-  <div class="sev">
-    <div class="sev-l"><span class="dot" style="background:var(--loss)"></span>critical</div>
-    <div class="sd rail"><div class="h">Daily loss limit breached
-      <span class="bd" style="background:var(--loss);color:#fff">CRITICAL</span></div>
-      <p>Solid badge, rail. A rule that is already broken.</p></div>
+  <div class="sec">
+    <p class="sh">Interaction states</p>
+    <p class="sd">The previous revision defined none — every hover in the file was undefined.</p>
+    <div class="st">
+      <div style="background:var(--canvas)">Rest<br><span class="mono" style="font-size:11px;color:var(--ink-3)">canvas</span></div>
+      <div style="background:var(--hover)">Hover<br><span class="mono" style="font-size:11px;color:var(--ink-3)">#F5F8FA</span></div>
+      <div style="background:var(--pressed)">Pressed<br><span class="mono" style="font-size:11px;color:var(--ink-3)">#EDF1F5</span></div>
+      <div style="background:var(--selected);color:var(--brand-text)">Selected<br><span class="mono" style="font-size:11px">#E4F3F1</span></div>
+      <div class="ring" style="background:var(--canvas)">Focus<br><span class="mono" style="font-size:11px;color:var(--ink-3)">2px ring, 2px offset</span></div>
+    </div>
+    <p class="n"><b>Focus is a ring with offset, never a colour change.</b> A colour-only focus
+      state is invisible against <code>selected</code> — which is exactly where keyboard users
+      spend their time. Hit targets are 32px minimum, 44px on mobile.</p>
   </div>
-  <div class="sev">
-    <div class="sev-l"><span class="dot" style="background:var(--loss)"></span>danger</div>
-    <div class="sd rail"><div class="h">Size Escalation
-      <span class="bd" style="background:var(--loss-t);color:var(--loss)">DANGER</span></div>
-      <p>Tinted badge, rail. Money at risk right now.</p></div>
-  </div>
-  <div class="sev">
-    <div class="sev-l"><span class="dot" style="background:var(--caution)"></span>caution</div>
-    <div class="sd"><div class="h">Early Exit
-      <span class="bd" style="background:var(--caution-t);color:var(--caution)">CAUTION</span></div>
-      <p>No rail. Worth knowing, not worth interrupting for.</p></div>
-  </div>
-  <div class="sev">
-    <div class="sev-l"><span class="dot" style="background:var(--brand)"></span>info</div>
-    <div class="sd"><div class="h">Cooldown honoured
-      <span class="bd" style="background:var(--brand-t);color:var(--brand)">INFO</span></div>
-      <p>Teal. Something went right. Never money.</p></div>
-  </div>
-</div>
 
-<h2>Scale</h2>
-<div class="card">
-  <div class="sp">
-    <div><i style="width:4px"></i><span>4</span></div>
-    <div><i style="width:8px"></i><span>8</span></div>
-    <div><i style="width:12px"></i><span>12</span></div>
-    <div><i style="width:16px"></i><span>16</span></div>
-    <div><i style="width:20px"></i><span>20</span></div>
-    <div><i style="width:24px"></i><span>24</span></div>
-    <div><i style="width:32px"></i><span>32</span></div>
-    <div><i style="width:48px"></i><span>48</span></div>
+  <div class="sec">
+    <p class="sh">Type</p>
+    <p class="sd">Role-named, line-height bundled. Weights 400 and 600 only.</p>
+    <table>
+      <thead><tr><th style="width:120px">Role</th><th style="width:150px">Size / LH · weight</th><th>Example</th></tr></thead>
+      <tbody>
+        <tr><td><b>hero</b></td><td class="mono" style="font-size:11.5px;color:var(--ink-3)">40 / 48 mono 500</td>
+          <td><span class="mono" style="font-size:40px;line-height:48px;font-weight:500;letter-spacing:-.03em;color:var(--loss-text)">&minus;₹8,455</span></td></tr>
+        <tr><td><b>figure</b></td><td class="mono" style="font-size:11.5px;color:var(--ink-3)">22 / 28 mono 500</td>
+          <td><span class="mono" style="font-size:22px;font-weight:500">₹16.1k</span></td></tr>
+        <tr><td><b>figure-s</b></td><td class="mono" style="font-size:11.5px;color:var(--ink-3)">15 / 20 mono 500</td>
+          <td><span class="mono" style="font-size:15px;font-weight:500;color:var(--profit-text)">+₹440.00</span></td></tr>
+        <tr><td><b>title</b></td><td class="mono" style="font-size:11.5px;color:var(--ink-3)">20 / 28 · 600</td>
+          <td><span style="font:600 20px/28px Inter,sans-serif">Behavioral Alerts</span></td></tr>
+        <tr><td><b>section</b></td><td class="mono" style="font-size:11.5px;color:var(--ink-3)">14 / 20 · 600</td>
+          <td><span style="font:600 14px/20px Inter,sans-serif">Open positions</span></td></tr>
+        <tr><td><b>body</b></td><td class="mono" style="font-size:11.5px;color:var(--ink-3)">13.5 / 20 · 400</td>
+          <td><span style="color:var(--ink-2)">BANKNIFTY 45500 PE entry at 100 lots — 4&times; your average size.</span></td></tr>
+        <tr><td><b>caption</b></td><td class="mono" style="font-size:11.5px;color:var(--ink-3)">12 / 16 · 400</td>
+          <td><span style="font-size:12px;color:var(--ink-3)">11:04 · BANKNIFTY25AUG45500PE · MIS</span></td></tr>
+        <tr><td><b>label</b></td><td class="mono" style="font-size:11.5px;color:var(--ink-3)">10 / 14 · 600 caps</td>
+          <td><span class="lbl">Loss budget</span></td></tr>
+      </tbody>
+    </table>
+    <p class="n"><b>Weight 700 is gone.</b> The previous revision put Bold on every badge; at 10px
+      it buys nothing 600 does not, and Fluent explicitly reserves Bold for limited use.
+      <br><br>
+      Body stays at <b>13.5/20</b> rather than Fluent&rsquo;s 14/20 — this app is deliberately denser
+      than an M365 productivity surface, and that is a decision to hold, not drift from.</p>
   </div>
-  <div class="rad">
-    <div style="border-radius:4px">4 · chips</div>
-    <div style="border-radius:6px">6 · inputs</div>
-    <div style="border-radius:10px">10 · cards</div>
-    <div style="border-radius:999px">999 · pills</div>
-  </div>
-</div>
-<p class="n">Page padding <span class="mono">24px 32px</span>. Sidebar <span class="mono">244px</span>.
-  Card padding <span class="mono">18px 20px</span>, card gap <span class="mono">16px</span> — enough
-  for the shadow to read, not so much that the page falls apart. <b>No max-width cap on any
-  route</b>, which remains the largest single difference between these screens and a generic
-  dashboard kit.</p>
 
+  <div class="sec">
+    <p class="sh">Spacing, radius, stroke</p>
+    <p class="sd">Half-steps at 6 and 10 (amber below) exist so dense controls fit without leaving
+      the grid.</p>
+    <div class="sp">
+      <div><i style="width:2px"></i><span>2</span></div>
+      <div><i style="width:4px"></i><span>4</span></div>
+      <div class="nudge"><i style="width:6px"></i><span>6</span></div>
+      <div><i style="width:8px"></i><span>8</span></div>
+      <div class="nudge"><i style="width:10px"></i><span>10</span></div>
+      <div><i style="width:12px"></i><span>12</span></div>
+      <div><i style="width:16px"></i><span>16</span></div>
+      <div><i style="width:20px"></i><span>20</span></div>
+      <div><i style="width:24px"></i><span>24</span></div>
+      <div><i style="width:32px"></i><span>32</span></div>
+    </div>
+    <p class="n"><b>Vertical and horizontal are separate ramps</b> with identical values, so row
+      rhythm can be tuned without touching gutters.
+      <br><br>
+      Radius <code>2</code> chips · <code>4</code> controls · <code>6</code> inputs ·
+      <code>8</code> wells · <code>12</code> canvas · <code>999</code> pills. The previous
+      <code>10</code> is gone — off-ramp. Stroke <code>1</code> hairline · <code>2</code> emphasis ·
+      <code>3</code> severity rail.
+      <br><br>
+      This is the fix for a real symptom: the previous revision had badge padding
+      <code>5px 7px</code>, chips <code>4px 6px</code> and gaps of <code>9/11/13px</code> — all
+      off-grid, all invented per component, because the scale had no half-steps to reach for.</p>
+  </div>
+
+  <div class="sec">
+    <p class="sh">Motion</p>
+    <p class="sd">Things enter decelerating and leave accelerating.</p>
+    <div class="eu"><code>--dur-fast</code><span>150ms — hover, press</span></div>
+    <div class="eu"><code>--dur-normal</code><span>200ms — expand, reveal</span></div>
+    <div class="eu"><code>--dur-gentle</code><span>250ms — panel, drawer</span></div>
+    <div class="eu"><code>--ease-enter</code><span><code>cubic-bezier(0,0,0,1)</code> decelerate</span></div>
+    <div class="eu"><code>--ease-exit</code><span><code>cubic-bezier(1,0,1,1)</code> accelerate</span></div>
+    <p class="n"><b>Never <code>transition-all</code> — name the properties.</b> A blanket
+      transition animated <code>background-color</code> through a theme switch during this project
+      and produced a mid-transition value that disagreed with the DOM for long enough to send a bug
+      hunt in the wrong direction.
+      <br><br>
+      Under <code>prefers-reduced-motion</code> every duration collapses to <code>1ms</code> and
+      nothing translates.</p>
+  </div>
+
+</div>
 </body>
 </html>

@@ -1,127 +1,136 @@
-<!-- @dsCard group="Pages" name="Analytics — Habits" subtitle="Report hero, session log, and bars with a signed zero axis" viewport-width="1600" -->
+<!-- @dsCard group="Pages" name="Analytics — Habits" subtitle="Report band, session log, signed bars on inset tracks" viewport-width="1500" -->
 <!doctype html>
 <html lang="en">
 <head>
 <meta charset="utf-8">
 <title>Mirror — Analytics</title>
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=DM+Mono:wght@300;400;500&display=swap">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=DM+Mono:wght@400;500&display=swap">
 <style>
-  :root{ --page:#EEF1F5; --surface:#FFFFFF; --inset:#E4E9F0; --sidebar:#FFFFFF;
-    --border:#D6DEE8; --divider:#E8EDF3; --ink:#0F1724; --ink2:#4A5768; --ink3:#7C8899;
-    --brand:#0E7A6E; --brand-t:#E2F2EF; --profit:#12795B; --profit-t:#E3F3EE;
-    --loss:#C2372B; --loss-t:#FBE9E7; --caution:#A96A0C; --caution-t:#FBF0DF;
-    --sh1:0 1px 2px rgba(15,23,36,.05), 0 1px 3px rgba(15,23,36,.06);
-    --sh2:0 2px 4px rgba(15,23,36,.04), 0 8px 20px rgba(15,23,36,.08); }
+  :root{
+    --ground:#EEF1F5; --canvas:#FFFFFF; --inset:#E9EDF3;
+    --rule:#E3E8EF; --edge:#D3DBE4; --stroke-strong:#5E6B7A;
+    --ink:#0F1724; --ink-2:#4A5768; --ink-3:#647285;
+    --brand:#0E7A6E; --brand-text:#0B6155; --brand-tint:#E4F3F1;
+    --profit:#12795B; --profit-text:#0E6249; --profit-tint:#E7F4EF;
+    --loss:#C2372B; --loss-text:#A62B21; --loss-tint:#FCEEEC; --loss-edge:#EFC0BA;
+    --caution:#96600C; --caution-text:#8F5A0B; --caution-tint:#FDF4E6;
+    --hover:#F5F8FA; --selected:#E4F3F1;
+    --sh-2:0 0 2px rgba(15,23,36,.12), 0 1px 2px rgba(15,23,36,.14);
+    --sh-4:0 0 2px rgba(15,23,36,.12), 0 2px 4px rgba(15,23,36,.14);
+    --sh-8:0 0 2px rgba(15,23,36,.12), 0 4px 8px rgba(15,23,36,.14);
+    --dur-fast:150ms; --ease-enter:cubic-bezier(0,0,0,1);
+  }
   *{box-sizing:border-box}
-  body{margin:0;background:var(--page);color:var(--ink);
-    font:400 13.5px/1.6 Inter,system-ui,sans-serif;display:flex;min-height:100vh}
+  body{margin:0;background:var(--ground);color:var(--ink);
+    font:400 13.5px/20px Inter,system-ui,sans-serif;padding:20px 24px}
   .mono{font-family:'DM Mono',monospace;font-variant-numeric:tabular-nums}
-  .lbl{font:600 10.5px/1 Inter,sans-serif;letter-spacing:.09em;text-transform:uppercase;color:var(--ink3)}
-
-  aside{width:244px;flex-shrink:0;background:var(--sidebar);border-right:1px solid var(--border);
-    display:flex;flex-direction:column;padding:0 12px 14px;position:sticky;top:0;height:100vh}
-  .brand{display:flex;align-items:center;gap:10px;height:64px;padding:0 8px;
-    font:600 16px/1 Inter,sans-serif;letter-spacing:-.01em}
+  .lbl{font:600 10px/14px Inter,sans-serif;letter-spacing:.09em;text-transform:uppercase;color:var(--ink-3)}
+  .shell{max-width:1440px;margin:0 auto;background:var(--canvas);border:1px solid var(--edge);
+    border-radius:12px;box-shadow:var(--sh-4);display:flex;overflow:hidden;min-height:calc(100vh - 40px)}
+  aside{width:244px;flex-shrink:0;border-right:1px solid var(--rule);
+    display:flex;flex-direction:column;padding:0 10px 12px}
+  .brand{display:flex;align-items:center;gap:10px;height:60px;padding:0 10px;
+    font:600 16px/20px Inter,sans-serif;letter-spacing:-.01em}
   .brand svg{color:var(--brand)}
-  .nav{display:flex;align-items:center;gap:12px;height:38px;padding:0 12px;border-radius:6px;
-    font:500 13.5px/1 Inter,sans-serif;color:var(--ink2);margin-bottom:2px;position:relative}
-  .nav .ic{width:16px;height:16px;flex-shrink:0;color:var(--ink3)}
-  .nav.on{background:var(--brand-t);color:var(--brand);font-weight:600}
+  .nav{display:flex;align-items:center;gap:10px;height:36px;padding:0 10px;border-radius:6px;
+    font:500 13.5px/20px Inter,sans-serif;color:var(--ink-2);margin-bottom:2px;
+    transition:background-color var(--dur-fast) var(--ease-enter)}
+  .nav .ic{width:16px;height:16px;flex-shrink:0;color:var(--ink-3)}
+  .nav:hover{background:var(--hover)}
+  .nav.on{background:var(--selected);color:var(--brand-text);font-weight:600}
   .nav.on .ic{color:var(--brand)}
-  .nav.on:before{content:"";position:absolute;left:-12px;top:9px;bottom:9px;width:3px;
-    background:var(--brand);border-radius:0 2px 2px 0}
-  .nav .bdg{margin-left:auto;font:500 10.5px/1 'DM Mono',monospace;background:var(--loss);
-    color:#fff;border-radius:999px;padding:3px 6px}
-  .grp{font:600 10px/1 Inter,sans-serif;letter-spacing:.11em;text-transform:uppercase;
-    color:var(--ink3);padding:20px 12px 8px}
-  .side-b{margin-top:auto;padding-top:14px}
-  .acct{display:flex;align-items:center;gap:9px;height:40px;padding:0 12px;border-radius:8px;
-    background:var(--inset);font:500 12.5px/1 'DM Mono',monospace;margin-top:12px}
-  .acct i{width:7px;height:7px;border-radius:999px;background:var(--profit)}
-
+  .nav .bdg{margin-left:auto;font:500 10px/14px 'DM Mono',monospace;background:var(--loss);
+    color:#fff;border-radius:999px;padding:2px 6px}
+  .grp{font:600 10px/14px Inter,sans-serif;letter-spacing:.09em;text-transform:uppercase;
+    color:var(--ink-3);padding:16px 10px 6px}
+  .side-b{margin-top:auto;padding-top:12px}
+  .acct{display:flex;align-items:center;gap:8px;height:36px;padding:0 10px;border-radius:6px;
+    background:var(--inset);font:500 12px/16px 'DM Mono',monospace}
+  .acct i{width:6px;height:6px;border-radius:999px;background:var(--profit)}
   main{flex:1;min-width:0}
-  .wrap{padding:24px 32px 56px;display:flex;flex-direction:column;gap:16px}
-  .card{background:var(--surface);border:1px solid var(--border);border-radius:10px;box-shadow:var(--sh1)}
-  .card.hero{box-shadow:var(--sh2)}
-  .ch{display:flex;align-items:flex-start;gap:12px;padding:15px 20px;border-bottom:1px solid var(--divider)}
-  .ch h2{font:600 14px/1.2 Inter,sans-serif;margin:0}
-  .ch p{font-size:12.5px;color:var(--ink3);margin:7px 0 0}
-  .ch .ic{width:16px;height:16px;color:var(--brand);flex-shrink:0;margin-top:1px}
 
-  .top{display:flex;align-items:flex-end;justify-content:space-between}
-  h1{font:600 19px/1.25 Inter,sans-serif;margin:0;letter-spacing:-.015em}
-  .sub{font-size:12.5px;color:var(--ink3);margin:6px 0 0}
-  .ctl{display:flex;gap:12px;align-items:center}
-  .seg{display:inline-flex;background:var(--inset);border-radius:7px;padding:3px}
-  .seg span{font:500 12px/1 Inter,sans-serif;padding:8px 14px;border-radius:5px;color:var(--ink2)}
-  .seg span.sel{background:var(--surface);color:var(--ink);font-weight:600;box-shadow:var(--sh1)}
-  .btn{border:1px solid var(--border);background:var(--surface);color:var(--ink2);border-radius:7px;
-    height:34px;padding:0 15px;font:600 12.5px/1 Inter,sans-serif;cursor:pointer;box-shadow:var(--sh1)}
+  .band{padding:20px 24px;border-bottom:1px solid var(--rule)}
+  .top{display:flex;align-items:flex-start;justify-content:space-between;gap:24px}
+  h1{font:600 20px/28px Inter,sans-serif;margin:0;letter-spacing:-.01em}
+  .sub{font-size:12px;line-height:16px;color:var(--ink-3);margin:4px 0 0}
+  .ctl{display:flex;gap:10px;align-items:center}
+  .seg{display:inline-flex;background:var(--inset);border-radius:6px;padding:2px}
+  .seg span{font:500 12px/16px Inter,sans-serif;padding:6px 12px;border-radius:4px;color:var(--ink-2);cursor:pointer}
+  .seg span.sel{background:var(--canvas);color:var(--ink);font-weight:600;box-shadow:var(--sh-2)}
+  .btn{border:1px solid var(--stroke-strong);background:var(--canvas);color:var(--ink-2);
+    border-radius:6px;height:32px;padding:0 14px;font:600 12px/16px Inter,sans-serif;cursor:pointer}
 
-  .rep-t{display:flex;align-items:flex-end;justify-content:space-between;gap:48px;padding:22px 24px}
-  .big{font:500 40px/1 'DM Mono',monospace;letter-spacing:-.03em;margin:13px 0 0;color:var(--profit)}
-  .verdict{font:500 14px/1.5 Inter,sans-serif;color:var(--ink2);margin:12px 0 0}
-  .rep-m{display:flex;gap:14px}
-  .rm{background:var(--inset);border-radius:8px;padding:12px 18px;text-align:right;min-width:110px}
-  .rm .f{font:500 23px/1 'DM Mono',monospace;margin:10px 0 0;letter-spacing:-.02em}
-  .rep-b{display:grid;grid-template-columns:repeat(3,1fr);border-top:1px solid var(--divider)}
-  .rep-b > div{padding:16px 24px;display:flex;gap:13px;align-items:flex-start}
-  .rep-b > div + div{border-left:1px solid var(--divider)}
-  .ico{width:30px;height:30px;border-radius:8px;display:flex;align-items:center;justify-content:center;
-    flex-shrink:0;font-size:13px}
-  .rep-b .v{font:600 14px/1 Inter,sans-serif;margin:9px 0 0}
-  .rep-b .s{font:400 11.5px/1 'DM Mono',monospace;color:var(--ink3);margin:8px 0 0}
+  .report{display:flex;align-items:flex-end;justify-content:space-between;gap:32px;margin-top:14px}
+  .big{font:500 40px/48px 'DM Mono',monospace;letter-spacing:-.03em;margin:4px 0 0;color:var(--profit-text)}
+  .verdict{font:500 14px/20px Inter,sans-serif;color:var(--ink-2);margin:6px 0 0}
+  .rm{display:flex;gap:8px}
+  .rmi{background:var(--inset);border-radius:8px;padding:10px 16px;text-align:right;min-width:104px}
+  .rmi .f{font:500 22px/28px 'DM Mono',monospace;margin:4px 0 0;letter-spacing:-.02em}
+  .pillars{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-top:12px}
+  .pil{background:var(--inset);border-radius:8px;padding:12px 14px;display:flex;gap:10px;align-items:flex-start}
+  .ico{width:26px;height:26px;border-radius:6px;display:flex;align-items:center;
+    justify-content:center;flex-shrink:0;font-size:12px}
+  .pil .v{font:600 14px/20px Inter,sans-serif;margin:2px 0 0}
+  .pil .s{font:400 11.5px/16px 'DM Mono',monospace;color:var(--ink-3);margin:3px 0 0}
 
-  .tabs{display:flex;gap:24px;padding:0 20px;border-bottom:1px solid var(--divider);
-    background:var(--surface);border-radius:10px 10px 0 0}
-  .tab{font:500 13.5px/1 Inter,sans-serif;color:var(--ink3);padding:14px 0 13px;position:relative}
+  .tabs{display:flex;gap:22px;padding:0 24px;border-bottom:1px solid var(--rule)}
+  .tab{font:500 13.5px/20px Inter,sans-serif;color:var(--ink-3);padding:12px 0 10px;
+    position:relative;cursor:pointer}
   .tab.on{color:var(--ink);font-weight:600}
   .tab.on:after{content:"";position:absolute;left:0;right:0;bottom:-1px;height:2px;background:var(--brand)}
 
-  /* session log */
-  .insight{display:flex;align-items:flex-start;gap:10px;margin:16px 20px;padding:11px 14px;
-    background:var(--loss-t);border:1px solid #F0CFCA;border-radius:8px;font-size:13px;color:var(--ink)}
-  .insight b{font-weight:600}
-  .drow{display:grid;grid-template-columns:120px 130px 1fr 110px;gap:16px;align-items:center;
-    padding:12px 20px;border-bottom:1px solid var(--divider)}
+  .section{padding:16px 24px;border-bottom:1px solid var(--rule)}
+  .section:last-of-type{border-bottom:0}
+  .sec-h{display:flex;align-items:flex-start;gap:10px;padding-bottom:12px}
+  .sec-h h2{font:600 14px/20px Inter,sans-serif;margin:0}
+  .sec-h p{font-size:12px;line-height:16px;color:var(--ink-3);margin:3px 0 0}
+  .sec-h .ic{width:16px;height:16px;color:var(--brand);flex-shrink:0;margin-top:2px}
+
+  .insight{display:flex;align-items:center;gap:8px;padding:9px 12px;background:var(--loss-tint);
+    border:1px solid var(--loss-edge);border-radius:6px;font-size:13px;margin-bottom:8px}
+  .drow{display:grid;grid-template-columns:116px 128px 1fr 104px;gap:14px;align-items:center;
+    padding:9px 0;border-bottom:1px solid var(--rule);
+    transition:background-color var(--dur-fast) var(--ease-enter)}
+  .drow:hover{background:var(--hover)}
   .drow:last-child{border-bottom:0}
-  .dd{font:400 12px/1 'DM Mono',monospace;color:var(--ink2)}
-  .pill{font:600 11px/1 Inter,sans-serif;padding:5px 10px;border-radius:999px;width:fit-content}
-  .dm{font:400 11.5px/1 'DM Mono',monospace;color:var(--ink3)}
-  .dp{text-align:right;font:500 14px/1 'DM Mono',monospace}
+  .dd{font:400 12px/16px 'DM Mono',monospace;color:var(--ink-2)}
+  .pill{font:600 11px/16px Inter,sans-serif;padding:3px 9px;border-radius:999px;width:fit-content}
+  .dm{font:400 11.5px/16px 'DM Mono',monospace;color:var(--ink-3)}
+  .dp{text-align:right;font:500 15px/20px 'DM Mono',monospace}
 
-  .headline{display:flex;align-items:baseline;gap:16px;padding:22px 20px}
-  .headline .n{font:500 34px/1 'DM Mono',monospace;color:var(--loss);letter-spacing:-.025em}
-  .headline p{margin:0;font-size:13.5px;color:var(--ink2);max-width:92ch}
+  .headline{display:flex;align-items:baseline;gap:14px;padding:4px 0 8px}
+  .headline .n{font:500 34px/40px 'DM Mono',monospace;color:var(--loss-text);letter-spacing:-.025em}
+  .headline p{margin:0;font-size:13.5px;line-height:20px;color:var(--ink-2);max-width:94ch}
 
-  .bars{padding:8px 20px 14px}
-  .brow{display:grid;grid-template-columns:64px 1fr 96px 56px;gap:16px;align-items:center;
-    padding:9px 0;border-bottom:1px solid var(--divider)}
+  .brow{display:grid;grid-template-columns:60px 1fr 92px 52px;gap:14px;align-items:center;
+    padding:7px 0;border-bottom:1px solid var(--rule)}
   .brow:last-child{border-bottom:0}
-  .bk{font:400 12px/1 'DM Mono',monospace;color:var(--ink3)}
-  .track{position:relative;height:24px;background:var(--inset);border-radius:4px}
-  .axis{position:absolute;left:50%;top:0;bottom:0;width:1px;background:#BFCAD8}
-  .bfill{position:absolute;top:5px;height:14px;border-radius:3px}
-  .bv{text-align:right;font:500 13px/1 'DM Mono',monospace}
-  .bw{text-align:right;font:400 12px/1 'DM Mono',monospace;color:var(--ink3)}
+  .bk{font:400 12px/16px 'DM Mono',monospace;color:var(--ink-3)}
+  .track{position:relative;height:22px;background:var(--inset);border-radius:4px}
+  .axis{position:absolute;left:50%;top:0;bottom:0;width:1px;background:#B9C4D2}
+  .bfill{position:absolute;top:5px;height:12px;border-radius:2px}
+  .bv{text-align:right;font:500 13px/16px 'DM Mono',monospace}
+  .bw{text-align:right;font:400 12px/16px 'DM Mono',monospace;color:var(--ink-3)}
 
-  .inst{display:grid;grid-template-columns:170px 1fr 120px 96px;gap:18px;align-items:center;
-    padding:14px 20px;border-bottom:1px solid var(--divider)}
+  .inst{display:grid;grid-template-columns:160px 1fr 112px 88px;gap:16px;align-items:center;
+    padding:11px 0;border-bottom:1px solid var(--rule);
+    transition:background-color var(--dur-fast) var(--ease-enter)}
+  .inst:hover{background:var(--hover)}
   .inst:last-child{border-bottom:0}
-  .isym{font:600 13.5px/1 Inter,sans-serif;display:flex;align-items:center;gap:9px}
-  .imeta{font:400 12px/1 'DM Mono',monospace;color:var(--ink3)}
+  .isym{font:600 13.5px/20px Inter,sans-serif;display:flex;align-items:center;gap:8px}
 
-  .note{background:var(--surface);border:1px solid var(--border);border-left:3px solid var(--brand);
-    border-radius:10px;box-shadow:var(--sh1);padding:17px 20px;max-width:104ch;
-    font-size:13px;color:var(--ink2);line-height:1.7}
-  .note b{color:var(--ink);font-weight:600}
+  .callout{background:var(--canvas);border:1px solid var(--edge);border-left:3px solid var(--brand);
+    border-radius:8px;box-shadow:var(--sh-8);padding:14px 16px;margin:20px 24px 24px;
+    font-size:13px;line-height:22px;color:var(--ink-2);max-width:104ch}
+  .callout b{color:var(--ink);font-weight:600}
 </style>
 </head>
 <body>
+<div class="shell">
 
 <aside>
   <div class="brand">
-    <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2 4 6v6c0 5 3.4 9.4 8 10 4.6-.6 8-5 8-10V6z"/></svg>
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2 4 6v6c0 5 3.4 9.4 8 10 4.6-.6 8-5 8-10V6z"/></svg>
     TradeMentor</div>
   <div class="nav"><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/></svg>Dashboard</div>
   <div class="nav on"><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 17l6-6 4 4 7-7"/><path d="M14 8h6v6"/></svg>Analytics</div>
@@ -139,92 +148,88 @@
 </aside>
 
 <main>
-<div class="wrap">
 
-  <div class="top">
-    <div><h1>Analytics</h1><p class="sub">Realized P&amp;L only. No brokerage, no tax, no estimates.</p></div>
-    <div class="ctl">
-      <div class="seg"><span>7D</span><span class="sel">30D</span><span>90D</span></div>
-      <button class="btn">↓&nbsp; Export</button>
+  <div class="band">
+    <div class="top">
+      <div><h1>Analytics</h1>
+        <p class="sub">Realized P&amp;L only. No brokerage, no tax, no estimates.</p></div>
+      <div class="ctl">
+        <div class="seg"><span>7D</span><span class="sel">30D</span><span>90D</span></div>
+        <button class="btn">↓&nbsp; Export</button>
+      </div>
     </div>
-  </div>
 
-  <div class="card hero">
-    <div class="rep-t">
+    <div class="report">
       <div>
         <div class="lbl">Your 30-day report</div>
         <p class="big">+₹7,990.00</p>
         <p class="verdict">Net positive, but the edge is thin — protect it.</p>
       </div>
-      <div class="rep-m">
-        <div class="rm"><div class="lbl">Win rate</div><p class="f">60%</p></div>
-        <div class="rm"><div class="lbl">Profit factor</div>
-          <p class="f" style="color:var(--caution)">1.28</p></div>
-        <div class="rm"><div class="lbl">Trades</div><p class="f">42</p></div>
+      <div class="rm">
+        <div class="rmi"><div class="lbl">Win rate</div><p class="f">60%</p></div>
+        <div class="rmi"><div class="lbl">Profit factor</div>
+          <p class="f" style="color:var(--caution-text)">1.28</p></div>
+        <div class="rmi"><div class="lbl">Trades</div><p class="f">42</p></div>
       </div>
     </div>
-    <div class="rep-b">
-      <div><span class="ico" style="background:var(--profit-t);color:var(--profit)">▲</span>
+
+    <div class="pillars">
+      <div class="pil"><span class="ico" style="background:var(--profit-tint);color:var(--profit-text)">▲</span>
         <div><div class="lbl">Biggest strength</div>
-          <p class="v" style="color:var(--profit)">9 AM &ndash; 10 AM</p>
+          <p class="v" style="color:var(--profit-text)">9 AM &ndash; 10 AM</p>
           <p class="s">+₹5,100.00 · 5 trades</p></div></div>
-      <div><span class="ico" style="background:var(--loss-t);color:var(--loss)">▼</span>
+      <div class="pil"><span class="ico" style="background:var(--loss-tint);color:var(--loss-text)">▼</span>
         <div><div class="lbl">Biggest leak</div>
-          <p class="v" style="color:var(--loss)">2 PM &ndash; 3 PM</p>
+          <p class="v" style="color:var(--loss-text)">2 PM &ndash; 3 PM</p>
           <p class="s">&minus;₹14,270.00 · 5 trades</p></div></div>
-      <div><span class="ico" style="background:var(--brand-t);color:var(--brand)">◎</span>
+      <div class="pil"><span class="ico" style="background:var(--brand-tint);color:var(--brand-text)">◎</span>
         <div><div class="lbl">Where to focus</div>
-          <p class="v" style="font-weight:500;line-height:1.45">Start with your 2 PM &ndash; 3 PM
-            trades — the biggest single drain in the window.</p></div></div>
+          <p class="v" style="font-weight:500">Start with your 2 PM &ndash; 3 PM trades — the
+            biggest single drain in the window.</p></div></div>
     </div>
   </div>
 
   <div class="tabs">
-    <div class="tab on">Habits</div>
-    <div class="tab">Edge</div>
-    <div class="tab">Overview</div>
-    <div class="tab">Behaviour</div>
-    <div class="tab">Advanced</div>
+    <div class="tab on">Habits</div><div class="tab">Edge</div><div class="tab">Overview</div>
+    <div class="tab">Behaviour</div><div class="tab">Advanced</div>
   </div>
 
-  <div class="card">
-    <div class="ch">
+  <div class="section">
+    <div class="sec-h">
       <svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4M8 2v4M3 10h18"/></svg>
       <div><h2>Your trading days</h2>
         <p>Each day tagged by its dominant behaviour, with realized P&amp;L.</p></div>
     </div>
-    <div class="insight">
-      <span style="color:var(--loss);font-weight:700">!</span>
-      <span><b>2 of your 3 worst days</b> were <b>Revenge / tilt</b> days. That&rsquo;s the pattern to break.</span>
-    </div>
+    <div class="insight"><span style="color:var(--loss-text);font-weight:600">!</span>
+      <span><b>2 of your 3 worst days</b> were <b>Revenge / tilt</b> days. That&rsquo;s the pattern to break.</span></div>
     <div class="drow"><span class="dd">Wed, 05 Aug</span>
-      <span class="pill" style="background:var(--loss-t);color:var(--loss)">Revenge / tilt</span>
+      <span class="pill" style="background:var(--loss-tint);color:var(--loss-text)">Revenge / tilt</span>
       <span class="dm">1 trade · 2 alerts</span>
-      <span class="dp" style="color:var(--loss)">&minus;₹2,700</span></div>
+      <span class="dp" style="color:var(--loss-text)">&minus;₹2,700</span></div>
     <div class="drow"><span class="dd">Tue, 04 Aug</span>
-      <span class="pill" style="background:var(--caution-t);color:var(--caution)">Flagged</span>
+      <span class="pill" style="background:var(--caution-tint);color:var(--caution-text)">Flagged</span>
       <span class="dm">4 trades · 1 alert</span>
-      <span class="dp" style="color:var(--profit)">₹6,350</span></div>
+      <span class="dp" style="color:var(--profit-text)">₹6,350</span></div>
     <div class="drow"><span class="dd">Mon, 03 Aug</span>
-      <span class="pill" style="background:var(--profit-t);color:var(--profit)">Clean</span>
+      <span class="pill" style="background:var(--profit-tint);color:var(--profit-text)">Clean</span>
       <span class="dm">3 trades</span>
-      <span class="dp" style="color:var(--profit)">₹4,200</span></div>
+      <span class="dp" style="color:var(--profit-text)">₹4,200</span></div>
     <div class="drow"><span class="dd">Fri, 31 Jul</span>
-      <span class="pill" style="background:var(--caution-t);color:var(--caution)">Overtrading</span>
+      <span class="pill" style="background:var(--caution-tint);color:var(--caution-text)">Overtrading</span>
       <span class="dm">1 trade · 1 alert</span>
-      <span class="dp" style="color:var(--loss)">&minus;₹1,000</span></div>
+      <span class="dp" style="color:var(--loss-text)">&minus;₹1,000</span></div>
     <div class="drow"><span class="dd">Thu, 30 Jul</span>
-      <span class="pill" style="background:var(--loss-t);color:var(--loss)">Revenge / tilt</span>
+      <span class="pill" style="background:var(--loss-tint);color:var(--loss-text)">Revenge / tilt</span>
       <span class="dm">4 trades · 5 alerts</span>
-      <span class="dp" style="color:var(--loss)">&minus;₹7,410</span></div>
+      <span class="dp" style="color:var(--loss-text)">&minus;₹7,410</span></div>
     <div class="drow"><span class="dd">Wed, 29 Jul</span>
-      <span class="pill" style="background:var(--profit-t);color:var(--profit)">Clean</span>
+      <span class="pill" style="background:var(--profit-tint);color:var(--profit-text)">Clean</span>
       <span class="dm">2 trades</span>
-      <span class="dp" style="color:var(--profit)">₹8,550</span></div>
+      <span class="dp" style="color:var(--profit-text)">₹8,550</span></div>
   </div>
 
-  <div class="card">
-    <div class="ch">
+  <div class="section">
+    <div class="sec-h">
       <svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 9v4M12 17h.01"/><path d="M10.3 3.9 1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0z"/></svg>
       <div><h2>After a loss, do you size up?</h2>
         <p>Average position value on the trade right after a losing one, against your normal.</p></div>
@@ -236,109 +241,93 @@
     </div>
   </div>
 
-  <div class="card">
-    <div class="ch">
+  <div class="section">
+    <div class="sec-h">
       <svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>
       <div><h2>Time of day</h2>
-        <p>Your weakest hour is around 14:00. Bars are net P&amp;L against a zero axis; right column is win rate.</p></div>
+        <p>Weakest hour is around 14:00. Bars are net P&amp;L against a zero axis; right column is win rate.</p></div>
     </div>
-    <div class="bars">
-      <div class="brow"><span class="bk">09:00</span>
-        <span class="track"><i class="axis"></i>
-          <i class="bfill" style="left:50%;width:22%;background:var(--profit)"></i></span>
-        <span class="bv" style="color:var(--profit)">+₹5,100</span><span class="bw">80%</span></div>
-      <div class="brow"><span class="bk">10:00</span>
-        <span class="track"><i class="axis"></i>
-          <i class="bfill" style="left:50%;width:9%;background:var(--profit)"></i></span>
-        <span class="bv" style="color:var(--profit)">+₹2,140</span><span class="bw">67%</span></div>
-      <div class="brow"><span class="bk">11:00</span>
-        <span class="track"><i class="axis"></i>
-          <i class="bfill" style="right:50%;width:6%;background:var(--loss)"></i></span>
-        <span class="bv" style="color:var(--loss)">&minus;₹1,420</span><span class="bw">33%</span></div>
-      <div class="brow"><span class="bk">12:00</span>
-        <span class="track"><i class="axis"></i>
-          <i class="bfill" style="left:50%;width:3%;background:var(--profit)"></i></span>
-        <span class="bv" style="color:var(--profit)">+₹680</span><span class="bw">50%</span></div>
-      <div class="brow"><span class="bk">14:00</span>
-        <span class="track"><i class="axis"></i>
-          <i class="bfill" style="right:50%;width:48%;background:var(--loss)"></i></span>
-        <span class="bv" style="color:var(--loss)">&minus;₹14,270</span><span class="bw">0%</span></div>
-    </div>
+    <div class="brow"><span class="bk">09:00</span>
+      <span class="track"><i class="axis"></i><i class="bfill" style="left:50%;width:22%;background:var(--profit)"></i></span>
+      <span class="bv" style="color:var(--profit-text)">+₹5,100</span><span class="bw">80%</span></div>
+    <div class="brow"><span class="bk">10:00</span>
+      <span class="track"><i class="axis"></i><i class="bfill" style="left:50%;width:9%;background:var(--profit)"></i></span>
+      <span class="bv" style="color:var(--profit-text)">+₹2,140</span><span class="bw">67%</span></div>
+    <div class="brow"><span class="bk">11:00</span>
+      <span class="track"><i class="axis"></i><i class="bfill" style="right:50%;width:6%;background:var(--loss)"></i></span>
+      <span class="bv" style="color:var(--loss-text)">&minus;₹1,420</span><span class="bw">33%</span></div>
+    <div class="brow"><span class="bk">12:00</span>
+      <span class="track"><i class="axis"></i><i class="bfill" style="left:50%;width:3%;background:var(--profit)"></i></span>
+      <span class="bv" style="color:var(--profit-text)">+₹680</span><span class="bw">50%</span></div>
+    <div class="brow"><span class="bk">14:00</span>
+      <span class="track"><i class="axis"></i><i class="bfill" style="right:50%;width:48%;background:var(--loss)"></i></span>
+      <span class="bv" style="color:var(--loss-text)">&minus;₹14,270</span><span class="bw">0%</span></div>
   </div>
 
-  <div class="card">
-    <div class="ch">
+  <div class="section">
+    <div class="sec-h">
       <svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4M8 2v4M3 10h18"/></svg>
       <div><h2>Day of week</h2>
-        <p>Captures the Thursday weekly-expiry effect. Bars are net P&amp;L; right column is win rate.</p></div>
+        <p>Captures the Thursday weekly-expiry effect. Reconciles exactly with the day rows above.</p></div>
     </div>
-    <div class="bars">
-      <div class="brow"><span class="bk">Mon</span>
-        <span class="track"><i class="axis"></i>
-          <i class="bfill" style="left:50%;width:18%;background:var(--profit)"></i></span>
-        <span class="bv" style="color:var(--profit)">+₹4,200</span><span class="bw">67%</span></div>
-      <div class="brow"><span class="bk">Tue</span>
-        <span class="track"><i class="axis"></i>
-          <i class="bfill" style="left:50%;width:28%;background:var(--profit)"></i></span>
-        <span class="bv" style="color:var(--profit)">+₹6,350</span><span class="bw">75%</span></div>
-      <div class="brow"><span class="bk">Wed</span>
-        <span class="track"><i class="axis"></i>
-          <i class="bfill" style="left:50%;width:25%;background:var(--profit)"></i></span>
-        <span class="bv" style="color:var(--profit)">+₹5,850</span><span class="bw">67%</span></div>
-      <div class="brow"><span class="bk">Thu</span>
-        <span class="track"><i class="axis"></i>
-          <i class="bfill" style="right:50%;width:32%;background:var(--loss)"></i></span>
-        <span class="bv" style="color:var(--loss)">&minus;₹7,410</span><span class="bw">25%</span></div>
-      <div class="brow"><span class="bk">Fri</span>
-        <span class="track"><i class="axis"></i>
-          <i class="bfill" style="right:50%;width:4%;background:var(--loss)"></i></span>
-        <span class="bv" style="color:var(--loss)">&minus;₹1,000</span><span class="bw">0%</span></div>
-    </div>
+    <div class="brow"><span class="bk">Mon</span>
+      <span class="track"><i class="axis"></i><i class="bfill" style="left:50%;width:18%;background:var(--profit)"></i></span>
+      <span class="bv" style="color:var(--profit-text)">+₹4,200</span><span class="bw">67%</span></div>
+    <div class="brow"><span class="bk">Tue</span>
+      <span class="track"><i class="axis"></i><i class="bfill" style="left:50%;width:28%;background:var(--profit)"></i></span>
+      <span class="bv" style="color:var(--profit-text)">+₹6,350</span><span class="bw">75%</span></div>
+    <div class="brow"><span class="bk">Wed</span>
+      <span class="track"><i class="axis"></i><i class="bfill" style="left:50%;width:25%;background:var(--profit)"></i></span>
+      <span class="bv" style="color:var(--profit-text)">+₹5,850</span><span class="bw">67%</span></div>
+    <div class="brow"><span class="bk">Thu</span>
+      <span class="track"><i class="axis"></i><i class="bfill" style="right:50%;width:32%;background:var(--loss)"></i></span>
+      <span class="bv" style="color:var(--loss-text)">&minus;₹7,410</span><span class="bw">25%</span></div>
+    <div class="brow"><span class="bk">Fri</span>
+      <span class="track"><i class="axis"></i><i class="bfill" style="right:50%;width:4%;background:var(--loss)"></i></span>
+      <span class="bv" style="color:var(--loss-text)">&minus;₹1,000</span><span class="bw">0%</span></div>
   </div>
 
-  <div class="card">
-    <div class="ch">
+  <div class="section">
+    <div class="sec-h">
       <svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2 2 7l10 5 10-5z"/><path d="M2 17l10 5 10-5M2 12l10 5 10-5"/></svg>
       <div><h2>By instrument</h2>
         <p>Where your edge lives and leaks, worst first. Full breakdown in the Edge tab.</p></div>
     </div>
     <div class="inst"><span class="isym">
       <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="var(--loss)" stroke-width="2.4"><path d="M3 7l6 6 4-4 7 7"/></svg>SOLARINDS</span>
-      <span class="imeta">2 trades</span>
-      <span class="bv" style="color:var(--loss)">&minus;₹6,500</span><span class="bw">50%</span></div>
+      <span class="dm">2 trades</span>
+      <span class="bv" style="color:var(--loss-text)">&minus;₹6,500</span><span class="bw">50%</span></div>
     <div class="inst"><span class="isym">
       <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="var(--loss)" stroke-width="2.4"><path d="M3 7l6 6 4-4 7 7"/></svg>SENSEX</span>
-      <span class="imeta">1 trade</span>
-      <span class="bv" style="color:var(--loss)">&minus;₹1,700</span><span class="bw">0%</span></div>
+      <span class="dm">1 trade</span>
+      <span class="bv" style="color:var(--loss-text)">&minus;₹1,700</span><span class="bw">0%</span></div>
     <div class="inst"><span class="isym">
       <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="var(--profit)" stroke-width="2.4"><path d="M3 17l6-6 4 4 7-7"/></svg>NIFTY</span>
-      <span class="imeta">7 trades</span>
-      <span class="bv" style="color:var(--profit)">+₹925</span><span class="bw">57%</span></div>
+      <span class="dm">7 trades</span>
+      <span class="bv" style="color:var(--profit-text)">+₹925</span><span class="bw">57%</span></div>
     <div class="inst"><span class="isym">
       <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="var(--profit)" stroke-width="2.4"><path d="M3 17l6-6 4 4 7-7"/></svg>BANKNIFTY</span>
-      <span class="imeta">3 trades</span>
-      <span class="bv" style="color:var(--profit)">+₹3,990</span><span class="bw">67%</span></div>
+      <span class="dm">3 trades</span>
+      <span class="bv" style="color:var(--profit-text)">+₹3,990</span><span class="bw">67%</span></div>
     <div class="inst"><span class="isym">
       <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="var(--profit)" stroke-width="2.4"><path d="M3 17l6-6 4 4 7-7"/></svg>FORTIS</span>
-      <span class="imeta">2 trades</span>
-      <span class="bv" style="color:var(--profit)">+₹11,770</span><span class="bw">100%</span></div>
+      <span class="dm">2 trades</span>
+      <span class="bv" style="color:var(--profit-text)">+₹11,770</span><span class="bw">100%</span></div>
   </div>
 
-  <div class="note">
-    <b>Every bar has a zero axis and a signed figure.</b> The track is an inset well, so an empty
-    bar still shows the space it could have filled — and the centre line means a losing hour reads
-    as losing before you get to the number. The shipping Habits tab drew each bar full width in one
-    colour with the value rendered as <span class="mono" style="color:var(--loss)">₹NaN</span>,
-    which made a winning hour and a losing hour identical.
+  <div class="callout">
+    <b>The chart track is an inset well, not a card.</b> It gives the bar a floor to sit in, so an
+    empty bar still shows the space it could have filled and a losing hour reads as losing before
+    you reach the number. The shipping Habits tab drew every bar full width in one colour with the
+    value rendered as <span class="mono" style="color:var(--loss-text)">₹NaN</span> — a winning hour
+    and a losing hour were identical.
     <br><br>
-    <b>Session log and bar charts must reconcile.</b> Mon +₹4,200, Tue +₹6,350, Wed +₹5,850 as
-    &minus;₹2,700 and +₹8,550, Thu &minus;₹7,410, Fri &minus;₹1,000 — the day rows above sum to
-    exactly the day-of-week bars below. Two views of one week that disagree by a rupee is the
-    fastest way to lose a trader&rsquo;s trust in both.
+    <b>Session log and bar charts reconcile to the rupee.</b> Mon +₹4,200, Tue +₹6,350, Wed +₹5,850
+    as &minus;₹2,700 and +₹8,550, Thu &minus;₹7,410, Fri &minus;₹1,000. Two views of one week that
+    disagree is the fastest way to lose a trader&rsquo;s trust in both.
   </div>
 
-</div>
 </main>
-
+</div>
 </body>
 </html>

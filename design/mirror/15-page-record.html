@@ -1,106 +1,119 @@
-<!-- @dsCard group="Pages" name="My Record" subtitle="Pre-trade lookup — what actually happened last time you traded this" viewport-width="1600" -->
+<!-- @dsCard group="Pages" name="My Record" subtitle="Pre-trade lookup — one verdict, the evidence under it" viewport-width="1500" -->
 <!doctype html>
 <html lang="en">
 <head>
 <meta charset="utf-8">
 <title>Mirror — My Record</title>
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=DM+Mono:wght@300;400;500&display=swap">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=DM+Mono:wght@400;500&display=swap">
 <style>
-  :root{ --page:#EEF1F5; --surface:#FFFFFF; --inset:#E4E9F0; --sidebar:#FFFFFF;
-    --border:#D6DEE8; --divider:#E8EDF3; --ink:#0F1724; --ink2:#4A5768; --ink3:#7C8899;
-    --brand:#0E7A6E; --brand-t:#E2F2EF; --profit:#12795B; --profit-t:#E3F3EE;
-    --loss:#C2372B; --loss-t:#FBE9E7; --caution:#A96A0C; --caution-t:#FBF0DF;
-    --sh1:0 1px 2px rgba(15,23,36,.05), 0 1px 3px rgba(15,23,36,.06);
-    --sh2:0 2px 4px rgba(15,23,36,.04), 0 8px 20px rgba(15,23,36,.08); }
+  :root{
+    --ground:#EEF1F5; --canvas:#FFFFFF; --inset:#E9EDF3;
+    --rule:#E3E8EF; --edge:#D3DBE4; --stroke-strong:#5E6B7A;
+    --ink:#0F1724; --ink-2:#4A5768; --ink-3:#647285;
+    --brand:#0E7A6E; --brand-text:#0B6155; --brand-tint:#E4F3F1;
+    --profit:#12795B; --profit-text:#0E6249; --profit-tint:#E7F4EF;
+    --loss:#C2372B; --loss-text:#A62B21; --loss-tint:#FCEEEC;
+    --caution:#96600C; --caution-text:#8F5A0B; --caution-tint:#FDF4E6;
+    --hover:#F5F8FA; --selected:#E4F3F1;
+    --sh-2:0 0 2px rgba(15,23,36,.12), 0 1px 2px rgba(15,23,36,.14);
+    --sh-4:0 0 2px rgba(15,23,36,.12), 0 2px 4px rgba(15,23,36,.14);
+    --sh-8:0 0 2px rgba(15,23,36,.12), 0 4px 8px rgba(15,23,36,.14);
+    --dur-fast:150ms; --ease-enter:cubic-bezier(0,0,0,1);
+  }
   *{box-sizing:border-box}
-  body{margin:0;background:var(--page);color:var(--ink);
-    font:400 13.5px/1.6 Inter,system-ui,sans-serif;display:flex;min-height:100vh}
+  body{margin:0;background:var(--ground);color:var(--ink);
+    font:400 13.5px/20px Inter,system-ui,sans-serif;padding:20px 24px}
   .mono{font-family:'DM Mono',monospace;font-variant-numeric:tabular-nums}
-  .lbl{font:600 10.5px/1 Inter,sans-serif;letter-spacing:.09em;text-transform:uppercase;color:var(--ink3)}
-
-  aside{width:244px;flex-shrink:0;background:var(--sidebar);border-right:1px solid var(--border);
-    display:flex;flex-direction:column;padding:0 12px 14px;position:sticky;top:0;height:100vh}
-  .brand{display:flex;align-items:center;gap:10px;height:64px;padding:0 8px;
-    font:600 16px/1 Inter,sans-serif;letter-spacing:-.01em}
+  .lbl{font:600 10px/14px Inter,sans-serif;letter-spacing:.09em;text-transform:uppercase;color:var(--ink-3)}
+  .shell{max-width:1440px;margin:0 auto;background:var(--canvas);border:1px solid var(--edge);
+    border-radius:12px;box-shadow:var(--sh-4);display:flex;overflow:hidden;min-height:calc(100vh - 40px)}
+  aside{width:244px;flex-shrink:0;border-right:1px solid var(--rule);
+    display:flex;flex-direction:column;padding:0 10px 12px}
+  .brand{display:flex;align-items:center;gap:10px;height:60px;padding:0 10px;
+    font:600 16px/20px Inter,sans-serif;letter-spacing:-.01em}
   .brand svg{color:var(--brand)}
-  .nav{display:flex;align-items:center;gap:12px;height:38px;padding:0 12px;border-radius:6px;
-    font:500 13.5px/1 Inter,sans-serif;color:var(--ink2);margin-bottom:2px;position:relative}
-  .nav .ic{width:16px;height:16px;flex-shrink:0;color:var(--ink3)}
-  .nav.on{background:var(--brand-t);color:var(--brand);font-weight:600}
+  .nav{display:flex;align-items:center;gap:10px;height:36px;padding:0 10px;border-radius:6px;
+    font:500 13.5px/20px Inter,sans-serif;color:var(--ink-2);margin-bottom:2px;
+    transition:background-color var(--dur-fast) var(--ease-enter)}
+  .nav .ic{width:16px;height:16px;flex-shrink:0;color:var(--ink-3)}
+  .nav:hover{background:var(--hover)}
+  .nav.on{background:var(--selected);color:var(--brand-text);font-weight:600}
   .nav.on .ic{color:var(--brand)}
-  .nav.on:before{content:"";position:absolute;left:-12px;top:9px;bottom:9px;width:3px;
-    background:var(--brand);border-radius:0 2px 2px 0}
-  .nav .bdg{margin-left:auto;font:500 10.5px/1 'DM Mono',monospace;background:var(--loss);
-    color:#fff;border-radius:999px;padding:3px 6px}
-  .grp{font:600 10px/1 Inter,sans-serif;letter-spacing:.11em;text-transform:uppercase;
-    color:var(--ink3);padding:20px 12px 8px}
-  .side-b{margin-top:auto;padding-top:14px}
-  .acct{display:flex;align-items:center;gap:9px;height:40px;padding:0 12px;border-radius:8px;
-    background:var(--inset);font:500 12.5px/1 'DM Mono',monospace;margin-top:12px}
-  .acct i{width:7px;height:7px;border-radius:999px;background:var(--profit)}
-
+  .nav .bdg{margin-left:auto;font:500 10px/14px 'DM Mono',monospace;background:var(--loss);
+    color:#fff;border-radius:999px;padding:2px 6px}
+  .grp{font:600 10px/14px Inter,sans-serif;letter-spacing:.09em;text-transform:uppercase;
+    color:var(--ink-3);padding:16px 10px 6px}
+  .side-b{margin-top:auto;padding-top:12px}
+  .acct{display:flex;align-items:center;gap:8px;height:36px;padding:0 10px;border-radius:6px;
+    background:var(--inset);font:500 12px/16px 'DM Mono',monospace}
+  .acct i{width:6px;height:6px;border-radius:999px;background:var(--profit)}
   main{flex:1;min-width:0}
-  .wrap{padding:24px 32px 56px;display:flex;flex-direction:column;gap:16px}
-  .card{background:var(--surface);border:1px solid var(--border);border-radius:10px;box-shadow:var(--sh1)}
-  .card.hero{box-shadow:var(--sh2)}
-  .ch{display:flex;align-items:center;gap:11px;padding:15px 20px;border-bottom:1px solid var(--divider)}
-  .ch h2{font:600 14px/1.2 Inter,sans-serif;margin:0}
-  .ch .r{margin-left:auto;font:400 12px/1 'DM Mono',monospace;color:var(--ink3)}
 
-  h1{font:600 19px/1.25 Inter,sans-serif;margin:0;letter-spacing:-.015em}
-  .sub{font-size:12.5px;color:var(--ink3);margin:6px 0 0}
-
-  .searchbox{padding:20px}
-  .search{display:flex;align-items:center;gap:11px;background:var(--inset);
-    border:1px solid var(--border);border-radius:9px;height:46px;padding:0 15px;
-    font:400 14px/44px Inter,sans-serif;color:var(--ink)}
-  .search .c{margin-left:auto;font:400 11px/1 'DM Mono',monospace;color:var(--ink3);
-    background:var(--surface);border:1px solid var(--border);border-radius:5px;padding:5px 8px}
-  .quick{display:flex;gap:9px;margin-top:14px;flex-wrap:wrap}
-  .q{background:var(--surface);border:1px solid var(--border);border-radius:999px;
-    padding:8px 14px;font:600 12.5px/1 Inter,sans-serif;box-shadow:var(--sh1)}
-  .q b{color:var(--ink3);font-family:'DM Mono',monospace;font-weight:400;margin-left:8px}
-  .q.sel{background:var(--brand);border-color:var(--brand);color:#fff}
+  .band{padding:20px 24px;border-bottom:1px solid var(--rule)}
+  h1{font:600 20px/28px Inter,sans-serif;margin:0;letter-spacing:-.01em}
+  .sub{font-size:12px;line-height:16px;color:var(--ink-3);margin:4px 0 0}
+  .search{display:flex;align-items:center;gap:10px;background:var(--inset);
+    border:1px solid var(--stroke-strong);border-radius:8px;height:44px;padding:0 14px;
+    font:400 14px/20px Inter,sans-serif;color:var(--ink-3);margin-top:14px}
+  .search .c{margin-left:auto;font:400 11px/14px 'DM Mono',monospace;color:var(--ink-3);
+    background:var(--canvas);border:1px solid var(--edge);border-radius:4px;padding:3px 7px}
+  .quick{display:flex;gap:8px;margin-top:10px;flex-wrap:wrap}
+  .q{background:var(--inset);border-radius:999px;padding:7px 13px;
+    font:600 12.5px/16px Inter,sans-serif;color:var(--ink-2);cursor:pointer}
+  .q b{color:var(--ink-3);font-family:'DM Mono',monospace;font-weight:400;margin-left:7px}
+  .q.sel{background:var(--brand);color:#fff}
   .q.sel b{color:#BFE3DD}
 
-  .verdict{padding:22px 24px;display:flex;align-items:flex-start;justify-content:space-between;gap:44px}
-  .vt{font:600 22px/1.35 Inter,sans-serif;letter-spacing:-.015em;margin:11px 0 0;max-width:46ch}
-  .vsub{font-size:13px;color:var(--ink2);margin:11px 0 0;max-width:62ch;line-height:1.65}
-  .vm{display:flex;gap:14px;flex-shrink:0}
-  .mm{background:var(--inset);border-radius:8px;padding:13px 18px;text-align:right;min-width:118px}
-  .mm .f{font:500 23px/1 'DM Mono',monospace;margin:10px 0 0;letter-spacing:-.02em}
+  .section{padding:16px 24px;border-bottom:1px solid var(--rule)}
+  .section:last-of-type{border-bottom:0}
+  .sec-h{display:flex;align-items:center;gap:10px;padding-bottom:10px}
+  .sec-h h2{font:600 14px/20px Inter,sans-serif;margin:0}
+  .sec-h .r{margin-left:auto;font:400 12px/16px 'DM Mono',monospace;color:var(--ink-3)}
 
-  .grid2{display:grid;grid-template-columns:1fr 1fr;gap:16px}
-  .crow{display:grid;grid-template-columns:1fr 96px 110px;gap:16px;align-items:center;
-    padding:13px 20px;border-bottom:1px solid var(--divider)}
+  .verdict{display:flex;align-items:flex-start;justify-content:space-between;gap:36px;padding:4px 0}
+  .vt{font:600 22px/32px Inter,sans-serif;letter-spacing:-.01em;margin:4px 0 0;max-width:46ch}
+  .vsub{font-size:13px;line-height:20px;color:var(--ink-2);margin:8px 0 0;max-width:66ch}
+  .vm{display:flex;gap:8px;flex-shrink:0}
+  .mm{background:var(--inset);border-radius:8px;padding:10px 16px;text-align:right;min-width:104px}
+  .mm .f{font:500 22px/28px 'DM Mono',monospace;margin:4px 0 0;letter-spacing:-.02em}
+
+  .two{display:grid;grid-template-columns:1fr 1fr;gap:0}
+  .two > div{padding:16px 24px}
+  .two > div:first-child{border-right:1px solid var(--rule)}
+  .crow{display:grid;grid-template-columns:1fr 90px 104px;gap:14px;align-items:center;
+    padding:11px 0;border-bottom:1px solid var(--rule)}
   .crow:last-child{border-bottom:0}
-  .ck{font:500 13px/1.3 Inter,sans-serif}
-  .ckm{font:400 11.5px/1 'DM Mono',monospace;color:var(--ink3);margin-top:6px}
-  .cw{text-align:right;font:400 12.5px/1 'DM Mono',monospace;color:var(--ink3)}
-  .cp{text-align:right;font:500 14px/1 'DM Mono',monospace}
+  .ck{font:500 13px/20px Inter,sans-serif}
+  .ckm{font:400 11.5px/16px 'DM Mono',monospace;color:var(--ink-3);margin-top:2px}
+  .cw{text-align:right;font:400 12px/16px 'DM Mono',monospace;color:var(--ink-3)}
+  .cp{text-align:right;font:500 15px/20px 'DM Mono',monospace}
 
-  thead th{font:600 10px/1 Inter,sans-serif;letter-spacing:.09em;text-transform:uppercase;
-    color:var(--ink3);text-align:right;padding:11px 20px;background:var(--inset);
-    border-bottom:1px solid var(--border)}
-  thead th:first-child{text-align:left}
   table{width:100%;border-collapse:collapse}
-  tbody td{padding:14px 20px;border-bottom:1px solid var(--divider);text-align:right;
-    font:500 13.5px/1 'DM Mono',monospace;font-variant-numeric:tabular-nums}
-  tbody td:first-child{text-align:left}
+  thead th{font:600 10px/14px Inter,sans-serif;letter-spacing:.09em;text-transform:uppercase;
+    color:var(--ink-3);text-align:right;padding:8px 12px;background:var(--inset)}
+  thead th:first-child{text-align:left;padding-left:24px}
+  thead th:last-child{padding-right:24px}
+  tbody td{padding:11px 12px;border-bottom:1px solid var(--rule);text-align:right;
+    font:500 13.5px/20px 'DM Mono',monospace;font-variant-numeric:tabular-nums}
+  tbody td:first-child{text-align:left;padding-left:24px}
+  tbody td:last-child{padding-right:24px}
   tbody tr:last-child td{border-bottom:0}
-  .tag{font:600 10px/1 Inter,sans-serif;padding:5px 8px;border-radius:999px}
+  tbody tr{transition:background-color var(--dur-fast) var(--ease-enter)}
+  tbody tr:hover{background:var(--hover)}
+  .tag{font:600 10px/14px Inter,sans-serif;padding:3px 8px;border-radius:999px}
 
-  .note{background:var(--surface);border:1px solid var(--border);border-left:3px solid var(--brand);
-    border-radius:10px;box-shadow:var(--sh1);padding:17px 20px;max-width:104ch;
-    font-size:13px;color:var(--ink2);line-height:1.7}
-  .note b{color:var(--ink);font-weight:600}
+  .callout{background:var(--canvas);border:1px solid var(--edge);border-left:3px solid var(--brand);
+    border-radius:8px;box-shadow:var(--sh-8);padding:14px 16px;margin:16px 24px 24px;
+    font-size:13px;line-height:22px;color:var(--ink-2);max-width:104ch}
+  .callout b{color:var(--ink);font-weight:600}
 </style>
 </head>
 <body>
+<div class="shell">
 
 <aside>
   <div class="brand">
-    <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2 4 6v6c0 5 3.4 9.4 8 10 4.6-.6 8-5 8-10V6z"/></svg>
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2 4 6v6c0 5 3.4 9.4 8 10 4.6-.6 8-5 8-10V6z"/></svg>
     TradeMentor</div>
   <div class="nav"><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/></svg>Dashboard</div>
   <div class="nav"><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 17l6-6 4 4 7-7"/><path d="M14 8h6v6"/></svg>Analytics</div>
@@ -118,118 +131,113 @@
 </aside>
 
 <main>
-<div class="wrap">
 
-  <div>
+  <div class="band">
     <h1>My Record</h1>
     <p class="sub">Before you trade it — what actually happened last time you did.</p>
-  </div>
-
-  <div class="card">
-    <div class="searchbox">
-      <div class="search">⌕ <span style="color:var(--ink3)">Search an instrument you have traded</span>
-        <span class="c">⌘K</span></div>
-      <div class="quick">
-        <span class="q sel">NIFTY<b>8</b></span>
-        <span class="q">BANKNIFTY<b>3</b></span>
-        <span class="q">FORTIS<b>2</b></span>
-        <span class="q">SOLARINDS<b>2</b></span>
-        <span class="q">FINNIFTY<b>2</b></span>
-      </div>
+    <div class="search">⌕ <span>Search an instrument you have traded</span>
+      <span class="c">⌘K</span></div>
+    <div class="quick">
+      <span class="q sel">NIFTY<b>8</b></span>
+      <span class="q">BANKNIFTY<b>3</b></span>
+      <span class="q">FORTIS<b>2</b></span>
+      <span class="q">SOLARINDS<b>2</b></span>
+      <span class="q">FINNIFTY<b>2</b></span>
     </div>
   </div>
 
-  <div class="card hero">
+  <div class="section">
     <div class="verdict">
       <div>
         <div class="lbl">Your record · NIFTY · 90 days</div>
         <p class="vt">You make money on NIFTY in the morning and give it back after 2 PM.</p>
         <p class="vsub">Eight trades. The four before 11 AM returned
-          <span class="mono" style="color:var(--profit);font-weight:500">+₹7,240</span>; the four
-          after 2 PM returned <span class="mono" style="color:var(--loss);font-weight:500">&minus;₹6,315</span>.
+          <span class="mono" style="color:var(--profit-text);font-weight:500">+₹7,240</span>; the four
+          after 2 PM returned
+          <span class="mono" style="color:var(--loss-text);font-weight:500">&minus;₹6,315</span>.
           Same instrument, same size, opposite outcome.</p>
       </div>
       <div class="vm">
         <div class="mm"><div class="lbl">Net</div>
-          <p class="f" style="color:var(--profit)">+₹925</p></div>
+          <p class="f" style="color:var(--profit-text)">+₹925</p></div>
         <div class="mm"><div class="lbl">Win rate</div><p class="f">57%</p></div>
         <div class="mm"><div class="lbl">Trades</div><p class="f">8</p></div>
       </div>
     </div>
   </div>
 
-  <div class="grid2">
-    <div class="card">
-      <div class="ch"><h2>By hour</h2><span class="r">NIFTY only</span></div>
+  <div class="two" style="border-bottom:1px solid var(--rule)">
+    <div>
+      <div class="sec-h"><h2>By hour</h2><span class="r">NIFTY only</span></div>
       <div class="crow"><div><div class="ck">09:00 &ndash; 11:00</div>
         <div class="ckm">4 trades</div></div>
         <span class="cw">75% win</span>
-        <span class="cp" style="color:var(--profit)">+₹7,240</span></div>
+        <span class="cp" style="color:var(--profit-text)">+₹7,240</span></div>
       <div class="crow"><div><div class="ck">11:00 &ndash; 14:00</div>
         <div class="ckm">no trades in this window</div></div>
         <span class="cw">&mdash;</span>
-        <span class="cp" style="color:var(--ink3)">&mdash;</span></div>
+        <span class="cp" style="color:var(--ink-3)">&mdash;</span></div>
       <div class="crow"><div><div class="ck">14:00 &ndash; 15:30</div>
         <div class="ckm">4 trades</div></div>
         <span class="cw">25% win</span>
-        <span class="cp" style="color:var(--loss)">&minus;₹6,315</span></div>
+        <span class="cp" style="color:var(--loss-text)">&minus;₹6,315</span></div>
     </div>
-
-    <div class="card">
-      <div class="ch"><h2>After a loss</h2><span class="r">NIFTY only</span></div>
+    <div>
+      <div class="sec-h"><h2>After a loss</h2><span class="r">NIFTY only</span></div>
       <div class="crow"><div><div class="ck">Entered within 15 min of a loss</div>
         <div class="ckm">3 trades · your cooldown is 15 min</div></div>
         <span class="cw">0% win</span>
-        <span class="cp" style="color:var(--loss)">&minus;₹5,180</span></div>
+        <span class="cp" style="color:var(--loss-text)">&minus;₹5,180</span></div>
       <div class="crow"><div><div class="ck">Waited longer than 15 min</div>
         <div class="ckm">5 trades</div></div>
         <span class="cw">80% win</span>
-        <span class="cp" style="color:var(--profit)">+₹6,105</span></div>
+        <span class="cp" style="color:var(--profit-text)">+₹6,105</span></div>
       <div class="crow"><div><div class="ck">Average size after a loss</div>
         <div class="ckm">against your NIFTY normal</div></div>
         <span class="cw">&mdash;</span>
-        <span class="cp" style="color:var(--loss)">1.31&times;</span></div>
+        <span class="cp" style="color:var(--loss-text)">1.31&times;</span></div>
     </div>
   </div>
 
-  <div class="card">
-    <div class="ch"><h2>Every NIFTY trade</h2><span class="r">8 closed · last 90 days</span></div>
+  <div class="section" style="padding-left:0;padding-right:0">
+    <div class="sec-h" style="padding-left:24px;padding-right:24px">
+      <h2>Every NIFTY trade</h2><span class="r">8 closed · last 90 days</span></div>
     <table>
       <thead><tr><th>Opened</th><th>Side</th><th>Qty</th><th>Entry</th><th>Exit</th>
         <th>Held</th><th>Behaviour</th><th>P&amp;L</th></tr></thead>
       <tbody>
         <tr><td>5 Aug, 14:12</td><td>BUY CE</td><td>50</td><td>118.05</td><td>64.05</td><td>22m</td>
-          <td><span class="tag" style="background:var(--loss-t);color:var(--loss)">Revenge</span></td>
-          <td style="color:var(--loss)">&minus;₹2,700</td></tr>
+          <td><span class="tag" style="background:var(--loss-tint);color:var(--loss-text)">Revenge</span></td>
+          <td style="color:var(--loss-text)">&minus;₹2,700</td></tr>
         <tr><td>4 Aug, 09:24</td><td>BUY CE</td><td>50</td><td>96.40</td><td>137.20</td><td>1h 04m</td>
-          <td><span class="tag" style="background:var(--profit-t);color:var(--profit)">Clean</span></td>
-          <td style="color:var(--profit)">+₹2,040</td></tr>
+          <td><span class="tag" style="background:var(--profit-tint);color:var(--profit-text)">Clean</span></td>
+          <td style="color:var(--profit-text)">+₹2,040</td></tr>
         <tr><td>4 Aug, 10:02</td><td>BUY PE</td><td>50</td><td>72.15</td><td>108.55</td><td>48m</td>
-          <td><span class="tag" style="background:var(--profit-t);color:var(--profit)">Clean</span></td>
-          <td style="color:var(--profit)">+₹1,820</td></tr>
+          <td><span class="tag" style="background:var(--profit-tint);color:var(--profit-text)">Clean</span></td>
+          <td style="color:var(--profit-text)">+₹1,820</td></tr>
         <tr><td>3 Aug, 09:41</td><td>BUY CE</td><td>50</td><td>141.30</td><td>187.90</td><td>1h 21m</td>
-          <td><span class="tag" style="background:var(--profit-t);color:var(--profit)">Clean</span></td>
-          <td style="color:var(--profit)">+₹2,330</td></tr>
+          <td><span class="tag" style="background:var(--profit-tint);color:var(--profit-text)">Clean</span></td>
+          <td style="color:var(--profit-text)">+₹2,330</td></tr>
         <tr><td>31 Jul, 14:48</td><td>BUY CE</td><td>50</td><td>88.20</td><td>68.20</td><td>14m</td>
-          <td><span class="tag" style="background:var(--caution-t);color:var(--caution)">Overtrading</span></td>
-          <td style="color:var(--loss)">&minus;₹1,000</td></tr>
+          <td><span class="tag" style="background:var(--caution-tint);color:var(--caution-text)">Overtrading</span></td>
+          <td style="color:var(--loss-text)">&minus;₹1,000</td></tr>
         <tr><td>30 Jul, 14:05</td><td>BUY PE</td><td>100</td><td>154.60</td><td>126.15</td><td>31m</td>
-          <td><span class="tag" style="background:var(--loss-t);color:var(--loss)">Size tilt</span></td>
-          <td style="color:var(--loss)">&minus;₹2,845</td></tr>
+          <td><span class="tag" style="background:var(--loss-tint);color:var(--loss-text)">Size tilt</span></td>
+          <td style="color:var(--loss-text)">&minus;₹2,845</td></tr>
         <tr><td>30 Jul, 10:18</td><td>BUY CE</td><td>50</td><td>102.75</td><td>124.75</td><td>52m</td>
-          <td><span class="tag" style="background:var(--profit-t);color:var(--profit)">Clean</span></td>
-          <td style="color:var(--profit)">+₹1,100</td></tr>
+          <td><span class="tag" style="background:var(--profit-tint);color:var(--profit-text)">Clean</span></td>
+          <td style="color:var(--profit-text)">+₹1,100</td></tr>
         <tr><td>29 Jul, 14:33</td><td>BUY CE</td><td>50</td><td>133.40</td><td>119.00</td><td>18m</td>
-          <td><span class="tag" style="background:var(--loss-t);color:var(--loss)">Revenge</span></td>
-          <td style="color:var(--loss)">&minus;₹720</td></tr>
+          <td><span class="tag" style="background:var(--loss-tint);color:var(--loss-text)">Revenge</span></td>
+          <td style="color:var(--loss-text)">&minus;₹720</td></tr>
       </tbody>
     </table>
   </div>
 
-  <div class="note">
-    <b>This screen answers one question, asked before a trade, in one sentence.</b>
-    The verdict is the interface — the tables underneath exist to prove it, not to be read first.
-    A trader about to buy NIFTY at 14:30 needs &ldquo;you lose money doing this&rdquo; in the time it
+  <div class="callout">
+    <b>One question, asked before a trade, answered in one sentence.</b>
+    The verdict is the interface; the tables underneath exist to prove it, not to be read first. A
+    trader about to buy NIFTY at 14:30 needs &ldquo;you lose money doing this&rdquo; in the time it
     takes to glance, and the evidence available if they want to argue with it.
     <br><br>
     <b>A window with no trades says so.</b> 11:00&ndash;14:00 renders an em dash and the words
@@ -237,8 +245,7 @@
     facts and a trader will act on them differently.
   </div>
 
-</div>
 </main>
-
+</div>
 </body>
 </html>
