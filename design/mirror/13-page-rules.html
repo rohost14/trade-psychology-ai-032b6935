@@ -6,85 +6,83 @@
 <title>Mirror — My Rules</title>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=DM+Mono:wght@300;400;500&display=swap">
 <style>
-  :root{ --sidebar:#101114; --page:#121316; --surface:#191B1F; --overlay:#232529;
-    --border:#2A2C32; --divider:#1E2024; --ink:#EEECE8; --ink2:#939698; --ink3:#646670;
-    --brand:#59C0B4; --profit:#47B88E; --loss:#CF6559; --caution:#D39145; }
+  :root{ --page:#EEF1F5; --surface:#FFFFFF; --inset:#E4E9F0; --sidebar:#FFFFFF;
+    --border:#D6DEE8; --divider:#E8EDF3; --ink:#0F1724; --ink2:#4A5768; --ink3:#7C8899;
+    --brand:#0E7A6E; --brand-t:#E2F2EF; --profit:#12795B; --profit-t:#E3F3EE;
+    --loss:#C2372B; --loss-t:#FBE9E7; --caution:#A96A0C; --caution-t:#FBF0DF;
+    --sh1:0 1px 2px rgba(15,23,36,.05), 0 1px 3px rgba(15,23,36,.06);
+    --sh2:0 2px 4px rgba(15,23,36,.04), 0 8px 20px rgba(15,23,36,.08); }
   *{box-sizing:border-box}
   body{margin:0;background:var(--page);color:var(--ink);
     font:400 13.5px/1.6 Inter,system-ui,sans-serif;display:flex;min-height:100vh}
   .mono{font-family:'DM Mono',monospace;font-variant-numeric:tabular-nums}
+  .lbl{font:600 10.5px/1 Inter,sans-serif;letter-spacing:.09em;text-transform:uppercase;color:var(--ink3)}
 
-  aside{width:244px;flex-shrink:0;background:var(--sidebar);border-right:1px solid var(--divider);
-    display:flex;flex-direction:column;padding:0 12px 14px;position:sticky;top:0;height:100vh;overflow-y:auto}
+  aside{width:244px;flex-shrink:0;background:var(--sidebar);border-right:1px solid var(--border);
+    display:flex;flex-direction:column;padding:0 12px 14px;position:sticky;top:0;height:100vh}
   .brand{display:flex;align-items:center;gap:10px;height:64px;padding:0 8px;
     font:600 16px/1 Inter,sans-serif;letter-spacing:-.01em}
   .brand svg{color:var(--brand)}
   .nav{display:flex;align-items:center;gap:12px;height:38px;padding:0 12px;border-radius:6px;
     font:500 13.5px/1 Inter,sans-serif;color:var(--ink2);margin-bottom:2px;position:relative}
   .nav .ic{width:16px;height:16px;flex-shrink:0;color:var(--ink3)}
-  .nav.on{background:rgba(89,192,180,.10);color:var(--brand);font-weight:600}
+  .nav.on{background:var(--brand-t);color:var(--brand);font-weight:600}
   .nav.on .ic{color:var(--brand)}
   .nav.on:before{content:"";position:absolute;left:-12px;top:9px;bottom:9px;width:3px;
     background:var(--brand);border-radius:0 2px 2px 0}
   .nav .bdg{margin-left:auto;font:500 10.5px/1 'DM Mono',monospace;background:var(--loss);
-    color:#121316;border-radius:999px;padding:3px 6px}
+    color:#fff;border-radius:999px;padding:3px 6px}
   .grp{font:600 10px/1 Inter,sans-serif;letter-spacing:.11em;text-transform:uppercase;
     color:var(--ink3);padding:20px 12px 8px}
   .side-b{margin-top:auto;padding-top:14px}
-  .acct{display:flex;align-items:center;gap:9px;height:40px;padding:0 12px;border-radius:6px;
-    background:var(--overlay);font:500 12.5px/1 'DM Mono',monospace;margin-top:12px}
+  .acct{display:flex;align-items:center;gap:9px;height:40px;padding:0 12px;border-radius:8px;
+    background:var(--inset);font:500 12.5px/1 'DM Mono',monospace;margin-top:12px}
   .acct i{width:7px;height:7px;border-radius:999px;background:var(--profit)}
 
   main{flex:1;min-width:0}
-  .wrap{padding:22px 32px 56px}
-  .lbl{font:600 10.5px/1 Inter,sans-serif;letter-spacing:.09em;text-transform:uppercase;color:var(--ink3)}
+  .wrap{padding:24px 32px 56px;display:flex;flex-direction:column;gap:16px}
+  .card{background:var(--surface);border:1px solid var(--border);border-radius:10px;box-shadow:var(--sh1)}
+  .ch{display:flex;align-items:center;gap:11px;padding:15px 20px;border-bottom:1px solid var(--divider)}
+  .ch h2{font:600 14px/1.2 Inter,sans-serif;margin:0}
+  .ch .r{margin-left:auto;font:400 12px/1 'DM Mono',monospace;color:var(--ink3)}
 
   .top{display:flex;align-items:flex-end;justify-content:space-between}
   h1{font:600 19px/1.25 Inter,sans-serif;margin:0;letter-spacing:-.015em}
-  .sub{font-size:12.5px;color:var(--ink3);margin:5px 0 0}
-  .btn{border:1px solid var(--border);background:var(--surface);color:var(--ink);border-radius:6px;
-    height:34px;padding:0 15px;font:600 12.5px/1 Inter,sans-serif;cursor:pointer;
-    display:inline-flex;align-items:center;gap:8px}
+  .sub{font-size:12.5px;color:var(--ink3);margin:6px 0 0}
+  .btn{border:1px solid var(--border);background:var(--surface);color:var(--ink);border-radius:7px;
+    height:36px;padding:0 16px;font:600 12.5px/1 Inter,sans-serif;cursor:pointer;box-shadow:var(--sh1)}
 
-  .sec{margin-top:28px}
-  .sec-h{display:flex;align-items:center;padding-bottom:12px;border-bottom:1px solid var(--border)}
-  .sec-h h2{font:600 10.5px/1 Inter,sans-serif;letter-spacing:.09em;text-transform:uppercase;
-    color:var(--ink2);margin:0}
-  .sec-h .r{margin-left:auto;font:400 12px/1 'DM Mono',monospace;color:var(--ink3)}
-
-  /* rule row: name | declared | enforced | usage bar | state */
-  .rrow{display:grid;grid-template-columns:1.4fr 120px 120px 1.6fr 150px;gap:22px;align-items:center;
-    padding:17px 0;border-bottom:1px solid var(--divider)}
+  .rrow{display:grid;grid-template-columns:1.4fr 116px 116px 1.5fr 160px;gap:22px;align-items:center;
+    padding:17px 20px;border-bottom:1px solid var(--divider)}
   .rrow:last-child{border-bottom:0}
   .rn{font:600 13.5px/1.3 Inter,sans-serif;margin:0}
-  .rd{font-size:12.5px;color:var(--ink3);margin:5px 0 0}
-  .val{font:500 16px/1 'DM Mono',monospace;margin:7px 0 0}
-  .track{height:5px;background:var(--overlay);border-radius:3px;overflow:hidden}
+  .rd{font-size:12.5px;color:var(--ink3);margin:6px 0 0}
+  .val{font:500 16px/1 'DM Mono',monospace;margin:8px 0 0}
+  .track{height:6px;background:var(--inset);border-radius:3px;overflow:hidden}
   .track i{display:block;height:100%;border-radius:3px}
-  .use{font:400 12px/1 'DM Mono',monospace;color:var(--ink3);margin:9px 0 0}
-  .pill{display:inline-flex;align-items:center;gap:6px;border-radius:999px;
-    font:600 10px/1 Inter,sans-serif;letter-spacing:.05em;padding:5px 10px}
-  .over{font-size:11.5px;color:var(--ink3);margin:7px 0 0}
-
-  .expand{display:flex;align-items:center;gap:9px;padding:15px 0;color:var(--ink3);
+  .use{font:400 12px/1 'DM Mono',monospace;color:var(--ink3);margin:10px 0 0}
+  .pill{display:inline-flex;align-items:center;border-radius:999px;
+    font:600 10px/1 Inter,sans-serif;letter-spacing:.05em;padding:6px 11px}
+  .over{font-size:11.5px;color:var(--ink3);margin:8px 0 0;line-height:1.45}
+  .expand{display:flex;align-items:center;gap:9px;padding:14px 20px;color:var(--ink2);
     font-size:12.5px;border-top:1px solid var(--divider)}
 
-  /* violations */
-  .vrow{display:grid;grid-template-columns:1fr 190px;gap:20px;align-items:center;
-    padding:15px 0 15px 15px;border-bottom:1px solid var(--divider);border-left:3px solid transparent}
+  .vrow{display:grid;grid-template-columns:1fr 200px;gap:20px;align-items:center;
+    padding:15px 20px 15px 17px;border-bottom:1px solid var(--divider);border-left:3px solid transparent}
+  .vrow:last-child{border-bottom:0}
   .vrow.danger{border-left-color:var(--loss)}
   .vt{font:500 13.5px/1.4 Inter,sans-serif;margin:0}
-  .vm{font:400 11.5px/1 'DM Mono',monospace;color:var(--ink3);margin:8px 0 0}
-  .vc{text-align:right;font:500 14px/1 'DM Mono',monospace;color:var(--loss)}
-  .vcs{font:400 11px/1 'DM Mono',monospace;color:var(--ink3);margin-top:6px}
+  .vm{font:400 11.5px/1 'DM Mono',monospace;color:var(--ink3);margin:9px 0 0}
+  .vc{text-align:right;font:500 15px/1 'DM Mono',monospace;color:var(--loss)}
+  .vcs{text-align:right;font:400 11px/1 'DM Mono',monospace;color:var(--ink3);margin-top:7px}
 
-  .chips{display:flex;gap:9px;flex-wrap:wrap;padding-top:18px}
-  .ch{background:var(--overlay);border:1px solid var(--border);border-radius:999px;
-    padding:7px 12px;font:500 12px/1 Inter,sans-serif;color:var(--ink2)}
-  .ch b{color:var(--ink);font-family:'DM Mono',monospace;font-weight:500;margin-left:6px}
+  .chips{display:flex;gap:9px;flex-wrap:wrap;padding:15px 20px;border-top:1px solid var(--divider)}
+  .ch2{background:var(--inset);border-radius:999px;padding:8px 13px;
+    font:500 12px/1 Inter,sans-serif;color:var(--ink2)}
+  .ch2 b{color:var(--ink);font-family:'DM Mono',monospace;font-weight:500;margin-left:7px}
 
   .note{background:var(--surface);border:1px solid var(--border);border-left:3px solid var(--brand);
-    border-radius:0 8px 8px 0;padding:16px 18px;margin:30px 0 0;max-width:96ch;
+    border-radius:10px;box-shadow:var(--sh1);padding:17px 20px;max-width:104ch;
     font-size:13px;color:var(--ink2);line-height:1.7}
   .note.warn{border-left-color:var(--caution)}
   .note b{color:var(--ink);font-weight:600}
@@ -117,12 +115,11 @@
   <div class="top">
     <div><h1>My Rules</h1>
       <p class="sub">Your trading constitution. You wrote these rules. The system holds you to them.</p></div>
-    <button class="btn">✎ Edit rules</button>
+    <button class="btn">✎&nbsp; Edit rules</button>
   </div>
 
-  <section class="sec">
-    <div class="sec-h"><h2>Your rules</h2>
-      <span class="r">Declared · enforced · today</span></div>
+  <div class="card">
+    <div class="ch"><h2>Your rules</h2><span class="r">Declared · enforced · today</span></div>
 
     <div class="rrow">
       <div><p class="rn">Trades per day</p><p class="rd">Hard cap on entries this session</p></div>
@@ -130,7 +127,7 @@
       <div><div class="lbl">Enforced</div><p class="val" style="color:var(--caution)">6</p></div>
       <div><div class="track"><i style="width:100%;background:var(--loss)"></i></div>
         <p class="use"><span style="color:var(--loss)">9</span> of 6 · 150%</p></div>
-      <div><span class="pill" style="background:rgba(207,101,89,.14);color:var(--loss)">BREACHED</span>
+      <div><span class="pill" style="background:var(--loss-t);color:var(--loss)">BREACHED</span>
         <p class="over">You set 50. Your own trading runs tighter, so 6 applies.</p></div>
     </div>
 
@@ -140,7 +137,7 @@
       <div><div class="lbl">Enforced</div><p class="val">15 min</p></div>
       <div><div class="track"><i style="width:0%;background:var(--brand)"></i></div>
         <p class="use">Not in cooldown</p></div>
-      <div><span class="pill" style="background:var(--overlay);color:var(--ink2)">AS DECLARED</span></div>
+      <div><span class="pill" style="background:var(--inset);color:var(--ink2)">AS DECLARED</span></div>
     </div>
 
     <div class="rrow">
@@ -149,7 +146,7 @@
       <div><div class="lbl">Enforced</div><p class="val">₹25,000</p></div>
       <div><div class="track"><i style="width:34%;background:var(--ink2)"></i></div>
         <p class="use">₹8,455 of ₹25,000 · 34%</p></div>
-      <div><span class="pill" style="background:var(--overlay);color:var(--ink2)">AS DECLARED</span></div>
+      <div><span class="pill" style="background:var(--inset);color:var(--ink2)">AS DECLARED</span></div>
     </div>
 
     <div class="rrow">
@@ -158,7 +155,7 @@
       <div><div class="lbl">Enforced</div><p class="val">₹2,00,000</p></div>
       <div><div class="track"><i style="width:93%;background:var(--caution)"></i></div>
         <p class="use">₹1,86,000 of ₹2,00,000 · 93%</p></div>
-      <div><span class="pill" style="background:rgba(211,145,69,.14);color:var(--caution)">NEAR LIMIT</span></div>
+      <div><span class="pill" style="background:var(--caution-t);color:var(--caution)">NEAR LIMIT</span></div>
     </div>
 
     <div class="rrow">
@@ -167,11 +164,11 @@
       <div><div class="lbl">Enforced</div><p class="val">3</p></div>
       <div><div class="track"><i style="width:66%;background:var(--caution)"></i></div>
         <p class="use">2 of 3</p></div>
-      <div><span class="pill" style="background:rgba(211,145,69,.14);color:var(--caution)">ONE AWAY</span></div>
+      <div><span class="pill" style="background:var(--caution-t);color:var(--caution)">ONE AWAY</span></div>
     </div>
 
     <div class="expand">⌄ &nbsp;4 more limits learned from your trading</div>
-  </section>
+  </div>
 
   <div class="note">
     <b>Declared and enforced sit side by side because they are not the same number.</b>
@@ -181,9 +178,8 @@
     figure is how a trader ends up asking why an alert fired while they were inside their limit.
   </div>
 
-  <section class="sec">
-    <div class="sec-h"><h2>Rule violations</h2>
-      <span class="r">11 in last 30 days</span></div>
+  <div class="card">
+    <div class="ch"><h2>Rule violations</h2><span class="r">11 in last 30 days</span></div>
 
     <div class="vrow danger">
       <div><p class="vt">9 trades today against a limit of 6.</p>
@@ -197,7 +193,7 @@
       <div><div class="vc">&minus;₹2,600</div>
         <div class="vcs">realized on that trade</div></div>
     </div>
-    <div class="vrow danger" style="border-bottom:0">
+    <div class="vrow danger">
       <div><p class="vt">Position sized at ₹2,14,000 against a ceiling of ₹2,00,000.</p>
         <p class="vm">Position size · 4 Aug, 11:04</p></div>
       <div><div class="vc">&minus;₹6,450</div>
@@ -205,11 +201,11 @@
     </div>
 
     <div class="chips">
-      <span class="ch">Max trades per day<b>5</b></span>
-      <span class="ch">Cooldown after a loss<b>4</b></span>
-      <span class="ch">Max risk per trade<b>2</b></span>
+      <span class="ch2">Max trades per day<b>5</b></span>
+      <span class="ch2">Cooldown after a loss<b>4</b></span>
+      <span class="ch2">Max risk per trade<b>2</b></span>
     </div>
-  </section>
+  </div>
 
   <div class="note warn">
     <b>Tightening is instant. Loosening waits for the close.</b>
