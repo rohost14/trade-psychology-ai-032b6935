@@ -41,6 +41,7 @@ import BehaviorTab from '@/components/analytics/BehaviorTab';
 import SessionsTab from '@/components/analytics/SessionsTab';
 import TradeDnaTab from '@/components/analytics/TradeDnaTab';
 import EdgeTab from '@/components/analytics/EdgeTab';
+import HabitsTab from '@/components/analytics/HabitsTab';
 import BehaviourLead from '@/components/analytics/BehaviourLead';
 import PnlCalendar from '@/components/analytics/PnlCalendar';
 import ReportCard from '@/components/analytics/ReportCard';
@@ -92,6 +93,29 @@ describe('Analytics tab render smoke (demo data, backend-shaped)', () => {
 
     // Attribution is a ranked table now, not a donut (§20 bans donut/pie).
     expect(screen.getByText('Where the P&L came from')).toBeInTheDocument();
+
+    expect(container.textContent).not.toContain('NaN');
+  });
+
+  // HabitsTab was the one tab this file never covered, and it is the one that
+  // shipped the regression: DEMO_HABITS called the bucket figure `pnl` while the
+  // component (and habits_service.py) use `net_pnl`, so every bar printed "₹NaN",
+  // took the loss colour because NaN >= 0 is false, and stretched to full width
+  // because a NaN width is dropped and the bar's `inset: 0` takes over. Asserting
+  // a real figure is present matters as much as the NaN check — a tab that
+  // rendered nothing at all would satisfy "no NaN" on its own.
+  it('HabitsTab renders after-loss drift and signed bucket bars without NaN', async () => {
+    const { container } = renderWithRouter(<HabitsTab days={30} />);
+
+    expect(await screen.findByText('After a loss, do you size up?')).toBeInTheDocument();
+    expect(screen.getByText('Time of day')).toBeInTheDocument();
+    expect(screen.getByText('Day of week')).toBeInTheDocument();
+    expect(screen.getByText('By instrument')).toBeInTheDocument();
+
+    // Real figures, correctly signed — the bug rendered these as "₹NaN".
+    expect(screen.getByText('₹5,100')).toBeInTheDocument();   // 09:00 bucket
+    expect(screen.getByText('-₹14,270')).toBeInTheDocument(); // 14:00 bucket
+    expect(screen.getByText('-₹6,500')).toBeInTheDocument();  // SOLARINDS
 
     expect(container.textContent).not.toContain('NaN');
   });

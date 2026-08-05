@@ -1060,30 +1060,39 @@ export const DEMO_BEHAVIORAL_ANALYSIS = {
 // the tab rendered its locked state permanently, and it announced a 5-trade
 // unlock gate directly beneath an Overview reporting 15 trades for the same
 // period. Numbers below are consistent with DEMO_OVERVIEW / DEMO_PERFORMANCE.
+//
+// Bucket rows must carry `key` and `net_pnl` — the field names habits_service.py
+// emits and HabitsTab reads. An earlier version of this fixture called the figure
+// `pnl`, so every bar read Math.round(undefined) === NaN: the label printed "₹NaN",
+// `net_pnl >= 0` was false so every bar rendered in the loss colour, and the NaN%
+// width was rejected by CSS, leaving the bar's `inset: 0` to stretch it full width.
+// A winning hour and a losing hour were indistinguishable. Renaming a mock field is
+// not cosmetic — these fixtures are the only smoke test of the response shape.
 export const DEMO_HABITS = {
   has_data: true,
   sample: 15,
   min_sample: 5,
   by_hour: [
-    { label: '09:00', trades: 5, pnl: 5100,   win_rate: 80 },
-    { label: '10:00', trades: 3, pnl: 1450,   win_rate: 67 },
-    { label: '11:00', trades: 3, pnl: 5210,   win_rate: 33 },
-    { label: '13:00', trades: 1, pnl: -2700,  win_rate: 0  },
-    { label: '14:00', trades: 3, pnl: -14270, win_rate: 0  },
+    { key: 9,  label: '09:00', trades: 5, net_pnl: 5100,   win_rate: 80 },
+    { key: 10, label: '10:00', trades: 3, net_pnl: 1450,   win_rate: 67 },
+    { key: 11, label: '11:00', trades: 3, net_pnl: 5210,   win_rate: 33 },
+    { key: 13, label: '13:00', trades: 1, net_pnl: -2700,  win_rate: 0  },
+    { key: 14, label: '14:00', trades: 3, net_pnl: -14270, win_rate: 0  },
   ],
   by_day_of_week: [
-    { label: 'Mon', trades: 3, pnl: 4200,  win_rate: 67 },
-    { label: 'Tue', trades: 4, pnl: 6350,  win_rate: 75 },
-    { label: 'Wed', trades: 3, pnl: 5850,  win_rate: 67 },
-    { label: 'Thu', trades: 4, pnl: -7410, win_rate: 25 },
-    { label: 'Fri', trades: 1, pnl: -1000, win_rate: 0  },
+    { key: 0, label: 'Mon', trades: 3, net_pnl: 4200,  win_rate: 67 },
+    { key: 1, label: 'Tue', trades: 4, net_pnl: 6350,  win_rate: 75 },
+    { key: 2, label: 'Wed', trades: 3, net_pnl: 5850,  win_rate: 67 },
+    { key: 3, label: 'Thu', trades: 4, net_pnl: -7410, win_rate: 25 },
+    { key: 4, label: 'Fri', trades: 1, net_pnl: -1000, win_rate: 0  },
   ],
+  // Ascending net_pnl — worst first, matching habits_service.py's inst_rows sort.
   by_instrument: [
-    { label: 'FORTIS',    trades: 2, pnl: 11770, win_rate: 100 },
-    { label: 'BANKNIFTY', trades: 3, pnl: 3990,  win_rate: 67  },
-    { label: 'NIFTY',     trades: 7, pnl: 925,   win_rate: 57  },
-    { label: 'SENSEX',    trades: 1, pnl: -1700, win_rate: 0   },
-    { label: 'SOLARINDS', trades: 2, pnl: -6500, win_rate: 50  },
+    { key: 'SOLARINDS', label: 'SOLARINDS', trades: 2, net_pnl: -6500, win_rate: 50  },
+    { key: 'SENSEX',    label: 'SENSEX',    trades: 1, net_pnl: -1700, win_rate: 0   },
+    { key: 'NIFTY',     label: 'NIFTY',     trades: 7, net_pnl: 925,   win_rate: 57  },
+    { key: 'BANKNIFTY', label: 'BANKNIFTY', trades: 3, net_pnl: 3990,  win_rate: 67  },
+    { key: 'FORTIS',    label: 'FORTIS',    trades: 2, net_pnl: 11770, win_rate: 100 },
   ],
   after_loss_size: {
     overall_avg_notional: 186_000,
