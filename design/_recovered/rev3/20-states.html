@@ -1,0 +1,266 @@
+<!-- @dsCard group="Components" name="States & announcements" subtitle="Loading, empty, error, degraded — plus the live-region spec for real-time alerts" viewport-width="1440" -->
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Mirror — States</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=DM+Mono:wght@400;500&display=swap">
+<style>
+  :root{
+    --ground:#EEF1F5; --canvas:#FFFFFF; --inset:#E9EDF3;
+    --rule:#E3E8EF; --edge:#D3DBE4; --stroke-strong:#5E6B7A;
+    --ink:#0F1724; --ink-2:#4A5768; --ink-3:#647285;
+    --brand:#0E7A6E; --brand-text:#0B6155; --brand-tint:#E4F3F1; --brand-edge:#B4DDD7;
+    --profit:#12795B; --profit-text:#0E6249; --profit-tint:#E7F4EF;
+    --loss:#C2372B; --loss-text:#A62B21; --loss-tint:#FCEEEC; --loss-edge:#EFC0BA;
+    --caution:#96600C; --caution-text:#8F5A0B; --caution-tint:#FDF4E6; --caution-edge:#EBD8B4;
+    --hover:#F5F8FA;
+    --sh-2:0 0 2px rgba(15,23,36,.12), 0 1px 2px rgba(15,23,36,.14);
+    --sh-4:0 0 2px rgba(15,23,36,.12), 0 2px 4px rgba(15,23,36,.14);
+    --sh-8:0 0 2px rgba(15,23,36,.12), 0 4px 8px rgba(15,23,36,.14);
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--ground);color:var(--ink);
+    font:400 13.5px/20px Inter,system-ui,sans-serif;padding:20px 24px 48px}
+  .mono{font-family:'DM Mono',monospace;font-variant-numeric:tabular-nums}
+  .canvas{background:var(--canvas);border:1px solid var(--edge);border-radius:12px;
+    box-shadow:var(--sh-4);max-width:1440px;margin:0 auto;overflow:hidden}
+  .band{padding:24px 28px;border-bottom:1px solid var(--rule)}
+  h1{font:600 20px/28px Inter,sans-serif;margin:0;letter-spacing:-.01em}
+  .sub{color:var(--ink-2);margin:8px 0 0;max-width:88ch}
+  .sec{padding:24px 28px;border-bottom:1px solid var(--rule)}
+  .sec:last-child{border-bottom:0}
+  .sh{font:600 14px/20px Inter,sans-serif;margin:0 0 4px}
+  .sd{font:400 12px/16px Inter,sans-serif;color:var(--ink-3);margin:0 0 18px;max-width:90ch}
+  .n{color:var(--ink-2);font-size:13px;margin:20px 0 0;max-width:94ch;line-height:22px}
+  .n b{color:var(--ink);font-weight:600}
+  .lbl{font:600 10px/14px Inter,sans-serif;letter-spacing:.09em;text-transform:uppercase;color:var(--ink-3)}
+  code{font:400 12px/16px 'DM Mono',monospace;background:var(--inset);
+    border-radius:4px;padding:2px 5px;color:var(--ink)}
+  .two{display:grid;grid-template-columns:1fr 1fr;gap:18px}
+
+  .frame{border:1px solid var(--rule);border-radius:8px;overflow:hidden}
+  .fh{display:flex;align-items:center;gap:10px;padding:11px 16px;border-bottom:1px solid var(--rule);
+    font:600 13px/20px Inter,sans-serif}
+  .fh .tag{margin-left:auto;font:500 10px/14px 'DM Mono',monospace;color:var(--ink-3);
+    background:var(--inset);border-radius:4px;padding:3px 8px}
+
+  .sk{background:linear-gradient(90deg,#E4E9F0 0%,#F1F4F8 50%,#E4E9F0 100%);border-radius:4px;height:12px}
+  .skrow{display:grid;grid-template-columns:1fr 72px 88px 88px 72px 108px;gap:16px;
+    align-items:center;padding:13px 16px;border-bottom:1px solid var(--rule)}
+  .skrow:last-child{border-bottom:0}
+  .spin{width:13px;height:13px;border:2px solid rgba(255,255,255,.45);border-top-color:#fff;
+    border-radius:999px;display:inline-block;vertical-align:-2px}
+
+  .cs{text-align:center;padding:36px 24px 32px;max-width:56ch;margin:0 auto}
+  .cs .ic{width:40px;height:40px;border-radius:999px;display:inline-flex;align-items:center;
+    justify-content:center;font-size:17px;margin-bottom:12px}
+  .cs h3{font:600 15px/22px Inter,sans-serif;margin:0}
+  .cs p{font-size:13px;color:var(--ink-2);margin:8px 0 0;line-height:20px}
+  .cs .code{font:400 11.5px/16px 'DM Mono',monospace;color:var(--ink-2);margin-top:14px;
+    background:var(--inset);border-radius:6px;padding:7px 11px;display:inline-block}
+  .acts{display:flex;gap:9px;justify-content:center;margin-top:16px}
+  .btn{border:1px solid var(--stroke-strong);background:var(--canvas);color:var(--ink);border-radius:6px;
+    height:36px;padding:0 16px;font:600 12.5px/16px Inter,sans-serif;cursor:pointer}
+  .btn.p{background:var(--brand);border-color:var(--brand);color:#fff}
+  .btn.q{border-color:transparent;color:var(--ink-3);font-weight:500}
+
+  .ban{display:flex;align-items:center;gap:12px;padding:12px 16px;border-radius:8px;
+    font-size:12.5px;border:1px solid}
+  .ban b{font-weight:600}
+  .ban .r{margin-left:auto;font:600 12px/16px Inter,sans-serif}
+
+  table{width:100%;border-collapse:collapse}
+  th{font:600 10px/14px Inter,sans-serif;letter-spacing:.09em;text-transform:uppercase;
+    color:var(--ink-3);text-align:left;padding:9px 12px;background:var(--inset)}
+  td{padding:11px 12px;border-bottom:1px solid var(--rule);font-size:12.5px;vertical-align:top}
+  tr:last-child td{border-bottom:0}
+</style>
+</head>
+<body>
+<div class="canvas">
+
+  <div class="band">
+    <h1>States &amp; announcements</h1>
+    <p class="sub">Where a product stops feeling finished, and always the part left out of a design
+      file. Specified here because this codebase has two recurring bugs that are design problems
+      before they are code problems.</p>
+  </div>
+
+  <div class="sec">
+    <p class="sh">1 · Loading — content uses a skeleton</p>
+    <p class="sd">The section header renders immediately; only the body waits.</p>
+    <div class="frame">
+      <div class="fh">Open positions<span class="tag">loading</span></div>
+      <div class="skrow"><div><div class="sk" style="width:184px"></div>
+        <div class="sk" style="width:116px;height:9px;margin-top:8px;opacity:.7"></div></div>
+        <div class="sk" style="width:32px;margin-left:auto"></div>
+        <div class="sk" style="width:58px;margin-left:auto"></div>
+        <div class="sk" style="width:58px;margin-left:auto"></div>
+        <div class="sk" style="width:48px;margin-left:auto"></div>
+        <div class="sk" style="width:88px;margin-left:auto"></div></div>
+      <div class="skrow"><div><div class="sk" style="width:208px"></div>
+        <div class="sk" style="width:116px;height:9px;margin-top:8px;opacity:.7"></div></div>
+        <div class="sk" style="width:32px;margin-left:auto"></div>
+        <div class="sk" style="width:58px;margin-left:auto"></div>
+        <div class="sk" style="width:58px;margin-left:auto"></div>
+        <div class="sk" style="width:48px;margin-left:auto"></div>
+        <div class="sk" style="width:88px;margin-left:auto"></div></div>
+      <div class="skrow"><div><div class="sk" style="width:162px"></div>
+        <div class="sk" style="width:116px;height:9px;margin-top:8px;opacity:.7"></div></div>
+        <div class="sk" style="width:32px;margin-left:auto"></div>
+        <div class="sk" style="width:58px;margin-left:auto"></div>
+        <div class="sk" style="width:58px;margin-left:auto"></div>
+        <div class="sk" style="width:48px;margin-left:auto"></div>
+        <div class="sk" style="width:88px;margin-left:auto"></div></div>
+    </div>
+    <p class="n"><b>Content loads with a skeleton in the shape of the content. An action spins.</b>
+      The skeleton reserves the exact row grid so nothing jumps when data lands — a table that
+      reflows on arrival is how a trader mis-clicks a position. A spinner attaches only to a control
+      the user pressed:
+      <button class="btn p" style="height:30px;font-size:12px"><span class="spin"></span>&nbsp; Saving</button></p>
+  </div>
+
+  <div class="sec">
+    <p class="sh">2 · Empty — nothing is wrong, there is simply nothing</p>
+    <div class="two">
+      <div class="frame">
+        <div class="fh">Alerts · unreviewed<span class="tag">empty</span></div>
+        <div class="cs">
+          <span class="ic" style="background:var(--profit-tint);color:var(--profit-text)">✓</span>
+          <h3>Clean session</h3>
+          <p>Eight trades, no behavioural flags. Your pace, sizing and cooldowns all stayed inside
+            what you set.</p>
+          <div class="acts"><button class="btn">See history</button></div>
+        </div>
+      </div>
+      <div class="frame">
+        <div class="fh">Journal · today<span class="tag">empty</span></div>
+        <div class="cs">
+          <span class="ic" style="background:var(--inset);color:var(--ink-3)">✎</span>
+          <h3>Nothing written yet</h3>
+          <p>How you are trading today, and what you plan to do about it. Two lines is enough.</p>
+          <div class="acts"><button class="btn p">Write today</button>
+            <button class="btn q">Skip</button></div>
+        </div>
+      </div>
+    </div>
+    <p class="n"><b>An empty state names what is absent and offers the one action that fills it.</b>
+      &ldquo;Clean session&rdquo; earns a green tick because zero alerts across eight trades is
+      genuinely the good outcome. An empty state never takes an error colour and never gets a retry
+      button; if there were something to retry, it was not empty.</p>
+  </div>
+
+  <div class="sec">
+    <p class="sh">3 · Error — always distinguishable from empty</p>
+    <div class="two">
+      <div class="frame">
+        <div class="fh">Analytics · behaviour<span class="tag">error 500</span></div>
+        <div class="cs">
+          <span class="ic" style="background:var(--loss-tint);color:var(--loss-text)">!</span>
+          <h3>We could not load your behaviour data</h3>
+          <p>The request failed after one automatic retry. Your trades are safe — this is a read,
+            and nothing was written.</p>
+          <p class="code">GET /api/analytics/behaviour · 500 · 14:22:07</p>
+          <div class="acts"><button class="btn p">Try again</button>
+            <button class="btn q">Contact support</button></div>
+        </div>
+      </div>
+      <div class="frame">
+        <div class="fh">Positions<span class="tag">offline</span></div>
+        <div class="cs">
+          <span class="ic" style="background:var(--caution-tint);color:var(--caution-text)">⚡</span>
+          <h3>You are offline</h3>
+          <p>Showing the last snapshot from 13:41. Prices and P&amp;L are frozen until the
+            connection comes back.</p>
+          <p class="code">reconnecting · attempt 3</p>
+          <div class="acts"><button class="btn">Retry now</button></div>
+        </div>
+      </div>
+    </div>
+    <p class="n"><b>Three things an error state must carry:</b> what failed in the user's language,
+      whether their data is at risk, and a way out. The endpoint and timestamp sit in an inset well
+      in mono — a trader will paste that line into a support email and it saves a round trip.
+      <b>Offline is an error, not an empty</b>, and it names the snapshot on screen, because a
+      frozen P&amp;L presented as live is the most expensive lie this interface could tell.</p>
+  </div>
+
+  <div class="sec">
+    <p class="sh">4 · Degraded — the page works, one guarantee does not</p>
+    <div style="display:flex;flex-direction:column;gap:10px">
+      <div class="ban" style="background:var(--caution-tint);border-color:var(--caution-edge);color:var(--caution-text)">
+        <b>Prices are delayed.</b>
+        <span style="color:var(--ink-2)">The market-data feed dropped at 13:38. P&amp;L below is
+          computed from the last tick received, not live.</span>
+        <span class="r">Details</span>
+      </div>
+      <div class="ban" style="background:var(--brand-tint);border-color:var(--brand-edge);color:var(--brand-text)">
+        <b>Syncing your trades.</b>
+        <span style="color:var(--ink-2)">142 of 380 fills imported. Analytics will be incomplete
+          until this finishes.</span>
+        <span class="r">42%</span>
+      </div>
+      <div class="ban" style="background:var(--inset);border-color:var(--edge);color:var(--ink-2)">
+        <b style="color:var(--ink)">Demo mode — showing sample data.</b>
+        <span>Nothing here is your trading. Connect Zerodha to replace it.</span>
+        <span class="r" style="color:var(--brand-text)">Connect Zerodha</span>
+      </div>
+    </div>
+    <p class="n"><b>Degradation is announced inline, above the thing that is degraded, never as a
+      toast.</b> A toast saying prices are stale is gone by the time the trader looks at the price.
+      The banner stays as long as the condition does, and states the consequence
+      (&ldquo;computed from the last tick&rdquo;) rather than the cause
+      (&ldquo;websocket disconnected&rdquo;).</p>
+  </div>
+
+  <div class="sec">
+    <p class="sh">5 · Announcements — the live-region spec</p>
+    <p class="sd">Alerts arrive over WebSocket with no user action. Nothing on screen has focus, so
+      a screen reader is told nothing at all.</p>
+    <table>
+      <thead><tr><th style="width:110px">Severity</th><th style="width:170px">Region</th>
+        <th>Announced string</th></tr></thead>
+      <tbody>
+        <tr><td><b>critical</b></td><td><code>aria-live="assertive"</code><br><code>role="alert"</code></td>
+          <td class="mono" style="font-size:12px">&ldquo;Critical. Daily loss limit breached. ₹25,000 of ₹25,000 used.&rdquo;</td></tr>
+        <tr><td><b>danger</b></td><td><code>aria-live="assertive"</code><br><code>role="alert"</code></td>
+          <td class="mono" style="font-size:12px">&ldquo;Danger. Size escalation. BANKNIFTY entry 4 times your average size.&rdquo;</td></tr>
+        <tr><td><b>caution</b></td><td><code>aria-live="polite"</code><br><code>role="status"</code></td>
+          <td class="mono" style="font-size:12px">&ldquo;Caution. Early exit. NIFTY CE closed after 8 minutes.&rdquo;</td></tr>
+        <tr><td><b>info</b></td><td>not announced</td>
+          <td style="color:var(--ink-3)">Visible only. Announcing every info event is how a user turns the app off.</td></tr>
+      </tbody>
+    </table>
+    <p class="n"><b>Severity, title, and one clause of reason — nothing else.</b> The full alert body
+      runs to three sentences and carries five figures; read aloud on arrival it buries the one word
+      that matters. The detail stays on screen for the user to navigate to.
+      <br><br>
+      <b>The region is a single persistent node, emptied and refilled.</b> Appending to a live region
+      re-announces everything already in it. And a live region must exist in the DOM before the
+      content is written into it, or nothing is spoken at all — which is the failure mode that makes
+      this bug invisible in testing.
+      <br><br>
+      <b>Rate-limit to one announcement every 3 seconds</b>, coalescing the rest into
+      &ldquo;3 more alerts&rdquo;. During a tilt sequence the engine can fire several detectors on a
+      single fill, and a screen-reader user should not be read a paragraph mid-trade.</p>
+  </div>
+
+  <div class="sec">
+    <p class="sh">The two rules</p>
+    <p class="n" style="margin-top:0"><b>A failed request is never rendered as an empty state.</b>
+      Empty means the server answered and the answer was nothing. Error means the server did not
+      answer. Those are different facts and a trader acts on them differently — one says
+      &ldquo;you had a clean session&rdquo;, the other says &ldquo;you do not know what your session
+      was&rdquo;. Any component that can show both takes them as separate props, never as one
+      nullable array.
+      <br><br>
+      <b>If a section has a header, the header renders even when the body cannot.</b> The nastier
+      version of the same bug: a component that returns <code>null</code> when its data is missing,
+      so a failed request renders as <em>nothing at all</em> — no header, no space, no trace. That is
+      worse than a wrong empty state, because there is nothing on screen to be suspicious of. It has
+      already happened here twice.</p>
+  </div>
+
+</div>
+</body>
+</html>

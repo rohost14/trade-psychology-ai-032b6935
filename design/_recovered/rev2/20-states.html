@@ -1,0 +1,203 @@
+<!-- @dsCard group="Components" name="States" subtitle="Loading, empty, error, degraded — and why empty must never stand in for error" viewport-width="1440" -->
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Mirror — States</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=DM+Mono:wght@300;400;500&display=swap">
+<style>
+  :root{ --page:#EEF1F5; --surface:#FFFFFF; --inset:#E4E9F0;
+    --border:#D6DEE8; --divider:#E8EDF3; --ink:#0F1724; --ink2:#4A5768; --ink3:#7C8899;
+    --brand:#0E7A6E; --brand-t:#E2F2EF; --profit:#12795B; --profit-t:#E3F3EE;
+    --loss:#C2372B; --loss-t:#FBE9E7; --caution:#A96A0C; --caution-t:#FBF0DF;
+    --sh1:0 1px 2px rgba(15,23,36,.05), 0 1px 3px rgba(15,23,36,.06); }
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--page);color:var(--ink);
+    font:400 13.5px/1.6 Inter,system-ui,sans-serif;padding:32px 40px 64px}
+  .mono{font-family:'DM Mono',monospace;font-variant-numeric:tabular-nums}
+  h1{font:600 26px/1.2 Inter,sans-serif;margin:0 0 5px;letter-spacing:-.02em}
+  .sub{color:var(--ink2);font-size:13.5px;margin:0 0 30px;max-width:86ch}
+  h2{font:600 12px/1 Inter,sans-serif;letter-spacing:.1em;text-transform:uppercase;
+    color:var(--ink3);margin:44px 0 18px}
+  .n{color:var(--ink2);font-size:13px;margin:16px 0 0;max-width:90ch;line-height:1.7}
+  .n b{color:var(--ink);font-weight:600}
+  .lbl{font:600 10.5px/1 Inter,sans-serif;letter-spacing:.09em;text-transform:uppercase;color:var(--ink3)}
+
+  .card{background:var(--surface);border:1px solid var(--border);border-radius:10px;
+    box-shadow:var(--sh1);overflow:hidden}
+  .ch{display:flex;align-items:center;gap:11px;padding:14px 20px;border-bottom:1px solid var(--divider);
+    font:600 14px/1.2 Inter,sans-serif}
+  .ch .tag{margin-left:auto;font:500 10.5px/1 'DM Mono',monospace;color:var(--ink3);
+    background:var(--inset);border-radius:5px;padding:5px 9px}
+
+  .sk{background:linear-gradient(90deg,#E8ECF2 0%,#F3F6F9 50%,#E8ECF2 100%);border-radius:4px;height:13px}
+  .skrow{display:grid;grid-template-columns:1fr 80px 96px 96px 80px 116px;gap:18px;
+    align-items:center;padding:15px 20px;border-bottom:1px solid var(--divider)}
+  .skrow:last-child{border-bottom:0}
+  .spin{width:14px;height:14px;border:2px solid rgba(255,255,255,.45);border-top-color:#fff;
+    border-radius:999px;display:inline-block;vertical-align:-2px}
+
+  .cs{text-align:center;padding:42px 24px 38px;max-width:58ch;margin:0 auto}
+  .cs .ic{width:44px;height:44px;border-radius:999px;display:inline-flex;align-items:center;
+    justify-content:center;font-size:18px;margin-bottom:15px}
+  .cs h3{font:600 15px/1.35 Inter,sans-serif;margin:0}
+  .cs p{font-size:13px;color:var(--ink2);margin:10px 0 0;line-height:1.65}
+  .cs .code{font:400 11.5px/1 'DM Mono',monospace;color:var(--ink3);margin-top:15px;
+    background:var(--inset);border-radius:6px;padding:8px 11px;display:inline-block}
+  .acts{display:flex;gap:10px;justify-content:center;margin-top:19px}
+  .btn{border:1px solid var(--border);background:var(--surface);color:var(--ink);border-radius:7px;
+    height:36px;padding:0 16px;font:600 12.5px/1 Inter,sans-serif;cursor:pointer;box-shadow:var(--sh1)}
+  .btn.p{background:var(--brand);border-color:var(--brand);color:#fff}
+  .btn.q{background:transparent;border-color:transparent;color:var(--ink3);
+    box-shadow:none;font-weight:500}
+
+  .ban{display:flex;align-items:center;gap:12px;padding:13px 16px;border-radius:9px;
+    font-size:12.5px;border:1px solid;box-shadow:var(--sh1)}
+  .ban b{font-weight:600}
+  .ban .r{margin-left:auto;font:600 12px/1 Inter,sans-serif}
+  .two{display:grid;grid-template-columns:1fr 1fr;gap:16px}
+</style>
+</head>
+<body>
+
+<h1>States</h1>
+<p class="sub">Loading, empty, error and degraded are where a product stops feeling finished, and
+  they are always the ones left out of a design file. They are specified here because this codebase
+  has a recurring bug — <span class="mono" style="color:var(--ink)">catch { setX([]) }</span> — that
+  renders a <em>failed request</em> as an <em>empty list</em>. That is a design problem before it is
+  a code problem: if the empty state is the nicest-looking thing in the file, it is what gets
+  reached for.</p>
+
+<h2>1 · Loading — content uses a skeleton</h2>
+<div class="card">
+  <div class="ch">Open positions<span class="tag">loading</span></div>
+  <div class="skrow"><div><div class="sk" style="width:190px"></div>
+    <div class="sk" style="width:120px;height:10px;margin-top:9px;opacity:.7"></div></div>
+    <div class="sk" style="width:36px;margin-left:auto"></div>
+    <div class="sk" style="width:62px;margin-left:auto"></div>
+    <div class="sk" style="width:62px;margin-left:auto"></div>
+    <div class="sk" style="width:52px;margin-left:auto"></div>
+    <div class="sk" style="width:92px;margin-left:auto"></div></div>
+  <div class="skrow"><div><div class="sk" style="width:214px"></div>
+    <div class="sk" style="width:120px;height:10px;margin-top:9px;opacity:.7"></div></div>
+    <div class="sk" style="width:36px;margin-left:auto"></div>
+    <div class="sk" style="width:62px;margin-left:auto"></div>
+    <div class="sk" style="width:62px;margin-left:auto"></div>
+    <div class="sk" style="width:52px;margin-left:auto"></div>
+    <div class="sk" style="width:92px;margin-left:auto"></div></div>
+  <div class="skrow"><div><div class="sk" style="width:168px"></div>
+    <div class="sk" style="width:120px;height:10px;margin-top:9px;opacity:.7"></div></div>
+    <div class="sk" style="width:36px;margin-left:auto"></div>
+    <div class="sk" style="width:62px;margin-left:auto"></div>
+    <div class="sk" style="width:62px;margin-left:auto"></div>
+    <div class="sk" style="width:52px;margin-left:auto"></div>
+    <div class="sk" style="width:92px;margin-left:auto"></div></div>
+</div>
+<p class="n"><b>Content loads with a skeleton in the shape of the content. An action spins.</b>
+  The skeleton reserves the exact row grid so nothing jumps when data lands — a table that reflows
+  on arrival is how a trader mis-clicks a position. The card and its header render immediately,
+  because the <em>subject</em> is known before the data is. A spinner attaches only to a control the
+  user pressed: <button class="btn p" style="height:30px;font-size:12px"><span class="spin"></span>&nbsp; Saving</button></p>
+
+<h2>2 · Empty — nothing is wrong, there is simply nothing</h2>
+<div class="two">
+  <div class="card">
+    <div class="ch">Alerts · unreviewed<span class="tag">empty</span></div>
+    <div class="cs">
+      <span class="ic" style="background:var(--profit-t);color:var(--profit)">✓</span>
+      <h3>Clean session</h3>
+      <p>Eight trades, no behavioural flags. Your pace, sizing and cooldowns all stayed inside
+        what you set.</p>
+      <div class="acts"><button class="btn">See history</button></div>
+    </div>
+  </div>
+  <div class="card">
+    <div class="ch">Journal · today<span class="tag">empty</span></div>
+    <div class="cs">
+      <span class="ic" style="background:var(--inset);color:var(--ink3)">✎</span>
+      <h3>Nothing written yet</h3>
+      <p>How you are trading today, and what you plan to do about it. Two lines is enough.</p>
+      <div class="acts"><button class="btn p">Write today</button>
+        <button class="btn q">Skip</button></div>
+    </div>
+  </div>
+</div>
+<p class="n"><b>An empty state names what is absent and offers the one action that fills it.</b>
+  &ldquo;Clean session&rdquo; is a result, not a blank — it earns a green tick because zero alerts
+  across eight trades is genuinely the good outcome. An empty state never takes an error colour and
+  never gets a retry button; if there were something to retry, it was not empty.</p>
+
+<h2>3 · Error — always distinguishable from empty</h2>
+<div class="two">
+  <div class="card">
+    <div class="ch">Analytics · behaviour<span class="tag">error 500</span></div>
+    <div class="cs">
+      <span class="ic" style="background:var(--loss-t);color:var(--loss)">!</span>
+      <h3>We could not load your behaviour data</h3>
+      <p>The request failed after one automatic retry. Your trades are safe — this is a read, and
+        nothing was written.</p>
+      <p class="code">GET /api/analytics/behaviour · 500 · 14:22:07</p>
+      <div class="acts"><button class="btn p">Try again</button>
+        <button class="btn q">Contact support</button></div>
+    </div>
+  </div>
+  <div class="card">
+    <div class="ch">Positions<span class="tag">offline</span></div>
+    <div class="cs">
+      <span class="ic" style="background:var(--caution-t);color:var(--caution)">⚡</span>
+      <h3>You are offline</h3>
+      <p>Showing the last snapshot from 13:41. Prices and P&amp;L are frozen until the connection
+        comes back.</p>
+      <p class="code">reconnecting · attempt 3</p>
+      <div class="acts"><button class="btn">Retry now</button></div>
+    </div>
+  </div>
+</div>
+<p class="n"><b>Three things an error state must carry:</b> what failed in the user's language,
+  whether their data is at risk, and a way out. The endpoint and timestamp go in mono in an inset
+  well — a trader will paste that line into a support email and it saves a round trip.
+  <b>Offline is an error, not an empty</b>, and it names the snapshot you are looking at, because a
+  frozen P&amp;L presented as live is the most expensive lie this interface could tell.</p>
+
+<h2>4 · Degraded — the page works, one guarantee does not</h2>
+<div style="display:flex;flex-direction:column;gap:12px">
+  <div class="ban" style="background:var(--caution-t);border-color:#EBD4AE;color:var(--caution)">
+    <b>Prices are delayed.</b>
+    <span style="color:var(--ink2)">The market-data feed dropped at 13:38. P&amp;L below is computed
+      from the last tick received, not live.</span>
+    <span class="r">Details</span>
+  </div>
+  <div class="ban" style="background:var(--brand-t);border-color:#B9DDD6;color:var(--brand)">
+    <b>Syncing your trades.</b>
+    <span style="color:var(--ink2)">142 of 380 fills imported. Analytics will be incomplete until
+      this finishes.</span>
+    <span class="r">42%</span>
+  </div>
+  <div class="ban" style="background:var(--surface);border-color:var(--border);color:var(--ink2)">
+    <b style="color:var(--ink)">Demo mode — showing sample data.</b>
+    <span>Nothing here is your trading. Connect Zerodha to replace it.</span>
+    <span class="r" style="color:var(--brand)">Connect Zerodha</span>
+  </div>
+</div>
+<p class="n"><b>Degradation is announced inline, above the thing that is degraded, and never as a
+  toast.</b> A toast saying prices are stale is gone by the time the trader looks at the price. The
+  banner stays as long as the condition does, and states the consequence
+  (&ldquo;P&amp;L is computed from the last tick&rdquo;) rather than the cause
+  (&ldquo;websocket disconnected&rdquo;).</p>
+
+<h2>The rule</h2>
+<p class="n"><b>A failed request is never rendered as an empty state.</b>
+  Empty means the server answered and the answer was nothing. Error means the server did not answer.
+  Those are different facts about the world and a trader acts on them differently — one says
+  &ldquo;you had a clean session&rdquo;, the other says &ldquo;you do not know what your session
+  was&rdquo;. Any component that can show both must take them as separate props, never as one
+  nullable array.
+  <br><br>
+  There is a third case this codebase keeps hitting: a component that returns
+  <span class="mono">null</span> when its data is missing, so a failed request renders as
+  <em>nothing at all</em> — no card, no header, no space. That is worse than a wrong empty state,
+  because there is nothing on screen to be suspicious of. <b>If a section has a header, the header
+  renders even when the body cannot.</b></p>
+
+</body>
+</html>

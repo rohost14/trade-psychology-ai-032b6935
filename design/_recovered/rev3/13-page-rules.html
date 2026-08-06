@@ -1,0 +1,230 @@
+<!-- @dsCard group="Pages" name="My Rules" subtitle="Declared vs enforced, usage on inset tracks, violations" viewport-width="1500" -->
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Mirror — My Rules</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=DM+Mono:wght@400;500&display=swap">
+<style>
+  :root{
+    --ground:#EEF1F5; --canvas:#FFFFFF; --inset:#E9EDF3;
+    --rule:#E3E8EF; --edge:#D3DBE4; --stroke-strong:#5E6B7A;
+    --ink:#0F1724; --ink-2:#4A5768; --ink-3:#647285;
+    --brand:#0E7A6E; --brand-text:#0B6155; --brand-tint:#E4F3F1;
+    --profit:#12795B; --profit-text:#0E6249; --profit-tint:#E7F4EF;
+    --loss:#C2372B; --loss-text:#A62B21; --loss-tint:#FCEEEC;
+    --caution:#96600C; --caution-text:#8F5A0B; --caution-tint:#FDF4E6;
+    --hover:#F5F8FA; --selected:#E4F3F1;
+    --sh-2:0 0 2px rgba(15,23,36,.12), 0 1px 2px rgba(15,23,36,.14);
+    --sh-4:0 0 2px rgba(15,23,36,.12), 0 2px 4px rgba(15,23,36,.14);
+    --sh-8:0 0 2px rgba(15,23,36,.12), 0 4px 8px rgba(15,23,36,.14);
+    --dur-fast:150ms; --ease-enter:cubic-bezier(0,0,0,1);
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--ground);color:var(--ink);
+    font:400 13.5px/20px Inter,system-ui,sans-serif;padding:20px 24px}
+  .mono{font-family:'DM Mono',monospace;font-variant-numeric:tabular-nums}
+  .lbl{font:600 10px/14px Inter,sans-serif;letter-spacing:.09em;text-transform:uppercase;color:var(--ink-3)}
+  .shell{max-width:1440px;margin:0 auto;background:var(--canvas);border:1px solid var(--edge);
+    border-radius:12px;box-shadow:var(--sh-4);display:flex;overflow:hidden;min-height:calc(100vh - 40px)}
+  aside{width:244px;flex-shrink:0;border-right:1px solid var(--rule);
+    display:flex;flex-direction:column;padding:0 10px 12px}
+  .brand{display:flex;align-items:center;gap:10px;height:60px;padding:0 10px;
+    font:600 16px/20px Inter,sans-serif;letter-spacing:-.01em}
+  .brand svg{color:var(--brand)}
+  .nav{display:flex;align-items:center;gap:10px;height:36px;padding:0 10px;border-radius:6px;
+    font:500 13.5px/20px Inter,sans-serif;color:var(--ink-2);margin-bottom:2px;
+    transition:background-color var(--dur-fast) var(--ease-enter)}
+  .nav .ic{width:16px;height:16px;flex-shrink:0;color:var(--ink-3)}
+  .nav:hover{background:var(--hover)}
+  .nav.on{background:var(--selected);color:var(--brand-text);font-weight:600}
+  .nav.on .ic{color:var(--brand)}
+  .nav .bdg{margin-left:auto;font:500 10px/14px 'DM Mono',monospace;background:var(--loss);
+    color:#fff;border-radius:999px;padding:2px 6px}
+  .grp{font:600 10px/14px Inter,sans-serif;letter-spacing:.09em;text-transform:uppercase;
+    color:var(--ink-3);padding:16px 10px 6px}
+  .side-b{margin-top:auto;padding-top:12px}
+  .acct{display:flex;align-items:center;gap:8px;height:36px;padding:0 10px;border-radius:6px;
+    background:var(--inset);font:500 12px/16px 'DM Mono',monospace}
+  .acct i{width:6px;height:6px;border-radius:999px;background:var(--profit)}
+  main{flex:1;min-width:0}
+
+  .band{padding:20px 24px;border-bottom:1px solid var(--rule);
+    display:flex;align-items:flex-start;justify-content:space-between;gap:24px}
+  h1{font:600 20px/28px Inter,sans-serif;margin:0;letter-spacing:-.01em}
+  .sub{font-size:12px;line-height:16px;color:var(--ink-3);margin:4px 0 0}
+  .btn{border:1px solid var(--stroke-strong);background:var(--canvas);color:var(--ink);
+    border-radius:6px;height:34px;padding:0 15px;font:600 12.5px/16px Inter,sans-serif;cursor:pointer}
+
+  .section{padding:16px 24px;border-bottom:1px solid var(--rule)}
+  .section:last-of-type{border-bottom:0}
+  .sec-h{display:flex;align-items:center;gap:10px;padding-bottom:10px}
+  .sec-h h2{font:600 14px/20px Inter,sans-serif;margin:0}
+  .sec-h .r{margin-left:auto;font:400 12px/16px 'DM Mono',monospace;color:var(--ink-3)}
+
+  .rrow{display:grid;grid-template-columns:1.4fr 108px 108px 1.5fr 152px;gap:20px;align-items:center;
+    padding:14px 0;border-bottom:1px solid var(--rule);
+    transition:background-color var(--dur-fast) var(--ease-enter)}
+  .rrow:hover{background:var(--hover)}
+  .rrow:last-child{border-bottom:0}
+  .rn{font:600 13.5px/20px Inter,sans-serif;margin:0}
+  .rd{font-size:12px;line-height:16px;color:var(--ink-3);margin:2px 0 0}
+  .val{font:500 16px/20px 'DM Mono',monospace;margin:4px 0 0}
+  .track{height:6px;background:var(--inset);border-radius:3px;overflow:hidden}
+  .track i{display:block;height:100%;border-radius:3px}
+  .use{font:400 12px/16px 'DM Mono',monospace;color:var(--ink-3);margin:8px 0 0}
+  .pill{display:inline-flex;border-radius:999px;font:600 10px/14px Inter,sans-serif;
+    letter-spacing:.05em;padding:4px 10px}
+  .over{font-size:11.5px;line-height:16px;color:var(--ink-3);margin:6px 0 0}
+  .expand{display:flex;align-items:center;gap:8px;padding:12px 0 0;color:var(--ink-2);font-size:12.5px}
+
+  .vrow{display:grid;grid-template-columns:1fr 196px;gap:20px;align-items:center;
+    padding:12px 0 12px 13px;margin-left:-13px;border-bottom:1px solid var(--rule);
+    border-left:3px solid transparent;transition:background-color var(--dur-fast) var(--ease-enter)}
+  .vrow:hover{background:var(--hover)}
+  .vrow:last-of-type{border-bottom:0}
+  .vrow.danger{border-left-color:var(--loss)}
+  .vt{font:500 13.5px/20px Inter,sans-serif;margin:0}
+  .vm{font:400 11.5px/16px 'DM Mono',monospace;color:var(--ink-3);margin:6px 0 0}
+  .vc{text-align:right;font:500 15px/20px 'DM Mono',monospace;color:var(--loss-text)}
+  .vcs{text-align:right;font:400 11px/16px 'DM Mono',monospace;color:var(--ink-3);margin-top:4px}
+  .chips{display:flex;gap:8px;flex-wrap:wrap;padding-top:14px}
+  .ch2{background:var(--inset);border-radius:999px;padding:6px 12px;
+    font:500 12px/16px Inter,sans-serif;color:var(--ink-2)}
+  .ch2 b{color:var(--ink);font-family:'DM Mono',monospace;font-weight:500;margin-left:6px}
+
+  .callout{background:var(--canvas);border:1px solid var(--edge);border-left:3px solid var(--brand);
+    border-radius:8px;box-shadow:var(--sh-8);padding:14px 16px;margin:16px 24px;
+    font-size:13px;line-height:22px;color:var(--ink-2);max-width:104ch}
+  .callout.warn{border-left-color:var(--caution)}
+  .callout b{color:var(--ink);font-weight:600}
+</style>
+</head>
+<body>
+<div class="shell">
+
+<aside>
+  <div class="brand">
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2 4 6v6c0 5 3.4 9.4 8 10 4.6-.6 8-5 8-10V6z"/></svg>
+    TradeMentor</div>
+  <div class="nav"><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/></svg>Dashboard</div>
+  <div class="nav"><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 17l6-6 4 4 7-7"/><path d="M14 8h6v6"/></svg>Analytics</div>
+  <div class="nav"><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 8a6 6 0 1 0-12 0c0 7-3 8-3 8h18s-3-1-3-8"/><path d="M13.7 21a2 2 0 0 1-3.4 0"/></svg>Alerts<span class="bdg">3</span></div>
+  <div class="nav"><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>Chat</div>
+  <div class="grp">Insights</div>
+  <div class="nav"><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M2 4h7a3 3 0 0 1 3 3v13a2.5 2.5 0 0 0-2.5-2.5H2z"/><path d="M22 4h-7a3 3 0 0 0-3 3v13a2.5 2.5 0 0 1 2.5-2.5H22z"/></svg>Reports</div>
+  <div class="nav"><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/></svg>Journal</div>
+  <div class="grp">Risk</div>
+  <div class="nav on"><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 3v18"/><path d="M5 7h14"/><path d="M5 7 2 14h6z"/><path d="M19 7l-3 7h6z"/></svg>My Rules</div>
+  <div class="nav"><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4.3-4.3"/></svg>My Record</div>
+  <div class="grp">Account</div>
+  <div class="nav"><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.9l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-2.9 1.2 2 2 0 1 1-4 0 1.7 1.7 0 0 0-2.9-1.2l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1A1.7 1.7 0 0 0 3 15a2 2 0 1 1 0-4 1.7 1.7 0 0 0 1.5-2.6l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1A1.7 1.7 0 0 0 10 4.6a2 2 0 1 1 4 0 1.7 1.7 0 0 0 2.9 1.2l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1A1.7 1.7 0 0 0 21 11a2 2 0 1 1 0 4z"/></svg>Settings</div>
+  <div class="side-b"><div class="acct"><i></i>ZA1234</div></div>
+</aside>
+
+<main>
+
+  <div class="band">
+    <div><h1>My Rules</h1>
+      <p class="sub">Your trading constitution. You wrote these rules. The system holds you to them.</p></div>
+    <button class="btn">✎&nbsp; Edit rules</button>
+  </div>
+
+  <div class="section">
+    <div class="sec-h"><h2>Your rules</h2><span class="r">Declared · enforced · today</span></div>
+
+    <div class="rrow">
+      <div><p class="rn">Trades per day</p><p class="rd">Hard cap on entries this session</p></div>
+      <div><div class="lbl">Declared</div><p class="val">50</p></div>
+      <div><div class="lbl">Enforced</div><p class="val" style="color:var(--caution-text)">6</p></div>
+      <div><div class="track"><i style="width:100%;background:var(--loss)"></i></div>
+        <p class="use"><span style="color:var(--loss-text)">9</span> of 6 · 150%</p></div>
+      <div><span class="pill" style="background:var(--loss-tint);color:var(--loss-text)">BREACHED</span>
+        <p class="over">You set 50. Your own trading runs tighter, so 6 applies.</p></div>
+    </div>
+
+    <div class="rrow">
+      <div><p class="rn">Cooldown after a loss</p><p class="rd">Minimum wait before the next entry</p></div>
+      <div><div class="lbl">Declared</div><p class="val">15 min</p></div>
+      <div><div class="lbl">Enforced</div><p class="val">15 min</p></div>
+      <div><div class="track"><i style="width:0%"></i></div>
+        <p class="use">Not in cooldown</p></div>
+      <div><span class="pill" style="background:var(--inset);color:var(--ink-2)">AS DECLARED</span></div>
+    </div>
+
+    <div class="rrow">
+      <div><p class="rn">Daily loss limit</p><p class="rd">Session stops when this is reached</p></div>
+      <div><div class="lbl">Declared</div><p class="val">₹25,000</p></div>
+      <div><div class="lbl">Enforced</div><p class="val">₹25,000</p></div>
+      <div><div class="track"><i style="width:34%;background:var(--ink-2)"></i></div>
+        <p class="use">₹8,455 of ₹25,000 · 34%</p></div>
+      <div><span class="pill" style="background:var(--inset);color:var(--ink-2)">AS DECLARED</span></div>
+    </div>
+
+    <div class="rrow">
+      <div><p class="rn">Position size</p><p class="rd">Per-trade notional ceiling</p></div>
+      <div><div class="lbl">Declared</div><p class="val">₹2,00,000</p></div>
+      <div><div class="lbl">Enforced</div><p class="val">₹2,00,000</p></div>
+      <div><div class="track"><i style="width:93%;background:var(--caution)"></i></div>
+        <p class="use">₹1,86,000 of ₹2,00,000 · 93%</p></div>
+      <div><span class="pill" style="background:var(--caution-tint);color:var(--caution-text)">NEAR LIMIT</span></div>
+    </div>
+
+    <div class="rrow">
+      <div><p class="rn">Losses in a row</p><p class="rd">Session ends after this many consecutive</p></div>
+      <div><div class="lbl">Declared</div><p class="val">3</p></div>
+      <div><div class="lbl">Enforced</div><p class="val">3</p></div>
+      <div><div class="track"><i style="width:66%;background:var(--caution)"></i></div>
+        <p class="use">2 of 3</p></div>
+      <div><span class="pill" style="background:var(--caution-tint);color:var(--caution-text)">ONE AWAY</span></div>
+    </div>
+
+    <div class="expand">⌄ &nbsp;4 more limits learned from your trading</div>
+  </div>
+
+  <div class="callout">
+    <b>Declared and enforced sit side by side because they are not the same number.</b>
+    A rule applies only when it is stricter than your own behaviour — your trade cap is enforced at
+    <span class="mono" style="color:var(--ink)">6</span> because that is your own median, not the
+    <span class="mono" style="color:var(--ink)">50</span> you wrote down. Showing only the declared
+    figure is how a trader ends up asking why an alert fired while they were inside their limit.
+  </div>
+
+  <div class="section">
+    <div class="sec-h"><h2>Rule violations</h2><span class="r">11 in last 30 days</span></div>
+    <div class="vrow danger">
+      <div><p class="vt">9 trades today against a limit of 6.</p>
+        <p class="vm">Max trades per day · 14:22 · today</p></div>
+      <div><div class="vc">&minus;₹4,180</div>
+        <div class="vcs">realized on the 3 over-cap trades</div></div>
+    </div>
+    <div class="vrow">
+      <div><p class="vt">Re-entered 6 min after a loss; cooldown is 15.</p>
+        <p class="vm">Cooldown after a loss · 13:40 · today</p></div>
+      <div><div class="vc">&minus;₹2,600</div>
+        <div class="vcs">realized on that trade</div></div>
+    </div>
+    <div class="vrow danger">
+      <div><p class="vt">Position sized at ₹2,14,000 against a ceiling of ₹2,00,000.</p>
+        <p class="vm">Position size · 4 Aug, 11:04</p></div>
+      <div><div class="vc">&minus;₹6,450</div>
+        <div class="vcs">realized on that trade</div></div>
+    </div>
+    <div class="chips">
+      <span class="ch2">Max trades per day<b>5</b></span>
+      <span class="ch2">Cooldown after a loss<b>4</b></span>
+      <span class="ch2">Max risk per trade<b>2</b></span>
+    </div>
+  </div>
+
+  <div class="callout warn">
+    <b>Tightening is instant. Loosening waits for the close.</b>
+    A rule made stricter applies on the next fill. A rule made looser is queued until after market
+    hours and needs an explicit override — because the moment a trader most wants to raise their
+    loss limit is the moment it is doing its job.
+  </div>
+
+</main>
+</div>
+</body>
+</html>

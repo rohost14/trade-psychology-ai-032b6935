@@ -1,0 +1,343 @@
+<!-- @dsCard group="Foundations" name="Layout & responsive" subtitle="Four breakpoints, a canvas that caps at 1440 and centres" viewport-width="1440" -->
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Mirror — Layout</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=DM+Mono:wght@400;500&display=swap">
+<style>
+  :root{
+    --ground:#EEF1F5; --canvas:#FFFFFF; --inset:#E9EDF3;
+    --rule:#E3E8EF; --edge:#D3DBE4; --stroke-strong:#5E6B7A;
+    --ink:#0F1724; --ink-2:#4A5768; --ink-3:#647285;
+    --brand:#0E7A6E; --brand-text:#0B6155; --brand-tint:#E4F3F1;
+    --profit-text:#0E6249; --loss:#C2372B; --loss-text:#A62B21; --loss-tint:#FCEEEC;
+    --caution-text:#8F5A0B; --caution-tint:#FDF4E6;
+    --sh-2:0 0 2px rgba(15,23,36,.12), 0 1px 2px rgba(15,23,36,.14);
+    --sh-4:0 0 2px rgba(15,23,36,.12), 0 2px 4px rgba(15,23,36,.14);
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--ground);color:var(--ink);
+    font:400 13.5px/20px Inter,system-ui,sans-serif;padding:20px 24px 48px}
+  .mono{font-family:'DM Mono',monospace;font-variant-numeric:tabular-nums}
+  .canvas{background:var(--canvas);border:1px solid var(--edge);border-radius:12px;
+    box-shadow:var(--sh-4);max-width:1440px;margin:0 auto;overflow:hidden}
+  .band{padding:24px 28px;border-bottom:1px solid var(--rule)}
+  h1{font:600 20px/28px Inter,sans-serif;margin:0;letter-spacing:-.01em}
+  .sub{color:var(--ink-2);margin:8px 0 0;max-width:84ch}
+  .sec{padding:24px 28px;border-bottom:1px solid var(--rule)}
+  .sec:last-child{border-bottom:0}
+  .sh{font:600 14px/20px Inter,sans-serif;margin:0 0 4px}
+  .sd{font:400 12px/16px Inter,sans-serif;color:var(--ink-3);margin:0 0 20px;max-width:88ch}
+  .n{color:var(--ink-2);font-size:13px;margin:20px 0 0;max-width:92ch;line-height:22px}
+  .n b{color:var(--ink);font-weight:600}
+  .lbl{font:600 10px/14px Inter,sans-serif;letter-spacing:.09em;text-transform:uppercase;color:var(--ink-3)}
+  code{font:400 12px/16px 'DM Mono',monospace;background:var(--inset);
+    border-radius:4px;padding:2px 5px;color:var(--ink)}
+  table{width:100%;border-collapse:collapse}
+  th{font:600 10px/14px Inter,sans-serif;letter-spacing:.09em;text-transform:uppercase;
+    color:var(--ink-3);text-align:left;padding:9px 12px;background:var(--inset);
+    border-bottom:1px solid var(--edge)}
+  td{padding:11px 12px;border-bottom:1px solid var(--rule);font-size:12.5px}
+  tr:last-child td{border-bottom:0}
+
+  /* width diagram */
+  .wd{background:var(--inset);border-radius:8px;padding:18px;display:flex;
+    flex-direction:column;gap:14px}
+  .wr{display:grid;grid-template-columns:112px 1fr;gap:14px;align-items:center}
+  .wk{font:400 11.5px/16px 'DM Mono',monospace;color:var(--ink-3)}
+  .wbar{position:relative;height:38px;background:#DDE3EA;border-radius:5px;overflow:hidden}
+  .wfill{position:absolute;top:0;bottom:0;background:var(--canvas);
+    border:1px solid var(--edge);border-radius:5px;display:flex;align-items:center;
+    font:500 11px/14px Inter,sans-serif;color:var(--ink-3)}
+  .wnav{position:absolute;top:0;bottom:0;left:0;background:var(--brand-tint);
+    border-right:1px solid var(--edge)}
+  .wcap{font:400 11px/14px 'DM Mono',monospace;color:var(--ink-3);
+    position:absolute;right:8px;top:12px}
+
+  /* device frames */
+  .devs{display:flex;gap:22px;align-items:flex-start;flex-wrap:wrap}
+  .dev{border:1px solid var(--edge);border-radius:12px;background:var(--ground);
+    padding:10px;box-shadow:var(--sh-2)}
+  .dev .cap{font:600 10px/14px Inter,sans-serif;letter-spacing:.09em;text-transform:uppercase;
+    color:var(--ink-3);padding:2px 2px 9px}
+  .screen{background:var(--canvas);border:1px solid var(--edge);border-radius:8px;overflow:hidden}
+
+  /* mini page bits */
+  .mtop{padding:9px 10px;border-bottom:1px solid var(--rule);display:flex;
+    align-items:center;gap:7px;font:600 11px/16px Inter,sans-serif}
+  .mdot{width:9px;height:9px;border-radius:2px;background:var(--brand)}
+  .mhero{padding:10px;border-bottom:1px solid var(--rule)}
+  .mpnl{font:500 20px/24px 'DM Mono',monospace;color:var(--loss-text);letter-spacing:-.02em}
+  .mmet{display:flex;gap:5px;margin-top:8px;flex-wrap:wrap}
+  .mchip{background:var(--inset);border-radius:5px;padding:5px 7px;
+    font:400 9px/12px 'DM Mono',monospace;color:var(--ink-2)}
+  .msec{padding:9px 10px;border-bottom:1px solid var(--rule)}
+  .msec:last-child{border-bottom:0}
+  .msh{font:600 10px/14px Inter,sans-serif;margin-bottom:7px}
+  .mrow{display:flex;justify-content:space-between;padding:6px 0;
+    border-bottom:1px solid var(--rule);font:400 10px/14px Inter,sans-serif}
+  .mrow:last-child{border-bottom:0}
+  .mrow.alert{border-left:2px solid var(--loss);padding-left:6px;display:block}
+  .mrow .m2{font:400 9px/12px 'DM Mono',monospace;color:var(--ink-3);margin-top:3px}
+  .mbar{display:flex;border-top:1px solid var(--rule);background:var(--canvas)}
+  .mbar div{flex:1;text-align:center;padding:7px 0;font:500 8px/11px Inter,sans-serif;color:var(--ink-3)}
+  .mbar div.on{color:var(--brand)}
+  .mrail{width:38px;border-right:1px solid var(--rule);padding:8px 0;
+    display:flex;flex-direction:column;align-items:center;gap:11px}
+  .mrail i{width:16px;height:16px;border-radius:4px;background:var(--inset);display:block}
+  .mrail i.on{background:var(--brand-tint)}
+  .msb{width:96px;border-right:1px solid var(--rule);padding:8px 6px}
+  .msb b{display:block;font:500 9px/14px Inter,sans-serif;color:var(--ink-3);
+    padding:3px 5px;border-radius:3px}
+  .msb b.on{background:var(--brand-tint);color:var(--brand-text)}
+  .flexrow{display:flex}
+</style>
+</head>
+<body>
+<div class="canvas">
+
+  <div class="band">
+    <h1>Layout &amp; responsive</h1>
+    <p class="sub">Four breakpoints. The canvas caps at 1440 and centres — above that the ground
+      simply shows as a wider margin. No ultra-wide tier.</p>
+  </div>
+
+  <div class="sec">
+    <p class="sh">Breakpoints</p>
+    <p class="sd">Deliberately four, not six.</p>
+    <table>
+      <thead><tr><th style="width:100px">Name</th><th style="width:130px">Range</th>
+        <th style="width:170px">Navigation</th><th>Canvas</th><th>Content</th></tr></thead>
+      <tbody>
+        <tr><td><b>mobile</b></td><td class="mono">&lt; 640</td>
+          <td>Bottom bar, 56px, 5 targets</td>
+          <td>Full bleed, no radius, no side margin</td>
+          <td>Single column. Tables become two-line rows</td></tr>
+        <tr><td><b>tablet</b></td><td class="mono">640 &ndash; 1023</td>
+          <td>Icon rail, 64px</td>
+          <td>16px gutter, radius 12</td>
+          <td>Metrics wrap to 2&times;2. Tables drop LTP and Chg%</td></tr>
+        <tr><td><b>laptop</b></td><td class="mono">1024 &ndash; 1439</td>
+          <td>Full sidebar, 244px</td>
+          <td>24px gutter, fills width</td>
+          <td>Full tables, metrics in one row</td></tr>
+        <tr><td><b>desktop</b></td><td class="mono">&ge; 1440</td>
+          <td>Full sidebar, 244px</td>
+          <td><b>Caps at 1440, centred</b></td>
+          <td>Identical to laptop — nothing reflows</td></tr>
+      </tbody>
+    </table>
+    <p class="n"><b>Nothing changes above 1440 except the size of the margin.</b> A trader on a 27&Prime;
+      monitor gets the same layout as one on a 14&Prime; laptop, just with more space around it. The
+      alternative — letting an eight-column table stretch to 2560px — puts the symbol and its P&amp;L
+      two feet apart, and reading across that gap is exactly the error a P&amp;L table exists to
+      prevent.</p>
+  </div>
+
+  <div class="sec">
+    <p class="sh">Width behaviour</p>
+    <p class="sd">Sidebar is fixed. The canvas takes the remainder until 1440, then stops.</p>
+    <div class="wd">
+      <div class="wr"><span class="wk">2560 · desktop</span>
+        <div class="wbar">
+          <div class="wfill" style="left:22%;right:22%;padding-left:8px">
+            <div class="wnav" style="width:42px"></div>
+            <span style="margin-left:50px">canvas 1440, centred</span>
+            <span class="wcap">margin</span>
+          </div>
+        </div></div>
+      <div class="wr"><span class="wk">1440 · desktop</span>
+        <div class="wbar">
+          <div class="wfill" style="left:3%;right:3%;padding-left:8px">
+            <div class="wnav" style="width:52px"></div>
+            <span style="margin-left:60px">canvas at cap</span>
+          </div>
+        </div></div>
+      <div class="wr"><span class="wk">1280 · laptop</span>
+        <div class="wbar">
+          <div class="wfill" style="left:3%;right:3%;padding-left:8px">
+            <div class="wnav" style="width:58px"></div>
+            <span style="margin-left:66px">canvas fills</span>
+          </div>
+        </div></div>
+      <div class="wr"><span class="wk">834 · tablet</span>
+        <div class="wbar">
+          <div class="wfill" style="left:2%;right:2%;padding-left:8px">
+            <div class="wnav" style="width:24px"></div>
+            <span style="margin-left:32px">icon rail + canvas</span>
+          </div>
+        </div></div>
+      <div class="wr"><span class="wk">390 · mobile</span>
+        <div class="wbar">
+          <div class="wfill" style="left:0;right:0;border-radius:0;padding-left:8px">
+            <span>full bleed · bottom bar</span>
+          </div>
+        </div></div>
+    </div>
+  </div>
+
+  <div class="sec">
+    <p class="sh">The same page at three sizes</p>
+    <p class="sd">Dashboard. Arrangement changes; content does not.</p>
+    <div class="devs">
+
+      <div class="dev">
+        <div class="cap">Mobile · 390</div>
+        <div class="screen" style="width:250px">
+          <div class="mtop"><span class="mdot"></span>Dashboard</div>
+          <div class="mhero">
+            <div class="lbl">Day P&amp;L</div>
+            <div class="mpnl">&minus;₹8,455</div>
+            <div class="mmet">
+              <span class="mchip">TRADES 8</span>
+              <span class="mchip">₹16.1k / ₹25k</span>
+              <span class="mchip">WIN 50%</span>
+              <span class="mchip">UNREAL +₹440</span>
+            </div>
+          </div>
+          <div class="msec">
+            <div class="msh">What we caught today · 3</div>
+            <div class="mrow alert"><b>Size Escalation</b>
+              <div class="m2">4&times; avg size · 8 min after loss</div></div>
+            <div class="mrow alert" style="border-left-color:#C9A227"><b>Early Exit</b>
+              <div class="m2">exited +₹820 after 8 min</div></div>
+          </div>
+          <div class="msec">
+            <div class="msh">Open positions · 2</div>
+            <div class="mrow" style="display:block">
+              <div style="display:flex;justify-content:space-between">
+                <b>FINNIFTY 19800 CE</b>
+                <span class="mono" style="color:var(--loss-text)">&minus;₹3,200</span></div>
+              <div class="m2">40 · entry 172.40 · LTP 168.20</div></div>
+            <div class="mrow" style="display:block">
+              <div style="display:flex;justify-content:space-between">
+                <b>BANKNIFTY 45500 PE</b>
+                <span class="mono" style="color:var(--profit-text)">+₹3,640</span></div>
+              <div class="m2">100 · entry 214.80 · LTP 218.44</div></div>
+          </div>
+          <div class="mbar">
+            <div class="on">Home</div><div>Analytics</div><div>Alerts</div>
+            <div>Chat</div><div>More</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="dev">
+        <div class="cap">Tablet · 834</div>
+        <div class="screen flexrow" style="width:330px">
+          <div class="mrail">
+            <i class="on"></i><i></i><i></i><i></i><i></i><i></i>
+          </div>
+          <div style="flex:1;min-width:0">
+            <div class="mhero">
+              <div class="lbl">Day P&amp;L</div>
+              <div class="mpnl">&minus;₹8,455</div>
+              <div class="mmet" style="display:grid;grid-template-columns:1fr 1fr;gap:5px">
+                <span class="mchip">TRADES 8</span>
+                <span class="mchip">LOSS ₹16.1k / ₹25k</span>
+                <span class="mchip">WIN RATE 50%</span>
+                <span class="mchip">UNREAL +₹440</span>
+              </div>
+            </div>
+            <div class="msec">
+              <div class="msh">What we caught today · 3</div>
+              <div class="mrow alert"><b>Size Escalation</b>
+                <div class="m2">4&times; avg size · 8 min after ₹2,600 loss</div></div>
+              <div class="mrow alert" style="border-left-color:#C9A227"><b>Early Exit</b>
+                <div class="m2">exited +₹820 after 8 min</div></div>
+            </div>
+            <div class="msec">
+              <div class="msh">Open positions · 2</div>
+              <div class="mrow"><span>FINNIFTY 19800 CE</span>
+                <span class="mono" style="color:var(--loss-text)">&minus;₹3,200</span></div>
+              <div class="mrow"><span>BANKNIFTY 45500 PE</span>
+                <span class="mono" style="color:var(--profit-text)">+₹3,640</span></div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="dev">
+        <div class="cap">Laptop · 1280</div>
+        <div class="screen flexrow" style="width:470px">
+          <div class="msb">
+            <b class="on">Dashboard</b><b>Analytics</b><b>Alerts</b><b>Chat</b>
+            <b style="color:var(--ink-3);opacity:.6;margin-top:6px">INSIGHTS</b>
+            <b>Reports</b><b>Journal</b>
+          </div>
+          <div style="flex:1;min-width:0">
+            <div class="mhero" style="display:flex;justify-content:space-between;align-items:flex-start">
+              <div><div class="lbl">Day P&amp;L</div>
+                <div class="mpnl">&minus;₹8,455</div></div>
+              <div class="mmet" style="margin-top:0">
+                <span class="mchip">TRADES 8</span>
+                <span class="mchip">₹16.1k / ₹25k</span>
+                <span class="mchip">50%</span>
+                <span class="mchip">+₹440</span>
+              </div>
+            </div>
+            <div class="msec">
+              <div class="msh">What we caught today · 3</div>
+              <div class="mrow alert"><b>Size Escalation</b>
+                <div class="m2">BANKNIFTY 45500 PE · 4&times; avg size · 8 min after ₹2,600 loss</div></div>
+            </div>
+            <div class="msec">
+              <div class="msh">Open positions · 2</div>
+              <div class="mrow" style="font-size:9px">
+                <span style="flex:1">FINNIFTY 19800 CE</span>
+                <span class="mono" style="width:34px">40</span>
+                <span class="mono" style="width:48px">172.40</span>
+                <span class="mono" style="width:48px">168.20</span>
+                <span class="mono" style="width:48px;color:var(--loss-text)">&minus;2.44%</span>
+                <span class="mono" style="width:62px;text-align:right;color:var(--loss-text)">&minus;₹3,200</span></div>
+              <div class="mrow" style="font-size:9px">
+                <span style="flex:1">BANKNIFTY 45500 PE</span>
+                <span class="mono" style="width:34px">100</span>
+                <span class="mono" style="width:48px">214.80</span>
+                <span class="mono" style="width:48px">218.44</span>
+                <span class="mono" style="width:48px;color:var(--profit-text)">+1.69%</span>
+                <span class="mono" style="width:62px;text-align:right;color:var(--profit-text)">+₹3,640</span></div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+    </div>
+    <p class="n"><b>Nothing is hidden behind a tap.</b> Every figure on the laptop layout is on the
+      mobile one — the arrangement changes, the content does not. A shorter mobile version is a
+      different product, not a smaller one.
+      <br><br>
+      <b>The table is the only thing that genuinely restructures.</b> Six columns cannot survive
+      390px, so symbol and P&amp;L take the top line and quantity, entry and LTP fold into a caption
+      underneath. The two figures being compared stay in a column, which was the property that
+      mattered about the table in the first place. At tablet the table keeps its columns but drops
+      LTP and Chg%, both derivable from what is left.
+      <br><br>
+      <b>Mobile navigation is a flat bottom bar of five equal targets</b> — no floating action
+      button. A raised centre button implies one dominant action per screen; these screens are for
+      reading.</p>
+  </div>
+
+  <div class="sec">
+    <p class="sh">Rules that hold at every size</p>
+    <div class="n" style="margin-top:0">
+      <b>Hit targets 32px minimum, 44px on mobile.</b> The alert response buttons —
+      &ldquo;I stood down&rdquo; / &ldquo;Took it anyway&rdquo; / &ldquo;Not useful&rdquo; — are the
+      one place this product asks for input at all, so they get the 44px treatment on every
+      breakpoint, not just below 640.
+      <br><br>
+      <b>Horizontal scrolling is never the page.</b> If something must scroll sideways it does so
+      inside its own container with a visible edge, and it is never the primary content of a screen.
+      <br><br>
+      <b>The canvas is one scroll context.</b> No inner panes with their own scrollbars except the
+      sidebar, which is fixed and scrolls independently because its length is content-dependent.
+      <br><br>
+      <b>Sticky is limited to the page header row.</b> Table headers do not stick — a sticky header
+      on a five-row table is motion for its own sake.
+    </div>
+  </div>
+
+</div>
+</body>
+</html>

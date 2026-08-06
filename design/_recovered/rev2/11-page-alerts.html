@@ -1,0 +1,285 @@
+<!-- @dsCard group="Pages" name="Alerts" subtitle="One card of hairline rows, the record line, the three-button loop" viewport-width="1600" -->
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Mirror — Alerts</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=DM+Mono:wght@300;400;500&display=swap">
+<style>
+  :root{ --page:#EEF1F5; --surface:#FFFFFF; --inset:#E4E9F0; --sidebar:#FFFFFF;
+    --border:#D6DEE8; --divider:#E8EDF3; --ink:#0F1724; --ink2:#4A5768; --ink3:#7C8899;
+    --brand:#0E7A6E; --brand-t:#E2F2EF; --profit:#12795B; --profit-t:#E3F3EE;
+    --loss:#C2372B; --loss-t:#FBE9E7; --caution:#A96A0C; --caution-t:#FBF0DF;
+    --sh1:0 1px 2px rgba(15,23,36,.05), 0 1px 3px rgba(15,23,36,.06);
+    --sh2:0 2px 4px rgba(15,23,36,.04), 0 8px 20px rgba(15,23,36,.08); }
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--page);color:var(--ink);
+    font:400 13.5px/1.6 Inter,system-ui,sans-serif;display:flex;min-height:100vh}
+  .mono{font-family:'DM Mono',monospace;font-variant-numeric:tabular-nums}
+  .lbl{font:600 10.5px/1 Inter,sans-serif;letter-spacing:.09em;text-transform:uppercase;color:var(--ink3)}
+
+  aside{width:244px;flex-shrink:0;background:var(--sidebar);border-right:1px solid var(--border);
+    display:flex;flex-direction:column;padding:0 12px 14px;position:sticky;top:0;height:100vh}
+  .brand{display:flex;align-items:center;gap:10px;height:64px;padding:0 8px;
+    font:600 16px/1 Inter,sans-serif;letter-spacing:-.01em}
+  .brand svg{color:var(--brand)}
+  .nav{display:flex;align-items:center;gap:12px;height:38px;padding:0 12px;border-radius:6px;
+    font:500 13.5px/1 Inter,sans-serif;color:var(--ink2);margin-bottom:2px;position:relative}
+  .nav .ic{width:16px;height:16px;flex-shrink:0;color:var(--ink3)}
+  .nav.on{background:var(--brand-t);color:var(--brand);font-weight:600}
+  .nav.on .ic{color:var(--brand)}
+  .nav.on:before{content:"";position:absolute;left:-12px;top:9px;bottom:9px;width:3px;
+    background:var(--brand);border-radius:0 2px 2px 0}
+  .nav .bdg{margin-left:auto;font:500 10.5px/1 'DM Mono',monospace;background:var(--loss);
+    color:#fff;border-radius:999px;padding:3px 6px}
+  .grp{font:600 10px/1 Inter,sans-serif;letter-spacing:.11em;text-transform:uppercase;
+    color:var(--ink3);padding:20px 12px 8px}
+  .side-b{margin-top:auto;padding-top:14px}
+  .acct{display:flex;align-items:center;gap:9px;height:40px;padding:0 12px;border-radius:8px;
+    background:var(--inset);font:500 12.5px/1 'DM Mono',monospace;margin-top:12px}
+  .acct i{width:7px;height:7px;border-radius:999px;background:var(--profit)}
+
+  main{flex:1;min-width:0}
+  .wrap{padding:24px 32px 56px;display:flex;flex-direction:column;gap:16px}
+  .card{background:var(--surface);border:1px solid var(--border);border-radius:10px;box-shadow:var(--sh1)}
+
+  .top{display:flex;align-items:flex-end;justify-content:space-between;gap:40px}
+  h1{font:600 19px/1.25 Inter,sans-serif;margin:0;letter-spacing:-.015em}
+  .sub{font-size:12.5px;color:var(--ink3);margin:6px 0 0}
+
+  .stats{display:grid;grid-template-columns:repeat(4,1fr)}
+  .stat{padding:16px 20px;border-right:1px solid var(--divider)}
+  .stat:last-child{border-right:0}
+  .stat .f{font:500 24px/1 'DM Mono',monospace;margin:11px 0 0;letter-spacing:-.02em}
+  .stat .u{font:400 11.5px/1 'DM Mono',monospace;color:var(--ink3);margin-left:7px}
+
+  .tabs{display:flex;gap:24px;padding:0 20px;border-bottom:1px solid var(--divider)}
+  .tab{font:500 13.5px/1 Inter,sans-serif;color:var(--ink3);padding:14px 0 13px;position:relative;
+    display:flex;align-items:center;gap:7px}
+  .tab.on{color:var(--ink);font-weight:600}
+  .tab.on:after{content:"";position:absolute;left:0;right:0;bottom:-1px;height:2px;background:var(--brand)}
+  .tab .n{font:500 10.5px/1 'DM Mono',monospace;color:var(--ink3)}
+
+  .bar{display:flex;align-items:center;gap:12px;padding:13px 20px;border-bottom:1px solid var(--divider)}
+  .seg{display:inline-flex;background:var(--inset);border-radius:7px;padding:3px}
+  .seg span{font:500 12px/1 Inter,sans-serif;padding:7px 13px;border-radius:5px;color:var(--ink2)}
+  .seg span.sel{background:var(--surface);color:var(--ink);font-weight:600;box-shadow:var(--sh1)}
+  .count{margin-left:auto;font:400 12px/1 'DM Mono',monospace;color:var(--ink3)}
+
+  .day{font:600 10.5px/1 Inter,sans-serif;letter-spacing:.09em;text-transform:uppercase;
+    color:var(--ink3);padding:14px 20px;background:var(--inset);border-bottom:1px solid var(--divider)}
+
+  .arow{display:grid;grid-template-columns:1fr 20px;gap:20px;padding:19px 20px 19px 17px;
+    border-bottom:1px solid var(--divider);border-left:3px solid transparent}
+  .arow:last-child{border-bottom:0}
+  .arow.danger{border-left-color:var(--loss)}
+  .arow.done{background:#FAFBFD}
+  .arow.done .a-t,.arow.done .a-b{color:var(--ink3)}
+  .a-h{display:flex;align-items:center;gap:10px}
+  .a-t{font:600 14px/1 Inter,sans-serif;margin:0}
+  .dot{width:8px;height:8px;border-radius:999px;flex-shrink:0;margin-right:2px}
+  .bd{font:700 9.5px/1 Inter,sans-serif;letter-spacing:.08em;padding:5px 7px;border-radius:4px}
+  .chip{font:600 10px/1 Inter,sans-serif;background:var(--brand-t);color:var(--brand);
+    border-radius:4px;padding:5px 7px}
+  .a-b{font-size:13.5px;color:var(--ink2);margin:9px 0 0;line-height:1.6;max-width:104ch}
+  .a-b .num{color:var(--ink);font-weight:500;font-family:'DM Mono',monospace}
+  .meta{font:400 11.5px/1 'DM Mono',monospace;color:var(--ink3);margin-top:11px}
+  .rec{font-size:12.5px;color:var(--ink2);margin:12px 0 0;background:var(--inset);
+    border-radius:7px;padding:9px 12px;display:inline-block}
+  .rec b{color:var(--ink);font-weight:600}
+  .rec .neg{color:var(--loss);font-weight:500;font-family:'DM Mono',monospace}
+
+  .resp{display:flex;align-items:center;gap:9px;margin-top:14px}
+  .resp .q{font-size:12px;color:var(--ink3);margin-right:4px}
+  .rb{font:600 12.5px/1 Inter,sans-serif;border:1px solid var(--border);background:var(--surface);
+    color:var(--ink);border-radius:7px;height:34px;padding:0 14px;cursor:pointer;box-shadow:var(--sh1)}
+  .rb.ghost{background:transparent;border-color:transparent;color:var(--ink3);
+    box-shadow:none;font-weight:500}
+  .ans{display:flex;align-items:center;gap:11px;margin-top:13px;font-size:12.5px;color:var(--ink3)}
+  .ans .pill{background:var(--inset);border-radius:999px;padding:6px 12px;
+    font:600 11px/1 Inter,sans-serif;color:var(--ink2)}
+  .chev{color:var(--ink3);font-size:16px;text-align:right;padding-top:2px}
+
+  .note{background:var(--surface);border:1px solid var(--border);border-left:3px solid var(--brand);
+    border-radius:10px;box-shadow:var(--sh1);padding:17px 20px;max-width:104ch;
+    font-size:13px;color:var(--ink2);line-height:1.7}
+  .note b{color:var(--ink);font-weight:600}
+</style>
+</head>
+<body>
+
+<aside>
+  <div class="brand">
+    <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2 4 6v6c0 5 3.4 9.4 8 10 4.6-.6 8-5 8-10V6z"/></svg>
+    TradeMentor</div>
+  <div class="nav"><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/></svg>Dashboard</div>
+  <div class="nav"><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 17l6-6 4 4 7-7"/><path d="M14 8h6v6"/></svg>Analytics</div>
+  <div class="nav on"><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 8a6 6 0 1 0-12 0c0 7-3 8-3 8h18s-3-1-3-8"/><path d="M13.7 21a2 2 0 0 1-3.4 0"/></svg>Alerts<span class="bdg">3</span></div>
+  <div class="nav"><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>Chat</div>
+  <div class="grp">Insights</div>
+  <div class="nav"><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M2 4h7a3 3 0 0 1 3 3v13a2.5 2.5 0 0 0-2.5-2.5H2z"/><path d="M22 4h-7a3 3 0 0 0-3 3v13a2.5 2.5 0 0 1 2.5-2.5H22z"/></svg>Reports</div>
+  <div class="nav"><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/></svg>Journal</div>
+  <div class="grp">Risk</div>
+  <div class="nav"><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 3v18"/><path d="M5 7h14"/><path d="M5 7 2 14h6z"/><path d="M19 7l-3 7h6z"/></svg>My Rules</div>
+  <div class="nav"><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4.3-4.3"/></svg>My Record</div>
+  <div class="grp">Account</div>
+  <div class="nav"><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.9l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-2.9 1.2 2 2 0 1 1-4 0 1.7 1.7 0 0 0-2.9-1.2l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1A1.7 1.7 0 0 0 3 15a2 2 0 1 1 0-4 1.7 1.7 0 0 0 1.5-2.6l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1A1.7 1.7 0 0 0 10 4.6a2 2 0 1 1 4 0 1.7 1.7 0 0 0 2.9 1.2l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1A1.7 1.7 0 0 0 21 11a2 2 0 1 1 0 4z"/></svg>Settings</div>
+  <div class="side-b"><div class="acct"><i></i>ZA1234</div></div>
+</aside>
+
+<main>
+<div class="wrap">
+
+  <div class="top">
+    <div><h1>Behavioral Alerts</h1>
+      <p class="sub">Fired from your fills, live. Answering one is what teaches the engine.</p></div>
+  </div>
+
+  <div class="card">
+    <div class="stats">
+      <div class="stat"><div class="lbl">Fired · 30d</div><p class="f">55</p></div>
+      <div class="stat"><div class="lbl">Answered</div><p class="f">12<span class="u">22%</span></p></div>
+      <div class="stat"><div class="lbl">You stood down</div>
+        <p class="f" style="color:var(--profit)">7</p></div>
+      <div class="stat"><div class="lbl">Took it anyway</div>
+        <p class="f" style="color:var(--loss)">&minus;₹18,900</p></div>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="tabs">
+      <div class="tab">Unreviewed<span class="n">3</span></div>
+      <div class="tab on">History<span class="n">55</span></div>
+      <div class="tab">Patterns<span class="n">9</span></div>
+    </div>
+
+    <div class="bar">
+      <div class="seg"><span class="sel">7d</span><span>30d</span><span>90d</span></div>
+      <div class="seg"><span class="sel">All</span><span>Danger</span><span>Caution</span></div>
+      <span class="count">7 alerts</span>
+    </div>
+
+    <div class="day">Today</div>
+
+    <div class="arow danger">
+      <div>
+        <div class="a-h"><span class="dot" style="background:var(--loss)"></span>
+          <p class="a-t">Size Escalation</p>
+          <span class="bd" style="background:var(--loss-t);color:var(--loss)">DANGER</span>
+          <span class="chip">New</span></div>
+        <p class="a-b">BANKNIFTY 45500 PE entry at <span class="num">100</span> lots —
+          <span class="num">4&times;</span> your average size — <span class="num">8 min</span> after
+          <span class="num">₹2,600</span> loss. Win rate on oversized entries:
+          <span class="num">28%</span> vs <span class="num">60%</span> baseline.</p>
+        <div class="meta">11:04 · BANKNIFTY25AUG45500PE · 100 qty · MIS</div>
+        <p class="rec">Your record: <b>2 times</b> in 90 days,
+          <span class="neg">&minus;₹6,450</span> realized on those trades.</p>
+        <div class="resp"><span class="q">What did you do?</span>
+          <button class="rb">I stood down</button>
+          <button class="rb">Took it anyway</button>
+          <button class="rb ghost">Not useful</button></div>
+      </div>
+      <div class="chev">&rsaquo;</div>
+    </div>
+
+    <div class="arow">
+      <div>
+        <div class="a-h"><span class="dot" style="background:var(--caution)"></span>
+          <p class="a-t">Early Exit</p>
+          <span class="bd" style="background:var(--caution-t);color:var(--caution)">CAUTION</span>
+          <span class="chip">New</span></div>
+        <p class="a-b">NIFTY CE exited at <span class="num">+₹820</span> after
+          <span class="num">8 min</span>. Position continued to <span class="num">+₹2,100</span>.
+          You exit <span class="num">42%</span> early on average — <span class="num">₹7,680</span>
+          in unrealised gains left behind this month.</p>
+        <div class="meta">10:52 · NIFTY25AUG23000CE · 50 qty · MIS</div>
+        <div class="resp"><span class="q">What did you do?</span>
+          <button class="rb">I stood down</button>
+          <button class="rb">Took it anyway</button>
+          <button class="rb ghost">Not useful</button></div>
+      </div>
+      <div class="chev">&rsaquo;</div>
+    </div>
+
+    <div class="arow danger">
+      <div>
+        <div class="a-h"><span class="dot" style="background:var(--loss)"></span>
+          <p class="a-t">No Stop-Loss</p>
+          <span class="bd" style="background:var(--loss-t);color:var(--loss)">DANGER</span>
+          <span class="chip">New</span></div>
+        <p class="a-b">FINNIFTY 19800 CE open <span class="num">47 min</span> with no stop-loss.
+          Unrealised loss: <span class="num">₹3,200</span>. Positions without stop-loss average
+          <span class="num">3&times;</span> larger final loss for you.</p>
+        <div class="meta">13:04 · FINNIFTY25AUG19800CE · 40 qty · NRML</div>
+        <p class="rec">Your record: <b>2 times</b> in 90 days,
+          <span class="neg">&minus;₹1,700</span> realized on those trades.</p>
+        <div class="resp"><span class="q">What did you do?</span>
+          <button class="rb">I stood down</button>
+          <button class="rb">Took it anyway</button>
+          <button class="rb ghost">Not useful</button></div>
+      </div>
+      <div class="chev">&rsaquo;</div>
+    </div>
+
+    <div class="day">Yesterday</div>
+
+    <div class="arow danger done">
+      <div>
+        <div class="a-h"><span class="dot" style="background:var(--loss)"></span>
+          <p class="a-t">Revenge Trade</p>
+          <span class="bd" style="background:var(--loss-t);color:var(--loss)">DANGER</span></div>
+        <p class="a-b">NIFTY23000CE entry came <span class="num">25 min</span> after
+          <span class="num">₹13,000</span> loss on SOLARINDS. Re-entering under active loss stress.</p>
+        <div class="meta">4 Aug, 13:22 · NIFTY25AUG23000CE · 500 qty · MIS</div>
+        <div class="ans"><span class="pill">Took it anyway</span>
+          That trade closed at <span class="neg mono" style="color:var(--loss);font-weight:500">&minus;₹6,200</span></div>
+      </div>
+      <div class="chev">&rsaquo;</div>
+    </div>
+
+    <div class="arow done">
+      <div>
+        <div class="a-h"><span class="dot" style="background:var(--caution)"></span>
+          <p class="a-t">Martingale / Averaging Down</p>
+          <span class="bd" style="background:var(--caution-t);color:var(--caution)">CAUTION</span></div>
+        <p class="a-b">BANKNIFTY lot size went <span class="num">1 &rarr; 1 &rarr; 3</span> across
+          three consecutive losses. Total session exposure has tripled.</p>
+        <div class="meta">4 Aug, 11:47 · BANKNIFTY25AUG48500PE · 150 qty · MIS</div>
+        <div class="ans"><span class="pill">Not useful</span> Muted for 30 days</div>
+      </div>
+      <div class="chev">&rsaquo;</div>
+    </div>
+
+    <div class="arow done">
+      <div>
+        <div class="a-h"><span class="dot" style="background:var(--caution)"></span>
+          <p class="a-t">Overtrading</p>
+          <span class="bd" style="background:var(--caution-t);color:var(--caution)">CAUTION</span></div>
+        <p class="a-b"><span class="num">5</span> trades in the last <span class="num">3 hours</span>.
+          Typical pace is <span class="num">2&ndash;3</span>. Each additional trade this session has
+          been a loss.</p>
+        <div class="meta">4 Aug, 10:31 · session rule</div>
+        <div class="ans"><span class="pill" style="background:var(--profit-t);color:var(--profit)">I stood down</span>
+          No further trades that session</div>
+      </div>
+      <div class="chev">&rsaquo;</div>
+    </div>
+  </div>
+
+  <div class="note">
+    <b>One card, hairline rows — not a card per alert.</b> Fifty-five alerts stacked as fifty-five
+    containers is fifty-five boundaries to cross; the card says &ldquo;this is the alert history&rdquo;
+    once, and <span class="mono">1px</span> says where each one ends. Answered rows tint to
+    <span class="mono">#FAFBFD</span> and drop their ink a level rather than moving.
+    <br><br>
+    <b>Three buttons, and the third is the important one.</b> Fifty-five fired, twelve answered.
+    &ldquo;Not useful&rdquo; is what keeps the other two honest — without a way to say the alert was
+    wrong, a trader who disagrees ignores the whole surface. An answered row shows <b>what happened
+    next</b>, which is the only argument for answering the next one.
+  </div>
+
+</div>
+</main>
+
+</body>
+</html>
