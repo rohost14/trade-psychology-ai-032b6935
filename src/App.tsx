@@ -23,6 +23,9 @@ const LandingLab    = lazy(() => import("./pages/_lab/LandingLab"));
 const SoftPrecisionLab = lazy(() => import("./pages/_lab/SoftPrecisionLab"));
 const SoftPrecisionWebLab = lazy(() => import("./pages/_lab/SoftPrecisionWebLab"));
 const DesignLab     = lazy(() => import("./pages/_lab/DesignLab"));
+/* Restored 2026-08-06 from tag `dashboard-lab-good` (596c066, 31 Jul) — the
+   approved dashboard lab, deleted in c40968b once it had been ported. */
+const DashboardLab  = lazy(() => import("./pages/_lab/DashboardLab"));
 const ImpersonateEntry = lazy(() => import("./pages/ImpersonateEntry"));
 const Analytics     = lazy(() => import("./pages/Analytics"));
 const Alerts        = lazy(() => import("./pages/Alerts"));
@@ -124,6 +127,7 @@ const App = () => (
                   <Route path="soft-lab" element={<SoftPrecisionLab />} />
                   <Route path="soft-web-lab" element={<SoftPrecisionWebLab />} />
                   <Route path="design-lab" element={<DesignLab />} />
+                  <Route path="dashboard-lab" element={<DashboardLab />} />
                   <Route path="terms" element={<TermsOfService />} />
                   <Route path="privacy" element={<PrivacyPolicy />} />
                   <Route path="maintenance" element={<Maintenance />} />
