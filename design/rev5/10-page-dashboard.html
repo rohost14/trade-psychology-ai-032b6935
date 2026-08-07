@@ -1,0 +1,310 @@
+<!-- @dsCard group="rev5" name="Dashboard" subtitle="Demo's character on the desktop app. Tinted neutrals, indigo accent, Jakarta + Plex Mono" viewport-width="1500" -->
+<!doctype html>
+<html lang="en" class="light">
+<head>
+<meta charset="utf-8">
+<title>rev5 — Dashboard</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap">
+<style>
+  html.light{
+    --ground:#F4F4FA; --surface:#FFFFFF; --raised:#FFFFFF; --inset:#F0F0F8;
+    --line:#E7E7F1; --line-soft:#EFEFF6;
+    --ink:#1B1B2E; --body:#55566B; --muted:#82849C;
+    --accent:#4A46D6; --accent-t:#ECEBFB; --accent-d:#3A36B8;
+    --up:#0F9D76; --up-t:#E4F3EE;
+    --down:#D42F4E; --down-t:#FBE8EC;
+    --hover:#FAFAFE;
+    --shadow:0 4px 20px rgba(27,27,46,.06);
+    --shadow-lg:0 8px 32px rgba(27,27,46,.09);
+    --state-grad:linear-gradient(135deg,#FDF0F3 0%,#FFFFFF 62%);
+    --state-edge:#F6DBE2;
+  }
+  html.dark{
+    --ground:#131320; --surface:#1C1C2C; --raised:#222234; --inset:#191926;
+    --line:#2C2C40; --line-soft:#252536;
+    --ink:#ECECF4; --body:#A5A6BC; --muted:#8688A0;
+    --accent:#8B87F5; --accent-t:#232144; --accent-d:#A9A6F8;
+    --up:#35C79B; --up-t:#12312A;
+    --down:#F2637E; --down-t:#3A1A25;
+    --hover:#222234;
+    --shadow:none; --shadow-lg:none;
+    --state-grad:linear-gradient(135deg,#2A1A24 0%,#1C1C2C 62%);
+    --state-edge:#4A2833;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--ground);color:var(--ink);
+    font:400 13.5px/20px 'Plus Jakarta Sans',system-ui,sans-serif;display:flex;min-height:100vh;
+    -webkit-font-smoothing:antialiased}
+  /* mono is for MONEY only — not timestamps, not counts, not quantities */
+  .m{font-family:'IBM Plex Mono',ui-monospace,monospace;font-variant-numeric:tabular-nums}
+  .lbl{font:600 11px/14px 'Plus Jakarta Sans',sans-serif;letter-spacing:.06em;
+    text-transform:uppercase;color:var(--muted)}
+  .up{color:var(--up)} .dn{color:var(--down)}
+
+  .themer{position:fixed;top:16px;right:18px;z-index:60;border:1px solid var(--line);
+    background:var(--surface);color:var(--body);border-radius:999px;height:32px;padding:0 15px;
+    font:600 12px/1 'Plus Jakarta Sans',sans-serif;cursor:pointer;box-shadow:var(--shadow)}
+
+  /* ── sidebar ── */
+  aside{width:236px;flex-shrink:0;background:var(--surface);border-right:1px solid var(--line);
+    display:flex;flex-direction:column;padding:0 12px 16px;position:sticky;top:0;height:100vh}
+  .brand{display:flex;align-items:center;gap:10px;height:66px;padding:0 10px;
+    font:700 16px/1 'Plus Jakarta Sans',sans-serif;letter-spacing:-.02em}
+  .mark{width:30px;height:30px;border-radius:10px;background:var(--accent);color:#fff;
+    display:flex;align-items:center;justify-content:center;flex-shrink:0}
+  .nav{display:flex;align-items:center;gap:11px;height:38px;padding:0 12px;border-radius:10px;
+    font:500 13.5px/1 'Plus Jakarta Sans',sans-serif;color:var(--body);margin-bottom:2px}
+  .nav .ic{width:16px;height:16px;flex-shrink:0;color:var(--muted)}
+  .nav:hover{background:var(--hover)}
+  .nav.on{background:var(--accent-t);color:var(--accent);font-weight:600}
+  .nav.on .ic{color:var(--accent)}
+  .nav .bdg{margin-left:auto;font:600 10.5px/1 'Plus Jakarta Sans',sans-serif;
+    background:var(--down);color:#fff;border-radius:999px;padding:3px 7px}
+  .grp{font:600 10.5px/14px 'Plus Jakarta Sans',sans-serif;letter-spacing:.07em;
+    text-transform:uppercase;color:var(--muted);padding:20px 12px 6px}
+  .side-b{margin-top:auto;padding-top:14px}
+  .acct{display:flex;align-items:center;gap:10px;padding:9px 12px;border-radius:12px;
+    background:var(--inset)}
+  .av{width:26px;height:26px;border-radius:999px;background:var(--accent-t);color:var(--accent);
+    display:flex;align-items:center;justify-content:center;font:700 11px/1 'Plus Jakarta Sans',sans-serif}
+  .acct b{font:600 12.5px/1 'Plus Jakarta Sans',sans-serif;display:block}
+  .acct span{font-size:11px;color:var(--muted)}
+
+  main{flex:1;min-width:0}
+  .wrap{max-width:1400px;margin:0 auto;padding:26px 30px 60px;
+    display:flex;flex-direction:column;gap:18px}
+
+  /* ── the one gradient on the page: session state ── */
+  .state{background:var(--state-grad);border:1px solid var(--state-edge);border-radius:16px;
+    padding:24px 26px;display:flex;align-items:flex-start;justify-content:space-between;gap:36px;
+    box-shadow:var(--shadow)}
+  .pnl{font:700 40px/44px 'IBM Plex Mono',monospace;letter-spacing:-.03em;margin:10px 0 0;
+    color:var(--down);font-variant-numeric:tabular-nums}
+  .sub{font-size:12.5px;line-height:18px;color:var(--muted);margin:10px 0 0}
+  .sub b{font-weight:500}
+  .pill{display:inline-flex;align-items:center;gap:6px;border-radius:999px;
+    font:600 11.5px/1 'Plus Jakarta Sans',sans-serif;padding:6px 12px}
+  .pill i{width:6px;height:6px;border-radius:999px;background:currentColor}
+
+  /* metric tiles — soft cards, the demo's Performance Stats grid */
+  .mets{display:flex;gap:10px;flex-shrink:0}
+  .met{background:var(--surface);border:1px solid var(--line);border-radius:12px;
+    padding:12px 15px;min-width:126px;box-shadow:var(--shadow)}
+  .met .h{display:flex;align-items:center;gap:7px}
+  .met .f{font:600 20px/26px 'IBM Plex Mono',monospace;margin:9px 0 0;
+    font-variant-numeric:tabular-nums;letter-spacing:-.01em}
+  .met .u{font:400 11px/1 'Plus Jakarta Sans',sans-serif;color:var(--muted);margin-left:5px}
+  .dotic{width:18px;height:18px;border-radius:999px;display:flex;align-items:center;
+    justify-content:center;flex-shrink:0}
+
+  /* ── card ── */
+  .card{background:var(--surface);border:1px solid var(--line);border-radius:14px;
+    box-shadow:var(--shadow);overflow:hidden}
+  .ch{display:flex;align-items:center;gap:11px;padding:15px 20px;border-bottom:1px solid var(--line-soft)}
+  .ch h2{font:600 15px/22px 'Plus Jakarta Sans',sans-serif;margin:0;letter-spacing:-.01em}
+  .cnt{font:600 11px/1 'Plus Jakarta Sans',sans-serif;background:var(--down-t);color:var(--down);
+    border-radius:999px;padding:4px 9px}
+  .cnt.q{background:var(--inset);color:var(--muted)}
+  .sp{margin-left:auto;display:flex;align-items:center;gap:13px}
+  .lnk{color:var(--accent);font:600 12.5px/1 'Plus Jakarta Sans',sans-serif;text-decoration:none}
+  .tag{font:600 10.5px/1 'Plus Jakarta Sans',sans-serif;color:var(--muted);
+    background:var(--inset);border-radius:999px;padding:5px 10px}
+
+  /* ── alert rows — pastel circular icon badge is the demo's signature ── */
+  .arow{display:grid;grid-template-columns:38px 1fr 54px;gap:14px;padding:15px 20px;
+    border-bottom:1px solid var(--line-soft);align-items:flex-start}
+  .arow:last-of-type{border-bottom:0}
+  .arow:hover{background:var(--hover)}
+  .badge{width:38px;height:38px;border-radius:999px;display:flex;align-items:center;
+    justify-content:center;flex-shrink:0}
+  .ah{display:flex;align-items:center;gap:9px;flex-wrap:wrap}
+  .at{font:600 14px/20px 'Plus Jakarta Sans',sans-serif;margin:0;letter-spacing:-.01em}
+  .sev{font:600 10.5px/1 'Plus Jakarta Sans',sans-serif;border-radius:999px;padding:4px 9px}
+  .ab{font-size:13px;line-height:19px;color:var(--body);margin:6px 0 0}
+  .ab .n{color:var(--ink);font-weight:600}
+  .when{font:400 11.5px/1 'Plus Jakarta Sans',sans-serif;color:var(--muted);text-align:right;padding-top:11px}
+  .more{display:block;text-align:center;padding:14px 0;
+    font:600 12.5px/1 'Plus Jakarta Sans',sans-serif;color:var(--accent);text-decoration:none}
+
+  /* ── table ── */
+  table{width:100%;border-collapse:collapse}
+  thead th{font:600 10.5px/14px 'Plus Jakarta Sans',sans-serif;letter-spacing:.06em;
+    text-transform:uppercase;color:var(--muted);text-align:right;padding:11px 16px;background:var(--inset)}
+  thead th:first-child{text-align:left;padding-left:20px}
+  thead th:last-child{padding-right:20px}
+  tbody td{padding:15px 16px;border-bottom:1px solid var(--line-soft);text-align:right;
+    font:500 14px/20px 'IBM Plex Mono',monospace;font-variant-numeric:tabular-nums}
+  tbody td:first-child{text-align:left;padding-left:20px}
+  tbody td:last-child{padding-right:20px}
+  tbody tr:last-child td{border-bottom:0}
+  tbody tr:hover{background:var(--hover)}
+  /* symbol + qty are NOT money, so they are not mono */
+  .sym{font:600 13.5px/19px 'Plus Jakarta Sans',sans-serif;letter-spacing:-.01em}
+  .sym small{display:block;font:400 11.5px/16px 'Plus Jakarta Sans',sans-serif;
+    color:var(--muted);margin-top:3px;letter-spacing:0}
+  .prod{font:600 10px/1 'Plus Jakarta Sans',sans-serif;color:var(--muted);background:var(--inset);
+    border-radius:999px;padding:3px 8px;margin-left:8px;vertical-align:1.5px}
+  td.qty{font:500 13.5px/20px 'Plus Jakarta Sans',sans-serif}
+
+  .line{display:flex;align-items:center;justify-content:space-between;gap:18px;padding:0 4px}
+  .line p{margin:0;font-size:13px;color:var(--body)}
+  .line b{color:var(--ink);font-weight:600}
+</style>
+</head>
+<body>
+<button class="themer" onclick="var h=document.documentElement;h.classList.toggle('dark');h.classList.toggle('light');this.textContent=h.classList.contains('dark')?'Dark':'Light'">Light</button>
+
+<aside>
+  <div class="brand">
+    <span class="mark"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M12 2 4 6v6c0 5 3.4 9.4 8 10 4.6-.6 8-5 8-10V6z"/></svg></span>
+    TradeMentor</div>
+  <div class="nav on"><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="3" width="7" height="7" rx="1.5"/><rect x="3" y="14" width="7" height="7" rx="1.5"/><rect x="14" y="14" width="7" height="7" rx="1.5"/></svg>Dashboard</div>
+  <div class="nav"><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 17l6-6 4 4 7-7"/><path d="M14 8h6v6"/></svg>Analytics</div>
+  <div class="nav"><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 8a6 6 0 1 0-12 0c0 7-3 8-3 8h18s-3-1-3-8"/><path d="M13.7 21a2 2 0 0 1-3.4 0"/></svg>Alerts<span class="bdg">3</span></div>
+  <div class="nav"><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>Chat</div>
+  <div class="grp">Insights</div>
+  <div class="nav"><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M2 4h7a3 3 0 0 1 3 3v13a2.5 2.5 0 0 0-2.5-2.5H2z"/><path d="M22 4h-7a3 3 0 0 0-3 3v13a2.5 2.5 0 0 1 2.5-2.5H22z"/></svg>Reports</div>
+  <div class="nav"><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/></svg>Journal</div>
+  <div class="grp">Risk</div>
+  <div class="nav"><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 3v18"/><path d="M5 7h14"/><path d="M5 7 2 14h6z"/><path d="M19 7l-3 7h6z"/></svg>My Rules</div>
+  <div class="nav"><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4.3-4.3"/></svg>My Record</div>
+  <div class="grp">Account</div>
+  <div class="nav"><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.9l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-2.9 1.2 2 2 0 1 1-4 0 1.7 1.7 0 0 0-2.9-1.2l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1A1.7 1.7 0 0 0 3 15a2 2 0 1 1 0-4 1.7 1.7 0 0 0 1.5-2.6l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1A1.7 1.7 0 0 0 10 4.6a2 2 0 1 1 4 0 1.7 1.7 0 0 0 2.9 1.2l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1A1.7 1.7 0 0 0 21 11a2 2 0 1 1 0 4z"/></svg>Settings</div>
+  <div class="side-b">
+    <div class="acct"><span class="av">ZA</span>
+      <div><b>ZA1234</b><span>Zerodha · connected</span></div></div>
+  </div>
+</aside>
+
+<main>
+<div class="wrap">
+
+  <!-- THE one gradient, tinted by the day -->
+  <div class="state">
+    <div>
+      <span class="pill" style="background:var(--down-t);color:var(--down)"><i></i>Down day · loss budget 64% used</span>
+      <p class="pnl">−₹8,455</p>
+      <p class="sub">Booked <b class="m dn">−₹8,895</b> &nbsp;·&nbsp; Unrealized <b class="m up">+₹440</b>
+        &nbsp;·&nbsp; Session closed 13:43</p>
+    </div>
+    <div class="mets">
+      <div class="met"><div class="h">
+        <span class="dotic" style="background:var(--accent-t);color:var(--accent)">
+          <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6"><path d="M3 12h18M12 3v18"/></svg></span>
+        <span class="lbl">Trades</span></div>
+        <p class="f">8<span class="u">0.8× pace</span></p></div>
+      <div class="met"><div class="h">
+        <span class="dotic" style="background:var(--down-t);color:var(--down)">
+          <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6"><path d="M12 3v18"/></svg></span>
+        <span class="lbl">Loss budget</span></div>
+        <p class="f">₹16.1k<span class="u">of ₹25k</span></p></div>
+      <div class="met"><div class="h">
+        <span class="dotic" style="background:var(--inset);color:var(--muted)">
+          <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6"><path d="M3 12l6 6L21 6"/></svg></span>
+        <span class="lbl">Win rate</span></div>
+        <p class="f">50%<span class="u">8 trades</span></p></div>
+      <div class="met"><div class="h">
+        <span class="dotic" style="background:var(--up-t);color:var(--up)">
+          <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6"><path d="M5 15l7-7 7 7"/></svg></span>
+        <span class="lbl">Unrealized</span></div>
+        <p class="f up">+₹440</p></div>
+    </div>
+  </div>
+
+  <div class="line">
+    <p><b>Today:</b> Only A+ breakouts. Nothing before 10am.</p>
+    <div><a class="lnk" href="#">Edit intent</a>
+      <a class="lnk" href="#" style="color:var(--muted);margin-left:16px">Journal</a></div>
+  </div>
+
+  <section class="card">
+    <div class="ch">
+      <h2>What we caught today</h2><span class="cnt">3</span>
+      <div class="sp"><span class="tag">Live</span><a class="lnk" href="#">View all →</a></div>
+    </div>
+
+    <div class="arow">
+      <span class="badge" style="background:var(--down-t);color:var(--down)">
+        <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M12 9v4M12 17h.01"/><path d="M10.3 3.9 1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0z"/></svg></span>
+      <div>
+        <div class="ah"><p class="at">Size Escalation</p>
+          <span class="sev" style="background:var(--down-t);color:var(--down)">High severity</span></div>
+        <p class="ab">BANKNIFTY 45500 PE entry at <span class="n">100</span> lots —
+          <span class="n">4×</span> your average size — <span class="n">8 min</span> after a
+          <span class="n">₹2,600</span> loss. Win rate on oversized entries:
+          <span class="n">28%</span> against a <span class="n">60%</span> baseline.</p>
+      </div>
+      <span class="when">now</span>
+    </div>
+
+    <div class="arow">
+      <span class="badge" style="background:var(--accent-t);color:var(--accent)">
+        <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M12 3v6M12 15v6M3 12h6M15 12h6"/></svg></span>
+      <div>
+        <div class="ah"><p class="at">Early Exit</p>
+          <span class="sev" style="background:var(--accent-t);color:var(--accent)">Pattern</span></div>
+        <p class="ab">NIFTY CE exited at <span class="n">+₹820</span> after <span class="n">8 min</span>.
+          The position continued to <span class="n">+₹2,100</span>. You exit <span class="n">42%</span>
+          early on average — <span class="n">₹7,680</span> left behind this month.</p>
+      </div>
+      <span class="when">now</span>
+    </div>
+
+    <div class="arow">
+      <span class="badge" style="background:var(--down-t);color:var(--down)">
+        <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><circle cx="12" cy="12" r="9"/><path d="M15 9l-6 6M9 9l6 6"/></svg></span>
+      <div>
+        <div class="ah"><p class="at">No Stop-Loss</p>
+          <span class="sev" style="background:var(--down-t);color:var(--down)">High severity</span></div>
+        <p class="ab">FINNIFTY 19800 CE open <span class="n">47 min</span> with no stop-loss.
+          Unrealised loss <span class="n">₹3,200</span>. Positions without a stop average
+          <span class="n">3×</span> the final loss for you.</p>
+      </div>
+      <span class="when">now</span>
+    </div>
+
+    <div class="arow">
+      <span class="badge" style="background:var(--down-t);color:var(--down)">
+        <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M3 12a9 9 0 1 0 3-6.7"/><path d="M3 4v5h5"/></svg></span>
+      <div>
+        <div class="ah"><p class="at">Revenge Trade</p>
+          <span class="sev" style="background:var(--down-t);color:var(--down)">High severity</span></div>
+        <p class="ab">NIFTY23000CE entry came <span class="n">25 min</span> after a
+          <span class="n">₹13,000</span> loss on SOLARINDS. Re-entering under active loss stress.</p>
+      </div>
+      <span class="when">11h</span>
+    </div>
+
+    <a class="more" href="#">View 3 more →</a>
+  </section>
+
+  <section class="card">
+    <div class="ch">
+      <h2>Open positions</h2><span class="cnt q">2</span>
+      <div class="sp"><span class="tag">Delayed</span><span class="tag">2 to journal</span>
+        <span class="lbl">Unrealized</span>
+        <span class="m up" style="font-size:15px;font-weight:600">+₹440.00</span></div>
+    </div>
+    <table>
+      <thead><tr><th>Symbol</th><th>Qty</th><th>Entry</th><th>LTP</th><th>Chg %</th><th>P&amp;L</th></tr></thead>
+      <tbody>
+        <tr>
+          <td><span class="sym">FINNIFTY 19800 CE<span class="prod">NRML</span>
+            <small>Opened 13:04 · 47 min ago</small></span></td>
+          <td class="qty">40</td><td>172.40</td><td>168.20</td>
+          <td class="dn">−2.44%</td><td class="dn">−₹3,200.00</td>
+        </tr>
+        <tr>
+          <td><span class="sym">BANKNIFTY 45500 PE<span class="prod">MIS</span>
+            <small>Opened 13:35 · 16 min ago</small></span></td>
+          <td class="qty">100</td><td>214.80</td><td>218.44</td>
+          <td class="up">+1.69%</td><td class="up">+₹3,640.00</td>
+        </tr>
+      </tbody>
+    </table>
+  </section>
+
+</div>
+</main>
+</body>
+</html>
