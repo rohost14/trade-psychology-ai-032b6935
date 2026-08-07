@@ -1,0 +1,46 @@
+<!-- @dsCard group="rev6" name="Responsive preview" subtitle="The same Dashboard at 390, 834 and 1280 — live iframes, not mockups" viewport-width="1500" -->
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>rev6 — responsive</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap">
+<style>
+  body{margin:0;background:#E9E9F2;font:400 13px/19px 'Plus Jakarta Sans',system-ui,sans-serif;
+    color:#1B1B2E;padding:20px 22px 40px}
+  h1{font:700 18px/24px 'Plus Jakarta Sans',sans-serif;margin:0 0 4px;letter-spacing:-.02em}
+  .sub{color:#6A6C86;margin:0 0 20px;font-size:12.5px}
+  .row{display:flex;gap:20px;align-items:flex-start;flex-wrap:wrap}
+  .dev{background:#fff;border:1px solid #D5D5E4;border-radius:10px;padding:10px;
+    box-shadow:0 2px 10px rgba(27,27,46,.06)}
+  .cap{font:600 10.5px/14px 'Plus Jakarta Sans',sans-serif;letter-spacing:.05em;
+    text-transform:uppercase;color:#82849C;padding:2px 2px 9px;display:flex;
+    justify-content:space-between}
+  .cap b{color:#4A46D6;font-weight:600}
+  iframe{border:1px solid #E4E4EF;border-radius:6px;display:block;background:#F4F4FA}
+</style>
+</head>
+<body>
+  <h1>rev 6 — responsive</h1>
+  <p class="sub">The same file at three widths. Live iframes, so what is below is the real
+    behaviour of the breakpoints, not a drawing of them.</p>
+
+  <div class="row">
+    <div class="dev">
+      <div class="cap"><span>Mobile</span><b>390 × 780</b></div>
+      <iframe src="./dash.html" width="390" height="780"></iframe>
+    </div>
+    <div class="dev">
+      <div class="cap"><span>Tablet</span><b>834 × 780</b></div>
+      <iframe src="./dash.html" width="834" height="780"></iframe>
+    </div>
+  </div>
+
+  <div class="row" style="margin-top:20px">
+    <div class="dev">
+      <div class="cap"><span>Laptop</span><b>1280 × 700</b></div>
+      <iframe src="./dash.html" width="1280" height="700"></iframe>
+    </div>
+  </div>
+</body>
+</html>

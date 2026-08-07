@@ -159,6 +159,102 @@
   /* magnitude behind the change, the way Sensibull backs OI with a bar */
   .cell{position:relative;display:inline-block;padding:2px 7px;border-radius:3px;min-width:64px}
   .cell.d{background:var(--down-bar)} .cell.u{background:var(--up-bar)}
+  .mob{display:none}
+
+  /* ══════════ TABLET · ≤1023px ══════════
+     Sidebar collapses to a 56px icon rail. Nothing is removed — every route is
+     still reachable, it just loses its label. */
+  @media (max-width:1023px){
+    aside{width:56px;padding:0 6px 12px;align-items:center}
+    .nl{display:none}
+    .brand{justify-content:center;padding:0}
+    .brand{font-size:0}                 /* wordmark drops, the mark stays */
+    .brand svg{width:20px;height:20px}
+    .nav{justify-content:center;padding:0;width:40px;height:38px;position:relative}
+    .nav .bdg{position:absolute;top:2px;right:2px;margin:0;padding:1px 4px;font-size:9px}
+    .grp{display:none}
+    .side-b{display:none}
+    /* four metrics across is too tight — go 2×2 under the P&L */
+    .session{flex-direction:column}
+    .sess-l{border-right:0;border-bottom:1px solid var(--line-soft);min-width:0}
+    .sess-r{grid-template-columns:1fr 1fr}
+    .met:nth-child(1),.met:nth-child(2){border-bottom:1px solid var(--line-soft)}
+    .met:nth-child(2n){border-right:0}
+    .body{padding:12px 16px 40px}
+    .topbar{padding:0 16px}
+  }
+
+  /* ══════════ MOBILE · ≤639px ══════════
+     Sidebar becomes a bottom bar of five equal targets. No floating action
+     button: a raised centre control implies one dominant action per screen, and
+     these screens are for reading. */
+  @media (max-width:639px){
+    body{display:block;padding-bottom:60px}
+    aside{position:fixed;bottom:0;left:0;right:0;top:auto;width:auto;height:58px;
+      flex-direction:row;border-right:0;border-top:1px solid var(--line);
+      padding:0;z-index:40}
+    .brand{display:none}
+    .nav{display:none}
+    .nav.m{display:flex;flex:1;flex-direction:column;gap:3px;height:58px;width:auto;
+      justify-content:center;border-radius:0;background:transparent}
+    .nav.m .nl{display:block;font:500 9.5px/1 'Plus Jakarta Sans',sans-serif}
+    .nav.m.on{background:transparent;color:var(--accent)}
+    .nav.m .bdg{position:absolute;top:8px;right:50%;margin-right:-18px}
+
+    .topbar{height:auto;flex-wrap:wrap;gap:0 14px;padding:10px 14px;position:sticky;top:0;z-index:30}
+    .crumb{font-size:14px;width:100%}
+    .crumb span,.crumb{white-space:nowrap}
+    .tabs{margin:8px 0 0;gap:16px;overflow-x:auto;width:100%;
+      -webkit-overflow-scrolling:touch;scrollbar-width:none}
+    .tabs::-webkit-scrollbar{display:none}
+    .tab{padding-bottom:7px;flex-shrink:0}
+    .topbar .r{width:100%;margin:8px 0 0;justify-content:space-between}
+
+    .body{padding:10px 12px 24px;gap:10px}
+    /* the figure stays the biggest thing on the screen */
+    .pnl{font-size:32px;line-height:36px}
+    .sess-l{padding:14px 16px}
+    .met{padding:12px 14px}
+    .sess-r{grid-template-columns:1fr 1fr}
+
+    .line{flex-direction:column;align-items:flex-start;gap:8px;padding:12px 14px}
+
+    /* alert rows: the timestamp moves under the title rather than fighting it
+       for width at 390px */
+    .arow{grid-template-columns:1fr;gap:0;padding:12px 14px 12px 12px}
+    .when{text-align:left;padding:6px 0 0;color:var(--muted)}
+    .ph{padding:10px 14px}
+
+    /* Six columns cannot survive 390px. Entry and LTP fold into the row's own
+       caption line — visible, not hidden behind a tap — and the two figures
+       being compared, Chg% and P&L, keep their column. */
+    /* At 390px six columns pushed P&L off the right edge — the one number that
+       matters. Qty, Entry, LTP and Chg% all fold into the row's caption line, so
+       Symbol and P&L keep their columns. Nothing is hidden behind a tap; every
+       figure on the laptop layout is still on this one. */
+    .c-entry,.c-ltp,.c-qty,.c-chg{display:none}
+    .mob{display:inline}
+    .sym small b{font-weight:600}
+    /* the panel header carried five things on one line at 390px and clipped the
+       figure at the edge — it wraps, and the summary drops to its own row */
+    .ph{flex-wrap:wrap;row-gap:6px}
+    .ph .sp{width:100%;margin-left:0;justify-content:flex-start;gap:10px}
+    /* A money figure must never break across lines. But the caption carries four
+       folded values, and holding IT on one line blew the symbol column wide and
+       pushed P&L off the edge — so the caption wraps and only figures do not. */
+    tbody td,.m{white-space:nowrap}
+    .sym,.sym small{white-space:normal}
+    thead th{padding:7px 10px;font-size:9.5px}
+    tbody td{padding:10px;font-size:12.5px}
+    tbody td:first-child{padding-left:14px}
+    tbody td:last-child{padding-right:14px}
+    thead th:first-child{padding-left:14px}
+    thead th:last-child{padding-right:14px}
+    .sym{font-size:12.5px}
+    .cell{min-width:0;padding:2px 5px}
+
+    .themer{bottom:70px}
+  }
 </style>
 </head>
 <body>
@@ -168,18 +264,18 @@
   <div class="brand">
     <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M12 2 4 6v6c0 5 3.4 9.4 8 10 4.6-.6 8-5 8-10V6z"/></svg>
     TradeMentor</div>
-  <div class="nav on"><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/></svg>Dashboard</div>
-  <div class="nav"><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 17l6-6 4 4 7-7"/><path d="M14 8h6v6"/></svg>Analytics</div>
-  <div class="nav"><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 8a6 6 0 1 0-12 0c0 7-3 8-3 8h18s-3-1-3-8"/><path d="M13.7 21a2 2 0 0 1-3.4 0"/></svg>Alerts<span class="bdg">3</span></div>
-  <div class="nav"><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>Chat</div>
+  <div class="nav on m"><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/></svg><span class="nl">Dashboard</span></div>
+  <div class="nav m"><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 17l6-6 4 4 7-7"/><path d="M14 8h6v6"/></svg><span class="nl">Analytics</span></div>
+  <div class="nav m"><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 8a6 6 0 1 0-12 0c0 7-3 8-3 8h18s-3-1-3-8"/><path d="M13.7 21a2 2 0 0 1-3.4 0"/></svg><span class="nl">Alerts</span><span class="bdg">3</span></div>
+  <div class="nav m"><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg><span class="nl">Chat</span></div>
   <div class="grp">Insights</div>
-  <div class="nav"><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M2 4h7a3 3 0 0 1 3 3v13a2.5 2.5 0 0 0-2.5-2.5H2z"/><path d="M22 4h-7a3 3 0 0 0-3 3v13a2.5 2.5 0 0 1 2.5-2.5H22z"/></svg>Reports</div>
-  <div class="nav"><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/></svg>Journal</div>
+  <div class="nav"><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M2 4h7a3 3 0 0 1 3 3v13a2.5 2.5 0 0 0-2.5-2.5H2z"/><path d="M22 4h-7a3 3 0 0 0-3 3v13a2.5 2.5 0 0 1 2.5-2.5H22z"/></svg><span class="nl">Reports</span></div>
+  <div class="nav"><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/></svg><span class="nl">Journal</span></div>
   <div class="grp">Risk</div>
-  <div class="nav"><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 3v18"/><path d="M5 7h14"/><path d="M5 7 2 14h6z"/><path d="M19 7l-3 7h6z"/></svg>My Rules</div>
-  <div class="nav"><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4.3-4.3"/></svg>My Record</div>
+  <div class="nav"><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 3v18"/><path d="M5 7h14"/><path d="M5 7 2 14h6z"/><path d="M19 7l-3 7h6z"/></svg><span class="nl">My Rules</span></div>
+  <div class="nav"><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4.3-4.3"/></svg><span class="nl">My Record</span></div>
   <div class="grp">Account</div>
-  <div class="nav"><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.9l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-2.9 1.2 2 2 0 1 1-4 0 1.7 1.7 0 0 0-2.9-1.2l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1A1.7 1.7 0 0 0 3 15a2 2 0 1 1 0-4 1.7 1.7 0 0 0 1.5-2.6l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1A1.7 1.7 0 0 0 10 4.6a2 2 0 1 1 4 0 1.7 1.7 0 0 0 2.9 1.2l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1A1.7 1.7 0 0 0 21 11a2 2 0 1 1 0 4z"/></svg>Settings</div>
+  <div class="nav m"><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.9l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-2.9 1.2 2 2 0 1 1-4 0 1.7 1.7 0 0 0-2.9-1.2l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1A1.7 1.7 0 0 0 3 15a2 2 0 1 1 0-4 1.7 1.7 0 0 0 1.5-2.6l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1A1.7 1.7 0 0 0 10 4.6a2 2 0 1 1 4 0 1.7 1.7 0 0 0 2.9 1.2l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1A1.7 1.7 0 0 0 21 11a2 2 0 1 1 0 4z"/></svg><span class="nl">Settings</span></div>
   <div class="side-b"><div class="acct"><b>ZA1234</b><span>Zerodha · connected</span></div></div>
 </aside>
 
@@ -289,20 +385,20 @@
           <span class="m up" style="font-size:13.5px;font-weight:600">+₹440.00</span></div>
       </div>
       <table>
-        <thead><tr><th>Symbol</th><th>Qty</th><th>Entry</th><th>LTP</th><th>Chg %</th><th>P&amp;L</th></tr></thead>
+        <thead><tr><th>Symbol</th><th class="c-qty">Qty</th><th class="c-entry">Entry</th><th class="c-ltp">LTP</th><th class="c-chg">Chg %</th><th>P&amp;L</th></tr></thead>
         <tbody>
           <tr>
             <td><span class="sym">FINNIFTY 19800 CE<span class="prod">NRML</span>
-              <small>Opened 13:04 · 47 min ago</small></span></td>
-            <td class="qty">40</td><td>172.40</td><td>168.20</td>
-            <td><span class="cell d dn">−2.44%</span></td>
+              <small>Opened 13:04 · 47 min<span class="mob"> · 40 qty · 172.40 → 168.20 · <b class="dn">−2.44%</b></span></small></span></td>
+            <td class="qty c-qty">40</td><td class="c-entry">172.40</td><td class="c-ltp">168.20</td>
+            <td class="c-chg"><span class="cell d dn">−2.44%</span></td>
             <td class="dn">−₹3,200.00</td>
           </tr>
           <tr>
             <td><span class="sym">BANKNIFTY 45500 PE<span class="prod">MIS</span>
-              <small>Opened 13:35 · 16 min ago</small></span></td>
-            <td class="qty">100</td><td>214.80</td><td>218.44</td>
-            <td><span class="cell u up">+1.69%</span></td>
+              <small>Opened 13:35 · 16 min<span class="mob"> · 100 qty · 214.80 → 218.44 · <b class="up">+1.69%</b></span></small></span></td>
+            <td class="qty c-qty">100</td><td class="c-entry">214.80</td><td class="c-ltp">218.44</td>
+            <td class="c-chg"><span class="cell u up">+1.69%</span></td>
             <td class="up">+₹3,640.00</td>
           </tr>
         </tbody>
