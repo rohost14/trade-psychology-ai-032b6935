@@ -1,0 +1,315 @@
+<!-- @dsCard group="rev6" name="Dashboard" subtitle="rev5 palette + type, gimmicks stripped, Sensibull discipline" viewport-width="1500" -->
+<!doctype html>
+<html lang="en" class="light">
+<head>
+<meta charset="utf-8">
+<title>rev6 — Dashboard</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap">
+<style>
+  html.light{
+    --ground:#F4F4FA; --surface:#FFFFFF; --inset:#F2F2F8; --head:#F6F6FB;
+    --line:#E4E4EF; --line-soft:#EDEDF4;
+    --ink:#1B1B2E; --body:#55566B; --muted:#82849C;
+    --accent:#4A46D6; --accent-t:#EDECFC; --accent-b:#4A46D6;
+    --up:#0F9D76; --up-t:#E9F5F1; --up-bar:#CBEADF;
+    --down:#D42F4E; --down-t:#FCEDF0; --down-bar:#F5CFD8;
+    --hover:#FAFAFE;
+  }
+  html.dark{
+    --ground:#131320; --surface:#1B1B2A; --inset:#212132; --head:#1F1F2E;
+    --line:#2B2B3E; --line-soft:#262636;
+    --ink:#ECECF4; --body:#A5A6BC; --muted:#8688A0;
+    --accent:#8B87F5; --accent-t:#242246; --accent-b:#8B87F5;
+    --up:#35C79B; --up-t:#13302A; --up-bar:#1D4A3E;
+    --down:#F2637E; --down-t:#361A23; --down-bar:#552A38;
+    --hover:#222234;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--ground);color:var(--ink);
+    font:400 13px/19px 'Plus Jakarta Sans',system-ui,sans-serif;display:flex;min-height:100vh;
+    -webkit-font-smoothing:antialiased}
+  /* mono for MONEY only */
+  .m{font-family:'IBM Plex Mono',ui-monospace,monospace;font-variant-numeric:tabular-nums}
+  .lbl{font:600 10.5px/14px 'Plus Jakarta Sans',sans-serif;letter-spacing:.05em;
+    text-transform:uppercase;color:var(--muted)}
+  .up{color:var(--up)} .dn{color:var(--down)}
+
+  .themer{position:fixed;bottom:16px;right:18px;z-index:60;border:1px solid var(--line);
+    background:var(--surface);color:var(--body);border-radius:6px;height:30px;padding:0 13px;
+    font:600 11.5px/1 'Plus Jakarta Sans',sans-serif;cursor:pointer}
+
+  /* ── sidebar: flat, no shadow, thin hairline ── */
+  aside{width:214px;flex-shrink:0;background:var(--surface);border-right:1px solid var(--line);
+    display:flex;flex-direction:column;padding:0 8px 12px;position:sticky;top:0;height:100vh}
+  .brand{display:flex;align-items:center;gap:9px;height:52px;padding:0 8px;
+    font:700 15px/1 'Plus Jakarta Sans',sans-serif;letter-spacing:-.02em}
+  .brand svg{color:var(--accent)}
+  .nav{display:flex;align-items:center;gap:10px;height:32px;padding:0 10px;border-radius:6px;
+    font:500 13px/1 'Plus Jakarta Sans',sans-serif;color:var(--body);margin-bottom:1px}
+  .nav .ic{width:15px;height:15px;flex-shrink:0;color:var(--muted)}
+  .nav:hover{background:var(--hover)}
+  .nav.on{background:var(--accent-t);color:var(--accent);font-weight:600}
+  .nav.on .ic{color:var(--accent)}
+  .nav .bdg{margin-left:auto;font:600 10px/1 'Plus Jakarta Sans',sans-serif;
+    background:var(--down);color:#fff;border-radius:4px;padding:2px 6px}
+  .grp{font:600 10px/13px 'Plus Jakarta Sans',sans-serif;letter-spacing:.06em;
+    text-transform:uppercase;color:var(--muted);padding:16px 10px 5px}
+  .side-b{margin-top:auto;padding:10px 10px 0;border-top:1px solid var(--line-soft)}
+  .acct b{font:600 12px/16px 'Plus Jakarta Sans',sans-serif;display:block}
+  .acct span{font-size:11px;color:var(--muted)}
+
+  main{flex:1;min-width:0;display:flex;flex-direction:column}
+
+  /* ── page bar: breadcrumb + tabs with blue underline (Sensibull) ── */
+  .topbar{background:var(--surface);border-bottom:1px solid var(--line);
+    display:flex;align-items:center;gap:20px;padding:0 22px;height:48px}
+  .crumb{font:600 13.5px/1 'Plus Jakarta Sans',sans-serif}
+  .crumb span{color:var(--muted);font-weight:400;margin:0 8px}
+  .tabs{display:flex;gap:20px;margin-left:8px;align-self:stretch}
+  .tab{display:flex;align-items:center;font:500 13px/1 'Plus Jakarta Sans',sans-serif;
+    color:var(--body);border-bottom:2px solid transparent;cursor:pointer}
+  .tab.on{color:var(--accent);font-weight:600;border-bottom-color:var(--accent-b)}
+  .topbar .r{margin-left:auto;display:flex;align-items:center;gap:10px}
+  .st{display:inline-flex;align-items:center;gap:6px;font:500 11.5px/1 'Plus Jakarta Sans',sans-serif;
+    color:var(--muted)}
+  .st i{width:6px;height:6px;border-radius:999px;background:var(--muted)}
+  .btn{border:1px solid var(--line);background:var(--surface);color:var(--body);border-radius:6px;
+    height:28px;padding:0 11px;font:500 12px/1 'Plus Jakarta Sans',sans-serif;cursor:pointer}
+
+  .body{padding:14px 22px 40px;display:flex;flex-direction:column;gap:12px;
+    max-width:1400px;width:100%;margin:0 auto}
+
+  /* ── session strip: flat, no gradient ── */
+  .session{background:var(--surface);border:1px solid var(--line);border-radius:8px;
+    display:flex;align-items:stretch}
+  .sess-l{padding:16px 20px;flex-shrink:0;border-right:1px solid var(--line-soft);min-width:270px}
+  .pnl{font:600 34px/38px 'IBM Plex Mono',monospace;letter-spacing:-.02em;margin:7px 0 0;
+    color:var(--down);font-variant-numeric:tabular-nums}
+  .sub{font-size:12px;line-height:17px;color:var(--muted);margin:8px 0 0}
+  .sub b{font-weight:500}
+  /* metrics: no icons. A bar ONLY where the number has a ceiling. */
+  .sess-r{display:grid;grid-template-columns:repeat(4,1fr);flex:1}
+  .met{padding:16px 18px;border-right:1px solid var(--line-soft)}
+  .met:last-child{border-right:0}
+  .met .f{font:600 19px/24px 'IBM Plex Mono',monospace;margin:8px 0 0;
+    font-variant-numeric:tabular-nums}
+  .met .u{font:400 11px/1 'Plus Jakarta Sans',sans-serif;color:var(--muted);margin-left:5px}
+  /* Sensibull's magnitude bar */
+  .bar{margin-top:9px;height:5px;background:var(--inset);border-radius:2px;overflow:hidden}
+  .bar i{display:block;height:100%;border-radius:2px;background:var(--down)}
+  .barlbl{font:400 10.5px/14px 'Plus Jakarta Sans',sans-serif;color:var(--muted);margin-top:5px}
+
+  .line{display:flex;align-items:center;justify-content:space-between;gap:16px;
+    background:var(--surface);border:1px solid var(--line);border-radius:8px;padding:10px 18px}
+  .line p{margin:0;font-size:12.5px;color:var(--body)}
+  .line b{color:var(--ink);font-weight:600}
+  .lnk{color:var(--accent);font:600 12px/1 'Plus Jakarta Sans',sans-serif;text-decoration:none}
+
+  /* ── panel ── */
+  .panel{background:var(--surface);border:1px solid var(--line);border-radius:8px;overflow:hidden}
+  .ph{display:flex;align-items:center;gap:9px;padding:10px 18px;background:var(--head);
+    border-bottom:1px solid var(--line)}
+  .ph h2{font:600 13px/18px 'Plus Jakarta Sans',sans-serif;margin:0}
+  .cnt{font:600 10.5px/1 'Plus Jakarta Sans',sans-serif;background:var(--down-t);color:var(--down);
+    border-radius:4px;padding:3px 7px}
+  .cnt.q{background:var(--inset);color:var(--muted)}
+  .sp{margin-left:auto;display:flex;align-items:center;gap:12px}
+  .info{width:13px;height:13px;color:var(--muted);flex-shrink:0}
+
+  /* ── alert rows: NO icon. Severity rail + pill, tinted row for high ── */
+  .arow{display:grid;grid-template-columns:1fr 46px;gap:14px;padding:11px 18px 11px 15px;
+    border-bottom:1px solid var(--line-soft);border-left:3px solid transparent}
+  .arow:last-of-type{border-bottom:0}
+  .arow:hover{background:var(--hover)}
+  /* No row tint. Sensibull tints to separate SIDES (calls vs puts), not severity
+     down a list — with 3 of 4 alerts high, a tinted row becomes a wash over the
+     whole panel and stops meaning anything. Rail + pill already carry severity. */
+  .arow.high{border-left-color:var(--down)}
+  .arow.med{border-left-color:var(--accent)}
+  .ah{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+  .at{font:600 13px/18px 'Plus Jakarta Sans',sans-serif;margin:0}
+  .sev{font:600 10px/1 'Plus Jakarta Sans',sans-serif;border-radius:3px;padding:3px 7px}
+  .ab{font-size:12.5px;line-height:18px;color:var(--body);margin:4px 0 0}
+  .ab .n{color:var(--ink);font-weight:600}
+  .when{font:400 11px/1 'Plus Jakarta Sans',sans-serif;color:var(--muted);text-align:right;padding-top:3px}
+  .more{display:block;text-align:center;padding:10px 0;background:var(--head);
+    border-top:1px solid var(--line-soft);
+    font:600 12px/1 'Plus Jakarta Sans',sans-serif;color:var(--accent);text-decoration:none}
+
+  /* ── table: dense, header band, in-cell bar on Chg% ── */
+  table{width:100%;border-collapse:collapse}
+  thead th{font:600 10.5px/14px 'Plus Jakarta Sans',sans-serif;letter-spacing:.05em;
+    text-transform:uppercase;color:var(--muted);text-align:right;padding:8px 14px;
+    background:var(--head);border-bottom:1px solid var(--line)}
+  thead th:first-child{text-align:left;padding-left:18px}
+  thead th:last-child{padding-right:18px}
+  tbody td{padding:10px 14px;border-bottom:1px solid var(--line-soft);text-align:right;
+    font:500 13px/18px 'IBM Plex Mono',monospace;font-variant-numeric:tabular-nums}
+  tbody td:first-child{text-align:left;padding-left:18px}
+  tbody td:last-child{padding-right:18px}
+  tbody tr:last-child td{border-bottom:0}
+  tbody tr:hover{background:var(--hover)}
+  /* symbol and qty are not money — not mono */
+  .sym{font:600 13px/17px 'Plus Jakarta Sans',sans-serif}
+  .sym small{display:block;font:400 11px/15px 'Plus Jakarta Sans',sans-serif;
+    color:var(--muted);margin-top:2px}
+  .prod{font:600 9.5px/1 'Plus Jakarta Sans',sans-serif;color:var(--muted);background:var(--inset);
+    border-radius:3px;padding:2px 6px;margin-left:7px;vertical-align:1.5px}
+  td.qty{font:500 13px/18px 'Plus Jakarta Sans',sans-serif}
+  /* magnitude behind the change, the way Sensibull backs OI with a bar */
+  .cell{position:relative;display:inline-block;padding:2px 7px;border-radius:3px;min-width:64px}
+  .cell.d{background:var(--down-bar)} .cell.u{background:var(--up-bar)}
+</style>
+</head>
+<body>
+<button class="themer" onclick="var h=document.documentElement;h.classList.toggle('dark');h.classList.toggle('light');this.textContent=h.classList.contains('dark')?'Dark':'Light'">Light</button>
+
+<aside>
+  <div class="brand">
+    <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M12 2 4 6v6c0 5 3.4 9.4 8 10 4.6-.6 8-5 8-10V6z"/></svg>
+    TradeMentor</div>
+  <div class="nav on"><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/></svg>Dashboard</div>
+  <div class="nav"><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 17l6-6 4 4 7-7"/><path d="M14 8h6v6"/></svg>Analytics</div>
+  <div class="nav"><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 8a6 6 0 1 0-12 0c0 7-3 8-3 8h18s-3-1-3-8"/><path d="M13.7 21a2 2 0 0 1-3.4 0"/></svg>Alerts<span class="bdg">3</span></div>
+  <div class="nav"><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>Chat</div>
+  <div class="grp">Insights</div>
+  <div class="nav"><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M2 4h7a3 3 0 0 1 3 3v13a2.5 2.5 0 0 0-2.5-2.5H2z"/><path d="M22 4h-7a3 3 0 0 0-3 3v13a2.5 2.5 0 0 1 2.5-2.5H22z"/></svg>Reports</div>
+  <div class="nav"><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/></svg>Journal</div>
+  <div class="grp">Risk</div>
+  <div class="nav"><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 3v18"/><path d="M5 7h14"/><path d="M5 7 2 14h6z"/><path d="M19 7l-3 7h6z"/></svg>My Rules</div>
+  <div class="nav"><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4.3-4.3"/></svg>My Record</div>
+  <div class="grp">Account</div>
+  <div class="nav"><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.9l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-2.9 1.2 2 2 0 1 1-4 0 1.7 1.7 0 0 0-2.9-1.2l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1A1.7 1.7 0 0 0 3 15a2 2 0 1 1 0-4 1.7 1.7 0 0 0 1.5-2.6l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1A1.7 1.7 0 0 0 10 4.6a2 2 0 1 1 4 0 1.7 1.7 0 0 0 2.9 1.2l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1A1.7 1.7 0 0 0 21 11a2 2 0 1 1 0 4z"/></svg>Settings</div>
+  <div class="side-b"><div class="acct"><b>ZA1234</b><span>Zerodha · connected</span></div></div>
+</aside>
+
+<main>
+  <div class="topbar">
+    <span class="crumb">TradeMentor <span>/</span> Dashboard</span>
+    <div class="tabs">
+      <span class="tab on">Today</span>
+      <span class="tab">This week</span>
+      <span class="tab">30 days</span>
+    </div>
+    <div class="r">
+      <span class="st"><i></i>Market closed · 13:43</span>
+      <button class="btn">Today&rsquo;s read</button>
+    </div>
+  </div>
+
+  <div class="body">
+
+    <!-- flat. no gradient. -->
+    <div class="session">
+      <div class="sess-l">
+        <div class="lbl">Day P&amp;L</div>
+        <p class="pnl">−₹8,455</p>
+        <p class="sub">Booked <b class="m dn">−₹8,895</b> · Unrealized <b class="m up">+₹440</b></p>
+      </div>
+      <div class="sess-r">
+        <div class="met"><div class="lbl">Trades</div>
+          <p class="f">8<span class="u">0.8× pace</span></p></div>
+        <!-- the ONLY metric with a ceiling, so the only one with a bar -->
+        <div class="met"><div class="lbl">Loss budget</div>
+          <p class="f">₹16.1k<span class="u">of ₹25k</span></p>
+          <div class="bar"><i style="width:64%"></i></div>
+          <div class="barlbl">64% used</div></div>
+        <div class="met"><div class="lbl">Win rate</div>
+          <p class="f">50%<span class="u">4 of 8</span></p></div>
+        <div class="met"><div class="lbl">Unrealized</div>
+          <p class="f up">+₹440</p></div>
+      </div>
+    </div>
+
+    <div class="line">
+      <p><b>Today&rsquo;s intent:</b> Only A+ breakouts. Nothing before 10am.</p>
+      <div><a class="lnk" href="#">Edit</a>
+        <a class="lnk" href="#" style="color:var(--muted);margin-left:14px">Journal</a></div>
+    </div>
+
+    <section class="panel">
+      <div class="ph">
+        <h2>What we caught today</h2><span class="cnt">3</span>
+        <svg class="info" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/><path d="M12 16v-5M12 8h.01"/></svg>
+        <div class="sp"><a class="lnk" href="#">View all</a></div>
+      </div>
+
+      <div class="arow high">
+        <div>
+          <div class="ah"><p class="at">Size Escalation</p>
+            <span class="sev" style="background:var(--down);color:#fff">HIGH</span></div>
+          <p class="ab">BANKNIFTY 45500 PE entry at <span class="n">100</span> lots —
+            <span class="n">4×</span> your average size — <span class="n">8 min</span> after a
+            <span class="n">₹2,600</span> loss. Win rate on oversized entries
+            <span class="n">28%</span> against a <span class="n">60%</span> baseline.</p>
+        </div>
+        <span class="when">now</span>
+      </div>
+
+      <div class="arow med">
+        <div>
+          <div class="ah"><p class="at">Early Exit</p>
+            <span class="sev" style="background:var(--accent-t);color:var(--accent)">PATTERN</span></div>
+          <p class="ab">NIFTY CE exited at <span class="n">+₹820</span> after <span class="n">8 min</span>.
+            Position continued to <span class="n">+₹2,100</span>. You exit <span class="n">42%</span>
+            early on average — <span class="n">₹7,680</span> left behind this month.</p>
+        </div>
+        <span class="when">now</span>
+      </div>
+
+      <div class="arow high">
+        <div>
+          <div class="ah"><p class="at">No Stop-Loss</p>
+            <span class="sev" style="background:var(--down);color:#fff">HIGH</span></div>
+          <p class="ab">FINNIFTY 19800 CE open <span class="n">47 min</span> with no stop-loss.
+            Unrealised loss <span class="n">₹3,200</span>. Positions without a stop average
+            <span class="n">3×</span> the final loss for you.</p>
+        </div>
+        <span class="when">now</span>
+      </div>
+
+      <div class="arow high">
+        <div>
+          <div class="ah"><p class="at">Revenge Trade</p>
+            <span class="sev" style="background:var(--down);color:#fff">HIGH</span></div>
+          <p class="ab">NIFTY23000CE entry came <span class="n">25 min</span> after a
+            <span class="n">₹13,000</span> loss on SOLARINDS. Re-entering under active loss stress.</p>
+        </div>
+        <span class="when">11h</span>
+      </div>
+
+      <a class="more" href="#">View 3 more</a>
+    </section>
+
+    <section class="panel">
+      <div class="ph">
+        <h2>Open positions</h2><span class="cnt q">2</span>
+        <div class="sp"><span class="lbl">Delayed</span><span class="lbl">2 to journal</span>
+          <span class="lbl">Unrealized</span>
+          <span class="m up" style="font-size:13.5px;font-weight:600">+₹440.00</span></div>
+      </div>
+      <table>
+        <thead><tr><th>Symbol</th><th>Qty</th><th>Entry</th><th>LTP</th><th>Chg %</th><th>P&amp;L</th></tr></thead>
+        <tbody>
+          <tr>
+            <td><span class="sym">FINNIFTY 19800 CE<span class="prod">NRML</span>
+              <small>Opened 13:04 · 47 min ago</small></span></td>
+            <td class="qty">40</td><td>172.40</td><td>168.20</td>
+            <td><span class="cell d dn">−2.44%</span></td>
+            <td class="dn">−₹3,200.00</td>
+          </tr>
+          <tr>
+            <td><span class="sym">BANKNIFTY 45500 PE<span class="prod">MIS</span>
+              <small>Opened 13:35 · 16 min ago</small></span></td>
+            <td class="qty">100</td><td>214.80</td><td>218.44</td>
+            <td><span class="cell u up">+1.69%</span></td>
+            <td class="up">+₹3,640.00</td>
+          </tr>
+        </tbody>
+      </table>
+    </section>
+
+  </div>
+</main>
+</body>
+</html>
