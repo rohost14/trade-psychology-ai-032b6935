@@ -261,3 +261,72 @@ async def detector_stats(
         })
     rows.sort(key=lambda r: -r["events"])
     return {"window_days": days, "detectors": rows}
+
+
+@router.get("/detection-quality")
+async def detection_quality(
+    days: int = Query(default=30, ge=1, le=180),
+    db: AsyncSession = Depends(get_db),
+    _: dict = Depends(get_current_admin),
+):
+    """
+    Is the engine any good? — latency, precision proxy, and the shadow readout.
+
+    /detector-stats answers what the engine DID. This answers whether it was
+    right, and how fast. The three questions the product could not answer:
+
+      latency    trade close → alert persisted, against the 5s gate. Live
+                 alerts are excluded: they set detected_at to the moment they
+                 fired, so including them would report an instant pipeline
+                 because half the sample measures nothing.
+      precision  not_useful rate and mute rate per detector. Both are the
+                 trader telling us WE were wrong, as opposed to every other
+                 number here, which measures whether they complied.
+      shadow     what detectors in shadow mode have been producing. The flag
+                 machinery was built for a promote-on-parity migration and
+                 never given a readout, so parity was never checkable.
+
+    All reads over existing columns. No new storage.
+    """
+    from datetime import datetime, timedelta, timezone
+    from sqlalchemy import select, func
+
+    from app.models.alert_mute import AlertMute
+    from app.models.behavior_event import BehaviorEvent
+    from app.models.risk_alert import RiskAlert
+    from app.services.detection_quality import (
+        MIN_ALERTS_FOR_RATE, summarise_latency, summarise_precision, summarise_shadow,
+    )
+
+    cutoff = datetime.now(timezone.utc) - timedelta(days=days)
+
+    alerts = list((await db.execute(
+        select(RiskAlert).where(RiskAlert.detected_at >= cutoff)
+    )).scalars().all())
+
+    mutes = list((await db.execute(select(AlertMute))).scalars().all())
+
+    shadow_events = list((await db.execute(
+        select(BehaviorEvent).where(
+            BehaviorEvent.detected_at >= cutoff,
+            BehaviorEvent.shadow.is_(True),
+        )
+    )).scalars().all())
+
+    # Denominator for mute rate: accounts that actually saw an alert in the
+    # window. Dividing by all accounts would flatter every rate with users who
+    # were never shown anything.
+    accounts_seen = (await db.execute(
+        select(func.count(func.distinct(RiskAlert.broker_account_id)))
+        .where(RiskAlert.detected_at >= cutoff)
+    )).scalar() or 0
+
+    return {
+        "window_days": days,
+        "alerts_in_window": len(alerts),
+        "accounts_seen": accounts_seen,
+        "min_alerts_for_rate": MIN_ALERTS_FOR_RATE,
+        "latency": summarise_latency(alerts),
+        "precision": summarise_precision(alerts, mutes, accounts_seen),
+        "shadow": summarise_shadow(shadow_events),
+    }
