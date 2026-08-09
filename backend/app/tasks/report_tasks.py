@@ -34,9 +34,15 @@ BATCH_SIZE = 20  # accounts processed concurrently per batch
 
 async def _get_delivery_channels(account_id: UUID, db) -> tuple:
     """Return (phone,) for report delivery via WhatsApp."""
+    from app.services.alert_service import guardian_reachable
+
     account = await db.get(BrokerAccount, account_id)
     user = await db.get(User, account.user_id) if account and account.user_id else None
-    phone = user.guardian_phone if user else None
+    # A scheduled report is still a message to a third party. This path had no
+    # consent check at all, so a guardian who declined kept receiving one daily.
+    phone, _reason = guardian_reachable(user)
+    if not phone:
+        logger.info(f"Guardian unreachable for {account_id}: {_reason}")
     return phone, None  # email delivery removed
 
 
@@ -338,12 +344,13 @@ def send_weekly_summary(broker_account_id: str):
                 account = account_result.scalar_one_or_none()
 
                 if account:
+                    from app.services.alert_service import guardian_reachable
                     user = await db.get(User, account.user_id) if account.user_id else None
-                    phone = user.guardian_phone if user else None
+                    phone, _reason = guardian_reachable(user)
                     if phone:
                         await _wa.send_message(phone, report)
                     else:
-                        logger.info(f"No guardian phone for account {account_id}, skipping weekly summary")
+                        logger.info(f"Weekly summary skipped for {account_id}: {_reason}")
 
                 return {"sent": True, "pnl": total_pnl, "trades": len(trades)}
 

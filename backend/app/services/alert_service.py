@@ -60,6 +60,27 @@ def _ist_time(alert: RiskAlert) -> str:
         return ts.strftime("%I:%M %p").lstrip("0")
 
 
+def guardian_reachable(user) -> tuple:
+    """
+    (phone, reason) — the phone to message a guardian on, or why not.
+
+    One gate for every path that contacts an accountability partner. It existed
+    in two places and not in the other four: a guardian who replied NO, or who
+    never replied at all, still received scheduled reports every day and every
+    week. The consent handshake (profile.py guardian/send-consent, migration
+    056) promises otherwise, and a promise to a third party is not one to keep
+    only on the paths someone remembered.
+    """
+    if not user:
+        return None, "no_user"
+    phone = (user.guardian_phone or "").strip() if user.guardian_phone else None
+    if not phone:
+        return None, "no_guardian_phone"
+    if not user.guardian_confirmed:
+        return None, "guardian_not_confirmed"
+    return phone, None
+
+
 class AlertService:
     """
     Send WhatsApp alerts for behaviour patterns.

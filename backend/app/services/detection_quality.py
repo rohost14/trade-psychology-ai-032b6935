@@ -51,6 +51,22 @@ def percentile(values: Sequence[float], p: float) -> Optional[float]:
     return round(ordered[k], 3)
 
 
+def _raised_while_open(alert) -> bool:
+    """
+    Was this alert raised while the position was still open?
+
+    Three signals, because none of them is sufficient alone. `lifecycle` is the
+    obvious one and it is destroyed by the merge — linking a live alert to its
+    completed trade rewrites the row to 'post'. The details markers survive
+    that: `live` is stamped on every position-monitor alert at creation, and
+    `at_entry` on the entry-rule checks.
+    """
+    if getattr(alert, "lifecycle", "post") == "live":
+        return True
+    details = getattr(alert, "details", None) or {}
+    return bool(details.get("at_entry") or details.get("live"))
+
+
 def latency_seconds(alert) -> Optional[float]:
     """
     Trade close → alert row written, in seconds.
@@ -62,8 +78,15 @@ def latency_seconds(alert) -> Optional[float]:
     open sets `detected_at` to the moment it fired, so its latency is zero by
     construction — including those would report a pipeline that looks instant
     because half the sample is measuring nothing.
+
+    `lifecycle` alone is not enough to tell them apart. When the exit pass links
+    a live alert to its completed trade it flips that row to 'post', so the
+    near-zero delta would quietly re-enter the sample and reintroduce exactly
+    the distortion this exclusion exists to prevent. A merged row is identified
+    by its evidence rather than its lifecycle: entry-time detections carry
+    `at_entry` in their details, and that marker survives the merge.
     """
-    if getattr(alert, "lifecycle", "post") == "live":
+    if _raised_while_open(alert):
         return None
     detected, created = alert.detected_at, alert.created_at
     if detected is None or created is None:
@@ -78,9 +101,9 @@ def summarise_latency(alerts: Sequence[Any]) -> Dict[str, Any]:
     breaching = [s for s in samples if s > LATENCY_GATE_SECONDS]
     return {
         "alerts_measured": len(samples),
-        "alerts_excluded_live": sum(
-            1 for a in alerts if getattr(a, "lifecycle", "post") == "live"
-        ),
+        # Counts merged rows too: they are 'post' by lifecycle but were raised
+        # at entry, and reporting them as measured would overstate coverage.
+        "alerts_excluded_live": sum(1 for a in alerts if _raised_while_open(a)),
         "p50_seconds": percentile(samples, 50),
         "p95_seconds": percentile(samples, 95),
         "max_seconds": round(max(samples), 3) if samples else None,

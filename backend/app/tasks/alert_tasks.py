@@ -13,7 +13,7 @@ from typing import Optional
 
 from app.core.celery_app import celery_app
 from app.core.database import SessionLocal
-from app.services.alert_service import AlertService
+from app.services.alert_service import AlertService, guardian_reachable
 from app.models.user import User
 from app.models.risk_alert import RiskAlert
 from app.models.broker_account import BrokerAccount
@@ -56,10 +56,15 @@ def send_whatsapp_alert(
 
                 # Get phone number from user
                 user = await db.get(User, account.user_id) if account.user_id else None
-                phone = phone_number or (user.guardian_phone if user else None)
+                # Consent gate — see alert_service.guardian_reachable. An explicit
+                # phone_number override is a test/admin send and bypasses it.
+                if phone_number:
+                    phone, _reason = phone_number, None
+                else:
+                    phone, _reason = guardian_reachable(user)
                 if not phone:
-                    logger.warning(f"No phone number for account {broker_account_id}")
-                    return {"success": False, "error": "No phone number"}
+                    logger.warning(f"Guardian unreachable for {broker_account_id}: {_reason}")
+                    return {"success": False, "error": _reason}
 
                 # Send via Twilio
                 alert_service = AlertService()
@@ -137,10 +142,10 @@ _Stay disciplined. Follow your rules._
 
                 # Get phone from user
                 user = await db.get(User, account.user_id) if account.user_id else None
-                phone = user.guardian_phone if user else None
+                phone, _reason = guardian_reachable(user)
                 if not phone:
-                    logger.warning(f"No guardian phone for account {account.id}, skipping alert notification")
-                    return {"error": "No guardian phone configured"}
+                    logger.warning(f"Guardian unreachable for {account.id}: {_reason}")
+                    return {"error": _reason}
 
                 # Send
                 alert_service = AlertService()

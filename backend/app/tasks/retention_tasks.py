@@ -78,10 +78,11 @@ async def _dispatch_reports(report_type: str):
                 if user_time != current_time:
                     continue
 
+                from app.services.alert_service import guardian_reachable
                 user = await db.get(User, account.user_id) if account.user_id else None
-                user_phone = user.guardian_phone if user else None
+                user_phone, _reason = guardian_reachable(user)
                 if not user_phone:
-                    logger.info(f"No guardian phone for account {account.id}, skipping")
+                    logger.info(f"Report skipped for {account.id}: {_reason}")
                     continue
 
                 try:

@@ -488,9 +488,23 @@ async def _fire_position_alert(
             )
         )
     )
-    rule = (details or {}).get("rule")
+    # Dedup scope. A pattern type alone is too coarse: premium_loss_event names
+    # a specific instrument, so with two long options bleeding at once only the
+    # first ever alerted, and an escalation on one position was blocked by an
+    # existing critical on another. The 60s beat sweeps every open position, so
+    # that was the normal case rather than an edge one.
+    #
+    # `rule` continues to separate the constitution rules (Q15), and `symbol`
+    # separates per-position findings. Alerts carrying neither stay
+    # account-scoped, which is right for portfolio_concentration — that IS an
+    # account-level statement.
+    def _scope(d) -> tuple:
+        d = d or {}
+        return (d.get("rule"), d.get("symbol"))
+
+    want = _scope(details)
     recent = [a for a in existing.scalars().all()
-              if rule is None or (a.details or {}).get("rule") == rule]
+              if want == (None, None) or _scope(a.details) == want]
     max_recent = max((_sev_rank(a.severity) for a in recent), default=-1)
     if recent and _sev_rank(severity) <= max_recent:
         logger.debug(
@@ -506,6 +520,15 @@ async def _fire_position_alert(
     confidence = (details or {}).pop("_confidence", 90.0)
     data_quality = (details or {}).pop("_data_quality", "GOOD")
     now_utc = datetime.now(timezone.utc)
+
+    # Stamp the live marker HERE rather than at each call site. `lifecycle` on
+    # its own cannot carry this: the exit pass flips a merged alert to 'post',
+    # and the latency metric would then treat a row whose detected_at was "now"
+    # as a measured trade-close-to-alert lag. Details survive the merge, so the
+    # marker does. Callers that already set it (the entry-rule checks) keep
+    # their value; overexposure, holding_loser and concentration had none.
+    details = {**(details or {})}
+    details.setdefault("live", True)
 
     alert = RiskAlert(
         id=_uuid4(),
@@ -1185,12 +1208,28 @@ async def __entry_rules_impl(broker_account_id: str, entered: str, symbols: list
             and getattr(r, "entry_type", None) in _OPENING_FILLS
         ]
         if mis_rows:
-            exchange = next((r.exchange for r in mis_rows if r.exchange), None)
-            panic_start, _ = _squareoff_window(exchange, now_ist)
-            late_count = sum(
-                1 for r in mis_rows
-                if r.occurred_at and r.occurred_at.astimezone(IST) >= panic_start
+            # The exchange must come from THIS batch, not from the first MIS
+            # fill of the day. Taking the earliest one meant a morning MCX
+            # position set the window to MCX's 23:00 square-off, and every
+            # afternoon NFO entry then evaluated against it — the detector
+            # silently never fired for the rest of the session.
+            batch_rows = [r for r in mis_rows if r.tradingsymbol in set(symbols)]
+            exchange = next(
+                (r.exchange for r in sorted(
+                    batch_rows or mis_rows,
+                    key=lambda r: r.occurred_at or now_utc, reverse=True,
+                ) if r.exchange),
+                None,
             )
+            panic_start, _ = _squareoff_window(exchange, now_ist)
+            # Structures, not legs — a four-leg condor entered at 15:05 is one
+            # decision. Counting its ledger rows put a spread trader at the
+            # danger threshold on a single entry, which is the same leg-vs-
+            # structure error E2 fixed in the overtrading detectors.
+            late_count = count_entries_today([
+                r for r in mis_rows
+                if r.occurred_at and r.occurred_at.astimezone(IST) >= panic_start
+            ])
             mis_hit = evaluate_mis_panic(
                 now_ist, exchange, "MIS", late_count,
                 caution_count=th.get("end_session_mis_caution_count", 2),

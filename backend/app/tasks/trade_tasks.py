@@ -51,6 +51,36 @@ from app.services.fill_classification import (  # noqa: E402
 )
 
 
+def _same_instrument(live_alert, completed_trade) -> bool:
+    """
+    May this live alert be linked to this completed trade?
+
+    The dedup key is the pattern type, so without this check the merge would
+    attach a live alert to whatever round happened to close next. A live
+    premium_loss_event on a NIFTY call, followed an hour later by an unrelated
+    BANKNIFTY round closing, would have linked the NIFTY alert to BANKNIFTY's
+    CompletedTrade — and behaviour→money joins on exactly that column, so the
+    figure the merge exists to protect would have reported another instrument's
+    money.
+
+    Account-level findings (a daily trade or loss limit) name no instrument and
+    are legitimately about the session rather than a position, so they merge
+    with whatever round closed.
+
+    When the instruments disagree the alert is left unlinked. It then
+    contributes ₹0, which under-reports — but under-reporting is a smaller lie
+    than attributing money to the wrong trade, and it stays visibly zero rather
+    than plausibly wrong.
+    """
+    details = getattr(live_alert, "details", None) or {}
+    symbol = details.get("symbol")
+    if not symbol:
+        return True     # account-level finding, no instrument to disagree about
+    return str(symbol).upper() == str(
+        getattr(completed_trade, "tradingsymbol", "") or ""
+    ).upper()
+
+
 def _pattern_dedup_key(pattern_type: str, details) -> str:
     """
     Dedup key for alerts. constitution_violation covers many rules under one
@@ -976,7 +1006,8 @@ async def run_risk_detection_async(
                 _prior = last_fired_alert.get(k)
                 if (_prior is not None
                         and getattr(_prior, "lifecycle", None) == "live"
-                        and _prior.trigger_completed_trade_id is None):
+                        and _prior.trigger_completed_trade_id is None
+                        and _same_instrument(_prior, latest_ct)):
                     _prior.trigger_completed_trade_id = latest_ct.id
                     _prior.lifecycle = "post"
                     _mincr("alerts_live_merged")
