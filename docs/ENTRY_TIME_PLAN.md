@@ -273,6 +273,16 @@ duplicate pairs; must ship before E5 volume arrives.
 
 ## 3a. Status
 
+**E2 shipped 2026-08-09** (`a35769d`). `count_structures` wired into `overtrading_burst`,
+`daily_overtrading` and `expiry_day_overtrading` — the counting fix deferred from E0.
+Collapses a cluster only when it classifies as a recognised strategy, so **the count can
+only fall**: a single-leg trader's numbers are unchanged, which is why this needed no
+shadow gate. Leg counts kept in the evidence. `_classify` factored into a pure
+`classify_legs(LegView)`, enabling `classify_open_positions` — entry-time grouping from the
+sign of the position quantity, which is what `strategy_detector`'s docstring called a later
+improvement. 24 tests; three drive the burst detector itself, and it fires danger at eight
+legs without the fix. 554 backend tests pass.
+
 **E1 shipped 2026-08-09** (`124f7c2`). Coalescing window (5s, tumbling, SET NX concurrency,
 inline fallback if Redis or the queue is down) · scale-in classified as add-to-loser /
 add-to-winner from the ledger row alone, no price feed needed · exposure and concentration
