@@ -5,7 +5,7 @@ import { Sheet, SheetContent } from '@/components/ui/sheet';
 import { cn } from '@/lib/utils';
 import { toast } from 'sonner';
 import { AlertNotification, useAlerts } from '@/contexts/AlertContext';
-import { usePatternCatalogue } from '@/hooks/usePatternCatalogue';
+import { usePatternCatalogue, usePatternRecord } from '@/hooks/usePatternCatalogue';
 import { PatternSeverity } from '@/types/patterns';
 import { SEV_DOT, SEV_LABEL, SEV_LABEL_COLOR, SEV_LEFT_BORDER } from '@/lib/alertSeverity';
 
@@ -151,6 +151,7 @@ export default function AlertDetailSheet({ alert, open, onClose, onAcknowledge }
   const [busy, setBusy] = useState(false);
   const [localOutcome, setLocalOutcome] = useState<string | null>(null);
   const { lookup: lookupPattern } = usePatternCatalogue();
+  const { data: record } = usePatternRecord(open && alert ? alert.pattern.backend_type : null);
   if (!alert) return null;
 
   const sev = alert.pattern.severity;
@@ -368,6 +369,49 @@ export default function AlertDetailSheet({ alert, open, onClose, onAcknowledge }
                   {patternInfo.explanation}
                 </p>
               </div>
+            </div>
+          )}
+
+          {/* Your own record with this pattern.
+              What sat here before was a paragraph of invented population
+              statistics phrased as measurement. This is the trader's own
+              realised history — true, checkable, and the one thing no
+              competitor can show them. Below the sample gate it says so
+              rather than presenting a number built from three trades. */}
+          {record && (
+            <div className="rounded-lg bg-muted/40 px-3 py-3">
+              <p className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wide mb-1.5">
+                Your record with this pattern
+              </p>
+              {record.enough ? (
+                <>
+                  <p className="text-[12px] text-foreground leading-relaxed">
+                    Flagged <span className="font-medium">{record.times_fired}</span> times in
+                    the last {Math.round(record.window_days / 30)} months.
+                    {' '}Of the {record.trades_measured} trades that have closed,
+                    {' '}<span className="font-medium">{record.losses}</span> lost money
+                    {record.win_rate != null && <> and you won {record.win_rate}% of them</>}.
+                  </p>
+                  <p className={cn(
+                    'text-[12px] font-mono tabular-nums font-medium mt-1.5',
+                    record.pnl < 0 ? 'text-tm-loss' : 'text-tm-profit',
+                  )}>
+                    {record.pnl < 0 ? '−' : '+'}₹
+                    {Math.abs(record.pnl).toLocaleString('en-IN', { maximumFractionDigits: 0 })}
+                    <span className="font-sans font-normal text-muted-foreground">
+                      {' '}realised across those trades
+                    </span>
+                  </p>
+                </>
+              ) : (
+                <p className="text-[12px] text-muted-foreground leading-relaxed">
+                  {record.times_fired === 0
+                    ? 'First time we have flagged this for you.'
+                    : `Flagged ${record.times_fired} times so far. ` +
+                      `We will show your record here once ${record.min_sample} of ` +
+                      `those trades have closed — fewer than that is not a pattern yet.`}
+                </p>
+              )}
             </div>
           )}
 

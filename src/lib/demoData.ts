@@ -1507,6 +1507,27 @@ export const DEMO_PATTERN_CATALOGUE = {
   ]
 };
 
+// Mirrors GET /api/risk/patterns/{pattern_type}/my-record — the trader's own
+// history with a pattern, which replaced the invented population statistics
+// that used to sit in the alert panel. `enough` gates the display: below
+// min_sample the UI says so rather than showing a number built from 3 trades.
+export const DEMO_PATTERN_RECORD = {
+  pattern_type: 'revenge_trade',
+  window_days: 180,
+  times_fired: 11,
+  last_seen: daysAgo(4, 11, 20),
+  trades_measured: 9,
+  win_rate: 22.2,
+  wins: 2,
+  losses: 7,
+  pnl: -18400,
+  avg_pnl: -2044.44,
+  best: 1250,
+  worst: -6800,
+  enough: true,
+  min_sample: 5,
+};
+
 // Mirrors GET /api/constitution/suggestions exactly — field names included.
 // Guest fixtures double as smoke fixtures, and every past divergence between a
 // mock and its endpoint shipped as a live bug.

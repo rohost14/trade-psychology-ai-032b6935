@@ -58,6 +58,72 @@ async def get_pattern_catalogue():
             "severity_order": list(SEVERITY_ORDER)}
 
 
+@router.get("/patterns/{pattern_type}/my-record")
+async def get_pattern_my_record(
+    pattern_type: str,
+    days: int = Query(180, ge=7, le=1825),
+    broker_account_id: UUID = Depends(get_verified_broker_account_id),
+    db: AsyncSession = Depends(get_db),
+):
+    """
+    The trader's OWN history with one pattern: when it fired, what it cost.
+
+    This replaces what used to sit in the alert panel — a paragraph of precise,
+    unsourced population statistics ("win rate on the 4th trade after 3 losses
+    is typically below 30%") written to sound like measurement. Nobody measured
+    it. The trader's own record is both true and more persuasive, and it is the
+    thing no competitor can show them.
+
+    Same discipline as /api/my-record:
+      * Facts only. Realised P&L of the trades this pattern actually flagged,
+        joined through trigger_completed_trade_id. Never a counterfactual —
+        we do not claim what would have happened had they not traded.
+      * P&L stays RAW, per the standing project rule.
+      * Sample-gated and honest about it. A two-trade history is reported as
+        insufficient rather than dressed up as a finding.
+    """
+    from app.api.my_record import MIN_SAMPLE, _stats
+    from app.models.completed_trade import CompletedTrade
+
+    cutoff = datetime.now(timezone.utc) - timedelta(days=days)
+
+    alerts = (await db.execute(
+        select(RiskAlert).where(and_(
+            RiskAlert.broker_account_id == broker_account_id,
+            RiskAlert.pattern_type == pattern_type,
+            RiskAlert.detected_at >= cutoff,
+        )).order_by(desc(RiskAlert.detected_at))
+    )).scalars().all()
+
+    trade_ids = [a.trigger_completed_trade_id for a in alerts
+                 if a.trigger_completed_trade_id is not None]
+
+    trades = []
+    if trade_ids:
+        trades = list((await db.execute(
+            select(CompletedTrade).where(and_(
+                CompletedTrade.id.in_(trade_ids),
+                CompletedTrade.realized_pnl.isnot(None),
+            ))
+        )).scalars().all())
+
+    stats = _stats(trades)
+    last_seen = alerts[0].detected_at if alerts else None
+
+    return {
+        "pattern_type": pattern_type,
+        "window_days": days,
+        "times_fired": len(alerts),
+        "last_seen": last_seen.isoformat() if last_seen else None,
+        # Alerts raised while a position was still open have no completed trade
+        # until it closes, so the flagged-trade count trails times_fired. Stated
+        # rather than hidden — a silent gap between the two numbers reads as a bug.
+        "trades_measured": stats["trades"],
+        **{k: v for k, v in stats.items() if k != "trades"},
+        "min_sample": MIN_SAMPLE,
+    }
+
+
 @router.get("/state", response_model=RiskStateResponse)
 async def get_risk_state(
     broker_account_id: UUID = Depends(get_verified_broker_account_id),

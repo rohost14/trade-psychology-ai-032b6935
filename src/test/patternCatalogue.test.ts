@@ -14,7 +14,7 @@
  */
 import { describe, it, expect } from 'vitest';
 
-import { DEMO_PATTERN_CATALOGUE, DEMO_RISK_ALERTS } from '@/lib/demoData';
+import { DEMO_PATTERN_CATALOGUE, DEMO_PATTERN_RECORD, DEMO_RISK_ALERTS } from '@/lib/demoData';
 import { SEV_LABEL, isSevere, normalizeSeverityStr } from '@/lib/alertSeverity';
 import type { PatternSeverity } from '@/types/patterns';
 
@@ -103,5 +103,36 @@ describe('severity normalisation', () => {
     for (const s of severities) {
       expect(SEV_LABEL[s]).toBeTruthy();
     }
+  });
+});
+
+describe('pattern record fixture', () => {
+  it('mirrors the endpoint shape the sheet reads', () => {
+    for (const key of ['pattern_type', 'window_days', 'times_fired', 'trades_measured',
+                       'win_rate', 'wins', 'losses', 'pnl', 'enough', 'min_sample']) {
+      expect(DEMO_PATTERN_RECORD).toHaveProperty(key);
+    }
+  });
+
+  it('reports fewer measured trades than fires, since live alerts have no closed trade yet', () => {
+    expect(DEMO_PATTERN_RECORD.trades_measured).toBeLessThanOrEqual(
+      DEMO_PATTERN_RECORD.times_fired,
+    );
+  });
+
+  it('only claims `enough` once the sample gate is met', () => {
+    if (DEMO_PATTERN_RECORD.enough) {
+      expect(DEMO_PATTERN_RECORD.trades_measured).toBeGreaterThanOrEqual(
+        DEMO_PATTERN_RECORD.min_sample,
+      );
+    }
+  });
+
+  it('carries realised P&L, not a counterfactual saving', () => {
+    // The rule this obeys: behaviour→money is the realised P&L of trades the
+    // pattern actually flagged. Never "this would have saved you X".
+    expect(typeof DEMO_PATTERN_RECORD.pnl).toBe('number');
+    expect(DEMO_PATTERN_RECORD.wins + DEMO_PATTERN_RECORD.losses)
+      .toBeLessThanOrEqual(DEMO_PATTERN_RECORD.trades_measured);
   });
 });

@@ -36,6 +36,40 @@ interface CatalogueResponse {
   severity_order: string[];
 }
 
+/**
+ * The trader's own history with one pattern.
+ *
+ * This slot used to hold population statistics we invented — precise, unsourced,
+ * and phrased as measurement. The trader's own record is true, checkable, and
+ * the one thing no competitor can show them.
+ *
+ * `enough` is the gate. Below it the UI must say there is not enough history
+ * yet rather than render a number computed from two trades.
+ */
+export interface PatternRecord {
+  pattern_type: string;
+  window_days: number;
+  times_fired: number;
+  last_seen: string | null;
+  /** Flagged trades that have closed. Trails times_fired while positions are open. */
+  trades_measured: number;
+  win_rate: number | null;
+  wins: number;
+  losses: number;
+  pnl: number;
+  avg_pnl: number;
+  enough: boolean;
+  min_sample: number;
+}
+
+export function usePatternRecord(patternType: string | null) {
+  return useApiQuery<PatternRecord>(
+    ['pattern-record', patternType ?? ''],
+    `/api/risk/patterns/${patternType}/my-record`,
+    { enabled: !!patternType, staleTime: 5 * 60 * 1000 },
+  );
+}
+
 export function usePatternCatalogue() {
   const { data, isPending, error } = useApiQuery<CatalogueResponse>(
     ['pattern-catalogue'],
