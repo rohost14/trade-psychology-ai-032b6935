@@ -182,7 +182,11 @@ You asked whether the same alert is sent twice. I could not find a mechanism tha
 alert twice on the live path. I found something more serious: **on the live path, the first
 alert of any pattern suppresses itself, and nothing is sent at all.**
 
-### 3.1 The self-suppression
+### 3.1 The self-suppression — **FIXED 2026-08-09** (`a1267ed`)
+
+The bucket query now excludes the alerts it was handed, by id. Nine tests added
+(`backend/tests/test_alert_consolidation.py`); seven fail against the old code. The
+function had no test before. §3.2–§3.4 below are **not** fixed.
 
 `trade_tasks.py` order of operations in `run_risk_detection_async`:
 
