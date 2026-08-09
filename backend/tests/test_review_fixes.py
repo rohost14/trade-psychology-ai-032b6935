@@ -280,3 +280,42 @@ def test_has_danger_is_true_for_critical():
            / "app" / "tasks" / "position_monitor_tasks.py").read_text(encoding="utf-8")
     assert '"has_danger": is_notifiable(severity)' in src
     assert '"has_danger": severity == "danger"' not in src
+
+
+# ── instrument_type on the live path (found by alertlab scenario E-05) ───────
+
+def test_ledger_derives_instrument_type_from_the_symbol():
+    """
+    A Kite postback carries no instrument type, and the ledger builder replaced
+    the FIFO calculator that used to set it — so every CompletedTrade created
+    live had instrument_type NULL. Twelve guards in behavior_engine read it, so
+    premium_loss_event, options_premium_avg_down, expiry_day_overtrading,
+    fomo_entry and opening_5min_trap fired on bulk-synced trades and silently
+    never fired on live ones.
+    """
+    from app.services.position_ledger_service import _instrument_type_for
+
+    assert _instrument_type_for("NIFTY26AUG24500CE") == "CE"
+    assert _instrument_type_for("NIFTY26AUG24500PE") == "PE"
+    assert _instrument_type_for("NIFTY26AUGFUT") == "FUT"
+
+
+def test_an_equity_ticker_ending_in_ce_is_not_an_option():
+    """RELIANCE ends in CE. A suffix check would make every options detector
+    run against an equity position."""
+    from app.services.position_ledger_service import _instrument_type_for
+
+    assert _instrument_type_for("RELIANCE") == "EQ"
+
+
+def test_the_completed_trade_builder_sets_instrument_type():
+    """The helper being right proves nothing if the builder does not call it."""
+    import pathlib
+    import re
+
+    src = (pathlib.Path(__file__).resolve().parent.parent
+           / "app" / "services" / "position_ledger_service.py").read_text(encoding="utf-8")
+    ctor = re.search(r"tradingsymbol=close_entry\.tradingsymbol,(.{0,900}?)direction=fields",
+                     src, re.S)
+    assert ctor, "CompletedTrade construction not found — did it move?"
+    assert "instrument_type=_instrument_type_for(" in ctor.group(1)

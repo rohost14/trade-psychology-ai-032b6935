@@ -43,6 +43,22 @@ if TYPE_CHECKING:
 
 logger = logging.getLogger(__name__)
 
+
+def _instrument_type_for(tradingsymbol: str) -> Optional[str]:
+    """
+    CE / PE / FUT / EQ from the symbol.
+
+    Delegates to the canonical parser rather than matching suffixes: a local
+    check would classify RELIANCE as a call option, because the ticker ends in
+    "CE". Returns None only if parsing fails outright, which keeps a bad symbol
+    from being asserted as equity.
+    """
+    try:
+        from app.services.instrument_parser import parse_symbol
+        return parse_symbol(tradingsymbol or "").instrument_type or None
+    except Exception:
+        return None
+
 # Decimal precision for prices
 _PRICE_PRECISION = Decimal("0.0001")
 
@@ -656,6 +672,16 @@ class PositionLedgerService:
             tradingsymbol=close_entry.tradingsymbol,
             exchange=close_entry.exchange,
             product=close_entry.product,
+            # Derived from the symbol, because nothing else on this path can
+            # supply it: a Kite postback carries no instrument type, and this
+            # builder replaced the FIFO calculator that used to set it. Every
+            # CompletedTrade created live therefore had instrument_type NULL,
+            # and TWELVE guards in behavior_engine read it — premium_loss_event,
+            # options_premium_avg_down, expiry_day_overtrading, fomo_entry and
+            # opening_5min_trap among them. Those detectors fired on
+            # bulk-synced trades (sync sets the field) and silently never fired
+            # on live ones. Found by alertlab scenario E-05.
+            instrument_type=_instrument_type_for(close_entry.tradingsymbol),
             direction=fields["direction"],
             total_quantity=fields["total_quantity"],
             num_entries=fields["num_entries"],
