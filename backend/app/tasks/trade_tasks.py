@@ -1236,13 +1236,28 @@ async def _apply_alert_consolidation(
 ) -> list:
     """
     Alert consolidation (P-02):
-    1. 5-minute bucket: suppress notification if same pattern_type was already
-       notified within the last 5 minutes (record the alert, just don't notify)
+    1. 5-minute bucket: suppress notification if the same pattern_type already
+       fired within the last 5 minutes (record the alert, just don't notify)
     2. Hard cap: if session has fired 8+ alerts today, suppress further notifications
        (user would tune out anyway — alert fatigue is worse than no alert)
 
     Returns the subset of alerts that should trigger notifications.
-    All alerts are already saved to DB before this function runs.
+
+    **The alerts passed in are already committed** (caller commits at the persist
+    step, then calls this). The 5-minute bucket therefore has to exclude them by
+    id: without that, every alert found its own freshly-written row in the bucket
+    query and suppressed itself, so on the live webhook path the first alert of a
+    pattern was never delivered at all — no push, no WhatsApp, and no
+    `alert_update` WebSocket event, because the caller rebinds new_alerts to this
+    function's return value and gates all three on it. Alerts still reached users
+    only because the bulk-sync path does not call this function.
+
+    Note on the proxy: "already fired" is measured by rows in risk_alerts, not by
+    actual delivery. RiskAlert.delivered_push_at / delivered_whatsapp_at exist for
+    that and are never written (see docs/VOCABULARY_AUDIT.md §3.3), so a saved-but-
+    suppressed alert still counts here. That is deliberate for now — it errs toward
+    quiet — but it is the wrong signal and should move to the delivery columns once
+    they are populated.
     """
     from app.models.risk_alert import RiskAlert
     from app.models.trading_session import TradingSession
@@ -1277,15 +1292,17 @@ async def _apply_alert_consolidation(
         )
         return []  # All alerts saved to DB, none will notify
 
-    # 5-minute bucket: check for recent same-pattern alerts
-    recent_result = await db.execute(
-        select(RiskAlert).where(
-            and_(
-                RiskAlert.broker_account_id == broker_account_id,
-                RiskAlert.detected_at >= five_min_ago,
-            )
-        )
-    )
+    # 5-minute bucket: check for recent same-pattern alerts — EXCLUDING the ones
+    # we are deciding about, which are already in the table by the time we run.
+    bucket_filters = [
+        RiskAlert.broker_account_id == broker_account_id,
+        RiskAlert.detected_at >= five_min_ago,
+    ]
+    subject_ids = [a.id for a in alerts if getattr(a, "id", None) is not None]
+    if subject_ids:
+        bucket_filters.append(RiskAlert.id.notin_(subject_ids))
+
+    recent_result = await db.execute(select(RiskAlert).where(and_(*bucket_filters)))
     recent_patterns = {a.pattern_type for a in recent_result.scalars().all()}
 
     notifiable = []
