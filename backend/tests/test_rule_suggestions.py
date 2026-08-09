@@ -184,3 +184,25 @@ def test_different_underlyings_at_the_same_moment_are_not_a_spread():
         trade(0, minute=0, symbol="BANKNIFTY25AUG52000CE"),
     ]
     assert uses_multi_leg(pair) is False
+
+
+def test_cooldown_keeps_looking_past_a_window_that_is_not_an_improvement():
+    """
+    The loop returned None the moment a qualifying window was not tighter than
+    the user's current setting, abandoning the search. A trader on a 10-minute
+    cooldown whose data supported 15 was told nothing, because 5 qualified first
+    and 5 is not an improvement on 10.
+
+    Losses inside 15 minutes, wins after — so both 5 and 15 separate, and only
+    15 is a genuine tightening.
+    """
+    trades = []
+    for d in range(12):
+        trades.append(trade(d, minute=0, pnl=-500, duration=1))
+        trades.append(trade(d, minute=3, pnl=-400, duration=1))    # 2 min gap
+        trades.append(trade(d, minute=10, pnl=-450, duration=1))   # 6 min gap
+        trades.append(trade(d, minute=60, pnl=700, duration=1))    # 49 min gap
+
+    out = suggest_cooldown_after_loss(sessions_from(trades), current=10)
+    assert out is not None, "abandoned the search instead of looking further"
+    assert out.suggested_value > 10

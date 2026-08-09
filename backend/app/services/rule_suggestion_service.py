@@ -339,7 +339,12 @@ def suggest_cooldown_after_loss(
         if _rate(far) - _rate(near) < MIN_SEPARATION:
             continue
         if current is not None and m <= current:
-            return None
+            # Not tighter than what they already have — but a LARGER window
+            # further up this loop might be. `return None` here abandoned the
+            # search on the first non-improvement: a trader on a 10-minute
+            # cooldown whose data supported 15 was told nothing, because 5
+            # qualified first and 5 is not an improvement on 10.
+            continue
         return Suggestion(
             field="cooldown_after_loss",
             current_value=current,
