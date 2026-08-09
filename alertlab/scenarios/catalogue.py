@@ -298,35 +298,6 @@ EQUITY_NOT_AN_OPTION = Scenario(
 # A — capital tiers, identical behaviour
 # ---------------------------------------------------------------------------
 
-def _capital_tier(tier_id: str, capital: float, qty: int) -> Scenario:
-    """Three losses then a double-size entry — the same story at every size."""
-    return Scenario(
-        id=tier_id, section="Capital tiers",
-        title=f"Recovery bet at ₹{capital:,.0f} capital",
-        story="Three losses, then an entry at double size on the same underlying.",
-        capital=capital,
-        profile=ROOMY,
-        fills=_flatten([
-            losing_trade(NIFTY_CE, at(10, 0), qty, 8, hold_minutes=15),
-            losing_trade(NIFTY_CE, at(10, 30), qty, 9, hold_minutes=15),
-            losing_trade(NIFTY_CE, at(11, 0), qty, 7, hold_minutes=15),
-            round_trip(NIFTY_CE, at(11, 20), qty * 3, 100.0, 94.0, hold_minutes=20),
-        ]),
-        must_fire=[
-            Expect("consecutive_loss_streak",
-                   reason="the pattern must be found at every capital tier, not just the tuned one"),
-        ],
-    )
-
-
-CAPITAL_TIERS = [
-    _capital_tier("A-02", 25_000, 50),
-    _capital_tier("A-04", 100_000, 50),
-    _capital_tier("A-06", 1_000_000, 100),
-    _capital_tier("A-08", 10_000_000, 250),
-]
-
-
 # ---------------------------------------------------------------------------
 # E / F — time of day and suppression
 # ---------------------------------------------------------------------------
@@ -359,13 +330,31 @@ DEDUP_ONE_ALERT = Scenario(
 )
 
 
-ALL_SCENARIOS: List[Scenario] = [
+_CORE: List[Scenario] = [
     QUIET_DAY,
     SPREAD_TRADER, OPTION_SELLER, DISCIPLINED_BAD_DAY, SCALPER,
     REVENGE, REVENGE_NEAR_MISS, MARTINGALE, PYRAMIDING_NEAR_MISS, FOMO_NEAR_MISS,
     SHORT_COVER, PARTIAL_FILLS, EQUITY_NOT_AN_OPTION,
-    *CAPITAL_TIERS,
     EXPIRY_DAY_HEAVY, DEDUP_ONE_ALERT,
 ]
 
+
+def _all() -> List[Scenario]:
+    """Core stories, per-detector coverage, and the variation matrix."""
+    from .detectors import DETECTOR_SCENARIOS
+    from .variations import VARIATION_SCENARIOS
+
+    merged = _CORE + DETECTOR_SCENARIOS + VARIATION_SCENARIOS
+    seen, out = set(), []
+    for sc in merged:
+        # A duplicate id would silently shadow one scenario with another and the
+        # count would still look right.
+        if sc.id in seen:
+            raise ValueError(f"duplicate scenario id: {sc.id}")
+        seen.add(sc.id)
+        out.append(sc)
+    return out
+
+
+ALL_SCENARIOS: List[Scenario] = _all()
 BY_ID = {s.id: s for s in ALL_SCENARIOS}
