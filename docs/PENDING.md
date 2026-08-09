@@ -22,6 +22,28 @@ accurately on a deliberate strategy was indistinguishable from one firing on not
 
 ---
 
+## 🟡 Guardian / WhatsApp / reports — parked until the business number exists
+
+Blocked on a Meta-approved business number and message templates. **Do not build on
+this area until then.** Everything below is known and deliberately unresolved:
+
+- **Reports are addressed to the wrong field.** EOD and weekly reports are meant for the
+  *trader* but go to `user.guardian_phone`, because that is the only number stored —
+  `profile.py:669` still reads `user_phone = None  # user's own WhatsApp — not stored
+  separately yet`. Two channels squeezed through one field.
+- **Daily/weekly reports should not reach a guardian at all.** Confirmed as the intent.
+  The current consent gate blocks them when the guardian is unconfirmed, which is the safe
+  failure but not the right design.
+- **Zero live impact today.** `whatsapp_service` is in SAFE MODE until `TWILIO_*` is set,
+  so none of these paths send anything. The behaviour to settle is which number receives
+  what, and that is a decision for when the channel is real.
+
+Fix properly later: store the trader's own phone, split trader messages from guardian
+messages by destination rather than by which field happened to be populated, and keep the
+consent gate on the guardian side only.
+
+---
+
 ## 🟡 Promote the entry-time detectors — decision, once the numbers exist
 
 Ten inferred detectors (revenge_trade, rapid_reentry, size_escalation,
