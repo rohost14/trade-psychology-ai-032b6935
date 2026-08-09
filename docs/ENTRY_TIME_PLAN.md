@@ -273,6 +273,14 @@ duplicate pairs; must ship before E5 volume arrives.
 
 ## 3a. Status
 
+**E1 shipped 2026-08-09** (`124f7c2`). Coalescing window (5s, tumbling, SET NX concurrency,
+inline fallback if Redis or the queue is down) · scale-in classified as add-to-loser /
+add-to-winner from the ledger row alone, no price feed needed · exposure and concentration
+moved under the opening-fill gate, since neither can rise on a DECREASE · entry copy names
+the batch rather than one arbitrary leg. New: `app/services/fill_classification.py`,
+`app/services/entry_batch_service.py`, `flush_entry_batch` task. 27 tests. 530 backend
+tests pass.
+
 **E0 shipped 2026-08-09** (`184ec0a`). Two defects fixed: the entry gate now reads the
 ledger's fill classification instead of the order side, and position-monitor alerts are
 recorded as `lifecycle="live"`. 13 tests. 503 backend tests pass.
