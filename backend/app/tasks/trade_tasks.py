@@ -43,11 +43,12 @@ def _get_redis_client():
     return get_sync_redis()
 
 
-# PositionLedger entry_type values that mean "a position was opened or grown".
-# FLIP counts: it closes one direction and opens the opposite, so it is an entry
-# as well as an exit — and behaviourally it is one of the louder things a trader
-# can do. DECREASE and CLOSE are exits and must never trigger entry-time checks.
-_POSITION_OPENING_FILLS = frozenset({"OPEN", "INCREASE", "FLIP"})
+# Which fills count as entries — see app/services/fill_classification.py.
+# Re-exported here because this module is where the pipeline reads it.
+from app.services.fill_classification import (  # noqa: E402
+    POSITION_OPENING_FILLS as _POSITION_OPENING_FILLS,
+    classify_fill as _classify_fill,
+)
 
 
 def _pattern_dedup_key(pattern_type: str, details) -> str:
@@ -445,6 +446,8 @@ def process_webhook_trade(self, trade_data: Dict[str, Any], broker_account_id: s
                 # must not be treated as an entry. Stays None if the ledger step
                 # failed, in which case entry checks are skipped rather than guessed.
                 _fill_entry_type: str = None
+                # JSON-safe classification of this fill for the coalescing window.
+                _fill_batch_payload: dict = None
 
                 try:
                     redis_client = _get_redis_client()
@@ -500,6 +503,7 @@ def process_webhook_trade(self, trade_data: Dict[str, Any], broker_account_id: s
                         ledger_entry, is_new = await PositionLedgerService.apply_fill(fill, db)
                         await db.flush()
                         _fill_entry_type = ledger_entry.entry_type
+                        _fill_batch_payload = _classify_fill(ledger_entry)
 
                         # If this fill realized P&L, write it back to Trade.pnl
                         # (backward compat for any code still reading Trade.pnl)
@@ -638,33 +642,61 @@ def process_webhook_trade(self, trade_data: Dict[str, Any], broker_account_id: s
                 try:
                     from app.tasks.position_monitor_tasks import (
                         check_holding_loser_scheduled,
+                        flush_entry_batch,
                         _overexposure_task,
                         _concentration_task,
                         _entry_rules_task,
                     )
-                    # P2 coalescing (review S6.2): position checks run INLINE
-                    # in this worker instead of 3 spawned Celery tasks - kills
-                    # the task fan-out and its per-task connection churn.
-                    # Each is individually non-fatal.
-                    try:
-                        await _overexposure_task(broker_account_id, trade.tradingsymbol or "")
-                    except Exception as _oe:
-                        logger.warning(f"overexposure inline check failed: {_oe}")
-                    try:
-                        await _concentration_task(broker_account_id)
-                    except Exception as _ce:
-                        logger.warning(f"concentration inline check failed: {_ce}")
                     # Entry-time checks run on fills that OPEN or GROW a position.
-                    # This was gated on transaction_type == "BUY", which is not the
-                    # same thing: a BUY that covers a short is an EXIT. Every short
-                    # seller was getting "cooldown violated — position is OPEN" on
-                    # the way out of a position. The ledger already classifies each
-                    # fill, so ask it instead of inferring from the side.
+                    # The gate was transaction_type == "BUY", which is not the same
+                    # thing: covering a short is a BUY and an exit, opening a short
+                    # is a SELL and an entry. The ledger classifies every fill, so
+                    # ask it rather than inferring from the side.
+                    #
+                    # Exposure and concentration moved under this gate too. Both
+                    # only rise when a position opens or grows; running them on a
+                    # DECREASE asked whether a position that just got smaller is
+                    # too large.
                     if _fill_entry_type in _POSITION_OPENING_FILLS:
+                        # E1: coalesce. The first opening fill starts a short
+                        # window and everything inside it is evaluated once —
+                        # partial fills, the legs of a spread, a sliced order.
+                        # Evaluating per fill turns one intent into N alerts.
+                        _batched = False
                         try:
-                            await _entry_rules_task(broker_account_id, trade.tradingsymbol or "")
-                        except Exception as _ee:
-                            logger.warning(f"entry rules inline check failed: {_ee}")
+                            from app.services import entry_batch_service as _entry_batch
+                            if redis_client is not None and _fill_batch_payload:
+                                _opened_window = _entry_batch.add_fill(
+                                    redis_client, broker_account_id, _fill_batch_payload
+                                )
+                                _batched = True
+                                if _opened_window:
+                                    flush_entry_batch.apply_async(
+                                        args=[broker_account_id],
+                                        countdown=COLD_START_DEFAULTS.get(
+                                            "entry_batch_window_sec", 5
+                                        ),
+                                    )
+                        except Exception as _be:
+                            # Redis or the queue is unavailable. Fall through to
+                            # the inline path — that is the pre-E1 behaviour, and
+                            # a duplicate-prone check beats no check at all.
+                            logger.warning(f"entry batch enqueue failed, running inline: {_be}")
+                            _batched = False
+
+                        if not _batched:
+                            try:
+                                await _overexposure_task(broker_account_id, trade.tradingsymbol or "")
+                            except Exception as _oe:
+                                logger.warning(f"overexposure inline check failed: {_oe}")
+                            try:
+                                await _concentration_task(broker_account_id)
+                            except Exception as _ce:
+                                logger.warning(f"concentration inline check failed: {_ce}")
+                            try:
+                                await _entry_rules_task(broker_account_id, trade.tradingsymbol or "")
+                            except Exception as _ee:
+                                logger.warning(f"entry rules inline check failed: {_ee}")
                     # Schedule the holding-loser check 30 min out. Same gate: the
                     # check itself is direction-agnostic (it computes P&L for long
                     # and short), so gating it on BUY meant a trader who only

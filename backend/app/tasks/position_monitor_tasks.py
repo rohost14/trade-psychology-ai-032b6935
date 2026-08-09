@@ -570,6 +570,65 @@ async def _fire_position_alert(
 # Phase 6: portfolio concentration + entry-time constitution rules
 # ─────────────────────────────────────────────────────────────────────────────
 
+@celery_app.task(name="app.tasks.position_monitor_tasks.flush_entry_batch")
+def flush_entry_batch(broker_account_id: str):
+    """
+    Run the entry-time checks once for everything that landed in the window.
+
+    Scheduled by the fill pipeline when an opening fill starts a window (E1).
+    Whatever arrived inside it — partial fills of one order, the four legs of a
+    condor, a sliced entry — is evaluated as a single event instead of N.
+    """
+    return asyncio.run(_flush_entry_batch(broker_account_id))
+
+
+async def _flush_entry_batch(broker_account_id: str) -> dict:
+    from app.services import entry_batch_service as batch
+
+    try:
+        redis = _get_redis()
+        fills = batch.drain(redis, broker_account_id)
+    except Exception as e:
+        # Nothing to fall back to here: the fills are gone with the window.
+        # Loud, because it means entry checks silently did not run.
+        logger.error(f"[entry_batch] drain failed for {broker_account_id[:8]}: {e}")
+        return {"error": "drain_failed"}
+
+    if not fills:
+        return {"skipped": "empty_batch"}
+
+    summary = batch.summarise(fills)
+    symbols = summary["symbols"]
+    logger.info(
+        f"[entry_batch] {broker_account_id[:8]}: {summary['fill_count']} fill(s), "
+        f"{summary['distinct_symbols']} instrument(s) — evaluating once"
+    )
+
+    # Account-level: one check per window regardless of how many legs landed.
+    try:
+        await _concentration_task(broker_account_id)
+    except Exception as e:
+        logger.warning(f"concentration check failed: {e}")
+
+    # Position-level: genuinely per instrument — each leg is its own position
+    # and its own exposure. The 30-minute dedup in _fire_position_alert keeps
+    # this from becoming one alert per leg.
+    for symbol in symbols:
+        try:
+            await _overexposure_task(broker_account_id, symbol)
+        except Exception as e:
+            logger.warning(f"overexposure check failed for {symbol}: {e}")
+
+    # Account-level rules, but the copy names what was entered — which is the
+    # point of coalescing: "4 positions (NIFTY… +3 more)", not one arbitrary leg.
+    try:
+        await _entry_rules_task(broker_account_id, symbols)
+    except Exception as e:
+        logger.warning(f"entry rules check failed: {e}")
+
+    return {"fills": summary["fill_count"], "symbols": summary["distinct_symbols"]}
+
+
 @celery_app.task(name="app.tasks.position_monitor_tasks.check_portfolio_concentration")
 def check_portfolio_concentration(broker_account_id: str):
     """
@@ -664,7 +723,25 @@ def check_entry_rules(broker_account_id: str, tradingsymbol: str):
     return asyncio.run(_entry_rules_task(broker_account_id, tradingsymbol))
 
 
-async def _entry_rules_task(broker_account_id: str, tradingsymbol: str) -> dict:
+async def _entry_rules_task(broker_account_id: str, tradingsymbol) -> dict:
+    """
+    Entry-time constitution rules.
+
+    `tradingsymbol` accepts a single symbol or a list of them: E1 coalesces the
+    fills that land inside one window, so a four-leg structure arrives here once
+    with four symbols rather than four times with one each. The rules themselves
+    are account-level facts (is it a no-trade window, are we inside a cooldown),
+    so the symbols only shape the copy.
+    """
+    from app.services.entry_batch_service import describe as _describe
+
+    symbols = [tradingsymbol] if isinstance(tradingsymbol, str) else list(tradingsymbol or [])
+    symbols = [s for s in symbols if s]
+    entered = _describe(symbols)
+    return await __entry_rules_impl(broker_account_id, entered, symbols)
+
+
+async def __entry_rules_impl(broker_account_id: str, entered: str, symbols: list) -> dict:
     from zoneinfo import ZoneInfo as _ZI
     from app.models.user_profile import UserProfile
     from app.models.completed_trade import CompletedTrade
@@ -702,11 +779,12 @@ async def _entry_rules_task(broker_account_id: str, tradingsymbol: str) -> dict:
                     severity="danger",
                     message=(
                         f"Your no-trade window ({w} IST) violated: entered "
-                        f"{tradingsymbol} at {now_ist.strftime('%H:%M')} - position is OPEN."
+                        f"{entered} at {now_ist.strftime('%H:%M')} - position is OPEN."
                     ),
                     details={"rule": "restricted_window", "window": w,
                              "entry_time_ist": now_ist.strftime("%H:%M"),
-                             "symbol": tradingsymbol, "at_entry": True,
+                             "symbol": symbols[0] if symbols else None,
+                             "symbols": symbols, "at_entry": True,
                              "_confidence": 100.0},
                     db=db,
                 )
@@ -732,7 +810,7 @@ async def _entry_rules_task(broker_account_id: str, tradingsymbol: str) -> dict:
                     severity="danger",
                     message=(
                         f"Your {int(cooldown_min)}-minute cooldown violated: entered "
-                        f"{tradingsymbol} {gap:.0f} min after a "
+                        f"{entered} {gap:.0f} min after a "
                         f"₹{abs(float(last_loss.realized_pnl or 0)):,.0f} loss - "
                         f"position is OPEN."
                     ),
@@ -740,7 +818,8 @@ async def _entry_rules_task(broker_account_id: str, tradingsymbol: str) -> dict:
                              "limit_min": int(cooldown_min),
                              "prior_loss": float(last_loss.realized_pnl or 0),
                              "prior_symbol": last_loss.tradingsymbol,
-                             "symbol": tradingsymbol, "at_entry": True,
+                             "symbol": symbols[0] if symbols else None,
+                             "symbols": symbols, "at_entry": True,
                              "_confidence": 100.0},
                     db=db,
                 )

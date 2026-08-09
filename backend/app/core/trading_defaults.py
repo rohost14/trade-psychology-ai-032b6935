@@ -269,6 +269,13 @@ COLD_START_DEFAULTS: Dict[str, Any] = {
     'alert_session_hard_cap':           8,   # max notified alerts per session (fatigue guard)
     'alert_bucket_minutes':             5,   # same pattern re-notification bucket
 
+    # ── Entry-time coalescing (E1) ───────────────────────────────────────
+    # Seconds the first opening fill waits before entry checks run, so partial
+    # fills, multi-leg legs and split orders are evaluated once instead of N
+    # times. Costs latency on an alert a human reads; buys a class of false
+    # positive that would otherwise be structural.
+    'entry_batch_window_sec':           5,
+
     # ── Notification staleness (Engine v2 Phase 0, master Q12) ───────────
     # Push/WhatsApp only fire for alerts whose triggering trade is recent.
     # Bulk-synced historical trades (detected_at = trade time, hours old)
