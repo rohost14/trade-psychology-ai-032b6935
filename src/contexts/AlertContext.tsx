@@ -104,7 +104,7 @@ interface AlertContextValue {
   acknowledgeAlert: (alertId: string) => void;
   acknowledgeAll: () => void;
   clearAllAlerts: () => void;
-  submitAlertFeedback: (alertId: string, outcome: 'stopped' | 'took_anyway' | 'not_useful') => Promise<boolean>;
+  submitAlertFeedback: (alertId: string, outcome: 'stopped' | 'took_anyway' | 'not_useful' | 'planned') => Promise<boolean>;
   mutePattern: (patternType: string) => Promise<void>;
   unmutePattern: (patternType: string) => Promise<void>;
 }
@@ -454,7 +454,7 @@ export function AlertProvider({ children }: { children: ReactNode }) {
 
   // Feedback loop: record what the user did about an alert. Also acknowledges it.
   const submitAlertFeedback = useCallback(
-    async (alertId: string, outcome: 'stopped' | 'took_anyway' | 'not_useful') => {
+    async (alertId: string, outcome: 'stopped' | 'took_anyway' | 'not_useful' | 'planned') => {
       setAlerts(prev => prev.map(a => a.id === alertId ? { ...a, acknowledged: true } : a));
       try {
         await api.post(`/api/risk/alerts/${alertId}/feedback`, { outcome });

@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Clock, X, MessageSquare, BellOff, Bell, Hand, ArrowRight, ThumbsDown } from 'lucide-react';
+import { Clock, X, MessageSquare, BellOff, Bell, Hand, ArrowRight, ThumbsDown, ClipboardCheck } from 'lucide-react';
 import { Sheet, SheetContent } from '@/components/ui/sheet';
 import { cn } from '@/lib/utils';
 import { toast } from 'sonner';
@@ -12,6 +12,7 @@ import { SEV_DOT, SEV_LABEL, SEV_LABEL_COLOR, SEV_LEFT_BORDER } from '@/lib/aler
 const OUTCOME_LABEL: Record<string, string> = {
   stopped:     'You stopped',
   took_anyway: 'Took it anyway',
+  planned:     'This was planned',
   not_useful:  'Not useful',
 };
 
@@ -162,7 +163,7 @@ export default function AlertDetailSheet({ alert, open, onClose, onAcknowledge }
   const outcome = localOutcome ?? alert.pattern.outcome ?? null;
   const isMuted = mutedPatterns.includes(backendType);
 
-  async function handleFeedback(o: 'stopped' | 'took_anyway' | 'not_useful') {
+  async function handleFeedback(o: 'stopped' | 'took_anyway' | 'not_useful' | 'planned') {
     if (busy) return;
     setBusy(true);
     setLocalOutcome(o);
@@ -445,7 +446,7 @@ export default function AlertDetailSheet({ alert, open, onClose, onAcknowledge }
           ) : (
             <>
               <p className="text-[11px] text-muted-foreground">What did you do?</p>
-              <div className="grid grid-cols-3 gap-2">
+              <div className="grid grid-cols-2 gap-2">
                 <button
                   onClick={() => handleFeedback('stopped')}
                   disabled={busy}
@@ -461,6 +462,20 @@ export default function AlertDetailSheet({ alert, open, onClose, onAcknowledge }
                 >
                   <ArrowRight className="h-3.5 w-3.5" />
                   Took it anyway
+                </button>
+                {/* "This was planned" is the option the trader most often
+                    means, and the one we could not hear. It says the facts are
+                    right and the concern is misplaced — which is a different
+                    statement from "not useful", and the difference between a
+                    detector that is wrong and one that is merely telling this
+                    trader something they already knew. */}
+                <button
+                  onClick={() => handleFeedback('planned')}
+                  disabled={busy}
+                  className="flex flex-col items-center gap-1 py-2 rounded-lg border border-border text-[11px] font-medium text-foreground hover:border-tm-brand hover:text-tm-brand transition-colors disabled:opacity-50"
+                >
+                  <ClipboardCheck className="h-3.5 w-3.5" />
+                  This was planned
                 </button>
                 <button
                   onClick={() => handleFeedback('not_useful')}

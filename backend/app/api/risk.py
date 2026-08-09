@@ -19,7 +19,15 @@ router = APIRouter()
 # A user may silence real-time delivery of at most this many patterns at once.
 # Capped so they can't mute everything — that would defeat the app's purpose.
 MAX_ACTIVE_MUTES = 3
-VALID_OUTCOMES = {"stopped", "took_anyway", "not_useful"}
+# What a trader can say about an alert. `planned` (migration 079) is the one
+# that separates "your detection is wrong" from "I meant to do that" — the same
+# tap, a completely different statement, and the difference between a detector
+# with a precision problem and one that is simply not telling this trader
+# anything new.
+#
+# Requires migration 079: 069 added a CHECK constraint listing the first three,
+# so an INSERT of 'planned' fails at the database until it is applied.
+VALID_OUTCOMES = {"stopped", "took_anyway", "not_useful", "planned"}
 
 @router.get("/patterns")
 async def get_pattern_catalogue():
@@ -441,7 +449,7 @@ async def alert_response_stats(
         d = by_pattern.setdefault(
             a.pattern_type,
             {"total": 0, "acknowledged": 0, "stopped": 0, "took_anyway": 0,
-             "not_useful": 0},
+             "not_useful": 0, "planned": 0},
         )
         d["total"] += 1
         if a.acknowledged_at is not None:
@@ -452,6 +460,11 @@ async def alert_response_stats(
             d["stopped"] += 1
         elif a.outcome == "took_anyway":
             d["took_anyway"] += 1
+        elif a.outcome == "planned":
+            # Detection correct, concern misplaced. Deliberately NOT folded into
+            # not_useful: one says we were wrong, the other says we were right
+            # and this trader already knew.
+            d["planned"] += 1
         elif a.outcome == "not_useful":
             # The only signal we have that the ENGINE was wrong rather than the
             # trader. It was accepted, stored, and read by nothing — so every
@@ -462,7 +475,7 @@ async def alert_response_stats(
         {"pattern": p, "total": d["total"], "acknowledged": d["acknowledged"],
          "ignored": d["total"] - d["acknowledged"],
          "stopped": d["stopped"], "took_anyway": d["took_anyway"],
-         "not_useful": d["not_useful"],
+         "not_useful": d["not_useful"], "planned": d["planned"],
          # Share of alerts the trader marked as not useful. This is the closest
          # thing to a false-positive rate the product has.
          "not_useful_rate": round(d["not_useful"] / d["total"], 2) if d["total"] else None,
@@ -475,4 +488,5 @@ async def alert_response_stats(
             "total_ignored": sum(r["ignored"] for r in rows),
             "total_took_anyway": sum(r["took_anyway"] for r in rows),
             "total_stopped": sum(r["stopped"] for r in rows),
-            "total_not_useful": sum(r["not_useful"] for r in rows)}
+            "total_not_useful": sum(r["not_useful"] for r in rows),
+            "total_planned": sum(r["planned"] for r in rows)}

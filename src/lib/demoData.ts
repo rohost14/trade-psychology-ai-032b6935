@@ -1180,10 +1180,15 @@ export const DEMO_ALERT_RESPONSE_STATS = {
   total_took_anyway: 12,
   total_stopped: 3,
   total_ignored: 40,
+  total_not_useful: 3,
+  total_planned: 4,
   patterns: [
-    { pattern: 'revenge_trade',   total: 9, ignored: 6, stopped: 1, took_anyway: 5 },
-    { pattern: 'size_escalation', total: 7, ignored: 5, stopped: 1, took_anyway: 4 },
-    { pattern: 'no_stoploss',     total: 6, ignored: 4, stopped: 1, took_anyway: 3 },
+    { pattern: 'revenge_trade',   total: 9, ignored: 6, stopped: 1, took_anyway: 5,
+      not_useful: 1, planned: 0, not_useful_rate: 0.11, ack_rate: 0.33 },
+    { pattern: 'size_escalation', total: 7, ignored: 5, stopped: 1, took_anyway: 4,
+      not_useful: 0, planned: 3, not_useful_rate: 0, ack_rate: 0.29 },
+    { pattern: 'no_stoploss',     total: 6, ignored: 4, stopped: 1, took_anyway: 3,
+      not_useful: 2, planned: 1, not_useful_rate: 0.33, ack_rate: 0.33 },
   ],
 };
 

@@ -209,3 +209,38 @@ def test_no_shadow_detectors_reports_zero_not_an_error():
     summary = summarise_shadow([])
     assert summary == {"detectors_in_shadow": 0, "events": 0,
                        "would_have_alerted": 0, "by_detector": []}
+
+
+# ── "Planned" is its own signal ──────────────────────────────────────────────
+# Phase 5. `not_useful` conflated two opposite statements: "your detection is
+# wrong" and "I meant to do that". The second is not a precision problem at all
+# — it is an accurate detector telling this trader something they already knew.
+
+def test_planned_is_counted_separately_from_not_useful():
+    alerts = ([alert(outcome="planned") for _ in range(4)]
+              + [alert(outcome="not_useful") for _ in range(2)]
+              + [alert() for _ in range(4)])
+    row = summarise_precision(alerts, [], accounts_seen=1)[0]
+    assert row["planned"] == 4
+    assert row["not_useful"] == 2
+    assert row["planned_rate"] == 0.4
+    assert row["not_useful_rate"] == 0.2
+
+
+def test_planned_does_not_inflate_the_false_positive_rate():
+    """
+    The whole reason for the fourth option. A detector firing accurately on a
+    deliberate strategy must not look like one firing on nothing — they need
+    different fixes.
+    """
+    alerts = [alert(outcome="planned") for _ in range(10)]
+    row = summarise_precision(alerts, [], accounts_seen=1)[0]
+    assert row["not_useful_rate"] == 0.0
+    assert row["planned_rate"] == 1.0
+
+
+def test_a_detector_with_no_feedback_has_zero_rates_not_null():
+    alerts = [alert() for _ in range(5)]
+    row = summarise_precision(alerts, [], accounts_seen=1)[0]
+    assert row["planned_rate"] == 0.0
+    assert row["not_useful_rate"] == 0.0

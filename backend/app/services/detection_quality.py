@@ -106,23 +106,23 @@ def summarise_precision(
     costs the same tap. A pattern many accounts have muted is a pattern that is
     wrong for them, whatever its fire count says.
     """
+    def _blank(name: str) -> Dict[str, Any]:
+        return {"detector": name, "alerts": 0, "not_useful": 0, "planned": 0,
+                "acknowledged": 0, "muted_by_accounts": 0}
+
     per: Dict[str, Dict[str, Any]] = {}
     for a in alerts:
-        d = per.setdefault(a.pattern_type, {
-            "detector": a.pattern_type, "alerts": 0, "not_useful": 0,
-            "acknowledged": 0, "muted_by_accounts": 0,
-        })
+        d = per.setdefault(a.pattern_type, _blank(a.pattern_type))
         d["alerts"] += 1
         if a.outcome == "not_useful":
             d["not_useful"] += 1
+        elif a.outcome == "planned":
+            d["planned"] += 1
         if a.acknowledged_at is not None:
             d["acknowledged"] += 1
 
     for m in mutes:
-        d = per.setdefault(m.pattern_type, {
-            "detector": m.pattern_type, "alerts": 0, "not_useful": 0,
-            "acknowledged": 0, "muted_by_accounts": 0,
-        })
+        d = per.setdefault(m.pattern_type, _blank(m.pattern_type))
         d["muted_by_accounts"] += 1
 
     rows = []
@@ -131,6 +131,12 @@ def summarise_precision(
         rows.append({
             **d,
             "not_useful_rate": round(d["not_useful"] / n, 3) if n else None,
+            # Kept apart from not_useful_rate on purpose. "Planned" means the
+            # detection was CORRECT and the trader had already accounted for it
+            # — a detector with a high planned rate is accurate and redundant,
+            # which is a different problem from one that is wrong, and needs a
+            # different fix. Folding them together would hide both.
+            "planned_rate": round(d["planned"] / n, 3) if n else None,
             "mute_rate": (round(d["muted_by_accounts"] / accounts_seen, 3)
                           if accounts_seen else None),
             # Whether these rates mean anything yet. Rendering a 100% not-useful
