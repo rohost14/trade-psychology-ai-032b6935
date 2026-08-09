@@ -29,7 +29,7 @@ from app.core.celery_app import celery_app
 from app.core.config import settings
 from app.core.database import SessionLocal
 from app.core.market_hours import is_market_open, MarketSegment
-from app.core.severity import rank as _sev_rank
+from app.core.severity import is_notifiable, rank as _sev_rank
 from app.services.price_stream_service import get_cached_ltp
 
 logger = logging.getLogger(__name__)
@@ -571,7 +571,11 @@ async def _fire_position_alert(
     # Push to frontend immediately via WebSocket
     publish_event(broker_account_id, "alert_update", {
         "count": 1,
-        "has_danger": severity == "danger",
+        # is_notifiable, not == "danger": a critical alert published
+        # has_danger:false to the browser — the exact literal comparison
+        # app/core/severity.py exists to eliminate, in a function this
+        # session had already edited twice.
+        "has_danger": is_notifiable(severity),
         "behavior_state": None,
     })
 
@@ -655,18 +659,34 @@ async def _shadow_entry_detection(broker_account_id: str, symbols: list) -> dict
             select(UserProfile).where(UserProfile.broker_account_id == account_uuid)
         )).scalar_one_or_none()
 
+        # One evaluation per DECISION, not per position. Looping over every leg
+        # wrote 4× the shadow events for a four-leg entry — reintroducing,
+        # inside the shadow path, exactly the duplication the coalescing window
+        # exists to remove. The shadow readout is the evidence for the promote
+        # decision, so inflating it for spread traders would bias the very
+        # numbers this phase is measured on.
+        #
+        # The representative is the largest leg: detectors that read quantity
+        # should see the position the trader actually committed to, not
+        # whichever leg happened to sort first.
+        representative = max(
+            positions, key=lambda p: abs(p.total_quantity or 0)
+        )
         engine = BehaviorEngine()
-        all_events = []
-        for pos in positions:
-            ctx = EngineContext(
-                broker_account_id=account_uuid,
-                session=session,
-                completed_trade=entry_view_from_position(account_uuid, pos, now_utc),
-                session_trades=session_trades,
-                active_cooldowns=[],
-                thresholds=get_thresholds(profile),
-            )
-            all_events.extend(evaluate_entry(engine, ctx))
+        ctx = EngineContext(
+            broker_account_id=account_uuid,
+            session=session,
+            completed_trade=entry_view_from_position(account_uuid, representative, now_utc),
+            session_trades=session_trades,
+            active_cooldowns=[],
+            thresholds=get_thresholds(profile),
+        )
+        all_events = evaluate_entry(engine, ctx)
+        if len(positions) > 1:
+            for ev in all_events:
+                ev.context = {**(ev.context or {}),
+                              "legs_in_entry": len(positions),
+                              "evaluated_leg": representative.tradingsymbol}
 
         if not all_events:
             return {"detections": 0}

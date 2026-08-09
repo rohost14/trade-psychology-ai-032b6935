@@ -93,3 +93,6 @@ bun.lockb
 .next/
 scroll-loss-experience/.next/
 
+
+# Raw source transcripts pasted in for analysis — read, not shipped.
+docs/taxdocx.txt

@@ -197,3 +197,86 @@ def test_position_monitor_stamps_the_live_marker_at_creation():
     src = (pathlib.Path(__file__).resolve().parent.parent
            / "app" / "tasks" / "position_monitor_tasks.py").read_text(encoding="utf-8")
     assert 'details.setdefault("live", True)' in src
+
+
+# ── The five lower-severity items ────────────────────────────────────────────
+
+def test_drain_does_not_lose_a_fill_that_lands_mid_drain():
+    """
+    Read-then-delete dropped fills. A fill landing between the LRANGE and the
+    DELETE was wiped, and because its SET NX succeeded it also scheduled a flush
+    that then drained an empty window — so that entry got no checks at all,
+    silently. RENAME moves the list aside in one operation.
+    """
+    from tests.test_entry_batch import ACCOUNT, FakeRedis, leg
+    from app.services.entry_batch_service import add_fill, drain
+
+    r = FakeRedis()
+    add_fill(r, ACCOUNT, leg("FIRST"))
+
+    original_lrange = r.lrange
+
+    def lrange_then_race(key, start, end):
+        rows = original_lrange(key, start, end)
+        add_fill(r, ACCOUNT, leg("RACER"))    # arrives mid-drain
+        return rows
+
+    r.lrange = lrange_then_race
+    drained = drain(r, ACCOUNT)
+
+    assert [f["symbol"] for f in drained] == ["FIRST"]
+    # The racer must survive into the NEXT window rather than vanish.
+    assert [f["symbol"] for f in drain(r, ACCOUNT)] == ["RACER"]
+
+
+def test_draining_an_empty_window_is_not_an_error():
+    from tests.test_entry_batch import ACCOUNT, FakeRedis
+    from app.services.entry_batch_service import drain
+
+    assert drain(FakeRedis(), ACCOUNT) == []
+
+
+def test_releasing_a_window_lets_the_next_fill_open_a_new_one():
+    """
+    When the flush cannot be queued, the claim has to be given back — otherwise
+    every fill for the marker's full TTL joins a window nobody will process and
+    none of them falls back to an inline check.
+    """
+    from tests.test_entry_batch import ACCOUNT, FakeRedis, leg
+    from app.services.entry_batch_service import add_fill, release_window
+
+    r = FakeRedis()
+    assert add_fill(r, ACCOUNT, leg("A")) is True
+    assert add_fill(r, ACCOUNT, leg("B")) is False       # window already open
+    release_window(r, ACCOUNT)
+    assert add_fill(r, ACCOUNT, leg("C")) is True        # claim is free again
+
+
+def test_a_panic_call_and_put_is_not_one_disciplined_straddle():
+    """
+    A 120s window swallowed a panic entry: buying a call and then a put a minute
+    later classified as a straddle and collapsed to one decision — the opposite
+    of what that behaviour is. Structures go in seconds apart.
+    """
+    from tests.test_structure_counting import trade, CE_LO
+    from app.services.strategy_detector import count_structures
+
+    panic = [trade(CE_LO, "LONG", 0), trade("NIFTY25AUG24500PE", "LONG", 60)]
+    assert count_structures(panic) == 2
+
+    real_straddle = [trade(CE_LO, "LONG", 0), trade("NIFTY25AUG24500PE", "LONG", 2)]
+    assert count_structures(real_straddle) == 1
+
+
+def test_has_danger_is_true_for_critical():
+    """
+    A critical alert published has_danger:false to the browser — the exact
+    literal comparison app/core/severity.py exists to eliminate, in a function
+    this session had already edited twice.
+    """
+    import pathlib
+
+    src = (pathlib.Path(__file__).resolve().parent.parent
+           / "app" / "tasks" / "position_monitor_tasks.py").read_text(encoding="utf-8")
+    assert '"has_danger": is_notifiable(severity)' in src
+    assert '"has_danger": severity == "danger"' not in src

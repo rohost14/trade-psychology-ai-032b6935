@@ -163,7 +163,11 @@ export default function OnboardingWizard({ brokerAccountId, onComplete, onSkip }
       } catch {
         // A failed recommendation must not block onboarding — the review step
         // still works, the user just types their own numbers.
-        prefilledRef.current = false;
+        //
+        // No retry flag here: resetting prefilledRef looked like it enabled one,
+        // but the effect only depends on currentStep, which does not change
+        // while the user sits on step 4. It was dead code pretending to be a
+        // recovery path. The defaults already in the form are the fallback.
       }
     })();
   }, [currentStep]);

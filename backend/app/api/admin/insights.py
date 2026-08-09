@@ -304,7 +304,13 @@ async def detection_quality(
         select(RiskAlert).where(RiskAlert.detected_at >= cutoff)
     )).scalars().all())
 
-    mutes = list((await db.execute(select(AlertMute))).scalars().all())
+    # Windowed, like everything else here. An all-time numerator over a windowed
+    # denominator let mute_rate exceed 1.0 — thirty historic muters against ten
+    # accounts alerted this month rendered as "300%", in red, next to a 20%
+    # threshold.
+    mutes = list((await db.execute(
+        select(AlertMute).where(AlertMute.created_at >= cutoff)
+    )).scalars().all())
 
     shadow_events = list((await db.execute(
         select(BehaviorEvent).where(

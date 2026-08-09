@@ -698,20 +698,40 @@ def process_webhook_trade(self, trade_data: Dict[str, Any], broker_account_id: s
                                 _opened_window = _entry_batch.add_fill(
                                     redis_client, broker_account_id, _fill_batch_payload
                                 )
-                                _batched = True
                                 if _opened_window:
+                                    # Only claim the fill is batched once a flush
+                                    # is genuinely queued. Setting it before the
+                                    # dispatch meant a broker outage left the
+                                    # pending marker set for its full TTL, so
+                                    # every fill in that window was neither
+                                    # batched nor checked inline — silently
+                                    # unchecked entries, which is the failure
+                                    # this whole path exists to prevent.
                                     flush_entry_batch.apply_async(
                                         args=[broker_account_id],
                                         countdown=COLD_START_DEFAULTS.get(
                                             "entry_batch_window_sec", 5
                                         ),
                                     )
+                                    _batched = True
+                                else:
+                                    # A window is already open and its flush was
+                                    # dispatched by the fill that opened it.
+                                    _batched = True
                         except Exception as _be:
                             # Redis or the queue is unavailable. Fall through to
                             # the inline path — that is the pre-E1 behaviour, and
                             # a duplicate-prone check beats no check at all.
                             logger.warning(f"entry batch enqueue failed, running inline: {_be}")
                             _batched = False
+                            # Release the claim if we took it, so the next fill
+                            # can open a fresh window instead of joining one
+                            # whose flush was never queued.
+                            try:
+                                from app.services import entry_batch_service as _eb
+                                _eb.release_window(redis_client, broker_account_id)
+                            except Exception:
+                                pass
 
                         if not _batched:
                             try:

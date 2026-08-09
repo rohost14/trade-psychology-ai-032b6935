@@ -108,6 +108,14 @@ class FakeRedis:
         self.keys[key] = value
         return True
 
+    def rename(self, src, dst):
+        # Real Redis raises when the source key does not exist. Modelling that
+        # matters: drain() relies on the error to detect an empty window, and a
+        # forgiving fake would hide a wrong branch.
+        if src not in self.lists:
+            raise RuntimeError("no such key")
+        self.lists[dst] = self.lists.pop(src)
+
     def lrange(self, key, start, end):
         return list(self.lists.get(key, []))
 

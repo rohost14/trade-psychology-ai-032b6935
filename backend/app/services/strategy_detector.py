@@ -151,7 +151,15 @@ async def get_group_for_trade(
 
 #: Legs of one structure are placed together. Beyond this gap it is a new
 #: decision, not another leg of the same one.
-STRUCTURE_GAP_SECONDS = 120
+#:
+#: 30s, not 120s. A real structure goes in as a basket or a rapid sequence —
+#: seconds apart. Two minutes was wide enough to swallow a panic entry: buying
+#: a call and then a put a minute later classifies as a straddle and collapsed
+#: to one "disciplined decision", which is the opposite of what that behaviour
+#: is. Deliberate legging-in over minutes is not covered by any sane window and
+#: is handled by classify_open_positions instead, which reads the positions
+#: themselves rather than guessing from timing.
+STRUCTURE_GAP_SECONDS = 30
 
 
 def _entry_ts(trade) -> Optional[datetime]:

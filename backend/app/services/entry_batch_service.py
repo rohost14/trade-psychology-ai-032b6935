@@ -76,18 +76,46 @@ def add_fill(redis, account_id: str, fill: Dict[str, Any]) -> bool:
     return opened
 
 
+def release_window(redis, account_id: str) -> None:
+    """
+    Give up the claim on this window without draining it.
+
+    Called when the caller won the SET NX but then failed to queue a flush —
+    a broker outage, say. Leaving the marker set would mean every fill for the
+    next two minutes joined a window nobody would ever process, and none of
+    them would fall back to an inline check either.
+    """
+    try:
+        redis.delete(_pending_key(account_id))
+    except Exception:
+        pass    # best effort; the TTL is the backstop
+
+
 def drain(redis, account_id: str) -> List[Dict[str, Any]]:
     """
-    Take everything in the window and clear it.
+    Take everything in the window and clear it, atomically.
 
-    Clears the pending marker first: a fill arriving between the read and the
-    clear should start a *new* window rather than be silently dropped into one
-    that is already being processed.
+    Read-then-delete loses fills. A fill landing between the LRANGE and the
+    DELETE was pushed onto a list that was about to be wiped, and because its
+    SET NX succeeded it also scheduled a flush — which then drained an empty
+    batch and returned early. That entry got no checks at all, silently.
+
+    RENAME moves the list out of the way in one operation, so a fill arriving a
+    microsecond later lands on a fresh key and belongs to the next window.
+    The pending marker is cleared first for the same reason: that fill should
+    be free to open a new window.
     """
     redis.delete(_pending_key(account_id))
     key = _batch_key(account_id)
-    raw = redis.lrange(key, 0, -1) or []
-    redis.delete(key)
+    draining = f"{key}:draining"
+    try:
+        redis.rename(key, draining)
+    except Exception:
+        # RENAME errors when the source key does not exist — an empty window,
+        # which is a normal outcome, not a failure.
+        return []
+    raw = redis.lrange(draining, 0, -1) or []
+    redis.delete(draining)
 
     fills: List[Dict[str, Any]] = []
     for item in raw:
