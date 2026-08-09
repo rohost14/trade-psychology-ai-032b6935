@@ -249,7 +249,13 @@ Two paths, two different notification policies, for the same alerts. That asymme
 the most plausible source of a *perceived* duplicate: a pattern that stayed quiet live can
 be delivered later by a sync.
 
-### 3.3 No delivery idempotency — retries re-deliver
+### 3.3 No delivery idempotency — retries re-deliver — **FIXED 2026-08-09** (`a68396d`)
+
+Both columns are now stamped when a send actually succeeds, both channels are guarded
+independently before sending, and the merged-push path writes its own receipts. The
+guardian monthly cap can now engage for the first time. 17 tests
+(`backend/tests/test_delivery_receipts.py`); five drive the real task, not just the
+predicates.
 
 `RiskAlert` has `delivered_push_at` and `delivered_whatsapp_at` (migration 038, delivery
 state machine). **Nothing writes either column.** They are only read:
