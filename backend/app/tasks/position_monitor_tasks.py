@@ -570,6 +570,123 @@ async def _fire_position_alert(
 # Phase 6: portfolio concentration + entry-time constitution rules
 # ─────────────────────────────────────────────────────────────────────────────
 
+async def _shadow_entry_detection(broker_account_id: str, symbols: list) -> dict:
+    """
+    Evaluate the entry-decidable detectors against the positions just opened,
+    and record what they found as shadow evidence.
+
+    Shadow, not live, and that is the point of the phase rather than caution
+    about it. These detectors infer intent from partial evidence — the position
+    has not resolved — so promoting them on judgement would be exactly the
+    false-positive risk the whole entry-time plan was written to avoid. They
+    run, they are measured, and each is promoted individually once
+    /api/admin/detection-quality says its entry-time output holds up.
+    """
+    from sqlalchemy import and_, select
+
+    from app.models.position import Position
+    from app.models.trading_session import TradingSession
+    from app.models.completed_trade import CompletedTrade
+    from app.models.user_profile import UserProfile
+    from app.core.trading_defaults import get_thresholds
+    from app.services.behavior_engine import BehaviorEngine, EngineContext
+    from app.services.entry_detectors import (
+        entry_view_from_position, evaluate_entry, summarise_entry_evaluation,
+    )
+
+    if not symbols:
+        return {"skipped": "no_symbols"}
+
+    account_uuid = UUID(broker_account_id)
+    now_utc = datetime.now(timezone.utc)
+    day_start = now_utc.astimezone(IST).replace(
+        hour=0, minute=0, second=0, microsecond=0
+    ).astimezone(timezone.utc)
+
+    async with SessionLocal() as db:
+        positions = (await db.execute(
+            select(Position).where(and_(
+                Position.broker_account_id == account_uuid,
+                Position.tradingsymbol.in_(symbols),
+                Position.total_quantity != 0,
+            ))
+        )).scalars().all()
+        if not positions:
+            return {"skipped": "no_open_positions"}
+
+        session_trades = list((await db.execute(
+            select(CompletedTrade).where(and_(
+                CompletedTrade.broker_account_id == account_uuid,
+                CompletedTrade.exit_time >= day_start,
+            )).order_by(CompletedTrade.exit_time)
+        )).scalars().all())
+
+        session = (await db.execute(
+            select(TradingSession).where(and_(
+                TradingSession.broker_account_id == account_uuid,
+                TradingSession.session_date == now_utc.astimezone(IST).date(),
+            ))
+        )).scalar_one_or_none()
+
+        profile = (await db.execute(
+            select(UserProfile).where(UserProfile.broker_account_id == account_uuid)
+        )).scalar_one_or_none()
+
+        engine = BehaviorEngine()
+        all_events = []
+        for pos in positions:
+            ctx = EngineContext(
+                broker_account_id=account_uuid,
+                session=session,
+                completed_trade=entry_view_from_position(account_uuid, pos, now_utc),
+                session_trades=session_trades,
+                active_cooldowns=[],
+                thresholds=get_thresholds(profile),
+            )
+            all_events.extend(evaluate_entry(engine, ctx))
+
+        if not all_events:
+            return {"detections": 0}
+
+        summary = summarise_entry_evaluation(all_events)
+        await _persist_shadow_events(db, account_uuid, all_events, now_utc)
+        logger.info(
+            f"[entry_shadow] {broker_account_id[:8]}: {summary['detections']} detection(s), "
+            f"{summary['above_floor']} above the confidence floor"
+        )
+        return summary
+
+
+async def _persist_shadow_events(db, account_uuid, events, now_utc) -> None:
+    """
+    Write entry-time detections as BehaviorEvents marked shadow.
+
+    Marked shadow means scoring ignores them (`WHERE shadow = false`) and no
+    RiskAlert is created — they exist to be counted, nothing more.
+    """
+    from app.models.behavior_event import BehaviorEvent
+    from app.services.behavior_engine import ENGINE_VERSION
+    from app.services.detector_registry import BY_NAME
+
+    for ev in events:
+        spec = BY_NAME.get(ev.event_type)
+        db.add(BehaviorEvent(
+            broker_account_id=account_uuid,
+            detector=ev.event_type,
+            detector_version=spec.version if spec else ENGINE_VERSION,
+            severity=ev.severity,
+            confidence=ev.confidence,
+            data_quality="PARTIAL",   # the position has not resolved
+            message=ev.message,
+            evidence=ev.context or {},
+            input_snapshot={"source": "entry_shadow"},
+            risk_alert_id=None,
+            detected_at=now_utc,
+            shadow=True,
+        ))
+    await db.commit()
+
+
 async def _open_structures(broker_account_id: str) -> list:
     """
     Recognised multi-leg structures among the account's currently open positions.
@@ -756,6 +873,15 @@ async def _flush_entry_batch(broker_account_id: str) -> dict:
         f"[entry_batch] {broker_account_id[:8]}: {summary['fill_count']} fill(s), "
         f"{summary['distinct_symbols']} instrument(s) — evaluating once"
     )
+
+    # E5: run the inferred detectors against this entry, in shadow.
+    # Nothing here alerts. It writes evidence so the promote decision has
+    # numbers behind it instead of taste — which is the whole reason the
+    # detector_flags machinery exists and had never been used.
+    try:
+        await _shadow_entry_detection(broker_account_id, symbols)
+    except Exception as e:
+        logger.warning(f"[entry_batch] shadow entry detection skipped: {e}")
 
     # Account-level: one check per window regardless of how many legs landed.
     try:

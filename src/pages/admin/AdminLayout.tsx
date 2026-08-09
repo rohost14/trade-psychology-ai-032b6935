@@ -1,7 +1,7 @@
 import { useEffect } from 'react';
 import { Outlet, NavLink, useNavigate, useLocation } from 'react-router-dom';
 import {
-  LayoutDashboard, Users, Activity, BarChart3, Settings,
+  LayoutDashboard, Users, Activity, BarChart3, Gauge, Settings,
   LogOut, ScrollText, Megaphone, Shield, ShieldCheck,
 } from 'lucide-react';
 import { useAdminAuth } from '@/contexts/AdminAuthContext';
@@ -18,6 +18,7 @@ const NAV_GROUPS = [
       { to: '/admin/users',     icon: Users,           label: 'Users',      roles: ['superadmin','ops','support'] },
       { to: '/admin/system',    icon: Activity,        label: 'System',     roles: ['superadmin','ops','support'] },
       { to: '/admin/insights',  icon: BarChart3,       label: 'Insights',   roles: ['superadmin','ops','support'] },
+      { to: '/admin/detection', icon: Gauge,           label: 'Detection',  roles: ['superadmin','ops','support'] },
     ],
   },
   {

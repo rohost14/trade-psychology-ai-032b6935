@@ -48,6 +48,7 @@ const AdminUsers      = lazy(() => import("./pages/admin/AdminUsers"));
 const AdminUserDetail = lazy(() => import("./pages/admin/AdminUserDetail"));
 const AdminSystem     = lazy(() => import("./pages/admin/AdminSystemHealth"));
 const AdminInsights   = lazy(() => import("./pages/admin/AdminInsights"));
+const AdminDetection  = lazy(() => import("./pages/admin/AdminDetectionQuality"));
 const AdminConfig     = lazy(() => import("./pages/admin/AdminConfig"));
 const AdminAuditLog   = lazy(() => import("./pages/admin/AdminAuditLog"));
 const AdminBroadcast  = lazy(() => import("./pages/admin/AdminBroadcast"));
@@ -139,6 +140,7 @@ const App = () => (
                     <Route path="users/:id"     element={<AdminUserDetail />} />
                     <Route path="system"        element={<AdminSystem />} />
                     <Route path="insights"      element={<AdminInsights />} />
+                    <Route path="detection"     element={<AdminDetection />} />
                     <Route path="broadcast"     element={<AdminBroadcast />} />
                     <Route path="audit-log"     element={<AdminAuditLog />} />
                     <Route path="admins"        element={<AdminAdmins />} />

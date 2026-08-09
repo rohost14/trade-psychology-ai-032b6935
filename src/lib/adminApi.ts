@@ -82,6 +82,8 @@ export const adminApi = {
 
   // ── Insights ──────────────────────────────────────────────────────────────
   insights: (days = 30) => req(`/insights?days=${days}`),
+  // Is the engine RIGHT, and fast — as opposed to insights, which is what it did.
+  detectionQuality: (days = 30) => req(`/detection-quality?days=${days}`),
 
   // ── Config ────────────────────────────────────────────────────────────────
   getConfig:       () => req('/config'),
