@@ -597,6 +597,118 @@ async def _open_structures(broker_account_id: str) -> list:
         return []
 
 
+@celery_app.task(name="app.tasks.position_monitor_tasks.monitor_live_premium")
+def monitor_live_premium():
+    """
+    E4: tell option buyers their premium is going while they can still act.
+
+    The exit-time detector reports the same fact once the position has closed
+    and the loss is taken. Every input is already available live — we stream a
+    price for every open position — so waiting adds nothing but lateness.
+
+    Runs on a beat because it is driven by price movement, not by the trader
+    doing anything. It reads only the Redis LTP cache: no Kite calls, so the
+    3 req/s REST limit is not involved.
+    """
+    return asyncio.run(_monitor_live_premium())
+
+
+async def _monitor_live_premium() -> dict:
+    from datetime import time as dtime
+
+    from sqlalchemy import and_, select
+
+    from app.core.trading_defaults import get_thresholds
+    from app.models.broker_account import BrokerAccount
+    from app.models.position import Position
+    from app.models.user_profile import UserProfile
+    from app.services.instrument_parser import is_expiry_day as _is_expiry_day
+    from app.services.live_checks import evaluate_live_premium_loss, live_premium_message
+
+    now_ist = datetime.now(IST)
+    if now_ist.weekday() >= 5 or not (dtime(9, 15) <= now_ist.time() <= dtime(15, 25)):
+        return {"skipped": "outside_market_hours"}
+
+    fired = 0
+    checked = 0
+
+    async with SessionLocal() as db:
+        accounts = (await db.execute(
+            select(BrokerAccount).where(and_(
+                BrokerAccount.status == "connected",
+                BrokerAccount.token_revoked_at.is_(None),
+            ))
+        )).scalars().all()
+
+        for account in accounts:
+            positions = (await db.execute(
+                select(Position).where(and_(
+                    Position.broker_account_id == account.id,
+                    Position.total_quantity != 0,
+                ))
+            )).scalars().all()
+            if not positions:
+                continue
+
+            profile = (await db.execute(
+                select(UserProfile).where(UserProfile.broker_account_id == account.id)
+            )).scalar_one_or_none()
+            thresholds = get_thresholds(profile)
+
+            for pos in positions:
+                symbol = pos.tradingsymbol or ""
+                if not symbol.endswith(("CE", "PE")):
+                    continue
+                # None here means the price is missing or older than 2s. Skip —
+                # a fabricated loss percentage on a real position would be the
+                # worst false positive this system could produce.
+                ltp = get_cached_ltp(pos.instrument_token) if pos.instrument_token else None
+                if ltp is None:
+                    continue
+                checked += 1
+
+                try:
+                    expiry_today = _is_expiry_day(symbol, now_ist.date())
+                except Exception:
+                    expiry_today = False
+
+                verdict = evaluate_live_premium_loss(
+                    avg_entry_price=float(pos.average_entry_price or 0),
+                    ltp=ltp,
+                    quantity=pos.total_quantity or 0,
+                    thresholds=thresholds,
+                    is_expiry_day=expiry_today,
+                )
+                if not verdict:
+                    continue
+
+                # _fire_position_alert's dedup is escalation-aware over 30
+                # minutes, which is exactly the throttle this needs: caution,
+                # then danger, then critical each land once as the position
+                # deteriorates, and a position sitting still says nothing.
+                async with SessionLocal() as alert_db:
+                    if await _fire_position_alert(
+                        broker_account_id=str(account.id),
+                        pattern_type="premium_loss_event",
+                        severity=verdict["severity"],
+                        message=live_premium_message(symbol, verdict),
+                        details={
+                            "symbol": symbol,
+                            "loss_pct": verdict["loss_pct"],
+                            "unrealised_loss": verdict["unrealised_loss"],
+                            "levels": verdict["levels"],
+                            "expiry_day": verdict["expiry_day"],
+                            "at_entry": False,
+                            "live": True,
+                            "_confidence": 95.0,
+                        },
+                        db=alert_db,
+                    ):
+                        fired += 1
+
+    return {"positions_checked": checked, "alerts_fired": fired}
+
+
 @celery_app.task(name="app.tasks.position_monitor_tasks.flush_entry_batch")
 def flush_entry_batch(broker_account_id: str):
     """

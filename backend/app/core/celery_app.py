@@ -178,6 +178,16 @@ celery_app.conf.update(
             "task": "app.tasks.intent_tasks.send_morning_intent_push",
             "schedule": crontab(hour=8, minute=30, day_of_week="1-5"),
         },
+        # Live premium destruction (E4) — every 60s, market hours only.
+        # Driven by price movement rather than by the trader doing anything, so
+        # unlike the rest of the pipeline it cannot be event-driven off a fill.
+        # Reads only the Redis LTP cache the shared KiteTicker already fills:
+        # no Kite REST calls, so the 3 req/s limit is not involved. The task
+        # returns immediately outside 09:15–15:25 IST and at weekends.
+        "live-premium-monitor": {
+            "task": "app.tasks.position_monitor_tasks.monitor_live_premium",
+            "schedule": 60.0,
+        },
         # EOD comparison push — 3:35 PM IST Mon–Fri.
         # Compares planned intent limits vs actual session metrics.
         "eod-comparison": {
