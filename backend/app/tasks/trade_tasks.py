@@ -159,6 +159,40 @@ def _incr_metric(name: str, n: int = 1):
     incr(name, n)
 
 
+# ---------------------------------------------------------------------------
+# Delivery receipts (RiskAlert.delivered_push_at / delivered_whatsapp_at)
+# ---------------------------------------------------------------------------
+# Migration 038 added both columns and two places read them — the admin user
+# drawer, and check_guardian_budget, which enforces "a guardian pinged weekly
+# stops reading" by counting this month's guardian messages. Nothing ever wrote
+# them, so that count was always zero and the cap could never engage. The same
+# absence meant a task retry had no way to know what it had already delivered.
+#
+# delivered_whatsapp_at means "the GUARDIAN message went out". Nothing on this
+# path WhatsApps the trader, and check_guardian_budget reads the column with
+# that meaning, so that is what this column records.
+
+def _push_succeeded(push_result) -> bool:
+    """A push counts as delivered only if it reached at least one device."""
+    if not isinstance(push_result, dict):
+        return False
+    try:
+        return int(push_result.get("sent") or 0) > 0
+    except (TypeError, ValueError):
+        return False
+
+
+def _already_delivered(alert, channel: str) -> bool:
+    """
+    True when this channel already has a receipt for this alert.
+
+    The guard is what makes send_danger_alert safe to retry: a task that failed
+    after its push succeeded used to re-push the same alert on every attempt.
+    """
+    column = "delivered_push_at" if channel == "push" else "delivered_whatsapp_at"
+    return getattr(alert, column, None) is not None
+
+
 async def _run_death_spiral(broker_account_id: UUID, db, latest_trade_time=None):
     """
     Phase 5 meta-detector (L2): evaluates today's BehaviorEvents for the
@@ -969,8 +1003,7 @@ async def run_risk_detection_async(
             # One merged push instead of N (user gap #4: alert fatigue)
             try:
                 from app.services.push_notification_service import push_service
-                titles = [a.pattern_type.replace("_", " ") for a in other_alerts]
-                await push_service.send_notification(
+                merged_result = await push_service.send_notification(
                     broker_account_id=broker_account_id,
                     title=f"{len(other_alerts)} risk patterns on your last trade",
                     body=" · ".join(a.message[:70] for a in other_alerts[:3]),
@@ -980,6 +1013,14 @@ async def run_risk_detection_async(
                     severity="danger",
                     tag="merged-risk",
                 )
+                # The merged push never goes through send_danger_alert, so it has
+                # to write its own receipts — otherwise every alert it covered
+                # looks undelivered and a later path would push it again.
+                if _push_succeeded(merged_result):
+                    delivered_at = datetime.now(timezone.utc)
+                    for a in other_alerts:
+                        a.delivered_push_at = delivered_at
+                    await db.commit()
                 _mincr("notifications_merged")
             except Exception as _mp_err:
                 logger.warning(f"merged push failed, falling back: {_mp_err}")
@@ -1352,14 +1393,22 @@ def send_danger_alert(self, broker_account_id: str, alert_id: str):
                 return {"error": "Account not found"}
 
             results = {"whatsapp": False, "push": {"sent": 0, "failed": 0}}
+            now_utc = datetime.now(timezone.utc)
 
-            # 1. Push notification — non-fatal, device delivery is best-effort
-            try:
-                push_result = await push_service.send_risk_alert_notification(alert, db)
-                results["push"] = push_result
-                logger.info(f"Push notification: {push_result}")
-            except Exception as e:
-                logger.error(f"Push notification failed: {e}")
+            # 1. Push notification — non-fatal, device delivery is best-effort.
+            # Skipped outright if a previous attempt of this task already
+            # delivered it; the task retries up to 3 times.
+            if _already_delivered(alert, "push"):
+                results["push"] = "already_delivered"
+            else:
+                try:
+                    push_result = await push_service.send_risk_alert_notification(alert, db)
+                    results["push"] = push_result
+                    if _push_succeeded(push_result):
+                        alert.delivered_push_at = now_utc
+                    logger.info(f"Push notification: {push_result}")
+                except Exception as e:
+                    logger.error(f"Push notification failed: {e}")
 
             # 2. WhatsApp (guardian) alert — propagates on failure so task can retry.
             # Phase 5 gates (§1B.8): guardian is emergency accountability, not
@@ -1372,7 +1421,9 @@ def send_danger_alert(self, broker_account_id: str, alert_id: str):
             # we message them (profile.py guardian/send-consent, migration 056);
             # weekly reports have always honoured that answer and this path did
             # not, so a guardian who declined still received danger alerts.
-            if phone and user and user.guardian_confirmed:
+            if _already_delivered(alert, "whatsapp"):
+                results["whatsapp"] = "already_delivered"
+            elif phone and user and user.guardian_confirmed:
                 from app.services.detector_registry import BY_NAME as _SPECS
                 spec = _SPECS.get(alert.pattern_type)
                 guardian_ok = (
@@ -1395,10 +1446,17 @@ def send_danger_alert(self, broker_account_id: str, alert_id: str):
                         guardian_name=user.guardian_name,
                     )
                     results["whatsapp"] = sent
+                    if sent:
+                        alert.delivered_whatsapp_at = now_utc
                 else:
                     results["whatsapp"] = "skipped"
             elif phone:
                 results["whatsapp"] = "skipped_no_consent"
+
+            # Receipts are written before the task can raise again. The guardian
+            # budget reads delivered_whatsapp_at, so losing this commit would
+            # both re-notify on retry and hand the guardian a free message.
+            await db.commit()
 
             return results
 
