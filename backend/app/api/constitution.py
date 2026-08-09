@@ -25,6 +25,7 @@ from app.models.completed_trade import CompletedTrade
 from app.services.constitution_service import (
     ConstitutionService, LoosenRequiresOverride, RULE_FIELDS,
 )
+from app.services.rule_suggestion_service import build_suggestions
 
 router = APIRouter()
 logger = logging.getLogger(__name__)
@@ -109,6 +110,24 @@ async def update_constitution(
             },
         )
     return {"success": True, **outcome, "rules": ConstitutionService.snapshot(profile)}
+
+
+@router.get("/suggestions")
+async def get_rule_suggestions(
+    broker_account_id: UUID = Depends(get_verified_broker_account_id),
+    db: AsyncSession = Depends(get_db),
+):
+    """
+    Rules derived from the user's own completed trades (G3).
+
+    Read-only and never auto-applied: accepting a suggestion is an ordinary PUT
+    to this router, so the same change control applies. Only tightening is ever
+    proposed — see rule_suggestion_service for why.
+    """
+    profile = await _get_profile(broker_account_id, db)
+    return await build_suggestions(
+        broker_account_id, db, ConstitutionService.snapshot(profile)
+    )
 
 
 @router.post("/generate")

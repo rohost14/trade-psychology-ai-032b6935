@@ -12,6 +12,7 @@ import { api } from '@/lib/api';
 import { useApiQuery } from '@/hooks/useApiQuery';
 import ErrorState from '@/components/ErrorState';
 import EnforcedRules from '@/components/rules/EnforcedRules';
+import RuleSuggestions from '@/components/rules/RuleSuggestions';
 import { formatCurrency } from '@/lib/formatters';
 import { cn } from '@/lib/utils';
 
@@ -242,6 +243,8 @@ export default function MyRules() {
       )}
 
       <EnforcedRules status={status} />
+
+      <RuleSuggestions />
 
       {/* Violations */}
       <div className="tm-card overflow-hidden">

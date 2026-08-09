@@ -133,28 +133,40 @@ export default function OnboardingWizard({ brokerAccountId, onComplete, onSkip }
 
   const progress = (currentStep / STEPS.length) * 100;
 
-  // Constitution review (Engine v2 Q24): when the review step opens, prefill
-  // recommended rules from experience + capital. Mirrors backend
-  // ConstitutionService.generate_defaults; the accepted values are what count.
+  // Constitution review (Engine v2 Q24): when the review step opens, prefill the
+  // recommended rules.
+  //
+  // These values come from the server. A local copy of the matrix used to live
+  // here, and it had already drifted — it never set max_position_size, so the
+  // review screen showed four of the five recommended rules and the fifth stayed
+  // whatever the form defaulted to. The backend owns the matrix
+  // (ConstitutionService.generate_defaults); this asks it.
   const prefilledRef = useRef(false);
   useEffect(() => {
     if (currentStep !== 4 || prefilledRef.current) return;
-    const matrix: Record<string, { lossPct: number; trades: number; cd: number; consec: number; riskPct: number }> = {
-      beginner:     { lossPct: 0.02,  trades: 5,  cd: 15, consec: 3, riskPct: 1.0 },
-      intermediate: { lossPct: 0.02,  trades: 10, cd: 10, consec: 4, riskPct: 2.0 },
-      experienced:  { lossPct: 0.025, trades: 15, cd: 5,  consec: 5, riskPct: 2.5 },
-      professional: { lossPct: 0.03,  trades: 20, cd: 5,  consec: 5, riskPct: 3.0 },
-    };
-    const m = matrix[data.experience_level] || matrix.beginner;
-    setData(d => ({
-      ...d,
-      daily_loss_limit: d.trading_capital ? Math.round(d.trading_capital * m.lossPct) : d.daily_loss_limit,
-      daily_trade_limit: m.trades,
-      cooldown_after_loss: m.cd,
-      max_consecutive_losses: m.consec,
-    }));
     prefilledRef.current = true;
-  }, [currentStep, data.experience_level]);
+    (async () => {
+      try {
+        const res = await api.post('/api/constitution/generate', {});
+        const rec = res.data?.recommended;
+        if (!rec) return;
+        setData(d => ({
+          ...d,
+          // The server returns null for ₹ rules when capital is unknown; keep
+          // whatever the user already typed rather than blanking the field.
+          daily_loss_limit: rec.daily_loss_limit ?? d.daily_loss_limit,
+          daily_trade_limit: rec.daily_trade_limit ?? d.daily_trade_limit,
+          cooldown_after_loss: rec.cooldown_after_loss ?? d.cooldown_after_loss,
+          max_consecutive_losses: rec.max_consecutive_losses ?? d.max_consecutive_losses,
+          max_position_size: rec.max_position_size ?? d.max_position_size,
+        }));
+      } catch {
+        // A failed recommendation must not block onboarding — the review step
+        // still works, the user just types their own numbers.
+        prefilledRef.current = false;
+      }
+    })();
+  }, [currentStep]);
 
   const handleNext = async () => {
     setIsLoading(true);

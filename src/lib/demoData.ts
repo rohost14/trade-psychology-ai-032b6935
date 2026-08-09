@@ -1336,6 +1336,49 @@ export const DEMO_CONSTITUTION_VIOLATIONS = {
   },
 };
 
+// Mirrors GET /api/constitution/suggestions exactly — field names included.
+// Guest fixtures double as smoke fixtures, and every past divergence between a
+// mock and its endpoint shipped as a live bug.
+export const DEMO_RULE_SUGGESTIONS = {
+  suggestions: [
+    {
+      field: 'daily_loss_limit',
+      current_value: 25000,
+      suggested_value: 12000,
+      headline: 'Set your daily loss limit to ₹12,000',
+      evidence: [
+        { label: 'Red sessions in this window', value: '14 of 38 · median ₹7,400' },
+        { label: 'Sessions that reached ₹12,000', value: '4 · deepest ₹31,200' },
+      ],
+      confidence: 'high',
+      sample: { sessions: 38, red_sessions: 14, window_days: 90 },
+    },
+    {
+      field: 'max_consecutive_losses',
+      current_value: 3,
+      suggested_value: 2,
+      headline: 'Stop after 2 consecutive losses',
+      evidence: [
+        { label: 'Your next trade after 2 losses in a row', value: 'won 3 of 19 · 16%' },
+        { label: 'Your win rate the rest of the time', value: '47% across 214 trades' },
+      ],
+      confidence: 'medium',
+      sample: { trades: 214, sessions: 38, window_days: 90 },
+    },
+  ],
+  status: 'ok',
+  reason: null,
+  withheld: [],
+  context: {
+    window_days: 90,
+    trades: 214,
+    sessions: 38,
+    min_sessions: 10,
+    min_trades: 30,
+    multi_leg_detected: false,
+  },
+};
+
 export const DEMO_CONSTITUTION_HISTORY = {
   history: [
     {
