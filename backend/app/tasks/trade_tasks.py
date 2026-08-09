@@ -931,6 +931,7 @@ async def run_risk_detection_async(
         last_fired: dict = {}      # dedup key -> datetime
         last_fired_sev: dict = {}  # dedup key -> severity string
         last_fired_details: dict = {}  # dedup key -> details (worsening re-arm)
+        last_fired_alert: dict = {}    # dedup key -> the RiskAlert itself (live merge)
         today_patterns: set = set()
         for a in all_existing:
             k = _pattern_dedup_key(a.pattern_type, a.details)
@@ -939,6 +940,7 @@ async def run_risk_detection_async(
                 last_fired[k] = a.detected_at
                 last_fired_sev[k] = a.severity
                 last_fired_details[k] = a.details
+                last_fired_alert[k] = a
 
         def _is_deduped(key: str, pattern_type: str, new_severity: str, new_details=None) -> bool:
             if key not in last_fired:
@@ -964,6 +966,26 @@ async def run_risk_detection_async(
             if _is_deduped(k, alert.pattern_type, alert.severity, alert.details):
                 deduped_keys.add(k)
                 _mincr("alerts_deduped")
+                # E3/E6 merge. The alert that suppressed this one may be a LIVE
+                # alert raised at entry, which by definition has no
+                # CompletedTrade — the position had not closed. Behaviour→money
+                # joins on trigger_completed_trade_id, so leaving it null means
+                # every entry-time alert silently contributes ₹0 to the
+                # behaviour-cost figure and Analytics under-reports without any
+                # visible failure. Close the loop here: the live finding and the
+                # closed trade are the same event, so give the live row the
+                # trade it was always about.
+                _prior = last_fired_alert.get(k)
+                if (_prior is not None
+                        and getattr(_prior, "lifecycle", None) == "live"
+                        and _prior.trigger_completed_trade_id is None):
+                    _prior.trigger_completed_trade_id = latest_ct.id
+                    _prior.lifecycle = "post"
+                    _mincr("alerts_live_merged")
+                    logger.info(
+                        f"[merge] live {alert.pattern_type} alert {_prior.id} "
+                        f"linked to completed trade {latest_ct.id}"
+                    )
                 continue
             db.add(alert)
             new_alerts.append(alert)

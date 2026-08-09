@@ -764,6 +764,10 @@ def check_entry_rules(broker_account_id: str, tradingsymbol: str):
     return asyncio.run(_entry_rules_task(broker_account_id, tradingsymbol))
 
 
+from app.services.entry_checks import squareoff_window as _squareoff_window  # noqa: E402
+from app.services.fill_classification import POSITION_OPENING_FILLS as _OPENING_FILLS  # noqa: E402
+
+
 async def _entry_rules_task(broker_account_id: str, tradingsymbol) -> dict:
     """
     Entry-time constitution rules.
@@ -865,5 +869,106 @@ async def __entry_rules_impl(broker_account_id: str, entered: str, symbols: list
                     db=db,
                 )
                 fired.append("cooldown")
+
+        # ── E3: rules that are pure arithmetic at entry ───────────────────
+        # Trade limit, loss limit and the MIS square-off run-up. All three are
+        # fully decidable the moment the position opens, and all three lose most
+        # of their value once it has closed — "you have 20 minutes before this
+        # is squared off for you" is not a useful thing to learn afterwards.
+        from app.models.position_ledger import PositionLedger
+        from app.models.trading_session import TradingSession
+        from app.services.entry_checks import (
+            count_entries_today, evaluate_loss_limit, evaluate_mis_panic,
+            evaluate_trade_limit,
+        )
+
+        day_start_utc = now_ist.replace(
+            hour=0, minute=0, second=0, microsecond=0
+        ).astimezone(timezone.utc)
+
+        ledger_res = await db.execute(
+            select(PositionLedger).where(and_(
+                PositionLedger.broker_account_id == UUID(broker_account_id),
+                PositionLedger.occurred_at >= day_start_utc,
+            ))
+        )
+        ledger_rows = list(ledger_res.scalars().all())
+        entries_today = count_entries_today(ledger_rows)
+
+        approaching = float(th.get("constitution_approaching_pct", 0.80))
+        severe = float(th.get("constitution_severe_pct", 1.20))
+
+        trade_limit_hit = evaluate_trade_limit(
+            entries_today, th.get("user_daily_trade_limit"), approaching, severe
+        )
+        if trade_limit_hit:
+            await _fire_position_alert(
+                broker_account_id=broker_account_id,
+                pattern_type="constitution_violation",
+                severity=trade_limit_hit["severity"],
+                message=trade_limit_hit["message"],
+                details={**{k: v for k, v in trade_limit_hit.items()
+                            if k not in ("severity", "message")},
+                         "symbols": symbols, "at_entry": True, "_confidence": 100.0},
+                db=db,
+            )
+            fired.append("daily_trade_limit")
+
+        session_res = await db.execute(
+            select(TradingSession).where(and_(
+                TradingSession.broker_account_id == UUID(broker_account_id),
+                TradingSession.session_date == now_ist.date(),
+            ))
+        )
+        session_row = session_res.scalar_one_or_none()
+        session_pnl = float(getattr(session_row, "session_pnl", 0) or 0)
+
+        loss_limit_hit = evaluate_loss_limit(
+            session_pnl, th.get("daily_loss_limit"), approaching, severe
+        )
+        if loss_limit_hit:
+            await _fire_position_alert(
+                broker_account_id=broker_account_id,
+                pattern_type="constitution_violation",
+                severity=loss_limit_hit["severity"],
+                message=loss_limit_hit["message"],
+                details={**{k: v for k, v in loss_limit_hit.items()
+                            if k not in ("severity", "message")},
+                         "symbols": symbols, "at_entry": True, "_confidence": 100.0},
+                db=db,
+            )
+            fired.append("daily_loss_limit")
+
+        # MIS square-off run-up. Product and exchange come from the fills that
+        # opened the window, so this only fires for genuinely intraday entries.
+        mis_rows = [
+            r for r in ledger_rows
+            if (getattr(r, "product", "") or "").upper() in ("MIS", "INTRADAY")
+            and getattr(r, "entry_type", None) in _OPENING_FILLS
+        ]
+        if mis_rows:
+            exchange = next((r.exchange for r in mis_rows if r.exchange), None)
+            panic_start, _ = _squareoff_window(exchange, now_ist)
+            late_count = sum(
+                1 for r in mis_rows
+                if r.occurred_at and r.occurred_at.astimezone(IST) >= panic_start
+            )
+            mis_hit = evaluate_mis_panic(
+                now_ist, exchange, "MIS", late_count,
+                caution_count=th.get("end_session_mis_caution_count", 2),
+                danger_count=th.get("end_session_mis_danger_count", 3),
+            )
+            if mis_hit:
+                await _fire_position_alert(
+                    broker_account_id=broker_account_id,
+                    pattern_type="end_of_session_mis_panic",
+                    severity=mis_hit["severity"],
+                    message=mis_hit["message"],
+                    details={**{k: v for k, v in mis_hit.items()
+                                if k not in ("severity", "message")},
+                             "symbols": symbols, "at_entry": True, "_confidence": 100.0},
+                    db=db,
+                )
+                fired.append("end_of_session_mis_panic")
 
     return {"fired": fired}
