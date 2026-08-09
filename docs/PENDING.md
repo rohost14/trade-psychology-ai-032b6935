@@ -1,24 +1,7 @@
 # PENDING — single source of truth
 
-Updated 2026-08-09. Branch `dashboard-production-readiness`, CI green.
+Updated 2026-08-09. Migration 079 applied — 'This was planned' works. Branch `dashboard-production-readiness`, CI green.
 **Nothing is code-blocking.** Everything below is your action or Zerodha/business.
-
----
-
-## 🔴 Apply migration 079 — "This was planned" fails at the DB without it
-
-**`backend/migrations/079_alert_outcome_planned.sql`** — widens the CHECK constraint on
-`risk_alerts.outcome` to allow a fourth value, `planned`. Migration 069 created the
-constraint listing only `stopped / took_anyway / not_useful`, so until 079 runs, a trader
-tapping **"This was planned"** gets a database error.
-
-Additive and safe: the constraint only widens what is permitted, so no existing row can
-violate it and there is nothing to backfill.
-
-Why it matters beyond one button: `not_useful` was conflating *"your detection is wrong"*
-with *"I meant to do that"*. Those need different fixes, and folding them together made the
-precision numbers in **Admin → Detection** weaker than they look — a detector firing
-accurately on a deliberate strategy was indistinguishable from one firing on nothing.
 
 ---
 
