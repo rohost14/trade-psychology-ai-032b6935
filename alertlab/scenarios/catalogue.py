@@ -22,18 +22,36 @@ from ..runner.scenario import Expect, Scenario
 # A fixed Wednesday in the middle of a series, so nothing is accidentally an
 # expiry day unless a scenario asks for one.
 DAY = datetime(2026, 8, 5, tzinfo=IST)
-EXPIRY_DAY = datetime(2026, 8, 6, tzinfo=IST)      # Thursday
+# The LAST THURSDAY of the contract month — the parser derives expiry from the
+# symbol, so an arbitrary Thursday is not an expiry day and is_expiry_day says so.
+EXPIRY_DAY = datetime(2026, 8, 27, tzinfo=IST)
 
 
 def at(hour: int, minute: int = 0, day: datetime = DAY) -> datetime:
     return day.replace(hour=hour, minute=minute, second=0, microsecond=0)
 
 
-NIFTY_CE = "NIFTY25AUG24500CE"
-NIFTY_CE2 = "NIFTY25AUG24700CE"
-NIFTY_PE = "NIFTY25AUG24300PE"
-NIFTY_PE2 = "NIFTY25AUG24100PE"
-BANKNIFTY_CE = "BANKNIFTY25AUG52000CE"
+NIFTY_CE = "NIFTY26AUG24500CE"
+NIFTY_CE2 = "NIFTY26AUG24700CE"
+NIFTY_PE = "NIFTY26AUG24300PE"
+NIFTY_PE2 = "NIFTY26AUG24100PE"
+BANKNIFTY_CE = "BANKNIFTY26AUG52000CE"
+
+
+#: Limits deliberately far out of reach.
+#:
+#: The engine suppresses ordinary behavioural alerts behind a constitution
+#: breach — the rule the trader wrote is the louder, more specific finding. That
+#: is correct product behaviour and has its own scenario (F-15), but it means a
+#: scenario isolating a BEHAVIOUR must not also trip a RULE, or the rule alert
+#: is all you see. Six scenarios failed exactly this way on first run.
+ROOMY = {
+    "max_position_size": 60.0,
+    "daily_trade_limit": 60,
+    "max_consecutive_losses": 20,
+    "cooldown_after_loss": 1,
+    "daily_loss_limit": 5_000_000,
+}
 
 
 def _flatten(groups) -> List[Fill]:
@@ -110,7 +128,7 @@ DISCIPLINED_BAD_DAY = Scenario(
     id="B-12", section="Archetypes", title="Disciplined trader having a bad day",
     story="Six losses in a row, constant size, patient gaps. Losing is not misbehaving.",
     capital=500_000,
-    profile={"daily_loss_limit": 50_000},
+    profile=ROOMY,
     fills=_flatten([
         losing_trade(NIFTY_CE, at(9 + i, 30), 50, 8, hold_minutes=25)
         for i in range(6)
@@ -130,6 +148,7 @@ SCALPER = Scenario(
     id="B-01", section="Archetypes", title="Scalper — 12 rapid round trips",
     story="Twelve trades in ninety minutes, tiny holds, same instrument.",
     capital=500_000,
+    profile=ROOMY,
     fills=_flatten([
         round_trip(NIFTY_CE, at(10, 0) + timedelta(minutes=7 * i), 50,
                    100.0, 100.0 + (3 if i % 2 else -4), hold_minutes=3)
@@ -137,8 +156,10 @@ SCALPER = Scenario(
     ]),
     must_fire=[
         Expect("overtrading_burst", reason="twelve entries inside the burst window"),
-        Expect("daily_overtrading", reason="well past any daily limit"),
     ],
+    # NOT daily_overtrading. Both come from the same detector and the burst
+    # check returns first, so on any given trade they are mutually exclusive —
+    # asserting both was a misreading of the code, not a bug in it.
 )
 
 
@@ -284,6 +305,7 @@ def _capital_tier(tier_id: str, capital: float, qty: int) -> Scenario:
         title=f"Recovery bet at ₹{capital:,.0f} capital",
         story="Three losses, then an entry at double size on the same underlying.",
         capital=capital,
+        profile=ROOMY,
         fills=_flatten([
             losing_trade(NIFTY_CE, at(10, 0), qty, 8, hold_minutes=15),
             losing_trade(NIFTY_CE, at(10, 30), qty, 9, hold_minutes=15),
@@ -312,7 +334,8 @@ CAPITAL_TIERS = [
 EXPIRY_DAY_HEAVY = Scenario(
     id="E-05", section="Time", title="Expiry-day churn after 13:00",
     story="Eight NIFTY round trips on expiry Thursday afternoon.",
-    capital=500_000,
+    capital=5_000_000,
+    profile=ROOMY,
     fills=_flatten([
         round_trip(NIFTY_CE, at(13, 0, EXPIRY_DAY) + timedelta(minutes=12 * i), 50,
                    100.0, 100.0 + (4 if i % 3 == 0 else -6), hold_minutes=8)
@@ -324,7 +347,8 @@ EXPIRY_DAY_HEAVY = Scenario(
 DEDUP_ONE_ALERT = Scenario(
     id="F-01", section="Suppression", title="The same pattern twice — one alert",
     story="Two revenge-shaped entries an hour apart in the same session.",
-    capital=500_000,
+    capital=5_000_000,
+    profile=ROOMY,
     fills=_flatten([
         losing_trade(NIFTY_CE, at(10, 0), 50, 84, hold_minutes=10),
         round_trip(NIFTY_CE, at(10, 15), 150, 100.0, 96.0, hold_minutes=10),

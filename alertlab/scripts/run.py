@@ -25,6 +25,14 @@ from alertlab.runner.harness import quiet_logs, teardown_lab           # noqa: E
 from alertlab.runner.scenario import run_scenario          # noqa: E402
 from alertlab.scenarios.catalogue import ALL_SCENARIOS, BY_ID  # noqa: E402
 
+# Windows consoles default to cp1252, which cannot encode ₹ — and scenario
+# titles are full of it. Without this the runner dies formatting its own output.
+try:
+    sys.stdout.reconfigure(encoding="utf-8", errors="replace")
+    sys.stderr.reconfigure(encoding="utf-8", errors="replace")
+except Exception:
+    pass
+
 GREEN, RED, DIM, OFF = "\033[32m", "\033[31m", "\033[90m", "\033[0m"
 
 
