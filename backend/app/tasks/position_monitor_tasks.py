@@ -517,6 +517,14 @@ async def _fire_position_alert(
         detector_version=version,
         confidence=confidence,
         detected_at=now_utc,
+        # Every alert from this module is raised while the position is still
+        # open — that is the whole point of the position monitor, and the copy
+        # already says "position is OPEN". Migration 076 added `lifecycle` to
+        # record exactly that distinction and it was never set, so these were
+        # stored as 'post' alongside genuinely post-hoc findings. Nothing can
+        # tell live alerts from post-hoc ones until this is right, which is the
+        # foundation the entry-time work builds on.
+        lifecycle="live",
     )
     db.add(alert)
     await db.flush()

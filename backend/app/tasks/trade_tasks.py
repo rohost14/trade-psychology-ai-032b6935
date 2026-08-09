@@ -43,6 +43,13 @@ def _get_redis_client():
     return get_sync_redis()
 
 
+# PositionLedger entry_type values that mean "a position was opened or grown".
+# FLIP counts: it closes one direction and opens the opposite, so it is an entry
+# as well as an exit — and behaviourally it is one of the louder things a trader
+# can do. DECREASE and CLOSE are exits and must never trigger entry-time checks.
+_POSITION_OPENING_FILLS = frozenset({"OPEN", "INCREASE", "FLIP"})
+
+
 def _pattern_dedup_key(pattern_type: str, details) -> str:
     """
     Dedup key for alerts. constitution_violation covers many rules under one
@@ -432,6 +439,12 @@ def process_webhook_trade(self, trade_data: Dict[str, Any], broker_account_id: s
                 fifo_lock_key = f"fifo_lock:{broker_account_id}"
                 fifo_lock_acquired = False
                 _closed_ct_id: UUID = None  # set when a CompletedTrade is created this pipeline run
+                # PositionLedger's classification of THIS fill: OPEN | INCREASE |
+                # DECREASE | CLOSE | FLIP. Entry-time checks run on the fills that
+                # open or grow a position; a BUY that covers a short is an exit and
+                # must not be treated as an entry. Stays None if the ledger step
+                # failed, in which case entry checks are skipped rather than guessed.
+                _fill_entry_type: str = None
 
                 try:
                     redis_client = _get_redis_client()
@@ -486,6 +499,7 @@ def process_webhook_trade(self, trade_data: Dict[str, Any], broker_account_id: s
 
                         ledger_entry, is_new = await PositionLedgerService.apply_fill(fill, db)
                         await db.flush()
+                        _fill_entry_type = ledger_entry.entry_type
 
                         # If this fill realized P&L, write it back to Trade.pnl
                         # (backward compat for any code still reading Trade.pnl)
@@ -640,15 +654,24 @@ def process_webhook_trade(self, trade_data: Dict[str, Any], broker_account_id: s
                         await _concentration_task(broker_account_id)
                     except Exception as _ce:
                         logger.warning(f"concentration inline check failed: {_ce}")
-                    if trade.transaction_type == "BUY":
+                    # Entry-time checks run on fills that OPEN or GROW a position.
+                    # This was gated on transaction_type == "BUY", which is not the
+                    # same thing: a BUY that covers a short is an EXIT. Every short
+                    # seller was getting "cooldown violated — position is OPEN" on
+                    # the way out of a position. The ledger already classifies each
+                    # fill, so ask it instead of inferring from the side.
+                    if _fill_entry_type in _POSITION_OPENING_FILLS:
                         try:
                             await _entry_rules_task(broker_account_id, trade.tradingsymbol or "")
                         except Exception as _ee:
                             logger.warning(f"entry rules inline check failed: {_ee}")
-                    # For BUY fills: schedule holding-loser check 30 min out.
-                    # Use SETNX chain key so multiple BUY fills don't spawn
-                    # parallel chains — only one chain active per account.
-                    if trade.transaction_type == "BUY":
+                    # Schedule the holding-loser check 30 min out. Same gate: the
+                    # check itself is direction-agnostic (it computes P&L for long
+                    # and short), so gating it on BUY meant a trader who only
+                    # shorts never had the chain start at all.
+                    # SETNX chain key so multiple fills don't spawn parallel
+                    # chains — only one chain active per account.
+                    if _fill_entry_type in _POSITION_OPENING_FILLS:
                         chain_key = f"holding_loser_chain:{broker_account_id}"
                         if redis_client and redis_client.set(
                             chain_key, 0, ex=1900, nx=True
