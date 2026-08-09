@@ -570,6 +570,33 @@ async def _fire_position_alert(
 # Phase 6: portfolio concentration + entry-time constitution rules
 # ─────────────────────────────────────────────────────────────────────────────
 
+async def _open_structures(broker_account_id: str) -> list:
+    """
+    Recognised multi-leg structures among the account's currently open positions.
+
+    Non-fatal by design: this is context that improves a decision, never a
+    precondition for making one. If it fails the entry checks still run, they
+    just run without knowing the legs belong together.
+    """
+    from sqlalchemy import and_, select
+
+    from app.models.position import Position
+    from app.services.strategy_detector import classify_open_positions
+
+    try:
+        async with SessionLocal() as db:
+            result = await db.execute(
+                select(Position).where(and_(
+                    Position.broker_account_id == UUID(broker_account_id),
+                    Position.total_quantity != 0,
+                ))
+            )
+            return classify_open_positions(list(result.scalars().all()))
+    except Exception as e:
+        logger.warning(f"[entry_batch] open-structure classification failed: {e}")
+        return []
+
+
 @celery_app.task(name="app.tasks.position_monitor_tasks.flush_entry_batch")
 def flush_entry_batch(broker_account_id: str):
     """
@@ -599,6 +626,20 @@ async def _flush_entry_batch(broker_account_id: str) -> dict:
 
     summary = batch.summarise(fills)
     symbols = summary["symbols"]
+
+    # E2: what structures do the account's OPEN positions form right now?
+    # The exit-time detector cannot answer this — it waits for a second leg to
+    # close. Knowing at entry that these legs are an iron condor rather than
+    # four impulsive trades is the difference between one alert and four wrong
+    # ones, and it is the input the inferred detectors will need.
+    structures = await _open_structures(broker_account_id)
+    if structures:
+        summary["structures"] = structures
+        logger.info(
+            f"[entry_batch] {broker_account_id[:8]}: open structures — "
+            + ", ".join(f"{s['strategy_type']} ({s['leg_count']} legs)" for s in structures)
+        )
+
     logger.info(
         f"[entry_batch] {broker_account_id[:8]}: {summary['fill_count']} fill(s), "
         f"{summary['distinct_symbols']} instrument(s) — evaluating once"

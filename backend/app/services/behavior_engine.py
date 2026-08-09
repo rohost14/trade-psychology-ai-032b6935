@@ -767,6 +767,8 @@ class BehaviorEngine:
         if not ct.entry_time:
             return None
 
+        from app.services.strategy_detector import count_structures as count_structures_fn
+
         burst_caution = ctx.thresholds.get("burst_trades_per_30min_caution", 5)
         burst_danger  = ctx.thresholds.get("burst_trades_per_30min_danger", 8)
         daily_caution = ctx.thresholds.get("daily_trade_limit", 7)
@@ -797,7 +799,11 @@ class BehaviorEngine:
             losing_pnls = [p for p in pnls if p < 0]
             entry_times = [t.entry_time for t in all_trades if t.entry_time]
             ctx_dict = {
-                "trades_in_window":    len(all_trades),
+                # Legs, and the decisions they represent. Both are kept: the
+                # threshold is compared against structures, but the evidence
+                # must still be able to show a trader their actual fills.
+                "trades_in_window":    count_structures_fn(all_trades),
+                "legs_in_window":      len(all_trades),
                 "window_minutes":      30,
                 "window_start_ist":    entry_times[0].astimezone(IST).strftime("%H:%M") if entry_times else None,
                 "window_end_ist":      entry_times[-1].astimezone(IST).strftime("%H:%M") if entry_times else None,
@@ -819,7 +825,13 @@ class BehaviorEngine:
         recent = [t for t in ctx.session_trades
                   if t.entry_time and t.entry_time >= cutoff and t.id != ct.id]
         burst_all = recent + [ct]
-        burst_count = len(burst_all)
+        # Count structures, not legs. A CompletedTrade is per tradingsymbol, so
+        # one four-leg condor is four rows — two condors read as eight trades
+        # against a burst threshold of five and fired a danger alert for two
+        # positions. count_structures collapses a cluster only when it
+        # classifies as a recognised strategy, so the count can only fall: a
+        # trader who never trades multi-leg sees exactly the old number.
+        burst_count = count_structures_fn(burst_all)
 
         if burst_count >= burst_caution:
             recent_pnls = [float(t.realized_pnl or 0) for t in burst_all]
@@ -882,7 +894,9 @@ class BehaviorEngine:
         # Fires when total closed trades today cross the daily limit, regardless
         # of whether any 30-min burst occurred. Same pattern_type, different trigger.
         all_session = list(ctx.session_trades) + [ct]
-        daily_count = len(all_session)
+        # Structures, not legs — see the burst check above.
+        daily_count = count_structures_fn(all_session)
+        daily_legs = len(all_session)
 
         if daily_count >= daily_caution:
             pnls_today = [float(t.realized_pnl or 0) for t in all_session]
@@ -902,6 +916,7 @@ class BehaviorEngine:
                 ),
                 context={
                     "daily_count":       daily_count,
+                    "daily_legs":        daily_legs,
                     "daily_caution":     daily_caution,
                     "daily_danger":      daily_danger,
                     "session_pnl":       round(session_pnl, 2),
@@ -1902,7 +1917,12 @@ class BehaviorEngine:
             if parse_symbol(t.tradingsymbol or "").underlying == underlying
             and t.instrument_type in ("CE", "PE", "FUT")
         ]
-        today_count = len(today_expiry_trades) + 1
+        # Structures, not legs — an expiry-day iron condor is one decision, and
+        # counting its four rows put spread traders over the danger threshold
+        # after two positions.
+        from app.services.strategy_detector import count_structures as _count_structures
+        today_legs = len(today_expiry_trades) + 1
+        today_count = _count_structures(today_expiry_trades + [ct])
         today_lots = sum(t.total_quantity or 1 for t in today_expiry_trades) + (ct.total_quantity or 1)
 
         caution_count = ctx.thresholds.get("expiry_overtrading_caution_count", 5)
@@ -1923,6 +1943,7 @@ class BehaviorEngine:
                     f"has a structural loss rate above 85%."
                 ),
                 context={"underlying": underlying, "today_count": today_count,
+                         "today_legs": today_legs,
                          "today_lots": today_lots, "danger_threshold": danger_count},
             )
         if today_count >= caution_count or today_lots >= caution_lots:
@@ -1934,6 +1955,7 @@ class BehaviorEngine:
                     f"Each additional trade after 13:00 on expiry day statistically reduces your edge."
                 ),
                 context={"underlying": underlying, "today_count": today_count,
+                         "today_legs": today_legs,
                          "today_lots": today_lots, "caution_threshold": caution_count},
             )
         return None

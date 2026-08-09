@@ -35,7 +35,7 @@ Supported strategy types (12)
 import logging
 from datetime import datetime, timedelta, timezone
 from decimal import Decimal
-from typing import List, Optional
+from typing import Any, Dict, List, NamedTuple, Optional, Sequence
 from uuid import UUID
 
 from sqlalchemy import select, and_
@@ -137,6 +137,148 @@ async def get_group_for_trade(
 
 
 # ---------------------------------------------------------------------------
+# Counting structures instead of legs (E2)
+# ---------------------------------------------------------------------------
+# A CompletedTrade is per tradingsymbol, so one four-leg iron condor is four
+# rows. Detectors that count trades were therefore counting legs: two condors
+# read as eight trades against a burst threshold of five, and a spread trader
+# got a danger-severity overtrading alert for two positions.
+#
+# This does not use StrategyGroup rows, deliberately. Those are only written
+# when the second leg CLOSES, so mid-session the earlier legs of an open
+# structure are not yet grouped — the counting has to work from the trades in
+# hand, and identically at entry time and exit time.
+
+#: Legs of one structure are placed together. Beyond this gap it is a new
+#: decision, not another leg of the same one.
+STRUCTURE_GAP_SECONDS = 120
+
+
+def _entry_ts(trade) -> Optional[datetime]:
+    return getattr(trade, "entry_time", None)
+
+
+def cluster_legs(trades: Sequence[Any], gap_seconds: int = STRUCTURE_GAP_SECONDS) -> List[List[Any]]:
+    """
+    Group trades that were plausibly entered as one structure.
+
+    Two rules, both conservative:
+
+      * Same underlying and expiry, entered within `gap_seconds` of each other.
+      * **Distinct symbols.** A repeat of a symbol already in the cluster is a
+        re-entry, not another leg — otherwise a scalper taking the same strike
+        twice in a minute would be counted as one "structure" and their
+        overtrading would disappear.
+
+    Trades with no entry time or no parseable expiry are returned as singletons
+    rather than guessed at.
+    """
+    buckets: Dict[tuple, List[Any]] = {}
+    singletons: List[List[Any]] = []
+
+    for t in trades:
+        ts = _entry_ts(t)
+        parsed = parse_symbol(getattr(t, "tradingsymbol", "") or "")
+        if ts is None or not parsed.underlying or not parsed.expiry_key:
+            singletons.append([t])
+            continue
+        buckets.setdefault((parsed.underlying, parsed.expiry_key), []).append(t)
+
+    clusters: List[List[Any]] = []
+    for bucket in buckets.values():
+        bucket.sort(key=_entry_ts)
+        current: List[Any] = []
+        current_symbols: set = set()
+        prev_ts: Optional[datetime] = None
+        for t in bucket:
+            ts = _entry_ts(t)
+            symbol = getattr(t, "tradingsymbol", "") or ""
+            too_far = prev_ts is not None and (ts - prev_ts).total_seconds() > gap_seconds
+            repeat = symbol in current_symbols
+            if current and (too_far or repeat):
+                clusters.append(current)
+                current, current_symbols = [], set()
+            current.append(t)
+            current_symbols.add(symbol)
+            prev_ts = ts
+        if current:
+            clusters.append(current)
+
+    return clusters + singletons
+
+
+def count_structures(trades: Sequence[Any], gap_seconds: int = STRUCTURE_GAP_SECONDS) -> int:
+    """
+    How many trading decisions are in this list, counting a structure as one.
+
+    A cluster collapses to 1 only when it classifies as a *recognised* strategy.
+    An unrecognised cluster stays as its individual legs — two directional
+    trades on the same underlying a minute apart are two decisions, not a
+    mystery spread. That keeps the change strictly conservative: the count can
+    only fall, never rise, so thresholds can only fire less often. For a trader
+    who never trades multi-leg, this returns len(trades) exactly and nothing
+    about their alerts changes.
+    """
+    total = 0
+    for cluster in cluster_legs(trades, gap_seconds):
+        if len(cluster) > 1 and classify_legs(
+            [LegView(getattr(t, "tradingsymbol", "") or "",
+                     getattr(t, "direction", "") or "") for t in cluster]
+        ) != StrategyType.MULTI_LEG_UNKNOWN:
+            total += 1
+        else:
+            total += len(cluster)
+    return total
+
+
+def classify_open_positions(positions: Sequence[Any]) -> List[Dict[str, Any]]:
+    """
+    Entry-time grouping: what structures do these OPEN positions form?
+
+    The exit-time path cannot answer this — it waits for the second leg to
+    close, which is why `detect_and_save`'s docstring calls entry-time detection
+    a later improvement. Open positions carry everything the classifier needs:
+    the symbol, and the direction from the sign of the quantity.
+
+    Returns one entry per recognised structure. Single legs and unrecognised
+    combinations are omitted — callers want to know "is this part of a
+    structure", and a maybe is not useful for suppressing a false positive.
+    """
+    legs_by_key: Dict[tuple, List[Any]] = {}
+    for p in positions:
+        qty = getattr(p, "total_quantity", 0) or 0
+        if qty == 0:
+            continue
+        parsed = parse_symbol(getattr(p, "tradingsymbol", "") or "")
+        if not parsed.underlying or not parsed.expiry_key:
+            continue
+        legs_by_key.setdefault((parsed.underlying, parsed.expiry_key), []).append(p)
+
+    structures: List[Dict[str, Any]] = []
+    for (underlying, expiry_key), legs in legs_by_key.items():
+        if len(legs) < 2:
+            continue
+        views = [
+            LegView(
+                getattr(p, "tradingsymbol", "") or "",
+                "LONG" if (getattr(p, "total_quantity", 0) or 0) > 0 else "SHORT",
+            )
+            for p in legs
+        ]
+        strategy_type = classify_legs(views)
+        if strategy_type == StrategyType.MULTI_LEG_UNKNOWN:
+            continue
+        structures.append({
+            "strategy_type": strategy_type,
+            "underlying": underlying,
+            "expiry_key": expiry_key,
+            "symbols": [v.tradingsymbol for v in views],
+            "leg_count": len(views),
+        })
+    return structures
+
+
+# ---------------------------------------------------------------------------
 # Internal helpers
 # ---------------------------------------------------------------------------
 
@@ -203,17 +345,41 @@ async def _find_siblings(
     return siblings
 
 
+class LegView(NamedTuple):
+    """
+    The minimum a leg needs to be classified: what it is, and which way.
+
+    The classifier never looked at P&L, exit price or duration — only the symbol
+    and the direction — which is why the same logic works on an open position as
+    on a closed round. This type is what makes that reusable: CompletedTrades at
+    exit time, open Positions at entry time, both become LegViews.
+    """
+    tradingsymbol: str
+    direction: str          # "LONG" | "SHORT"
+
+
 def _classify(
     ct: CompletedTrade,
     parsed: ParsedSymbol,
     siblings: List[CompletedTrade],
 ) -> str:
+    """Exit-time entry point — unchanged behaviour, delegates to classify_legs."""
+    return classify_legs(
+        [LegView(ct.tradingsymbol or "", ct.direction or "")]
+        + [LegView(t.tradingsymbol or "", t.direction or "") for t in siblings]
+    )
+
+
+def classify_legs(legs: List[LegView]) -> str:
     """
-    Classify the strategy type from the current trade + its siblings.
-    All trades have the same underlying.
+    Classify a set of legs into a strategy type.
+
+    Pure: no DB, no P&L, no timestamps. Callers are responsible for having
+    established that these legs belong together (same underlying, entered
+    together) — this answers only "what shape is it".
     """
-    all_trades = [ct] + siblings
-    all_parsed = [parsed] + [parse_symbol(t.tradingsymbol or "") for t in siblings]
+    all_trades = list(legs)
+    all_parsed = [parse_symbol(t.tradingsymbol or "") for t in all_trades]
 
     n = len(all_trades)
     instrument_types = {p.instrument_type for p in all_parsed}
