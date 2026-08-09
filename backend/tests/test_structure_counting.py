@@ -282,3 +282,34 @@ def test_burst_evidence_keeps_the_leg_count():
     event = _burst(trades)
     assert event.context["legs_in_window"] == 8
     assert event.context["trades_in_window"] == 8
+
+
+# ── Labels for the positions table (Phase 6) ─────────────────────────────────
+
+def test_every_strategy_type_has_a_trader_facing_label():
+    """
+    A label map on the frontend keyed on backend strings is the drift that
+    produced the empty alert panel. These live beside the values they name.
+    """
+    from app.services.strategy_detector import STRATEGY_LABELS, strategy_label
+
+    for attr in dir(StrategyType):
+        if attr.startswith("_"):
+            continue
+        value = getattr(StrategyType, attr)
+        if isinstance(value, str):
+            assert value in STRATEGY_LABELS, f"{value} has no label"
+            assert strategy_label(value) == STRATEGY_LABELS[value]
+
+
+def test_an_unknown_strategy_type_still_reads_as_something():
+    from app.services.strategy_detector import strategy_label
+
+    assert strategy_label("some_new_structure") == "Some new structure"
+    assert strategy_label("") == "Position"
+
+
+def test_classified_structures_carry_their_label():
+    positions = [position(CE_LO, 50), position(CE_HI, -50)]
+    structure = classify_open_positions(positions)[0]
+    assert structure["label"] == "Bull call spread"

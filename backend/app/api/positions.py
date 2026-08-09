@@ -35,6 +35,36 @@ async def get_positions(
         "total_pnl": Decimal(str(total_pnl)) if total_pnl else Decimal(0)
     }
 
+@router.get("/structures")
+async def get_open_structures(
+    broker_account_id: UUID = Depends(get_verified_broker_account_id),
+    db: AsyncSession = Depends(get_db),
+):
+    """
+    Multi-leg structures among the trader's currently open positions.
+
+    Served rather than derived on the client on purpose. Classifying a spread
+    means parsing symbols, matching strikes and expiries and reading direction —
+    a second implementation of that on the frontend would drift from this one
+    exactly as the pattern-copy maps did, and the label map is here for the same
+    reason.
+
+    Separate from GET /api/positions/ so the positions payload keeps its shape;
+    plenty of code depends on it. A caller that does not ask still gets a
+    correct, flat list.
+    """
+    from app.services.strategy_detector import classify_open_positions
+
+    result = await db.execute(
+        select(Position).where(
+            Position.broker_account_id == broker_account_id,
+            Position.total_quantity != 0,
+        )
+    )
+    structures = classify_open_positions(list(result.scalars().all()))
+    return {"structures": structures, "count": len(structures)}
+
+
 @router.get("/exposure", response_model=ExposureMetrics)
 async def get_exposure_metrics(
     broker_account_id: UUID = Depends(get_verified_broker_account_id),

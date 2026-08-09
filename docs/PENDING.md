@@ -1,7 +1,49 @@
 # PENDING — single source of truth
 
-Updated 2026-08-04. Branch `dashboard-production-readiness`, CI green, working tree clean.
+Updated 2026-08-09. Branch `dashboard-production-readiness`, CI green.
 **Nothing is code-blocking.** Everything below is your action or Zerodha/business.
+
+---
+
+## 🔴 Apply migration 079 — "This was planned" fails at the DB without it
+
+**`backend/migrations/079_alert_outcome_planned.sql`** — widens the CHECK constraint on
+`risk_alerts.outcome` to allow a fourth value, `planned`. Migration 069 created the
+constraint listing only `stopped / took_anyway / not_useful`, so until 079 runs, a trader
+tapping **"This was planned"** gets a database error.
+
+Additive and safe: the constraint only widens what is permitted, so no existing row can
+violate it and there is nothing to backfill.
+
+Why it matters beyond one button: `not_useful` was conflating *"your detection is wrong"*
+with *"I meant to do that"*. Those need different fixes, and folding them together made the
+precision numbers in **Admin → Detection** weaker than they look — a detector firing
+accurately on a deliberate strategy was indistinguishable from one firing on nothing.
+
+---
+
+## 🟡 Promote the entry-time detectors — decision, once the numbers exist
+
+Ten inferred detectors (revenge_trade, rapid_reentry, size_escalation,
+martingale_behaviour, post_loss_recovery_bet, fomo_entry, same_symbol_obsession,
+direction_instability, winning_streak_overconfidence, options_premium_avg_down) now run
+**at entry, in shadow**. They write evidence and raise nothing.
+
+**They cannot be promoted yet, and that is arithmetic rather than caution.** The shadow
+readout reads `BehaviorEvent WHERE shadow = true`; nothing had ever written one before this
+shipped, so the numbers can only accumulate over real trading days.
+
+**What to do:** after a few live sessions, open **Admin → Detection** and read the Shadow
+panel. Promote one detector at a time via the detector-flags screen (`shadow → canary → on`).
+
+**What to look for, per detector:**
+- **not-useful rate under ~20%** once it has passed the significance threshold
+- **mute rate not climbing** — a mute is the strongest "you are wrong" signal we get
+- **most shadow detections above the confidence floor.** A detector whose entry-time output
+  is mostly sub-floor is telling you it needs the outcome after all, and should stay at exit.
+
+Nothing breaks if this is never done: the exit-time versions of all ten still run and alert
+exactly as before. Entry-time is an addition, not a replacement.
 
 ---
 

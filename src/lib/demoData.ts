@@ -1512,6 +1512,11 @@ export const DEMO_PATTERN_CATALOGUE = {
   ]
 };
 
+// Mirrors GET /api/positions/structures. The demo positions are two unrelated
+// single legs, so there is no structure to report — an empty list is the honest
+// fixture, and it exercises the path where the table renders flat rows.
+export const DEMO_OPEN_STRUCTURES = { structures: [], count: 0 };
+
 // Mirrors GET /api/risk/patterns/{pattern_type}/my-record — the trader's own
 // history with a pattern, which replaced the invented population statistics
 // that used to sit in the alert panel. `enough` gates the display: below

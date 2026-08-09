@@ -231,6 +231,37 @@ def count_structures(trades: Sequence[Any], gap_seconds: int = STRUCTURE_GAP_SEC
     return total
 
 
+#: How each structure is named to a trader. Lives here, beside the values it
+#: describes, for the same reason the pattern copy does: a label map on the
+#: frontend keyed on backend strings is the drift that produced the empty alert
+#: panel. The frontend renders what this returns.
+STRATEGY_LABELS: Dict[str, str] = {
+    StrategyType.STRADDLE_BUY:          "Long straddle",
+    StrategyType.STRADDLE_SELL:         "Short straddle",
+    StrategyType.STRANGLE_BUY:          "Long strangle",
+    StrategyType.STRANGLE_SELL:         "Short strangle",
+    StrategyType.BULL_CALL_SPREAD:      "Bull call spread",
+    StrategyType.BEAR_PUT_SPREAD:       "Bear put spread",
+    StrategyType.BULL_PUT_SPREAD:       "Bull put spread",
+    StrategyType.BEAR_CALL_SPREAD:      "Bear call spread",
+    StrategyType.IRON_CONDOR:           "Iron condor",
+    StrategyType.IRON_BUTTERFLY:        "Iron butterfly",
+    StrategyType.FUTURES_HEDGE_BULLISH: "Hedged long future",
+    StrategyType.FUTURES_HEDGE_BEARISH: "Hedged short future",
+    StrategyType.CALENDAR_SPREAD:       "Calendar spread",
+    StrategyType.SYNTHETIC_LONG:        "Synthetic long",
+    StrategyType.SYNTHETIC_SHORT:       "Synthetic short",
+    StrategyType.MULTI_LEG_UNKNOWN:     "Multi-leg position",
+}
+
+
+def strategy_label(strategy_type: str) -> str:
+    """Trader-facing name for a structure. Falls back to a readable form."""
+    return STRATEGY_LABELS.get(
+        strategy_type, (strategy_type or "").replace("_", " ").capitalize() or "Position"
+    )
+
+
 def classify_open_positions(positions: Sequence[Any]) -> List[Dict[str, Any]]:
     """
     Entry-time grouping: what structures do these OPEN positions form?
@@ -270,6 +301,7 @@ def classify_open_positions(positions: Sequence[Any]) -> List[Dict[str, Any]]:
             continue
         structures.append({
             "strategy_type": strategy_type,
+            "label": strategy_label(strategy_type),
             "underlying": underlying,
             "expiry_key": expiry_key,
             "symbols": [v.tradingsymbol for v in views],

@@ -5,6 +5,7 @@ import { formatPrice, formatNumber, formatCurrencyWithSign } from '@/lib/formatt
 import { positionJournalTradeId } from '@/lib/journalKey';
 import { parseSymbol } from '@/lib/symbolParser';
 import type { Position } from '@/types/api';
+import { groupByStructure, useOpenStructures } from '@/hooks/useOpenStructures';
 
 type PositionWithExtras = Position & {
   instrument_type: string;
@@ -95,6 +96,10 @@ export default function OpenPositionsTable({
   pricesConnected, lastPriceAt, tokenExpired,
 }: OpenPositionsTableProps) {
   const openPositions = positions.filter(p => p.status === 'open');
+  // Legs of one structure are shown together under a single caption.
+  // Classification is served, never computed here — see useOpenStructures.
+  const { structureFor } = useOpenStructures(openPositions.length > 0);
+  const rows = groupByStructure(openPositions, structureFor);
 
   const [now, setNow] = useState(Date.now());
   useEffect(() => {
@@ -177,7 +182,7 @@ export default function OpenPositionsTable({
           </div>
 
           <div className="divide-y divide-border">
-            {openPositions.map(pos => {
+            {rows.map(({ position: pos, groupStart }) => {
               const livePnl = getLivePnl(pos);
               const chgPct = getChgPct(pos);
               const qty = pos.total_quantity;
@@ -185,8 +190,22 @@ export default function OpenPositionsTable({
               const isJournaled = journaledIds.has(positionJournalTradeId(pos.id));
               const { name, sub } = parseSymbol(pos.tradingsymbol, pos.instrument_type);
               return (
+                <div key={pos.id}>
+                {/* One structure, one caption. Four condor legs shown as four
+                    unrelated rows is the same misreading that had the engine
+                    counting them as four trades. */}
+                {groupStart && (
+                  <div className="flex items-center gap-2 px-4 sm:px-6 pt-3 pb-1">
+                    <span className="text-[11px] font-semibold text-foreground">
+                      {groupStart.underlying} {groupStart.label}
+                    </span>
+                    <span className="text-[11px] text-muted-foreground">
+                      {groupStart.leg_count} legs
+                      {groupStart.expiry_key ? ` · ${groupStart.expiry_key}` : ''}
+                    </span>
+                  </div>
+                )}
                 <div
-                  key={pos.id}
                   role="button"
                   tabIndex={0}
                   onClick={() => onPositionClick?.(pos)}
@@ -256,6 +275,7 @@ export default function OpenPositionsTable({
                       <NotebookPen className="h-3 w-3" /> {isJournaled ? 'View note' : 'Add note'}
                     </p>
                   </div>
+                </div>
                 </div>
               );
             })}
