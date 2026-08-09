@@ -46,6 +46,12 @@ class Scenario:
     wall_clock: Optional[datetime] = None   # freeze; None = trade time is enough
     must_fire: List[Expect] = field(default_factory=list)
     must_not_fire: List[Expect] = field(default_factory=list)
+    # Detectors that are analytics-only by design: `rapid_reentry` and
+    # `opening_5min_trap` return a hard-coded `info` severity, so they are
+    # recorded as evidence and deliberately never surface as alerts. Asserting
+    # them with must_fire can never pass, and asserting nothing at all would let
+    # the detector break silently — this third kind covers exactly that gap.
+    must_record: List[Expect] = field(default_factory=list)
 
     def as_dict(self) -> Dict[str, Any]:
         return {
@@ -54,12 +60,15 @@ class Scenario:
             "fills": len(self.fills),
             "must_fire": [e.pattern for e in self.must_fire],
             "must_not_fire": [e.pattern for e in self.must_not_fire],
+            "must_record": [e.pattern for e in self.must_record],
         }
 
 
-def _check(scenario: Scenario, alerts: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
-    """Evaluate both halves and explain each outcome."""
+def _check(scenario: Scenario, alerts: List[Dict[str, Any]],
+           suppressed: List[Dict[str, Any]] | None = None) -> List[Dict[str, Any]]:
+    """Evaluate every kind of expectation and explain each outcome."""
     fired = {a["pattern_type"] for a in alerts}
+    recorded = {s["detector"]: s for s in (suppressed or [])}
     by_pattern: Dict[str, List[Dict[str, Any]]] = {}
     for a in alerts:
         by_pattern.setdefault(a["pattern_type"], []).append(a)
@@ -68,8 +77,14 @@ def _check(scenario: Scenario, alerts: List[Dict[str, Any]]) -> List[Dict[str, A
     for exp in scenario.must_fire:
         got = by_pattern.get(exp.pattern, [])
         if not got:
+            # Distinguish "the detector never triggered" from "it triggered and
+            # something downstream stopped it". Those are completely different
+            # bugs, and reporting both as "never fired" sent me looking in the
+            # wrong half of the pipeline twice.
+            held = recorded.get(exp.pattern)
+            detail = f"detected, but never surfaced — {held['reason']}" if held else "never fired"
             results.append({"kind": "must_fire", "pattern": exp.pattern, "pass": False,
-                            "detail": "never fired", "reason": exp.reason})
+                            "detail": detail, "reason": exp.reason})
             continue
         if exp.severity:
             severities = {a["severity"] for a in got}
@@ -86,13 +101,32 @@ def _check(scenario: Scenario, alerts: List[Dict[str, Any]]) -> List[Dict[str, A
             results.append({"kind": "must_fire", "pattern": exp.pattern, "pass": True,
                             "detail": f"fired ({got[0]['severity']})", "reason": exp.reason})
 
+    for exp in scenario.must_record:
+        held = recorded.get(exp.pattern)
+        if held:
+            ok, detail = True, f"recorded as evidence — {held['reason']}"
+        elif exp.pattern in fired:
+            # Louder than expected. An analytics-only detector that starts
+            # alerting is a regression in the noise budget, not an improvement.
+            ok, detail = False, "surfaced as an ALERT — expected evidence only"
+        else:
+            ok, detail = False, "not detected at all"
+        results.append({"kind": "must_record", "pattern": exp.pattern,
+                        "pass": ok, "detail": detail, "reason": exp.reason})
+
     for exp in scenario.must_not_fire:
-        wrongly = exp.pattern in fired
-        results.append({
-            "kind": "must_not_fire", "pattern": exp.pattern, "pass": not wrongly,
-            "detail": "fired when it should not have" if wrongly else "correctly silent",
-            "reason": exp.reason,
-        })
+        # Checked against evidence as well as alerts. An analytics-only detector
+        # never reaches the alert feed, so testing the feed alone would pass
+        # every near-miss scenario about one of them without testing anything.
+        # A wrong detection is a false positive whether or not it was shown.
+        if exp.pattern in fired:
+            ok, detail = False, "fired when it should not have"
+        elif exp.pattern in recorded:
+            ok, detail = False, "detected when it should not have (recorded as evidence)"
+        else:
+            ok, detail = True, "correctly silent"
+        results.append({"kind": "must_not_fire", "pattern": exp.pattern,
+                        "pass": ok, "detail": detail, "reason": exp.reason})
     return results
 
 
@@ -158,7 +192,7 @@ async def run_scenario(scenario: Scenario, db_factory) -> Dict[str, Any]:
         collected = {"alerts": [], "suppressed": [], "positions": {"open": [], "closed": []},
                      "structures": [], "guardian": [], "session_pnl": 0}
 
-    checks = _check(scenario, collected["alerts"]) if not error else []
+    checks = _check(scenario, collected["alerts"], collected["suppressed"]) if not error else []
     passed = bool(checks) and all(c["pass"] for c in checks) and not error
 
     try:

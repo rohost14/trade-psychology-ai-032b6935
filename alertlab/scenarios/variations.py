@@ -73,12 +73,15 @@ def _lot_scenario(sid: str, qty: int) -> Scenario:
     return Scenario(
         id=sid, section="Lot sizes",
         title=f"Doubling after each loss — base {qty} lots",
-        story=f"Martingale from {qty} lots: {qty} → {qty * 2} → {qty * 4}.",
+        story=f"Martingale from {qty} lots: {qty} → {qty*2} → {qty*4} → {qty*8}.",
         capital=20_000_000, profile=ROOMY,
         fills=_flatten([
+            # FOUR steps, not three: the detector needs at least three PRIOR
+            # session trades before it will look, so a three-trade martingale is
+            # invisible to it by design.
             losing_trade(NIFTY_CE, at(10, 0) + timedelta(minutes=25 * i),
-                         qty * (2 ** i), 6, hold_minutes=15)
-            for i in range(3)
+                         qty * (2 ** i), 30, hold_minutes=15)
+            for i in range(4)
         ]),
         must_fire=[Expect("martingale_behaviour",
                           reason="the ratio is what matters — base size must not change the verdict")],

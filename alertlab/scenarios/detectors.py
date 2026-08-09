@@ -32,13 +32,14 @@ NIFTY_ATM_CE = "NIFTY26AUG24500CE"
 NIFTY_ATM_PE = "NIFTY26AUG24500PE"
 
 
-def _s(sid, title, story, fills, *, must=(), must_not=(), capital=1_000_000,
-       profile=None, section="Detectors", wall=None) -> Scenario:
+def _s(sid, title, story, fills, *, must=(), must_not=(), records=(),
+       capital=1_000_000, profile=None, section="Detectors", wall=None) -> Scenario:
     return Scenario(
         id=sid, section=section, title=title, story=story, fills=fills,
         capital=capital, profile=profile if profile is not None else ROOMY,
         wall_clock=wall,
         must_fire=list(must), must_not_fire=list(must_not),
+        must_record=list(records),
     )
 
 
@@ -48,10 +49,12 @@ RAPID_REENTRY = _s(
     "C-02a", "Rapid re-entry — straight back into the same strike",
     "Closes at a loss and re-enters the same instrument two minutes later.",
     _flatten([
-        losing_trade(NIFTY_CE, at(10, 0), 50, 9, hold_minutes=12),
-        round_trip(NIFTY_CE, at(10, 14), 50, 100.0, 97.0, hold_minutes=10),
+        losing_trade(NIFTY_CE, at(10, 0), 50, 45, hold_minutes=12),
+        round_trip(NIFTY_CE, at(10, 14), 50, 100.0, 78.0, hold_minutes=10),
     ]),
-    must=[Expect("rapid_reentry", reason="same instrument, minutes after a losing exit")],
+    records=[Expect("rapid_reentry",
+                    reason="analytics-only by design — profitable traders re-enter fast, "
+                           "so this feeds revenge confidence instead of alerting")],
 )
 
 RAPID_REENTRY_MISS = _s(
@@ -90,9 +93,12 @@ POST_LOSS_RECOVERY = _s(
     "C-05a", "Recovery bet — 4x size after losing",
     "Loses twice on one underlying, then enters at four times the size.",
     _flatten([
+        # Three losses before the bet: the detector needs at least three prior
+        # session trades before it evaluates.
         losing_trade(NIFTY_CE, at(10, 0), 50, 20, hold_minutes=12),
         losing_trade(NIFTY_CE, at(10, 25), 50, 18, hold_minutes=12),
-        round_trip(NIFTY_CE, at(10, 50), 200, 100.0, 95.0, hold_minutes=15),
+        losing_trade(NIFTY_CE, at(10, 50), 50, 22, hold_minutes=12),
+        round_trip(NIFTY_CE, at(11, 15), 200, 100.0, 95.0, hold_minutes=15),
     ]),
     must=[Expect("post_loss_recovery_bet", reason="oversized attempt to win it back")],
 )
@@ -144,12 +150,12 @@ EXCESS_EXPOSURE = _s(
 
 OPTIONS_AVG_DOWN = _s(
     "C-14a", "Adding to a losing option",
-    "Buys a call, it halves, buys more of the same strike.",
-    [
-        Fill(NIFTY_ATM_CE, "BUY", 50, 120.0, at(10, 0), note="open"),
-        Fill(NIFTY_ATM_CE, "BUY", 100, 60.0, at(10, 30), note="add at half price"),
-        Fill(NIFTY_ATM_CE, "SELL", 150, 55.0, at(11, 0), note="close"),
-    ],
+    "Loses 40% on a call, then buys the same strike again — twice.",
+    _flatten([
+        round_trip(NIFTY_ATM_CE, at(10, 0), 50, 120.0, 72.0, hold_minutes=15),
+        round_trip(NIFTY_ATM_CE, at(10, 30), 50, 100.0, 62.0, hold_minutes=15),
+        round_trip(NIFTY_ATM_CE, at(11, 0), 100, 90.0, 58.0, hold_minutes=15),
+    ]),
     must=[Expect("options_premium_avg_down",
                  reason="averaging down an option fights direction AND decay")],
 )
@@ -239,9 +245,9 @@ OPENING_TRAP = _s(
     "C-19a", "Opening-minutes entry that collapses",
     "Buys in the first five minutes, out at a heavy loss eight minutes later.",
     _flatten([round_trip(NIFTY_ATM_CE, at(9, 17), 50, 140.0, 70.0, hold_minutes=8)]),
-    must=[Expect("opening_5min_trap",
-                 reason="widest spreads and least settled premium — and only ever "
-                        "fires on a LOSING opening trade, by design")],
+    records=[Expect("opening_5min_trap",
+                    reason="widest spreads and least settled premium — analytics-only, "
+                           "and only ever detected on a LOSING opening trade")],
 )
 
 OPENING_TRAP_MISS = _s(
