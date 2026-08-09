@@ -295,7 +295,7 @@ export const DEMO_RISK_STATE = {
 // ---------------------------------------------------------------------------
 export const DEMO_RISK_ALERTS = [
   {
-    id: 'ra-001', pattern_type: 'revenge_trade', severity: 'high',
+    id: 'ra-001', pattern_type: 'revenge_trade', severity: 'danger',
     message: 'NIFTY23000CE entry came 25 min after ₹13,000 loss on SOLARINDS. Re-entering under active loss stress.',
     created_at: daysAgo(1, 14, 36), acknowledged: false,
     details: {
@@ -307,7 +307,7 @@ export const DEMO_RISK_ALERTS = [
     },
   },
   {
-    id: 'ra-002', pattern_type: 'overtrading', severity: 'medium',
+    id: 'ra-002', pattern_type: 'overtrading_burst', severity: 'caution',
     message: '5 trades in the last 3 hours. Typical pace is 2–3. Each additional trade this session has been a loss.',
     created_at: daysAgo(1, 13, 0), acknowledged: false,
     details: {
@@ -319,7 +319,7 @@ export const DEMO_RISK_ALERTS = [
     },
   },
   {
-    id: 'ra-003', pattern_type: 'martingale_behaviour', severity: 'medium',
+    id: 'ra-003', pattern_type: 'martingale_behaviour', severity: 'caution',
     message: 'BANKNIFTY lot size went 1 → 1 → 3 across three consecutive losses. Total session exposure has tripled.',
     created_at: daysAgo(1, 14, 22), acknowledged: true,
     details: {
@@ -331,7 +331,7 @@ export const DEMO_RISK_ALERTS = [
     },
   },
   {
-    id: 'ra-004', pattern_type: 'size_escalation', severity: 'high',
+    id: 'ra-004', pattern_type: 'size_escalation', severity: 'critical',
     message: 'BANKNIFTY 45500 PE entry at 100 lots — 4× your average size — 8 min after ₹2,600 loss. Win rate on oversized entries: 28% vs 60% baseline.',
     created_at: daysAgo(0, 10, 51), acknowledged: false,
     details: {
@@ -347,7 +347,7 @@ export const DEMO_RISK_ALERTS = [
     },
   },
   {
-    id: 'ra-005', pattern_type: 'early_exit', severity: 'medium',
+    id: 'ra-005', pattern_type: 'early_exit', severity: 'caution',
     message: 'NIFTY CE exited at +₹820 after 8 min. Position continued to +₹2,100. You exit 42% early on average — ₹7,680 in unrealised gains left behind this month.',
     created_at: daysAgo(0, 9, 38), acknowledged: false,
     details: {
@@ -361,7 +361,7 @@ export const DEMO_RISK_ALERTS = [
     },
   },
   {
-    id: 'ra-006', pattern_type: 'no_stoploss', severity: 'high',
+    id: 'ra-006', pattern_type: 'no_stoploss', severity: 'danger',
     message: 'FINNIFTY 19800 CE open 47 min with no stop-loss. Unrealised loss: ₹3,200. Positions without stop-loss average 3× larger final loss for you.',
     created_at: daysAgo(0, 9, 15), acknowledged: false,
     details: {
@@ -373,7 +373,7 @@ export const DEMO_RISK_ALERTS = [
     },
   },
   {
-    id: 'ra-007', pattern_type: 'opening_5min_trap', severity: 'medium',
+    id: 'ra-007', pattern_type: 'opening_5min_trap', severity: 'caution',
     message: 'NIFTY CE entry at 09:17 — within opening 5-min window. Your win rate on opening entries is 19% vs 54% after 09:30. This pattern cost ₹9,400 last month.',
     created_at: daysAgo(1, 9, 20), acknowledged: true,
     details: {
@@ -1334,6 +1334,177 @@ export const DEMO_CONSTITUTION_VIOLATIONS = {
     cooldown_after_loss: 4,
     max_position_size: 2,
   },
+};
+
+// Mirrors GET /api/risk/patterns. A subset of the real catalogue, byte-identical
+// in shape to what the endpoint returns — guest fixtures double as smoke
+// fixtures, and every past divergence between a mock and its endpoint shipped
+// as a live bug. `count` is the real total; the list is trimmed to the patterns
+// the demo alerts actually use.
+export const DEMO_PATTERN_CATALOGUE = {
+  "patterns": [
+    {
+      "pattern_type": "martingale_behaviour",
+      "label": "Averaging down",
+      "observes": "Position size increasing after consecutive losses on the same instrument.",
+      "explanation": "Each step raises the total at risk in the session, not just the cost of this trade.",
+      "nature": "risk",
+      "disposition": "alerting",
+      "trigger": "exit",
+      "guardian_eligible": false,
+      "version": "1.1.0"
+    },
+    {
+      "pattern_type": "overtrading_burst",
+      "label": "Burst of trades",
+      "observes": "Positions opened inside a 30-minute window, counting a multi-leg structure as one.",
+      "explanation": "Trades taken minutes apart share one state of mind rather than separate assessments.",
+      "nature": "emotional",
+      "disposition": "alerting",
+      "trigger": "exit",
+      "guardian_eligible": false,
+      "version": "2.0.0"
+    },
+    {
+      "pattern_type": "early_exit",
+      "label": "Early exit",
+      "observes": "Winning positions closed well short of your usual holding time.",
+      "explanation": "Winners cut short while losers run is the asymmetry that quietly caps a strategy.",
+      "nature": "performance",
+      "disposition": "analytics",
+      "trigger": "session",
+      "guardian_eligible": false,
+      "version": "2.0.0"
+    },
+    {
+      "pattern_type": "profit_giveaway",
+      "label": "Gains given back",
+      "observes": "Session P&L against its high-water mark for the day.",
+      "explanation": "The trade taken after a session peak is the one that decides whether the day is kept.",
+      "nature": "emotional",
+      "disposition": "alerting",
+      "trigger": "exit",
+      "guardian_eligible": false,
+      "version": "1.0.0"
+    },
+    {
+      "pattern_type": "daily_overtrading",
+      "label": "Heavy day",
+      "observes": "Total positions opened today, counting a multi-leg structure as one.",
+      "explanation": "Past a certain count the day stops being a series of decisions and becomes momentum.",
+      "nature": null,
+      "disposition": "alerting",
+      "trigger": "position",
+      "guardian_eligible": false,
+      "version": "2.0.0"
+    },
+    {
+      "pattern_type": "rapid_reentry",
+      "label": "Immediate re-entry",
+      "observes": "Re-entering the same instrument shortly after closing it at a loss.",
+      "explanation": "The setup that just failed has not changed in those few minutes. The re-entry is a second attempt at the same idea at a worse moment.",
+      "nature": "emotional",
+      "disposition": "analytics",
+      "trigger": "exit",
+      "guardian_eligible": false,
+      "version": "2.0.0"
+    },
+    {
+      "pattern_type": "no_stoploss",
+      "label": "No stop-loss on record",
+      "observes": "Whether a stop-loss order was on the position when it was exited.",
+      "explanation": "A pre-defined exit is decided before the position moves. Without one, the exit is decided while it is moving.",
+      "nature": "risk",
+      "disposition": "alerting",
+      "trigger": "exit",
+      "guardian_eligible": false,
+      "version": "1.0.0"
+    },
+    {
+      "pattern_type": "opening_5min_trap",
+      "label": "Opening-minutes entry",
+      "observes": "Entries in the first minutes after open that closed quickly at a loss, or lost heavily.",
+      "explanation": "Spreads are widest and option premiums least settled while the market is still finding its level.",
+      "nature": "emotional",
+      "disposition": "analytics",
+      "trigger": "exit",
+      "guardian_eligible": false,
+      "version": "2.0.0"
+    },
+    {
+      "pattern_type": "premium_loss_event",
+      "label": "Premium destruction",
+      "observes": "Percentage of the premium paid that has been lost on a long option.",
+      "explanation": "Beyond a point the position needs a move it was never sized for. Time is on the other side.",
+      "nature": "risk",
+      "disposition": "alerting",
+      "trigger": "exit",
+      "guardian_eligible": false,
+      "version": "2.0.0"
+    },
+    {
+      "pattern_type": "post_loss_recovery_bet",
+      "label": "Recovery bet",
+      "observes": "A position materially larger than your average, entered after a loss on the same underlying.",
+      "explanation": "If this one also loses, the combined loss exceeds everything it was meant to recover.",
+      "nature": "risk",
+      "disposition": "alerting",
+      "trigger": "exit",
+      "guardian_eligible": false,
+      "version": "1.1.0"
+    },
+    {
+      "pattern_type": "size_escalation",
+      "label": "Rising position size",
+      "observes": "Quantity across consecutive trades on the same underlying while losing.",
+      "explanation": "Larger size on an instrument that is already losing compounds the drawdown rather than recovering it.",
+      "nature": "emotional",
+      "disposition": "alerting",
+      "trigger": "exit",
+      "guardian_eligible": false,
+      "version": "1.1.0"
+    },
+    {
+      "pattern_type": "constitution_violation",
+      "label": "Rule breach",
+      "observes": "Your own limits — loss cap, trade count, cooldown, no-trade windows, position size — against what you actually did.",
+      "explanation": "These are your numbers, written when the session was not running.",
+      "nature": "discipline",
+      "disposition": "alerting",
+      "trigger": "exit",
+      "guardian_eligible": true,
+      "version": "1.0.0"
+    },
+    {
+      "pattern_type": "session_meltdown",
+      "label": "Session breakdown",
+      "observes": "Session P&L against your daily loss limit, together with the pace of trading.",
+      "explanation": "A session that is both deep in loss and accelerating is the shape a bad day takes before it becomes the worst one.",
+      "nature": "risk",
+      "disposition": "alerting",
+      "trigger": "exit",
+      "guardian_eligible": true,
+      "version": "1.0.0"
+    },
+    {
+      "pattern_type": "revenge_trade",
+      "label": "Trade straight after a loss",
+      "observes": "How soon a new position follows a losing exit, and how its size compares to your average.",
+      "explanation": "A decision taken while the previous loss is still fresh is being made against that loss rather than on its own terms.",
+      "nature": "emotional",
+      "disposition": "alerting",
+      "trigger": "exit",
+      "guardian_eligible": false,
+      "version": "2.0.0"
+    }
+  ],
+  "count": 33,
+  "severity_order": [
+    "info",
+    "caution",
+    "danger",
+    "critical"
+  ]
 };
 
 // Mirrors GET /api/constitution/suggestions exactly — field names included.

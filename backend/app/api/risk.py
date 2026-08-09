@@ -21,6 +21,43 @@ router = APIRouter()
 MAX_ACTIVE_MUTES = 3
 VALID_OUTCOMES = {"stopped", "took_anyway", "not_useful"}
 
+@router.get("/patterns")
+async def get_pattern_catalogue():
+    """
+    Every behaviour pattern this system can raise, with what it observes and why.
+
+    One catalogue, served from the detector registry, so the copy cannot drift
+    from the pattern name again — which is exactly what happened when it lived
+    in three frontend `Record` maps keyed on names engine v2 had renamed.
+
+    Unauthenticated and cacheable: it is the same for every user, it is the
+    glossary, and it is the honest answer to "why did I get this alert".
+    """
+    from app.core.severity import SEVERITY_ORDER
+    from app.services.detector_registry import (
+        ALIASES, BY_NAME, all_pattern_types, pattern_copy,
+    )
+
+    patterns = []
+    for name in all_pattern_types():
+        copy = pattern_copy(name)
+        spec = BY_NAME.get(name)
+        patterns.append({
+            "pattern_type": name,
+            "label": copy.label,
+            "observes": copy.observes,
+            "explanation": copy.explanation,
+            "nature": spec.nature if spec else None,
+            "disposition": spec.disposition if spec else "alerting",
+            "trigger": spec.trigger if spec else "position",
+            "guardian_eligible": spec.guardian_eligible if spec else False,
+            "version": spec.version if spec else ALIASES.get(name),
+        })
+    patterns.sort(key=lambda p: p["label"])
+    return {"patterns": patterns, "count": len(patterns),
+            "severity_order": list(SEVERITY_ORDER)}
+
+
 @router.get("/state", response_model=RiskStateResponse)
 async def get_risk_state(
     broker_account_id: UUID = Depends(get_verified_broker_account_id),
@@ -46,15 +83,24 @@ async def get_risk_state(
     )
     recent_alerts = result.scalars().all()
 
+    # Severity has four values. This read `any(severity == "danger")` and fell
+    # to "caution" otherwise — so a session whose only unacknowledged alert was
+    # CRITICAL reported as caution, the mildest state above safe, on the
+    # endpoint that drives the dashboard. `worst` asks the shared vocabulary
+    # instead of comparing to a literal.
+    from app.core.severity import worst as _worst_severity
+
     if not recent_alerts:
         risk_state = "safe"
         active_patterns = []
-    elif any(a.severity == "danger" for a in recent_alerts):
-        risk_state = "danger"
-        active_patterns = list({a.pattern_type for a in recent_alerts if a.severity == "danger"})
     else:
-        risk_state = "caution"
-        active_patterns = list({a.pattern_type for a in recent_alerts})
+        top = _worst_severity(a.severity for a in recent_alerts)
+        if top in ("critical", "danger"):
+            risk_state = top
+            active_patterns = list({a.pattern_type for a in recent_alerts if a.severity == top})
+        else:
+            risk_state = "caution"
+            active_patterns = list({a.pattern_type for a in recent_alerts})
 
     # Resolve the user's EFFECTIVE daily limits from the same source the engine's
     # constitution / session-meltdown detectors use, so the dashboard hero and the
@@ -328,7 +374,8 @@ async def alert_response_stats(
     for a in alerts:
         d = by_pattern.setdefault(
             a.pattern_type,
-            {"total": 0, "acknowledged": 0, "stopped": 0, "took_anyway": 0},
+            {"total": 0, "acknowledged": 0, "stopped": 0, "took_anyway": 0,
+             "not_useful": 0},
         )
         d["total"] += 1
         if a.acknowledged_at is not None:
@@ -339,10 +386,20 @@ async def alert_response_stats(
             d["stopped"] += 1
         elif a.outcome == "took_anyway":
             d["took_anyway"] += 1
+        elif a.outcome == "not_useful":
+            # The only signal we have that the ENGINE was wrong rather than the
+            # trader. It was accepted, stored, and read by nothing — so every
+            # other number here measured the user's compliance and none
+            # measured our accuracy.
+            d["not_useful"] += 1
     rows = [
         {"pattern": p, "total": d["total"], "acknowledged": d["acknowledged"],
          "ignored": d["total"] - d["acknowledged"],
          "stopped": d["stopped"], "took_anyway": d["took_anyway"],
+         "not_useful": d["not_useful"],
+         # Share of alerts the trader marked as not useful. This is the closest
+         # thing to a false-positive rate the product has.
+         "not_useful_rate": round(d["not_useful"] / d["total"], 2) if d["total"] else None,
          "ack_rate": round(d["acknowledged"] / d["total"], 2) if d["total"] else None}
         for p, d in by_pattern.items()
     ]
@@ -351,4 +408,5 @@ async def alert_response_stats(
     return {"window_days": days, "patterns": rows,
             "total_ignored": sum(r["ignored"] for r in rows),
             "total_took_anyway": sum(r["took_anyway"] for r in rows),
-            "total_stopped": sum(r["stopped"] for r in rows)}
+            "total_stopped": sum(r["stopped"] for r in rows),
+            "total_not_useful": sum(r["not_useful"] for r in rows)}

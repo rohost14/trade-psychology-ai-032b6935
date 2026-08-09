@@ -31,7 +31,7 @@ Detectors consume primary state + the trade event; meta-detectors (Phase 5
 death spiral) consume BehaviorEvents.
 """
 from dataclasses import dataclass, field
-from typing import Tuple
+from typing import Dict, NamedTuple, Tuple
 
 
 @dataclass(frozen=True)
@@ -151,6 +151,10 @@ ALIASES = {
     "overexposure": "2.0.0",
     "portfolio_concentration": "1.0.0",
     "holding_loser": "1.0.0",
+    # Housekeeping nudge from maintenance_tasks, not a behaviour detector — but
+    # it IS written to risk_alerts.pattern_type, so it is part of the vocabulary
+    # and the contract test found it missing from this map.
+    "capital_mismatch": "1.0.0",
 }
 
 # Fast lookups
@@ -159,3 +163,236 @@ BY_NAME = {spec.name: spec for spec in REGISTRY}
 
 def spec_for(pattern_type: str) -> DetectorSpec | None:
     return BY_NAME.get(pattern_type)
+
+
+# ---------------------------------------------------------------------------
+# What each pattern MEANS — the single source of user-facing copy
+# ---------------------------------------------------------------------------
+# This lived in the frontend, in three separate `Record<string, string>` maps
+# keyed on pattern name with no normalisation. Engine v2 renamed the detectors;
+# the maps kept the v1 keys; the lookups silently returned undefined and React
+# rendered nothing. Overtrading — the most common alert we raise — opened a
+# detail panel with no facts, no explanation and no context, and there was no
+# error anywhere because a missing key is not a failure in either language.
+#
+# Copy lives here, next to the name it describes, and test_pattern_contract
+# fails if a pattern has no copy or copy has no pattern. A rename cannot
+# silently orphan a renderer again.
+#
+# Rules for writing these:
+#   observes    — what the detector actually looks at. Mechanical, checkable.
+#   explanation — why it is worth noticing. Mechanism only.
+#
+# No statistics. The frontend previously shipped precise unsourced claims
+# ("win rate on the 4th trade after 3 losses is typically below 30%") presented
+# as measurement. Where a number belongs, it is the trader's own — see My Record.
+
+class PatternCopy(NamedTuple):
+    label: str
+    observes: str
+    explanation: str
+
+
+PATTERN_COPY: Dict[str, PatternCopy] = {
+    # ── Emotional ────────────────────────────────────────────────────────
+    "revenge_trade": PatternCopy(
+        "Trade straight after a loss",
+        "How soon a new position follows a losing exit, and how its size compares to your average.",
+        "A decision taken while the previous loss is still fresh is being made against that loss "
+        "rather than on its own terms.",
+    ),
+    "rapid_reentry": PatternCopy(
+        "Immediate re-entry",
+        "Re-entering the same instrument shortly after closing it at a loss.",
+        "The setup that just failed has not changed in those few minutes. The re-entry is a "
+        "second attempt at the same idea at a worse moment.",
+    ),
+    "consecutive_loss_streak": PatternCopy(
+        "Consecutive losses",
+        "Losing trades in an unbroken run within one session.",
+        "After several losses in a row the next decision carries the weight of the previous ones "
+        "instead of standing on its own.",
+    ),
+    "session_meltdown": PatternCopy(
+        "Session breakdown",
+        "Session P&L against your daily loss limit, together with the pace of trading.",
+        "A session that is both deep in loss and accelerating is the shape a bad day takes before "
+        "it becomes the worst one.",
+    ),
+    "post_loss_recovery_bet": PatternCopy(
+        "Recovery bet",
+        "A position materially larger than your average, entered after a loss on the same underlying.",
+        "If this one also loses, the combined loss exceeds everything it was meant to recover.",
+    ),
+    "profit_giveaway": PatternCopy(
+        "Gains given back",
+        "Session P&L against its high-water mark for the day.",
+        "The trade taken after a session peak is the one that decides whether the day is kept.",
+    ),
+    "panic_exit": PatternCopy(
+        "Fast manual exit",
+        "A quick manual close at a loss with no stop-loss order on record.",
+        "May be a considered decision or a reaction. Worth reviewing against what you planned "
+        "before entering.",
+    ),
+    "fomo_entry": PatternCopy(
+        "Chasing several instruments",
+        "Entries spread across multiple distinct underlyings inside a short window.",
+        "Several unrelated instruments at once is usually chasing movement rather than acting on "
+        "a view.",
+    ),
+    "winning_streak_overconfidence": PatternCopy(
+        "Size up after wins",
+        "Position size after a run of winning trades, against your session average.",
+        "Size raised because recent trades worked is size raised on a sample, not on an edge.",
+    ),
+
+    # ── Risk / sizing ────────────────────────────────────────────────────
+    "size_escalation": PatternCopy(
+        "Rising position size",
+        "Quantity across consecutive trades on the same underlying while losing.",
+        "Larger size on an instrument that is already losing compounds the drawdown rather than "
+        "recovering it.",
+    ),
+    "martingale_behaviour": PatternCopy(
+        "Averaging down",
+        "Position size increasing after consecutive losses on the same instrument.",
+        "Each step raises the total at risk in the session, not just the cost of this trade.",
+    ),
+    "excess_exposure": PatternCopy(
+        "Oversized exposure",
+        "Capital at risk in a single position against the trading capital you declared.",
+        "One position large enough to define the session removes the choice of how the session ends.",
+    ),
+    "no_stoploss": PatternCopy(
+        "No stop-loss on record",
+        "Whether a stop-loss order was on the position when it was exited.",
+        "A pre-defined exit is decided before the position moves. Without one, the exit is decided "
+        "while it is moving.",
+    ),
+    "options_premium_avg_down": PatternCopy(
+        "Adding to a losing option",
+        "Additional quantity on an option position already down on premium.",
+        "Averaging down an option fights both direction and time decay.",
+    ),
+    "premium_loss_event": PatternCopy(
+        "Premium destruction",
+        "Percentage of the premium paid that has been lost on a long option.",
+        "Beyond a point the position needs a move it was never sized for. Time is on the other side.",
+    ),
+
+    # ── Discipline / pace ────────────────────────────────────────────────
+    "overtrading_burst": PatternCopy(
+        "Burst of trades",
+        "Positions opened inside a 30-minute window, counting a multi-leg structure as one.",
+        "Trades taken minutes apart share one state of mind rather than separate assessments.",
+    ),
+    "expiry_day_overtrading": PatternCopy(
+        "Expiry-day activity",
+        "Trades and lots on an instrument expiring today.",
+        "Expiry-day options move on time decay as much as direction, and the clock does not reverse.",
+    ),
+    "opening_5min_trap": PatternCopy(
+        "Opening-minutes entry",
+        "Entries in the first minutes after open that closed quickly at a loss, or lost heavily.",
+        "Spreads are widest and option premiums least settled while the market is still finding its level.",
+    ),
+    "end_of_session_mis_panic": PatternCopy(
+        "Late intraday entries",
+        "MIS entries in the run-up to auto square-off.",
+        "There is very little time for the position to work, and the exit is not yours to choose.",
+    ),
+    "cooldown_violation": PatternCopy(
+        "Cooldown ignored",
+        "Time between a losing exit and your next entry, against the cooldown you set.",
+        "The cooldown exists to put distance between a loss and the next decision.",
+    ),
+    "constitution_violation": PatternCopy(
+        "Rule breach",
+        "Your own limits — loss cap, trade count, cooldown, no-trade windows, position size — "
+        "against what you actually did.",
+        "These are your numbers, written when the session was not running.",
+    ),
+    "same_symbol_obsession": PatternCopy(
+        "Repeated same instrument",
+        "Repeat trades on one instrument, and their combined result.",
+        "Returning to the same instrument after losses on it is persistence with the instrument, "
+        "not with the strategy.",
+    ),
+    "direction_instability": PatternCopy(
+        "Direction flip-flop",
+        "Switching between long and short on the same underlying in a short window.",
+        "Reversing repeatedly usually tracks the price rather than a view about it.",
+    ),
+    "early_exit": PatternCopy(
+        "Early exit",
+        "Winning positions closed well short of your usual holding time.",
+        "Winners cut short while losers run is the asymmetry that quietly caps a strategy.",
+    ),
+
+    # ── Performance (analytics) ──────────────────────────────────────────
+    "win_rate_collapse": PatternCopy(
+        "Win rate below baseline",
+        "Today's win rate against your own longer-run baseline.",
+        "A sharp drop against your own history is a change in conditions or in execution — worth "
+        "knowing which.",
+    ),
+    "strategy_breakdown": PatternCopy(
+        "Strategy underperforming",
+        "Results grouped by the strategy structure you traded.",
+        "Separates a losing day from a structure that has stopped working.",
+    ),
+    "time_of_day_bias": PatternCopy(
+        "Time-of-day pattern",
+        "Results grouped by the hour you entered.",
+        "Most traders have hours that work and hours that do not. Yours are in your own record.",
+    ),
+}
+
+#: Copy for the event types emitted under a name that is not a registry spec.
+ALIAS_COPY: Dict[str, PatternCopy] = {
+    "daily_overtrading": PatternCopy(
+        "Heavy day",
+        "Total positions opened today, counting a multi-leg structure as one.",
+        "Past a certain count the day stops being a series of decisions and becomes momentum.",
+    ),
+    "death_spiral": PatternCopy(
+        "Multi-domain breakdown",
+        "Several different behaviour patterns firing together in one session.",
+        "One pattern is a moment. Several at once is a session that has stopped being managed.",
+    ),
+    "overexposure": PatternCopy(
+        "Position too large",
+        "The size of a position you have just opened against your capital.",
+        "Raised while the position is open, because that is while it can still be acted on.",
+    ),
+    "portfolio_concentration": PatternCopy(
+        "Concentrated exposure",
+        "Share of your open exposure sitting in one underlying.",
+        "Several positions in one underlying is one position wearing several names.",
+    ),
+    "holding_loser": PatternCopy(
+        "Holding a loser",
+        "How long an open position has been held while down.",
+        "A position held well past the point it was working is being held for a reason that is no "
+        "longer about the trade.",
+    ),
+    "capital_mismatch": PatternCopy(
+        "Capital out of date",
+        "The trading capital declared in your rules against what your account can actually deploy.",
+        "Percent-of-capital rules are only as accurate as the capital figure behind them.",
+    ),
+}
+
+
+def pattern_copy(pattern_type: str) -> PatternCopy | None:
+    """User-facing copy for any emitted pattern type, registry spec or alias."""
+    spec_copy = PATTERN_COPY.get(pattern_type)
+    if spec_copy:
+        return spec_copy
+    return ALIAS_COPY.get(pattern_type)
+
+
+def all_pattern_types() -> Tuple[str, ...]:
+    """Every pattern type this system can emit — specs plus aliases."""
+    return tuple(BY_NAME.keys()) + tuple(ALIASES.keys())

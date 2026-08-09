@@ -595,7 +595,10 @@ interface PatternSummary {
 }
 
 // Worst → least severe (index 0 = worst). Matches the app-wide 3-level scale.
-const SEVERITY_ORDER: PatternSeverity[] = ['danger', 'caution', 'positive'];
+// Worst first — index order IS the ranking (see worstSeverity below), so
+// critical has to lead. Omitting it did not just hide a badge: indexOf
+// returned -1 and the alert was skipped when picking a group's worst.
+const SEVERITY_ORDER: PatternSeverity[] = ['critical', 'danger', 'caution', 'positive'];
 
 function PatternsTab() {
   const { alerts, isLoading } = useAlerts();
@@ -609,7 +612,7 @@ function PatternsTab() {
         name: alert.pattern.name,
         count: 0,
         latestAt: undefined,
-        severities: { danger: 0, caution: 0, positive: 0 },
+        severities: { critical: 0, danger: 0, caution: 0, positive: 0 },
         worstSeverity: 'positive' as PatternSeverity,
       };
       existing.count++;

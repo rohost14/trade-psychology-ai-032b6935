@@ -14,7 +14,7 @@ from datetime import datetime, timedelta, timezone
 from sqlalchemy import select, and_, func
 from sqlalchemy.ext.asyncio import AsyncSession
 
-_SEV_RANK = {"info": 0, "caution": 1, "medium": 1, "danger": 2, "high": 2, "critical": 3}
+from app.core.severity import rank as _sev_rank
 
 
 def summarize_behavior(alerts, session_risk_score=None, flagged_pnl=0.0) -> dict:
@@ -33,7 +33,7 @@ def summarize_behavior(alerts, session_risk_score=None, flagged_pnl=0.0) -> dict
             continue
         sev = a.severity or "medium"
         cur = by_pattern.get(pt)
-        if cur is None or _SEV_RANK.get(sev, 0) > _SEV_RANK.get(cur["severity"], 0):
+        if cur is None or _sev_rank(sev) > _sev_rank(cur["severity"]):
             by_pattern[pt] = {
                 "pattern_type": pt,
                 "name": pt,
@@ -41,7 +41,7 @@ def summarize_behavior(alerts, session_risk_score=None, flagged_pnl=0.0) -> dict
                 "description": a.message or "",
                 "is_positive": False,
             }
-    patterns = sorted(by_pattern.values(), key=lambda p: -_SEV_RANK.get(p["severity"], 0))
+    patterns = sorted(by_pattern.values(), key=lambda p: -_sev_rank(p["severity"]))
     return {
         "patterns_detected": patterns,
         "behavior_score": session_risk_score,

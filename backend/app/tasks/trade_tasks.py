@@ -16,7 +16,7 @@ from app.core.celery_app import celery_app
 from app.core.database import SessionLocal
 from app.core.config import settings
 from app.core.trading_defaults import COLD_START_DEFAULTS
-from app.core.severity import is_notifiable
+from app.core.severity import is_notifiable, rank as _sev_rank
 from app.services.trade_sync_service import TradeSyncService
 from app.services.pnl_calculator import pnl_calculator
 from app.models.user import User
@@ -232,7 +232,6 @@ async def _run_death_spiral(broker_account_id: UUID, db, latest_trade_time=None)
     if not verdict:
         return None
 
-    _RANK = {"info": 0, "caution": 1, "danger": 2, "critical": 3}
     prior_result = await db.execute(
         select(RiskAlert).where(and_(
             RiskAlert.broker_account_id == broker_account_id,
@@ -241,8 +240,8 @@ async def _run_death_spiral(broker_account_id: UUID, db, latest_trade_time=None)
         ))
     )
     prior = list(prior_result.scalars().all())
-    max_prior = max((_RANK.get(a.severity, 0) for a in prior), default=-1)
-    if _RANK.get(verdict["severity"], 0) <= max_prior:
+    max_prior = max((_sev_rank(a.severity) for a in prior), default=-1)
+    if _sev_rank(verdict["severity"]) <= max_prior:
         return None  # already fired at this level or higher today
 
     detected_at = latest_trade_time or now_utc
@@ -927,7 +926,6 @@ async def run_risk_detection_async(
         # severity escalation (caution → danger) is allowed through within the
         # dedup window. Previously the escalation code was unreachable — the
         # dedup `continue` ran before it.
-        _SEV_RANK = {"info": 0, "caution": 1, "danger": 2, "critical": 3}
         last_fired: dict = {}      # dedup key -> datetime
         last_fired_sev: dict = {}  # dedup key -> severity string
         last_fired_details: dict = {}  # dedup key -> details (worsening re-arm)
@@ -949,8 +947,8 @@ async def run_risk_detection_async(
             if (now_utc - last_fired[key]) >= timedelta(hours=hours):
                 return False  # Window elapsed — allow
             # Within window: allow severity escalation through (caution → danger)
-            prev_rank = _SEV_RANK.get(last_fired_sev.get(key, ""), 0)
-            new_rank = _SEV_RANK.get(new_severity, 0)
+            prev_rank = _sev_rank(last_fired_sev.get(key, ""))
+            new_rank = _sev_rank(new_severity)
             if new_rank > prev_rank:
                 return False  # escalation always passes
             # Stateful re-arm (1B.9): same severity but the driving metric
@@ -1228,7 +1226,6 @@ async def run_behavior_engine_full_session(broker_account_id: UUID, db) -> int:
     )
     all_existing = existing_result.scalars().all()
     # HIGH-3 fix: track severity of last fire to allow caution → danger escalation.
-    _SEV_RANK = {"info": 0, "caution": 1, "danger": 2, "critical": 3}
     last_fired: dict = {}
     last_fired_sev: dict = {}
     last_fired_details: dict = {}
@@ -1250,8 +1247,8 @@ async def run_behavior_engine_full_session(broker_account_id: UUID, db) -> int:
         if (trade_time - last_fired[key]) >= timedelta(hours=hours):
             return False  # Window elapsed — allow
         # Within window: allow severity escalation (caution → danger)
-        prev_rank = _SEV_RANK.get(last_fired_sev.get(key, ""), 0)
-        new_rank = _SEV_RANK.get(new_severity, 0)
+        prev_rank = _sev_rank(last_fired_sev.get(key, ""))
+        new_rank = _sev_rank(new_severity)
         if new_rank > prev_rank:
             return False
         if _worsened(pattern_type, last_fired_details.get(key), new_details):

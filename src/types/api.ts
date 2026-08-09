@@ -125,7 +125,7 @@ export interface Alert {
   // Frontend uses pattern_name; backend sends pattern_type (RiskAlertResponse includes both)
   pattern_name: string;
   pattern_type?: string;
-  severity: 'danger' | 'caution' | 'positive';
+  severity: 'critical' | 'danger' | 'caution' | 'positive';
   // Frontend uses timestamp; backend sends detected_at (RiskAlertResponse includes both)
   timestamp: string;
   detected_at?: string;

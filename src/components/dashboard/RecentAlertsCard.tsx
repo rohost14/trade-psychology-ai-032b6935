@@ -3,7 +3,7 @@ import { Link } from 'react-router-dom';
 import { Skeleton } from '@/components/ui/skeleton';
 import { cn } from '@/lib/utils';
 import type { Alert } from '@/types/api';
-import { normalizeSeverityStr } from '@/lib/alertSeverity';
+import { isSevere, normalizeSeverityStr } from '@/lib/alertSeverity';
 
 interface RecentAlertsCardProps {
   alerts: (Alert & { pattern: string; description: string; why_it_matters?: string })[];
@@ -42,7 +42,9 @@ function compactAgo(ts: string): string {
 export default function RecentAlertsCard({ alerts, onOpen, onAcknowledge, loading }: RecentAlertsCardProps) {
   const visible = alerts.slice(0, MAX_VISIBLE);
   const hasMore = alerts.length > MAX_VISIBLE;
-  const criticalCount = visible.filter(a => normalizeSeverityStr(a.severity) === 'danger').length;
+  // isSevere, not === 'danger': critical is its own level now and this badge
+  // is the count of alerts that need attention, which includes both.
+  const criticalCount = visible.filter(a => isSevere(a.severity)).length;
 
   return (
     <section className="desk-card overflow-hidden">

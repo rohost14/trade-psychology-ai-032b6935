@@ -1793,10 +1793,15 @@ async def get_options_behavior(
     Aggregates direction_confusion, premium_avg_down, iv_crush alerts
     from risk_alerts table — gives "happened N times this month" insight.
     """
+    # `options_direction_confusion` and `iv_crush_behavior` were engine v1
+    # names. v2 renamed them and this query kept asking for the old ones, so
+    # two of the three sections below have been permanently empty — not "no
+    # occurrences this month", but "cannot ever have any". Removed rather than
+    # repointed: the nearest v2 equivalents are `direction_instability` and
+    # `premium_loss_event`, and pointing them here would silently change what
+    # those sections mean. That is a product decision, not a rename.
     OPTIONS_PATTERNS = (
-        "options_direction_confusion",
         "options_premium_avg_down",
-        "iv_crush_behavior",
     )
     try:
         cutoff = datetime.now(timezone.utc) - timedelta(days=days)
@@ -1813,13 +1818,11 @@ async def get_options_behavior(
         direction: list[RiskAlert] = []
         avg_down: list[RiskAlert] = []
         iv_crush: list[RiskAlert] = []
+        # direction / iv_crush stay empty — see OPTIONS_PATTERNS above. The
+        # response shape is unchanged so the frontend card keeps working.
         for a in alerts:
-            if a.pattern_type == "options_direction_confusion":
-                direction.append(a)
-            elif a.pattern_type == "options_premium_avg_down":
+            if a.pattern_type == "options_premium_avg_down":
                 avg_down.append(a)
-            elif a.pattern_type == "iv_crush_behavior":
-                iv_crush.append(a)
 
         # ── Direction confusion ──────────────────────────────────────────
         underlying_counts: dict[str, int] = defaultdict(int)

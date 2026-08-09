@@ -13,7 +13,7 @@ import {
   DEMO_PNL_PERCENT, DEMO_BTST, DEMO_PNL_ATTRIBUTION, DEMO_QUALITY_BREAKDOWN,
   DEMO_INSTRUMENT_NIFTY, DEMO_EDGE_LEAK, DEMO_STRATEGY_PERFORMANCE, DEMO_HABITS, DEMO_SESSION_LOG, DEMO_BEHAVIOUR_COST, DEMO_ALERT_RESPONSE_STATS, DEMO_RISK_SCORES, DEMO_SAVED_REPORTS, DEMO_JOURNAL_ENTRIES,
   DEMO_CONSTITUTION, DEMO_CONSTITUTION_STATUS, DEMO_CONSTITUTION_VIOLATIONS, DEMO_CONSTITUTION_HISTORY, DEMO_CONSTITUTION_EFFECTIVE,
-  DEMO_RULE_SUGGESTIONS,
+  DEMO_RULE_SUGGESTIONS, DEMO_PATTERN_CATALOGUE,
 } from './demoData';
 
 export const GUEST_MODE_KEY = 'tradementor_guest_mode';
@@ -84,6 +84,7 @@ export function getGuestResponse(url: string, method = 'GET'): unknown | undefin
   if (path === '/api/analytics/overview') return DEMO_OVERVIEW;
   if (path === '/api/analytics/habits') return DEMO_HABITS;
   if (path === '/api/analytics/session-log') return DEMO_SESSION_LOG;
+  if (path === '/api/risk/patterns') return DEMO_PATTERN_CATALOGUE;
   if (path === '/api/risk/alert-response-stats') return DEMO_ALERT_RESPONSE_STATS;
   if (path === '/api/risk/scores') return DEMO_RISK_SCORES;
   if (path === '/api/reports/saved') return DEMO_SAVED_REPORTS;

@@ -29,6 +29,7 @@ from app.core.celery_app import celery_app
 from app.core.config import settings
 from app.core.database import SessionLocal
 from app.core.market_hours import is_market_open, MarketSegment
+from app.core.severity import rank as _sev_rank
 from app.services.price_stream_service import get_cached_ltp
 
 logger = logging.getLogger(__name__)
@@ -477,7 +478,6 @@ async def _fire_position_alert(
 
     # 30-min dedup window; rule-aware for constitution (Q15) and
     # escalation-aware (Phase 6): a higher severity always passes.
-    _RANK = {"info": 0, "caution": 1, "danger": 2, "critical": 3}
     cutoff = datetime.now(timezone.utc) - timedelta(minutes=30)
     existing = await db.execute(
         select(RiskAlert).where(
@@ -491,8 +491,8 @@ async def _fire_position_alert(
     rule = (details or {}).get("rule")
     recent = [a for a in existing.scalars().all()
               if rule is None or (a.details or {}).get("rule") == rule]
-    max_recent = max((_RANK.get(a.severity, 0) for a in recent), default=-1)
-    if recent and _RANK.get(severity, 0) <= max_recent:
+    max_recent = max((_sev_rank(a.severity) for a in recent), default=-1)
+    if recent and _sev_rank(severity) <= max_recent:
         logger.debug(
             f"[position_monitor] {pattern_type} for {broker_account_id[:8]} "
             f"suppressed — already alerted at this level in last 30 min"

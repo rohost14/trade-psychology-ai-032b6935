@@ -5,6 +5,7 @@ import { Sheet, SheetContent } from '@/components/ui/sheet';
 import { cn } from '@/lib/utils';
 import { toast } from 'sonner';
 import { AlertNotification, useAlerts } from '@/contexts/AlertContext';
+import { usePatternCatalogue } from '@/hooks/usePatternCatalogue';
 import { PatternSeverity } from '@/types/patterns';
 import { SEV_DOT, SEV_LABEL, SEV_LABEL_COLOR, SEV_LEFT_BORDER } from '@/lib/alertSeverity';
 
@@ -15,41 +16,6 @@ const OUTCOME_LABEL: Record<string, string> = {
 };
 
 const WEEK_MS = 7 * 24 * 60 * 60 * 1000;
-
-// ─── Trader context / benchmarks (keyed by backend pattern_type) ─────────────
-// Based on trading psychology research and aggregate behavioral data.
-const TRADER_BENCHMARKS: Record<string, string> = {
-  revenge_trade:            'Most traders who trigger this alert take at least one more losing trade within the same hour. The second trade has a lower win rate than their session baseline.',
-  rapid_reentry:            'Re-entries on the same instrument after a stop-loss hit have a below-baseline win rate — the setup that failed has not changed.',
-  panic_exit:               'Panic exits typically occur when a position is down 30–50% beyond the trader\'s original planned stop. Positions exited in panic are rarely re-entered at a better price.',
-  size_escalation:          'Traders who escalate size after a loss sequence experience 2–3× their normal drawdown. The larger position compounds losses from an already-weakened emotional state.',
-  martingale_behaviour:     'Martingale sequences that escalate to 4 or more trades rarely recover to breakeven within the same session. The capital required doubles with each step.',
-  post_loss_recovery_bet:   'Recovery bets at 2× or more of normal position size lose more often than they win. The trade is entered at maximum emotional impairment and maximum capital risk.',
-  consecutive_loss_streak:  'Most traders who stop after a third consecutive loss end the session better than those who continue. Win rate on the 4th trade after 3 losses is typically below 30%.',
-  overtrading:              'Win rate for retail F&O traders drops measurably after the 7th trade in a session. More trades past the optimal count reduce expected return per trade.',
-  profit_giveaway:          'The trade taken after reaching a session P&L high is statistically the most likely to give back gains. The impulse to "keep it going" is strongest at the worst moment.',
-  no_stoploss:              'Positions held without a pre-defined stop-loss are held 3× longer than planned on average. The longer a losing position is held, the harder it becomes to exit.',
-  opening_5min_trap:        'Options premiums in the first 5–8 minutes of market open are typically 15–25% inflated versus 15 minutes later. Bid-ask spreads are also at their widest.',
-  end_of_session_mis_panic: 'MIS positions entered after 15:10 IST have less than 20 minutes before forced auto-square-off. The time available to manage the position is insufficient for most setups.',
-  fomo_entry:               'Entries taken after missing the initial move of a trend have a lower expected return than entries at the move\'s start. You are buying into momentum, not positioning for it.',
-};
-
-// ─── Pattern explanations (keyed by backend pattern_type) ────────────────────
-const PATTERN_EXPLANATIONS: Record<string, string> = {
-  revenge_trade:            'Entering immediately after a loss while the emotional response is still active. The next trade placed under stress tends to be larger, faster, and less disciplined than planned.',
-  rapid_reentry:            'Re-entering the same instrument shortly after a losing exit. The setup has not changed — the same conditions that caused the first loss are still in play.',
-  panic_exit:               'A fast manual exit at a loss with no stop-loss order on record. May be a rational decision or an impulsive reaction — worth reviewing against your pre-trade plan.',
-  size_escalation:          'Your quantity on the same underlying has been rising across consecutive trades while you were losing. A larger size on an already-losing instrument compounds the total drawdown.',
-  martingale_behaviour:     'Increasing position size after consecutive losses on the same instrument. Each escalation increases the total risk in the session, not just the cost of this trade.',
-  post_loss_recovery_bet:   'Taking a significantly larger position on the same underlying after losing. If this trade also loses, the combined loss will exceed all prior losses combined.',
-  consecutive_loss_streak:  'Multiple consecutive losses in the same session. After the third loss, the probability of the next trade being a loss is statistically higher due to emotional state, not randomness.',
-  overtrading:              'Trade frequency has exceeded your normal session pace. More trades per hour rarely means more profit — it usually means smaller gaps between decisions.',
-  profit_giveaway:          'You had reached a session high, then a subsequent trade gave back a large portion of those gains. Common pattern: taking one more trade after a good session.',
-  no_stoploss:              'The position was exited manually without a stop-loss order triggering. Pre-defined exits reduce the emotional cost of holding through a drawdown.',
-  opening_5min_trap:        'Entry in the first 8 minutes of market open. Bid-ask spreads are widest and option premiums are most distorted during this window as the market finds its opening level.',
-  end_of_session_mis_panic: 'MIS position opened after 15:10 IST with forced auto-square-off within minutes. Very little time to manage the trade once entered.',
-  fomo_entry:               'Entry spread across multiple unrelated instruments in a short window. Often a signal of chasing multiple moves simultaneously rather than a focused view.',
-};
 
 // ─── Formatters ───────────────────────────────────────────────────────────────
 function fmtRs(val: unknown) {
@@ -105,9 +71,19 @@ function buildFacts(patternType: string, d: Record<string, unknown>): { label: s
       if (d.streak != null)  add('Loss streak', `${d.streak} in a row`);
       if (d.total_loss)      add('Total loss', fmtRs(d.total_loss));
       break;
-    case 'overtrading':
+    // Engine v2 split overtrading into a 30-minute burst and a daily total.
+    // This case was still keyed on the v1 name, so the most frequent alert we
+    // raise showed no facts at all.
+    case 'overtrading_burst':
+    case 'daily_overtrading':
       if (d.daily_count != null)      add('Trades today', String(d.daily_count));
       if (d.trades_in_window != null) add('Trades in window', String(d.trades_in_window));
+      // Counting is structure-aware, so a four-leg spread is one decision.
+      // Show the legs too when they differ, or the numbers look wrong.
+      if (d.legs_in_window != null && d.legs_in_window !== d.trades_in_window)
+        add('Individual legs', String(d.legs_in_window));
+      if (d.daily_legs != null && d.daily_legs !== d.daily_count)
+        add('Legs today', String(d.daily_legs));
       break;
     case 'profit_giveaway':
       if (d.peak_pnl != null)   add('Session peak P&L', fmtRs(d.peak_pnl));
@@ -174,10 +150,12 @@ export default function AlertDetailSheet({ alert, open, onClose, onAcknowledge }
   } = useAlerts();
   const [busy, setBusy] = useState(false);
   const [localOutcome, setLocalOutcome] = useState<string | null>(null);
+  const { lookup: lookupPattern } = usePatternCatalogue();
   if (!alert) return null;
 
   const sev = alert.pattern.severity;
   const backendType = alert.pattern.backend_type;
+  const patternInfo = lookupPattern(backendType);
   const facts = buildFacts(backendType, alert.pattern.details ?? {});
   const confidence = alert.pattern.confidence;
   const outcome = localOutcome ?? alert.pattern.outcome ?? null;
@@ -364,23 +342,32 @@ export default function AlertDetailSheet({ alert, open, onClose, onAcknowledge }
             );
           })()}
 
-          {/* Pattern explanation */}
-          {PATTERN_EXPLANATIONS[backendType] && (
-            <p className="text-[12px] text-muted-foreground leading-relaxed border-t border-border pt-4">
-              {PATTERN_EXPLANATIONS[backendType]}
-            </p>
-          )}
-
-          {/* Trader context benchmark — clearly framed as a general pattern, not
-              individual advice or a guarantee (SEBI-sensitive copy). */}
-          {TRADER_BENCHMARKS[backendType] && (
-            <div className="rounded-lg bg-muted/40 px-3 py-3">
-              <p className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wide mb-1">
-                General pattern (not individual advice)
-              </p>
-              <p className="text-[12px] text-muted-foreground leading-relaxed">
-                {TRADER_BENCHMARKS[backendType]}
-              </p>
+          {/* What this pattern watches, and why — from the detector registry.
+              Two local Record maps used to live here, keyed on engine v1 names,
+              so the most common alert we raise rendered neither of them. The
+              second of those maps also carried precise unsourced statistics
+              ("win rate on the 4th trade after 3 losses is typically below
+              30%") presented as measurement. Both are gone: the copy has one
+              home, next to the names it describes, and it states mechanism
+              rather than numbers we cannot stand behind. */}
+          {patternInfo && (
+            <div className="border-t border-border pt-4 space-y-3">
+              <div>
+                <p className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wide mb-1">
+                  What this watches
+                </p>
+                <p className="text-[12px] text-muted-foreground leading-relaxed">
+                  {patternInfo.observes}
+                </p>
+              </div>
+              <div>
+                <p className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wide mb-1">
+                  Why it matters
+                </p>
+                <p className="text-[12px] text-muted-foreground leading-relaxed">
+                  {patternInfo.explanation}
+                </p>
+              </div>
             </div>
           )}
 

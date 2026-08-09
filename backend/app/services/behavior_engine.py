@@ -538,7 +538,6 @@ class BehaviorEngine:
 
         flags = flags or {}
         events = []
-        _SEV_RANK = {"critical": 0, "danger": 1, "caution": 2, "positive": 3}
         for spec in REGISTRY:
             mode = detector_flags.resolve(spec.name, ctx.broker_account_id, flags)
             if mode == EFFECTIVE_OFF:

@@ -30,7 +30,17 @@ export type PatternType =
   | 'post_loss_recovery_bet'
   | 'profit_giveaway';
 
-export type PatternSeverity = 'danger' | 'caution' | 'positive';
+/**
+ * Mirrors the backend vocabulary (app/core/severity.py), minus `info`, which is
+ * analytics-only evidence and never reaches a user.
+ *
+ * `critical` was missing here, and normalizeSeverityStr folded it into
+ * `danger` — so a trader who breached 120% of their own loss limit, or lost 80%
+ * of an option's premium, saw exactly the same row as one who breached 100%.
+ * Critical is also the severity that reaches an accountability partner, so the
+ * distinction the engine computes has to survive to the screen.
+ */
+export type PatternSeverity = 'critical' | 'danger' | 'caution' | 'positive';
 
 export interface BehaviorPattern {
   id: string;
