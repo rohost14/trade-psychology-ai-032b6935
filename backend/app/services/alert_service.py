@@ -1,163 +1,161 @@
+"""
+WhatsApp delivery for risk alerts — trader messages and guardian messages.
+
+This file used to carry its own copy of the alert copy: a per-pattern `if` chain
+that wrote a tailored sentence for `overtrading`, `revenge_sizing` and
+`consecutive_loss`. Engine v2 renamed those detectors, the comparisons stayed
+literal, and every message quietly fell through to the generic branch. Three
+hand-written messages that no user ever received.
+
+So there is now exactly one author of alert copy: the engine, which writes an
+evidenced sentence into `alert.message` at detection time ("5 positions opened
+between 10:02 and 10:18 after a ₹4,200 loss"). This module frames it and sends
+it. A rename cannot break framing.
+
+Two audiences, two formatters, and they must never be swapped:
+
+  * The **trader** gets `alert.message` verbatim. It is written for them and is
+    second-person in many detectors ("You entered NIFTY after…").
+  * The **guardian** must not receive that text — forwarding it tells a third
+    party "you are in tilt mode" and hands them the trader's P&L and symbols.
+    They get the minimum that makes a check-in possible: who, which pattern,
+    how serious, when. No numbers, no instrument, no broker client id.
+
+Voice: mirror, not blocker. We report what happened. We do not instruct anyone to
+stop trading, diagnose an emotional state, or claim a pattern causes losses.
+"""
 from typing import Optional
 import logging
-from uuid import UUID
+from zoneinfo import ZoneInfo
 
+from app.core.severity import is_notifiable, label as severity_label
 from app.models.risk_alert import RiskAlert
 from app.models.broker_account import BrokerAccount
 from app.services.whatsapp_service import whatsapp_service
 
 logger = logging.getLogger(__name__)
+IST = ZoneInfo("Asia/Kolkata")
+
+
+def _pattern_label(pattern_type: Optional[str]) -> str:
+    """
+    'overtrading_burst' -> 'Overtrading burst'.
+
+    Derived, not mapped. A lookup table keyed on pattern names is precisely what
+    broke this file before. Phase 2 moves real labels onto DetectorSpec, where
+    they live beside the name they describe; until then this cannot go stale.
+    """
+    if not pattern_type:
+        return "Behaviour pattern"
+    return pattern_type.replace("_", " ").capitalize()
+
+
+def _ist_time(alert: RiskAlert) -> str:
+    ts = alert.detected_at
+    if not ts:
+        return ""
+    try:
+        return ts.astimezone(IST).strftime("%I:%M %p").lstrip("0")
+    except Exception:
+        return ts.strftime("%I:%M %p").lstrip("0")
+
 
 class AlertService:
     """
-    Send WhatsApp alerts for critical risk patterns.
-    Delegates sending to the shared whatsapp_service singleton.
+    Send WhatsApp alerts for behaviour patterns.
+    Delegates transport to the shared whatsapp_service singleton.
     """
 
     def __init__(self):
         pass
-    
+
+    # ── Trader ────────────────────────────────────────────────────────────────
+
     async def send_risk_alert(
         self,
         risk_alert: RiskAlert,
         broker_account: BrokerAccount,
-        phone_number: str
+        phone_number: str,
     ) -> bool:
         """
-        Send WhatsApp alert for risk pattern.
-        
-        Args:
-            risk_alert: The RiskAlert object
-            broker_account: User's broker account
-            phone_number: WhatsApp number (format: +919876543210)
-        
-        Returns:
-            True if sent successfully, False otherwise
+        Send the alert to the trader.
+
+        Gated on the shared notifiable set, not a literal. The previous
+        `!= "danger"` check silently discarded every `critical` alert — the most
+        serious class we raise was the one class guaranteed never to send.
         """
         try:
-            # Only send for DANGER alerts (not CAUTION)
-            if risk_alert.severity != "danger":
-                logger.info(f"Skipping alert (severity={risk_alert.severity})")
+            if not is_notifiable(risk_alert.severity):
+                logger.info(f"Skipping WhatsApp alert (severity={risk_alert.severity})")
                 return False
-            
-            # Format message based on pattern type
-            message = self._format_alert_message(risk_alert, broker_account)
 
+            message = self._format_alert_message(risk_alert, broker_account)
             sent = await whatsapp_service.send_message(phone_number, message)
             if sent:
                 logger.info(f"WhatsApp alert sent for alert {risk_alert.id}")
             return sent
-            
+
         except Exception as e:
             logger.error(f"Failed to send WhatsApp alert: {e}", exc_info=True)
             return False
-    
+
     def _format_alert_message(
         self,
         alert: RiskAlert,
-        broker_account: BrokerAccount
+        broker_account: BrokerAccount,
     ) -> str:
         """
-        Format alert message based on pattern type.
-        Keep it SHORT, URGENT, ACTIONABLE.
-        """
-        header = "🚨 *TRADEMENTOR RISK ALERT* 🚨\n\n"
-        
-        if alert.pattern_type == "overtrading":
-            details = alert.details or {}
-            trade_count = details.get("trade_count", "multiple")
-            
-            message = (
-                f"{header}"
-                f"⚠️ *OVERTRADING DETECTED*\n\n"
-                f"You've taken *{trade_count} trades in 15 minutes*.\n\n"
-                f"🛑 *STOP TRADING NOW*\n"
-                f"Take a mandatory 30-minute break.\n\n"
-                f"This pattern historically leads to major losses."
-            )
-        
-        elif alert.pattern_type == "revenge_sizing":
-            details = alert.details or {}
-            size_increase = details.get("size_increase_pct", 0)
-            
-            message = (
-                f"{header}"
-                f"⚠️ *REVENGE TRADING DETECTED*\n\n"
-                f"Position size increased *{size_increase:.0f}%* after recent trade.\n\n"
-                f"🛑 *STOP IMMEDIATELY*\n"
-                f"You are in tilt mode.\n\n"
-                f"Close this position and step away."
-            )
-        
-        elif alert.pattern_type == "consecutive_loss":
-            details = alert.details or {}
-            loss_count = details.get("consecutive_losses", details.get("consecutive_count", 3))
-            
-            message = (
-                f"{header}"
-                f"⚠️ *LOSS SPIRAL DETECTED*\n\n"
-                f"*{loss_count} consecutive trades* without clear wins.\n\n"
-                f"🛑 *STOP TRADING*\n"
-                f"Your strategy isn't working today.\n\n"
-                f"Review and come back tomorrow."
-            )
-        
-        else:
-            message = (
-                f"{header}"
-                f"⚠️ *RISK PATTERN DETECTED*\n\n"
-                f"{alert.message}\n\n"
-                f"🛑 Stop trading and review your approach."
-            )
-        
-        # Add footer
-        footer = (
-            f"\n\n"
-            f"Account: {broker_account.broker_user_id}\n"
-            f"Time: {alert.detected_at.strftime('%I:%M %p')}"
-        )
-        
-        return message + footer
-    
-    async def send_test_alert(self, phone_number: str) -> bool:
-        """
-        Send test alert to verify WhatsApp setup.
-        """
-        try:
-            message = (
-                "✅ *TradeMentor Test Alert*\n\n"
-                "Your WhatsApp alerts are configured correctly!\n\n"
-                "You'll receive urgent notifications here when dangerous trading patterns are detected."
-            )
-            return await whatsapp_service.send_message(phone_number, message)
+        Frame the engine's sentence for the trader.
 
-        except Exception as e:
-            logger.error(f"Failed to send test alert: {e}", exc_info=True)
-            return False
-    
-    async def send_risk_alert_with_guardian(
+        No instruction to stop, no diagnosis, no "this historically leads to
+        major losses". The observation is the product.
+        """
+        body = (alert.message or "").strip() or (
+            f"{_pattern_label(alert.pattern_type)} detected on today's trading."
+        )
+        when = _ist_time(alert)
+        lines = [
+            f"*TradeMentor* · {severity_label(alert.severity)}",
+            "",
+            f"*{_pattern_label(alert.pattern_type)}*",
+            body,
+        ]
+        if when:
+            lines += ["", f"_{when} IST_"]
+        lines += ["", "Open TradeMentor to see the trades behind this."]
+        return "\n".join(lines)
+
+    # ── Guardian ──────────────────────────────────────────────────────────────
+
+    async def send_guardian_alert(
         self,
         risk_alert: RiskAlert,
-        broker_account: BrokerAccount,
-        user_phone: str,
-        guardian_phone: Optional[str] = None,
+        phone_number: str,
+        trader_name: Optional[str] = None,
         guardian_name: Optional[str] = None,
     ) -> bool:
         """
-        Send alert to user AND their risk guardian (if configured).
-        guardian_phone and guardian_name come from the User table (caller's responsibility).
+        Send the accountability-partner message.
+
+        Deliberately takes no BrokerAccount: the guardian has no business
+        receiving anything derived from the trading account, and not having the
+        object is the cheapest way to guarantee nothing leaks from it.
+
+        The caller is responsible for consent (`user.guardian_confirmed`),
+        eligibility (`DetectorSpec.guardian_eligible`) and the monthly budget.
         """
         try:
-            user_sent = await self.send_risk_alert(risk_alert, broker_account, user_phone)
+            if not is_notifiable(risk_alert.severity):
+                logger.info(f"Skipping guardian alert (severity={risk_alert.severity})")
+                return False
 
-            if guardian_phone:
-                guardian_message = self._format_guardian_alert(
-                    risk_alert, broker_account, guardian_name=guardian_name
-                )
-                await whatsapp_service.send_message(guardian_phone, guardian_message)
+            message = self._format_guardian_alert(
+                risk_alert, trader_name=trader_name, guardian_name=guardian_name
+            )
+            sent = await whatsapp_service.send_message(phone_number, message)
+            if sent:
                 logger.info(f"Guardian alert sent for alert {risk_alert.id}")
-
-            return user_sent
+            return sent
 
         except Exception as e:
             logger.error(f"Failed to send guardian alert: {e}", exc_info=True)
@@ -166,67 +164,53 @@ class AlertService:
     def _format_guardian_alert(
         self,
         alert: RiskAlert,
-        broker_account: BrokerAccount,
+        trader_name: Optional[str] = None,
         guardian_name: Optional[str] = None,
     ) -> str:
-        """Format alert for risk guardian."""
+        """
+        Minimum disclosure: who, which pattern, how serious, when.
 
-        guardian_name = guardian_name or "Guardian"
-        user_name = broker_account.broker_user_id
-        
-        header = f"⚠️ *RISK GUARDIAN ALERT*\n\n"
-        
-        if alert.pattern_type == "overtrading":
-            details = alert.details or {}
-            trade_count = details.get("trade_count", "multiple")
-            
+        Never `alert.message` — that text is addressed to the trader and carries
+        their P&L, instruments and second-person voice. Never the broker client
+        id. A guardian needs enough to decide whether to call, and nothing more;
+        DPDP purpose limitation and the trader's dignity point the same way here.
+
+        (Letting the trader choose what a guardian sees is the natural follow-up.
+        Until that setting exists, the floor is the safe default.)
+        """
+        who = (trader_name or "").strip() or "Your trading partner"
+        greeting = f"Hi {guardian_name.strip()}," if (guardian_name or "").strip() else "Hi,"
+        when = _ist_time(alert)
+
+        lines = [
+            "*TradeMentor* · accountability alert",
+            "",
+            greeting,
+            "",
+            f"{who} asked you to be their accountability partner.",
+            "",
+            f"A *{severity_label(alert.severity).lower()}* behaviour pattern was flagged on "
+            f"their trading today: *{_pattern_label(alert.pattern_type)}*.",
+        ]
+        if when:
+            lines += ["", f"_{when} IST_"]
+        lines += [
+            "",
+            "Trade details are not shared with you. If this is a good moment, check in with them.",
+        ]
+        return "\n".join(lines)
+
+    # ── Setup ─────────────────────────────────────────────────────────────────
+
+    async def send_test_alert(self, phone_number: str) -> bool:
+        """Verify a WhatsApp number is reachable, from Settings."""
+        try:
             message = (
-                f"{header}"
-                f"*{user_name}* is showing high-risk behavior.\n\n"
-                f"🔴 *Pattern:* Overtrading\n"
-                f"📊 *Details:* {trade_count} trades in 15 minutes\n\n"
-                f"This pattern historically leads to major losses.\n\n"
-                f"*You may want to check in with them.*"
+                "*TradeMentor* · test message\n\n"
+                "WhatsApp alerts are set up correctly.\n"
+                "You'll hear from us here when a behaviour pattern is flagged during a session."
             )
-        
-        elif alert.pattern_type == "revenge_sizing":
-            details = alert.details or {}
-            size_increase = details.get("size_increase_pct", 0)
-            
-            message = (
-                f"{header}"
-                f"*{user_name}* is showing high-risk behavior.\n\n"
-                f"🔴 *Pattern:* Revenge Trading\n"
-                f"📊 *Details:* Position size increased {size_increase:.0f}% after loss\n\n"
-                f"They may be in tilt mode.\n\n"
-                f"*You may want to check in with them.*"
-            )
-        
-        elif alert.pattern_type == "consecutive_loss":
-            details = alert.details or {}
-            loss_count = details.get("consecutive_losses", 3)
-            
-            message = (
-                f"{header}"
-                f"*{user_name}* is showing high-risk behavior.\n\n"
-                f"🔴 *Pattern:* Loss Spiral\n"
-                f"📊 *Details:* {loss_count} consecutive trades without wins\n\n"
-                f"They may need to step away.\n\n"
-                f"*You may want to check in with them.*"
-            )
-        
-        else:
-            message = (
-                f"{header}"
-                f"*{user_name}* triggered a risk alert.\n\n"
-                f"{alert.message}\n\n"
-                f"*You may want to check in with them.*"
-            )
-        
-        footer = (
-            f"\n\n"
-            f"Time: {alert.detected_at.strftime('%I:%M %p')}\n"
-            f"TradeMentor AI - Risk Guardian"
-        )
-        
-        return message + footer
+            return await whatsapp_service.send_message(phone_number, message)
+        except Exception as e:
+            logger.error(f"Failed to send test alert: {e}", exc_info=True)
+            return False

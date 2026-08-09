@@ -16,6 +16,7 @@ from app.core.celery_app import celery_app
 from app.core.database import SessionLocal
 from app.core.config import settings
 from app.core.trading_defaults import COLD_START_DEFAULTS
+from app.core.severity import is_notifiable
 from app.services.trade_sync_service import TradeSyncService
 from app.services.pnl_calculator import pnl_calculator
 from app.models.user import User
@@ -921,7 +922,7 @@ async def run_risk_detection_async(
         # Staleness gate (master Q12): push only when the triggering trade is
         # recent. detected_at = trade time, so bulk-synced old trades are
         # naturally suppressed here while still saved + visible in-app.
-        danger_alerts = [a for a in new_alerts if a.severity in ("danger", "critical")]
+        danger_alerts = [a for a in new_alerts if is_notifiable(a.severity)]
         stale_cutoff = now_utc - timedelta(
             minutes=COLD_START_DEFAULTS.get("alert_stale_push_min", 30)
         )
@@ -1195,7 +1196,7 @@ async def run_behavior_engine_full_session(broker_account_id: UUID, db) -> int:
         # Staleness gate (master Q12): bulk sync processes hours of history —
         # only trades closed within the push window may notify. Everything else
         # is saved for analytics/in-app only.
-        danger_alerts = [a for a in all_new_alerts if a.severity in ("danger", "critical")]
+        danger_alerts = [a for a in all_new_alerts if is_notifiable(a.severity)]
         stale_cutoff = now_utc - timedelta(
             minutes=COLD_START_DEFAULTS.get("alert_stale_push_min", 30)
         )
@@ -1349,22 +1350,38 @@ def send_danger_alert(self, broker_account_id: str, alert_id: str):
             # hard monthly budget applies — a guardian pinged weekly stops reading.
             user = await db.get(User, account.user_id) if account.user_id else None
             phone = user.guardian_phone if user else None
-            if phone:
+            # Consent is a property of this send path, not of whichever endpoint
+            # remembered to check it. The guardian is asked to reply YES before
+            # we message them (profile.py guardian/send-consent, migration 056);
+            # weekly reports have always honoured that answer and this path did
+            # not, so a guardian who declined still received danger alerts.
+            if phone and user and user.guardian_confirmed:
                 from app.services.detector_registry import BY_NAME as _SPECS
                 spec = _SPECS.get(alert.pattern_type)
                 guardian_ok = (
                     (spec.guardian_eligible if spec else alert.pattern_type == "death_spiral")
-                    and alert.severity in ("danger", "critical")
+                    and is_notifiable(alert.severity)
                 )
                 if guardian_ok:
                     from app.services.behavior_scores_service import check_guardian_budget
                     guardian_ok = await check_guardian_budget(UUID(broker_account_id), db)
                 if guardian_ok:
                     alert_service = AlertService()
-                    sent = await alert_service.send_risk_alert(alert, account, phone)
+                    # send_guardian_alert, NOT send_risk_alert: the trader-facing
+                    # formatter is second-person and carries their P&L. Sending it
+                    # to a third party told them "you are in tilt mode" and
+                    # included the Zerodha client id in the footer.
+                    sent = await alert_service.send_guardian_alert(
+                        alert,
+                        phone,
+                        trader_name=user.display_name,
+                        guardian_name=user.guardian_name,
+                    )
                     results["whatsapp"] = sent
                 else:
                     results["whatsapp"] = "skipped"
+            elif phone:
+                results["whatsapp"] = "skipped_no_consent"
 
             return results
 

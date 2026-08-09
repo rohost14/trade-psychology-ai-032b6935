@@ -137,7 +137,17 @@ class TestWhatsAppService:
 # =============================================================================
 
 class TestAlertMessageFormatting:
-    """AlertService._format_alert_message — message content per pattern type."""
+    """
+    AlertService._format_alert_message — framing the engine's sentence.
+
+    These assertions changed in the Phase 1 notification-integrity pass. The
+    previous versions asserted the defect: they checked for a per-pattern branch
+    keyed on `overtrading` / `revenge_sizing` / `consecutive_loss`, and for the
+    word "STOP". Those detector names stopped existing at engine v2 — the tests
+    kept passing because they used the same dead vocabulary the code did, which
+    is exactly why the drift went unnoticed. The imperative was a charter
+    violation ("mirror, not blocker") in the first place.
+    """
 
     svc = AlertService()
 
@@ -146,41 +156,46 @@ class TestAlertMessageFormatting:
         broker = make_broker_account(broker_user_id)
         return self.svc._format_alert_message(alert, broker)
 
-    def test_AS01_overtrading_message_contains_trade_count(self):
-        """AS-01: Overtrading message includes the trade count from alert details."""
-        msg = self._format("overtrading", {"trade_count": 9})
-        assert "9" in msg
-        assert "OVERTRADING" in msg.upper() or "overtrad" in msg.lower()
+    def test_AS01_message_carries_the_engine_sentence_verbatim(self):
+        """AS-01: The engine authors the evidence; this layer only frames it."""
+        msg = self._format("overtrading_burst", {"trade_count": 9})
+        assert "TEST: overtrading_burst detected" in msg
 
-    def test_AS02_overtrading_message_has_stop_instruction(self):
-        """AS-02: Overtrading message contains stop instruction."""
-        msg = self._format("overtrading", {"trade_count": 9})
-        assert "STOP" in msg.upper()
+    def test_AS02_message_gives_no_trading_instruction(self):
+        """AS-02: No 'STOP TRADING', no mandatory break — we mirror, not block."""
+        msg = self._format("overtrading_burst", {"trade_count": 9})
+        assert "STOP TRADING" not in msg.upper()
+        assert "MANDATORY" not in msg.upper()
 
-    def test_AS03_revenge_sizing_message_contains_size_increase(self):
-        """AS-03: Revenge sizing message includes size_increase_pct from details."""
-        msg = self._format("revenge_sizing", {"size_increase_pct": 75.0})
-        assert "75" in msg
-        assert "REVENGE" in msg.upper() or "tilt" in msg.lower()
+    def test_AS03_message_makes_no_causal_claim(self):
+        """AS-03: 'historically leads to major losses' was never substantiated."""
+        msg = self._format("size_escalation", {"size_increase_pct": 75.0})
+        assert "historically leads" not in msg.lower()
 
-    def test_AS04_consecutive_loss_message_contains_loss_count(self):
-        """AS-04: Consecutive loss message includes the consecutive_losses count."""
-        msg = self._format("consecutive_loss", {"consecutive_losses": 5})
-        assert "5" in msg
-        assert "LOSS" in msg.upper() or "loss" in msg.lower()
+    def test_AS04_current_detector_names_are_readable(self):
+        """AS-04: v2 names render as words, not snake_case, with no lookup table."""
+        msg = self._format("consecutive_loss_streak", {"consecutive_losses": 5})
+        assert "Consecutive loss streak" in msg
 
-    def test_AS05_unknown_pattern_shows_generic_message(self):
-        """AS-05: Unknown pattern_type falls back to generic risk alert message."""
-        msg = self._format("new_unknown_pattern", {})
-        assert "RISK ALERT" in msg.upper() or "RISK" in msg.upper()
+    def test_AS05_unknown_pattern_still_produces_a_message(self):
+        """AS-05: An unseen pattern_type must format, not blow up or blank out."""
+        msg = self._format("brand_new_pattern", {})
+        assert "Brand new pattern" in msg
+        assert len(msg.strip()) > 0
 
-    def test_AS06_message_includes_account_id_and_time(self):
-        """AS-06: All messages include broker_user_id and detected_at time."""
+    def test_AS06_message_states_severity_and_time(self):
+        """AS-06: Severity word and IST time appear for every pattern."""
         for pattern, severity, details in ALERT_PATTERNS:
             msg = self._format(pattern, details, broker_user_id="TESTACC")
-            assert "TESTACC" in msg, f"broker_user_id missing for {pattern}"
-            # Time should be in the footer
-            assert ":" in msg  # HH:MM format in footer
+            assert "Danger" in msg, f"severity missing for {pattern}"
+            assert "IST" in msg, f"time missing for {pattern}"
+
+    def test_AS06b_empty_engine_message_falls_back(self):
+        """AS-06b: A blank alert.message must not yield an empty WhatsApp body."""
+        alert = make_risk_alert("fomo_entry", "danger", {})
+        alert.message = ""
+        msg = self.svc._format_alert_message(alert, make_broker_account())
+        assert "Fomo entry" in msg
 
 
 # =============================================================================
@@ -188,40 +203,59 @@ class TestAlertMessageFormatting:
 # =============================================================================
 
 class TestGuardianMessageFormatting:
-    """AlertService._format_guardian_alert — separate message for risk guardian."""
+    """
+    AlertService._format_guardian_alert — the third-party message.
+
+    AS-08 previously asserted the trader's broker_user_id appears in the guardian
+    message. That was the leak: the Zerodha client id has no business on a
+    friend's phone. The guardian is still told *who* — via display name — so the
+    original intent survives; only the identifier changed. The rest of these
+    tests are new and assert what a third party must NOT receive.
+    """
 
     svc = AlertService()
 
-    def _guardian(self, pattern_type: str, details: dict) -> str:
+    def _guardian(self, pattern_type: str, details: dict, trader_name="Rohit O") -> str:
         alert = make_risk_alert(pattern_type, "danger", details)
-        broker = make_broker_account("TRADERX")
-        return self.svc._format_guardian_alert(alert, broker, guardian_name="Guardian")
+        return self.svc._format_guardian_alert(
+            alert, trader_name=trader_name, guardian_name="Guardian"
+        )
 
-    def test_AS07_guardian_message_says_guardian_alert(self):
-        """AS-07: Guardian message header says 'RISK GUARDIAN ALERT'."""
-        msg = self._guardian("overtrading", {"trade_count": 9})
-        assert "GUARDIAN" in msg.upper()
+    def test_AS07_guardian_message_is_addressed_to_the_guardian(self):
+        """AS-07: Named greeting and accountability framing."""
+        msg = self._guardian("session_meltdown", {"trade_count": 9})
+        assert "Guardian" in msg
+        assert "accountability" in msg.lower()
 
-    def test_AS08_guardian_message_names_user(self):
-        """AS-08: Guardian message includes the trader's broker_user_id."""
-        msg = self._guardian("overtrading", {"trade_count": 9})
-        assert "TRADERX" in msg
+    def test_AS08_guardian_message_names_trader_without_broker_id(self):
+        """AS-08: Display name identifies the trader; the client id never appears."""
+        msg = self._guardian("session_meltdown", {"trade_count": 9})
+        assert "Rohit O" in msg
+        assert "TRADERX" not in msg
+        assert "QAUSER01" not in msg
 
-    def test_AS09_guardian_message_does_not_say_stop_trading(self):
-        """AS-09: Guardian message says 'check in with them', not 'STOP TRADING'
-        (guardian should be informed, not commanded)."""
-        msg = self._guardian("overtrading", {"trade_count": 9})
-        assert "check in" in msg.lower() or "contact" in msg.lower() or "may want" in msg.lower()
+    def test_AS09_guardian_message_does_not_command_anyone(self):
+        """AS-09: An invitation to check in, never an instruction to intervene."""
+        msg = self._guardian("session_meltdown", {"trade_count": 9})
+        assert "check in" in msg.lower()
+        assert "STOP" not in msg.upper()
+        assert "tilt" not in msg.lower()
 
-    def test_AS10_guardian_overtrading_includes_trade_count(self):
-        """AS-10: Guardian overtrading message includes trade count for context."""
-        msg = self._guardian("overtrading", {"trade_count": 11})
-        assert "11" in msg
+    def test_AS10_guardian_message_withholds_trade_detail(self):
+        """AS-10: No P&L, no symbols, no counts — the trader did not consent to that."""
+        alert = make_risk_alert("session_meltdown", "danger", {"trade_count": 11})
+        alert.message = "You are down ₹12,400 after 11 trades in NIFTY"
+        msg = self.svc._format_guardian_alert(alert, trader_name="Rohit O")
+        assert alert.message not in msg
+        assert "12,400" not in msg
+        assert "NIFTY" not in msg
+        assert "11 trades" not in msg
 
-    def test_AS11_guardian_revenge_includes_size_increase(self):
-        """AS-11: Guardian revenge message includes size increase percentage."""
-        msg = self._guardian("revenge_sizing", {"size_increase_pct": 60.0})
-        assert "60" in msg
+    def test_AS11_guardian_message_survives_a_missing_display_name(self):
+        """AS-11: No display name must not produce 'None asked you to be…'."""
+        msg = self._guardian("session_meltdown", {}, trader_name=None)
+        assert "None" not in msg
+        assert "Your trading partner" in msg
 
 
 # =============================================================================
@@ -289,80 +323,125 @@ class TestAlertDeliveryRules:
 # =============================================================================
 
 class TestGuardianDelivery:
-    """AlertService.send_risk_alert_with_guardian — dual delivery."""
+    """
+    AlertService.send_guardian_alert — the function the live path actually calls.
 
-    async def test_AL05_both_user_and_guardian_receive_message(self):
-        """AL-05: When guardian_phone provided, BOTH user and guardian receive separate messages."""
+    These tests used to target `send_risk_alert_with_guardian`, a dual-delivery
+    helper that was correct, tested three times, and called from nowhere in
+    `app/`. Production sent to the guardian through `send_risk_alert` instead —
+    so the green tests were covering a function no caller reached while the real
+    path shipped the trader's message to a third party. The helper is gone and
+    these now exercise the path Celery uses.
+    """
+
+    async def test_AL05_guardian_alert_sends_to_the_guardian_number(self):
+        """AL-05: The guardian message goes to the guardian's phone."""
         svc = AlertService()
-        broker = make_broker_account()
-        alert = make_risk_alert("consecutive_loss", severity="danger", details={"consecutive_losses": 5})
+        alert = make_risk_alert("session_meltdown", severity="danger", details={"consecutive_losses": 5})
 
         with patch("app.services.alert_service.whatsapp_service") as mock_wa:
             mock_wa.send_message = AsyncMock(return_value=True)
-            result = await svc.send_risk_alert_with_guardian(
-                risk_alert=alert,
-                broker_account=broker,
-                user_phone="+919000000001",
-                guardian_phone="+919000000002",
-                guardian_name="Mentor",
+            result = await svc.send_guardian_alert(
+                alert, "+919000000002", trader_name="Rohit O", guardian_name="Mentor",
             )
 
         assert result is True
-        assert mock_wa.send_message.call_count == 2
-        phones_called = [call[0][0] for call in mock_wa.send_message.call_args_list]
-        assert "+919000000001" in phones_called
-        assert "+919000000002" in phones_called
+        mock_wa.send_message.assert_called_once()
+        assert mock_wa.send_message.call_args[0][0] == "+919000000002"
 
-    async def test_AL06_no_guardian_phone_only_user_receives(self):
-        """AL-06: When guardian_phone is None/empty, only user receives message."""
+    async def test_AL06_guardian_alert_respects_the_severity_floor(self):
+        """AL-06: Caution never reaches a third party."""
         svc = AlertService()
-        broker = make_broker_account()
-        alert = make_risk_alert("overtrading", severity="danger", details={"trade_count": 9})
+        alert = make_risk_alert("session_meltdown", severity="caution")
 
         with patch("app.services.alert_service.whatsapp_service") as mock_wa:
             mock_wa.send_message = AsyncMock(return_value=True)
-            result = await svc.send_risk_alert_with_guardian(
-                risk_alert=alert,
-                broker_account=broker,
-                user_phone="+919000000001",
-                guardian_phone=None,  # No guardian configured
-            )
+            result = await svc.send_guardian_alert(alert, "+919000000002", trader_name="Rohit O")
 
-        assert mock_wa.send_message.call_count == 1  # Only user
-        assert mock_wa.send_message.call_args[0][0] == "+919000000001"
+        assert result is False
+        mock_wa.send_message.assert_not_called()
 
-    async def test_AL07_guardian_message_is_different_from_user_message(self):
-        """AL-07: Guardian receives a DIFFERENT message than the user (guardian-specific format)."""
+    async def test_AL07_guardian_message_differs_from_the_trader_message(self):
+        """AL-07: The two audiences get different text — the whole point of A3."""
         svc = AlertService()
         broker = make_broker_account("TRADERX")
-        alert = make_risk_alert("overtrading", severity="danger", details={"trade_count": 9})
+        alert = make_risk_alert("session_meltdown", severity="danger", details={"trade_count": 9})
 
-        messages_sent = []
+        messages = []
 
-        async def capture_send(phone, message):
-            messages_sent.append((phone, message))
+        async def capture(phone, message):
+            messages.append((phone, message))
             return True
 
         with patch("app.services.alert_service.whatsapp_service") as mock_wa:
-            mock_wa.send_message = capture_send
-            await svc.send_risk_alert_with_guardian(
-                risk_alert=alert,
-                broker_account=broker,
-                user_phone="+910000000001",
-                guardian_phone="+910000000002",
-                guardian_name="Dad",
-            )
+            mock_wa.send_message = capture
+            await svc.send_risk_alert(alert, broker, "+910000000001")
+            await svc.send_guardian_alert(alert, "+910000000002", trader_name="Rohit O", guardian_name="Dad")
 
-        assert len(messages_sent) == 2
-        user_msg = messages_sent[0][1]
-        guardian_msg = messages_sent[1][1]
+        assert len(messages) == 2
+        trader_msg, guardian_msg = messages[0][1], messages[1][1]
+        assert trader_msg != guardian_msg
+        assert "accountability" in guardian_msg.lower()
+        # The trader's own evidence sentence must not be forwarded onward.
+        assert "TEST: session_meltdown detected" in trader_msg
+        assert "TEST: session_meltdown detected" not in guardian_msg
 
-        # Guardian message must mention the user (guardian context)
-        assert "TRADERX" in guardian_msg
-        # Guardian message should NOT say "STOP TRADING" directly at them
-        assert "GUARDIAN" in guardian_msg.upper()
-        # Messages must be different
-        assert user_msg != guardian_msg
+
+# =============================================================================
+# ALERT SERVICE — SEVERITY VOCABULARY (A1 regression)
+# =============================================================================
+
+class TestSeverityVocabulary:
+    """
+    `critical` is the top of the scale and used to be the one class that never
+    sent: the gate read `severity != "danger"`, which excluded it. Every channel
+    now asks app.core.severity instead of comparing to a literal.
+    """
+
+    async def test_SV01_critical_alert_is_sent_to_trader(self):
+        """SV-01: The most serious severity must reach the trader."""
+        svc = AlertService()
+        alert = make_risk_alert("session_meltdown", severity="critical")
+
+        with patch("app.services.alert_service.whatsapp_service") as mock_wa:
+            mock_wa.send_message = AsyncMock(return_value=True)
+            result = await svc.send_risk_alert(alert, make_broker_account(), "+919876543210")
+
+        assert result is True
+        mock_wa.send_message.assert_called_once()
+
+    async def test_SV02_critical_alert_is_sent_to_guardian(self):
+        """SV-02: Same for the guardian channel."""
+        svc = AlertService()
+        alert = make_risk_alert("session_meltdown", severity="critical")
+
+        with patch("app.services.alert_service.whatsapp_service") as mock_wa:
+            mock_wa.send_message = AsyncMock(return_value=True)
+            result = await svc.send_guardian_alert(alert, "+919000000002", trader_name="Rohit O")
+
+        assert result is True
+
+    async def test_SV03_info_severity_never_sends(self):
+        """SV-03: info is analytics-only evidence — no channel, ever."""
+        svc = AlertService()
+        alert = make_risk_alert("early_exit", severity="info")
+
+        with patch("app.services.alert_service.whatsapp_service") as mock_wa:
+            mock_wa.send_message = AsyncMock(return_value=True)
+            assert await svc.send_risk_alert(alert, make_broker_account(), "+919876543210") is False
+            assert await svc.send_guardian_alert(alert, "+919000000002") is False
+
+    def test_SV04_unknown_severity_is_never_treated_as_severe(self):
+        """SV-04: A typo must fail closed, not escalate."""
+        from app.core.severity import is_notifiable, rank, worst, at_least
+
+        assert is_notifiable("DANGER") is True          # case-insensitive
+        assert is_notifiable("dangerous") is False      # near-miss is not a match
+        assert is_notifiable(None) is False
+        assert rank("nonsense") == -1
+        assert at_least("nonsense", "info") is False
+        assert worst(["info", "critical", "caution"]) == "critical"
+        assert worst(["nope"]) is None
 
 
 # =============================================================================
@@ -502,14 +581,25 @@ class TestReportContentRules:
             assert len(msg) > 50, f"Message too short for {pattern}: '{msg}'"
 
     def test_RP07_guardian_messages_for_all_known_patterns(self):
-        """RP-07: Every known danger pattern has a formatted guardian message."""
+        """
+        RP-07: Every pattern produces a guardian message that names the trader
+        and never their broker client id.
+
+        The signature changed with A3/A4: _format_guardian_alert no longer takes
+        a BrokerAccount at all. Not having the object is the cheapest guarantee
+        that nothing from the trading account can leak into a third party's
+        message — the previous version pulled broker_user_id straight out of it.
+        """
         svc = AlertService()
         for pattern, severity, details in ALERT_PATTERNS:
             alert = make_risk_alert(pattern, severity, details)
-            broker = make_broker_account("GUARDIAN_TEST")
-            msg = svc._format_guardian_alert(alert, broker, guardian_name="TestGuardian")
+            msg = svc._format_guardian_alert(
+                alert, trader_name="Rohit O", guardian_name="TestGuardian"
+            )
             assert len(msg) > 50, f"Guardian message too short for {pattern}"
-            assert "GUARDIAN_TEST" in msg, f"Trader ID missing from guardian message for {pattern}"
+            assert "Rohit O" in msg, f"Trader name missing from guardian message for {pattern}"
+            assert "GUARDIAN_TEST" not in msg
+            assert "QAUSER01" not in msg
 
     def test_RP08_message_no_python_internals_leaked(self):
         """RP-08: Alert messages must not contain Python tracebacks or internal error info."""

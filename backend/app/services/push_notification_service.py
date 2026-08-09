@@ -16,6 +16,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, update, delete, and_
 
 from app.core.config import settings
+from app.core.severity import label as severity_label
 from app.models.push_subscription import PushSubscription
 from app.models.risk_alert import RiskAlert
 
@@ -179,7 +180,9 @@ class PushNotificationService:
             body: Notification body text
             db: Database session
             data: Additional data payload
-            severity: 'danger', 'caution', or 'info'
+            severity: one of app.core.severity.SEVERITY_ORDER
+                      ('info' | 'caution' | 'danger' | 'critical'). Passed
+                      through to the payload; do not compare it to a literal.
             pattern_type: Type of pattern detected
             tag: Notification tag (for grouping/replacing)
 
@@ -272,27 +275,18 @@ class PushNotificationService:
         Returns:
             Send result
         """
-        # Build title and body based on severity
-        if alert.severity == "danger":
-            title = "🚨 DANGER: Trading Alert"
-        else:
-            title = "⚠️ Caution: Trading Pattern Detected"
+        # Title carries the severity word, from the shared vocabulary. The old
+        # `== "danger"` else-branch labelled every CRITICAL alert "Caution" —
+        # the worst class we raise, announced as the mild one.
+        pattern_name = alert.pattern_type.replace("_", " ").capitalize() if alert.pattern_type else "Behaviour pattern"
+        title = f"{severity_label(alert.severity)}: {pattern_name}"
 
-        # Map pattern types to readable names
-        pattern_names = {
-            "consecutive_loss": "Consecutive Losses",
-            "revenge_sizing": "Revenge Trading",
-            "overtrading": "Overtrading",
-            "martingale": "Martingale Sizing",
-            "tilt_loss_spiral": "Loss Spiral",
-            "fomo": "FOMO Entry",
-            "options_direction_confusion": "Direction Confusion",
-            "options_premium_avg_down": "Premium Averaging Down",
-            "iv_crush_behavior": "IV Crush",
-        }
-
-        pattern_name = pattern_names.get(alert.pattern_type, alert.pattern_type.replace("_", " ").title())
-        body = alert.message or f"{pattern_name} pattern detected. Take a moment to review."
+        # Body is the engine's evidenced sentence. A local pattern-name table
+        # used to sit here keyed on v1 detector names (`overtrading`,
+        # `revenge_sizing`, `consecutive_loss`); engine v2 renamed all of them,
+        # so every lookup missed and the fallback did the work regardless.
+        # Phase 2 moves real labels onto DetectorSpec beside the names.
+        body = alert.message or f"{pattern_name} detected. Open TradeMentor to review."
 
         return await self.send_notification(
             broker_account_id=alert.broker_account_id,
