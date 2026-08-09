@@ -2,8 +2,18 @@
 
 Companion to `docs/CHATGPT_REVIEW_FINDINGS.md`.
 
-**Status — 2026-08-09.** Phase 7 (rule presets + rule suggestions) is **shipped**; see §7.
-Everything else in this document is still a proposal. Phases 1–6 are unstarted.
+**Status — 2026-08-09.** Phase 1 (notification integrity) **shipped** — `8d762c8`.
+Phase 7 (rule presets + rule suggestions) **shipped** — `9e064a9`.
+Phases 2–6 are still proposals.
+
+Phase 1 landed one thing not in the original scope: `backend/app/core/severity.py`, the
+single owner of the severity vocabulary. A1 needed it, and it is the first half of the
+Phase 2 argument — the pattern vocabulary needs the same treatment. Two of Phase 1's
+defects turned out to live on the **push** path as well (`== "danger"` titling every
+critical alert "Caution", plus a pattern-name table keyed on dead v1 names) and were fixed
+in the same pass. `_format_guardian_alert` no longer accepts a `BrokerAccount` at all, and
+`send_risk_alert_with_guardian` — correct, tested three times, called from nowhere — is
+deleted; `send_guardian_alert` is the one guardian entry point and the live path calls it.
 
 ---
 
@@ -157,9 +167,24 @@ correctness; 4–6 are product.
 
 ---
 
-### Phase 1 — Notification integrity (A1–A6)
+### Phase 1 — Notification integrity (A1–A6) — **SHIPPED 2026-08-09** (`8d762c8`)
 
-**Scope.** `alert_service.py`, `trade_tasks.py:1346–1367`.
+**Delivered.** `backend/app/core/severity.py` (new) · `alert_service.py` (rewritten) ·
+`trade_tasks.py` (consent gate, correct formatter, two dispatch filters) ·
+`push_notification_service.py` (same two defects) · `test_notifications.py` (35 pass).
+Full non-production suite: 464 pass. `tests/production` needs a live server, unchanged.
+
+Notes worth carrying forward:
+- The old tests **asserted the defects** — they checked for the word "STOP", for
+  per-pattern branches under their v1 names, and for the client id in the guardian
+  message. They passed only because the tests shared the same dead vocabulary as the
+  code. That is the sharpest illustration of §1.1 in this document.
+- Guardian disclosure is now the floor: who, which pattern, how serious, when. Letting the
+  trader choose what their guardian sees is the natural follow-up and is **not** built.
+- `alert.message` is second-person in many detectors ("You entered NIFTY after…"), which
+  is why forwarding it to a guardian was never merely a formatting slip.
+
+**Original scope.** `alert_service.py`, `trade_tasks.py:1346–1367`.
 
 1. Delete `_format_alert_message`'s pattern branches. Do **not** re-key them to v2 names — that
    recreates the drift with fresh strings. The engine already writes an evidenced sentence to
