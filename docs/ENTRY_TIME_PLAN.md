@@ -273,6 +273,25 @@ duplicate pairs; must ship before E5 volume arrives.
 
 ## 3a. Status
 
+**E4 shipped 2026-08-09** (`9d0a4ad`). Live `premium_loss_event` on a 60s market-hours beat
+reading the streamed LTP cache — no Kite REST calls. Degrades to silence when the price is
+missing or >2s old. Thresholds and the expiry-day shift mirror the exit detector exactly;
+throttling reuses the escalation-aware 30-minute dedup, so caution → danger → critical land
+once each. 19 tests, mostly refusals. **Live `no_stoploss` was NOT shipped**: the `orders`
+table is only filled by `sync_orders_to_db` on manual/EOD sync, so a stop placed 30 seconds
+ago is invisible to us, and the check would tell disciplined SL-M users they have no stop.
+Needs real-time order-book visibility we do not have.
+
+**E3 shipped 2026-08-09** (`4add99b`). Daily trade limit, daily loss limit and
+`end_of_session_mis_panic` now fire at entry, with the constitution severity ladder shared
+with the exit detector rather than restated. Entries counted from opening ledger rows and
+as structures, so a condor is one decision against the limit. **`opening_5min_trap` was NOT
+moved** — reading it showed the plan's "binary entry fact" classification was wrong: it
+fires only on losing trades precisely because "firing on every opening trade regardless of
+outcome creates noise". Also includes the E6 live→post merge, without which every
+entry-time alert would keep a null `trigger_completed_trade_id` and contribute ₹0 to
+behaviour-cost. 28 tests.
+
 **E2 shipped 2026-08-09** (`a35769d`). `count_structures` wired into `overtrading_burst`,
 `daily_overtrading` and `expiry_day_overtrading` — the counting fix deferred from E0.
 Collapses a cluster only when it classifies as a recognised strategy, so **the count can
