@@ -271,17 +271,115 @@ duplicate pairs; must ship before E5 volume arrives.
 
 ---
 
-## 4. Open questions for you
+## 3a. Status
+
+**E0 shipped 2026-08-09** (`184ec0a`). Two defects fixed: the entry gate now reads the
+ledger's fill classification instead of the order side, and position-monitor alerts are
+recorded as `lifecycle="live"`. 13 tests. 503 backend tests pass.
+
+**Two corrections to this document, found while implementing E0:**
+
+- **`fomo_entry` never had the multi-leg problem.** It counts *distinct underlyings*, with
+  an explicit comment: "buying 2 NIFTY strikes is not FOMO". A condor is one underlying.
+  The count-based FP risk is `overtrading_burst`, `daily_overtrading` and
+  `expiry_day_overtrading` only.
+- **The E0 item "add count-based detectors to `_STRATEGY_SUPPRESSED`" was wrong and is
+  dropped.** Suppression means *do not alert at all*, which would hide genuine overtrading
+  by a spread trader — someone doing five condors in thirty minutes is overtrading. The
+  correct fix is to count structures rather than legs, which needs grouping at count time.
+  Moved to E2.
+
+## 4. Decisions
+
+Four questions were open. Answers and reasoning below.
+
+### 4.1 Live `premium_loss_event` — is "this position is down 80%" advice?
+
+**Decision: ship it, worded as an observation with no recommended action, and gate the
+copy on the fact that we are not telling them what to do.**
+
+The reasoning that settles it: we are describing something *already true about a position
+the trader already holds*. SEBI's concern is personalised guidance about what to buy, sell
+or hold. "Your NIFTY 24500 CE is down 78% of the premium you paid" contains no
+recommendation — it is their own position's arithmetic, which their broker also shows them.
+It becomes advice the moment we append "consider exiting", so we do not.
+
+What tips the balance is the counterfactual. The alternative is to keep telling them the
+same fact *after* they have closed the position, which is strictly less useful and no less
+advisory. If the observation is legitimate at 15:30, it is legitimate at 11:48.
+
+Two constraints that come with it: no exit suggestion, no "act now" framing, and the
+severity stays as computed — we do not inflate it to force attention.
+
+### 4.2 Do live alerts share the suppression budget with exit alerts?
+
+**Decision: shared budget, but suppression is decided per *pattern-and-position*, not per
+alert; and a live alert never blocks its own exit-time enrichment.**
+
+The trader's attention is one budget — two systems each allowed eight alerts a day means
+sixteen alerts a day, which is the fatigue problem twice. So: shared.
+
+But the failure mode I raised is real — a noisy entry pass silencing the exit pass. The
+resolution is that the *merge* removes the conflict. Once the exit pass enriches an existing
+live alert rather than inserting a new one, there is no second alert to suppress. The two
+passes only compete when they produce genuinely different findings, which is exactly when
+both deserve to be counted.
+
+The one hard rule: **the exit pass may always write its enrichment**, regardless of budgets,
+because it carries the realized P&L that Analytics needs. Suppression governs
+*notification*, never the record — the existing §1C.8 "evidence is never suppressed"
+principle already says this.
+
+### 4.3 Scale-in to a winner vs scale-in to a loser
+
+**Decision: separate. `INCREASE` is classified by the position's unrealized P&L at the
+moment of the fill, and only adding-to-a-loser feeds the sizing detectors.**
+
+These are opposite behaviours wearing the same shape. Adding to a winner is what most
+trading literature calls correct — pyramiding into strength. Adding to a loser is averaging
+down, which is the behaviour `martingale_behaviour` and `options_premium_avg_down` exist to
+catch. Treating them as one category would produce a false positive on every disciplined
+scale-in, which is precisely the outcome you asked me to avoid.
+
+We can already tell them apart: the ledger has the position's average price, and the price
+stream has the live LTP, so unrealized P&L at fill time is available with no new data.
+
+A third case worth naming now rather than discovering later: **adding to a loser that is
+inside the trader's own plan** — a pre-declared two-tranche entry. We cannot distinguish
+that from tilt at entry, and we should not pretend to. This is where §2.3's confidence
+floor does the work: if the only signal is "added to a losing position", that is not enough
+to alert live. It needs corroboration — size ratio, time since a loss, prior escalation in
+the session.
+
+### 4.4 E4 depends on the market-data account
+
+**Decision: sequence E4 after E3, but treat the dependency as a hard gate, and build E4 so
+it degrades to silence rather than to wrong answers.**
+
+Live `premium_loss_event` needs a reliable price stream during market hours, which today
+rides on the borrowed-token arrangement that Gap #1 was meant to replace (code done,
+dormant, waiting on a dedicated account being provisioned).
+
+The engineering consequence: E4 must treat "no live price for this position" as *skip*, not
+as *zero*. A stale or missing LTP that gets treated as a price produces a fabricated loss
+percentage on a real position — the worst possible false positive, and the same silent-zero
+class this codebase has produced repeatedly. So: no cached price older than a defined
+staleness bound is usable, and no alert fires without one.
+
+That also means E4 can be built and shipped in shadow before the dedicated account exists —
+it simply will not fire much until the feed is solid.
+
+## 5. Remaining open questions
 
 1. **`premium_loss_event` live is the biggest win and the biggest behaviour change.** An
-   alert saying "this open position is down 80% of premium" while the position is live is
-   very close to advice. Are you comfortable with that framing, or does it need different
-   copy?
-2. **Does an entry alert count against the same suppression budgets** as an exit alert, or
-   do live alerts get their own allowance? My instinct: shared, because the trader's
-   attention is one budget — but it means a noisy entry pass can silence the exit pass.
-3. **Scale-ins.** Adding to a winning position and adding to a losing one are different
-   behaviours. Do you want them treated separately, or is "add" one category?
-4. **E4 needs the price stream during market hours to be reliable.** Gap #1 (dedicated
-   market-data account) is still a pending action item on your side. Live
-   `premium_loss_event` inherits that dependency — worth knowing before we sequence E4.
+The four questions above are decided in §4. What remains genuinely open, and needs a call
+before the phase it belongs to:
+
+1. **The coalescing window length (E1).** 5 seconds is my proposal. Longer catches more
+   legged-in structures; shorter alerts sooner. A trader who legs into a spread deliberately
+   over two minutes will not be coalesced at any sane window — E2's grouping from open
+   positions is what covers that case, not the window.
+2. **Whether E5 ships at all** (inferred patterns at entry). E3 and E4 deliver most of the
+   value with almost none of the false-positive risk. E5 is where the risk lives, and the
+   honest position is that it should only ship if the shadow-mode numbers justify it. That
+   is a decision to take with data, after Phase 4, not now.
