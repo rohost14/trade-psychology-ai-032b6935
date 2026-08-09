@@ -19,7 +19,7 @@ from dataclasses import dataclass, field
 from datetime import datetime
 from typing import Any, Callable, Dict, List, Optional
 
-from .collect import collect_all
+from .collect import collect_all, collect_step
 from .harness import (
     IST, ensure_lab_account, frozen_clock, lab_environment, teardown_lab,
 )
@@ -123,17 +123,27 @@ async def run_scenario(scenario: Scenario, db_factory) -> Dict[str, Any]:
         # detector that needs history could fire. Advancing the clock makes the
         # synthetic session real to the engine, and is why scenarios never need
         # market hours.
+        seen_alerts: set = set()
+        seen_events: set = set()
         with lab_environment(None):
             for fill in scenario.fills:
                 with frozen_clock(scenario.wall_clock or fill.at):
                     outcome = await inject(fill)
                 if outcome.get("error"):
                     injection_errors.append(f"{fill.symbol} {fill.side}: {outcome['error']}")
+
+                # Snapshot immediately, so an alert is attributed to the fill
+                # that raised it rather than appearing in one undifferentiated
+                # heap at the end.
+                async with db_factory() as db:
+                    step = await collect_step(db, seen_alerts, seen_events)
+
                 timeline.append({
                     "at_ist": fill.at.astimezone(IST).strftime("%H:%M:%S"),
                     "symbol": fill.symbol, "side": fill.side, "qty": fill.qty,
                     "price": fill.price, "product": fill.product, "note": fill.note,
                     "error": outcome.get("error"),
+                    **step,
                 })
 
         # A fill that never processed makes every negative assertion pass for

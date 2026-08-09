@@ -53,6 +53,18 @@
   .flash{animation:flash .5s ease}
   @keyframes flash{from{background:rgba(91,124,250,.18)}to{background:transparent}}
   .note{color:var(--dim);font-size:11px;margin-top:10px;line-height:1.5}
+  .step{border-left:2px solid var(--line);padding:8px 0 8px 12px;margin-bottom:2px}
+  .stephead{display:flex;gap:10px;align-items:center;flex-wrap:wrap;font-size:13px}
+  .time{color:var(--dim);font-size:12px}
+  .tag{font-size:10px;padding:1px 6px;border-radius:4px;font-weight:600}
+  .tag.buy{background:rgba(47,179,122,.15);color:var(--profit)}
+  .tag.sell{background:rgba(224,84,79,.15);color:var(--loss)}
+  .stepstate{font-size:11px;margin-top:3px}
+  .alertline{margin:8px 0 0 8px;padding:8px 10px;border-radius:8px;
+             background:rgba(224,84,79,.07);border-left:2px solid var(--loss);
+             display:flex;gap:8px;align-items:center;flex-wrap:wrap;font-size:12px}
+  .supline{margin:5px 0 0 8px;padding:4px 10px;font-size:11px;opacity:.6;
+           border-left:2px solid var(--line);display:flex;gap:8px}
 </style>
 </head>
 <body>
@@ -97,118 +109,75 @@ async function load() {
     b.onclick = () => run(b.dataset.id));
 }
 
-/* The run itself finishes in milliseconds — eager Celery, no real waiting. The
-   timeline is replayed at readable speed so the session can actually be watched
-   unfold, which is more useful than staring at real five-second gaps. */
-async function replay(timeline, mount) {
+/* A session, unfolding.
+
+   The run itself finishes in milliseconds — eager Celery, no real waiting — but
+   showing everything at once made it impossible to tell which trade caused which
+   alert, which is the single most useful thing to see. So the runner snapshots
+   state after EVERY fill, and this replays those steps: the fill lands, the
+   position opens or closes, and any alert it raised appears underneath it. */
+
+const SPEED = 700;   // ms between fills — readable, not a real 5-second wait
+const sleep = ms => new Promise(r => setTimeout(r, ms));
+
+function fillLine(f) {
+  const closed = f.last_closed && f.side !== 'BUY' || (f.last_closed && f.closed_count);
+  return `
+    <div class="step">
+      <div class="stephead">
+        <span class="mono time">${esc(f.at_ist)}</span>
+        <span class="tag ${f.side === 'BUY' ? 'buy' : 'sell'}">${esc(f.side)}</span>
+        <span class="mono">${esc(f.symbol)}</span>
+        <span class="dim mono">${f.qty} @ ${f.price}</span>
+        <span class="dim">${esc(f.note || '')}</span>
+        ${f.error ? '<span class="bad">FILL FAILED</span>' : ''}
+      </div>
+      <div class="stepstate dim mono" id="state-${esc(f.at_ist)}-${esc(f.symbol)}"></div>
+    </div>`;
+}
+
+async function replaySession(timeline, mount) {
+  mount.innerHTML = '';
   for (const [i, f] of timeline.entries()) {
-    mount.insertAdjacentHTML('beforeend', `
-      <tr class="flash"><td class="mono">${esc(f.at_ist)}</td>
-      <td class="mono">${esc(f.symbol)}</td>
-      <td class="${f.side === 'BUY' ? 'ok' : 'bad'}">${esc(f.side)}</td>
-      <td class="mono">${f.qty}</td><td class="mono">${f.price}</td>
-      <td class="dim">${esc(f.note)}</td></tr>`);
-    if (i < timeline.length - 1) await new Promise(r => setTimeout(r, 90));
+    mount.insertAdjacentHTML('beforeend', fillLine(f));
+    const step = mount.lastElementChild;
+    step.classList.add('flash');
+
+    // Position state after this fill — what the trader would see on screen.
+    const openTxt = f.open && f.open.length
+      ? 'open: ' + f.open.map(p => `${p.symbol} ${p.qty}`).join(', ')
+      : 'flat';
+    const pnlTxt = f.closed_count
+      ? ` · ${f.closed_count} closed · session ${money(f.session_pnl)}`
+      : '';
+    const lastTxt = f.last_closed && f.last_closed.exit_ist === f.at_ist
+      ? ` · closed ${f.last_closed.symbol} ${money(f.last_closed.pnl)}` : '';
+    step.querySelector('.stepstate').innerHTML =
+      esc(openTxt) + esc(pnlTxt) + `<span class="${f.last_closed && f.last_closed.pnl < 0 ? 'bad' : 'ok'}">${esc(lastTxt)}</span>`;
+
+    await sleep(SPEED / 2);
+
+    // Alerts raised BY THIS FILL, appearing where they belong.
+    for (const a of (f.new_alerts || [])) {
+      step.insertAdjacentHTML('beforeend', `
+        <div class="alertline flash">
+          ${sev(a.severity)}
+          <b>${esc(a.label)}</b>
+          <span class="dim">${esc(a.message)}</span>
+          ${a.would_route_to_guardian ? '<span class="pill critical">→ guardian</span>' : ''}
+        </div>`);
+      await sleep(SPEED / 2);
+    }
+    for (const x of (f.new_suppressed || [])) {
+      step.insertAdjacentHTML('beforeend', `
+        <div class="supline">
+          <span class="mono dim">${esc(x.detector)}</span>
+          <span class="dim">detected, not shown — ${esc(x.reason)}</span>
+        </div>`);
+      await sleep(200);
+    }
+    if (i < timeline.length - 1) await sleep(SPEED / 2);
   }
-}
-
-async function run(id) {
-  $('#status').textContent = `running ${id}…`;
-  $('#out').innerHTML = '<div class="empty">running…</div>';
-  const r = await (await fetch('/api/run/' + id, {method: 'POST'})).json();
-  $('#status').textContent = '';
-  render(r);
-  const dot = $('#dot-' + id);
-  if (dot) dot.className = 'dot ' + (r.passed ? 'pass' : 'fail');
-}
-
-function render(r) {
-  const s = r.scenario;
-  const checks = r.checks.map(c => `
-    <tr><td>${c.pass ? '<span class="ok">pass</span>' : '<span class="bad">FAIL</span>'}</td>
-    <td class="mono">${esc(c.pattern)}</td>
-    <td>${c.kind === 'must_fire' ? 'must fire' : '<b>must NOT fire</b>'}</td>
-    <td class="dim">${esc(c.detail)}<br><span style="font-size:11px">${esc(c.reason)}</span></td></tr>`).join('');
-
-  const alerts = r.alerts.length ? r.alerts.map(a => `
-    <tr><td class="mono">${esc(a.detected_at_ist)}</td>
-    <td>${sev(a.severity)}</td>
-    <td>${esc(a.label)}<br><span class="mono dim" style="font-size:11px">${esc(a.pattern_type)}</span></td>
-    <td>${esc(a.message)}</td>
-    <td class="mono">${a.latency_seconds ?? '—'}s</td></tr>`).join('')
-    : '<tr><td colspan="5" class="empty">No alerts — for a control scenario that is the pass condition.</td></tr>';
-
-  const sup = r.suppressed.length ? r.suppressed.map(x => `
-    <tr><td class="mono">${esc(x.detected_at_ist)}</td>
-    <td class="mono">${esc(x.detector)}</td><td>${sev(x.severity)}</td>
-    <td class="dim">${esc(x.reason)}</td></tr>`).join('')
-    : '<tr><td colspan="4" class="empty">Nothing was detected-then-suppressed.</td></tr>';
-
-  const guard = r.guardian.length ? r.guardian.map(a => `
-    <tr><td>${sev(a.severity)}</td><td>${esc(a.label)}</td>
-    <td class="dim">${esc(a.message)}</td></tr>`).join('')
-    : '<tr><td colspan="3" class="empty">Nothing would reach an accountability partner.</td></tr>';
-
-  $('#out').innerHTML = `
-    <div class="card"><h2>${esc(s.id)} · ${esc(s.title)} ${r.passed
-        ? '<span class="ok">PASS</span>' : '<span class="bad">FAIL</span>'}</h2>
-      <div class="body">
-        <div class="dim">${esc(s.story)}</div>
-        <div class="dim" style="margin-top:6px">capital ₹${s.capital.toLocaleString('en-IN')}
-          · ${s.fills} fills · session P&amp;L ${money(r.session_pnl)}
-          · ran in ${r.elapsed_ms} ms</div>
-        ${r.error ? `<pre class="bad mono" style="white-space:pre-wrap">${esc(r.error)}</pre>` : ''}
-      </div></div>
-
-    <div class="card"><h2>Assertions</h2><div class="body">
-      <table><thead><tr><th></th><th>Pattern</th><th>Expectation</th><th>Outcome</th></tr></thead>
-      <tbody>${checks || '<tr><td colspan="4" class="empty">none declared</td></tr>'}</tbody></table>
-    </div></div>
-
-    <div class="card"><h2>Fills</h2><div class="body">
-      <table><thead><tr><th>Time</th><th>Symbol</th><th>Side</th><th>Qty</th><th>Price</th><th></th></tr></thead>
-      <tbody id="tl"></tbody></table></div></div>
-
-    <div class="card"><h2>Alerts raised</h2><div class="body">
-      <table><thead><tr><th>Time</th><th>Severity</th><th>Pattern</th><th>Message</th><th>Latency</th></tr></thead>
-      <tbody>${alerts}</tbody></table></div></div>
-
-    <div class="card"><h2>Suppression trace — detected, not surfaced</h2><div class="body">
-      <table><thead><tr><th>Time</th><th>Detector</th><th>Severity</th><th>Why it stopped</th></tr></thead>
-      <tbody>${sup}</tbody></table>
-      <div class="note">The half no other tool shows. Most defects in this system are
-        something firing wrongly or vanishing silently — the alert list above only
-        proves the first kind.</div>
-    </div></div>
-
-    <div class="card"><h2>Would route to an accountability partner</h2><div class="body">
-      <table><thead><tr><th>Severity</th><th>Pattern</th><th>Message</th></tr></thead>
-      <tbody>${guard}</tbody></table>
-      <div class="note">Routing only — WhatsApp delivery is parked until the business
-        number exists. A <b>caution</b> appearing here would mean the severity floor
-        is broken.</div>
-    </div></div>
-
-    <div class="card"><h2>Positions</h2><div class="body">
-      <div class="dim" style="margin-bottom:6px">Open at end of run</div>
-      ${r.positions.open.length ? `<table><tbody>${r.positions.open.map(p => `
-        <tr><td class="mono">${esc(p.symbol)}</td>
-        <td class="mono">${p.qty}</td><td class="mono">@ ${p.avg_entry}</td></tr>`).join('')}
-        </tbody></table>` : '<div class="empty">Flat — everything closed.</div>'}
-      ${r.structures.length ? `<div class="dim" style="margin:10px 0 4px">Recognised structures</div>
-        ${r.structures.map(x => `<div class="mono">${esc(x.underlying)} ${esc(x.label)}
-          · ${x.leg_count} legs</div>`).join('')}` : ''}
-      <div class="dim" style="margin:12px 0 6px">Closed rounds</div>
-      ${r.positions.closed.length ? `<table><thead><tr><th>Symbol</th><th>Dir</th><th>Qty</th>
-        <th>Entry</th><th>Exit</th><th>P&amp;L</th></tr></thead><tbody>
-        ${r.positions.closed.map(c => `<tr><td class="mono">${esc(c.symbol)}</td>
-        <td>${esc(c.direction)}</td><td class="mono">${c.qty}</td>
-        <td class="mono">${c.entry}</td><td class="mono">${c.exit}</td>
-        <td class="mono ${c.pnl >= 0 ? 'ok' : 'bad'}">${money(c.pnl)}</td></tr>`).join('')}
-        </tbody></table>` : '<div class="empty">No completed rounds.</div>'}
-    </div></div>`;
-
-  replay(r.timeline, $('#tl'));
 }
 
 $('#runAll').onclick = async () => {

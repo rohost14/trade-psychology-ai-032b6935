@@ -171,6 +171,42 @@ async def collect_structures(db) -> List[Dict[str, Any]]:
     return classify_open_positions(list(rows))
 
 
+async def collect_step(db, seen_alerts: set, seen_events: set) -> Dict[str, Any]:
+    """
+    State immediately after one fill, and only what is NEW since the last one.
+
+    This is what makes a run readable. Collecting once at the end shows every
+    trade and every alert arriving together, so you cannot tell which entry
+    caused which alert — which is the single most important thing to see. The
+    snapshot is taken per fill and diffed, so an alert appears at the step that
+    actually raised it, the way it would during a live session.
+
+    The cost is one read per fill. A scenario has a dozen or so; the clarity is
+    worth several seconds.
+    """
+    alerts = await collect_alerts(db)
+    suppressed = await collect_suppressed(db)
+    positions = await collect_positions(db)
+
+    new_alerts = [a for a in alerts if a["id"] not in seen_alerts]
+    seen_alerts.update(a["id"] for a in alerts)
+
+    def _key(s):
+        return (s["detector"], s["detected_at_ist"], s["message"])
+
+    new_suppressed = [s for s in suppressed if _key(s) not in seen_events]
+    seen_events.update(_key(s) for s in suppressed)
+
+    return {
+        "new_alerts": new_alerts,
+        "new_suppressed": new_suppressed,
+        "open": positions["open"],
+        "closed_count": len(positions["closed"]),
+        "session_pnl": round(sum(c["pnl"] for c in positions["closed"]), 2),
+        "last_closed": positions["closed"][-1] if positions["closed"] else None,
+    }
+
+
 async def collect_all(db) -> Dict[str, Any]:
     alerts = await collect_alerts(db)
     positions = await collect_positions(db)
