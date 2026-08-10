@@ -76,16 +76,15 @@ GUARDIAN_NO_ROUTE_ON_CAUTION = _s(
 )
 
 GUARDIAN_ROUTES_ON_DANGER = _s(
-    "G-11", "A danger on an eligible pattern does reach the partner",
-    "Doubling into a losing run — the case the partner exists for.",
-    _flatten([
-        losing_trade(NIFTY_CE, at(10, 0) + timedelta(minutes=25 * i),
-                     50 * (2 ** i), 30, hold_minutes=15)
-        for i in range(4)
-    ]),
-    must=[Expect("martingale_behaviour", routes_to_guardian=True,
-                 reason="guardian_eligible and danger — if this does not route, the "
-                        "accountability feature is decorative")],
+    "G-11", "A rule the trader wrote, broken — that does reach the partner",
+    "Re-enters seconds after a loss, against their own cooldown rule.",
+    _flatten([losing_trade(NIFTY_CE, at(10, 0), 50, 40, hold_minutes=12)])
+    + [Fill(NIFTY_CE, "BUY", 50, 100.0, at(10, 13), note="inside the cooldown")],
+    profile={**ROOMY, "cooldown_after_loss": 15},
+    must=[Expect("constitution_violation", routes_to_guardian=True,
+                 reason="only session_meltdown and constitution_violation are "
+                        "guardian_eligible — the partner is told when a rule the "
+                        "trader set for themselves is broken, not on every danger")],
 )
 
 
@@ -113,6 +112,10 @@ FLIP_THROUGH_ZERO = _s(
         Fill(NIFTY_CE, "SELL", 100, 94.0, at(10, 30), note="flip: close 50, short 50"),
         Fill(NIFTY_CE, "BUY", 50, 92.0, at(11, 0), note="cover the short"),
     ],
+    # A flip closes at a loss and opens in the same instant, so any cooldown at
+    # all is breached — correctly, and for a reason unrelated to what this
+    # scenario is about. Zero here keeps the assertion on sizing.
+    profile={**ROOMY, "cooldown_after_loss": 0},
     must_not=[
         Expect("constitution_violation",
                reason="the flip is two positions, not a 100-lot one — sizing the whole "

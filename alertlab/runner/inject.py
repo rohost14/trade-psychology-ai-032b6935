@@ -198,3 +198,67 @@ def partial_fills(symbol: str, side: str, at: datetime, tranches: List[int],
              note=f"partial {i + 1}/{len(tranches)}")
         for i, q in enumerate(tranches)
     ]
+
+
+async def sync_positions_from_ledger(db, account_id) -> int:
+    """
+    Write the `positions` rows the Kite position sync would have written.
+
+    Not a convenience — without this the entry-time path cannot run at all.
+
+    The postback pipeline writes `position_ledger` and `completed_trades`. It
+    does NOT write `positions`: that table is maintained by
+    `trade_sync_service`, which polls Kite. So a lab driven purely by postbacks
+    has an empty `positions` table, and `_shadow_entry_detection` — which starts
+    by loading the open positions for the symbols in the batch — returns
+    `{"skipped": "no_open_positions"}` every time, silently, with no log line.
+
+    Worth carrying out of the lab: in production the entry batch flushes about
+    five seconds after a fill, and if the Kite sync has not landed by then the
+    same skip happens for the same reason. The lab makes that visible; it does
+    not cause it.
+
+    Derived from the ledger's own running totals rather than recomputed, so the
+    quantities and average price here are the pipeline's numbers, not a second
+    opinion that could disagree with it.
+    """
+    from sqlalchemy import delete, select
+
+    from app.models.position import Position
+    from app.models.position_ledger import PositionLedger
+    from app.services.instrument_parser import parse_symbol
+
+    rows = (await db.execute(
+        select(PositionLedger)
+        .where(PositionLedger.broker_account_id == account_id)
+        .order_by(PositionLedger.occurred_at, PositionLedger.created_at)
+    )).scalars().all()
+
+    latest = {}
+    for entry in rows:
+        latest[(entry.tradingsymbol, entry.exchange, entry.product)] = entry
+
+    await db.execute(delete(Position).where(Position.broker_account_id == account_id))
+
+    written = 0
+    for (symbol, exchange, product), entry in latest.items():
+        qty = entry.position_qty_after or 0
+        if qty == 0:
+            continue        # flat: the sync would not carry a row either
+        try:
+            instrument_type = parse_symbol(symbol).instrument_type or None
+        except Exception:
+            instrument_type = None
+        db.add(Position(
+            broker_account_id=account_id,
+            tradingsymbol=symbol,
+            exchange=exchange,
+            instrument_type=instrument_type,
+            product=product,
+            total_quantity=qty,
+            average_entry_price=entry.avg_entry_price_after,
+        ))
+        written += 1
+
+    await db.commit()
+    return written

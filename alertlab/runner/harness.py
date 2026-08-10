@@ -25,6 +25,7 @@ Three seams:
 """
 from __future__ import annotations
 
+import asyncio as _asyncio
 import contextlib
 import datetime as _dt
 import logging
@@ -269,6 +270,60 @@ def clock_is_frozen(expected: _dt.datetime) -> bool:
 # Environment
 # ---------------------------------------------------------------------------
 
+def _in_fresh_loop(fn):
+    """
+    Run a sync function in its own thread, so it sees no running event loop.
+
+    Only takes effect when a loop IS running. Outside one the function is called
+    directly, so the wrapper costs nothing where it is not needed.
+    """
+    import functools
+    import threading
+
+    @functools.wraps(fn)
+    def runner(*args, **kwargs):
+        try:
+            _asyncio.get_running_loop()
+        except RuntimeError:
+            return fn(*args, **kwargs)      # no loop; nothing to work around
+
+        box = {}
+
+        def go():
+            try:
+                box["value"] = fn(*args, **kwargs)
+            except BaseException as exc:     # surfaced, never silently dropped
+                box["error"] = exc
+
+        thread = threading.Thread(target=go, daemon=True)
+        thread.start()
+        thread.join()
+        if "error" in box:
+            raise box["error"]
+        return box.get("value")
+
+    return runner
+
+
+def _isolate_task_loops(celery_app):
+    """
+    Give every Celery task the loop-free context a real worker would.
+
+    Returns what was replaced, so `lab_environment` can put it back — these are
+    module-level objects shared with anything else in the process.
+    """
+    replaced = []
+    for task in list(celery_app.tasks.values()):
+        run = getattr(task, "run", None)
+        if run is None or getattr(run, "__wrapped__", None) is not None:
+            continue
+        if _asyncio.iscoroutinefunction(run):
+            continue                          # Celery would not accept it anyway
+        replaced.append((task, run))
+        task.run = _in_fresh_loop(run)
+    return replaced
+
+
 @contextlib.contextmanager
 def lab_environment(when: Optional[_dt.datetime] = None):
     """
@@ -288,9 +343,56 @@ def lab_environment(when: Optional[_dt.datetime] = None):
         "eager": celery_app.conf.task_always_eager,
         "propagate": celery_app.conf.task_eager_propagates,
     }
+    # Every sync Celery task in this codebase calls asyncio.run() on an async
+    # body. Under a real worker that is correct — the worker process has no
+    # running loop. Eager mode runs the task inline inside the loop already
+    # driving the scenario, where asyncio.run() raises, and
+    # task_eager_propagates=False swallows the error.
+    #
+    # The cost was silent and total: flush_entry_batch, check_holding_loser and
+    # send_danger_alert all died this way, so entry-time detection never ran in
+    # the lab at ALL. Nothing reported a problem, because "the entry checks
+    # found nothing" and "the entry checks never executed" produce identical
+    # output — every entry scenario would have passed or failed for a reason
+    # unrelated to what it was testing.
+    #
+    # Wrapping every task rather than the three found so far: the next task to
+    # be added will have the same shape, and would fail just as quietly.
+    saved["task_runs"] = _isolate_task_loops(celery_app)
+
+    # The entry checks load open positions first, and `positions` is written by
+    # the Kite sync, not by the postback path — so the flush must see a sync
+    # that has already landed. In production that is the normal case: the sync
+    # runs on its own cadence and the flush is ~5s behind the fill. Emulating it
+    # here is what lets the entry path be exercised at all; the race it papers
+    # over is real and is written up in inject.sync_positions_from_ledger.
+    saved["flush_body"] = pm._flush_entry_batch
+
+    async def _flush_with_synced_positions(broker_account_id: str):
+        from app.core.database import SessionLocal as _S
+        from alertlab.runner.inject import sync_positions_from_ledger
+        async with _S() as db:
+            await sync_positions_from_ledger(db, LAB_ACCOUNT_ID)
+        return await saved["flush_body"](broker_account_id)
+
+    pm._flush_entry_batch = _flush_with_synced_positions
 
     tt._get_redis_client = lambda: redis
     pm._get_redis = lambda: redis
+    # `flush_entry_batch` is a sync Celery task that calls asyncio.run() on its
+    # async body. Under a real worker that is correct — the worker process has no
+    # running loop. Eager mode runs it inline inside the loop that is already
+    # driving the scenario, where asyncio.run() raises, and
+    # task_eager_propagates=False swallows it.
+    #
+    # The cost of that was total: entry-time detection never executed in the lab
+    # at all, and the failure was invisible because "no entry detections" and
+    # "entry detections found nothing" produce identical output. Every scenario
+    # asserting entry behaviour would have passed or failed for the wrong reason.
+    #
+    # Running the body in its own thread gives it the loop-free context a worker
+    # would provide, without changing the task.
+
     celery_app.conf.task_always_eager = True
     # A failing task must not abort the scenario: the pipeline treats several
     # steps as non-fatal, and the lab has to observe that same behaviour rather
@@ -305,6 +407,9 @@ def lab_environment(when: Optional[_dt.datetime] = None):
         pm._get_redis = saved["pm_redis"]
         celery_app.conf.task_always_eager = saved["eager"]
         celery_app.conf.task_eager_propagates = saved["propagate"]
+        for task, original in saved["task_runs"]:
+            task.run = original
+        pm._flush_entry_batch = saved["flush_body"]
 
 
 # ---------------------------------------------------------------------------
