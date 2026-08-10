@@ -5,6 +5,10 @@ Run scenarios from a terminal.
     python alertlab/scripts/run.py K-01 B-05       named scenarios
     python alertlab/scripts/run.py --json          machine-readable (CI)
     python alertlab/scripts/run.py --teardown      just wipe the lab account
+    python alertlab/scripts/run.py --in-process    one process for all (faster, lies)
+
+A suite runs each scenario in its own process. Sharing one changes the results —
+63/70 against 70/70 on identical code. See runner/isolate.py.
 
 Same runner the UI uses, so a green terminal and a green page mean the same
 thing.
@@ -12,6 +16,7 @@ thing.
 from __future__ import annotations
 
 import asyncio
+import contextlib
 import json
 import sys
 from pathlib import Path
@@ -23,6 +28,9 @@ sys.path.insert(0, str(ROOT / "backend"))
 
 from alertlab.runner.harness import (                                  # noqa: E402
     quiet_logs, single_run_lock, teardown_lab,
+)
+from alertlab.runner.isolate import (                      # noqa: E402
+    RESULT_MARKER, run_suite_isolated,
 )
 from alertlab.runner.scenario import run_scenario          # noqa: E402
 from alertlab.scenarios.catalogue import ALL_SCENARIOS, BY_ID  # noqa: E402
@@ -59,30 +67,51 @@ async def main() -> int:
         print(f"unknown scenario(s): {', '.join(unknown)}", file=sys.stderr)
         return 2
 
-    results = []
-    with single_run_lock(owner="cli"):
-        for scenario in chosen:
-            outcome = await run_scenario(scenario, _db_factory())
-            results.append(outcome)
-            if "--json" in flags:
-                continue
-            mark = f"{GREEN}pass{OFF}" if outcome["passed"] else f"{RED}FAIL{OFF}"
-            print(f"{mark}  {scenario.id:<7} {scenario.title}"
-                  f"{DIM}  ({len(outcome['alerts'])} alerts, {outcome['elapsed_ms']}ms){OFF}")
-            for check in outcome["checks"]:
-                if not check["pass"]:
-                    kind = "must fire" if check["kind"] == "must_fire" else "must NOT fire"
-                    print(f"        {RED}·{OFF} {check['pattern']} [{kind}] — {check['detail']}")
-                    if check["reason"]:
-                        print(f"          {DIM}{check['reason']}{OFF}")
-            if outcome["error"]:
-                print(f"        {RED}{outcome['error'].strip().splitlines()[-1]}{OFF}")
+    def _report(row):
+        """One scenario's verdict, in the shape both run modes share."""
+        if "--json" in flags:
+            return
+        mark = f"{GREEN}pass{OFF}" if row["passed"] else f"{RED}FAIL{OFF}"
+        title = BY_ID[row["id"]].title if row["id"] in BY_ID else ""
+        print(f"{mark}  {row['id']:<7} {title}"
+              f"{DIM}  ({row['alerts']} alerts, {row['elapsed_ms']}ms){OFF}", flush=True)
+        for check in row["checks"]:
+            if not check["pass"]:
+                kind = {"must_fire": "must fire", "must_not_fire": "must NOT fire",
+                        "must_record": "must be recorded"}.get(check["kind"], check["kind"])
+                print(f"        {RED}·{OFF} {check['pattern']} [{kind}] — {check['detail']}")
+                if check["reason"]:
+                    print(f"          {DIM}{check['reason']}{OFF}")
+        if row["error"]:
+            print(f"        {RED}{row['error'].strip().splitlines()[-1]}{OFF}")
+
+    def _flatten(outcome):
+        return {"id": outcome["scenario"]["id"], "passed": outcome["passed"],
+                "checks": outcome["checks"], "alerts": len(outcome["alerts"]),
+                "elapsed_ms": outcome["elapsed_ms"], "error": outcome["error"]}
+
+    # `--no-lock` marks a child spawned by an isolated suite: the parent already
+    # holds the lock, so a child taking it would deadlock every run.
+    lock = (contextlib.nullcontext() if "--no-lock" in flags
+            else single_run_lock(owner="cli"))
+
+    with lock:
+        if len(chosen) > 1 and "--in-process" not in flags:
+            # A suite always isolates. See runner/isolate.py — sharing one
+            # process across scenarios silently changes the results.
+            results = await run_suite_isolated([s.id for s in chosen], on_result=_report)
+        else:
+            results = []
+            for scenario in chosen:
+                row = _flatten(await run_scenario(scenario, _db_factory()))
+                results.append(row)
+                _report(row)
 
     if "--json" in flags:
-        print(json.dumps([{
-            "id": r["scenario"]["id"], "passed": r["passed"],
-            "checks": r["checks"], "alerts": len(r["alerts"]),
-        } for r in results], indent=2))
+        # The marker lets an isolated parent find this payload without guessing
+        # where the JSON starts. See runner/isolate.py.
+        print(RESULT_MARKER)
+        print(json.dumps(results, indent=2))
     else:
         passed = sum(1 for r in results if r["passed"])
         colour = GREEN if passed == len(results) else RED

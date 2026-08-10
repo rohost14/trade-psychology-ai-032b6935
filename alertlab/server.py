@@ -29,6 +29,7 @@ from fastapi.responses import FileResponse, JSONResponse  # noqa: E402
 from alertlab.runner.harness import (                            # noqa: E402
     quiet_logs, single_run_lock, teardown_lab,
 )
+from alertlab.runner.isolate import run_suite_isolated  # noqa: E402
 from alertlab.runner.scenario import run_scenario    # noqa: E402
 from alertlab.scenarios.catalogue import ALL_SCENARIOS, BY_ID  # noqa: E402
 
@@ -103,13 +104,18 @@ async def run_all():
     _guard()
     results = []
     with _held():
-        for scenario in ALL_SCENARIOS:
-            outcome = await run_scenario(scenario, _db_factory())
+        # Each scenario in its own process. Running the suite inside the server
+        # process scored 63/70 against 70/70 isolated, on identical code — see
+        # runner/isolate.py. It also keeps a long suite from leaving the server
+        # holding torn-down ORM state for every request that follows it.
+        rows = await run_suite_isolated([s.id for s in ALL_SCENARIOS])
+        for row in rows:
+            scenario = BY_ID[row["id"]]
             results.append({
-                "id": scenario.id, "title": scenario.title, "section": scenario.section,
-                "passed": outcome["passed"], "error": outcome["error"],
-                "alerts": len(outcome["alerts"]),
-                "checks": outcome["checks"], "elapsed_ms": outcome["elapsed_ms"],
+                "id": row["id"], "title": scenario.title, "section": scenario.section,
+                "passed": row["passed"], "error": row["error"],
+                "alerts": row["alerts"],
+                "checks": row["checks"], "elapsed_ms": row["elapsed_ms"],
             })
     return {
         "total": len(results),
