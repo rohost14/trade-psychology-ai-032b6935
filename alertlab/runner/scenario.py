@@ -67,6 +67,15 @@ class Scenario:
     # them with must_fire can never pass, and asserting nothing at all would let
     # the detector break silently — this third kind covers exactly that gap.
     must_record: List[Expect] = field(default_factory=list)
+    #: Ceiling on total alerts. The noise budget is a product property, not a
+    #: detail: a session that produces forty alerts has told the trader nothing,
+    #: however correct each one is. Only a volume scenario can test it, because
+    #: dedup and consolidation windows do not bind at five fills.
+    max_alerts: Optional[int] = None
+    #: Volume scenarios skip the per-fill snapshot. It costs three queries per
+    #: fill, which is worth it to see which trade caused which alert and is
+    #: pointless across two hundred of them.
+    snapshot_steps: bool = True
 
     def as_dict(self) -> Dict[str, Any]:
         return {
@@ -76,6 +85,7 @@ class Scenario:
             "must_fire": [e.pattern for e in self.must_fire],
             "must_not_fire": [e.pattern for e in self.must_not_fire],
             "must_record": [e.pattern for e in self.must_record],
+            "max_alerts": self.max_alerts,
         }
 
 
@@ -155,6 +165,16 @@ def _check(scenario: Scenario, alerts: List[Dict[str, Any]],
         results.append({"kind": "must_record", "pattern": exp.pattern,
                         "pass": ok, "detail": detail, "reason": exp.reason})
 
+    if scenario.max_alerts is not None:
+        count = len(alerts)
+        results.append({
+            "kind": "max_alerts", "pattern": f"≤{scenario.max_alerts} alerts",
+            "pass": count <= scenario.max_alerts,
+            "detail": f"{count} alerts raised, budget {scenario.max_alerts}",
+            "reason": "an alert nobody reads is worse than no alert — dedup and "
+                      "consolidation only bind at real session volume",
+        })
+
     for exp in scenario.must_not_fire:
         # Checked against evidence as well as alerts. An analytics-only detector
         # never reaches the alert feed, so testing the feed alone would pass
@@ -218,8 +238,12 @@ async def run_scenario(scenario: Scenario, db_factory) -> Dict[str, Any]:
                 # Snapshot immediately, so an alert is attributed to the fill
                 # that raised it rather than appearing in one undifferentiated
                 # heap at the end.
-                async with db_factory() as db:
-                    step = await collect_step(db, seen_alerts, seen_events)
+                if scenario.snapshot_steps:
+                    async with db_factory() as db:
+                        step = await collect_step(db, seen_alerts, seen_events)
+                else:
+                    step = {"new_alerts": [], "new_suppressed": [], "open": [],
+                            "closed_count": 0, "session_pnl": 0, "last_closed": None}
 
                 timeline.append({
                     "at_ist": fill.at.astimezone(IST).strftime("%H:%M:%S"),

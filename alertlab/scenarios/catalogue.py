@@ -345,9 +345,10 @@ def _all() -> List[Scenario]:
     from .detectors import DETECTOR_SCENARIOS
     from .entry import ALL as ENTRY_SCENARIOS
     from .variations import VARIATION_SCENARIOS
+    from .volume import ALL as VOLUME_SCENARIOS
 
     merged = (_CORE + DETECTOR_SCENARIOS + VARIATION_SCENARIOS
-              + ENTRY_SCENARIOS + CONTRACT_SCENARIOS)
+              + ENTRY_SCENARIOS + CONTRACT_SCENARIOS + VOLUME_SCENARIOS)
     seen, out = set(), []
     for sc in merged:
         # A duplicate id would silently shadow one scenario with another and the
