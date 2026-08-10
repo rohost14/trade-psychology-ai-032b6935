@@ -2,7 +2,8 @@
  * Welcome.tsx — Homepage redesign
  * Reference: Zerodha, Sensibull, Tickertape
  * Theme: light + dark via useTheme()
- * Font: Plus Jakarta Sans (display) + JetBrains Mono (data)
+ * Font: Inter + Geist (display) + DM Mono (figures) — the app's faces,
+ *       so landing and product do not read as two products.
  */
 import { useEffect, useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
@@ -18,7 +19,7 @@ import LossSpiralSimulator from '@/components/LossSpiralSimulator';
 import { FeatureStory, AlertFeedMock, ShieldMock, CoachMock, type Story } from '@/components/FeatureStory';
 
 const FONT_URL =
-  'https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap';
+  'https://fonts.googleapis.com/css2?family=Inter:wght@300..700&family=DM+Mono:ital,wght@0,300;0,400;0,500&display=swap';
 
 // ── per-theme tokens ────────────────────────────────────────────────────────
 const LIGHT = {
@@ -89,7 +90,7 @@ const GLOBAL_CSS = `
 const ALERTS = [
   { type: 'Revenge Trading', sev: 'DANGER',   key: 'red',    msg: 'Re-entered NIFTY CE 3× in 18 min after losses. −₹14,200.' },
   { type: 'Overtrading',     sev: 'WARNING',  key: 'orange', msg: '9 trades in 45 min. Win rate drops to 22% at this pace.' },
-  { type: 'FOMO Entry',      sev: 'CAUTION',  key: 'yellow', msg: 'Entered BANKNIFTY 14 min after breakout — costs ₹3,200 avg.' },
+  { type: 'FOMO Entry',      sev: 'CAUTION',  key: 'yellow', msg: 'Entered BANKNIFTY 14 min after a breakout you did not plan.' },
   { type: 'Blowup Risk',     sev: 'CRITICAL', key: 'red',    msg: '78% of daily loss limit hit. Stop here — data says you won\'t recover.' },
   { type: 'Loss Streak',     sev: 'WARNING',  key: 'orange', msg: '4 consecutive losses. Historical: things get worse from here.' },
   { type: 'Early Exit',      sev: 'CAUTION',  key: 'yellow', msg: 'Cut winner at ₹1,800. It ran ₹4,100 more. 7× this week.' },
@@ -97,33 +98,28 @@ const ALERTS = [
 
 const FEATURES = [
   { icon: Bell,      title: 'Real-time Alerts',     desc: 'Pattern detection fires within seconds — revenge trading, FOMO, meltdown risk — before you lose more.', accent: 'primary' },
-  { icon: Brain,     title: 'AI Psychology Coach',  desc: 'Ask why you made a trade. Get pattern-matched analysis from your actual history, not generic advice.', accent: 'orange' },
-  { icon: Shield,    title: 'Blowup Shield',        desc: 'Opt-in circuit breakers that pause trading when behavioral data predicts a cascade loss day.', accent: 'red' },
+  { icon: Brain,     title: 'Ask about a trade',    desc: 'Ask why you took a position. The answer comes from your own trade history, not from generic advice.', accent: 'orange' },
+  { icon: Shield,    title: 'My Record',            desc: 'Before you size up, see what happened the last times you took this trade in this state. Your own history, not a rule.', accent: 'red' },
   { icon: BarChart3, title: 'Behavioral Analytics', desc: 'Win rate by time, streak context, trade count. See when you make money — and when you systematically lose it.', accent: 'green' },
-  { icon: Activity,  title: 'Portfolio Radar',      desc: 'Concentration, expiry exposure, Greeks at a glance. Built for NSE/BSE F&O with real lot sizes.', accent: 'primary' },
-  { icon: Target,    title: 'Pattern Commitments',  desc: 'Set behavioral goals, track streaks, measure improvement. Turn insight into lasting change.', accent: 'yellow' },
+  { icon: Activity,  title: 'Portfolio Radar',      desc: 'Concentration and expiry exposure at a glance. Built for NSE/BSE F&O with real lot sizes.', accent: 'primary' },
+  { icon: Target,    title: 'Your own rules',       desc: 'Write the limits you intend to trade within. When a trade breaks one, you hear about it — tightening applies at once, loosening waits for the next session.', accent: 'yellow' },
 ];
 
 const STEPS = [
   { n: '1', title: 'Connect Zerodha', desc: 'One-click OAuth. No credentials stored. Live trade feed via KiteConnect webhooks. 90-second setup.' },
   { n: '2', title: 'Mirror activates', desc: 'Behavioral engine watches every order in real-time, calibrated to your own historical patterns and thresholds.' },
-  { n: '3', title: 'Act on the alert', desc: 'Instant on-screen + WhatsApp alerts with pattern type, estimated cost, and your historical context.' },
+  { n: '3', title: 'Act on the alert', desc: 'Instant on-screen and WhatsApp alerts naming the pattern, the trades that triggered it, and what those trades actually cost you.' },
 ];
 
 const PATTERNS = [
-  { name: 'Revenge Trading',  sev: 'DANGER',   key: 'red',    cost: '₹8,400/incident', desc: '89% of revenge trades end in larger losses than the original.' },
-  { name: 'Overtrading',      sev: 'WARNING',  key: 'orange', cost: '₹4,200/session',  desc: 'Past trade #8 intraday, accuracy drops below 30% on average.' },
-  { name: 'FOMO Entry',       sev: 'CAUTION',  key: 'yellow', cost: '₹2,800/trade',    desc: 'Entering after a move — you\'re buying at peak momentum, someone else\'s exit.' },
-  { name: 'No Stop-Loss',     sev: 'WARNING',  key: 'orange', cost: '₹11,200/incident', desc: 'One uncapped position can erase 3 weeks of disciplined profits.' },
-  { name: 'Meltdown Cascade', sev: 'CRITICAL', key: 'red',    cost: '₹22,000+/session', desc: 'Loss streak + increasing position sizes = exponential, not arithmetic damage.' },
-  { name: 'Early Exit',       sev: 'CAUTION',  key: 'yellow', cost: '₹1,900 left/trade', desc: 'Cutting winners short out of anxiety while letting losers run — the slow bleed.' },
+  { name: 'Revenge Trading',  sev: 'DANGER',   key: 'red', desc: 'Re-entering the instrument that just took money off you, within minutes of the exit.' },
+  { name: 'Overtrading',      sev: 'WARNING',  key: 'orange',  desc: 'Trade count climbing well past your own usual day, in bursts rather than spaced out.' },
+  { name: 'FOMO Entry',       sev: 'CAUTION',  key: 'yellow',    desc: 'Entering after a move — you\'re buying at peak momentum, someone else\'s exit.' },
+  { name: 'No Stop-Loss',     sev: 'WARNING',  key: 'orange', desc: 'One uncapped position can erase 3 weeks of disciplined profits.' },
+  { name: 'Meltdown Cascade', sev: 'CRITICAL', key: 'red', desc: 'Loss streak + increasing position sizes = exponential, not arithmetic damage.' },
+  { name: 'Early Exit',       sev: 'CAUTION',  key: 'yellow', desc: 'Cutting winners short out of anxiety while letting losers run — the slow bleed.' },
 ];
 
-const TESTIMONIALS = [
-  { init: 'AM', name: 'Arjun M.', role: 'NIFTY Options · 4 yrs', saved: '₹82,000 saved', quote: 'I knew I was revenge trading but couldn\'t stop mid-session. Seeing the pattern flagged with my own trade data was the interruption I needed. Down months dropped 60%.' },
-  { init: 'PS', name: 'Priya S.', role: 'Bank Nifty Intraday · 2 yrs', saved: '₹1,20,000 saved', quote: 'The Blowup Shield stopped me on a day I thought I was fine. Data showed I was already 3 losses deep in my personal danger zone. I would\'ve blown the account.' },
-  { init: 'RK', name: 'Rahul K.', role: 'F&O Swing · 6 yrs', saved: '₹65,000 saved', quote: 'Analytics showed my Friday win rate is 18% vs 61% Mon–Thu. I stopped trading Fridays. One behavioral insight, massive P&L improvement every quarter.' },
-];
 
 const PRICING = [
   {
@@ -135,7 +131,7 @@ const PRICING = [
   {
     name: 'Pro', monthly: '₹499', yearly: '₹399', period: '/mo', highlight: true, badge: 'Most Popular',
     desc: 'For traders serious about their edge',
-    features: ['Everything in Free', 'AI Psychology Coach', 'Portfolio Radar', '90-day history', 'Blowup Shield', 'WhatsApp + push alerts', 'Pattern commitment tracker'],
+    features: ['Everything in Free', 'Ask about a trade', 'Portfolio Radar', '90-day history', 'My Record', 'WhatsApp + push alerts', 'Custom pattern thresholds'],
     cta: 'Start 7-day Trial',
   },
   {
@@ -148,9 +144,9 @@ const PRICING = [
 
 const FAQS = [
   { q: 'Is my trading data secure?', a: 'We never store your Zerodha credentials. Authentication is via OAuth — the same standard banks use. Trade data is encrypted at rest and can be deleted from Settings at any time.' },
-  { q: 'Does it restrict my trading?', a: 'TradeMentor is a mirror, not a blocker. We surface what your behavior looks like — the decision is always yours. Blowup Shield is opt-in and can be disabled at any time.' },
+  { q: 'Does it restrict my trading?', a: 'TradeMentor is a mirror, not a blocker. Nothing here can stop, pause or delay an order. It shows you what your behaviour looks like; the decision stays yours.' },
   { q: 'How does the Zerodha connection work?', a: "One-click OAuth via Zerodha's official KiteConnect API. We receive your trade feed via webhooks in real-time. We read trades for analysis — we never place, modify, or cancel orders." },
-  { q: "What's different about Free vs Pro?", a: 'Free gives real-time alerts and basic analytics. Pro adds the AI Coach, Portfolio Radar, 90-day behavioral history, Blowup Shield, and WhatsApp alerts.' },
+  { q: "What's different about Free vs Pro?", a: 'Free gives real-time alerts and basic analytics. Pro adds Portfolio Radar, 90-day behavioural history, My Record, and WhatsApp alerts.' },
   { q: 'Which products are supported?', a: 'NSE and BSE — F&O only: MIS, NRML, MTF. Equity delivery (CNC) is excluded. Built for active intraday and swing traders.' },
 ];
 
@@ -181,7 +177,7 @@ function Navbar({ c, isDark, onToggleTheme, onConnect, onGuest, scrolled }: {
           <div style={{ width: 30, height: 30, borderRadius: 8, background: c.primary, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
             <Eye size={15} color="#fff" strokeWidth={2.5} />
           </div>
-          <span style={{ fontFamily: 'Plus Jakarta Sans,sans-serif', fontWeight: 800, fontSize: '0.9375rem', color: c.text, letterSpacing: '-0.01em' }}>
+          <span style={{ fontFamily: 'Geist,Inter,system-ui,sans-serif', fontWeight: 800, fontSize: '0.9375rem', color: c.text, letterSpacing: '-0.01em' }}>
             TradeMentor
           </span>
         </Link>
@@ -189,7 +185,7 @@ function Navbar({ c, isDark, onToggleTheme, onConnect, onGuest, scrolled }: {
         {/* Nav links */}
         <nav style={{ display: 'flex', alignItems: 'center', gap: 4, flex: 1, justifyContent: 'center' }}>
           {[['#how', 'How it works'], ['#features', 'Features'], ['#pricing', 'Pricing']].map(([href, label]) => (
-            <a key={href} href={href} style={{ fontFamily: 'Plus Jakarta Sans,sans-serif', fontSize: '0.875rem', fontWeight: 500, color: c.sub, textDecoration: 'none', padding: '5px 12px', borderRadius: 6, transition: 'color 0.15s, background 0.15s' }}
+            <a key={href} href={href} style={{ fontFamily: 'Geist,Inter,system-ui,sans-serif', fontSize: '0.875rem', fontWeight: 500, color: c.sub, textDecoration: 'none', padding: '5px 12px', borderRadius: 6, transition: 'color 0.15s, background 0.15s' }}
               onMouseEnter={e => { e.currentTarget.style.color = c.text; e.currentTarget.style.background = c.bg2; }}
               onMouseLeave={e => { e.currentTarget.style.color = c.sub; e.currentTarget.style.background = 'transparent'; }}>
               {label}
@@ -205,11 +201,11 @@ function Navbar({ c, isDark, onToggleTheme, onConnect, onGuest, scrolled }: {
             onMouseLeave={e => { e.currentTarget.style.background = 'transparent'; e.currentTarget.style.color = c.sub; }}>
             {isDark ? <Sun size={15} /> : <Moon size={15} />}
           </button>
-          <button onClick={onGuest} style={{ fontFamily: 'Plus Jakarta Sans,sans-serif', fontSize: '0.8125rem', fontWeight: 500, color: c.sub, background: 'transparent', border: 'none', cursor: 'pointer', padding: '6px 10px' }}>
+          <button onClick={onGuest} style={{ fontFamily: 'Geist,Inter,system-ui,sans-serif', fontSize: '0.8125rem', fontWeight: 500, color: c.sub, background: 'transparent', border: 'none', cursor: 'pointer', padding: '6px 10px' }}>
             Try demo
           </button>
           <button onClick={onConnect}
-            style={{ fontFamily: 'Plus Jakarta Sans,sans-serif', fontSize: '0.8125rem', fontWeight: 600, color: '#fff', background: c.primary, border: 'none', cursor: 'pointer', padding: '7px 16px', borderRadius: 8, transition: 'opacity 0.15s, transform 0.15s' }}
+            style={{ fontFamily: 'Geist,Inter,system-ui,sans-serif', fontSize: '0.8125rem', fontWeight: 600, color: '#fff', background: c.primary, border: 'none', cursor: 'pointer', padding: '7px 16px', borderRadius: 8, transition: 'opacity 0.15s, transform 0.15s' }}
             onMouseEnter={e => { e.currentTarget.style.opacity = '0.88'; }}
             onMouseLeave={e => { e.currentTarget.style.opacity = '1'; }}>
             Connect Zerodha
@@ -227,11 +223,11 @@ function ProductCard({ c }: { c: C }) {
       <div style={{ padding: '14px 18px', borderBottom: `1px solid ${c.border}`, display: 'flex', alignItems: 'center', justifyContent: 'space-between', background: c.bg2 }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 7 }}>
           <Eye size={13} color={c.primary} />
-          <span style={{ fontFamily: 'Plus Jakarta Sans,sans-serif', fontWeight: 700, fontSize: '0.8125rem', color: c.text }}>Behavioral Mirror</span>
+          <span style={{ fontFamily: 'Geist,Inter,system-ui,sans-serif', fontWeight: 700, fontSize: '0.8125rem', color: c.text }}>Behavioral Mirror</span>
         </div>
         <div style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
           <span className="wm-blink" style={{ width: 6, height: 6, borderRadius: '50%', background: '#22c55e', display: 'inline-block' }} />
-          <span style={{ fontFamily: 'JetBrains Mono,monospace', fontSize: '0.6rem', fontWeight: 600, color: '#22c55e' }}>LIVE</span>
+          <span style={{ fontFamily: 'DM Mono,ui-monospace,monospace', fontSize: '0.6rem', fontWeight: 600, color: '#22c55e' }}>LIVE</span>
         </div>
       </div>
 
@@ -243,8 +239,8 @@ function ProductCard({ c }: { c: C }) {
           { label: 'Alerts',     value: '7',         col: c.sub },
         ].map(({ label, value, col }) => (
           <div key={label} style={{ padding: '10px 14px', borderRight: `1px solid ${c.border}` }}>
-            <div style={{ fontFamily: 'Plus Jakarta Sans,sans-serif', fontSize: '0.625rem', color: c.dim, marginBottom: 3, fontWeight: 500 }}>{label}</div>
-            <div style={{ fontFamily: 'JetBrains Mono,monospace', fontSize: '0.9375rem', fontWeight: 600, color: col }}>{value}</div>
+            <div style={{ fontFamily: 'Geist,Inter,system-ui,sans-serif', fontSize: '0.625rem', color: c.dim, marginBottom: 3, fontWeight: 500 }}>{label}</div>
+            <div style={{ fontFamily: 'DM Mono,ui-monospace,monospace', fontSize: '0.9375rem', fontWeight: 600, color: col }}>{value}</div>
           </div>
         ))}
       </div>
@@ -257,10 +253,10 @@ function ProductCard({ c }: { c: C }) {
             return (
               <div key={i} style={{ padding: '11px 16px', borderBottom: `1px solid ${c.border}` }}>
                 <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 4 }}>
-                  <span style={{ fontFamily: 'Plus Jakarta Sans,sans-serif', fontWeight: 700, fontSize: '0.75rem', color: c.text }}>{a.type}</span>
-                  <span style={{ fontFamily: 'JetBrains Mono,monospace', fontSize: '0.575rem', fontWeight: 600, color, background: bg, padding: '2px 7px', borderRadius: 4, letterSpacing: '0.07em' }}>{a.sev}</span>
+                  <span style={{ fontFamily: 'Geist,Inter,system-ui,sans-serif', fontWeight: 700, fontSize: '0.75rem', color: c.text }}>{a.type}</span>
+                  <span style={{ fontFamily: 'DM Mono,ui-monospace,monospace', fontSize: '0.575rem', fontWeight: 600, color, background: bg, padding: '2px 7px', borderRadius: 4, letterSpacing: '0.07em' }}>{a.sev}</span>
                 </div>
-                <p style={{ fontFamily: 'Plus Jakarta Sans,sans-serif', fontSize: '0.75rem', color: c.sub, margin: 0, lineHeight: 1.5 }}>{a.msg}</p>
+                <p style={{ fontFamily: 'Geist,Inter,system-ui,sans-serif', fontSize: '0.75rem', color: c.sub, margin: 0, lineHeight: 1.5 }}>{a.msg}</p>
               </div>
             );
           })}
@@ -270,7 +266,7 @@ function ProductCard({ c }: { c: C }) {
       {/* Footer */}
       <div style={{ padding: '9px 16px', background: c.bg2, display: 'flex', alignItems: 'center', gap: 5 }}>
         <Lock size={10} color={c.dim} />
-        <span style={{ fontFamily: 'Plus Jakarta Sans,sans-serif', fontSize: '0.6875rem', color: c.dim }}>Read-only · OAuth · SEBI compliant</span>
+        <span style={{ fontFamily: 'Geist,Inter,system-ui,sans-serif', fontSize: '0.6875rem', color: c.dim }}>Read-only · OAuth · Your data stays yours</span>
       </div>
     </div>
   );
@@ -279,7 +275,7 @@ function ProductCard({ c }: { c: C }) {
 function SectionLabel({ c, children }: { c: C; children: string }) {
   return (
     <div style={{ display: 'inline-flex', alignItems: 'center', gap: 7, background: c.primaryBg, border: `1px solid ${c.primaryBdr}`, borderRadius: 100, padding: '4px 12px', marginBottom: '1rem' }}>
-      <span style={{ fontFamily: 'JetBrains Mono,monospace', fontSize: '0.625rem', fontWeight: 600, color: c.primary, letterSpacing: '0.1em' }}>{children}</span>
+      <span style={{ fontFamily: 'DM Mono,ui-monospace,monospace', fontSize: '0.625rem', fontWeight: 600, color: c.primary, letterSpacing: '0.1em' }}>{children}</span>
     </div>
   );
 }
@@ -331,8 +327,8 @@ export default function Welcome() {
 
   const wrap: React.CSSProperties = { maxWidth: 1200, margin: '0 auto', padding: '0 clamp(1rem,3vw,2rem)' };
   const section = (bg = c.bg): React.CSSProperties => ({ background: bg, padding: 'clamp(4rem,8vw,6rem) 0' });
-  const mono = 'JetBrains Mono,monospace';
-  const sans = 'Plus Jakarta Sans,sans-serif';
+  const mono = 'DM Mono,ui-monospace,monospace';
+  const sans = 'Geist,Inter,system-ui,sans-serif';
 
   const alertStory: Story = {
     eyebrow: "Behavioral safety net",
@@ -349,10 +345,10 @@ export default function Welcome() {
 
   const shieldStory: Story = {
     eyebrow: "Accountability Loop",
-    title: "A circuit breaker that actually stops you",
-    body: "If you blow past your stop loss and keep click-trading, TradeMentor enforces a cooldown. It can automatically trigger a circuit breaker and dispatch an accountability alert to your partner.",
+    title: "Your own record, before you commit",
+    body: "Nothing here blocks a trade. When you are about to repeat something that has cost you before, TradeMentor shows you what it cost — and, if you have asked it to, tells the person you named.",
     bullets: [
-      "Opt-in circuit breaker to lock terminal access",
+      "What this exact setup did to your account the last five times",
       "WhatsApp dispatch to your accountability partner",
       "Threshold calculations based on your risk tolerance",
       "Proven pattern disruption to stop cascade losses"
@@ -364,7 +360,7 @@ export default function Welcome() {
   const coachStory: Story = {
     eyebrow: "Behavioral Analytics",
     title: "An AI Coach that knows your history",
-    body: "Why did you make that trade? Ask your AI Psychology Coach. It cross-references your live trade logs with your history to point out structural patterns, not generic advice.",
+    body: "Why did you take that trade? Ask. The answer cross-references the position against your own history and names the pattern it belongs to, with the trades behind it.",
     bullets: [
       "Win rate and profitability stats by day and time",
       "Personalized danger-zone profiling from historical logs",
@@ -505,49 +501,19 @@ export default function Welcome() {
                   <span key={h} style={{ fontFamily: mono, fontSize: '0.625rem', fontWeight: 600, color: c.dim, letterSpacing: '0.08em' }}>{h}</span>
                 ))}
               </div>
-              {PATTERNS.map(({ name, sev: sevLabel, key, cost, desc }) => {
+              {PATTERNS.map(({ name, sev: sevLabel, key, desc }) => {
                 const { color, bg } = sev(c, key);
                 return (
-                  <div key={name} style={{ display: 'grid', gridTemplateColumns: '1fr auto auto', gap: 16, padding: '14px 16px', borderBottom: `1px solid ${c.border}`, alignItems: 'center', background: c.card }}>
+                  <div key={name} style={{ display: 'grid', gridTemplateColumns: '1fr auto', gap: 16, padding: '14px 16px', borderBottom: `1px solid ${c.border}`, alignItems: 'center', background: c.card }}>
                     <div>
                       <div style={{ fontFamily: sans, fontWeight: 600, fontSize: '0.875rem', color: c.text, marginBottom: 3 }}>{name}</div>
                       <div style={{ fontFamily: sans, fontSize: '0.75rem', color: c.dim }}>{desc}</div>
                     </div>
-                    <span style={{ fontFamily: mono, fontSize: '0.75rem', fontWeight: 600, color: c.sub, whiteSpace: 'nowrap' }}>{cost}</span>
                     <span style={{ fontFamily: mono, fontSize: '0.575rem', fontWeight: 600, color, background: bg, padding: '3px 8px', borderRadius: 4, letterSpacing: '0.07em', whiteSpace: 'nowrap' }}>{sevLabel}</span>
                   </div>
                 );
               })}
             </div>
-          </div>
-        </div>
-      </section>
-
-      <Divider c={c} />
-
-      {/* ── TESTIMONIALS ─────────────────────────────────────────────────── */}
-      <section style={section(c.bg2)}>
-        <div style={wrap}>
-          <div style={{ textAlign: 'center', marginBottom: '3rem' }}>
-            <SectionLabel c={c}>TRADERS</SectionLabel>
-            <h2 style={{ fontFamily: sans, fontWeight: 800, fontSize: 'clamp(1.625rem,3vw,2.25rem)', color: c.text, letterSpacing: '-0.025em', margin: 0 }}>
-              Real traders. Real results.
-            </h2>
-          </div>
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(290px,1fr))', gap: 20 }}>
-            {TESTIMONIALS.map(({ init, name, role, saved, quote }) => (
-              <div key={name} className="wm-hover" style={{ background: c.card, border: `1px solid ${c.border}`, borderRadius: 12, padding: '1.5rem', boxShadow: c.shadow, display: 'flex', flexDirection: 'column', gap: 16 }}>
-                <p style={{ fontFamily: sans, fontSize: '0.9375rem', color: c.sub, lineHeight: 1.7, margin: 0, flex: 1 }}>"{quote}"</p>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 10, paddingTop: 14, borderTop: `1px solid ${c.border}` }}>
-                  <div style={{ width: 36, height: 36, borderRadius: '50%', background: c.primaryBg, border: `1px solid ${c.primaryBdr}`, display: 'flex', alignItems: 'center', justifyContent: 'center', fontFamily: mono, fontSize: '0.625rem', fontWeight: 700, color: c.primary, flexShrink: 0 }}>{init}</div>
-                  <div style={{ flex: 1 }}>
-                    <div style={{ fontFamily: sans, fontWeight: 700, fontSize: '0.8125rem', color: c.text }}>{name}</div>
-                    <div style={{ fontFamily: sans, fontSize: '0.75rem', color: c.dim }}>{role}</div>
-                  </div>
-                  <span style={{ fontFamily: mono, fontSize: '0.625rem', fontWeight: 600, color: c.green, background: c.greenBg, padding: '3px 8px', borderRadius: 5, whiteSpace: 'nowrap' }}>{saved}</span>
-                </div>
-              </div>
-            ))}
           </div>
         </div>
       </section>
