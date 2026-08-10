@@ -24,7 +24,7 @@ from dataclasses import dataclass, field
 from datetime import datetime, timedelta
 from typing import Any, Dict, List, Optional
 
-from .harness import IST, LAB_ACCOUNT_ID
+from .harness import IST, account_id
 
 
 @dataclass
@@ -115,7 +115,7 @@ async def inject(fill: Fill) -> Dict[str, Any]:
 
     def _run():
         outcome = process_webhook_trade.apply(
-            args=[payload, str(LAB_ACCOUNT_ID), "alertlab"]
+            args=[payload, str(account_id()), "alertlab"]
         )
         # Eager mode with task_eager_propagates=False stores the exception
         # rather than raising it. Surfacing it here is the difference between a

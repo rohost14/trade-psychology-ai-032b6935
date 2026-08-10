@@ -31,7 +31,7 @@ import datetime as _dt
 import logging
 import os
 import uuid
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, NamedTuple, Optional
 from zoneinfo import ZoneInfo
 
 # Must be set BEFORE app.core.database is imported anywhere.
@@ -121,12 +121,54 @@ def single_run_lock(owner: str = "cli"):
             os.unlink(_LOCK_PATH)
 
 
-#: One reserved account. Everything the lab creates hangs off it, and teardown is
-#: a single delete that cascades. Fixed so a crashed run is still cleanable.
-LAB_ACCOUNT_ID = uuid.UUID("00000000-0000-4000-8000-000000000001")
-LAB_USER_ID = uuid.UUID("00000000-0000-4000-8000-000000000002")
-LAB_EMAIL = "alertlab@synthetic.local"
-LAB_BROKER_USER_ID = "LAB000001"
+class Identity(NamedTuple):
+    """Who a synthetic run trades as."""
+    account_id: uuid.UUID
+    user_id: uuid.UUID
+    email: str
+    broker_user_id: str
+    label: str
+
+
+#: One reserved account per tool. Everything created hangs off it and teardown is
+#: a single delete that cascades. Fixed IDs, so a crashed run is still cleanable.
+#:
+#: Separate identities matter more than they look: the scenario suite tears its
+#: account down before EVERY scenario, so a manual desk sharing that account
+#: would have its positions deleted underneath it the moment anyone ran the
+#: suite. Different accounts let both run at once without a lock between them.
+LAB = Identity(
+    uuid.UUID("00000000-0000-4000-8000-000000000001"),
+    uuid.UUID("00000000-0000-4000-8000-000000000002"),
+    "alertlab@synthetic.local", "LAB000001", "Alert Lab",
+)
+DESK = Identity(
+    uuid.UUID("00000000-0000-4000-8000-000000000011"),
+    uuid.UUID("00000000-0000-4000-8000-000000000012"),
+    "tradedesk@synthetic.local", "DESK00001", "Trade Desk",
+)
+
+_ACTIVE = LAB
+
+
+def use_identity(identity: "Identity") -> None:
+    """
+    Point every read and write at a different synthetic account.
+
+    Set once at process start. A process runs as exactly one identity — the lab
+    server and the desk server are separate processes, which is what makes a
+    module-level value safe here.
+    """
+    global _ACTIVE
+    _ACTIVE = identity
+
+
+def account_id() -> uuid.UUID:
+    return _ACTIVE.account_id
+
+
+#: Kept as a name because it reads better at call sites that are lab-only.
+LAB_ACCOUNT_ID = LAB.account_id
 
 
 # ---------------------------------------------------------------------------
@@ -412,25 +454,25 @@ async def ensure_lab_account(db, capital: float = 500_000, **profile_overrides) 
     from app.models.user import User
     from app.models.user_profile import UserProfile
 
-    user = await db.get(User, LAB_USER_ID)
+    user = await db.get(User, _ACTIVE.user_id)
     if user is None:
-        db.add(User(id=LAB_USER_ID, email=LAB_EMAIL, display_name="Alert Lab"))
+        db.add(User(id=_ACTIVE.user_id, email=_ACTIVE.email, display_name=_ACTIVE.label))
         await db.flush()
 
-    account = await db.get(BrokerAccount, LAB_ACCOUNT_ID)
+    account = await db.get(BrokerAccount, account_id())
     if account is None:
         db.add(BrokerAccount(
-            id=LAB_ACCOUNT_ID,
-            user_id=LAB_USER_ID,
+            id=account_id(),
+            user_id=_ACTIVE.user_id,
             broker_name="synthetic",
-            broker_email=LAB_EMAIL,
-            broker_user_id=LAB_BROKER_USER_ID,
+            broker_email=_ACTIVE.email,
+            broker_user_id=_ACTIVE.broker_user_id,
             status="connected",
         ))
         await db.flush()
 
     profile = (await db.execute(
-        select(UserProfile).where(UserProfile.broker_account_id == LAB_ACCOUNT_ID)
+        select(UserProfile).where(UserProfile.broker_account_id == account_id())
     )).scalar_one_or_none()
 
     defaults = dict(
@@ -447,7 +489,7 @@ async def ensure_lab_account(db, capital: float = 500_000, **profile_overrides) 
     defaults.update(profile_overrides)
 
     if profile is None:
-        profile = UserProfile(broker_account_id=LAB_ACCOUNT_ID, **defaults)
+        profile = UserProfile(broker_account_id=account_id(), **defaults)
         db.add(profile)
     else:
         for key, value in defaults.items():
@@ -490,21 +532,21 @@ async def teardown_lab(db) -> Dict[str, int]:
     ):
         counts[label] = (await db.execute(
             select(func.count()).select_from(model)
-            .where(model.broker_account_id == LAB_ACCOUNT_ID)
+            .where(model.broker_account_id == account_id())
         )).scalar() or 0
-        await db.execute(delete(model).where(model.broker_account_id == LAB_ACCOUNT_ID))
+        await db.execute(delete(model).where(model.broker_account_id == account_id()))
 
     # Strategy groups have no direct account column on their legs.
     try:
         from app.models.strategy_group import StrategyGroup, StrategyGroupLeg
         groups = (await db.execute(
-            select(StrategyGroup.id).where(StrategyGroup.broker_account_id == LAB_ACCOUNT_ID)
+            select(StrategyGroup.id).where(StrategyGroup.broker_account_id == account_id())
         )).scalars().all()
         if groups:
             await db.execute(delete(StrategyGroupLeg).where(
                 StrategyGroupLeg.strategy_group_id.in_(groups)))
             await db.execute(delete(StrategyGroup).where(
-                StrategyGroup.broker_account_id == LAB_ACCOUNT_ID))
+                StrategyGroup.broker_account_id == account_id()))
         counts["strategy_groups"] = len(groups)
     except Exception:
         counts["strategy_groups"] = 0
@@ -512,7 +554,7 @@ async def teardown_lab(db) -> Dict[str, int]:
     try:
         from app.models.alert_mute import AlertMute
         await db.execute(delete(AlertMute).where(
-            AlertMute.broker_account_id == LAB_ACCOUNT_ID))
+            AlertMute.broker_account_id == account_id()))
     except Exception:
         pass
 

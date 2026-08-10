@@ -10,7 +10,7 @@ from __future__ import annotations
 
 from typing import Any, Dict, List
 
-from .harness import IST, LAB_ACCOUNT_ID
+from .harness import IST, account_id
 
 
 def _iso(value):
@@ -26,7 +26,7 @@ async def collect_alerts(db) -> List[Dict[str, Any]]:
 
     rows = (await db.execute(
         select(RiskAlert)
-        .where(RiskAlert.broker_account_id == LAB_ACCOUNT_ID)
+        .where(RiskAlert.broker_account_id == account_id())
         .order_by(RiskAlert.detected_at, RiskAlert.created_at)
     )).scalars().all()
 
@@ -78,7 +78,7 @@ async def collect_suppressed(db) -> List[Dict[str, Any]]:
 
     rows = (await db.execute(
         select(BehaviorEvent)
-        .where(BehaviorEvent.broker_account_id == LAB_ACCOUNT_ID)
+        .where(BehaviorEvent.broker_account_id == account_id())
         .order_by(BehaviorEvent.detected_at)
     )).scalars().all()
 
@@ -135,12 +135,12 @@ async def collect_positions(db) -> Dict[str, List[Dict[str, Any]]]:
     from app.models.position import Position
 
     open_rows = (await db.execute(
-        select(Position).where(Position.broker_account_id == LAB_ACCOUNT_ID)
+        select(Position).where(Position.broker_account_id == account_id())
     )).scalars().all()
 
     closed_rows = (await db.execute(
         select(CompletedTrade)
-        .where(CompletedTrade.broker_account_id == LAB_ACCOUNT_ID)
+        .where(CompletedTrade.broker_account_id == account_id())
         .order_by(CompletedTrade.exit_time)
     )).scalars().all()
 
@@ -173,7 +173,7 @@ async def collect_structures(db) -> List[Dict[str, Any]]:
 
     rows = (await db.execute(
         select(Position).where(
-            Position.broker_account_id == LAB_ACCOUNT_ID,
+            Position.broker_account_id == account_id(),
             Position.total_quantity != 0,
         )
     )).scalars().all()

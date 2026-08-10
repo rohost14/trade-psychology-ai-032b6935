@@ -21,8 +21,7 @@ from typing import Any, Callable, Dict, List, Optional
 
 from .collect import collect_all, collect_step
 from .harness import (
-    IST, LAB_ACCOUNT_ID, ensure_lab_account, frozen_clock, lab_environment,
-    teardown_lab,
+    IST, ensure_lab_account, frozen_clock, lab_environment, teardown_lab,
 )
 from .inject import Fill, inject
 
