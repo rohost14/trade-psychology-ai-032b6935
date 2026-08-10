@@ -193,7 +193,7 @@ def evaluate_mis_panic(
         "message": (
             f"{late_mis_count} MIS entries after {panic_start.strftime('%H:%M')} IST today. "
             f"{exchange or 'MIS'} auto-squares off at {squareoff_str} — "
-            f"about {max(minutes_left, 0)} minutes from now."
+            f"{max(minutes_left, 0)} minutes after this entry."
         ),
         "late_mis_count": late_mis_count,
         "squareoff": squareoff_str,

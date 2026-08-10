@@ -232,6 +232,10 @@ def evaluate_death_spiral(events: List, now: Optional[datetime] = None) -> Optio
 
     evidence = {
         "domains": domains,
+        # Named so the message can quote it. The composite absorbs the alerts it
+        # summarises, so it is frequently the only thing the trader sees — it has
+        # to carry the specifics rather than gesture at them.
+        "event_count": sum(len(v) for v in domain_events.values()),
         "domain_counts": {d: len(v) for d, v in domain_events.items()},
         "compressed_within_min": window_min if compressed else None,
         "continued_escalation": continued_escalation,
@@ -257,14 +261,19 @@ def evaluate_death_spiral(events: List, now: Optional[datetime] = None) -> Optio
         return {
             "severity": "danger",
             "message": (
-                f"Spiral forming: {' + '.join(domains)} deteriorating together "
+                f"Spiral forming: {' + '.join(domains)} deteriorating together, "
+                f"{evidence.get('event_count', 0)} signals today, "
                 f"with capital at meaningful risk."
             ),
             "context": {**evidence, "level": "danger"},
         }
     return {
         "severity": "caution",
-        "message": f"Behavior deteriorating across {' + '.join(domains)}.",
+        "message": (
+            f"{' + '.join(domains)} all deteriorating — "
+            f"{evidence.get('event_count', 0)} signals across "
+            f"{len(domains)} areas of your trading today."
+        ),
         "context": {**evidence, "level": "warning"},
     }
 

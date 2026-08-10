@@ -744,6 +744,26 @@ class BehaviorEngine:
                 context={"streak": streak, "total_loss": float(total_loss),
                          "threshold": danger, "losing_trades": losing_trades},
             )
+        # A streak's severity was decided by COUNT alone, so three trades that
+        # lost ₹12,000 came out as caution while five that lost ₹1,500 came out
+        # as danger. That is backwards from how the day actually felt. If the
+        # run has already eaten half the limit the trader set for themselves,
+        # it is a danger regardless of how few trades it took.
+        _limit = ctx.thresholds.get("daily_loss_limit")
+        if (streak >= caution and _limit and
+                float(total_loss) >= float(_limit) * 0.5):
+            return DetectedEvent(
+                event_type="consecutive_loss_streak",
+                severity="danger",
+                message=(
+                    f"{streak} consecutive losing trades — ₹{total_loss:,.0f} total loss, "
+                    f"{float(total_loss) / float(_limit) * 100:.0f}% of your daily limit."
+                ),
+                context={"streak": streak, "total_loss": float(total_loss),
+                         "threshold": caution, "losing_trades": losing_trades,
+                         "escalated_by": "loss_size"},
+            )
+
         if streak >= caution:
             return DetectedEvent(
                 event_type="consecutive_loss_streak",
@@ -1932,6 +1952,19 @@ class BehaviorEngine:
                 return None
             pnl_pct = (exit_price - entry_price) / entry_price * 100
         loss_pct = -pnl_pct  # positive % of premium lost
+
+        # A long option's downside is the premium. Anything past 100% is a
+        # defect in the stored pnl_pct, not a real loss — and "180% of premium
+        # lost" reaching a trader would cost the credibility of every other
+        # number on the screen. Report the truth (total loss) and refuse to
+        # assert the impossible percentage.
+        if loss_pct > 100:
+            logger.warning(
+                "[premium_loss_event] %s reported %.0f%% premium loss on a LONG "
+                "option — impossible, pnl_pct is wrong. Capped at 100%%.",
+                ct.tradingsymbol, loss_pct,
+            )
+            loss_pct = 100.0
         if loss_pct <= 0:
             return None
 

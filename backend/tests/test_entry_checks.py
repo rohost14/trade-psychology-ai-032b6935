@@ -157,7 +157,10 @@ def test_mis_panic_counts_down_to_squareoff():
     """The content of this alert is the time remaining — that is why it is early."""
     hit = evaluate_mis_panic(at(15, 5), "NFO", "MIS", 3)
     assert hit["minutes_to_squareoff"] == 20
-    assert "20 minutes from now" in hit["message"]
+    # Wording, not behaviour: "from now" read as the wall clock when the alert
+    # was reviewed later, though it was always measured from the entry. The
+    # number is the assertion that matters and it is unchanged.
+    assert "20 minutes after this entry" in hit["message"]
 
 
 def test_mis_panic_ignores_delivery_products():
