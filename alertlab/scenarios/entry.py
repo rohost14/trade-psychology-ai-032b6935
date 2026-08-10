@@ -31,7 +31,7 @@ from typing import List
 
 from ..runner.inject import Fill, losing_trade, round_trip, winning_trade
 from ..runner.scenario import Expect, Scenario
-from .catalogue import DAY, NIFTY_CE, NIFTY_PE, ROOMY, _flatten, at
+from .catalogue import BANKNIFTY_CE, DAY, NIFTY_CE, NIFTY_PE, ROOMY, _flatten, at
 
 NIFTY_ATM_CE = "NIFTY26AUG24500CE"
 NIFTY_ATM_PE = "NIFTY26AUG24500PE"
@@ -184,4 +184,122 @@ PARTIAL_THEN_DUPLICATE = _s(
 ALL: List[Scenario] = [
     ENTRY_REVENGE, ENTRY_SIZE_ESCALATION, ENTRY_CLEAN, ENTRY_BATCH_ONE_EVALUATION,
     DUPLICATE_POSTBACK, DUPLICATE_CLOSE, OUT_OF_ORDER_FILLS, PARTIAL_THEN_DUPLICATE,
+]
+
+
+# ── The rest of ENTRY_DECIDABLE, checked at entry ───────────────────────────
+#
+# Ten detectors are entry-decidable and running live in shadow. Two are covered
+# above; these are the other eight. Exit-time coverage says nothing about them
+# here: at entry the outcome fields are None, and the engine's idiom throughout
+# is `float(ct.realized_pnl or 0)`, which turns None into a clean zero. A
+# detector that reads the outcome anywhere in its path will therefore not crash
+# — it will quietly answer as though the trade broke even, which is the failure
+# mode worth catching before any of these is promoted.
+#
+# Every scenario leaves its final position OPEN. A closed one lets the exit-time
+# detector answer instead, and the scenario would pass without the entry check
+# having run at all.
+
+ENTRY_RAPID_REENTRY = _s(
+    "N-05", "Rapid re-entry, caught as it happens",
+    "Closes at a loss and is back in the same strike two minutes later.",
+    _flatten([losing_trade(NIFTY_CE, at(10, 0), 50, 45, hold_minutes=12)])
+    + [Fill(NIFTY_CE, "BUY", 50, 100.0, at(10, 14), note="straight back in, still open")],
+    records=[Expect("rapid_reentry", at_entry=True,
+                    reason="the gap to the previous exit is known the moment the "
+                           "order fills — nothing about the outcome changes it")],
+)
+
+ENTRY_POST_LOSS_RECOVERY = _s(
+    "N-06", "The recovery bet, before it resolves",
+    "Three losses, then an entry at four times the size — still open.",
+    _flatten([
+        losing_trade(NIFTY_CE, at(10, 0), 50, 20, hold_minutes=12),
+        losing_trade(NIFTY_CE, at(10, 25), 50, 18, hold_minutes=12),
+        losing_trade(NIFTY_CE, at(10, 50), 50, 22, hold_minutes=12),
+    ]) + [Fill(NIFTY_CE, "BUY", 200, 100.0, at(11, 15), note="4x, open")],
+    records=[Expect("post_loss_recovery_bet", at_entry=True,
+                    reason="size and the losses behind it are both already on the "
+                           "record — this is the alert with the most to gain from "
+                           "arriving early")],
+)
+
+ENTRY_MARTINGALE = _s(
+    "N-07", "Martingale, with the last leg still live",
+    "Doubling after every loss; the fourth double has not resolved.",
+    _flatten([
+        losing_trade(NIFTY_CE, at(10, 0), 25, 30, hold_minutes=15),
+        losing_trade(NIFTY_CE, at(10, 25), 50, 30, hold_minutes=15),
+        losing_trade(NIFTY_CE, at(10, 50), 100, 30, hold_minutes=15),
+    ]) + [Fill(NIFTY_CE, "BUY", 200, 100.0, at(11, 15), note="the fourth double, open")],
+    records=[Expect("martingale_behaviour", at_entry=True,
+                    reason="a progression is visible from the sizes alone; waiting for "
+                           "the outcome only confirms what the pattern already said")],
+)
+
+ENTRY_SAME_SYMBOL_OBSESSION = _s(
+    "N-08", "Back to the same strike a fourth time",
+    "Three losses on one strike, then a fourth entry that is still open.",
+    _flatten([
+        losing_trade(NIFTY_CE, at(10, 0), 50, 25, hold_minutes=15),
+        losing_trade(NIFTY_CE, at(10, 30), 75, 25, hold_minutes=15),
+        losing_trade(NIFTY_CE, at(11, 0), 100, 25, hold_minutes=15),
+    ]) + [Fill(NIFTY_CE, "BUY", 150, 100.0, at(11, 30), note="fourth attempt, open")],
+    records=[Expect("same_symbol_obsession", at_entry=True,
+                    reason="three losses and a fourth entry on one underlying — the "
+                           "count is complete before this trade resolves")],
+)
+
+ENTRY_DIRECTION_INSTABILITY = _s(
+    "N-09", "Reversing the view, mid-reversal",
+    "Long the call, loses, and is immediately long the put instead.",
+    _flatten([losing_trade(NIFTY_ATM_CE, at(10, 0), 50, 40, hold_minutes=12)])
+    + [Fill(NIFTY_ATM_PE, "BUY", 50, 95.0, at(10, 14), note="opposite view, open")],
+    records=[Expect("direction_instability", at_entry=True,
+                    reason="flipping from a call to a put on the same underlying "
+                           "minutes after a loss is a decision, not an outcome")],
+)
+
+ENTRY_WINNING_STREAK = _s(
+    "N-14", "Sizing up on a winning run, before it turns",
+    "Four winners, then triple size — the fifth is still open.",
+    _flatten([
+        winning_trade(NIFTY_CE, at(10, 0) + timedelta(minutes=25 * i), 50, 12,
+                      hold_minutes=15) for i in range(4)
+    ]) + [Fill(NIFTY_CE, "BUY", 150, 100.0, at(11, 45), note="3x after four wins, open")],
+    records=[Expect("winning_streak_overconfidence", at_entry=True,
+                    reason="the one entry-time pattern that fires on a GOOD run — "
+                           "worth saying while the position can still be sized down")],
+)
+
+ENTRY_PREMIUM_AVG_DOWN = _s(
+    "N-15", "Averaging into a losing option, live",
+    "Two heavy losses on one strike, then buying it again — open.",
+    _flatten([
+        round_trip(NIFTY_ATM_CE, at(10, 0), 50, 120.0, 72.0, hold_minutes=15),
+        round_trip(NIFTY_ATM_CE, at(10, 30), 50, 100.0, 62.0, hold_minutes=15),
+    ]) + [Fill(NIFTY_ATM_CE, "BUY", 100, 90.0, at(11, 0), note="third buy, open")],
+    records=[Expect("options_premium_avg_down", at_entry=True,
+                    reason="averaging down an option fights direction and decay at "
+                           "once — the moment to say so is before the third entry "
+                           "is sitting there")],
+)
+
+ENTRY_FOMO = _s(
+    "N-16", "Chasing several strikes in the opening half hour",
+    "Three different instruments inside the first thirty minutes.",
+    _flatten([
+        round_trip(NIFTY_CE, at(9, 20), 50, 100.0, 97.0, hold_minutes=8),
+        round_trip(NIFTY_PE, at(9, 30), 50, 90.0, 87.0, hold_minutes=8),
+    ]) + [Fill(BANKNIFTY_CE, "BUY", 25, 150.0, at(9, 40), note="third instrument, open")],
+    records=[Expect("fomo_entry", at_entry=True,
+                    reason="how many instruments were touched in the window is a "
+                           "count of entries, and needs no outcome at all")],
+)
+
+ALL += [
+    ENTRY_RAPID_REENTRY, ENTRY_POST_LOSS_RECOVERY, ENTRY_MARTINGALE,
+    ENTRY_SAME_SYMBOL_OBSESSION, ENTRY_DIRECTION_INSTABILITY,
+    ENTRY_WINNING_STREAK, ENTRY_PREMIUM_AVG_DOWN, ENTRY_FOMO,
 ]
