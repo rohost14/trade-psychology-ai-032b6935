@@ -597,6 +597,45 @@ async def _fire_position_alert(
 # Phase 6: portfolio concentration + entry-time constitution rules
 # ─────────────────────────────────────────────────────────────────────────────
 
+class _LedgerPosition:
+    """
+    A just-opened position as the ledger sees it, shaped for the entry checks.
+
+    Only the two attributes `entry_view_from_position` reads. Deliberately not a
+    Position: it must never be added to a session, and a real Position here
+    would be one refactor away from being written to the table that the Kite
+    sync owns.
+    """
+    __slots__ = ("tradingsymbol", "exchange", "product", "total_quantity",
+                 "average_entry_price", "instrument_type")
+
+    def __init__(self, state):
+        self.tradingsymbol = state.tradingsymbol
+        self.exchange = state.exchange
+        self.product = state.product
+        self.total_quantity = state.qty
+        self.average_entry_price = state.avg_entry_price
+        self.instrument_type = None      # derived downstream from the symbol
+
+
+async def _ledger_positions(db, account_uuid, symbols: list) -> list:
+    """Open positions for `symbols`, read from the ledger rather than Kite."""
+    from app.services.position_ledger_service import PositionLedgerService
+
+    try:
+        states = await PositionLedgerService.get_position_states_bulk(account_uuid, db)
+    except Exception as e:
+        logger.warning(f"[entry_shadow] ledger position lookup failed: {e}")
+        return []
+
+    wanted = set(symbols)
+    return [
+        _LedgerPosition(state)
+        for (symbol, _exchange, _product), state in states.items()
+        if symbol in wanted and (state.qty or 0) != 0
+    ]
+
+
 async def _shadow_entry_detection(broker_account_id: str, symbols: list) -> dict:
     """
     Evaluate the entry-decidable detectors against the positions just opened,
@@ -638,6 +677,22 @@ async def _shadow_entry_detection(broker_account_id: str, symbols: list) -> dict
                 Position.total_quantity != 0,
             ))
         )).scalars().all()
+        if not positions:
+            # `positions` is written by trade_sync_service polling Kite, not by
+            # the fill pipeline — so for the first seconds after a fill the
+            # ledger knows about a position and this table does not. The batch
+            # flushes ~5s after the fill, which made "did the Kite sync land
+            # yet" decide whether entry-time detection ran at all. When it lost
+            # that race it returned here and said nothing: no alert, no log, and
+            # nothing to distinguish it from the checks having found nothing.
+            #
+            # The ledger is authoritative for quantity and is written
+            # synchronously with the fill, so ask it. Reading rather than
+            # writing is deliberate: projecting the ledger INTO `positions`
+            # would make the two agree by construction and silently disable the
+            # broker-vs-ledger quantity mismatch check in
+            # apply_ledger_entry_prices, which exists to catch dropped fills.
+            positions = await _ledger_positions(db, account_uuid, symbols)
         if not positions:
             return {"skipped": "no_open_positions"}
 

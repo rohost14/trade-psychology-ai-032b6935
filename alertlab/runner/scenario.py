@@ -24,7 +24,7 @@ from .harness import (
     IST, LAB_ACCOUNT_ID, ensure_lab_account, frozen_clock, lab_environment,
     teardown_lab,
 )
-from .inject import Fill, inject, sync_positions_from_ledger
+from .inject import Fill, inject
 
 
 @dataclass
@@ -226,14 +226,6 @@ async def run_scenario(scenario: Scenario, db_factory) -> Dict[str, Any]:
                     outcome = await inject(fill)
                 if outcome.get("error"):
                     injection_errors.append(f"{fill.symbol} {fill.side}: {outcome['error']}")
-
-                # Stand in for the Kite position sync. The postback path writes
-                # the ledger and completed trades but never `positions`, and the
-                # entry-time checks load open positions first — so without this
-                # the entire entry path silently no-ops. See
-                # inject.sync_positions_from_ledger.
-                async with db_factory() as db:
-                    await sync_positions_from_ledger(db, LAB_ACCOUNT_ID)
 
                 # Snapshot immediately, so an alert is attributed to the fill
                 # that raised it rather than appearing in one undifferentiated

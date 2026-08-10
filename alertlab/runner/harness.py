@@ -360,22 +360,6 @@ def lab_environment(when: Optional[_dt.datetime] = None):
     # be added will have the same shape, and would fail just as quietly.
     saved["task_runs"] = _isolate_task_loops(celery_app)
 
-    # The entry checks load open positions first, and `positions` is written by
-    # the Kite sync, not by the postback path — so the flush must see a sync
-    # that has already landed. In production that is the normal case: the sync
-    # runs on its own cadence and the flush is ~5s behind the fill. Emulating it
-    # here is what lets the entry path be exercised at all; the race it papers
-    # over is real and is written up in inject.sync_positions_from_ledger.
-    saved["flush_body"] = pm._flush_entry_batch
-
-    async def _flush_with_synced_positions(broker_account_id: str):
-        from app.core.database import SessionLocal as _S
-        from alertlab.runner.inject import sync_positions_from_ledger
-        async with _S() as db:
-            await sync_positions_from_ledger(db, LAB_ACCOUNT_ID)
-        return await saved["flush_body"](broker_account_id)
-
-    pm._flush_entry_batch = _flush_with_synced_positions
 
     tt._get_redis_client = lambda: redis
     pm._get_redis = lambda: redis
@@ -409,7 +393,6 @@ def lab_environment(when: Optional[_dt.datetime] = None):
         celery_app.conf.task_eager_propagates = saved["propagate"]
         for task, original in saved["task_runs"]:
             task.run = original
-        pm._flush_entry_batch = saved["flush_body"]
 
 
 # ---------------------------------------------------------------------------
