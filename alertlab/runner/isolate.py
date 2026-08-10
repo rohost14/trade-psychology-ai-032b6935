@@ -47,10 +47,25 @@ _RUN_PY = _ROOT / "alertlab" / "scripts" / "run.py"
 #: find the result even if something else reached stdout first.
 RESULT_MARKER = "@@ALERTLAB_RESULT@@"
 
-#: A scenario that hangs must not hang the suite. The slowest real scenario runs
-#: about 50s; this is generous enough not to fire on a slow database and short
-#: enough that a wedged run is reported rather than waited on forever.
-CHILD_TIMEOUT_S = 300
+#: A scenario that hangs must not hang the suite — but the budget has to scale
+#: with the scenario, because a flat one turns "this session is large" into a
+#: failure indistinguishable from a wedged run. A 200-fill scenario timed out at
+#: a flat 300s and reported nothing, which is the least useful failure available.
+#:
+#: Measured cost is about 2.4s per fill against the real database (80 fills in
+#: 186s, 60 in 145s). Five seconds a fill leaves roughly double headroom for a
+#: slow connection without letting a genuinely stuck run sit for ever.
+CHILD_TIMEOUT_BASE_S = 120
+CHILD_TIMEOUT_PER_FILL_S = 5
+
+
+def _timeout_for(scenario_id: str) -> int:
+    try:
+        from alertlab.scenarios.catalogue import BY_ID
+        fills = len(BY_ID[scenario_id].fills)
+    except Exception:
+        fills = 20
+    return CHILD_TIMEOUT_BASE_S + CHILD_TIMEOUT_PER_FILL_S * fills
 
 
 def _blank(scenario_id: str, error: str) -> Dict[str, Any]:
@@ -82,12 +97,13 @@ async def run_isolated(scenario_id: str) -> Dict[str, Any]:
     except OSError as exc:
         return _blank(scenario_id, f"could not start runner process: {exc}")
 
+    budget = _timeout_for(scenario_id)
     try:
-        out, err = await asyncio.wait_for(proc.communicate(), timeout=CHILD_TIMEOUT_S)
+        out, err = await asyncio.wait_for(proc.communicate(), timeout=budget)
     except asyncio.TimeoutError:
         proc.kill()
         await proc.wait()
-        return _blank(scenario_id, f"timed out after {CHILD_TIMEOUT_S}s")
+        return _blank(scenario_id, f"timed out after {budget}s")
 
     text = (out or b"").decode("utf-8", "replace")
     # The child marks where its JSON begins. Scanning for the last `[` instead

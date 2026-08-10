@@ -82,6 +82,7 @@ async def detect_and_save(
 
     # Find candidate sibling trades (same account, session, similar entry time)
     siblings = await _find_siblings(completed_trade, parsed, db)
+    siblings = await _drop_already_grouped(siblings, db)
     if not siblings:
         return None
 
@@ -321,6 +322,41 @@ def classify_open_positions(positions: Sequence[Any]) -> List[Dict[str, Any]]:
 # ---------------------------------------------------------------------------
 # Internal helpers
 # ---------------------------------------------------------------------------
+
+async def _drop_already_grouped(siblings: List, db: AsyncSession) -> List:
+    """
+    Remove siblings that are already a leg of some other strategy group.
+
+    A CompletedTrade belongs to at most one group — `strategy_group_legs`
+    enforces it with a UNIQUE on completed_trade_id. The guard above checks that
+    for the trade being classified but never for its siblings, and on a busy day
+    a sibling is very often already grouped: the same strike gets traded round
+    after round, and _find_siblings matches on entry time, not on whether the
+    candidate is still free.
+
+    Building a group anyway made the bulk leg insert raise UniqueViolation. The
+    caller catches it and logs "strategy detection failed ... behavior engine
+    will not suppress hedge alerts" — so the failure is not just a lost group,
+    it silently disables hedge suppression for that trade and every alert that
+    depended on knowing the legs belonged together. It fired 36 times in a
+    single 200-fill session and never appears at the volumes the other tests
+    use, which is exactly why the volume scenario exists.
+    """
+    if not siblings:
+        return []
+
+    from sqlalchemy import select
+
+    from app.models.strategy_group import StrategyGroupLeg
+
+    ids = [t.id for t in siblings]
+    taken = set((await db.execute(
+        select(StrategyGroupLeg.completed_trade_id)
+        .where(StrategyGroupLeg.completed_trade_id.in_(ids))
+    )).scalars().all())
+
+    return [t for t in siblings if t.id not in taken]
+
 
 async def _get_group_for_trade(
     completed_trade_id: UUID,
