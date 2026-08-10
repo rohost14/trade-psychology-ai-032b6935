@@ -341,6 +341,7 @@ _CORE: List[Scenario] = [
 
 def _all() -> List[Scenario]:
     """Core stories, detectors, the variation matrix, entry path, contracts."""
+    from .adversarial import ALL as BOUNDARY_SCENARIOS
     from .contracts import ALL as CONTRACT_SCENARIOS
     from .detectors import DETECTOR_SCENARIOS
     from .entry import ALL as ENTRY_SCENARIOS
@@ -348,7 +349,8 @@ def _all() -> List[Scenario]:
     from .volume import ALL as VOLUME_SCENARIOS
 
     merged = (_CORE + DETECTOR_SCENARIOS + VARIATION_SCENARIOS
-              + ENTRY_SCENARIOS + CONTRACT_SCENARIOS + VOLUME_SCENARIOS)
+              + ENTRY_SCENARIOS + CONTRACT_SCENARIOS + VOLUME_SCENARIOS
+              + BOUNDARY_SCENARIOS)
     seen, out = set(), []
     for sc in merged:
         # A duplicate id would silently shadow one scenario with another and the
