@@ -1204,6 +1204,27 @@ class BehaviorEngine:
              and (_ps(t.tradingsymbol or "").underlying if t.tradingsymbol else "") == ct_underlying],
             key=lambda t: t.exit_time,
         )[-3:]
+
+        # Martingale is a decision, not a symbol. "I lost, so I'll go bigger" is
+        # the same behaviour whether the trader doubles down on NIFTY or moves to
+        # BANKNIFTY at twice the size — and a real tradebook shows people
+        # rotating instruments while escalating. Restricted to one underlying,
+        # this detector fired ZERO times across 61 real sessions belonging to a
+        # trader who knew he had martingaled.
+        #
+        # Quantity cannot be compared across instruments (50 Nifty against 2000
+        # Industower is meaningless), so the cross-instrument comparison uses
+        # notional value, which is the number the trader actually feels. The
+        # same-underlying path stays first because quantity is the more precise
+        # signal when it is available.
+        cross_instrument = False
+        if len(prior) < 2:
+            prior = sorted(
+                [t for t in trades if t.id != ct.id and t.exit_time],
+                key=lambda t: t.exit_time,
+            )[-3:]
+            cross_instrument = True
+
         if len(prior) < 2:
             return None
 
@@ -1212,7 +1233,17 @@ class BehaviorEngine:
         if loss_count < min_losses:
             return None
 
-        sizes = [t.total_quantity or 1 for t in prior]
+        def _notional(t) -> float:
+            """What the position was worth — comparable across instruments."""
+            return float(abs(t.total_quantity or 0)) * float(t.avg_entry_price or 0)
+
+        if cross_instrument:
+            sizes = [max(_notional(t), 1.0) for t in prior]
+            current_size = max(_notional(ct), 1.0)
+        else:
+            sizes = [t.total_quantity or 1 for t in prior]
+            current_size = ct.total_quantity or 1
+
         caution_mul = ctx.thresholds.get("martingale_caution_multiplier", 1.5)
         danger_mul  = ctx.thresholds.get("martingale_danger_multiplier", 2.0)
 
@@ -1220,9 +1251,12 @@ class BehaviorEngine:
         max_ratio = max(
             sizes[i] / max(sizes[i-1], 1) for i in range(1, len(sizes))
         )
-        # Build readable sequence using all prior + current trade
-        all_sizes = sizes + [ct.total_quantity or 1]
-        seq_str = "→".join(str(s) for s in all_sizes)
+        # Build readable sequence using all prior + current trade. Across
+        # instruments the numbers are rupees, so they are labelled as such —
+        # "50→100→200" and "₹10,000→₹20,000" are different claims.
+        all_sizes = sizes + [current_size]
+        seq_str = ("→".join(f"₹{s:,.0f}" for s in all_sizes) if cross_instrument
+                   else "→".join(str(int(s)) for s in all_sizes))
 
         trade_list = [
             {
