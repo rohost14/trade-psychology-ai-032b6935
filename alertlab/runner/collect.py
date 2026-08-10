@@ -88,7 +88,15 @@ async def collect_suppressed(db) -> List[Dict[str, Any]]:
             continue        # it became an alert; not suppressed
         evidence = ev.evidence or {}
         marker = evidence.get("_suppressed")
-        if ev.shadow:
+        # Entry-time detections are the whole point of E1–E5: the same detector,
+        # asked while the trader can still act. They are written shadow like any
+        # other shadow event, so without this the lab cannot tell "flagged at
+        # entry" from "flagged after the position closed" — which is the single
+        # distinction that work exists to make.
+        at_entry = (ev.input_snapshot or {}).get("source") == "entry_shadow"
+        if at_entry:
+            reason = "detected AT ENTRY, in shadow — before the position resolved"
+        elif ev.shadow:
             reason = "shadow mode — recorded for the promote decision, never alerts"
         elif marker == "dedup":
             reason = "deduplicated — same pattern already fired inside its window"
@@ -111,6 +119,7 @@ async def collect_suppressed(db) -> List[Dict[str, Any]]:
             "message": ev.message,
             "confidence": float(ev.confidence) if ev.confidence is not None else None,
             "shadow": bool(ev.shadow),
+            "at_entry": at_entry,
             "reason": reason,
             "detected_at_ist": ev.detected_at.astimezone(IST).strftime("%H:%M:%S")
                                if ev.detected_at else None,

@@ -32,6 +32,20 @@ class Expect:
     pattern: str
     severity: Optional[str] = None      # None = any severity
     reason: str = ""                    # why this matters, shown in the UI
+    #: must_fire only. `live` means the alert was raised while the position was
+    #: still open. Untested until now, and it is the field the UI uses to decide
+    #: whether an alert is actionable or a post-mortem.
+    lifecycle: Optional[str] = None
+    #: must_fire only. Whether this alert should reach the accountability
+    #: partner. Asserting False matters more than True: the contract that
+    #: protects the trader is the one that keeps ordinary noise away from
+    #: someone they had to ask permission from.
+    routes_to_guardian: Optional[bool] = None
+    #: must_record only. Require the detection to have happened at ENTRY rather
+    #: than after the position closed. Without it a scenario meant to prove
+    #: entry-time detection passes on the exit-time detection of the same
+    #: pattern, which is the opposite of what it set out to show.
+    at_entry: bool = False
 
 
 @dataclass
@@ -68,7 +82,13 @@ def _check(scenario: Scenario, alerts: List[Dict[str, Any]],
            suppressed: List[Dict[str, Any]] | None = None) -> List[Dict[str, Any]]:
     """Evaluate every kind of expectation and explain each outcome."""
     fired = {a["pattern_type"] for a in alerts}
-    recorded = {s["detector"]: s for s in (suppressed or [])}
+    recorded: Dict[str, Dict[str, Any]] = {}
+    for s in (suppressed or []):
+        # A detector can be recorded twice in one scenario — once at entry, once
+        # at exit. Keep the entry record: it is the stronger fact, and the last
+        # writer would otherwise be whichever the query happened to return last.
+        if s["detector"] not in recorded or s.get("at_entry"):
+            recorded[s["detector"]] = s
     by_pattern: Dict[str, List[Dict[str, Any]]] = {}
     for a in alerts:
         by_pattern.setdefault(a["pattern_type"], []).append(a)
@@ -97,13 +117,33 @@ def _check(scenario: Scenario, alerts: List[Dict[str, Any]],
                 "detail": f"expected {exp.severity}, got {', '.join(sorted(severities))}",
                 "reason": exp.reason,
             })
+        elif exp.lifecycle is not None:
+            seen = {a.get("lifecycle") for a in got}
+            results.append({
+                "kind": "must_fire", "pattern": exp.pattern,
+                "pass": exp.lifecycle in seen,
+                "detail": f"expected lifecycle {exp.lifecycle}, got {', '.join(sorted(str(x) for x in seen))}",
+                "reason": exp.reason,
+            })
+        elif exp.routes_to_guardian is not None:
+            routed = any(a.get("would_route_to_guardian") for a in got)
+            results.append({
+                "kind": "must_fire", "pattern": exp.pattern,
+                "pass": routed == exp.routes_to_guardian,
+                "detail": ("routes to guardian" if routed else "does not route to guardian")
+                          + f" (expected {'routes' if exp.routes_to_guardian else 'no route'})",
+                "reason": exp.reason,
+            })
         else:
             results.append({"kind": "must_fire", "pattern": exp.pattern, "pass": True,
                             "detail": f"fired ({got[0]['severity']})", "reason": exp.reason})
 
     for exp in scenario.must_record:
         held = recorded.get(exp.pattern)
-        if held:
+        if held and exp.at_entry and not held.get("at_entry"):
+            ok, detail = False, ("detected, but only after the position closed — "
+                                 "the entry-time check did not raise it")
+        elif held:
             ok, detail = True, f"recorded as evidence — {held['reason']}"
         elif exp.pattern in fired:
             # Louder than expected. An analytics-only detector that starts
