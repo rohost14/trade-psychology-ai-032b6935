@@ -52,6 +52,8 @@ from dataclasses import dataclass, field
 from datetime import datetime, timedelta, timezone
 from decimal import Decimal
 from typing import List, Optional, Dict, Any
+
+from app.core.severity import SEVERITY_ORDER
 from uuid import UUID, uuid4
 from zoneinfo import ZoneInfo
 
@@ -597,7 +599,110 @@ class BehaviorEngine:
                         f"constitution rule breached ({breached_rules})"
                     )
 
+        self._consolidate(events)
         return events
+
+    # ── One trade, one story ──────────────────────────────────────────────
+
+    #: Detectors that describe the SAME underlying fact. Firing all of them is
+    #: not three findings, it is one finding said three times.
+    #:
+    #: Within a family the FIRST name that fired wins and the rest are recorded
+    #: as evidence — ordered most specific first, because "you are doubling
+    #: after every loss" tells a trader more than "your position size is
+    #: rising", and the specific one is the harder claim to make.
+    _FAMILIES = (
+        ("sizing after losses", (
+            "martingale_behaviour",       # a doubling progression — the strongest claim
+            "post_loss_recovery_bet",     # one oversized bet after losses
+            "size_escalation",            # size drifting up: the weakest of the three
+        )),
+        ("going back to the same trade", (
+            "same_symbol_obsession",      # the whole session on one instrument
+            "revenge_trade",              # straight back in after a loss
+            "rapid_reentry",              # info-tier anyway, but keeps the order honest
+        )),
+        ("the position is too big", (
+            "excess_exposure",
+            "overexposure",
+            "portfolio_concentration",
+            "capital_mismatch",
+        )),
+    )
+
+    #: Alerts that are summaries of other alerts. A composite firing ALONGSIDE
+    #: what it summarises is double-reporting by construction: it exists to say
+    #: "several things are going wrong at once", so the several things do not
+    #: also need to be said.
+    _COMPOSITES = ("death_spiral", "session_meltdown")
+
+    def _consolidate(self, events: List[DetectedEvent]) -> None:
+        """
+        Collapse several descriptions of one behaviour into the strongest one.
+
+        Seven alerts on a single closing trade was the real-world result of
+        every detector answering independently and nothing asking how the answers
+        read together. Three of those seven were the same sentence — size grew
+        after losses — and two more were one rule-breach alert per rule broken.
+
+        Nothing is deleted. A folded detection keeps its BehaviorEvent with a
+        `_suppressed` marker, so it still appears in the suppression trace, still
+        counts for detection-quality metrics, and can still be read back. It
+        stops being shouted, which is different from being hidden.
+
+        Deliberately NOT a cap on total alerts. A cap discards whichever
+        detection happens to be last and gives no reason; this folds by meaning,
+        so what survives is chosen rather than arbitrary.
+        """
+        live = [e for e in events if not e.suppressed_reason and not e.shadow
+                and e.severity != "info"]
+        if len(live) < 2:
+            return
+
+        fired = {e.event_type for e in live}
+
+        # 1. A composite absorbs the alerts it summarises.
+        composite = next((c for c in self._COMPOSITES if c in fired), None)
+        if composite:
+            for e in live:
+                if e.event_type != composite and not e.suppressed_reason:
+                    e.suppressed_reason = f"absorbed:{composite}"
+            return
+
+        # 2. Within a family, the most specific description wins.
+        for label, members in self._FAMILIES:
+            present = [m for m in members if m in fired]
+            if len(present) < 2:
+                continue
+            winner = present[0]
+            for e in live:
+                if e.event_type in present[1:] and not e.suppressed_reason:
+                    e.suppressed_reason = f"same_story:{winner}"
+            logger.debug(
+                f"[BehaviorEngine] {label}: kept {winner}, folded {present[1:]}"
+            )
+
+        # 3. Several rules broken on one trade is one alert, not one per rule.
+        # The trader broke their constitution; which clauses is detail that
+        # belongs inside that alert, not spread across several.
+        breaches = [e for e in live
+                    if e.event_type == "constitution_violation" and not e.suppressed_reason]
+        if len(breaches) > 1:
+            # Keep the most severe; on a tie the first, which is the order the
+            # rules were evaluated in.
+            keep = max(breaches, key=lambda e: SEVERITY_ORDER.index(e.severity)
+                       if e.severity in SEVERITY_ORDER else 0)
+            others = [e for e in breaches if e is not keep]
+            rules = [e.context.get("rule") for e in breaches if e.context.get("rule")]
+            keep.context = {**(keep.context or {}), "also_breached":
+                            [r for r in rules if r != (keep.context or {}).get("rule")]}
+            if len(rules) > 1:
+                keep.message = (
+                    f"{keep.message} "
+                    f"({len(rules)} of your rules broke on this trade.)"
+                )
+            for e in others:
+                e.suppressed_reason = "merged_into_rule_breach"
 
     # ── Pattern 1: Consecutive loss streak ────────────────────────────────
 

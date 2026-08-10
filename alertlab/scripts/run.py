@@ -88,7 +88,16 @@ async def main() -> int:
     def _flatten(outcome):
         return {"id": outcome["scenario"]["id"], "passed": outcome["passed"],
                 "checks": outcome["checks"], "alerts": len(outcome["alerts"]),
-                "elapsed_ms": outcome["elapsed_ms"], "error": outcome["error"]}
+                "elapsed_ms": outcome["elapsed_ms"], "error": outcome["error"],
+                # Carried so an audit can ask how MANY alerts one trade produced,
+                # which is the question every assertion in the suite skips.
+                "alert_rows": [
+                    {"pattern_type": a["pattern_type"], "severity": a["severity"],
+                     "label": a["label"], "message": a["message"],
+                     "trigger": a["trigger_completed_trade_id"],
+                     "at": a["detected_at_ist"]}
+                    for a in outcome["alerts"]
+                ]}
 
     # `--no-lock` marks a child spawned by an isolated suite: the parent already
     # holds the lock, so a child taking it would deadlock every run.
