@@ -2,7 +2,10 @@
 
 What must be tested, and why each case exists. Companion to `PLAN.md`.
 
-Status: **catalogue only. No scenarios written yet.**
+Status: **written and passing — 108 scenarios.** See `alertlab/scenarios/` for
+the code and `python alertlab/scripts/run.py` to run them.
+
+For testing by hand rather than by suite, see `tradedesk/WHAT_TO_TEST.md`.
 
 ---
 

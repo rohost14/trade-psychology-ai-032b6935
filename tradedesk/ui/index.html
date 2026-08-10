@@ -61,6 +61,14 @@
   .kv{display:flex;justify-content:space-between;font-size:12px;padding:3px 0}
   .big{font-size:19px;font-weight:600;font-family:var(--mono)}
   details{margin-top:8px}
+  .filters{display:flex;gap:6px;margin-bottom:10px;flex-wrap:wrap}
+  .filters .f{font-size:11px;padding:4px 9px;border-radius:99px}
+  .filters .f.on{background:var(--brand);border-color:var(--brand);color:#fff}
+  .hint{position:fixed;bottom:14px;left:14px;background:var(--panel);
+        border:1px solid var(--line);border-radius:8px;padding:9px 12px;
+        font-size:11px;color:var(--dim);max-width:300px;line-height:1.5}
+  kbd{font-family:var(--mono);font-size:10px;background:#0b0c10;border:1px solid var(--line);
+      border-radius:3px;padding:1px 4px}
   summary{cursor:pointer;font-size:11px;color:var(--dim)}
 </style>
 </head>
@@ -103,8 +111,17 @@
         <button class="buy" style="flex:1" onclick="place('BUY')">BUY</button>
         <button class="sell" style="flex:1" onclick="place('SELL')">SELL</button>
       </div>
-      <div class="note">A SELL with no position opens a short. Selling more than you
-        hold flips the position — both are real cases the engine handles.</div>
+      <div class="bar">
+        <button style="flex:1" onclick="roundTrip(-6)">Round trip, lose 6%</button>
+        <button style="flex:1" onclick="roundTrip(6)">Round trip, win 6%</button>
+      </div>
+      <div class="bar">
+        <button style="flex:1" onclick="repeatLast()">Repeat last order</button>
+        <button style="flex:1" onclick="doubleUp()">Double the size</button>
+      </div>
+      <div class="note">A round trip buys and sells in one click, 15 minutes
+        apart — the unit most detectors actually reason about. A SELL with no
+        position opens a short; selling more than you hold flips it.</div>
     </div>
 
     <div class="card">
@@ -182,8 +199,17 @@
   <!-- ── RIGHT: what the engine said ─────────────────────────────────────── -->
   <div class="col">
     <div class="card">
-      <h2>Alerts</h2>
+      <h2>Alerts <span class="dim" id="alertcount" style="font-weight:400"></span></h2>
+      <div class="filters">
+        <button class="f on" data-sev="all">All</button>
+        <button class="f" data-sev="critical">Critical</button>
+        <button class="f" data-sev="danger">Danger</button>
+        <button class="f" data-sev="caution">Caution</button>
+        <button class="f" style="margin-left:auto" onclick="clearFeed()">Clear feed</button>
+      </div>
       <div id="alerts"><div class="empty">Nothing yet.</div></div>
+      <div class="note">Clear only empties this panel. The alerts stay in the
+        database — reload to see them again.</div>
     </div>
 
     <div class="card">
@@ -206,6 +232,12 @@
       <div id="probe"></div>
     </div>
   </div>
+</div>
+
+<div class="hint">
+  <b>Most detectors need CLOSED trades.</b> A buy on its own tells them almost
+  nothing — use <kbd>Round trip</kbd>, then repeat it three or four times to
+  build a streak. Press <kbd>Enter</kbd> in the form to BUY.
 </div>
 
 <script>
@@ -244,6 +276,22 @@ async function api(path, body, method){
 /* Alerts caused by the order just placed are marked fresh, so a busy right-hand
    column still tells you which order was responsible. */
 let freshIds = new Set();
+let sevFilter = 'all';
+let cleared = new Set();     // alert ids hidden from the panel only
+
+document.addEventListener('click', e => {
+  const b = e.target.closest('.filters .f[data-sev]');
+  if (!b) return;
+  sevFilter = b.dataset.sev;
+  document.querySelectorAll('.filters .f[data-sev]').forEach(x =>
+    x.classList.toggle('on', x === b));
+  refresh();
+});
+
+function clearFeed(){
+  document.querySelectorAll('#alerts [data-id]').forEach(el => cleared.add(el.dataset.id));
+  refresh();
+}
 
 function render(s){
   $('#clock').textContent = s.clock;
@@ -273,15 +321,21 @@ function render(s){
         <span class="dim mono">${st.leg_count} legs</span></div>`).join('')
     : '<div class="empty">No multi-leg structure among the open legs.</div>';
 
-  $('#alerts').innerHTML = s.alerts.length ? s.alerts.slice().reverse().map(a => `
-    <div class="alertline ${freshIds.has(a.id) ? 'fresh' : ''}">
+  const shown = s.alerts.filter(a => !cleared.has(a.id))
+                        .filter(a => sevFilter === 'all' || a.severity === sevFilter);
+  $('#alertcount').textContent = s.alerts.length
+    ? `· ${shown.length}${shown.length !== s.alerts.length ? ' of ' + s.alerts.length : ''}`
+    : '';
+  $('#alerts').innerHTML = shown.length ? shown.slice().reverse().map(a => `
+    <div class="alertline ${freshIds.has(a.id) ? 'fresh' : ''}" data-id="${esc(a.id)}">
       <div style="display:flex;gap:7px;align-items:center;flex-wrap:wrap">
         ${sev(a.severity)} <b style="font-size:12px">${esc(a.label)}</b>
         <span class="dim mono" style="font-size:10px">${esc(a.detected_at_ist||'')}</span>
       </div>
       <div class="dim" style="font-size:12px;margin-top:4px">${esc(a.message)}</div>
       ${a.confidence != null ? `<div class="dim mono" style="font-size:10px;margin-top:3px">confidence ${a.confidence}</div>` : ''}
-    </div>`).join('') : '<div class="empty">Nothing yet.</div>';
+    </div>`).join('')
+    : `<div class="empty">${s.alerts.length ? 'Nothing at this severity.' : 'Nothing yet.'}</div>`;
 
   $('#suppressed').innerHTML = s.suppressed.length ? s.suppressed.slice().reverse().map(x => `
     <div class="supline"><span class="mono">${esc(x.detector)}</span>
@@ -303,11 +357,47 @@ async function place(side){
     advance_minutes: Number($('#wait').value || 0),
   };
   const r = await api('/api/order', body);
+  lastOrder = body;
   freshIds = new Set((r.alerts || []).map(a => a.id));
   if (r.order.error) alert('Order failed: ' + r.order.error);
   await refresh();
   $('#wait').value = 0;
 }
+
+/* A round trip is the unit the engine thinks in: most detectors compare one
+   CLOSED trade against the ones before it, so a single BUY tells them nothing.
+   Doing it in one click is the difference between testing a streak in four
+   actions and testing it in sixteen. */
+async function roundTrip(pct){
+  const entry = Number($('#price').value);
+  const exit = Math.round(entry * (1 + pct / 100) * 100) / 100;
+  await place('BUY');
+  const keep = $('#price').value;
+  $('#price').value = exit;
+  $('#wait').value = 15;
+  await place('SELL');
+  $('#price').value = keep;
+}
+
+let lastOrder = null;
+async function repeatLast(){
+  if (!lastOrder) { alert('Place an order first.'); return; }
+  $('#symbol').value = lastOrder.symbol;
+  $('#qty').value = lastOrder.qty;
+  $('#price').value = lastOrder.price;
+  await place(lastOrder.side);
+}
+
+function doubleUp(){ $('#qty').value = Number($('#qty').value) * 2; }
+
+/* Enter places a BUY from anywhere in the order form — the single most repeated
+   action in a manual session. */
+document.addEventListener('keydown', e => {
+  if (e.key === 'Enter' && e.target.closest('.card') && e.target.tagName === 'INPUT') {
+    e.preventDefault();
+    place('BUY');
+  }
+});
 
 async function adv(m){ await api('/api/advance?minutes=' + m); await refresh(); }
 async function setClock(){
