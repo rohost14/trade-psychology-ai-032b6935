@@ -190,7 +190,8 @@ def _check(scenario: Scenario, alerts: List[Dict[str, Any]],
     return results
 
 
-async def run_scenario(scenario: Scenario, db_factory) -> Dict[str, Any]:
+async def run_scenario(scenario: Scenario, db_factory,
+                       include_probe: bool = False) -> Dict[str, Any]:
     """
     Clear, seed, replay, collect, assert, tear down.
 
@@ -255,6 +256,17 @@ async def run_scenario(scenario: Scenario, db_factory) -> Dict[str, Any]:
         error = traceback.format_exc()
         collected = {"alerts": [], "suppressed": [], "positions": {"open": [], "closed": []},
                      "structures": [], "guardian": [], "session_pnl": 0}
+
+    # Taken here, inside the run, because teardown at the end would leave the
+    # account empty and the probe would report "no completed trades" for a
+    # scenario that had just produced four. Off by default: it evaluates all 27
+    # detectors, which is worth a second for one scenario and not worth 108.
+    if include_probe and not error:
+        try:
+            from .probe import probe as _probe
+            collected["probe"] = await _probe()
+        except Exception as exc:
+            collected["probe"] = {"ready": False, "reason": f"probe failed: {exc}"}
 
     checks = _check(scenario, collected["alerts"], collected["suppressed"]) if not error else []
     passed = bool(checks) and all(c["pass"] for c in checks) and not error

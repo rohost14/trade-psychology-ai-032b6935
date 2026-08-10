@@ -228,6 +228,15 @@ async function run(id) {
       <div class="body"><div id="tl"></div></div>
     </div>
 
+    <div class="card"><h2>Why didn't it fire?</h2>
+      <div class="body">
+        <button onclick="labProbe()">Ask every detector about this session</button>
+        <div id="probe"></div>
+        <div class="note">A scenario asserting silence is green whether the
+          detector had nothing to say or never got to look. This says which.</div>
+      </div>
+    </div>
+
     <div class="card"><h2>Would route to accountability partner</h2>
       <div class="body">
         ${guardian ? `<table>${guardian}</table>`
@@ -238,7 +247,42 @@ async function run(id) {
       </div>
     </div>`;
 
+  LAST_PROBE = r.probe || null;
   await replaySession(r.timeline || [], $('#tl'));
+}
+
+/* The same probe the desk uses, pointed at whatever the last scenario left
+   behind. Teardown runs at the START of a scenario, so the session is still
+   there to ask about. */
+let LAST_PROBE = null;
+async function labProbe(){
+  const out = $('#probe');
+  out.innerHTML = '<div class="empty">asking…</div>';
+  const p = LAST_PROBE;
+  if (!p) { out.innerHTML = '<div class="empty">Run a scenario first.</div>'; return; }
+  if (!p.ready) { out.innerHTML = `<div class="note">${esc(p.reason)}</div>`; return; }
+  const verdict = v => v === 'fires' ? '<span class="ok">fires</span>'
+                    : v === 'error' ? '<span class="bad">ERROR</span>'
+                    : '<span class="dim">silent</span>';
+  out.innerHTML = `
+    <div class="note">Asked about <b>${esc(p.evaluated_against.symbol)}</b>,
+      ${money(p.evaluated_against.pnl)}, closed ${esc(p.evaluated_against.exit_ist || '')}.</div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px">
+      <div><b style="font-size:11px" class="dim">WHAT IT IS LOOKING AT</b>
+        <table>${Object.entries(p.facts).map(([k, v]) =>
+          `<tr><td class="dim">${esc(k.replace(/_/g, ' '))}</td>
+               <td class="mono" style="text-align:right">${esc(v)}</td></tr>`).join('')}</table></div>
+      <div><b style="font-size:11px" class="dim">LIMITS IT IS CHECKING</b>
+        <table>${Object.entries(p.thresholds).map(([k, v]) =>
+          `<tr><td class="dim">${esc(k.replace(/_/g, ' '))}</td>
+               <td class="mono" style="text-align:right">${esc(v)}</td></tr>`).join('')}</table></div>
+    </div>
+    <table style="margin-top:12px">${p.detectors.map(d => `
+      <tr><td>${esc(d.label)}</td>
+          <td style="text-align:right">${verdict(d.verdict)}</td></tr>
+      ${d.verdict !== 'silent' ? `<tr><td colspan="2" class="dim"
+        style="font-size:11px;border:0;padding-top:0">${esc(d.detail)}</td></tr>` : ''}`).join('')}
+    </table>`;
 }
 
 $('#runAll').onclick = async () => {

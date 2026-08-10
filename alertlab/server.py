@@ -30,6 +30,7 @@ from alertlab.runner.harness import (                            # noqa: E402
     quiet_logs, single_run_lock, teardown_lab,
 )
 from alertlab.runner.isolate import run_suite_isolated  # noqa: E402
+from alertlab.runner.probe import probe              # noqa: E402
 from alertlab.runner.scenario import run_scenario    # noqa: E402
 from alertlab.scenarios.catalogue import ALL_SCENARIOS, BY_ID  # noqa: E402
 
@@ -95,7 +96,8 @@ async def run_one(scenario_id: str):
     if scenario is None:
         raise HTTPException(status_code=404, detail=f"unknown scenario {scenario_id}")
     with _held():
-        return JSONResponse(await run_scenario(scenario, _db_factory()))
+        return JSONResponse(await run_scenario(scenario, _db_factory(),
+                                               include_probe=True))
 
 
 @app.post("/api/run-all")

@@ -1,6 +1,10 @@
 """
 Why a detector did not fire.
 
+Lives in the runner because both tools need it and neither owns it: the desk asks
+it about a session you traded by hand, the lab asks it about the scenario that
+just ran. Reads whichever synthetic account the process is running as.
+
 Every tool in this system answers "what fired". None answers the question a
 sceptic actually asks, which is why something did not — and "no alert" is
 indistinguishable from "detector broken" without it. Three of the bugs found
@@ -23,7 +27,7 @@ from __future__ import annotations
 from decimal import Decimal
 from typing import Any, Dict, List
 
-from alertlab.runner.harness import IST, account_id, quiet_logs
+from .harness import IST, account_id, quiet_logs
 
 
 def _db():
@@ -106,13 +110,24 @@ async def probe() -> Dict[str, Any]:
                 results.append(row)
                 continue
 
-            if event is None:
+            # A detector may return one event, a list of them, or None. The
+            # constitution detector returns one per rule broken, which is why
+            # this cannot assume a single object — assuming it took the whole
+            # probe down with "'list' object has no attribute 'severity'".
+            found = [e for e in (event if isinstance(event, (list, tuple)) else [event])
+                     if e is not None]
+
+            if not found:
                 row.update(verdict="silent",
                            detail="conditions not met for the trade that just closed")
             else:
-                row.update(verdict="fires", severity=event.severity,
-                           detail=event.message,
-                           confidence=float(event.confidence or 0))
+                strongest = max(found, key=lambda e: _rank(e.severity))
+                detail = strongest.message
+                if len(found) > 1:
+                    detail = f"{detail}  (+{len(found) - 1} more from this detector)"
+                row.update(verdict="fires", severity=strongest.severity,
+                           detail=detail,
+                           confidence=float(strongest.confidence or 0))
             results.append(row)
 
         order = {"fires": 0, "error": 1, "silent": 2}
@@ -131,6 +146,11 @@ async def probe() -> Dict[str, Any]:
             "thresholds": _relevant(thresholds),
             "detectors": results,
         }
+
+
+def _rank(severity: str) -> int:
+    from app.core.severity import SEVERITY_ORDER
+    return SEVERITY_ORDER.index(severity) if severity in SEVERITY_ORDER else 0
 
 
 def _facts(trades: List[Any]) -> Dict[str, Any]:

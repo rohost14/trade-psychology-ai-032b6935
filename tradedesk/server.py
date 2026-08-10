@@ -25,7 +25,7 @@ from fastapi.responses import FileResponse, JSONResponse  # noqa: E402
 from pydantic import BaseModel                      # noqa: E402
 
 from tradedesk.desk import Desk                     # noqa: E402
-from tradedesk.probe import probe                   # noqa: E402
+from alertlab.runner.probe import probe             # noqa: E402
 
 app = FastAPI(title="Trade Desk", docs_url=None, redoc_url=None)
 UI = Path(__file__).parent / "ui" / "index.html"
