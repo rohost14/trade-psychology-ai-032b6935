@@ -99,3 +99,8 @@ docs/taxdocx.txt
 
 # Alert Lab run lock (see alertlab/runner/harness.py)
 alertlab/.run.lock
+
+# Real broker exports — never commit. Personal financial data.
+*tradebook*.csv
+*pnl*.csv
+docs/*.csv
