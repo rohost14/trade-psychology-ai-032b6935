@@ -21,7 +21,9 @@ sys.path.insert(0, str(ROOT))
 sys.path.insert(0, str(ROOT / "backend"))
 
 
-from alertlab.runner.harness import quiet_logs, teardown_lab           # noqa: E402
+from alertlab.runner.harness import (                                  # noqa: E402
+    quiet_logs, single_run_lock, teardown_lab,
+)
 from alertlab.runner.scenario import run_scenario          # noqa: E402
 from alertlab.scenarios.catalogue import ALL_SCENARIOS, BY_ID  # noqa: E402
 
@@ -58,22 +60,23 @@ async def main() -> int:
         return 2
 
     results = []
-    for scenario in chosen:
-        outcome = await run_scenario(scenario, _db_factory())
-        results.append(outcome)
-        if "--json" in flags:
-            continue
-        mark = f"{GREEN}pass{OFF}" if outcome["passed"] else f"{RED}FAIL{OFF}"
-        print(f"{mark}  {scenario.id:<7} {scenario.title}"
-              f"{DIM}  ({len(outcome['alerts'])} alerts, {outcome['elapsed_ms']}ms){OFF}")
-        for check in outcome["checks"]:
-            if not check["pass"]:
-                kind = "must fire" if check["kind"] == "must_fire" else "must NOT fire"
-                print(f"        {RED}·{OFF} {check['pattern']} [{kind}] — {check['detail']}")
-                if check["reason"]:
-                    print(f"          {DIM}{check['reason']}{OFF}")
-        if outcome["error"]:
-            print(f"        {RED}{outcome['error'].strip().splitlines()[-1]}{OFF}")
+    with single_run_lock(owner="cli"):
+        for scenario in chosen:
+            outcome = await run_scenario(scenario, _db_factory())
+            results.append(outcome)
+            if "--json" in flags:
+                continue
+            mark = f"{GREEN}pass{OFF}" if outcome["passed"] else f"{RED}FAIL{OFF}"
+            print(f"{mark}  {scenario.id:<7} {scenario.title}"
+                  f"{DIM}  ({len(outcome['alerts'])} alerts, {outcome['elapsed_ms']}ms){OFF}")
+            for check in outcome["checks"]:
+                if not check["pass"]:
+                    kind = "must fire" if check["kind"] == "must_fire" else "must NOT fire"
+                    print(f"        {RED}·{OFF} {check['pattern']} [{kind}] — {check['detail']}")
+                    if check["reason"]:
+                        print(f"          {DIM}{check['reason']}{OFF}")
+            if outcome["error"]:
+                print(f"        {RED}{outcome['error'].strip().splitlines()[-1]}{OFF}")
 
     if "--json" in flags:
         print(json.dumps([{

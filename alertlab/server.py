@@ -13,6 +13,7 @@ point, and it is why this refuses to run against a production database.
 """
 from __future__ import annotations
 
+import contextlib
 import os
 import sys
 from pathlib import Path
@@ -25,7 +26,9 @@ from fastapi import FastAPI, HTTPException          # noqa: E402
 from fastapi.responses import FileResponse, JSONResponse  # noqa: E402
 
 
-from alertlab.runner.harness import quiet_logs, teardown_lab     # noqa: E402
+from alertlab.runner.harness import (                            # noqa: E402
+    quiet_logs, single_run_lock, teardown_lab,
+)
 from alertlab.runner.scenario import run_scenario    # noqa: E402
 from alertlab.scenarios.catalogue import ALL_SCENARIOS, BY_ID  # noqa: E402
 
@@ -66,6 +69,16 @@ async def list_scenarios():
     }
 
 
+@contextlib.contextmanager
+def _held():
+    """Translate a busy lab into a 409 the UI can show, not a 500."""
+    try:
+        with single_run_lock(owner="server"):
+            yield
+    except RuntimeError as exc:
+        raise HTTPException(status_code=409, detail=str(exc)) from None
+
+
 @app.post("/api/run/{scenario_id}")
 async def run_one(scenario_id: str):
     """
@@ -80,7 +93,8 @@ async def run_one(scenario_id: str):
     scenario = BY_ID.get(scenario_id)
     if scenario is None:
         raise HTTPException(status_code=404, detail=f"unknown scenario {scenario_id}")
-    return JSONResponse(await run_scenario(scenario, _db_factory()))
+    with _held():
+        return JSONResponse(await run_scenario(scenario, _db_factory()))
 
 
 @app.post("/api/run-all")
@@ -88,14 +102,15 @@ async def run_all():
     """The whole suite. Summary plus per-scenario pass/fail."""
     _guard()
     results = []
-    for scenario in ALL_SCENARIOS:
-        outcome = await run_scenario(scenario, _db_factory())
-        results.append({
-            "id": scenario.id, "title": scenario.title, "section": scenario.section,
-            "passed": outcome["passed"], "error": outcome["error"],
-            "alerts": len(outcome["alerts"]),
-            "checks": outcome["checks"], "elapsed_ms": outcome["elapsed_ms"],
-        })
+    with _held():
+        for scenario in ALL_SCENARIOS:
+            outcome = await run_scenario(scenario, _db_factory())
+            results.append({
+                "id": scenario.id, "title": scenario.title, "section": scenario.section,
+                "passed": outcome["passed"], "error": outcome["error"],
+                "alerts": len(outcome["alerts"]),
+                "checks": outcome["checks"], "elapsed_ms": outcome["elapsed_ms"],
+            })
     return {
         "total": len(results),
         "passed": sum(1 for r in results if r["passed"]),

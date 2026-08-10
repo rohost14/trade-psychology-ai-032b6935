@@ -96,3 +96,6 @@ scroll-loss-experience/.next/
 
 # Raw source transcripts pasted in for analysis — read, not shipped.
 docs/taxdocx.txt
+
+# Alert Lab run lock (see alertlab/runner/harness.py)
+alertlab/.run.lock

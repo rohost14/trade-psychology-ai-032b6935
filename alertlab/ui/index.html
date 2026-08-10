@@ -180,11 +180,78 @@ async function replaySession(timeline, mount) {
   }
 }
 
+/* One scenario, replayed. */
+async function run(id) {
+  const s = SCENARIOS.find(x => x.id === id) || {};
+  const out = $('#out');
+  out.innerHTML = `<div class="empty">running ${esc(id)}…</div>`;
+  $('#status').textContent = 'running ' + id + '…';
+
+  const res = await fetch('/api/run/' + encodeURIComponent(id), {method: 'POST'});
+  const r = await res.json();
+  $('#status').textContent = '';
+
+  if (res.status === 409) {
+    out.innerHTML = `<div class="card"><div class="body">
+      <b class="bad">Lab busy.</b> <span class="dim">${esc(r.detail)}</span></div></div>`;
+    return;
+  }
+
+  const dot = $('#dot-' + id);
+  if (dot) dot.className = 'dot ' + (r.passed ? 'pass' : 'fail');
+
+  // The verdict first: what was asserted and what actually happened. An alert
+  // list on its own cannot tell you whether silence was correct.
+  const checks = (r.checks || []).map(c => `
+    <tr><td>${c.pass ? '<span class="ok">✓</span>' : '<span class="bad">✗</span>'}</td>
+        <td class="mono">${esc(c.pattern)}</td>
+        <td class="dim">${esc(c.kind.replace(/_/g, ' '))}</td>
+        <td>${esc(c.detail)}<div class="dim" style="font-size:11px">${esc(c.reason || '')}</div></td>
+    </tr>`).join('');
+
+  const guardian = (r.guardian || []).map(a => `
+    <tr><td>${sev(a.severity)}</td><td>${esc(a.label)}</td>
+        <td class="dim">${esc(a.message)}</td></tr>`).join('');
+
+  out.innerHTML = `
+    <div class="card"><h2>${esc(id)} — ${r.passed ? '<span class="ok">passed</span>'
+                                                  : '<span class="bad">failed</span>'}</h2>
+      <div class="body">
+        <b>${esc(s.title || '')}</b><div class="dim">${esc(s.story || '')}</div>
+        ${r.error ? `<div class="bad mono" style="margin-top:8px">${esc(r.error.trim().split('\n').pop())}</div>` : ''}
+        ${checks ? `<table style="margin-top:10px">${checks}</table>`
+                 : '<div class="note">No assertions — this scenario only demonstrates behaviour.</div>'}
+      </div>
+    </div>
+
+    <div class="card"><h2>The session, as it happened</h2>
+      <div class="body"><div id="tl"></div></div>
+    </div>
+
+    <div class="card"><h2>Would route to accountability partner</h2>
+      <div class="body">
+        ${guardian ? `<table>${guardian}</table>`
+                   : '<div class="empty">Nothing at danger or above on a guardian-eligible pattern.</div>'}
+        <div class="note">Routing only. WhatsApp delivery is parked until the
+        business number exists — what is shown here is the decision the pipeline
+        made, which is the part worth checking now.</div>
+      </div>
+    </div>`;
+
+  await replaySession(r.timeline || [], $('#tl'));
+}
+
 $('#runAll').onclick = async () => {
   $('#runAll').disabled = true;
   $('#status').textContent = 'running every scenario…';
-  const r = await (await fetch('/api/run-all', {method: 'POST'})).json();
+  const res = await fetch('/api/run-all', {method: 'POST'});
+  const r = await res.json();
   $('#status').textContent = '';
+  if (res.status === 409) {
+    $('#summary').innerHTML = `<b class="bad">lab busy</b> <span class="dim">${esc(r.detail)}</span>`;
+    $('#runAll').disabled = false;
+    return;
+  }
   $('#summary').innerHTML = `<b class="${r.passed === r.total ? 'ok' : 'bad'}">
     ${r.passed}/${r.total} passed</b>${r.failed.length ? ' · failing: ' + r.failed.join(', ') : ''}`;
   r.results.forEach(x => {

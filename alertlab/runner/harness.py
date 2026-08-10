@@ -63,6 +63,63 @@ def quiet_logs() -> None:
                  "app.core.metrics", "app.services.position_ledger_service"):
         logging.getLogger(name).setLevel(logging.WARNING)
 
+    # setLevel alone is not enough: `echo=True` re-applies INFO to the engine
+    # logger every time an engine is constructed, and the lab builds one per
+    # run — so the firehose came back partway through a full-suite run and
+    # buried the results under 900KB of INSERT statements. `disabled` is the one
+    # switch echo never touches.
+    logging.getLogger("sqlalchemy.engine.Engine").disabled = True
+
+#: Path of the cross-process run lock. See `single_run_lock`.
+_LOCK_PATH = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
+                          ".run.lock")
+
+
+@contextlib.contextmanager
+def single_run_lock(owner: str = "cli"):
+    """
+    One lab run at a time, across processes.
+
+    Every run shares LAB_ACCOUNT_ID and every scenario begins by tearing that
+    account down. So two runs at once — the UI server and the CLI, typically —
+    delete each other's rows mid-flight. That does not fail loudly: it surfaces
+    as scenarios reporting zero alerts, alerts attributed to structures that
+    were never traded, and `UPDATE on trading_sessions expected to update 1
+    row(s); 0 were matched`. A whole suite came back 35/70 that way while every
+    one of those scenarios passed individually, which is the most expensive
+    possible way to be told two runs collided.
+
+    A lockfile rather than an in-process lock, because the colliding runs are
+    separate processes. Stale locks are reclaimed: a crashed run must not
+    require manual cleanup to get the lab working again.
+    """
+    stale_after = 3600
+    try:
+        if os.path.exists(_LOCK_PATH) and \
+                (_dt.datetime.now().timestamp() - os.path.getmtime(_LOCK_PATH)) > stale_after:
+            os.unlink(_LOCK_PATH)
+        fd = os.open(_LOCK_PATH, os.O_CREAT | os.O_EXCL | os.O_WRONLY)
+    except FileExistsError:
+        try:
+            held = open(_LOCK_PATH).read().strip()
+        except OSError:
+            held = "unknown"
+        raise RuntimeError(
+            f"another lab run is already in progress ({held}). Runs share one "
+            f"account and tear it down per scenario, so a second run would "
+            f"corrupt both. Wait for it to finish, or delete {_LOCK_PATH} if "
+            f"nothing is actually running."
+        ) from None
+
+    try:
+        os.write(fd, f"{owner} pid={os.getpid()}".encode())
+        os.close(fd)
+        yield
+    finally:
+        with contextlib.suppress(OSError):
+            os.unlink(_LOCK_PATH)
+
+
 #: One reserved account. Everything the lab creates hangs off it, and teardown is
 #: a single delete that cascades. Fixed so a crashed run is still cleanable.
 LAB_ACCOUNT_ID = uuid.UUID("00000000-0000-4000-8000-000000000001")
