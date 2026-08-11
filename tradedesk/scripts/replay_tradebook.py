@@ -60,6 +60,17 @@ use_identity(DESK)
 #: order type, so "no stop-loss on record" only ever means "no record".
 UNJUDGEABLE = {"no_stoploss"}
 
+#: Not constitution rules — engine defaults that are a share of declared capital.
+#: They survive --no-rules because nothing switched them off, and on a real
+#: account they are unvalidatable in principle: capital moved between ₹30,000 and
+#: ₹50,000 across the period, was withdrawn at month end and topped up mid-month,
+#: so there is no single number that makes "20% of capital" mean anything. An
+#: alert that is arithmetic on a figure nobody can state is not a finding.
+#:
+#: death_spiral is left IN but flagged: it aggregates domains and some of its
+#: inputs are these, so its count may be inflated.
+CAPITAL_DERIVED = {"excess_exposure", "session_meltdown"}
+
 
 def _db():
     from app.core.database import SessionLocal
@@ -105,11 +116,11 @@ def infer_products(day_rows):
     return {sym: ("MIS" if qty == 0 else "NRML") for sym, qty in net.items()}
 
 
-async def replay_day(day, rows, capital):
+async def replay_day(day, rows, capital, profile):
     factory = _db()
     async with factory() as db:
         await teardown_lab(db)
-        await ensure_lab_account(db, capital=capital)
+        await ensure_lab_account(db, capital=capital, **profile)
 
     products = infer_products(rows)
     with lab_environment(None):
@@ -133,6 +144,11 @@ async def main() -> int:
     ap.add_argument("--capital", type=float, required=True,
                     help="your trading capital — most rules are a share of it")
     ap.add_argument("--days", type=int, default=0, help="replay only the last N days")
+    ap.add_argument("--cooldown", type=int, default=None,
+                    help="minutes after a loss before re-entry is a breach; 0 disables it")
+    ap.add_argument("--no-rules", action="store_true",
+                    help="disable every constitution rule — only the behavioural "
+                         "detectors speak")
     ap.add_argument("--wipe", action="store_true", help="delete the synthetic rows and exit")
     args = ap.parse_args()
 
@@ -140,6 +156,23 @@ async def main() -> int:
         async with _db()() as db:
             print(await teardown_lab(db))
         return 0
+
+    # Only rules the trader actually set. A default cooldown firing on somebody
+    # who never asked for one produces alerts they would rightly call wrong, and
+    # the point of this exercise is to find the thresholds that are wrong — not
+    # to manufacture them.
+    profile = {}
+    if args.cooldown is not None:
+        profile["cooldown_after_loss"] = args.cooldown
+    if args.no_rules:
+        # The first full run came back 54% rule breaches — a default 2% per-trade
+        # limit against ₹50,000 of capital is breached by every option lot ever
+        # bought, so those alerts were arithmetic rather than behaviour. Rules the
+        # trader never wrote cannot be validated by the trader, and they bury the
+        # detectors that can.
+        profile.update(daily_loss_limit=None, daily_trade_limit=None,
+                       max_position_size=None, max_consecutive_losses=None,
+                       cooldown_after_loss=0)
 
     fills = read_fills(args.csv)
     if not fills:
@@ -157,8 +190,9 @@ async def main() -> int:
 
     report, totals, session_rows = [], defaultdict(int), []
     for i, day in enumerate(days, 1):
-        alerts, positions = await replay_day(day, by_day[day], args.capital)
-        judged = [a for a in alerts if a["pattern_type"] not in UNJUDGEABLE]
+        alerts, positions = await replay_day(day, by_day[day], args.capital, profile)
+        skip = set(UNJUDGEABLE) | (CAPITAL_DERIVED if args.no_rules else set())
+        judged = [a for a in alerts if a["pattern_type"] not in skip]
         pnl = round(sum(c["pnl"] for c in positions["closed"]), 2)
         for a in judged:
             totals[a["pattern_type"]] += 1
@@ -169,6 +203,16 @@ async def main() -> int:
 
         if judged:
             report.append(f"\n## {day} — P&L ₹{pnl:,.0f}, {len(judged)} alert(s)\n")
+            # The day's trades, because an alert cannot be judged without them.
+            # "Is this fair?" is unanswerable if you have to go back to the
+            # tradebook to see what you actually did that day.
+            report.append("\n| # | In | Out | Instrument | Qty | Entry | Exit | P&L |\n"
+                          "|---|---|---|---|---|---|---|---|\n")
+            for n, c in enumerate(positions["closed"], 1):
+                report.append(
+                    f"| {n} | {c['entry_ist']} | {c['exit_ist']} | {c['symbol']} | "
+                    f"{c['qty']} | {c['entry']} | {c['exit']} | ₹{c['pnl']:,.0f} |\n")
+            report.append("\n")
             for a in judged:
                 report.append(
                     f"- **{a['severity']}** · {a['label']} · {a['detected_at_ist']}  \n"
