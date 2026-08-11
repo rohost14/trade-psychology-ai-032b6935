@@ -425,20 +425,6 @@ def get_thresholds(profile=None) -> Dict[str, Any]:
             result['max_position_pct_caution'] = float(result['max_position_size'])
             result['max_position_pct_danger']  = float(result['max_position_size']) * 2.0
 
-        # Profit-giveaway floor scales with capital: a ₹1,000 peak is noise on a
-        # ₹5L account. 0.2% of capital, never below default.
-        #
-        # Capital is the wrong base and this is the blunt version of the fix. A
-        # real trader's capital moves — withdrawn at month end, topped up
-        # mid-month — so 0.2% of it is not a stable measure of what a meaningful
-        # session looks like. Typical POSITION SIZE would be, and is not
-        # available here. Raising the floor is what stops the noise today; the
-        # principled fix needs a different input.
-        if result.get('trading_capital'):
-            result['profit_giveaway_min_peak'] = max(
-                result['profit_giveaway_min_peak'],
-                float(result['trading_capital']) * 0.002,
-            )
     else:
         # Cold start: no profile — capital fields are unknown
         result['trading_capital']    = None

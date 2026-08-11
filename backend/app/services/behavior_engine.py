@@ -1841,11 +1841,22 @@ class BehaviorEngine:
                 (_ps(t.tradingsymbol).underlying or t.tradingsymbol) == ct_underlying
             )
         ]
-        avg_baseline = (
-            sum(t.total_quantity or 1 for t in prior_same) / len(prior_same)
-            if prior_same else None
-        )
-        current_qty = ct.total_quantity or 1
+        # The fourth sizing detector with the single-underlying restriction, and
+        # the one missed when the other three were fixed. Sizing up after a
+        # winning run is the same decision whether the trader stays in NIFTY or
+        # moves to BANKNIFTY — restricted to one symbol it saw nothing across 61
+        # real sessions. Falls back to notional value, which is comparable
+        # across instruments where quantity is not.
+        _cross = len(prior_same) < 2
+        _pool = prior if _cross else prior_same
+        if _cross:
+            avg_baseline = (sum(self._notional(t) for t in _pool) / len(_pool)
+                            if _pool else None)
+            current_qty = max(self._notional(ct), 1.0)
+        else:
+            avg_baseline = (sum(t.total_quantity or 1 for t in _pool) / len(_pool)
+                            if _pool else None)
+            current_qty = ct.total_quantity or 1
 
         def _streak_trade_list(win_list):
             return [

@@ -277,13 +277,31 @@ class ConstitutionService:
             "professional": {"loss_pct": 0.03, "max_trades": 20, "cooldown": 5, "consec": 5, "risk_pct": 3.0},
         }
         m = matrix.get(experience_level or "beginner", matrix["beginner"])
+
+        # The money rules are SUGGESTED, never applied. They arrive as None so
+        # nothing is enforced until the trader writes a number themselves.
+        #
+        # Why: "risk 1-2% of capital per trade" assumes continuous position
+        # sizing. F&O has fixed lot sizes — you cannot buy 0.4 of a NIFTY lot.
+        # On ₹50,000 of capital these defaults allow ₹500-1,000 a trade while
+        # one option lot costs ₹5,000-15,000, so the minimum tradeable unit is
+        # 10-30x the limit and EVERY trade breaches on contact. Replaying a real
+        # tradebook produced 212 rule violations across 61 sessions, 54% of all
+        # alerts, none of which described behaviour.
+        #
+        # The count and time rules survive because they are not shares of
+        # capital: "more than 10 trades today" means the same thing at any
+        # account size.
         capital = float(trading_capital or 0)
         return {
-            "daily_loss_limit": round(capital * m["loss_pct"]) if capital else None,
+            # Suggested, not set. The UI offers these; the trader confirms.
+            "suggested_daily_loss_limit": round(capital * m["loss_pct"]) if capital else None,
+            "suggested_max_position_size": m["risk_pct"],
+            "daily_loss_limit": None,
+            "max_position_size": None,
             "daily_trade_limit": m["max_trades"],
             "cooldown_after_loss": m["cooldown"],
             "max_consecutive_losses": m["consec"],
-            "max_position_size": m["risk_pct"],
             "restricted_windows": [],
         }
 
