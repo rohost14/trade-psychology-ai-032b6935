@@ -2531,6 +2531,13 @@ class BehaviorEngine:
 
         min_peak = Decimal(str(ctx.thresholds.get("profit_giveaway_min_peak", 1000)))
         min_erosion = Decimal(str(ctx.thresholds.get("profit_giveaway_min_erosion", 500)))
+        # Same reasoning as the revenge floor: ₹500 handed back is a bad hour for
+        # one trader and a rounding error for another. Measured against their own
+        # median losing trade, "you gave back real money" means the same thing at
+        # every account size.
+        _typical = self._typical_loss(ctx)
+        if _typical:
+            min_erosion = max(min_erosion, Decimal(str(_typical)))
         caution_pct = Decimal(str(ctx.thresholds.get("profit_giveaway_caution_pct", 0.50)))
         danger_pct = Decimal(str(ctx.thresholds.get("profit_giveaway_danger_pct", 0.70)))
 
