@@ -1082,7 +1082,22 @@ class BehaviorEngine:
         if len(prior) < 3:
             return None
 
-        sizes = [t.total_quantity or 1 for t in prior]
+        # Same underlying if there is enough of it; otherwise the same
+        # behaviour measured in rupees across whatever was traded. Escalating
+        # from a ₹5,000 position to ₹15,000 is escalation whether or not the
+        # symbol changed.
+        cross = False
+        if len(prior) < 3:
+            prior = sorted(
+                [t for t in trades if t.id != ct.id and t.exit_time],
+                key=lambda t: t.exit_time,
+            )[-3:]
+            cross = True
+            if len(prior) < 3:
+                return None
+
+        sizes = ([self._notional(t) for t in prior] if cross
+                 else [t.total_quantity or 1 for t in prior])
         if not (sizes[0] < sizes[1] < sizes[2]):
             return None
 
@@ -1183,6 +1198,19 @@ class BehaviorEngine:
         )
 
     # ── Pattern 7: Martingale / averaging down ────────────────────────────
+
+    @staticmethod
+    def _notional(t) -> float:
+        """
+        What a position was worth, in rupees.
+
+        The comparable size measure ACROSS instruments. Quantity is not: 50
+        Nifty against 2000 Industower says nothing. Every sizing detector was
+        restricted to a single underlying for that reason, and the restriction
+        cost them — they saw nothing across 61 real sessions from a trader who
+        escalates by rotating instruments.
+        """
+        return float(abs(t.total_quantity or 0)) * float(t.avg_entry_price or 0)
 
     def _detect_martingale_behaviour(self, ctx: EngineContext) -> Optional[DetectedEvent]:
         ct = ctx.completed_trade
@@ -2357,10 +2385,16 @@ class BehaviorEngine:
         if not all(p < 0 for p in last_two_pnls):
             return None
 
-        # Compare current qty against recent average for this same underlying
-        recent_qtys = [t.total_quantity or 1 for t in prior[-3:]]
+        # Compare current size against the recent average — by quantity within
+        # one underlying, by value when the trader has moved between them.
+        _cross = len({(_ps(t.tradingsymbol or "").underlying if t.tradingsymbol else "")
+                      for t in prior[-3:]}) > 1
+        if _cross:
+            recent_qtys = [max(self._notional(t), 1.0) for t in prior[-3:]]
+        else:
+            recent_qtys = [t.total_quantity or 1 for t in prior[-3:]]
         avg_qty = sum(recent_qtys) / len(recent_qtys)
-        current_qty = ct.total_quantity or 1
+        current_qty = max(self._notional(ct), 1.0) if _cross else (ct.total_quantity or 1)
 
         if avg_qty < 1:
             return None

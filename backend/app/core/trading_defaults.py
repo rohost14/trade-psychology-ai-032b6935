@@ -120,7 +120,7 @@ COLD_START_DEFAULTS: Dict[str, Any] = {
     'fomo_open_window_min':             30,   # first 30 min of session
     'fomo_close_window_min':            30,   # last 30 min of session (pre-close panic)
     # Expiry day (Thursday): theta decay + 0DTE options = heightened FOMO
-    'fomo_expiry_day_symbols':          2,    # on expiry day: lower to 2+ underlyings
+    'fomo_expiry_day_symbols':          4,   # was 2 — NIFTY plus one stock option inside half an hour on expiry day is an ordinary session, not a scramble.
 
     # ── Expiry day overtrading ────────────────────────────────────────────
     # On the instrument's own expiry date: heightened FOMO, 0DTE herding, vol spikes.
@@ -156,7 +156,7 @@ COLD_START_DEFAULTS: Dict[str, Any] = {
     # >50% of peak gains in a single subsequent trade. Most common at end of day.
     # Pattern: built significant profit → one trade erodes a large % of it.
     # Fires exactly once per threshold crossing (not on every subsequent loss).
-    'profit_giveaway_min_peak':          1000, # minimum peak P&L to qualify (₹1000)
+    'profit_giveaway_min_peak':          5000,   # was 1000 — fired on days that ENDED GREEN. A ₹1,348 peak is one tick on a ₹15,000 option lot, not a session built and given back. Seventeen firings across 61 real sessions, the most common alert in the product, almost all on profitable days.
     'profit_giveaway_min_erosion':        500, # minimum absolute erosion to avoid noise (₹500)
     'profit_giveaway_caution_pct':        0.50, # gave back 50% of peak gains = caution
     'profit_giveaway_danger_pct':         0.70, # gave back 70% of peak gains = danger
@@ -425,8 +425,15 @@ def get_thresholds(profile=None) -> Dict[str, Any]:
             result['max_position_pct_caution'] = float(result['max_position_size'])
             result['max_position_pct_danger']  = float(result['max_position_size']) * 2.0
 
-        # Profit-giveaway floor scales with capital (master P2 item): a ₹1,000
-        # peak is noise on a ₹5L account. 0.2% of capital, never below default.
+        # Profit-giveaway floor scales with capital: a ₹1,000 peak is noise on a
+        # ₹5L account. 0.2% of capital, never below default.
+        #
+        # Capital is the wrong base and this is the blunt version of the fix. A
+        # real trader's capital moves — withdrawn at month end, topped up
+        # mid-month — so 0.2% of it is not a stable measure of what a meaningful
+        # session looks like. Typical POSITION SIZE would be, and is not
+        # available here. Raising the floor is what stops the noise today; the
+        # principled fix needs a different input.
         if result.get('trading_capital'):
             result['profit_giveaway_min_peak'] = max(
                 result['profit_giveaway_min_peak'],
