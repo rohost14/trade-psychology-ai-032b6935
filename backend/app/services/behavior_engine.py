@@ -1096,25 +1096,30 @@ class BehaviorEngine:
              and (_ps(t.tradingsymbol or "").underlying if t.tradingsymbol else "") == ct_underlying],
             key=lambda t: t.exit_time,
         )[-3:]
-        if len(prior) < 3:
-            return None
-
-        # Same underlying if there is enough of it; otherwise the same
-        # behaviour measured in rupees across whatever was traded. Escalating
-        # from a ₹5,000 position to ₹15,000 is escalation whether or not the
-        # symbol changed.
+        # Try the same underlying first, by quantity — the more precise signal.
+        # Then, if that shows no escalation, try every trade of the session by
+        # notional value, because escalating from a ₹5,000 position to ₹15,000
+        # is escalation whether or not the symbol changed.
+        #
+        # The earlier version returned None before the cross-instrument branch
+        # could run, which made it dead code: a session with three same-symbol
+        # trades that did not escalate never reached the value check. Zero
+        # firings across 61 real sessions against six occurrences the
+        # independent checker found in the same file.
         cross = False
-        if len(prior) < 3:
-            prior = sorted(
+        sizes = [t.total_quantity or 1 for t in prior] if len(prior) >= 3 else []
+
+        if not (len(sizes) == 3 and sizes[0] < sizes[1] < sizes[2]):
+            session_prior = sorted(
                 [t for t in trades if t.id != ct.id and t.exit_time],
                 key=lambda t: t.exit_time,
             )[-3:]
-            cross = True
-            if len(prior) < 3:
+            if len(session_prior) < 3:
                 return None
+            prior = session_prior
+            sizes = [self._notional(t) for t in prior]
+            cross = True
 
-        sizes = ([self._notional(t) for t in prior] if cross
-                 else [t.total_quantity or 1 for t in prior])
         if not (sizes[0] < sizes[1] < sizes[2]):
             return None
 
