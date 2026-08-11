@@ -634,7 +634,18 @@ class BehaviorEngine:
     #: what it summarises is double-reporting by construction: it exists to say
     #: "several things are going wrong at once", so the several things do not
     #: also need to be said.
-    _COMPOSITES = ("death_spiral", "session_meltdown")
+    #: Only death_spiral. It is genuinely built FROM other detectors — it counts
+    #: how many behavioural domains are deteriorating — so firing it beside its
+    #: own inputs is double-reporting.
+    #:
+    #: session_meltdown was in this list and should never have been. It is a P&L
+    #: threshold ("83% of your daily limit used"), not a summary of anything, and
+    #: it fired on 41 of 61 real sessions. On every one of those days it absorbed
+    #: every other behavioural alert — same_symbol_obsession went from nine days
+    #: of behaviour in the tradebook to a single alert. A consolidation rule that
+    #: silences the product on exactly the days it matters most is worse than the
+    #: noise it was written to fix.
+    _COMPOSITES = ("death_spiral",)
 
     def _consolidate(self, events: List[DetectedEvent]) -> None:
         """
@@ -794,7 +805,13 @@ class BehaviorEngine:
             return None
 
         # Only trigger if prior loss is meaningful (not a scratch trade)
+        # A scratch for this trader, not a scratch in general. Half the median
+        # losing trade: below that the loss is ordinary for them and re-entering
+        # after it is not a reaction to anything.
         min_loss = ctx.thresholds.get("revenge_min_loss_inr", 500)
+        _typical = self._typical_loss(ctx)
+        if _typical:
+            min_loss = max(min_loss * 0.5, _typical * 0.5)
         if abs(last_pnl) < min_loss:
             return None
 
@@ -1198,6 +1215,29 @@ class BehaviorEngine:
         )
 
     # ── Pattern 7: Martingale / averaging down ────────────────────────────
+
+    @staticmethod
+    def _typical_loss(ctx) -> Optional[float]:
+        """
+        The trader's own median losing trade, in rupees.
+
+        Replaces a flat ₹500 floor that meant something at ₹50,000 of capital
+        and nothing at ₹10,00,000. Capital is the wrong base — it moves, gets
+        withdrawn at month end and topped up mid-month — but the size of the
+        trader's own losses is stable and observable, and it is what "a loss
+        worth reacting to" actually means.
+
+        Returns None when there is not enough history, and callers fall back to
+        the configured floor rather than inventing one from two data points.
+        """
+        losses = sorted(
+            abs(float(t.realized_pnl or 0))
+            for t in (ctx.session_trades or [])
+            if float(t.realized_pnl or 0) < 0
+        )
+        if len(losses) < 3:
+            return None
+        return losses[len(losses) // 2]
 
     @staticmethod
     def _notional(t) -> float:
