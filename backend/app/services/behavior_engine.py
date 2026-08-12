@@ -852,12 +852,19 @@ class BehaviorEngine:
             confidence += pts["high"]
             evidence.append({"signal": "fast_reentry", "value": round(gap_min, 1),
                              "importance": "high"})
-        if same_underlying:
-            confidence += pts["high"]
-            evidence.append({"signal": "same_underlying", "value": True, "importance": "high"})
+        # "Went back to the same thing" is ONE fact, and same_symbol implies
+        # same_underlying. Scoring both added +20 and then +10 for a single
+        # observation stated twice — once loosely, once precisely — which is
+        # not what additive stacking means. Additive points assume independent
+        # evidence; these are nested, so the tiers are exclusive: the exact
+        # contract is the stronger claim and scores high, the same underlying
+        # on a different strike is weaker and scores medium.
         if same_symbol:
+            confidence += pts["high"]
+            evidence.append({"signal": "same_symbol", "value": True, "importance": "high"})
+        elif same_underlying:
             confidence += pts["medium"]
-            evidence.append({"signal": "same_symbol", "value": True, "importance": "medium"})
+            evidence.append({"signal": "same_underlying", "value": True, "importance": "medium"})
         if size_ratio is not None and size_ratio >= 1.5:
             confidence += pts["high"]
             evidence.append({"signal": "bigger_position", "value": round(size_ratio, 2),

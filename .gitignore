@@ -107,3 +107,4 @@ docs/*.csv
 
 # Replay reports contain real trades — same rule as the exports.
 *-replay.md
+*-replay.json

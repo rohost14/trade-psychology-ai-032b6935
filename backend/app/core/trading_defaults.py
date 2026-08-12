@@ -1,20 +1,49 @@
 """
-Trading Defaults Module — Research-Backed Threshold System
+Trading Defaults Module — cold-start thresholds
 
-All thresholds are derived from Indian F&O market research:
-  - SEBI FY2022/23/24 studies on retail F&O trader behaviour
-  - NSE market microstructure data
-  - Behavioral finance research (Kahneman, Shefrin, Coates)
-  - Cortisol/emotional-state research applied to financial decision-making
+READ THIS BEFORE TRUSTING A NUMBER IN THIS FILE.
+
+This docstring used to claim every threshold was research-derived, with "no
+arbitrary guesses". That was not true, and the claim did more damage than the
+numbers: it told every reader the values were settled, so nobody questioned
+them. An audit of all 109 constants found roughly 14 with a source attached
+and roughly 95 without.
+
+The distribution is not random. Where a pair exists, the CAUTION value is
+usually sourced and the DANGER value beside it is not:
+
+    daily_trade_limit        7   SEBI FY2023 (>6/day → 94% loss probability)
+    daily_trade_danger      12   no source
+    consecutive_loss_caution 3   tilt onset, poker + trading research
+    consecutive_loss_danger  5   no source
+    revenge_window_caution  20   Coates & Herbert, Cambridge 2008 (cortisol)
+    revenge_window_danger    5   no source
+
+Danger is the level that interrupts the trader hardest, and it is the
+unsourced half. Several constants are openly provisional in their own comments
+("starting points, not spec constants") and have never been revisited.
+
+So: some values below ARE research-backed and say so in a comment naming the
+study. Everything else is a judgement someone made once. Both kinds are marked.
+An unmarked number is unsourced — treat it as a hypothesis, not a finding.
+
+Sources that ARE used, where cited: SEBI FY2022/23/24 retail F&O studies; NSE
+microstructure data; behavioural finance (Kahneman, Shefrin, Coates); cortisol
+research applied to financial decision-making.
 
 3-tier hierarchy:
-  Tier 1: User-declared values in UserProfile (highest priority — only 6 inputs)
-  Tier 2: Research-backed defaults below (no arbitrary guesses)
+  Tier 1: User-declared values in UserProfile (only 6 inputs, and only when
+          they are TIGHTER than the current threshold)
+  Tier 2: The cold-start defaults below, blended continuously toward the
+          trader's own observed baseline as evidence accumulates. The blend
+          currently covers 4 keys out of 109 — extending it is the open work.
   Tier 3: Universal floors (prevent absurd configs)
 
-None of the 35+ pattern thresholds are surfaced in Settings UI.
-Users only configure: capital, max_position_size, daily_loss_limit, daily_trade_limit,
-sl_percent, cooldown_after_loss. Everything else is internal.
+None of the pattern thresholds are surfaced in Settings UI. Users configure
+only: capital, max_position_size, daily_loss_limit, daily_trade_limit,
+sl_percent, cooldown_after_loss. That is deliberate — manual-input adoption on
+this product is zero — and it is exactly why the defaults have to be either
+sourced or self-relative. Nobody is going to correct them by hand.
 """
 
 from typing import Optional, Dict, Any

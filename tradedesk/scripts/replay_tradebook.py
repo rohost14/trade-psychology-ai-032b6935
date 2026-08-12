@@ -33,6 +33,7 @@ from __future__ import annotations
 import argparse
 import asyncio
 import csv
+import json
 import sys
 from collections import defaultdict
 from datetime import datetime
@@ -116,7 +117,38 @@ def infer_products(day_rows):
     return {sym: ("MIS" if qty == 0 else "NRML") for sym, qty in net.items()}
 
 
-async def replay_day(day, rows, capital, profile):
+async def replay_day(day, rows, capital, profile, attempts: int = 4):
+    """
+    One session, retried on a dropped connection.
+
+    A year is ~15 minutes of replay against a hosted Postgres, and a pooled
+    connection went stale mid-operation on the first full run — losing the
+    whole pass at session 150-odd. pool_pre_ping cannot help there; it checks
+    health before handing a connection out, not while one is in use. So the
+    day is simply retried against a rebuilt pool.
+    """
+    for attempt in range(1, attempts + 1):
+        try:
+            return await _replay_day_once(day, rows, capital, profile)
+        except Exception as e:
+            transient = any(s in f"{type(e).__name__}{e}".lower() for s in (
+                "connectiondoesnotexist", "connection was closed",
+                "connectionreset", "cannot perform operation",
+                "server closed the connection", "interfaceerror",
+            ))
+            if attempt == attempts or not transient:
+                raise
+            print(f"      {day}: {type(e).__name__} — rebuilding pool, "
+                  f"retry {attempt}/{attempts - 1}", flush=True)
+            try:
+                from app.core.database import engine
+                await engine.dispose()
+            except Exception:
+                pass
+            await asyncio.sleep(2 * attempt)
+
+
+async def _replay_day_once(day, rows, capital, profile):
     factory = _db()
     async with factory() as db:
         await teardown_lab(db)
@@ -189,6 +221,7 @@ async def main() -> int:
     print(f"{len(fills)} fills across {len(by_day)} sessions; replaying {len(days)}.\n")
 
     report, totals, session_rows = [], defaultdict(int), []
+    by_day_patterns = {}
     for i, day in enumerate(days, 1):
         alerts, positions = await replay_day(day, by_day[day], args.capital, profile)
         skip = set(UNJUDGEABLE) | (CAPITAL_DERIVED if args.no_rules else set())
@@ -196,6 +229,7 @@ async def main() -> int:
         pnl = round(sum(c["pnl"] for c in positions["closed"]), 2)
         for a in judged:
             totals[a["pattern_type"]] += 1
+        by_day_patterns[str(day)] = sorted(a["pattern_type"] for a in judged)
         session_rows.append((day, len(by_day[day]), len(positions["closed"]), pnl, len(judged)))
         print(f"  [{i}/{len(days)}] {day}  {len(by_day[day]):>3} fills  "
               f"{len(positions['closed']):>3} trades  P&L {pnl:>12,.0f}  "
@@ -239,10 +273,28 @@ async def main() -> int:
 
     out.write_text("".join(header) + "".join(report), encoding="utf-8")
 
+    # Machine-readable sidecar: which patterns fired on which day.
+    #
+    # Recall was being measured by comparing totals — "31 martingale alerts
+    # against 40 days of the behaviour" — which is two different units and can
+    # read 78% while the two sets overlap on twenty days. recall_check.py reads
+    # this to intersect the days properly.
+    sidecar = out.with_suffix(".json")
+    sidecar.write_text(json.dumps({
+        "source": args.csv.name,
+        "capital": args.capital,
+        "sessions": len(days),
+        "skipped_patterns": sorted(set(UNJUDGEABLE) |
+                                   (CAPITAL_DERIVED if args.no_rules else set())),
+        "days": by_day_patterns,
+    }, indent=1), encoding="utf-8")
+
     total_alerts = sum(totals.values())
     print(f"\n{total_alerts} alerts across {len(days)} sessions "
           f"({total_alerts / len(days):.1f} per session)")
     print(f"Report: {out}")
+    print(f"Per-day patterns: {sidecar}")
+    print(f"  python tradedesk/scripts/recall_check.py {args.csv} --engine {sidecar}")
     print("\nMark each alert fair or wrong, then send it back.")
     return 0
 
