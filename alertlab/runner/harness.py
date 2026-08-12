@@ -206,6 +206,27 @@ class FakeRedis:
     def expire(self, key, ttl):
         return True
 
+    def eval(self, script, numkeys, *args):
+        """
+        Just enough Lua for the fenced lock: compare-and-delete.
+
+        Without this, _release_lock raised AttributeError on every release.
+        That is caught and logged as non-fatal, so nothing failed loudly — but
+        this fake also ignores `ex`, so the lock never expired either. The
+        first acquire of a run succeeded and every one after it was refused:
+        detection was skipped for an entire replayed year and the report came
+        back with zero trades and zero alerts on all 203 sessions.
+
+        A fake that silently disables the thing under test is worse than no
+        fake, which is the same argument the RENAME note above makes.
+        """
+        key = args[0] if args else None
+        token = args[numkeys] if len(args) > numkeys else None
+        if key is not None and self.keys.get(key) == token:
+            self.keys.pop(key, None)
+            return 1
+        return 0
+
     # lists
     def rpush(self, key, value):
         self.lists.setdefault(key, []).append(value)
