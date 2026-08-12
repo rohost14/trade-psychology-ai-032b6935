@@ -229,7 +229,21 @@ async def main() -> int:
         pnl = round(sum(c["pnl"] for c in positions["closed"]), 2)
         for a in judged:
             totals[a["pattern_type"]] += 1
-        by_day_patterns[str(day)] = sorted(a["pattern_type"] for a in judged)
+        # The sidecar carries enough to label outcomes offline: the alerts with
+        # their times, and the trades around them. A year of alerts exists
+        # nowhere else — the replay tears down each day before the next, so the
+        # DB only ever holds the last one.
+        by_day_patterns[str(day)] = {
+            "patterns": sorted(a["pattern_type"] for a in judged),
+            "pnl": pnl,
+            "alerts": [{"id": a["id"], "pattern_type": a["pattern_type"],
+                        "severity": a["severity"], "detected_at": a["detected_at"]}
+                       for a in judged],
+            "trades": [{"symbol": c["symbol"], "qty": c["qty"],
+                        "entry": c["entry"], "exit": c["exit"], "pnl": c["pnl"],
+                        "entry_time": c.get("entry_time"), "exit_time": c.get("exit_time")}
+                       for c in positions["closed"]],
+        }
         session_rows.append((day, len(by_day[day]), len(positions["closed"]), pnl, len(judged)))
         print(f"  [{i}/{len(days)}] {day}  {len(by_day[day]):>3} fills  "
               f"{len(positions['closed']):>3} trades  P&L {pnl:>12,.0f}  "

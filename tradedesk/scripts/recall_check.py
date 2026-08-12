@@ -367,9 +367,20 @@ SPIRAL_MIN_DOMAINS = 3
 
 
 def load_engine(path: Path):
-    """Per-day pattern types from a replay run. Output, never engine code."""
+    """
+    Per-day pattern types from a replay run. Output, never engine code.
+
+    Two sidecar shapes: the first version mapped a day straight to a list of
+    pattern names, the current one maps it to an object also carrying the
+    alerts and trades (so outcomes can be labelled offline). Both are read so
+    an older sidecar still measures recall.
+    """
     data = json.loads(path.read_text(encoding="utf-8"))
-    return {date.fromisoformat(d): set(p) for d, p in data["days"].items()}, data
+    days = {}
+    for d, payload in data["days"].items():
+        names = payload["patterns"] if isinstance(payload, dict) else payload
+        days[date.fromisoformat(d)] = set(names)
+    return days, data
 
 
 def main() -> int:

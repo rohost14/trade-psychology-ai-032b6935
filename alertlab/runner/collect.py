@@ -160,6 +160,11 @@ async def collect_positions(db) -> Dict[str, List[Dict[str, Any]]]:
             "pnl": float(c.realized_pnl or 0),
             "entry_ist": c.entry_time.astimezone(IST).strftime("%H:%M:%S") if c.entry_time else None,
             "exit_ist": c.exit_time.astimezone(IST).strftime("%H:%M:%S") if c.exit_time else None,
+            # Full timestamps as well as the readable ones: outcome labelling
+            # needs to order alerts against trades, and "15:07:19" cannot be
+            # compared with an alert's detected_at.
+            "entry_time": _iso(c.entry_time),
+            "exit_time": _iso(c.exit_time),
         } for c in closed_rows],
     }
 
