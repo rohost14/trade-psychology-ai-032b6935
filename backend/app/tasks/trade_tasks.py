@@ -8,9 +8,9 @@ Async tasks for:
 """
 
 import logging
-from uuid import UUID
+from uuid import UUID, uuid4
 from datetime import datetime, timezone, timedelta
-from typing import Dict, Any
+from typing import Dict, Any, Optional
 
 from app.core.celery_app import celery_app
 from app.core.database import SessionLocal
@@ -310,19 +310,56 @@ async def _run_death_spiral(broker_account_id: UUID, db, latest_trade_time=None)
     return alert
 
 
-def _acquire_lock(redis_client, key: str, ttl_seconds: int) -> bool:
+#: Release the lock only if we still hold it. Compared and deleted inside one
+#: Lua script so no other worker can acquire between the GET and the DEL.
+_RELEASE_IF_MINE = """
+if redis.call("get", KEYS[1]) == ARGV[1] then
+    return redis.call("del", KEYS[1])
+end
+return 0
+"""
+
+
+def _acquire_lock(redis_client, key: str, ttl_seconds: int) -> Optional[str]:
     """
-    Try to acquire a Redis SETNX lock.
+    Try to acquire a Redis SETNX lock. Returns a fencing token, or None.
 
-    Returns True if lock acquired, False if already held by another worker.
-    The lock auto-expires after ttl_seconds to prevent deadlocks.
+    The token is what makes the release safe. With a constant value and an
+    unconditional DELETE, this sequence loses mutual exclusion:
+
+        worker A acquires (ttl 60s)
+        A's detection runs longer than 60s, so the key expires
+        worker B acquires the same key and starts detecting
+        A finishes, reaches its finally, and DELETEs *B's* lock
+        worker C acquires while B is still running
+
+    Two detections then run concurrently on one account, which is the
+    condition every counter and dedup check in this file assumes cannot
+    happen. Returning a per-acquisition token and releasing only when it still
+    matches closes that.
+
+    Truthiness is preserved for existing callers: a token is a non-empty
+    string, None is falsy.
     """
-    return bool(redis_client.set(key, "1", nx=True, ex=ttl_seconds))
+    token = uuid4().hex
+    return token if redis_client.set(key, token, nx=True, ex=ttl_seconds) else None
 
 
-def _release_lock(redis_client, key: str):
-    """Release a Redis lock."""
-    redis_client.delete(key)
+def _release_lock(redis_client, key: str, token: Optional[str] = None):
+    """
+    Release a lock we hold. Without a token this is the old unconditional
+    delete, which can free another worker's lock — see _acquire_lock.
+    """
+    if token is None:
+        redis_client.delete(key)
+        return
+    try:
+        redis_client.eval(_RELEASE_IF_MINE, 1, key, token)
+    except Exception as exc:
+        # A failed release is not worth failing the task for: the TTL will
+        # clear the key. Worth a log, because a persistent failure here means
+        # locks are held for their full TTL and throughput suffers.
+        logger.warning(f"[lock] release failed for {key}: {exc}")
 
 
 @celery_app.task(bind=True, max_retries=3, default_retry_delay=60, time_limit=120, soft_time_limit=110)
@@ -625,19 +662,26 @@ def process_webhook_trade(self, trade_data: Dict[str, Any], broker_account_id: s
 
                 finally:
                     if redis_client and fifo_lock_acquired:
-                        _release_lock(redis_client, fifo_lock_key)
+                        _release_lock(redis_client, fifo_lock_key, fifo_lock_acquired)
 
                 # ----------------------------------------------------------------
                 # ITEM 5: Redis SETNX lock — one behavioral detection per account
                 # ----------------------------------------------------------------
                 behavior_lock_key = f"behavior_lock:{broker_account_id}"
-                behavior_lock_acquired = False
+                behavior_lock_acquired = None
 
                 try:
                     if redis_client is None:
                         redis_client = _get_redis_client()
 
+                    # Same policy as the bulk path: no lock, no detection. When
+                    # Redis is unavailable this used to reach _acquire_lock(None,
+                    # ...) and die on AttributeError — fail-closed by accident,
+                    # via an exception rather than the graceful requeue that
+                    # already exists two lines below.
                     for attempt in range(3):
+                        if redis_client is None:
+                            break
                         behavior_lock_acquired = _acquire_lock(redis_client, behavior_lock_key, ttl_seconds=60)
                         if behavior_lock_acquired:
                             break
@@ -651,7 +695,8 @@ def process_webhook_trade(self, trade_data: Dict[str, Any], broker_account_id: s
                         _incr_metric("behavior_lock_exhausted")
                         _incr_metric("behavior_requeued")
                         logger.error(
-                            f"behavior_lock exhausted for {broker_account_id} - "
+                            f"behavior_lock {'infra unavailable' if redis_client is None else 'exhausted'} "
+                            f"for {broker_account_id} - "
                             f"requeuing detection for trade {trade.id}"
                         )
                         run_behavior_detection_retry.apply_async(
@@ -664,7 +709,7 @@ def process_webhook_trade(self, trade_data: Dict[str, Any], broker_account_id: s
 
                 finally:
                     if redis_client and behavior_lock_acquired:
-                        _release_lock(redis_client, behavior_lock_key)
+                        _release_lock(redis_client, behavior_lock_key, behavior_lock_acquired)
 
                 # ── Event-driven position checks (replaces beat tasks) ──────
                 # These are fire-and-forget — failures don't retry the trade task.
@@ -863,26 +908,56 @@ def run_risk_detection(broker_account_id: str, trigger_trade_id: str = None):
     """
     Run risk pattern detection for an account via BehaviorEngine.
     Phase 3 cutover: delegates to run_risk_detection_async (BehaviorEngine).
+
+    Takes the same per-account lock as the webhook and bulk paths. It had no
+    in-repo caller and no lock, which made it a live task name — invocable by
+    .delay() from a retry policy, an ops console, or any future code — that
+    walked straight into a critical section every other entry point is careful
+    to serialise. Detection is not safe to run twice concurrently on one
+    account: it duplicates alerts and races the session counters.
     """
     import asyncio
 
     async def _detect():
-        async with SessionLocal() as db:
-            try:
-                account_id = UUID(broker_account_id)
-                trigger_trade = None
-                if trigger_trade_id:
-                    result = await db.execute(
-                        select(Trade).where(Trade.id == UUID(trigger_trade_id))
-                    )
-                    trigger_trade = result.scalar_one_or_none()
+        redis_client = None
+        lock_key = f"behavior_lock:{broker_account_id}"
+        token = None
+        try:
+            redis_client = _get_redis_client()
+            if redis_client is not None:
+                token = _acquire_lock(redis_client, lock_key, ttl_seconds=60)
+        except Exception as lk_err:
+            logger.warning(f"[run_risk_detection] lock infra unavailable: {lk_err}")
 
-                await run_risk_detection_async(account_id, db, trigger_trade)
-                return {"success": True}
+        # Fail closed, like both other paths. Nothing calls this on a schedule,
+        # so there is no requeue to fall back on — refusing is the safe answer.
+        if not token:
+            logger.warning(
+                f"[run_risk_detection] {broker_account_id}: no behavior_lock — "
+                f"skipping (another detection is in flight, or lock infra is down)"
+            )
+            return {"skipped": "lock_unavailable"}
 
-            except Exception as e:
-                logger.error(f"Risk detection task failed: {e}", exc_info=True)
-                return {"error": str(e)}
+        try:
+            async with SessionLocal() as db:
+                try:
+                    account_id = UUID(broker_account_id)
+                    trigger_trade = None
+                    if trigger_trade_id:
+                        result = await db.execute(
+                            select(Trade).where(Trade.id == UUID(trigger_trade_id))
+                        )
+                        trigger_trade = result.scalar_one_or_none()
+
+                    await run_risk_detection_async(account_id, db, trigger_trade)
+                    return {"success": True}
+
+                except Exception as e:
+                    logger.error(f"Risk detection task failed: {e}", exc_info=True)
+                    return {"error": str(e)}
+        finally:
+            if redis_client is not None:
+                _release_lock(redis_client, lock_key, token)
 
     return asyncio.run(_detect())
 
@@ -1076,46 +1151,36 @@ async def run_risk_detection_async(
             logger.warning(f"[death_spiral] evaluation failed (non-fatal): {_ds_err}")
 
         # ── Alert consolidation (5-min bucket + hard cap) ─────────────
+        # What was PERSISTED and what may INTERRUPT are two different lists.
+        # They used to be the same variable, so a capped batch also suppressed
+        # the alert_update WebSocket event below — the row existed in
+        # risk_alerts and the dashboard was never told, leaving the trader to
+        # discover it on a manual refresh. The cap is a fatigue guard on
+        # notifications; it was silently acting as a real-time UI guard.
+        persisted_alerts = list(new_alerts)
         new_alerts = await _apply_alert_consolidation(broker_account_id, new_alerts, db)
 
         # ── Send notifications for danger alerts ──────────────────────
-        # Staleness gate (master Q12): push only when the triggering trade is
-        # recent. detected_at = trade time, so bulk-synced old trades are
-        # naturally suppressed here while still saved + visible in-app.
+        # Severity, staleness (master Q12) and per-pattern mutes are all asked
+        # by _would_interrupt, which is the same predicate the session budget
+        # was charged on. One definition, so the number the cap counts and the
+        # number the trader receives cannot drift apart.
+        _muted = await _muted_patterns(broker_account_id, db)
         danger_alerts = [a for a in new_alerts if is_notifiable(a.severity)]
-        stale_cutoff = now_utc - timedelta(
-            minutes=COLD_START_DEFAULTS.get("alert_stale_push_min", 30)
-        )
-        pushable = [a for a in danger_alerts if (a.detected_at or now_utc) >= stale_cutoff]
+        pushable = [a for a in new_alerts if _would_interrupt(a, now_utc, _muted)]
         suppressed = len(danger_alerts) - len(pushable)
         if suppressed:
-            _mincr("notifications_stale_suppressed", suppressed)
+            # Per-pattern mute (migration 069) and staleness both land here: a
+            # muted or stale pattern still saved its RiskAlert and is visible in
+            # History — only the real-time push is withheld.
+            _muted_n = sum(1 for a in danger_alerts if a.pattern_type in _muted)
+            _mincr("notifications_muted_suppressed", _muted_n)
+            _mincr("notifications_stale_suppressed", suppressed - _muted_n)
             logger.info(
-                f"[staleness] {broker_account_id}: {suppressed} danger alert(s) "
-                f"older than push window — saved, not pushed"
+                f"[notify] {broker_account_id}: {suppressed} danger alert(s) not "
+                f"pushed ({_muted_n} muted, {suppressed - _muted_n} outside the "
+                f"push window) — saved to history"
             )
-        # Per-pattern mute (migration 069): a muted pattern still saved its RiskAlert
-        # above (visible in History) — only its real-time push is suppressed here.
-        try:
-            from app.models.alert_mute import AlertMute
-            _mrows = await db.execute(
-                select(AlertMute.pattern_type).where(
-                    AlertMute.broker_account_id == broker_account_id
-                )
-            )
-            _muted = {r[0] for r in _mrows.all()}
-            if _muted:
-                _before = len(pushable)
-                pushable = [a for a in pushable if a.pattern_type not in _muted]
-                _muted_n = _before - len(pushable)
-                if _muted_n:
-                    _mincr("notifications_muted_suppressed", _muted_n)
-                    logger.info(
-                        f"[mute] {broker_account_id}: {_muted_n} alert(s) not pushed "
-                        f"(pattern muted) — still saved to history"
-                    )
-        except Exception as _mute_err:
-            logger.debug(f"mute filter skipped: {_mute_err}")
         _mincr("notifications_dispatched", len(pushable))
         from app.services.detector_registry import BY_NAME as _SPECS_N
         guardian_alerts = [a for a in pushable
@@ -1162,12 +1227,15 @@ async def run_risk_detection_async(
             f"risk={float(result.risk_score_before):.0f}→{float(result.risk_score_after):.0f}"
         )
 
-        # Notify frontend via WebSocket — new alerts available, refresh immediately.
-        if new_alerts:
+        # Notify frontend via WebSocket — new alerts available, refresh
+        # immediately. Keyed on what was PERSISTED, not on what survived
+        # consolidation: an alert the trader can open in the app is news to the
+        # dashboard whether or not it earned a push.
+        if persisted_alerts:
             from app.core.event_bus import publish_event
             publish_event(str(broker_account_id), "alert_update", {
-                "count": len(new_alerts),
-                "has_danger": len(danger_alerts) > 0,
+                "count": len(persisted_alerts),
+                "has_danger": any(is_notifiable(a.severity) for a in persisted_alerts),
                 "behavior_state": result.behavior_state,
             })
 
@@ -1218,9 +1286,18 @@ async def run_behavior_engine_full_session(broker_account_id: UUID, db) -> int:
 
     # P0 fix #4: bulk sync must not race the webhook path on the same
     # account - same lock, abort with metric if unavailable (sync can rerun).
+    #
+    # FAIL CLOSED. No lock, no detection — whatever the reason. The previous
+    # guard was `if _redis is not None and not _lock_acquired`, and when Redis
+    # is down _redis IS None, so the abort was skipped and a whole session was
+    # detected with no lock at all. That is the one outcome worth avoiding:
+    # concurrent detection on one account duplicates alerts and corrupts the
+    # session counters, silently. The webhook path already fails closed (it
+    # raises and the Celery task retries), so both paths now agree, and this
+    # one is explicitly documented as safe to rerun.
     _redis = None
     _lock_key = f"behavior_lock:{broker_account_id}"
-    _lock_acquired = False
+    _lock_acquired = None
     try:
         _redis = _get_redis_client()
         for _ in range(5):
@@ -1231,11 +1308,12 @@ async def run_behavior_engine_full_session(broker_account_id: UUID, db) -> int:
             await _a.sleep(2)
     except Exception as _lk_err:
         logger.warning(f"[FullSession] lock infra unavailable: {_lk_err}")
-    if _redis is not None and not _lock_acquired:
+    if not _lock_acquired:
         _incr_metric("behavior_bulk_lock_abort")
         logger.warning(
-            f"[FullSession] {broker_account_id}: behavior_lock busy - aborting "
-            f"bulk detection (webhook path active); rerun sync to retry"
+            f"[FullSession] {broker_account_id}: no behavior_lock "
+            f"({'busy' if _redis is not None else 'lock infra unavailable'}) — "
+            f"aborting bulk detection; rerun sync to retry"
         )
         return 0
 
@@ -1357,42 +1435,87 @@ async def run_behavior_engine_full_session(broker_account_id: UUID, db) -> int:
         logger.warning(f"[death_spiral] evaluation failed (non-fatal): {_ds_err}")
 
     if all_new_alerts:
+        # Same split as the webhook path: what was persisted is what the
+        # dashboard is told about, what survives consolidation is what may
+        # interrupt. Rebinding one name to the other silenced the UI whenever
+        # the cap was hit.
+        persisted_alerts = list(all_new_alerts)
         all_new_alerts = await _apply_alert_consolidation(broker_account_id, all_new_alerts, db)
 
-        # Staleness gate (master Q12): bulk sync processes hours of history —
-        # only trades closed within the push window may notify. Everything else
-        # is saved for analytics/in-app only.
+        # Same predicate as the webhook path and as the budget charge. This
+        # path previously checked severity and staleness but NOT mutes, so a
+        # muted pattern was silent on a live postback and pushed on a bulk
+        # sync of the same trade. One definition removes that by construction.
+        _muted = await _muted_patterns(broker_account_id, db)
         danger_alerts = [a for a in all_new_alerts if is_notifiable(a.severity)]
-        stale_cutoff = now_utc - timedelta(
-            minutes=COLD_START_DEFAULTS.get("alert_stale_push_min", 30)
-        )
-        pushable = [a for a in danger_alerts if (a.detected_at or now_utc) >= stale_cutoff]
+        pushable = [a for a in all_new_alerts if _would_interrupt(a, now_utc, _muted)]
         suppressed = len(danger_alerts) - len(pushable)
         if suppressed:
             logger.info(
-                f"[staleness/FullSession] {broker_account_id}: {suppressed} danger "
-                f"alert(s) older than push window — saved, not pushed"
+                f"[notify/FullSession] {broker_account_id}: {suppressed} danger "
+                f"alert(s) not pushed (muted or outside the push window) — "
+                f"saved to history"
             )
         for alert in pushable:
             send_danger_alert.delay(str(broker_account_id), str(alert.id))
 
-        if all_new_alerts:
+        if persisted_alerts:
             from app.core.event_bus import publish_event
             publish_event(str(broker_account_id), "alert_update", {
-                "count": len(all_new_alerts),
-                "has_danger": len(danger_alerts) > 0,
+                "count": len(persisted_alerts),
+                "has_danger": any(is_notifiable(a.severity) for a in persisted_alerts),
             })
             publish_event(str(broker_account_id), "trade_update", {})
 
         logger.info(
             f"[BehaviorEngine/FullSession] {broker_account_id}: "
-            f"{len(all_new_alerts)} alerts from {len(trades_today)} trades"
+            f"{len(persisted_alerts)} alerts from {len(trades_today)} trades "
+            f"({len(all_new_alerts)} notifiable)"
         )
 
     if _redis is not None and _lock_acquired:
-        _release_lock(_redis, _lock_key)
+        _release_lock(_redis, _lock_key, _lock_acquired)
 
     return len(all_new_alerts)
+
+
+async def _muted_patterns(broker_account_id: UUID, db) -> set:
+    """Patterns this account has muted. Empty set if the lookup fails."""
+    try:
+        from app.models.alert_mute import AlertMute
+        rows = await db.execute(
+            select(AlertMute.pattern_type).where(
+                AlertMute.broker_account_id == broker_account_id
+            )
+        )
+        return {r[0] for r in rows.all()}
+    except Exception as exc:
+        logger.debug(f"mute lookup skipped: {exc}")
+        return set()
+
+
+def _would_interrupt(alert, now_utc, muted: set) -> bool:
+    """
+    Will this alert actually reach the trader?
+
+    Defined once because it is asked twice: the session budget must be charged
+    for it, and the notification dispatch must act on it. Two copies of this
+    rule would drift, and the drift would be invisible — the budget would go on
+    reporting a number nobody receives.
+
+    Three reasons an alert never interrupts:
+      · severity below danger — caution is analytics, it has no channel
+      · staleness — bulk-synced history is saved and shown, never pushed
+      · the trader muted the pattern
+    """
+    if not is_notifiable(alert.severity):
+        return False
+    stale_cutoff = now_utc - timedelta(
+        minutes=COLD_START_DEFAULTS.get("alert_stale_push_min", 30)
+    )
+    if (alert.detected_at or now_utc) < stale_cutoff:
+        return False
+    return alert.pattern_type not in muted
 
 
 async def _apply_alert_consolidation(
@@ -1426,37 +1549,29 @@ async def _apply_alert_consolidation(
     they are populated.
     """
     from app.models.risk_alert import RiskAlert
-    from app.models.trading_session import TradingSession
+    from app.services.trading_session_service import TradingSessionService
     from sqlalchemy import and_
-    import pytz
+
+    if not alerts:
+        return []                 # nothing to consolidate; do not log a cap hit
 
     now_utc = datetime.now(timezone.utc)
     five_min_ago = now_utc - timedelta(
         minutes=COLD_START_DEFAULTS.get("alert_bucket_minutes", 5)
     )
-    today_ist = datetime.now(pytz.timezone("Asia/Kolkata")).date()
 
-    # Check today's session alert count
-    session_result = await db.execute(
-        select(TradingSession).where(
-            and_(
-                TradingSession.broker_account_id == broker_account_id,
-                TradingSession.session_date == today_ist,
-            )
-        )
-    )
-    session = session_result.scalar_one_or_none()
-    session_alert_count = session.alerts_fired if session else 0
-
-    HARD_CAP = COLD_START_DEFAULTS.get("alert_session_hard_cap", 8)
-    if session_alert_count >= HARD_CAP:
-        # LOW-3: warn (not info) — danger alerts silently suppressed after cap is worth seeing in ops logs
-        suppressed_summary = [f"{a.pattern_type}({a.severity})" for a in alerts]
-        logger.warning(
-            f"[consolidation] {broker_account_id}: session alert cap reached "
-            f"({session_alert_count}/{HARD_CAP}). Suppressing: {suppressed_summary}"
-        )
-        return []  # All alerts saved to DB, none will notify
+    # The session an alert belongs to is the session of the TRADE that raised
+    # it. detected_at is the trade's exit time, deliberately, so the budget is
+    # charged to that day and not to whatever day it happens to be while this
+    # task runs. Those are the same in the normal live case and diverge for a
+    # postback processed after IST midnight, or for anything that re-evaluates
+    # an earlier session — where the old wall-clock lookup found no row,
+    # treated the budget as zero, and never incremented it either, so the cap
+    # silently reset.
+    import pytz
+    _IST = pytz.timezone("Asia/Kolkata")
+    _stamps = [a.detected_at for a in alerts if getattr(a, "detected_at", None)]
+    session_date = (max(_stamps) if _stamps else now_utc).astimezone(_IST).date()
 
     # 5-minute bucket: check for recent same-pattern alerts — EXCLUDING the ones
     # we are deciding about, which are already in the table by the time we run.
@@ -1471,7 +1586,7 @@ async def _apply_alert_consolidation(
     recent_result = await db.execute(select(RiskAlert).where(and_(*bucket_filters)))
     recent_patterns = {a.pattern_type for a in recent_result.scalars().all()}
 
-    notifiable = []
+    candidates = []
     for alert in alerts:
         if alert.pattern_type in recent_patterns:
             logger.debug(
@@ -1479,16 +1594,65 @@ async def _apply_alert_consolidation(
                 f"— already fired in last 5 min"
             )
         else:
-            notifiable.append(alert)
+            candidates.append(alert)
             recent_patterns.add(alert.pattern_type)
 
-    # LOW-1: batch counter increment — single DB write instead of N serial writes
-    if notifiable and session:
-        from app.services.trading_session_service import TradingSessionService
-        await TradingSessionService.increment_alerts_fired(session.id, db, count=len(notifiable))
-        await db.commit()
+    if not candidates:
+        return []
 
-    return notifiable
+    # Charge the budget for what will actually INTERRUPT the trader, not for
+    # every row written. The cap is a fatigue guard, and fatigue comes from
+    # notifications: a caution has no channel, a stale alert is never pushed,
+    # and a muted pattern is muted. Counting those made muting actively
+    # harmful — silencing one noisy pattern quietly spent the budget of every
+    # other pattern that day.
+    muted = await _muted_patterns(broker_account_id, db)
+    interrupting = [a for a in candidates if _would_interrupt(a, now_utc, muted)]
+
+    if not interrupting:
+        # Nothing here can reach the trader, so nothing is charged and the cap
+        # has no opinion. The rows are saved either way; the caller's own
+        # filters will drop them at the notification step.
+        return candidates
+
+    # One atomic statement: adds to the budget and reports what it was before.
+    # Two concurrent detections can no longer both read the same number and
+    # both write one more than it. Returns None when the session row is absent,
+    # which means "budget unknown" — the cap is not applied rather than treated
+    # as zero, because silently uncapping is the failure this whole function
+    # exists to prevent.
+    before = await TradingSessionService.consume_alert_budget(
+        broker_account_id, session_date, len(interrupting), db
+    )
+    await db.commit()
+
+    HARD_CAP = COLD_START_DEFAULTS.get("alert_session_hard_cap", 8)
+    if before is None:
+        logger.warning(
+            f"[consolidation] {broker_account_id}: no session row for "
+            f"{session_date} — alert budget not tracked for this batch"
+        )
+        return candidates
+
+    if before < HARD_CAP:
+        return candidates
+
+    # Past the cap. It governs INTERRUPTION, not visibility — and a critical is
+    # the one thing that must never be dropped silently. A session that has
+    # already produced eight alerts is the definition of a day going wrong, and
+    # death_spiral is late by construction, so the alert most worth delivering
+    # arrives after the budget is spent.
+    survivors = [a for a in candidates if a.severity == "critical"]
+    dropped = [f"{a.pattern_type}({a.severity})" for a in candidates
+               if a.severity != "critical"]
+    if dropped:
+        logger.warning(
+            f"[consolidation] {broker_account_id}: session alert cap reached "
+            f"({before}/{HARD_CAP}). Suppressing: {dropped}"
+            + (f" | {len(survivors)} critical alert(s) still notified"
+               if survivors else "")
+        )
+    return survivors
 
 
 

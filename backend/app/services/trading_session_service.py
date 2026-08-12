@@ -28,7 +28,7 @@ from decimal import Decimal
 from typing import Optional
 from uuid import UUID
 
-from sqlalchemy import select
+from sqlalchemy import select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.trading_session import TradingSession
@@ -177,6 +177,55 @@ class TradingSessionService:
             session.alerts_fired += count
             session.updated_at = datetime.now(timezone.utc)
             await db.flush()
+
+    @staticmethod
+    async def consume_alert_budget(
+        broker_account_id: UUID,
+        session_date: date,
+        count: int,
+        db: AsyncSession,
+    ) -> Optional[int]:
+        """
+        Add `count` to the day's alert budget and return the total BEFORE it.
+
+        One statement, so it cannot lose an update. `increment_alerts_fired`
+        above reads the row into Python, adds, and writes back: two concurrent
+        detections on one account both read 5 and both write 6, and the day's
+        budget silently under-counts. That is currently masked by the
+        per-account Redis lock, which means the correctness of the cap depends
+        on a lock that can be bypassed (an unlocked task path exists) and whose
+        release is unfenced. Doing the arithmetic in the database removes that
+        dependency entirely.
+
+        Keyed by (account, date) rather than by session id because the CALLER
+        must supply the date of the session the ALERT belongs to — derived from
+        its detected_at, which is the trade's exit time — not whatever day it
+        happens to be while the task runs. Those diverge for a postback
+        processed after IST midnight and for anything that re-evaluates an
+        earlier session, and when they diverge the old code looked up nothing,
+        treated the budget as zero, and never incremented it either: the cap
+        silently reset.
+
+        Returns None when no session row exists for that date, which the caller
+        must treat as "cannot judge the budget" rather than as zero.
+
+        Single-row write against uq_trading_session_account_date, so the cost
+        is constant in both users and trades.
+        """
+        result = await db.execute(
+            update(TradingSession)
+            .where(
+                TradingSession.broker_account_id == broker_account_id,
+                TradingSession.session_date == session_date,
+            )
+            .values(
+                alerts_fired=TradingSession.alerts_fired + count,
+                updated_at=datetime.now(timezone.utc),
+            )
+            .returning(TradingSession.alerts_fired)
+        )
+        row = result.scalar_one_or_none()
+        return None if row is None else int(row) - count
 
     @staticmethod
     async def add_session_pnl(

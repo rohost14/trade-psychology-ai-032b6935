@@ -218,14 +218,22 @@ class TestRedisLocks:
     """
 
     def test_acquire_lock_succeeds_when_free(self):
+        """
+        Returns a fencing token rather than True. The old constant value "1"
+        made release unsafe: any holder could delete any other holder's key.
+        See test_lock_fencing.py for the race this prevents.
+        """
         from app.tasks.trade_tasks import _acquire_lock
 
         mock_redis = MagicMock()
         mock_redis.set.return_value = True  # SETNX succeeded
 
         result = _acquire_lock(mock_redis, "fifo_lock:abc", ttl_seconds=30)
-        assert result is True
-        mock_redis.set.assert_called_once_with("fifo_lock:abc", "1", nx=True, ex=30)
+        assert result                       # truthy, as callers rely on
+        key, value = mock_redis.set.call_args.args
+        assert key == "fifo_lock:abc"
+        assert value == result and len(value) == 32   # the token was stored
+        assert mock_redis.set.call_args.kwargs == {"nx": True, "ex": 30}
 
     def test_acquire_lock_fails_when_held(self):
         from app.tasks.trade_tasks import _acquire_lock
@@ -234,7 +242,7 @@ class TestRedisLocks:
         mock_redis.set.return_value = None  # SETNX failed — key already exists
 
         result = _acquire_lock(mock_redis, "fifo_lock:abc", ttl_seconds=30)
-        assert result is False
+        assert not result
 
     def test_release_lock_deletes_key(self):
         from app.tasks.trade_tasks import _release_lock
