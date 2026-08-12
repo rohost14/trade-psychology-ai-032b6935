@@ -32,6 +32,7 @@ from __future__ import annotations
 
 import argparse
 import asyncio
+import contextlib
 import csv
 import json
 import sys
@@ -168,6 +169,35 @@ async def _replay_day_once(day, rows, capital, profile):
         alerts = await collect_alerts(db)
         positions = await collect_positions(db)
     return alerts, positions
+
+
+#: Two replays share one synthetic account, so a second run tears down rows the
+#: first is still writing. Postgres reports it as a deadlock on INSERT INTO
+#: risk_alerts, days come back with zero trades, and the result looks like a
+#: code regression. That misdiagnosis has now happened three times, and it is
+#: expensive: each replay is fifteen minutes and the conclusion drawn from a
+#: contaminated one is worse than no conclusion. Checking for a running process
+#: is not a substitute — Git Bash `ps` does not see native Windows Python.
+LOCK = ROOT / "tradedesk" / ".replay.lock"
+
+
+@contextlib.contextmanager
+def _single_run():
+    if LOCK.exists():
+        try:
+            held = LOCK.read_text(encoding="utf-8").strip()
+        except Exception:
+            held = "unknown"
+        print(f"Another replay is already running (started {held}).\n"
+              f"Two replays share one account and will corrupt each other's "
+              f"results.\nIf you are certain nothing is running, delete "
+              f"{LOCK}", file=sys.stderr)
+        raise SystemExit(2)
+    LOCK.write_text(datetime.now().isoformat(timespec="seconds"), encoding="utf-8")
+    try:
+        yield
+    finally:
+        LOCK.unlink(missing_ok=True)
 
 
 async def main() -> int:
@@ -314,4 +344,5 @@ async def main() -> int:
 
 
 if __name__ == "__main__":
-    raise SystemExit(asyncio.run(main()))
+    with _single_run():
+        raise SystemExit(asyncio.run(main()))
