@@ -15,7 +15,7 @@ import { api } from '@/lib/api';
 import { useBroker } from '@/contexts/BrokerContext';
 import { useAlerts } from '@/contexts/AlertContext';
 import { useWebSocket } from '@/contexts/WebSocketContext';
-import { BehaviorScoresCard } from '@/components/patterns/BehaviorScoresCard';
+import { BehaviorScoresCard } from '@/components/patterns/_archive/BehaviorScoresCard';
 import { StreakTrackerCard } from '@/components/goals/StreakTrackerCard';
 import PatternCalendar from '@/components/patterns/PatternCalendar';
 import BehaviourCostCard from '@/components/patterns/BehaviourCostCard';

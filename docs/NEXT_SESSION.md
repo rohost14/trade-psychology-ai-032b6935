@@ -1,9 +1,17 @@
 # Next session — start here
 
-State at end of 12 Aug 2026. Branch `dashboard-production-readiness`, pushed
-through `c919f92`. 733 backend tests pass (`pytest tests/ --ignore=tests/production`
-— the `tests/production/` suite needs a live server on localhost and its 35
-`ConnectError` failures are environmental, not real).
+State at end of 13 Aug 2026. Branch `dashboard-production-readiness`.
+**716 backend tests pass** (`pytest tests/ --ignore=tests/production` — the
+`tests/production/` suite needs a live server on localhost and its 35
+`ConnectError` failures are environmental, not real). Was 733; the 17 removed
+are exactly the tests whose subject the L3 retirement deleted. Frontend: 102
+vitest tests, typecheck clean, 0 lint errors.
+
+**Environment note:** `email-validator==2.3.0` is pinned in
+`backend/requirements.txt` but was missing from `.venv` — `from app.main import
+app` failed on a clean tree until it was installed. If boot fails with
+`ImportError: email-validator is not installed`, that is the cause, not your
+change.
 
 Supersedes the 11 Aug note. That note's four items are addressed or reordered:
 items 2 and 3 (retire `post_loss_recovery_bet`, move `time_of_day_bias`) are
@@ -14,8 +22,8 @@ still open and still cheap; item 1 (readable replay report) is still open; item
 
 ## Do this first
 
-**Verify the regression replay.** A clean run was in flight when the session
-ended. Run it, then diff:
+**Verify the regression replay.** Confirms L1/L2 detection is unchanged. Run
+it, then diff:
 
 ```
 python tradedesk/scripts/replay_tradebook.py docs/tradebook-CY6001-FO2025-26.csv \
@@ -166,55 +174,114 @@ downgrades an exception to a log line turns a loud failure into a silent one.
 
 ## Open, in the order agreed
 
-### 1. Globals — the constants (analysis DONE, nothing implemented)
+### 1. Globals — DONE 13 Aug. L3 retired.
 
-`docs/GLOBAL_CONSTANTS_FINDINGS.md`. Headline: **the audit undercounted, it is
-~148 constants, not 109.**
+`docs/GLOBALS_DERIVATION.md` is the record — it derives the constants from the
+tradebook instead of citing them, and it supersedes the open items that
+`docs/GLOBAL_CONSTANTS_FINDINGS.md` listed as G0–G5.
 
-- **G0** `RISK_DELTAS` in `behavior_engine.py` holds **36 more** weights, in a
-  different file from `trading_defaults.py`, with no citations — and they are
-  the entire input to the session risk score and the multiplier in every driver
-  score. Plus 3 inline literals in `behavior_scores_service.py` (`75` default
-  confidence, `0.5` noise floor, `10` default weight).
-- **G1 (real defect, fix is small and unambiguous)** `capital_mismatch` is a
-  live pattern with **no weight**, and the two consumers disagree on what a
-  missing key means: `RISK_DELTAS.get(x, Decimal("0"))` in the engine,
-  `RISK_DELTAS.get(x, 10)` in the scores service. Same event moves one score by
-  0 and the other by 10. Four dead entries also exist for retired patterns
-  (harmless).
-- **G2** three band systems, and two of them read the SAME number: `new_risk`
-  is computed once and fed both to `_behavior_state` (cuts 20/40/60/80,
-  hardcoded in `behavior_engine.py`) and to `update_risk_score` (cuts 40/70/90,
-  hardcoded in `trading_session_service.py`). A score of 45 is simultaneously
-  "caution" and "Tilt Risk". The third (`score_band_*`, 30/60/80) is a
-  different computation. Only that one is in `trading_defaults`, which is why
-  the audit missed the others.
-- **G3** signal stacking exists in **one detector of twenty-seven**
-  (`revenge_trade`). Everything else leaves `confidence=None`, which resolves
-  to data quality — `GOOD` = 100 on any live postback. So
-  `confidence_alert_gate` (50) is dead code for 26 detectors, and `confidence`
-  in the score formula is ~always 1.0: a four-factor formula behaving as three.
-- **G5** `death_spiral` is the strongest anti-signal measured, and its
-  `critical` path requires five simultaneous conditions. `critical` is exactly
-  the severity now exempted from the cap — **if it never reaches critical in a
-  year, that exemption protects nothing.** Countable from the sidecar, free.
+**What the year of trades said:**
 
-**Next concrete step (agreed):** count from the existing sidecar first — no
-replay needed. Death-spiral severities, `capital_mismatch` frequency, and how
-often the three band systems disagree. That decides whether G1 and G5 are worth
-acting on. Then fix G1, then sweep `confidence_alert_gate` (40/50/60) and
-`score_halflife_min` (45/90/180) and measure what actually changes.
+(All recomputed on the repaired harness — see the §7 table in
+`GLOBALS_DERIVATION.md` for what moved.)
 
-**The framing that makes this cheap:** a constant whose value changes NOTHING
-across a year of real trading is not a threshold, it is decoration — delete it
-rather than argue about it.
+- the 36 `RISK_DELTAS` weights ranked **0 of 14** against measured cost. Their
+  means do carry a weak signal in the right direction (20.0 for patterns that
+  predict loss vs 16.7 for those that do not) — so "no information at all" was
+  overstated; "does not rank" is the defensible claim;
+- **severity orders backwards** — `caution` +3 lift, `danger` −11. At fixed
+  horizon caution is +16 and danger **−2**: approximately null, *not* the −12
+  inversion first reported. Not a heeding effect either way — in a replay the
+  trader saw none of these alerts;
+- `score_halflife_min` 90 outlives the signal ~3× — lift is +4 at 30 min and
+  gone by 45;
+- the L2 co-occurrence premise fails: 0 domains open **+5**, 1 domain −10,
+  2 domains −7. The most informative moment of the day is the *first* danger
+  event with nothing else open.
 
-**What cannot be answered without more labels:** whether 50 is the *right*
-gate. Sensitivity says whether a constant is load-bearing; only outcomes say
-where it belongs. 300 labelled alerts from one trader is enough to rank
-detectors, not to fit a coefficient.
+**What was removed (2026-08-13):** `RISK_DELTAS`, `_behavior_state`,
+`_trajectory`, `update_risk_score` + the 40/70/90 ladder, `compute_scores` /
+`get_today_scores`, `score_band_*`, `score_halflife_min`, `score_sev_mult_*`,
+`headline_other_weight`, `GET /api/risk/scores`, `behavior_score`, `peak_risk`,
+and the two unmounted components that read them. **L1's 27 detectors and L2's
+`death_spiral` are untouched** — verified by replay diff, byte-identical alerts.
 
-### 2. Then pattern by pattern
+`risk_score` / `peak_risk_score` **columns remain** on `trading_sessions`;
+dropping them needs a migration and you apply those manually.
+
+**Still open from that group, deliberately:**
+
+- **G1** `capital_mismatch` has no weight and the two consumers disagreed on
+  the missing-key default (0 vs 10). Moot now — both consumers are gone. If a
+  weight is ever reintroduced, do not reintroduce this.
+- **G3** `confidence_alert_gate` (50) is still dead code for 26 of 27
+  detectors, because only `revenge_trade` sets confidence. Left alone: it gates
+  alerts, so it is not L3. Decide whether to build the axis out or delete it.
+- **G5** `death_spiral` reached `critical` **zero** times in 203 sessions (2
+  criticals all year, both `premium_loss_event`), so the cap's critical
+  exemption protects 0.6% of alerts. The detector still fires and still
+  measures −17 lift. It is now a **pattern-pass item**, not a globals one.
+
+### 2. Fix the adaptive layer — AGREED 13 Aug, and it now comes BEFORE patterns
+
+`docs/ARCHITECTURE_REVIEW_2026-08.md`. The order changed deliberately: tuning 27
+detectors against global constants and *then* switching the reference to each
+trader's own distribution means doing the work twice.
+
+The engine is designed to personalise (`get_thresholds` implements a continuous
+confidence blend, no activation cliff). It substantially does not run:
+
+- **two writers, one JSONB key, incompatible shapes.**
+  `behavioral_baseline_service` writes a flat dict on sync;
+  `ai_personalization_service` writes `{"metrics": {...}}`. Both write
+  `detected_patterns["baseline"]`, and `get_thresholds` picks its algorithm by
+  sniffing the shape — so which personalisation a trader gets depends on which
+  service wrote last. Each writer's 24h freshness guard can also be satisfied by
+  the other's `computed_at`.
+- **the legacy branch drops 2 of its 5 values on a name mismatch** —
+  `burst_trades_per_15min` vs `burst_trades_per_30min_caution`, and
+  `revenge_window_min` vs `revenge_window_caution_min`. No error, no log.
+- **nothing recomputes on a schedule.** `api/profile.py:804` says "nightly";
+  there is no beat entry for either service.
+- **`uses_baseline` is wrong in 4 of 27.** `consecutive_loss_streak` and
+  `expiry_day_overtrading` declare it and read only unblended constants;
+  `revenge_trade` does not declare it and *is* blended;
+  `winning_streak_overconfidence` uses a session-local average.
+- **9 metrics computed, 3 wired.** `typical_drawdown` and
+  `median_position_risk_pct` — the two most useful for sizing/risk patterns —
+  are computed, stored and read by nothing.
+
+Order: **C1** one writer, one versioned shape (kills the race and the dropped
+keys) → **C2** one nightly batched beat task → **C3** thresholds become
+self-describing `{value, source, confidence}` so `uses_baseline` is derivable
+rather than hand-maintained, and cold start is inspectable.
+
+### 3. Then redefine severity — AGREED 13 Aug
+
+**Severity = the size of the fact against the trader's OWN distribution**, not a
+forecast: `caution` = within your normal range, `danger` ≈ your p80, `critical`
+≈ your p95. Certainty (data quality, hedge-leg suppression) becomes a *separate*
+gate. Priority becomes a computed L4 policy, not a stored field:
+
+> interrupt when magnitude ≥ your p80 **and** certainty is good **and** it is the
+> first time today for that pattern — otherwise record it, show it, never push.
+
+Why: severity today is already a threshold crossing (a magnitude measure), but
+the line is a global constant and the word implies a forecast the data does not
+support — `danger` measures −11 lift against `caution`'s +3, i.e. the classes
+are ordered the wrong way round. The engine is
+already drifting this way by hand — see the comment inside
+`_detect_consecutive_loss_streak` about ₹12,000 in three trades reading as
+caution while ₹1,500 in five reads as danger.
+
+Side effect worth having: `critical` becomes a real class (~5% per pattern
+instead of 2 alerts in a year), so the cap's critical exemption starts meaning
+something.
+
+Depends on §2 — personal percentiles need a working baseline pipeline. Cold
+start still falls back to the default prior and must *say* so.
+
+### 4. Then pattern by pattern
 
 Ranked by value (lift × missed days), not by gap size alone:
 
@@ -236,7 +303,7 @@ Per-detector constants get fixed INSIDE their pattern's pass, with the missed
 days open — not in a batch beforehand, which is guessing with a different
 guesser.
 
-### 3. Cheap items that fall out along the way
+### 5. Cheap items that fall out along the way
 
 - Retire `post_loss_recovery_bet` (duplicate of revenge, 4% recall).
 - `time_of_day_bias` is dispositioned `alerting` and should be `analytics`.

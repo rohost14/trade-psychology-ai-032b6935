@@ -405,23 +405,10 @@ async def remove_mute(
     return {"success": True}
 
 
-@router.get("/scores")
-async def get_behavior_scores(
-    broker_account_id: UUID = Depends(get_verified_broker_account_id),
-    db: AsyncSession = Depends(get_db),
-):
-    """
-    Phase 5 behavioral scores (master 1D.9): one headline (Behavior Risk),
-    four drivers (tilt / risk / discipline / strategy), with per-driver
-    contributors for the Analytics detail view. Dashboard shows the band only.
-    """
-    from app.services.behavior_scores_service import get_today_scores
-    try:
-        return await get_today_scores(broker_account_id, db)
-    except Exception as e:
-        import logging
-        logging.getLogger(__name__).error(f"scores computation failed: {e}", exc_info=True)
-        raise HTTPException(status_code=500, detail="Internal server error")
+# GET /scores (Behavior Risk headline + four driver scores) was removed
+# 2026-08-13 — docs/GLOBALS_DERIVATION.md. Its only two callers were an
+# unmounted badge and an archived card, and the year of replayed trades did not
+# support the weights, the severity multiplier or the decay constant behind it.
 
 
 @router.get("/alert-response-stats")

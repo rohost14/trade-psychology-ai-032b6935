@@ -436,7 +436,6 @@ Be direct and practical. Focus on behavior modification, not theory."""
         pattern_str = ", ".join(patterns[:5]) if patterns else "None detected"
         return (
             f"Analyze this trader's behavioral patterns:\n"
-            f"- Behavior Score: {score or 'N/A'}/100\n"
             f"- Patterns Detected: {pattern_str}\n"
             f"- Emotional Tax: ₹{data.get('emotional_tax', 0):,.2f}\n\n"
             f"Provide exactly 3 lines:\n1. A narrative paragraph (3-5 sentences)\n"

@@ -1,26 +1,8 @@
 """
-Behavior Scores + Death Spiral — Engine v2 Phase 5.
+Death Spiral + guardian budget — Engine v2 Phase 5.
 
 Layering (A.10): this module sits ABOVE detectors. It consumes BehaviorEvents
-only — never detector internals, never EngineContext. Detectors must never
-consume these scores (derived-state ban).
-
-Driver scores (master §1D.1, user V3/V4 final):
-    contribution = pattern_weight × severity_mult × (confidence/100)
-    score        = Σ contributions × exp-decay(event age) → clamp 0-100
-  * one aging mechanism only: decay on the running sum, no recency factor
-  * no positive-behavior credits in v1 — absence of new events + decay IS
-    the recovery
-  * suppressed events STILL contribute (§1C.8 — suppression is notification-
-    layer only; hiding evidence would corrupt the state)
-
-Drivers map from the registry nature axis:
-    emotional → tilt · risk → risk · discipline → discipline · performance → strategy
-  All four are higher-is-worse (discipline here measures rule-breaking, not
-  adherence — the inversion the master doc requires happens by construction).
-
-Headline (V4): Behavior Risk = max(drivers) + w × mean(other drivers), so
-"Tilt 95, rest quiet" reads ~95, never a mushy average.
+only — never detector internals, never EngineContext.
 
 Death Spiral (master §1D.2 FINAL — state-based, never raw counts):
     warning  → in-app        (behavior deteriorating)
@@ -28,9 +10,12 @@ Death Spiral (master §1D.2 FINAL — state-based, never raw counts):
     critical → push+guardian (3+ independent domains + continued escalation
                               inside the compression window)
 Guardian budget: hard cap per month (§1B.8) enforced at dispatch.
+
+The driver scores and the Behavior Risk headline that this module used to own
+were removed 2026-08-13 (docs/GLOBALS_DERIVATION.md). Death spiral is the part
+that fires alerts, and it never depended on them.
 """
 import logging
-import math
 from datetime import datetime, timedelta, timezone
 from typing import Dict, List, Optional
 from uuid import UUID
@@ -45,15 +30,6 @@ from app.services.detector_registry import BY_NAME
 logger = logging.getLogger(__name__)
 IST = ZoneInfo("Asia/Kolkata")
 
-# Pattern weight = risk delta (already per-pattern calibrated). Imported lazily
-# to avoid a circular import with behavior_engine.
-_NATURE_TO_DRIVER = {
-    "emotional": "tilt",
-    "risk": "risk",
-    "discipline": "discipline",
-    "performance": "strategy",
-}
-
 # Emitted names that carry another spec's nature
 _ALIAS_NATURE = {
     "daily_overtrading": "emotional",
@@ -65,97 +41,15 @@ _ALIAS_NATURE = {
 }
 
 
-def _driver_for(detector: str) -> Optional[str]:
-    spec = BY_NAME.get(detector)
-    nature = spec.nature if spec else _ALIAS_NATURE.get(detector)
-    return _NATURE_TO_DRIVER.get(nature) if nature else None
-
-
-def compute_scores(events: List, now: Optional[datetime] = None) -> Dict:
-    """
-    Pure function: today's BehaviorEvents → driver scores + headline.
-    Accepts anything with .detector, .severity, .confidence, .detected_at,
-    .evidence (BehaviorEvent rows or compatible objects).
-    """
-    from app.services.behavior_engine import RISK_DELTAS
-
-    now = now or datetime.now(timezone.utc)
-    half_life = float(COLD_START_DEFAULTS.get("score_halflife_min", 90))
-    sev_mult = {
-        "info":     float(COLD_START_DEFAULTS.get("score_sev_mult_info", 0.5)),
-        "caution":  float(COLD_START_DEFAULTS.get("score_sev_mult_caution", 1.0)),
-        "danger":   float(COLD_START_DEFAULTS.get("score_sev_mult_danger", 1.5)),
-        "critical": float(COLD_START_DEFAULTS.get("score_sev_mult_critical", 2.0)),
-    }
-
-    drivers = {"tilt": 0.0, "risk": 0.0, "discipline": 0.0, "strategy": 0.0}
-    contributors: Dict[str, List] = {k: [] for k in drivers}
-
-    for ev in events:
-        driver = _driver_for(ev.detector)
-        if not driver:
-            continue
-        weight = float(RISK_DELTAS.get(ev.detector, 10))
-        mult = sev_mult.get(ev.severity, 1.0)
-        conf = float(ev.confidence or 75) / 100.0
-        age_min = max(0.0, (now - ev.detected_at).total_seconds() / 60) if ev.detected_at else 0.0
-        decay = math.pow(0.5, age_min / half_life)
-        contribution = weight * mult * conf * decay
-        if contribution < 0.5:
-            continue  # fully decayed — noise
-        drivers[driver] += contribution
-        contributors[driver].append({
-            "detector": ev.detector,
-            "severity": ev.severity,
-            "contribution": round(contribution, 1),
-            "age_min": round(age_min),
-        })
-
-    for k in drivers:
-        drivers[k] = min(100.0, round(drivers[k], 1))
-        contributors[k].sort(key=lambda c: -c["contribution"])
-
-    # Headline: dominant-driver weighted (V4) — never a mean
-    values = list(drivers.values())
-    dominant = max(values)
-    others = [v for v in values if v != dominant] or [0.0]
-    w = float(COLD_START_DEFAULTS.get("headline_other_weight", 0.15))
-    behavior_risk = min(100.0, round(dominant + w * (sum(others) / len(others)), 1))
-
-    b_elev = COLD_START_DEFAULTS.get("score_band_elevated", 30)
-    b_high = COLD_START_DEFAULTS.get("score_band_high", 60)
-    b_crit = COLD_START_DEFAULTS.get("score_band_critical", 80)
-    band = ("critical" if behavior_risk >= b_crit
-            else "high" if behavior_risk >= b_high
-            else "elevated" if behavior_risk >= b_elev
-            else "normal")
-
-    return {
-        "behavior_risk": behavior_risk,
-        "band": band,
-        "drivers": drivers,
-        "contributors": contributors,
-        "computed_at": now.isoformat(),
-    }
-
-
-async def get_today_scores(broker_account_id: UUID, db: AsyncSession) -> Dict:
-    """Load today's (IST) BehaviorEvents and compute scores."""
-    from app.models.behavior_event import BehaviorEvent
-
-    ist_now = datetime.now(IST)
-    day_start_utc = ist_now.replace(hour=0, minute=0, second=0, microsecond=0).astimezone(timezone.utc)
-    result = await db.execute(
-        select(BehaviorEvent).where(and_(
-            BehaviorEvent.broker_account_id == broker_account_id,
-            BehaviorEvent.detected_at >= day_start_utc,
-            # Shadow (dark-launched) detector events are evidence only — excluded
-            # from every user-facing score.
-            BehaviorEvent.shadow.is_(False),
-        ))
-    )
-    events = list(result.scalars().all())
-    return compute_scores(events)
+# `compute_scores` / `get_today_scores` — the four driver scores, the
+# dominant-weighted headline and the 30/60/80 band — were removed 2026-08-13.
+# `docs/GLOBALS_DERIVATION.md` has the measurement: the weights did not rank
+# with measured cost, the severity multiplier had the wrong sign (danger
+# measured −10 lift against caution's +1), and the 90-minute half-life outlived
+# the signal by roughly 3×. Nothing rendered the result.
+#
+# Death spiral below is UNCHANGED and still fires. It reads severity and nature
+# domain off the events themselves; it never read the scores.
 
 
 # ─────────────────────────────────────────────────────────────────────────────

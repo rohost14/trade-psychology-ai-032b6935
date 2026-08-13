@@ -5,15 +5,13 @@ Manages one TradingSession row per (broker_account, trading_day).
 
 Responsibilities:
   - get_or_create_session: idempotent, safe to call multiple times per day
-  - update_risk_score: accumulates risk score, tracks peak, advances state
   - increment_trade_count / increment_alerts_fired: lightweight counters
   - close_session: records closing equity at end of day
 
-Risk score state transitions:
-  0-39  → normal
-  40-69 → caution
-  70-89 → danger
-  90+   → blowup
+`update_risk_score` and the 40/70/90 session_state ladder were removed
+2026-08-13 — see docs/GLOBALS_DERIVATION.md. The `risk_score` and
+`peak_risk_score` columns remain on the table (dropping them needs a
+migration) but nothing writes them.
 
 Design rules:
   - This service ONLY writes to trading_sessions.
@@ -35,23 +33,6 @@ from app.models.trading_session import TradingSession
 from app.core.market_hours import get_session_boundaries, MarketSegment
 
 logger = logging.getLogger(__name__)
-
-# Risk score → session state thresholds
-_STATE_THRESHOLDS = [
-    (Decimal("90"), "blowup"),
-    (Decimal("70"), "danger"),
-    (Decimal("40"), "caution"),
-    (Decimal("0"),  "normal"),
-]
-
-
-def _state_for_score(score: Decimal) -> str:
-    """Return session_state string for a given risk score."""
-    for threshold, state in _STATE_THRESHOLDS:
-        if score >= threshold:
-            return state
-    return "normal"
-
 
 class TradingSessionService:
 
@@ -114,48 +95,6 @@ class TradingSessionService:
                 return existing
             raise  # Unexpected error — re-raise
 
-        return session
-
-    # ------------------------------------------------------------------
-    # Risk score management
-    # ------------------------------------------------------------------
-
-    @staticmethod
-    async def update_risk_score(
-        session_id: UUID,
-        delta: Decimal,
-        db: AsyncSession,
-    ) -> TradingSession:
-        """
-        Add delta to the session risk score.
-
-        Score is clamped to [0, 100].
-        peak_risk_score is updated if the new score exceeds it.
-        session_state advances automatically based on thresholds.
-
-        delta can be negative (risk reducing events).
-        Returns the updated TradingSession.
-        """
-        session = await db.get(TradingSession, session_id)
-        if not session:
-            raise ValueError(f"TradingSession {session_id} not found")
-
-        new_score = max(Decimal("0"), min(Decimal("100"), session.risk_score + delta))
-        session.risk_score = new_score
-
-        if new_score > session.peak_risk_score:
-            session.peak_risk_score = new_score
-
-        new_state = _state_for_score(new_score)
-        if new_state != session.session_state:
-            logger.info(
-                f"[session:{session_id}] state {session.session_state} → {new_state} "
-                f"(score: {session.risk_score} → {new_score})"
-            )
-            session.session_state = new_state
-
-        session.updated_at = datetime.now(timezone.utc)
-        await db.flush()
         return session
 
     # ------------------------------------------------------------------

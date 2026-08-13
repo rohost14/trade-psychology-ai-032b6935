@@ -20,7 +20,7 @@ from app.services.position_ledger_service import (
     FillData,
     PositionLedgerService,
 )
-from app.services.trading_session_service import TradingSessionService, _state_for_score
+from app.services.trading_session_service import TradingSessionService
 from app.models.position_ledger import PositionLedger
 from app.models.trading_session import TradingSession
 from tests.helpers import now_utc
@@ -490,68 +490,11 @@ class TestTradingSessionDB:
         s2 = await TradingSessionService.get_or_create_session(broker.id, today, db)
         assert s1.id == s2.id
 
-    async def test_state_transitions(self, db, broker):
-        """Risk score thresholds drive correct state transitions."""
-        assert _state_for_score(Decimal("0")) == "normal"
-        assert _state_for_score(Decimal("39")) == "normal"
-        assert _state_for_score(Decimal("40")) == "caution"
-        assert _state_for_score(Decimal("69")) == "caution"
-        assert _state_for_score(Decimal("70")) == "danger"
-        assert _state_for_score(Decimal("89")) == "danger"
-        assert _state_for_score(Decimal("90")) == "blowup"
-        assert _state_for_score(Decimal("100")) == "blowup"
-
-    async def test_update_risk_score_advances_state(self, db, broker):
-        session = await TradingSessionService.get_or_create_session(
-            broker.id, date.today(), db
-        )
-        assert session.session_state == "normal"
-
-        # Push into caution
-        session = await TradingSessionService.update_risk_score(
-            session.id, Decimal("50"), db
-        )
-        assert session.risk_score == Decimal("50")
-        assert session.session_state == "caution"
-
-        # Push into danger
-        session = await TradingSessionService.update_risk_score(
-            session.id, Decimal("25"), db
-        )
-        assert session.risk_score == Decimal("75")
-        assert session.session_state == "danger"
-
-    async def test_risk_score_clamps_at_100(self, db, broker):
-        session = await TradingSessionService.get_or_create_session(
-            broker.id, date.today(), db
-        )
-        session = await TradingSessionService.update_risk_score(
-            session.id, Decimal("150"), db
-        )
-        assert session.risk_score == Decimal("100")
-        assert session.session_state == "blowup"
-
-    async def test_risk_score_clamps_at_zero(self, db, broker):
-        """Risk score cannot go below 0."""
-        session = await TradingSessionService.get_or_create_session(
-            broker.id, date.today(), db
-        )
-        session = await TradingSessionService.update_risk_score(
-            session.id, Decimal("-50"), db
-        )
-        assert session.risk_score == Decimal("0")
-
-    async def test_peak_risk_score_tracked(self, db, broker):
-        """peak_risk_score captures the highest value seen."""
-        session = await TradingSessionService.get_or_create_session(
-            broker.id, date.today(), db
-        )
-        await TradingSessionService.update_risk_score(session.id, Decimal("70"), db)
-        session = await TradingSessionService.update_risk_score(
-            session.id, Decimal("-40"), db
-        )
-        assert session.risk_score == Decimal("30")
-        assert session.peak_risk_score == Decimal("70")
+    # test_state_transitions, test_update_risk_score_advances_state,
+    # test_risk_score_clamps_at_100 / _at_zero and test_peak_risk_score_tracked
+    # were removed 2026-08-13 with their subject: `update_risk_score` and the
+    # 40/70/90 `_state_for_score` ladder no longer exist.
+    # See docs/GLOBALS_DERIVATION.md.
 
     async def test_increment_trade_count(self, db, broker):
         session = await TradingSessionService.get_or_create_session(

@@ -1222,9 +1222,7 @@ async def run_risk_detection_async(
 
         logger.info(
             f"[BehaviorEngine] {broker_account_id}: {len(new_alerts)} new alerts "
-            f"({len(danger_alerts)} danger) | "
-            f"state={result.behavior_state} | "
-            f"risk={float(result.risk_score_before):.0f}→{float(result.risk_score_after):.0f}"
+            f"({len(danger_alerts)} danger)"
         )
 
         # Notify frontend via WebSocket — new alerts available, refresh
@@ -1236,7 +1234,6 @@ async def run_risk_detection_async(
             publish_event(str(broker_account_id), "alert_update", {
                 "count": len(persisted_alerts),
                 "has_danger": any(is_notifiable(a.severity) for a in persisted_alerts),
-                "behavior_state": result.behavior_state,
             })
 
         # Also notify trade update so dashboard refreshes completed trades.

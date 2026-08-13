@@ -6,8 +6,6 @@ Frontend patternDetector.ts has been removed — backend is the only engine.
 
 Architecture:
   - Session-scoped (today IST only)
-  - Cumulative risk score (0-100) via TradingSession
-  - Behavior state: Stable → Pressure → Tilt Risk → Tilt → Breakdown → Recovery
   - Context loaded once per call (3 DB queries shared across all 15 detectors)
   - All detectors are pure (no DB access inside detectors)
   - Strategy-aware: suppresses false alerts on hedge/multi-leg strategy legs
@@ -78,69 +76,18 @@ IST = ZoneInfo("Asia/Kolkata")
 # logic that produced them.
 ENGINE_VERSION = "1.1.0"
 
-# ---------------------------------------------------------------------------
-# Risk score deltas per pattern
-# ---------------------------------------------------------------------------
-RISK_DELTAS: Dict[str, Decimal] = {
-    "consecutive_loss_streak":          Decimal("20"),
-    "revenge_trade":                    Decimal("25"),
-    "overtrading_burst":                Decimal("10"),
-    "size_escalation":                  Decimal("15"),
-    "rapid_reentry":                    Decimal("15"),
-    "panic_exit":                       Decimal("10"),
-    "martingale_behaviour":             Decimal("20"),
-    "cooldown_violation":               Decimal("25"),
-    "rapid_flip":                       Decimal("15"),
-    "excess_exposure":                  Decimal("15"),
-    "session_meltdown":                 Decimal("30"),
-    "fomo_entry":                       Decimal("15"),
-    "no_stoploss":                      Decimal("20"),
-    "early_exit":                       Decimal("10"),
-    "winning_streak_overconfidence":    Decimal("15"),
-    "options_direction_confusion":      Decimal("20"),
-    "options_premium_avg_down":         Decimal("15"),
-    "iv_crush_behavior":                Decimal("10"),
-    # G2 / G4 / G5 / G6 — new patterns
-    "expiry_day_overtrading":           Decimal("20"),
-    "opening_5min_trap":                Decimal("10"),
-    "end_of_session_mis_panic":         Decimal("15"),
-    "post_loss_recovery_bet":           Decimal("20"),
-    "profit_giveaway":                  Decimal("20"),
-    "constitution_violation":           Decimal("25"),
-    "direction_instability":            Decimal("15"),
-    "premium_loss_event":               Decimal("15"),
-    "daily_overtrading":                Decimal("10"),
-    "same_symbol_obsession":            Decimal("20"),
-    "time_of_day_bias":                 Decimal("5"),
-    "death_spiral":                     Decimal("30"),
-    "overexposure":                     Decimal("15"),
-    "portfolio_concentration":          Decimal("15"),
-    "holding_loser":                    Decimal("10"),
-    "win_rate_collapse":                Decimal("10"),
-    "strategy_breakdown":               Decimal("15"),
-    "premium_destruction":              Decimal("25"),
-}
-
-# ---------------------------------------------------------------------------
-# Behavior state
-# ---------------------------------------------------------------------------
-
-def _behavior_state(risk_score: Decimal, peak: Decimal) -> str:
-    if peak >= Decimal("60") and risk_score <= peak - Decimal("20"):
-        return "Recovery"
-    s = float(risk_score)
-    if s >= 80: return "Breakdown"
-    if s >= 60: return "Tilt"
-    if s >= 40: return "Tilt Risk"
-    if s >= 20: return "Pressure"
-    return "Stable"
-
-
-def _trajectory(risk_before: Decimal, risk_after: Decimal) -> str:
-    delta = risk_after - risk_before
-    if delta > Decimal("5"):  return "deteriorating"
-    if delta < Decimal("-5"): return "improving"
-    return "stable"
+# The per-pattern risk weights, the 0-100 session score they fed, and the
+# Stable→Pressure→Tilt→Breakdown state machine were removed 2026-08-13.
+#
+# They were derived state with no consumer: nothing rendered the score, and
+# `docs/GLOBALS_DERIVATION.md` measured the weights against a year of real
+# trades — rank agreement with what the patterns actually cost was 0 of 16,
+# and the mean weight was the same (17.1 vs 17.8) for patterns that predicted
+# loss and patterns that did not. The escalation they expressed is a forecast,
+# and the data does not support one.
+#
+# Detectors never read them (A.10 derived-state ban), so nothing about which
+# alerts fire changed. Death spiral (L2) counts nature domains, not this score.
 
 
 # ---------------------------------------------------------------------------
@@ -169,11 +116,6 @@ class DetectedEvent:
 class DetectionResult:
     alerts: List[RiskAlert]
     events: List["BehaviorEventRecord"]  # ALL detections incl. info/suppressed — caller persists
-    risk_score_before: Decimal
-    risk_score_after: Decimal
-    total_delta: Decimal
-    behavior_state: str
-    trajectory: str
     session_id: Optional[UUID]
 
 
@@ -224,7 +166,6 @@ class BehaviorEngine:
             session = await TradingSessionService.get_or_create_session(
                 broker_account_id, today_ist, db
             )
-            risk_before = session.risk_score
 
             ctx = await self._load_context(
                 broker_account_id, completed_trade, session, db, profile
@@ -312,38 +253,30 @@ class BehaviorEngine:
                 for e in events
             ]
 
-            # Suppressed events are recorded as evidence but do not move the
-            # risk score (pre-registry behavior: they never reached this sum).
-            # Shadow events (dark-launched detectors) are excluded too — they must
-            # never influence the user-facing score.
-            total_delta = sum(
-                RISK_DELTAS.get(e.event_type, Decimal("0"))
-                for e in events if not e.suppressed_reason and not e.shadow
-            )
-            new_risk = max(Decimal("0"), min(Decimal("100"), risk_before + total_delta))
-            state = _behavior_state(new_risk, session.peak_risk_score)
-            traj = _trajectory(risk_before, new_risk)
-
-            if total_delta != Decimal("0"):
-                await TradingSessionService.update_risk_score(session.id, total_delta, db)
+            # `update_risk_score` used to be called here, and its `db.flush()`
+            # was the only thing persisting the `session.session_pnl` computed
+            # `update_risk_score` used to be called here and its `db.flush()`
+            # was documented as what persisted the `session.session_pnl` set in
+            # `_load_context`. It was not: that call was conditional on
+            # `total_delta != 0`, so a trade that fired no events never flushed
+            # and session_pnl persisted anyway — every caller commits
+            # (trade_tasks.py:1134/1422, alertlab inject.py:263), and the commit
+            # flushes it. Adding an unconditional flush here instead made the
+            # replay 5x slower: one long-lived session accumulates an identity
+            # map across the whole year, so a per-trade flush turns O(n) work
+            # into O(n²). Left to the caller's commit, which is where it was.
 
             if events:
                 logger.info(
                     f"[BehaviorEngine] {broker_account_id} | "
                     f"{completed_trade.tradingsymbol} | "
                     f"{len(events)} patterns | "
-                    f"risk {float(risk_before):.0f}→{float(new_risk):.0f} | "
-                    f"state={state} | {[e.event_type for e in events]}"
+                    f"{[e.event_type for e in events]}"
                 )
 
             return DetectionResult(
                 alerts=alerts,
                 events=behavior_events,
-                risk_score_before=risk_before,
-                risk_score_after=new_risk,
-                total_delta=total_delta,
-                behavior_state=state,
-                trajectory=traj,
                 session_id=session.id,
             )
 
@@ -357,16 +290,7 @@ class BehaviorEngine:
                 _incr("engine_analyze_failed")
             except Exception:
                 pass
-            return DetectionResult(
-                alerts=[],
-                events=[],
-                risk_score_before=Decimal("0"),
-                risk_score_after=Decimal("0"),
-                total_delta=Decimal("0"),
-                behavior_state="Stable",
-                trajectory="stable",
-                session_id=None,
-            )
+            return DetectionResult(alerts=[], events=[], session_id=None)
 
     @staticmethod
     def _detector_version(pattern_type: str) -> str:

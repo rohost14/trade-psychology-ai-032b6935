@@ -31,7 +31,6 @@ interface TradeEvent {
 interface AlertEvent {
   count: number;
   has_danger: boolean;
-  behavior_state?: string;
   timestamp: string;
 }
 

@@ -8,7 +8,7 @@ import { CalendarDays, Info } from 'lucide-react';
 import { api } from '@/lib/api';
 import { cn } from '@/lib/utils';
 
-interface Day { date: string; pnl: number; trades: number; alerts: number; peak_risk: number; tag: string; top_patterns: string[]; }
+interface Day { date: string; pnl: number; trades: number; alerts: number; tag: string; top_patterns: string[]; }
 interface Data { has_data: boolean; days: Day[]; insight: { tag: string; count: number; of: number } | null; }
 
 const TAG: Record<string, { label: string; cls: string }> = {

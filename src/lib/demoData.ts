@@ -1132,17 +1132,17 @@ export const DEMO_SESSION_LOG = {
   has_data: true,
   period_days: 60,
   days: [
-    { date: '2026-08-05', pnl: -2700, trades: 1, alerts: 2, peak_risk: 68,
+    { date: '2026-08-05', pnl: -2700, trades: 1, alerts: 2,
       tag: 'revenge',     top_patterns: ['revenge_trade', 'no_stoploss'] },
-    { date: '2026-08-04', pnl: 6350,  trades: 4, alerts: 1, peak_risk: 34,
+    { date: '2026-08-04', pnl: 6350,  trades: 4, alerts: 1,
       tag: 'flagged',     top_patterns: ['early_exit'] },
-    { date: '2026-08-03', pnl: 4200,  trades: 3, alerts: 0, peak_risk: 12,
+    { date: '2026-08-03', pnl: 4200,  trades: 3, alerts: 0,
       tag: 'clean',       top_patterns: [] },
-    { date: '2026-07-31', pnl: -1000, trades: 1, alerts: 1, peak_risk: 41,
+    { date: '2026-07-31', pnl: -1000, trades: 1, alerts: 1,
       tag: 'overtrading', top_patterns: ['overtrading'] },
-    { date: '2026-07-30', pnl: -7410, trades: 4, alerts: 5, peak_risk: 82,
+    { date: '2026-07-30', pnl: -7410, trades: 4, alerts: 5,
       tag: 'revenge',     top_patterns: ['revenge_trade', 'size_escalation', 'consecutive_loss_streak'] },
-    { date: '2026-07-29', pnl: 8550,  trades: 2, alerts: 0, peak_risk: 9,
+    { date: '2026-07-29', pnl: 8550,  trades: 2, alerts: 0,
       tag: 'clean',       top_patterns: [] },
   ],
   insight: { tag: 'revenge', count: 2, of: 3 },
@@ -1190,12 +1190,6 @@ export const DEMO_ALERT_RESPONSE_STATS = {
     { pattern: 'no_stoploss',     total: 6, ignored: 4, stopped: 1, took_anyway: 3,
       not_useful: 2, planned: 1, not_useful_rate: 0.33, ack_rate: 0.33 },
   ],
-};
-
-// Mirrors GET /api/risk/scores. Missing fixture crashed My Patterns.
-export const DEMO_RISK_SCORES = {
-  behavior_risk: 42,
-  drivers: { tilt: 55, risk: 38, discipline: 30, strategy: 22 },
 };
 
 // ---------------------------------------------------------------------------

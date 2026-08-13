@@ -576,7 +576,6 @@ async def _fire_position_alert(
         # app/core/severity.py exists to eliminate, in a function this
         # session had already edited twice.
         "has_danger": is_notifiable(severity),
-        "behavior_state": None,
     })
 
     logger.info(

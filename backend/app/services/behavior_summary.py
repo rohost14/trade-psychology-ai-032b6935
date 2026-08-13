@@ -17,14 +17,17 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.severity import rank as _sev_rank
 
 
-def summarize_behavior(alerts, session_risk_score=None, flagged_pnl=0.0) -> dict:
+def summarize_behavior(alerts, flagged_pnl=0.0) -> dict:
     """
     Pure: build the behavioural summary the FE reads from the real engine's alerts.
 
     alerts: objects with .pattern_type, .severity, .message.
     Returns patterns_detected (distinct pattern, worst severity, representative
-    message), behavior_score (the session risk score, 0-100), and emotional_tax
-    (realized P&L of flagged trades — factual, negative = drag).
+    message) and emotional_tax (realized P&L of flagged trades — factual,
+    negative = drag).
+
+    `behavior_score` was dropped 2026-08-13 with the rest of the session risk
+    score (docs/GLOBALS_DERIVATION.md). No caller read it.
     """
     by_pattern: dict = {}
     for a in alerts:
@@ -44,7 +47,6 @@ def summarize_behavior(alerts, session_risk_score=None, flagged_pnl=0.0) -> dict
     patterns = sorted(by_pattern.values(), key=lambda p: -_sev_rank(p["severity"]))
     return {
         "patterns_detected": patterns,
-        "behavior_score": session_risk_score,
         "emotional_tax": round(float(flagged_pnl or 0), 2),
         "top_strength": None,
         "focus_area": patterns[0]["pattern_type"] if patterns else None,
@@ -80,19 +82,4 @@ async def get_behavior_summary(broker_account_id, db: AsyncSession, days: int = 
         )
     )).scalar() or 0
 
-    # behavior_score = today's session risk score (0-100) from the real engine.
-    session_risk = None
-    try:
-        from app.models.trading_session import TradingSession
-        session_risk = (await db.execute(
-            select(TradingSession.risk_score)
-            .where(TradingSession.broker_account_id == broker_account_id)
-            .order_by(TradingSession.session_date.desc())
-            .limit(1)
-        )).scalar()
-        if session_risk is not None:
-            session_risk = float(session_risk)
-    except Exception:
-        session_risk = None
-
-    return summarize_behavior(alerts, session_risk_score=session_risk, flagged_pnl=float(flagged_pnl))
+    return summarize_behavior(alerts, flagged_pnl=float(flagged_pnl))

@@ -1211,11 +1211,7 @@ async def get_ai_summary(
             # archived behavioral_analysis_service.
             from app.services.behavior_summary import get_behavior_summary
             analysis = await get_behavior_summary(broker_account_id, db, days)
-            tab_data = {
-                "emotional_tax": analysis.get("emotional_tax", 0),
-                "behavior_score": analysis.get("behavior_score"),
-            }
-            behavior_score = analysis.get("behavior_score")
+            tab_data = {"emotional_tax": analysis.get("emotional_tax", 0)}
             patterns = [p["name"] for p in analysis.get("patterns_detected", []) if not p.get("is_positive")]
         elif tab == "performance":
             # Reuse performance endpoint logic inline (minimal data needed for narrative)
@@ -1303,7 +1299,10 @@ async def get_ai_summary(
         # 3. Fire Celery task to generate narrative — non-blocking.
         # The task writes the result to UserProfile.ai_cache; the next
         # request will return it as a cache hit.
-        bscore = tab_data.get("behavior_score") if tab == "behavior" else None
+        # The behaviour score was retired 2026-08-13 (docs/GLOBALS_DERIVATION.md).
+        # The argument stays in the task signature so tasks already queued with
+        # six positional args still bind on deploy; it is always None now.
+        bscore = None
         pats = patterns if tab == "behavior" else None
 
         try:
@@ -3244,7 +3243,6 @@ async def get_session_log(
             "pnl":            float(s.session_pnl or 0),
             "trades":         int(s.trade_count or 0),
             "alerts":         int(s.alerts_fired or 0),
-            "peak_risk":      float(s.peak_risk_score or 0),
             "tag":            _tag(pats, int(s.alerts_fired or 0)),
             "top_patterns":   [k for k, _ in top],
         })

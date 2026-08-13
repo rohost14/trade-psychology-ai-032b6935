@@ -19,9 +19,6 @@ from app.services.behavior_engine import (
     BehaviorEngine,
     EngineContext,
     DetectedEvent,
-    _behavior_state,
-    _trajectory,
-    RISK_DELTAS,
 )
 from app.models.completed_trade import CompletedTrade
 from app.models.trading_session import TradingSession
@@ -105,60 +102,9 @@ engine = BehaviorEngine()
 
 
 # =============================================================================
-# Behavior state machine
-# =============================================================================
-
-class TestBehaviorStateMachine:
-
-    def test_stable_at_zero(self):
-        assert _behavior_state(Decimal("0"), Decimal("0")) == "Stable"
-
-    def test_stable_below_20(self):
-        assert _behavior_state(Decimal("19"), Decimal("19")) == "Stable"
-
-    def test_pressure_at_20(self):
-        assert _behavior_state(Decimal("20"), Decimal("20")) == "Pressure"
-
-    def test_tilt_risk_at_40(self):
-        assert _behavior_state(Decimal("40"), Decimal("40")) == "Tilt Risk"
-
-    def test_tilt_at_60(self):
-        assert _behavior_state(Decimal("60"), Decimal("60")) == "Tilt"
-
-    def test_breakdown_at_80(self):
-        assert _behavior_state(Decimal("80"), Decimal("80")) == "Breakdown"
-
-    def test_recovery_when_improving_from_peak(self):
-        # Was at 80 (Breakdown), now at 55 (Tilt)
-        # peak=80, current=55, diff=25 > 20 → Recovery
-        assert _behavior_state(Decimal("55"), Decimal("80")) == "Recovery"
-
-    def test_no_recovery_if_peak_was_low(self):
-        # Peak was only 30 — never in danger zone
-        assert _behavior_state(Decimal("10"), Decimal("30")) == "Stable"
-
-    def test_trajectory_deteriorating(self):
-        assert _trajectory(Decimal("20"), Decimal("50")) == "deteriorating"
-
-    def test_trajectory_improving(self):
-        assert _trajectory(Decimal("50"), Decimal("30")) == "improving"
-
-    def test_trajectory_stable(self):
-        assert _trajectory(Decimal("30"), Decimal("33")) == "stable"
-
-    def test_all_risk_deltas_defined(self):
-        """All 11 implemented patterns must have a risk delta."""
-        patterns = [
-            "consecutive_loss_streak", "revenge_trade", "overtrading_burst",
-            "size_escalation", "rapid_reentry", "panic_exit",
-            "martingale_behaviour", "cooldown_violation", "direction_instability",
-            "excess_exposure", "session_meltdown",
-        ]
-        for p in patterns:
-            assert p in RISK_DELTAS, f"Missing risk delta for {p}"
-            assert RISK_DELTAS[p] > 0
-
-
+# TestBehaviorStateMachine (11 tests) was removed 2026-08-13 along with its
+# subject — `_behavior_state`, `_trajectory` and `RISK_DELTAS` no longer exist.
+# See docs/GLOBALS_DERIVATION.md. The detector tests below are untouched.
 # =============================================================================
 # Detector pure function tests (no DB)
 # =============================================================================
@@ -394,11 +340,8 @@ class TestBehaviorEngineDB:
         )
 
         assert result is not None
-        assert result.behavior_state in ("Stable", "Pressure", "Tilt Risk", "Tilt",
-                                          "Breakdown", "Recovery")
-        assert result.trajectory in ("stable", "improving", "deteriorating")
-        assert result.risk_score_after >= Decimal("0")
-        assert result.risk_score_after <= Decimal("100")
+        assert result.alerts == []
+        assert result.session_id is not None
 
     async def test_analyze_creates_session(self, db, broker):
         """analyze() creates a TradingSession for today if none exists."""

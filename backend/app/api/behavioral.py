@@ -21,8 +21,8 @@ async def get_behavioral_analysis(
     time_window_days: int = Query(default=30, ge=1, le=365),
     db: AsyncSession = Depends(get_db)
 ):
-    """Behavioral summary (patterns_detected / behavior_score / emotional_tax),
-    sourced from the live engine's RiskAlerts."""
+    """Behavioral summary (patterns_detected / emotional_tax), sourced from the
+    live engine's RiskAlerts."""
     try:
         return await get_behavior_summary(broker_account_id, db, time_window_days)
     except Exception as e:
@@ -39,7 +39,6 @@ async def get_detected_patterns(
         summary = await get_behavior_summary(broker_account_id, db)
         return {
             "patterns": summary["patterns_detected"],
-            "behavior_score": summary["behavior_score"],
             "top_strength": summary["top_strength"],
             "focus_area": summary["focus_area"],
         }
