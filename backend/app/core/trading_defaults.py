@@ -158,8 +158,9 @@ COLD_START_DEFAULTS: Dict[str, Any] = {
     'expiry_overtrading_caution_count':  5,
     'expiry_overtrading_danger_count':   8,
     'expiry_overtrading_caution_lots':   10,
-    'expiry_overtrading_caution_mul':    1.5,  # 1.5× personal baseline = caution
-    'expiry_overtrading_danger_mul':     2.0,  # 2.0× personal baseline = danger
+    # expiry_overtrading_{caution,danger}_mul removed 2026-08-13: declared as
+    # multiples of the personal baseline, read by nothing. The detector uses the
+    # _count and _lots thresholds above.
 
     # ── Opening 10-minute trap ────────────────────────────────────────────
     # 09:15-09:25 IST: widest spreads, most distorted option pricing of the day.
@@ -223,11 +224,9 @@ COLD_START_DEFAULTS: Dict[str, Any] = {
     # 20% floor to exclude scratch trades that hit SL cleanly.
     'premium_avg_down_loss_pct':        20,   # prior options position must have lost ≥20%
 
-    # IV crush proxy: fast large premium loss = buying into high IV.
-    # IV rank >60%: options expire worthless 65% of the time (Cboe/NSE data).
-    # Proxy: losing >40% premium in <30 min without directional move = IV collapse.
-    'iv_crush_proxy_hold_min':          30,   # hold < 30 min for this to be IV (not theta)
-    'iv_crush_proxy_loss_pct':          40,   # lost > 40% of premium paid
+    # iv_crush_proxy_{hold_min,loss_pct} removed 2026-08-13: the iv_crush_behavior
+    # detector was merged into premium_loss_event, and these were left behind
+    # reading to nothing. premium_loss_{caution,danger,critical}_pct replace them.
 
     # ── Confidence signal points (Engine v2 Phase 4, master §1.4) ────────
     # Relative importance → tunable values. Starting points, not spec constants.
@@ -290,12 +289,9 @@ COLD_START_DEFAULTS: Dict[str, Any] = {
     'alert_session_hard_cap':           8,   # max notified alerts per session (fatigue guard)
     'alert_bucket_minutes':             5,   # same pattern re-notification bucket
 
-    # ── Entry-time coalescing (E1) ───────────────────────────────────────
-    # Seconds the first opening fill waits before entry checks run, so partial
-    # fills, multi-leg legs and split orders are evaluated once instead of N
-    # times. Costs latency on an alert a human reads; buys a class of false
-    # positive that would otherwise be structural.
-    'entry_batch_window_sec':           5,
+    # entry_batch_window_sec removed 2026-08-13: the entry-time coalescing it
+    # configured was never implemented, so the constant described behaviour the
+    # code does not have. Reinstate it with the feature, not before.
 
     # ── Notification staleness (Engine v2 Phase 0, master Q12) ───────────
     # Push/WhatsApp only fire for alerts whose triggering trade is recent.
@@ -305,12 +301,9 @@ COLD_START_DEFAULTS: Dict[str, Any] = {
     # older than this window, so they are auto-suppressed too.
     'alert_stale_push_min':            30,   # no push if trade older than 30 min
 
-    # Premium destruction: options trade exits losing > X% of entry premium.
-    # Fires regardless of hold time — measures exit severity, not speed.
-    # -60 means the threshold is "worse than -60%" (e.g. -65%, -80%, -99%).
-    # Derived from: options losing >60% have almost no recovery probability
-    # in the same session. Source: NSE options data, Zerodha SPAN margin docs.
-    'premium_destruction_pct':         -60,  # pnl_pct < -60% triggers alert
+    # premium_destruction_pct removed 2026-08-13: the premium_destruction
+    # detector was merged into premium_loss_event and this threshold was left
+    # behind, read by nothing. premium_loss_danger_pct (60) is its successor.
 }
 
 
