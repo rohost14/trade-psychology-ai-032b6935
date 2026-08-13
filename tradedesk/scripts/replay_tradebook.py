@@ -81,7 +81,26 @@ def _db():
 
 
 def read_fills(path: Path):
-    """Parse the Console export into fills, oldest first."""
+    """
+    Parse the Console export into ORDERS, oldest first.
+
+    One CSV row is one FILL, and a single order may fill in several tranches
+    that all carry the SAME order_id. This function merges them, because the
+    thing being replayed is the postback pipeline and Zerodha posts once per
+    ORDER — `filled_quantity` is the total and `average_price` is the VWAP of
+    the tranches, never one postback per tranche.
+
+    Injecting the tranches separately was a real defect, not a nuance: the
+    lab writes `order_id` into `Trade.order_id`, which carries
+    `UniqueConstraint(broker_account_id, order_id)`, so every tranche after the
+    first collided and was silently dropped — 182 of 2,175 fills (8.4%) on this
+    tradebook, across 61 of 203 sessions, with the surviving tranche's quantity
+    standing in for the whole order. Days lost trades, counts read low, and the
+    same day could come out differently on consecutive runs.
+
+    Production never had this: `tradebook_import_service` writes the per-fill
+    trade_id into `Trade.order_id` and keeps the order id in `kite_order_id`.
+    """
     rows = []
     with open(path, newline="", encoding="utf-8-sig") as fh:
         for r in csv.DictReader(fh):
@@ -100,8 +119,33 @@ def read_fills(path: Path):
                 })
             except (KeyError, ValueError, TypeError):
                 continue        # a malformed row must not stop the replay
-    rows.sort(key=lambda x: x["at"])
-    return rows
+
+    # Merge tranches of one order into the single postback production sees.
+    # Grouped on (order_id, symbol, side) rather than order_id alone so a reused
+    # or blank id can never fuse two genuinely different orders; rows with no
+    # order_id keep their own identity.
+    merged: dict = {}
+    out = []
+    for r in rows:
+        if not r["order_id"]:
+            out.append(r)
+            continue
+        key = (r["order_id"], r["symbol"], r["side"])
+        prev = merged.get(key)
+        if prev is None:
+            merged[key] = r
+            out.append(r)
+            continue
+        total = prev["qty"] + r["qty"]
+        prev["price"] = round(
+            (prev["price"] * prev["qty"] + r["price"] * r["qty"]) / total, 4
+        ) if total else prev["price"]
+        prev["qty"] = total
+        prev["at"] = min(prev["at"], r["at"])     # the order completes once
+        prev["date"] = prev["at"].date()
+
+    out.sort(key=lambda x: x["at"])
+    return out
 
 
 def infer_products(day_rows):
