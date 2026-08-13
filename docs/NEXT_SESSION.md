@@ -1,7 +1,7 @@
 # Next session — start here
 
 State at end of 12 Aug 2026. Branch `dashboard-production-readiness`, pushed
-through `2eae675`. 733 backend tests pass (`pytest tests/ --ignore=tests/production`
+through `c919f92`. 733 backend tests pass (`pytest tests/ --ignore=tests/production`
 — the `tests/production/` suite needs a live server on localhost and its 35
 `ConnectError` failures are environmental, not real).
 
