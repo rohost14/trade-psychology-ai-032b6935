@@ -198,14 +198,21 @@ def send_daily_score_push(self):
                     score_data = await analytics.calculate_weekly_risk_score(
                         account.id, db
                     )
-                    score = score_data.get("score", 0)
-                    grade = score_data.get("grade", "")
+                    # calculate_weekly_risk_score returns current_score/previous_score/
+                    # trend/factors. It has never returned "score" or "grade", so both
+                    # .get() calls always hit their defaults and every trader received
+                    # "Discipline: 0/100". The scale is 0-10 and the floor is 0.5, so
+                    # the number being sent was not merely wrong, it was unreachable.
+                    score = score_data.get("current_score", 0)
+                    trend = score_data.get("trend", "")
 
                     # Calculate intent adherence streak (days within limits)
                     streak = await _calc_adherence_streak(account.id, db)
 
                     # Build push body
-                    parts = [f"Discipline: {score}/100 {grade}"]
+                    parts = [f"Discipline: {score}/10"]
+                    if trend in ("improving", "declining"):
+                        parts.append(trend)
                     if streak > 1:
                         parts.append(f"Streak: {streak} days")
 
