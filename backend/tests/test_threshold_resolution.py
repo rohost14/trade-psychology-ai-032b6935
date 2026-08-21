@@ -377,3 +377,85 @@ def test_populated_learned_values_are_personal():
     }))
     assert ts.explain("danger_hours").source is Source.HISTORY
     assert ts.explain("baseline_win_rate").source is Source.HISTORY
+
+
+# ---------------------------------------------------------------------------
+# Rung 1 — the versioned baseline (H1: one writer, one shape)
+# ---------------------------------------------------------------------------
+
+def _pct(value, percentile, confidence=1.0, n=40):
+    return {"value": value, "percentile": percentile, "confidence": confidence, "n": n}
+
+
+V2_BASELINE = {
+    "version": 2,
+    "computed_at": "2026-08-22T00:00:00+00:00",
+    "sessions_analyzed": 40,
+    "trades_analyzed": 150,
+    "metrics": {
+        "daily_trades_p75": _pct(18.0, 75),
+        "burst_per_30min_p75": _pct(9.0, 75),
+        "reentry_after_loss_p25": _pct(4.0, 25),
+        "loss_streak_p60": _pct(4.0, 60),
+        "loss_streak_p85": _pct(7.0, 85),
+    },
+}
+
+
+def test_v2_baseline_personalises_every_threshold_it_carries():
+    ts = resolve_thresholds(FakeProfile(detected_patterns={"baseline": V2_BASELINE}))
+    for key in ("daily_trade_limit", "burst_trades_per_30min_caution",
+                "revenge_window_caution_min", "consecutive_loss_caution",
+                "consecutive_loss_danger"):
+        assert ts.explain(key).source is Source.HISTORY, f"{key} did not personalise"
+
+
+def test_the_two_silently_dropped_keys_now_arrive():
+    """
+    H1's sharpest edge: the flat writer emitted `revenge_window_min` and
+    `burst_trades_per_15min` while resolution read `revenge_window_caution_min`
+    and `burst_trades_per_30min_caution`. Two of five personalised values were
+    discarded on a name mismatch, with no error and no log. Under v2 both land.
+    """
+    ts = resolve_thresholds(FakeProfile(detected_patterns={"baseline": V2_BASELINE}))
+    # p25 of this trader's re-entry gaps is 4 min, well under the 20-min default
+    assert ts["revenge_window_caution_min"] == pytest.approx(4.0)
+    assert ts.explain("revenge_window_caution_min").source is Source.HISTORY
+    # p75 of their busiest half-hour is 9, above the default 5
+    assert ts["burst_trades_per_30min_caution"] == 9
+    assert ts.explain("burst_trades_per_30min_caution").source is Source.HISTORY
+
+
+def test_v2_needs_no_multiplier_and_says_which_percentile():
+    """
+    The v1 path had to invent multipliers (median x 1.5, median / 4, median x
+    0.5) because it was handed averages. v2 is handed percentiles, so the value
+    IS the trader's number and the provenance can name it.
+    """
+    ts = resolve_thresholds(FakeProfile(detected_patterns={"baseline": V2_BASELINE}))
+    assert ts["daily_trade_limit"] == 18          # exactly their p75, no 1.5x
+    detail = ts.explain("daily_trade_limit").detail
+    assert "p75" in detail and "40" in detail
+
+
+def test_v2_shrinks_toward_the_default_on_thin_evidence():
+    thin = {**V2_BASELINE, "metrics": {"daily_trades_p75": _pct(18.0, 75, confidence=0.25, n=10)}}
+    ts = resolve_thresholds(FakeProfile(detected_patterns={"baseline": thin}))
+    r = ts.explain("daily_trade_limit")
+    assert r.confidence == pytest.approx(0.25)
+    # 0.25*18 + 0.75*7 = 9.75 -> 10, between the default and their own number
+    assert r.value == 10
+
+
+def test_v1_baselines_still_resolve():
+    """Stored baselines must keep working until their next recompute."""
+    ts = resolve_thresholds(PROFILES["metrics_baseline"])
+    assert ts.explain("daily_trade_limit").source is Source.HISTORY
+    assert ts["daily_trade_limit"] == 18          # 12.0 * 1.5, the v1 multiplier
+
+
+def test_danger_stays_above_caution_on_the_v2_path():
+    odd = {**V2_BASELINE, "metrics": {
+        "loss_streak_p60": _pct(6.0, 60), "loss_streak_p85": _pct(6.0, 85)}}
+    ts = resolve_thresholds(FakeProfile(detected_patterns={"baseline": odd}))
+    assert ts["consecutive_loss_danger"] > ts["consecutive_loss_caution"]

@@ -21,8 +21,9 @@ The ladder, most personal first:
 values and, for every key, a `Resolved` record saying which rung answered and how
 confident it is.
 
-**What each rung currently covers.** Rung 1 reads whichever of the two baseline
-shapes was written last (see `_apply_history` — that race is defect H1). Rung 2
+**What each rung currently covers.** Rung 1 reads a versioned baseline written
+by one service (`baseline_service`); v1 shapes are still read so stored
+baselines keep working until their next recompute. Rung 2
 covers `panic_exit_min` and `rapid_reentry_min` only, both belonging to
 `notification_level=0` detectors, so it cannot change alert volume; extending it
 to a threshold that fires alerts needs a replay behind it. Rung 4 covers
@@ -33,14 +34,9 @@ through to rung 6.
 Everything else resolves at rung 6. On a cold-start profile that is 100% of
 keys; with capital and declared rules known it is still the large majority.
 
-Known defects it deliberately preserves rather than quietly fixing, because a
-refactor that also changes behaviour cannot be verified:
+Known defects it still preserves (the two-writer race that used to head this
+list was fixed 2026-08-22):
 
-  * the two baseline shapes take different paths and produce different numbers,
-    and two of the five personalised values are dropped on a name mismatch —
-    the flat writer emits `revenge_window_min` and `burst_trades_per_15min`
-    while resolution reads `revenge_window_caution_min` and
-    `burst_trades_per_30min_caution`;
   * universal floors are applied last, so they override a trader's own declared
     rule;
   * personalisation only ever loosens (`min`/`max` against the default), so a
@@ -196,54 +192,28 @@ def resolve_thresholds(profile=None, session_trades=None) -> ThresholdSet:
 def _apply_history(profile, values: Dict[str, Any], meta: Dict[str, Resolved],
                    put: Callable) -> None:
     """
-    Two incompatible baseline shapes exist and take different paths. Which one a
-    trader gets depends on which service wrote last — a race, not a design.
-    Reproduced here rather than fixed, so this refactor stays value-identical.
+    Read the trader's own baseline.
+
+    Branches on `version`, not on the shape. Two services used to write this same
+    JSONB key in incompatible shapes and the reader sniffed for a `metrics` key
+    to tell them apart — so which personalisation a trader got depended on which
+    service wrote last. `baseline_service` is now the only writer and stamps
+    `version: 2`; v1 is still read so stored baselines keep working until they
+    are next recomputed.
     """
     baseline = (getattr(profile, "detected_patterns", None) or {}).get("baseline")
     if not isinstance(baseline, dict):
         return
 
+    version = baseline.get("version")
     metrics = baseline.get("metrics")
 
+    if version == 2 and isinstance(metrics, dict):
+        _apply_history_v2(metrics, values, put)
+        return
+
     if metrics and isinstance(metrics, dict):
-        # Per-metric confidence blend: effective = c*personal + (1-c)*default.
-        # No activation cliff — a trader with 3 sessions barely moves the needle.
-        def blend(metric_key: str, derive, default_val: float):
-            rec = metrics.get(metric_key)
-            if not rec or rec.get("value") is None:
-                return default_val, 0.0, None
-            conf = float(rec.get("confidence") or 0)
-            personal = derive(float(rec["value"]))
-            blended = conf * personal + (1 - conf) * default_val
-            return blended, conf, (
-                f"{metric_key}={rec['value']} (n={rec.get('n', '?')}, "
-                f"confidence {conf:.2f})"
-            )
-
-        v, c, d = blend("avg_daily_trades", lambda x: x * 1.5,
-                        values["daily_trade_limit"])
-        put("daily_trade_limit", int(round(v)),
-            Source.HISTORY if c else Source.GLOBAL, c, d)
-        put("daily_trade_danger",
-            max(values["daily_trade_limit"] + 1,
-                int(round(values["daily_trade_limit"] * 1.5))),
-            Source.HISTORY if c else Source.GLOBAL, c, "derived from daily_trade_limit")
-
-        v, c, d = blend("avg_daily_trades", lambda x: max(3.0, x / 4),
-                        values["burst_trades_per_30min_caution"])
-        put("burst_trades_per_30min_caution", int(round(v)),
-            Source.HISTORY if c else Source.GLOBAL, c, d)
-        put("burst_trades_per_30min_danger",
-            max(values["burst_trades_per_30min_caution"] + 2,
-                int(round(values["burst_trades_per_30min_caution"] * 1.6))),
-            Source.HISTORY if c else Source.GLOBAL, c,
-            "derived from burst_trades_per_30min_caution")
-
-        v, c, d = blend("median_reentry_after_loss_min", lambda x: max(5.0, x * 0.5),
-                        values["revenge_window_caution_min"])
-        put("revenge_window_caution_min", round(v, 1),
-            Source.HISTORY if c else Source.GLOBAL, c, d)
+        _apply_history_v1_metrics(metrics, values, put)
         return
 
     # Legacy flat shape — direct assignment, no confidence, no blend.
@@ -263,6 +233,109 @@ def _apply_history(profile, values: Dict[str, Any], meta: Dict[str, Resolved],
         if baseline.get(key) is not None:
             put(key, baseline[key], Source.HISTORY, 1.0,
                 f"personal baseline (n={n} sessions)")
+
+
+def _blend(rec, default_val: float, derive=None):
+    """
+    effective = c*personal + (1-c)*default, with c = the metric's own confidence.
+
+    Continuous, so there is no activation cliff and nobody has to be classified:
+    three sessions barely move the number, forty decide it.
+    """
+    if not rec or rec.get("value") is None:
+        return default_val, 0.0, None
+    conf = float(rec.get("confidence") or 0)
+    personal = float(rec["value"])
+    if derive is not None:
+        personal = derive(personal)
+    blended = conf * personal + (1 - conf) * default_val
+    pct = rec.get("percentile")
+    what = f"p{pct:.0f} of your own" if pct else "your own median"
+    return blended, conf, (
+        f"{what} ({rec['value']}, n={rec.get('n', '?')}, confidence {conf:.2f})"
+    )
+
+
+def _apply_history_v2(metrics: Dict[str, Any], values: Dict[str, Any],
+                      put: Callable) -> None:
+    """
+    Thresholds as points on the trader's own distribution.
+
+    Every value here is a percentile of something this trader actually did, so
+    there is no multiplier to defend. The v1 path had to invent them — `median x
+    1.5` for the daily limit, `median / 4` for burst, `median x 0.5` for the
+    revenge window — because the metrics it was given were averages rather than
+    percentiles. Those three constants disappear with this path.
+    """
+    def place(key: str, metric_key: str, floor=None, cast=None, extra=None):
+        v, c, d = _blend(metrics.get(metric_key), float(values[key]))
+        if floor is not None:
+            v = max(v, floor)
+        v = cast(v) if cast else round(v, 1)
+        put(key, v, Source.HISTORY if c else Source.GLOBAL, c, d)
+        return c
+
+    c = place("daily_trade_limit", "daily_trades_p75", cast=lambda x: int(round(x)))
+    put("daily_trade_danger",
+        max(values["daily_trade_limit"] + 1,
+            int(round(values["daily_trade_limit"] * 1.5))),
+        Source.HISTORY if c else Source.GLOBAL, c, "derived from daily_trade_limit")
+
+    c = place("burst_trades_per_30min_caution", "burst_per_30min_p75",
+              floor=3.0, cast=lambda x: int(round(x)))
+    put("burst_trades_per_30min_danger",
+        max(values["burst_trades_per_30min_caution"] + 2,
+            int(round(values["burst_trades_per_30min_caution"] * 1.6))),
+        Source.HISTORY if c else Source.GLOBAL, c,
+        "derived from burst_trades_per_30min_caution")
+
+    # The fast end of their own re-entry pace. v1 wrote this to
+    # `revenge_window_min` while the reader looked for
+    # `revenge_window_caution_min`, so it never arrived at all.
+    place("revenge_window_caution_min", "reentry_after_loss_p25", floor=1.0)
+
+    c = place("consecutive_loss_caution", "loss_streak_p60",
+              floor=2.0, cast=lambda x: int(round(x)))
+    v, c2, d = _blend(metrics.get("loss_streak_p85"),
+                      float(values["consecutive_loss_danger"]))
+    put("consecutive_loss_danger",
+        max(values["consecutive_loss_caution"] + 1, int(round(v))),
+        Source.HISTORY if c2 else Source.GLOBAL, c2, d)
+
+
+def _apply_history_v1_metrics(metrics: Dict[str, Any], values: Dict[str, Any],
+                              put: Callable) -> None:
+    """
+    The pre-versioning nested shape: averages plus invented multipliers.
+
+    Kept only so baselines already stored keep resolving until their next
+    recompute. Do not extend it.
+    """
+    v, c, d = _blend(metrics.get("avg_daily_trades"),
+                     float(values["daily_trade_limit"]), lambda x: x * 1.5)
+    put("daily_trade_limit", int(round(v)),
+        Source.HISTORY if c else Source.GLOBAL, c, d)
+    put("daily_trade_danger",
+        max(values["daily_trade_limit"] + 1,
+            int(round(values["daily_trade_limit"] * 1.5))),
+        Source.HISTORY if c else Source.GLOBAL, c, "derived from daily_trade_limit")
+
+    v, c, d = _blend(metrics.get("avg_daily_trades"),
+                     float(values["burst_trades_per_30min_caution"]),
+                     lambda x: max(3.0, x / 4))
+    put("burst_trades_per_30min_caution", int(round(v)),
+        Source.HISTORY if c else Source.GLOBAL, c, d)
+    put("burst_trades_per_30min_danger",
+        max(values["burst_trades_per_30min_caution"] + 2,
+            int(round(values["burst_trades_per_30min_caution"] * 1.6))),
+        Source.HISTORY if c else Source.GLOBAL, c,
+        "derived from burst_trades_per_30min_caution")
+
+    v, c, d = _blend(metrics.get("median_reentry_after_loss_min"),
+                     float(values["revenge_window_caution_min"]),
+                     lambda x: max(5.0, x * 0.5))
+    put("revenge_window_caution_min", round(v, 1),
+        Source.HISTORY if c else Source.GLOBAL, c, d)
 
 
 # ---------------------------------------------------------------------------

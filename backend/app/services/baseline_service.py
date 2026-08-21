@@ -43,6 +43,36 @@ logger = logging.getLogger(__name__)
 IST = ZoneInfo("Asia/Kolkata")
 
 
+def _percentile(values: List[float], p: float) -> Optional[float]:
+    """Nearest-rank percentile. Robust for the small, skewed samples here."""
+    if not values:
+        return None
+    ordered = sorted(values)
+    idx = min(len(ordered) - 1, int(round(p / 100.0 * len(ordered))))
+    return float(ordered[idx])
+
+
+def _pct_metric(values: List[float], p: float, n: int, target: int,
+                floor: float = 0.0) -> Optional[Dict]:
+    """
+    A percentile of the trader's own distribution, carrying its own confidence.
+
+    This is how the OTHER baseline service derived its thresholds, and it is the
+    better derivation: a direct percentile needs no arbitrary multiplier, where
+    the reader's blend used `median x 1.5` and `median / 4`. Merging them means
+    the multipliers can go.
+    """
+    v = _percentile(values, p)
+    if v is None:
+        return None
+    return {
+        "value": round(max(v, floor), 4),
+        "percentile": p,
+        "confidence": round(min(1.0, n / max(target, 1)), 3),
+        "n": n,
+    }
+
+
 def _metric(values: List[float], n: int, target: int) -> Optional[Dict]:
     """Build one metric record. confidence = sample size vs target, capped 1."""
     if not values:
@@ -106,11 +136,14 @@ async def compute_baseline(
 
     peak_pnls: List[float] = []
     drawdowns: List[float] = []
+    burst_counts: List[float] = []      # busiest 30 minutes of each session
+    consec_losses: List[float] = []     # longest losing run of each session
     for day_trades in by_session.values():
         running = 0.0
         peak = 0.0
         max_dd = 0.0
-        for t in sorted(day_trades, key=lambda x: x.exit_time):
+        ordered = sorted(day_trades, key=lambda x: x.exit_time)
+        for t in ordered:
             running += float(t.realized_pnl or 0)
             peak = max(peak, running)
             max_dd = max(max_dd, peak - running)
@@ -118,6 +151,28 @@ async def compute_baseline(
             peak_pnls.append(peak)
         if max_dd > 0:
             drawdowns.append(max_dd)
+
+        # Busiest 30-minute window, by entry time. Sliding rather than fixed
+        # buckets: a burst that straddles a bucket boundary is still a burst.
+        entries = sorted(t.entry_time for t in ordered if t.entry_time)
+        busiest = 0
+        for i, start in enumerate(entries):
+            j = i
+            while j < len(entries) and (entries[j] - start).total_seconds() <= 1800:
+                j += 1
+            busiest = max(busiest, j - i)
+        if busiest:
+            burst_counts.append(float(busiest))
+
+        # Longest consecutive losing run in the session.
+        longest = current = 0
+        for t in ordered:
+            if float(t.realized_pnl or 0) < 0:
+                current += 1
+                longest = max(longest, current)
+            else:
+                current = 0
+        consec_losses.append(float(longest))
 
     # ── Trade-level metrics (mature with TRADE count) ─────────────────────
     winner_holds, loser_holds = [], []
@@ -166,6 +221,19 @@ async def compute_baseline(
         "profit_factor": _metric([_profit_factor(trades)], n_trades, target_trades)
                          if _profit_factor(trades) is not None else None,
         "median_position_risk_pct": _metric(risk_pcts, len(risk_pcts), target_trades),
+
+        # ── Percentile-derived thresholds (merged in from behavioral_baseline_service)
+        # Each is a point on THIS trader's own distribution, so it needs no
+        # multiplier and no population assumption. The percentiles are the ones
+        # that service already used: an active-but-not-outlier day, the fast end
+        # of their own re-entry pace, and where their loss streaks start to be
+        # unusual for them.
+        "daily_trades_p75": _pct_metric(daily_counts, 75, n_sessions, target_sessions),
+        "burst_per_30min_p75": _pct_metric(burst_counts, 75, n_sessions, target_sessions),
+        "reentry_after_loss_p25": _pct_metric(reentry_delays, 25, len(reentry_delays),
+                                              target_trades // 2, floor=1.0),
+        "loss_streak_p60": _pct_metric(consec_losses, 60, n_sessions, target_sessions),
+        "loss_streak_p85": _pct_metric(consec_losses, 85, n_sessions, target_sessions),
     }
     # p95 daily trades as a plain value on the avg record (upper-bound signal)
     if metrics["avg_daily_trades"] and len(daily_counts) >= 2:
@@ -173,6 +241,10 @@ async def compute_baseline(
         metrics["avg_daily_trades"]["p95"] = round(s[min(len(s) - 1, int(0.95 * len(s)))], 1)
 
     baseline = {
+        # Shape version. The reader branches on this instead of sniffing for a
+        # "metrics" key, which is what let two services write incompatible
+        # shapes to the same JSONB column for months without anyone noticing.
+        "version": 2,
         "computed_at": datetime.now(timezone.utc).isoformat(),
         "days_window": days,
         "sessions_analyzed": n_sessions,
