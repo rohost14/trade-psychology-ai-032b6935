@@ -124,11 +124,19 @@ const App = () => (
                   </Route>
                   <Route path="impersonate" element={<ImpersonateEntry />} />
                   <Route path="welcome" element={<Welcome />} />
-                  <Route path="landing-lab" element={<LandingLab />} />
-                  <Route path="soft-lab" element={<SoftPrecisionLab />} />
-                  <Route path="soft-web-lab" element={<SoftPrecisionWebLab />} />
-                  <Route path="design-lab" element={<DesignLab />} />
-                  <Route path="dashboard-lab" element={<DashboardLab />} />
+                  {/* Design labs are working surfaces, not product. They were
+                      publicly reachable in production builds - and the landing
+                      lab in particular holds copy that docs/LANDING_PAGE_AUDIT.md
+                      flags as not shippable. Dev-only now. */}
+                  {import.meta.env.DEV && (
+                    <>
+                      <Route path="landing-lab" element={<LandingLab />} />
+                      <Route path="soft-lab" element={<SoftPrecisionLab />} />
+                      <Route path="soft-web-lab" element={<SoftPrecisionWebLab />} />
+                      <Route path="design-lab" element={<DesignLab />} />
+                      <Route path="dashboard-lab" element={<DashboardLab />} />
+                    </>
+                  )}
                   <Route path="terms" element={<TermsOfService />} />
                   <Route path="privacy" element={<PrivacyPolicy />} />
                   <Route path="maintenance" element={<Maintenance />} />

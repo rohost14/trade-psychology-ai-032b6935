@@ -15,10 +15,12 @@ class TradingSession(Base):
     Tracks session P&L, risk score (0-100 internal), and state machine.
     Created on first trade of the day. Updated incrementally as trades arrive.
 
-    session_state transitions: normal → caution → danger → blowup
-    Driven by risk_score thresholds (40 / 70 / 90).
-
-    risk_score is INTERNAL ONLY — never surfaced directly to users.
+    risk_score, peak_risk_score and session_state are DORMANT as of 2026-08-13.
+    The 40/70/90 ladder and update_risk_score were removed with the behaviour
+    score (see trading_session_service). Nothing writes these three columns any
+    more, so risk_score and peak_risk_score stay 0 and session_state stays
+    "normal" — the CheckConstraint below still polices four values of which only
+    one can now occur. Columns kept because dropping them needs a migration.
     """
     __tablename__ = "trading_sessions"
 

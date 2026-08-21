@@ -11,28 +11,36 @@ different claims and the product makes both.
 The ladder, most personal first:
 
     1 HISTORY     your own past trades          ~20 sessions / ~100 trades
-    2 SESSION     your own trades today         2-5 trades          (not yet built)
+    2 SESSION     your own trades today         2-5 trades      (analytics only)
     3 DECLARED    a rule you set for yourself   day 1 if set
-    4 CAPITAL     a ratio of your capital       day 1, zero input   (partly built)
-    5 POPULATION  median of comparable users    once we have users  (not yet built)
+    4 CAPITAL     a ratio of your capital       day 1, zero input
+    5 POPULATION  median of comparable users    once we have users  (not built)
     6 GLOBAL      a constant in this repo       always — last resort
 
-`resolve_thresholds(profile)` walks it and returns both the values and, for every
-key, a `Resolved` record saying which rung answered and how confident it is.
+`resolve_thresholds(profile, session_trades)` walks it and returns both the
+values and, for every key, a `Resolved` record saying which rung answered and how
+confident it is.
 
-**This module is currently a pure refactor.** It reproduces the previous
-`get_thresholds` byte-for-byte (see tests/test_threshold_resolution.py, which
-pins six profile shapes against a golden capture taken before the change). The
-only thing it adds is provenance. Rungs 2 and 5 are declared in the enum but not
-yet implemented — naming them now is what makes their absence visible instead of
-silently falling through to rung 6.
+**What each rung currently covers.** Rung 1 reads whichever of the two baseline
+shapes was written last (see `_apply_history` — that race is defect H1). Rung 2
+covers `panic_exit_min` and `rapid_reentry_min` only, both belonging to
+`notification_level=0` detectors, so it cannot change alert volume; extending it
+to a threshold that fires alerts needs a replay behind it. Rung 4 covers
+`max_position_pct_*` and the three former rupee floors. Rung 5 is named but not
+built — naming it is what makes its absence visible instead of silently falling
+through to rung 6.
+
+Everything else resolves at rung 6. On a cold-start profile that is 100% of
+keys; with capital and declared rules known it is still the large majority.
 
 Known defects it deliberately preserves rather than quietly fixing, because a
 refactor that also changes behaviour cannot be verified:
 
-  * the two baseline shapes take different paths and produce different numbers
-    (the legacy flat shape never reaches `revenge_window_caution_min` at all —
-    it writes `revenge_window_min`, which is a different key);
+  * the two baseline shapes take different paths and produce different numbers,
+    and two of the five personalised values are dropped on a name mismatch —
+    the flat writer emits `revenge_window_min` and `burst_trades_per_15min`
+    while resolution reads `revenge_window_caution_min` and
+    `burst_trades_per_30min_caution`;
   * universal floors are applied last, so they override a trader's own declared
     rule;
   * personalisation only ever loosens (`min`/`max` against the default), so a
@@ -239,9 +247,15 @@ def _apply_history(profile, values: Dict[str, Any], meta: Dict[str, Resolved],
         return
 
     # Legacy flat shape — direct assignment, no confidence, no blend.
-    # NOTE the key set: it does NOT include revenge_window_caution_min, so a
-    # trader on this path keeps the global revenge window however fast they
-    # actually re-enter. Faithfully reproduced; filed as a defect.
+    #
+    # The key list below DOES include revenge_window_caution_min, but a trader on
+    # this path still keeps the global revenge window: the flat writer emits
+    # `revenge_window_min`, a different key, so the lookup simply misses. Same
+    # story for burst — it writes `burst_trades_per_15min` while this reads
+    # `burst_trades_per_30min_caution`. Two of the five personalised values are
+    # silently dropped on a name mismatch, with no error and no log.
+    #
+    # Faithfully reproduced; filed as H1 in docs/ENGINE_BACKLOG.md.
     n = baseline.get("session_count") or baseline.get("sessions_analyzed") or 0
     for key in ("daily_trade_limit", "burst_trades_per_30min_caution",
                 "revenge_window_caution_min", "consecutive_loss_caution",
