@@ -1494,7 +1494,16 @@ class BehaviorEngine:
         session_pnl = Decimal(str(ctx.session.session_pnl or 0))
         daily_loss_limit = ctx.thresholds.get("daily_loss_limit")
 
+        # Whether this limit is the trader's or ours changes what we may claim.
+        # Saying "your ₹2,500 daily limit" about a number invented from their
+        # capital is not true, and it is the same class of thing the landing-page
+        # audit flags: our guess presented as their fact. The alert still fires
+        # either way — a derived limit protects just as well — but the copy has
+        # to say where the number came from, which doubles as the prompt to set
+        # a real one.
+        limit_is_declared = True
         if not daily_loss_limit or daily_loss_limit <= 0:
+            limit_is_declared = False
             capital = ctx.thresholds.get("trading_capital")
             # Use 5% of capital as daily loss limit for any account size.
             # The ≥10k floor was wrong — a ₹5k account can still blow up.
@@ -1507,31 +1516,35 @@ class BehaviorEngine:
         caution_pct = Decimal(str(ctx.thresholds.get("meltdown_caution_pct", 0.40)))
         danger_pct  = Decimal(str(ctx.thresholds.get("meltdown_danger_pct", 0.75)))
 
+        def _message(pct_used: Decimal) -> str:
+            if limit_is_declared:
+                return (f"Today's P&L: ₹{session_pnl:,.0f} — {pct_used:.0f}% of your "
+                        f"₹{limit:,.0f} daily limit used.")
+            return (f"Today's P&L: ₹{session_pnl:,.0f} — that is {pct_used:.0f}% of "
+                    f"₹{limit:,.0f}, which is 5% of your capital. "
+                    f"You have not set a daily loss limit yet.")
+
+        def _context(pct_used: Decimal) -> dict:
+            return {"session_pnl": float(session_pnl),
+                    "daily_loss_limit": float(limit),
+                    "limit_source": "declared" if limit_is_declared else "capital_derived",
+                    "pct_used": round(float(pct_used), 1)}
+
         if session_pnl < -(limit * danger_pct):
             pct_used = abs(session_pnl) / limit * 100
             return DetectedEvent(
                 event_type="session_meltdown",
                 severity="danger",
-                message=(
-                    f"Today's P&L: ₹{session_pnl:,.0f} — {pct_used:.0f}% of your "
-                    f"₹{limit:,.0f} daily limit used."
-                ),
-                context={"session_pnl": float(session_pnl),
-                         "daily_loss_limit": float(limit),
-                         "pct_used": round(float(pct_used), 1)},
+                message=_message(pct_used),
+                context=_context(pct_used),
             )
         if session_pnl < -(limit * caution_pct):
             pct_used = abs(session_pnl) / limit * 100
             return DetectedEvent(
                 event_type="session_meltdown",
                 severity="caution",
-                message=(
-                    f"Today's P&L: ₹{session_pnl:,.0f} — {pct_used:.0f}% of your "
-                    f"₹{limit:,.0f} daily limit used."
-                ),
-                context={"session_pnl": float(session_pnl),
-                         "daily_loss_limit": float(limit),
-                         "pct_used": round(float(pct_used), 1)},
+                message=_message(pct_used),
+                context=_context(pct_used),
             )
         return None
 
