@@ -1,3 +1,12 @@
+> **ARCHIVED 21 Aug 2026 — do not use as a current reference.**
+>
+> Predates the August work entirely (14 Jul 2026). Describes the engine before
+> L3 was retired, before the resolution ladder, and before the replay harness was
+> found to be dropping 8.4% of fills - so its measurements were taken on
+> corrupted data.
+
+---
+
 # Behavioral Engine — Full Audit v2
 *Session 39 · 2026-06-17 · Discussion document — do not implement without approval*
 

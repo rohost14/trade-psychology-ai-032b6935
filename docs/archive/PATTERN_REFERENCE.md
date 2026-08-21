@@ -1,3 +1,12 @@
+> **ARCHIVED 21 Aug 2026 — do not use as a current reference.**
+>
+> Stale and actively misleading. Says '23 Patterns' (the registry has 27
+> detectors emitting 33 pattern types) and documents a 'Risk Score' section that
+> was removed in 16d79ce. Per-pattern copy now lives in PATTERN_COPY inside
+> `backend/app/services/detector_registry.py`, which is the single source of truth.
+
+---
+
 # Behavioral Pattern Reference
 
 TradeMentor AI monitors 23 distinct behavioral and psychological patterns in a trader's activity.

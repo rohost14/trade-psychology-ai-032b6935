@@ -1,3 +1,10 @@
+> **ARCHIVED 21 Aug 2026 — do not use as a current reference.**
+>
+> Predates the August cleanup (14 Jul 2026). Six dead constants and the whole of
+> L3 have been removed since; this list was never updated.
+
+---
+
 # Dead Code Register
 
 Code that has been disabled and archived. Kept for reference under `_archive/` folders. Never deleted.

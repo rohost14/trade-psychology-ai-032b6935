@@ -1,3 +1,11 @@
+> **ARCHIVED 21 Aug 2026 — do not use as a current reference.**
+>
+> Closed record, not a plan. Every finding B1-B9 was fixed in 27c7c6d (B8 was
+> withdrawn - the engine is deterministic). Kept for the reasoning; nothing here
+> is outstanding.
+
+---
+
 # Globals layer — structural findings
 
 Findings only. Nothing in this document has been implemented.

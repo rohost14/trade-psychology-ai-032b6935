@@ -1,3 +1,12 @@
+> **ARCHIVED 21 Aug 2026 — do not use as a current reference.**
+>
+> Superseded by `docs/GLOBALS_DERIVATION.md` (13 Aug 2026), which re-derived
+> every one of these findings from the tradebook after the replay harness was
+> repaired. This file still describes RISK_DELTAS, the behaviour score and the
+> band systems, all of which were removed in 16d79ce.
+
+---
+
 # Global constants — findings
 
 Findings only. Nothing here is implemented.

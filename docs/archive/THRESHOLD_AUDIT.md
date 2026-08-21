@@ -1,3 +1,12 @@
+> **ARCHIVED 21 Aug 2026 — do not use as a current reference.**
+>
+> Superseded by `docs/THRESHOLD_RESOLUTION_DESIGN.md` section 4, which
+> dispositions every constant. This file's headline count (109) was never right:
+> the runtime dict held 98, and UNIVERSAL_FLOORS was not counted at all. Current
+> truth is 86 defaults + 11 floors = 97, and the registry/module are authoritative.
+
+---
+
 # Threshold audit — all 109 constants
 
 Findings only. Nothing here is fixed except the two items marked DONE.
