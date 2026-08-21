@@ -44,17 +44,40 @@ answer, with `{value, source, confidence}` attached so the answer is inspectable
 | 2 | **Your own recent + session-so-far** | **2-5 trades** | self-relative comparison |
 | 3 | **Your declared rules** | day 1 if set | commitment - authoritative, never overridden |
 | 4 | **Your capital** | **day 1, zero input** (fetched) | ratio of capital |
-| 5 | **Your declared style/experience** | **day 1 if onboarded** | structural prior |
-| 6 | **Population posterior** | once we have users | median of comparable users |
-| 7 | **Global constant** | always | last resort, explicitly labelled |
+| 5 | **Population posterior** | once we have users | median of comparable users |
+| 6 | **Global constant** | always | last resort, explicitly labelled |
 
-Rungs 2, 4, 5 and 6 do not exist today. Rung 7 is doing their work.
+Rungs 2, 4 and 5 do not exist today. Rung 6 is doing their work.
+
+### Why there is no "declared style" rung
+
+An earlier draft had one: ask the trader whether they are a scalper / intraday /
+swing / positional and price the hold-time and pace thresholds from it. That was
+wrong and is removed.
+
+**A declared category is an identity label, not a behavioural fact.** Someone who
+selects "scalper" may take four trades next week; a "positional" trader may take
+fifteen in a day. Behaviour is situational and moves with the market. Worse, a
+wrong label is never corrected, because nothing ever measures "scalperness" —
+so it would silently mis-price every hold-time threshold for the life of the
+account.
+
+The same objection retires `experience_level` as a detection input: two years
+can be good and five can be bad, so it is a poor proxy for skill.
+
+What replaces it is rung 2. Median hold time *today* is directly observable from
+the trades themselves, needs no declaration, and moves when the trader moves.
+
+**Governing rule for anything we ask a user:**
+
+> Ask only for numbers we will later measure and replace. Never for categories,
+> because a category never gets displaced.
 
 **Rung 3 is never displaced.** A declared limit is a commitment, not an
 estimate. Data may show a trader routinely exceeds their own limit — that is a
 finding to show them, never a reason to quietly raise the limit.
 
-**Rungs 1 and 5-7 blend rather than switch**, by the shrinkage already
+**Rungs 1, 5 and 6 blend rather than switch**, by the shrinkage already
 implemented: `effective = c*personal + (1-c)*prior`, `c = min(1, n/target)`.
 No cliff, and no need to classify anyone.
 
@@ -66,8 +89,7 @@ What we know about a user on the morning they sign up, with zero trades:
 
 - capital (fetched from the broker on login)
 - declared limits, if they completed onboarding
-- declared style and experience, if they completed onboarding
-- which patterns they say they already have
+- their stated normal trade count, if they answered
 
 That is enough to set a usable, *personal* threshold for most detectors on day
 one. Worked through:
@@ -78,13 +100,18 @@ one. Worked through:
 | `profit_giveaway` | rung 2 — % of **your own peak today**, needs no history at all | unchanged |
 | `martingale` | rung 2 — multiple of **your previous trade** (2 trades) | personal typical size |
 | `size_escalation` | rung 2 — vs your session average (3-5 trades) | rung 1 |
-| `revenge_trade` | rung 5 — style sets the window (a scalper's 5 min is not a swing trader's 5 min) | rung 1: P25 of your own gaps |
-| `consecutive_loss` | rung 4/5 — scaled to capital and style | rung 1: P60/P85 of your streaks |
-| `daily_trade_limit` | rung 5/6 — style prior, then population median for your band | rung 1: P75 of your sessions |
-| `panic_exit` / `early_exit` | rung 5 — hold-time expectations differ by style by design | rung 1 |
+| `revenge_trade` | rung 6 prior, then rung 2 — vs **your own gaps this session** (3-5 trades) | rung 1: P25 of your own gaps |
+| `consecutive_loss` | rung 4 — scaled to capital | rung 1: P60/P85 of your streaks |
+| `daily_trade_limit` | rung 3 if declared, else stated normal count, else rung 5 | rung 1: P75 of your sessions |
+| `panic_exit` / `early_exit` | rung 2 — vs **your own median hold this session** | rung 1 |
 
 Nothing on this list needs 90 days. The longest is ~20 sessions, and only to
 *refine* a threshold that was already personal on day one.
+
+Note what changed when the declared-style rung was removed: the hold-time and
+pace detectors moved from "a label the trader picked once" to "what the trader
+actually did in the last few trades". That is strictly better — it is available
+just as early, it cannot be wrong, and it tracks a trader whose behaviour shifts.
 
 ---
 
@@ -158,11 +185,35 @@ stay hardcoded and defended as product choices:
 `spiral_domain_min_severity` danger · `spiral_warning_domains` 2 ·
 `spiral_critical_domains` 3
 
-### 4f. Inert — decide explicitly (5)
+### 4f. Signal stacking — EXTEND, do not delete (5)
 
-`signal_points_critical/high/medium/low`, `confidence_alert_gate` 50. The
-confidence axis is implemented in 1 detector of 27, so these are dead for the
-other 26. Build the axis out or delete them; do not leave them looking live.
+`signal_points_critical/high/medium/low` 30/20/10/5, `confidence_alert_gate` 50.
+
+An earlier draft called these inert and proposed deleting them. That was a
+misreading, corrected here. Inside `revenge_trade` they are fully live and are
+**the only false-positive suppression mechanism in the engine**:
+
+```
+base                                 30   meaningful loss + re-entry inside window
++ fast re-entry (<= danger window)  +20
++ same exact symbol                 +20   (or +10 for same underlying only)
++ position >= 1.5x the losing trade +20
++ session already red               +10
+gate = 50 -> below this the event becomes "info": recorded, never alerts
+```
+
+Base alone is 30, under the gate. So "you traded 18 minutes after a loss" does
+not alert without corroboration. Deleting these constants would make
+`revenge_trade` — the highest-volume detector — fire on timing alone.
+
+The other 26 detectors leave `confidence=None`, which resolves to
+`DATA_QUALITY_CONFIDENCE["GOOD"] = 100`, so the gate always passes for them.
+They do not participate; the mechanism is not broken for them.
+
+This is the "certainty" axis of `docs/BEHAVIOUR_SYSTEM_DESIGN.md`, already built
+once and never extended. Best candidates to extend to, by measured need:
+`fomo_entry` (over-fires roughly 4:1), `same_symbol_obsession` (-20 lift),
+`size_escalation`.
 
 ### 4g. UNIVERSAL_FLOORS — replace the mechanism (11)
 
@@ -214,15 +265,46 @@ change in the plan and needs an explicit decision, not a default.
 
 ---
 
-## 7. Build order
+## 7. What onboarding should ask
 
-1. `resolve(metric, ctx)` returning `{value, source, confidence}` — the ladder,
-   with rung 7 as the fallback it should always have been.
-2. Wire the onboarding fields already being collected — `trading_style` first,
-   since it prices every hold-time and pace threshold on day one.
-3. Convert 4b (3 rupee constants) and the ready parts of 4c to capital-relative.
-4. Capital on login via a throttled worker.
+Only what cannot be observed. Anything observable is measured, not asked.
+
+| # | question | kind | status |
+|---|---|---|---|
+| 1 | Capital | fact — **fetched** from broker, shown to confirm | change: stop asking, start fetching |
+| 2 | Daily loss limit (₹ or % of capital) | **commitment** | exists |
+| 3 | Max trades per day you want to hold yourself to | **commitment** | exists |
+| 4 | On a normal day, how many trades do you take? (band) | **number** — prior, displaced by measurement | **add**; surfaces in Rules beside #3 |
+| 5 | Max consecutive losses before you stop | **commitment** | exists |
+| 6 | Cooldown after a loss | **commitment** | exists |
+| 7 | Accountability partner contact | fact, not inferable | exists |
+
+Commitments (2, 3, 5, 6) are rung 3 and are **never displaced by data**. If the
+trader routinely exceeds their own limit, that is a finding to show them — never
+a reason to quietly raise the limit.
+
+**Dropped:** `known_patterns` ("which of these do you struggle with?") has
+**zero consumers anywhere in the codebase** — asked at onboarding, read by
+nothing. Remove the question.
+
+**Demoted, not removed:** `trading_style`, `experience_level`, `risk_tolerance`
+are kept as profile/coach context (the AI coach uses them for prose) but must
+never become detection inputs — see §2.
+
+---
+
+## 8. Build order
+
+1. **`resolve()` returning `{value, source, confidence}`** — the ladder made
+   explicit, with the global constant demoted to the fallback it should always
+   have been. First cut is a pure refactor: identical values out, plus
+   provenance.
+2. Convert 4b (3 rupee constants) and the ready parts of 4c to capital-relative.
+3. Capital on login via a throttled worker (rung 4).
+4. Rung 2 — session-relative comparisons, which is what makes day one work.
 5. One baseline writer: percentile derivation (service A) + confidence model
    (service B), matured on trades rather than calendar days.
-6. Replace the floors with the interruption policy.
-7. Population posterior (rung 6) — interface now, switch on when users exist.
+6. Extend signal stacking to `fomo_entry`, `same_symbol_obsession`,
+   `size_escalation`.
+7. Replace the floors with the interruption policy.
+8. Population posterior (rung 5) — interface now, switch on when users exist.

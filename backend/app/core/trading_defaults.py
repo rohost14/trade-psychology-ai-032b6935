@@ -328,14 +328,30 @@ UNIVERSAL_FLOORS: Dict[str, Any] = {
 
 def get_thresholds(profile=None) -> Dict[str, Any]:
     """
-    Build merged threshold dict: user-declared > research defaults > universal floor.
+    Build the merged threshold dict every detector reads.
 
-    Args:
-        profile: UserProfile model instance (can be None for cold start)
+    Thin wrapper over `threshold_resolution.resolve_thresholds`, which walks the
+    resolution ladder (own history > own session > declared rule > capital >
+    population > repo constant) and records WHICH rung answered each key.
 
-    Returns:
-        Dict with all threshold keys. Zero hardcoded values in detectors —
-        all pattern logic reads exclusively from this dict.
+    This function returns only the values, so every existing caller is
+    unaffected. Callers that need provenance — the Rules page, cold-start
+    diagnostics — should use `resolve_thresholds()` and read `.explain(key)`.
+
+    See docs/THRESHOLD_RESOLUTION_DESIGN.md.
+    """
+    from app.core.threshold_resolution import resolve_thresholds
+    return resolve_thresholds(profile).values
+
+
+def _get_thresholds_pre_ladder(profile=None) -> Dict[str, Any]:
+    """
+    The implementation as it stood before the resolution ladder.
+
+    Kept ONLY as the parity oracle for tests/test_threshold_resolution.py, which
+    asserts the ladder returns identical values for every profile shape. Delete
+    once the ladder starts deliberately changing values (the capital-relative
+    conversion), at which point a golden fixture replaces it.
     """
     result = dict(COLD_START_DEFAULTS)  # Start with Tier 2 research defaults
 
