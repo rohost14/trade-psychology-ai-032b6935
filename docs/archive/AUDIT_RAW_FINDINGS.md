@@ -1,3 +1,11 @@
+> **ARCHIVED 22 Aug 2026 — do not use as a current reference.**
+>
+> June raw scan, each item annotated CONFIRMED/FALSE POSITIVE; fix pass complete.
+>
+> Live findings, if any, were rescued into `docs/ENGINE_BACKLOG.md`.
+
+---
+
 # AUDIT RAW FINDINGS — TradeMentor AI
 **Date**: 2026-06-10  
 **Auditor**: Claude Sonnet 4.6 (exhaustive codebase scan)  

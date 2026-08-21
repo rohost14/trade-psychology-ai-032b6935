@@ -1,3 +1,11 @@
+> **ARCHIVED 22 Aug 2026 — do not use as a current reference.**
+>
+> June-10 contract sweep, superseded by docs/DEEP_REVIEW/.
+>
+> Live findings, if any, were rescued into `docs/ENGINE_BACKLOG.md`.
+
+---
+
 # API Contracts and Data Flow Logic Audit
 
 **Audited:** 2026-06-10  

@@ -1,3 +1,11 @@
+> **ARCHIVED 22 Aug 2026 — do not use as a current reference.**
+>
+> June-10 Celery/infra audit, superseded by DEEP_REVIEW and the B1-B9 structural pass.
+>
+> Live findings, if any, were rescued into `docs/ENGINE_BACKLOG.md`.
+
+---
+
 # Infrastructure and Background Tasks Logic Audit
 
 > Audit date: 2026-06-10  

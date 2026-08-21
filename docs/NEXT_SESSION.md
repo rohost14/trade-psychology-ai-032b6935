@@ -1,5 +1,8 @@
 # Next session — start here
 
+> **The live checklist is now `docs/ENGINE_BACKLOG.md`** — verified findings only.
+> This file remains the narrative orientation: how we got here and why.
+
 State at end of 13 Aug 2026. Branch `dashboard-production-readiness`.
 **716 backend tests pass** (`pytest tests/ --ignore=tests/production` — the
 `tests/production/` suite needs a live server on localhost and its 35
@@ -132,7 +135,7 @@ trader against a population study, but it is a direct argument for making
 
 The machinery around the detectors — consolidation, cap, dedup, lock,
 notification gate. Belongs to no pattern, so pattern-by-pattern never reaches
-it. Full detail in `docs/GLOBALS_STRUCTURAL_FINDINGS.md`.
+it. Full detail in `docs/archive/GLOBALS_STRUCTURAL_FINDINGS.md`.
 
 - **B1** cap returned `[]` for the whole batch with no severity check, dropping
   criticals; and the caller rebound its list to that return, so `alert_update`
@@ -178,7 +181,7 @@ downgrades an exception to a log line turns a loud failure into a silent one.
 
 `docs/GLOBALS_DERIVATION.md` is the record — it derives the constants from the
 tradebook instead of citing them, and it supersedes the open items that
-`docs/GLOBAL_CONSTANTS_FINDINGS.md` listed as G0–G5.
+`docs/archive/GLOBAL_CONSTANTS_FINDINGS.md` listed as G0–G5.
 
 **What the year of trades said:**
 
@@ -342,5 +345,5 @@ guesser.
   the engine, deliberately a second implementation
 - `tradedesk/scripts/outcome_check.py` — labels a year of alerts from trades
 - `alertlab/scripts/audit.py` — alert quality across 108 scenarios
-- `docs/THRESHOLD_AUDIT.md`, `docs/GLOBAL_CONSTANTS_FINDINGS.md`,
-  `docs/GLOBALS_STRUCTURAL_FINDINGS.md`, `docs/DETECTOR_ASSUMPTIONS.md`
+- `docs/archive/THRESHOLD_AUDIT.md`, `docs/archive/GLOBAL_CONSTANTS_FINDINGS.md`,
+  `docs/archive/GLOBALS_STRUCTURAL_FINDINGS.md`, `docs/DETECTOR_ASSUMPTIONS.md`

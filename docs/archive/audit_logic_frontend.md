@@ -1,3 +1,11 @@
+> **ARCHIVED 22 Aug 2026 — do not use as a current reference.**
+>
+> "The behavior engine has 22 patterns" - it is 27 detectors emitting 33 pattern types. Frontend rebuilt twice since.
+>
+> Live findings, if any, were rescued into `docs/ENGINE_BACKLOG.md`.
+
+---
+
 # Frontend Logic Audit
 Generated: 2026-06-10 | Auditor: Claude Sonnet 4.6
 

@@ -1,3 +1,11 @@
+> **ARCHIVED 22 Aug 2026 — do not use as a current reference.**
+>
+> Feb-2026 v1.3.0-beta documenting a v1 taxonomy the engine has not emitted since v2, and behavioral_analysis_service, which no longer exists.
+>
+> Live findings, if any, were rescued into `docs/ENGINE_BACKLOG.md`.
+
+---
+
 # TradeMentor AI - Complete Product Documentation
 
 > **Version:** 1.3.0-beta

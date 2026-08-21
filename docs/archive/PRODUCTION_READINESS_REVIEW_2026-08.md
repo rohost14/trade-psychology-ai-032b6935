@@ -1,3 +1,11 @@
+> **ARCHIVED 22 Aug 2026 — do not use as a current reference.**
+>
+> Self-declares all findings implemented.
+>
+> Live findings, if any, were rescued into `docs/ENGINE_BACKLOG.md`.
+
+---
+
 # Production Readiness Review — Dashboard, Real-Time Pipeline, FIFO, Instruments, Scale
 
 *Date: 2026-07-15. Scope: Dashboard/Home page (all components + popups), Real-Time Alerts status, real-time data flow (the 3–5 min delay), FIFO/position ledger edge cases, instruments & lot-size handling, P&L calculation strategy, future architecture (Sensibull-style streaming, 10k+ users), plus cross-cutting production concerns.*

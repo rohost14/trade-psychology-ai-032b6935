@@ -1,3 +1,11 @@
+> **ARCHIVED 22 Aug 2026 — do not use as a current reference.**
+>
+> June-10 "NOT PRODUCTION READY"; superseded by PRODUCTION_READINESS_CHECKLIST.md.
+>
+> Live findings, if any, were rescued into `docs/ENGINE_BACKLOG.md`.
+
+---
+
 # AUDIT: Production Readiness Report — TradeMentor AI
 **Date**: 2026-06-10  
 **Re-verified**: 2026-06-11 (every finding checked against actual code)  

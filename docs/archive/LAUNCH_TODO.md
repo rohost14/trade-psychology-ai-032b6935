@@ -1,3 +1,11 @@
+> **ARCHIVED 22 Aug 2026 — do not use as a current reference.**
+>
+> June-15 checklist superseded by PENDING.md, and contradicts it (Render vs Fly.io).
+>
+> Live findings, if any, were rescued into `docs/ENGINE_BACKLOG.md`.
+
+---
+
 # TradeMentor AI — Launch TODO
 *Last updated: 2026-06-15. Compiled from all session notes, memory, and working notes.*
 

@@ -1,3 +1,11 @@
+> **ARCHIVED 22 Aug 2026 — do not use as a current reference.**
+>
+> Abandoned running log - last entry Session 37, 13 Jun. Points at dead design_v2/, archived Portfolio Radar, three docs that no longer exist, and "22 patterns".
+>
+> Live findings, if any, were rescued into `docs/ENGINE_BACKLOG.md`.
+
+---
+
 # TradeMentor AI — Working Notes
 *Running log of decisions, state, and context. Updated every session.*
 *If context is lost (restart/rate limit), read this + MEMORY.md + production_readiness_review.md*

@@ -1,3 +1,11 @@
+> **ARCHIVED 22 Aug 2026 — do not use as a current reference.**
+>
+> June-10 P&L math audit; its core finding closed by the one-P&L-convention work.
+>
+> Live findings, if any, were rescued into `docs/ENGINE_BACKLOG.md`.
+
+---
+
 # P&L and Analytics Math Logic Audit
 
 **Date**: 2026-06-10

@@ -1,3 +1,11 @@
+> **ARCHIVED 22 Aug 2026 — do not use as a current reference.**
+>
+> The plan whose five deliverables are the audit_logic_* files; executed.
+>
+> Live findings, if any, were rescued into `docs/ENGINE_BACKLOG.md`.
+
+---
+
 # Feature Logic Review Plan
 
 End-to-end code review — one feature at a time, in priority order.

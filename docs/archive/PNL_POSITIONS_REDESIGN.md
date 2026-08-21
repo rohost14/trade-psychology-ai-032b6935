@@ -1,3 +1,11 @@
+> **ARCHIVED 22 Aug 2026 — do not use as a current reference.**
+>
+> Proposal fully shipped - getLastSessionStartUTC and ClosedPositionsCard both live.
+>
+> Live findings, if any, were rescued into `docs/ENGINE_BACKLOG.md`.
+
+---
+
 # P&L + Positions redesign — analysis & proposal (2026-07-30)
 
 User pain: (1) can't journal yesterday's trades after the date rolls over / dashboard goes blank; (2) three confusing P&L numbers (hero vs open vs closed); (3) closed positions list every round-trip instead of consolidating like Zerodha, and breaks for high-frequency traders. "Make it clean and simple like Zerodha."

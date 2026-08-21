@@ -1,3 +1,11 @@
+> **ARCHIVED 22 Aug 2026 — do not use as a current reference.**
+>
+> July-25 inventory, "22 detectors", superseded by DEEP_REVIEW/.
+>
+> Live findings, if any, were rescued into `docs/ENGINE_BACKLOG.md`.
+
+---
+
 # Codebase Audit
 
 > Full-codebase review (2026-07-25). **Method (honest):** enumerated *every* file (183 backend `.py`

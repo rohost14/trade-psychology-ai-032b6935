@@ -1,3 +1,11 @@
+> **ARCHIVED 22 Aug 2026 — do not use as a current reference.**
+>
+> Audits the pre-registry engine; findings keyed to patterns merged away in Phase 4 and to RISK_DELTAS, deleted 2026-08-13. Its two CRITICALs are both fixed. Its live finding (fomo pre-close threshold) was rescued and fixed in a67fc4f.
+>
+> Live findings, if any, were rescued into `docs/ENGINE_BACKLOG.md`.
+
+---
+
 # Behavioral Engine Logic Audit
 
 **Audited files:**

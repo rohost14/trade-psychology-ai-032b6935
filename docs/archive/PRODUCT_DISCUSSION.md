@@ -1,3 +1,11 @@
+> **ARCHIVED 22 Aug 2026 — do not use as a current reference.**
+>
+> June-17 log recommending a "60% behaviour score" - exactly the number deleted in 16d79ce and banned by DESIGN_SYSTEM.md:122.
+>
+> Live findings, if any, were rescued into `docs/ENGINE_BACKLOG.md`.
+
+---
+
 # Product Discussion Log
 Running record of product decisions, problems raised, and recommendations given.
 Format: Q = what user asked / raised. R = what I recommended.

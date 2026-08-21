@@ -1,3 +1,11 @@
+> **ARCHIVED 22 Aug 2026 — do not use as a current reference.**
+>
+> Superseded by ENTRY_TIME_PLAN.md section 3a, which records E0-E4 as shipped. Its cooldown_violation duplication note was rescued into ENGINE_BACKLOG.md section 5.
+>
+> Live findings, if any, were rescued into `docs/ENGINE_BACKLOG.md`.
+
+---
+
 # When do alerts actually fire? Entry vs exit
 
 Findings only. 2026-08-09.

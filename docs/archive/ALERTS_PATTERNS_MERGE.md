@@ -1,3 +1,11 @@
+> **ARCHIVED 22 Aug 2026 — do not use as a current reference.**
+>
+> Merge shipped; /my-patterns redirects. Its "28 detectors" is historical.
+>
+> Live findings, if any, were rescued into `docs/ENGINE_BACKLOG.md`.
+
+---
+
 # Alerts + My Patterns — should they merge?
 
 Researched 2026-08-01. Sources: the Lovable mockup, this repo's page-ownership rule, the shipped code for both pages, and published notification-UX practice.
