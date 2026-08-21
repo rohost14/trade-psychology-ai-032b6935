@@ -351,3 +351,29 @@ def test_a_break_is_not_a_re_entry():
     ts = resolve_thresholds(None, session_trades=st)
     assert ts.explain("rapid_reentry_min").source is Source.SESSION
     assert ts["rapid_reentry_min"] < 20
+
+
+def test_empty_learned_values_are_not_claimed_as_personal():
+    """
+    An empty baseline is not knowledge about the trader. Marking danger_hours=[]
+    or baseline_win_rate=None as HISTORY made personal_keys() claim we knew
+    something we did not — and the Rules page would have shown it as "your
+    number". Provenance that overclaims is worse than none.
+    """
+    ts = resolve_thresholds(FakeProfile(trading_capital=50000))
+    for key in ("danger_hours", "baseline_win_rate", "baseline_profit_factor"):
+        r = ts.explain(key)
+        assert r.source is Source.GLOBAL, f"{key} claims {r.source} while empty"
+        assert not r.is_personal
+    # only the three capital-derived keys are genuinely personal here
+    assert set(ts.personal_keys()) == set(CAPITAL_DERIVED)
+
+
+def test_populated_learned_values_are_personal():
+    """The converse: once something IS learned, it must be claimed."""
+    ts = resolve_thresholds(FakeProfile(detected_patterns={
+        "time_patterns": {"danger_hours": [{"hour": 13}]},
+        "baseline": {"metrics": {"win_rate": {"value": 41.0, "confidence": 1.0}}},
+    }))
+    assert ts.explain("danger_hours").source is Source.HISTORY
+    assert ts.explain("baseline_win_rate").source is Source.HISTORY

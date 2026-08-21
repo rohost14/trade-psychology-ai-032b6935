@@ -298,15 +298,27 @@ def _apply_profile_facts(profile, values: Dict[str, Any], put: Callable) -> None
     put("user_cooldown_min", getattr(profile, "cooldown_after_loss", None),
         Source.FACT, 1.0, "declared")
 
+    # An EMPTY learned value is not personal knowledge. Marking [] or None as
+    # HISTORY made `personal_keys()` claim we knew something about a trader we
+    # knew nothing about — the exact thing provenance exists to prevent, and the
+    # Rules page would have rendered it as "your number".
     dp = getattr(profile, "detected_patterns", None) or {}
-    put("danger_hours", (dp.get("time_patterns") or {}).get("danger_hours") or [],
-        Source.HISTORY, 1.0, "learned danger hours")
+    hours = (dp.get("time_patterns") or {}).get("danger_hours") or []
+    put("danger_hours", hours,
+        Source.HISTORY if hours else Source.GLOBAL,
+        1.0 if hours else 0.0,
+        "learned danger hours" if hours else "none learned yet")
 
     bl = dp.get("baseline") or {}
     blm = bl.get("metrics") or {}
     put("baseline_sessions", bl.get("sessions_analyzed", 0), Source.FACT, 1.0, None)
-    put("baseline_win_rate", blm.get("win_rate"), Source.HISTORY, 1.0, None)
-    put("baseline_profit_factor", blm.get("profit_factor"), Source.HISTORY, 1.0, None)
+    for key, metric in (("baseline_win_rate", "win_rate"),
+                        ("baseline_profit_factor", "profit_factor")):
+        val = blm.get(metric)
+        put(key, val,
+            Source.HISTORY if val is not None else Source.GLOBAL,
+            1.0 if val is not None else 0.0,
+            None if val is not None else "not computed yet")
 
     put("sl_percent_futures", getattr(profile, "sl_percent_futures", None) or 1.0,
         Source.FACT, 1.0, None)
