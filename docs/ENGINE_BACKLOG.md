@@ -16,7 +16,7 @@ orientation; this is the checklist.
 
 ## 1. Open — HIGH
 
-### H1. Two baseline services race on one JSONB key, in incompatible shapes
+### ~~H1. Two baseline services race on one JSONB key~~ — CLOSED `05962ae`
 `baseline_service.py:67` writes `{computed_at, days_window, sessions_analyzed, trades_analyzed, metrics{}}`.
 `behavioral_baseline_service.py:289` writes a flat `{daily_trade_limit, burst_trades_per_15min, revenge_window_min, consecutive_loss_caution, consecutive_loss_danger, session_count, computed_at}`.
 Both land at `user_profile.detected_patterns["baseline"]`.
@@ -151,6 +151,11 @@ no bundle cost, but publicly reachable in production.
 | Empty baseline claimed as personal knowledge | `38f0345` |
 | Six dead constants | `9536230` |
 | Replay harness dropping 8.4% of fills | `6812b3f` |
+| **H1** — two baseline writers, one key, incompatible shapes | `05962ae` |
+| Two personalised values silently dropped on a key-name mismatch | `05962ae` |
+| `baseline_sessions` reporting 0 whenever a sync wrote last | `05962ae` |
+| Three invented multipliers (median x1.5, /4, x0.5) | `05962ae` |
+| An invented daily limit described to the trader as "yours" | `3f1eb6e` |
 | Demo fixtures using 3 non-existent pattern types and retired severities | `e56268b` |
 | **Pattern-vocabulary contract test** — 7 assertions, closes the drift class | `e56268b` |
 | Comment misdescribing the baseline key mismatch (would misdirect the H1 fix) | `3995ec9` |
@@ -160,6 +165,13 @@ no bundle cost, but publicly reachable in production.
 ---
 
 ## 5. Claimed but NOT verified — do not act on these yet
+
+- **The v2 baseline is not replay-verified.** `05962ae` changes thresholds for
+  any trader with a baseline. Unit-tested, not run against the tradebook.
+- **Whether a capital-derived limit should reach an accountability partner.**
+  `session_meltdown` is `guardian_eligible`, so today it can. Telling a third
+  party someone breached a limit they never set is a further step than telling
+  the trader. Undecided.
 
 - **How often `fomo_entry`'s pre-close path fires.** The bug is verified in code;
   the frequency is not. The existing replay report is a summary only and predates
