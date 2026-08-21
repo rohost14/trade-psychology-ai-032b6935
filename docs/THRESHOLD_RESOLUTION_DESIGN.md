@@ -295,16 +295,41 @@ never become detection inputs — see §2.
 
 ## 8. Build order
 
-1. **`resolve()` returning `{value, source, confidence}`** — the ladder made
-   explicit, with the global constant demoted to the fallback it should always
-   have been. First cut is a pure refactor: identical values out, plus
-   provenance.
-2. Convert 4b (3 rupee constants) and the ready parts of 4c to capital-relative.
-3. Capital on login via a throttled worker (rung 4).
-4. Rung 2 — session-relative comparisons, which is what makes day one work.
-5. One baseline writer: percentile derivation (service A) + confidence model
-   (service B), matured on trades rather than calendar days.
-6. Extend signal stacking to `fomo_entry`, `same_symbol_obsession`,
+1. ~~**`resolve()` returning `{value, source, confidence}`**~~ — **DONE**
+   (`app/core/threshold_resolution.py`). Pure refactor, parity-tested against
+   the previous implementation across 7 profile shapes.
+2. ~~Convert the 3 rupee constants to capital-relative~~ — **DONE**. Ratios
+   calibrated so a ₹50,000 account resolves to exactly its previous 500 / 1500 /
+   500; a ₹20,000 account now gets 200 / 600 / 200 and a ₹20,00,000 account
+   20,000 / 60,000 / 20,000.
+3. ~~Rung 2 — session-relative~~ — **DONE for analytics thresholds only.**
+   `panic_exit_min` and `rapid_reentry_min` now come from the trader's own
+   median hold and median gap today, shrunk toward the default by sample size
+   (`n/8`, so two trades nudge and eight decide). Both belong to
+   `notification_level=0` detectors, so **this cannot change alert volume** —
+   which is why it was the right place to prove the mechanism.
+
+   A scalper with 3-minute holds now gets `panic_exit_min` 1.5; a positional
+   trader with 4-hour holds gets 120. One constant could never have served both,
+   and this is measured rather than declared.
+
+4. **Extend rung 2 to alerting thresholds** — `revenge_window_*`,
+   `size_escalation`. This DOES change alert volume, so it needs a replay over
+   the reference tradebook behind it, not just unit tests.
+5. Capital on login via a throttled worker — makes rung 4 automatic rather than
+   dependent on onboarding.
+6. One baseline writer: percentile derivation (service A) + confidence model
+   (service B), matured on trades rather than calendar days. Kills the
+   two-shapes race.
+7. Extend signal stacking to `fomo_entry`, `same_symbol_obsession`,
    `size_escalation`.
-7. Replace the floors with the interruption policy.
-8. Population posterior (rung 5) — interface now, switch on when users exist.
+8. Replace the floors with the interruption policy.
+9. Population posterior (rung 5) — interface now, switch on when users exist.
+
+### What is deliberately still on the global rung
+
+Everything that fires an alert. Rung 2 is scoped to analytics detectors on
+purpose: it is a real behavioural change, and the honest way to introduce one is
+where it cannot reach the trader, verify the mechanism, and only then extend it
+to the thresholds that interrupt. `test_session_rung_only_touches_analytics_thresholds`
+pins that boundary, so widening it has to be a deliberate act.

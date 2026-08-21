@@ -86,7 +86,13 @@ COLD_START_DEFAULTS: Dict[str, Any] = {
     # Unified revenge window used by RiskDetector + BehavioralEvaluator.
     # Overridden by profile.cooldown_after_loss in get_thresholds().
     'revenge_window_min':               10,   # default: 10-min window
-    'revenge_min_loss_inr':             500,  # only trigger if prior loss > ₹500 (ignore scratch trades)
+    # A rupee amount cannot be universal: Rs 500 is 1% of Rs 50,000 and 0.1% of
+    # Rs 5,00,000. The RATIO is the thing that generalises, so when capital is
+    # known this is derived from it (threshold_resolution, rung 4) and the
+    # absolute value below is only the no-capital fallback. The percentage is
+    # calibrated so a Rs 50,000 account resolves to the same 500 it had before.
+    'revenge_min_loss_pct_capital':     1.0,   # 1% of capital = a loss worth reacting to
+    'revenge_min_loss_inr':             500,   # fallback when capital is unknown
 
     # ── Position sizing / excess exposure ────────────────────────────────
     # Kelly criterion for 45% win rate, 1.5:1 R:R → ~13% optimal, half-Kelly = 6%.
@@ -186,6 +192,12 @@ COLD_START_DEFAULTS: Dict[str, Any] = {
     # >50% of peak gains in a single subsequent trade. Most common at end of day.
     # Pattern: built significant profit → one trade erodes a large % of it.
     # Fires exactly once per threshold crossing (not on every subsequent loss).
+    # Same reasoning as revenge_min_loss_inr: a rupee floor cannot be universal.
+    # Derived from capital when known (threshold_resolution, rung 4); the
+    # absolute values below are the no-capital fallback. Percentages calibrated
+    # so a Rs 50,000 account resolves to the previous 1500 / 500.
+    'profit_giveaway_min_peak_pct_capital':    3.0,
+    'profit_giveaway_min_erosion_pct_capital': 1.0,
     'profit_giveaway_min_peak':          1500,   # was 1000, briefly 5000. 5000 silenced it completely — 17 firings to zero against nine days of the behaviour in the same tradebook, which is worse than the noise it replaced. The self-relative erosion floor is the real fix; this only needs to exclude the trivial. Originally fired on days that ENDED GREEN. A ₹1,348 peak is one tick on a ₹15,000 option lot, not a session built and given back. Seventeen firings across 61 real sessions, the most common alert in the product, almost all on profitable days.
     'profit_giveaway_min_erosion':        500, # minimum absolute erosion to avoid noise (₹500)
     'profit_giveaway_caution_pct':        0.50, # gave back 50% of peak gains = caution
@@ -326,7 +338,7 @@ UNIVERSAL_FLOORS: Dict[str, Any] = {
 }
 
 
-def get_thresholds(profile=None) -> Dict[str, Any]:
+def get_thresholds(profile=None, session_trades=None) -> Dict[str, Any]:
     """
     Build the merged threshold dict every detector reads.
 
@@ -341,7 +353,7 @@ def get_thresholds(profile=None) -> Dict[str, Any]:
     See docs/THRESHOLD_RESOLUTION_DESIGN.md.
     """
     from app.core.threshold_resolution import resolve_thresholds
-    return resolve_thresholds(profile).values
+    return resolve_thresholds(profile, session_trades=session_trades).values
 
 
 def _get_thresholds_pre_ladder(profile=None) -> Dict[str, Any]:

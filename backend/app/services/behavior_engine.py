@@ -329,8 +329,6 @@ class BehaviorEngine:
             except Exception as _p_err:
                 logger.warning(f"[BehaviorEngine] profile load failed, using defaults: {_p_err}")
 
-        thresholds = get_thresholds(profile)
-
         session_start = session.market_open
         if session_start is None:
             from app.core.market_hours import get_session_boundaries, MarketSegment
@@ -350,6 +348,12 @@ class BehaviorEngine:
             .order_by(CompletedTrade.exit_time.asc())
         )
         session_trades = list(ct_result.scalars().all())
+
+        # Thresholds resolve AFTER today's trades are loaded, so the ladder can
+        # use rung 2 — comparisons against what this trader has done today. That
+        # is what lets a brand-new account get a threshold that fits it instead
+        # of a constant chosen for an imaginary average trader.
+        thresholds = get_thresholds(profile, session_trades=session_trades)
 
         # Query 2: active cooldowns
         now_utc = datetime.now(timezone.utc)

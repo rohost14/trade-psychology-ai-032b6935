@@ -137,12 +137,14 @@ class ThresholdSet:
         return {k: r for k, r in self.meta.items() if r.is_personal}
 
 
-def resolve_thresholds(profile=None) -> ThresholdSet:
+def resolve_thresholds(profile=None, session_trades=None) -> ThresholdSet:
     """
     Walk the ladder and return values + provenance.
 
-    Values are identical to the previous `get_thresholds()` for every profile
-    shape; only the provenance is new.
+    `session_trades` is today's closed trades, newest last. When supplied it
+    enables rung 2 — comparisons against what this trader has done *today*,
+    which is the rung that makes day one work. When omitted (every caller that
+    has not been updated) rung 2 is skipped and nothing changes.
     """
     from app.core.trading_defaults import COLD_START_DEFAULTS, UNIVERSAL_FLOORS
 
@@ -163,6 +165,11 @@ def resolve_thresholds(profile=None) -> ThresholdSet:
         _apply_profile_facts(profile, values, put)
     else:
         _apply_cold_start(put)
+
+    # Rung 2 sits below history and above the repo constant: today's evidence is
+    # more specific than a 90-day median, but a declared rule still outranks it.
+    if session_trades:
+        _apply_session(session_trades, values, put)
 
     # Universal floors, applied last — they win over every rung above, including
     # a rule the trader set for themselves. Preserved as-is; see module docstring.
@@ -308,14 +315,148 @@ def _apply_profile_facts(profile, values: Dict[str, Any], put: Callable) -> None
     put("risk_tolerance", getattr(profile, "risk_tolerance", None) or "moderate",
         Source.FACT, 1.0, None)
 
-    # Rung 4, the only capital-derived pair that exists today. The design doc
-    # proposes moving the three absolute-rupee constants here too.
     if values.get("max_position_size"):
         size = float(values["max_position_size"])
         put("max_position_pct_caution", size, Source.CAPITAL, 1.0,
             "your declared max position size")
         put("max_position_pct_danger", size * 2.0, Source.CAPITAL, 1.0,
             "2x your declared max position size")
+
+    _apply_capital_ratios(values, put)
+
+
+# ---------------------------------------------------------------------------
+# Rung 2 — what this trader has done today
+# ---------------------------------------------------------------------------
+
+#: Trades needed before today's evidence is trusted completely. Deliberately
+#: small: the point of this rung is that it works on day one. Below it the value
+#: is shrunk toward the repo default rather than switched, so three trades nudge
+#: and ten decide — there is no cliff and nobody has to be classified.
+_SESSION_TARGET_N = 8
+
+#: Fraction of the trader's own median used as the "unusually fast" line. Half
+#: your normal hold is short for you whether your normal is three minutes or two
+#: hours — which is the entire reason this rung exists and a fixed 5 minutes
+#: cannot work for both.
+_SESSION_FAST_FRACTION = 0.5
+
+
+def _minutes(a, b) -> Optional[float]:
+    if a is None or b is None:
+        return None
+    delta = (b - a).total_seconds() / 60.0
+    return delta if delta >= 0 else None
+
+
+def _median(xs):
+    xs = sorted(xs)
+    n = len(xs)
+    if not n:
+        return None
+    mid = n // 2
+    return xs[mid] if n % 2 else (xs[mid - 1] + xs[mid]) / 2.0
+
+
+def _apply_session(session_trades, values: Dict[str, Any], put: Callable) -> None:
+    """
+    Derive "unusually fast for you" from today's trades.
+
+    This is what replaced the declared-style rung. Asking a trader whether they
+    are a scalper produces a label that is wrong the week they trade differently
+    and that nothing ever corrects. Measuring their median hold *today* is
+    available just as early, cannot be wrong, and moves when they move.
+
+    Applied only to thresholds owned by analytics-disposition detectors
+    (`panic_exit`, `rapid_reentry`), which record evidence and never notify — so
+    this rung cannot change alert volume. Extending it to alerting detectors is
+    a separate change that needs a replay behind it.
+    """
+    holds, gaps = [], []
+    ordered = [t for t in session_trades if getattr(t, "exit_time", None)]
+    ordered.sort(key=lambda t: t.exit_time)
+
+    for t in ordered:
+        held = _minutes(getattr(t, "entry_time", None), t.exit_time)
+        if held is not None:
+            holds.append(held)
+
+    for prev, nxt in zip(ordered, ordered[1:]):
+        gap = _minutes(prev.exit_time, getattr(nxt, "entry_time", None))
+        # Cap at one hour: a longer gap is a break, not a re-entry decision.
+        if gap is not None and 0 < gap < 60:
+            gaps.append(gap)
+
+    _blend_session(values, put, "panic_exit_min", holds,
+                   "your median hold today")
+    _blend_session(values, put, "rapid_reentry_min", gaps,
+                   "your median gap between trades today")
+
+
+def _blend_session(values: Dict[str, Any], put: Callable, key: str,
+                   samples, what: str) -> None:
+    """Shrink today's evidence toward the repo default by sample size."""
+    if len(samples) < 2:
+        return
+    med = _median(samples)
+    if med is None or med <= 0:
+        return
+
+    default_val = float(values[key])
+    personal = max(1.0, med * _SESSION_FAST_FRACTION)
+    confidence = min(1.0, len(samples) / _SESSION_TARGET_N)
+    blended = confidence * personal + (1 - confidence) * default_val
+
+    put(key, round(blended, 1), Source.SESSION, confidence,
+        f"{what} is {med:.0f}min (n={len(samples)}, confidence {confidence:.2f})")
+
+
+# ---------------------------------------------------------------------------
+# Rung 4 — ratios of the trader's capital
+# ---------------------------------------------------------------------------
+
+#: threshold key -> (percentage key, what the number means)
+#: Each of these was an absolute rupee amount, which cannot be universal:
+#: Rs 500 is 1% of Rs 50,000 and 0.1% of Rs 5,00,000. Same money, different
+#: event. The ratio is what generalises.
+_CAPITAL_RATIOS = {
+    "revenge_min_loss_inr": (
+        "revenge_min_loss_pct_capital", "a loss big enough to react to"),
+    "profit_giveaway_min_peak": (
+        "profit_giveaway_min_peak_pct_capital", "a peak worth protecting"),
+    "profit_giveaway_min_erosion": (
+        "profit_giveaway_min_erosion_pct_capital", "a giveback worth naming"),
+}
+
+
+def _apply_capital_ratios(values: Dict[str, Any], put: Callable) -> None:
+    """
+    Re-derive the rupee floors from capital, when capital is known.
+
+    Capital is available on day one with no trading history and no typing — it
+    comes off the broker. So this rung is what makes a brand-new Rs 5,00,000
+    account behave differently from a brand-new Rs 20,000 one, which the
+    absolute constants could never do.
+
+    When capital is unknown the absolute fallback stands, still marked GLOBAL,
+    so the distinction between "scaled to you" and "our starting guess" survives
+    into the UI rather than being flattened into one number.
+    """
+    capital = values.get("trading_capital")
+    try:
+        capital = float(capital) if capital is not None else 0.0
+    except (TypeError, ValueError):
+        capital = 0.0
+    if capital <= 0:
+        return
+
+    for key, (pct_key, meaning) in _CAPITAL_RATIOS.items():
+        pct = values.get(pct_key)
+        if pct is None:
+            continue
+        derived = round(capital * float(pct) / 100.0, 2)
+        put(key, derived, Source.CAPITAL, 1.0,
+            f"{pct}% of your capital (₹{capital:,.0f}) — {meaning}")
 
 
 def _apply_cold_start(put: Callable) -> None:
