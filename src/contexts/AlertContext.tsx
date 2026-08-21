@@ -15,6 +15,7 @@
 
 import { createContext, useContext, useState, useEffect, useCallback, useRef, ReactNode } from 'react';
 import { PatternSeverity, PatternType } from '@/types/patterns';
+import { normalizeSeverityStr, isSevere } from '@/lib/alertSeverity';
 import { toast } from 'sonner';
 import { api } from '@/lib/api';
 import { useWebSocket } from '@/contexts/WebSocketContext';
@@ -203,13 +204,13 @@ interface BackendAlert {
   acknowledged?: boolean; // present in demo data and some API responses
 }
 
-// Map backend severity strings to frontend PatternSeverity (3-level system)
-function normalizeSeverity(s: string): PatternSeverity {
-  const lc = s.toLowerCase();
-  if (lc === 'danger' || lc === 'critical' || lc === 'high') return 'danger';
-  if (lc === 'positive') return 'positive';
-  return 'caution'; // caution / medium / low / unknown
-}
+// Severity normalisation lives in @/lib/alertSeverity, which declares itself the
+// single source of truth. This file used to redeclare it as a 3-level mapping
+// that folded `critical` into `danger` — so on the LIVE alert path a trader who
+// breached 120% of their own loss limit saw the same row as one who breached
+// 100%, while the history path (which already used the shared helper) showed
+// them apart. Critical is also the severity that reaches an accountability
+// partner, so collapsing it here silently removed that distinction.
 
 function mapBackendAlert(a: BackendAlert): AlertNotification {
   const frontendType = (BACKEND_TO_FRONTEND_TYPE[a.pattern_type] || a.pattern_type) as PatternType;
@@ -221,7 +222,7 @@ function mapBackendAlert(a: BackendAlert): AlertNotification {
       type:                frontendType,
       backend_type:        a.pattern_type,
       name:                formatPatternName(a.pattern_type),
-      severity:            normalizeSeverity(a.severity),
+      severity:            normalizeSeverityStr(a.severity),
       description:         a.message,
       detected_at,
       insight:             a.details?.insight || '',
@@ -240,7 +241,7 @@ function mapBackendAlert(a: BackendAlert): AlertNotification {
 }
 
 const SEVERITY_LABEL: Record<string, string> = {
-  critical: '🚨 Danger',
+  critical: '🚨 Critical',
   danger:   '🚨 Danger',
   high:     '⚠️ High Alert',
   medium:   '⚡ Caution',
@@ -344,8 +345,11 @@ export function AlertProvider({ children }: { children: ReactNode }) {
 
             const sev = alert.pattern.severity;
             const label = SEVERITY_LABEL[sev] ?? '⚠️ Alert';
-            // CRIT-2 fix: PatternSeverity is 'danger' | 'caution', not 'critical'/'high'/'medium'
-            if (sev === 'danger') {
+            // `isSevere` covers danger AND critical — the frontend twin of the
+            // backend's is_notifiable. Checking `=== 'danger'` here silently
+            // dropped every critical toast once critical stopped being folded
+            // into danger upstream.
+            if (isSevere(sev)) {
               toast.error(`${label}: ${alert.pattern.name}`, {
                 description: alert.pattern.description,
                 duration: 8000,
@@ -385,8 +389,8 @@ export function AlertProvider({ children }: { children: ReactNode }) {
           persistSeenIds(unseenIds);
 
           // One summary toast — don't spam N individual toasts at startup
-          // CRIT-2 fix: PatternSeverity is 'danger', not 'high'/'critical'
-          const dangers = unseen.filter(a => a.pattern.severity === 'danger');
+          // Same reason as above: danger AND critical both warrant the summary.
+          const dangers = unseen.filter(a => isSevere(a.pattern.severity));
           const hasDanger = dangers.length > 0;
           const names = unseen.map(a => a.pattern.name).slice(0, 3).join(', ');
           const extra = unseen.length > 3 ? ` +${unseen.length - 3} more` : '';
