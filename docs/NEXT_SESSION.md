@@ -3,8 +3,15 @@
 > **The live checklist is now `docs/ENGINE_BACKLOG.md`** — verified findings only.
 > This file remains the narrative orientation: how we got here and why.
 
-State at end of 13 Aug 2026. Branch `dashboard-production-readiness`.
-**716 backend tests pass** (`pytest tests/ --ignore=tests/production` — the
+State at end of 22 Aug 2026. Branch `dashboard-production-readiness`, clean and
+pushed through `995819c`.
+
+**22 Aug in one line:** three user-facing bugs fixed, the baseline two-writer
+race closed, a contract test added that makes pattern-vocabulary drift
+impossible, and 23 stale documents archived. Nothing touching capital-relative
+thresholds — that decision is still open.
+
+Earlier state (13 Aug): **716 backend tests passed** (`pytest tests/ --ignore=tests/production` — the
 `tests/production/` suite needs a live server on localhost and its 35
 `ConnectError` failures are environmental, not real). Was 733; the 17 removed
 are exactly the tests whose subject the L3 retirement deleted. Frontend: 102
@@ -25,8 +32,14 @@ still open and still cheap; item 1 (readable replay report) is still open; item
 
 ## Do this first
 
-**Verify the regression replay.** Confirms L1/L2 detection is unchanged. Run
-it, then diff:
+**Run the replay.** Two changes since it was last run are NOT replay-verified
+and both move thresholds: the v2 baseline (`05962ae`) and the capital-relative
+rupee floors (`91975d4`). Expect **388 alerts / 203 sessions** on the repaired
+harness — the older 358/359 figures came from the harness that dropped 8.4% of
+fills, fixed in `6812b3f`. A replay takes ~40 minutes, not the fifteen its
+docstring claims, and only ONE may run at a time.
+
+Run it, then diff:
 
 ```
 python tradedesk/scripts/replay_tradebook.py docs/tradebook-CY6001-FO2025-26.csv \
@@ -35,9 +48,11 @@ python tradedesk/scripts/replay_diff.py <baseline>.json \
     docs/tradebook-CY6001-FO2025-26-replay.json
 ```
 
-Expected: 359 alerts, 203 sessions, REPRODUCIBLE. Ordering may differ on a
-handful of days — that is cosmetic (`created_at` is wall-clock and breaks ties
-between alerts sharing a trade's `detected_at`).
+Expected: **388 alerts, 203 sessions**. Ordering may differ on a handful of days
+— that is cosmetic (`created_at` is wall-clock and breaks ties between alerts
+sharing a trade's `detected_at`). A COUNT difference is real and means one of the
+two unverified changes above moved a threshold; that is expected, and the job is
+to decide whether the movement is right, not to assume a regression.
 
 **If it reports COUNT or PATTERN differences, do not assume a code regression.**
 Three times in one session I diagnosed one and was wrong every time. Check in

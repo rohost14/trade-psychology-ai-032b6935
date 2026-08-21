@@ -189,7 +189,29 @@ no bundle cost, but publicly reachable in production.
 
 ---
 
-## 6. Standing caveat on every threshold decision
+## 6. Parked by decision, not forgotten
+
+- **Capital-relative rupee floors** (`91975d4`, live). `revenge_min_loss_inr`,
+  `profit_giveaway_min_peak` and `_min_erosion` derive from capital. Calibrated
+  so ₹50,000 resolves to exactly the old 500/1500/500, so it is a no-op at the
+  only account currently using it — but measured against the tradebook it
+  excludes 91% of losses at ₹2,00,000 capital and 100% at ₹20,00,000, which
+  would silence `revenge_trade` entirely. **Must not reach a second trader
+  unchanged.** The user is deciding between reverting, the hybrid
+  `min(capital %, trade %)`, and percentile-of-own-losses.
+- **Percentile-of-own-losses for those same three floors** — the alternative to
+  the above, so it is inside the same decision.
+- **Frontend vocabulary final form** — deleting `BACKEND_TO_FRONTEND_TYPE` and
+  `formatPatternName` in favour of `GET /api/risk/patterns`. Deferred
+  deliberately: the maps are correct as of `a67fc4f`, the contract test fails
+  the build if they drift, and `mapBackendAlert` is synchronous while
+  `usePatternCatalogue` is an async hook — so it is a UI refactor with real
+  regression risk and no bug attached. Fold into the Rules page work.
+- **Whether a capital-derived limit may reach an accountability partner.**
+
+---
+
+## 7. Standing caveat on every threshold decision
 
 Every calibration decision made so far rests on **one trader's tradebook**. It is
 far better than the judgement it replaced and it is still one trader. A second
