@@ -75,7 +75,7 @@ this is type-safety debt rather than a live user-facing bug — but any
 
 Verified by live import of `all_pattern_types()` diffed against the union.
 
-### M3. Guest-mode fixtures emit a vocabulary the API cannot produce
+### ~~M3. Guest-mode fixtures emit a vocabulary the API cannot produce~~ — CLOSED `e56268b`
 `src/lib/demoData.ts` — 17 occurrences of retired `severity: 'high' | 'medium'`,
 and `pattern_type` values `revenge_trading`, `loss_aversion`, `overtrading` that
 are not in the registry.
@@ -116,7 +116,7 @@ deleted 40/70/90 ladder.
 
 Verified: zero assignments to those attributes anywhere outside tests/scripts.
 
-### M8. Design-lab routes ship unguarded
+### ~~M8. Design-lab routes ship unguarded~~ — CLOSED `3995ec9`
 `App.tsx:127-131` routes `/landing-lab`, `/soft-lab`, `/soft-web-lab`,
 `/design-lab`, `/dashboard-lab` with no `import.meta.env.DEV` guard. `lazy()`, so
 no bundle cost, but publicly reachable in production.
@@ -151,6 +151,11 @@ no bundle cost, but publicly reachable in production.
 | Empty baseline claimed as personal knowledge | `38f0345` |
 | Six dead constants | `9536230` |
 | Replay harness dropping 8.4% of fills | `6812b3f` |
+| Demo fixtures using 3 non-existent pattern types and retired severities | `e56268b` |
+| **Pattern-vocabulary contract test** — 7 assertions, closes the drift class | `e56268b` |
+| Comment misdescribing the baseline key mismatch (would misdirect the H1 fix) | `3995ec9` |
+| `trading_session.py` documenting the deleted 40/70/90 ladder | `3995ec9` |
+| Five design-lab routes publicly reachable in production | `3995ec9` |
 
 ---
 
