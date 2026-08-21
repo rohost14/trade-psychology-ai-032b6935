@@ -548,19 +548,19 @@ export const DEMO_BEHAVIORAL = {
   has_data: true,
   patterns: [
     {
-      pattern_type: 'revenge_trading', frequency: 3, severity: 'high',
+      pattern_type: 'revenge_trade', frequency: 3, severity: 'danger',
       estimated_cost: 8400,
       description: 'You entered positions within 30 min of a significant loss 3 times this month.',
       examples: ['NIFTY23000CE after SOLARINDS loss', 'NIFTY23200PE after BANKNIFTY loss'],
     },
     {
-      pattern_type: 'loss_aversion', frequency: 2, severity: 'medium',
+      pattern_type: 'holding_loser', frequency: 2, severity: 'caution',
       estimated_cost: 9200,
       description: 'Held losing positions 2-4× longer than winners. Average loser held 185 min vs 97 min for winners.',
       examples: ['SOLARINDS: 197 min', 'SENSEX75000PE: 165 min'],
     },
     {
-      pattern_type: 'overtrading', frequency: 1, severity: 'medium',
+      pattern_type: 'daily_overtrading', frequency: 1, severity: 'caution',
       estimated_cost: 3660,
       description: '5 trades on one day vs your average of 2.5. High-frequency days correlate with net losses.',
       examples: ['Day 6: 3 rapid-fire losses'],
@@ -659,7 +659,7 @@ export const DEMO_RISK_METRICS = {
   consecutive_max: { wins: 4, losses: 3 },
   alerts_summary: [
     { pattern_type: 'revenge_trade',           count: 3, last_detected: daysAgo(1, 14, 40) },
-    { pattern_type: 'overtrading',             count: 2, last_detected: daysAgo(6, 11, 55) },
+    { pattern_type: 'daily_overtrading',             count: 2, last_detected: daysAgo(6, 11, 55) },
     { pattern_type: 'no_stoploss',             count: 2, last_detected: daysAgo(3, 12, 10) },
     { pattern_type: 'opening_5min_trap',       count: 1, last_detected: daysAgo(6, 9, 18) },
     { pattern_type: 'consecutive_loss_streak', count: 1, last_detected: daysAgo(1, 15, 5) },
@@ -1013,37 +1013,37 @@ export const DEMO_BEHAVIORAL_ANALYSIS = {
   time_window_days: 30,
   patterns_detected: [
     {
-      pattern_type: 'revenge_trading', count: 3, severity: 'high',
+      pattern_type: 'revenge_trade', count: 3, severity: 'danger',
       estimated_cost: 8400, last_seen: daysAgo(1, 14, 35),
       description: 'Quick re-entry after significant loss',
     },
     {
-      pattern_type: 'loss_aversion', count: 2, severity: 'medium',
+      pattern_type: 'holding_loser', count: 2, severity: 'caution',
       estimated_cost: 9200, last_seen: daysAgo(1, 14, 22),
       description: 'Holding losers 2-4× longer than winners',
     },
     {
-      pattern_type: 'overtrading', count: 1, severity: 'medium',
+      pattern_type: 'daily_overtrading', count: 1, severity: 'caution',
       estimated_cost: 3660, last_seen: daysAgo(6, 11, 50),
       description: 'High-frequency trading day correlated with net loss',
     },
     {
-      pattern_type: 'size_escalation', count: 2, severity: 'high',
+      pattern_type: 'size_escalation', count: 2, severity: 'danger',
       estimated_cost: 6300, last_seen: daysAgo(0, 10, 51),
       description: 'Position size 3–4× average after consecutive losses',
     },
     {
-      pattern_type: 'early_exit', count: 6, severity: 'medium',
+      pattern_type: 'early_exit', count: 6, severity: 'caution',
       estimated_cost: 7680, last_seen: daysAgo(0, 9, 38),
       description: 'Exiting profitable positions 42% before their peak on average',
     },
     {
-      pattern_type: 'no_stoploss', count: 2, severity: 'high',
+      pattern_type: 'no_stoploss', count: 2, severity: 'danger',
       estimated_cost: 5800, last_seen: daysAgo(0, 9, 15),
       description: 'Open positions held 40+ min with no stop-loss defined',
     },
     {
-      pattern_type: 'opening_5min_trap', count: 3, severity: 'medium',
+      pattern_type: 'opening_5min_trap', count: 3, severity: 'caution',
       estimated_cost: 4800, last_seen: daysAgo(1, 9, 20),
       description: 'Entries within opening 5-min window — 19% win rate vs 54% baseline',
     },
@@ -1161,7 +1161,7 @@ export const DEMO_BEHAVIOUR_COST = {
   patterns: [
     { pattern_type: 'revenge_trade',   alert_count: 3, trade_count: 3, realized_pnl: -13000 },
     { pattern_type: 'size_escalation', alert_count: 2, trade_count: 2, realized_pnl: -6450  },
-    { pattern_type: 'overtrading',     alert_count: 2, trade_count: 4, realized_pnl: -3750  },
+    { pattern_type: 'daily_overtrading',     alert_count: 2, trade_count: 4, realized_pnl: -3750  },
     { pattern_type: 'no_stoploss',     alert_count: 2, trade_count: 2, realized_pnl: -1700  },
     { pattern_type: 'early_exit',      alert_count: 1, trade_count: 1, realized_pnl: 820    },
   ],
