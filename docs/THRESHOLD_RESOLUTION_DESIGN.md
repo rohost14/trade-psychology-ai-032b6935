@@ -1,6 +1,8 @@
 # How a threshold gets its value — design
 
-Design proposal, 21 Aug 2026. Nothing here is implemented.
+Design proposal, 21 Aug 2026. **Steps 1-3 of section 8 are now implemented**
+(`app/core/threshold_resolution.py`); everything else is still a proposal. The
+status of each step is marked in section 8 - trust that, not this header.
 
 Answers one question: **where does the number a detector compares against come
 from, for a user who signed up this morning and for a user with a year of
@@ -115,9 +117,10 @@ just as early, it cannot be wrong, and it tracks a trader whose behaviour shifts
 
 ---
 
-## 4. The 94 constants — disposition of every one
+## 4. The 97 constants — disposition of every one
 
-83 in `COLD_START_DEFAULTS` + 11 in `UNIVERSAL_FLOORS`.
+86 in `COLD_START_DEFAULTS` + 11 in `UNIVERSAL_FLOORS`. (Was 83+11; step 2
+below added the three `*_pct_capital` keys.)
 
 ### 4a. Already ratio-based — keep as they are (~20)
 

@@ -28,6 +28,10 @@ mentioned it is to record that it did *not* reproduce.
 
 ## 0. First: what the three layers actually are
 
+**Read in past tense.** This section describes the engine as it stood when the
+measurement was taken. L3 was removed on 13 Aug 2026 *because* of what follows;
+L1 and L2 are unchanged.
+
 Worth stating exactly, because the layers are easy to conflate and the
 distinction decides what is safe to change.
 
@@ -141,10 +145,6 @@ fills and should not be repeated.
 
 A second explanation must be ruled out explicitly: *were the danger alerts
 heeded?* No. This is a historical tradebook replayed offline — the trader never
-saw a single one of these alerts. Nothing could have been heeded.
-
-A second explanation must be ruled out explicitly: *were the danger alerts
-heeded?* No. This is a historical tradebook replayed offline — the trader never
 saw a single one of these alerts. Nothing could have been heeded. Whatever
 `danger` is selecting for, it is not behaviour change.
 
@@ -240,7 +240,7 @@ inputs do not survive contact with the data.
 rendered anywhere: `BehaviorRiskBadge` is defined and never imported,
 `BehaviorScoresCard` lives only in `_archive/`, `behavior_state` is sent over
 the WebSocket and read by nothing, and Dashboard fetches `/api/risk/state` only
-to extract two limit fields. So ~55 of the ~148 constants currently feed an
+to extract two limit fields. So ~55 constants (of the ~144 that existed then; 97 remain) fed an
 output with no consumer.
 
 **As a developer.** There is a live latent defect on the way out:
