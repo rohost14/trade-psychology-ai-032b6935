@@ -115,14 +115,17 @@ const AlertContext = createContext<AlertContextValue | undefined>(undefined);
 // ---------------------------------------------------------------------------
 // Backend pattern_type → frontend PatternType mapping
 // ---------------------------------------------------------------------------
+// NOTE: GET /api/risk/patterns already serves this copy from the detector
+// registry, and its docstring says it exists so "the copy cannot drift from the
+// pattern name again - which is exactly what happened when it lived in three
+// frontend Record maps". These two maps ARE those maps; the endpoint shipped and
+// they were never removed. usePatternCatalogue.ts already consumes it, so the
+// right end state is deleting both of these in favour of the catalogue. Until
+// then the labels below are copied verbatim from PATTERN_COPY so they cannot
+// disagree, and the phantom keys the engine can no longer emit are gone.
 const BACKEND_TO_FRONTEND_TYPE: Record<string, string> = {
-  'consecutive_loss':  'consecutive_losses',
-  'revenge_sizing':    'revenge_trading',
-  'tilt_loss_spiral':  'revenge_trading',
-  'overtrading':       'overtrading',
   // MED-2: overtrading_burst is the actual key emitted by BehaviorEngine
   'overtrading_burst': 'overtrading',
-  'fomo':              'fomo',
   'fomo_entry':        'fomo',
   'revenge_trade':     'revenge_trading',
   'martingale_behaviour': 'position_sizing',
@@ -134,14 +137,8 @@ const BACKEND_TO_FRONTEND_TYPE: Record<string, string> = {
   'winning_streak_overconfidence': 'winning_streak_overconfidence',
   'panic_exit':        'early_exit',
   'rapid_reentry':     'same_instrument_chasing',
-  'rapid_flip':        'same_instrument_chasing',
-  'burst_trading':     'overtrading',
   'consecutive_loss_streak': 'consecutive_losses',
-  'options_direction_confusion': 'options_direction_confusion',
   'options_premium_avg_down':    'options_premium_avg_down',
-  'iv_crush_behavior':           'iv_crush_behavior',
-  // MED-1: premium_destruction is a distinct pattern (not iv_crush_behavior)
-  'premium_destruction':         'premium_destruction',
   'expiry_day_overtrading':      'overtrading',
   'opening_5min_trap':           'opening_5min_trap',
   'end_of_session_mis_panic':    'end_of_session_mis_panic',
@@ -184,6 +181,22 @@ export function formatPatternName(patternType: string): string {
     'end_of_session_mis_panic':      'End-of-Session Panic',
     'post_loss_recovery_bet':        'Recovery Bet',
     'profit_giveaway':               'Profit Giveaway',
+    'capital_mismatch': 'Capital out of date',
+    'constitution_violation': 'Rule breach',
+    'cooldown_violation': 'Cooldown ignored',
+    'daily_overtrading': 'Heavy day',
+    'death_spiral': 'Multi-domain breakdown',
+    'direction_instability': 'Direction flip-flop',
+    'expiry_day_overtrading': 'Expiry-day activity',
+    'holding_loser': 'Holding a loser',
+    'overexposure': 'Position too large',
+    'overtrading_burst': 'Burst of trades',
+    'portfolio_concentration': 'Concentrated exposure',
+    'premium_loss_event': 'Premium destruction',
+    'same_symbol_obsession': 'Repeated same instrument',
+    'strategy_breakdown': 'Strategy underperforming',
+    'time_of_day_bias': 'Time-of-day pattern',
+    'win_rate_collapse': 'Win rate below baseline',
   };
   return names[patternType]
     || patternType.split('_').map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' ');

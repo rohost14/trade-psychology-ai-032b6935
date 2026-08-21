@@ -1555,6 +1555,7 @@ class BehaviorEngine:
         fomo_open_symbols    = ctx.thresholds.get("fomo_symbols_at_open", 2)
         fomo_open_window_min = ctx.thresholds.get("fomo_open_window_min", 30)
         fomo_close_window_min = ctx.thresholds.get("fomo_close_window_min", 30)
+        fomo_close_symbols   = ctx.thresholds.get("fomo_symbols_at_close", 3)
         fomo_expiry_symbols  = ctx.thresholds.get("fomo_expiry_day_symbols", 2)
 
         entry_ist = ct.entry_time.astimezone(IST)
@@ -1603,7 +1604,7 @@ class BehaviorEngine:
             threshold = fomo_open_symbols
             context_note = "market open"
         elif is_close_window:
-            threshold = fomo_open_symbols
+            threshold = fomo_close_symbols
             context_note = "pre-close"
         else:
             threshold = fomo_general

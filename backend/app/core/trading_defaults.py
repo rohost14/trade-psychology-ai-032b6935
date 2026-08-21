@@ -154,6 +154,13 @@ COLD_START_DEFAULTS: Dict[str, Any] = {
     'fomo_symbols_at_open':             2,    # first 30 min (market open rush): 2+ underlyings
     'fomo_open_window_min':             30,   # first 30 min of session
     'fomo_close_window_min':            30,   # last 30 min of session (pre-close panic)
+    # The pre-close branch had no threshold of its own and silently reused
+    # fomo_symbols_at_open (2) - the tightest value in the detector, justified
+    # by the OPEN rush and never by anything about the close. Named here so the
+    # code says what it means. It starts equal to the general threshold because
+    # nothing measured justifies a tighter one; a pre-close scramble is
+    # plausible but unmeasured, and this knob is where that evidence would land.
+    'fomo_symbols_at_close':            3,
     # Expiry day (Thursday): theta decay + 0DTE options = heightened FOMO
     'fomo_expiry_day_symbols':          4,   # was 2 — NIFTY plus one stock option inside half an hour on expiry day is an ordinary session, not a scramble.
 
