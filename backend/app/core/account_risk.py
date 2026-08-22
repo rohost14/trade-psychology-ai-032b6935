@@ -29,6 +29,14 @@ account they had at 10:00. The resolved value is stored on the session row with
 its source, timestamp and quality, so a stale or self-reported figure can never
 be mistaken for live truth.
 
+DEPLOYMENT ORDER
+
+Migration 080 must be applied BEFORE the ORM columns are mapped. A mapped
+attribute for a column that does not exist fails every select against that
+table immediately - not lazily on first use. The columns are therefore left
+unmapped in the models until 080 lands, and this module degrades to the
+declared-capital rung in the meantime.
+
 ABSTENTION
 
 If nothing in the chain answers, this returns quality UNKNOWN and
@@ -181,12 +189,20 @@ async def _latest_opening_balance(broker_account_id: UUID, db: AsyncSession):
     """Most recent non-null opening balance, with its timestamp."""
     from app.models.margin_snapshot import MarginSnapshot
 
+    # Until migration 080 is applied the column is not mapped, and asking for it
+    # would raise rather than degrade. Absence simply means this rung cannot
+    # answer, so the chain falls through to declared capital - which is exactly
+    # what the fallback exists for.
+    col = getattr(MarginSnapshot, "equity_opening_balance", None)
+    if col is None:
+        return None
+
     result = await db.execute(
-        select(MarginSnapshot.equity_opening_balance, MarginSnapshot.snapshot_at)
+        select(col, MarginSnapshot.snapshot_at)
         .where(
             MarginSnapshot.broker_account_id == broker_account_id,
-            MarginSnapshot.equity_opening_balance.isnot(None),
-            MarginSnapshot.equity_opening_balance > 0,
+            col.isnot(None),
+            col > 0,
         )
         .order_by(desc(MarginSnapshot.snapshot_at))
         .limit(1)
