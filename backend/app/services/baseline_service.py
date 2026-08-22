@@ -38,6 +38,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.completed_trade import CompletedTrade
 from app.core.trading_defaults import COLD_START_DEFAULTS, estimate_capital_at_risk
+from app.core import session_facts
 from app.core.baseline_rules import (
     RECENT_WINDOW_TRADES,
     cap_adaptation,
@@ -235,18 +236,17 @@ async def compute_baseline(
     burst_counts: List[float] = []      # busiest 30 minutes of each session
     consec_losses: List[float] = []     # longest losing run of each session
     for day_trades in by_session.values():
-        running = 0.0
-        peak = 0.0
-        max_dd = 0.0
-        ordered = sorted(day_trades, key=lambda x: x.exit_time)
-        for t in ordered:
-            running += float(t.realized_pnl or 0)
-            peak = max(peak, running)
-            max_dd = max(max_dd, peak - running)
-        if peak > 0:
-            peak_pnls.append(peak)
-        if max_dd > 0:
-            drawdowns.append(max_dd)
+        # Peak, max drawdown and the longest losing run all come from the one
+        # definition (app/core/session_facts). A baseline that learned "your
+        # typical peak" from arithmetic written here, while the live detector
+        # measured it with arithmetic written there, would be comparing a trader
+        # against a version of themselves the engine never sees.
+        ordered = session_facts.in_exit_order(day_trades)
+        facts = session_facts.derive(ordered)
+        if facts.peak_pnl > 0:
+            peak_pnls.append(float(facts.peak_pnl))
+        if facts.max_drawdown > 0:
+            drawdowns.append(float(facts.max_drawdown))
 
         # Busiest 30-minute window, by entry time. Sliding rather than fixed
         # buckets: a burst that straddles a bucket boundary is still a burst.
@@ -260,15 +260,7 @@ async def compute_baseline(
         if busiest:
             burst_counts.append(float(busiest))
 
-        # Longest consecutive losing run in the session.
-        longest = current = 0
-        for t in ordered:
-            if float(t.realized_pnl or 0) < 0:
-                current += 1
-                longest = max(longest, current)
-            else:
-                current = 0
-        consec_losses.append(float(longest))
+        consec_losses.append(float(facts.longest_loss_run))
 
     # ── Trade-level metrics (mature with TRADE count) ─────────────────────
     winner_holds, loser_holds = [], []

@@ -149,3 +149,31 @@ def test_none_pnl_counts_as_flat_not_as_a_loss():
     f = derive([t])
     assert f.pnl == Decimal("0")
     assert f.consecutive_losses == 0
+
+
+def test_max_drawdown_is_not_the_same_as_drawdown_from_peak():
+    """
+    The distinction the baseline needs. Up 20k, down to 0, back to 20k: the
+    trader ENDS at no drawdown, but they lived through a 20k one.
+    """
+    f = derive(_trades((20000, 10), (-20000, 20), (20000, 30)))
+    assert f.drawdown_from_peak == Decimal("0")
+    assert f.max_drawdown == Decimal("20000")
+
+
+def test_longest_loss_run_is_not_the_trailing_run():
+    # four losses, then a win: the run in progress is 0, the longest was 4.
+    f = derive(_trades((-1, 10), (-1, 20), (-1, 30), (-1, 40), (5, 50)))
+    assert f.consecutive_losses == 0
+    assert f.longest_loss_run == 4
+
+
+def test_longest_loss_run_includes_a_run_still_going():
+    f = derive(_trades((-1, 10), (-1, 20), (5, 30), (-1, 40), (-1, 50), (-1, 60)))
+    assert f.consecutive_losses == 3
+    assert f.longest_loss_run == 3
+
+
+def test_max_drawdown_on_a_session_that_never_went_green():
+    f = derive(_trades((-1000, 10), (-2000, 20)))
+    assert f.max_drawdown == Decimal("3000")

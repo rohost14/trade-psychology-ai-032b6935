@@ -2660,12 +2660,10 @@ class BehaviorEngine:
         # ── Rule: max consecutive losses ──────────────────────────────────
         max_consec = th.get("max_consecutive_losses")
         if max_consec:
-            streak = 0
-            for t in reversed(list(ctx.session_trades) + [ct]):
-                if Decimal(str(t.realized_pnl or 0)) < 0:
-                    streak += 1
-                else:
-                    break
+            # Canonical streak, same as consecutive_loss_streak reads. This used
+            # to count its own, so a trader's declared rule and the engine's
+            # detector could in principle disagree about the same run.
+            streak = ctx.facts.consecutive_losses if ctx.facts else 0
             ratio = streak / float(max_consec)
             sev = ladder(ratio)
             if sev:

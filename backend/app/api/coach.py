@@ -28,6 +28,7 @@ from app.api.deps import get_verified_broker_account_id
 from app.services.ai_service import ai_service, SEBI_REDIRECT
 from app.services.rag_service import rag_service
 from app.models.position import Position
+from app.core import session_facts
 from app.models.risk_alert import RiskAlert
 from app.models.user_profile import UserProfile
 from app.models.journal_entry import JournalEntry
@@ -288,36 +289,28 @@ async def _build_trading_context(
         lines.append("(Either no trades have been made, or positions haven't been synced yet.)")
         lines.append("")
 
-    # Section E: Today's session summary — gives AI the numbers to do erosion math
-    today_start_ist = now_ist.replace(hour=0, minute=0, second=0, microsecond=0)
-    today_start_utc = today_start_ist.astimezone(timezone.utc)
-    # Separate unlimited query — positions list is capped at 25/50, so today's full
-    # session data would be wrong for traders with >limit trades today.
-    today_result = await db.execute(
-        select(Position)
-        .where(
-            Position.broker_account_id == broker_account_id,
-            Position.status == "closed",
-            Position.last_exit_time >= today_start_utc,
-        )
-        .order_by(Position.last_exit_time.asc())
+    # Section E: Today's session summary — gives AI the numbers to do erosion math.
+    #
+    # Reads the canonical session facts. This used to run its own query over
+    # closed `Position` rows with an IST-midnight boundary, which made it a
+    # seventh unit for "today's trades": the coach could quote the trader a
+    # different session P&L and a different peak from the one the dashboard and
+    # the alerts were built on.
+    today_trades = await session_facts.load_session_trades(
+        db, broker_account_id, now_ist.date()
     )
-    today_closed = list(today_result.scalars().all())
-    if today_closed:
-        # Sort by exit time ascending to compute running P&L and find peak
-        today_sorted = sorted(today_closed, key=lambda p: p.last_exit_time)
+    if today_trades:
+        facts = session_facts.derive(today_trades)
         running = 0.0
-        peak = 0.0
         running_series = []
-        for p in today_sorted:
-            pnl = float(p.realized_pnl or 0)
+        for t in session_facts.in_exit_order(today_trades):
+            pnl = float(t.realized_pnl or 0)
             running += pnl
-            if running > peak:
-                peak = running
-            running_series.append((p.tradingsymbol, pnl, running))
+            running_series.append((t.tradingsymbol, pnl, running))
 
-        final = running
-        erosion = peak - final
+        peak = float(facts.peak_pnl)
+        final = float(facts.pnl)
+        erosion = float(facts.drawdown_from_peak)
         erosion_pct = (erosion / peak * 100) if peak > 0 else 0
 
         lines.append("**Today's Session (closed trades only, chronological):**")

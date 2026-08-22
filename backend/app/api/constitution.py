@@ -21,7 +21,7 @@ from app.core.database import get_db
 from app.models.user_profile import UserProfile
 from app.models.constitution_history import ConstitutionHistory
 from app.models.risk_alert import RiskAlert
-from app.models.completed_trade import CompletedTrade
+from app.core import session_facts
 from app.services.constitution_service import (
     ConstitutionService, LoosenRequiresOverride, RULE_FIELDS,
 )
@@ -245,26 +245,19 @@ async def constitution_status(
     rules = ConstitutionService.snapshot(profile)
 
     ist_now = datetime.now(IST)
-    day_start_utc = ist_now.replace(hour=0, minute=0, second=0, microsecond=0).astimezone(timezone.utc)
 
-    result = await db.execute(
-        select(CompletedTrade)
-        .where(and_(
-            CompletedTrade.broker_account_id == broker_account_id,
-            CompletedTrade.exit_time >= day_start_utc,
-        ))
-        .order_by(CompletedTrade.exit_time.asc())
+    # My Rules shows the trader their own limits against today. The numbers come
+    # from the canonical session facts so this page cannot disagree with the
+    # alert that fires on the same rule - it used to run its own query from IST
+    # midnight and count its own streak.
+    trades = await session_facts.load_session_trades(
+        db, broker_account_id, ist_now.date()
     )
-    trades = list(result.scalars().all())
+    facts = session_facts.derive(trades)
 
-    session_pnl = sum(float(t.realized_pnl or 0) for t in trades)
+    session_pnl = float(facts.pnl)
     loss = -session_pnl if session_pnl < 0 else 0.0
-    streak = 0
-    for t in reversed(trades):
-        if float(t.realized_pnl or 0) < 0:
-            streak += 1
-        else:
-            break
+    streak = facts.consecutive_losses
     last_loss = next((t for t in reversed(trades) if float(t.realized_pnl or 0) < 0), None)
     cooldown_active = False
     cooldown_remaining_min = 0
@@ -285,7 +278,7 @@ async def constitution_status(
         "session_date": ist_now.date().isoformat(),
         "status": [
             usage("daily_loss", round(loss, 2), rules.get("daily_loss_limit")),
-            usage("daily_trades", len(trades), rules.get("daily_trade_limit")),
+            usage("daily_trades", facts.trades, rules.get("daily_trade_limit")),
             usage("max_consecutive_losses", streak, rules.get("max_consecutive_losses")),
             {"rule": "cooldown", "active": cooldown_active,
              "remaining_min": cooldown_remaining_min,

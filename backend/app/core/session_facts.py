@@ -45,7 +45,18 @@ loss. Wins break it too.
 *peak_pnl* — the highest the running cumulative reached, floored at zero. A
 session that never went green has a peak of zero, not a negative "peak".
 
-*drawdown_from_peak* — `peak - current`, never negative.
+*drawdown_from_peak* — `peak - current`, never negative. This is the drawdown
+the trader ENDED on.
+
+*max_drawdown* — the deepest peak-to-trough reached at any point in the session.
+A trader who fell twenty thousand and clawed it all back ends with a
+`drawdown_from_peak` of zero and a `max_drawdown` of twenty thousand. Baselines
+want the second; a live "you are giving it back" alert wants the first. Two
+facts, two names, both defined here rather than one of them being recomputed
+inline wherever it is needed.
+
+*longest_loss_run* — the longest losing run anywhere in the session, as against
+`consecutive_losses`, which is the run still going at the end.
 
 WHAT IS DELIBERATELY NOT HERE
 
@@ -86,6 +97,13 @@ class SessionFacts:
     consecutive_wins: int
     peak_pnl: Decimal
     drawdown_from_peak: Decimal
+    #: The deepest peak-to-trough within the session, which is NOT the same as
+    #: drawdown_from_peak: a trader who fell 20k and recovered ends the day at a
+    #: drawdown of zero and a max_drawdown of 20k. Baselines want this one.
+    max_drawdown: Decimal
+    #: The longest losing run anywhere in the session, as against
+    #: consecutive_losses, which is the run still in progress at the end.
+    longest_loss_run: int
     winners: int
     losers: int
     last_trade_pnl: Optional[Decimal]
@@ -103,6 +121,8 @@ EMPTY = SessionFacts(
     consecutive_wins=0,
     peak_pnl=Decimal("0"),
     drawdown_from_peak=Decimal("0"),
+    max_drawdown=Decimal("0"),
+    longest_loss_run=0,
     winners=0,
     losers=0,
     last_trade_pnl=None,
@@ -140,16 +160,25 @@ def derive(trades: Iterable[CompletedTrade]) -> SessionFacts:
 
     running = Decimal("0")
     peak = Decimal("0")
+    max_dd = Decimal("0")
+    run = longest_run = 0
     winners = losers = 0
     for t in ordered:
         p = _pnl(t)
         running += p
         if running > peak:
             peak = running
+        if peak - running > max_dd:
+            max_dd = peak - running
         if p > 0:
             winners += 1
         elif p < 0:
             losers += 1
+        if p < 0:
+            run += 1
+            longest_run = max(longest_run, run)
+        else:
+            run = 0
 
     consecutive_losses = 0
     for t in reversed(ordered):
@@ -173,6 +202,8 @@ def derive(trades: Iterable[CompletedTrade]) -> SessionFacts:
         consecutive_wins=consecutive_wins,
         peak_pnl=peak,
         drawdown_from_peak=max(Decimal("0"), peak - running),
+        max_drawdown=max_dd,
+        longest_loss_run=longest_run,
         winners=winners,
         losers=losers,
         last_trade_pnl=_pnl(last),

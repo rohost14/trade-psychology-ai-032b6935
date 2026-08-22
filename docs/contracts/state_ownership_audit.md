@@ -84,6 +84,28 @@ session** bounded by the market open, a **flat trade breaks a streak**, peak is
 | `pattern_prediction_service` computed all five facts from raw `Trade` fills | reads `session_facts.load_facts` |
 | `pnl_calculator._build_feature` counted the streak across days, next to a session-scoped P&L in the same row | reads `session_facts.as_of(...)` at entry time |
 | `SessionState` treated a flat trade as not breaking a streak | matches the canonical rule |
+| `behavior_engine`'s `max_consecutive_losses` rule check counted its own streak | reads `ctx.facts` |
+| `constitution.py` /status (My Rules) ran its own query from IST midnight and counted its own streak and P&L | reads `session_facts` |
+| `coach.py` Section E computed today's P&L and peak from closed `Position` rows - a seventh unit | reads `session_facts` |
+| `baseline_service` computed each historical day's peak, max drawdown and longest run inline | reads `session_facts.derive` per day |
+
+Nine computers in total, not the three first reported.
+
+### Two facts that were being conflated
+
+`baseline_service` needed things the first cut of the module could not express,
+and the honest fix was more names rather than a looser definition:
+
+- **`max_drawdown`** - the deepest peak-to-trough *at any point*, as against
+  `drawdown_from_peak`, the drawdown the session *ended* on. Up 20k, back to
+  flat, back to 20k: the first is 20,000 and the second is 0. A baseline wants
+  the first; a live "you are giving it back" alert wants the second.
+- **`longest_loss_run`** - the longest run *anywhere* in the session, as against
+  `consecutive_losses`, the run still going at the end.
+
+Both are now defined once and tested. They were previously computed inline in
+`baseline_service` with no name at all, which is how a baseline could end up
+teaching the engine about a quantity the engine never measures.
 
 `EngineContext` derives its own facts when a caller does not supply them, so a
 context assembled in a test and one assembled by the engine cannot disagree.
@@ -106,6 +128,18 @@ context assembled in a test and one assembled by the engine cannot disagree.
    there is; run it with `--dry-run` first.
 4. **`SessionState` shadow mismatches should drop**, because it and the engine
    now agree about scratch trades.
+5. **My Rules and the AI coach change units.** Both counted a "trade"
+   differently from the engine - My Rules from IST midnight, the coach from
+   closed `Position` rows. Neither can now disagree with the alert that fires on
+   the same rule.
+
+### Deliberately left alone - different facts, not competing definitions
+
+- `analytics.py` drawdown over a multi-day equity curve.
+- `intent_tasks.py` streak of consecutive *days* on which intent was respected.
+- `danger_zone_service`'s windowed order counts: burst detection wants order
+  velocity, and three tranches of one exit are three orders in a minute.
+- Period aggregates in `analytics.py` and `coach.py` Section D (7 days).
 
 ### Removed, not left dormant
 
