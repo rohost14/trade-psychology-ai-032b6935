@@ -58,13 +58,19 @@ class TradingSession(Base):
     trade_count: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
     alerts_fired: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
 
-    # ── Account-risk denominator (migration 080) ─────────────────────────
-    # Columns are DELIBERATELY not mapped yet. Declaring a mapped attribute for
-    # a column that does not exist makes EVERY select against this table fail
-    # with UndefinedColumnError - it is not a lazy error on first use. So the
-    # model change ships only after 080 is applied, never with it.
-    # Re-add: risk_denominator, _source, _as_of, _quality. See
-    # app/core/account_risk.py.
+    # ── Account-risk denominator, frozen for this session (migration 080) ──
+    # Every "how much of the account did this cost" rule divides by THIS number.
+    # Resolved once and then left alone: a deposit at 13:00 must not
+    # retroactively change what the morning's alerts meant. Source/as_of/quality
+    # travel with it so a stale or self-reported figure cannot be mistaken for
+    # live truth. See app/core/account_risk.py.
+    #
+    # These are mapped only because 080 is applied. Mapping a column that does
+    # not exist fails every select against this table immediately.
+    risk_denominator: Mapped[Optional[Decimal]] = mapped_column(Numeric(18, 2), nullable=True)
+    risk_denominator_source: Mapped[Optional[str]] = mapped_column(String, nullable=True)
+    risk_denominator_as_of: Mapped[Optional[datetime]] = mapped_column(TIMESTAMP(timezone=True), nullable=True)
+    risk_denominator_quality: Mapped[Optional[str]] = mapped_column(String, nullable=True)
 
     # Risk tracking (internal)
     risk_score: Mapped[Decimal] = mapped_column(Numeric(5, 2), nullable=False, default=Decimal("0"))

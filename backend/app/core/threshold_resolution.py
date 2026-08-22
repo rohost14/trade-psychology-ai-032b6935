@@ -62,6 +62,7 @@ class Source(str, Enum):
     GLOBAL = "global"          # rung 6 — a constant in this repo
     FLOOR = "floor"            # a universal floor overrode whatever was resolved
     FACT = "fact"              # not a threshold: a profile fact passed through
+    INSUFFICIENT = "insufficient"   # no rung could answer — the caller must abstain
 
 
 #: Rung number per source, for display and for asserting we are not regressing
@@ -75,7 +76,54 @@ RUNG = {
     Source.GLOBAL: 6,
     Source.FLOOR: 6,
     Source.FACT: 0,
+    Source.INSUFFICIENT: 99,   # off the ladder entirely: nothing answered
 }
+
+
+class Kind(str, Enum):
+    """
+    WHAT a threshold fundamentally is — a different axis from `Source`, which
+    records where a value came from on one particular resolution.
+
+    Source answers "where did this number come from just now".
+    Kind answers "what sort of number is this allowed to be".
+
+    Both are needed, and together they are enforceable: a UNIVERSAL_SAFETY
+    threshold that resolves from a personal baseline is a bug, because a
+    trader's habits must never raise the bar on objective danger. Recording the
+    kind is what makes it impossible to quietly reintroduce an arbitrary number
+    later - every constant has to declare what it claims to be.
+    """
+
+    UNIVERSAL_SAFETY = "universal_safety"    # objective danger; never personalised
+    PRODUCT_POLICY = "product_policy"        # our choice, not a claim about traders
+    USER_RULE = "user_rule"                  # a commitment the trader made
+    PERSONAL_BASELINE = "personal_baseline"  # learned from this trader
+    DEFINITIONAL = "definitional"            # defines what is measured, not where the line is
+    FALLBACK = "fallback"                    # a stand-in until something better exists
+
+
+#: Sources that mean "this came from the trader's own behaviour".
+_LEARNED_SOURCES = frozenset({Source.HISTORY, Source.SESSION, Source.POPULATION})
+
+
+def violates_kind(kind: "Kind", source: Source) -> Optional[str]:
+    """
+    Is this resolution illegal for this kind of threshold?
+
+    Returns a reason, or None when the pairing is sound. Asserted in tests so
+    the rule is machinery rather than documentation.
+    """
+    if kind is Kind.UNIVERSAL_SAFETY and source in _LEARNED_SOURCES:
+        return (f"universal_safety threshold resolved from {source.value}: a "
+                f"trader's habits must not raise the bar on objective danger")
+    if kind is Kind.PRODUCT_POLICY and source in _LEARNED_SOURCES:
+        return (f"product_policy threshold resolved from {source.value}: our "
+                f"product decisions are not learned from one trader")
+    if kind is Kind.USER_RULE and source in _LEARNED_SOURCES:
+        return (f"user_rule threshold resolved from {source.value}: a "
+                f"commitment is not an estimate and must not be inferred")
+    return None
 
 
 @dataclass(frozen=True)
@@ -89,6 +137,10 @@ class Resolved:
     confidence: float = 0.0
     #: Human-readable provenance, e.g. "P75 of your sessions (n=40)".
     detail: Optional[str] = None
+    #: What this threshold IS, independent of where it resolved from this time.
+    #: Defaults to FALLBACK so an unclassified constant is visible as such
+    #: rather than silently passing as something considered.
+    kind: "Kind" = None
 
     @property
     def rung(self) -> int:
@@ -100,6 +152,15 @@ class Resolved:
         return self.source in (
             Source.HISTORY, Source.SESSION, Source.DECLARED, Source.CAPITAL
         )
+
+    @property
+    def is_insufficient(self) -> bool:
+        """
+        No rung could answer. The caller must abstain rather than substitute a
+        default — see app/core/evidence.py. Distinct from resolving at GLOBAL,
+        which means "we have a number and it is ours, not theirs".
+        """
+        return self.source is Source.INSUFFICIENT
 
 
 class ThresholdSet:

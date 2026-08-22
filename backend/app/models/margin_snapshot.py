@@ -26,9 +26,11 @@ class MarginSnapshot(Base):
     equity_available: Mapped[Optional[float]] = mapped_column(Numeric(15, 4), nullable=True)
     equity_used: Mapped[Optional[float]] = mapped_column(Numeric(15, 4), nullable=True)
     equity_total: Mapped[Optional[float]] = mapped_column(Numeric(15, 4), nullable=True)
-    # equity_opening_balance (migration 080) is deliberately NOT mapped yet -
-    # see the note in trading_session.py. NB equity_total stores live_balance,
-    # not an opening figure, so it must not be used as a risk denominator.
+    #: Kite available.opening_balance - "Opening balance at the day start".
+    #: The canonical account-risk denominator. NB equity_total above stores
+    #: live_balance, which moves with utilisation, so it must never be used for
+    #: that. Mapped only because migration 080 is applied.
+    equity_opening_balance: Mapped[Optional[float]] = mapped_column(Numeric(18, 2), nullable=True)
     equity_utilization_pct: Mapped[Optional[float]] = mapped_column(Numeric(5, 2), nullable=True)
 
     # Commodity segment
