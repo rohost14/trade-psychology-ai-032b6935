@@ -10,10 +10,9 @@ from typing import Dict, List, Optional
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, func, and_
 from uuid import UUID
-import statistics
 import logging
 
-from app.models.trade import Trade
+from app.core import session_facts
 from app.models.risk_alert import RiskAlert
 from app.models.user_profile import UserProfile
 from app.models.cooldown import Cooldown
@@ -86,69 +85,48 @@ class PatternPredictionService:
         db: AsyncSession,
         now: datetime
     ) -> Dict:
-        """Extract current trading session state."""
-        today_start = now.replace(hour=0, minute=0, second=0, microsecond=0)
+        """
+        Where this trader stands right now, from the canonical session facts.
 
-        # Fetch today's trades
-        result = await db.execute(
-            select(Trade).where(
-                and_(
-                    Trade.broker_account_id == broker_account_id,
-                    Trade.status == "COMPLETE",
-                    Trade.order_timestamp >= today_start
-                )
-            ).order_by(Trade.order_timestamp.desc())
-        )
-        today_trades = list(result.scalars().all())
+        REWRITTEN 2026-08-23. This used to compute consecutive_losses,
+        session_pnl, trades_today, peak and drawdown itself, from raw `Trade`
+        fills. That made every number here a different quantity from the one the
+        alert engine used for the same word:
 
-        if not today_trades:
-            return {
-                "consecutive_losses": 0,
-                "session_pnl": 0,
-                "trades_today": 0,
-                "last_trade_pnl": 0,
-                "minutes_since_last_trade": 999,
-                "time_of_day": now.hour,
-                "day_of_week": now.strftime("%A"),
-                "is_first_hour": now.hour == 9 and now.minute < 60,
-                "is_last_hour": now.hour >= 15,
-                "drawdown_from_peak": 0
-            }
+          * `Trade.pnl` is a compatibility value written onto closing fills by
+            pnl_calculator, not the round-trip P&L, so the sums differed;
+          * an exit filled in three tranches counted as three "trades", so
+            trades_today ran ahead of the engine's count;
+          * the streak counted fills, so one scaled exit could read as a run of
+            three losses.
 
-        # Calculate consecutive losses
-        consecutive_losses = 0
-        for trade in today_trades:  # Already sorted desc
-            if (trade.pnl or 0) < 0:
-                consecutive_losses += 1
-            else:
-                break
+        All of it now comes from app/core/session_facts, which is the same source
+        the engine, the danger zone and the personal record read. The time-of-day
+        flags stay local: they are facts about the clock, not about the session.
+        """
+        facts = await session_facts.load_facts(db, broker_account_id)
 
-        # Session P&L
-        session_pnl = sum(float(t.pnl or 0) for t in today_trades)
-
-        # Peak and drawdown
-        cumulative = 0
-        peak = 0
-        for trade in reversed(today_trades):  # Chronological
-            cumulative += float(trade.pnl or 0)
-            peak = max(peak, cumulative)
-        drawdown = peak - cumulative if peak > 0 else abs(min(0, cumulative))
-
-        # Last trade info
-        last_trade = today_trades[0]
-        minutes_since = (now - last_trade.order_timestamp).total_seconds() / 60 if last_trade.order_timestamp else 999
+        # Gap since the last CLOSE, not the last order. A trader with a position
+        # still open has not "stopped trading", and the re-entry patterns this
+        # predicts are all measured from an exit.
+        if facts.last_exit_time:
+            minutes_since = max(
+                0.0, (now - facts.last_exit_time).total_seconds() / 60
+            )
+        else:
+            minutes_since = 999
 
         return {
-            "consecutive_losses": consecutive_losses,
-            "session_pnl": round(session_pnl, 2),
-            "trades_today": len(today_trades),
-            "last_trade_pnl": round(float(last_trade.pnl or 0), 2),
+            "consecutive_losses": facts.consecutive_losses,
+            "session_pnl": round(float(facts.pnl), 2),
+            "trades_today": facts.trades,
+            "last_trade_pnl": round(float(facts.last_trade_pnl or 0), 2),
             "minutes_since_last_trade": round(minutes_since, 1),
             "time_of_day": now.hour,
             "day_of_week": now.strftime("%A"),
             "is_first_hour": now.hour == 9,
             "is_last_hour": now.hour >= 15,
-            "drawdown_from_peak": round(drawdown, 2)
+            "drawdown_from_peak": round(float(facts.drawdown_from_peak), 2),
         }
 
     async def _get_historical_patterns(
@@ -170,18 +148,6 @@ class PatternPredictionService:
         )
         alerts = list(result.scalars().all())
 
-        # Fetch trades for context
-        trades_result = await db.execute(
-            select(Trade).where(
-                and_(
-                    Trade.broker_account_id == broker_account_id,
-                    Trade.status == "COMPLETE",
-                    Trade.order_timestamp >= cutoff
-                )
-            ).order_by(Trade.order_timestamp)
-        )
-        trades = list(trades_result.scalars().all())
-
         # Calculate pattern frequencies
         pattern_counts = {}
         for alert in alerts:
@@ -190,23 +156,11 @@ class PatternPredictionService:
                 pattern_counts[p] = {"total": 0, "after_loss": 0, "after_consecutive_loss": 0}
             pattern_counts[p]["total"] += 1
 
-        # Calculate trigger conditions
-        # Analyze when revenge trading typically occurs
-        revenge_after_loss_count = 0
-        revenge_total = pattern_counts.get("revenge_trading", {}).get("total", 0)
-
-        # Calculate average time to revenge trade
-        revenge_times = []
-        sorted_trades = sorted(trades, key=lambda t: t.order_timestamp)
-        for i in range(1, len(sorted_trades)):
-            prev = sorted_trades[i-1]
-            curr = sorted_trades[i]
-            if (prev.pnl or 0) < 0 and (curr.pnl or 0) < 0:
-                gap = (curr.order_timestamp - prev.order_timestamp).total_seconds() / 60
-                if gap < 30:
-                    revenge_times.append(gap)
-
-        avg_revenge_time = statistics.mean(revenge_times) if revenge_times else 15
+        # Removed 2026-08-23: a 60-day query over raw `Trade` fills that computed
+        # `total_trades`, `avg_revenge_time_minutes` and two locals. Nothing read
+        # any of them - `_calculate_probabilities` reads only `pattern_counts` -
+        # and the trade count it produced counted order fills, so it was a third
+        # meaning of "a trade" inside a file that now has one.
 
         # Get user profile for personalized thresholds
         profile_result = await db.execute(
@@ -217,8 +171,6 @@ class PatternPredictionService:
         return {
             "pattern_counts": pattern_counts,
             "total_alerts": len(alerts),
-            "total_trades": len(trades),
-            "avg_revenge_time_minutes": round(avg_revenge_time, 1),
             "profile": profile.detected_patterns if profile and profile.detected_patterns else {}
         }
 

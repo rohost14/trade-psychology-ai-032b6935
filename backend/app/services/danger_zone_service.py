@@ -28,6 +28,7 @@ from sqlalchemy import select, and_, func
 from app.models.user import User
 from app.models.trade import Trade
 from app.models.completed_trade import CompletedTrade
+from app.core import session_facts
 from app.models.risk_alert import RiskAlert
 from app.models.user_profile import UserProfile
 from app.models.broker_account import BrokerAccount
@@ -156,8 +157,11 @@ class DangerZoneService:
         daily_loss_limit = profile.daily_loss_limit if profile else None
         trader_thresholds = get_trader_thresholds(profile)
 
-        # 3. Calculate today's P&L
-        today_pnl = await self._get_today_pnl(db, broker_account_id)
+        # 3. This session's facts, from the one canonical definition.
+        # Everything below that says "today" means this session, bounded by the
+        # market open - see app/core/session_facts.
+        facts = await session_facts.load_facts(db, broker_account_id)
+        today_pnl = float(facts.pnl)
         daily_loss_used_percent = 0.0
 
         if daily_loss_limit and daily_loss_limit > 0:
@@ -168,10 +172,22 @@ class DangerZoneService:
         # 4. Get recent trades
         trades_30min = await self._get_trade_count(db, broker_account_id, minutes=30)
         trades_1hr = await self._get_trade_count(db, broker_account_id, minutes=60)
-        trades_today = await self._get_trade_count(db, broker_account_id, minutes=None)  # All today
+        trades_today = facts.trades
 
-        # 5. Count consecutive losses
-        consecutive_losses = await self._count_consecutive_losses(db, broker_account_id)
+        # 5. Consecutive losses, session-scoped.
+        #
+        # CHANGED 2026-08-23, deliberately. This used to count backwards through
+        # the last 10 completed trades with NO session boundary, so three losses
+        # on Friday and one on Monday morning read as a streak of four - enough
+        # to reach consecutive_loss_critical, start a hard cooldown and send a
+        # WhatsApp message about a run that had already ended. The engine, which
+        # counts within the session, stayed silent on the same trader at the same
+        # moment.
+        #
+        # Tilt is a state someone is in now. It does not survive a night's sleep
+        # and a new open. This is the narrower and the correct count, and it
+        # means the danger zone will fire LESS often than it did.
+        consecutive_losses = facts.consecutive_losses
 
         # 6. Check recent patterns/alerts
         recent_alerts = await self._get_recent_alerts(db, broker_account_id, minutes=30)
@@ -513,26 +529,10 @@ class DangerZoneService:
         )
         return result.scalar_one_or_none()
 
-    async def _get_today_pnl(
-        self,
-        db: AsyncSession,
-        broker_account_id: UUID
-    ) -> float:
-        """Get total P&L for today using CompletedTrade.realized_pnl (real P&L)."""
-        today_start_utc = datetime.combine(
-            datetime.now(IST).date(), _time.min, tzinfo=IST
-        ).astimezone(timezone.utc)
-
-        result = await db.execute(
-            select(func.sum(CompletedTrade.realized_pnl)).where(
-                and_(
-                    CompletedTrade.broker_account_id == broker_account_id,
-                    CompletedTrade.exit_time >= today_start_utc
-                )
-            )
-        )
-        total = result.scalar()
-        return float(total) if total else 0.0
+    # _get_today_pnl and _count_consecutive_losses were removed 2026-08-23.
+    # Both re-answered questions app/core/session_facts now answers once. The
+    # streak version here was the cross-day one that could start a cooldown for
+    # a run that ended on a previous day.
 
     async def _get_trade_count(
         self,
@@ -540,12 +540,17 @@ class DangerZoneService:
         broker_account_id: UUID,
         minutes: Optional[int] = None
     ) -> int:
-        """Get trade count in time window.
+        """Count raw order events in a time window.
 
-        Windowed (minutes set): raw Trade order events — burst detection cares
-        about order velocity, not completed round-trips.
-        Daily (minutes=None): CompletedTrade — matches user's 'trades per day' goal
-        which counts round-trips, not individual order legs.
+        Deliberately a DIFFERENT unit from the session facts: burst detection
+        cares about order velocity, and three tranches of one exit are three
+        orders placed in a minute even though they are one round-trip. That is a
+        distinct fact, not a competing definition of the same one.
+
+        The daily branch (minutes=None) is retained for callers that pass no
+        window, but session-wide counts should come from
+        `session_facts.load_facts(...).trades` instead - that is the canonical
+        round-trip count.
         """
         now = datetime.now(timezone.utc)
         if minutes:
@@ -572,31 +577,6 @@ class DangerZoneService:
                 )
             )
         return result.scalar() or 0
-
-    async def _count_consecutive_losses(
-        self,
-        db: AsyncSession,
-        broker_account_id: UUID
-    ) -> int:
-        """Count consecutive losing completed trades from most recent (uses real P&L)."""
-        result = await db.execute(
-            select(CompletedTrade).where(
-                and_(
-                    CompletedTrade.broker_account_id == broker_account_id,
-                    CompletedTrade.realized_pnl.isnot(None)
-                )
-            ).order_by(CompletedTrade.exit_time.desc()).limit(10)
-        )
-        completed_trades = result.scalars().all()
-
-        consecutive = 0
-        for ct in completed_trades:
-            if float(ct.realized_pnl) < 0:
-                consecutive += 1
-            else:
-                break
-
-        return consecutive
 
     async def _get_recent_alerts(
         self,

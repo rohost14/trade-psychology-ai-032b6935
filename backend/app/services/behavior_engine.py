@@ -52,6 +52,8 @@ from decimal import Decimal
 from typing import List, Optional, Dict, Any
 
 from app.core.severity import SEVERITY_ORDER
+from app.core import session_facts
+from app.core.session_facts import SessionFacts
 from uuid import UUID, uuid4
 from zoneinfo import ZoneInfo
 
@@ -141,6 +143,21 @@ class EngineContext:
     # do NOT read this yet - cutover happens detector-by-detector once shadow
     # mismatch count stays zero across live sessions.
     session_state: Optional[object] = None
+    # The session's canonical facts INCLUDING completed_trade: P&L, trade count,
+    # loss/win streak, peak and drawdown. One definition, in app/core/session_facts.
+    # Detectors read these instead of each recomputing their own version - which is
+    # how four different answers to "how many losses in a row" got shipped.
+    facts: Optional[SessionFacts] = None
+
+    def __post_init__(self):
+        # Derive rather than require. A context assembled anywhere - the engine,
+        # a test, a future caller - has the same facts as any other, instead of
+        # detectors silently seeing a streak of zero because whoever built the
+        # context did not know to pass one.
+        if self.facts is None:
+            self.facts = session_facts.derive(
+                list(self.session_trades) + [self.completed_trade]
+            )
 
 
 # ---------------------------------------------------------------------------
@@ -337,17 +354,12 @@ class BehaviorEngine:
                 for_date=session.session_date,
             )
 
-        # Query 1: today's completed trades
-        ct_result = await db.execute(
-            select(CompletedTrade)
-            .where(and_(
-                CompletedTrade.broker_account_id == broker_account_id,
-                CompletedTrade.exit_time >= session_start,
-                CompletedTrade.id != completed_trade.id,  # exclude current trade — it's already ctx.completed_trade
-            ))
-            .order_by(CompletedTrade.exit_time.asc())
+        # Query 1: this session's completed trades, excluding the one being
+        # analysed — it travels separately as ctx.completed_trade.
+        session_trades = await session_facts.load_session_trades(
+            db, broker_account_id, session.session_date,
+            exclude_id=completed_trade.id,
         )
-        session_trades = list(ct_result.scalars().all())
 
         # Thresholds resolve AFTER today's trades are loaded, so the ladder can
         # use rung 2 — comparisons against what this trader has done today. That
@@ -401,11 +413,9 @@ class BehaviorEngine:
         #   session_intent compared actual_trades (always 0) against the trader's
         #   declared limit, so the end-of-day comparison always reported that they
         #   had kept to it. Found by auditing ownership, not by a test.
-        session.session_pnl = (
-            sum(Decimal(str(t.realized_pnl or 0)) for t in session_trades)
-            + Decimal(str(completed_trade.realized_pnl or 0))
-        )
-        session.trade_count = len(session_trades) + 1
+        facts = session_facts.derive(list(session_trades) + [completed_trade])
+        session.session_pnl = facts.pnl
+        session.trade_count = facts.trades
 
         # ── P2 shadow: SessionState fold vs legacy recompute ──────────────
         # Zero extra IO (folds rows already loaded). A mismatch means the
@@ -437,6 +447,7 @@ class BehaviorEngine:
             strategy_group=strategy_group,
             exit_order_types=exit_order_types,
             session_state=shadow_state,
+            facts=facts,
         )
 
     # ── Run all detectors ──────────────────────────────────────────────────
@@ -657,27 +668,29 @@ class BehaviorEngine:
     def _detect_consecutive_loss_streak(self, ctx: EngineContext) -> Optional[DetectedEvent]:
         # HIGH-1 fix: session_trades excludes the current trade — include it so
         # the 5th consecutive loss correctly triggers danger (not the 6th).
-        all_trades = list(ctx.session_trades) + [ctx.completed_trade]
+        all_trades = session_facts.in_exit_order(
+            list(ctx.session_trades) + [ctx.completed_trade]
+        )
         if not all_trades:
             return None
 
-        streak = 0
+        # The streak itself comes from the canonical definition, not from a
+        # count written here. Three other places used to count it their own way.
+        streak = ctx.facts.consecutive_losses if ctx.facts else 0
+        if streak == 0:
+            return None
+
         total_loss = Decimal("0")
         losing_trades = []
-        for _t in reversed(all_trades):
+        for _t in all_trades[-streak:]:
             pnl = Decimal(str(_t.realized_pnl or 0))
-            if pnl < 0:
-                streak += 1
-                total_loss += abs(pnl)
-                losing_trades.append({
-                    "symbol": _t.tradingsymbol or "—",
-                    "pnl": float(pnl),
-                    "qty": _t.total_quantity or 0,
-                    "exit_time_ist": _t.exit_time.astimezone(IST).strftime("%H:%M") if _t.exit_time else None,
-                })
-            else:
-                break
-        losing_trades.reverse()  # oldest → newest for display
+            total_loss += abs(pnl)
+            losing_trades.append({
+                "symbol": _t.tradingsymbol or "—",
+                "pnl": float(pnl),
+                "qty": _t.total_quantity or 0,
+                "exit_time_ist": _t.exit_time.astimezone(IST).strftime("%H:%M") if _t.exit_time else None,
+            })
 
         caution = ctx.thresholds.get("consecutive_loss_caution", 3)
         danger  = ctx.thresholds.get("consecutive_loss_danger", 5)
@@ -2484,13 +2497,10 @@ class BehaviorEngine:
         if len(trades) < 2:
             return None
 
-        # Compute cumulative P&L at each exit to find session peak.
-        running_pnl = Decimal("0")
-        peak_pnl = Decimal("0")
-        for t in trades:
-            running_pnl += Decimal(str(t.realized_pnl or 0))
-            if running_pnl > peak_pnl:
-                peak_pnl = running_pnl
+        # Peak and running total come from the canonical session facts — same
+        # arithmetic this used to do inline, now defined once.
+        peak_pnl = ctx.facts.peak_pnl if ctx.facts else Decimal("0")
+        running_pnl = ctx.facts.pnl if ctx.facts else Decimal("0")
 
         min_peak = Decimal(str(ctx.thresholds.get("profit_giveaway_min_peak", 1000)))
         min_erosion = Decimal(str(ctx.thresholds.get("profit_giveaway_min_erosion", 500)))

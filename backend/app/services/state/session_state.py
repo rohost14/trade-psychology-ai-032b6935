@@ -24,6 +24,12 @@ DERIVED STATE (scores — Phase 5) lives elsewhere and is NEVER an input to
 detectors (A.10 derived-state ban).
 ────────────────────────────────────────────────────────────────
 
+The definitions of the shared fields (session_pnl, trade_count, streaks, peak,
+drawdown) are NOT set here — they live in `app/core/session_facts`, which the
+live engine, the danger zone, the prediction service and the per-trade feature
+rows all read. This object folds them incrementally and must agree with it;
+`test_session_state_matches_canonical_facts` is what holds that.
+
 Design rule: this object is a PURE FOLD over the session's CompletedTrades.
 rebuild(trades) from scratch and update(state, trade) incrementally MUST
 produce identical results — that property is what makes Redis caching safe
@@ -106,7 +112,18 @@ class SessionState:
             self.last_loss_time = trade.exit_time
             if hold_min is not None:
                 self.loser_hold_minutes.append(hold_min)
-        # pnl == 0: scratch trade — counts, breaks no streak either way
+        else:
+            # Scratch trade (exactly zero). It counts as a trade and it BREAKS
+            # both streaks - a flat trade is not a loss, so a run of losses has
+            # ended.
+            #
+            # CHANGED 2026-08-23. This branch used to leave both streaks
+            # untouched, so a loss-flat-loss sequence read as a streak of two
+            # here and a streak of one in the live detector. Shadow state and the
+            # engine disagreed about what a streak is. The canonical definition
+            # is app/core/session_facts, and this now matches it.
+            self.consecutive_losses = 0
+            self.consecutive_wins = 0
 
         if trade.exit_time:
             if self.first_trade_time is None:

@@ -73,6 +73,26 @@ def _unrealized_pnl_for_position(
     return base * multiplier
 
 
+def _entry_facts(ct, prev_rounds, entry_ist):
+    """
+    This session's facts as they stood when `ct` was entered.
+
+    Returns EMPTY when the entry time is unknown - the honest answer, and better
+    than the old code's silent zero, which was indistinguishable from a clean
+    session.
+    """
+    from app.core import session_facts
+
+    if not entry_ist or not ct.entry_time:
+        return session_facts.EMPTY
+    try:
+        start = session_facts.session_start(entry_ist.date())
+    except Exception:
+        return session_facts.EMPTY
+    same_session = [r for r in prev_rounds if r.exit_time and r.exit_time >= start]
+    return session_facts.as_of(same_session, ct.entry_time)
+
+
 class PnLCalculator:
     """
     Calculates P&L for trades by matching BUY/SELL pairs using FIFO.
@@ -707,33 +727,24 @@ class PnLCalculator:
         size_rel = (ct.total_quantity or 0) / avg_qty if avg_qty > 0 else 1.0
 
         # --- Context features ---
-        last_round = prev_rounds[-1] if prev_rounds else None
+        # State the trader was in when they ENTERED this round, from the same
+        # definitions the live engine uses (app/core/session_facts), with the
+        # cutoff moved back to entry time.
+        #
+        # CHANGED 2026-08-23: consecutive_loss_count and entry_after_loss used to
+        # be counted across every prior round in the 50-trade context window,
+        # with no session boundary, while session_pnl_at_entry in the SAME ROW
+        # was session-scoped. So one row could say "third loss in a row" about a
+        # streak that spanned a weekend, next to a session P&L of zero. Both are
+        # now session-scoped and cannot contradict each other.
+        facts = _entry_facts(ct, prev_rounds, entry_ist)
         entry_after_loss = bool(
-            last_round and float(last_round.realized_pnl or 0) < 0
+            facts.last_trade_pnl is not None and facts.last_trade_pnl < 0
         )
+        consecutive_losses = facts.consecutive_losses
+        session_pnl = facts.pnl
 
-        consecutive_losses = 0
-        for r in reversed(prev_rounds):
-            if float(r.realized_pnl or 0) < 0:
-                consecutive_losses += 1
-            else:
-                break
-
-        # Session P&L at entry (realized P&L from same session before this round)
-        session_pnl = Decimal("0")
-        if entry_ist:
-            try:
-                from app.core.market_hours import get_session_boundaries
-                sess_start, sess_end = get_session_boundaries(
-                    for_date=entry_ist.date()
-                )
-                session_pnl = sum(
-                    Decimal(str(r.realized_pnl or 0))
-                    for r in prev_rounds
-                    if r.exit_time and sess_start <= r.exit_time <= sess_end
-                )
-            except Exception:
-                session_pnl = Decimal("0")
+        last_round = prev_rounds[-1] if prev_rounds else None
 
         # Gap from previous round
         minutes_since = None
