@@ -389,14 +389,23 @@ class BehaviorEngine:
             except Exception as _ot_err:
                 logger.debug(f"Exit order type lookup skipped: {_ot_err}")
 
-        # CRIT-1 fix: session.session_pnl is never written by any caller
-        # (add_session_pnl has zero call sites). Compute it fresh from actual
-        # CompletedTrades so session_meltdown and overtrading_burst get real data.
-        # update_risk_score() calls db.flush() which will persist this as a side effect.
+        # ── Session facts: this is their ONE owner ───────────────────────────
+        # Both are derived fresh from the session's CompletedTrades on every
+        # call. Deriving beats incrementing here because a replay, a late fill or
+        # a retried task all recompute to the same answer, where increments
+        # double-count.
+        #
+        # session_pnl: add_session_pnl() existed for this and had zero callers.
+        # trade_count: had NO writer at all. Two live consumers read it anyway -
+        #   the session log rendered "0 trades" for every session, and
+        #   session_intent compared actual_trades (always 0) against the trader's
+        #   declared limit, so the end-of-day comparison always reported that they
+        #   had kept to it. Found by auditing ownership, not by a test.
         session.session_pnl = (
             sum(Decimal(str(t.realized_pnl or 0)) for t in session_trades)
             + Decimal(str(completed_trade.realized_pnl or 0))
         )
+        session.trade_count = len(session_trades) + 1
 
         # ── P2 shadow: SessionState fold vs legacy recompute ──────────────
         # Zero extra IO (folds rows already loaded). A mismatch means the

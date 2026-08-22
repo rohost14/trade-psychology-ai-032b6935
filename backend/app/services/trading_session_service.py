@@ -5,8 +5,13 @@ Manages one TradingSession row per (broker_account, trading_day).
 
 Responsibilities:
   - get_or_create_session: idempotent, safe to call multiple times per day
-  - increment_trade_count / increment_alerts_fired: lightweight counters
+  - alert-budget counters
   - close_session: records closing equity at end of day
+
+This service does NOT own `session_pnl` or `trade_count`. Both are derived from
+the session's CompletedTrades by `behavior_engine._load_context`, which is their
+single writer. The incremental setters that used to live here are gone — see the
+note below.
 
 `update_risk_score` and the 40/70/90 session_state ladder were removed
 2026-08-13 — see docs/GLOBALS_DERIVATION.md. The `risk_score` and
@@ -97,17 +102,20 @@ class TradingSessionService:
 
         return session
 
+    # ── Removed 2026-08-23: increment_trade_count and add_session_pnl ──────
+    # Both mutated session facts incrementally, and both had ZERO production
+    # callers. They are gone rather than dormant because a dormant second writer
+    # is an invitation: session_pnl and trade_count now have exactly one owner
+    # (behavior_engine._load_context, which derives both from the session's
+    # CompletedTrades), and an increment path alongside a derive path is how the
+    # two disagree.
+    #
+    # Deriving is also what makes replay and retries safe - recomputing gives the
+    # same answer, incrementing double-counts.
+
     # ------------------------------------------------------------------
     # Lightweight counters
     # ------------------------------------------------------------------
-
-    @staticmethod
-    async def increment_trade_count(session_id: UUID, db: AsyncSession) -> None:
-        session = await db.get(TradingSession, session_id)
-        if session:
-            session.trade_count += 1
-            session.updated_at = datetime.now(timezone.utc)
-            await db.flush()
 
     @staticmethod
     async def increment_alerts_fired(session_id: UUID, db: AsyncSession, count: int = 1) -> None:
@@ -165,23 +173,6 @@ class TradingSessionService:
         )
         row = result.scalar_one_or_none()
         return None if row is None else int(row) - count
-
-    @staticmethod
-    async def add_session_pnl(
-        session_id: UUID,
-        pnl_delta: Decimal,
-        db: AsyncSession,
-    ) -> None:
-        """Add realized P&L from a trade to the session total."""
-        session = await db.get(TradingSession, session_id)
-        if session:
-            session.session_pnl = (session.session_pnl or Decimal("0")) + pnl_delta
-            session.updated_at = datetime.now(timezone.utc)
-            await db.flush()
-
-    # ------------------------------------------------------------------
-    # Session close
-    # ------------------------------------------------------------------
 
     @staticmethod
     async def close_session(

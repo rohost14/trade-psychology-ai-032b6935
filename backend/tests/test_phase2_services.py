@@ -496,23 +496,11 @@ class TestTradingSessionDB:
     # 40/70/90 `_state_for_score` ladder no longer exist.
     # See docs/GLOBALS_DERIVATION.md.
 
-    async def test_increment_trade_count(self, db, broker):
-        session = await TradingSessionService.get_or_create_session(
-            broker.id, date.today(), db
-        )
-        await TradingSessionService.increment_trade_count(session.id, db)
-        await TradingSessionService.increment_trade_count(session.id, db)
-        await db.refresh(session)
-        assert session.trade_count == 2
-
-    async def test_add_session_pnl(self, db, broker):
-        session = await TradingSessionService.get_or_create_session(
-            broker.id, date.today(), db
-        )
-        await TradingSessionService.add_session_pnl(session.id, Decimal("1500"), db)
-        await TradingSessionService.add_session_pnl(session.id, Decimal("-500"), db)
-        await db.refresh(session)
-        assert session.session_pnl == Decimal("1000")
+    # test_increment_trade_count and test_add_session_pnl were removed
+    # 2026-08-23 with their subject. `session_pnl` and `trade_count` are now
+    # derived from CompletedTrades by behavior_engine._load_context, which is
+    # their single writer; the incremental setters no longer exist. Coverage
+    # moved to tests/test_session_fact_ownership.py.
 
     async def test_close_session(self, db, broker):
         session = await TradingSessionService.get_or_create_session(
