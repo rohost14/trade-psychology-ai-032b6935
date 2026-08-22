@@ -55,6 +55,20 @@ applied?".
 
 ---
 
+- **`completed_trade_features` is empty in production.** 1,515 completed trades,
+  **0** feature rows, verified against the live DB. Features are only written by
+  `_compute_features_for_new_rounds` inside `pnl_calculator.calculate_and_update_pnl`,
+  over a bounded recompute window. The consequence is on **My Record**: every
+  feature-derived card ("your record after 2+ losses in a row", "after a loss",
+  "on expiry day", "quick re-entry") is guarded by `f is not None` and so renders
+  empty rather than erroring. Presumably always has.
+- **`pattern_prediction_service` looks up a pattern type that does not exist** —
+  `pattern_counts.get("revenge_trading")` against a vocabulary whose 33 types
+  include `revenge_trade` and never `revenge_trading`. Always 0, so the history
+  factor in the revenge probability is dead. Left alone on purpose: it changes
+  user-visible probabilities and belongs with the parked frontend-vocabulary
+  work.
+
 ## 2. Open — MEDIUM
 
 ### M1. The frontend duplicates a catalogue the backend already serves
@@ -148,6 +162,9 @@ no bundle cost, but publicly reachable in production.
 | `critical` folded into `danger` on the live alert path only | `49f70c3` |
 | 14 pattern types unmapped, 10 phantom keys, 16 missing labels | `a67fc4f` |
 | `fomo_entry` pre-close reused the market-open threshold | `a67fc4f` |
+| `trading_sessions.trade_count` had NO writer — the session log showed "0 trades" for every day, and the end-of-day intent review always reported the trader had kept to their trade limit | `3dc9fc0` |
+| Nine places computed a session fact for themselves; `consecutive_losses` alone had five definitions. `app/core/session_facts.py` is now the only one | `d8cde10`, `e70b457` |
+| Danger zone counted the loss streak ACROSS DAYS — five losses on Friday plus one on Monday started a cooldown and a WhatsApp for a run that had ended. Now session-scoped; **fires less than it did** | `d8cde10` |
 | Empty baseline claimed as personal knowledge | `38f0345` |
 | Six dead constants | `9536230` |
 | Replay harness dropping 8.4% of fills | `6812b3f` |
