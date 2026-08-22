@@ -38,9 +38,21 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.completed_trade import CompletedTrade
 from app.core.trading_defaults import COLD_START_DEFAULTS, estimate_capital_at_risk
+from app.core.baseline_rules import (
+    RECENT_WINDOW_TRADES,
+    cap_adaptation,
+    clean_for_learning,
+    divergence,
+)
 
 logger = logging.getLogger(__name__)
 IST = ZoneInfo("Asia/Kolkata")
+
+
+def _mad(values: List[float]) -> float:
+    """Median absolute deviation - the robust spread measure."""
+    from app.core.baseline_rules import mad as _m
+    return _m(values) or 0.0
 
 
 def _percentile(values: List[float], p: float) -> Optional[float]:
@@ -62,7 +74,12 @@ def _pct_metric(values: List[float], p: float, n: int, target: int,
     the reader's blend used `median x 1.5` and `median / 4`. Merging them means
     the multipliers can go.
     """
-    v = _percentile(values, p)
+    # Learn only from observations a baseline is ALLOWED to learn from. Extremes
+    # are excluded from the UPDATE (global rule 5): an outlier is evidence about
+    # a day, not about a habit. It stays in the trade record and can still fire a
+    # detector - it simply does not get to redefine what is typical.
+    learnable = clean_for_learning(values)
+    v = _percentile(learnable, p)
     if v is None:
         return None
     return {
@@ -70,6 +87,8 @@ def _pct_metric(values: List[float], p: float, n: int, target: int,
         "percentile": p,
         "confidence": round(min(1.0, n / max(target, 1)), 3),
         "n": n,
+        "n_learned": len(learnable),
+        "n_excluded": len(values) - len(learnable),
     }
 
 
@@ -77,12 +96,23 @@ def _metric(values: List[float], n: int, target: int) -> Optional[Dict]:
     """Build one metric record. confidence = sample size vs target, capped 1."""
     if not values:
         return None
+    learnable = clean_for_learning(values)
+    if not learnable:
+        return None
     return {
-        "value": round(statistics.median(values), 4),
-        "mean": round(statistics.fmean(values), 4),
+        "value": round(statistics.median(learnable), 4),
+        # Diagnosis only. NOTHING may resolve a threshold from a mean: nine
+        # Rs 500 losses and one Rs 25,000 loss put the mean at 2,950, which is
+        # true of nothing this trader does.
+        "mean": round(statistics.fmean(learnable), 4),
         "confidence": round(min(1.0, n / max(target, 1)), 3),
         "n": n,
-        "stddev": round(statistics.pstdev(values), 4) if len(values) > 1 else None,
+        "n_learned": len(learnable),
+        "n_excluded": len(values) - len(learnable),
+        # MAD, not stddev: stddev is defined around the mean and inherits its
+        # sensitivity to exactly the outliers trading data is full of.
+        "mad": round(_mad(learnable), 4) if len(learnable) > 1 else None,
+        "stddev": round(statistics.pstdev(learnable), 4) if len(learnable) > 1 else None,
     }
 
 
@@ -94,12 +124,78 @@ def _profit_factor(trades) -> float | None:
     return round(gross_win / gross_loss, 3)
 
 
+
+def _apply_adaptation_cap(metrics: Dict, previous: Optional[Dict]) -> Dict:
+    """
+    Limit how far each metric may move in one recompute (global rule 3).
+
+    Without a cap a trader who escalates for a fortnight has simply taught the
+    system that escalation is normal: they size up, the baseline follows, and the
+    detector never fires again. The cap is what makes that impossible.
+
+    The uncapped value is kept alongside, so the fact that a cap bound is visible
+    rather than silent.
+    """
+    if not previous:
+        return metrics
+    prev_metrics = (previous or {}).get("metrics") or {}
+    capped = {}
+    for name, rec in metrics.items():
+        prev = prev_metrics.get(name)
+        prev_value = prev.get("value") if isinstance(prev, dict) else None
+        if prev_value is None or rec.get("value") is None:
+            capped[name] = rec
+            continue
+        proposed = float(rec["value"])
+        limited = cap_adaptation(float(prev_value), proposed)
+        if limited != proposed:
+            rec = {**rec, "value": round(limited, 4),
+                   "uncapped_value": round(proposed, 4),
+                   "adaptation_capped": True}
+        capped[name] = rec
+    return capped
+
+
+def _compute_divergence(by_session: Dict, trades: List) -> Optional[Dict]:
+    """
+    Recent behaviour against long-term behaviour, for the two metrics where
+    escalation actually matters: how much they trade, and how big.
+
+    Deliberately not computed for every metric. The plan flagged universal
+    two-window tracking as premature - it doubles state for a benefit only a
+    couple of metrics have.
+    """
+    daily_counts = [float(len(v)) for v in by_session.values()]
+    sizes = [abs(float(t.avg_entry_price or 0)) * abs(int(t.total_quantity or 0))
+             for t in trades]
+    sizes = [v for v in sizes if v > 0]
+
+    out = {}
+    d = divergence(daily_counts, daily_counts[-RECENT_WINDOW_TRADES:])
+    if d.ratio is not None:
+        out["daily_trades"] = {"long_term": d.long_term, "recent": d.recent,
+                               "ratio": round(d.ratio, 3), "notable": d.is_notable,
+                               "direction": d.direction}
+    d = divergence(sizes, sizes[-RECENT_WINDOW_TRADES:])
+    if d.ratio is not None:
+        out["position_size"] = {"long_term": d.long_term, "recent": d.recent,
+                                "ratio": round(d.ratio, 3), "notable": d.is_notable,
+                                "direction": d.direction}
+    return out or None
+
+
 async def compute_baseline(
     broker_account_id: UUID,
     db: AsyncSession,
     days: int = 90,
     trading_capital: Optional[float] = None,
+    previous: Optional[Dict] = None,
 ) -> Dict:
+    """
+    `previous` is the baseline this one replaces. Supplying it enables capped
+    adaptation (global rule 3): without a previous value there is nothing to cap
+    against, and a first baseline is legitimately unconstrained.
+    """
     cutoff = datetime.now(timezone.utc) - timedelta(days=days)
     result = await db.execute(
         select(CompletedTrade)
@@ -249,7 +345,14 @@ async def compute_baseline(
         "days_window": days,
         "sessions_analyzed": n_sessions,
         "trades_analyzed": n_trades,
-        "metrics": {k: v for k, v in metrics.items() if v is not None},
+        "metrics": _apply_adaptation_cap(
+            {k: v for k, v in metrics.items() if v is not None}, previous
+        ),
+        # Long-window vs recent behaviour, per global rule 2. Reported, never
+        # used as a threshold: a trader whose sizes have doubled this month is a
+        # finding in itself, and one rolling window cannot express it because by
+        # the time it has adapted there is nothing left to compare against.
+        "divergence": _compute_divergence(by_session, trades),
     }
     logger.info(
         f"[baseline] {broker_account_id}: {n_sessions} sessions / {n_trades} trades — "

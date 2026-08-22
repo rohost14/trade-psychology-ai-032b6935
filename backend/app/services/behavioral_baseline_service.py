@@ -117,9 +117,14 @@ class BehavioralBaselineService:
                     UserProfile.broker_account_id == broker_account_id
                 )
             )).scalar_one_or_none()
+            # The previous baseline is what capped adaptation caps AGAINST. Without
+            # it every recompute is unconstrained, and a fortnight of escalation
+            # quietly becomes the new normal.
+            _previous = (getattr(_prof, "detected_patterns", None) or {}).get("baseline")
             baseline = await compute_baseline(
                 broker_account_id, db,
                 trading_capital=getattr(_prof, "trading_capital", None),
+                previous=_previous,
             )
             if baseline is None:
                 logger.info(f"Insufficient data for baseline: {broker_account_id}")
