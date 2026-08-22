@@ -112,6 +112,14 @@ class MarginService:
         utilised = segment_data.get("utilised", {})
 
         live_balance = float(available_data.get("live_balance", 0))
+        # Kite documents this as "Opening balance at the day start". It is the
+        # only figure here that does NOT move with M2M or margin utilisation,
+        # which makes it the honest denominator for "how much of the account did
+        # today cost". live_balance is deliberately NOT used for that — it
+        # shrinks as risk is taken, so a %-of-equity floor would get easier to
+        # breach as the day got worse. Our own client docstring omitted this
+        # field entirely, which is how it was missed until now.
+        opening_balance = float(available_data.get("opening_balance", 0) or 0)
         cash = float(available_data.get("cash", 0))
         collateral = float(available_data.get("collateral", 0))
         intraday_payin = float(available_data.get("intraday_payin", 0))
@@ -138,12 +146,14 @@ class MarginService:
         return {
             "available": round(live_balance, 2),
             "used": round(net_blocked, 2),
-            "total": round(live_balance, 2),   # total equity = live_balance
+            "total": round(live_balance, 2),   # NB: live_balance, not opening
+            "opening_balance": round(opening_balance, 2),
             "utilization_pct": utilization_pct,
             # M3: distinct flag so callers can distinguish "fully used" from "in debt"
             "is_insolvent": live_balance < 0,
             "breakdown": {
                 "cash": cash,
+                "opening_balance": opening_balance,
                 "collateral": collateral,
                 "intraday_payin": intraday_payin,
                 "exposure": exposure,
@@ -288,6 +298,7 @@ class MarginService:
             equity_available=equity.get("available"),
             equity_used=equity.get("used"),
             equity_total=equity.get("total"),
+            equity_opening_balance=equity.get("opening_balance"),
             equity_utilization_pct=_clamp_pct(equity.get("utilization_pct")),
             commodity_available=commodity.get("available"),
             commodity_used=commodity.get("used"),

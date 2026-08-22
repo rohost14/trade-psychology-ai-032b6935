@@ -26,6 +26,10 @@ class MarginSnapshot(Base):
     equity_available: Mapped[Optional[float]] = mapped_column(Numeric(15, 4), nullable=True)
     equity_used: Mapped[Optional[float]] = mapped_column(Numeric(15, 4), nullable=True)
     equity_total: Mapped[Optional[float]] = mapped_column(Numeric(15, 4), nullable=True)
+    #: Kite available.opening_balance — balance at day start. The canonical
+    #: account-risk denominator. equity_total above stores live_balance, which
+    #: moves with utilisation and must NOT be used for that.
+    equity_opening_balance: Mapped[Optional[float]] = mapped_column(Numeric(18, 2), nullable=True)
     equity_utilization_pct: Mapped[Optional[float]] = mapped_column(Numeric(5, 2), nullable=True)
 
     # Commodity segment

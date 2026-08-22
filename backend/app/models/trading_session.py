@@ -58,6 +58,18 @@ class TradingSession(Base):
     trade_count: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
     alerts_fired: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
 
+    # ── Account-risk denominator, frozen for this session ────────────────────
+    # Every "how much of the account did this cost" rule divides by THIS number.
+    # Resolved once when the session's first trade is processed and then left
+    # alone: a deposit or withdrawal at 13:00 must not retroactively change what
+    # the morning's alerts meant. Source/as_of/quality travel with it so a stale
+    # or self-reported figure can never be mistaken for live truth.
+    # See app/core/account_risk.py and migration 080.
+    risk_denominator: Mapped[Optional[Decimal]] = mapped_column(Numeric(18, 2), nullable=True)
+    risk_denominator_source: Mapped[Optional[str]] = mapped_column(String, nullable=True)
+    risk_denominator_as_of: Mapped[Optional[datetime]] = mapped_column(TIMESTAMP(timezone=True), nullable=True)
+    risk_denominator_quality: Mapped[Optional[str]] = mapped_column(String, nullable=True)
+
     # Risk tracking (internal)
     risk_score: Mapped[Decimal] = mapped_column(Numeric(5, 2), nullable=False, default=Decimal("0"))
     peak_risk_score: Mapped[Decimal] = mapped_column(Numeric(5, 2), nullable=False, default=Decimal("0"))
