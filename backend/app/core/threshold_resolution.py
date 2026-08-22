@@ -214,15 +214,20 @@ def resolve_thresholds(profile=None, session_trades=None) -> ThresholdSet:
     from app.core.trading_defaults import COLD_START_DEFAULTS, UNIVERSAL_FLOORS
 
     values: Dict[str, Any] = dict(COLD_START_DEFAULTS)
+    from app.core.threshold_registry import kind_for as _kind_for
     meta: Dict[str, Resolved] = {
-        k: Resolved(v, Source.GLOBAL, 0.0, "repo default")
+        k: Resolved(v, Source.GLOBAL, 0.0, "repo default", _kind_for(k))
         for k, v in COLD_START_DEFAULTS.items()
     }
+
+    from app.core.threshold_registry import kind_for
 
     def put(key: str, value: Any, source: Source,
             confidence: float = 0.0, detail: Optional[str] = None) -> None:
         values[key] = value
-        meta[key] = Resolved(value, source, confidence, detail)
+        # Kind comes from the registry, never from the caller: what a threshold
+        # IS must not depend on which code path happened to resolve it.
+        meta[key] = Resolved(value, source, confidence, detail, kind_for(key))
 
     if profile is not None:
         _apply_history(profile, values, meta, put)

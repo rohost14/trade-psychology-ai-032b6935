@@ -819,12 +819,24 @@ async def get_behavioral_insights(
                 "message": "Trade for at least 5 sessions to see your behavioral patterns.",
             }
 
-        session_count = baseline.get("session_count", 0)
-        daily_limit = baseline.get("daily_trade_limit")
-        burst = baseline.get("burst_trades_per_15min")
-        revenge_window = baseline.get("revenge_window_min")
-        consec_caution = baseline.get("consecutive_loss_caution")
-        consec_danger = baseline.get("consecutive_loss_danger")
+        # The baseline is v2 ({version, metrics{...}}) since 05962ae. This block
+        # read the v1 FLAT keys, which share nothing with v2 - so every guard
+        # below silently failed and this endpoint returned an empty list. A
+        # regression introduced by the H1 merge and missed at the time.
+        #
+        # v1 is still read for baselines not yet recomputed.
+        def _metric(name, *, legacy_key=None):
+            m = (baseline.get("metrics") or {}).get(name)
+            if isinstance(m, dict) and m.get("value") is not None:
+                return m["value"]
+            return baseline.get(legacy_key) if legacy_key else None
+
+        session_count = baseline.get("sessions_analyzed") or baseline.get("session_count", 0)
+        daily_limit = _metric("daily_trades_p75", legacy_key="daily_trade_limit")
+        burst = _metric("burst_per_30min_p75", legacy_key="burst_trades_per_30min_caution")
+        revenge_window = _metric("reentry_after_loss_p25", legacy_key="revenge_window_min")
+        consec_caution = _metric("loss_streak_p60", legacy_key="consecutive_loss_caution")
+        consec_danger = _metric("loss_streak_p85", legacy_key="consecutive_loss_danger")
 
         if daily_limit:
             insights.append({
@@ -838,9 +850,12 @@ async def get_behavioral_insights(
         if burst:
             insights.append({
                 "category": "Overtrading Risk",
-                "insight": f"Your burst trading threshold is {burst} trades per 15 minutes — alerts fire above this.",
+                "insight": f"Your burst threshold is {burst:.0f} trades in 30 minutes — alerts fire above this.",
                 "source": "observed",
-                "threshold_key": "burst_trades_per_15min",
+                # Repointed from burst_trades_per_15min, which no detector reads:
+                # both live burst detectors use the 30-minute pair, so the old key
+                # described a window nothing was measuring.
+                "threshold_key": "burst_trades_per_30min_caution",
                 "threshold_value": burst,
             })
 

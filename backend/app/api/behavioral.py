@@ -81,19 +81,34 @@ async def get_behavioral_baseline(
             )
 
         is_personalized = baseline is not None
-        active = baseline if is_personalized else COLD_START_DEFAULTS
+
+        # active_thresholds used to read flat keys straight off `baseline`. Since
+        # 05962ae the baseline is v2 ({version, metrics{...}}) and shares none of
+        # those keys, so every value came back null. Ask the resolver instead -
+        # it reports what is genuinely in force, which is what this endpoint
+        # claims to show.
+        from app.models.user_profile import UserProfile as _UP
+        from sqlalchemy import select as _select
+        from app.core.threshold_resolution import resolve_thresholds
+        _prof = (await db.execute(
+            _select(_UP).where(_UP.broker_account_id == broker_account_id)
+        )).scalar_one_or_none()
+        active = resolve_thresholds(_prof)
 
         return {
             "is_personalized": is_personalized,
-            "session_count": baseline.get("session_count") if baseline else 0,
+            "session_count": (baseline.get("sessions_analyzed")
+                              or baseline.get("session_count", 0)) if baseline else 0,
             "computed_at": baseline.get("computed_at") if baseline else None,
             "baseline": baseline,
             "cold_start_defaults": COLD_START_DEFAULTS,
             "universal_floors": UNIVERSAL_FLOORS,
             "active_thresholds": {
                 "daily_trade_limit":        active.get("daily_trade_limit"),
-                "burst_trades_per_15min":   active.get("burst_trades_per_15min"),
-                "revenge_window_min":       active.get("revenge_window_min"),
+                # was burst_trades_per_15min - no detector reads that key; the
+                # live burst detectors use the 30-minute pair.
+                "burst_trades_per_30min_caution": active.get("burst_trades_per_30min_caution"),
+                "revenge_window_caution_min": active.get("revenge_window_caution_min"),
                 "consecutive_loss_caution": active.get("consecutive_loss_caution"),
                 "consecutive_loss_danger":  active.get("consecutive_loss_danger"),
             },

@@ -67,9 +67,11 @@ COLD_START_DEFAULTS: Dict[str, Any] = {
     'burst_trades_per_30min_caution':   5,
     'burst_trades_per_30min_danger':    8,
 
-    # SEBI FY2023: traders with >6 trades/15 min window showed panic patterns.
-    # Used by RiskDetector (15-min window). BehaviorEngine uses 30-min window above.
-    'burst_trades_per_15min':           6,
+    # burst_trades_per_15min removed 2026-08-23. Its comment claimed "Used by
+    # RiskDetector", which was archived; a check of every reader found none in
+    # any detector - only two API endpoints displaying it. Both live burst
+    # detectors use burst_trades_per_30min_caution/_danger above, so this
+    # described a window nothing measured. The displays were repointed there.
 
     # ── Consecutive losses ────────────────────────────────────────────────
     # Tilt state begins after 3 losses (confirmed in poker+trading research).
@@ -331,7 +333,6 @@ COLD_START_DEFAULTS: Dict[str, Any] = {
 # Never fire alerts below these, regardless of user settings.
 # ---------------------------------------------------------------------------
 UNIVERSAL_FLOORS: Dict[str, Any] = {
-    'burst_trades_per_15min':           4,    # Never alert for < 4 trades in 15 min
     'burst_trades_per_30min_caution':   3,    # Never alert for < 3 trades in 30 min
     'revenge_window_caution_min':       2,    # Minimum 2-min caution window
     'revenge_window_danger_min':        1,    # Minimum 1-min danger window

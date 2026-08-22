@@ -173,7 +173,50 @@ before building.
 4. **`burst_trades_per_15min: 6`** — comment claims a detection role it has not
    had since `RiskDetector` was archived.
 
-### What G4 builds next (pending approval)
+### IMPLEMENTED 23 Aug 2026
+
+`app/core/threshold_registry.py` holds a `ThresholdSpec` for each of the 16
+migrated constants, declaring: **Kind · current fallback · resolution source ·
+metric · percentile · maturity · provenance**, plus `review_required` for the
+flagged ones.
+
+`Resolved.kind` is now populated from the registry on **every** resolution -
+never from the caller, so what a threshold IS cannot depend on which code path
+resolved it. `violates_kind()` is asserted against real resolutions in tests.
+
+**`personalise=False` on every entry.** The path exists; nothing is switched on.
+A test fails if any entry is enabled, so it cannot happen without a detector
+review. A named metric records that personalisation is *available*, not that it
+is correct - whether it makes a given detector more accurate is evidence work at
+that detector's review, and several of the 20 `personal_baseline` constants will
+be better left universal.
+
+Also enforced: a spec whose fallback drifts from the live constant fails the
+suite, and a spec naming a metric must state a maturity requirement - a
+percentile over no observations is noise, not personalisation.
+
+**`burst_trades_per_15min` retired** (default and its universal floor). Readers
+checked exhaustively: no detector, only two display endpoints, both repointed to
+`burst_trades_per_30min_caution` - the value that actually fires. Its entry is
+kept in `MANDATORY_REVIEW` so the reason survives the constant. Constants: 87 ->
+86 defaults, 11 -> 10 floors.
+
+**A regression found while doing it.** `/api/profile/behavioral-insights` and
+`/api/behavioral/baseline` both read v1 flat baseline keys, which share NOTHING
+with the v2 shape introduced by the H1 merge (`05962ae`). Every guard failed
+silently, so both endpoints returned empty - the first one's docstring calls it
+"the product differentiator". Introduced by me in H1 and missed at the time.
+Both now read v2 metrics with a v1 fallback for baselines not yet recomputed.
+
+### What is deliberately NOT built
+
+No metric computation. The specs name metrics that `baseline_service` does not
+yet produce; computing distributions nothing reads would be waste. Each metric
+is added when its detector's review decides personalisation actually helps.
+
+Groups A and B are untouched, as instructed.
+
+### Superseded plan (kept for the record)
 
 For the 11 in Group C plus the 5 personalisable in Group D: add the metric to
 `baseline_service`, register the ladder entry with its `Kind`, and **default the
