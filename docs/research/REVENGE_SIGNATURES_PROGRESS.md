@@ -10,13 +10,16 @@ picking this up cold, read this file, then `REVENGE_TRADING_REVIEW_BRIEF.md`.
 
 ## Where this stands
 
+**All five steps complete. Result: negative.** Read
+`REVENGE_SIGNATURES_FINDINGS.md` for the full report.
+
 | step | state |
 |---|---|
 | 1. Confidence-gate audit | **DONE** — `docs/contracts/confidence_alert_gate_CLOSED.md` |
-| 2. 15 signatures, full book | **collecting** — see restart below |
+| 2. 15 signatures, full book | **DONE** — `REVENGE_SIGNATURES_FINDINGS.md` |
 | 3. The 14-episode problem | **DONE** — root cause found, below |
-| 4. Personal ground-truth list | blocked on step 2 |
-| 5. Final conclusion | blocked on step 2 |
+| 4. Personal ground-truth list | **DONE** — Groups A-D, unlabelled, in the findings doc |
+| 5. Final conclusion | **DONE** — no trade-level signature clears 1.5 SE |
 
 ## If the collection was interrupted, restart it like this
 
