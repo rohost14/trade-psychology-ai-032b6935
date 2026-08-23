@@ -172,3 +172,63 @@ enforced where they can be", not "the foundation is validated".
 **If any of F1–F6 turns out to be hard to specify without a detector in front of
 it, that is evidence it is not foundation work.** I would rather say that at the
 time than build a general mechanism for one case.
+
+---
+
+## 6. Final status — F1–F5 complete, 23 Aug 2026
+
+F6 was dropped by decision: `confidence_alert_gate` stays at 50 and its effect on
+alerting belongs to detector review, once a real detector consumes the new
+confidence model.
+
+### Now shared and enforced
+
+| | what it guarantees |
+|---|---|
+| **F1** safety classification | 6 thresholds are `universal_safety`; `violates_kind` guards a non-empty set at resolution time. Registry: `universal_safety 6 · personal_baseline 14 · definitional 2 · fallback 8` |
+| **F2** floor directions | all 10 `UNIVERSAL_FLOORS` declare direction — 4 noise floors, 6 sensitivity floors. Each read from its consumer |
+| **F3** maturity | mature / immature / unavailable, per metric. Only `mature` may be described to a trader as theirs |
+| **F4** confidence | the weakest link, never a sum. No new constant |
+| **F5** instrument class | the denominator says what kind of quantity it is; a spread abstains rather than reporting a known-understated ratio |
+| earlier | canonical session facts · abstention semantics · baseline contamination · account-risk freezing · explainability · runtime guards · `DetectorResult` acceptance |
+
+**Verification, not assertion.** The full threshold set was resolved for a cold
+profile and a personalised one before and after F1+F2: identical. Replay: 40/40
+days identical, 79 = 79 alerts.
+
+**Why F1 is neutral and still worth doing.** Rung 1 moves seven keys and none is
+classified; rung 2 moves exactly two and neither is; POPULATION is unused. The
+guard refuses resolutions that do not currently occur — a lock fitted before
+anyone tries the door.
+
+**Why the tempo thresholds are not safety.** The seven keys personal history
+actually moves describe a trader's rhythm, not objective harm. Classifying them
+`universal_safety` would forbid the personalisation a baseline exists for, which
+is the opposite error to the one being fixed.
+
+### Intentionally pattern-by-pattern
+
+S1 · S2a–d · P1 · P3 · M1 values · B1 bound values · the frozen A×B matrix ·
+severity mapping · migrating any detector to `DetectorResult` · adoption of
+`measurements`, `maturity`, `confidence`, `instrument_risk`.
+
+A test asserts `behavior_engine` imports none of the new modules, so adoption
+cannot happen outside a detector review.
+
+### Infrastructure, not foundation
+
+`margin_snapshots` has no scheduled producer — gates A3 in the field · WebSocket
+head-of-line blocking · worker concurrency and NullPool churn.
+
+### Optional, unclaimed
+
+`EpisodeHint` · baseline `divergence` · the v1 baseline path · consolidation
+family ordering.
+
+### The honest limit
+
+Every F1–F5 mechanism is inert until a detector consumes it. The correct
+statement is **"the shared mechanisms exist and are enforced where they can be"**,
+not "the foundation is validated". Validation begins with `revenge_trade`, and if
+that detector does not come out demonstrably better, the foundation is wrong —
+which is far cheaper to discover at one detector than at twenty-seven.
