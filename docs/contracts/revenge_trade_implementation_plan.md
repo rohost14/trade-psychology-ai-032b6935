@@ -26,12 +26,33 @@ metric will be computed and stored while the A2-via-personal route stays abstain
 until P1 is decided.
 
 **b. The gap baseline is contaminated today.**
-`reentry_after_loss_p25` learns from every re-entry including confirmed revenge
-sequences, so the detector's own positives drag "normal" downward until it
-silences itself. `clean_for_learning(values, excluded_indices)` accepts the
-argument and **nothing has ever passed it**. Supplying it needs the baseline
-computation to read prior `RiskAlert`s for this account — a new input to
-`baseline_service`.
+`reentry_after_loss_p25` learns from every re-entry including harmful sequences,
+so the detector's own positives drag "normal" downward until it silences itself.
+`clean_for_learning(values, excluded_indices)` accepts the argument and **nothing
+has ever passed it**.
+
+**Corrected after review — the exclusion source must not be the detector's own
+output.** Reading prior `RiskAlert`s would create
+`detector → RiskAlert → baseline → detector`: the baseline would depend on what
+the detector previously decided, so a threshold change would silently rewrite the
+history it is measured against, and a detector that mis-fired once would keep
+teaching itself that it was right.
+
+The exclusion is therefore defined **structurally, from the trade record alone**:
+
+> A re-entry gap is excluded from learning when the trade that produced it
+> followed a losing trade **and itself closed at a loss**.
+
+Every term is observable in `CompletedTrade` — no alert, no threshold, no
+detector verdict. It is a statement about what happened, not about what we said
+about it. The same sequence facts already exist on `CompletedTradeFeature`
+(`entry_after_loss`, `minutes_since_last_round`), so this is a read of data the
+pipeline already produces.
+
+**Documented source of exclusions**: `CompletedTrade` sequence within a session —
+prior trade's `realized_pnl < 0`, this trade's `realized_pnl < 0`, ordered by
+`exit_time`. Recorded in the baseline output so the exclusion is auditable rather
+than implicit.
 
 **c. The registry entry is wrong for the new design.** `revenge_trade` is declared
 `uses_constitution=True` and **not** `uses_baseline=True`, though the new design
@@ -101,7 +122,7 @@ First consumer in every case — this is the point of doing this detector first.
 | `estimate_capital_at_risk(prior)` | existing helper | newly called for the prior trade |
 | own losing-trade size distribution | **new baseline metric** | yes |
 | own position-size distribution | **new baseline metric** | yes |
-| prior revenge alerts for this account | `RiskAlert` query in `baseline_service` | yes |
+| harmful-sequence indices for learning exclusion | `CompletedTrade` sequence (loss → re-entry → loss), **not** `RiskAlert` — see §0b | yes |
 
 ---
 
@@ -115,7 +136,7 @@ First consumer in every case — this is the point of doing this detector first.
 | **S2c** | A2 for futures | abstains |
 | **S2d** | A2 for equity/delivery | abstains — notional is not capital at risk |
 | **P1** | A2 via personal | that signal abstains; metric still computed and stored |
-| **P2** | B1 window percentile | falls back to existing `revenge_window_caution_min` |
+| **P2** | B1 window percentile | three explicit states — see below |
 | **P4** | `revenge_window_danger_min` | unused by the frozen matrix — B has no danger sub-tier |
 | **M1** | maturity per metric | personal signals abstain until decided |
 | **B1** | safety-bound values | bounds inert |
@@ -125,6 +146,26 @@ A0 → B0–B3**, producing `info` up to B2 and `caution` at B3. That is strictl
 honest than today and is the cold-start behaviour the contract promises.
 
 ---
+
+### P2 has three states, not two
+
+Conflating "we learned this from you" with "we had nothing, so we used the
+default" is how a trader ends up being told *your* limit about a number that was
+never theirs.
+
+| state | condition | window used | provenance recorded |
+|---|---|---|---|
+| **personalised** | metric present and mature | their `reentry_after_loss_p25` | `Source.HISTORY`, confidence from maturity, `personalised: true` |
+| **immature** | metric present, sample below M1 | declared fallback | its own existing provenance — `Source.DECLARED` if the trader set a cooldown, else `Source.GLOBAL`; **`personalised: false`** |
+| **unavailable** | no metric at all | declared fallback | same as immature, with `Insufficiency.NO_BASELINE` recorded |
+
+The fallback is never relabelled as personal. `threshold_recorder` already emits
+`personalised: false` with the reason when a `personal_baseline` Kind resolves
+from `global`; the immature and unavailable states reuse that path rather than
+inventing a second one.
+
+Copy follows the same split: a personalised window may say "faster than you
+usually re-enter"; the fallback may not, and says what it is.
 
 ## 4. Sequence
 
