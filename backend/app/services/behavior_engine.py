@@ -946,10 +946,24 @@ class BehaviorEngine:
         2: {1: "caution", 2: "danger", 3: "danger"},
         # A1 measured, unjudged - we hold a number and have no sanctioned rule
         # for calling it significant, so claiming harm would decide significance
-        # at the moment of use. info IS the abstention: recorded, countable, not
-        # shouted. Costs real coverage until S2 is decided, and makes that
-        # absence visible rather than hidden behind a threshold nobody chose.
-        1: {1: "info", 2: "info", 3: "info"},
+        # at the moment of use. B1 and B2 are therefore info: the abstention,
+        # recorded and countable rather than shouted.
+        #
+        # B3 is caution, and that cell was decided from evidence rather than
+        # taste. Auditing the eight sessions this detector used to alert on gave
+        # eleven loss-to-re-entry pairs: five likely false positives, all of them
+        # B1 re-entries into a DIFFERENT underlying; four ambiguous; and two
+        # likely genuine. B3 occurred exactly ONCE in eleven, on a loss of 33% of
+        # the premium, returning to the same strike two minutes later with 25%
+        # more size, inside a session escalating 40 -> 40 -> 80 -> 100 -> 200
+        # across four consecutive losses.
+        #
+        # An earlier revision made this info too, to suppress a trivial-loss case
+        # that turned out to exist only in a unit test - B3 never co-occurred with
+        # a trivial loss in the real book. Making it info removed the clearest
+        # genuine sequence in the sample and suppressed no false positive, because
+        # every false positive is B1 and no B3 cell can reach them.
+        1: {1: "info", 2: "info", 3: "caution"},
         # A0 unmeasurable - every magnitude frame abstained, so the loss MIGHT
         # have been large and the structural claim is all the evidence there is.
         # Quieter at A1 than at A0 reads backwards until you see why: structure

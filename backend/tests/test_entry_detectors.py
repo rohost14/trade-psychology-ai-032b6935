@@ -149,8 +149,10 @@ def test_a_scratch_loss_is_recorded_but_never_notified():
     events = evaluate_entry(engine, ctx(entry(), [closed_trade(pnl=-120.0)]))
     revenge = [e for e in events if e.event_type == "revenge_trade"]
     assert revenge, "the structural fact should still be recorded"
-    assert all(e.severity == "info" for e in revenge), (
-        "a measured-but-unjudged loss must never reach a notifying severity"
+    assert all(e.severity in ("info", "caution") for e in revenge)
+    assert all(e.shadow for e in revenge), (
+        "entry-time output is shadow evidence and never notifies, whatever the "
+        "severity"
     )
 
 

@@ -29,8 +29,8 @@ M = BehaviorEngine._RT_MATRIX
     (3, 1, "danger"), (3, 2, "danger"), (3, 3, "critical"),
     # A2 large — a decided threshold was crossed
     (2, 1, "caution"), (2, 2, "danger"), (2, 3, "danger"),
-    # A1 measured, unjudged — recorded, never notified
-    (1, 1, "info"), (1, 2, "info"), (1, 3, "info"),
+    # A1 measured, unjudged — B3 is caution, decided from the alert audit
+    (1, 1, "info"), (1, 2, "info"), (1, 3, "caution"),
     # A0 unmeasurable — structure alone carries the cold-start cell
     (0, 1, "info"), (0, 2, "info"), (0, 3, "caution"),
 ])
@@ -55,26 +55,40 @@ def test_only_one_cell_is_critical():
 
 def test_a_measured_small_loss_is_quieter_than_an_unknown_one():
     """
-    The revision. A0 and A1 used to be identical rows, which treated "we measured
-    it and have no rule to judge it by" exactly like "we could not see it at all".
+    A0 and A1 used to be identical rows, treating "we measured it and have no
+    rule to judge it by" exactly like "we could not see it at all". They are
+    different claims and must not act the same.
 
-    A1 is quieter, which reads backwards until the reason is stated: at A0 the
-    loss MIGHT have been large and the structural claim is all the evidence there
-    is; at A1 we hold a number we are not licensed to interpret, and claiming
-    harm would decide significance at the moment of use.
+    They now differ at B1 and B2, where a measured-but-unjudged loss stays silent.
+    They agree at B3, for the reason in
+    `test_escalation_is_reachable_without_a_significance_threshold`.
     """
-    assert M[0][3] == "caution"
-    assert M[1][3] == "info"
+    assert M[0][1] == M[1][1] == "info"
+    assert M[0][2] == M[1][2] == "info"
 
 
-def test_the_a1_row_never_notifies():
+def test_escalation_is_reachable_without_a_significance_threshold():
     """
-    Until a significance threshold is decided, a measured loss produces evidence
-    and nothing louder. This is real lost coverage and it is deliberate — it
-    makes the missing decision visible instead of hiding it behind a number
-    nobody chose.
+    (A1, B3) is `caution`, and that cell was decided from evidence rather than
+    taste.
+
+    Auditing the eight sessions this detector used to alert on gave eleven
+    loss-to-re-entry pairs: five likely false positives — every one a B1 re-entry
+    into a DIFFERENT underlying — four ambiguous, and two likely genuine. B3
+    occurred exactly once in eleven, on a 33%-of-premium loss returning to the
+    same strike two minutes later with 25% more size, inside a session escalating
+    40 → 40 → 80 → 100 → 200 across four consecutive losses.
+
+    An earlier revision made this `info` to suppress a trivial-loss case that
+    existed only in a unit test. It removed the clearest genuine sequence in the
+    book and suppressed no false positive — every false positive is B1, and no B3
+    cell can reach them.
     """
-    assert set(M[1].values()) == {"info"}
+    assert M[1][3] == "caution"
+    assert M[1][1] == "info" and M[1][2] == "info", (
+        "B1 and B2 stay silent at A1 — B2 is genuinely mixed and separating it "
+        "is what S2a is for"
+    )
 
 
 def test_severity_rises_with_reaction_structure_within_a_row():
@@ -85,19 +99,19 @@ def test_severity_rises_with_reaction_structure_within_a_row():
         assert levels == sorted(levels), f"A{a} is not monotonic in B"
 
 
-def test_severity_rises_with_trigger_magnitude_within_a_column():
+def test_severity_never_falls_as_trigger_magnitude_rises():
     """
-    Except at B3, where A0 outranks A1 for the reason in
-    `test_a_measured_small_loss_is_quieter_than_an_unknown_one`. That single
-    inversion is the whole content of the revision, so it is asserted rather
-    than tolerated.
+    Monotonic down every column. With (A1,B3) restored there is no inversion
+    left, so this holds without exception — a stronger property than the one it
+    replaced.
     """
     from app.core.severity import SEVERITY_ORDER
 
     for b in (1, 2, 3):
         for a in (1, 2, 3):
-            assert SEVERITY_ORDER.index(M[a][b]) >= SEVERITY_ORDER.index(M[a - 1][b]) \
-                or (a, b) == (1, 3), f"A{a}B{b} ranks below A{a-1}B{b}"
+            assert SEVERITY_ORDER.index(M[a][b]) >= SEVERITY_ORDER.index(M[a - 1][b]), (
+                f"A{a}B{b} ranks below A{a-1}B{b}"
+            )
 
 
 # ── the joins, with negative controls ──────────────────────────────────────
