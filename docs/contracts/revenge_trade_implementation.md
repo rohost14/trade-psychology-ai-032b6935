@@ -183,14 +183,9 @@ clean year from an unmonitored one.
 
 ## 7. Severity and confidence
 
-**Severity = harm if the behaviour is real.** From the safety frames only.
-
-| severity | condition |
-|---|---|
-| `critical` | safety breach **and** the new position is larger than the one that lost |
-| `danger` | safety breach in either safety frame |
-| `caution` | no safety breach; mature personal signals present |
-| `info` | structural fact only, or personal signals immature |
+**Severity = harm if the behaviour is real**, read from the two-axis table in
+§7A. Trigger magnitude alone never sets it: a large loss is evidence about what
+they were reacting to, not proof that the reaction was revenge.
 
 **Confidence = how well we could see it.** From data quality, how many frames
 were measurable, how mature the percentiles were, whether the symbol parsed.
@@ -215,6 +210,126 @@ applies afterwards as it does today.
 
 ---
 
+---
+
+## 7A. How the evidence combines — exact decision logic, no score
+
+**The semantic correction this section exists for.** A large prior loss is
+evidence about the **size of the trigger**. It is not evidence that a re-entry was
+revenge, and it is not severity on its own. `S2a` does not mean "80% of premium
+lost = revenge trade". It means "the loss they were reacting to was large in
+trade-relative terms" — and that signifies only once the structural gate has
+already established that a re-entry followed.
+
+So the detector reasons on **two ordinal axes** and reads a table. No sum, no
+weight, no count of signals.
+
+### Axis A — trigger magnitude: how big was the thing they reacted to
+
+Levels are named claims, each with a stated membership rule. `A` is the
+**highest level any frame establishes** — a lattice join, never an average.
+
+| level | established when | frame |
+|---|---|---|
+| **A0** `unquantified` | every magnitude frame abstained | — |
+| **A1** `ordinary` | at least one frame measured the loss and none reached A2 | any |
+| **A2** `large` | trade-relative ratio ≥ `S2[class]` **or** loss ≥ their own `P1` percentile | trade / personal |
+| **A3** `account_threatening` | account-relative ratio ≥ `S1` | account |
+
+Two properties follow from taking the maximum, and both are the point:
+
+- **An abstaining frame can never lower A.** Missing equity cannot reduce the
+  severity of a large trade-relative loss.
+- **Personal history can only raise A, never lower it.** "This is normal for them"
+  is unreachable — no rule in the logic removes a level. That is the
+  non-suppression guarantee, structural rather than promised.
+
+### Axis B — reaction structure: how much does the re-entry look like a reaction
+
+Levels are conjunctions of observable facts, ordered by **specificity of the
+claim**, not by how many facts are true.
+
+| level | established when |
+|---|---|
+| **B0** `unrelated` | re-entry outside the caution window, or a different underlying with no other tie |
+| **B1** `prompt` | re-entry inside the caution window |
+| **B2** `prompt_and_targeted` | B1 **and** same underlying (the exact same symbol is the stronger tier of that same fact, never both) |
+| **B3** `prompt_targeted_and_escalated` | B2 **and** the new position is larger than the one that lost |
+
+B2 and B3 are **nested**: B3 is unreachable without B2. That is precisely why they
+are levels and not points — the observations are not independent, so adding them
+was never valid.
+
+### The table
+
+Severity is read from (A, B). Every cell is a stated decision.
+
+| | **B0** unrelated | **B1** prompt | **B2** targeted | **B3** escalated |
+|---|---|---|---|---|
+| **A3** account-threatening | `caution` | `danger` | `danger` | `critical` |
+| **A2** large | `info` | `caution` | `danger` | `danger` |
+| **A1** ordinary | `info` | `info` | `caution` | `caution` |
+| **A0** unquantified | `info` | `info` | `caution` | `caution` |
+
+The corners, because a table is only as good as its edges:
+
+- **(A3, B0)** — an account-threatening loss with no re-entry pattern is
+  `caution`, not `danger`. This detector is about the *reaction*; without one
+  there is nothing here to call revenge. The loss itself is another detector's
+  business.
+- **(A0, B3)** — fast, same underlying, larger position, and the loss could not be
+  sized at all: `caution`. The structure is real and observable; the harm is not
+  established, so it does not escalate. **This is the cold-start cell, and it
+  fires on day one.**
+- **(A3, B3)** — the only `critical`. Account-threatening loss, immediate targeted
+  re-entry, larger position.
+- **A0 and A1 rows are identical.** Deliberate: "measured, and it was ordinary" and
+  "could not measure" should lead to the same action. Separating them would let
+  abstention behave like evidence.
+
+### The declared-rule breach is separate
+
+A breach of the trader's own `cooldown_after_loss` is a **fact about a commitment
+they made**, not objective harm. So it:
+
+- is always recorded in the evidence when it occurs;
+- raises severity to **at least `caution`** — they broke a rule they set;
+- **never** reaches `danger` or `critical` on its own, because those levels are
+  about harm and a self-set cooldown does not measure harm.
+
+Formally: `severity = max(table[A][B], caution if declared_breach else info)`.
+
+### What severity never depends on
+
+- **Confidence.** `danger` at 55% confidence is a legitimate output — that is why
+  the axes are separate.
+- **How many signals fired.** Counting is a weighted score with every weight set
+  to one, and it inherits every objection to the score that was retired.
+- **Personal history, downward.** No path lowers a level.
+
+### Confidence, computed separately
+
+Confidence answers *how well could we see this*, from four observable facts: the
+trade's data quality (`GOOD`/`PARTIAL`/`UNKNOWN`), how many magnitude frames were
+measurable rather than abstaining, the maturity of any personal percentile used,
+and whether both symbols parsed. Reported and recorded alongside severity; it
+never feeds the table.
+
+### Still unresolved, and what each costs
+
+| # | governs | if undecided |
+|---|---|---|
+| `S1` | the A3 boundary | A3 unreachable; account frame abstains; ceiling becomes `danger` |
+| `S2a–d` | the A2 boundary via trade-relative | A2 still reachable via `P1` once personal matures |
+| `P1` | the A2 boundary via personal | A2 reachable via `S2` once decided |
+| `P2` | the B1 window | falls back to the existing `revenge_window_caution_min` |
+| `B1` bounds | how far personal may move P1/P2 | bounds inert; personal percentiles unbounded until set |
+
+**P3 is gone, not deferred.** The draft carried an inline `1.5×` size multiple. B3
+as written needs no constant — "larger than the position that just lost" is
+directly observable. If evidence later shows a bare inequality is too noisy, a
+multiple can be introduced *with* that evidence. One fewer invented number.
+
 ## 8. Old → new threshold mapping
 
 | current | value | disposition |
@@ -225,7 +340,7 @@ applies afterwards as it does today.
 | `revenge_window_danger_min` | 5 | **UNRESOLVED (P4)** — already flagged mandatory-review |
 | `signal_points_*` ×4 | 30/20/10/5 | **DELETE** (§7) |
 | `_typical_loss` (inline, 3 losses, session-scoped) | — | **DELETE** — mislabelled; replaced by the personal frame over the baseline window |
-| size-escalation `1.5` (inline literal) | 1.5 | **UNRESOLVED (P3)** — or derived from their own size distribution, removing the constant |
+| size-escalation `1.5` (inline literal) | 1.5 | **DELETE** — B3 uses a plain inequality (larger than the position that lost), so no constant is needed |
 | `confidence_alert_gate` | 50 | **UNCHANGED** — engine-level |
 | `cooldown_after_loss` | user-set | **UNCHANGED** — `user_rule`, already correct |
 
