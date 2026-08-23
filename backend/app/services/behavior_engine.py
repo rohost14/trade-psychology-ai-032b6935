@@ -55,6 +55,7 @@ from app.core.severity import SEVERITY_ORDER
 from app.core import session_facts
 from app.core.session_facts import SessionFacts
 from app.core.threshold_recorder import RecordingThresholds
+from app.core.account_risk import AccountRisk, freeze_for_session, resolve_account_risk
 from uuid import UUID, uuid4
 from zoneinfo import ZoneInfo
 
@@ -173,6 +174,11 @@ class EngineContext:
     # Detectors read these instead of each recomputing their own version - which is
     # how four different answers to "how many losses in a row" got shipped.
     facts: Optional[SessionFacts] = None
+    # The account-size denominator for this session, resolved once and frozen.
+    # Detectors do NOT read this yet - no detector has been migrated. It is here
+    # so that when one is, the number it divides by is the same number the rest
+    # of the session was measured against, and is recorded on the session row.
+    account_risk: Optional[AccountRisk] = None
 
     def __post_init__(self):
         # Derive rather than require. A context assembled anywhere - the engine,
@@ -444,6 +450,28 @@ class BehaviorEngine:
         session.session_pnl = facts.pnl
         session.trade_count = facts.trades
 
+        # ── Account-size denominator: resolved once per session, then frozen ──
+        # Every "how much of the account did this cost" question divides by this
+        # one number. Freezing it is a correctness decision before it is a
+        # performance one: a deposit at 13:00 must not retroactively change what
+        # the morning's alerts meant. It is also why this costs one query on the
+        # first trade of a session and none afterwards - the frozen path reads
+        # the session row that is already loaded.
+        #
+        # It can resolve to ABSTAIN, and that is a real answer, not a failure: a
+        # trader whose equity we cannot see gets no account-relative claims,
+        # rather than a fabricated denominator. The trade-relative and structural
+        # families still work on their first ever trade - see core/measurements.
+        try:
+            account_risk = await resolve_account_risk(
+                broker_account_id, db, session=session, profile=profile
+            )
+            await freeze_for_session(session, account_risk, db)
+        except Exception as _ar_err:
+            # Never let the denominator take the analysis down with it.
+            logger.warning(f"[BehaviorEngine] account risk unresolved: {_ar_err}")
+            account_risk = None
+
         # ── P2 shadow: SessionState fold vs legacy recompute ──────────────
         # Zero extra IO (folds rows already loaded). A mismatch means the
         # fold and the rescan disagree about reality - the exact drift the
@@ -475,6 +503,7 @@ class BehaviorEngine:
             exit_order_types=exit_order_types,
             session_state=shadow_state,
             facts=facts,
+            account_risk=account_risk,
         )
 
     # ── Run all detectors ──────────────────────────────────────────────────
