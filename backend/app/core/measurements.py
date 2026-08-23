@@ -67,6 +67,13 @@ class Measurement:
     #: Sample size behind a trader-relative denominator. None for the others,
     #: which need no sample.
     sample_size: Optional[int] = None
+    #: What KIND of denominator this is, where that matters. A ratio against a
+    #: loss ceiling and the same ratio against posted margin are not comparable
+    #: events, so a stored measurement that does not say which cannot be checked
+    #: afterwards. See core/instrument_risk.
+    denominator_kind: Optional[str] = None
+    #: The instrument class the denominator came from, for the same reason.
+    instrument_class: Optional[str] = None
 
     @property
     def is_measurable(self) -> bool:
@@ -113,13 +120,12 @@ def loss_vs_trade(loss: float, capital_at_risk: Optional[float]) -> Measurement:
     """
     How much of what was put at risk on THIS trade has been lost.
 
-    `capital_at_risk` comes from `estimate_capital_at_risk`, which is already
-    instrument-aware: premium paid for a long option (exact), SPAN-approximated
-    for futures and short options. That is the spec's "instrument-specific risk
-    metric" requirement, and it exists.
-
     Available on a trader's first ever trade. This is what protects a new user
     while the account-relative family is still abstaining.
+
+    Prefer `loss_vs_risk_basis` where the instrument class is known: the bare
+    number cannot say whether it was divided by a loss ceiling or by posted
+    margin, and 80% of each is a different event.
     """
     if not capital_at_risk or capital_at_risk <= 0:
         return UNMEASURABLE
@@ -128,6 +134,33 @@ def loss_vs_trade(loss: float, capital_at_risk: Optional[float]) -> Measurement:
         denominator=float(capital_at_risk),
         denominator_label="the capital you put at risk on this trade",
         quality=Quality.GOOD,
+    )
+
+
+def loss_vs_risk_basis(loss: float, basis) -> Measurement:
+    """
+    The same ratio, carrying what it was divided by.
+
+    Abstains when the basis is not comparable — a spread's denominator is known
+    to be over-estimated, so the ratio would be understated in a known direction.
+    A confident wrong answer is worse than none.
+
+    `basis` is a `core.instrument_risk.RiskBasis`. Taken untyped to keep this
+    module free of an import it would otherwise only need for an annotation.
+    """
+    if basis is None or not basis.amount or basis.amount <= 0:
+        return UNMEASURABLE
+    if not basis.is_comparable:
+        return Measurement(None, None, None, Quality.UNKNOWN,
+                           denominator_kind=basis.kind.value,
+                           instrument_class=basis.instrument.value)
+    return Measurement(
+        value=abs(float(loss)) / float(basis.amount),
+        denominator=float(basis.amount),
+        denominator_label=basis.label,
+        quality=Quality.GOOD,
+        denominator_kind=basis.kind.value,
+        instrument_class=basis.instrument.value,
     )
 
 
