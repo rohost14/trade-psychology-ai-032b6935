@@ -1,5 +1,22 @@
 # Behavioural engine foundation — implementation plan
 
+**STATUS 23 Aug 2026: the foundation is built.** Sequence completed —
+measurements → baseline integration → detector contract → state ownership →
+canonical session facts → explainability → runtime → account-risk session
+handling. What remains from this document is step 4 (migrate one detector),
+which is deliberately NOT done: detector work waits for the pattern-by-pattern
+phase.
+
+Two things in §1's gap list are now closed rather than open: G1–G4 are no longer
+unconsumed (`session_facts`, `account_risk` and the threshold provenance are all
+live on the hot path), and the hot path is no longer unmeasured — detectors are
+3.2ms of a 73ms trade, so the queries dominate exactly as predicted and nothing
+was optimised.
+
+Original plan below, unedited.
+
+---
+
 Plan only. No code written. 23 Aug 2026.
 
 Reviewed against `docs/Redesign_Alerts_BehaviouralEngineV3.md` and the G1–G4

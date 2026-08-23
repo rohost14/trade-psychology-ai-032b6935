@@ -55,13 +55,15 @@ applied?".
 
 ---
 
-- **`completed_trade_features` is empty in production.** 1,515 completed trades,
-  **0** feature rows, verified against the live DB. Features are only written by
-  `_compute_features_for_new_rounds` inside `pnl_calculator.calculate_and_update_pnl`,
-  over a bounded recompute window. The consequence is on **My Record**: every
-  feature-derived card ("your record after 2+ losses in a row", "after a loss",
-  "on expiry day", "quick re-entry") is guarded by `f is not None` and so renders
-  empty rather than erroring. Presumably always has.
+- **The database this project develops against is full of test residue.**
+  4,607 users, 2,736 broker accounts and 1,199 accounts holding one or two
+  completed trades each, in a product with no real users. `tests/conftest.py`
+  points at `settings.DATABASE_URL` — the live Supabase instance — and rolls back
+  per test, so only the paths that commit leak. They have been leaking for a
+  while. This corrects an earlier claim of mine: I cited "0 feature rows against
+  1,515 completed trades" as evidence for the feature-pipeline bug. The bug was
+  real and is fixed, but that row count was not a trader's book and should not
+  have been quoted as one.
 - **`pattern_prediction_service` looks up a pattern type that does not exist** —
   `pattern_counts.get("revenge_trading")` against a vocabulary whose 33 types
   include `revenge_trade` and never `revenge_trading`. Always 0, so the history
@@ -164,6 +166,11 @@ no bundle cost, but publicly reachable in production.
 | `fomo_entry` pre-close reused the market-open threshold | `a67fc4f` |
 | `trading_sessions.trade_count` had NO writer — the session log showed "0 trades" for every day, and the end-of-day intent review always reported the trader had kept to their trade limit | `3dc9fc0` |
 | Nine places computed a session fact for themselves; `consecutive_losses` alone had five definitions. `app/core/session_facts.py` is now the only one | `d8cde10`, `e70b457` |
+| The live path never wrote a `completed_trade_features` row — only the bulk FIFO recompute did, so every My Record feature statistic rendered empty | `d0f6a5d` |
+| A guard test now fails the build when anything outside `session_facts` computes a session fact; it immediately found a tenth computer (`early_warning_service`) | `d0f6a5d` |
+| An alert stored no record of the thresholds it was judged against — unanswerable once baselines started moving | `326b421` |
+| Hot path measured: detectors 3.2ms, `_load_context` 51.6ms, end-to-end 73ms. Guarded by query count, not wall clock | `c8519f3` |
+| Account-risk denominator resolved once per session and frozen (G1 + migration 080 were unconsumed) | `c8519f3` |
 | Danger zone counted the loss streak ACROSS DAYS — five losses on Friday plus one on Monday started a cooldown and a WhatsApp for a run that had ended. Now session-scoped; **fires less than it did** | `d8cde10` |
 | Empty baseline claimed as personal knowledge | `38f0345` |
 | Six dead constants | `9536230` |
