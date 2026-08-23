@@ -71,6 +71,24 @@ applied?".
   user-visible probabilities and belongs with the parked frontend-vocabulary
   work.
 
+- **WebSocket delivery is head-of-line blocked, today, at one user's scale.**
+  `websocket.py:59` awaits each socket in turn with a 2-second timeout, and it is
+  called from inside the single event-subscriber loop. One trader on a bad mobile
+  connection stalls delivery of *every other user's* alerts for up to two seconds
+  per socket. This is a real-time correctness defect in a product whose claim is
+  that the alert lands while the decision is live — and it cannot be observed
+  with one user. `docs/SCALABILITY_50K_ANALYSIS.md` ceiling 3.
+- **`margin_snapshots` has no scheduled producer.** Rows are written only by
+  `margin_service.get_margin_status`, reachable only from
+  `GET /api/zerodha/margins`. So the account-risk denominator (live since
+  `c8519f3`) reaches its GOOD rung only if the trader happened to open a page
+  that fetched margins; otherwise it falls to declared capital or abstains. The
+  obvious fix — snapshot everyone before the open — is what Kite's 3 req/s
+  shared key forbids at scale: 50,000 fetches is 4.6 hours of exclusive API
+  budget. Three options are written up in the scalability analysis; **the choice
+  is a product decision** about what the engine may claim, and it touches the
+  frozen capital-relative constants.
+
 ## 2. Open — MEDIUM
 
 ### M1. The frontend duplicates a catalogue the backend already serves
