@@ -194,13 +194,6 @@ _GROUP_C = [
 # ---------------------------------------------------------------------------
 
 _GROUP_D = [
-    _spec(key="revenge_window_danger_min", kind=Kind.PERSONAL_BASELINE, fallback=5,
-          meaning="re-entry inside this many minutes of a loss is danger",
-          resolution_source=Source.HISTORY, metric="reentry_after_loss_p10",
-          percentile=10, maturity=Maturity.TRADES_20, review_required=True,
-          provenance="FLAGGED: its caution twin already resolves from the trader's own p25 "
-                     "re-entry gap while this stayed fixed - one detector measuring its two "
-                     "lines two different ways"),
 
     _spec(key="rapid_flip_min", kind=Kind.PERSONAL_BASELINE, fallback=10,
           meaning="direction reversal on the same symbol inside this many minutes",
@@ -308,6 +301,33 @@ for _key, (_default, _direction, _meaning) in _UNIVERSAL_SAFETY.items():
         ),
     )
 
+# ---------------------------------------------------------------------------
+# Product policy - our decisions, never the trader's and never learned
+# ---------------------------------------------------------------------------
+#
+# These say how much we are willing to interrupt someone. They are not claims
+# about trading and no amount of a trader's history should move them: a trader
+# must not be able to learn their way into a larger alert budget.
+#
+# Classified 2026-08-24. Values unchanged - only the Kind, which is what stops
+# them ever resolving from HISTORY, SESSION or POPULATION via violates_kind.
+_PRODUCT_POLICY = {
+    "alert_session_hard_cap": (8, "alerts a trader may receive in one session"),
+    "alert_bucket_minutes": (5, "window in which similar alerts are grouped"),
+    "alert_stale_push_min": (30, "age past which a push notification is not worth sending"),
+    "guardian_monthly_budget": (3, "guardian messages a month"),
+}
+
+for _key, (_default, _meaning) in _PRODUCT_POLICY.items():
+    THRESHOLD_SPECS[_key] = ThresholdSpec(
+        key=_key,
+        kind=Kind.PRODUCT_POLICY,
+        fallback=_default,
+        meaning=_meaning,
+        provenance="product decision about interruption, not a trading threshold",
+    )
+
+
 #: Flagged in the G4 inventory as unsupported judgements. Detector review is
 #: mandatory for these, not discretionary.
 # ---------------------------------------------------------------------------
@@ -348,8 +368,6 @@ _FLOOR_DIRECTIONS = {
     # sensitivity floors - a bigger number means the detector looks wider
     "revenge_window_caution_min": (20, Sensitivity.HIGHER_IS_STRICTER,
                                    "minutes after a loss still counted as a reaction"),
-    "revenge_window_danger_min": (5, Sensitivity.HIGHER_IS_STRICTER,
-                                  "minutes after a loss counted as an immediate reaction"),
     "revenge_window_min": (10, Sensitivity.HIGHER_IS_STRICTER,
                            "unified re-entry window, set from a declared cooldown"),
     "panic_exit_min": (5, Sensitivity.HIGHER_IS_STRICTER,
@@ -384,7 +402,7 @@ for _key, (_default, _direction, _meaning) in _FLOOR_DIRECTIONS.items():
 
 MANDATORY_REVIEW = frozenset({
     "fomo_symbols_at_open",
-    "revenge_window_danger_min",
+    "revenge_window_danger_min",   # retired 2026-08-24; kept so the reason survives
     "premium_loss_caution_pct",   # documented as firing routinely without behavioural failure
     "burst_trades_per_15min",     # retired 2026-08-23; kept here so the reason survives
 })

@@ -79,11 +79,8 @@ def ctx(view, trades, session_pnl=-4200.0, thresholds=None):
         session_trades=trades,
         active_cooldowns=[],
         thresholds=thresholds or {
-            "revenge_min_loss_inr": 500,
             "revenge_window_caution_min": 20,
             "revenge_window_danger_min": 5,
-            "signal_points_critical": 30, "signal_points_high": 20,
-            "signal_points_medium": 10, "signal_points_low": 5,
             "trading_capital": 500000,
         },
     )

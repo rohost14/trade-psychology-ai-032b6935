@@ -7,7 +7,7 @@ compares it against `_get_thresholds_pre_ladder` — the previous implementation
 kept as a parity oracle — across every profile shape that reaches it in
 production, and requires byte-identical output except for `CAPITAL_DERIVED`.
 
-Those three (`revenge_min_loss_inr`, `profit_giveaway_min_peak`,
+Those two (`profit_giveaway_min_peak`,
 `profit_giveaway_min_erosion`) were absolute rupee floors, which cannot be
 universal: ₹500 is 1% of a ₹50,000 account and 0.1% of a ₹5,00,000 one — the
 same money describing two different events. They are now ratios of capital,
@@ -98,7 +98,6 @@ PROFILES = {
 #: known: three rupee floors that are now ratios of capital. Everything else
 #: must still match the pre-ladder implementation exactly.
 CAPITAL_DERIVED = {
-    "revenge_min_loss_inr",
     "profit_giveaway_min_peak",
     "profit_giveaway_min_erosion",
 }
@@ -201,8 +200,10 @@ def test_threshold_set_is_dict_compatible():
 # Rung 4 — rupee floors become ratios of capital
 # ---------------------------------------------------------------------------
 
-CAPITAL_KEYS = ("revenge_min_loss_inr", "profit_giveaway_min_peak",
-                "profit_giveaway_min_erosion")
+# revenge_min_loss_inr was the third of these until 2026-08-24, when it was
+# deleted with the gate it fed - capital there SUPPRESSED rather than
+# protected. The two that remain carry the same property and the same test.
+CAPITAL_KEYS = ("profit_giveaway_min_peak", "profit_giveaway_min_erosion")
 
 
 def test_reference_account_is_unchanged():
@@ -212,22 +213,26 @@ def test_reference_account_is_unchanged():
     conversion quietly re-tuned three detectors while claiming to generalise one.
     """
     ts = resolve_thresholds(FakeProfile(trading_capital=50000))
-    assert ts["revenge_min_loss_inr"] == 500
     assert ts["profit_giveaway_min_peak"] == 1500
     assert ts["profit_giveaway_min_erosion"] == 500
 
 
-@pytest.mark.parametrize("capital,expected_revenge", [
-    (20_000, 200),
-    (50_000, 500),
-    (200_000, 2_000),
-    (2_000_000, 20_000),
+@pytest.mark.parametrize("capital,expected_peak", [
+    (20_000, 600),
+    (50_000, 1_500),
+    (200_000, 6_000),
+    (2_000_000, 60_000),
 ])
-def test_rupee_floors_scale_with_capital(capital, expected_revenge):
-    """Rs 500 is 1% of one account and 0.1% of another. The ratio is the claim."""
+def test_rupee_floors_scale_with_capital(capital, expected_peak):
+    """
+    Rs 1,500 is 3% of one account and 0.15% of another. The ratio is the claim.
+
+    Uses profit_giveaway_min_peak since revenge_min_loss_inr was deleted; the
+    property under test is the conversion, not the key.
+    """
     ts = resolve_thresholds(FakeProfile(trading_capital=capital))
-    assert ts["revenge_min_loss_inr"] == expected_revenge
-    assert ts.explain("revenge_min_loss_inr").source is Source.CAPITAL
+    assert ts["profit_giveaway_min_peak"] == expected_peak
+    assert ts.explain("profit_giveaway_min_peak").source is Source.CAPITAL
 
 
 def test_unknown_capital_keeps_the_absolute_fallback_and_says_so():
@@ -240,7 +245,7 @@ def test_unknown_capital_keeps_the_absolute_fallback_and_says_so():
         for key in CAPITAL_KEYS:
             assert ts.explain(key).source is Source.GLOBAL
             assert not ts.explain(key).is_personal
-        assert ts["revenge_min_loss_inr"] == 500
+        assert ts["profit_giveaway_min_peak"] == 1500
 
 
 def test_capital_derived_detail_names_the_ratio_and_the_capital():
@@ -254,8 +259,8 @@ def test_capital_derived_detail_names_the_ratio_and_the_capital():
 def test_non_numeric_capital_does_not_break_resolution():
     """Profile fields come from JSON and the DB; a bad value must not 500."""
     ts = resolve_thresholds(FakeProfile(trading_capital="not-a-number"))
-    assert ts["revenge_min_loss_inr"] == 500
-    assert ts.explain("revenge_min_loss_inr").source is Source.GLOBAL
+    assert ts["profit_giveaway_min_peak"] == 1500
+    assert ts.explain("profit_giveaway_min_peak").source is Source.GLOBAL
 
 
 # ---------------------------------------------------------------------------

@@ -632,8 +632,6 @@ def _blend_session(values: Dict[str, Any], put: Callable, key: str,
 #: Rs 500 is 1% of Rs 50,000 and 0.1% of Rs 5,00,000. Same money, different
 #: event. The ratio is what generalises.
 _CAPITAL_RATIOS = {
-    "revenge_min_loss_inr": (
-        "revenge_min_loss_pct_capital", "a loss big enough to react to"),
     "profit_giveaway_min_peak": (
         "profit_giveaway_min_peak_pct_capital", "a peak worth protecting"),
     "profit_giveaway_min_erosion": (

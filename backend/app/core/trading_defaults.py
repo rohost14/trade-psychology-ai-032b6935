@@ -84,7 +84,6 @@ COLD_START_DEFAULTS: Dict[str, Any] = {
     # SEBI data: 73% of trades within 15 min of a loss are also losing trades.
     # The "loss recovery" impulse peaks at 3-8 min (immediate = danger).
     'revenge_window_caution_min':       20,   # entry within 20 min of loss = caution
-    'revenge_window_danger_min':        5,    # entry within 5 min of loss = danger
     # Unified revenge window used by RiskDetector + BehavioralEvaluator.
     # Overridden by profile.cooldown_after_loss in get_thresholds().
     'revenge_window_min':               10,   # default: 10-min window
@@ -93,8 +92,6 @@ COLD_START_DEFAULTS: Dict[str, Any] = {
     # known this is derived from it (threshold_resolution, rung 4) and the
     # absolute value below is only the no-capital fallback. The percentage is
     # calibrated so a Rs 50,000 account resolves to the same 500 it had before.
-    'revenge_min_loss_pct_capital':     1.0,   # 1% of capital = a loss worth reacting to
-    'revenge_min_loss_inr':             500,   # fallback when capital is unknown
 
     # ── Position sizing / excess exposure ────────────────────────────────
     # Kelly criterion for 45% win rate, 1.5:1 R:R → ~13% optimal, half-Kelly = 6%.
@@ -251,10 +248,6 @@ COLD_START_DEFAULTS: Dict[str, Any] = {
 
     # ── Confidence signal points (Engine v2 Phase 4, master §1.4) ────────
     # Relative importance → tunable values. Starting points, not spec constants.
-    'signal_points_critical':          30,
-    'signal_points_high':              20,
-    'signal_points_medium':            10,
-    'signal_points_low':                5,
     'confidence_alert_gate':           50,   # below this: recorded as info, no alert
 
     # ── Premium loss event (merged iv_crush + premium_destruction) ───────
@@ -332,10 +325,25 @@ COLD_START_DEFAULTS: Dict[str, Any] = {
 # Tier 3: Universal floors
 # Never fire alerts below these, regardless of user settings.
 # ---------------------------------------------------------------------------
+# Removed 2026-08-24 as dead machinery, after revenge_trade's pattern review:
+#   revenge_min_loss_inr / revenge_min_loss_pct_capital
+#       A minimum-loss gate resolving to 1% of capital. It SUPPRESSED rather than
+#       protected: the larger the account, the larger a loss had to be before the
+#       detector would look at it at all - 8 alerts at Rs 50,000 and zero at
+#       Rs 5,00,000 on the same tradebook. Deleted with the gate, not replaced.
+#   revenge_window_danger_min
+#       The frozen A x B matrix has no danger sub-tier on the reaction axis, so
+#       nothing reads it. Its MANDATORY_REVIEW entry is kept so the reason it was
+#       ever questioned survives the constant.
+#   signal_points_critical / high / medium / low
+#       Weights summed into a confidence score inside one detector - the
+#       behaviour score in miniature. Deleted with that arithmetic.
+# None of the seven had a production reader when removed.
+
+
 UNIVERSAL_FLOORS: Dict[str, Any] = {
     'burst_trades_per_30min_caution':   3,    # Never alert for < 3 trades in 30 min
     'revenge_window_caution_min':       2,    # Minimum 2-min caution window
-    'revenge_window_danger_min':        1,    # Minimum 1-min danger window
     'revenge_window_min':               1,    # Unified window floor: minimum 1 min
     'consecutive_loss_caution':         3,    # At least 3 losses before any alert
     'panic_exit_min':                   1,    # Minimum 1 min

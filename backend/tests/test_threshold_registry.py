@@ -70,7 +70,10 @@ def test_definitional_thresholds_name_no_metric():
 def test_the_flagged_judgements_are_marked_for_mandatory_review():
     flagged = {k for k, s in THRESHOLD_SPECS.items() if s.review_required}
     assert "fomo_symbols_at_open" in flagged
-    assert "revenge_window_danger_min" in flagged
+    # revenge_window_danger_min was flagged here until 2026-08-24, when the
+    # constant was deleted as unread - the frozen A x B matrix has no danger
+    # sub-tier on the reaction axis. Its MANDATORY_REVIEW entry is kept so the
+    # reason survives, but it no longer has a spec to carry review_required.
     for k in flagged:
         assert "FLAGGED" in spec_for(k).provenance
 

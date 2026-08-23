@@ -281,8 +281,9 @@ def test_declaring_direction_never_overwrites_an_existing_classification():
     from app.core.threshold_resolution import Kind
     from app.core.trading_defaults import UNIVERSAL_FLOORS
 
+    # revenge_window_danger_min was the second key here until 2026-08-24, when
+    # it was deleted as unread. rapid_flip_min still carries the property.
     already_classified = {
-        "revenge_window_danger_min": Kind.PERSONAL_BASELINE,
         "rapid_flip_min": Kind.PERSONAL_BASELINE,
     }
     for key, expected in already_classified.items():
