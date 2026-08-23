@@ -1,373 +1,354 @@
-# `revenge_trade` — implementation contract
+# `revenge_trade` — final implementation contract
 
-23 Aug 2026. **Proposal. Nothing implemented.** Builds on the approved conceptual
-contract in `revenge_trade.md`; that document is the *what*, this is the *how*,
-mapped onto the foundation as it now exists.
+23 Aug 2026. **Proposal. Nothing implemented.** Supersedes the first draft of this
+file. The conceptual contract (`revenge_trade.md`) remains the *what*; this is the
+*how*, revised after review.
 
-Read §1 first. It is the finding that changes the design, and it was not visible
-until the foundation made the frames explicit.
+Five changes from the draft, all from the review:
+
+1. Unresolved thresholds no longer block the detector. Each frame activates
+   independently and abstains alone.
+2. Trade-relative risk is instrument- and strategy-aware. A single percentage
+   across long options, short options, futures and spreads is provably wrong —
+   §4 shows why, from the estimator's own code.
+3. `EpisodeRole`/`EpisodeHint` kept as an interface. No state machine.
+4. Safety bounds stay as machinery with no values.
+5. `confidence_alert_gate` is an engine decision, not this detector's.
 
 ---
 
-## 1. The central defect: capital is currently used to SUPPRESS, not to protect
+## 1. The defect this detector exists to correct
 
-Today's detector gates on a rupee floor:
+`revenge_min_loss_inr` resolves to **1% of capital** and is used as a **gate**:
 
 ```python
-min_loss = ctx.thresholds.get("revenge_min_loss_inr", 500)   # = 1% of capital
-_typical = self._typical_loss(ctx)
-if _typical:
-    min_loss = max(min_loss * 0.5, _typical * 0.5)
+min_loss = ctx.thresholds.get("revenge_min_loss_inr", 500)
 if abs(last_pnl) < min_loss:
-    return None                                   # ← larger account, higher bar
+    return None            # bigger account → higher bar → less protection
 ```
 
-`revenge_min_loss_inr` resolves to **1% of capital** (rung 4). So the bigger the
-account, the larger a loss must be before the detector will look at it at all.
-Capital raises the bar.
+Measured on 40 sessions, only capital changed: **8 alerts at ₹50k, 0 at ₹5L.**
 
-Measured, not argued — the same 40 sessions, capital changed and nothing else:
-
-| capital | `revenge_trade` alerts |
-|---|---|
-| ₹50,000 | 8 |
-| ₹5,00,000 | **0** |
-
-**This is backwards.** Account-relative measurement exists to say *"that loss was
-big enough to matter to your account"* — it is a reason to **fire**, not a reason
-to stay quiet. Used as a floor, it does the opposite: the trader with more at
-stake gets less protection.
-
-The correction is not to change the number. It is that account-relative belongs
-in the **safety trigger** and must never appear in a **suppression gate**. That
-distinction is what the frames are for, and it is the reason to do this detector
-first.
+Account-relative measurement is a reason to **fire**, never a reason to stay
+quiet. It moves to the safety trigger and is removed from the gate.
 
 ---
 
-## 2. Reference frames
+## 2. Decision tree
 
-`revenge_trade` uses all four. That is why it is the right detector to validate
-the architecture — it exercises every path.
+Read top to bottom. Each frame is evaluated independently; none can suppress
+another; any may abstain alone.
 
-| frame | what it answers here | input | available |
+```
+STRUCTURAL GATE — no thresholds, no history, no capital
+├─ prior CompletedTrade exists in this session, closed BEFORE current entry?
+│    no  → NOT_DETECTED  ("no re-entry to judge")
+├─ prior trade closed at a loss (realized_pnl < 0)?
+│    no  → NOT_DETECTED
+├─ entry_time and prior exit_time both present, gap ≥ 0?
+│    no  → ABSTAIN (Insufficiency.MISSING_INPUT — timestamps unusable)
+└─ strategy_group present and this trade is a leg?
+     yes → SUPPRESSED (existing behaviour, unchanged)
+
+  ↓ structural fact established: a loss, then a re-entry, N minutes later.
+    This alone is reportable at `info` and needs nothing else.
+
+SAFETY — objective harm. Never learns. Nothing personal may suppress it.
+├─ ACCOUNT-RELATIVE
+│   ├─ ctx.account_risk.is_usable?          no → abstain (this frame only)
+│   ├─ S1 decided?                          no → abstain (this frame only)
+│   └─ loss_vs_account(prior_loss) ≥ S1     → SAFETY BREACH
+└─ TRADE-RELATIVE                            (see §4 — per instrument class)
+    ├─ instrument class resolvable?         no → abstain (this frame only)
+    ├─ class is SPREAD/hedged?              yes → abstain (denominator invalid)
+    ├─ S2[class] decided?                   no → abstain (this frame only)
+    └─ loss_vs_trade(prior_loss) ≥ S2[class] → SAFETY BREACH
+
+PERSONAL — unusual for them. Requires maturity. Bounded.
+├─ loss unusual?   percentile(own losses)   immature → abstain (signal only)
+├─ gap fast?       percentile(own gaps)     immature → abstain (signal only)
+└─ size up?        ratio(own sizes)         immature → abstain (signal only)
+
+DECLARED — their own commitment
+└─ cooldown_after_loss set and gap < it     → BREACH (a fact, not an estimate)
+```
+
+**Output rule.** The detector emits when the structural gate passes. Severity is
+set by what else was established (§7). A detector that establishes only the
+structural fact emits `info`: recorded as evidence, never notified.
+
+This is the change from the draft — the detector is never blocked by an
+unresolved threshold. It reports what it can see and abstains, per frame, on what
+it cannot.
+
+---
+
+## 3. Inputs
+
+| input | source | absent → |
+|---|---|---|
+| prior `realized_pnl`, `exit_time` | `CompletedTrade` (session) | NOT_DETECTED / abstain |
+| current `entry_time` | `CompletedTrade` | abstain |
+| `instrument_type`, `direction`, `avg_entry_price`, `total_quantity` | `CompletedTrade` | trade-relative frame abstains |
+| `tradingsymbol` both sides | `CompletedTrade` | same-instrument signal abstains; others unaffected |
+| account equity | `ctx.account_risk` (frozen per session) | account frame abstains |
+| own loss / gap / size distributions | baseline, long window | that personal signal abstains |
+| `cooldown_after_loss` | profile | declared frame silent (not an abstention — no commitment made) |
+| `strategy_group` | `ctx.strategy_group` | no suppression |
+
+---
+
+## 4. Trade-relative risk is not one number
+
+`estimate_capital_at_risk` returns different *kinds* of quantity per instrument,
+and a single S2 percentage across them is wrong. From the code:
+
+| class | denominator returned | what it means | is 100% loss possible? |
 |---|---|---|---|
-| **Account** | did the prior loss damage the account? | `loss_vs_account(prior_loss, ctx.account_risk)` | trade 1, **if** equity known |
-| **Trade** | did the prior trade lose most of what was risked on it? | `loss_vs_trade(prior_loss, estimate_capital_at_risk(prior))` | **trade 1, always** |
-| **Personal** | is this loss / gap / size unusual **for them**? | `loss_vs_own_losses`, `gap_vs_own_gaps`, `size_vs_own_sizes` | after maturity |
-| **Structural** | did a re-entry follow a loss, on the same instrument, larger? | ordering, symbol identity, quantity | **trade 2, always** |
+| **Long option** (LONG CE/PE) | premium paid — **exact** | the maximum possible loss | **Yes, routinely.** Expiring worthless is a normal outcome |
+| **Short option** (SHORT CE/PE) | SPAN ≈ 12–20% of notional | **margin posted**, not a loss ceiling | Loss is **unbounded**; losing 100% of margin is near-catastrophic |
+| **Futures** | SPAN ≈ 12–20% of notional | margin posted | Unbounded both ways |
+| **Spread / hedged** | over-estimated (docstring says so) | denominator too large | ratio understated → detector under-fires |
+| **Equity / unknown** | full notional | delivery value | ~never; ratio always tiny → frame never fires |
 
-`DetectorSpec.frames = (ACCOUNT, TRADE, PERSONAL, STRUCTURAL)` — the first
-assignment, made while reading the detector, as intended.
+So "lost 80% of capital at risk" means two completely different things: a long
+option buyer having a bad but ordinary day, and a short seller in serious trouble.
+**One threshold cannot carry both.**
 
----
+Consequences for this contract:
 
-## 3. Structure: one trigger, three independent judgements
-
-The detector answers a **structural** question first, then judges the answer in up
-to three frames. It never averages them.
-
-```
-STRUCTURAL GATE  (no thresholds, no history)
-  prior CompletedTrade closed at a loss, and
-  current trade entered after it, and
-  gap ≥ 0                                        → else NOT_DETECTED
-
-then, independently:
-
-  SAFETY   account-relative: prior loss ≥ [S1]% of equity      → fires alone
-           trade-relative:   prior loss ≥ [S2]% of capital-at-risk → fires alone
-           neither may be suppressed by anything personal
-
-  PERSONAL loss unusual for them (percentile of own losses)
-           gap fast for them   (percentile of own gaps)
-           size up for them    (ratio to own median)
-           → requires maturity; abstains without it
-
-  DECLARED trader's own cooldown_after_loss, if set → a breach is a fact
-```
-
-**No points. No sum.** The existing implementation adds `signal_points_*` into a
-confidence score; §9 explains why that has to go.
+- **S2 becomes S2[class]**, one decision per class, each unresolved (§8).
+- **Spreads abstain.** The docstring already admits the denominator is wrong; an
+  understated ratio would produce a confident false negative, which is worse than
+  silence. `ctx.strategy_group` identifies these.
+- **Equity abstains** until someone decides what trade-relative risk means for
+  delivery. Notional is not it.
+- The stored evidence must record **which class and which denominator** were used
+  (`Measurement.denominator_label` carries this), or the alert cannot be checked.
 
 ---
 
-## 4. Cold start — a brand-new trader, first ever session
+## 5. Cold start
 
-| frame | day one | why |
+| frame | trade 1 | why |
 |---|---|---|
-| Structural | **works** | "you re-entered four minutes after a loss" needs no history and no numbers |
-| Trade-relative | **works** | `estimate_capital_at_risk` is instrument-aware: premium paid for a long option is exact |
-| Account-relative | works **iff** equity known | otherwise abstains — see below |
-| Personal | **abstains** | three data points is not a distribution |
+| Structural | **works** | needs no numbers at all |
+| Trade-relative | **works for long options**, subject to S2 | premium paid is exact from the first trade |
+| Trade-relative | abstains for spreads and equity | §4 |
+| Account-relative | works **iff** equity known and S1 decided | otherwise abstains |
+| Personal | **abstains** | three points is not a distribution |
 
-So a new trader gets: the structural observation, trade-relative safety, and
-account-relative safety when we can see the account. They do **not** get "this is
-unusual for you", which is honest — we do not know them yet.
+A brand-new trader therefore gets the structural observation immediately, plus
+trade-relative safety on long options — the most common F&O retail instrument —
+and account-relative safety when we can see the account.
 
-**The account-relative path is weaker than it should be, for an infrastructure
-reason.** `margin_snapshots` has no scheduled producer, so `ctx.account_risk`
-reaches its GOOD rung only if the trader happened to load a page that fetched
-margins. Otherwise: declared capital (PARTIAL) or abstain. **This must be resolved
-before the account-relative safety trigger means anything in production** — see
-`SCALABILITY_50K_ANALYSIS.md` §4. It is a product decision, not a detector one.
-
----
-
-## 5. Maturity and abstention
-
-Per metric, never one global flag.
-
-| metric | counter | below maturity |
-|---|---|---|
-| own losing-trade distribution | count of losing CompletedTrades in the baseline window | that signal abstains |
-| own loss→re-entry gap distribution | count of observed gaps | that signal abstains |
-| own position-size distribution | count of trades | that signal abstains |
-
-A signal that abstains contributes **nothing** — not a neutral value, not a
-default. `Evidence` / `abstain()` from `evidence.py` carry this, and this detector
-would be their first consumer.
-
-**Today's implementation violates this twice.** `_typical_loss` requires 3 losses
-and otherwise falls back to a flat ₹500 — an invented number standing in for
-missing knowledge. And `None` currently means both "no revenge trade" and "could
-not tell", so the 203-session replay cannot distinguish a clean year from an
-unmonitored one.
-
-### `_typical_loss` is mislabelled
-
-```python
-losses = sorted(... for t in (ctx.session_trades or []) ...)   # TODAY only
-if len(losses) < 3: return None
-```
-
-It reads **today's session**, not the trader's history. It is a *session-relative*
-measure presented as personal. Under this contract the personal frame draws from
-the baseline (long window), and today's session may be used as rung 2 — but the
-two must be labelled distinctly, because "unusual for you" and "unusual for you
-today" are different claims.
+**Infrastructure blocker, stated again because it gates the account frame in
+production:** `margin_snapshots` has no scheduled producer, so `ctx.account_risk`
+reaches GOOD only if the trader loaded a page that fetched margins. Until that is
+resolved the account frame will mostly abstain in the field regardless of S1.
+Product decision, not a detector one.
 
 ---
 
-## 6. Protection against bad habits becoming normal
+## 6. Maturity, abstention, and bad habits
 
-Three mechanisms, all already built, none yet applied here.
+**Maturity is per metric.** Each personal signal carries its own counter and
+abstains alone; there is no global "baseline ready" flag.
 
-1. **Frame separation.** The safety trigger reads account- and trade-relative
-   measures only. No personal input can reach it, so no habit can quieten it.
-   Enforced by `violates_kind` at resolution time once the safety thresholds are
-   classified `universal_safety`.
-2. **Safety bounds.** The personal signals may move only so far before a bound
-   holds them. The direction matters and differs per key:
-   - `revenge_window_*` — **HIGHER_IS_STRICTER**; a habitual fast re-enterer has a
-     low p25, shrinking their window until nothing qualifies. The bound is a
-     **minimum**.
-   - loss-meaningfulness percentile — **HIGHER_IS_LOOSER**; a trader with large
-     habitual losses raises their own p60. The bound is a **maximum**.
+**Abstention is a first-class outcome.** `Evidence` / `Insufficiency` distinguish:
+
+- `NOT_DETECTED` — no loss, or no re-entry. We looked and it did not happen.
+- `ABSTAINED` — we could not see. Never rendered as an alert, always recorded.
+
+Today `None` means both, which is why the 203-session replay cannot distinguish a
+clean year from an unmonitored one.
+
+**Three defences against habit becoming licence:**
+
+1. **Frame separation.** Safety reads account- and trade-relative only. No
+   personal input can reach it, enforced by `violates_kind` once the safety
+   thresholds are classified `universal_safety`.
+2. **Safety bounds**, with direction declared per key:
+   - re-entry window — `HIGHER_IS_STRICTER`; the habitual fast re-enterer has a
+     low p25 that shrinks their window to nothing. Bound is a **minimum**.
+   - loss-meaningfulness percentile — `HIGHER_IS_LOOSER`; large habitual losses
+     raise their own p60. Bound is a **maximum**.
+   **Values unresolved (B1). Machinery only.**
 3. **Contamination exclusion.** Confirmed revenge sequences must not train the gap
-   baseline — otherwise the detector's own positives drag "normal" downward until
-   it silences itself. `clean_for_learning(values, excluded_indices)` exists for
-   exactly this; **nothing currently passes `excluded_indices`.** Wiring it is part
-   of this detector's work.
+   baseline, or the detector's positives drag "normal" down until it silences
+   itself. `clean_for_learning(values, excluded_indices)` accepts this argument
+   and **nothing has ever passed it**. Wiring it is part of this work.
 
 ---
 
-## 7. Constants and their provenance
+## 7. Severity and confidence
 
-Everything the detector touches today, with an honest status. **No value below has
-been invented to complete this table.**
-
-| constant | current | Kind | status |
-|---|---|---|---|
-| `revenge_min_loss_inr` | 1% of capital, else ₹500 | fallback | **REMOVE** as a gate — §1 |
-| `revenge_min_loss_pct_capital` | 1.0 | fallback | **REMOVE** with it |
-| `revenge_window_caution_min` | 20 min (or own p25) | fallback | **KEEP**, reclassify `personal_baseline` |
-| `revenge_window_danger_min` | 5 min | fallback | **UNRESOLVED** — already flagged mandatory-review |
-| `signal_points_critical/high/medium/low` | 30/20/10/5 | fallback | **REMOVE** — §9 |
-| `confidence_alert_gate` | 50 | fallback | **UNRESOLVED**, and not this detector's to decide |
-| `_typical_loss` min sample | 3 (inline) | none | **REPLACE** with declared maturity |
-| size-escalation ratio | 1.5 (inline literal) | none | **UNRESOLVED** |
-| `cooldown_after_loss` | user-set | user_rule | **KEEP** unchanged |
-
-### Unresolved — each needs a decision, not a guess
-
-| # | what must be decided | why it cannot be derived here |
-|---|---|---|
-| **S1** | account-relative safety trigger: prior loss ≥ ?% of equity | A product claim about what counts as account damage. The conceptual contract says 5% and marks it illustrative. One trader's tradebook cannot validate it — the account size moved between ₹30k and ₹50k across the period, so no single equity figure makes the percentage mean anything. |
-| **S2** | trade-relative safety trigger: prior loss ≥ ?% of capital at risk | Instrument-dependent. Losing 80% of an option premium and 80% of futures SPAN are different events. Probably needs a value per instrument class, which is a research question. |
-| **P1** | which percentile marks a loss "meaningful for them" | p60 is a plausible default and is a choice. Measurable against the tradebook by comparing recall of days the trader themselves would call revenge. |
-| **P2** | which percentile marks a gap "fast for them" | Same, in the other direction (p25). Same evidence available. |
-| **P3** | size-escalation multiple | Currently 1.5 with no derivation. Could come from the trader's own size distribution instead, which would remove the constant. |
-| **M1** | maturity thresholds per metric | The conceptual contract proposes 10 / 30 as illustrative. Needs the sample-stability check that has not been run. |
-| **B1** | the safety bound values, and their direction | Deliberately empty. Each is a claim about one behaviour and must be argued from evidence when set. |
-| **C1** | whether `confidence_alert_gate` stays a single global 50 | Affects every detector, so it belongs to the engine review, not here. |
-
-**S1 and S2 are the two that block the safety layer.** Without them there is no
-account-relative or trade-relative trigger, and the detector reduces to structural
-plus personal — which is where it already is.
-
----
-
-## 8. Severity and confidence
-
-**Severity = harm if real. Confidence = certainty it is real.** They must not be
-computed from the same inputs.
-
-Proposed severity, subject to S1/S2:
+**Severity = harm if the behaviour is real.** From the safety frames only.
 
 | severity | condition |
 |---|---|
-| `critical` | safety trigger breached **and** the new position is larger than the one that lost |
-| `danger` | safety trigger breached |
-| `caution` | no safety trigger; personal signals present and mature |
-| `info` | structural only, or personal signals immature — recorded, never notified |
+| `critical` | safety breach **and** the new position is larger than the one that lost |
+| `danger` | safety breach in either safety frame |
+| `caution` | no safety breach; mature personal signals present |
+| `info` | structural fact only, or personal signals immature |
 
-Confidence comes from **how well we could see it**: data quality, how many
-percentiles were mature, whether the symbol parsed. Not from severity, and not
-from the number of signals — that conflates "several things are true" with "we are
-sure", which are different.
+**Confidence = how well we could see it.** From data quality, how many frames
+were measurable, how mature the percentiles were, whether the symbol parsed.
 
-Today's code derives severity partly from the same signals it scores for
-confidence. That has to be separated, and it is a change in alert behaviour.
+Neither derives from the other. Severity may be `danger` at low confidence; that
+combination is exactly what the two axes exist to express.
 
----
+**Removed: the points system.** `signal_points_critical/high/medium/low`
+(30/20/10/5) summed across incommensurable observations to produce a number that
+gated whether the trader was told anything. Four invented weights, no derivation —
+L3 in miniature. Every argument that retired the behaviour score applies verbatim.
+The replacement is not a better weighting; it is to stop summing.
 
-## 9. Why the points system must go
+**Kept from that block**: the reasoning that `same_symbol` and `same_underlying`
+are nested rather than independent, so they are exclusive tiers. That argument is
+correct, and it is also the argument for deleting the arithmetic around it.
 
-```python
-confidence = float(pts["critical"])        # 30
-if gap_min <= danger_window: confidence += pts["high"]      # +20
-if same_symbol:              confidence += pts["high"]      # +20
-if size_ratio >= 1.5:        confidence += pts["high"]      # +20
-if session_pnl < 0:          confidence += pts["medium"]    # +10
-```
-
-**This is L3 in miniature.** Four invented weights, summed across incommensurable
-observations, producing a number nobody can defend — and it gates whether the
-trader is told anything, because below 50 the severity is rewritten to `info`.
-
-Every argument that retired the behaviour score applies here unchanged. The
-replacement is not a better weighting; it is to **stop summing**. Signals are
-recorded individually as evidence, severity comes from harm, confidence comes from
-observability. If a combination genuinely deserves escalation, that is a stated
-rule about that combination, not an emergent property of arithmetic.
-
-The one genuinely good thing in this block should be kept: the comment explaining
-that `same_symbol` and `same_underlying` are nested rather than independent. That
-reasoning is right and is the seed of the objection to the whole scheme.
+**`confidence_alert_gate` (50) is out of scope.** It affects every detector and
+belongs to the engine review. This contract does not change it and does not depend
+on its value: severity is set by harm, and the gate's rewrite-to-`info` behaviour
+applies afterwards as it does today.
 
 ---
 
-## 10. Evidence and explainability
+## 8. Old → new threshold mapping
 
-The alert must reconstruct from stored data alone:
+| current | value | disposition |
+|---|---|---|
+| `revenge_min_loss_inr` | 1% of capital / ₹500 | **DELETE** — capital as suppression (§1) |
+| `revenge_min_loss_pct_capital` | 1.0 | **DELETE** with it |
+| `revenge_window_caution_min` | 20 (or own p25) | **KEEP**, reclassify `personal_baseline`, add bound direction `HIGHER_IS_STRICTER` |
+| `revenge_window_danger_min` | 5 | **UNRESOLVED (P4)** — already flagged mandatory-review |
+| `signal_points_*` ×4 | 30/20/10/5 | **DELETE** (§7) |
+| `_typical_loss` (inline, 3 losses, session-scoped) | — | **DELETE** — mislabelled; replaced by the personal frame over the baseline window |
+| size-escalation `1.5` (inline literal) | 1.5 | **UNRESOLVED (P3)** — or derived from their own size distribution, removing the constant |
+| `confidence_alert_gate` | 50 | **UNCHANGED** — engine-level |
+| `cooldown_after_loss` | user-set | **UNCHANGED** — `user_rule`, already correct |
 
-- the trigger: prior trade id, its loss, its exit time, the current entry time, the gap
-- each frame's measurement, with its denominator and provenance (`Measurement`
-  carries `denominator_label` for exactly this)
-- which signals abstained and why (`Insufficiency`)
-- the thresholds it was judged against — **already stored**, via `_thresholds`
-- when a safety bound held a personal value back, that fact and the reason
+### Unresolved decisions
 
-Copy must never say "your limit" about a number that is not the trader's. The
-`personalised: false` marker added to the threshold record exists for this.
+| # | decision | what would settle it | blocks |
+|---|---|---|---|
+| **S1** | account-relative trigger: prior loss ≥ ?% of equity | product decision on what counts as account damage. Cannot be derived from one tradebook whose capital moved ₹30k–₹50k | account frame only |
+| **S2a** | long option: loss ≥ ?% of premium paid | research — a 100% premium loss is routine, so the line is not obvious | trade frame, long options |
+| **S2b** | short option: loss ≥ ?% of SPAN posted | research — unbounded downside, different meaning entirely | trade frame, short options |
+| **S2c** | futures: loss ≥ ?% of SPAN posted | research | trade frame, futures |
+| **S2d** | equity/delivery: what is capital at risk at all? | product — notional is not it | trade frame, equity |
+| **P1** | percentile marking a loss "meaningful for them" | measurable against the tradebook | personal signal only |
+| **P2** | percentile marking a gap "fast for them" | measurable against the tradebook | personal signal only |
+| **P3** | size-escalation multiple, or derive it | measurable | personal signal only |
+| **P4** | `revenge_window_danger_min` | mandatory review | severity split within personal |
+| **M1** | maturity thresholds per metric | sample-stability check, not yet run | personal frame |
+| **B1** | safety-bound values and directions | evidence + product. **Deliberately empty** | bounds inert until set |
+
+**None of these blocks the detector.** Each disables exactly one frame or signal,
+and that frame abstains and says so. This is the substantive change from the
+draft.
 
 ---
 
-## 11. Consolidation and output
+## 9. Evidence and explainability
 
-Unchanged, and correct as it stands. `revenge_trade` sits in the *"going back to
-the same trade"* family behind `same_symbol_obsession` and ahead of
-`rapid_reentry`; `death_spiral` absorbs it when both fire. Folded events keep
-their `BehaviorEvent` with a `_suppressed` marker.
+Reconstructible from stored data alone:
 
-One open question, not a change: the family ordering is hand-picked and
-unvalidated. It is out of scope here but should not be forgotten.
+- trigger: prior trade id, its loss, its exit time, current entry time, the gap
+- per frame: the `Measurement` — value, denominator, `denominator_label`,
+  quality, and for personal signals the sample size
+- **which instrument class was used for the trade-relative denominator**, since
+  the same ratio means different things per class (§4)
+- every abstention, with its `Insufficiency` reason
+- the thresholds it was judged against — already stored via `_thresholds`
+- when a safety bound held a personal value back, that fact and its reason
+
+Copy must never say "your limit" about a number that is not the trader's; the
+`personalised: false` marker exists for this.
 
 ---
 
-## 12. Across capital bands and styles
+## 10. Episodes — interface kept, machine not built
 
-Behaviour under the proposed design. **The account-relative row depends on S1 and
-is therefore provisional.**
+`revenge_trade` is the archetypal episode participant: a loss (trigger), a fast
+re-entry (escalation), a larger position (escalation), a second loss (terminal)
+are four detections of **one** behavioural event, and a trader should be told once
+about the event rather than four times about its parts.
+
+So the detector will **declare** `EpisodeHint(role=ESCALATION, key=<underlying +
+session>)`. Nothing consumes it. That costs one field and no machinery, and it
+means the data exists when episodes are built.
+
+**The open question stays open**: an episode needs a lifetime, the session
+boundary is the honest candidate, and a position held overnight makes it wrong.
+That is the design problem to solve before anything consumes the hint, and it is
+why nothing does yet.
+
+---
+
+## 11. Across capital bands and styles
 
 | trader | today | proposed |
 |---|---|---|
-| **₹5,000** | floor = ₹50; almost any loss qualifies; likely noisy | structural + trade-relative; personal after maturity. Account-relative fires on a genuinely account-threatening loss |
-| **₹50,000** | floor = ₹500 — the band it was tuned on; **8 alerts / 40 sessions** | broadly similar, with the arbitrary floor replaced by their own distribution |
-| **₹5,00,000** | floor = ₹5,000 → **0 alerts**, silenced | fires normally: personal frame scales by construction; account-relative fires on a large loss |
-| **₹50,00,000** | floor = ₹50,000 → silent for almost everything | same as above. The percentile is scale-free; the rupee floor never was |
+| **₹5,000** | floor ₹50 — nearly every loss qualifies; noisy | structural always; trade-relative on long options; personal after maturity; account-relative on genuine account damage |
+| **₹50,000** | floor ₹500 — the band it was tuned on; 8 alerts / 40 sessions | similar volume, arbitrary floor replaced by their own distribution |
+| **₹5,00,000** | floor ₹5,000 → **0 alerts** | fires normally — percentiles are scale-free |
+| **₹50,00,000** | floor ₹50,000 → silent | same |
 
 | style | risk | defence |
 |---|---|---|
-| Scalper, 90-second tempo | every re-entry looks fast | percentile of **their own** gaps: 90s is their p50 |
-| Positional, two trades a week | never reaches maturity | abstains on personal; keeps structural and safety |
-| Options seller, multi-leg | legs seconds apart after a losing leg | strategy-group suppression, already built |
-| Systematic re-entry at a level | fast, same instrument, bigger | **no defence.** Intent is unobservable. Accept as a known false positive rather than pretend |
+| Scalper, 90-second tempo | every re-entry looks fast | percentile of **their own** gaps — 90s is their p50 |
+| Positional, 2 trades/week | never matures | personal abstains; structural and safety continue |
+| Options seller, multi-leg | legs seconds apart | strategy-group suppression; spread denominators abstain (§4) |
+| Systematic re-entry at a level | fast, same instrument, bigger | **no defence.** Intent is unobservable — a known, accepted false positive |
 
 ---
 
-## 13. Foundation: consume, and remove
+## 12. Foundation: consume and remove
 
-**Must be consumed** (first consumer in each case):
+**First consumer of** — this is the validation:
 
-| piece | use |
-|---|---|
-| `measurements.py` | all four families — this is the validation of that module |
-| `evidence.py` | per-signal abstention |
-| `detector_result.py` — `DetectorResult`, `Layer` | separating safety from personal in the result |
-| `ctx.account_risk` | account-relative trigger; **first reader** |
-| `safety_bounds` | bounds on the personal percentiles, once B1 is decided |
-| `DetectorSpec.frames` | first assignment |
-| `clean_for_learning(excluded_indices=...)` | contamination exclusion; the argument exists and is never passed |
+`measurements.py` (all four families) · `evidence.py` (per-signal abstention) ·
+`DetectorResult` + `Layer` · `ctx.account_risk` · `DetectorSpec.frames =
+(ACCOUNT, TRADE, PERSONAL, STRUCTURAL)` · `safety_bounds` (inert until B1) ·
+`clean_for_learning(excluded_indices=…)` · `EpisodeHint` (declared, unconsumed).
 
-**Should be removed or changed:**
+**Removed**: `signal_points_*` ×4, `revenge_min_loss_inr`,
+`revenge_min_loss_pct_capital`, `_typical_loss`, the inline `1.5`.
 
-| piece | why |
-|---|---|
-| `signal_points_*` (4 constants) | §9 — invented weights summed across incommensurable evidence |
-| `revenge_min_loss_inr` + `_pct_capital` | §1 — capital used to suppress |
-| `_typical_loss` | mislabelled session-scoped measure; replaced by the personal frame with declared maturity |
-| inline `1.5` size ratio | either a declared constant with provenance or derived from their own distribution |
-| `EpisodeRole` / `EpisodeHint` | not needed by this detector, not needed by any. Delete unless something else claims them |
-
-**Genuinely not needed here**, and that is fine: baseline `divergence` (a good
-idea with no consumer yet), and `max_drawdown` / `longest_loss_run` (used by the
-baseline, not by this detector).
+**Still without a consumer after this work**, and honestly so: baseline
+`divergence`; `max_drawdown` and `longest_loss_run` (baseline-side, not used
+here). If nothing claims `divergence` by the third detector, delete it.
 
 ---
 
-## 14. Critical assessment
+## 13. Critical assessment
 
-**The strongest reason to do this detector first** is §1. The frame taxonomy was
-justified on principle; applying it to one detector immediately exposed that
-capital is currently wired backwards — suppressing instead of protecting — and
-the replay quantified it at 8 → 0. No amount of further foundation work would
-have surfaced that.
+**What this contract gets right that the draft did not.** Frames now degrade
+independently. The draft made the whole detector contingent on S1/S2; this one
+ships structural on day one for everybody, trade-relative for long options as
+soon as S2a is decided, and account-relative when both the number and the
+denominator exist. Unresolved never means silent-and-unexplained — it means
+abstained-and-recorded.
 
-**The contract is blocked on two numbers, and I will not invent them.** Without
-S1 and S2 there is no safety layer, and the detector stays structural + personal —
-better than today, but not the two-layer design. If those decisions are not made,
-we should say so and ship the personal-frame improvement alone rather than pretend
-the safety layer exists.
+**The instrument split is the finding of this revision.** A single trade-relative
+percentage across long options, short options, futures, spreads and equity is not
+a simplification, it is an error: the estimator returns a *loss ceiling* in one
+case and *margin posted* in another, and 80% of each are not comparable events.
+The draft would have shipped that.
 
-**The riskiest part is severity.** Separating it from confidence changes which
-alerts a trader sees and at what level. That is a real behavioural change and
-needs the replay, with every difference classified.
+**What remains genuinely unresolved and matters most**: S2a. It governs the only
+safety frame available to a brand-new long-option buyer, which is the most common
+retail F&O position in this market. If nothing else is decided, decide that.
 
-**What I think is over-built.** `EpisodeRole`/`EpisodeHint` are not needed here
-and I cannot name a detector that needs them; they should go. The two-window
-`divergence` is computed and stored for nobody. `threshold_recorder` records keys
-*read* rather than *used*, so some irrelevant numbers will attach to alerts — the
-right trade-off, but worth stating.
+**What I would still delete but am keeping on your instruction**: nothing —
+`EpisodeHint` as a declared field with no consumer is a fair call, and cheaper
+than I argued. I would revisit it if a second detector cannot state its role
+without inventing one.
 
-**What I think is right and should not be touched:** consolidation-by-meaning,
-the strategy-group suppression, and the nested `same_symbol`/`same_underlying`
-reasoning — which is the one part of the current points block that is genuinely
-well argued, and is also the argument for deleting the rest of it.
-
-**Honest scope.** This contract makes `revenge_trade` correct in structure. It
-does not make it *validated*: that needs the ₹50k tradebook replayed with the new
-logic, every difference classified, and — for the personal percentiles — a
-judgement about which days the trader would call revenge. Only `heeded` can
-ultimately judge the product, and that is live data we do not have.
+**The honest limit.** This makes `revenge_trade` structurally correct and
+explainable. It does not make it *validated*. Validation needs the ₹50k tradebook
+replayed with the new logic, every difference classified, and a judgement about
+which days the trader would themselves call revenge. Only `heeded` can settle it,
+and that is live data nobody has yet.
