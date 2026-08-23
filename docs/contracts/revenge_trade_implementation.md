@@ -268,8 +268,12 @@ Severity is read from (A, B). Every cell is a stated decision.
 |---|---|---|---|---|
 | **A3** account-threatening | `caution` | `danger` | `danger` | `critical` |
 | **A2** large | `info` | `caution` | `danger` | `danger` |
-| **A1** ordinary | `info` | `info` | `caution` | `caution` |
-| **A0** unquantified | `info` | `info` | `caution` | `caution` |
+| **A1** ordinary | `info` | `info` | `info` | `caution` |
+| **A0** unquantified | `info` | `info` | `info` | `caution` |
+
+**Amended after persona validation** — see §7A.1. The two B2 cells were `caution`
+in the first draft; a scalper reaches B2 dozens of times a day as ordinary tempo,
+and with no magnitude established there is nothing to separate that from tilt.
 
 The corners, because a table is only as good as its edges:
 
@@ -286,6 +290,121 @@ The corners, because a table is only as good as its edges:
 - **A0 and A1 rows are identical.** Deliberate: "measured, and it was ordinary" and
   "could not measure" should lead to the same action. Separating them would let
   abstention behave like evidence.
+- **(A1, B2) and (A0, B2)** are `info`, not `caution` — the amendment in §7A.1.
+  Prompt plus same-underlying with no magnitude established is indistinguishable
+  from an active trader's ordinary rhythm.
+
+### 7A.1 Persona validation
+
+Walked cell by cell. One amendment came out of it; everything else holds.
+
+**Scalper, ~90-second tempo, 40 trades/day, small losses.** Every re-entry is
+inside a 20-minute window (B1) and usually the same underlying (B2). Losses are
+small, so trade-relative sits below `S2a` and their own losses cluster at their
+p50 — A1.
+
+That lands on **(A1, B2)**, which the draft table made `caution`. For this trader
+that is their entire day: dozens of caution alerts describing normal tempo.
+
+The contract claimed the defence was "percentile of their own gaps — 90s is their
+p50". **That defence requires maturity, and cold start does not have it.** Until
+the gap baseline matures the window is the 20-minute default and every re-entry
+qualifies. The claimed protection arrives weeks after the flood.
+
+**Amendment: (A0, B2) and (A1, B2) become `info`.**
+
+The reasoning is epistemic, not a tuning knob. At B2 with no magnitude
+established, promptness plus same-underlying is exactly what an active trader's
+ordinary rhythm looks like, and we have neither a loss size nor a baseline to
+separate the two. `info` is the honest answer: recorded as evidence, visible in
+analytics, not pushed at them. It is the same abstention principle applied to a
+cell rather than a frame.
+
+This costs a real detection: a first-week trader who loses, comes straight back
+to the same underlying at the same size, and is genuinely on tilt is now `info`
+rather than `caution`. That is a deliberate trade — we cannot distinguish them
+from the scalper without either magnitude or history, and inventing the
+difference is what this whole exercise exists to stop.
+
+**Systematic re-entry at a level.** Reaches (A1–A2, B3) every time, so `caution`
+or `danger`, repeatedly. Already accepted as an unfixable false positive — intent
+is unobservable. Worth noting the existing 24-hour per-pattern dedup limits it to
+one alert a day rather than one per re-entry, which makes the accepted cost
+bearable rather than punishing.
+
+**Cold-start user, no equity, long options.** Account abstains (no equity), trade
+abstains (S2a undecided), personal abstains (no history) → **A0**. With the
+amendment they get `info` up to B2 and `caution` at B3. So a brand-new trader is
+told exactly one thing: *you came back to the same underlying with a bigger
+position right after a loss.* Every word of that is directly observed. Correct.
+
+**Missing equity — which is most users today.** A3 is unreachable, so **`critical`
+never fires in production**. That is not a matrix defect but it is a fact worth
+stating plainly: until `margin_snapshots` has a scheduled producer, one of the
+four severity levels is dead in the field, and anything downstream that assumes
+`critical` occurs — copy, dashboards, routing — is untested against reality.
+
+**Invalid trade-risk denominator (spreads, equity/delivery).** Trade frame
+abstains, so A comes from account and personal only. A spread trader with no
+equity and an immature baseline sits permanently at A0 and can only ever reach
+`caution`, via B3. Consistent with the frame design, and mostly moot because
+strategy-group suppression already removes the legs.
+
+**Long-option buyer.** This is where `S2a` is dangerous. A near-total premium loss
+is routine — options expire worthless every week — so if `S2a` is set low, A2 is
+reached constantly, and **(A2, B2) is `danger`**. "Lost most of a cheap option,
+re-entered the same underlying within twenty minutes" describes an ordinary expiry
+afternoon for a large fraction of this market.
+
+Not a matrix problem, but a hard constraint on the decision: **`S2a` set too low
+converts a routine outcome into a danger alert.** Of all the unresolved numbers,
+this is the one where an incautious value does the most damage.
+
+**Options seller.** The denominator is SPAN margin, not a loss ceiling. Losing 80%
+of posted margin is close to catastrophic, where losing 80% of a premium is a
+normal Tuesday. Two consequences:
+
+- A required ordering, derivable from the semantics rather than invented:
+  **`S2b` must be materially lower than `S2a`.** The same ratio means a far worse
+  event on a short position.
+- Sellers trading defined-risk spreads are suppressed or abstained anyway, so this
+  mostly bites the naked seller — the one it should bite.
+
+### 7A.2 (A0, B3) — confirmed, and why
+
+**Confirmed. Structural escalation is a caution-level signal with no measurable
+loss magnitude, deliberately.**
+
+Every element of B3 is directly observed and needs no threshold, no baseline and
+no capital: a trade closed at a loss; a new position was entered inside the
+window; on the same underlying; larger than the one that just lost. The sentence
+"you came straight back to the same thing with more size after losing" is true
+whether or not we can size the loss.
+
+Why `caution` and not higher: harm is unestablished. A0 means we genuinely cannot
+say how much was lost, and severity is a claim about harm.
+
+Why `caution` and not `info`: escalation after a loss is not tempo. A scalper's
+defence — this is simply how fast I trade — explains B1 and B2 and does not
+explain deliberately increasing size immediately after losing. That is what makes
+B3 survive the amendment that demotes B2.
+
+This is also the cell that makes the whole cold-start argument real. Without it, a
+trader in their first week with no equity data gets nothing but `info` from this
+detector, and the claim that structural detection protects new traders would be
+decorative.
+
+### 7A.3 The amended table
+
+| | **B0** unrelated | **B1** prompt | **B2** targeted | **B3** escalated |
+|---|---|---|---|---|
+| **A3** account-threatening | `caution` | `danger` | `danger` | `critical` |
+| **A2** large | `info` | `caution` | `danger` | `danger` |
+| **A1** ordinary | `info` | `info` | **`info`** | `caution` |
+| **A0** unquantified | `info` | `info` | **`info`** | `caution` |
+
+Two cells changed from the draft, both `caution` → `info`. No new constants, no
+weights, no multipliers were introduced to achieve it.
 
 ### The declared-rule breach is separate
 
