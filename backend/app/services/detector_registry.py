@@ -30,8 +30,38 @@ Dependency rule (A.10): no detector may consume another detector's output.
 Detectors consume primary state + the trade event; meta-detectors (Phase 5
 death spiral) consume BehaviorEvents.
 """
-from dataclasses import dataclass, field
+from dataclasses import dataclass
+from enum import Enum
 from typing import Dict, NamedTuple, Tuple
+
+
+class ReferenceFrame(str, Enum):
+    """
+    What a detector measures against.
+
+    The distinction is the whole of "normal is not safe": only PERSONAL depends
+    on the trader's own history, so only PERSONAL can be quietened by a trader
+    whose history is bad. The other three keep working on a brand-new account and
+    cannot be argued down by habit.
+
+        ACCOUNT     impact relative to account equity - needs a denominator,
+                    abstains without one
+        TRADE       loss or risk relative to THIS position - needs only the trade,
+                    so it works on someone's first ever one
+        PERSONAL    deviation from this trader's own established behaviour -
+                    meaningless without history, and the only frame a baseline
+                    may move
+        STRUCTURAL  objectively observable behaviour needing no baseline at all -
+                    "you added to a losing position" is a fact about a sequence
+
+    A detector may use more than one. Recording which is what makes it checkable
+    that a PERSONAL frame has not been allowed to silence a STRUCTURAL claim.
+    """
+
+    ACCOUNT = "account"
+    TRADE = "trade"
+    PERSONAL = "personal"
+    STRUCTURAL = "structural"
 
 
 @dataclass(frozen=True)
@@ -53,6 +83,13 @@ class DetectorSpec:
     # reworked detectors ship as "shadow" here, then promote to "on" once shadow
     # parity holds — the safe detector-by-detector migration path.
     default_mode: str = "on"
+    #: Which reference frame(s) this detector measures in. See ReferenceFrame.
+    #:
+    #: EMPTY ON EVERY ENTRY, deliberately. The frame is decided while reading the
+    #: detector during its review, not guessed in a bulk annotation pass - a field
+    #: filled in by guesswork is worse than an empty one, because it reads as a
+    #: decision somebody made.
+    frames: tuple = ()
 
 
 REGISTRY: Tuple[DetectorSpec, ...] = (

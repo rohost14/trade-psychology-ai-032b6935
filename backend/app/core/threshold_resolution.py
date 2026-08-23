@@ -46,9 +46,14 @@ Each is filed in the design doc with a proposed fix.
 """
 from __future__ import annotations
 
+import logging
+
 from dataclasses import dataclass
 from enum import Enum
 from typing import Any, Callable, Dict, Optional
+
+
+logger = logging.getLogger(__name__)
 
 
 class Source(str, Enum):
@@ -212,6 +217,7 @@ def resolve_thresholds(profile=None, session_trades=None) -> ThresholdSet:
     has not been updated) rung 2 is skipped and nothing changes.
     """
     from app.core.trading_defaults import COLD_START_DEFAULTS, UNIVERSAL_FLOORS
+    from app.core.safety_bounds import clamp_to_bound
 
     values: Dict[str, Any] = dict(COLD_START_DEFAULTS)
     from app.core.threshold_registry import kind_for as _kind_for
@@ -224,10 +230,36 @@ def resolve_thresholds(profile=None, session_trades=None) -> ThresholdSet:
 
     def put(key: str, value: Any, source: Source,
             confidence: float = 0.0, detail: Optional[str] = None) -> None:
-        values[key] = value
         # Kind comes from the registry, never from the caller: what a threshold
         # IS must not depend on which code path happened to resolve it.
-        meta[key] = Resolved(value, source, confidence, detail, kind_for(key))
+        kind = kind_for(key)
+
+        # THE INVARIANT, ENFORCED HERE RATHER THAN ASSERTED IN A TEST.
+        #
+        # A test can only prove that today's registry and today's ladder agree.
+        # This refuses the illegal resolution at the moment it is attempted, so a
+        # new rung, a new metric or a future caller cannot quietly learn a safety
+        # threshold from the trader it is meant to protect.
+        #
+        # Refusing keeps whatever was already there - the repo default, or a rung
+        # that was entitled to answer. Silence would be the wrong failure: the
+        # detector would keep running against a number nobody sanctioned.
+        reason = violates_kind(kind, source)
+        if reason is not None:
+            logger.warning("[thresholds] refused %s <- %s: %s", key, source.value, reason)
+            kept = values.get(key)
+            if kept is not None:
+                meta[key] = Resolved(
+                    kept,
+                    meta[key].source if key in meta else Source.GLOBAL,
+                    0.0,
+                    f"refused a {source.value} resolution: {reason}",
+                    kind,
+                )
+            return
+
+        values[key] = value
+        meta[key] = Resolved(value, source, confidence, detail, kind)
 
     if profile is not None:
         _apply_history(profile, values, meta, put)
@@ -243,10 +275,25 @@ def resolve_thresholds(profile=None, session_trades=None) -> ThresholdSet:
 
     # Universal floors, applied last — they win over every rung above, including
     # a rule the trader set for themselves. Preserved as-is; see module docstring.
+    #
+    # These are FLOORS on sensitivity in the noise direction: "never alert below
+    # three losses". They bound how loud a detector may get and say nothing about
+    # how quiet it may become, which is the opposite guarantee and the one the
+    # bounds below provide.
     for key, floor in UNIVERSAL_FLOORS.items():
         if values.get(key, 0) < floor:
             put(key, floor, Source.FLOOR, 0.0,
                 f"raised to universal floor {floor}")
+
+    # Safety bounds, applied after everything including the floors, because a
+    # bound on insensitivity must be the last word. Nothing declares one today —
+    # each value is decided during its detector's review, with its justification
+    # — so this is a live mechanism guarding an empty set, by design.
+    for key in list(values):
+        bounded, why = clamp_to_bound(key, values[key])
+        if why is not None:
+            values[key] = bounded
+            meta[key] = Resolved(bounded, Source.FLOOR, 0.0, why, kind_for(key))
 
     return ThresholdSet(values, meta)
 

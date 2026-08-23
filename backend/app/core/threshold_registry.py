@@ -38,6 +38,26 @@ from typing import Any, Dict, Optional
 from app.core.threshold_resolution import Kind, Source
 
 
+class Sensitivity(str, Enum):
+    """
+    Which way this threshold's number points.
+
+    Required before any bound can be enforced on it, and deliberately not
+    guessable: for `consecutive_loss_caution` a bigger number means the detector
+    speaks LESS (more losses required), while for `revenge_window_caution_min` a
+    bigger number means it speaks MORE (a wider window catches more re-entries).
+
+    `UNIVERSAL_FLOORS` applies one `<` comparison to both shapes, which is why it
+    reads as a noise floor on some keys and a sensitivity floor on others. A
+    bound that does not know its own direction cannot be enforced, so an
+    unclassified threshold gets no bound rather than a guessed one.
+    """
+
+    UNKNOWN = "unknown"                    # not yet decided — no bound enforceable
+    HIGHER_IS_LOOSER = "higher_is_looser"  # counts, streaks, percentages
+    HIGHER_IS_STRICTER = "higher_is_stricter"  # windows, durations
+
+
 class Maturity(str, Enum):
     """What must accumulate before a metric may be trusted."""
 
@@ -73,6 +93,20 @@ class ThresholdSpec:
     review_required: bool = False
     #: Why this classification, in one line. Provenance for the decision itself.
     provenance: str = ""
+    #: Which way the number points. Without it, no bound can be enforced.
+    sensitivity: Sensitivity = Sensitivity.UNKNOWN
+    #: The point past which personal history may not push this threshold, in the
+    #: direction that makes the detector quieter.
+    #:
+    #: DELIBERATELY None ON EVERY ENTRY. The mechanism is the architecture; the
+    #: number is a claim about a specific behaviour and has to be justified
+    #: against that detector's evidence during its review. Filling these in as a
+    #: batch would recreate exactly the problem this whole exercise exists to
+    #: undo - a wall of numbers nobody can defend individually.
+    safety_bound: Optional[float] = None
+    #: Why that bound, in one line. Required whenever safety_bound is set; a
+    #: bound without a justification is an arbitrary constant wearing a new name.
+    bound_provenance: str = ""
 
 
 def _spec(**kw) -> ThresholdSpec:
