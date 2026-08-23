@@ -31,11 +31,30 @@ class ConnectionManager:
     live socket for the account; dead sockets are pruned individually.
     """
 
+    #: Outbound queue depth per account. A client this far behind is not going
+    #: to catch up, and buffering more of its backlog only spends memory to
+    #: deliver alerts it will read long after they mattered.
+    QUEUE_MAXSIZE = 100
+
     def __init__(self):
         # account_id -> set of WebSocket connections
         self.active_connections: Dict[str, "set[WebSocket]"] = {}
         # Lock for thread safety
         self._lock = asyncio.Lock()
+        # account_id -> outbound queue, and the single task draining it.
+        #
+        # WHY THIS EXISTS. The event subscriber used to `await` delivery for one
+        # account before reading the next event, and delivery awaits each socket
+        # with a 2-second timeout. So one trader on a stalled connection delayed
+        # EVERY other trader's alerts by up to two seconds per socket. At one
+        # user that is invisible; with a few thousand it is the difference
+        # between a mirror and a report.
+        #
+        # One queue and one drain task per account: accounts are isolated from
+        # each other, and ordering WITHIN an account is preserved because its
+        # drain task is strictly sequential.
+        self._queues: Dict[str, asyncio.Queue] = {}
+        self._drainers: Dict[str, asyncio.Task] = {}
 
     async def connect(self, account_id: str, websocket: WebSocket):
         """Register a live connection for an account (additive — does not evict tabs)."""
@@ -54,6 +73,13 @@ class ConnectionManager:
                     conns.discard(websocket)
                     if not conns:
                         self.active_connections.pop(account_id, None)
+                        # Nothing left to deliver to: drop the queue and let the
+                        # drain task finish, so a disconnected account does not
+                        # leak a queue and a task for the process lifetime.
+                        self._queues.pop(account_id, None)
+                        task = self._drainers.pop(account_id, None)
+                        if task is not None and not task.done():
+                            task.cancel()
         logger.info(f"WebSocket disconnected: {account_id[:8]}...")
 
     async def send_to_account(self, account_id: str, message: dict):
@@ -62,15 +88,79 @@ class ConnectionManager:
             conns = list(self.active_connections.get(account_id, ()))
         if not conns:
             return
-        dead = []
-        for websocket in conns:
+        # Concurrently, not one after another: these are separate devices for the
+        # same trader and nothing orders them relative to each other, so a stalled
+        # phone must not hold up the desktop it is sitting next to.
+        async def _send(ws):
             try:
-                await asyncio.wait_for(websocket.send_json(message), timeout=2.0)
+                await asyncio.wait_for(ws.send_json(message), timeout=2.0)
+                return None
             except Exception as e:
                 logger.error(f"Send failed for {account_id[:8]}...: {e}")
-                dead.append(websocket)
-        for websocket in dead:
+                return ws
+
+        results = await asyncio.gather(*(_send(ws) for ws in conns))
+        for websocket in [ws for ws in results if ws is not None]:
             await self.disconnect(account_id, websocket)
+
+    def deliver(self, account_id: str, message: dict) -> bool:
+        """
+        Hand a message off for delivery WITHOUT waiting for the sockets.
+
+        This is what the event subscriber calls. It returns immediately, so the
+        time one account's sockets take is paid by that account's drain task and
+        by nobody else.
+
+        Ordering within an account is preserved: one queue, one drain task,
+        strictly sequential. Ordering ACROSS accounts was never meaningful and is
+        now explicitly independent.
+
+        Returns False when the account's queue is full - a client that far behind
+        is dropped rather than allowed to consume unbounded memory.
+        """
+        if account_id not in self.active_connections:
+            return False
+
+        q = self._queues.get(account_id)
+        if q is None:
+            q = asyncio.Queue(maxsize=self.QUEUE_MAXSIZE)
+            self._queues[account_id] = q
+
+        try:
+            q.put_nowait(message)
+        except asyncio.QueueFull:
+            logger.warning(
+                "[ws] %s... outbound queue full (%d) - dropping message",
+                account_id[:8], self.QUEUE_MAXSIZE,
+            )
+            return False
+
+        task = self._drainers.get(account_id)
+        if task is None or task.done():
+            self._drainers[account_id] = asyncio.create_task(self._drain(account_id))
+        return True
+
+    async def _drain(self, account_id: str) -> None:
+        """
+        Deliver one account's queued messages, in order, until it is empty.
+
+        Exceptions are contained here on purpose: a failure delivering to one
+        account must not kill the subscriber or any other account's drain.
+        """
+        q = self._queues.get(account_id)
+        if q is None:
+            return
+        while True:
+            try:
+                message = q.get_nowait()
+            except asyncio.QueueEmpty:
+                return
+            try:
+                await self.send_to_account(account_id, message)
+            except Exception as e:
+                logger.error("[ws] drain failed for %s...: %s", account_id[:8], e)
+            finally:
+                q.task_done()
 
     async def send_alert(self, account_id: str, alert_data: dict, event_id: str = ""):
         """Send risk alert to specific account."""

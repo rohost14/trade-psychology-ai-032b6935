@@ -245,7 +245,11 @@ async def start_event_subscriber() -> None:
                         except (json.JSONDecodeError, TypeError):
                             data = {}
 
-                        await _dispatch_to_websocket(account_id, event_type, data, entry_id)
+                        # Hand off without awaiting the sockets. Delivery time
+                        # for one account is now paid by that account's drain
+                        # task; previously it was paid by every account behind it
+                        # in this loop, at up to 2 seconds per stalled socket.
+                        _dispatch_to_websocket(account_id, event_type, data, entry_id)
 
         except Exception as e:
             logger.error(f"[event_bus] Subscriber error (reconnecting in 5s): {e}")
@@ -280,37 +284,56 @@ async def _handle_internal_event(account_id: str, event_type: str) -> None:
             logger.warning(f"[event_bus] subscription_refresh failed for {account_id[:8]}: {e}")
 
 
-async def _dispatch_to_websocket(
+def _dispatch_to_websocket(
     account_id: str,
     event_type: str,
     data: dict,
     event_id: str,
 ) -> None:
-    """Forward a stream event to the connected WebSocket client for this account."""
+    """
+    Hand a stream event to the account's outbound queue. Returns immediately.
+
+    SYNCHRONOUS ON PURPOSE. This used to be awaited by the subscriber loop, which
+    meant the loop waited for one account's sockets - up to two seconds per
+    stalled socket - before reading the next event for anybody else. Now the wait
+    is paid by that account's own drain task.
+
+    The message shapes are unchanged, so what a browser receives is byte for byte
+    what it received before; only who waits for it has changed.
+    """
     try:
+        from datetime import datetime, timezone
+
         from app.api.websocket import manager
 
-        message = {
-            "type": event_type,
-            "event_id": event_id,
-            "data": data,
-        }
-
         if event_type in ("trade_update", "position_update"):
-            await manager.send_trade_update(account_id, data, event_id=event_id)
-
+            message = {
+                "type": "trade_update",
+                "event_id": event_id,
+                "data": data,
+                "timestamp": datetime.now(timezone.utc).isoformat(),
+            }
         elif event_type == "alert_update":
-            await manager.send_alert(account_id, data, event_id=event_id)
-
+            message = {
+                "type": "alert_update",
+                "event_id": event_id,
+                "data": data,
+                "timestamp": datetime.now(timezone.utc).isoformat(),
+            }
         elif event_type == "margin_update":
-            await manager.send_to_account(account_id, {
+            message = {
                 "type": "margin_update",
                 "event_id": event_id,
                 "data": data,
-            })
-
+            }
         else:
-            await manager.send_to_account(account_id, message)
+            message = {
+                "type": event_type,
+                "event_id": event_id,
+                "data": data,
+            }
+
+        manager.deliver(account_id, message)
 
     except Exception as e:
         logger.debug(f"[event_bus] dispatch failed for {account_id[:8]}: {e}")
