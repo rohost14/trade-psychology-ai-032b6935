@@ -37,9 +37,16 @@ Nothing to do with trading. These are our decisions about how much to interrupt.
 | `alert_bucket_minutes` | 5 |
 | `alert_stale_push_min` | 30 |
 | `guardian_monthly_budget` | 3 |
-| `confidence_alert_gate` | 50 |
+| ~~`confidence_alert_gate`~~ | ~~50~~ |
 
-**Verdict: keep the values, fix the `Kind`.** All five are `fallback` today.
+**`confidence_alert_gate` does not belong in this table** — struck 24 Aug after the
+audit in `confidence_alert_gate_CLOSED.md`. It was never product policy and never
+engine-wide: it had exactly one reader for its entire life, inside
+`revenge_trade`'s deleted points score, and has zero readers now. Its Kind is not
+being fixed because it has no behaviour left to classify. Only its definition and
+a now-false comment remain in `trading_defaults.py:251`.
+
+**Verdict for the other four: keep the values, fix the `Kind`.** All are `fallback` today.
 They are `product_policy`, and classifying them would stop anything ever
 personalising them — which is right: a trader should not be able to learn their
 way into more alerts.
