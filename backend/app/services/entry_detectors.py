@@ -182,9 +182,16 @@ def evaluate_entry(engine, ctx, whitelist: Sequence[str] = ENTRY_DECIDABLE) -> L
         except Exception as e:
             logger.warning("[entry_detectors] %s failed at entry: %s", name, e)
             continue
-        if not result:
+        # A detector may return DetectedEvent(s) or a DetectorResult. Normalise
+        # through the same adapter the engine uses, so this second call site
+        # cannot drift from the first - and so a NEGATIVE result (the detector
+        # looked and the behaviour did not happen) yields nothing here rather
+        # than being written as shadow evidence that something occurred.
+        from app.services.behavior_engine import _as_events
+        events_out = _as_events(name, result)
+        if not events_out:
             continue
-        for ev in (result if isinstance(result, list) else [result]):
+        for ev in events_out:
             ev.shadow = True
             ev.context = {**(ev.context or {}), "at_entry": True}
             events.append(ev)

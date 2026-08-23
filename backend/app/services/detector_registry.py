@@ -96,9 +96,13 @@ REGISTRY: Tuple[DetectorSpec, ...] = (
     DetectorSpec("consecutive_loss_streak", "_detect_consecutive_loss_streak",
                  "1.1.0", "emotional", "alerting", "exit", 2,
                  uses_baseline=True, uses_constitution=True),
+    # 3.0.0: rewritten to the frozen A x B contract 2026-08-23. First detector
+    # to declare its reference frames and the first to return a DetectorResult.
     DetectorSpec("revenge_trade", "_detect_revenge_trade",
-                 "2.0.0", "emotional", "alerting", "exit", 2,
-                 uses_constitution=True),
+                 "3.0.0", "emotional", "alerting", "exit", 2,
+                 uses_baseline=True, uses_constitution=True,
+                 frames=(ReferenceFrame.ACCOUNT, ReferenceFrame.TRADE,
+                         ReferenceFrame.PERSONAL, ReferenceFrame.STRUCTURAL)),
     # Emits overtrading_burst (30-min window) AND daily_overtrading (Phase 4
     # split) — version lookup for the alias lives in ALIASES below.
     DetectorSpec("overtrading_burst", "_detect_overtrading_burst",

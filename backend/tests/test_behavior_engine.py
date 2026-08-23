@@ -153,36 +153,48 @@ class TestDetectors:
     # ── Revenge trade ─────────────────────────────────────────────────────
 
     def test_revenge_trade_detected(self):
-        now = now_utc()
-        loser = make_ct(pnl=-500, entry_offset_min=-20, duration_min=10)
-        # Current trade entered 5 min after loser exited
-        loser.exit_time = now - timedelta(minutes=5)
-        winner = make_ct(pnl=100, entry_offset_min=-4, duration_min=3)
-        winner.entry_time = now - timedelta(minutes=4)
+        """
+        REWRITTEN 2026-08-23 with its subject: revenge_trade returns a
+        DetectorResult, not a DetectedEvent. It carries the layer that judged it,
+        the measurements behind the verdict, and the difference between "did not
+        happen" and "could not tell".
 
-        ctx = make_ctx(
-            completed_trade=winner,
-            session_trades=[loser, winner],
+        A fast re-entry after a loss, with no equity, no baseline and no decided
+        significance threshold, is A1 — measured, unjudged — so it is recorded
+        and never notified. That is the designed cost of deleting the
+        capital-derived gate, not a regression.
+        """
+        prior = make_ct(pnl=-3000, entry_offset_min=-60, duration_min=25)
+        current = make_ct(pnl=-1000, entry_offset_min=-30, duration_min=20)
+        ctx = make_ctx(completed_trade=current, session_trades=[prior])
+
+        result = engine._detect_revenge_trade(ctx)
+
+        assert result is not None
+        assert result.detector == "revenge_trade"
+        assert result.fired, "the structural fact should be established"
+        assert result.severity == "info", (
+            "measured but unjudged must not reach a notifying severity"
         )
-        event = engine._detect_revenge_trade(ctx)
-        assert event is not None
-        assert event.event_type == "revenge_trade"
+        assert result.context["b_level"] >= 1
+        assert result.context["a_level"] == 1, "the loss was measurable"
 
     def test_no_revenge_after_winner(self):
-        now = now_utc()
-        winner = make_ct(pnl=500, entry_offset_min=-20, duration_min=10)
-        winner.exit_time = now - timedelta(minutes=5)
-        next_trade = make_ct(pnl=100, entry_offset_min=-4, duration_min=3)
-        next_trade.entry_time = now - timedelta(minutes=4)
+        """
+        A winner is not something to avenge. NOT_DETECTED rather than None: the
+        detector looked and can say the behaviour did not occur, which is a
+        different claim from "could not tell" and is what makes a clean session
+        distinguishable from an unmonitored one.
+        """
+        prior = make_ct(pnl=5000, entry_offset_min=-60, duration_min=25)
+        current = make_ct(pnl=-1000, entry_offset_min=-30, duration_min=20)
+        ctx = make_ctx(completed_trade=current, session_trades=[prior])
 
-        ctx = make_ctx(
-            completed_trade=next_trade,
-            session_trades=[winner, next_trade],
-        )
-        event = engine._detect_revenge_trade(ctx)
-        assert event is None  # Prior trade was a winner
+        result = engine._detect_revenge_trade(ctx)
 
-    # ── Overtrading burst ─────────────────────────────────────────────────
+        assert result is not None
+        assert not result.fired
+        assert not result.abstained, "we could see clearly enough to say no"
 
     def test_overtrading_detected(self):
         now = now_utc()

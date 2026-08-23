@@ -54,7 +54,12 @@ from typing import List, Optional, Dict, Any
 from app.core.severity import SEVERITY_ORDER
 from app.core import session_facts
 from app.core.session_facts import SessionFacts
-from app.core.detector_result import DetectorResult
+from app.core.detector_result import (
+    DetectorResult,
+    Layer,
+    abstained,
+    not_detected,
+)
 from app.core.threshold_recorder import RecordingThresholds
 from app.core.account_risk import AccountRisk, freeze_for_session, resolve_account_risk
 from uuid import UUID, uuid4
@@ -271,6 +276,10 @@ class EngineContext:
     # so that when one is, the number it divides by is the same number the rest
     # of the session was measured against, and is recorded on the session row.
     account_risk: Optional[AccountRisk] = None
+    #: The trader's profile, for detectors that read their own baseline
+    #: metrics. Loaded once in _load_context; previously it was fetched and
+    #: then discarded after thresholds were resolved.
+    profile: Optional[object] = None
 
     def __post_init__(self):
         # Derive rather than require. A context assembled anywhere - the engine,
@@ -596,6 +605,7 @@ class BehaviorEngine:
             session_state=shadow_state,
             facts=facts,
             account_risk=account_risk,
+            profile=profile,
         )
 
     # ── Run all detectors ──────────────────────────────────────────────────
@@ -910,124 +920,262 @@ class BehaviorEngine:
 
     # ── Pattern 2: Revenge trade ──────────────────────────────────────────
 
-    def _detect_revenge_trade(self, ctx: EngineContext) -> Optional[DetectedEvent]:
-        ct = ctx.completed_trade
-        trades = ctx.session_trades
-        if not ct.entry_time or len(trades) < 1:
-            return None
+    # ── The A x B evidence model ──────────────────────────────────────────
+    #
+    # Two ordinal axes and a table. No score, no weights, no counting of signals.
+    #
+    #   A  how big was the thing they reacted to
+    #   B  how much does the re-entry look like a reaction
+    #
+    # Each axis takes the HIGHEST level any frame establishes - a lattice join.
+    # Two guarantees fall out of that structurally rather than by promise: an
+    # abstaining frame can never lower a level, so missing equity cannot reduce
+    # the severity of a large trade-relative loss; and personal history can only
+    # raise a level, because no rule removes one. "This is normal for them" is
+    # unreachable by construction.
+    #
+    # See docs/contracts/revenge_trade_implementation.md - frozen 23 Aug 2026.
+    # Indexed [A][B]. B0 is absent by construction - the detector returns
+    # NOT_DETECTED before reaching the table, because "these two trades were
+    # unrelated" is a non-detection and recording it would write an event on
+    # essentially every trade that follows a loss.
+    _RT_MATRIX = {
+        # A3 account-threatening
+        3: {1: "danger", 2: "danger", 3: "critical"},
+        # A2 large - a decided threshold was crossed
+        2: {1: "caution", 2: "danger", 3: "danger"},
+        # A1 measured, unjudged - we hold a number and have no sanctioned rule
+        # for calling it significant, so claiming harm would decide significance
+        # at the moment of use. info IS the abstention: recorded, countable, not
+        # shouted. Costs real coverage until S2 is decided, and makes that
+        # absence visible rather than hidden behind a threshold nobody chose.
+        1: {1: "info", 2: "info", 3: "info"},
+        # A0 unmeasurable - every magnitude frame abstained, so the loss MIGHT
+        # have been large and the structural claim is all the evidence there is.
+        # Quieter at A1 than at A0 reads backwards until you see why: structure
+        # alone can carry a claim, a number we are not licensed to interpret
+        # cannot. This is the cold-start cell.
+        0: {1: "info", 2: "info", 3: "caution"},
+    }
 
-        prior = [t for t in trades if t.exit_time and t.exit_time < ct.entry_time]
-        if not prior:
-            return None
+    def _detect_revenge_trade(self, ctx: EngineContext) -> Optional[DetectorResult]:
+        """
+        A decision taken against the previous loss rather than on its own terms.
+
+        REWRITTEN 2026-08-23 to the frozen contract. What changed and why:
+
+        The old detector gated on `revenge_min_loss_inr`, which resolves to 1% of
+        capital - so the bigger the account, the larger a loss had to be before
+        the detector would look at it at all. Measured on 40 sessions with only
+        capital changed: 8 alerts at Rs 50,000 and ZERO at Rs 5,00,000. Capital
+        was being used to SUPPRESS. Account-relative measurement is a reason to
+        fire, never a reason to stay quiet, so it moves to the safety trigger and
+        is gone from the gate.
+
+        It also summed invented points - 30 for a base case, 20 for this, 10 for
+        that - into a confidence that decided whether the trader was told
+        anything. That is the behaviour score in miniature and it is gone;
+        severity is read from the matrix above and confidence is the shared
+        weakest-link calculation.
+
+        Frames degrade independently. With S1, S2 and every maturity requirement
+        unresolved, the account, trade and personal frames all abstain and the
+        detector still reports the structural fact - which is the cold-start
+        behaviour the contract promises, not a degraded mode.
+        """
+        from app.core import confidence as _confidence
+        from app.core import maturity as _maturity
+        from app.core.evidence import Insufficiency, positive
+        from app.core.instrument_risk import risk_basis
+        from app.core.measurements import (
+            UNMEASURABLE,
+            loss_vs_account,
+            loss_vs_risk_basis,
+        )
+
+        ct = ctx.completed_trade
+        abstentions = {}
+        measurements = {}
+
+        # ── Structural gate ───────────────────────────────────────────────
+        prior = [t for t in ctx.session_trades
+                 if t.exit_time and ct.entry_time and t.exit_time < ct.entry_time]
+        if not ct.entry_time or not prior:
+            return not_detected("revenge_trade", "no closed trade to react to")
 
         last = prior[-1]
         last_pnl = Decimal(str(last.realized_pnl or 0))
         if last_pnl >= 0:
-            return None
+            return not_detected("revenge_trade", "the previous trade did not lose")
 
-        # Only trigger if prior loss is meaningful (not a scratch trade)
-        # A scratch for this trader, not a scratch in general. Half the median
-        # losing trade: below that the loss is ordinary for them and re-entering
-        # after it is not a reaction to anything.
-        min_loss = ctx.thresholds.get("revenge_min_loss_inr", 500)
-        _typical = self._typical_loss(ctx)
-        if _typical:
-            min_loss = max(min_loss * 0.5, _typical * 0.5)
-        if abs(last_pnl) < min_loss:
-            return None
-
+        if not last.exit_time:
+            return abstained("revenge_trade", Insufficiency.MISSING_INPUT,
+                             "the previous trade has no exit time")
         gap_min = (ct.entry_time - last.exit_time).total_seconds() / 60
         if gap_min < 0:
-            return None  # data issue: timestamps out of order
+            return abstained("revenge_trade", Insufficiency.MISSING_INPUT,
+                             "timestamps are out of order")
+
+        prior_loss = abs(float(last_pnl))
+
+        # ── A: trigger magnitude. Highest level any frame establishes ─────
+        #
+        # A1 is reached by MEASURABILITY, not by crossing a threshold. Measuring
+        # a loss needs only a comparable denominator - risk_basis gives one for a
+        # long option on trade one - while a threshold is needed to call the
+        # result significant. Conflating the two made A1 unreachable and let a
+        # Rs 120 scratch loss be treated exactly like a loss we could not see.
+        a_level = 0
+
+        # Account-relative. Abstains without equity, and S1 is unresolved, so it
+        # abstains twice over today. Recorded both ways so the two reasons stay
+        # distinguishable.
+        acct = loss_vs_account(prior_loss, ctx.account_risk) if ctx.account_risk \
+            else UNMEASURABLE
+        measurements["loss_vs_account"] = acct
+        s1 = ctx.thresholds.get("revenge_account_loss_pct")   # unresolved: absent
+        if not acct.is_measurable:
+            abstentions["account"] = "no usable account denominator"
+        else:
+            a_level = max(a_level, 1)          # measured
+            if s1 is None:
+                abstentions["account"] = "S1 undecided: no account-relative threshold"
+            elif acct.value >= float(s1) / 100.0:
+                a_level = max(a_level, 3)
+
+        # Trade-relative, per instrument class. A spread's denominator is known to
+        # be over-estimated, so loss_vs_risk_basis abstains rather than reporting
+        # a ratio understated in a known direction.
+        is_spread = ctx.strategy_group is not None
+        basis = risk_basis(
+            last.instrument_type, last.tradingsymbol or "", last.direction,
+            float(last.avg_entry_price or 0), int(last.total_quantity or 0),
+            is_spread=is_spread,
+        )
+        trade_m = loss_vs_risk_basis(prior_loss, basis)
+        measurements["loss_vs_trade"] = trade_m
+        s2 = ctx.thresholds.get(f"revenge_trade_loss_pct_{basis.instrument.value}")
+        if not trade_m.is_measurable:
+            abstentions["trade"] = f"denominator not comparable for {basis.instrument.value}"
+        else:
+            a_level = max(a_level, 1)          # measured
+            if s2 is None:
+                abstentions["trade"] = f"S2 undecided for {basis.instrument.value}"
+            elif trade_m.value >= float(s2) / 100.0:
+                a_level = max(a_level, 2)
+
+        # Personal. maturity.assess returns UNAVAILABLE while M1 is undeclared, so
+        # this abstains for every trader today.
+        loss_metric = self._rt_metric(ctx, "own_loss_size")
+        loss_maturity = _maturity.assess(loss_metric,
+                                         ctx.thresholds.get("revenge_loss_min_sample"))
+        if not loss_maturity.is_usable:
+            abstentions["personal_loss"] = loss_maturity.describe()
+        else:
+            a_level = max(a_level, 1)          # measured against their own history
+            p1 = ctx.thresholds.get("revenge_loss_percentile")
+            marker = (loss_metric.get("percentiles") or {}).get(f"p{int(p1)}") if p1 else None
+            if marker is None:
+                abstentions["personal_loss"] = "P1 undecided: no percentile selected"
+            elif prior_loss >= float(marker):
+                a_level = max(a_level, 2)
+
+        # ── B: reaction structure. Nested levels, never added ─────────────
         caution_window = ctx.thresholds.get("revenge_window_caution_min", 20)
-        danger_window  = ctx.thresholds.get("revenge_window_danger_min", 5)
+        window_maturity = _maturity.assess(
+            self._rt_metric(ctx, "reentry_after_loss_p25"),
+            ctx.thresholds.get("revenge_gap_min_sample"),
+        )
+        if not window_maturity.is_usable:
+            # The fallback carries its OWN provenance and is never relabelled as
+            # personal - threshold_recorder already emits personalised: false with
+            # the reason, and both non-mature states reuse that path.
+            abstentions["personal_gap"] = window_maturity.describe()
 
-        if gap_min > caution_window:
-            return None
+        if gap_min > float(caution_window):
+            # B0: outside the window, so these are two decisions rather than a
+            # reaction. A non-detection, not evidence - recording it would write
+            # an event on essentially every trade that follows a loss.
+            return not_detected(
+                "revenge_trade",
+                f"re-entered {gap_min:.0f}min after the loss, outside the "
+                f"{caution_window}min window",
+            )
 
-        # ── Phase 4: signal-stacking confidence (master §1.4, doc 2) ──────
-        # Timing alone is weak evidence. Stack independent signals; below the
-        # gate the event is recorded as info (evidence) but never alerts.
-        pts = {
-            "critical": ctx.thresholds.get("signal_points_critical", 30),
-            "high":     ctx.thresholds.get("signal_points_high", 20),
-            "medium":   ctx.thresholds.get("signal_points_medium", 10),
-            "low":      ctx.thresholds.get("signal_points_low", 5),
-        }
-        from app.services.instrument_parser import parse_symbol as _ps
+        b_level = 1                      # B1: inside the window
         try:
+            from app.services.instrument_parser import parse_symbol as _ps
             same_underlying = (_ps(ct.tradingsymbol or "").underlying
                                == _ps(last.tradingsymbol or "").underlying)
+            parsed = True
         except Exception:
             same_underlying = ct.tradingsymbol == last.tradingsymbol
-        same_symbol = ct.tradingsymbol == last.tradingsymbol
-        size_ratio = (ct.total_quantity or 1) / max(last.total_quantity or 1, 1) \
-            if same_underlying else None
-        session_pnl = float(ctx.session.session_pnl or 0) if ctx.session else 0
+            parsed = False
 
-        evidence = []
-        confidence = float(pts["critical"])          # base: meaningful loss + inside window
-        evidence.append({"signal": "loss_then_reentry_in_window", "value": round(gap_min, 1),
-                         "importance": "critical"})
-        if gap_min <= danger_window:
-            confidence += pts["high"]
-            evidence.append({"signal": "fast_reentry", "value": round(gap_min, 1),
-                             "importance": "high"})
-        # "Went back to the same thing" is ONE fact, and same_symbol implies
-        # same_underlying. Scoring both added +20 and then +10 for a single
-        # observation stated twice — once loosely, once precisely — which is
-        # not what additive stacking means. Additive points assume independent
-        # evidence; these are nested, so the tiers are exclusive: the exact
-        # contract is the stronger claim and scores high, the same underlying
-        # on a different strike is weaker and scores medium.
-        if same_symbol:
-            confidence += pts["high"]
-            evidence.append({"signal": "same_symbol", "value": True, "importance": "high"})
-        elif same_underlying:
-            confidence += pts["medium"]
-            evidence.append({"signal": "same_underlying", "value": True, "importance": "medium"})
-        if size_ratio is not None and size_ratio >= 1.5:
-            confidence += pts["high"]
-            evidence.append({"signal": "bigger_position", "value": round(size_ratio, 2),
-                             "importance": "high"})
-        if session_pnl < 0:
-            confidence += pts["medium"]
-            evidence.append({"signal": "session_red", "value": round(session_pnl, 2),
-                             "importance": "medium"})
-        confidence = min(confidence, 100.0)
+        # same_symbol IMPLIES same_underlying. One fact at two precisions, so
+        # they are exclusive tiers of B2 rather than two observations - which is
+        # why levels replaced points.
+        if same_underlying or ct.tradingsymbol == last.tradingsymbol:
+            b_level = 2
+            # B3 needs no constant: bigger than the position that just lost.
+            if (ct.total_quantity or 0) > (last.total_quantity or 0):
+                b_level = 3
 
-        # Severity = risk impact, independent of confidence (master §1.3):
-        # a fast re-entry with escalated size is dangerous; timing alone is caution.
-        severity = "danger" if (gap_min <= danger_window
-                                and size_ratio is not None and size_ratio >= 1.5) \
-            else "danger" if gap_min <= danger_window and same_underlying \
-            else "caution"
+        severity = self._RT_MATRIX[a_level][b_level]
 
-        gate = ctx.thresholds.get("confidence_alert_gate", 50)
-        if confidence < gate:
-            severity = "info"  # recorded as evidence, never alerts
+        # A declared cooldown breach is a fact about a COMMITMENT, not about harm.
+        # It raises severity to at least caution and never on its own to danger.
+        declared = ctx.thresholds.get("user_cooldown_min")
+        declared_breach = bool(declared and gap_min < float(declared))
+        if declared_breach and SEVERITY_ORDER.index(severity) < SEVERITY_ORDER.index("caution"):
+            severity = "caution"
 
-        loc = "the same instrument" if same_symbol else last.tradingsymbol
-        return DetectedEvent(
-            event_type="revenge_trade",
+        # Confidence answers how well we could SEE this, never how bad it is.
+        conf = _confidence.from_observables(
+            data_quality=None,
+            sample_confidences=[m.get("confidence") for m in
+                                (loss_metric,) if m],
+            inputs_parsed=parsed,
+        )
+
+        loc = "the same instrument" if ct.tradingsymbol == last.tradingsymbol \
+            else last.tradingsymbol
+        message = (f"Entered {ct.tradingsymbol} {gap_min:.0f}min after a "
+                   f"Rs {prior_loss:,.0f} loss on {loc}.")
+        if b_level == 3:
+            message += " The new position is larger than the one that lost."
+
+        return DetectorResult(
+            detector="revenge_trade",
+            evidence=positive("loss then re-entry", gap_minutes=round(gap_min, 1)),
+            layer=Layer.SAFETY if a_level >= 2 else Layer.PERSONAL,
             severity=severity,
-            confidence=confidence,
-            message=(
-                f"Entered {ct.tradingsymbol} {gap_min:.0f}min after a "
-                f"₹{abs(float(last_pnl)):,.0f} loss on {loc}."
-                + (f" Position is {size_ratio:.1f}× the losing trade." if size_ratio and size_ratio >= 1.5 else "")
-            ),
+            confidence=conf,
+            measurements=measurements,
+            message=message,
             context={
                 "gap_minutes": round(gap_min, 1),
                 "prior_loss": float(last_pnl),
                 "prior_symbol": last.tradingsymbol,
                 "trigger_symbol": ct.tradingsymbol,
                 "caution_window": caution_window,
-                "danger_window": danger_window,
-                "size_ratio": round(size_ratio, 2) if size_ratio is not None else None,
-                "signals": evidence,
+                "a_level": a_level,
+                "b_level": b_level,
+                "instrument_class": basis.instrument.value,
+                "denominator_kind": basis.kind.value,
+                "declared_breach": declared_breach,
+                "abstained_frames": abstentions,
             },
         )
+
+    @staticmethod
+    def _rt_metric(ctx: EngineContext, name: str):
+        """One baseline metric record, or None. No thresholds, no defaults."""
+        try:
+            baseline = (getattr(ctx.profile, "detected_patterns", None) or {}).get("baseline")
+            return ((baseline or {}).get("metrics") or {}).get(name)
+        except Exception:
+            return None
 
     # ── Pattern 3: Overtrading burst + daily count ────────────────────────
 

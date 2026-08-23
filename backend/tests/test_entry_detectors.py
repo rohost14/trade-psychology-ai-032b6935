@@ -134,10 +134,24 @@ def test_a_long_gap_since_the_loss_is_not_revenge():
     assert [e for e in events if e.event_type == "revenge_trade"] == []
 
 
-def test_a_scratch_loss_does_not_trigger_revenge():
-    """Below revenge_min_loss_inr there is nothing to be avenging."""
+def test_a_scratch_loss_is_recorded_but_never_notified():
+    """
+    REWRITTEN 2026-08-23 with its subject. This asserted that a loss below
+    `revenge_min_loss_inr` produced nothing — and that gate was deleted, because
+    it resolved to 1% of capital and therefore silenced the detector entirely on
+    a larger account (8 alerts at Rs 50,000, zero at Rs 5,00,000).
+
+    Under the frozen contract a small loss is A1: measured, and with no decided
+    significance threshold there is no sanctioned rule for calling it large. So
+    it is recorded as `info` — evidence, countable, never notified — rather than
+    suppressed by a threshold nobody chose.
+    """
     events = evaluate_entry(engine, ctx(entry(), [closed_trade(pnl=-120.0)]))
-    assert [e for e in events if e.event_type == "revenge_trade"] == []
+    revenge = [e for e in events if e.event_type == "revenge_trade"]
+    assert revenge, "the structural fact should still be recorded"
+    assert all(e.severity == "info" for e in revenge), (
+        "a measured-but-unjudged loss must never reach a notifying severity"
+    )
 
 
 # ── The whitelist is the safety property ─────────────────────────────────────

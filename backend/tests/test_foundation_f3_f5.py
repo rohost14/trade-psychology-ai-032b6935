@@ -191,21 +191,41 @@ def test_the_label_names_the_denominator_in_the_trader_s_terms():
 # ── all three are inert ────────────────────────────────────────────────────
 
 
-def test_nothing_consumes_these_yet():
+#: Detectors whose pattern review is complete. Adoption of the shared mechanisms
+#: is allowed only for these — one at a time, each behind a replay.
+REVIEWED_DETECTORS = {"revenge_trade"}
+
+
+def test_only_reviewed_detectors_consume_the_shared_mechanisms():
     """
-    F1-F5 are shared mechanisms, not behaviour. If a detector starts importing
-    one before the pattern phase, it happened outside a detector review.
+    F1-F5 are mechanisms, not behaviour, and adoption is a per-detector decision
+    taken during that detector's review.
+
+    This guarded "nobody consumes them" until revenge_trade was reviewed. It now
+    guards the real property: the modules are imported inside the reviewed
+    detector's own method and nowhere else. A second detector reaching for them
+    without a review fails here.
     """
     import inspect
 
-    from app.services import behavior_engine
+    from app.services.behavior_engine import BehaviorEngine
 
-    src = inspect.getsource(behavior_engine)
     for module in ("core.maturity", "core.confidence", "core.instrument_risk"):
-        assert module not in src, (
-            f"behavior_engine imports {module} - adoption belongs to the "
-            "pattern-by-pattern phase, behind a replay"
-        )
+        for name in dir(BehaviorEngine):
+            if not name.startswith("_detect_"):
+                continue
+            detector = name.replace("_detect_", "", 1)
+            if detector in REVIEWED_DETECTORS:
+                continue
+            method = getattr(BehaviorEngine, name, None)
+            try:
+                src = inspect.getsource(method)
+            except (TypeError, OSError):
+                continue
+            assert module not in src, (
+                f"{detector} imports {module} but has not been reviewed - "
+                "adoption belongs to that detector's own review, behind a replay"
+            )
 
 
 # ── F2: every universal floor declares which way it points ─────────────────

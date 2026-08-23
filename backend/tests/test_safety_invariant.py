@@ -261,14 +261,24 @@ def test_a_declared_bound_must_carry_its_reason():
             )
 
 
-def test_detector_frames_are_deferred_not_guessed():
+def test_frames_are_assigned_only_by_a_detector_review():
     """
-    `frames` exists so the pattern review can fill it in one detector at a time.
+    `frames` is filled in one detector at a time, while reading that detector.
     A bulk annotation pass would read as decisions somebody made.
+
+    This asserted "no detector has frames" until revenge_trade was reviewed. It
+    now names the reviewed set, so a second detector gaining frames without a
+    review still fails.
     """
+    from tests.test_foundation_f3_f5 import REVIEWED_DETECTORS
     from app.services.detector_registry import REGISTRY
 
     assert all(hasattr(spec, "frames") for spec in REGISTRY)
-    assert not any(spec.frames for spec in REGISTRY), (
-        "frames were assigned outside a detector review"
-    )
+    unreviewed = [s.name for s in REGISTRY
+                  if s.frames and s.name not in REVIEWED_DETECTORS]
+    assert unreviewed == [], f"frames assigned outside a review: {unreviewed}"
+
+    reviewed = [s.name for s in REGISTRY if s.name in REVIEWED_DETECTORS]
+    for name in reviewed:
+        spec = next(s for s in REGISTRY if s.name == name)
+        assert spec.frames, f"{name} was reviewed but declares no frames"
