@@ -54,6 +54,7 @@ from typing import List, Optional, Dict, Any
 from app.core.severity import SEVERITY_ORDER
 from app.core import session_facts
 from app.core.session_facts import SessionFacts
+from app.core.threshold_recorder import RecordingThresholds
 from uuid import UUID, uuid4
 from zoneinfo import ZoneInfo
 
@@ -68,7 +69,7 @@ from app.models.behavior_event import BehaviorEvent as BehaviorEventRecord
 from app.models.strategy_group import StrategyGroup
 from app.services.detector_registry import REGISTRY, BY_NAME
 from app.services.trading_session_service import TradingSessionService
-from app.core.trading_defaults import get_thresholds, estimate_capital_at_risk
+from app.core.trading_defaults import estimate_capital_at_risk
 
 logger = logging.getLogger(__name__)
 IST = ZoneInfo("Asia/Kolkata")
@@ -112,6 +113,12 @@ class DetectedEvent:
     # context['rule']) disambiguates the BehaviorEvent idempotency key — lets a
     # detector legitimately emit more than one event for the same trade.
     discriminator: Optional[str] = None
+    # The thresholds this detector read, with the ladder rung each resolved from.
+    # Filled in by the engine, never by the detector - see threshold_recorder.
+    # Stored on the BehaviorEvent so an alert can be explained against the numbers
+    # it was judged by, which is no longer answerable by reading a constant out of
+    # a file: personal baselines move, and the ladder resolves per session.
+    thresholds_used: Dict[str, Any] = field(default_factory=dict)
 
 
 @dataclass
@@ -119,6 +126,24 @@ class DetectionResult:
     alerts: List[RiskAlert]
     events: List["BehaviorEventRecord"]  # ALL detections incl. info/suppressed — caller persists
     session_id: Optional[UUID]
+
+
+def _evidence_for(e: "DetectedEvent") -> Dict[str, Any]:
+    """
+    What gets stored so the alert can be explained later.
+
+    The detector's own context, plus the thresholds it was judged against and
+    where each of those came from. Kept under a reserved `_thresholds` key so it
+    cannot collide with a detector's own field, and omitted entirely when the
+    detector read no thresholds - an empty dict would imply "judged against
+    nothing", which is a different claim from "reads no thresholds".
+    """
+    evidence = dict(e.context)
+    if e.suppressed_reason:
+        evidence["_suppressed"] = e.suppressed_reason
+    if e.thresholds_used:
+        evidence["_thresholds"] = e.thresholds_used
+    return evidence
 
 
 # Data quality → deterministic-detector confidence (master §1.3: for arithmetic
@@ -257,10 +282,7 @@ class BehaviorEngine:
                                 if e.confidence is not None else default_confidence),
                     data_quality=data_quality,
                     message=e.message,
-                    evidence=(
-                        {**e.context, "_suppressed": e.suppressed_reason}
-                        if e.suppressed_reason else dict(e.context)
-                    ),
+                    evidence=_evidence_for(e),
                     input_snapshot=(input_snapshot
                                     if e.severity in ("danger", "critical") else None),
                     shadow=e.shadow,
@@ -365,7 +387,12 @@ class BehaviorEngine:
         # use rung 2 — comparisons against what this trader has done today. That
         # is what lets a brand-new account get a threshold that fits it instead
         # of a constant chosen for an imaginary average trader.
-        thresholds = get_thresholds(profile, session_trades=session_trades)
+        # Resolve once, keeping the provenance the ladder produced. `get_thresholds`
+        # returns only `.values` and throws the rest away, which is what made an
+        # alert unexplainable after the fact.
+        from app.core.threshold_resolution import resolve_thresholds
+        _resolved = resolve_thresholds(profile, session_trades=session_trades)
+        thresholds = RecordingThresholds(_resolved.values, _resolved.meta)
 
         # Query 2: active cooldowns
         now_utc = datetime.now(timezone.utc)
@@ -497,7 +524,20 @@ class BehaviorEngine:
                 logger.error(f"[BehaviorEngine] registry method missing: {spec.method}")
                 continue
             try:
+                # Note which thresholds this detector reads, so the alert it
+                # produces can be explained against the numbers it was actually
+                # judged by. Those numbers move now - baselines adapt, the ladder
+                # resolves per session - so "the constant is in the file" stopped
+                # being an answer to "why did this fire".
+                recording = isinstance(ctx.thresholds, RecordingThresholds)
+                if recording:
+                    ctx.thresholds.start_recording()
+
                 result = detector(ctx)
+
+                if recording:
+                    used = ctx.thresholds.provenance()
+
                 if not result:
                     continue
                 # constitution_violation returns a list (multiple rules can
@@ -513,6 +553,8 @@ class BehaviorEngine:
                             f"[BehaviorEngine] suppressed {event.event_type} — "
                             f"trade is part of {ctx.strategy_group.strategy_type}"
                         )
+                    if recording and used and not event.thresholds_used:
+                        event.thresholds_used = used
                     events.append(event)
             except Exception as e:
                 logger.warning(f"[BehaviorEngine] {spec.method} failed: {e}")
