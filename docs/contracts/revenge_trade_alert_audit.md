@@ -139,3 +139,80 @@ evidence would settle it: more sessions, and ideally a second trader's book.
 - **The sample is drawn from what the OLD detector fired on**, so it cannot show
   what the old detector *missed* — false negatives are invisible to this method
   entirely.
+
+---
+
+## Addendum — tracing the "unexplained" caution (23 Aug 2026)
+
+The audit above reported an unsuppressed `caution` that produced no `RiskAlert`
+for an unknown reason. Traced end to end, it was two separate things.
+
+### 1. Not a bug — it was an entry-time detection
+
+`entry_detectors.py` runs the same detector against a position that has just
+been opened and marks **every** entry-time event `shadow`. Shadow never alerts,
+by design. The event was correct.
+
+What was wrong was the audit tooling: nothing in the stored record distinguished
+*"ran, judged, deliberately not shown"* from *"silently lost"*, so a correct
+entry-time finding looked like a pipeline defect.
+
+### 2. Underneath it, a real defect
+
+`_persist_events` discards `info` events from `alerting` detectors that carry no
+suppression marker. That is sound when `info` means confidence-demoted noise —
+its stated purpose, halving write volume for near-zero read value.
+
+It is wrong when a detector **states** `info` as its verdict. `revenge_trade` is
+an `alerting` detector, so:
+
+- every **A1-row detection** was dropped and never written, making the
+  contract's justification for that row — *recorded, countable, not shouted* —
+  **false in production**; and
+- **every abstention it produced was dropped**, so the machinery built in Step 1
+  specifically to make "could not tell" countable recorded nothing at all.
+
+**Fixed** by marking a `DetectorResult`'s verdict as deliberate (`_verdict`:
+`stated` or `abstained`) and exempting those from the gate. Demoted-to-info is
+still discarded, suppressed evidence is still kept, analytics detectors are
+untouched.
+
+### The five dispositions
+
+A finding now ends in exactly one, each readable from the stored row:
+
+| disposition | how it reads | reaches the trader |
+|---|---|---|
+| `surfaced` | `risk_alert_id` set | yes |
+| `consolidated` | `_suppressed: same_story:…` / `absorbed:…` | no |
+| `deduped` | `_suppressed: dedup` | no |
+| `shadow` | `shadow = True` | no, by design |
+| `stated` | `_verdict` set, severity `info` | no, by design |
+
+Nothing may be dropped without one of them. `tests/test_event_disposition.py`
+holds that, with a negative control: removing the verdict check from the gate
+fails six of its ten tests.
+
+---
+
+## The `same_symbol_obsession` consolidation case — documented, not changed
+
+On 2026-01-22 the exit-time detection at (A1, B3) — the clearest genuine revenge
+sequence in the book — was folded with `_suppressed: same_story:same_symbol_obsession`.
+
+That is consolidation working as designed. `revenge_trade` sits behind
+`same_symbol_obsession` in the *"going back to the same trade"* family, and
+`same_symbol_obsession/danger` did fire that session, so the trader **was** told
+they kept returning to one instrument.
+
+**The open question, not decided here:** does `revenge_trade` carry information
+`same_symbol_obsession` does not? Both describe returning to the same contract.
+`revenge_trade` adds the *trigger* — that the return followed a loss, how quickly,
+and whether size increased — and `same_symbol_obsession` adds the *aggregate* —
+that it happened repeatedly across the session.
+
+The family ordering is hand-picked and unvalidated, and on the one day with a
+genuine sequence it is what decided the trader saw the aggregate framing rather
+than the trigger framing. **No change made.** This is a product decision that
+belongs with `same_symbol_obsession`'s own review, and it cannot be settled from
+one session.

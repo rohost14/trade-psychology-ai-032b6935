@@ -202,6 +202,12 @@ def _events_from_result(detector: str, result: "DetectorResult") -> Optional[Lis
         # finding are different claims and must stay distinguishable downstream.
         context["_layer"] = result.layer.value
 
+    # A DetectorResult states its verdict deliberately. An `info` that comes from
+    # a contract - an abstention, or a matrix cell that says "recorded, never
+    # notified" - is EVIDENCE, and must not be mistaken for the confidence-demoted
+    # noise the write gate exists to discard.
+    context["_verdict"] = "abstained" if result.abstained else "stated"
+
     if result.abstained:
         context["_abstained"] = {
             "reason": result.evidence.reason.value

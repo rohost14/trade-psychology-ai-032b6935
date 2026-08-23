@@ -134,15 +134,30 @@ async def _persist_events(db, events, surviving_by_key: dict, deduped_keys: set)
 
     rows = []
     for ev in events:
-        # P2 write gating (review S7): info events from ALERTING detectors
-        # with no suppression marker are confidence-demoted noise (e.g.
-        # revenge at 30 confidence) - half the write volume, near-zero read
-        # value. Analytics-disposition info events are the product (journal,
-        # strategy driver) and suppressed evidence is sacred (1C.8) - both kept.
+        # P2 write gating (review S7): info events from ALERTING detectors with
+        # no suppression marker are confidence-demoted noise (e.g. revenge at 30
+        # confidence) - half the write volume, near-zero read value.
+        # Analytics-disposition info events are the product (journal, strategy
+        # driver) and suppressed evidence is sacred (1C.8) - both kept.
+        #
+        # ALSO KEPT, added 2026-08-23: an info severity that a detector STATED
+        # rather than had demoted. A migrated detector returns a DetectorResult
+        # whose verdict is deliberate - an abstention ("I could not tell"), or a
+        # matrix cell that means "recorded as evidence, never notified". Both are
+        # exactly the thing this gate was discarding.
+        #
+        # Found while auditing revenge_trade: it is an `alerting` detector, so
+        # every one of its A1-row detections AND every abstention it produced was
+        # dropped here and never written. The contract's justification for that
+        # row - recorded, countable, not shouted - was false in production, and
+        # the abstention machinery built for exactly this recorded nothing.
         if ev.severity == "info":
             spec = _SPECS_G.get(ev.detector)
-            suppressed = bool((ev.evidence or {}).get("_suppressed"))
-            if spec and spec.disposition == "alerting" and not suppressed:
+            evidence_now = ev.evidence or {}
+            suppressed = bool(evidence_now.get("_suppressed"))
+            stated = bool(evidence_now.get("_verdict"))
+            if (spec and spec.disposition == "alerting"
+                    and not suppressed and not stated):
                 _mi_gate("events_info_gated")
                 continue
         ek = _pattern_dedup_key(ev.detector, ev.evidence)
