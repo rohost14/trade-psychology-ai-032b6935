@@ -31,7 +31,7 @@ distribution needs sessions; a time-of-day pattern needs weeks. A single
 """
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, replace as _replace
 from enum import Enum
 from typing import Any, Dict, Optional
 
@@ -231,8 +231,157 @@ THRESHOLD_SPECS: Dict[str, ThresholdSpec] = {
     s.key: s for s in (_GROUP_C + _GROUP_D)
 }
 
+# ---------------------------------------------------------------------------
+# F1 - the thresholds that are universal safety
+# ---------------------------------------------------------------------------
+#
+# Until now `violates_kind` was enforced at resolution time and guarded NOTHING,
+# because no threshold was classified `universal_safety`. The rule was machinery
+# protecting an empty set.
+#
+# WHAT QUALIFIES, AND WHAT DELIBERATELY DOES NOT
+#
+# A universal-safety threshold states objective harm - a magnitude of loss or
+# exposure that is dangerous whoever the trader is. It must never be learned from
+# the person it protects, because their habits cannot make an objectively
+# dangerous event safe.
+#
+# The seven thresholds personal history actually moves today - daily trade limit
+# and danger, burst caution and danger, the re-entry window, loss-streak caution
+# and danger - are NOT here, and that is deliberate rather than an oversight.
+# They describe a trader's tempo, not objective harm. "Six losses in a row" is a
+# streak, and whether it hurt depends entirely on the size of the six. Classifying
+# them universal_safety would forbid the personalisation that is the whole point
+# of a baseline, and would be the opposite error to the one being fixed.
+#
+# What IS here measures magnitude:
+#
+#   position size as a fraction of the account  - account-relative exposure
+#   loss as a fraction of premium paid          - trade-relative loss
+#   loss with no stop in place                  - trade-relative loss
+#
+# CAPITAL IS STILL ALLOWED
+#
+# `violates_kind` forbids HISTORY, SESSION and POPULATION. It permits CAPITAL,
+# which is right and necessary: account-relative safety needs an account size,
+# and capital comes off the broker rather than out of the trader's habits.
+#
+# NEUTRAL TODAY, BY VERIFICATION NOT BY HOPE
+#
+# Rung 1 moves seven keys and none is below. Rung 2 moves exactly two,
+# `panic_exit_min` and `rapid_reentry_min`, and neither is below. POPULATION is
+# unused. So the guard now refuses resolutions that do not currently occur - it
+# is a lock on a door nobody is yet trying to open, which is when a lock should
+# be fitted.
+#
+# KIND IS NOT VALUE
+#
+# `premium_loss_caution_pct` is in MANDATORY_REVIEW because its VALUE is
+# disputed - it fires routinely without behavioural failure. Its Kind is settled
+# regardless: it is a claim about objective loss magnitude, and a wrong number of
+# the right kind is still the right kind.
+_UNIVERSAL_SAFETY = {
+    "max_position_pct_caution": (5.0, Sensitivity.HIGHER_IS_LOOSER,
+                                 "percent of the account in one position"),
+    "max_position_pct_danger": (10.0, Sensitivity.HIGHER_IS_LOOSER,
+                                "percent of the account in one position"),
+    "premium_loss_caution_pct": (40, Sensitivity.HIGHER_IS_LOOSER,
+                                 "percent of the premium paid that has been lost"),
+    "premium_loss_danger_pct": (60, Sensitivity.HIGHER_IS_LOOSER,
+                                "percent of the premium paid that has been lost"),
+    "premium_loss_critical_pct": (80, Sensitivity.HIGHER_IS_LOOSER,
+                                  "percent of the premium paid that has been lost"),
+    "no_stoploss_loss_pct_danger": (50, Sensitivity.HIGHER_IS_LOOSER,
+                                    "percent lost with no stop in place"),
+}
+
+for _key, (_default, _direction, _meaning) in _UNIVERSAL_SAFETY.items():
+    THRESHOLD_SPECS[_key] = ThresholdSpec(
+        key=_key,
+        kind=Kind.UNIVERSAL_SAFETY,
+        fallback=_default,
+        meaning=_meaning,
+        sensitivity=_direction,
+        provenance=(
+            "objective magnitude of loss or exposure; may not be learned from "
+            "the trader it protects (F1)"
+        ),
+    )
+
 #: Flagged in the G4 inventory as unsupported judgements. Detector review is
 #: mandatory for these, not discretionary.
+# ---------------------------------------------------------------------------
+# UNIVERSAL_FLOORS, with the one thing they never declared: which way they point
+# ---------------------------------------------------------------------------
+#
+# A floor is arithmetically the same operation either way - raise the value to
+# the minimum - but it MEANS opposite things depending on the threshold's
+# direction, and `trading_defaults` applies one `<` comparison to both without
+# saying which is which:
+#
+#   HIGHER_IS_LOOSER   a bigger number is a quieter detector, so the floor is a
+#                      NOISE floor: "never alert on fewer than three losses".
+#   HIGHER_IS_STRICTER a bigger number is a louder detector, so the floor is a
+#                      SENSITIVITY floor: "always look at least two minutes back".
+#
+# Four of the ten are noise floors and six are sensitivity floors. Nothing said
+# so until now, which is why the same dict reads as a safety guarantee on some
+# keys and as spam suppression on others.
+#
+# Every direction below was read from the consumer, not inferred from the name:
+# a window compared with `gap <= window` widens as it grows, while a gate
+# compared with `value < threshold: return None` narrows.
+#
+# Kind stays FALLBACK on every entry. Declaring direction changes no value and no
+# resolution; classifying these as universal_safety is a separate decision (F1)
+# with its own replay.
+_FLOOR_DIRECTIONS = {
+    # noise floors - a bigger number means the detector says less
+    "burst_trades_per_30min_caution": (5, Sensitivity.HIGHER_IS_LOOSER,
+                                       "trades in 30 minutes before a burst is worth naming"),
+    "consecutive_loss_caution": (3, Sensitivity.HIGHER_IS_LOOSER,
+                                 "losses in a row before the streak is worth naming"),
+    "no_stoploss_hold_min": (5, Sensitivity.HIGHER_IS_LOOSER,
+                             "minutes held before a missing stop is judged at all"),
+    "no_stoploss_loss_pct_caution": (25, Sensitivity.HIGHER_IS_LOOSER,
+                                     "percent lost before a missing stop is worth naming"),
+    # sensitivity floors - a bigger number means the detector looks wider
+    "revenge_window_caution_min": (20, Sensitivity.HIGHER_IS_STRICTER,
+                                   "minutes after a loss still counted as a reaction"),
+    "revenge_window_danger_min": (5, Sensitivity.HIGHER_IS_STRICTER,
+                                  "minutes after a loss counted as an immediate reaction"),
+    "revenge_window_min": (10, Sensitivity.HIGHER_IS_STRICTER,
+                           "unified re-entry window, set from a declared cooldown"),
+    "panic_exit_min": (5, Sensitivity.HIGHER_IS_STRICTER,
+                       "minutes held under which a losing exit reads as panic"),
+    "rapid_reentry_min": (5, Sensitivity.HIGHER_IS_STRICTER,
+                          "minutes within which a re-entry counts as rapid"),
+    "rapid_flip_min": (10, Sensitivity.HIGHER_IS_STRICTER,
+                       "minutes within which reversing direction counts as a flip"),
+}
+
+for _key, (_default, _direction, _meaning) in _FLOOR_DIRECTIONS.items():
+    _existing = THRESHOLD_SPECS.get(_key)
+    if _existing is not None:
+        # ALREADY CLASSIFIED. Add the direction and change nothing else.
+        #
+        # The first cut of this block rebuilt every entry with kind=FALLBACK and
+        # silently downgraded two thresholds that were already personal_baseline.
+        # No value moved, so a threshold-equality check showed nothing - the loss
+        # was of classification, which is exactly what this registry exists to
+        # hold. Declaring a direction must never overwrite a decision someone
+        # else made.
+        THRESHOLD_SPECS[_key] = _replace(_existing, sensitivity=_direction)
+        continue
+    THRESHOLD_SPECS[_key] = ThresholdSpec(
+        key=_key,
+        kind=Kind.FALLBACK,          # unclassified before, unclassified now
+        fallback=_default,
+        meaning=_meaning,
+        sensitivity=_direction,
+        provenance="direction read from the consumer; value unchanged (F2)",
+    )
+
 MANDATORY_REVIEW = frozenset({
     "fomo_symbols_at_open",
     "revenge_window_danger_min",

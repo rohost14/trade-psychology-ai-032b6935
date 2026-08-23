@@ -206,3 +206,178 @@ def test_nothing_consumes_these_yet():
             f"behavior_engine imports {module} - adoption belongs to the "
             "pattern-by-pattern phase, behind a replay"
         )
+
+
+# ── F2: every universal floor declares which way it points ─────────────────
+
+
+def test_every_universal_floor_declares_a_direction():
+    """
+    A floor is the same arithmetic either way and means opposite things. Without
+    a declared direction the same dict reads as a safety guarantee on some keys
+    and as spam suppression on others, and a bound applied to one of them later
+    would silently invert its guarantee.
+    """
+    from app.core.threshold_registry import THRESHOLD_SPECS, Sensitivity
+    from app.core.trading_defaults import UNIVERSAL_FLOORS
+
+    undeclared = [
+        key for key in UNIVERSAL_FLOORS
+        if key not in THRESHOLD_SPECS
+        or THRESHOLD_SPECS[key].sensitivity is Sensitivity.UNKNOWN
+    ]
+    assert undeclared == [], f"floors with no declared direction: {undeclared}"
+
+
+def test_the_floors_contain_both_kinds():
+    """
+    Not a formality. Four are noise floors and six are sensitivity floors — if
+    they were all one kind, a single comparison would have been defensible.
+    """
+    from app.core.threshold_registry import THRESHOLD_SPECS, Sensitivity
+    from app.core.trading_defaults import UNIVERSAL_FLOORS
+
+    kinds = {THRESHOLD_SPECS[k].sensitivity for k in UNIVERSAL_FLOORS}
+    assert Sensitivity.HIGHER_IS_LOOSER in kinds
+    assert Sensitivity.HIGHER_IS_STRICTER in kinds
+
+
+def test_declaring_direction_never_overwrites_an_existing_classification():
+    """
+    The regression this test exists for, and the reason it is written this way.
+
+    The first cut of F2 rebuilt every floor entry with kind=FALLBACK and silently
+    downgraded two thresholds that were already personal_baseline —
+    revenge_window_danger_min and rapid_flip_min. No value moved, so a
+    threshold-equality check showed nothing: what was lost was classification,
+    which is the one thing this registry exists to hold.
+
+    Worse, the first version of THIS test asserted every floor was FALLBACK, so
+    it passed *because* of the bug. A test that encodes the defect it should
+    catch is worse than no test, so it now names the two keys that carry a prior
+    classification and requires them to keep it.
+    """
+    from app.core.threshold_registry import THRESHOLD_SPECS, Sensitivity
+    from app.core.threshold_resolution import Kind
+    from app.core.trading_defaults import UNIVERSAL_FLOORS
+
+    already_classified = {
+        "revenge_window_danger_min": Kind.PERSONAL_BASELINE,
+        "rapid_flip_min": Kind.PERSONAL_BASELINE,
+    }
+    for key, expected in already_classified.items():
+        spec = THRESHOLD_SPECS[key]
+        assert spec.kind is expected, (
+            f"{key} was {expected.value} and is now {spec.kind.value}; declaring "
+            "a direction must not overwrite a decision someone else made"
+        )
+        assert spec.sensitivity is not Sensitivity.UNKNOWN, (
+            f"{key} kept its Kind but lost its direction"
+        )
+
+
+def test_f2_did_not_classify_anything_as_safety():
+    """
+    Declaring direction is F2; deciding what is universal safety is F1. If a
+    floor became universal_safety while its direction was being recorded, two
+    decisions were conflated in one change.
+    """
+    from app.core.threshold_registry import THRESHOLD_SPECS
+    from app.core.threshold_resolution import Kind
+    from app.core.trading_defaults import UNIVERSAL_FLOORS
+
+    for key in UNIVERSAL_FLOORS:
+        assert THRESHOLD_SPECS[key].kind is not Kind.UNIVERSAL_SAFETY, (
+            f"{key} was classified as safety during F2"
+        )
+        assert THRESHOLD_SPECS[key].safety_bound is None
+
+
+
+# ── F1: the safety classification ──────────────────────────────────────────
+
+
+def test_the_safety_guard_now_guards_something():
+    """
+    `violates_kind` has been enforced at resolution time since the foundation
+    work, and guarded an empty set: no threshold was classified universal_safety,
+    so the central invariant was machinery protecting nothing.
+    """
+    from app.core.threshold_registry import THRESHOLD_SPECS
+    from app.core.threshold_resolution import Kind
+
+    safety = [k for k, s in THRESHOLD_SPECS.items()
+              if s.kind is Kind.UNIVERSAL_SAFETY]
+    assert safety, "no threshold is classified universal_safety"
+
+
+def test_tempo_thresholds_are_deliberately_not_safety():
+    """
+    The seven keys personal history actually moves describe a trader's TEMPO, not
+    objective harm. "Six losses in a row" is a streak, and whether it hurt depends
+    entirely on the size of the six.
+
+    Classifying them universal_safety would forbid the personalisation that is the
+    entire purpose of a baseline — the opposite error to the one being fixed.
+    """
+    from app.core.threshold_registry import kind_for
+    from app.core.threshold_resolution import Kind
+
+    tempo = (
+        "daily_trade_limit", "daily_trade_danger",
+        "burst_trades_per_30min_caution", "burst_trades_per_30min_danger",
+        "revenge_window_caution_min",
+        "consecutive_loss_caution", "consecutive_loss_danger",
+    )
+    for key in tempo:
+        assert kind_for(key) is not Kind.UNIVERSAL_SAFETY, (
+            f"{key} was classified as safety; it describes tempo, and this would "
+            "silently disable personalisation for it"
+        )
+
+
+def test_a_safety_threshold_may_still_come_from_capital():
+    """
+    violates_kind forbids HISTORY, SESSION and POPULATION. CAPITAL must remain
+    allowed: account-relative safety needs an account size, and capital comes off
+    the broker rather than out of the trader's habits.
+    """
+    from app.core.threshold_resolution import Kind, Source, violates_kind
+
+    assert violates_kind(Kind.UNIVERSAL_SAFETY, Source.CAPITAL) is None
+    assert violates_kind(Kind.UNIVERSAL_SAFETY, Source.HISTORY) is not None
+    assert violates_kind(Kind.UNIVERSAL_SAFETY, Source.SESSION) is not None
+
+
+def test_no_safety_threshold_is_reachable_by_a_learning_rung_today():
+    """
+    Neutrality, asserted rather than hoped. Rung 1 moves seven keys and rung 2
+    moves exactly two; if a future rung starts writing one of the safety keys,
+    this fails before the guard has to.
+    """
+    from app.core.threshold_registry import THRESHOLD_SPECS
+    from app.core.threshold_resolution import (
+        Kind,
+        Source,
+        _LEARNED_SOURCES,
+        resolve_thresholds,
+    )
+
+    class _Rich:
+        detected_patterns = {"baseline": {"version": 2, "metrics": {
+            k: {"value": 9.0, "confidence": 1.0, "n": 60} for k in (
+                "daily_trades_p75", "burst_per_30min_p75",
+                "reentry_after_loss_p25", "loss_streak_p60", "loss_streak_p85")
+        }}}
+        trading_capital = 500000
+
+    resolved = resolve_thresholds(_Rich())
+    for key, spec in THRESHOLD_SPECS.items():
+        if spec.kind is not Kind.UNIVERSAL_SAFETY:
+            continue
+        record = resolved.explain(key)
+        if record is None:
+            continue
+        assert record.source not in _LEARNED_SOURCES, (
+            f"{key} is universal_safety and resolved from {record.source.value}"
+        )
