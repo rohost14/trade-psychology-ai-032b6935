@@ -44,6 +44,8 @@ from app.core.baseline_rules import (
     cap_adaptation,
     clean_for_learning,
     divergence,
+    mad,
+    median,
 )
 
 logger = logging.getLogger(__name__)
@@ -66,7 +68,8 @@ def _percentile(values: List[float], p: float) -> Optional[float]:
 
 
 def _pct_metric(values: List[float], p: float, n: int, target: int,
-                floor: float = 0.0) -> Optional[Dict]:
+                floor: float = 0.0,
+                excluded_indices=()) -> Optional[Dict]:
     """
     A percentile of the trader's own distribution, carrying its own confidence.
 
@@ -79,7 +82,12 @@ def _pct_metric(values: List[float], p: float, n: int, target: int,
     # are excluded from the UPDATE (global rule 5): an outlier is evidence about
     # a day, not about a habit. It stays in the trade record and can still fire a
     # detector - it simply does not get to redefine what is typical.
-    learnable = clean_for_learning(values)
+    #
+    # `excluded_indices` is global baseline rule 4: observations belonging
+    # to a confirmed harmful sequence must not train the baseline they will
+    # later be judged against. The argument has always existed here and
+    # nothing ever passed it.
+    learnable = clean_for_learning(values, excluded_indices)
     v = _percentile(learnable, p)
     if v is None:
         return None
@@ -90,6 +98,52 @@ def _pct_metric(values: List[float], p: float, n: int, target: int,
         "n": n,
         "n_learned": len(learnable),
         "n_excluded": len(values) - len(learnable),
+        # Kept separate so the two exclusion reasons stay distinguishable:
+        # an outlier is excluded because it says nothing about a habit, a
+        # harmful sequence because letting it teach would let the behaviour
+        # redefine what counts as normal.
+        "n_excluded_harmful": len(set(excluded_indices)),
+    }
+
+
+def _distribution(values: List[float], unit: str) -> Optional[Dict]:
+    """
+    A recorded distribution: the shape of what this trader actually did.
+
+    NOT a threshold. It carries several percentiles rather than one because
+    the percentile that marks "unusual" has not been decided, and picking one
+    here would be exactly the invented constant this work exists to remove.
+    Storing the shape lets that decision be argued from evidence later, and
+    lets anyone check afterwards what it was argued from.
+
+    Outliers are excluded on the same rule as everywhere else - an extreme
+    observation is evidence about a day, not about a habit - and both counts
+    are kept so the exclusion is visible rather than implied.
+    """
+    if not values:
+        return None
+    learnable = clean_for_learning(values)
+    if not learnable:
+        return None
+    ordered = sorted(learnable)
+
+    def pct(q):
+        idx = min(len(ordered) - 1, int(round(q / 100.0 * len(ordered))))
+        return round(float(ordered[idx]), 2)
+
+    return {
+        "unit": unit,
+        "n": len(values),
+        "n_learned": len(learnable),
+        "n_excluded": len(values) - len(learnable),
+        "median": round(float(median(learnable)), 2),
+        "mad": round(float(mad(learnable) or 0.0), 2),
+        "percentiles": {"p%d" % q: pct(q) for q in (25, 50, 60, 75, 85, 95)},
+        "active": False,
+        "provenance": (
+            "observed distribution; no percentile selected as a threshold "
+            "(P1 unresolved)"
+        ),
     }
 
 
@@ -266,6 +320,12 @@ async def compute_baseline(
     winner_holds, loser_holds = [], []
     wins = 0
     reentry_delays: List[float] = []
+    #: indices into reentry_delays whose re-entry itself closed at a loss
+    reentry_harmful: List[int] = []
+    #: every losing trade's size in rupees - the P1 distribution
+    own_loss_sizes: List[float] = []
+    #: every trade's capital at risk in rupees - the size distribution
+    own_position_risk: List[float] = []
     risk_pcts: List[float] = []
 
     for day_trades in by_session.values():
@@ -280,6 +340,7 @@ async def compute_baseline(
                 if hold is not None:
                     winner_holds.append(hold)
             elif pnl < 0:
+                own_loss_sizes.append(abs(pnl))
                 if hold is not None:
                     loser_holds.append(hold)
                 # delay from this loss exit to the next entry that day
@@ -288,13 +349,27 @@ async def compute_baseline(
                         reentry_delays.append(
                             (nxt.entry_time - t.exit_time).total_seconds() / 60
                         )
+                        # A harmful sequence, defined from the TRADE RECORD
+                        # alone: a loss, a re-entry, and that re-entry also
+                        # lost. No alert, no threshold and no detector
+                        # verdict is consulted - reading our own alerts here
+                        # would make the baseline depend on what the detector
+                        # previously decided, so a threshold change would
+                        # silently rewrite the history it is measured against.
+                        if float(nxt.realized_pnl or 0) < 0:
+                            reentry_harmful.append(len(reentry_delays) - 1)
                         break
+            # Capital at risk in rupees needs no declared capital, so this is
+            # available for every trader. risk_pcts additionally divides by
+            # capital and so is only available when capital is known.
+            risk_rupees = estimate_capital_at_risk(
+                t.instrument_type, t.tradingsymbol or "", t.direction or "LONG",
+                float(t.avg_entry_price or 0), int(t.total_quantity or 0),
+            )
+            if risk_rupees > 0:
+                own_position_risk.append(risk_rupees)
             if trading_capital and trading_capital > 0:
-                risk = estimate_capital_at_risk(
-                    t.instrument_type, t.tradingsymbol or "", t.direction or "LONG",
-                    float(t.avg_entry_price or 0), int(t.total_quantity or 0),
-                )
-                risk_pcts.append(risk / trading_capital * 100)
+                risk_pcts.append(risk_rupees / trading_capital * 100)
 
     metrics = {
         # session-count confidence
@@ -319,9 +394,20 @@ async def compute_baseline(
         "daily_trades_p75": _pct_metric(daily_counts, 75, n_sessions, target_sessions),
         "burst_per_30min_p75": _pct_metric(burst_counts, 75, n_sessions, target_sessions),
         "reentry_after_loss_p25": _pct_metric(reentry_delays, 25, len(reentry_delays),
-                                              target_trades // 2, floor=1.0),
+                                              target_trades // 2, floor=1.0,
+                                              excluded_indices=reentry_harmful),
         "loss_streak_p60": _pct_metric(consec_losses, 60, n_sessions, target_sessions),
         "loss_streak_p85": _pct_metric(consec_losses, 85, n_sessions, target_sessions),
+
+        # -- Distributions, recorded but NOT active -------------------------
+        # Observations and counts, not thresholds. Which percentile marks
+        # "unusual for this trader" is P1, an unapproved decision, so nothing
+        # reads these yet. They are stored so that decision can later be
+        # argued from this trader's real distribution rather than guessed,
+        # and so the choice is auditable afterwards.
+        "own_loss_size": _distribution(own_loss_sizes, "losing trades, rupees"),
+        "own_position_risk": _distribution(own_position_risk,
+                                           "capital at risk per trade, rupees"),
     }
     # p95 daily trades as a plain value on the avg record (upper-bound signal)
     if metrics["avg_daily_trades"] and len(daily_counts) >= 2:
