@@ -54,6 +54,7 @@ from typing import List, Optional, Dict, Any
 from app.core.severity import SEVERITY_ORDER
 from app.core import session_facts
 from app.core.session_facts import SessionFacts
+from app.core.detector_result import DetectorResult
 from app.core.threshold_recorder import RecordingThresholds
 from app.core.account_risk import AccountRisk, freeze_for_session, resolve_account_risk
 from uuid import UUID, uuid4
@@ -127,6 +128,97 @@ class DetectionResult:
     alerts: List[RiskAlert]
     events: List["BehaviorEventRecord"]  # ALL detections incl. info/suppressed — caller persists
     session_id: Optional[UUID]
+
+
+def _as_events(detector: str, result) -> Optional[List["DetectedEvent"]]:
+    """
+    Normalise whatever a detector returned into the list the engine persists.
+
+    Accepts, in order of how much the detector has to say:
+
+      None                 nothing happened, and nothing is recorded
+      DetectedEvent        the current contract, passed through untouched
+      list[DetectedEvent]  the constitution detector, several rules at once
+      DetectorResult       the new contract
+
+    WHY AN ABSTENTION BECOMES A RECORDED EVENT
+
+    `Optional[DetectedEvent]` makes `None` mean both "the behaviour did not
+    occur" and "I could not see well enough to say", which is why nobody could
+    tell whether three detectors being silent across 203 replayed sessions was
+    correct. A DetectorResult that abstained is therefore recorded as an `info`
+    event carrying its reason: `info` never notifies, so this changes nothing a
+    trader sees while making the distinction measurable.
+
+    A NEGATIVE result - the detector looked and the behaviour genuinely did not
+    happen - records nothing, exactly as `None` does today. Recording every
+    non-detection for 27 detectors on every trade would be a write amplification
+    with no reader.
+    """
+    if result is None:
+        return None
+    if isinstance(result, DetectedEvent):
+        return [result]
+    if isinstance(result, list):
+        return result
+    if isinstance(result, DetectorResult):
+        return _events_from_result(detector, result)
+    logger.error(
+        "[BehaviorEngine] %s returned %s, which is neither a DetectedEvent nor a "
+        "DetectorResult", detector, type(result).__name__
+    )
+    return None
+
+
+def _events_from_result(detector: str, result: "DetectorResult") -> Optional[List["DetectedEvent"]]:
+    """Project a DetectorResult onto the DetectedEvent the persistence path expects."""
+    from app.core.evidence import Verdict as _Verdict
+
+    if result.evidence.verdict is _Verdict.NEGATIVE:
+        return None
+
+    context: Dict[str, Any] = dict(result.context)
+    # The measurements are the explanation: each carries its own denominator and
+    # what that denominator was, so the alert reconstructs from stored evidence
+    # rather than from its own prose.
+    if result.measurements:
+        context["_measurements"] = {
+            name: {
+                "value": m.value,
+                "denominator": m.denominator,
+                "denominator_label": m.denominator_label,
+                "quality": m.quality.value if m.quality else None,
+                "sample_size": m.sample_size,
+            }
+            for name, m in result.measurements.items()
+        }
+    if result.layer is not None:
+        # Which layer judged this. A safety finding and a personal-deviation
+        # finding are different claims and must stay distinguishable downstream.
+        context["_layer"] = result.layer.value
+
+    if result.abstained:
+        context["_abstained"] = {
+            "reason": result.evidence.reason.value
+            if result.evidence.reason else "unknown",
+            "detail": result.evidence.detail,
+        }
+        return [DetectedEvent(
+            event_type=detector,
+            severity="info",          # never notifies; recorded so it is countable
+            message=result.message or "Could not judge this trade.",
+            context=context,
+            confidence=result.confidence,
+            discriminator="abstained",
+        )]
+
+    return [DetectedEvent(
+        event_type=detector,
+        severity=result.severity or "info",
+        message=result.message or "",
+        context=context,
+        confidence=result.confidence,
+    )]
 
 
 def _evidence_for(e: "DetectedEvent") -> Dict[str, Any]:
@@ -566,6 +658,14 @@ class BehaviorEngine:
 
                 if recording:
                     used = ctx.thresholds.provenance()
+
+                # A detector may return DetectedEvent(s) as they all do today, or
+                # a DetectorResult, which additionally carries which layer judged
+                # it, the measurements behind the verdict, and - the point of the
+                # type - the difference between "did not happen" and "could not
+                # tell". Both are accepted during the migration; no detector has
+                # been converted yet.
+                result = _as_events(spec.name, result)
 
                 if not result:
                     continue
