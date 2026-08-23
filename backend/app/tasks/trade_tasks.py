@@ -595,6 +595,21 @@ def process_webhook_trade(self, trade_data: Dict[str, Any], broker_account_id: s
                                 db.add(ct)
                                 await db.flush()  # give ct.id before strategy detection
                                 _closed_ct_id = ct.id  # pass to run_risk_detection_async below
+
+                                # Feature row for this round. The bulk FIFO
+                                # recompute used to be the only thing that wrote
+                                # these, and it does not run on the live path -
+                                # which is why the table was empty in production
+                                # and every My Record statistic built on it
+                                # rendered as nothing. Derived data: a failure
+                                # here must not lose the trade.
+                                try:
+                                    await pnl_calculator.ensure_feature_for(ct, db)
+                                except Exception as _feat_err:
+                                    logger.warning(
+                                        f"[ledger] feature computation failed for "
+                                        f"{ct.tradingsymbol}: {_feat_err}"
+                                    )
                                 logger.info(
                                     f"[ledger] CompletedTrade: {ct.tradingsymbol} "
                                     f"{ct.direction} pnl={ct.realized_pnl}"

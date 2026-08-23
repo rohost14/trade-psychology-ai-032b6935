@@ -16,14 +16,14 @@ Redis dedup: once per day per warning type.
 """
 
 import logging
-from datetime import datetime, date, time, timezone
+from datetime import datetime
 from uuid import UUID
 from zoneinfo import ZoneInfo
 
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select, and_
+from sqlalchemy import select
 
-from app.models.completed_trade import CompletedTrade
+from app.core import session_facts
 from app.models.user_profile import UserProfile
 
 logger = logging.getLogger(__name__)
@@ -52,8 +52,6 @@ async def _check(
     redis_client,
 ) -> list[dict]:
     today_ist = datetime.now(IST).date()
-    # Correct IST→UTC: midnight IST = previous day 18:30 UTC
-    today_start_utc = datetime.combine(today_ist, time.min, tzinfo=IST).astimezone(timezone.utc)
 
     # Fetch profile limits
     profile_result = await db.execute(
@@ -61,17 +59,14 @@ async def _check(
     )
     profile = profile_result.scalar_one_or_none()
 
-    # Fetch today's completed trades — no limit so P&L sum is always accurate
-    trades_result = await db.execute(
-        select(CompletedTrade)
-        .where(
-            and_(
-                CompletedTrade.broker_account_id == broker_account_id,
-                CompletedTrade.exit_time >= today_start_utc,
-            )
-        )
+    # This session's trades and facts, from the one canonical definition. These
+    # warnings are PUSHED to the trader and compared against their declared daily
+    # limit, so the P&L quoted here has to be the same number the dashboard and
+    # the alerts are working from - it used to be summed here from its own query.
+    trades_today = await session_facts.load_session_trades(
+        db, broker_account_id, today_ist
     )
-    trades_today = trades_result.scalars().all()
+    facts = session_facts.derive(trades_today)
 
     if not trades_today:
         return []
@@ -81,7 +76,7 @@ async def _check(
 
     # ── 1. P&L at 70% of daily loss limit ────────────────────────────────────
     if profile and profile.daily_loss_limit:
-        session_pnl = sum(float(t.realized_pnl or 0) for t in trades_today)
+        session_pnl = float(facts.pnl)
         limit = float(profile.daily_loss_limit)
         used_pct = abs(session_pnl) / limit if session_pnl < 0 and limit > 0 else 0.0
 
@@ -99,7 +94,7 @@ async def _check(
 
     # ── 2. Trade count at 80% of daily limit ─────────────────────────────────
     if profile and profile.daily_trade_limit:
-        count = len(trades_today)
+        count = facts.trades
         limit = profile.daily_trade_limit
         if limit >= 5 and count >= int(0.80 * limit) and count < limit:
             key = f"{dedup_prefix}:cnt80"

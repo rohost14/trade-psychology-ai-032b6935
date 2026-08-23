@@ -46,9 +46,17 @@ EPOCH = datetime(2000, 1, 1, tzinfo=timezone.utc)
 
 
 async def _accounts(db, account: str = None):
+    """
+    Accounts to process, sourced from COMPLETED TRADES rather than from existing
+    features.
+
+    The obvious source is the features table, and it is the wrong one: the
+    original defect was that production had no feature rows at all, so an account
+    list built from them is empty exactly when the work is most needed.
+    """
     if account:
         return [UUID(account)]
-    rows = await db.execute(select(CompletedTradeFeature.broker_account_id).distinct())
+    rows = await db.execute(select(CompletedTrade.broker_account_id).distinct())
     return [r[0] for r in rows.all()]
 
 
@@ -69,8 +77,27 @@ async def _compare(db, broker_account_id) -> dict:
             )
         ).scalars()
     }
+    missing = (
+        await db.execute(
+            select(CompletedTrade.id)
+            .outerjoin(
+                CompletedTradeFeature,
+                CompletedTradeFeature.completed_trade_id == CompletedTrade.id,
+            )
+            .where(
+                CompletedTrade.broker_account_id == broker_account_id,
+                CompletedTradeFeature.id.is_(None),
+            )
+        )
+    ).all()
+
     if not existing:
-        return {"rows": 0, "streak_changes": 0, "flag_changes": 0}
+        return {
+            "rows": 0,
+            "missing": len(missing),
+            "streak_changes": 0,
+            "flag_changes": 0,
+        }
 
     trades = list(
         (
@@ -100,6 +127,7 @@ async def _compare(db, broker_account_id) -> dict:
 
     return {
         "rows": len(existing),
+        "missing": len(missing),
         "streak_changes": streak_changes,
         "flag_changes": flag_changes,
     }
@@ -140,7 +168,8 @@ async def main() -> int:
             if args.dry_run:
                 d = await _compare(db, acc)
                 print(
-                    f"{acc}: {d['rows']} feature rows, "
+                    f"{acc}: {d['rows']} existing feature rows, "
+                    f"{d['missing']} trades with NO feature row, "
                     f"{d['streak_changes']} streak values would change, "
                     f"{d['flag_changes']} after-loss flags would change"
                 )

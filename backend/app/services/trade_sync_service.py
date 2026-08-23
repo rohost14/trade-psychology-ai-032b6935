@@ -1291,6 +1291,16 @@ class TradeSyncService:
                 )
                 db.add(ct)
                 await db.flush()
+
+                # Same reason as the live ledger path: this creates a
+                # CompletedTrade without the bulk recompute ever running, so
+                # without this the round has no feature row.
+                try:
+                    from app.services.pnl_calculator import pnl_calculator
+                    await pnl_calculator.ensure_feature_for(ct, db)
+                except Exception as _feat_err:
+                    logger.warning(f"[overnight] feature computation failed: {_feat_err}")
+
                 created += 1
                 logger.info(
                     f"[overnight] Created CompletedTrade for {symbol} "

@@ -644,6 +644,57 @@ class PnLCalculator:
     # Step 3.5: Feature computation (post-FIFO, separate pass)
     # ------------------------------------------------------------------
 
+    async def ensure_feature_for(
+        self,
+        ct: "CompletedTrade",
+        db: AsyncSession,
+    ) -> Optional["CompletedTradeFeature"]:
+        """
+        Write the feature row for ONE completed trade, if it does not have one.
+
+        WHY THIS EXISTS
+
+        Three code paths create a CompletedTrade and only one of them - the bulk
+        FIFO recompute below - also wrote its feature row. The other two are the
+        ones production actually uses:
+
+          * `PositionLedgerService.build_completed_trade_on_close`, the live
+            postback path, and
+          * the overnight-position backfill in `trade_sync_service`.
+
+        So the features table was empty in production - 1,515 completed trades
+        and 0 feature rows - and every statistic on My Record that is guarded by
+        `feature is not None` rendered as nothing at all rather than as an error.
+
+        Idempotent, and returns None when a row already exists. Costs one query
+        for the context window; features are derived data, so a failure here must
+        never take the trade down with it - callers log and continue.
+        """
+        existing = await db.execute(
+            select(CompletedTradeFeature.id).where(
+                CompletedTradeFeature.completed_trade_id == ct.id
+            )
+        )
+        if existing.scalar_one_or_none() is not None:
+            return None
+
+        # Same context window as the bulk path: the 50 most recent rounds that
+        # closed before this one started.
+        ctx = await db.execute(
+            select(CompletedTrade)
+            .where(and_(
+                CompletedTrade.broker_account_id == ct.broker_account_id,
+                CompletedTrade.exit_time < (ct.entry_time or ct.exit_time),
+            ))
+            .order_by(CompletedTrade.exit_time.desc())
+            .limit(50)
+        )
+        prev_rounds = list(reversed(ctx.scalars().all()))
+
+        feature = self._build_feature(ct, prev_rounds, ct.broker_account_id)
+        db.add(feature)
+        return feature
+
     async def _compute_features_for_new_rounds(
         self,
         broker_account_id: UUID,
