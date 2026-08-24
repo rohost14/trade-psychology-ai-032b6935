@@ -421,3 +421,85 @@ class TestPerformanceDetectorGuards:
             make_ctx(completed_trade=ct, session_trades=priors, thresholds=th))
         if ev is not None:
             assert ev.confidence == pytest.approx(60.0)
+
+
+class TestMartingaleAcrossInstrumentClasses:
+    """
+    Synthetic coverage for the instruments the real book barely contains.
+
+    The tradebook is 727 LONG positions against 15 SHORT, with 16 equity rows
+    and 2 futures. Every escalation measured in it is a long option, so short
+    options, futures and equity have no real case to validate against and are
+    proven here instead. This is stated as a limitation in the contract, not
+    papered over.
+
+    What these pin is that risk is measured by instrument_risk rather than by
+    quantity — which is the correction this detector's review made. Premium
+    received is not exposure for a short; margin is.
+    """
+
+    def _run(self, itype, symbol, direction, prior_qty, current_qty, price):
+        priors = []
+        for i in range(2):
+            t = make_ct(symbol=symbol, instrument_type=itype,
+                        direction=direction, pnl=-500.0,
+                        entry_offset_min=-60 + i * 20)
+            t.total_quantity = prior_qty
+            t.avg_entry_price = Decimal(str(price))
+            priors.append(t)
+        ct = make_ct(symbol=symbol, instrument_type=itype, direction=direction,
+                     pnl=-400.0, entry_offset_min=-5)
+        ct.total_quantity = current_qty
+        ct.avg_entry_price = Decimal(str(price))
+        return engine._detect_martingale_behaviour(
+            make_ctx(completed_trade=ct, session_trades=priors))
+
+    @pytest.mark.parametrize("itype,symbol,direction", [
+        ("EQ", "RELIANCE", "LONG"),
+        ("EQ", "RELIANCE", "SHORT"),
+        ("FUT", "NIFTY25AUGFUT", "LONG"),
+        ("FUT", "NIFTY25AUGFUT", "SHORT"),
+        ("CE", "NIFTY25AUG24000CE", "LONG"),
+        ("PE", "NIFTY25AUG24000PE", "LONG"),
+        ("CE", "NIFTY25AUG24000CE", "SHORT"),
+        ("PE", "NIFTY25AUG24000PE", "SHORT"),
+    ])
+    def test_doubling_risk_after_two_losses_fires_on_every_class(
+            self, itype, symbol, direction):
+        r = self._run(itype, symbol, direction, 100, 200, 50.0)
+        assert r.fired, f"{direction} {itype} escalation not detected"
+        assert r.severity == "danger"
+        assert r.context["risk_ratio"] == pytest.approx(2.0)
+        assert r.context["denominator_kind"], "the unit must be named"
+
+    @pytest.mark.parametrize("itype,symbol,direction", [
+        ("EQ", "RELIANCE", "SHORT"),
+        ("FUT", "NIFTY25AUGFUT", "SHORT"),
+        ("CE", "NIFTY25AUG24000CE", "SHORT"),
+    ])
+    def test_a_short_uses_margin_not_the_premium_received(
+            self, itype, symbol, direction):
+        """
+        Premium received is the maximum GAIN on a short, never its exposure.
+        The ratio must still be right, and the denominator must say what it is.
+        """
+        r = self._run(itype, symbol, direction, 100, 200, 50.0)
+        assert r.fired
+        assert r.context["denominator_kind"] in ("margin_posted", "notional")
+        assert r.context["risk_after"] > r.context["risk_before"]
+
+    def test_a_spread_leg_abstains_rather_than_guessing(self):
+        priors = []
+        for i in range(2):
+            t = make_ct(symbol="NIFTY25AUG24000CE", instrument_type="CE",
+                        pnl=-500.0, entry_offset_min=-60 + i * 20)
+            t.total_quantity = 100
+            priors.append(t)
+        ct = make_ct(symbol="NIFTY25AUG24000CE", instrument_type="CE",
+                     pnl=-400.0, entry_offset_min=-5)
+        ct.total_quantity = 300
+        ctx = make_ctx(completed_trade=ct, session_trades=priors)
+        ctx.strategy_group = type("SG", (), {"strategy_type": "iron_condor",
+                                             "net_pnl": None})()
+        r = engine._detect_martingale_behaviour(ctx)
+        assert r.abstained and not r.fired

@@ -1279,8 +1279,8 @@ reason goes in the notes column, not into someone's head.
 |---|---|---|---|---|---|
 | — | *(shared foundation)* | **COMPLETE** | — | 23 Aug 2026 | F1–F5; `session_facts`, threshold ladder, maturity, confidence, instrument risk |
 | — | *(pre-pattern hygiene)* | **COMPLETE** | 24 Aug 2026 | 24 Aug 2026 | 9 fixed, 20 deferred, commit `1a0940f` |
-| 2 | `adding_to_adverse_position` **(new)** | **COMPLETE — shipped** | 24 Aug 2026 | 24 Aug 2026 | Adding to an OPEN position moving against you. Real-time, fires on the INCREASE fill. 65 tests. `adding_to_adverse_position_contract.md` + 3 companions |
-| 1 | `martingale_behaviour` | **COMPLETE — shipped** | 24 Aug 2026 | 24 Aug 2026 | v2.0.0. Escalation across ATTEMPTS after a closed loss. Step is the one the trader took, losses must be trailing consecutive, size is capital at risk. 58 firings -> 31, every one now true to its own message. `two_behaviours_not_one.md` |
+| 2 | `adding_to_adverse_position` | **COMPLETE** | 24 Aug 2026 | 24 Aug 2026 | v2.0.0. Adding to an OPEN adverse position, real-time on the INCREASE fill. 65 tests + integration through the genuine pipeline. `patterns_1_and_2_closeout.md` |
+| 1 | `martingale_behaviour` | **COMPLETE** | 24 Aug 2026 | 24 Aug 2026 | v2.0.0. Escalation across ATTEMPTS after a closed loss. 58 firings -> 31, every one true to its own message. 20 tests inc. all instrument classes. `patterns_1_and_2_closeout.md` |
 | 2 | `same_symbol_obsession` | NOT STARTED | — | — | 29 alerts / 20 danger |
 | 3 | `consecutive_loss_streak` | NOT STARTED | — | — | 61 alerts, most frequent |
 | 4 | `overtrading_burst` + `daily_overtrading` | NOT STARTED | — | — | reviewed together — one method, two pattern types |
