@@ -106,9 +106,16 @@ Adverse adds within one position, measured on the book:
 | **Normal re-entry** — a *new* position after the previous one closed | every 671 single-fill position | **not this detector.** This is what `martingale_behaviour` measures today |
 | **Adding after a favourable move** | `TITAN25AUG3600CE` held 175@19.20, added 175@21.20 — 10% **in profit** | **must not catch** — 20 such adds exist |
 
-**Averaging down and martingale are the same behaviour at different intensities.**
-Adding to a losing position is the general case; martingale is the case where each
-add is also bigger. One detector, with intensity rising, not two detectors.
+**WITHDRAWN 24 Aug.** This paragraph claimed averaging down and martingale are
+"the same behaviour at different intensities" and should be one detector. That is
+wrong and the conflation was mine. Adding to an adverse position needs the
+position to still be OPEN and does not care about size; martingale needs a CLOSED
+loss and an escalation on the next attempt. They read different objects and
+neither can observe the other's subject. They may fire together, which is two
+true statements rather than duplication.
+
+See `two_behaviours_not_one.md` and
+`tests/test_adverse_add_lifecycle.py::TestTheTwoBehavioursAreDistinct`.
 
 ### Cases it must catch — verbatim from the book
 
