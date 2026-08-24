@@ -1279,9 +1279,9 @@ reason goes in the notes column, not into someone's head.
 |---|---|---|---|---|---|
 | — | *(shared foundation)* | **COMPLETE** | — | 23 Aug 2026 | F1–F5; `session_facts`, threshold ladder, maturity, confidence, instrument risk |
 | — | *(pre-pattern hygiene)* | **COMPLETE** | 24 Aug 2026 | 24 Aug 2026 | 9 fixed, 20 deferred, commit `1a0940f` |
-| 2 | `adding_to_adverse_position` | **COMPLETE** | 24 Aug 2026 | 24 Aug 2026 | v2.0.0. Adding to an OPEN adverse position, real-time on the INCREASE fill. 65 tests + integration through the genuine pipeline. `patterns_1_and_2_closeout.md` |
-| 1 | `martingale_behaviour` | **COMPLETE** | 24 Aug 2026 | 24 Aug 2026 | v2.0.0. Escalation across ATTEMPTS after a closed loss. 58 firings -> 31, every one true to its own message. 20 tests inc. all instrument classes. `patterns_1_and_2_closeout.md` |
-| 3 | `same_symbol_obsession` | **COMPLETE** | 24 Aug 2026 | 24 Aug 2026 | v2.0.0. Persistence on one underlying - the only detector that sees it WITHOUT escalation (4 of 20 episodes are invisible to everything else). Severity = peak vs first, stable by construction; `obsession_min_reentries` deleted as unreachable. 23 tests. `same_symbol_obsession_contract.md` |
+| 2 | `adding_to_adverse_position` | **COMPLETE** | 24 Aug 2026 | 24 Aug 2026 | v2.0.0. **Corrected replay: 99 alerts / 56 days, 4/4 checks PASS, episode dedup verified in the real path.** `patterns_1_2_3_replay_closeout.md` |
+| 1 | `martingale_behaviour` | **COMPLETE** | 24 Aug 2026 | 24 Aug 2026 | v2.0.0. **Corrected replay: 39 alerts / 36 days, 5/5 definition checks PASS, multipliers hold unchanged.** `patterns_1_2_3_replay_closeout.md` |
+| 3 | `same_symbol_obsession` | **COMPLETE** | 24 Aug 2026 | 24 Aug 2026 | v2.0.0. Persistence on one underlying - the only detector that sees it WITHOUT escalation (4 of 20 episodes are invisible to everything else). Severity = peak vs first, stable by construction; `obsession_min_reentries` deleted as unreachable. 23 tests. **Corrected replay: 22 alerts / 21 days.** Entry-triggering measured and rejected — later in 14/20 episodes, never in 6. `same_symbol_obsession_contract.md` |
 | 4 | `consecutive_loss_streak` | NOT STARTED | — | — | 61 alerts, most frequent |
 | 5 | `overtrading_burst` + `daily_overtrading` | NOT STARTED | — | — | reviewed together — one method, two pattern types |
 | 6 | `profit_giveaway` | NOT STARTED | — | — | 26 alerts / 12 days |
