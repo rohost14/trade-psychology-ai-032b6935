@@ -1279,7 +1279,7 @@ reason goes in the notes column, not into someone's head.
 |---|---|---|---|---|---|
 | — | *(shared foundation)* | **COMPLETE** | — | 23 Aug 2026 | F1–F5; `session_facts`, threshold ladder, maturity, confidence, instrument risk |
 | — | *(pre-pattern hygiene)* | **COMPLETE** | 24 Aug 2026 | 24 Aug 2026 | 9 fixed, 20 deferred, commit `1a0940f` |
-| 1 | `martingale_behaviour` | **REWORKED — contract awaiting agreement** | 24 Aug 2026 | — | First review measured the wrong unit. Real behaviour is **adding to an adverse position**, invisible to every detector today: 64 positions / 96 adverse adds, **99% of them smaller than 1.5x**. Evidence validated: no defensible percentage threshold exists; multipliers fire 0-1 times in 96 adverse adds. `adding_to_adverse_position_contract.md` + `_evidence.md` |
+| 1 | `martingale_behaviour` | **REWORKED — contract awaiting agreement** | 24 Aug 2026 | — | First review measured the wrong unit. Real behaviour is **adding to an adverse position**, invisible to every detector today: 64 positions / 96 adverse adds, **99% of them smaller than 1.5x**. Contract VALIDATED - 24/24 synthetic cases, symmetry proven, boundaries measured. 3 additions needed. Awaiting approval to implement. `adding_to_adverse_position_contract.md` + `_evidence.md` |
 | 2 | `same_symbol_obsession` | NOT STARTED | — | — | 29 alerts / 20 danger |
 | 3 | `consecutive_loss_streak` | NOT STARTED | — | — | 61 alerts, most frequent |
 | 4 | `overtrading_burst` + `daily_overtrading` | NOT STARTED | — | — | reviewed together — one method, two pattern types |
