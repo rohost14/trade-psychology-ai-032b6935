@@ -1785,118 +1785,161 @@ class BehaviorEngine:
         """
         return float(abs(t.total_quantity or 0)) * float(t.avg_entry_price or 0)
 
-    def _detect_martingale_behaviour(self, ctx: EngineContext) -> Optional[DetectedEvent]:
+    def _detect_martingale_behaviour(self, ctx: EngineContext):
+        """
+        A loss, then the next attempt at materially more risk.
+
+        REWRITTEN 2026-08-24, Pattern #1. What changed and why:
+
+        This is NOT "adding to a losing position". The losing position here is
+        CLOSED; the escalation happens on a SUBSEQUENT attempt. Adding to a
+        position that is still open is `adding_to_adverse_position`, which reads
+        a fill sequence this detector cannot see - a CompletedTrade folds every
+        entry into one average price. The two can both be true and neither
+        implies the other. See docs/contracts/two_behaviours_not_one.md.
+
+        Three corrections, each measured:
+
+        1. The step is the one the TRADER TOOK - the previous closed position to
+           this one. It used to be the largest step between two EARLIER
+           positions, with the current trade displayed but taking part in no
+           decision. On 58 firings that produced 29 alerts where the current
+           position was smaller than the previous one and 26 where the trade was
+           profitable, while missing 22 real escalations.
+
+        2. The losses must be TRAILING CONSECUTIVE, which is what the message
+           has always claimed. It used to count any 2 of the last 3, so 23 of 58
+           firings said "consecutive losses" when there had not been two in a
+           row.
+
+        3. Size is CAPITAL AT RISK, via instrument_risk. It used to be quantity
+           within one underlying and notional across them - two different units
+           compared against one multiplier, and neither is risk for a short
+           option or a future. 45 of the 64 escalations in the book are on a
+           DIFFERENT underlying, so the cross-instrument comparison is the
+           normal case rather than the exception, and it has to be valid.
+
+        The 1.5x/2.0x multipliers are UNCHANGED. Measured on the corrected step
+        they give 31 caution and 20 danger firings across the book. No natural
+        break exists in the distribution to replace them with - p50 1.44x, p75
+        2.79x, and the only gaps are in the two-point tail - so changing them
+        would be inventing a number, not correcting one.
+        """
+        from app.core.evidence import Insufficiency, positive
+        from app.core.instrument_risk import risk_basis
+
         ct = ctx.completed_trade
-        trades = ctx.session_trades
-        if len(trades) < 3:
-            return None
-
-        # Compare only within the SAME underlying so different lot sizes
-        # (e.g. Nifty 50 qty vs Industower 2000 qty) are never mixed.
-        from app.services.instrument_parser import parse_symbol as _ps
-        try:
-            ct_underlying = _ps(ct.tradingsymbol or "").underlying
-        except Exception:
-            ct_underlying = ct.tradingsymbol or ""
-
         prior = sorted(
-            [t for t in trades
-             if t.id != ct.id and t.exit_time
-             and (_ps(t.tradingsymbol or "").underlying if t.tradingsymbol else "") == ct_underlying],
+            [t for t in ctx.session_trades if t.id != ct.id and t.exit_time],
             key=lambda t: t.exit_time,
-        )[-3:]
-
-        # Martingale is a decision, not a symbol. "I lost, so I'll go bigger" is
-        # the same behaviour whether the trader doubles down on NIFTY or moves to
-        # BANKNIFTY at twice the size — and a real tradebook shows people
-        # rotating instruments while escalating. Restricted to one underlying,
-        # this detector fired ZERO times across 61 real sessions belonging to a
-        # trader who knew he had martingaled.
-        #
-        # Quantity cannot be compared across instruments (50 Nifty against 2000
-        # Industower is meaningless), so the cross-instrument comparison uses
-        # notional value, which is the number the trader actually feels. The
-        # same-underlying path stays first because quantity is the more precise
-        # signal when it is available.
-        cross_instrument = False
-        if len(prior) < 2:
-            prior = sorted(
-                [t for t in trades if t.id != ct.id and t.exit_time],
-                key=lambda t: t.exit_time,
-            )[-3:]
-            cross_instrument = True
-
-        if len(prior) < 2:
-            return None
-
-        min_losses = ctx.thresholds.get("martingale_min_losses", 2)
-        loss_count = sum(1 for t in prior if Decimal(str(t.realized_pnl or 0)) < 0)
-        if loss_count < min_losses:
-            return None
-
-        # A local _notional identical to the static method above lived here
-        # until 2026-08-24. One definition; same arithmetic.
-        if cross_instrument:
-            sizes = [max(self._notional(t), 1.0) for t in prior]
-            current_size = max(self._notional(ct), 1.0)
-        else:
-            sizes = [t.total_quantity or 1 for t in prior]
-            current_size = ct.total_quantity or 1
-
-        caution_mul = ctx.thresholds.get("martingale_caution_multiplier", 1.5)
-        danger_mul  = ctx.thresholds.get("martingale_danger_multiplier", 2.0)
-
-        # Check from latest to earliest: is any step a danger/caution double?
-        max_ratio = max(
-            sizes[i] / max(sizes[i-1], 1) for i in range(1, len(sizes))
         )
-        # Build readable sequence using all prior + current trade. Across
-        # instruments the numbers are rupees, so they are labelled as such —
-        # "50→100→200" and "₹10,000→₹20,000" are different claims.
-        all_sizes = sizes + [current_size]
-        seq_str = ("→".join(f"₹{s:,.0f}" for s in all_sizes) if cross_instrument
-                   else "→".join(str(int(s)) for s in all_sizes))
-
-        trade_list = [
-            {
-                "symbol": t.tradingsymbol or "—",
-                "qty": t.total_quantity or 0,
-                "pnl": float(Decimal(str(t.realized_pnl or 0))),
-                "exit_time_ist": t.exit_time.astimezone(IST).strftime("%H:%M") if t.exit_time else None,
-            }
-            for t in prior
-        ] + [{
-            "symbol": ct.tradingsymbol or "—",
-            "qty": ct.total_quantity or 0,
-            "pnl": float(Decimal(str(ct.realized_pnl or 0))),
-            "exit_time_ist": ct.exit_time.astimezone(IST).strftime("%H:%M") if ct.exit_time else None,
-        }]
-
-        if max_ratio >= danger_mul:
-            return DetectedEvent(
-                event_type="martingale_behaviour",
-                severity="danger",
-                message=(
-                    f"{ct_underlying} position sizes after consecutive losses: {seq_str}. "
-                    f"Each loss was followed by a larger position — a martingale pattern."
-                ),
-                context={"size_sequence": all_sizes, "max_ratio": round(max_ratio, 2),
-                         "consecutive_losses": loss_count, "underlying": ct_underlying,
-                         "trigger_symbol": ct.tradingsymbol, "trade_list": trade_list},
+        min_losses = int(ctx.thresholds.get("martingale_min_losses", 2))
+        if len(prior) < min_losses:
+            return not_detected(
+                "martingale_behaviour",
+                f"fewer than {min_losses} closed trades to escalate from",
             )
-        if max_ratio >= caution_mul:
-            return DetectedEvent(
-                event_type="martingale_behaviour",
-                severity="caution",
-                message=(
-                    f"{ct_underlying} position sizes after losses: {seq_str}. "
-                    f"Increasing size after losses raises total risk, not just cost basis."
-                ),
-                context={"size_sequence": all_sizes, "max_ratio": round(max_ratio, 2),
-                         "consecutive_losses": loss_count, "underlying": ct_underlying,
-                         "trigger_symbol": ct.tradingsymbol, "trade_list": trade_list},
+
+        # Trailing consecutive losses, not any-N-of-the-last-3.
+        run = 0
+        for t in reversed(prior):
+            if float(t.realized_pnl or 0) < 0:
+                run += 1
+            else:
+                break
+        if run < min_losses:
+            return not_detected(
+                "martingale_behaviour",
+                f"{run} consecutive losing trades before this one, not {min_losses}",
             )
-        return None
+
+        previous = prior[-1]
+        is_spread = ctx.strategy_group is not None
+        cur = risk_basis(ct.instrument_type, ct.tradingsymbol or "", ct.direction,
+                         float(ct.avg_entry_price or 0),
+                         int(ct.total_quantity or 0), is_spread=is_spread)
+        prv = risk_basis(previous.instrument_type, previous.tradingsymbol or "",
+                         previous.direction, float(previous.avg_entry_price or 0),
+                         int(previous.total_quantity or 0))
+        if not cur.is_comparable or not prv.is_comparable:
+            return abstained(
+                "martingale_behaviour", Insufficiency.NOT_APPLICABLE,
+                "risk is not comparable across these instruments",
+                instrument=cur.instrument.value, denominator=cur.kind.value,
+            )
+        if prv.amount <= 0:
+            return abstained("martingale_behaviour", Insufficiency.MISSING_INPUT,
+                             "the previous attempt has no measurable risk")
+
+        ratio = cur.amount / prv.amount
+        caution_mul = float(ctx.thresholds.get("martingale_caution_multiplier", 1.5))
+        danger_mul = float(ctx.thresholds.get("martingale_danger_multiplier", 2.0))
+
+        if ratio < caution_mul:
+            return not_detected(
+                "martingale_behaviour",
+                f"risk went {prv.amount:,.0f} to {cur.amount:,.0f} "
+                f"({ratio:.2f}x) after {run} losses",
+            )
+
+        severity = "danger" if ratio >= danger_mul else "caution"
+        total_loss = sum(abs(float(t.realized_pnl or 0)) for t in prior[-run:])
+        from app.services.instrument_parser import parse_symbol as _ps
+
+        def _und(sym):
+            try:
+                return _ps(sym or "").underlying or sym or ""
+            except Exception:
+                return sym or ""
+
+        rotated = _und(ct.tradingsymbol) != _und(previous.tradingsymbol)
+        where = (f"moved to {ct.tradingsymbol}" if rotated
+                 else f"went back into {ct.tradingsymbol}")
+
+        return DetectorResult(
+            detector="martingale_behaviour",
+            evidence=positive("escalation after losses", ratio=round(ratio, 2)),
+            layer=Layer.SAFETY if severity == "danger" else Layer.PERSONAL,
+            severity=severity,
+            message=(
+                f"After {run} losing trades (Rs {total_loss:,.0f}), you {where} "
+                f"with {ratio:.1f}x the capital at risk "
+                f"(Rs {prv.amount:,.0f} to Rs {cur.amount:,.0f})."
+            ),
+            context={
+                "consecutive_losses": run,
+                "prior_total_loss": round(total_loss, 2),
+                "risk_before": round(prv.amount),
+                "risk_after": round(cur.amount),
+                "risk_ratio": round(ratio, 2),
+                "rotated_instrument": rotated,
+                "previous_symbol": previous.tradingsymbol,
+                "trigger_symbol": ct.tradingsymbol,
+                "instrument_class": cur.instrument.value,
+                # Which unit the ratio is in. The old implementation compared
+                # lots in one branch and rupees in the other without recording
+                # which, so a reader could not tell what "2x" meant.
+                "denominator_kind": cur.kind.value,
+                "caution_multiplier": caution_mul,
+                "danger_multiplier": danger_mul,
+                "trade_list": [
+                    {
+                        "symbol": t.tradingsymbol or "-",
+                        "qty": t.total_quantity or 0,
+                        "pnl": float(Decimal(str(t.realized_pnl or 0))),
+                        "exit_time_ist": (t.exit_time.astimezone(IST).strftime("%H:%M")
+                                          if t.exit_time else None),
+                    }
+                    for t in prior[-run:]
+                ] + [{
+                    "symbol": ct.tradingsymbol or "-",
+                    "qty": ct.total_quantity or 0,
+                    "pnl": float(Decimal(str(ct.realized_pnl or 0))),
+                    "exit_time_ist": (ct.exit_time.astimezone(IST).strftime("%H:%M")
+                                      if ct.exit_time else None),
+                }],
+            },
+        )
 
     # ── Pattern 8: Cooldown violation ─────────────────────────────────────
 

@@ -196,34 +196,86 @@ class TestDailyOvertrading:
 
 
 class TestMartingaleLadder:
-    """26 danger alerts in the replay — the largest single source — no test."""
+    """
+    REWRITTEN 2026-08-24 with the detector, in its Pattern #1 review.
 
-    def _run(self, qtys, current_qty):
-        priors = _loss_run(len(qtys), qtys=qtys)
+    These tests used to pin the OLD semantics, and one of them
+    (`test_ratio_is_computed_from_priors_only`) existed specifically to record a
+    defect its own docstring described as "documenting current behaviour, not
+    endorsing it... Flagged for the martingale pattern review." This is that
+    review, so the tests move with the contract rather than the contract being
+    bent to keep them green.
+
+    What martingale means now: a CLOSED loss, then a subsequent attempt at
+    materially more CAPITAL AT RISK. The step measured is the one the trader
+    took - previous closed position to this one - and the losses must be
+    trailing consecutive.
+    """
+
+    def _run(self, prior_qtys, current_qty, prior_pnl=-400.0):
+        priors = _loss_run(len(prior_qtys), qtys=prior_qtys, pnl=prior_pnl)
         ct = make_ct(pnl=-400.0, entry_offset_min=-5)
         ct.total_quantity = current_qty
         return engine._detect_martingale_behaviour(
             make_ctx(completed_trade=ct, session_trades=priors))
 
     def test_flat_sizing_after_losses_is_not_martingale(self):
-        assert self._run([50, 50, 50], 50) is None
+        r = self._run([50, 50, 50], 50)
+        assert not r.fired
+
+    def test_a_smaller_next_attempt_is_not_martingale(self):
+        """The old implementation could fire here: the current trade took no
+        part in its arithmetic, so a de-escalation was scored by a step between
+        two earlier trades."""
+        r = self._run([50, 100, 200], 50)
+        assert not r.fired
 
     def test_caution_at_the_caution_multiple(self):
-        ev = self._run([50, 80, 80], 80)          # 1.6x step
-        assert ev is not None and ev.severity == "caution"
+        r = self._run([50, 50, 50], 80)          # 1.6x the previous attempt
+        assert r.fired and r.severity == "caution"
+        assert r.context["risk_ratio"] == pytest.approx(1.6)
 
     def test_danger_at_the_danger_multiple(self):
-        ev = self._run([50, 100, 100], 100)       # 2.0x step
-        assert ev is not None and ev.severity == "danger"
+        r = self._run([50, 50, 50], 100)         # 2.0x
+        assert r.fired and r.severity == "danger"
 
-    def test_ratio_is_computed_from_priors_only(self):
+    def test_the_step_measured_is_the_one_the_trader_took(self):
         """
-        Documenting current behaviour, not endorsing it: the displayed sequence
-        includes the current trade, the ratio that decides severity does not.
-        Flagged for the martingale pattern review.
+        The correction. Priors 50 -> 50 -> 50 contain no escalation at all; the
+        escalation is the current attempt at 500. The old implementation
+        returned nothing here, because it only ever compared priors.
         """
-        ev = self._run([50, 50, 50], 500)         # 10x jump on the CURRENT trade
-        assert ev is None, "current trade size does not enter max_ratio today"
+        r = self._run([50, 50, 50], 500)
+        assert r.fired and r.severity == "danger"
+        assert r.context["risk_ratio"] == pytest.approx(10.0)
+
+    def test_losses_must_be_trailing_consecutive(self):
+        """
+        Two losses and a WIN immediately before this attempt. The message has
+        always said "consecutive losses"; now the code agrees with it.
+        """
+        priors = _loss_run(2, qtys=[50, 50])
+        winner = make_ct(pnl=900.0, entry_offset_min=-30)
+        winner.total_quantity = 50
+        ct = make_ct(pnl=-400.0, entry_offset_min=-5)
+        ct.total_quantity = 500
+        r = engine._detect_martingale_behaviour(
+            make_ctx(completed_trade=ct, session_trades=priors + [winner]))
+        assert not r.fired
+
+    def test_escalating_after_WINS_is_not_martingale(self):
+        r = self._run([50, 50, 50], 500, prior_pnl=400.0)
+        assert not r.fired
+
+    def test_the_ratio_is_capital_at_risk_and_says_so(self):
+        """
+        It used to compare lots within one underlying and rupees across them,
+        against one multiplier, without recording which. Now it is one unit and
+        the context names it.
+        """
+        r = self._run([50, 50, 50], 100)
+        assert r.context["denominator_kind"]
+        assert r.context["risk_before"] > 0 and r.context["risk_after"] > 0
 
 
 class TestSameSymbolObsession:

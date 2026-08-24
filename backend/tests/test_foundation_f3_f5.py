@@ -200,6 +200,9 @@ REVIEWED_DETECTORS = {
     # docs/contracts/adding_to_adverse_position_contract.md + three
     # validation companions.
     "adding_to_adverse_position",
+    # Pattern #1, reviewed 2026-08-24. Uses instrument_risk for capital at
+    # risk and abstains when is_comparable is False.
+    "martingale_behaviour",
 }
 
 

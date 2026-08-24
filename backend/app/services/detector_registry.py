@@ -115,8 +115,15 @@ REGISTRY: Tuple[DetectorSpec, ...] = (
     DetectorSpec("panic_exit", "_detect_panic_exit",
                  "2.0.0", "emotional", "analytics", "exit", 0,
                  consumes=("completed_trade", "exit_order_types", "thresholds")),
+    # 2.0.0: Pattern #1 review, 2026-08-24. Escalation across ATTEMPTS after a
+    # closed loss - not adding to an open one, which is
+    # adding_to_adverse_position and reads a fill sequence this cannot see.
+    # The step is now the one the trader took, the losses must be trailing
+    # consecutive, and size is capital at risk rather than quantity in one
+    # branch and notional in the other.
     DetectorSpec("martingale_behaviour", "_detect_martingale_behaviour",
-                 "1.1.0", "risk", "alerting", "exit", 2),
+                 "2.0.0", "risk", "alerting", "exit", 2,
+                 frames=(ReferenceFrame.TRADE, ReferenceFrame.STRUCTURAL)),
     # 2.0.0: Pattern #1, 2026-08-24. The first detector to read a position's
     # FILL SEQUENCE rather than its aggregate - a CompletedTrade folds every
     # entry into one avg_entry_price, so an averaging-down ladder was invisible

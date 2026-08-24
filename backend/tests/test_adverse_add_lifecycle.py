@@ -330,7 +330,7 @@ class TestTheTwoBehavioursAreDistinct:
 
         # The same trader, as martingale sees them: one open position, which is
         # a single CompletedTrade, so martingale has nothing to compare.
-        assert _martingale([_ct("NIFTY25AUG24000CE", 225, 40.0, 30.0, 0)]) is None
+        assert not _martingale([_ct("NIFTY25AUG24000CE", 225, 40.0, 30.0, 0)]).fired
 
     def test_2_closed_loss_then_a_bigger_trade_is_martingale_not_adding(self):
         """
@@ -340,7 +340,7 @@ class TestTheTwoBehavioursAreDistinct:
         """
         trades = [_ct("NIFTY25AUG24000CE", q, 50 - i, 45 - i, i * 20)
                   for i, q in enumerate([75, 150, 300, 600])]
-        assert _martingale(trades) is not None, "escalation across attempts"
+        assert _martingale(trades).fired, "escalation across attempts"
 
         r = run(fills(("OPEN", 600, 47.0)))
         assert not r.fired, "a single-fill position was never added to"
@@ -357,7 +357,7 @@ class TestTheTwoBehavioursAreDistinct:
 
         trades = [_ct("NIFTY25AUG24000CE", q, 50 - i, 45 - i, i * 20)
                   for i, q in enumerate([75, 150, 300, 600])]
-        assert _martingale(trades) is not None
+        assert _martingale(trades).fired
 
     def test_4_a_favourable_add_is_neither(self):
         r = run(fills(("OPEN", 75, 50.0), ("INCREASE", 75, 60.0)))
@@ -367,7 +367,7 @@ class TestTheTwoBehavioursAreDistinct:
         # losses among the prior trades.
         trades = [_ct("NIFTY25AUG24000CE", q, 50, 55, i * 20)
                   for i, q in enumerate([75, 150, 300, 600])]
-        assert _martingale(trades) is None
+        assert not _martingale(trades).fired
 
     def test_neither_detector_can_see_what_the_other_sees(self):
         """

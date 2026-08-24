@@ -85,24 +85,18 @@ def main():
                 thresholds={},          # inline defaults: 2 losses, 1.5x, 2.0x
             )
             ev = engine._detect_martingale_behaviour(ctx)
-            if ev is None:
+            if ev is None or not getattr(ev, "fired", False):
                 continue
             c = ev.context
-            seq = c["size_sequence"]
-            cross = any(isinstance(x, float) and x != int(x) for x in seq) or max(seq) > 5000
             fired.append({
                 "day": day, "idx": i, "severity": ev.severity,
-                "max_ratio": c["max_ratio"], "seq": seq,
+                "ratio": c["risk_ratio"],
+                "risk_before": c["risk_before"], "risk_after": c["risk_after"],
                 "losses": c["consecutive_losses"],
-                "underlying": c["underlying"],
-                "current_qty": ct.total_quantity,
+                "rotated": c["rotated_instrument"],
+                "instrument": c["instrument_class"],
                 "current_pnl": float(ct.realized_pnl),
-                "current_notional": float(ct.total_quantity) * float(ct.avg_entry_price),
-                "n_priors_in_seq": len(seq) - 1,
                 "message": ev.message,
-                "prior_pnls": [p["pnl"] for p in c["trade_list"][:-1]],
-                "prior_syms": [p["symbol"] for p in c["trade_list"][:-1]],
-                "cross_guess": cross,
             })
 
     print(f"sessions with trades: {sessions_with_trades}   round-trips: {total_trades}")
