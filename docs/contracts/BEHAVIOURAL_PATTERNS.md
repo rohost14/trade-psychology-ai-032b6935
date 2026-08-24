@@ -1139,6 +1139,52 @@ Shown as found; not reconciled.
 
 ---
 
+# H0. Hygiene pass — full audit table
+
+Every finding the pass produced, with its classification. The nine rows marked
+FIX NOW are detailed in H below; everything else is in the DEFERRED register.
+
+| Finding | Evidence | Classification | Action | Behaviour changed? | Tests | Pattern review required? |
+|---|---|---|---|---|---|---|
+| `fomo_expiry_day_symbols` inline default 2 vs configured 4 | `resolve_thresholds` returns 4, so the inline value is unreachable | **FIX NOW** | inline default to 4 | **No** | `test_inline_defaults_agree_with_cold_start_defaults` | **Yes** — is 4 right when the general threshold is 3? |
+| `profit_giveaway_min_peak` inline default 1000 vs configured 1500 | resolves to 1500.0; also scales via `_CAPITAL_RATIOS` | **FIX NOW** | inline default to 1500 | **No** | same contract test | No |
+| `opening_5min_trap` computes a severity and discards it | `pyflakes` L2582 `local variable 'severity' is assigned to but never used` | **FIX NOW** | dead line removed | **No** | `TestOpeningTrapSeverity` (3) | **Yes** — should it alert at all? |
+| `size_escalation` computes `cross` and never reads it, so a rupee sequence prints as "qty" | `pyflakes` L1417 | **FIX NOW** | message labels rupees; `cross_instrument` added to context | **Message only** | `test_size_escalation_cross_instrument_reports_rupees_not_qty` | **Yes** — 30% threshold applied to notional |
+| `_notional` re-defined as a local closure in martingale | bodies character-identical | **FIX NOW** | closure deleted | **No** | `TestMartingaleLadder` (4) | No |
+| SL order-type set written out in two detectors | 2 sites, identical literal | **FIX NOW** | module constant `_STOP_ORDER_TYPES` | **No** | `test_stop_order_types_defined_once` | No |
+| `confidence_alert_gate` defined with a comment describing suppression it no longer performs | 0 readers across `backend/` and `src/` | **FIX NOW** | constant + stale header removed | **No** — verified not recreated by any floor/default loop | `test_confidence_alert_gate_is_gone_and_stays_gone` | No — stays DEFERRED |
+| `rapid_reentry` comment claims it "feeds revenge confidence" | `revenge_trade` 3.0.0 uses `confidence.from_observables` | **FIX NOW** | comment corrected | **No** | n/a | No |
+| `_holding_loser_task` queries `UserProfile` and calls `get_thresholds()`, reads neither | `pyflakes` L279 | **FIX NOW** | dead block removed | **No alert change**; one fewer DB round-trip | `pyflakes` clean | No |
+| Underlying extraction re-implemented in 8 detectors | fallbacks **differ**: #4 to `""`, #15 to the symbol | **DEFER** | not centralised | — | — | **Yes** |
+| Same-underlying to cross-instrument fallback in 4 detectors | 4 switch conditions, 3 unit changes | **DEFER** | none | — | — | **Yes** |
+| 09:15 hardcoded in `opening_5min_trap` | #12 and #20 derive it from `exchange_constants` | **DEFER** | none — fixing changes what fires on MCX | — | — | **Yes** |
+| `martingale` `max_ratio` excludes the current trade | displayed sequence includes it | **DEFER** | pinned, not changed | — | `test_ratio_is_computed_from_priors_only` | **Yes** |
+| `same_symbol_obsession` `size_rising` compares first vs last qty across strikes | raises severity a full tier alone | **DEFER** | none | — | `TestSameSymbolObsession` (3) | **Yes** |
+| `consecutive_loss_streak` `0.5`-of-limit escalation | inline literal, no key | **DEFER** | none | — | — | **Yes** |
+| `expiry_day_overtrading` unsourced statistics in shipped copy | "loss rate above 85%" | **DEFER** | none | — | — | **Yes** |
+| `expiry_day_overtrading` 13:00 cutoff | inline literal | **DEFER** | none | — | — | **Yes** |
+| `direction_instability` 3-flip count; two keys both = 10 | inline literal | **DEFER** | none | — | — | **Yes** |
+| `session_meltdown` invents a limit at 5% of capital | inline `0.05` | **DEFER** | none | — | — | **Yes** |
+| `profit_giveaway` `_typical_loss` reads today's losses only | docstring describes a cross-session figure | **DEFER** | none | — | — | **Yes** |
+| `profit_giveaway` fires 26 times on 12 days | comment claims once-per-session dedup | **DEFER** | none | — | — | **Yes** |
+| `winning_streak_overconfidence` danger tier never fired | 0 in 203 sessions | **DEFER** | none | — | `TestWinningStreakOverconfidence` (4) | **Yes** |
+| `options_premium_avg_down` in no consolidation family | can fire beside every pattern describing the same re-entry | **DEFER** | none | — | — | **Yes** |
+| 45 constants with no `Kind` | `THRESHOLD_SPECS` covers 33 of 78 | **DEFER** | not bulk-classified | — | — | Per detector |
+| `trigger` field says `session`/`exit` where execution differs | 6 specs say `session` but run per trade; 10 detectors already run at entry | **DEFER** | recorded only | — | — | Architecture |
+| `AVERAGING_DOWN_SIZE_INCREASE_PCT = 50` | module-level, no matching pattern type | **UNKNOWN** | recorded, not traced | — | — | **Yes** |
+| `no_stoploss`, `panic_exit` unverifiable | tradebook has no order-type column | **RESEARCH REQUIRED** | none | — | — | Blocked on live order data |
+| `excess_exposure`, `session_meltdown` unverifiable | capital moved 30k-50k across the period | **RESEARCH REQUIRED** | none | — | — | Blocked on a stateable capital figure |
+| `time_of_day_bias`, `win_rate_collapse`, `strategy_breakdown` never fired | 0 in 203 sessions | **RESEARCH REQUIRED** | guards pinned so "correctly silent" is distinguishable from "unreachable" | — | `TestPerformanceDetectorGuards` (6) | Yes, after evidence |
+| `revenge_trade` | AUC 0.482, no fill-level signature separates | **RESEARCH REQUIRED** | **FROZEN** — untouched | **No** | 12 files | Last, and only with new data |
+| Kind guard blocks personal sources on safety/policy thresholds | `violates_kind` called inside `put()`, refuses and records | **KEEP AS-IS** | none | — | verified | No |
+| `RecordingThresholds` captures reads | verified for both `.get()` and `[]` | **KEEP AS-IS** | none | — | verified | No |
+| Structure counting via `count_structures` | already one shared helper | **KEEP AS-IS** | none | — | — | No |
+| Expiry detection via `is_expiry_day` | already one shared helper | **KEEP AS-IS** | none | — | — | No |
+
+**Totals — A. FIXED NOW 9 · B. DEFERRED 20 · C. RESEARCH REQUIRED 4 · D. KEEP AS-IS 4.**
+
+---
+
 # H. Hygiene pass — what changed, 24 Aug 2026
 
 Nine changes. Every one is a bug fix, a dead-code removal or a comment. **No
