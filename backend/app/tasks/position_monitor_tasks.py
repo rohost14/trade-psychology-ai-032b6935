@@ -941,6 +941,59 @@ def flush_entry_batch(broker_account_id: str):
     return asyncio.run(_flush_entry_batch(broker_account_id))
 
 
+def position_epoch(rows) -> str | None:
+    """
+    An identity for the position that is open right now.
+
+    The dedup this detector needs is not time-shaped. A ladder is one episode
+    whether its rungs are ninety seconds or four hours apart, so any window is
+    wrong at one end or the other: shorten it and fast ladders spam, lengthen it
+    and a genuinely new position in the same symbol an hour later is silenced.
+
+    The position itself is the episode, and the ledger already identifies it -
+    it begins at the OPEN (or FLIP) that took the quantity away from zero. That
+    timestamp is stable for the position's life and changes the instant the
+    trader flattens and re-enters, which is exactly when a fresh alert is
+    legitimate.
+
+    Returns None when no opening row is in view, and the caller then falls back
+    to the shared 30-minute window rather than inventing an identity.
+    """
+    for r in reversed(rows):
+        if (r.entry_type or "").upper() in ("OPEN", "FLIP"):
+            return r.occurred_at.isoformat() if r.occurred_at else None
+    return None
+
+
+async def _already_alerted_at_or_above(db, broker_account_id, epoch, severity) -> bool:
+    """
+    Has this episode already been reported at this severity or higher?
+
+    Deliberately NOT part of _fire_position_alert. That function's 30-minute
+    window is shared with holding_loser, overexposure and portfolio_concentration,
+    and changing it would alter three detectors that have not been reviewed. The
+    episode rule lives here, so only this pattern is affected.
+
+    The consequence is that the alert count is bounded by construction rather
+    than by a cap: the severity ladder has three notifiable rungs, so one open
+    position can produce at most three alerts however many times it is added to.
+    """
+    from app.models.risk_alert import RiskAlert
+    from sqlalchemy import and_, select
+
+    if not epoch:
+        return False
+    rows = await db.execute(
+        select(RiskAlert.severity).where(and_(
+            RiskAlert.broker_account_id == UUID(broker_account_id),
+            RiskAlert.pattern_type == "adding_to_adverse_position",
+            RiskAlert.details["episode"].astext == epoch,
+        ))
+    )
+    seen = [r[0] for r in rows.all()]
+    return bool(seen) and _sev_rank(severity) <= max(_sev_rank(x) for x in seen)
+
+
 def _adverse_add_symbols(fills) -> set:
     """
     Symbols in this window where the trader added to a LOSING position.
@@ -1118,15 +1171,24 @@ async def _adverse_add_task(broker_account_id: str, tradingsymbol: str) -> dict:
             # Recorded by the exit-time evidence path; not worth interrupting for.
             return {"skipped": "info_not_notified"}
 
+        # One alert per severity level per open position. Adding again at the
+        # same severity says nothing new, however long ago the last add was.
+        epoch = position_epoch(rows)
+        if await _already_alerted_at_or_above(db, broker_account_id, epoch,
+                                              result.severity):
+            return {"skipped": "no_escalation_in_episode",
+                    "severity": result.severity}
+
         created = await _fire_position_alert(
             broker_account_id,
             "adding_to_adverse_position",
             result.severity,
             result.message,
-            {**(result.context or {}), "symbol": tradingsymbol, "at_fill": True},
+            {**(result.context or {}), "symbol": tradingsymbol,
+             "at_fill": True, "episode": epoch},
             db,
         )
-        return {"fired": created, "severity": result.severity}
+        return {"fired": created, "severity": result.severity, "episode": epoch}
 
 
 def _instrument_type_of(symbol: str) -> str:
