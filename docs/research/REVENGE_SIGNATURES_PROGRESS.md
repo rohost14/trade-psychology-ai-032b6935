@@ -10,8 +10,11 @@ picking this up cold, read this file, then `REVENGE_TRADING_REVIEW_BRIEF.md`.
 
 ## Where this stands
 
-**All five steps complete. Result: negative.** Read
-`REVENGE_SIGNATURES_FINDINGS.md` for the full report.
+**CLOSED. Verdict: DATA-CAPTURE-FIRST, `revenge_trade` FROZEN.** Final review:
+`REVENGE_FINAL_EVIDENCE_REVIEW.md`. Two results there supersede earlier notes:
+a free-weight model over all ten observables reaches **AUC 0.482 (chance)**, and
+**loss runs match what a 41.4% win rate produces by chance** - which retracts the
+loss-run mirror recommended earlier.
 
 | step | state |
 |---|---|
