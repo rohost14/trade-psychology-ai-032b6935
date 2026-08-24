@@ -27,35 +27,92 @@ chosen** because it says something the trader can check against the episode as a
 whole ("it got bigger than where you started") rather than something about one
 adjacent pair.
 
-## Severity — two ordinal axes and a table
+## Severity — validated, and simpler than first proposed
 
-Same shape as Pattern 2, which is the sanctioned structure in this engine: two
-ordinal axes, a lookup, no weights, no sum, no score.
+Two challenges were put to the first draft. One survived, one did not.
+
+### Challenge 1: is `peak > first` meaningful, or only stable? — **MEANINGFUL**
+
+Stability is necessary and not sufficient. A rule that is stable but almost
+always true, or that fires on marginal changes, carries no information. So:
+**how much bigger did it actually get?**
+
+Every rise in the book, sorted:
 
 ```
-                B1 size never exceeded    B2 size exceeded
-                   the first attempt       the first attempt
-
-A1  3 losses          caution                  caution
-A2  4+ losses         caution                  danger
+1.67  1.67  2.00  2.00  2.00  3.00  3.00  3.00  5.00  5.00  5.00  5.00  5.00  10.00  10.00
 ```
 
-**Both axes are definitional, not calibrated.**
+**Minimum 1.67×. Median 3.00×. Not one rise under 1.5×.** There is no marginal
+population at all — in these episodes size either stays flat or it multiplies.
+The rule is not separating "went up a bit" from "stayed level"; it is separating
+"stayed level" from "tripled".
 
-- **A** is the loss count. 3 is what "repeatedly" means and is already the
-  detector's own minimum; 4 is *one more than the minimum*, the same shape
-  Pattern 2 uses for its repetition axis. No new quantity is introduced.
-- **B** is `max(qty) > qty[0]`. The comparison is the identity — did it get
-  bigger than where it started — not a chosen multiple. Quantity is comparable
-  here because every strike and expiry of one underlying shares a lot size.
+And the two groups are materially different episodes:
 
-Measured over the book's 20 episodes: **12 caution, 8 danger.** The current rule
-gives 13/7 but arrives there unstably.
+| | size rose | size flat |
+|---|---|---|
+| attempts (median) | 6 | 4 |
+| losses (median) | 4 | 3 |
+| **total loss** | **₹3,911** | **₹1,537** |
+| peak exposure ÷ first exposure | **1.78×** | **1.00×** |
 
-**`danger` requires both.** Persistence alone and escalation alone are each the
-behaviour; together they are the worse version of it. That reserves `danger` for
-the compound case and leaves `caution` carrying what this detector uniquely sees
-(below).
+**One honest nuance that changes how the caution tier should be read.** The flat
+group starts *larger* — median first exposure ₹5,760 against ₹2,948 — and ends
+at a similar peak (₹6,120 against ₹6,669). So `caution` does not mean "small".
+It means **committed at full size from the first attempt and staying there**,
+which is a different failure from ramping up, not a milder one.
+
+### Challenge 2: is the 3 → 4 loss boundary justified? — **NO. It is dropped.**
+
+Loss count per episode: `{3: 11, 4: 6, 5: 2, 6: 1}`. A smooth decay. **No gap,
+no mode, no break at 4 or anywhere else.**
+
+What the data *does* show is that more losses cost materially more:
+
+| losses | episodes | median total loss |
+|---|---|---|
+| 3 | 11 | ₹1,695 |
+| 4 | 6 | ₹3,911 |
+| 5 | 2 | ₹6,251 |
+| 6 | 1 | ₹6,116 |
+
+That is monotone and steep — four losses cost 2.3× what three cost — but it is
+**continuous**. It supports "more is worse". It does not support "4 is the
+line". Putting the boundary at 4 because it is one more than 3 would be a choice
+wearing the costume of a fact, which is the exact move this review has refused
+everywhere else.
+
+**So the loss-count axis is removed.** The count stays in the message as a fact;
+it does not decide severity.
+
+### The resulting rule — one axis, no invented number
+
+```
+caution   the behaviour occurred: 3+ losses on one underlying in a session
+danger    and the position size at some point exceeded the first attempt
+```
+
+`max(qty) > qty[0]`. The comparison is the identity, not a chosen multiple.
+Quantity is comparable because every strike and expiry of one underlying shares
+a lot size.
+
+**Split over the book: 15 danger, 5 caution.** Sanity-checked against the worst
+episodes:
+
+```
+2025-09-16 NIFTY  6 losses  [225, 375, 225, 225, 300, 300]      danger
+2025-08-13 NIFTY  5 losses  [75, 75, 300, 300, 225, 375]        danger
+2025-09-02 NIFTY  4 losses  [150, 150, 150, 375, 300, 1500]     danger
+2025-07-28 SENSEX 4 losses  [20, 20, 20, 20, 20]                caution
+```
+
+The last is right: four losses at constant size is persistence without
+escalation, which is the caution case and this detector's unique contribution.
+
+This is a stronger position than the two-axis table it replaces — **one
+definitional comparison, zero constants to defend** — and it is simpler to
+implement and to explain.
 
 ## What Pattern #3 uniquely contributes
 
@@ -152,8 +209,7 @@ underlying*; the others are about a trade, a position, or a pair of trades.
 |---|---|---|---|
 | `obsession_min_losses` | **3** | **definitional — KEEP** | "Repeatedly" needs a number and 3 is the smallest that means it. Unchanged. |
 | `obsession_min_reentries` | 2 | **DELETE — unreachable** | `losses` is a subset of the attempts, so `losses >= 3` implies `attempts >= 3` implies `reentries >= 2`. Minimum attempts observed across the whole book: **3**. It has never changed an outcome and cannot. |
-| severity axis A boundary | 4 | definitional | one more than the minimum; the same shape Pattern 2's repetition axis uses |
-| severity axis B | `max(qty) > qty[0]` | definitional | the identity, not a multiple |
+| severity rule | `max(qty) > qty[0]` | definitional | the identity, not a multiple. The loss-count axis was proposed and then **dropped**: the distribution has no break at 4 or anywhere else, so any boundary would be a choice presented as a fact |
 
 **Nothing is added, and one thing is removed.**
 
@@ -161,7 +217,7 @@ underlying*; the others are about a trade, a position, or a pair of trades.
 
 | # | change | effect |
 |---|---|---|
-| 1 | severity from the table above (`peak > first` × loss count), replacing `last > first` | stops the danger↔caution oscillation; 8 firings currently mis-scored; 12 caution / 8 danger over the book |
+| 1 | severity = `peak > first`, replacing `last > first` | stops the danger↔caution oscillation; 8 firings currently mis-scored; **15 danger / 5 caution** over the book |
 | 2 | delete `obsession_min_reentries` and its check | none — it cannot bind |
 | 3 | episode dedup on `(session, underlying)`, one alert per severity level | 49 firings → 20-28 alerts |
 | 4 | record `concurrent_pairs` in context; copy must not imply sequence | none to firing |
