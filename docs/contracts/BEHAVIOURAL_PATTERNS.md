@@ -1281,7 +1281,7 @@ reason goes in the notes column, not into someone's head.
 | — | *(pre-pattern hygiene)* | **COMPLETE** | 24 Aug 2026 | 24 Aug 2026 | 9 fixed, 20 deferred, commit `1a0940f` |
 | 2 | `adding_to_adverse_position` | **COMPLETE** | 24 Aug 2026 | 24 Aug 2026 | v2.0.0. Adding to an OPEN adverse position, real-time on the INCREASE fill. 65 tests + integration through the genuine pipeline. `patterns_1_and_2_closeout.md` |
 | 1 | `martingale_behaviour` | **COMPLETE** | 24 Aug 2026 | 24 Aug 2026 | v2.0.0. Escalation across ATTEMPTS after a closed loss. 58 firings -> 31, every one true to its own message. 20 tests inc. all instrument classes. `patterns_1_and_2_closeout.md` |
-| 3 | `same_symbol_obsession` | **REVIEWED — awaiting approval** | 24 Aug 2026 | — | Verdict **MODIFY**. Severity oscillates danger/caution on the same session; `obsession_min_reentries` can never bind. `same_symbol_obsession_review.md` |
+| 3 | `same_symbol_obsession` | **REVIEWED — awaiting approval** | 24 Aug 2026 | — | Verdict **MODIFY**. Contract agreed on evidence: severity by peak-vs-first x loss count (stable), `obsession_min_reentries` deleted as unreachable, episode dedup on (session, underlying). `same_symbol_obsession_review.md` + `_contract.md` |
 | 4 | `consecutive_loss_streak` | NOT STARTED | — | — | 61 alerts, most frequent |
 | 5 | `overtrading_burst` + `daily_overtrading` | NOT STARTED | — | — | reviewed together — one method, two pattern types |
 | 6 | `profit_giveaway` | NOT STARTED | — | — | 26 alerts / 12 days |
