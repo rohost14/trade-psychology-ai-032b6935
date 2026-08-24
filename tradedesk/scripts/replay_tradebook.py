@@ -230,25 +230,44 @@ async def replay_day(day, rows, capital, profile, attempts: int = 4, carry=()):
             await asyncio.sleep(2 * attempt)
 
 
-async def _clear_seed_artifacts(db):
+async def _seed_carried_positions(db, carry):
     """
-    Delete what seeding produced, keeping the position state it restored.
+    Rebuild a carried position by writing its ledger directly.
 
-    Alerts and events from an earlier session must not be attributed to the day
-    under test - that would inflate every count the replay reports. Completed
-    trades and sessions go for the same reason. The ledger, positions and trades
-    stay, because those ARE the carried position.
+    The first version replayed the carried fills through `inject`, which runs
+    the whole Celery pipeline - engine, detectors, alerts, position sync - and
+    then deleted the alerts and completed trades it had just produced. Correct,
+    and about twenty times too slow: 128 of 203 sessions carry something, some
+    of them positions built over several days, and a full run reached 21
+    sessions in two hours.
+
+    Nothing downstream needs to run. The only thing the day under test needs is
+    for PositionLedger to hold the real OPEN row and the real average, so the
+    ledger is written directly through the same service the pipeline uses. No
+    engine, no alerts, nothing to clean up afterwards.
     """
-    from sqlalchemy import delete
+    from decimal import Decimal
 
     from alertlab.runner.harness import account_id
-    from app.models.behavior_event import BehaviorEvent
-    from app.models.completed_trade import CompletedTrade
-    from app.models.risk_alert import RiskAlert
-    from app.models.trading_session import TradingSession
+    from app.services.position_ledger_service import FillData, PositionLedgerService
 
-    for model in (BehaviorEvent, RiskAlert, CompletedTrade, TradingSession):
-        await db.execute(delete(model).where(model.broker_account_id == account_id()))
+    products = infer_products(carry)
+    for r in carry:
+        signed = r["qty"] if r["side"] == "BUY" else -r["qty"]
+        await PositionLedgerService.apply_fill(
+            FillData(
+                broker_account_id=account_id(),
+                tradingsymbol=r["symbol"],
+                exchange=r["exchange"],
+                fill_order_id=r["order_id"],
+                fill_qty=signed,
+                fill_price=Decimal(str(r["price"])),
+                occurred_at=r["at"],
+                idempotency_key=f"{r['order_id']}:carry",
+                product=products.get(r["symbol"], "NRML"),
+            ),
+            db,
+        )
     await db.commit()
 
 
@@ -268,17 +287,8 @@ async def _replay_day_once(day, rows, capital, profile, carry=()):
     # otherwise be counted against this one. The ledger, positions and trades
     # are deliberately KEPT: they are the state being restored.
     if carry:
-        carry_products = infer_products(carry)
-        with lab_environment(None):
-            for r in carry:
-                with frozen_clock(r["at"]):
-                    await inject(Fill(
-                        symbol=r["symbol"], side=r["side"], qty=r["qty"],
-                        price=r["price"], at=r["at"], exchange=r["exchange"],
-                        product=carry_products.get(r["symbol"], "NRML"),
-                        order_id=r["order_id"]))
         async with factory() as db:
-            await _clear_seed_artifacts(db)
+            await _seed_carried_positions(db, carry)
 
     products = infer_products(rows)
     with lab_environment(None):
