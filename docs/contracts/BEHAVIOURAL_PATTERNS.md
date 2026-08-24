@@ -1281,21 +1281,21 @@ reason goes in the notes column, not into someone's head.
 | — | *(pre-pattern hygiene)* | **COMPLETE** | 24 Aug 2026 | 24 Aug 2026 | 9 fixed, 20 deferred, commit `1a0940f` |
 | 2 | `adding_to_adverse_position` | **COMPLETE** | 24 Aug 2026 | 24 Aug 2026 | v2.0.0. Adding to an OPEN adverse position, real-time on the INCREASE fill. 65 tests + integration through the genuine pipeline. `patterns_1_and_2_closeout.md` |
 | 1 | `martingale_behaviour` | **COMPLETE** | 24 Aug 2026 | 24 Aug 2026 | v2.0.0. Escalation across ATTEMPTS after a closed loss. 58 firings -> 31, every one true to its own message. 20 tests inc. all instrument classes. `patterns_1_and_2_closeout.md` |
-| 2 | `same_symbol_obsession` | NOT STARTED | — | — | 29 alerts / 20 danger |
-| 3 | `consecutive_loss_streak` | NOT STARTED | — | — | 61 alerts, most frequent |
-| 4 | `overtrading_burst` + `daily_overtrading` | NOT STARTED | — | — | reviewed together — one method, two pattern types |
-| 5 | `profit_giveaway` | NOT STARTED | — | — | 26 alerts / 12 days |
-| 6 | `fomo_entry` | NOT STARTED | — | — | expiry threshold question inherited from hygiene |
-| 7 | `premium_loss_event` | NOT STARTED | — | — | only source of `critical` |
-| 8 | `expiry_day_overtrading` | NOT STARTED | — | — | copy breaks the no-unsourced-statistics rule |
-| 9 | `size_escalation` | NOT STARTED | — | — | after #1 decides the family |
-| 10 | `direction_instability` | NOT STARTED | — | — | |
-| 11 | `session_meltdown` | **ON HOLD** | — | — | blocked: capital not stateable for the replay period |
-| 12 | `excess_exposure` | **ON HOLD** | — | — | blocked: same |
-| 13 | `no_stoploss` | **ON HOLD** | — | — | blocked: tradebook has no order-type column |
-| 14 | `rapid_reentry` | NOT STARTED | — | — | analytics-only |
-| 15 | `panic_exit` | **ON HOLD** | — | — | blocked: needs order types |
-| 16 | `early_exit` | NOT STARTED | — | — | analytics-only |
+| 3 | `same_symbol_obsession` | NOT STARTED | — | — | 29 alerts / 20 danger |
+| 4 | `consecutive_loss_streak` | NOT STARTED | — | — | 61 alerts, most frequent |
+| 5 | `overtrading_burst` + `daily_overtrading` | NOT STARTED | — | — | reviewed together — one method, two pattern types |
+| 6 | `profit_giveaway` | NOT STARTED | — | — | 26 alerts / 12 days |
+| 7 | `fomo_entry` | NOT STARTED | — | — | expiry threshold question inherited from hygiene |
+| 8 | `premium_loss_event` | NOT STARTED | — | — | only source of `critical` |
+| 9 | `expiry_day_overtrading` | NOT STARTED | — | — | copy breaks the no-unsourced-statistics rule |
+| 10 | `size_escalation` | NOT STARTED | — | — | after #1 decides the family |
+| 11 | `direction_instability` | NOT STARTED | — | — | |
+| 12 | `session_meltdown` | **ON HOLD** | — | — | blocked: capital not stateable for the replay period |
+| 13 | `excess_exposure` | **ON HOLD** | — | — | blocked: same |
+| 14 | `no_stoploss` | **ON HOLD** | — | — | blocked: tradebook has no order-type column |
+| 15 | `rapid_reentry` | NOT STARTED | — | — | analytics-only |
+| 16 | `panic_exit` | **ON HOLD** | — | — | blocked: needs order types |
+| 17 | `early_exit` | NOT STARTED | — | — | analytics-only |
 | 17 | `opening_5min_trap` | NOT STARTED | — | — | three windows in one detector |
 | 18 | `time_of_day_bias` | **ON HOLD** | — | — | blocked: never fired, needs a mature baseline |
 | 19 | `win_rate_collapse` | **ON HOLD** | — | — | blocked: same |
