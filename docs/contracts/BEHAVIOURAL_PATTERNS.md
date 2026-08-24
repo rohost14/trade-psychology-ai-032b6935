@@ -1267,6 +1267,51 @@ Nothing here is fixed. Nothing here is hidden.
 
 ---
 
+# REVIEW STATUS — updated as each pattern moves
+
+The live tracker. One row per pattern, in review order. Status values:
+**NOT STARTED · IN PROGRESS · ON HOLD · COMPLETE · FROZEN**.
+
+Updated at every state change, not at the end. If a pattern goes ON HOLD the
+reason goes in the notes column, not into someone's head.
+
+| # | pattern | status | started | finished | notes |
+|---|---|---|---|---|---|
+| — | *(shared foundation)* | **COMPLETE** | — | 23 Aug 2026 | F1–F5; `session_facts`, threshold ladder, maturity, confidence, instrument risk |
+| — | *(pre-pattern hygiene)* | **COMPLETE** | 24 Aug 2026 | 24 Aug 2026 | 9 fixed, 20 deferred, commit `1a0940f` |
+| 1 | `martingale_behaviour` | **IN PROGRESS** | 24 Aug 2026 | — | started; 36 replay alerts / 26 danger |
+| 2 | `same_symbol_obsession` | NOT STARTED | — | — | 29 alerts / 20 danger |
+| 3 | `consecutive_loss_streak` | NOT STARTED | — | — | 61 alerts, most frequent |
+| 4 | `overtrading_burst` + `daily_overtrading` | NOT STARTED | — | — | reviewed together — one method, two pattern types |
+| 5 | `profit_giveaway` | NOT STARTED | — | — | 26 alerts / 12 days |
+| 6 | `fomo_entry` | NOT STARTED | — | — | expiry threshold question inherited from hygiene |
+| 7 | `premium_loss_event` | NOT STARTED | — | — | only source of `critical` |
+| 8 | `expiry_day_overtrading` | NOT STARTED | — | — | copy breaks the no-unsourced-statistics rule |
+| 9 | `size_escalation` | NOT STARTED | — | — | after #1 decides the family |
+| 10 | `direction_instability` | NOT STARTED | — | — | |
+| 11 | `session_meltdown` | **ON HOLD** | — | — | blocked: capital not stateable for the replay period |
+| 12 | `excess_exposure` | **ON HOLD** | — | — | blocked: same |
+| 13 | `no_stoploss` | **ON HOLD** | — | — | blocked: tradebook has no order-type column |
+| 14 | `rapid_reentry` | NOT STARTED | — | — | analytics-only |
+| 15 | `panic_exit` | **ON HOLD** | — | — | blocked: needs order types |
+| 16 | `early_exit` | NOT STARTED | — | — | analytics-only |
+| 17 | `opening_5min_trap` | NOT STARTED | — | — | three windows in one detector |
+| 18 | `time_of_day_bias` | **ON HOLD** | — | — | blocked: never fired, needs a mature baseline |
+| 19 | `win_rate_collapse` | **ON HOLD** | — | — | blocked: same |
+| 20 | `strategy_breakdown` | **ON HOLD** | — | — | blocked: same |
+| 21 | `cooldown_violation` | NOT STARTED | — | — | cannot fire under `--no-rules` |
+| 22 | `constitution_violation` | NOT STARTED | — | — | 6 rules in one pattern type |
+| 23 | `options_premium_avg_down` | NOT STARTED | — | — | in no consolidation family |
+| 24 | `end_of_session_mis_panic` | NOT STARTED | — | — | 2 alerts |
+| 25 | `winning_streak_overconfidence` | NOT STARTED | — | — | danger tier has never fired |
+| 26 | `post_loss_recovery_bet` | NOT STARTED | — | — | 2 alerts |
+| M | `death_spiral` (meta) | NOT STARTED | — | — | after #1–#4; consumes their output |
+| P | `overexposure` / `portfolio_concentration` / `holding_loser` | NOT STARTED | — | — | separate pipeline, reviewed as a group |
+| H | `capital_mismatch` | NOT STARTED | — | — | housekeeping, not a behaviour detector |
+| 27 | `revenge_trade` | **FROZEN** | 23 Aug 2026 | — | by decision. No new threshold, no episode rule, no score, no replacement, no global confidence gate. `docs/research/REVENGE_FINAL_EVIDENCE_REVIEW.md` |
+
+---
+
 # Recommended order for the pattern reviews
 
 Ordered by *evidence available per unit of risk carried* — patterns that fire
