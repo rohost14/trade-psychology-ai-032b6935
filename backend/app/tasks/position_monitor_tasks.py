@@ -272,11 +272,11 @@ async def _holding_loser_task(broker_account_id: str, check_number: int) -> dict
             _get_redis().delete(f"holding_loser_chain:{broker_account_id}")
             return {"skipped": "no_open_positions", "check_number": check_number}
 
-        profile_result = await db.execute(
-            select(UserProfile).where(UserProfile.broker_account_id == UUID(broker_account_id))
-        )
-        profile = profile_result.scalar_one_or_none()
-        thresholds = get_thresholds(profile)
+        # A UserProfile query and a get_thresholds() call stood here until
+        # 2026-08-24. Neither result was ever read - holding_loser uses the
+        # module constants below, not the ladder - so this was one wasted DB
+        # round-trip per holding-loser check. Removed, not rewired: whether
+        # this pattern SHOULD read the ladder is a pattern-review question.
 
     alerts_fired = 0
     for pos in open_positions:

@@ -81,6 +81,11 @@ from app.core.trading_defaults import estimate_capital_at_risk
 logger = logging.getLogger(__name__)
 IST = ZoneInfo("Asia/Kolkata")
 
+#: Exit order types meaning a stop-loss was resting on the position and fired.
+#: Written out separately in panic_exit and no_stoploss until 2026-08-24; one
+#: definition so the two cannot drift apart. Values unchanged.
+_STOP_ORDER_TYPES = frozenset({"SL", "SL-M", "SLM", "SL-MKT"})
+
 # Detector code version, stored on every alert (Engine v2 Appendix A.2).
 # Bump on any detection-logic change so alerts remain attributable to the
 # logic that produced them.
@@ -1427,6 +1432,12 @@ class BehaviorEngine:
             escalation_pct = (sizes[2] - sizes[0]) / max(sizes[0], 1) * 100
             if escalation_pct >= threshold:
                 symbols = [t.tradingsymbol or "—" for t in prior]
+                # `cross` was assigned and never read, so a cross-instrument
+                # sequence - which is NOTIONAL RUPEES, not lots - was printed
+                # as "12500.0→18000.0→24000.0 qty". Same labelling martingale
+                # already does. Detection is unchanged: only the sentence is.
+                seq_str = ("→".join(f"₹{s:,.0f}" for s in sizes) if cross
+                           else "→".join(f"{int(s)}" for s in sizes) + " qty")
                 trade_list = [
                     {"symbol": t.tradingsymbol or "—", "qty": t.total_quantity or 0,
                      "pnl": float(Decimal(str(t.realized_pnl or 0)))}
@@ -1437,10 +1448,13 @@ class BehaviorEngine:
                     severity="caution",
                     message=(
                         f"{ct_underlying}: position size increased across 3 consecutive trades "
-                        f"while losing — {sizes[0]}→{sizes[1]}→{sizes[2]} qty "
+                        f"while losing — {seq_str} "
                         f"({symbols[0]} / {symbols[1]} / {symbols[2]})."
                     ),
                     context={"underlying": ct_underlying, "size_sequence": sizes,
+                             # Which unit size_sequence is in. Readers could not
+                             # tell lots from rupees before this.
+                             "cross_instrument": cross,
                              "escalation_pct": round(escalation_pct, 1),
                              "threshold_pct": threshold, "trade_list": trade_list},
                 )
@@ -1472,7 +1486,11 @@ class BehaviorEngine:
         if 0 <= gap_min <= window:
             return DetectedEvent(
                 event_type="rapid_reentry",
-                severity="info",  # Phase 4: analytics-only — profitable traders re-enter; evidence feeds revenge confidence
+                # Phase 4: analytics-only — profitable traders re-enter.
+                # This said "evidence feeds revenge confidence" until 2026-08-24.
+                # revenge_trade 3.0.0 takes its confidence from
+                # confidence.from_observables and never reads this event.
+                severity="info",
                 message=(
                     f"{ct.tradingsymbol}: re-entered {gap_min:.0f}min after a "
                     f"₹{abs(float(prior_pnl)):,.0f} loss on the same instrument."
@@ -1501,7 +1519,7 @@ class BehaviorEngine:
 
         # If exit was via SL/SL-M order → pre-planned stop, not panic. Skip.
         exit_types = {(ot or "").upper() for ot in (ctx.exit_order_types or [])}
-        if exit_types & {"SL", "SL-M", "SLM", "SL-MKT"}:
+        if exit_types & _STOP_ORDER_TYPES:
             return None
 
         return DetectedEvent(
@@ -1602,13 +1620,11 @@ class BehaviorEngine:
         if loss_count < min_losses:
             return None
 
-        def _notional(t) -> float:
-            """What the position was worth — comparable across instruments."""
-            return float(abs(t.total_quantity or 0)) * float(t.avg_entry_price or 0)
-
+        # A local _notional identical to the static method above lived here
+        # until 2026-08-24. One definition; same arithmetic.
         if cross_instrument:
-            sizes = [max(_notional(t), 1.0) for t in prior]
-            current_size = max(_notional(ct), 1.0)
+            sizes = [max(self._notional(t), 1.0) for t in prior]
+            current_size = max(self._notional(ct), 1.0)
         else:
             sizes = [t.total_quantity or 1 for t in prior]
             current_size = ct.total_quantity or 1
@@ -1930,7 +1946,12 @@ class BehaviorEngine:
         fomo_open_window_min = ctx.thresholds.get("fomo_open_window_min", 30)
         fomo_close_window_min = ctx.thresholds.get("fomo_close_window_min", 30)
         fomo_close_symbols   = ctx.thresholds.get("fomo_symbols_at_close", 3)
-        fomo_expiry_symbols  = ctx.thresholds.get("fomo_expiry_day_symbols", 2)
+        # 4, matching COLD_START_DEFAULTS and the registry. The inline default
+        # read 2 until 2026-08-24 while the resolved value has always been 4, so
+        # the 2 was unreachable. Whether 4 is the RIGHT number for expiry day -
+        # it is less sensitive than the general threshold of 3 - is a question
+        # for the fomo_entry pattern review, not a hygiene fix.
+        fomo_expiry_symbols  = ctx.thresholds.get("fomo_expiry_day_symbols", 4)
 
         entry_ist = ct.entry_time.astimezone(IST)
 
@@ -2026,7 +2047,7 @@ class BehaviorEngine:
         # shows as MKT — that edge case is acceptable; we'd still flag it, which
         # is benign (they exited consciously anyway).
         exit_types = {(ot or "").upper() for ot in (ctx.exit_order_types or [])}
-        if exit_types & {"SL", "SL-M", "SLM", "SL-MKT"}:
+        if exit_types & _STOP_ORDER_TYPES:
             return None
 
         duration = ct.duration_minutes or 0
@@ -2579,7 +2600,11 @@ class BehaviorEngine:
             return None
 
         mins_after_open = int((entry_ist - market_open).total_seconds() / 60)
-        severity = "danger" if (is_quick_reactive and is_large_loss) else "caution"
+        # A `severity = "danger" if ... else "caution"` was computed here and
+        # never used - the event below has returned a hardcoded "info" since the
+        # Phase 4 flip to analytics disposition. Removed 2026-08-24; the two
+        # flags still select the message. Whether this detector should alert at
+        # all is a question for its pattern review.
 
         if is_quick_reactive and is_large_loss:
             detail = (
@@ -2841,7 +2866,10 @@ class BehaviorEngine:
         peak_pnl = ctx.facts.peak_pnl if ctx.facts else Decimal("0")
         running_pnl = ctx.facts.pnl if ctx.facts else Decimal("0")
 
-        min_peak = Decimal(str(ctx.thresholds.get("profit_giveaway_min_peak", 1000)))
+        # 1500, matching COLD_START_DEFAULTS. The inline default read 1000 until
+        # 2026-08-24 while the resolved value has always been 1500 (and scales
+        # with capital via _CAPITAL_RATIOS), so the 1000 was unreachable.
+        min_peak = Decimal(str(ctx.thresholds.get("profit_giveaway_min_peak", 1500)))
         min_erosion = Decimal(str(ctx.thresholds.get("profit_giveaway_min_erosion", 500)))
         # Same reasoning as the revenge floor: ₹500 handed back is a bad hour for
         # one trader and a rounding error for another. Measured against their own

@@ -246,9 +246,14 @@ COLD_START_DEFAULTS: Dict[str, Any] = {
     # detector was merged into premium_loss_event, and these were left behind
     # reading to nothing. premium_loss_{caution,danger,critical}_pct replace them.
 
-    # ── Confidence signal points (Engine v2 Phase 4, master §1.4) ────────
-    # Relative importance → tunable values. Starting points, not spec constants.
-    'confidence_alert_gate':           50,   # below this: recorded as info, no alert
+    # confidence_alert_gate lived here until 2026-08-24, under a header about
+    # signal points whose four constants had already gone with the revenge
+    # rewrite. Its comment claimed alerts below 50 confidence were recorded but
+    # not shown; that had exactly one reader for its whole life - revenge_trade's
+    # deleted points score - and zero when it was removed. Keeping a constant
+    # that describes behaviour the engine does not have is worse than the gap.
+    # See docs/contracts/confidence_alert_gate_CLOSED.md. Global confidence
+    # suppression remains DEFERRED and is deliberately NOT reintroduced here.
 
     # ── Premium loss event (merged iv_crush + premium_destruction) ───────
     # Levels are % of premium lost. Expiry day shifts all levels up — deep

@@ -1,7 +1,19 @@
 # The behavioural engine as it exists today — all 33 pattern types
 
-24 Aug 2026. **Documentation and audit only. No code, thresholds, detectors or
-architecture were changed.** Baseline for the pattern-by-pattern review.
+24 Aug 2026. Baseline for the pattern-by-pattern review.
+
+**Revision 2 — post-hygiene.** Revision 1 was documentation only. A single
+pre-pattern hygiene pass then ran against it (commit below): definite bugs,
+dead machinery and stale comments only. **No behavioural definition, empirical
+threshold, severity rule, detector sensitivity, personalisation strategy or
+merge/overlap behaviour was changed.** Everything that looked questionable but
+was not provably wrong is in **DEFERRED TO PATTERN REVIEWS** at the foot of this
+document, not silently fixed.
+
+Verification after the pass: **1,078 backend tests pass** (1,047 before, +31
+new), zero failures outside `tests/production/`, which requires a live server.
+`pyflakes` is clean on `behavior_engine.py`, `trading_defaults.py` and
+`position_monitor_tasks.py` for everything except unused imports.
 
 Written from the code, not from prior documents or conversation. Every claim
 below was checked against the file and line cited. Where code and documentation
@@ -754,9 +766,14 @@ No test.
 `baseline_sessions >= tod_bias_min_sessions`. Fires caution quoting the trader's
 own win rate for that hour.
 
-**Thresholds** `tod_bias_min_sessions` 30 (**unclassified**). **`baseline_sessions`
-is not in `COLD_START_DEFAULTS` at all** — read as `ctx.thresholds.get("baseline_sessions", 0)`,
-so it defaults to 0 and the gate fails unless a baseline injects it.
+**Thresholds** `tod_bias_min_sessions` 30 (**unclassified**). `baseline_sessions`
+is not in `COLD_START_DEFAULTS`, but **it is resolved** — `threshold_resolution.py:514`
+puts it from the baseline's `sessions_analyzed` at `Source.FACT`, and `:680` puts
+0 when there is no profile.
+
+*Correction to revision 1, which said this key "has no config key" and implied the
+gate was broken. It is not: the detector is correctly silent until a baseline
+exists. It has still never fired.*
 
 **Evidence** never fired in 203 sessions. **Tests** zero mentions.
 
@@ -860,10 +877,17 @@ Participates in the "the position is too big" consolidation family, last.
 1. **Underlying extraction.** `parse_symbol(...).underlying` wrapped in
    try/except is re-implemented inline in at least eight detectors (#4, #7, #9,
    #12, #15, #16, #21, #24), three of them defining a local `_u`/`_underlying`
-   helper with identical bodies.
-2. **Notional.** `_notional` is defined as a static method on the engine
-   (`1543-1554`) **and re-defined as a local closure inside
-   `_detect_martingale_behaviour` (`1605-1607`)** with an identical body.
+   helper. **NOT centralised — DEFERRED, and this is the finding.** They are
+   *not* mechanically identical: #4 falls back to `ct.tradingsymbol or ""` when
+   `underlying` is falsy, while #15 falls back to
+   `_ps(...).underlying or ct.tradingsymbol or ""`. Those differ for any symbol
+   the parser returns an empty underlying for. Centralising would silently pick
+   one behaviour for eight detectors, which is exactly the kind of change this
+   pass must not make.
+2. ~~**Notional.** `_notional` defined as a static method AND re-defined as an
+   identical local closure inside `_detect_martingale_behaviour`.~~ **FIXED.**
+   The duplicate closure is deleted; martingale calls `self._notional`. The two
+   bodies were character-identical, so this is arithmetic-preserving.
 3. **The same-underlying-then-cross-instrument fallback** appears in four sizing
    detectors (#4, #7, #15, #21), each with its own trigger for switching
    (`len(prior)<3`, `len(prior)<2`, `len(prior_same)<2`, `len({underlyings})>1`)
@@ -872,14 +896,30 @@ Participates in the "the position is too big" consolidation family, last.
    #12, #13, #17, #18, with #13 additionally deriving monthly-vs-weekly from
    `len(parsed.expiry_key) == 7`.
 5. **Session-bound derivation.** #12 and #20 derive exchange open/close from
-   `exchange_constants`; **#19 hardcodes 09:15.**
-6. **SL order-type set.** `{"SL", "SL-M", "SLM", "SL-MKT"}` is written out twice,
-   in #6 and #13.
+   `exchange_constants`; **#19 hardcodes 09:15. NOT fixed — DEFERRED.** Aligning
+   it would change which trades the detector flags on MCX, which is a
+   behavioural change however obviously correct it looks.
+6. ~~**SL order-type set** written out twice, in #6 and #13.~~ **FIXED.**
+   Both now read the module constant `_STOP_ORDER_TYPES`; the values are
+   unchanged and `test_stop_order_types_defined_once` asserts the literal
+   appears only in the definition.
 7. **Structure counting.** `count_structures` is called by #3 (twice) and #18.
 
 # B. Shared constants and thresholds
 
-**79 `COLD_START_DEFAULTS`. 33 classified in `threshold_registry`. 46 unclassified.**
+**78 `COLD_START_DEFAULTS`. 33 classified in `threshold_registry`. 45 unclassified.**
+(79/46 before the hygiene pass removed `confidence_alert_gate`.)
+
+**Deliberately not reduced further.** A `Kind` is a claim about what a number
+*is*; assigning 45 of them in a bulk pass would be guesswork wearing the
+appearance of a decision — the same reason `DetectorSpec.frames` is empty on 26
+of 27 specs. Each is classified at its own detector's review.
+
+**The kind guard is real and was verified.** `violates_kind` is called inside
+`put()` (`threshold_resolution.py:247`) and *refuses* the resolution, keeping
+whatever was already there and recording the refusal, rather than accepting it
+silently. A `universal_safety`, `product_policy` or `user_rule` threshold cannot
+be resolved from HISTORY, SESSION or POPULATION. **KEEP AS-IS.**
 
 Classification breakdown of the 33: `personal_baseline` 13 · `fallback` 8 ·
 `universal_safety` 6 · `product_policy` 4 · `definitional` 2.
@@ -898,8 +938,7 @@ Keys read by more than one detector:
 and the ladder cannot know whether they may be personalised):
 
 `baseline_target_sessions`, `baseline_target_trades`,
-`burst_trades_per_30min_danger`, `confidence_alert_gate`,
-`consecutive_loss_danger`, `constitution_approaching_pct`,
+`burst_trades_per_30min_danger`, `consecutive_loss_danger`, `constitution_approaching_pct`,
 `constitution_severe_pct`, `daily_trade_danger`, `daily_trade_limit`,
 `direction_confusion_window_min`, `early_exit_min_samples`,
 `fomo_close_window_min`, `fomo_open_window_min`, `fomo_window_min`,
@@ -925,10 +964,10 @@ and the ladder cannot know whether they may be personalised):
 open (#19) · `100` premium cap (#17) · `0.4`, `0.5`, `8` (#26, #27) ·
 `1.5` exposure multiplier, `30`, `0.5`, `50` (A2–A4).
 
-**`confidence_alert_gate`** is in `COLD_START_DEFAULTS` with **zero readers**
-anywhere in `backend/` or `src/` — **DEAD/UNUSED**. Its comment
-(`trading_defaults.py:251`, *"below this: recorded as info, no alert"*) describes
-behaviour that no longer exists.
+**`confidence_alert_gate` is gone** (hygiene pass) — it had zero readers and a
+comment describing behaviour the engine does not have. Absent by decision, not
+by oversight; `test_engine_hygiene.py::test_confidence_alert_gate_is_gone_and_stays_gone`
+asserts it is not quietly reintroduced.
 
 # C. Shared mechanisms
 
@@ -1006,7 +1045,7 @@ CONSTITUTION PAIRS (breached rule silences the behavioural twin)
 
 | pattern | alerts in 203 sessions | why |
 |---|---|---|
-| `time_of_day_bias` | 0 | needs 30+ baseline sessions; `baseline_sessions` has no config key |
+| `time_of_day_bias` | 0 | needs 30+ baseline sessions; correctly silent without a baseline, not broken |
 | `win_rate_collapse` | 0 | needs a confident baseline; ≥8 trades/day is rare in this book |
 | `strategy_breakdown` | 0 | needs two confident baselines and both collapses |
 | `cooldown_violation` | 0 | rules disabled in replay |
@@ -1029,17 +1068,23 @@ Two of those — `daily_overtrading` (37 alerts) and `same_symbol_obsession`
 
 Shown as found; not reconciled.
 
-1. **`fomo_expiry_day_symbols`** — code `behavior_engine.py:1933` defaults to
-   **2**; `trading_defaults.py` and `threshold_registry.py` both say **4**.
-   Effective value 4, which is *less* sensitive than the general threshold of 3
-   on the day the code comments treat as most dangerous.
-2. **`profit_giveaway_min_peak`** — code `2844` defaults to **1000**;
-   `trading_defaults.py` says **1500**.
-3. **`opening_5min_trap` severity** — `2582` computes `danger`/`caution`; `2605`
-   returns hardcoded `"info"`. The computed value is dead.
-4. **`rapid_reentry` comment** — `1475` says its evidence *"feeds revenge
-   confidence"*; `revenge_trade` v3.0.0 computes confidence from
-   `confidence.from_observables` and never reads it.
+1. ~~**`fomo_expiry_day_symbols`** — inline default 2 vs configured 4.~~
+   **FIXED.** Inline default aligned to 4. `resolve_thresholds` always supplies
+   the key, so the 2 was unreachable and behaviour is unchanged. *Whether 4 is
+   the right number — it is less sensitive than the general threshold of 3 on
+   the day the comments treat as most dangerous — is DEFERRED to the `fomo_entry`
+   review.*
+2. ~~**`profit_giveaway_min_peak`** — inline default 1000 vs configured 1500.~~
+   **FIXED.** Aligned to 1500. Same reasoning: the resolved value has always
+   been 1500 and scales with capital via `_CAPITAL_RATIOS`.
+3. ~~**`opening_5min_trap` severity** — computed then discarded.~~ **FIXED.**
+   The dead `severity = "danger" if ... else "caution"` line is removed. The
+   event has returned `"info"` since the Phase 4 analytics flip and still does;
+   the two flags still select the message. *Whether this detector should alert
+   at all is DEFERRED to its review.*
+4. ~~**`rapid_reentry` comment** — claimed its evidence "feeds revenge
+   confidence".~~ **FIXED (comment only).** `revenge_trade` 3.0.0 takes its
+   confidence from `confidence.from_observables` and never reads this event.
 5. **`trigger="session"`** — the registry declares it for `early_exit`,
    `win_rate_collapse`, `strategy_breakdown` and documents that such detectors
    *"will move to EOD evaluation in Phase 4+"*. All three are called from the
@@ -1056,9 +1101,17 @@ Shown as found; not reconciled.
    *"prevents this from firing more than once per session"*; the replay shows
    26 alerts across 12 sessions.
 9. **`martingale_behaviour` ratio** — the displayed sequence includes the current
-   trade; the `max_ratio` that decides severity does not.
-10. **`confidence_alert_gate`** — present in `COLD_START_DEFAULTS` with a comment
-    describing alert suppression; zero readers. DEAD/UNUSED.
+   trade; the `max_ratio` that decides severity does not. **NOT FIXED — DEFERRED.**
+   Which trades should enter the ratio is a detector-definition question, not a
+   typo. Now pinned by `test_ratio_is_computed_from_priors_only`, which asserts
+   current behaviour so the review can change it deliberately.
+10. ~~**`confidence_alert_gate`** — defined with a comment describing alert
+    suppression it no longer performs; zero readers.~~ **FIXED.** The definition
+    and its stale "signal points" header are removed from `COLD_START_DEFAULTS`
+    (78 constants now, was 79). Verified not recreated by any floor or default
+    loop. The gate stays **absent** and global confidence suppression stays
+    **DEFERRED** — see `docs/contracts/confidence_alert_gate_CLOSED.md`. Nothing
+    was restored and no replacement was designed.
 11. **`frames`** — declared on 1 of 27 specs. The registry documents this as
     deliberate, so it is a known gap rather than a contradiction, but it means
     the "normal is not safe" invariant is machine-checkable for `revenge_trade`
@@ -1083,3 +1136,114 @@ Shown as found; not reconciled.
 | UNKNOWN | 1 | `AVERAGING_DOWN_SIZE_INCREASE_PCT` |
 
 **Reviewed: 1 of 33.**
+
+---
+
+# H. Hygiene pass — what changed, 24 Aug 2026
+
+Nine changes. Every one is a bug fix, a dead-code removal or a comment. **No
+behavioural definition, threshold value, severity rule, sensitivity, merge rule
+or personalisation strategy was touched.**
+
+| # | what was wrong | what changed | source of truth | behaviour changed? | proof |
+|---|---|---|---|---|---|
+| 1 | `fomo_entry` read inline default **2**; config and registry say **4** | inline default to 4 | `COLD_START_DEFAULTS` and `THRESHOLD_SPECS` agree on 4 | **No** — `resolve_thresholds` always supplies the key, so the 2 was unreachable | `test_inline_defaults_agree_with_cold_start_defaults` |
+| 2 | `profit_giveaway` read inline default **1000**; config says **1500** | inline default to 1500 | `COLD_START_DEFAULTS`, and the key scales via `_CAPITAL_RATIOS` | **No** — same reason | same contract test |
+| 3 | `opening_5min_trap` computed a severity and discarded it | dead line removed; returned `"info"` unchanged | Phase 4 analytics disposition in the registry | **No** | `TestOpeningTrapSeverity`, both branches |
+| 4 | `size_escalation` computed `cross` and never read it, printing a **rupee** sequence labelled **"qty"** | message labels rupees when cross-instrument; `cross_instrument` added to context | the labelling `martingale_behaviour` already does | **Message only.** Detection, threshold and severity untouched | `test_size_escalation_cross_instrument_reports_rupees_not_qty` |
+| 5 | `_notional` re-defined as an identical local closure in martingale | closure deleted, calls `self._notional` | bodies were character-identical | **No** | `TestMartingaleLadder` |
+| 6 | the SL order-type set written out in two detectors | module constant `_STOP_ORDER_TYPES` | values unchanged | **No** | `test_stop_order_types_defined_once` |
+| 7 | `confidence_alert_gate` defined with a comment describing suppression it no longer performs; zero readers | constant and its stale "signal points" header removed | `confidence_alert_gate_CLOSED.md` | **No** — verified not recreated by any floor/default loop | `test_confidence_alert_gate_is_gone_and_stays_gone` |
+| 8 | `rapid_reentry` comment claimed its evidence "feeds revenge confidence" | comment corrected | `revenge_trade` 3.0.0 uses `confidence.from_observables` | **No** — comment only | n/a |
+| 9 | `_holding_loser_task` ran a `UserProfile` query and `get_thresholds()` and read neither | dead block removed | `pyflakes`: `thresholds` assigned, never used | **No alert change.** One fewer DB round-trip per check | `pyflakes` clean |
+
+**Two traps this pass walked into and out of, recorded so the next pass does not
+repeat them.** The `profile`/`thresholds` block appears **four** times in
+`position_monitor_tasks.py` and only the one at line 279 is dead — a whole-file
+replace would have broken three live call sites. And the underlying-extraction
+helpers *look* identical across eight detectors but are not (see A.1). Both were
+caught by checking readers rather than trusting a match.
+
+**Tests added: 31**, in `backend/tests/test_engine_hygiene.py`. Suite went from
+1,047 to 1,078 passing.
+
+The most valuable of them is not a detector test.
+`test_inline_defaults_agree_with_cold_start_defaults` parses every
+`ctx.thresholds.get(key, N)` in the engine and fails if any `N` contradicts
+`COLD_START_DEFAULTS`. That closes the whole class rather than the two instances.
+
+---
+
+# DEFERRED TO PATTERN REVIEWS
+
+Nothing here is fixed. Nothing here is hidden.
+
+### Detector-definition questions — need the pattern's own evidence
+
+| item | pattern | question |
+|---|---|---|
+| expiry threshold is **4** vs general **3** | `fomo_entry` | expiry day is treated as *less* sensitive than an ordinary window. Intended? |
+| `max_ratio` excludes the current trade | `martingale_behaviour` | the displayed sequence includes it. Which is the claim? Pinned by test |
+| 30% escalation applied to **notional** in the cross-instrument branch | `size_escalation` | a threshold whose meaning was set for lots, applied to rupees |
+| `size_rising` = last qty > first qty, across possibly different strikes | `same_symbol_obsession` | raises severity a whole tier on that alone |
+| hardcoded 09:15 market open | `opening_5min_trap` | patterns 12 and 20 derive it per exchange; this does not, so it is wrong for MCX. Fixing changes what fires |
+| name says 5 minutes, threshold is 10, message says 09:15-09:25 | `opening_5min_trap` | three different windows in one detector |
+| should it alert at all? | `opening_5min_trap` | currently analytics-only with a hardcoded `info` |
+| unsourced statistics in the shipped message | `expiry_day_overtrading` | "loss rate above 85%", "statistically reduces your edge" — the registry's own copy rules forbid this |
+| `_typical_loss` reads **today's** losses only | `profit_giveaway` | the docstring describes a stable cross-session loss size |
+| 26 alerts across 12 sessions | `profit_giveaway` | the comment claims DB dedup limits it to once per session |
+| the `0.5`-of-daily-limit escalation branch | `consecutive_loss_streak` | inline literal, no key, no test, decides a danger tier |
+| the 13:00 expiry cutoff | `expiry_day_overtrading` | inline literal |
+| the `3`-flip Level 3 count | `direction_instability` | inline literal; two keys of value 10 drive the two windows |
+| `0.05` of capital as an invented daily limit | `session_meltdown` | fires on a number the trader never set |
+| the danger tier has never fired | `winning_streak_overconfidence` | 5 wins **and** 2x size never co-occurred in 203 sessions |
+| no family membership | `options_premium_avg_down` | can fire alongside every pattern describing the same re-entry |
+
+### Infrastructure deferred
+
+| item | why not now |
+|---|---|
+| centralising underlying extraction | the eight implementations differ in their fallback (A.1) |
+| centralising the same-underlying to cross-instrument fallback | four detectors, four switch conditions, three unit changes |
+| classifying the remaining 45 constants | a `Kind` is a claim; assigning them in bulk is guesswork |
+| `trigger` field semantics (`session` / `entry`) | the registry describes a Phase 4+/Phase 6 plan; 6 specs say `session` but run per trade, and 10 detectors already run at entry. Changing the field is documentation; changing execution is architecture |
+| `AVERAGING_DOWN_SIZE_INCREASE_PCT = 50` | **UNKNOWN.** Module-level in `position_monitor_tasks.py` with no corresponding pattern type. Not traced |
+| unused imports in `position_monitor_tasks.py`, `behavior_scores_service.py` | cosmetic; left to avoid widening the diff |
+
+### Research required
+
+| item | what evidence would settle it |
+|---|---|
+| `no_stoploss`, `panic_exit` | live order data — the tradebook has no order-type column, so 203 sessions say nothing about either |
+| `excess_exposure`, `session_meltdown` | a stateable capital figure; capital moved 30k-50k across the period |
+| `time_of_day_bias`, `win_rate_collapse`, `strategy_breakdown` | a trader with a mature baseline and 8-trade days. Guards are now pinned, so "correctly silent" is distinguishable from "unreachable" |
+| `revenge_trade` | **FROZEN by decision.** No new threshold, no 3-attempt episode rule, no score, no replacement detector, no global confidence gate. Findings stand in `docs/research/REVENGE_FINAL_EVIDENCE_REVIEW.md`. Revisit after other reviews and potentially after order-level data |
+
+---
+
+# Recommended order for the pattern reviews
+
+Ordered by *evidence available per unit of risk carried* — patterns that fire
+often, decide `danger`, and can actually be measured against the replay first.
+
+| order | pattern | why here |
+|---|---|---|
+| 1 | `martingale_behaviour` | 36 alerts, **26 danger** — the largest danger source. Two open definition questions (ratio excludes the current trade; the unit switch). Rich evidence |
+| 2 | `same_symbol_obsession` | 29 alerts, **20 danger**, no tests until now. Overlaps pattern 1's family and wins the other one |
+| 3 | `consecutive_loss_streak` | 61 alerts, the most frequent. One inline literal decides a danger tier |
+| 4 | `overtrading_burst` + `daily_overtrading` | 49 combined; the alias out-fires its own spec 3:1. Review together — one method, two pattern types |
+| 5 | `profit_giveaway` | 26 alerts on 12 days; a dedup claim the replay contradicts and a `_typical_loss` that does not match its docstring |
+| 6 | `fomo_entry` | 28 alerts, widest test coverage, one live semantic question |
+| 7 | `premium_loss_event` | the only source of `critical`; the instrument-derived alternative belongs to it |
+| 8 | `expiry_day_overtrading` | 28 alerts, and its shipped copy breaks the project's own no-unsourced-statistics rule |
+| 9 | `size_escalation` | 9 alerts; already loses its family to pattern 1, so review after that family is decided |
+| 10 | `direction_instability` | 10 alerts, two windows of equal value, one inline count |
+| 11-13 | `session_meltdown`, `excess_exposure`, `no_stoploss` | blocked on evidence, not on thinking — schedule after the measurable ones |
+| 14+ | analytics-only and never-fired | `rapid_reentry`, `panic_exit`, `early_exit`, `opening_5min_trap`, `time_of_day_bias`, `win_rate_collapse`, `strategy_breakdown` |
+| last | `revenge_trade` | frozen by decision; revisit only with new data |
+
+`death_spiral` should be reviewed **after** at least 1-4, because it consumes
+their output and absorbs every other alert when it fires. The three
+position-monitor patterns are a separate pipeline and should be reviewed as a
+group, not interleaved.
+
