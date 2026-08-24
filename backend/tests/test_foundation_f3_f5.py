@@ -203,6 +203,9 @@ REVIEWED_DETECTORS = {
     # Pattern #1, reviewed 2026-08-24. Uses instrument_risk for capital at
     # risk and abstains when is_comparable is False.
     "martingale_behaviour",
+    # Pattern #3, reviewed 2026-08-24. Declares STRUCTURAL only: it needs no
+    # baseline and no account denominator, just the session's own trades.
+    "same_symbol_obsession",
 }
 
 

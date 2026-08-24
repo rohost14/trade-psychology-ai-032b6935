@@ -1,6 +1,7 @@
 # Pattern #3 — `same_symbol_obsession`, final contract
 
-24 Aug 2026. **Proposed. No code changed. No threshold invented.**
+24 Aug 2026. **IMPLEMENTED.** v2.0.0, shipped after the two validation
+challenges below. No threshold invented; one constant removed.
 Follows `same_symbol_obsession_review.md`, which returned MODIFY.
 
 ---
@@ -213,7 +214,26 @@ underlying*; the others are about a trade, a position, or a pair of trades.
 
 **Nothing is added, and one thing is removed.**
 
-## Exact changes required — for approval, not implemented
+## What shipped
+
+| # | change | measured effect |
+|---|---|---|
+| 1 | severity `max(qty) > qty[0]`, replacing `last > first` | **0 firings now peak mid-episode and score caution** — was 8. Severity can no longer fall as an episode grows |
+| 2 | `obsession_min_reentries` deleted | none — it could never bind |
+| 3 | dedup key gains the underlying; the `total_loss` re-arm removed | one alert per severity level per episode |
+| 4 | `concurrent_pairs`, `size_first`, `size_peak` in context | none to firing |
+| 5 | copy: "one instrument" → "one underlying — any strike or expiry" | copy only |
+
+Firing-level severity moved from 33 danger / 16 caution to **41 / 8**; at
+episode level, which is what survives dedup, it is **15 danger / 5 caution**.
+Detection is unchanged — the gate did not move, only how it is scored and
+reported.
+
+**23 tests** in `tests/test_same_symbol_obsession.py`, including one that walks
+a real ladder attempt by attempt and asserts severity never falls. Suite: 1,203
+passing.
+
+## Superseded — the original change list
 
 | # | change | effect |
 |---|---|---|

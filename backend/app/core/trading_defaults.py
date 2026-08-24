@@ -266,7 +266,10 @@ COLD_START_DEFAULTS: Dict[str, Any] = {
 
     # ── Same symbol obsession (doc 4 P27) ────────────────────────────────
     'obsession_min_losses':             3,   # 3+ losses on one underlying today
-    'obsession_min_reentries':          2,   # after 2+ re-entries
+    # obsession_min_reentries was here until 2026-08-24. It could never
+    # bind: losses is a subset of the attempts, so losses >= 3 implies
+    # attempts >= 3 implies reentries >= 2. Minimum attempts observed
+    # across the whole reference book: 3.
 
     # ── Time-of-day bias (doc 4 P28) ─────────────────────────────────────
     'tod_bias_min_sessions':           30,   # need 30 sessions of history

@@ -89,6 +89,13 @@ def _pattern_dedup_key(pattern_type: str, details) -> str:
     """
     if pattern_type == "constitution_violation":
         return f"constitution_violation:{(details or {}).get('rule', '')}"
+    # same_symbol_obsession's subject is one UNDERLYING, so two underlyings in
+    # one session are two episodes and must not suppress each other. Latent
+    # rather than observed - no day in the reference book has obsession on two
+    # underlyings - but the key was pattern_type alone, so the second would have
+    # been swallowed by the first.
+    if pattern_type == "same_symbol_obsession":
+        return f"same_symbol_obsession:{(details or {}).get('underlying', '')}"
     return pattern_type
 
 
@@ -98,7 +105,11 @@ def _pattern_dedup_key(pattern_type: str, details) -> str:
 _WORSEN_METRIC = {
     "martingale_behaviour":   "max_ratio",
     "premium_loss_event":     "loss_pct",
-    "same_symbol_obsession":  "total_loss",
+    # same_symbol_obsession is deliberately ABSENT since 2026-08-24. It re-armed
+    # on total_loss growing 20%, which let one episode alert several times at
+    # the SAME severity - the ASIANPAINT session produced four. Its re-arm is
+    # now severity escalation alone, which _is_deduped_full already allows, so
+    # one open episode yields at most one caution and one danger.
     "constitution_violation": "ratio",
     "profit_giveaway":        "erosion_pct",  # deepening giveback re-fires
 }

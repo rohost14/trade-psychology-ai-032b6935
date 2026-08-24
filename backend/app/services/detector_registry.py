@@ -192,8 +192,14 @@ REGISTRY: Tuple[DetectorSpec, ...] = (
                  guardian_eligible=True, uses_constitution=True,
                  consumes=("session", "session_trades", "completed_trade", "thresholds")),
     # Phase 4 additions
+    # 2.0.0: Pattern #3 review, 2026-08-24. Severity now reads the PEAK size
+    # rather than the last, which stopped it oscillating danger/caution as an
+    # episode grew, and obsession_min_reentries is gone - it could never bind.
+    # Its unique contribution is persistence WITHOUT escalation: on 4 of the 20
+    # episodes in the book no other detector fires at all.
     DetectorSpec("same_symbol_obsession", "_detect_same_symbol_obsession",
-                 "1.0.0", "emotional", "alerting", "exit", 2),
+                 "2.0.0", "emotional", "alerting", "exit", 2,
+                 frames=(ReferenceFrame.STRUCTURAL,)),
     DetectorSpec("time_of_day_bias", "_detect_time_of_day_bias",
                  "1.0.0", "performance", "alerting", "exit", 1,
                  uses_baseline=True),
@@ -389,7 +395,7 @@ PATTERN_COPY: Dict[str, PatternCopy] = {
     ),
     "same_symbol_obsession": PatternCopy(
         "Repeated same instrument",
-        "Repeat trades on one instrument, and their combined result.",
+        "Repeat trades on one underlying — any strike or expiry — and their combined result.",
         "Returning to the same instrument after losses on it is persistence with the instrument, "
         "not with the strategy.",
     ),

@@ -3361,6 +3361,39 @@ class BehaviorEngine:
     # "Not trading. Chasing." Escalates to danger when position size is rising.
 
     def _detect_same_symbol_obsession(self, ctx: EngineContext) -> Optional[DetectedEvent]:
+        """
+        Coming back to the same underlying, losing on it, and coming back again.
+
+        REVIEWED 2026-08-24, Pattern #3. What this is NOT: it is not martingale,
+        which needs escalation across attempts, and not
+        adding_to_adverse_position, which needs an OPEN position being added to.
+        Its own subject is the session's relationship with ONE UNDERLYING, and
+        on 4 of the 20 episodes in the reference book no other detector fires at
+        all - repeated losing attempts at flat or falling size. Nothing else in
+        the engine sees persistence without escalation.
+
+        Two corrections, both measured:
+
+        1. Severity used `qtys[-1] > qtys[0]`. Because the last element changes
+           as the episode grows, the comparison FLIPPED - four of twenty episodes
+           changed severity across their repeats, and changed back. It also
+           missed what it existed to catch: a sequence of 75, 150, 375, 75 was
+           scored caution because only the endpoints were compared.
+
+           It is now `max(qty) > qty[0]`, which can only ever rise. When size
+           does rise in these episodes it rises a long way - minimum 1.67x,
+           median 3.00x, and not one rise below 1.5x - so the comparison
+           separates "stayed level" from "tripled" rather than splitting hairs.
+
+        2. `obsession_min_reentries` is gone. `losses` is a subset of the
+           attempts, so `losses >= 3` implies `attempts >= 3` implies
+           `reentries >= 2`. It could never bind, and the minimum attempts
+           observed across the whole book is 3.
+
+        A loss-count tier was considered for severity and REJECTED: the
+        distribution is {3: 11, 4: 6, 5: 2, 6: 1}, a smooth decay with no break
+        anywhere, so any boundary would be a choice presented as a fact.
+        """
         ct = ctx.completed_trade
         from app.services.instrument_parser import parse_symbol as _ps
 
@@ -3380,15 +3413,24 @@ class BehaviorEngine:
         ) + [ct]
 
         losses = [t for t in same if float(t.realized_pnl or 0) < 0]
-        reentries = len(same) - 1
         min_losses = ctx.thresholds.get("obsession_min_losses", 3)
-        min_reentries = ctx.thresholds.get("obsession_min_reentries", 2)
-        if len(losses) < min_losses or reentries < min_reentries:
+        if len(losses) < min_losses:
             return None
 
         total_loss = sum(abs(float(t.realized_pnl or 0)) for t in losses)
         qtys = [t.total_quantity or 1 for t in same]
-        size_rising = len(qtys) >= 2 and qtys[-1] > qtys[0]
+        # The peak, not the last. Quantity is comparable here because every
+        # strike and expiry of one underlying shares a lot size.
+        size_rising = max(qtys) > qtys[0]
+
+        # How many of these "attempts" were actually held at the same time. The
+        # count is not changed by this - excluding concurrent positions needs a
+        # rule no evidence supports - but the alert must not imply a sequence it
+        # has not checked. 24 of 49 firings in the book contain such a pair.
+        concurrent_pairs = sum(
+            1 for a, b in zip(same, same[1:])
+            if a.exit_time and b.entry_time and b.entry_time < a.exit_time
+        )
 
         return DetectedEvent(
             event_type="same_symbol_obsession",
@@ -3396,7 +3438,8 @@ class BehaviorEngine:
             message=(
                 f"{underlying}: {len(losses)} losses across {len(same)} attempts today "
                 f"(₹{total_loss:,.0f} total)"
-                + (" and position size is growing." if size_rising else ".")
+                + (f" and position size reached {max(qtys)} against {qtys[0]} at the start."
+                   if size_rising else ".")
             ),
             context={
                 "underlying": underlying,
@@ -3404,6 +3447,9 @@ class BehaviorEngine:
                 "losses": len(losses),
                 "total_loss": round(total_loss, 2),
                 "size_rising": size_rising,
+                "size_first": qtys[0],
+                "size_peak": max(qtys),
+                "concurrent_pairs": concurrent_pairs,
                 "trade_list": [
                     {"symbol": t.tradingsymbol or "—", "qty": t.total_quantity or 0,
                      "pnl": round(float(t.realized_pnl or 0), 2),
