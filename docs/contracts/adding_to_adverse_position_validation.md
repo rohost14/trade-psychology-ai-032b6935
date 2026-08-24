@@ -106,10 +106,13 @@ Examples of the first kind:
 2025-07-18  SENSEX   open 82400PE  →  new 81300PE
 ```
 
-Moving to a cheaper strike as the trade goes against you is, behaviourally, the
-same decision as averaging down. **It is covered by nothing today:** the contract
-treats it as a new position, and `options_premium_avg_down` requires the prior
-position to be **closed**.
+**WITHDRAWN 24 Aug — this paragraph originally claimed that moving to a cheaper
+strike is "behaviourally the same decision as averaging down." That was an
+overstatement from a bare count and is retracted.** Strike progression on its own
+is not evidence of anything; a trader moving strikes may be managing delta,
+rolling, or taking a different view. What the 53 cases justify is a research
+question about post-loss rotation, not a claim about this behaviour. See
+`adding_to_adverse_position_datapath.md` §5.
 
 **Recommendation: exclude it from this contract, state the exclusion explicitly,
 and open it as its own research item.** Not because it is unimportant — 53 cases
@@ -160,10 +163,11 @@ Written by `position_ledger_service.py` and driven from `trade_tasks.py`.
 **What is missing is access, not data.** `EngineContext` carries none of it, no
 detector reads `PositionLedger`, and nothing reads `num_entries`.
 
-**One caveat for the replay gate:** `replay_tradebook.py` has zero direct
-`apply_fill` calls — it drives the pipeline instead. Whether the replay populates
-`position_ledger` must be confirmed **before** the replay can validate this
-detector, otherwise the gate would pass on an empty table and prove nothing.
+**RESOLVED 24 Aug.** The caveat here was that replay ledger population needed
+confirming. It has been confirmed by running it: `replay_tradebook.py` injects
+through `process_webhook_trade`, the same task the live webhook dispatches, and
+one replay day wrote 19 `position_ledger` rows including the full averaging-down
+ladder. See `adding_to_adverse_position_datapath.md` §1.
 
 ## 4. Overlap between the related detectors — measured
 
