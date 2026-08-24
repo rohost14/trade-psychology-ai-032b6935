@@ -117,13 +117,22 @@ REGISTRY: Tuple[DetectorSpec, ...] = (
                  consumes=("completed_trade", "exit_order_types", "thresholds")),
     DetectorSpec("martingale_behaviour", "_detect_martingale_behaviour",
                  "1.1.0", "risk", "alerting", "exit", 2),
-    # 1.0.0: Pattern #1 review, 2026-08-24. The first detector to read a
-    # position's FILL SEQUENCE rather than its aggregate - a CompletedTrade
-    # folds every entry into one avg_entry_price, so an averaging-down ladder
-    # was invisible to every other detector in this list. Second detector to
-    # declare its reference frames, and the second to return a DetectorResult.
+    # 2.0.0: Pattern #1, 2026-08-24. The first detector to read a position's
+    # FILL SEQUENCE rather than its aggregate - a CompletedTrade folds every
+    # entry into one avg_entry_price, so an averaging-down ladder was invisible
+    # to every other detector in this list.
+    #
+    # The FIRST detector with trigger="entry", and the first the exit loop skips.
+    # It fires on the INCREASE fill itself: by the time a position closes, the
+    # decision to add is long past - 50 -> 40 -> 30 -> close alerts after the
+    # last one, when nothing can be done about it. Fired on the fill, the trader
+    # is looking at the position they just added to.
+    #
+    # It needs no price feed: the fill price is a market print and the running
+    # average comes from the ledger, so nothing here can be made wrong by a
+    # stale tick.
     DetectorSpec("adding_to_adverse_position", "_detect_adding_to_adverse_position",
-                 "1.0.0", "risk", "alerting", "exit", 2,
+                 "2.0.0", "risk", "alerting", "entry", 2,
                  consumes=("completed_trade", "position_fills", "strategy_group"),
                  frames=(ReferenceFrame.TRADE, ReferenceFrame.STRUCTURAL)),
     DetectorSpec("direction_instability", "_detect_direction_instability",

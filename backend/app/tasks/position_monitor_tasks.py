@@ -47,6 +47,12 @@ HOLDING_LOSER_MIN_LOSS_PCT = 0.5  # Position down at least 0.5%
 # Size increase threshold for averaging-down detection
 AVERAGING_DOWN_SIZE_INCREASE_PCT = 50   # 50%+ size increase on a loser
 
+#: How far back to read a symbol's ledger when reconstructing the OPEN position.
+#: Not a behavioural number - a query bound. The walker resets on OPEN and FLIP,
+#: so extra rows are discarded rather than misread; this only stops the query
+#: growing without limit on a symbol traded all day.
+_LEDGER_LOOKBACK_FILLS = 50
+
 
 @celery_app.task(name="app.tasks.position_monitor_tasks.monitor_open_positions")
 def monitor_open_positions():
@@ -935,6 +941,20 @@ def flush_entry_batch(broker_account_id: str):
     return asyncio.run(_flush_entry_batch(broker_account_id))
 
 
+def _adverse_add_symbols(fills) -> set:
+    """
+    Symbols in this window where the trader added to a LOSING position.
+
+    `classify_scale_in` already answered this on the fill itself, from the fill
+    price against the position average - no feed, no second opinion. This only
+    reads the answer, so the ledger is queried for symbols where an adverse add
+    genuinely happened rather than for every entry.
+    """
+    from app.services.fill_classification import ADD_TO_LOSER
+    return {f.get("symbol") for f in fills
+            if f.get("scale_in") == ADD_TO_LOSER and f.get("symbol")}
+
+
 async def _flush_entry_batch(broker_account_id: str) -> dict:
     from app.services import entry_batch_service as batch
 
@@ -995,6 +1015,15 @@ async def _flush_entry_batch(broker_account_id: str) -> dict:
         except Exception as e:
             logger.warning(f"overexposure check failed for {symbol}: {e}")
 
+        # Adding to a position that was already going against them. Gated on the
+        # batch actually containing an add-to-loser for this symbol, so a plain
+        # OPEN never touches the ledger.
+        if symbol in _adverse_add_symbols(fills):
+            try:
+                await _adverse_add_task(broker_account_id, symbol)
+            except Exception as e:
+                logger.warning(f"adverse-add check failed for {symbol}: {e}")
+
     # Account-level rules, but the copy names what was entered — which is the
     # point of coalescing: "4 positions (NIFTY… +3 more)", not one arbitrary leg.
     try:
@@ -1003,6 +1032,109 @@ async def _flush_entry_batch(broker_account_id: str) -> dict:
         logger.warning(f"entry rules check failed: {e}")
 
     return {"fills": summary["fill_count"], "symbols": summary["distinct_symbols"]}
+
+
+async def _adverse_add_task(broker_account_id: str, tradingsymbol: str) -> dict:
+    """
+    The trader just added to a position that was already going against them.
+
+    Runs on the FILL, not at exit. By the time a position closes the decision is
+    weeks old in trading terms - 50 -> 40 -> 30 -> close, and the alert arrives
+    after the last one. Fired here, the trader is looking at the position they
+    just added to.
+
+    Needs no price feed. The fill price IS a market print, and the position's
+    running average comes from the ledger, so this asks nothing of the LTP cache
+    and cannot be made wrong by a stale tick.
+    """
+    from app.core.position_fills import PositionFill
+    from app.models.position_ledger import PositionLedger
+    from app.services.behavior_engine import EngineContext, behavior_engine
+    from sqlalchemy import select, and_
+    from types import SimpleNamespace
+
+    async with SessionLocal() as db:
+        # ONE query, and it is the ledger rather than the positions table.
+        #
+        # positions is a snapshot refreshed by sync_positions, which needs a
+        # broker call - so at the instant a fill lands it may not exist yet or
+        # may still show the pre-fill quantity. The ledger is written
+        # synchronously by the same pipeline that just wrote this fill and
+        # already carries the running position and average, so it cannot race
+        # the thing that triggered it.
+        rows = list((await db.execute(
+            select(PositionLedger)
+            .where(and_(
+                PositionLedger.broker_account_id == UUID(broker_account_id),
+                PositionLedger.tradingsymbol == tradingsymbol,
+            ))
+            .order_by(PositionLedger.occurred_at.desc())
+            .limit(_LEDGER_LOOKBACK_FILLS)
+        )).scalars())[::-1]
+        if not rows:
+            return {"skipped": "no_ledger_rows"}
+
+        last = rows[-1]
+
+        # Only an INCREASE is an add. The batch gate already selects symbols
+        # whose window contained one, but the task guards itself too: dispatched
+        # from anywhere else - a retry, a future caller, a test - a DECREASE
+        # must not re-raise the alert the adds already earned.
+        if (last.entry_type or "").upper() != "INCREASE":
+            return {"skipped": f"last_fill_was_{(last.entry_type or 'unknown').lower()}"}
+
+        qty = int(last.position_qty_after or 0)
+        if qty == 0:
+            # The position closed. Whatever happened inside it is the exit-time
+            # record's business, not a live interruption.
+            return {"skipped": "position_not_open"}
+        avg_now = last.avg_entry_price_after
+        view = SimpleNamespace(
+            id=None, broker_account_id=UUID(broker_account_id),
+            tradingsymbol=tradingsymbol,
+            exchange=getattr(last, "exchange", None),
+            product=getattr(last, "product", None),
+            instrument_type=_instrument_type_of(tradingsymbol),
+            direction="LONG" if qty > 0 else "SHORT",
+            total_quantity=abs(qty),
+            avg_entry_price=avg_now,
+            avg_exit_price=None, realized_pnl=None, pnl_pct=None,
+            duration_minutes=None, entry_time=None, exit_time=None,
+            num_entries=sum(1 for r in rows
+                            if (r.entry_type or "").upper() in ("OPEN", "INCREASE")),
+            num_exits=0, closed_by_flip=False, status="open", quality_score=None,
+        )
+
+        ctx = EngineContext(
+            broker_account_id=UUID(broker_account_id),
+            session=None, completed_trade=view, session_trades=[],
+            active_cooldowns=[], thresholds={},
+            position_fills=[PositionFill.from_ledger(r) for r in rows],
+        )
+        result = behavior_engine._detect_adding_to_adverse_position(ctx)
+        if result is None or not getattr(result, "fired", False):
+            return {"skipped": "not_detected"}
+        if result.severity == "info":
+            # Recorded by the exit-time evidence path; not worth interrupting for.
+            return {"skipped": "info_not_notified"}
+
+        created = await _fire_position_alert(
+            broker_account_id,
+            "adding_to_adverse_position",
+            result.severity,
+            result.message,
+            {**(result.context or {}), "symbol": tradingsymbol, "at_fill": True},
+            db,
+        )
+        return {"fired": created, "severity": result.severity}
+
+
+def _instrument_type_of(symbol: str) -> str:
+    from app.services.instrument_parser import parse_symbol
+    try:
+        return parse_symbol(symbol or "").instrument_type or "EQ"
+    except Exception:
+        return "EQ"
 
 
 @celery_app.task(name="app.tasks.position_monitor_tasks.check_portfolio_concentration")

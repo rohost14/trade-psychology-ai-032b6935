@@ -705,6 +705,13 @@ class BehaviorEngine:
         flags = flags or {}
         events = []
         for spec in REGISTRY:
+            # trigger="entry" detectors fire on the fill, not when the position
+            # closes, and are dispatched from the entry-batch flush instead. The
+            # field was descriptive until 2026-08-24; this is the first detector
+            # that needed it to mean something. Every other spec says "exit", so
+            # nothing else changes.
+            if spec.trigger == "entry":
+                continue
             mode = detector_flags.resolve(spec.name, ctx.broker_account_id, flags)
             if mode == EFFECTIVE_OFF:
                 continue
