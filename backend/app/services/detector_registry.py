@@ -117,6 +117,15 @@ REGISTRY: Tuple[DetectorSpec, ...] = (
                  consumes=("completed_trade", "exit_order_types", "thresholds")),
     DetectorSpec("martingale_behaviour", "_detect_martingale_behaviour",
                  "1.1.0", "risk", "alerting", "exit", 2),
+    # 1.0.0: Pattern #1 review, 2026-08-24. The first detector to read a
+    # position's FILL SEQUENCE rather than its aggregate - a CompletedTrade
+    # folds every entry into one avg_entry_price, so an averaging-down ladder
+    # was invisible to every other detector in this list. Second detector to
+    # declare its reference frames, and the second to return a DetectorResult.
+    DetectorSpec("adding_to_adverse_position", "_detect_adding_to_adverse_position",
+                 "1.0.0", "risk", "alerting", "exit", 2,
+                 consumes=("completed_trade", "position_fills", "strategy_group"),
+                 frames=(ReferenceFrame.TRADE, ReferenceFrame.STRUCTURAL)),
     DetectorSpec("direction_instability", "_detect_direction_instability",
                  "2.0.0", "emotional", "alerting", "exit", 1),
     DetectorSpec("excess_exposure", "_detect_excess_exposure",
@@ -310,6 +319,14 @@ PATTERN_COPY: Dict[str, PatternCopy] = {
         "Whether a stop-loss order was on the position when it was exited.",
         "A pre-defined exit is decided before the position moves. Without one, the exit is decided "
         "while it is moving.",
+    ),
+    "adding_to_adverse_position": PatternCopy(
+        "Added to a losing position",
+        "Additions made to a position that had already moved against you, and how far "
+        "against it had moved each time.",
+        "The position that is already wrong is the one being made bigger. Each addition "
+        "lowers the price at which it has to come back, and raises what it costs if it "
+        "does not.",
     ),
     "options_premium_avg_down": PatternCopy(
         "Adding to a losing option",

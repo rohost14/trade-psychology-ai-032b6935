@@ -60,6 +60,11 @@ from app.core.detector_result import (
     abstained,
     not_detected,
 )
+from app.core.position_fills import (
+    PositionFill,
+    adverse_adds,
+    deepens_each_time,
+)
 from app.core.threshold_recorder import RecordingThresholds
 from app.core.account_risk import AccountRisk, freeze_for_session, resolve_account_risk
 from uuid import UUID, uuid4
@@ -291,6 +296,14 @@ class EngineContext:
     #: metrics. Loaded once in _load_context; previously it was fetched and
     #: then discarded after thresholds were resolved.
     profile: Optional[object] = None
+    #: The fill sequence of THIS position, oldest first, straight from
+    #: position_ledger. Empty for a single-entry position - which is ~90% of
+    #: them - so only the detectors that need the sequence pay for it.
+    #:
+    #: A CompletedTrade folds every entry into one avg_entry_price, so without
+    #: this an averaging-down ladder is invisible: 1 lot @50, add @40, add @30
+    #: arrives as a single row at 40.
+    position_fills: List[PositionFill] = field(default_factory=list)
 
     def __post_init__(self):
         # Derive rather than require. A context assembled anywhere - the engine,
@@ -546,6 +559,39 @@ class BehaviorEngine:
             except Exception as _ot_err:
                 logger.debug(f"Exit order type lookup skipped: {_ot_err}")
 
+        # Query 5: the fill sequence of THIS position, for detectors that need
+        # to see inside it rather than only its aggregate.
+        #
+        # Gated on num_entries > 1, because a single-entry position has no
+        # sequence to read - about 90% of positions on a real book - so nine
+        # trades in ten never issue this at all. Served exactly by
+        # idx_position_ledger_account_symbol (broker_account_id, tradingsymbol,
+        # occurred_at), which already exists.
+        #
+        # One query inside a run that is already per-CompletedTrade: it cannot
+        # become an N+1, because there is no loop over trades to nest it in.
+        position_fills: List[PositionFill] = []
+        if (completed_trade.num_entries or 1) > 1 and completed_trade.entry_time:
+            from app.models.position_ledger import PositionLedger as _PL
+            try:
+                _pl_result = await db.execute(
+                    select(_PL)
+                    .where(
+                        _PL.broker_account_id == broker_account_id,
+                        _PL.tradingsymbol == completed_trade.tradingsymbol,
+                        _PL.occurred_at >= completed_trade.entry_time,
+                        _PL.occurred_at <= (completed_trade.exit_time
+                                            or completed_trade.entry_time),
+                    )
+                    .order_by(_PL.occurred_at)
+                )
+                position_fills = [PositionFill.from_ledger(r)
+                                  for r in _pl_result.scalars()]
+            except Exception as _pf_err:
+                # Best-effort context, never a precondition. A detector that
+                # cannot see the sequence reports nothing rather than guessing.
+                logger.debug(f"Position fill lookup skipped: {_pf_err}")
+
         # ── Session facts: this is their ONE owner ───────────────────────────
         # Both are derived fresh from the session's CompletedTrades on every
         # call. Deriving beats incrementing here because a replay, a late fill or
@@ -613,6 +659,7 @@ class BehaviorEngine:
             thresholds=thresholds,
             strategy_group=strategy_group,
             exit_order_types=exit_order_types,
+            position_fills=position_fills,
             session_state=shadow_state,
             facts=facts,
             account_risk=account_risk,
@@ -1531,6 +1578,166 @@ class BehaviorEngine:
             ),
             context={"hold_minutes": round(hold_min, 1), "realized_pnl": float(pnl),
                      "window_min": window, "trigger_symbol": ct.tradingsymbol},
+        )
+
+    # ── Adding to an adverse position ─────────────────────────────────────
+    #
+    # The one behaviour in this engine that happens INSIDE a position rather
+    # than between two of them, and the reason ctx.position_fills exists.
+
+    #: Severity, as two ordinal axes and a table. No score, no weights, no sum.
+    #:
+    #:   A  how many times the trader added while under water
+    #:   B  whether any of those adds was at least as large as the position it
+    #:      was added to
+    #:
+    #: Both axes are definitional rather than calibrated, which is the whole
+    #: reason this shape was chosen. "More than once" needs no number - a
+    #: repetition requires two. "At least as much again" is the identity, 1.0,
+    #: not a threshold somebody picked. The review measured every percentage
+    #: candidate and found no defensible cut point in any of them: adverse depth
+    #: is one smooth mode with no gap, and the median move when adding is 10.6%
+    #: against and 10.4% in favour - the magnitude carries no information, only
+    #: the sign does.
+    #:
+    #: Indexed [A][B]. See docs/contracts/adding_to_adverse_position_contract.md
+    #: and its three validation companions.
+    _AAP_MATRIX = {
+        # A3 three or more adverse adds - 9 of 64 positions in the real book
+        3: {1: "danger", 2: "critical"},
+        # A2 did it again
+        2: {1: "caution", 2: "danger"},
+        # A1 once. Recorded rather than shouted: 46 of the 64 positions sit
+        # here, and one add while under water is a fact worth keeping, not an
+        # interruption worth making.
+        1: {1: "info", 2: "caution"},
+    }
+
+    def _detect_adding_to_adverse_position(self, ctx: EngineContext):
+        """
+        The position moved against the trader and the trader added to it.
+
+        Size is deliberately not part of whether this happened. In a year of
+        real trades, 95 of 96 adverse adds were SMALLER than 1.5x the position
+        held and the median was 0.67x - a multiplier rule sees essentially none
+        of this behaviour. What separates it from ordinary scaling is the sign
+        of the move, not its magnitude.
+
+        Strictly position-level: one symbol, one open position. A different
+        strike is a different position, and strike progression on its own is not
+        evidence of anything - that question is recorded as separate research
+        rather than folded in here.
+        """
+        from app.core import confidence as _confidence
+        from app.core.evidence import Insufficiency, positive
+        from app.core.instrument_risk import risk_basis
+
+        ct = ctx.completed_trade
+
+        if not ctx.position_fills:
+            # Either a single-entry position - the common case, and a real
+            # non-detection - or the sequence could not be read. The loader
+            # only queries when num_entries > 1, so the first reading is right
+            # whenever the position had one entry.
+            if (getattr(ct, "num_entries", 1) or 1) > 1:
+                return abstained(
+                    "adding_to_adverse_position", Insufficiency.MISSING_INPUT,
+                    "the position had multiple entries but its fill sequence "
+                    "could not be read",
+                )
+            return not_detected("adding_to_adverse_position",
+                                "the position was opened in a single fill")
+
+        # Exposure has to mean something before a claim about it can. A spread
+        # leg's denominator is known to be over-estimated, so the honest answer
+        # is to decline rather than report a ratio wrong in a known direction.
+        basis = risk_basis(
+            ct.instrument_type, ct.tradingsymbol or "", ct.direction,
+            float(ct.avg_entry_price or 0), int(ct.total_quantity or 0),
+            is_spread=ctx.strategy_group is not None,
+        )
+        if not basis.is_comparable:
+            return abstained(
+                "adding_to_adverse_position", Insufficiency.NOT_APPLICABLE,
+                f"exposure is not reliably determinable for a "
+                f"{basis.instrument.value}",
+                instrument=basis.instrument.value,
+                denominator=basis.kind.value,
+            )
+
+        adds = adverse_adds(ctx.position_fills)
+        if not adds:
+            return not_detected(
+                "adding_to_adverse_position",
+                "every addition to this position was made after a favourable "
+                "move, or the position was never added to",
+            )
+
+        a_level = min(len(adds), 3)
+        b_level = 2 if any(a.at_least_doubled_down for a in adds) else 1
+        severity = self._AAP_MATRIX[a_level][b_level]
+
+        deepest = max(adds, key=lambda a: a.adverse_pct)
+        first, last = adds[0], adds[-1]
+        deepening = deepens_each_time(adds)
+
+        exposure_at_open = risk_basis(
+            ct.instrument_type, ct.tradingsymbol or "", ct.direction,
+            first.avg_before, first.held_qty,
+            is_spread=False,
+        ).amount
+        exposure_now = basis.amount
+
+        if len(adds) == 1:
+            message = (
+                f"{ct.tradingsymbol}: added {last.added_qty} to a position "
+                f"already {last.adverse_pct:.0f}% against you "
+                f"({last.avg_before:,.2f} -> {last.fill_price:,.2f})."
+            )
+        else:
+            message = (
+                f"{ct.tradingsymbol}: added to this position {len(adds)} times "
+                f"while it moved against you, from {first.adverse_pct:.0f}% down "
+                f"to {deepest.adverse_pct:.0f}% down."
+            )
+        if b_level == 2:
+            message += " At least one addition was as large as the position it was added to."
+
+        return DetectorResult(
+            detector="adding_to_adverse_position",
+            evidence=positive("adverse add", adverse_adds=len(adds)),
+            layer=Layer.SAFETY if a_level >= 2 else Layer.PERSONAL,
+            severity=severity,
+            confidence=_confidence.from_observables(inputs_parsed=True),
+            message=message,
+            context={
+                "adverse_add_count": len(adds),
+                "deepest_adverse_pct": round(deepest.adverse_pct, 1),
+                "first_adverse_pct": round(first.adverse_pct, 1),
+                "deepens_each_time": deepening,
+                "at_least_doubled_down": b_level == 2,
+                "a_level": a_level,
+                "b_level": b_level,
+                "instrument_class": basis.instrument.value,
+                "denominator_kind": basis.kind.value,
+                "exposure_at_open": round(exposure_at_open),
+                "exposure_at_close": round(exposure_now),
+                "trigger_symbol": ct.tradingsymbol,
+                "adds": [
+                    {
+                        "index": a.index,
+                        "adverse_pct": round(a.adverse_pct, 1),
+                        "added_qty": a.added_qty,
+                        "held_qty": a.held_qty,
+                        "add_ratio": round(a.add_ratio, 2),
+                        "price": a.fill_price,
+                        "avg_before": round(a.avg_before, 2),
+                        "time_ist": (a.occurred_at.astimezone(IST).strftime("%H:%M")
+                                     if a.occurred_at else None),
+                    }
+                    for a in adds
+                ],
+            },
         )
 
     # ── Pattern 7: Martingale / averaging down ────────────────────────────

@@ -228,9 +228,60 @@ trades**. The detector itself stays pure over `ctx`, as every detector is today.
 This is still a change to `EngineContext` and one extra query, so it needs
 explicit approval before any code is written.
 
-## Status
+## Status — IMPLEMENTED 24 Aug 2026
 
-**Contract proposed. Awaiting agreement. Nothing implemented.**
+Shipped as detector `adding_to_adverse_position` v1.0.0. What was built:
+
+| piece | where |
+|---|---|
+| fill sequence + adverse-add walker | `app/core/position_fills.py` (new) |
+| `EngineContext.position_fills` | `behavior_engine.py`, gated on `num_entries > 1` |
+| the detector | `_detect_adding_to_adverse_position`, returns a `DetectorResult` |
+| registry + copy | `detector_registry.py`, frames `TRADE` + `STRUCTURAL` |
+| frontend name | `AlertContext.tsx` — required by the vocabulary contract test |
+| tests | `tests/test_adding_to_adverse_position.py`, 30 cases |
+
+### Severity — two ordinal axes, no score
+
+```
+        B1 add < held      B2 add >= held
+A1  1×      info               caution
+A2  2×      caution            danger
+A3  3×+     danger             critical
+```
+
+Both axes are **definitional, not calibrated**. "More than once" needs no
+number — a repetition requires two. "At least as much again" is the identity,
+1.0, not a value anyone picked. No percentage appears in the detector, because
+the evidence pass measured every candidate and found no defensible cut point:
+adverse depth is one smooth mode with no gap, and the median move when adding is
+10.6% against versus 10.4% in favour — **the magnitude carries no information,
+only the sign does.**
+
+### Verified on real data
+
+Replayed through the full engine path, six representative sessions:
+
+```
+2025-11-25 [critical] NIFTY25NOV26000CE: added 4 times, 15% down to 34% down
+2025-06-12 [danger]   ASIANPAINT25JUN2400CE: added 5 times, 6% down to 34% down
+2025-07-03 [caution]  NIFTY2570325500PE: added 150 to a position 34% against
+2026-01-29 [critical] SENSEX26JAN82000CE: added 4 times, 9% down to 18% down
+2025-08-12 [silent]   TITAN — adds were made after FAVOURABLE moves
+2025-04-02 [silent]   single-fill position
+```
+
+Projected over the full 175-session book: **49 alerting (34 caution, 7 danger,
+8 critical) across 40 sessions, plus 15 recorded as info.** For scale, the whole
+engine currently produces 388 alerts across 203 sessions.
+
+### A bug the tests caught before it shipped
+
+`test_flip_resets_the_counter` failed on the first run. The walker reset the
+add *counter* on a flip but kept the collected adds, so a position that reversed
+double-counted. Fixed in `position_fills.py`: `OPEN` and `FLIP` clear the list as
+well as the counter, `CLOSE` deliberately does not — a sequence ending
+`OPEN..INCREASE..CLOSE` is exactly one position and those adds are the answer.
 `martingale_behaviour` is unchanged and still carries the defects documented in
 `martingale_behaviour_review.md` — 46 of 58 firings containing a false statement,
 22 real escalations missed. Those findings stand; what changes is that fixing

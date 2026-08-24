@@ -193,7 +193,14 @@ def test_the_label_names_the_denominator_in_the_trader_s_terms():
 
 #: Detectors whose pattern review is complete. Adoption of the shared mechanisms
 #: is allowed only for these — one at a time, each behind a replay.
-REVIEWED_DETECTORS = {"revenge_trade"}
+REVIEWED_DETECTORS = {
+    "revenge_trade",
+    # Pattern #1, reviewed 2026-08-24. Reads instrument_risk for its
+    # exposure denominator and abstains when is_comparable is False.
+    # docs/contracts/adding_to_adverse_position_contract.md + three
+    # validation companions.
+    "adding_to_adverse_position",
+}
 
 
 def test_only_reviewed_detectors_consume_the_shared_mechanisms():
