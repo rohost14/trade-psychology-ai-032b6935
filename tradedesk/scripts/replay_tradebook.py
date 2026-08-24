@@ -162,7 +162,44 @@ def infer_products(day_rows):
     return {sym: ("MIS" if qty == 0 else "NRML") for sym, qty in net.items()}
 
 
-async def replay_day(day, rows, capital, profile, attempts: int = 4):
+def carry_fills(all_fills, day):
+    """
+    The fills that built any position still open when `day` begins.
+
+    WHY THIS EXISTS. The harness tears the account down between sessions so one
+    day's alerts cannot leak into the next. That is right for alerts and wrong
+    for POSITIONS: a position opened on Monday and closed on Tuesday has no OPEN
+    row on Tuesday, so PositionLedger reads Tuesday's closing SELL as opening a
+    SHORT. Every detector downstream then sees a position that never existed, in
+    the wrong direction, at the wrong price.
+
+    It is not a corner case. 128 of the 203 sessions in the reference tradebook
+    carry a position in.
+
+    Returns the fills of the OPEN position only - everything since that symbol
+    last stood flat - so the ledger can rebuild the real entry and average
+    before the day under test starts.
+    """
+    from collections import defaultdict
+
+    qty = defaultdict(int)
+    building = defaultdict(list)
+    for f in all_fills:
+        if f["date"] >= day:
+            break
+        sym = f["symbol"]
+        if qty[sym] == 0:
+            building[sym] = []
+        building[sym].append(f)
+        qty[sym] += f["qty"] if f["side"] == "BUY" else -f["qty"]
+        if qty[sym] == 0:
+            building[sym] = []
+    out = [f for sym, q in qty.items() if q != 0 for f in building[sym]]
+    out.sort(key=lambda f: f["at"])
+    return out
+
+
+async def replay_day(day, rows, capital, profile, attempts: int = 4, carry=()):
     """
     One session, retried on a dropped connection.
 
@@ -174,7 +211,7 @@ async def replay_day(day, rows, capital, profile, attempts: int = 4):
     """
     for attempt in range(1, attempts + 1):
         try:
-            return await _replay_day_once(day, rows, capital, profile)
+            return await _replay_day_once(day, rows, capital, profile, carry)
         except Exception as e:
             transient = any(s in f"{type(e).__name__}{e}".lower() for s in (
                 "connectiondoesnotexist", "connection was closed",
@@ -193,11 +230,55 @@ async def replay_day(day, rows, capital, profile, attempts: int = 4):
             await asyncio.sleep(2 * attempt)
 
 
-async def _replay_day_once(day, rows, capital, profile):
+async def _clear_seed_artifacts(db):
+    """
+    Delete what seeding produced, keeping the position state it restored.
+
+    Alerts and events from an earlier session must not be attributed to the day
+    under test - that would inflate every count the replay reports. Completed
+    trades and sessions go for the same reason. The ledger, positions and trades
+    stay, because those ARE the carried position.
+    """
+    from sqlalchemy import delete
+
+    from alertlab.runner.harness import account_id
+    from app.models.behavior_event import BehaviorEvent
+    from app.models.completed_trade import CompletedTrade
+    from app.models.risk_alert import RiskAlert
+    from app.models.trading_session import TradingSession
+
+    for model in (BehaviorEvent, RiskAlert, CompletedTrade, TradingSession):
+        await db.execute(delete(model).where(model.broker_account_id == account_id()))
+    await db.commit()
+
+
+async def _replay_day_once(day, rows, capital, profile, carry=()):
     factory = _db()
     async with factory() as db:
         await teardown_lab(db)
         await ensure_lab_account(db, capital=capital, **profile)
+
+    # Rebuild any position carried in from an earlier session, by replaying the
+    # fills that built it. The ledger then holds the real OPEN row and the real
+    # average, so a closing fill today reads as a close rather than as opening
+    # the opposite direction.
+    #
+    # What the seeding itself produces is then deleted - alerts, events,
+    # completed trades and sessions all belong to the earlier day and would
+    # otherwise be counted against this one. The ledger, positions and trades
+    # are deliberately KEPT: they are the state being restored.
+    if carry:
+        carry_products = infer_products(carry)
+        with lab_environment(None):
+            for r in carry:
+                with frozen_clock(r["at"]):
+                    await inject(Fill(
+                        symbol=r["symbol"], side=r["side"], qty=r["qty"],
+                        price=r["price"], at=r["at"], exchange=r["exchange"],
+                        product=carry_products.get(r["symbol"], "NRML"),
+                        order_id=r["order_id"]))
+        async with factory() as db:
+            await _clear_seed_artifacts(db)
 
     products = infer_products(rows)
     with lab_environment(None):
@@ -297,7 +378,13 @@ async def main() -> int:
     report, totals, session_rows = [], defaultdict(int), []
     by_day_patterns = {}
     for i, day in enumerate(days, 1):
-        alerts, positions = await replay_day(day, by_day[day], args.capital, profile)
+        # Rebuild any position carried in from an earlier session first.
+        # 128 of the 203 sessions in the reference tradebook carry one,
+        # and without this the ledger reads their closing fill as opening
+        # the opposite direction.
+        alerts, positions = await replay_day(
+            day, by_day[day], args.capital, profile,
+            carry=carry_fills(fills, day))
         skip = set(UNJUDGEABLE) | (CAPITAL_DERIVED if args.no_rules else set())
         judged = [a for a in alerts if a["pattern_type"] not in skip]
         pnl = round(sum(c["pnl"] for c in positions["closed"]), 2)
