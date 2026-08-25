@@ -61,10 +61,19 @@ real behavioural difference, and loss size sees it better than the count does.**
 returns `None`, and `resolve_thresholds` supplies no fallback. Any distribution
 here would be one I manufactured by picking a limit.
 
-**And it is already owned.** `constitution_violation`'s `daily_loss` rule fires
-at 80% / 100% / 120% of the declared limit — approaching, breached, severe. A
-second detector tiering on the same user value against a different multiple
-would be the same statement twice, in two voices, with two different cut points.
+**CORRECTION, 25 Aug — I said this was "already owned" and that was wrong.**
+`constitution_violation`'s `daily_loss` rule fires at **80% / 100% / 120%** of
+the declared limit. The streak branch fires at **50%**. Fifty is below eighty, so
+it is an **earlier rung with an additional condition attached** — half the limit
+gone *and* it went in an unbroken run — not a second voice saying the same thing.
+The two form a ladder rather than a duplication.
+
+**And it is not dead for real users either.** The onboarding wizard collects
+`daily_loss_limit` and pre-fills a suggestion at **2% of declared capital**. It
+is absent in the replay only because that run passes `--no-rules`. For a real
+trader who completed onboarding, this value exists — and because it is derived
+from their own capital at their own choosing, it adapts to account size and
+style by construction, which is exactly what a fixed count cannot do.
 
 ## Candidate C — loss as a percentage of capital
 
@@ -115,8 +124,9 @@ Reasoning, in order:
    distribution is one smooth mode with gaps only in a five-point tail. Any
    cutoff would be chosen, not found — and choosing one is exactly what this
    review is not permitted to do.
-3. **The one definitional boundary that exists — the trader's own declared limit
-   at 100% — is `constitution_violation`'s.** Using it here duplicates.
+3. **The trader's own declared limit is available and is NOT owned elsewhere at
+   this level** — see the correction above. It is the strongest reference in the
+   engine: their number, derived from their capital, collected at onboarding.
 4. **Percent of capital adds nothing** and costs validatability.
 
 So the honest position is that **no tier is supported**, and the detector should
