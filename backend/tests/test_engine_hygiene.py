@@ -168,12 +168,25 @@ def _loss_run(n, *, symbol="NIFTY25AUGFUT", qtys=None, start=-240, pnl=-500.0):
 
 
 class TestDailyOvertrading:
-    """37 alerts across 36 replay sessions and, until now, zero tests."""
+    """
+    REWRITTEN 2026-08-26 with the detector, in its Pattern #5 review.
 
-    def _run(self, n_prior, thresholds=None):
+    These tests pinned the OLD contract: a line at `daily_trade_limit` (7) with
+    a danger tier at `daily_trade_danger` (12). Both are gone from the alerting
+    path — the first because a p75-derived line alerts on a quarter of any
+    trader's sessions by construction, the second because the file that defines
+    it records "no source" while it decides a push notification.
+
+    `test_daily_danger_tier` is deleted rather than adjusted: its subject, the
+    12-tier, no longer exists. The rest move to the declared limit.
+
+    Full evidence in docs/patterns/05-overtrading/overtrading_review.md.
+    """
+
+    def _run(self, n_prior, declared=7, thresholds=None):
         priors = _loss_run(n_prior)
         ct = make_ct(pnl=-100.0, entry_offset_min=-5)
-        th = {"daily_trade_limit": 7, "daily_trade_danger": 12,
+        th = {"user_daily_trade_limit": declared,
               "burst_trades_per_30min_caution": 5, "burst_trades_per_30min_danger": 8}
         th.update(thresholds or {})
         return engine._detect_overtrading_burst(
@@ -182,17 +195,22 @@ class TestDailyOvertrading:
     def test_under_the_limit_is_silent(self):
         assert self._run(3) is None
 
-    def test_crossing_the_daily_limit_emits_daily_overtrading(self):
+    def test_crossing_the_declared_limit_emits_daily_overtrading(self):
         ev = self._run(7)
         assert ev is not None
         assert ev.event_type == "daily_overtrading", "the alias, not the spec name"
         assert ev.severity == "caution"
         assert ev.context["daily_count"] >= 7
+        assert ev.context["declared_limit"] == 7
 
-    def test_daily_danger_tier(self):
+    def test_there_is_no_second_tier_above_the_declared_limit(self):
+        """
+        `daily_trade_danger` = 12 was NOT reimplemented. Twelve positions
+        against a declared limit of 7 is exactly as loud as seven.
+        """
         ev = self._run(12)
         assert ev is not None and ev.event_type == "daily_overtrading"
-        assert ev.severity == "danger"
+        assert ev.severity == "caution"
 
 
 class TestMartingaleLadder:

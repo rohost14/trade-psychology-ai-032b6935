@@ -1191,8 +1191,10 @@ class BehaviorEngine:
 
         burst_caution = ctx.thresholds.get("burst_trades_per_30min_caution", 5)
         burst_danger  = ctx.thresholds.get("burst_trades_per_30min_danger", 8)
-        daily_caution = ctx.thresholds.get("daily_trade_limit", 7)
-        daily_danger  = ctx.thresholds.get("daily_trade_danger", 12)
+        # The daily check reads `user_daily_trade_limit` — the number the trader
+        # DECLARED — and not `daily_trade_limit`, which is the p75-derived line.
+        # See Check 2 for why.
+        declared_daily_limit = ctx.thresholds.get("user_daily_trade_limit")
 
         session_pnl = float(ctx.session.session_pnl or 0) if ctx.session else 0
 
@@ -1310,35 +1312,62 @@ class BehaviorEngine:
                         context=bctx,
                     )
 
-        # ── Check 2: daily session count ────────────────────────────────────
-        # Fires when total closed trades today cross the daily limit, regardless
-        # of whether any 30-min burst occurred. Same pattern_type, different trigger.
+        # ── Check 2: daily session count, against the DECLARED limit ────────
+        #
+        # REVIEWED 2026-08-26, Pattern #5. This fired at `daily_trade_limit`,
+        # which resolves from history as the trader's own `daily_trades_p75`.
+        # A line set at a p75 alerts on 25% of that trader's sessions BY
+        # CONSTRUCTION — for anyone, forever, however they behave. Measured on
+        # the reference book: 26%, 52 alerts. Halve your trading and the p75
+        # halves with you and still takes a quarter of your sessions. That is a
+        # quota, not a finding.
+        #
+        # And the claim it carried did not survive the book either. The copy
+        # said a heavy day "becomes momentum"; past the line this trader was
+        # SLOWER (median gap 4 -> 9 min), SMALLER (median risk 8,044 -> 7,213)
+        # and no worse (win rate 44.7% -> 42.6%, 0.4 SE). Heavy days were 26% of
+        # sessions and 2% of the book's loss, and the 141 positions taken past
+        # the line made 1,265 net. Heavy days already differ at position ONE
+        # (+14.9pp win rate), so the count is a symptom of the kind of day it
+        # is, not a cause of anything.
+        #
+        # What is left is the only version that is true by construction: the
+        # trader said they stop at N and they are at N. No declaration, no
+        # alert — the count stays visible to analytics, which computes it from
+        # the trades themselves and never needed this event.
+        #
+        # ONE severity. `daily_trade_danger` (12) is NOT read here: the file
+        # that defines it records "no source", and it reached 3 of 189 sessions
+        # while deciding a push. No approaching rung either — the constitution's
+        # own `daily_trades` rule already fires at 80% of the same declared
+        # number, and building a second voice for it is the consolidation
+        # question this review deferred.
+        if not declared_daily_limit:
+            return None
+        declared_daily_limit = int(declared_daily_limit)
+
         all_session = list(ctx.session_trades) + [ct]
         # Structures, not legs — see the burst check above.
         daily_count = count_structures_fn(all_session)
         daily_legs = len(all_session)
 
-        if daily_count >= daily_caution:
+        if daily_count >= declared_daily_limit:
             pnls_today = [float(t.realized_pnl or 0) for t in all_session]
             winning_today = sum(1 for p in pnls_today if p > 0)
             losing_today  = sum(1 for p in pnls_today if p < 0)
             total_loss_today = sum(p for p in pnls_today if p < 0)
-            severity = "danger" if daily_count >= daily_danger else "caution"
-            # Phase 4 split (master §2 3b): daily total is its own pattern —
-            # a 30-min burst and a heavy day are different behaviors with
-            # different dedup and their own constitution pairing.
             return DetectedEvent(
                 event_type="daily_overtrading",
-                severity=severity,
+                severity="caution",
                 message=(
-                    f"{daily_count} trades today"
-                    + (f", session P&L: ₹{session_pnl:+,.0f}." if session_pnl != 0 else ".")
+                    f"{daily_count} positions today — your limit is "
+                    f"{declared_daily_limit}"
+                    + (f". Session P&L: ₹{session_pnl:+,.0f}." if session_pnl != 0 else ".")
                 ),
                 context={
                     "daily_count":       daily_count,
                     "daily_legs":        daily_legs,
-                    "daily_caution":     daily_caution,
-                    "daily_danger":      daily_danger,
+                    "declared_limit":    declared_daily_limit,
                     "session_pnl":       round(session_pnl, 2),
                     "winning_count":     winning_today,
                     "losing_count":      losing_today,

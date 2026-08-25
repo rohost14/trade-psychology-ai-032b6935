@@ -312,8 +312,7 @@ export const DEMO_RISK_ALERTS = [
     created_at: daysAgo(1, 13, 0), acknowledged: false,
     details: {
       daily_count: 5,
-      daily_caution: 4,
-      daily_danger: 7,
+      declared_limit: 4,
       trades_in_window: 5,
       estimated_cost: 0,
     },

@@ -112,6 +112,13 @@ REGISTRY: Tuple[DetectorSpec, ...] = (
                          ReferenceFrame.PERSONAL, ReferenceFrame.STRUCTURAL)),
     # Emits overtrading_burst (30-min window) AND daily_overtrading (Phase 4
     # split) — version lookup for the alias lives in ALIASES below.
+    #
+    # `overtrading_burst` is DEFERRED as of the Pattern #5 review (2026-08-26)
+    # and is deliberately UNCHANGED. 13 detections, 12 alerts, 10 of 189
+    # sessions, and it never once fired alone — n is far too small to justify
+    # moving its thresholds in either direction. Absence of evidence is not
+    # evidence, so it was neither tuned nor removed. `daily_overtrading`, which
+    # shares this method, WAS changed. See docs/patterns/05-overtrading/.
     DetectorSpec("overtrading_burst", "_detect_overtrading_burst",
                  "2.0.0", "emotional", "alerting", "exit", 2,
                  uses_baseline=True, uses_constitution=True),
@@ -432,10 +439,17 @@ PATTERN_COPY: Dict[str, PatternCopy] = {
 
 #: Copy for the event types emitted under a name that is not a registry spec.
 ALIAS_COPY: Dict[str, PatternCopy] = {
+    # Copy rewritten 2026-08-26, Pattern #5. It used to say "past a certain
+    # count the day stops being a series of decisions and becomes momentum" —
+    # a claim about psychology the reference book contradicts on all three
+    # observable markers (past the line the trader was slower, smaller and no
+    # worse). The pattern now reports one thing that is true by construction:
+    # you are at or past the number you set for yourself.
     "daily_overtrading": PatternCopy(
-        "Heavy day",
-        "Total positions opened today, counting a multi-leg structure as one.",
-        "Past a certain count the day stops being a series of decisions and becomes momentum.",
+        "Past your trade limit",
+        "Positions opened today against the daily trade limit you declared, counting a "
+        "multi-leg structure as one.",
+        "You set a limit on how many positions you take in a day. This is where you reached it.",
     ),
     "death_spiral": PatternCopy(
         "Multi-domain breakdown",
