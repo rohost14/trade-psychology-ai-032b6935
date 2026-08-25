@@ -1607,7 +1607,7 @@ class BehaviorEngine:
     #: against and 10.4% in favour - the magnitude carries no information, only
     #: the sign does.
     #:
-    #: Indexed [A][B]. See docs/contracts/adding_to_adverse_position_contract.md
+    #: Indexed [A][B]. See docs/patterns/02-adding_to_adverse_position/adding_to_adverse_position_contract.md
     #: and its three validation companions.
     _AAP_MATRIX = {
         # A3 three or more adverse adds - 9 of 64 positions in the real book
@@ -1796,7 +1796,7 @@ class BehaviorEngine:
         position that is still open is `adding_to_adverse_position`, which reads
         a fill sequence this detector cannot see - a CompletedTrade folds every
         entry into one average price. The two can both be true and neither
-        implies the other. See docs/contracts/two_behaviours_not_one.md.
+        implies the other. See docs/patterns/00-shared/two_behaviours_not_one.md.
 
         Three corrections, each measured:
 

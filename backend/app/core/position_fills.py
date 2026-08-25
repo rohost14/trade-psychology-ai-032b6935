@@ -32,7 +32,7 @@ and the median add was 0.67× — a multiplier rule is blind to the behaviour.
 Adding after a FAVOURABLE move is a different thing (scaling into a position that
 is working) and is never reported here.
 
-See docs/contracts/adding_to_adverse_position_contract.md and its three
+See docs/patterns/02-adding_to_adverse_position/adding_to_adverse_position_contract.md and its three
 validation companions.
 """
 from __future__ import annotations
