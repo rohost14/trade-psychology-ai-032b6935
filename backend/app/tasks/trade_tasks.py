@@ -1071,9 +1071,8 @@ async def run_risk_detection_async(
         # ── Deduplicate with pattern-specific windows ─────────────────
         # Most patterns: 24h (once per session is enough).
         # Streak/meltdown patterns: 2h so a second episode in the same day
-        # still fires, and repeated consecutive_loss_streak escalates to danger.
+        # still fires and can escalate in severity.
         _DEDUP_HOURS = {
-            "consecutive_loss_streak": 2,
             "session_meltdown":        2,
             "profit_giveaway":         2,
         }
@@ -1311,7 +1310,7 @@ async def run_behavior_engine_full_session(broker_account_id: UUID, db) -> int:
 
     Used by the REST sync path when trades arrive in bulk (user was not in the
     app while trading).  Running the engine only on the *most recent* trade
-    misses patterns like consecutive_loss_streak and options_premium_avg_down
+    misses patterns like session_meltdown and options_premium_avg_down
     that fire on the 2nd/3rd loss in a sequence — not on a later winner.
 
     Returns the number of new alerts saved.
@@ -1377,7 +1376,6 @@ async def run_behavior_engine_full_session(broker_account_id: UUID, db) -> int:
     # Pattern-specific windows: streak/meltdown patterns use 2h so a second
     # episode in the same day can still fire.
     _DEDUP_HOURS = {
-        "consecutive_loss_streak": 2,
         "session_meltdown":        2,
         "profit_giveaway":         2,
     }

@@ -138,7 +138,6 @@ const BACKEND_TO_FRONTEND_TYPE: Record<string, string> = {
   'winning_streak_overconfidence': 'winning_streak_overconfidence',
   'panic_exit':        'early_exit',
   'rapid_reentry':     'same_instrument_chasing',
-  'consecutive_loss_streak': 'consecutive_losses',
   'options_premium_avg_down':    'options_premium_avg_down',
   'expiry_day_overtrading':      'overtrading',
   'opening_5min_trap':           'opening_5min_trap',
@@ -151,6 +150,8 @@ export function formatPatternName(patternType: string): string {
   const names: Record<string, string> = {
     'consecutive_loss':              'Consecutive Loss Spiral',
     'consecutive_losses':            'Consecutive Losses',
+    // Retired 2026-08-26. Kept because stored alert rows still carry it and a
+    // missing key renders as a title-cased raw key.
     'consecutive_loss_streak':       'Consecutive Loss Streak',
     'revenge_sizing':                'Revenge Sizing',
     'revenge_trading':               'Revenge Trading',

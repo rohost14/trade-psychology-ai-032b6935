@@ -44,7 +44,7 @@ logger = logging.getLogger(__name__)
 #: Not listed, deliberately — these need the outcome and would be answering a
 #: question they cannot see: early_exit, panic_exit, profit_giveaway,
 #: premium_loss_event (live variant already ships separately, E4),
-#: consecutive_loss_streak, win_rate_collapse, strategy_breakdown,
+#: win_rate_collapse, strategy_breakdown,
 #: time_of_day_bias, no_stoploss, opening_5min_trap.
 ENTRY_DECIDABLE = (
     "revenge_trade",

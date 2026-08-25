@@ -8,7 +8,8 @@ Covers gaps the behavior engine doesn't: P&L limit proximity and trade count lim
 - Trade count at 80% of daily limit → "N trades left in your plan"
 
 NOT included (removed to prevent spam):
-- 2 consecutive losses: behavior engine fires consecutive_loss_streak at 3 anyway.
+- 2 consecutive losses: the trader's own max_consecutive_losses rule covers this
+  (consecutive_loss_streak was retired 2026-08-26).
   Having both causes 2 pushes within seconds for the same situation.
 
 These do NOT create RiskAlert records (keeps alerts list clean).

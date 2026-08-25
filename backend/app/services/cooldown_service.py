@@ -97,7 +97,6 @@ class CooldownService:
         "session_meltdown": CooldownType.SOFT,        # BehaviorEngine
         "post_loss_recovery_bet": CooldownType.SOFT,  # BehaviorEngine
         "martingale_behaviour": CooldownType.SOFT,    # BehaviorEngine
-        "consecutive_loss_streak": CooldownType.SOFT, # BehaviorEngine
         "emotional_trading": CooldownType.SOFT,
     }
 
@@ -396,6 +395,9 @@ class CooldownService:
         except Exception:
             recent_alerts = []
 
+        # Both `consecutive_loss_streak` and `tilt_loss_spiral` are retired
+        # pattern names; stored rows can still carry them, which is why they stay
+        # readable here even though nothing emits them any more.
         HIGH_DISTRESS_TYPES = {"session_meltdown", "consecutive_loss_streak", "tilt_loss_spiral"}
         has_high_distress = any(
             a.pattern_type in HIGH_DISTRESS_TYPES and a.severity == "danger"

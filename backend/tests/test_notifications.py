@@ -174,8 +174,8 @@ class TestAlertMessageFormatting:
 
     def test_AS04_current_detector_names_are_readable(self):
         """AS-04: v2 names render as words, not snake_case, with no lookup table."""
-        msg = self._format("consecutive_loss_streak", {"consecutive_losses": 5})
-        assert "Consecutive loss streak" in msg
+        msg = self._format("martingale_behaviour", {"consecutive_losses": 5})
+        assert "Martingale behaviour" in msg
 
     def test_AS05_unknown_pattern_still_produces_a_message(self):
         """AS-05: An unseen pattern_type must format, not blow up or blank out."""

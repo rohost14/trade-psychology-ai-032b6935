@@ -1,5 +1,11 @@
 # The behavioural engine as it exists today — all 33 pattern types
 
+> **The membership below is stale, 26 Aug 2026 — the totals are not.** Pattern 2
+> ADDED `adding_to_adverse_position` and Pattern 4 RETIRED
+> `consecutive_loss_streak`, so the engine is still **27 detectors / 33 pattern
+> types** but they are not the same 27. `all_pattern_types()` is the authority.
+> See the REVIEW STATUS table and `../04-consecutive_loss_streak/STATUS.md`.
+
 24 Aug 2026. Baseline for the pattern-by-pattern review.
 
 **Revision 2 — post-hygiene.** Revision 1 was documentation only. A single
@@ -1160,7 +1166,7 @@ FIX NOW are detailed in H below; everything else is in the DEFERRED register.
 | 09:15 hardcoded in `opening_5min_trap` | #12 and #20 derive it from `exchange_constants` | **DEFER** | none — fixing changes what fires on MCX | — | — | **Yes** |
 | `martingale` `max_ratio` excludes the current trade | displayed sequence includes it | **DEFER** | pinned, not changed | — | `test_ratio_is_computed_from_priors_only` | **Yes** |
 | `same_symbol_obsession` `size_rising` compares first vs last qty across strikes | raises severity a full tier alone | **DEFER** | none | — | `TestSameSymbolObsession` (3) | **Yes** |
-| `consecutive_loss_streak` `0.5`-of-limit escalation | inline literal, no key | **DEFER** | none | — | — | **Yes** |
+| ~~`consecutive_loss_streak` `0.5`-of-limit escalation~~ | inline literal, no key | **CLOSED 26 Aug** | deleted with its detector — it had fired 0 times in 106 | — | — | No |
 | `expiry_day_overtrading` unsourced statistics in shipped copy | "loss rate above 85%" | **DEFER** | none | — | — | **Yes** |
 | `expiry_day_overtrading` 13:00 cutoff | inline literal | **DEFER** | none | — | — | **Yes** |
 | `direction_instability` 3-flip count; two keys both = 10 | inline literal | **DEFER** | none | — | — | **Yes** |
@@ -1282,7 +1288,7 @@ reason goes in the notes column, not into someone's head.
 | 2 | `adding_to_adverse_position` | **COMPLETE** | 24 Aug 2026 | 24 Aug 2026 | v2.0.0. **Corrected replay: 99 alerts / 56 days, 4/4 checks PASS, episode dedup verified in the real path.** `patterns_1_2_3_replay_closeout.md` |
 | 1 | `martingale_behaviour` | **COMPLETE** | 24 Aug 2026 | 24 Aug 2026 | v2.0.0. **Corrected replay: 39 alerts / 36 days, 5/5 definition checks PASS, multipliers hold unchanged.** `patterns_1_2_3_replay_closeout.md` |
 | 3 | `same_symbol_obsession` | **COMPLETE** | 24 Aug 2026 | 24 Aug 2026 | v2.0.0. Persistence on one underlying - the only detector that sees it WITHOUT escalation (4 of 20 episodes are invisible to everything else). Severity = peak vs first, stable by construction; `obsession_min_reentries` deleted as unreachable. 23 tests. **Corrected replay: 22 alerts / 21 days.** Entry-triggering measured and rejected — later in 14/20 episodes, never in 6. `same_symbol_obsession_contract.md` |
-| 4 | `consecutive_loss_streak` | **REVIEWED — awaiting approval** | 25 Aug 2026 | — | Verdict **MODIFY**. Trigger is chance: 63 sessions with a 3+ run observed, 63.0 expected. `04-consecutive_loss_streak/` |
+| 4 | `consecutive_loss_streak` | **RETIRED — DELETED** | 26 Aug 2026 | 26 Aug 2026 | Trigger is chance: 63 sessions with a 3+ run observed, 63.0 expected of 189. Detector deleted; the trader's own `max_consecutive_losses` rule under `constitution_violation` keeps the behaviour and gained the warning rung that was unreachable at limits 2/3/4 — including the onboarding default of 3. `04-consecutive_loss_streak/STATUS.md` |
 | 5 | `overtrading_burst` + `daily_overtrading` | NOT STARTED | — | — | reviewed together — one method, two pattern types |
 | 6 | `profit_giveaway` | NOT STARTED | — | — | 26 alerts / 12 days |
 | 7 | `fomo_entry` | NOT STARTED | — | — | expiry threshold question inherited from hygiene |

@@ -162,7 +162,7 @@ def test_outcome_dependent_detectors_are_never_asked():
     produce nonsense, so the whitelist never offers them the question.
     """
     for name in ("early_exit", "panic_exit", "profit_giveaway",
-                 "consecutive_loss_streak", "no_stoploss", "opening_5min_trap"):
+                 "no_stoploss", "opening_5min_trap"):
         assert name not in ENTRY_DECIDABLE
 
 

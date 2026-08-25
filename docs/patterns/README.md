@@ -7,12 +7,12 @@ pattern, numbered in review order.
 
 | # | pattern | status | replay (203 sessions) |
 |---|---|---|---|
-| [00](00-shared/) | *shared* — the 33-pattern baseline, the martingale/adding distinction, the replay close-out | — | **578 alerts / 203 sessions** |
+| [00](00-shared/) | *shared* — the pattern baseline (33 types at the time of writing; **32 since Pattern 4 was retired**), the martingale/adding distinction, the replay close-out | — | **578 alerts / 203 sessions** |
 | [01](01-martingale_behaviour/) | `martingale_behaviour` | **COMPLETE** | 39 alerts / 36 days |
 | [02](02-adding_to_adverse_position/) | `adding_to_adverse_position` | **COMPLETE** | 99 / 56 |
 | [03](03-same_symbol_obsession/) | `same_symbol_obsession` | **COMPLETE** | 22 / 21 |
 | [99](99-revenge_trade-FROZEN/) | `revenge_trade` | **FROZEN** by decision | 7 / 7 |
-| [04](04-consecutive_loss_streak/) | `consecutive_loss_streak` | **REVIEWED — awaiting approval** | 78 / 56 |
+| [04](04-consecutive_loss_streak/) | `consecutive_loss_streak` | **RETIRED** — deleted 26 Aug, replaced by the user's own `max_consecutive_losses` rule | was 78 / 56, now **0** |
 | — | `overtrading_burst` + `daily_overtrading` | next | 12 / 10 + 52 / 49 |
 
 The live queue for every remaining pattern is the **REVIEW STATUS** table in

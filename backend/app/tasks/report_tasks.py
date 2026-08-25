@@ -283,7 +283,6 @@ def send_weekly_summary(broker_account_id: str):
                     "overtrading": "Overtrading",
                     "burst_trading": "Overtrading",
                     "revenge_trade": "Revenge Trading",
-                    "consecutive_loss_streak": "Consecutive Loss Streak",
                     "session_meltdown": "Session Meltdown",
                     "size_escalation": "Size Escalation",
                     "excess_exposure": "Excess Exposure",

@@ -10,7 +10,7 @@ to compute net P&L). Open legs are linked retroactively once their trade closes.
 Why this matters
 ----------------
 Without strategy awareness, the BehaviorEngine fires false alerts:
-  - consecutive_loss_streak on a single losing leg of a profitable straddle
+  - martingale_behaviour on a single losing leg of a profitable straddle
   - revenge_trade when adjusting a position (closing one strike, opening another)
   - size_escalation when adding a hedge leg (which REDUCES risk, not increases it)
 

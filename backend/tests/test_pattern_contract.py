@@ -178,6 +178,10 @@ def test_no_shipping_module_uses_a_severity_value_outside_the_vocabulary():
 #: against these is dead code that looks alive.
 RETIRED_PATTERN_NAMES = (
     "revenge_sizing",
+    # Retired 2026-08-26: the trigger was chance (63 sessions with a 3+ loss run
+    # against 63.0 expected from the win rate alone). The trader's own
+    # max_consecutive_losses rule under constitution_violation replaces it.
+    "consecutive_loss_streak",
     "tilt_loss_spiral",
     "iv_crush_behavior",
     "options_direction_confusion",

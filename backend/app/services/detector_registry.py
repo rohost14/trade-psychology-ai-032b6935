@@ -92,10 +92,17 @@ class DetectorSpec:
     frames: tuple = ()
 
 
+# RETIRED 2026-08-26 — `consecutive_loss_streak`. It was the engine's most
+# frequent alert and its trigger was chance: across 189 sessions, 63 contained a
+# 3+ loss run against 63.0 expected from the trader's 39.9% win rate alone. A run
+# of losses is what that win rate produces on its own, so the run is not evidence
+# of a changed state and severity derived from the count was derived from noise.
+# The behaviour worth alerting on — "you are approaching / have crossed the
+# consecutive-loss limit YOU set" — is the `max_consecutive_losses` rule of
+# `constitution_violation`, which reads the same canonical streak against the
+# trader's own declared number instead of ours. See
+# docs/patterns/04-consecutive_loss_streak/.
 REGISTRY: Tuple[DetectorSpec, ...] = (
-    DetectorSpec("consecutive_loss_streak", "_detect_consecutive_loss_streak",
-                 "1.1.0", "emotional", "alerting", "exit", 2,
-                 uses_baseline=True, uses_constitution=True),
     # 3.0.0: rewritten to the frozen A x B contract 2026-08-23. First detector
     # to declare its reference frames and the first to return a DetectorResult.
     DetectorSpec("revenge_trade", "_detect_revenge_trade",
@@ -278,12 +285,6 @@ PATTERN_COPY: Dict[str, PatternCopy] = {
         "Re-entering the same instrument shortly after closing it at a loss.",
         "The setup that just failed has not changed in those few minutes. The re-entry is a "
         "second attempt at the same idea at a worse moment.",
-    ),
-    "consecutive_loss_streak": PatternCopy(
-        "Consecutive losses",
-        "Losing trades in an unbroken run within one session.",
-        "After several losses in a row the next decision carries the weight of the previous ones "
-        "instead of standing on its own.",
     ),
     "session_meltdown": PatternCopy(
         "Session breakdown",

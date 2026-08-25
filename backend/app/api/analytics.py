@@ -3219,7 +3219,7 @@ async def get_session_log(
         patterns_by_day[d][detector] = int(n)
 
     # dominant-behaviour tag from the day's patterns
-    REVENGE = {"revenge_trade", "rapid_reentry", "post_loss_recovery_bet", "consecutive_loss_streak"}
+    REVENGE = {"revenge_trade", "rapid_reentry", "post_loss_recovery_bet"}
     SIZING  = {"size_escalation", "martingale_behaviour"}
 
     def _tag(pats: dict, alerts_fired: int) -> str:

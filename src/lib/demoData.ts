@@ -662,7 +662,7 @@ export const DEMO_RISK_METRICS = {
     { pattern_type: 'daily_overtrading',             count: 2, last_detected: daysAgo(6, 11, 55) },
     { pattern_type: 'no_stoploss',             count: 2, last_detected: daysAgo(3, 12, 10) },
     { pattern_type: 'opening_5min_trap',       count: 1, last_detected: daysAgo(6, 9, 18) },
-    { pattern_type: 'consecutive_loss_streak', count: 1, last_detected: daysAgo(1, 15, 5) },
+    { pattern_type: 'constitution_violation', count: 1, last_detected: daysAgo(1, 15, 5) },
   ],
   recent_alerts: [],
 };
@@ -1141,7 +1141,7 @@ export const DEMO_SESSION_LOG = {
     { date: '2026-07-31', pnl: -1000, trades: 1, alerts: 1,
       tag: 'overtrading', top_patterns: ['overtrading'] },
     { date: '2026-07-30', pnl: -7410, trades: 4, alerts: 5,
-      tag: 'revenge',     top_patterns: ['revenge_trade', 'size_escalation', 'consecutive_loss_streak'] },
+      tag: 'revenge',     top_patterns: ['revenge_trade', 'size_escalation', 'rapid_reentry'] },
     { date: '2026-07-29', pnl: 8550,  trades: 2, alerts: 0,
       tag: 'clean',       top_patterns: [] },
   ],

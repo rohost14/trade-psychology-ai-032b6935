@@ -19,8 +19,8 @@ Severity vocabulary:
   "danger"  — HIGH risk, action required
   "caution" — MEDIUM risk, awareness needed
 
-Patterns (18 real-time, per CompletedTrade):
-  1.  consecutive_loss_streak
+Patterns (real-time, per CompletedTrade). Numbering is historical — gaps are
+retirements, not omissions; detector_registry.REGISTRY is the authority:
   2.  revenge_trade
   3.  overtrading_burst          (burst + daily count)
   4.  size_escalation
@@ -673,7 +673,6 @@ class BehaviorEngine:
         "revenge_trade",
         "martingale_behaviour",
         "size_escalation",
-        "consecutive_loss_streak",
         # Suppress for multi-leg hedges: buying a CE + PE simultaneously is
         # not rapid re-entry, missing stop-loss, or a recovery bet — it is a
         # defined strategy (straddle/strangle/spread). strategy_group is set by
@@ -772,7 +771,6 @@ class BehaviorEngine:
         # behavioral event is still recorded and still feeds state/scores.
         _CONSTITUTION_PAIRS = {
             "cooldown":               ("revenge_trade",),
-            "max_consecutive_losses": ("consecutive_loss_streak",),
             "daily_trades":           ("overtrading_burst", "daily_overtrading"),
             "max_trade_risk":         ("excess_exposure",),
             "daily_loss":             ("session_meltdown",),
@@ -908,80 +906,6 @@ class BehaviorEngine:
                 )
             for e in others:
                 e.suppressed_reason = "merged_into_rule_breach"
-
-    # ── Pattern 1: Consecutive loss streak ────────────────────────────────
-
-    def _detect_consecutive_loss_streak(self, ctx: EngineContext) -> Optional[DetectedEvent]:
-        # HIGH-1 fix: session_trades excludes the current trade — include it so
-        # the 5th consecutive loss correctly triggers danger (not the 6th).
-        all_trades = session_facts.in_exit_order(
-            list(ctx.session_trades) + [ctx.completed_trade]
-        )
-        if not all_trades:
-            return None
-
-        # The streak itself comes from the canonical definition, not from a
-        # count written here. Three other places used to count it their own way.
-        streak = ctx.facts.consecutive_losses if ctx.facts else 0
-        if streak == 0:
-            return None
-
-        total_loss = Decimal("0")
-        losing_trades = []
-        for _t in all_trades[-streak:]:
-            pnl = Decimal(str(_t.realized_pnl or 0))
-            total_loss += abs(pnl)
-            losing_trades.append({
-                "symbol": _t.tradingsymbol or "—",
-                "pnl": float(pnl),
-                "qty": _t.total_quantity or 0,
-                "exit_time_ist": _t.exit_time.astimezone(IST).strftime("%H:%M") if _t.exit_time else None,
-            })
-
-        caution = ctx.thresholds.get("consecutive_loss_caution", 3)
-        danger  = ctx.thresholds.get("consecutive_loss_danger", 5)
-
-        if streak >= danger:
-            return DetectedEvent(
-                event_type="consecutive_loss_streak",
-                severity="danger",
-                message=(
-                    f"{streak} consecutive losing trades — ₹{total_loss:,.0f} total loss."
-                ),
-                context={"streak": streak, "total_loss": float(total_loss),
-                         "threshold": danger, "losing_trades": losing_trades},
-            )
-        # A streak's severity was decided by COUNT alone, so three trades that
-        # lost ₹12,000 came out as caution while five that lost ₹1,500 came out
-        # as danger. That is backwards from how the day actually felt. If the
-        # run has already eaten half the limit the trader set for themselves,
-        # it is a danger regardless of how few trades it took.
-        _limit = ctx.thresholds.get("daily_loss_limit")
-        if (streak >= caution and _limit and
-                float(total_loss) >= float(_limit) * 0.5):
-            return DetectedEvent(
-                event_type="consecutive_loss_streak",
-                severity="danger",
-                message=(
-                    f"{streak} consecutive losing trades — ₹{total_loss:,.0f} total loss, "
-                    f"{float(total_loss) / float(_limit) * 100:.0f}% of your daily limit."
-                ),
-                context={"streak": streak, "total_loss": float(total_loss),
-                         "threshold": caution, "losing_trades": losing_trades,
-                         "escalated_by": "loss_size"},
-            )
-
-        if streak >= caution:
-            return DetectedEvent(
-                event_type="consecutive_loss_streak",
-                severity="caution",
-                message=(
-                    f"{streak} consecutive losing trades — ₹{total_loss:,.0f} total loss."
-                ),
-                context={"streak": streak, "total_loss": float(total_loss),
-                         "threshold": caution, "losing_trades": losing_trades},
-            )
-        return None
 
     # ── Pattern 2: Revenge trade ──────────────────────────────────────────
 
@@ -3284,18 +3208,38 @@ class BehaviorEngine:
         # ── Rule: max consecutive losses ──────────────────────────────────
         max_consec = th.get("max_consecutive_losses")
         if max_consec:
-            # Canonical streak, same as consecutive_loss_streak reads. This used
-            # to count its own, so a trader's declared rule and the engine's
-            # detector could in principle disagree about the same run.
+            # Canonical streak — the same session fact the retired
+            # `consecutive_loss_streak` detector read. Since that retirement
+            # (2026-08-26) this is the only place a losing run is alerted on, and
+            # it is judged against the trader's OWN declared stop point rather
+            # than a count the engine picked. See docs/patterns/04-*.
             streak = ctx.facts.consecutive_losses if ctx.facts else 0
+            limit = int(max_consec)
             ratio = streak / float(max_consec)
             sev = ladder(ratio)
+            # The percentage ladder cannot express "one away" on a small integer
+            # rule. A streak moves in whole trades, and 0.80 x 3 = 2.4 and
+            # 0.80 x 4 = 3.2 both round up to the limit itself — so for limits of
+            # 2, 3 and 4 the first streak that clears `approaching` IS the
+            # breach, and the warning rung can never fire. The onboarding default
+            # is 3, so most traders got the breach with no run-up at all.
+            #
+            # No multiplier is needed to fix it, because "approaching" has an
+            # exact meaning for a whole-number rule: one more loss breaks it.
+            if sev is None and limit >= 2 and streak == limit - 1:
+                sev = "caution"
             if sev:
-                verb = "breached" if ratio >= 1.0 else "approaching"
-                add("max_consecutive_losses", sev,
-                    f"Your consecutive-loss rule {verb}: {streak} losses in a row "
-                    f"(your stop point: {int(max_consec)}).",
-                    {"limit": int(max_consec), "current": streak, "ratio": round(ratio, 2)})
+                if ratio >= 1.0:
+                    msg = (f"Your consecutive-loss rule breached: {streak} losses "
+                           f"in a row (your stop point: {limit}).")
+                elif streak == limit - 1:
+                    msg = (f"One more loss breaks your consecutive-loss rule: "
+                           f"{streak} losses in a row (your stop point: {limit}).")
+                else:
+                    msg = (f"Your consecutive-loss rule approaching: {streak} "
+                           f"losses in a row (your stop point: {limit}).")
+                add("max_consecutive_losses", sev, msg,
+                    {"limit": limit, "current": streak, "ratio": round(ratio, 2)})
 
         # ── Rule: cooldown after loss (binary) ────────────────────────────
         cooldown_min = th.get("user_cooldown_min")

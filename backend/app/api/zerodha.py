@@ -873,7 +873,7 @@ async def sync_all_data(
 
             # BehaviorEngine — full session replay for bulk-synced trades.
             # Replays engine on EACH of today's CompletedTrades in order so patterns
-            # like consecutive_loss_streak and options_premium_avg_down fire correctly
+            # like session_meltdown and options_premium_avg_down fire correctly
             # even when the user was not in the app during trading (trades arrived via REST
             # sync rather than webhooks). Dedup (24h window) prevents duplicate alerts.
             try:

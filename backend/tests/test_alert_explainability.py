@@ -130,9 +130,13 @@ def test_it_is_still_an_ordinary_dict_for_detectors():
 @pytest.mark.asyncio
 async def test_a_stored_event_carries_the_thresholds_it_was_judged_against(db, broker):
     """
-    Five losses in a row fires consecutive_loss_streak. The stored event must say
-    what the danger threshold was, so the alert can be reconstructed when that
-    number has since moved.
+    Five losses on one underlying fires same_symbol_obsession. The stored event
+    must say what threshold it was judged against, so the alert can be
+    reconstructed when that number has since moved.
+
+    Retargeted 2026-08-26: this used consecutive_loss_streak as its vehicle,
+    which was retired. The mechanism under test is the recorder, not the
+    detector — any detector that reads a threshold exercises it.
     """
     result = None
     for i in range(5):
@@ -141,15 +145,15 @@ async def test_a_stored_event_carries_the_thresholds_it_was_judged_against(db, b
             broker_account_id=broker.id, completed_trade=ct, db=db
         )
 
-    streak_events = [e for e in result.events if e.detector == "consecutive_loss_streak"]
-    assert streak_events, "the streak detector did not fire on five losses"
+    events = [e for e in result.events if e.detector == "same_symbol_obsession"]
+    assert events, "same_symbol_obsession did not fire on five losses"
 
-    evidence = streak_events[0].evidence or {}
+    evidence = events[0].evidence or {}
     thresholds = evidence.get("_thresholds")
     assert thresholds, "the event cannot say what it was judged against"
-    assert "consecutive_loss_danger" in thresholds
+    assert "obsession_min_losses" in thresholds
 
-    entry = thresholds["consecutive_loss_danger"]
+    entry = thresholds["obsession_min_losses"]
     assert "value" in entry and "source" in entry, (
         "a threshold without its origin is half an explanation"
     )
@@ -186,8 +190,8 @@ async def test_evidence_still_carries_the_detector_context(db, broker):
             broker_account_id=broker.id, completed_trade=ct, db=db
         )
 
-    streak = [e for e in result.events if e.detector == "consecutive_loss_streak"][0]
-    evidence = streak.evidence or {}
+    event = [e for e in result.events if e.detector == "same_symbol_obsession"][0]
+    evidence = event.evidence or {}
     assert any(k for k in evidence if not k.startswith("_")), (
         "detector context was lost when the thresholds were added"
     )
