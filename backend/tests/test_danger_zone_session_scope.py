@@ -10,6 +10,11 @@ start a hard cooldown and send a WhatsApp message about a run that had ended two
 days earlier. The alert engine, counting within the session, was silent about the
 same trader at the same moment.
 
+(The 3/5/7 ladder named above was itself removed on 2026-08-26 — the trigger now
+reads the trader's declared `max_consecutive_losses` and nothing else. Session
+scoping, which is what this file is about, is unaffected: it decides WHICH losses
+count, not how many are too many. See test_danger_zone_consecutive_losses.py.)
+
 The danger zone now reads `session_facts`, like everything else. It therefore
 fires LESS than it used to, and these tests pin the difference in both
 directions: yesterday's losses must not carry, today's must still count.
@@ -21,6 +26,7 @@ import pytest
 
 from app.core import session_facts
 from app.models.completed_trade import CompletedTrade
+from app.models.user_profile import UserProfile
 from app.services.danger_zone_service import danger_zone_service
 
 
@@ -76,16 +82,28 @@ async def test_yesterdays_losses_do_not_carry_into_todays_streak(db, broker):
 
 @pytest.mark.asyncio
 async def test_todays_losses_still_escalate(db, broker):
-    """The change narrows the scope. It must not blunt the detector."""
+    """
+    The change narrows the scope. It must not blunt the trigger.
+
+    RETARGETED 2026-08-26. This used to reach `critical` on seven losses via the
+    fixed 3/5/7 ladder, which is gone — the trigger now reads only the trader's
+    declared `max_consecutive_losses`. The subject of this test is session
+    scoping, not the tiers, so the trader is given a rule and the assertion
+    stays: today's losses still count. Its partner above asserts the other
+    direction, that yesterday's do not.
+    """
     today = session_facts.session_date_now()
+    db.add(UserProfile(broker_account_id=broker.id, max_consecutive_losses=4))
+    await db.flush()
+
     for i in range(7):
         await _loss(db, broker, today, 30 + i * 15)
 
     status = await danger_zone_service.assess_danger_level(db, broker.id)
 
     assert status.consecutive_losses == 7
-    assert status.level.value in ("danger", "critical")
-    assert any(t.startswith("consecutive_loss") for t in status.triggers)
+    assert status.level.value == "danger"
+    assert "consecutive_loss_danger" in status.triggers
 
 
 @pytest.mark.asyncio

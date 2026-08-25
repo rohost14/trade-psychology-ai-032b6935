@@ -134,15 +134,19 @@ Four tests were deleted with their subject (`test_no_alert_on_winner`,
 
 ## Known limitations, recorded not closed
 
-1. **`danger_zone_service` still makes the deleted claim.** It reads
-   `consecutive_loss_caution` / `consecutive_loss_danger` independently of the
-   engine and returns *"5 consecutive losses. Take a break."* at `DANGER`,
-   wired live through `/api/danger-zone` and the post-sync path in
-   `api/zerodha.py`. **That is the same count-based assertion this decision
-   removed, on a different surface.** Not changed here — it is a separate
-   service with its own thresholds and API contract, and it needs its own
-   review. **The two thresholds stay in `trading_defaults.py` because of this
-   reader**; they are dead to the engine but not to the product.
+1. ~~**`danger_zone_service` still makes the deleted claim.**~~ **CLOSED 26 Aug**
+   — reviewed and fixed the same day, see `danger_zone_service_review.md`. It ran
+   the same claim on a 3 / 5 / 7 ladder off the same two threshold keys, and
+   escalated to a WhatsApp to the trader's *guardian* at 7. It now reads the
+   trader's declared `max_consecutive_losses` and nothing else: `limit - 1` →
+   WARNING, `>= limit` → DANGER, **no rung above the limit** (no `1.2x` tier —
+   `constitution_violation` owns severe, and nothing evidences a second level
+   above the trader's own line), and **no declaration means no check at all**.
+   Consecutive losses can no longer reach a guardian.
+   **`consecutive_loss_caution` / `consecutive_loss_danger` stay in
+   `trading_defaults.py`** — they keep readers in `api/behavioral.py`,
+   `api/constitution.py`, `api/profile.py` and the resolution ladder, but they
+   now have **zero detector readers** and are configuration/display values only.
 2. **`daily_trades` has the identical unreachable-warning defect.**
    `ceil(0.80 × 3)` is 3 for a trade limit as well. Left for the
    `overtrading_burst` / `daily_overtrading` review, which owns that rule.

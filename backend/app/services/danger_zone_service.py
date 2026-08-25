@@ -11,7 +11,8 @@ Danger Zone Triggers:
 1. Loss Limit Breach (CRITICAL) - Immediate hard cooldown + WhatsApp
 2. Approaching Loss Limit (WARNING) - Soft warning + optional notification
 3. Pattern Detection (WARNING) - Contextual intervention based on pattern
-4. Consecutive Losses (GRADUATED) - Escalating cooldowns
+4. Consecutive Losses - against the trader's own declared max_consecutive_losses
+   only; no declared rule means no check (see assess_danger_level)
 5. Overtrading (SOFT) - Warning + suggestion
 """
 
@@ -107,10 +108,10 @@ class TriggerThresholds:
     trades_per_hour_warning: int = 15
     trades_per_hour_danger: int = 25
 
-    # Consecutive losses
-    consecutive_loss_warning: int = 2
-    consecutive_loss_danger: int = 3
-    consecutive_loss_critical: int = 5
+    # (Consecutive-loss fields removed 2026-08-26. They were already dead —
+    # the assessment read `trader_thresholds`, never `self.thresholds`, for
+    # these — and the ladder they described is gone. The rule is now the
+    # trader's declared `max_consecutive_losses`.)
 
     # Time-based (avoid trading during bad times for user)
     # These would be personalized per user
@@ -218,28 +219,55 @@ class DangerZoneService:
             triggers.append("loss_limit_warning")
             recommendations.append("Consider reducing position sizes.")
 
-        # Profile-derived consecutive loss thresholds (3-tier system)
-        consec_caution = trader_thresholds['consecutive_loss_caution']   # e.g. 3
-        consec_danger  = trader_thresholds['consecutive_loss_danger']    # e.g. 5
-        consec_critical = consec_danger + 2                              # e.g. 7
-
-        # Check consecutive losses
-        if consecutive_losses >= consec_critical:
-            level = DangerLevel.CRITICAL
-            intervention = InterventionType.HARD_COOLDOWN
-            triggers.append("consecutive_loss_critical")
-            recommendations.append(f"{consecutive_losses} consecutive losses. Take a break.")
-
-        elif consecutive_losses >= consec_danger:
-            level = _upgrade_level(level, DangerLevel.DANGER)
-            if level == DangerLevel.DANGER and intervention == InterventionType.NONE:
-                intervention = InterventionType.SOFT_COOLDOWN
-            triggers.append("consecutive_loss_danger")
-            recommendations.append("Consider pausing to reset mentally.")
-
-        elif consecutive_losses >= consec_caution:
-            level = _upgrade_level(level, DangerLevel.WARNING)
-            triggers.append("consecutive_loss_warning")
+        # Consecutive losses — against the trader's OWN declared rule, and
+        # nothing else.
+        #
+        # CHANGED 2026-08-26. This was a three-tier ladder on
+        # `consecutive_loss_caution` (3), `consecutive_loss_danger` (5) and an
+        # inline `danger + 2` (7) — the same fixed counts, read from the same
+        # two keys, as the `consecutive_loss_streak` detector that was retired
+        # the same day. The evidence that retired it applies here unchanged: of
+        # 189 sessions, 63 contained a run of 3+ losses against 63.0 expected
+        # from the trader's 39.9% win rate alone. A run of that length is what
+        # the win rate produces on its own, so it is not evidence of a changed
+        # state, and escalating on it sent a WhatsApp to the trader's guardian
+        # about a number nobody had chosen.
+        #
+        # What survives is the claim that is true by construction: the trader
+        # said they stop after N, and they are at or past N. `max_consecutive_losses`
+        # was already in this dict — resolved at Source.FACT, "declared" — and
+        # this service was ignoring it in favour of 3/5/7, so it stayed silent
+        # at the exact moment a trader with a declared limit of 4 broke their
+        # own rule, then escalated to their guardian at 7.
+        #
+        # NO FALLBACK. A trader who has declared nothing gets nothing here:
+        # a commitment cannot be inferred, and guessing one and calling it
+        # theirs is the failure mode this whole review exists to remove.
+        #
+        # No tier above the limit. `constitution_violation` owns the severe
+        # percentage logic, and there is no evidence a second level above the
+        # declared line adds anything.
+        max_consec = trader_thresholds.get('max_consecutive_losses')
+        if max_consec:
+            max_consec = int(max_consec)
+            if consecutive_losses >= max_consec:
+                level = _upgrade_level(level, DangerLevel.DANGER)
+                if level == DangerLevel.DANGER and intervention == InterventionType.NONE:
+                    intervention = InterventionType.SOFT_COOLDOWN
+                triggers.append("consecutive_loss_danger")
+                recommendations.append(
+                    f"{consecutive_losses} losses in a row — you said you stop "
+                    f"at {max_consec}."
+                )
+            elif max_consec >= 2 and consecutive_losses == max_consec - 1:
+                # "One more breaks it" is exact for a whole-number rule, so no
+                # multiplier is needed to express "approaching". This mirrors
+                # the rung added to constitution_violation in 6534146.
+                level = _upgrade_level(level, DangerLevel.WARNING)
+                triggers.append("consecutive_loss_warning")
+                recommendations.append(
+                    f"One more loss and you are at your stop point of {max_consec}."
+                )
 
         # Profile-derived overtrading thresholds
         burst_warn   = trader_thresholds['burst_trades_per_30min_caution']       # e.g. 5
@@ -372,7 +400,6 @@ class DangerZoneService:
         mapping = {
             "loss_limit_breach": NotificationType.LOSS_LIMIT_BREACHED,
             "approaching_loss_limit": NotificationType.APPROACHING_LOSS_LIMIT,
-            "consecutive_loss_critical": NotificationType.LOSS_LIMIT_BREACHED,
             "consecutive_loss_danger": NotificationType.TILT_DETECTED,
             "overtrading_danger": NotificationType.OVERTRADING_DETECTED,
             "pattern_revenge_trading": NotificationType.REVENGE_TRADING_DETECTED,
