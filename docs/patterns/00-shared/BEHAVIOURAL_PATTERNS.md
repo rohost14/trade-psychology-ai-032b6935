@@ -1282,7 +1282,7 @@ reason goes in the notes column, not into someone's head.
 | 2 | `adding_to_adverse_position` | **COMPLETE** | 24 Aug 2026 | 24 Aug 2026 | v2.0.0. **Corrected replay: 99 alerts / 56 days, 4/4 checks PASS, episode dedup verified in the real path.** `patterns_1_2_3_replay_closeout.md` |
 | 1 | `martingale_behaviour` | **COMPLETE** | 24 Aug 2026 | 24 Aug 2026 | v2.0.0. **Corrected replay: 39 alerts / 36 days, 5/5 definition checks PASS, multipliers hold unchanged.** `patterns_1_2_3_replay_closeout.md` |
 | 3 | `same_symbol_obsession` | **COMPLETE** | 24 Aug 2026 | 24 Aug 2026 | v2.0.0. Persistence on one underlying - the only detector that sees it WITHOUT escalation (4 of 20 episodes are invisible to everything else). Severity = peak vs first, stable by construction; `obsession_min_reentries` deleted as unreachable. 23 tests. **Corrected replay: 22 alerts / 21 days.** Entry-triggering measured and rejected — later in 14/20 episodes, never in 6. `same_symbol_obsession_contract.md` |
-| 4 | `consecutive_loss_streak` | NOT STARTED | — | — | 61 alerts, most frequent |
+| 4 | `consecutive_loss_streak` | **REVIEWED — awaiting approval** | 25 Aug 2026 | — | Verdict **MODIFY**. Trigger is chance: 63 sessions with a 3+ run observed, 63.0 expected. `04-consecutive_loss_streak/` |
 | 5 | `overtrading_burst` + `daily_overtrading` | NOT STARTED | — | — | reviewed together — one method, two pattern types |
 | 6 | `profit_giveaway` | NOT STARTED | — | — | 26 alerts / 12 days |
 | 7 | `fomo_entry` | NOT STARTED | — | — | expiry threshold question inherited from hygiene |

@@ -12,7 +12,8 @@ pattern, numbered in review order.
 | [02](02-adding_to_adverse_position/) | `adding_to_adverse_position` | **COMPLETE** | 99 / 56 |
 | [03](03-same_symbol_obsession/) | `same_symbol_obsession` | **COMPLETE** | 22 / 21 |
 | [99](99-revenge_trade-FROZEN/) | `revenge_trade` | **FROZEN** by decision | 7 / 7 |
-| — | `consecutive_loss_streak` | next | 78 / 56 |
+| [04](04-consecutive_loss_streak/) | `consecutive_loss_streak` | **REVIEWED — awaiting approval** | 78 / 56 |
+| — | `overtrading_burst` + `daily_overtrading` | next | 12 / 10 + 52 / 49 |
 
 The live queue for every remaining pattern is the **REVIEW STATUS** table in
 [`00-shared/BEHAVIOURAL_PATTERNS.md`](00-shared/BEHAVIOURAL_PATTERNS.md).
