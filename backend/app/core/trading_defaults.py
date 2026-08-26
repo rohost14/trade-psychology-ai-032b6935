@@ -206,8 +206,11 @@ COLD_START_DEFAULTS: Dict[str, Any] = {
     'profit_giveaway_min_erosion_pct_capital': 1.0,
     'profit_giveaway_min_peak':          1500,   # was 1000, briefly 5000. 5000 silenced it completely — 17 firings to zero against nine days of the behaviour in the same tradebook, which is worse than the noise it replaced. The self-relative erosion floor is the real fix; this only needs to exclude the trivial. Originally fired on days that ENDED GREEN. A ₹1,348 peak is one tick on a ₹15,000 option lot, not a session built and given back. Seventeen firings across 61 real sessions, the most common alert in the product, almost all on profitable days.
     'profit_giveaway_min_erosion':        500, # minimum absolute erosion to avoid noise (₹500)
-    'profit_giveaway_caution_pct':        0.50, # gave back 50% of peak gains = caution
-    'profit_giveaway_danger_pct':         0.70, # gave back 70% of peak gains = danger
+    'profit_giveaway_caution_pct':        0.50, # gave back 50% of peak gains = the one erosion tier
+    # profit_giveaway_danger_pct (0.70) DELETED 2026-08-27, Pattern #6: the
+    # 50/70 split ranked firings but did not separate behaviour (1.1 SE against
+    # a ~1.4 floor) and sat at no break in the distribution. One severity now,
+    # so it had no reader left.
 
     # ── Monthly vs weekly expiry: no_stoploss tighter thresholds ─────────
     # Monthly expiry: theta at maximum all day. Primary gate = exit order type;

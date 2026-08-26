@@ -111,7 +111,12 @@ _WORSEN_METRIC = {
     # now severity escalation alone, which _is_deduped_full already allows, so
     # one open episode yields at most one caution and one danger.
     "constitution_violation": "ratio",
-    "profit_giveaway":        "erosion_pct",  # deepening giveback re-fires
+    # `erosion_pct` until 2026-08-27. It is unbounded once the session is red
+    # (new loss over an old peak, observed to 4.87) and it moves DOWN as well as
+    # up, so it re-armed hardest where it meant least. `worst_giveaway` is
+    # facts.max_drawdown - a running maximum, so a re-arm can only mean the
+    # giveback actually deepened.
+    "profit_giveaway":        "worst_giveaway",
 }
 _WORSEN_FACTOR = 1.20  # metric must grow >=20% past the last fired value
 
