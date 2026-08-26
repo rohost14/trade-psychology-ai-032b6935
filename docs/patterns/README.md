@@ -14,7 +14,7 @@ pattern, numbered in review order.
 | [99](99-revenge_trade-FROZEN/) | `revenge_trade` | **FROZEN** by decision | 7 / 7 |
 | [04](04-consecutive_loss_streak/) | `consecutive_loss_streak` | **RETIRED** — deleted 26 Aug, replaced by the user's own `max_consecutive_losses` rule | was 78 / 56, now **0** |
 | [05](05-overtrading/) | `overtrading_burst` + `daily_overtrading` | **`daily_overtrading` COMPLETE** — now fires on the declared limit only · **`overtrading_burst` DEFERRED**, untouched | daily was 52 / 49, now **0** undeclared · burst 12 / 10, unchanged |
-| — | `profit_giveaway` | next | 48 / — |
+| [06](06-profit_giveaway/) | `profit_giveaway` | **REVIEWED — awaiting approval.** MODIFY | 48 alerts / 20 days |
 
 The live queue for every remaining pattern is the **REVIEW STATUS** table in
 [`00-shared/BEHAVIOURAL_PATTERNS.md`](00-shared/BEHAVIOURAL_PATTERNS.md).
