@@ -232,8 +232,10 @@ class TestEpisodeDedup:
 
 class TestOtherDetectorsAreUnaffected:
 
+    # profit_giveaway left this list on 2026-08-27 when the detector was
+    # retired; its _WORSEN_METRIC entry went with it.
     @pytest.mark.parametrize("pattern", [
-        "martingale_behaviour", "premium_loss_event", "profit_giveaway",
+        "martingale_behaviour", "premium_loss_event",
     ])
     def test_other_worsen_metrics_are_intact(self, pattern):
         assert pattern in _WORSEN_METRIC

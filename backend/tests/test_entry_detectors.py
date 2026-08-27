@@ -157,11 +157,13 @@ def test_a_scratch_loss_is_recorded_but_never_notified():
 
 def test_outcome_dependent_detectors_are_never_asked():
     """
-    early_exit, panic_exit and profit_giveaway are statements about a completed
-    outcome. Run against a position that has not resolved they could only
-    produce nonsense, so the whitelist never offers them the question.
+    early_exit and panic_exit are statements about a completed outcome. Run
+    against a position that has not resolved they could only produce nonsense,
+    so the whitelist never offers them the question.
+
+    profit_giveaway left this list on 2026-08-27 with the detector itself.
     """
-    for name in ("early_exit", "panic_exit", "profit_giveaway",
+    for name in ("early_exit", "panic_exit",
                  "no_stoploss", "opening_5min_trap"):
         assert name not in ENTRY_DECIDABLE
 

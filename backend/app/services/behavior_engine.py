@@ -42,7 +42,6 @@ retirements, not omissions; detector_registry.REGISTRY is the authority:
   20. opening_5min_trap           (derivative entry 09:15–09:20 IST)
   21. end_of_session_mis_panic    (MIS entries after 15:10 IST — forced 10-min exit)
   22. post_loss_recovery_bet      (one oversized position after 2+ consecutive losses)
-  23. profit_giveaway             (gave back ≥50% of session peak P&L in one trade)
 """
 
 import logging
@@ -1379,7 +1378,10 @@ class BehaviorEngine:
                 },
             )
 
-        # MED-4: gains-erosion check removed — owned by profit_giveaway detector.
+        # MED-4: the gains-erosion check that used to live here was moved to
+        # profit_giveaway, which was itself RETIRED 2026-08-27. Nothing checks
+        # session gains-erosion now, deliberately: the giveback was measured to
+        # be indistinguishable from chance. See docs/patterns/06-profit_giveaway/.
         return None
 
     # ── Pattern 4: Size escalation after losses ───────────────────────────
@@ -3059,194 +3061,6 @@ class BehaviorEngine:
     # Research: NSE/SEBI data shows 38% of profitable intraday sessions end with
     # the trader giving back >50% of peak gains in a single subsequent trade.
     # This is the "one more trade" impulse after a good day.
-
-    def _detect_profit_giveaway(self, ctx: EngineContext) -> Optional[DetectedEvent]:
-        """
-        The session reached a high-water mark and a material part of it is gone.
-
-        REVIEWED 2026-08-27, Pattern #6. Six changes, all from the measurement in
-        docs/patterns/06-profit_giveaway/:
-
-        1. **The green-to-red branch is no longer gated on `min_peak`.** That gate
-           asks how HIGH the session got; the harm is how far BELOW zero it went,
-           and the two are unrelated. On the reference book it silenced 23
-           sessions that turned green into red, worth -Rs 66,212, while admitting
-           -Rs 29,751. The worst silenced day touched +Rs 334 and closed at
-           -Rs 6,548. `min_erosion` stays as that branch's floor, and it is the
-           self-relative one: it rises to the trader's own median losing trade.
-
-        2. **One severity on the percentage branch.** The 50/70 split ranked
-           firings but did not separate behaviour (1.1 SE against a ~1.4 floor,
-           with a position-matched control absorbing most of the rest) and sat at
-           no break in the distribution. `profit_giveaway_danger_pct` is deleted
-           rather than left resolving with no reader.
-
-        3. **The re-arm metric is `worst_giveaway`, not `erosion_pct`.**
-           `erosion_pct` is unbounded once the session is red - new loss divided
-           by an old peak, observed up to 4.87 - and it moves DOWN as well as up,
-           so it re-armed hardest exactly where it meant least.
-           `facts.max_drawdown` is the deepest peak-to-trough reached today and
-           is a running maximum, so it can only grow.
-
-        4. **Severity cannot fall within a session.** `went_red` is sticky: once
-           the running total has been below break-even after the peak it stays
-           true for the day. The same peak used to produce danger, then caution,
-           then danger again as the session bounced.
-
-        5. **It reports the moment, not the outcome.** Half the alert-days on the
-           reference book closed profitable (median +Rs 620). That is not a false
-           positive - at the instant it fired the giveback had happened - but the
-           wording must not imply the day is lost, because often it is not.
-
-        6. **The `erosion_pct >= 1.0` literal is gone.** With a positive peak and
-           a negative running total it could never be false, so it decided
-           nothing.
-
-        NOT addressed here, recorded in the review: `peak_pnl` is the high-water
-        mark of the REALIZED curve only. A trader who was up on an open position
-        and closed it lower has a peak that never recorded what they gave back.
-        That is an engine-wide observability boundary, not a Pattern 6 defect.
-        """
-        # HIGH-2 fix: session_trades excludes ctx.completed_trade (contrary to the
-        # old stale comment). The trade causing the giveaway would not be detected
-        # until the NEXT trade. Include it by sorting all trades by exit_time.
-        trades = sorted(
-            list(ctx.session_trades) + [ctx.completed_trade],
-            key=lambda t: t.exit_time or datetime.min.replace(tzinfo=timezone.utc),
-        )
-        if len(trades) < 2:
-            return None
-
-        # Peak and running total come from the canonical session facts - same
-        # arithmetic this used to do inline, now defined once.
-        peak_pnl = ctx.facts.peak_pnl if ctx.facts else Decimal("0")
-        running_pnl = ctx.facts.pnl if ctx.facts else Decimal("0")
-        # Deepest peak-to-trough reached at any point today. See docstring (3).
-        worst_giveaway = ctx.facts.max_drawdown if ctx.facts else Decimal("0")
-
-        # Nothing was ever built, so there is nothing to give back.
-        if peak_pnl <= 0:
-            return None
-
-        # 1500, matching COLD_START_DEFAULTS. The inline default read 1000 until
-        # 2026-08-24 while the resolved value has always been 1500 (and scales
-        # with capital via _CAPITAL_RATIOS), so the 1000 was unreachable.
-        min_peak = Decimal(str(ctx.thresholds.get("profit_giveaway_min_peak", 1500)))
-        min_erosion = Decimal(str(ctx.thresholds.get("profit_giveaway_min_erosion", 500)))
-        # Same reasoning as the revenge floor: Rs 500 handed back is a bad hour
-        # for one trader and a rounding error for another. Measured against their
-        # own median losing trade, "you gave back real money" means the same thing
-        # at every account size.
-        _typical = self._typical_loss(ctx)
-        if _typical:
-            min_erosion = max(min_erosion, Decimal(str(_typical)))
-        caution_pct = Decimal(str(ctx.thresholds.get("profit_giveaway_caution_pct", 0.50)))
-
-        current_pnl = running_pnl
-        erosion = peak_pnl - current_pnl
-
-        # The giveback must be worth naming at this trader's scale, on BOTH
-        # branches. This is the only floor the green-to-red branch now has.
-        if erosion < min_erosion:
-            return None
-
-        erosion_pct = erosion / peak_pnl
-
-        # Did the session cross below break-even at any point AFTER its peak?
-        # Reconstructed from the trades already in hand: definitional, no
-        # threshold. Sticky for the rest of the day - see docstring (4).
-        running = Decimal("0")
-        trough_after_peak = None
-        seen_peak = False
-        for _t in trades:
-            running += Decimal(str(_t.realized_pnl or 0))
-            if running >= peak_pnl:
-                seen_peak = True
-            elif seen_peak:
-                if trough_after_peak is None or running < trough_after_peak:
-                    trough_after_peak = running
-        went_red = trough_after_peak is not None and trough_after_peak < 0
-
-        # No "first crossing" guard here. Dedup lives in the alert layer:
-        # `_DEDUP_HOURS["profit_giveaway"]` is 2 HOURS and `_WORSEN_METRIC`
-        # re-arms on `worst_giveaway`, so one session can legitimately produce
-        # more than one alert as the giveback deepens - but only when it HAS
-        # deepened. (The comment this replaces claimed a 24h window and
-        # once-per-session firing. Both were wrong: the reference book shows up
-        # to four alerts in a single session.)
-
-        ct = ctx.completed_trade
-        # The dedup key is (session_date, peak_pnl) - one episode is one fall
-        # from one high-water mark. Both have to be IN the stored details,
-        # because `last_fired` is rebuilt by re-keying existing RiskAlert rows.
-        _session_date = getattr(ctx.session, "session_date", None) if ctx.session else None
-        base_context = {
-            "session_date": str(_session_date) if _session_date else None,
-            "peak_pnl": round(float(peak_pnl), 2),
-            "current_pnl": round(float(current_pnl), 2),
-            "erosion": round(float(erosion), 2),
-            "erosion_pct": round(float(erosion_pct), 2),
-            # The re-arm metric. Monotonic; see docstring (3).
-            "worst_giveaway": round(float(worst_giveaway), 2),
-            "trough_pnl": (round(float(trough_after_peak), 2)
-                           if trough_after_peak is not None else None),
-            "trigger_symbol": ct.tradingsymbol,
-        }
-
-        # Two occasions to speak, and they are separate from the question of how
-        # loudly. The green-to-red occasion is "the session is in loss having
-        # been in profit", gated only by min_erosion - see docstring (1). The
-        # percentage occasion keeps its min_peak gate, because talking about a
-        # share of a peak needs a peak worth taking a share of.
-        crossed_now = current_pnl < 0
-        past_pct_line = peak_pnl >= min_peak and erosion_pct >= caution_pct
-        if not (crossed_now or past_pct_line):
-            return None
-
-        # `went_red` is sticky and decides SEVERITY only. It does not create a
-        # firing occasion: a session that flipped and recovered speaks again only
-        # when the percentage line is crossed, and then it speaks at the severity
-        # it already reached. That is what stops danger falling back to caution
-        # while the session bounces - see docstring (4).
-        severity = "danger" if went_red else "caution"
-
-        if crossed_now or went_red:
-            if crossed_now:
-                message = (
-                    f"Your session turned from profit to loss: you were up "
-                    f"₹{float(peak_pnl):,.0f} today and are now down "
-                    f"₹{abs(float(current_pnl)):,.0f}."
-                )
-            else:
-                # Flipped earlier, since recovered above break-even. Severity
-                # stays put - it cannot fall within a session - but the sentence
-                # has to describe what is true right now.
-                message = (
-                    f"You built ₹{float(peak_pnl):,.0f} today and went "
-                    f"₹{abs(float(trough_after_peak)):,.0f} below break-even. "
-                    f"Session P&L now ₹{float(current_pnl):+,.0f}."
-                )
-            return DetectedEvent(
-                event_type="profit_giveaway",
-                severity=severity,
-                message=message,
-                context={**base_context, "sign_flip": True,
-                         "currently_negative": crossed_now},
-            )
-
-        if past_pct_line:
-            return DetectedEvent(
-                event_type="profit_giveaway",
-                severity=severity,
-                message=(
-                    f"You built ₹{float(peak_pnl):,.0f} today and have given back "
-                    f"₹{float(erosion):,.0f} ({float(erosion_pct)*100:.0f}%) so far — "
-                    f"session P&L now ₹{float(current_pnl):+,.0f}."
-                ),
-                context={**base_context, "sign_flip": False},
-            )
-
-        return None
 
     # ── Constitution violation (Engine v2 Phase 2, master §1C.4 / Q15) ──────
     #

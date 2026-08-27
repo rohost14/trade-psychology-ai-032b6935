@@ -182,6 +182,11 @@ RETIRED_PATTERN_NAMES = (
     # against 63.0 expected from the win rate alone). The trader's own
     # max_consecutive_losses rule under constitution_violation replaces it.
     "consecutive_loss_streak",
+    # Retired 2026-08-27: a drawdown from the session peak is arithmetic. 181 of
+    # 189 sessions have one, and shuffling each session's trade order produced
+    # MORE firings than the real order (49 vs 56.3) with identical money given
+    # back (ratio 1.01).
+    "profit_giveaway",
     "tilt_loss_spiral",
     "iv_crush_behavior",
     "options_direction_confusion",

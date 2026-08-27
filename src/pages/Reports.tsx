@@ -83,6 +83,31 @@ function PostMarketDetail({ data }: { data: Record<string, any> }) {
         ))}
       </div>
 
+      {/* Peak vs close — the giveback, as a reported fact. `profit_giveaway`
+          was retired as an alert (the drawdown is arithmetic); the number is
+          still worth seeing after the close. */}
+      {journey.peak_pnl > 0 && (
+        <div>
+          <p className="text-[12px] font-medium text-muted-foreground mb-2">Peak vs close</p>
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+            {[
+              { label: 'Session peak', value: formatCurrencyWhole(journey.peak_pnl), color: 'text-tm-profit' },
+              { label: 'Finished', value: formatCurrencyWhole(journey.final_pnl),
+                color: journey.finished_green ? 'text-tm-profit' : 'text-tm-loss' },
+              { label: 'Given back', value: formatCurrencyWhole(journey.given_back ?? 0),
+                color: (journey.given_back ?? 0) > 0 ? 'text-tm-loss' : 'text-foreground' },
+              { label: '% of peak', value: journey.given_back_pct != null ? `${journey.given_back_pct}%` : '—',
+                color: 'text-foreground' },
+            ].map(stat => (
+              <div key={stat.label} className="bg-muted/40 rounded-lg p-3">
+                <p className="text-[10px] uppercase tracking-widest text-muted-foreground mb-1">{stat.label}</p>
+                <p className={cn('text-[20px] font-bold font-mono tabular-nums', stat.color)}>{stat.value}</p>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
       {/* Emotional journey */}
       {journey.timeline?.length > 0 && (
         <div>

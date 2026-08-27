@@ -143,7 +143,6 @@ const BACKEND_TO_FRONTEND_TYPE: Record<string, string> = {
   'opening_5min_trap':           'opening_5min_trap',
   'end_of_session_mis_panic':    'end_of_session_mis_panic',
   'post_loss_recovery_bet':      'post_loss_recovery_bet',
-  'profit_giveaway':             'profit_giveaway',
 };
 
 export function formatPatternName(patternType: string): string {

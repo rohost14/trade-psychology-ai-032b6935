@@ -96,27 +96,6 @@ def _pattern_dedup_key(pattern_type: str, details) -> str:
     # been swallowed by the first.
     if pattern_type == "same_symbol_obsession":
         return f"same_symbol_obsession:{(details or {}).get('underlying', '')}"
-    # profit_giveaway's subject is one fall from ONE high-water mark, and
-    # `peak_pnl` is monotonic non-decreasing within a session - so a new peak IS
-    # a new episode and must not be suppressed by the previous one.
-    #
-    # The case the pattern_type key gets wrong: `worst_giveaway`, the re-arm
-    # metric, is facts.max_drawdown, which is SESSION-wide and does not reset at
-    # a new peak. A session that peaks at 5,000, falls to 1,000 (alert), recovers
-    # to 8,000 and falls to 5,000 has given back 3,000 from a new high while
-    # max_drawdown still reads 4,000 - no escalation, no +20% re-arm, inside the
-    # window, so the second giveback was silently swallowed. Measured on the
-    # reference book this changes nothing (100 alerts before and after, the
-    # identical set: 47 of 48 affected sessions hold exactly one episode, and the
-    # one that holds two escaped only because its second episode happened to
-    # escalate). It is a correctness fix, not a volume one.
-    #
-    # The session date joins the key because peak_pnl resets at the open and two
-    # days can coincidentally reach the same peak.
-    if pattern_type == "profit_giveaway":
-        _d = details or {}
-        return (f"profit_giveaway:{_d.get('session_date', '')}"
-                f":{_d.get('peak_pnl', '')}")
     return pattern_type
 
 
@@ -132,12 +111,6 @@ _WORSEN_METRIC = {
     # now severity escalation alone, which _is_deduped_full already allows, so
     # one open episode yields at most one caution and one danger.
     "constitution_violation": "ratio",
-    # `erosion_pct` until 2026-08-27. It is unbounded once the session is red
-    # (new loss over an old peak, observed to 4.87) and it moves DOWN as well as
-    # up, so it re-armed hardest where it meant least. `worst_giveaway` is
-    # facts.max_drawdown - a running maximum, so a re-arm can only mean the
-    # giveback actually deepened.
-    "profit_giveaway":        "worst_giveaway",
 }
 _WORSEN_FACTOR = 1.20  # metric must grow >=20% past the last fired value
 
@@ -1100,7 +1073,6 @@ async def run_risk_detection_async(
         # still fires and can escalate in severity.
         _DEDUP_HOURS = {
             "session_meltdown":        2,
-            "profit_giveaway":         2,
         }
         now_utc = datetime.now(timezone.utc)
         cutoff = now_utc - timedelta(hours=24)
@@ -1403,7 +1375,6 @@ async def run_behavior_engine_full_session(broker_account_id: UUID, db) -> int:
     # episode in the same day can still fire.
     _DEDUP_HOURS = {
         "session_meltdown":        2,
-        "profit_giveaway":         2,
     }
     now_utc = datetime.now(timezone.utc)
     cutoff = now_utc - timedelta(hours=24)

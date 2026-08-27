@@ -188,10 +188,26 @@ REGISTRY: Tuple[DetectorSpec, ...] = (
                  "2.0.0", "emotional", "alerting", "exit", 1),
     DetectorSpec("post_loss_recovery_bet", "_detect_post_loss_recovery_bet",
                  "1.1.0", "risk", "alerting", "exit", 2),
-    DetectorSpec("profit_giveaway", "_detect_profit_giveaway",
-                 "2.0.0", "emotional", "alerting", "exit", 2,
-                 consumes=("session", "session_trades", "completed_trade", "thresholds",
-                           "facts")),
+    # RETIRED 2026-08-27 - `profit_giveaway`. A drawdown from the session
+    # high-water mark is arithmetic, not behaviour: the peak IS the maximum of
+    # the running curve, so 181 of 189 sessions have one. Shuffling each
+    # session's trades - same trades, same day, different order - produced MORE
+    # firings than the real order (49 observed against 56.3 expected, ratio
+    # 0.87) and an identical amount of money given back (Rs 624,839 against
+    # Rs 616,891, ratio 1.01), so the trader's ordering contributed nothing.
+    # Every mechanism it was premised on failed too: house money predicts risk
+    # RISING after a peak and this trader's fell in 54% of sessions
+    # (Rs 7,315 -> Rs 6,737 median); the break-even effect predicts that
+    # crossing zero changes behaviour and it measured 0.6 SE against a ~1.4
+    # floor. The median giveback puts 77% of its loss in one trade, which is
+    # what a losing trade is.
+    #
+    # The measurement is kept and needs no detector: peak_pnl,
+    # drawdown_from_peak and max_drawdown stay in session_facts with eleven
+    # readers, and reports compute the giveback from the trades directly. If it
+    # is ever to interrupt a session again it must be against a give-back stop
+    # the trader DECLARES, which does not exist yet.
+    # See docs/patterns/06-profit_giveaway/.
     # cooldown_violation: system-suggested cooldowns (Cooldown DB records),
     # analytics-only. Distinct from the constitution cooldown rule below.
     DetectorSpec("cooldown_violation", "_detect_cooldown_violation",
@@ -304,16 +320,6 @@ PATTERN_COPY: Dict[str, PatternCopy] = {
         "Recovery bet",
         "A position materially larger than your average, entered after a loss on the same underlying.",
         "If this one also loses, the combined loss exceeds everything it was meant to recover.",
-    ),
-    # Copy rewritten 2026-08-27, Pattern #6. It used to say the trade after a
-    # peak "decides whether the day is kept" - a claim about the day's outcome,
-    # and on the reference book half the alert-days closed profitable anyway.
-    # This reports the state at the moment it is raised and forecasts nothing.
-    "profit_giveaway": PatternCopy(
-        "Gains given back",
-        "Session P&L against its high-water mark for the day, as things stand right now.",
-        "Says what has happened so far, not how the day ends. Money built and handed back is "
-        "still money, whatever the close looks like.",
     ),
     "panic_exit": PatternCopy(
         "Fast manual exit",

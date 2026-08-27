@@ -311,12 +311,27 @@ class DailyReportsService:
         else:
             overall = "neutral"
 
+        # Peak / final / given-back. `profit_giveaway` was retired as a
+        # behavioural detector on 2026-08-27 - a drawdown from the session high
+        # is arithmetic, and shuffling the trade order reproduced it exactly
+        # (ratio 1.01), so it cannot carry an alert. It is still a fact worth
+        # reporting after the close, which is what these are. Derived here from
+        # numbers already computed above; no threshold is involved.
+        peak = round(max((e["cumulative_pnl"] for e in timeline), default=0), 2)
+        final = round(cumulative_pnl, 2)
+        given_back = round(max(0.0, peak - final), 2)
         return {
             "timeline": timeline,
             "overall_mood": overall,
-            "final_pnl": round(cumulative_pnl, 2),
-            "peak_pnl": round(max((e["cumulative_pnl"] for e in timeline), default=0), 2),
-            "trough_pnl": round(min((e["cumulative_pnl"] for e in timeline), default=0), 2)
+            "final_pnl": final,
+            "peak_pnl": peak,
+            "trough_pnl": round(min((e["cumulative_pnl"] for e in timeline), default=0), 2),
+            "given_back": given_back,
+            # Only meaningful against a peak that was actually positive: a
+            # session that never went green has no gains to give back.
+            "given_back_pct": (round(100.0 * given_back / peak, 1)
+                               if peak > 0 else None),
+            "finished_green": final > 0,
         }
 
     def _generate_key_lessons(

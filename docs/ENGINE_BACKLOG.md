@@ -65,11 +65,12 @@ applied?".
   real and is fixed, but that row count was not a trader's book and should not
   have been quoted as one.
 - **`pattern_prediction_service` looks up a pattern type that does not exist** —
-  `pattern_counts.get("revenge_trading")` against a vocabulary whose 33 types
-  include `revenge_trade` and never `revenge_trading`. Always 0, so the history
-  factor in the revenge probability is dead. Left alone on purpose: it changes
-  user-visible probabilities and belongs with the parked frontend-vocabulary
-  work.
+  `pattern_counts.get("revenge_trading")` against a vocabulary that includes
+  `revenge_trade` and never `revenge_trading`. Always 0, so the history factor in
+  the revenge probability is dead. Left alone on purpose: it changes user-visible
+  probabilities and belongs with the parked frontend-vocabulary work.
+  **Superseded 27 Aug by §2 M0** — this is one of FIVE dead names in that file,
+  not one, and the vocabulary count is now 32 rather than 33. Read M0.
 
 - **WebSocket delivery is head-of-line blocked, today, at one user's scale.**
   `websocket.py:59` awaits each socket in turn with a 2-second timeout, and it is
@@ -90,6 +91,60 @@ applied?".
   frozen capital-relative constants.
 
 ## 2. Open — MEDIUM
+
+### M-1. The Pattern 6 confirmation replay has not run
+
+`profit_giveaway` was retired on 27 Aug with every other check green — 1,241
+backend tests, 35 new regression tests, a clean frontend, and six manual
+verifications of the measurements, death_spiral, the dedup wiring, historical
+readability and the capital-ratio rung. **The 203-session replay that confirms no
+other detector moved is the one thing still owed.**
+
+The attempt reached session 5 of 203 in 72 minutes. **Cause: the Memurai (Redis)
+service was stopped**, so every `publish_event` and `admin_settings` read waited
+on a refused `localhost:6379` connection dozens of times per trade. Nothing to do
+with the engine change.
+
+Before re-running: `Start-Service Memurai` (admin), **do not pipe the replay
+through `tail`** (it buffers until exit, which is why this took 72 minutes to
+notice), and do not run pytest against the same database concurrently.
+
+Expected result: `profit_giveaway` 0 alerts, everything else unchanged.
+
+### M0. `pattern_prediction_service` speaks a vocabulary the engine retired
+
+Found 2026-08-27 while researching giveback-as-context for Pattern 6. **Recorded,
+deliberately NOT fixed there** — it is a live defect on two API surfaces and
+deserves its own change, not a silent ride-along on a retirement.
+
+**All five of its prediction keys name patterns the engine cannot emit:**
+
+| key it writes | what the engine actually has |
+|---|---|
+| `revenge_trading` | `revenge_trade` |
+| `tilt_loss_spiral` | **retired** — already in `RETIRED_PATTERN_NAMES` |
+| `overtrading` | `overtrading_burst` / `daily_overtrading` |
+| `fomo` | `fomo_entry` |
+| `recovery_chase` | never existed |
+
+They are dict keys (`predictions["tilt_loss_spiral"] = ...`), not
+`pattern_type == "..."` comparisons, so
+`test_pattern_contract.test_no_shipping_module_compares_against_a_retired_pattern_name`
+does not catch them. **This is precisely the drift class that test was written
+for, arriving through a hole in it.**
+
+The service is live: `api/analytics.py:1095` and `api/reports.py:159, 228`.
+
+Second, smaller problem in the same file: `pattern_prediction_service.py:241`
+adds 15 points to a tilt probability when `drawdown_from_peak > 2000` — an
+**unsourced absolute rupee literal on a per-trader quantity**, of exactly the
+kind the capital-ratio rung exists to replace. It is also the one surviving
+consumer of the giveback as *context*, which is the shape Pattern 6's research
+concluded was defensible — so it should be reviewed alongside that, not patched.
+
+**Do not fix in isolation.** The right unit of work is: correct the vocabulary,
+widen the contract test to catch dict keys as well as comparisons, and decide
+whether the tilt heuristic should exist at all.
 
 ### M1. The frontend duplicates a catalogue the backend already serves
 `GET /api/risk/patterns` serves pattern copy from the registry, and its docstring

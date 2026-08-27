@@ -1375,17 +1375,6 @@ export const DEMO_PATTERN_CATALOGUE = {
       "version": "2.0.0"
     },
     {
-      "pattern_type": "profit_giveaway",
-      "label": "Gains given back",
-      "observes": "Session P&L against its high-water mark for the day.",
-      "explanation": "The trade taken after a session peak is the one that decides whether the day is kept.",
-      "nature": "emotional",
-      "disposition": "alerting",
-      "trigger": "exit",
-      "guardian_eligible": false,
-      "version": "1.0.0"
-    },
-    {
       "pattern_type": "daily_overtrading",
       "label": "Heavy day",
       "observes": "Total positions opened today, counting a multi-leg structure as one.",

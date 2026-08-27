@@ -1,167 +1,184 @@
-# Pattern #6 — `profit_giveaway` · **STATUS**
+# Pattern #6 — `profit_giveaway` · **RETIRED**
 
-27 Aug 2026. Review approved with eight decisions; all eight implemented.
-Detector `1.0.0` → `2.0.0`. Evidence in `profit_giveaway_review.md`.
+27 Aug 2026. Retired as a behavioural detector. **The measurements underneath it
+are kept.** Decision taken on the evidence below; impact checked in
+`retirement_impact.md`, evidence in `giveback_research.md`. The v2.0.0 detector
+this replaces is documented in `profit_giveaway_review.md` and in git history
+(`2202912`, `3293f93`).
+
+The engine is now **26 detectors / 32 pattern types**.
 
 ---
 
-## Current logic
+## Why
 
-`behavior_engine.py`, `_detect_profit_giveaway`.
+**A drawdown from the session high-water mark is arithmetic, not behaviour.**
+The peak is by definition the maximum of the running curve, so any session not
+ending at its maximum has given something back. **181 of 189 sessions (96%)
+contain one.**
+
+The decisive test — the same one that retired Pattern 4 — shuffles each
+session's trade P&Ls. Same trades, same day, same count, different order.
+Behaviour lives in the order the trader chose to act in.
+
+| | observed | chance (shuffled) | ratio |
+|---|---|---|---|
+| sessions where it would fire | **49** | **56.3** | **0.87** |
+| …via green-to-red | 40 | 45.7 | 0.88 |
+| …via the percentage line | 16 | 17.2 | 0.93 |
+| **total money given back** | **₹624,839** | **₹616,891** | **1.01** |
+
+> The money given back is chance to within 1%, and the detector fires **13% less
+> often than a random reordering of the same trades would**. The trader's
+> ordering contributes nothing.
+
+**Every mechanism it was premised on also failed.**
+
+| test | prediction | result |
+|---|---|---|
+| **House money** (Thaler & Johnson 1990) | risk per trade RISES after the peak | **failed** — fell in 54% of sessions, rose in 30%; median ₹7,315 → ₹6,737 |
+| **Break-even effect** (same paper) | crossing zero changes behaviour vs an equal loss that does not | **failed** — 0.6 SE on stopping, 0.2 SE on next-position-bigger, against a ~1.4 floor |
+
+The median giveback puts **77% of its loss in a single trade** (41% are ≥80% one
+trade) — which is what a losing trade is. The peak preceding it changes nothing
+about what happened.
+
+**Caveat kept on the record: this is one trader.** The literature is
+population-level, and a trader who *does* escalate after a peak would show it in
+the house-money test. We acted on the evidence we have.
+
+## What was removed
+
+| file | change |
+|---|---|
+| `behavior_engine.py` | `_detect_profit_giveaway` — 188 lines |
+| `detector_registry.py` | the `DetectorSpec` and its `PatternCopy`, replaced by a retirement note carrying the evidence |
+| `trade_tasks.py` | the episode dedup-key branch, the `_WORSEN_METRIC` entry, both `_DEDUP_HOURS` entries |
+| `trading_defaults.py` | `profit_giveaway_caution_pct` (a pure severity tier) |
+| `entry_detectors.py` | two comments naming it as outcome-dependent |
+| `tests/test_profit_giveaway.py` | **deleted** — 37 tests whose entire subject is gone |
+| `tests/test_pattern_contract.py` | added to `RETIRED_PATTERN_NAMES` |
+| `tests/test_entry_detectors.py`, `tests/test_same_symbol_obsession.py` | dropped from two lists |
+| `src/contexts/AlertContext.tsx` | the `BACKEND_TO_FRONTEND_TYPE` key |
+| `src/lib/demoData.ts` | the pattern-catalogue fixture entry |
+
+## What was deliberately kept
+
+**1. The session measurements — eleven independent readers.** `peak_pnl`,
+`drawdown_from_peak` and `max_drawdown` stay in `session_facts`, which was **not
+modified at all**. Readers: `api/coach.py`, `baseline_service`
+(`typical_peak_pnl` and the drawdown distribution), `daily_reports_service`,
+four `api/analytics.py` endpoints, `ai_service`, `pattern_prediction_service`,
+`state/session_state.py`, `api/reports.py`.
+
+**2. The four capital-relative threshold keys.** `profit_giveaway_min_peak`,
+`profit_giveaway_min_erosion` and their two `_pct_capital` ratios have **no
+detector reader any more and are kept anyway**: they are the only entries in
+`_CAPITAL_RATIOS`, so deleting them would empty rung 4 of the resolution ladder
+and remove its only remaining test vehicle (`test_threshold_resolution.py`
+defines `CAPITAL_KEYS` as exactly these two and says the property under test is
+the conversion, not the key). They are also the two values a declared give-back
+stop would need.
+
+**3. Everything that renders stored rows.** The frontend display name, the
+`AlertDetailSheet` case, `types/patterns.ts`, `BehaviourLead`,
+`BehaviourCostCard` and `report_tasks._PATTERN_LABELS` all stay — historical
+alerts still carry the type, and a missing key renders a title-cased raw key.
+
+## Verified after the deletion
+
+| check | result |
+|---|---|
+| detector method, spec and vocabulary entry gone | **PASS** — 26 detectors / 32 pattern types |
+| `peak_pnl` / `drawdown_from_peak` / `max_drawdown` still on `SessionFacts` | **PASS**, `session_facts` untouched |
+| `death_spiral` unchanged | **PASS** — no reference to it; 13 other detectors carry `emotional`, and 0 replay days lose their second domain |
+| no other detector's dedup or re-arm wiring moved | **PASS** — `_WORSEN_METRIC` is now `constitution_violation`, `martingale_behaviour`, `premium_loss_event`; the `constitution_violation` and `same_symbol_obsession` keys are intact |
+| historical rows readable | **PASS** — FE name, type union and report label all present |
+| capital-ratio rung intact | **PASS** — resolves ₹6,000 at ₹200,000 capital, `Source.CAPITAL` |
+
+## The measurement, kept and now shown
+
+`daily_reports_service._generate_emotional_journey` already computed
+`peak_pnl`, `trough_pnl` and `final_pnl` — and `Reports.tsx` rendered only the
+timeline, so the numbers were computed and thrown away. Three derived fields
+were added with the retirement (`given_back`, `given_back_pct`,
+`finished_green`) and a **Peak vs close** block now renders them.
+
+All three are arithmetic on values that already existed. **No threshold is
+involved**, and `given_back_pct` is `None` rather than 0 or 100 when the session
+never went green — there are no gains to take a percentage of, and inventing one
+would be a claim.
+
+Pinned by `tests/test_daily_report_giveback.py` (8 tests).
+
+## Giveback as CONTEXT — RESEARCH FURTHER, not implemented
+
+Whether the giveback should raise the confidence of detectors that already exist
+was tested and **is not settled**. Full working in `giveback_as_context.md`.
+
+| detector | controlled result | status |
+|---|---|---|
+| `martingale_behaviour` | 10 armed vs 4.0 expected, 2.5×, z=3.2 at the loose gate — but z=0.9 at the strict one | **interesting; needs a second, independent book** |
+| `adding_to_adverse_position` | z=0.8 loose, z=3.3 strict — the reverse pattern | **insufficient evidence** |
+| `same_symbol_obsession` | 2.3 SE uncontrolled → **z=0.9 controlled** | **no reliable signal** |
+| `revenge_trade` | 7 alerts in total, z=0.4 / 1.5 | **no reliable signal** |
+
+The uncontrolled version of this test looked convincing and was wrong: both
+"armed" and "detector fires" rise with position in the session
+(`P(armed | reached)` runs 0% → 17% across positions 1–10), the same confound
+that retracted the Pattern 5 result. **Results that flip which detector they
+belong to when the gate moves are what small counts look like, not what signal
+looks like.**
+
+**Nothing from this is implemented.** No severity change, no confidence change,
+no new threshold, no new detector.
+
+## OUTSTANDING — the confirmation replay has NOT run
+
+Everything else in this retirement is verified (see the table above, plus 1,241
+backend tests, 35 new regression tests, and a clean frontend). **The 203-session
+confirmation replay is not among them.**
+
+It was attempted on 27 Aug and reached **session 5 of 203 in 72 minutes** before
+being killed. The cause was not the engine: the **Memurai (Redis) service was
+stopped**, so every `publish_event` and every `admin_settings` read attempted
+`localhost:6379`, waited for the connection to be refused, and did so dozens of
+times per trade. Projected finish at that rate was about ten days.
+
+**To run it:** start the service (`Start-Service Memurai`, needs admin), then
 
 ```
-peak    = facts.peak_pnl          # high-water mark of the REALIZED curve
-current = facts.pnl
-worst   = facts.max_drawdown      # deepest peak-to-trough today; a running maximum
-
-if peak <= 0:                      -> nothing was built
-erosion = peak - current
-if erosion < min_erosion:          -> not worth naming at this trader's scale
-                                      (min_erosion rises to their median losing trade)
-
-went_red = the running total was below zero at any point AFTER the peak   # sticky
-
-OCCASIONS   crossed_now   = current < 0                       # no min_peak gate
-            past_pct_line = peak >= min_peak and erosion/peak >= caution_pct
-
-SEVERITY    danger if went_red else caution                   # cannot fall within a session
+python tradedesk/scripts/replay_tradebook.py docs/tradebook-CY6001-FO2025-26.csv     --capital 50000 --no-rules
 ```
 
-Occasion and loudness are now separate questions. `went_red` decides **severity
-only** — it does not create a firing occasion, so a session that flipped and
-recovered speaks again only when the percentage line is crossed, and then at the
-severity it already reached.
+**Do not pipe it through `tail`** — that buffers until exit and is why the Redis
+errors went unseen for 72 minutes. Redirect to a file and watch it. Do not run
+pytest against the same database while it runs.
 
-## What changed
+**What it should show:** `profit_giveaway` at **0 alerts**, every other detector
+unchanged from the pre-retirement baseline, and the session facts and analytics
+identical. The expected delta is exactly the retired pattern and nothing else.
 
-| | before | after |
-|---|---|---|
-| green→red gate | `min_peak` **and** `min_erosion` | **`min_erosion` only** |
-| erosion tiers | caution 50% / **danger 70%** | **one severity**; `profit_giveaway_danger_pct` deleted |
-| re-arm metric | `erosion_pct` — unbounded, oscillates | **`worst_giveaway`** = `facts.max_drawdown`, a running maximum |
-| severity within a session | could fall (danger → caution → danger) | **monotonic** |
-| the `erosion_pct >= 1.0` literal | inline, unkeyed, untested | **deleted** — unreachable given a positive peak and negative current |
-| copy | "the trade after a peak decides whether the day is kept" | reports the moment; forecasts nothing |
-| dedup comment | claimed 24h and once-per-session | corrected: 2h with a deliberate re-arm |
-| `consumes` | omitted `facts` | includes `facts` |
+Tracked in `docs/ENGINE_BACKLOG.md`.
 
-## Measured effect (189 sessions, 912 positions)
+## Limitations and follow-ups, recorded not closed
 
-| | before | after |
-|---|---|---|
-| detections | 55 | **135** |
-| **alerts after dedup** | **~38** | **~95** |
-| sessions with an alert | 20 (11%) | **48 (25%)** |
-| severity split | 41 danger / 14 caution | 107 danger / 28 caution |
-| alerts per affected day | mean 1.90, max 4 | **mean 1.98, max 5** |
-| sessions where severity fell | **2 of 20** | **0** |
-| sessions where the re-arm metric fell | not tracked | **0** (guaranteed by definition) |
-| firings on days closing green | 24 of 55 (10 of 20 days) | 35 of 135 (17 of 48 days) |
-
-### The gate removal, measured directly
-
-| | sessions | closing P&L |
-|---|---|---|
-| green→red sessions in the book | 33 | −₹95,963 |
-| of which **previously silenced** by `min_peak` | 23 | −₹66,212 |
-| **now covered** | **21 of 23** | **−₹65,200** |
-| previously covered, still covered | 10 of 10 | — |
-
-The two still silent are correctly excluded by `min_erosion`: 2025-07-25 (peak
-₹141 → −₹90, a ₹231 giveback) and 2025-12-03 (peak ₹382 → −₹922), the latter
-because the self-relative floor had risen above ₹1,304 for that session. **No
-regression on anything that fired before.**
-
-> **CORRECTION, same day.** The alert counts in this section say **~95**. The
-> correct figure is **100**: that simulation modelled the first fire, the
-> severity escalation and the metric re-arm but omitted the **2-hour elapsed
-> window**, which does expire inside a 09:15-15:30 session. See
-> `episode_dedup_analysis.md`, which models `_is_deduped_full` completely.
->
-> **The conclusion below is also superseded.** The repeat alerts are NOT
-> redundant: 45 of the 100 are same-episode repeats, but each required a
-> monotonic `worst_giveaway` to grow >=20%, so each is a materially worse
-> figure. Suppressing them would cost the trader **Rs 65,769** of unreported
-> deterioration. The volume should stay.
-
-## What did NOT improve — stated plainly
-
-**Total alerts went from ~38 to ~95, and the per-day rate did not fall** (1.90 →
-1.98, max 4 → 5). Problem #3 in the review — *"the same story told several
-times"* — is **not solved by these changes.**
-
-The increase is the direct, intended consequence of removing the `min_peak`
-gate: 28 more sessions now qualify. The monotonic re-arm metric did not reduce
-per-day volume, and on inspection it re-arms *more* readily than `erosion_pct`
-did — `erosion_pct` spiked and then needed 20% above its own spike, which
-accidentally suppressed later firings, while `worst_giveaway` grows steadily as
-a session sinks so each +20% step is a genuine deepening.
-
-Every re-arm now means the giveback actually got worse, which is the property
-that was asked for. **Whether ~1 alert per affected session is the right volume
-is a separate decision that has not been made** — it needs an episode key (one
-peak, one alert, escalating only), which is a change nobody has approved.
-
-## Episode dedup — added 27 Aug, after the analysis
-
-`profit_giveaway` keys its dedup on **`(session_date, peak_pnl)`** rather than
-`pattern_type`. One episode is one fall from one high-water mark; `peak_pnl` is
-monotonic non-decreasing within a session, so a new peak IS a new episode.
-
-**Why, given it changes nothing measurable** — 100 alerts before and after, the
-identical set, because 47 of the 48 affected sessions hold exactly one episode.
-It closes a latent false negative: `worst_giveaway` is `facts.max_drawdown`,
-which is **session-wide and does not reset at a new peak**, so a second,
-shallower giveback could be swallowed. A session peaking at ₹5,000 that falls to
-₹1,000 alerts; recovering to ₹8,000 and falling to ₹5,000 gives back ₹3,000 from
-a new high while `max_drawdown` still reads ₹4,000 — no escalation, no +20%
-re-arm, inside the window, silence. The one two-episode session in the book
-escaped only because its second episode happened to escalate.
-
-Unchanged by this: the 2-hour window, the `worst_giveaway` re-arm, severity
-monotonicity, every threshold, and every other detector's key.
-
-**Known imperfection, recorded not fixed:** because `worst_giveaway` stays
-session-wide, re-arms *inside* a second episode still compare against the
-session's deepest point, so a shallower later episode fires once and then stays
-quiet. Its first alert is now guaranteed, which is the part that matters. A
-per-episode drawdown would close the rest; the evidence does not ask for one.
-
-## Limitations, recorded not closed
-
-1. **`peak_pnl` is the high-water mark of the REALIZED curve only.** A trader up
-   ₹10,000 on an open position who closes it at +₹2,000 has a recorded peak of
-   ₹2,000; the giveback they actually felt is invisible. **Left unsolved by
-   explicit instruction** — an engine-wide observability boundary, not a Pattern
-   6 defect.
-2. **The frontend renders `erosion_pct` wrong, and did before this change.**
-   `AlertDetailSheet.tsx:92` prints `` `${fmtN(d.erosion_pct)}%` `` while the
-   context stores a **ratio**, so a 51% giveback displays as **"0.5%"** and a
-   487% one as "4.9%". Pre-existing, verified, **not fixed here** — outside the
-   approved change list. Worth its own small fix.
-3. **`erosion_pct` is still reported in context** and is still unbounded on the
-   flip branch (observed to 42.8 on the widened set). It no longer decides
-   severity or re-arms anything, but it is still shown to the trader — see (2).
-4. **Volume per affected session is unchanged** — see above.
-5. **`profit_giveaway_caution_pct` (0.50) remains unsourced.** The review found
-   no break in the distribution supporting it and no research fixing a
-   session-level giveback percentage. It survives as the percentage branch's
-   only line because removing it would need a replacement, and the review
-   proposed none.
-6. **No replay re-run.** These numbers come from running the real detector over
-   the corrected book in-process, which is how every Pattern 4-6 measurement was
-   taken; a full harness replay would also re-derive every other detector and
-   was not needed to measure this one.
-
-## Tests
-
-`tests/test_profit_giveaway.py` — **21 tests, the detector's first.** Groups:
-the gate removal (small peak turning red now fires; `min_peak` still gates the
-percentage branch; `min_erosion` still gates green→red; the self-relative floor;
-peak of zero), one severity (5 parametrised givebacks 50-99% all caution; the
-deleted key is unresolvable), the re-arm metric (it is `worst_giveaway`; never
-decreases across a bouncing session; `erosion_pct` decides nothing), severity
-monotonicity (does not fall on recovery; monotonic across a whole session),
-reporting the moment (a recovered session is not described as "turned to loss";
-a currently-red one is; the percentage message says "so far"), and the spec
-(`facts` declared; the detector is still pure).
+1. **No replacement.** Nothing in the engine watches session gains-erosion now,
+   deliberately. The giveback is reported after the close and nothing acts on it
+   during a session.
+2. **If it should ever interrupt a session again, it needs a declared give-back
+   stop** in the constitution — *"if I'm up ₹X and hand back Y%, I'm done"*.
+   That field does not exist and adding it is a product decision, not an engine
+   one. The four retained thresholds are what it would use.
+3. **`AlertDetailSheet.tsx:92` renders `erosion_pct` as a percentage while the
+   context stores a ratio** — a 51% giveback displays as "0.5%". Pre-existing;
+   now only affects historical rows, which lowers its priority without making it
+   correct.
+4. **`peak_pnl` is the high-water mark of the REALIZED curve only.** Unrealized
+   peaks are invisible. Engine-wide observability boundary, untouched.
+5. **`early_exit` makes the opposite claim about this trader** — that they bank
+   gains too early — and the risk-falls-after-peak finding is consistent with
+   it. Read the two together at that review.
+6. **The shuffle control is now a standing first test** for any detector keyed
+   on a running total. It takes ~2 minutes and would have saved most of the
+   Pattern 6 implementation work had it been run first.

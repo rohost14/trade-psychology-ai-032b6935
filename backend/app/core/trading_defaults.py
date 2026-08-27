@@ -202,15 +202,24 @@ COLD_START_DEFAULTS: Dict[str, Any] = {
     # Derived from capital when known (threshold_resolution, rung 4); the
     # absolute values below are the no-capital fallback. Percentages calibrated
     # so a Rs 50,000 account resolves to the previous 1500 / 500.
+    # RETAINED after profit_giveaway was retired (2026-08-27). These four keys
+    # have NO detector reader any more, and they are deliberately kept:
+    # `_CAPITAL_RATIOS` in threshold_resolution.py contains only this pair, so
+    # deleting them empties rung 4 of the ladder - the mechanism that turns an
+    # absolute rupee floor into a ratio of the trader's capital - and removes its
+    # only remaining test vehicle (tests/test_threshold_resolution.py defines
+    # CAPITAL_KEYS as exactly these two and says the property under test is the
+    # conversion, not the key; the third, revenge_min_loss_inr, went in August).
+    # They are also the two values a DECLARED give-back stop would need.
     'profit_giveaway_min_peak_pct_capital':    3.0,
     'profit_giveaway_min_erosion_pct_capital': 1.0,
     'profit_giveaway_min_peak':          1500,   # was 1000, briefly 5000. 5000 silenced it completely — 17 firings to zero against nine days of the behaviour in the same tradebook, which is worse than the noise it replaced. The self-relative erosion floor is the real fix; this only needs to exclude the trivial. Originally fired on days that ENDED GREEN. A ₹1,348 peak is one tick on a ₹15,000 option lot, not a session built and given back. Seventeen firings across 61 real sessions, the most common alert in the product, almost all on profitable days.
     'profit_giveaway_min_erosion':        500, # minimum absolute erosion to avoid noise (₹500)
-    'profit_giveaway_caution_pct':        0.50, # gave back 50% of peak gains = the one erosion tier
-    # profit_giveaway_danger_pct (0.70) DELETED 2026-08-27, Pattern #6: the
-    # 50/70 split ranked firings but did not separate behaviour (1.1 SE against
-    # a ~1.4 floor) and sat at no break in the distribution. One severity now,
-    # so it had no reader left.
+    # profit_giveaway_caution_pct (0.50) and profit_giveaway_danger_pct (0.70)
+    # both DELETED 2026-08-27 with the detector. They were purely severity tiers
+    # - unsourced, sitting at no break in the distribution, and measured at
+    # 1.1 SE against a ~1.4 floor - so unlike the four keys above they hold
+    # nothing up.
 
     # ── Monthly vs weekly expiry: no_stoploss tighter thresholds ─────────
     # Monthly expiry: theta at maximum all day. Primary gate = exit order type;
