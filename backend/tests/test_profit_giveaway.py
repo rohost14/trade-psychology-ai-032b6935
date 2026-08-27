@@ -37,6 +37,7 @@ import pytest
 
 from app.models.completed_trade import CompletedTrade
 from app.services.behavior_engine import BehaviorEngine, EngineContext
+from app.tasks.trade_tasks import _WORSEN_METRIC, _pattern_dedup_key, _worsened
 from tests.helpers import now_utc
 
 engine = BehaviorEngine()
@@ -70,7 +71,7 @@ def _facts(pnls):
     return SimpleNamespace(pnl=running, peak_pnl=peak, max_drawdown=max_dd)
 
 
-def _run(pnls, thresholds=None):
+def _run(pnls, thresholds=None, session_date=None):
     """Run the detector on the LAST trade of a session with these P&Ls."""
     trades = [_ct(p, -60 + i * 5) for i, p in enumerate(pnls)]
     th = {"profit_giveaway_min_peak": 1500,
@@ -80,7 +81,7 @@ def _run(pnls, thresholds=None):
     ctx = EngineContext(
         broker_account_id=trades[-1].broker_account_id,
         session=SimpleNamespace(session_pnl=_facts(pnls).pnl,
-                                session_date=None, market_open=None),
+                                session_date=session_date, market_open=None),
         completed_trade=trades[-1],
         session_trades=trades[:-1],
         active_cooldowns=[],
@@ -268,3 +269,146 @@ def test_the_detector_is_pure():
     src = inspect.getsource(engine._detect_profit_giveaway)
     for forbidden in ("await ", "db.", "select("):
         assert forbidden not in src, f"detector reaches for {forbidden!r}"
+
+
+# ── episode dedup: one episode is one fall from one high-water mark ────────
+#
+# Added 2026-08-27. `worst_giveaway` is facts.max_drawdown, which is SESSION-wide
+# and does not reset when the session makes a new high. Under the old
+# pattern_type key a second, shallower giveback could therefore be swallowed: a
+# session peaking at 5,000 that falls to 1,000 alerts, recovers to 8,000 and
+# falls to 5,000 has given back 3,000 from a new high while max_drawdown still
+# reads 4,000 - no escalation, no +20% re-arm, inside the window, silence.
+#
+# On the reference book this changes nothing: 100 alerts before and after, the
+# identical set, because 47 of the 48 affected sessions hold exactly one
+# episode. It is a correctness fix, not a volume one. Full analysis in
+# docs/patterns/06-profit_giveaway/episode_dedup_analysis.md.
+
+
+class TestEpisodeDedup:
+
+    def test_a_new_high_water_mark_is_a_new_episode(self):
+        """`peak_pnl` identifies the episode, so a new peak is a new key."""
+        first = _pattern_dedup_key(
+            "profit_giveaway", {"session_date": "2026-02-06", "peak_pnl": 1667.0})
+        second = _pattern_dedup_key(
+            "profit_giveaway", {"session_date": "2026-02-06", "peak_pnl": 3615.0})
+        assert first != second, (
+            "a giveback from a higher high would be suppressed by the earlier one"
+        )
+
+    def test_the_same_peak_shares_one_key(self):
+        a = _pattern_dedup_key(
+            "profit_giveaway", {"session_date": "2026-02-06", "peak_pnl": 1667.0})
+        b = _pattern_dedup_key(
+            "profit_giveaway", {"session_date": "2026-02-06", "peak_pnl": 1667.0})
+        assert a == b, "one episode must not alert twice for the same reason"
+
+    def test_the_same_peak_on_a_different_day_is_a_different_episode(self):
+        """
+        peak_pnl resets at the market open, so two sessions can coincidentally
+        reach the same figure. The session date is in the key for that reason.
+        """
+        a = _pattern_dedup_key(
+            "profit_giveaway", {"session_date": "2026-02-06", "peak_pnl": 2000.0})
+        b = _pattern_dedup_key(
+            "profit_giveaway", {"session_date": "2026-02-09", "peak_pnl": 2000.0})
+        assert a != b
+
+    def test_the_detector_supplies_both_halves_of_the_key(self):
+        """
+        `last_fired` is rebuilt by re-keying stored RiskAlert rows, so both key
+        components have to survive into the alert's details - not just be
+        available in the engine.
+        """
+        ev = _run([6000, -4000], session_date="2026-02-06")
+        assert ev.context["peak_pnl"] == 6000
+        assert ev.context["session_date"] == "2026-02-06"
+        key = _pattern_dedup_key("profit_giveaway", ev.context)
+        assert key == "profit_giveaway:2026-02-06:6000.0"
+
+    def test_an_earlier_episode_does_not_suppress_a_later_one(self):
+        """
+        The end-to-end case, run through the real dedup predicate rather than
+        asserted about the key. Episode 1 gives back from a peak of 6,000 and
+        alerts. The session then makes a new high of 12,000 and gives back from
+        THAT - shallower in absolute terms, so max_drawdown has not moved and
+        the severity has not escalated. It must still be heard.
+        """
+        first = _run([6000, -4000], session_date="2026-02-06")
+        # Recover past the old peak, then give back half of the NEW one. The
+        # second giveback (4,500) is deeper than the first (4,000) but not by
+        # the 20% the re-arm needs, so nothing except the episode key can let
+        # it through.
+        second = _run([6000, -4000, 7000, -4500], session_date="2026-02-06")
+        assert first is not None and second is not None
+        assert second.context["peak_pnl"] > first.context["peak_pnl"]
+
+        k1 = _pattern_dedup_key("profit_giveaway", first.context)
+        k2 = _pattern_dedup_key("profit_giveaway", second.context)
+        assert k1 != k2, "the second episode shares the first's dedup stream"
+
+        # Same severity, and max_drawdown has NOT grown by 20% - so neither the
+        # escalation rule nor the re-arm would have let it through.
+        assert second.severity == first.severity
+        assert not _worsened("profit_giveaway", first.context, second.context), (
+            "this test is only meaningful if the re-arm would NOT have fired"
+        )
+
+    def test_the_rearm_still_works_inside_one_episode(self):
+        """
+        The episode key must not disable the deepening re-arm. Same peak, same
+        key, but the giveback grew well past 20% - `_worsened` still says yes.
+        """
+        shallow = _run([8000, -4000], session_date="2026-02-06")
+        deep = _run([8000, -4000, -3000], session_date="2026-02-06")
+        assert shallow.context["peak_pnl"] == deep.context["peak_pnl"]
+        assert (_pattern_dedup_key("profit_giveaway", shallow.context)
+                == _pattern_dedup_key("profit_giveaway", deep.context))
+        assert _worsened("profit_giveaway", shallow.context, deep.context), (
+            "a deepening giveback inside one episode must still re-fire"
+        )
+
+    def test_a_shallower_moment_in_the_same_episode_does_not_refire(self):
+        """The re-arm rule is unchanged: it takes +20%, not any change."""
+        deep = _run([8000, -6000], session_date="2026-02-06")
+        recovered = _run([8000, -6000, 2000], session_date="2026-02-06")
+        assert not _worsened("profit_giveaway", deep.context, recovered.context)
+
+
+class TestOtherDetectorsUntouched:
+
+    @pytest.mark.parametrize("pattern", [
+        "martingale_behaviour", "revenge_trade", "adding_to_adverse_position",
+        "size_escalation", "daily_overtrading", "overtrading_burst",
+    ])
+    def test_every_other_pattern_still_keys_on_its_type_alone(self, pattern):
+        assert _pattern_dedup_key(
+            pattern, {"peak_pnl": 5000, "session_date": "2026-02-06"}) == pattern
+
+    def test_the_two_pre_existing_per_episode_keys_are_unchanged(self):
+        assert (_pattern_dedup_key("constitution_violation", {"rule": "daily_loss"})
+                == "constitution_violation:daily_loss")
+        assert (_pattern_dedup_key("same_symbol_obsession", {"underlying": "NIFTY"})
+                == "same_symbol_obsession:NIFTY")
+
+    def test_other_worsen_metrics_are_intact(self):
+        for pattern in ("martingale_behaviour", "premium_loss_event",
+                        "constitution_violation"):
+            assert pattern in _WORSEN_METRIC
+
+    def test_the_dedup_window_is_still_two_hours(self):
+        """
+        The window was NOT part of this change. `_DEDUP_HOURS` is a local inside
+        both task functions rather than a module attribute, so this reads the
+        source - an awkward test that pins a real decision beats no test.
+        """
+        import inspect
+
+        from app.tasks import trade_tasks
+
+        src = inspect.getsource(trade_tasks)
+        assert src.count('"profit_giveaway":         2,') == 2, (
+            "the 2-hour dedup window changed, or moved"
+        )

@@ -243,6 +243,10 @@ class TestOtherDetectorsAreUnaffected:
         assert k == "constitution_violation:daily_loss"
 
     def test_every_other_pattern_still_keys_on_its_type_alone(self):
-        for p in ("martingale_behaviour", "revenge_trade", "profit_giveaway",
+        # profit_giveaway left this list on 2026-08-27: it now keys on its
+        # episode, (session_date, peak_pnl). See test_profit_giveaway.py. The
+        # subject of this test - that adding a per-episode key for one detector
+        # does not quietly give one to the rest - is unchanged.
+        for p in ("martingale_behaviour", "revenge_trade",
                   "adding_to_adverse_position"):
             assert _pattern_dedup_key(p, {"underlying": "NIFTY"}) == p

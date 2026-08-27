@@ -96,6 +96,27 @@ def _pattern_dedup_key(pattern_type: str, details) -> str:
     # been swallowed by the first.
     if pattern_type == "same_symbol_obsession":
         return f"same_symbol_obsession:{(details or {}).get('underlying', '')}"
+    # profit_giveaway's subject is one fall from ONE high-water mark, and
+    # `peak_pnl` is monotonic non-decreasing within a session - so a new peak IS
+    # a new episode and must not be suppressed by the previous one.
+    #
+    # The case the pattern_type key gets wrong: `worst_giveaway`, the re-arm
+    # metric, is facts.max_drawdown, which is SESSION-wide and does not reset at
+    # a new peak. A session that peaks at 5,000, falls to 1,000 (alert), recovers
+    # to 8,000 and falls to 5,000 has given back 3,000 from a new high while
+    # max_drawdown still reads 4,000 - no escalation, no +20% re-arm, inside the
+    # window, so the second giveback was silently swallowed. Measured on the
+    # reference book this changes nothing (100 alerts before and after, the
+    # identical set: 47 of 48 affected sessions hold exactly one episode, and the
+    # one that holds two escaped only because its second episode happened to
+    # escalate). It is a correctness fix, not a volume one.
+    #
+    # The session date joins the key because peak_pnl resets at the open and two
+    # days can coincidentally reach the same peak.
+    if pattern_type == "profit_giveaway":
+        _d = details or {}
+        return (f"profit_giveaway:{_d.get('session_date', '')}"
+                f":{_d.get('peak_pnl', '')}")
     return pattern_type
 
 

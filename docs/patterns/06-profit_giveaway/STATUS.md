@@ -102,6 +102,31 @@ that was asked for. **Whether ~1 alert per affected session is the right volume
 is a separate decision that has not been made** — it needs an episode key (one
 peak, one alert, escalating only), which is a change nobody has approved.
 
+## Episode dedup — added 27 Aug, after the analysis
+
+`profit_giveaway` keys its dedup on **`(session_date, peak_pnl)`** rather than
+`pattern_type`. One episode is one fall from one high-water mark; `peak_pnl` is
+monotonic non-decreasing within a session, so a new peak IS a new episode.
+
+**Why, given it changes nothing measurable** — 100 alerts before and after, the
+identical set, because 47 of the 48 affected sessions hold exactly one episode.
+It closes a latent false negative: `worst_giveaway` is `facts.max_drawdown`,
+which is **session-wide and does not reset at a new peak**, so a second,
+shallower giveback could be swallowed. A session peaking at ₹5,000 that falls to
+₹1,000 alerts; recovering to ₹8,000 and falling to ₹5,000 gives back ₹3,000 from
+a new high while `max_drawdown` still reads ₹4,000 — no escalation, no +20%
+re-arm, inside the window, silence. The one two-episode session in the book
+escaped only because its second episode happened to escalate.
+
+Unchanged by this: the 2-hour window, the `worst_giveaway` re-arm, severity
+monotonicity, every threshold, and every other detector's key.
+
+**Known imperfection, recorded not fixed:** because `worst_giveaway` stays
+session-wide, re-arms *inside* a second episode still compare against the
+session's deepest point, so a shallower later episode fires once and then stays
+quiet. Its first alert is now guaranteed, which is the part that matters. A
+per-episode drawdown would close the rest; the evidence does not ask for one.
+
 ## Limitations, recorded not closed
 
 1. **`peak_pnl` is the high-water mark of the REALIZED curve only.** A trader up

@@ -3176,7 +3176,12 @@ class BehaviorEngine:
         # to four alerts in a single session.)
 
         ct = ctx.completed_trade
+        # The dedup key is (session_date, peak_pnl) - one episode is one fall
+        # from one high-water mark. Both have to be IN the stored details,
+        # because `last_fired` is rebuilt by re-keying existing RiskAlert rows.
+        _session_date = getattr(ctx.session, "session_date", None) if ctx.session else None
         base_context = {
+            "session_date": str(_session_date) if _session_date else None,
             "peak_pnl": round(float(peak_pnl), 2),
             "current_pnl": round(float(current_pnl), 2),
             "erosion": round(float(erosion), 2),
