@@ -1,4 +1,13 @@
-# Pattern #8 — `premium_loss_event` · **COMPLETE (KEEP AS-IS)**
+# Pattern #8 — `premium_loss_event` · **REOPENED**
+
+> **This was marked COMPLETE on 27 Aug and the marking is RETRACTED the same
+> day.** The review below measured the exit path thoroughly and treated the live
+> path as a footnote, and it closed before checking whether the trader's own
+> declared limit was used. Both were wrong: the live path is the half that can
+> change an outcome, and `sl_percent_options` is collected, resolved, and read by
+> nothing. See **`realtime_review.md`** — verdict **MODIFY**.
+>
+> Everything below about the BANDS still stands and was not disturbed.
 
 27 Aug 2026. Verdict **KEEP AS-IS** — the first detector in this series to
 survive its evidence intact. Three non-behavioural cleanup items applied.

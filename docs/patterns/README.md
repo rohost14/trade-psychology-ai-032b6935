@@ -16,7 +16,7 @@ pattern, numbered in review order.
 | [05](05-overtrading/) | `overtrading_burst` + `daily_overtrading` | **`daily_overtrading` COMPLETE** — now fires on the declared limit only · **`overtrading_burst` DEFERRED**, untouched | daily was 52 / 49, now **0** undeclared · burst 12 / 10, unchanged |
 | [06](06-profit_giveaway/) | `profit_giveaway` | **RETIRED / COMPLETE** — the giveback is arithmetic, not behaviour. Measurement kept and now shown in Reports; giveback-as-context is RESEARCH FURTHER | was 100 / 48 days, now **0** |
 | [07](07-fomo_entry/) | `fomo_entry` | **COMPLETE** — v2.0.0, one threshold for every context; two of the four could not fire | was 74 / 41 days, now **46 / 26** |
-| [08](08-premium_loss_event/) | `premium_loss_event` | **COMPLETE — KEEP AS-IS.** The one detector that finds the money: 5% of positions, **35% of all losses** | 48 detections / 41 alerts / 39 days |
+| [08](08-premium_loss_event/) | `premium_loss_event` | **REOPENED — MODIFY.** Bands are right (5% of positions, **35% of all losses**) but the plumbing is not: declared rule unused, live path is a 60s poll that fails at 10k users, two unreconciled dedup scopes. `realtime_review.md` | 48 detections / 41 alerts / 39 days |
 | — | `expiry_day_overtrading` | next | 28 / — |
 
 The live queue for every remaining pattern is the **REVIEW STATUS** table in
