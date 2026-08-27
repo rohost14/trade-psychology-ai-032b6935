@@ -179,15 +179,15 @@ celery_app.conf.update(
             "schedule": crontab(hour=8, minute=30, day_of_week="1-5"),
         },
         # Live premium destruction (E4) — every 60s, market hours only.
-        # Driven by price movement rather than by the trader doing anything, so
-        # unlike the rest of the pipeline it cannot be event-driven off a fill.
-        # Reads only the Redis LTP cache the shared KiteTicker already fills:
-        # no Kite REST calls, so the 3 req/s limit is not involved. The task
-        # returns immediately outside 09:15–15:25 IST and at weekends.
-        "live-premium-monitor": {
-            "task": "app.tasks.position_monitor_tasks.monitor_live_premium",
-            "schedule": 60.0,
-        },
+        # "live-premium-monitor" was here until 2026-08-27 (Pattern #8 review).
+        # It re-read every connected account's positions and profile once a
+        # minute to check a number that only changes when a price does - roughly
+        # 20,001 database round trips per minute at 10,000 users, in a serial
+        # loop, which does not fit inside its own 60-second period. Premium-loss
+        # crossings are now evaluated on the tick itself against in-memory state
+        # (`services/live_risk_state.py`), with the database read only when a
+        # position or a rule changes. Latency went from up to 60 seconds to
+        # sub-second, and the hot path performs no I/O at all.
         # EOD comparison push — 3:35 PM IST Mon–Fri.
         # Compares planned intent limits vs actual session metrics.
         "eod-comparison": {

@@ -105,6 +105,25 @@ class PriceStreamProvider(ABC):
 # Shared helper — used by both stream implementations
 # ─────────────────────────────────────────────────────────────────────────────
 
+
+async def _refresh_risk_state(broker_account_id: UUID, db) -> None:
+    """
+    Reload the tick-path premium-loss state for one account.
+
+    This is the ONLY moment the live premium check reads the database. It hangs
+    off `refresh_subscriptions` deliberately rather than inventing a trigger:
+    that already runs on a fill (via the event bus), on a manual sync and at
+    startup, which is exactly the set of moments an account's open positions or
+    rules can change. Failure is non-fatal — the price stream matters more than
+    the risk state, and the next refresh will pick it up.
+    """
+    try:
+        from app.tasks.position_monitor_tasks import rebuild_account_risk_state
+        await rebuild_account_risk_state(broker_account_id, db)
+    except Exception as e:
+        logger.debug(f"[live_risk] state refresh skipped for {broker_account_id}: {e}")
+
+
 async def _get_open_position_tokens(
     broker_account_id: UUID, db
 ) -> Dict[int, str]:
@@ -496,6 +515,22 @@ class AsyncKiteTicker:
             except Exception:
                 pass
 
+            # Premium-loss risk state (Pattern #8). Pure in-memory evaluation -
+            # no database, no Redis, no network - so it is safe to run on every
+            # tick batch. It returns only CROSSINGS, which are rare, and the
+            # alert write is handed to a separate task so nothing that touches
+            # the database can ever block the price stream.
+            try:
+                from app.services.live_risk_state import live_risk_state
+                crossings = live_risk_state.evaluate_batch(
+                    {t: float(p) for t, p in ltp_updates.items()}
+                )
+                if crossings:
+                    from app.tasks.position_monitor_tasks import dispatch_risk_crossings
+                    asyncio.create_task(dispatch_risk_crossings(crossings))
+            except Exception:
+                pass
+
     async def subscribe_async(self, token_symbol_map: Dict[int, str]) -> None:
         for t, s in token_symbol_map.items():
             self._token_to_symbol[t] = s
@@ -847,6 +882,7 @@ class SharedPriceStream(PriceStreamProvider):
     async def refresh_subscriptions(self, broker_account_id: UUID, db) -> None:
         """Re-check positions and subscribe to newly opened instruments."""
         await self.start_account(broker_account_id, db)
+        await _refresh_risk_state(broker_account_id, db)
 
     async def stop_account(self, broker_account_id: UUID) -> None:
         """
@@ -976,6 +1012,7 @@ class PerUserPriceStream(PriceStreamProvider):
         token_symbol_map = await _get_open_position_tokens(broker_account_id, db)
         if token_symbol_map:
             ticker.subscribe(token_symbol_map)
+        await _refresh_risk_state(broker_account_id, db)
 
     async def stop_account(self, broker_account_id: UUID) -> None:
         account_id_str = str(broker_account_id)

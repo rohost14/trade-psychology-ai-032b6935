@@ -79,8 +79,31 @@ def _run(ct, prior=(), thresholds=None):
     (100.0, "critical"),
 ])
 def test_the_bands_are_40_60_80(loss, expected):
+    """
+    The boundaries are unchanged. What moved is what they decide: this path is
+    analytics now, so they set `band` in the evidence rather than the severity.
+    """
     ev = _run(_opt(loss))
-    assert (ev.severity if ev else None) == expected, f"{loss}% -> {expected}"
+    assert (ev.context["band"] if ev else None) == expected, f"{loss}% -> {expected}"
+
+
+@pytest.mark.parametrize("loss", [40.0, 65.0, 85.0, 100.0])
+def test_the_exit_path_never_alerts(loss):
+    """
+    It runs on a CLOSED position, where the trader necessarily knows. The alert
+    that can change something is the live crossing. `info` never becomes a
+    RiskAlert, which is what removes the live/exit double-report.
+    """
+    assert _run(_opt(loss)).severity == "info"
+
+
+def test_the_spec_says_analytics():
+    from app.services.detector_registry import BY_NAME
+
+    spec = BY_NAME["premium_loss_event"]
+    assert spec.disposition == "analytics"
+    assert spec.notification_level == 0
+    assert spec.nature == "risk", "a premium loss is a market outcome"
 
 
 def test_the_band_constants_did_not_move():
@@ -123,33 +146,23 @@ def test_a_profitable_option_says_nothing():
 
 # ── the repeat rule is unchanged ───────────────────────────────────────────
 
-def test_a_second_option_past_danger_promotes_danger_to_critical():
+def test_the_repeat_rule_no_longer_promotes_severity():
     """
-    Unsourced and load-bearing: it produced 2 of the 10 criticals on the
-    reference book. Left alone by the review; pinned here so a change is
-    deliberate.
+    It used to turn danger into critical, producing 2 of the 10 criticals on the
+    reference book. That promotion went with the severity it operated on — this
+    path is analytics. The COUNT survives, because "two long options past the
+    danger level today" is a fact the daily report can use.
     """
     prior = [_opt(70.0, symbol="BANKNIFTY25AUG55000CE")]
-    # 65% is in the danger band on its own...
-    assert _run(_opt(65.0), prior=[]).severity == "danger"
-    # ...and a second long option already past danger today makes it critical.
-    assert _run(_opt(65.0), prior=prior).severity == "critical"
+    ev = _run(_opt(65.0), prior=prior)
+    assert ev.severity == "info"
+    assert ev.context["band"] == "danger", "the band is still what the loss was"
+    assert ev.context["repeat_count_today"] == 1
 
 
-def test_the_repeat_rule_does_not_promote_caution():
-    """It escalates danger, and only danger."""
-    prior = [_opt(70.0, symbol="BANKNIFTY25AUG55000CE")]
-    assert _run(_opt(45.0), prior=prior).severity == "caution"
-
-
-def test_the_repeat_rule_needs_a_prior_past_danger():
-    prior = [_opt(45.0, symbol="BANKNIFTY25AUG55000CE")]   # caution only
-    assert _run(_opt(65.0), prior=prior).severity == "danger"
-
-
-def test_the_repeat_count_is_reported():
-    prior = [_opt(70.0, symbol="BANKNIFTY25AUG55000CE")]
-    assert _run(_opt(65.0), prior=prior).context["repeat_count_today"] == 1
+def test_the_repeat_count_only_counts_priors_past_danger():
+    caution_only = [_opt(45.0, symbol="BANKNIFTY25AUG55000CE")]
+    assert _run(_opt(65.0), prior=caution_only).context["repeat_count_today"] == 0
 
 
 # ── the impossible-loss cap is unchanged ───────────────────────────────────
@@ -223,6 +236,7 @@ def test_the_repeat_rules_inline_literal_is_recorded_as_unsourced():
 def test_the_message_says_the_position_is_closed():
     ev = _run(_opt(85.0))
     assert ev.message.startswith("Closed "), ev.message
+    assert ev.severity == "info"
     assert "lost 85% of the premium paid" in ev.message
 
 
@@ -244,7 +258,8 @@ def test_the_message_no_longer_speculates_about_why():
 def test_the_fast_collapse_flag_still_never_touches_severity():
     slow = _run(_opt(65.0, hold=600))
     fast = _run(_opt(65.0, hold=5))
-    assert slow.severity == fast.severity == "danger"
+    assert slow.severity == fast.severity == "info"
+    assert slow.context["band"] == fast.context["band"] == "danger"
     assert fast.context["fast_collapse"] is True
     assert slow.context["fast_collapse"] is False
 
@@ -267,8 +282,6 @@ def test_the_spec_and_worsen_metric_did_not_move():
 
     spec = BY_NAME["premium_loss_event"]
     assert spec.nature == "risk"
-    assert spec.disposition == "alerting"
-    assert spec.notification_level == 3
     assert spec.guardian_eligible is False
     assert _WORSEN_METRIC["premium_loss_event"] == "loss_pct"
 

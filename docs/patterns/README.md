@@ -16,7 +16,7 @@ pattern, numbered in review order.
 | [05](05-overtrading/) | `overtrading_burst` + `daily_overtrading` | **`daily_overtrading` COMPLETE** — now fires on the declared limit only · **`overtrading_burst` DEFERRED**, untouched | daily was 52 / 49, now **0** undeclared · burst 12 / 10, unchanged |
 | [06](06-profit_giveaway/) | `profit_giveaway` | **RETIRED / COMPLETE** — the giveback is arithmetic, not behaviour. Measurement kept and now shown in Reports; giveback-as-context is RESEARCH FURTHER | was 100 / 48 days, now **0** |
 | [07](07-fomo_entry/) | `fomo_entry` | **COMPLETE** — v2.0.0, one threshold for every context; two of the four could not fire | was 74 / 41 days, now **46 / 26** |
-| [08](08-premium_loss_event/) | `premium_loss_event` | **REOPENED — contract proposed, awaiting approval.** Bands are right; the detector is doing three jobs at once. Split: live crossing alerts, exit → analytics, declared boundary → `constitution_violation`, after-boundary behaviour → Pattern 2. **Event contract ready — `event_contract.md`.** Pattern 8 becomes a real-time RISK-STATE detector feeding context to the behavioural ones, not a behaviour detector itself | 48 detections / 41 alerts / 39 days |
+| [08](08-premium_loss_event/) | `premium_loss_event` | **COMPLETE** — v3.0.0. No longer a behaviour detector: a real-time **risk-state** detector on the tick path (zero DB on the hot path, sub-second), exit → analytics, declared boundary → `constitution_violation`. `event_contract.md` | exit alerts 41 → **0**; live path covered by 106 tests |
 | — | `expiry_day_overtrading` | next | 28 / — |
 
 The live queue for every remaining pattern is the **REVIEW STATUS** table in

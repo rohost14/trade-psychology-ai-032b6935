@@ -180,8 +180,17 @@ REGISTRY: Tuple[DetectorSpec, ...] = (
                  uses_baseline=True),
     DetectorSpec("options_premium_avg_down", "_detect_options_premium_avg_down",
                  "1.0.0", "emotional", "alerting", "exit", 1),
+    # 3.0.0 (2026-08-27): Pattern #8 stopped being a behaviour detector and
+    # became a real-time RISK-STATE detector. The alerting half moved onto the
+    # tick path (`services/live_risk_state.py`), which raises a band crossing
+    # while the position is still open and something can be done about it. What
+    # remains HERE runs on a closed position, so it is analytics: it records what
+    # the position finished at and feeds the daily report, and never alerts.
+    #
+    # `nature="risk"` was always right - a large premium loss is a market
+    # outcome, not a behavioural failure - and the disposition now agrees with it.
     DetectorSpec("premium_loss_event", "_detect_premium_loss_event",
-                 "2.0.0", "risk", "alerting", "exit", 3),
+                 "3.0.0", "risk", "analytics", "exit", 0),
     DetectorSpec("expiry_day_overtrading", "_detect_expiry_day_overtrading",
                  "1.0.0", "emotional", "alerting", "exit", 2,
                  uses_baseline=True),
@@ -383,10 +392,14 @@ PATTERN_COPY: Dict[str, PatternCopy] = {
         "Additional quantity on an option position already down on premium.",
         "Averaging down an option fights both direction and time decay.",
     ),
+    # Copy rewritten 2026-08-27, Pattern #8. "Premium destruction" and "the
+    # position needs a move it was never sized for" both read as a verdict on the
+    # trade. This is a risk STATE - how much of the premium is gone - and the
+    # evidence says nothing about how the trade was taken.
     "premium_loss_event": PatternCopy(
-        "Premium destruction",
+        "Premium lost",
         "Percentage of the premium paid that has been lost on a long option.",
-        "Beyond a point the position needs a move it was never sized for. Time is on the other side.",
+        "A long option's whole downside is the premium. This is how much of it is gone.",
     ),
 
     # ── Discipline / pace ────────────────────────────────────────────────

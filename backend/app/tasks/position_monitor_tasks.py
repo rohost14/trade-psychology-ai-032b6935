@@ -817,6 +817,153 @@ async def _open_structures(broker_account_id: str) -> list:
         return []
 
 
+# ─────────────────────────────────────────────────────────────────────────────
+# Live premium-loss risk state — rebuild, and dispatch of tick crossings
+# ─────────────────────────────────────────────────────────────────────────────
+#
+# The 60-second `monitor_live_premium` beat that used to do this was deleted in
+# the Pattern #8 review (2026-08-27). It re-read every connected account's
+# positions and profile once a minute — roughly 20,001 database round trips per
+# minute at 10,000 users, in a serial loop, to check a number that only changes
+# when a price does.
+#
+# Now the state lives in memory beside the shared ticker and the database is read
+# only when it CHANGES. `rebuild_account_risk_state` is that read; it is called
+# from `refresh_subscriptions`, which already runs on a fill, on sync and at
+# startup, so no new trigger was invented.
+
+async def rebuild_account_risk_state(broker_account_id, db) -> int:
+    """
+    Re-read one account's open option positions and rules into the tick-path state.
+
+    Called when the state CHANGES, never on a tick. Returns the watch count.
+    """
+    from sqlalchemy import and_, select
+
+    from app.core.trading_defaults import get_thresholds
+    from app.models.position import Position
+    from app.models.user_profile import UserProfile
+    from app.services.instrument_parser import is_expiry_day as _ied
+    from app.services.live_risk_state import build_watches, live_risk_state
+
+    acct = str(broker_account_id)
+    try:
+        positions = (await db.execute(
+            select(Position).where(and_(
+                Position.broker_account_id == UUID(acct),
+                Position.total_quantity != 0,
+            ))
+        )).scalars().all()
+
+        profile = (await db.execute(
+            select(UserProfile).where(UserProfile.broker_account_id == UUID(acct))
+        )).scalar_one_or_none()
+
+        today = datetime.now(IST).date()
+        watches = build_watches(
+            positions, get_thresholds(profile), acct,
+            is_expiry_day_fn=lambda sym: _ied(sym, today),
+        )
+        live_risk_state.replace_account(acct, watches)
+        return len(watches)
+    except Exception as e:
+        logger.warning(f"[live_risk] rebuild failed for {acct}: {e}")
+        return 0
+
+
+async def dispatch_risk_crossings(crossings) -> int:
+    """
+    Turn tick crossings into alerts. Runs OFF the tick path, once per crossing.
+
+    Consolidation, per the Pattern #8 event contract: when the trader's declared
+    boundary and a universal band are crossed by the same price on the same
+    position, that is ONE alert — the declared one, because it is their own line
+    — carrying the universal fact inside it.
+
+    `Layer.SAFETY` is respected: the universal finding is never dropped. It is
+    either the alert or it is carried in the alert that wins, which is the same
+    thing `_consolidate` does when several constitution rules break at once.
+    """
+    from app.services.live_risk_state import DECLARED, UNIVERSAL
+
+    if not crossings:
+        return 0
+
+    by_position = {}
+    for c in crossings:
+        by_position.setdefault((c.broker_account_id, c.tradingsymbol, c.epoch), []).append(c)
+
+    fired = 0
+    for (acct, symbol, _epoch), group in by_position.items():
+        declared = next((c for c in group if c.kind == DECLARED), None)
+        universal = next((c for c in group if c.kind == UNIVERSAL), None)
+
+        if declared is not None:
+            pattern = "constitution_violation"
+            severity = declared.severity
+            message = (
+                f"You set your options exit at {declared.boundary_pct:.0f}% of premium. "
+                f"{symbol} is {declared.loss_pct:.0f}% down."
+            )
+            details = {
+                "rule": "sl_percent_options",
+                "symbol": symbol,
+                "limit_pct": declared.boundary_pct,
+                "current_pct": declared.loss_pct,
+                "entry_premium": declared.entry_price,
+                "last_price": declared.last_price,
+                "expiry_day": declared.expiry_day,
+                "live": True,
+                "at_entry": False,
+                "_confidence": 95.0,
+            }
+            if universal is not None:
+                # The safety finding is carried, not dropped.
+                details["also_crossed"] = {
+                    "pattern_type": "premium_loss_event",
+                    "boundary_pct": universal.boundary_pct,
+                    "severity": universal.severity,
+                }
+                message += f" That is past the {universal.boundary_pct:.0f}% safety level."
+        elif universal is not None:
+            pattern = "premium_loss_event"
+            severity = universal.severity
+            message = (
+                f"{symbol} is {universal.loss_pct:.0f}% down on the premium paid "
+                f"(entry {universal.entry_price:.2f}, now {universal.last_price:.2f})."
+            )
+            details = {
+                "symbol": symbol,
+                "loss_pct": universal.loss_pct,
+                "boundary_pct": universal.boundary_pct,
+                "entry_premium": universal.entry_price,
+                "last_price": universal.last_price,
+                "quantity": universal.quantity,
+                "expiry_day": universal.expiry_day,
+                "live": True,
+                "at_entry": False,
+                "_confidence": 95.0,
+            }
+        else:
+            continue
+
+        try:
+            async with SessionLocal() as alert_db:
+                if await _fire_position_alert(
+                    broker_account_id=acct,
+                    pattern_type=pattern,
+                    severity=severity,
+                    message=message,
+                    details=details,
+                    db=alert_db,
+                ):
+                    fired += 1
+        except Exception as e:
+            logger.warning(f"[live_risk] alert write failed for {symbol}: {e}")
+
+    return fired
+
+
 @celery_app.task(name="app.tasks.position_monitor_tasks.monitor_live_premium")
 def monitor_live_premium():
     """

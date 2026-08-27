@@ -43,6 +43,13 @@ RULE_FIELDS = (
     "cooldown_after_loss",
     "max_consecutive_losses",
     "restricted_windows",
+    # Added 2026-08-27 (Pattern #8). Settings has asked "I exit options when
+    # premium drops by" since long before that, stored the answer, and resolved
+    # it into the threshold dict - and NOTHING read it. It is a declared exit
+    # rule in everything but name, so it becomes one: the live premium-loss path
+    # raises it as a constitution_violation when the trader's own line is
+    # reached, beside (never instead of) the universal safety band.
+    "sl_percent_options",
 )
 
 # direction: +1 means numerically higher = tighter, -1 means lower = tighter
@@ -52,6 +59,8 @@ _TIGHTEN_DIRECTION = {
     "max_position_size": -1,
     "cooldown_after_loss": +1,
     "max_consecutive_losses": -1,
+    # Exiting sooner is tighter: 25% is a stricter promise than 50%.
+    "sl_percent_options": -1,
 }
 
 LOCK_DAYS = 30

@@ -2679,9 +2679,24 @@ class BehaviorEngine:
 
         if loss_pct < l_caution:
             return None
-        severity = ("critical" if loss_pct >= l_critical
-                    else "danger" if loss_pct >= l_danger
-                    else "caution")
+
+        # ANALYTICS ONLY since 2026-08-27 (Pattern #8 review).
+        #
+        # This path runs on a position that is already CLOSED, and the trader
+        # necessarily knows - they just closed it. The alert that can change
+        # something is the live one, raised on a band crossing while the position
+        # is still open (`services/live_risk_state.py`), and this used to repeat
+        # it: the same 80% event was reported once live and once here, because
+        # the two paths have separate dedup scopes and nothing reconciles them.
+        #
+        # `info` is the existing mechanism for exactly this - "recorded as
+        # evidence, never sent anywhere" - so demoting it removes the duplicate
+        # without any dedup surgery. The BAND is still computed and still stored
+        # in the evidence below, because Analytics and the daily report want it.
+        band = ("critical" if loss_pct >= l_critical
+                else "danger" if loss_pct >= l_danger
+                else "caution")
+        severity = "info"
 
         fast_hold = ctx.thresholds.get("premium_loss_fast_hold_min", 30)
         fast_collapse = (ct.duration_minutes is not None
@@ -2703,8 +2718,11 @@ class BehaviorEngine:
             and t.direction == "LONG" and t.pnl_pct is not None
             and float(t.pnl_pct) <= -l_danger
         )
-        if repeat_count >= 1 and severity == "danger":
-            severity = "critical"
+        # The promotion this rule used to perform (danger -> critical) is gone
+        # with the severity it operated on: this path is analytics now. The count
+        # itself is kept and still reported, because "two long options past the
+        # danger level today" is a fact the daily report can use, and because the
+        # live path may want it once it has completed-trade context.
 
         # This path runs on a CLOSED position. The median flagged trade in the
         # reference book was held 1,341 minutes - overnight - so the present
@@ -2739,6 +2757,7 @@ class BehaviorEngine:
                 "hold_minutes": ct.duration_minutes,
                 "fast_collapse": fast_collapse,
                 "repeat_count_today": repeat_count,
+                "band": band,
                 "levels": {"caution": l_caution, "danger": l_danger, "critical": l_critical},
             },
         )
