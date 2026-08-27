@@ -2687,7 +2687,16 @@ class BehaviorEngine:
         fast_collapse = (ct.duration_minutes is not None
                          and ct.duration_minutes < fast_hold)
 
-        # Repeat destruction today escalates danger→critical
+        # Repeat destruction today escalates danger -> critical.
+        #
+        # The `>= 1` below is an INLINE LITERAL WITH NO KEY AND NO SOURCE, and
+        # it is load-bearing: measured in the Pattern #8 review it engages on 5
+        # of 48 firings and promotes twice, so 2 of the detector's 10 criticals
+        # come from this rule rather than from the magnitude of the loss. Both
+        # promotions were genuine large losses (85.5% against an expiry-shifted
+        # critical level of 95, and 75.6% against 80), which is why the review
+        # left it alone rather than changing it. Recorded here so the next person
+        # does not have to rediscover that it is unsourced.
         repeat_count = sum(
             1 for t in ctx.session_trades
             if t.id != ct.id and t.instrument_type in ("CE", "PE")
@@ -2697,17 +2706,29 @@ class BehaviorEngine:
         if repeat_count >= 1 and severity == "danger":
             severity = "critical"
 
-        speed_note = (f" in {ct.duration_minutes}min — fast collapse, likely bought into peak IV"
+        # This path runs on a CLOSED position. The median flagged trade in the
+        # reference book was held 1,341 minutes - overnight - so the present
+        # tense read as though something were still happening to a position that
+        # no longer existed. The live variant
+        # (`live_checks.evaluate_live_premium_loss`, fired from the 60-second
+        # position-monitor beat) is the one that speaks while the trade is open
+        # and can still be acted on; this one is the record of what happened.
+        #
+        # "likely bought into peak IV" went with the rewrite: the hold time is
+        # observed, the reason for it is not, and this detector has no way to
+        # see what implied volatility was at entry.
+        speed_note = (f", held {ct.duration_minutes} min"
                       if fast_collapse else "")
-        repeat_note = (f" ({repeat_count + 1} trades today past the danger level)"
+        repeat_note = (f" ({repeat_count + 1} long options past the danger level today)"
                        if repeat_count else "")
 
         return DetectedEvent(
             event_type="premium_loss_event",
             severity=severity,
             message=(
-                f"{ct.tradingsymbol}: {loss_pct:.0f}% of premium lost "
-                f"(₹{abs(float(ct.realized_pnl or 0)):,.0f}){speed_note}{repeat_note}."
+                f"Closed {ct.tradingsymbol} having lost {loss_pct:.0f}% of the "
+                f"premium paid (₹{abs(float(ct.realized_pnl or 0)):,.0f})"
+                f"{speed_note}{repeat_note}."
             ),
             context={
                 "tradingsymbol": ct.tradingsymbol,

@@ -284,8 +284,19 @@ COLD_START_DEFAULTS: Dict[str, Any] = {
     'premium_loss_caution_pct':        40,
     'premium_loss_danger_pct':         60,
     'premium_loss_critical_pct':       80,
-    'premium_loss_expiry_shift_pct':   15,   # +15pp on expiry day
-    'premium_loss_fast_hold_min':      30,   # context flag: fast collapse (IV-crush-like)
+    # UNSOURCED, both of them, and left unchanged by the Pattern #8 review
+    # (2026-08-27) which found nothing wrong with the bands above and no basis
+    # for moving these two either.
+    #
+    # The expiry shift's DIRECTION is well argued - a deep OTM option near expiry
+    # loses 40% of its premium routinely, so the same percentage means less - and
+    # it engaged on 12 of the detector's 48 firings in the reference book. The
+    # MAGNITUDE of 15pp has no stated derivation.
+    'premium_loss_expiry_shift_pct':   15,   # UNSOURCED. Direction argued, size not.
+    # Context flag only: it sets `fast_collapse` in the evidence and never
+    # touches severity, so the cost of it being wrong is one wrong word in a
+    # message. Engaged on 5 of 48.
+    'premium_loss_fast_hold_min':      30,   # UNSOURCED. Never affects severity.
 
     # ── Same symbol obsession (doc 4 P27) ────────────────────────────────
     'obsession_min_losses':             3,   # 3+ losses on one underlying today

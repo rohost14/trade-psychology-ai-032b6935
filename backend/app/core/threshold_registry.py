@@ -269,10 +269,16 @@ THRESHOLD_SPECS: Dict[str, ThresholdSpec] = {
 #
 # KIND IS NOT VALUE
 #
-# `premium_loss_caution_pct` is in MANDATORY_REVIEW because its VALUE is
-# disputed - it fires routinely without behavioural failure. Its Kind is settled
-# regardless: it is a claim about objective loss magnitude, and a wrong number of
-# the right kind is still the right kind.
+# `premium_loss_caution_pct` WAS in MANDATORY_REVIEW because its VALUE was
+# disputed - it was said to fire routinely without behavioural failure. Measured
+# in the Pattern #8 review (2026-08-27) that is not true, and the flag was
+# cleared: 6% of long options lose 40%+ of premium, and the 48 trades the
+# detector flags carry 35% of every rupee the book lost.
+#
+# The reasoning the note was written to make survives the flag being cleared and
+# is the more important half: its Kind was settled either way. It is a claim
+# about objective loss magnitude, and a wrong number of the right kind is still
+# the right kind.
 _UNIVERSAL_SAFETY = {
     "max_position_pct_caution": (5.0, Sensitivity.HIGHER_IS_LOOSER,
                                  "percent of the account in one position"),
@@ -406,8 +412,20 @@ MANDATORY_REVIEW = frozenset({
     # general threshold. Kept here so the reason survives the constant.
     "fomo_symbols_at_open",
     "revenge_window_danger_min",   # retired 2026-08-24; kept so the reason survives
-    "premium_loss_caution_pct",   # documented as firing routinely without behavioural failure
     "burst_trades_per_15min",     # retired 2026-08-23; kept here so the reason survives
+    #
+    # premium_loss_caution_pct was here until 2026-08-27, flagged as "documented
+    # as firing routinely without behavioural failure". Its Pattern #8 review
+    # MEASURED that and the flag is refuted, so it is removed rather than kept:
+    # across all 888 long options in the reference book only 6% lose 40% or more
+    # of premium (40.2% finish in profit, 43.8% lose under a fifth, 9.6% lose a
+    # fifth to two fifths). The caution level is the top 6% of outcomes, not a
+    # routine event.
+    #
+    # The other three entries above stay because their constants were DELETED
+    # and the reason has to outlive them. This one stays in the code, vindicated,
+    # so an open-concern marker on it would be false. See
+    # docs/patterns/08-premium_loss_event/.
 })
 
 
