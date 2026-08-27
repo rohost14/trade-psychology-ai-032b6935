@@ -51,7 +51,6 @@ ENTRY_DECIDABLE = (
     "rapid_reentry",
     "post_loss_recovery_bet",
     "martingale_behaviour",
-    "size_escalation",
     "fomo_entry",
     "same_symbol_obsession",
     "direction_instability",

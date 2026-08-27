@@ -129,10 +129,11 @@ COLD_START_DEFAULTS: Dict[str, Any] = {
     'martingale_danger_multiplier':     2.0,  # 2.0× (full double) = danger
     'martingale_min_losses':            2,    # at least 2 consecutive losses (not 3)
 
-    # ── Size escalation after losses ─────────────────────────────────────
-    # 30% consistent increase after losses is meaningful signal (not 50%).
-    # It compounds: 3 trades at +30% each = 2.2× original size.
-    'size_escalation_pct':              30,   # 30% size increase over 3 trades after loss
+    # size_escalation_pct DELETED 2026-08-27 with `size_escalation`. It was never
+    # in threshold_registry, so it had no Kind and no provenance - only the
+    # comment above, which described +30% PER STEP compounding to 2.2x while the
+    # code computed a single first-to-third ratio (30% => 1.3x). It decided
+    # little either way: 0% gave 51 firings, 30% gave 42.
 
     # ── No stop-loss (long-held option loser) ─────────────────────────────
     # Primary gate is now exit_order_type (SL/SL-M = skip). Hold time is only a
@@ -176,11 +177,13 @@ COLD_START_DEFAULTS: Dict[str, Any] = {
 
     # ── Expiry day overtrading ────────────────────────────────────────────
     # On the instrument's own expiry date: heightened FOMO, 0DTE herding, vol spikes.
-    # Cold-start fallback (no baseline): fire after 13:00 IST only.
-    # 5+ trades or 10+ lots on one underlying = caution; 8+ = danger.
-    'expiry_overtrading_caution_count':  5,
-    'expiry_overtrading_danger_count':   8,
-    'expiry_overtrading_caution_lots':   10,
+    # expiry_overtrading_{caution_count, danger_count, caution_lots} DELETED
+    # 2026-08-27 with `expiry_day_overtrading`. Unlike the profit_giveaway keys
+    # above these hold nothing up: they were not in _CAPITAL_RATIOS, had no
+    # second reader, and their three registry metrics were produced by no code,
+    # so the ladder always fell through to these literals anyway. The lots value
+    # was compared against a sum of CONTRACTS, which made it unconditionally
+    # true. See docs/patterns/09-expiry_day_overtrading/.
     # expiry_overtrading_{caution,danger}_mul removed 2026-08-13: declared as
     # multiples of the personal baseline, read by nothing. The detector uses the
     # _count and _lots thresholds above.

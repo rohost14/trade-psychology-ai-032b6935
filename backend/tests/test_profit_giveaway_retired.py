@@ -69,8 +69,9 @@ def test_no_registry_spec_points_at_the_deleted_method():
 def test_the_engine_counts_are_what_the_retirement_left():
     from app.services.detector_registry import REGISTRY, all_pattern_types
 
-    assert len(REGISTRY) == 26
-    assert len(all_pattern_types()) == 32
+    # 24 / 30 since `size_escalation` was retired 2026-08-27 (Pattern 10).
+    assert len(REGISTRY) == 24
+    assert len(all_pattern_types()) == 30
 
 
 def test_it_is_recorded_as_retired():
@@ -145,7 +146,7 @@ def test_the_two_surviving_per_episode_dedup_keys_are_intact():
 
 @pytest.mark.parametrize("pattern", [
     "martingale_behaviour", "revenge_trade", "adding_to_adverse_position",
-    "size_escalation", "daily_overtrading", "overtrading_burst",
+    "post_loss_recovery_bet", "daily_overtrading", "overtrading_burst",
     "session_meltdown", "fomo_entry",
 ])
 def test_every_other_pattern_still_keys_on_its_type_alone(pattern):

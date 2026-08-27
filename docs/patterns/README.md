@@ -7,7 +7,7 @@ pattern, numbered in review order.
 
 | # | pattern | status | replay (203 sessions) |
 |---|---|---|---|
-| [00](00-shared/) | *shared* — the pattern baseline (33 types at the time of writing; **32 since Pattern 4 was retired**), the martingale/adding distinction, the replay close-out | — | **578 alerts / 203 sessions** |
+| [00](00-shared/) | *shared* — the pattern baseline (33 types at the time of writing; **30 since Patterns 4, 6, 9 and 10 were retired**), the martingale/adding distinction, the replay close-out | — | **578 alerts / 203 sessions** |
 | [01](01-martingale_behaviour/) | `martingale_behaviour` | **COMPLETE** | 39 alerts / 36 days |
 | [02](02-adding_to_adverse_position/) | `adding_to_adverse_position` | **COMPLETE** | 99 / 56 |
 | [03](03-same_symbol_obsession/) | `same_symbol_obsession` | **COMPLETE** | 22 / 21 |
@@ -17,7 +17,9 @@ pattern, numbered in review order.
 | [06](06-profit_giveaway/) | `profit_giveaway` | **RETIRED / COMPLETE** — the giveback is arithmetic, not behaviour. Measurement kept and now shown in Reports; giveback-as-context is RESEARCH FURTHER | was 100 / 48 days, now **0** |
 | [07](07-fomo_entry/) | `fomo_entry` | **COMPLETE** — v2.0.0, one threshold for every context; two of the four could not fire | was 74 / 41 days, now **46 / 26** |
 | [08](08-premium_loss_event/) | `premium_loss_event` | **COMPLETE** — v3.0.0. No longer a behaviour detector: a real-time **risk-state** detector on the tick path (zero DB on the hot path, sub-second), exit → analytics, declared boundary → `constitution_violation`. `event_contract.md` | exit alerts 41 → **0**; live path covered by 106 tests |
-| — | `expiry_day_overtrading` | next | 28 / — |
+| [09](09-expiry_day_overtrading/) | `expiry_day_overtrading` | **RETIRED — code+tests green, replay green. ONE OPEN ITEM: the `death_spiral 20→16` reconciliation (see HANDOVER_2026-08-27_PATTERNS_9_10.md).** It never withheld, firing on 55 of the 55 positions it could judge; both trader-facing statistics were unsourced and measured false | was 28 / 28, now **0** |
+
+| [10](10-size_escalation/) | `size_escalation` | **RETIRED — code complete, regression tests written but NOT YET RUN, replay NOT YET RUN.** Its claim was ordering; the real trade order fired *less* than shuffled (42 vs 49.7, p = 0.880) and its gate hit the 1-in-6 chance rate. Coverage confirmed: `martingale_behaviour` + `post_loss_recovery_bet` keep the claim | 30 / 30, expect **0** |
 
 The live queue for every remaining pattern is the **REVIEW STATUS** table in
 [`00-shared/BEHAVIOURAL_PATTERNS.md`](00-shared/BEHAVIOURAL_PATTERNS.md).

@@ -677,8 +677,8 @@ class PositionLedgerService:
             # builder replaced the FIFO calculator that used to set it. Every
             # CompletedTrade created live therefore had instrument_type NULL,
             # and TWELVE guards in behavior_engine read it — premium_loss_event,
-            # options_premium_avg_down, expiry_day_overtrading, fomo_entry and
-            # opening_5min_trap among them. Those detectors fired on
+            # options_premium_avg_down, expiry_day_overtrading (since retired
+            # 2026-08-27), fomo_entry and opening_5min_trap among them. Those fired on
             # bulk-synced trades (sync sets the field) and silently never fired
             # on live ones. Found by alertlab scenario E-05.
             instrument_type=_instrument_type_for(close_entry.tradingsymbol),

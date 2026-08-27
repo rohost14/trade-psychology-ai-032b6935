@@ -187,6 +187,17 @@ RETIRED_PATTERN_NAMES = (
     # MORE firings than the real order (49 vs 56.3) with identical money given
     # back (ratio 1.01).
     "profit_giveaway",
+    # Retired 2026-08-27: it never withheld. Of the 55 positions it could judge
+    # it fired on 55, because `today_lots` summed CONTRACTS against a threshold
+    # of 10 and a NIFTY lot is 75. Both trader-facing statistics were unsourced
+    # and measured false (claimed >85% loss rate, actual 53.8%; "each additional
+    # trade reduces your edge" measured r = +0.260, the opposite sign).
+    "expiry_day_overtrading",
+    # Retired 2026-08-27: its claim was ordering, and against 200 permutations of
+    # each session's trade order the real order fired LESS than chance (42 vs
+    # 49.7, p = 0.880). Its gate selected at the rate three random numbers are
+    # increasing. martingale_behaviour and post_loss_recovery_bet keep the claim.
+    "size_escalation",
     "tilt_loss_spiral",
     "iv_crush_behavior",
     "options_direction_confusion",

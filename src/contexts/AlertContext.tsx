@@ -130,7 +130,6 @@ const BACKEND_TO_FRONTEND_TYPE: Record<string, string> = {
   'revenge_trade':     'revenge_trading',
   'martingale_behaviour': 'position_sizing',
   'adding_to_adverse_position': 'position_sizing',
-  'size_escalation':   'position_sizing',
   'excess_exposure':   'position_sizing',
   'session_meltdown':  'capital_drawdown',
   'no_stoploss':       'no_stoploss',
@@ -139,7 +138,6 @@ const BACKEND_TO_FRONTEND_TYPE: Record<string, string> = {
   'panic_exit':        'early_exit',
   'rapid_reentry':     'same_instrument_chasing',
   'options_premium_avg_down':    'options_premium_avg_down',
-  'expiry_day_overtrading':      'overtrading',
   'opening_5min_trap':           'opening_5min_trap',
   'end_of_session_mis_panic':    'end_of_session_mis_panic',
   'post_loss_recovery_bet':      'post_loss_recovery_bet',
@@ -164,6 +162,8 @@ export function formatPatternName(patternType: string): string {
     'tilt_loss_spiral':              'Tilt / Loss Spiral',
     'position_sizing':               'Oversized Position',
     'excess_exposure':               'Excess Exposure',
+    // Retired 2026-08-27. Display name stays: stored alerts still carry
+    // this pattern_type and would render as a title-cased raw key.
     'size_escalation':               'Size Escalation',
     'martingale_behaviour':          'Martingale / Averaging Down',
     'adding_to_adverse_position':    'Added to a Losing Position',
@@ -191,6 +191,8 @@ export function formatPatternName(patternType: string): string {
     'daily_overtrading': 'Heavy day',
     'death_spiral': 'Multi-domain breakdown',
     'direction_instability': 'Direction flip-flop',
+    // Retired 2026-08-27. The display name stays: stored alerts still carry
+    // this pattern_type and would otherwise render as a title-cased raw key.
     'expiry_day_overtrading': 'Expiry-day activity',
     'holding_loser': 'Holding a loser',
     'overexposure': 'Position too large',

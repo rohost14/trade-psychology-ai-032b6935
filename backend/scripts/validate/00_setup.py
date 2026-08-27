@@ -68,7 +68,7 @@ async def main():
     print("    Script 03 → Third loss quickly               → consecutive_loss_streak CAUTION")
     print("    Script 04 → Immediate re-entry after loss    → revenge_trade")
     print("    Script 05 → 4 more rapid trades              → overtrading_burst")
-    print("    Script 06 → Double position after losses     → size_escalation")
+    # Script 06 archived 2026-08-27 with `size_escalation` (Pattern #10).
     print("    Script 07 → Massive loss                     → session_meltdown")
     print("    cleanup   → Deletes all test data")
     print()

@@ -23,7 +23,6 @@ Patterns (real-time, per CompletedTrade). Numbering is historical — gaps are
 retirements, not omissions; detector_registry.REGISTRY is the authority:
   2.  revenge_trade
   3.  overtrading_burst          (burst + daily count)
-  4.  size_escalation
   5.  rapid_reentry
   6.  panic_exit
   7.  martingale_behaviour
@@ -38,7 +37,6 @@ retirements, not omissions; detector_registry.REGISTRY is the authority:
   16. options_direction_confusion (CE→PE flip on same underlying within 10 min)
   17. options_premium_avg_down    (re-entry on same underlying options after prior loss)
   18. iv_crush_behavior           (fast large premium loss = buying into high IV)
-  19. expiry_day_overtrading      (excessive trades on an instrument's own expiry date)
   20. opening_5min_trap           (derivative entry 09:15–09:20 IST)
   21. end_of_session_mis_panic    (MIS entries after 15:10 IST — forced 10-min exit)
   22. post_loss_recovery_bet      (one oversized position after 2+ consecutive losses)
@@ -671,7 +669,6 @@ class BehaviorEngine:
     _STRATEGY_SUPPRESSED = frozenset({
         "revenge_trade",
         "martingale_behaviour",
-        "size_escalation",
         # Suppress for multi-leg hedges: buying a CE + PE simultaneously is
         # not rapid re-entry, missing stop-loss, or a recovery bet — it is a
         # defined strategy (straddle/strangle/spread). strategy_group is set by
@@ -806,7 +803,9 @@ class BehaviorEngine:
         ("sizing after losses", (
             "martingale_behaviour",       # a doubling progression — the strongest claim
             "post_loss_recovery_bet",     # one oversized bet after losses
-            "size_escalation",            # size drifting up: the weakest of the three
+            # `size_escalation` was the third member until 2026-08-27. Retired:
+            # its premise was ordering, and ordering fired less than chance
+            # (42 vs 49.7, p = 0.880). The two above keep the claim.
         )),
         ("going back to the same trade", (
             "same_symbol_obsession",      # the whole session on one instrument
@@ -1384,90 +1383,37 @@ class BehaviorEngine:
         # be indistinguishable from chance. See docs/patterns/06-profit_giveaway/.
         return None
 
-    # ── Pattern 4: Size escalation after losses ───────────────────────────
-
-    def _detect_size_escalation(self, ctx: EngineContext) -> Optional[DetectedEvent]:
-        ct = ctx.completed_trade
-        trades = ctx.session_trades
-        if len(trades) < 3:
-            return None
-
-        # Only compare trades on the SAME underlying — mixing NIFTY and SENSEX
-        # lot sizes (50 vs 20) would produce meaningless comparisons.
-        from app.services.instrument_parser import parse_symbol as _ps
-        try:
-            ct_underlying = _ps(ct.tradingsymbol or "").underlying
-        except Exception:
-            ct_underlying = ct.tradingsymbol or ""
-
-        prior = sorted(
-            [t for t in trades
-             if t.id != ct.id and t.exit_time
-             and (_ps(t.tradingsymbol or "").underlying if t.tradingsymbol else "") == ct_underlying],
-            key=lambda t: t.exit_time,
-        )[-3:]
-        # Try the same underlying first, by quantity — the more precise signal.
-        # Then, if that shows no escalation, try every trade of the session by
-        # notional value, because escalating from a ₹5,000 position to ₹15,000
-        # is escalation whether or not the symbol changed.
-        #
-        # The earlier version returned None before the cross-instrument branch
-        # could run, which made it dead code: a session with three same-symbol
-        # trades that did not escalate never reached the value check. Zero
-        # firings across 61 real sessions against six occurrences the
-        # independent checker found in the same file.
-        cross = False
-        sizes = [t.total_quantity or 1 for t in prior] if len(prior) >= 3 else []
-
-        if not (len(sizes) == 3 and sizes[0] < sizes[1] < sizes[2]):
-            session_prior = sorted(
-                [t for t in trades if t.id != ct.id and t.exit_time],
-                key=lambda t: t.exit_time,
-            )[-3:]
-            if len(session_prior) < 3:
-                return None
-            prior = session_prior
-            sizes = [self._notional(t) for t in prior]
-            cross = True
-
-        if not (sizes[0] < sizes[1] < sizes[2]):
-            return None
-
-        pnls = [Decimal(str(t.realized_pnl or 0)) for t in prior]
-        losses_before = sum(1 for p in pnls[:2] if p < 0)
-
-        if losses_before >= 1:
-            threshold = ctx.thresholds.get("size_escalation_pct", 30)
-            escalation_pct = (sizes[2] - sizes[0]) / max(sizes[0], 1) * 100
-            if escalation_pct >= threshold:
-                symbols = [t.tradingsymbol or "—" for t in prior]
-                # `cross` was assigned and never read, so a cross-instrument
-                # sequence - which is NOTIONAL RUPEES, not lots - was printed
-                # as "12500.0→18000.0→24000.0 qty". Same labelling martingale
-                # already does. Detection is unchanged: only the sentence is.
-                seq_str = ("→".join(f"₹{s:,.0f}" for s in sizes) if cross
-                           else "→".join(f"{int(s)}" for s in sizes) + " qty")
-                trade_list = [
-                    {"symbol": t.tradingsymbol or "—", "qty": t.total_quantity or 0,
-                     "pnl": float(Decimal(str(t.realized_pnl or 0)))}
-                    for t in prior
-                ]
-                return DetectedEvent(
-                    event_type="size_escalation",
-                    severity="caution",
-                    message=(
-                        f"{ct_underlying}: position size increased across 3 consecutive trades "
-                        f"while losing — {seq_str} "
-                        f"({symbols[0]} / {symbols[1]} / {symbols[2]})."
-                    ),
-                    context={"underlying": ct_underlying, "size_sequence": sizes,
-                             # Which unit size_sequence is in. Readers could not
-                             # tell lots from rupees before this.
-                             "cross_instrument": cross,
-                             "escalation_pct": round(escalation_pct, 1),
-                             "threshold_pct": threshold, "trade_list": trade_list},
-                )
-        return None
+    # ── RETIRED 2026-08-27 — `size_escalation` ────────────────────────────
+    #
+    # Its whole claim was that the ORDER of position sizes carries information:
+    # three consecutive trades each larger than the last, while losing. Tested
+    # with this detector's own code against 200 permutations of each session's
+    # trade order — same trades, same sizes, same P&L, only the sequence changed
+    # — the real order fired LESS than chance: 42 observed against 49.7 expected,
+    # ratio 0.85, p(shuffled >= observed) = 0.880. Its defining gate selects at
+    # exactly the rate three random numbers are increasing: 16.9% of 3-trade
+    # windows in the book against 16.7% expected.
+    #
+    # The rest was already broken. 37 of 42 firings ran the cross-instrument
+    # branch, whose headline named `ct_underlying` — the CURRENT trade — while
+    # the three trades shown were the session's previous three, so the alert read
+    # "ICICIGI: ... (TCS25APR2900PE / TCS25APR3500CE / HUDCO25APR230CE)". `prior`
+    # excludes `ct`, so it fired on trade N and described N-3..N-1; only 7 of 42
+    # alerts contained the trade that raised them. "While losing" tested
+    # `pnls[:2]` for a single loss — true 83% of the time by base rate, and never
+    # checking the trade at the top of the escalation. It predicted nothing
+    # (+Rs 69/trade, p = 0.797, sign favouring the flagged trade).
+    #
+    # THE CONCEPT OF DANGEROUS SIZING IS NOT RETIRED. `martingale_behaviour`
+    # (the step the trader took, capital at risk, >=2 trailing consecutive
+    # losses) and `post_loss_recovery_bet` (current against the mean of the last
+    # three) both keep the current trade as the subject and both survive
+    # untouched. The one shape only this detector could have caught — a slow ramp
+    # where every step stays under martingale's 1.5x and the current trade under
+    # recovery's 2.0x of the recent mean — occurs 0 times in 3-trade windows
+    # across 189 sessions (once each at 4 and 5 trades), so no replacement was
+    # built. `_notional` stays: martingale-adjacent detectors at 2473 and 3033
+    # read it. See docs/patterns/10-size_escalation/.
 
     # ── Pattern 5: Rapid re-entry (same symbol) ───────────────────────────
 
@@ -2762,74 +2708,39 @@ class BehaviorEngine:
             },
         )
 
-    # ── Pattern 20: Expiry day overtrading ────────────────────────────────
+    # ── RETIRED 2026-08-27 — `expiry_day_overtrading` ─────────────────────
     #
-    # Excessive trades on the instrument's own expiry date.
-    # 0DTE herding: NSE data shows retail activity spikes 3-5× near expiry EOD.
-    # Uses cold-start fallback (fire after 13:00 IST) until baseline data available.
-
-    def _detect_expiry_day_overtrading(self, ctx: EngineContext) -> Optional[DetectedEvent]:
-        ct = ctx.completed_trade
-        if not ct.entry_time or ct.instrument_type not in ("CE", "PE", "FUT"):
-            return None
-
-        from app.services.instrument_parser import parse_symbol, is_expiry_day as _is_expiry_day
-        entry_ist = ct.entry_time.astimezone(IST)
-
-        if not _is_expiry_day(ct.tradingsymbol or "", entry_ist.date()):
-            return None
-
-        ct_parsed = parse_symbol(ct.tradingsymbol or "")
-        underlying = ct_parsed.underlying
-
-        # Today's completed trades for this underlying on expiry (include current trade)
-        today_expiry_trades = [
-            t for t in ctx.session_trades
-            if parse_symbol(t.tradingsymbol or "").underlying == underlying
-            and t.instrument_type in ("CE", "PE", "FUT")
-        ]
-        # Structures, not legs — an expiry-day iron condor is one decision, and
-        # counting its four rows put spread traders over the danger threshold
-        # after two positions.
-        from app.services.strategy_detector import count_structures as _count_structures
-        today_legs = len(today_expiry_trades) + 1
-        today_count = _count_structures(today_expiry_trades + [ct])
-        today_lots = sum(t.total_quantity or 1 for t in today_expiry_trades) + (ct.total_quantity or 1)
-
-        caution_count = ctx.thresholds.get("expiry_overtrading_caution_count", 5)
-        danger_count  = ctx.thresholds.get("expiry_overtrading_danger_count", 8)
-        caution_lots  = ctx.thresholds.get("expiry_overtrading_caution_lots", 10)
-
-        # Cold-start: only fire after 13:00 IST to avoid flagging morning expiry trades
-        if entry_ist.hour < 13:
-            return None
-
-        if today_count >= danger_count:
-            return DetectedEvent(
-                event_type="expiry_day_overtrading",
-                severity="danger",
-                message=(
-                    f"{today_count} {underlying} trades today on expiry. "
-                    f"NSE data: retail option activity in the last 2 hours of expiry day "
-                    f"has a structural loss rate above 85%."
-                ),
-                context={"underlying": underlying, "today_count": today_count,
-                         "today_legs": today_legs,
-                         "today_lots": today_lots, "danger_threshold": danger_count},
-            )
-        if today_count >= caution_count or today_lots >= caution_lots:
-            return DetectedEvent(
-                event_type="expiry_day_overtrading",
-                severity="caution",
-                message=(
-                    f"{today_count} {underlying} trades / {today_lots} lots today on expiry. "
-                    f"Each additional trade after 13:00 on expiry day statistically reduces your edge."
-                ),
-                context={"underlying": underlying, "today_count": today_count,
-                         "today_legs": today_legs,
-                         "today_lots": today_lots, "caution_threshold": caution_count},
-            )
-        return None
+    # Deleted, not demoted. It never withheld: of the 55 positions it was
+    # allowed to judge in the 189-session book (expiry + CE/PE/FUT + entry at or
+    # after 13:00) it fired on 55 and stayed silent on 0. The cause was a units
+    # bug — `today_lots` summed `total_quantity`, which is CONTRACTS
+    # (completed_trade.py: "in units, lot_size already factored"), against a
+    # threshold of 10. A NIFTY lot is 75, so the only reachable clause was
+    # unconditionally true and the trade-count logic decided nothing. 71% of
+    # firings came from that clause alone with a count under five; the count was
+    # 1 on eight of them.
+    #
+    # Both trader-facing sentences were unsourced and both measured false. The
+    # claimed ">85% structural loss rate in the last 2 hours of expiry day" is
+    # 53.8% at 14:00+ and 61.8% at 13:00+, against a book-wide ~60% — no
+    # different from the trader's ordinary trading. "Each additional trade after
+    # 13:00 reduces your edge" asserts r < 0 and measured r = +0.260 (p = 0.056,
+    # n = 55), the opposite sign. The reversal repeats at day level
+    # (expiry-trade-count vs session P&L r = +0.107, p = 0.485, n = 45), and this
+    # trader's expiry-active sessions are their BETTER sessions (51.1% green
+    # against 38.9%). Post-13:00 expiry against all non-expiry trading is
+    # Rs 58/trade at p = 0.863.
+    #
+    # Fixing the units would have moved the pass rate from 100% to 58% —
+    # restoring discrimination without creating a finding, because there is no
+    # outcome difference to discriminate on. So the units were not fixed.
+    #
+    # Expiry-day-ness survives where it already earns its place: as a MODIFIER
+    # inside detectors that measure a decision — `premium_loss_event`
+    # (premium_loss_expiry_shift_pct, +15pp), `no_stoploss`
+    # (no_stoploss_expiry_loss_pct / _hold_min) and `fomo_entry`'s context_note.
+    # `is_expiry_day` and `count_structures` both keep other readers.
+    # See docs/patterns/09-expiry_day_overtrading/.
 
     # ── Pattern 20: Opening 5-minute trap ─────────────────────────────────
     #

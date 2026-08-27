@@ -289,9 +289,9 @@ def test_ledger_derives_instrument_type_from_the_symbol():
     A Kite postback carries no instrument type, and the ledger builder replaced
     the FIFO calculator that used to set it — so every CompletedTrade created
     live had instrument_type NULL. Twelve guards in behavior_engine read it, so
-    premium_loss_event, options_premium_avg_down, expiry_day_overtrading,
-    fomo_entry and opening_5min_trap fired on bulk-synced trades and silently
-    never fired on live ones.
+    premium_loss_event, options_premium_avg_down, expiry_day_overtrading
+    (since retired, 2026-08-27), fomo_entry and opening_5min_trap fired on
+    bulk-synced trades and silently never fired on live ones.
     """
     from app.services.position_ledger_service import _instrument_type_for
 

@@ -608,7 +608,16 @@ statistics presented as measurement, which the registry's own copy rules forbid
 presented as measurement"*). The registry copy for this pattern is clean; the
 **detector message is not**, and the detector message is what ships.
 
-**Status: IMPLEMENTED AND VERIFIED**, with a copy-vs-policy contradiction.
+**Status: RETIRED 2026-08-27 (Pattern #9).** The copy-vs-policy contradiction
+above was the smaller half. The detector fired on **55 of the 55 positions it
+could judge** and never withheld, because `today_lots` summed CONTRACTS against a
+threshold of 10 (a NIFTY lot is 75), so its only reachable clause was
+unconditionally true. Both statistics measured false: the claimed >85% loss rate
+is 53.8% at 14:00+ against a book-wide ~60%, and "each additional trade reduces
+your edge" measured **r = +0.260** (p = 0.056, n = 55) — the opposite sign. The
+reversal repeats at day level and expiry-active sessions are this trader's better
+sessions. Expiry stays as a modifier in `premium_loss_event`, `no_stoploss` and
+`fomo_entry`. See `docs/patterns/09-expiry_day_overtrading/`.
 
 ## 19. `opening_5min_trap`
 
@@ -1100,9 +1109,14 @@ Shown as found; not reconciled.
    `entry_detectors.ENTRY_DECIDABLE`, and three alias patterns run entry-time in
    `position_monitor_tasks`. The registry's `trigger` field does not describe
    current behaviour.
-7. **`expiry_day_overtrading` copy** — the detector message ships unsourced
-   statistics ("loss rate above 85%", "statistically reduces your edge"), which
-   the registry's own copy rules forbid in writing.
+7. **`expiry_day_overtrading` copy** — CLOSED 2026-08-27 by retiring the
+   detector. Both statistics were measured and both were false; the message is
+   gone with the detector, and the archived origin of the 85% figure
+   (`docs/archive/PATTERN_REFERENCE.md`) is marked RETRACTED. Note the general
+   gap survives: `test_copy_carries_no_invented_statistics` covers
+   `PatternCopy` only, not detector `message` strings, which is why the registry
+   copy was clean while the shipped sentence was not. `opening_5min_trap` still
+   carries "78% of retail opening-5-min derivative trades are unprofitable".
 8. **`profit_giveaway` dedup** — the comment at `2867` says DB-level dedup
    *"prevents this from firing more than once per session"*; the replay shows
    26 alerts across 12 sessions.
@@ -1241,11 +1255,11 @@ Nothing here is fixed. Nothing here is hidden.
 | hardcoded 09:15 market open | `opening_5min_trap` | patterns 12 and 20 derive it per exchange; this does not, so it is wrong for MCX. Fixing changes what fires |
 | name says 5 minutes, threshold is 10, message says 09:15-09:25 | `opening_5min_trap` | three different windows in one detector |
 | should it alert at all? | `opening_5min_trap` | currently analytics-only with a hardcoded `info` |
-| unsourced statistics in the shipped message | `expiry_day_overtrading` | "loss rate above 85%", "statistically reduces your edge" — the registry's own copy rules forbid this |
+| ~~unsourced statistics in the shipped message~~ | ~~`expiry_day_overtrading`~~ | **CLOSED — detector retired 2026-08-27**, both statistics measured false |
 | `_typical_loss` reads **today's** losses only | `profit_giveaway` | the docstring describes a stable cross-session loss size |
 | 26 alerts across 12 sessions | `profit_giveaway` | the comment claims DB dedup limits it to once per session |
 | the `0.5`-of-daily-limit escalation branch | `consecutive_loss_streak` | inline literal, no key, no test, decides a danger tier |
-| the 13:00 expiry cutoff | `expiry_day_overtrading` | inline literal |
+| ~~the 13:00 expiry cutoff~~ | ~~`expiry_day_overtrading`~~ | **CLOSED — detector retired 2026-08-27** |
 | the `3`-flip Level 3 count | `direction_instability` | inline literal; two keys of value 10 drive the two windows |
 | `0.05` of capital as an invented daily limit | `session_meltdown` | fires on a number the trader never set |
 | the danger tier has never fired | `winning_streak_overconfidence` | 5 wins **and** 2x size never co-occurred in 203 sessions |

@@ -298,9 +298,11 @@ def send_weekly_summary(broker_account_id: str):
                     "profit_giveaway": "Profit Giveaway",
                     "martingale_behaviour": "Martingale Behaviour",
                 }
+                # `size_escalation` dropped 2026-08-27 with the detector; the
+                # LABEL above stays so stored rows still render.
                 _COMMON_PATTERNS = [
                     "overtrading", "revenge_trade", "no_stoploss",
-                    "size_escalation", "session_meltdown",
+                    "session_meltdown",
                 ]
 
                 if not week_alerts:

@@ -123,35 +123,14 @@ class TestOpeningTrapSeverity:
 
 
 # ---------------------------------------------------------------------------
-# 3. size_escalation — a rupee sequence may not be labelled "qty"
+# 3. size_escalation — RETIRED 2026-08-27 (Pattern #10)
 # ---------------------------------------------------------------------------
-
-def test_size_escalation_cross_instrument_reports_rupees_not_qty():
-    """
-    The `cross` flag was computed and never read, so a notional sequence was
-    printed as "12500.0→18000.0→24000.0 qty". Detection is unchanged; only the
-    sentence and one context key are.
-    """
-    priors = []
-    for i, (sym, qty, price, pnl) in enumerate([
-        ("NIFTY25AUG24000CE", 75, 100.0, -500.0),
-        ("SENSEX25AUG80000CE", 20, 600.0, -700.0),
-        ("BANKNIFTY25AUG52000CE", 30, 700.0, -400.0),
-    ]):
-        t = make_ct(symbol=sym, instrument_type="CE", pnl=pnl, entry_offset_min=-90 + i * 20)
-        t.total_quantity = qty
-        t.avg_entry_price = Decimal(str(price))
-        priors.append(t)
-    ct = make_ct(symbol="FINNIFTY25AUG23000CE", instrument_type="CE", pnl=-300.0)
-    ct.total_quantity = 40
-    ct.avg_entry_price = Decimal("800")
-
-    ev = engine._detect_size_escalation(make_ctx(completed_trade=ct, session_trades=priors))
-    assert ev is not None, "three rising notionals with losses should escalate"
-    assert ev.context["cross_instrument"] is True
-    assert "qty" not in ev.message
-    assert "₹" in ev.message
-
+#
+# `test_size_escalation_cross_instrument_reports_rupees_not_qty` was deleted
+# with its subject. It pinned a real fix - a notional sequence must not be
+# labelled "qty" - but the detector it exercised no longer exists, so the test
+# could only fail on an AttributeError. The retirement itself is covered by
+# tests/test_size_escalation_retired.py.
 
 # ---------------------------------------------------------------------------
 # 4. Detectors that fire often in the replay and had no test at all

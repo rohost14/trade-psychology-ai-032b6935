@@ -1,5 +1,28 @@
 # Next session — start here
 
+**27 Aug 2026 (late).** Read `docs/HANDOVER_2026-08-27_PATTERNS_9_10.md` FIRST.
+It has the full state, the one open blocker, and the replay operating rules.
+
+## Immediate
+
+1. **Pattern 9 blocker** — reconcile `death_spiral 20 → 16` against the
+   pre-change baseline replay. The worktree and the exact commands are in the
+   hand-over. Post-change artifact saved at
+   `C:/Users/being/.claude/jobs/33a73186/tmp/after_p9.json` (job-scoped, may be
+   gone — re-run both sides if so). If it reconciles: tests, fill the STATUS
+   replay table, mark CLOSED. If not: **stop and report, do not close.**
+2. **Pattern 10** — run `backend/tests/test_size_escalation_retired.py` (25
+   tests, never executed) and the 203-session replay. Expect
+   `size_escalation` 30 → 0 and a `death_spiral` fall as arithmetic; anything
+   else moving means the run failed.
+3. **Then** Pattern 11 `direction_instability`. Not before.
+
+**Counts: 24 detectors, 30 pattern types.** Four retirements: 4, 6, 9, 10.
+
+---
+
+# Next session — start here
+
 > **The live checklist is now `docs/ENGINE_BACKLOG.md`** — verified findings only.
 > This file remains the narrative orientation: how we got here and why.
 

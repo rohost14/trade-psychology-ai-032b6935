@@ -13,6 +13,8 @@ Without strategy awareness, the BehaviorEngine fires false alerts:
   - martingale_behaviour on a single losing leg of a profitable straddle
   - revenge_trade when adjusting a position (closing one strike, opening another)
   - size_escalation when adding a hedge leg (which REDUCES risk, not increases it)
+    [size_escalation retired 2026-08-27; the suppression rationale still
+     applies to martingale_behaviour and post_loss_recovery_bet]
 
 With StrategyGroup, BehaviorEngine uses net_pnl instead of per-leg pnl and
 suppresses structurally invalid alerts.

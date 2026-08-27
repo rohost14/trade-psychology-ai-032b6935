@@ -61,7 +61,7 @@ async def main():
     total = 2500 + 3495 + 4200 + 2500 + 1005 + 1700 + 1005 + 1700
     print(f"\n    Session loss so far: ~₹{total:,.0f}")
     print_wait(2, "before size escalation")
-    print("\n→  Next: python scripts/validate/06_size_escalation.py")
+    print("\n→  Next: python scripts/validate/07_session_meltdown.py")
 
 
 if __name__ == "__main__":

@@ -92,24 +92,36 @@ applied?".
 
 ## 2. Open — MEDIUM
 
-### M-1. The Pattern 6 confirmation replay has not run
+### ~~M-1. The Pattern 6 confirmation replay has not run~~ — CLOSED 27 Aug
 
-`profit_giveaway` was retired on 27 Aug with every other check green — 1,241
-backend tests, 35 new regression tests, a clean frontend, and six manual
-verifications of the measurements, death_spiral, the dedup wiring, historical
-readability and the capital-ratio rung. **The 203-session replay that confirms no
-other detector moved is the one thing still owed.**
+Superseded twice over. The **Pattern 8 confirmation replay ran clean to 203/203**
+and reported **330 alerts / 203 sessions**, with `profit_giveaway` at **0** — the
+result M-1 was owed. A second full replay ran for **Pattern 9**.
 
-The attempt reached session 5 of 203 in 72 minutes. **Cause: the Memurai (Redis)
-service was stopped**, so every `publish_event` and `admin_settings` read waited
-on a refused `localhost:6379` connection dozens of times per trade. Nothing to do
-with the engine change.
+The original failure was environmental, not an engine change: the attempt reached
+session 5 of 203 in 72 minutes because the **Memurai (Redis) service was
+stopped**, so every `publish_event` and `admin_settings` read waited on a refused
+`localhost:6379`.
 
-Before re-running: `Start-Service Memurai` (admin), **do not pipe the replay
-through `tail`** (it buffers until exit, which is why this took 72 minutes to
-notice), and do not run pytest against the same database concurrently.
+**Operating rules for the replay, all learned the hard way:**
 
-Expected result: `profit_giveaway` 0 alerts, everything else unchanged.
+- `Start-Service Memurai` (admin) before starting. Verify with a `ping`.
+- **Do not pipe through `tail`** — it buffers until exit, which is why a stalled
+  run took 72 minutes to notice. Redirect to a file instead.
+- **Run `python -u`.** Redirecting without `-u` block-buffers stdout, so the log
+  sits at 0 bytes and a healthy run is indistinguishable from a hung one.
+- **Do not run pytest against the same database concurrently.**
+- **Never start a second replay while one is running.** They serialise on the
+  same rows, deadlock, and the symptom looks exactly like a code regression.
+  `tradedesk/.replay.lock` exists to prevent this — **do not delete it to clear
+  the way.** On 27 Aug a `nohup ... &` child outlived the task that reported
+  "completed", the lock was deleted on the assumption the process was dead, and
+  two replays ran against one database. Check for a live process
+  (`Get-CimInstance Win32_Process | Where CommandLine -like '*replay_tradebook*'`)
+  before touching the lock; if a run was killed, `--wipe` the partial synthetic
+  rows before restarting.
+- Budget **40 min to ~2 h** depending on database latency. The docstring's 15 min
+  is wrong.
 
 ### M0. `pattern_prediction_service` speaks a vocabulary the engine retired
 

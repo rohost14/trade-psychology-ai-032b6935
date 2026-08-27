@@ -122,8 +122,15 @@ REGISTRY: Tuple[DetectorSpec, ...] = (
     DetectorSpec("overtrading_burst", "_detect_overtrading_burst",
                  "2.0.0", "emotional", "alerting", "exit", 2,
                  uses_baseline=True, uses_constitution=True),
-    DetectorSpec("size_escalation", "_detect_size_escalation",
-                 "1.1.0", "emotional", "alerting", "exit", 1),
+    # RETIRED 2026-08-27 - `size_escalation`. Its claim was that the ORDER of
+    # position sizes carries information. Against 200 permutations of each
+    # session's trade order, using this detector's own code, the real order fired
+    # LESS than chance (42 vs 49.7, ratio 0.85, p = 0.880), and its gate selects
+    # at the rate three random numbers are increasing (16.9% vs 16.7%). 37 of 42
+    # alerts named an instrument absent from the three trades they showed, and
+    # only 7 of 42 contained the trade that raised them. Dangerous sizing is NOT
+    # retired: martingale_behaviour and post_loss_recovery_bet keep the claim
+    # with the current trade as the subject. See docs/patterns/10-size_escalation/.
     DetectorSpec("rapid_reentry", "_detect_rapid_reentry",
                  "2.0.0", "emotional", "analytics", "exit", 0),
     DetectorSpec("panic_exit", "_detect_panic_exit",
@@ -191,9 +198,20 @@ REGISTRY: Tuple[DetectorSpec, ...] = (
     # outcome, not a behavioural failure - and the disposition now agrees with it.
     DetectorSpec("premium_loss_event", "_detect_premium_loss_event",
                  "3.0.0", "risk", "analytics", "exit", 0),
-    DetectorSpec("expiry_day_overtrading", "_detect_expiry_day_overtrading",
-                 "1.0.0", "emotional", "alerting", "exit", 2,
-                 uses_baseline=True),
+    # RETIRED 2026-08-27 - `expiry_day_overtrading`. It never withheld: of the
+    # 55 positions it could judge in the 189-session book it fired on 55 and
+    # stayed silent on 0, because `today_lots` summed CONTRACTS against a
+    # threshold of 10 and a NIFTY lot is 75 - the only reachable clause was
+    # unconditionally true. Both trader-facing sentences were unsourced and
+    # measured false: the claimed ">85% loss rate in the last 2 hours of expiry"
+    # is 53.8% at 14:00+ against a book-wide ~60%, and "each additional trade
+    # reduces your edge" measured r = +0.260 (p = 0.056), the opposite sign. The
+    # reversal repeats at day level (r = +0.107) and expiry-active sessions are
+    # this trader's better sessions (51.1% green against 38.9%). Fixing the units
+    # would have moved the pass rate 100% -> 58% without creating a finding, so
+    # they were not fixed. Expiry-day-ness stays as a MODIFIER inside
+    # premium_loss_event, no_stoploss and fomo_entry, which is where it works.
+    # See docs/patterns/09-expiry_day_overtrading/.
     DetectorSpec("opening_5min_trap", "_detect_opening_5min_trap",
                  "2.0.0", "emotional", "analytics", "exit", 0),
     DetectorSpec("end_of_session_mis_panic", "_detect_end_of_session_mis_panic",
@@ -357,12 +375,8 @@ PATTERN_COPY: Dict[str, PatternCopy] = {
     ),
 
     # ── Risk / sizing ────────────────────────────────────────────────────
-    "size_escalation": PatternCopy(
-        "Rising position size",
-        "Quantity across consecutive trades on the same underlying while losing.",
-        "Larger size on an instrument that is already losing compounds the drawdown rather than "
-        "recovering it.",
-    ),
+    # `size_escalation` copy removed 2026-08-27 with the detector. It promised
+    # "on the same underlying", which described a branch used in 5 of 42 firings.
     "martingale_behaviour": PatternCopy(
         "Averaging down",
         "Position size increasing after consecutive losses on the same instrument.",
@@ -408,11 +422,9 @@ PATTERN_COPY: Dict[str, PatternCopy] = {
         "Positions opened inside a 30-minute window, counting a multi-leg structure as one.",
         "Trades taken minutes apart share one state of mind rather than separate assessments.",
     ),
-    "expiry_day_overtrading": PatternCopy(
-        "Expiry-day activity",
-        "Trades and lots on an instrument expiring today.",
-        "Expiry-day options move on time decay as much as direction, and the clock does not reverse.",
-    ),
+    # `expiry_day_overtrading` copy removed 2026-08-27 with the detector. The
+    # copy here was never the problem - it carried no statistic. The two invented
+    # ones lived in the detector's `message`, which this contract does not cover.
     "opening_5min_trap": PatternCopy(
         "Opening-minutes entry",
         "Entries in the first minutes after open that closed quickly at a loss, or lost heavily.",

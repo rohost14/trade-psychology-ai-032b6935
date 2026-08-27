@@ -145,23 +145,17 @@ _GROUP_C = [
     # threshold of 2 produced 39% of the detector's output on its own. Every
     # context now uses fomo_symbols_in_window. See docs/patterns/07-fomo_entry/.
 
-    _spec(key="expiry_overtrading_caution_count", kind=Kind.PERSONAL_BASELINE, fallback=5,
-          meaning="trades on one underlying on its expiry day",
-          resolution_source=Source.HISTORY, metric="expiry_day_trades_p75",
-          percentile=75, maturity=Maturity.SESSIONS_20,
-          provenance="an expiry-day specialist and an occasional participant are not comparable"),
-
-    _spec(key="expiry_overtrading_danger_count", kind=Kind.PERSONAL_BASELINE, fallback=8,
-          meaning="trades on one underlying on expiry, danger level",
-          resolution_source=Source.HISTORY, metric="expiry_day_trades_p90",
-          percentile=90, maturity=Maturity.SESSIONS_20,
-          provenance="upper tail of the same distribution as the caution line"),
-
-    _spec(key="expiry_overtrading_caution_lots", kind=Kind.PERSONAL_BASELINE, fallback=10,
-          meaning="lots traded on one underlying on expiry",
-          resolution_source=Source.HISTORY, metric="expiry_day_lots_p75",
-          percentile=75, maturity=Maturity.SESSIONS_20,
-          provenance="lot counts are not comparable across instruments or account sizes"),
+    # expiry_overtrading_caution_count / _danger_count / _caution_lots were
+    # DELETED here 2026-08-27 with `expiry_day_overtrading`. All three were
+    # declared Kind.PERSONAL_BASELINE against Source.HISTORY metrics
+    # (expiry_day_trades_p75 / _p90, expiry_day_lots_p75) that NO code produced -
+    # verified at 0 occurrences outside this file - so the ladder fell through to
+    # the literals 5 / 8 / 10 permanently, for every trader. Declaring a value
+    # personal when nothing can ever personalise it is a false statement in the
+    # registry, and it is the same defect Pattern 7 found in fomo_underlyings_*.
+    # The lots key was worse still: it was compared against a sum of CONTRACTS,
+    # which made its clause unconditionally true.
+    # See docs/patterns/09-expiry_day_overtrading/.
 
     _spec(key="end_session_mis_caution_count", kind=Kind.PERSONAL_BASELINE, fallback=2,
           meaning="MIS entries after 15:00 IST, facing auto-square-off",

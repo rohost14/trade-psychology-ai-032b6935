@@ -505,6 +505,18 @@ more of its premium, danger fires.
 
 ### 20. Expiry Day Overtrading
 
+> **RETRACTED 2026-08-27. The detector was retired and the claim below is the
+> reason.** This paragraph is the ONLY origin in the repository for *"NSE market
+> data shows retail option activity in the last two hours of an expiry day has a
+> structural loss rate above 85%"* — it cites no study, no dataset and no link,
+> and the shipped alert quoted it verbatim to traders as sourced fact. Measured
+> against a 189-session book the rate is **53.8%** for entries at 14:00+ and
+> 61.8% at 13:00+, against a book-wide ~60%. The companion claim that each
+> additional trade after 13:00 reduces the trader's edge measured
+> **r = +0.260 (p = 0.056, n = 55)** — the opposite sign. Do not re-adopt this
+> number or this pattern. See `docs/patterns/09-expiry_day_overtrading/`.
+
+
 **Risk added per firing**: 20 points  
 **Alert levels**: Caution (5 or more trades, or 10 or more lots), Danger (8 or more trades)
 
