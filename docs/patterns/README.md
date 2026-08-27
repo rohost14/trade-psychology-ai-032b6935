@@ -15,7 +15,8 @@ pattern, numbered in review order.
 | [04](04-consecutive_loss_streak/) | `consecutive_loss_streak` | **RETIRED** — deleted 26 Aug, replaced by the user's own `max_consecutive_losses` rule | was 78 / 56, now **0** |
 | [05](05-overtrading/) | `overtrading_burst` + `daily_overtrading` | **`daily_overtrading` COMPLETE** — now fires on the declared limit only · **`overtrading_burst` DEFERRED**, untouched | daily was 52 / 49, now **0** undeclared · burst 12 / 10, unchanged |
 | [06](06-profit_giveaway/) | `profit_giveaway` | **RETIRED / COMPLETE** — the giveback is arithmetic, not behaviour. Measurement kept and now shown in Reports; giveback-as-context is RESEARCH FURTHER | was 100 / 48 days, now **0** |
-| — | `fomo_entry` | next | 29 / — |
+| [07](07-fomo_entry/) | `fomo_entry` | **REVIEWED — awaiting approval.** MODIFY | 74 detections / 29 alerts / 41 days |
+| — | `premium_loss_event` | next | 41 / — |
 
 The live queue for every remaining pattern is the **REVIEW STATUS** table in
 [`00-shared/BEHAVIOURAL_PATTERNS.md`](00-shared/BEHAVIOURAL_PATTERNS.md).
