@@ -143,25 +143,36 @@ COLD_START_DEFAULTS: Dict[str, Any] = {
     'no_stoploss_expiry_hold_min':      5,    # expiry day: same 5 min minimum
     'no_stoploss_expiry_loss_pct':      25,   # expiry day: same 25% loss threshold
 
-    # ── FOMO entry (scattering across instruments) ─────────────────────────
-    # FOMO is NOT time-of-day specific — it's about scattering.
-    # Buying multiple strikes of same underlying = strategy (not FOMO).
-    # Buying NIFTY call + BANKNIFTY call + RELIANCE option in 30 min = FOMO.
-    # Signal: different underlyings (not different strikes of same underlying).
-    'fomo_window_min':                  30,   # rolling 30-min detection window
-    'fomo_symbols_in_window':           3,    # 3+ different underlyings at any time
-    'fomo_symbols_at_open':             2,    # first 30 min (market open rush): 2+ underlyings
-    'fomo_open_window_min':             30,   # first 30 min of session
-    'fomo_close_window_min':            30,   # last 30 min of session (pre-close panic)
-    # The pre-close branch had no threshold of its own and silently reused
-    # fomo_symbols_at_open (2) - the tightest value in the detector, justified
-    # by the OPEN rush and never by anything about the close. Named here so the
-    # code says what it means. It starts equal to the general threshold because
-    # nothing measured justifies a tighter one; a pre-close scramble is
-    # plausible but unmeasured, and this knob is where that evidence would land.
-    'fomo_symbols_at_close':            3,
-    # Expiry day (Thursday): theta decay + 0DTE options = heightened FOMO
-    'fomo_expiry_day_symbols':          4,   # was 2 — NIFTY plus one stock option inside half an hour on expiry day is an ordinary session, not a scramble.
+    # -- Breadth across underlyings (fomo_entry) ---------------------------
+    # Distinct UNDERLYINGS in a rolling window - strikes of the same underlying
+    # count once, because two NIFTY strikes are a structure and not a scatter.
+    #
+    # BOTH NUMBERS BELOW ARE UNSOURCED. The Pattern #7 review (2026-08-27)
+    # established which of this detector's constants were wrong; it did not
+    # establish what the right ones are, so these two were deliberately left
+    # untouched. Treat them as hypotheses, in the sense this file's header
+    # describes: an unmarked number is a judgement someone made once.
+    'fomo_window_min':                  30,   # rolling window. Unsourced; a round number.
+    'fomo_symbols_in_window':           3,    # distinct underlyings. Unsourced.
+    'fomo_open_window_min':             30,   # labels the opening stretch. Reported, never thresholded.
+    'fomo_close_window_min':            30,   # labels the closing stretch. Reported, never thresholded.
+    #
+    # DELETED 2026-08-27 with the Pattern #7 review. All three are now read by
+    # nothing, and every context uses fomo_symbols_in_window instead:
+    #
+    #   fomo_symbols_at_open     (2) - produced 29 of the detector's 74 firings,
+    #        39% of all output, at 3.6:1 against the general threshold, on a
+    #        state (two underlyings inside half an hour) occurring in 20% of all
+    #        entries. It sat in safety_bounds.MANDATORY_REVIEW precisely for
+    #        this; that review is now complete.
+    #   fomo_symbols_at_close    (3) - UNREACHABLE. Across 50 pre-close entries
+    #        the maximum breadth ever reached was 2. Its own comment asked for
+    #        exactly this measurement.
+    #   fomo_expiry_day_symbols  (4) - UNREACHABLE. Across 142 expiry-day
+    #        entries the maximum was 3, once.
+    #
+    # No replacement was invented: a threshold above the highest value its
+    # branch has ever produced is not conservative, it is absent.
 
     # ── Expiry day overtrading ────────────────────────────────────────────
     # On the instrument's own expiry date: heightened FOMO, 0DTE herding, vol spikes.

@@ -158,7 +158,9 @@ export function formatPatternName(patternType: string): string {
     'overtrading':                   'Overtrading',
     'burst_trading':                 'Burst Trading',
     'fomo':                          'FOMO Entry',
-    'fomo_entry':                    'FOMO Entry',
+    // Renamed 2026-08-27 (Pattern #7): the detector measures breadth across
+    // underlyings and the evidence does not support calling it FOMO.
+    'fomo_entry':                    'Several underlyings at once',
     'tilt_loss_spiral':              'Tilt / Loss Spiral',
     'position_sizing':               'Oversized Position',
     'excess_exposure':               'Excess Exposure',

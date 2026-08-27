@@ -165,8 +165,11 @@ REGISTRY: Tuple[DetectorSpec, ...] = (
                  "1.0.0", "risk", "alerting", "exit", 4, guardian_eligible=True,
                  uses_constitution=True,
                  consumes=("session", "completed_trade", "thresholds")),
+    # 2.0.0: one threshold for every context (Pattern #7 review, 2026-08-27).
+    # The expiry and pre-close thresholds could not fire on the reference book
+    # and the market-open threshold of 2 produced 39% of all firings on its own.
     DetectorSpec("fomo_entry", "_detect_fomo_entry",
-                 "1.0.0", "emotional", "alerting", "exit", 1),
+                 "2.0.0", "emotional", "alerting", "exit", 1),
     DetectorSpec("no_stoploss", "_detect_no_stoploss",
                  "1.0.0", "risk", "alerting", "exit", 2,
                  consumes=("completed_trade", "exit_order_types", "thresholds")),
@@ -327,11 +330,16 @@ PATTERN_COPY: Dict[str, PatternCopy] = {
         "May be a considered decision or a reaction. Worth reviewing against what you planned "
         "before entering.",
     ),
+    # Copy rewritten 2026-08-27, Pattern #7. It used to say several instruments
+    # at once "is usually chasing movement rather than acting on a view" - a
+    # claim about intent that the permutation null contradicts (ratio 0.94) and
+    # that the win rate on flagged trades points against (45.9% vs a 39.9%
+    # baseline). It now describes what was counted.
     "fomo_entry": PatternCopy(
-        "Chasing several instruments",
-        "Entries spread across multiple distinct underlyings inside a short window.",
-        "Several unrelated instruments at once is usually chasing movement rather than acting on "
-        "a view.",
+        "Several underlyings at once",
+        "Distinct underlyings entered inside a short window, counting strikes of the same "
+        "underlying as one.",
+        "Breadth is worth seeing on its own. It is not evidence about why the trades were taken.",
     ),
     "winning_streak_overconfidence": PatternCopy(
         "Size up after wins",

@@ -2145,6 +2145,46 @@ class BehaviorEngine:
     # Works at any time of day (not just market open).
 
     def _detect_fomo_entry(self, ctx: EngineContext) -> Optional[DetectedEvent]:
+        """
+        How many different underlyings were entered inside a short window.
+
+        REVIEWED 2026-08-27, Pattern #7. What changed, and why:
+
+        1. **One threshold, every context.** There were four - expiry day 4,
+           market open 2, pre-close 3, otherwise 3 - and on the reference book
+           two of them could not fire at all. Expiry needed 4 distinct
+           underlyings inside 30 minutes and the maximum ever reached across 142
+           expiry entries was 3, once. Pre-close needed 3 and the maximum across
+           50 entries was 2. A threshold above the highest value its own branch
+           has ever produced is not conservative, it is absent. Both were
+           removed rather than replaced, because replacing them means inventing
+           a number this book cannot justify.
+
+        2. **The market-open threshold of 2 is gone**, which is the outcome of
+           the mandatory review it was flagged for. It produced 29 of the
+           detector's 74 firings - 39% of all output - at 3.6:1 against the
+           general threshold, on a state (two underlyings in half an hour) that
+           occurs on 20% of all entries.
+
+        3. **The cause claim is gone from the copy.** It said scattering
+           "indicates FOMO - not a focused plan". A permutation null that keeps
+           each session's exact entry times and its exact multiset of
+           instruments, and permutes only WHICH was traded WHEN, reproduced the
+           firings almost exactly: 74 observed against 78.4 expected, ratio
+           0.94, and 1.02 on the market-open branch. The trader's pairing of
+           instrument to moment carries no information, so the alert cannot say
+           they were chased together. The flagged trades also win more often
+           than this trader's average - 45.9% against 39.9% - so it cannot say
+           they were bad either. It now states the breadth and stops.
+
+        The context (expiry day, open, pre-close) is still computed and still
+        reported as a fact on the evidence. It no longer changes the count.
+
+        NOT changed, deliberately: the 30-minute window and the threshold of 3
+        are unsourced and are left exactly as they were - this review found
+        which numbers were wrong, not what the right ones are. Severity stays
+        `caution` and the disposition stays `alerting`.
+        """
         ct = ctx.completed_trade
         if not ct.entry_time or ct.instrument_type not in ("CE", "PE", "FUT"):
             return None
@@ -2153,17 +2193,11 @@ class BehaviorEngine:
         ct_parsed = parse_symbol(ct.tradingsymbol or "")
 
         fomo_window_min      = ctx.thresholds.get("fomo_window_min", 30)
-        fomo_general         = ctx.thresholds.get("fomo_symbols_in_window", 3)
-        fomo_open_symbols    = ctx.thresholds.get("fomo_symbols_at_open", 2)
+        # ONE threshold, every context. See the docstring: the three
+        # context-specific numbers were removed in the Pattern #7 review.
+        fomo_threshold       = ctx.thresholds.get("fomo_symbols_in_window", 3)
         fomo_open_window_min = ctx.thresholds.get("fomo_open_window_min", 30)
         fomo_close_window_min = ctx.thresholds.get("fomo_close_window_min", 30)
-        fomo_close_symbols   = ctx.thresholds.get("fomo_symbols_at_close", 3)
-        # 4, matching COLD_START_DEFAULTS and the registry. The inline default
-        # read 2 until 2026-08-24 while the resolved value has always been 4, so
-        # the 2 was unreachable. Whether 4 is the RIGHT number for expiry day -
-        # it is less sensitive than the general threshold of 3 - is a question
-        # for the fomo_entry pattern review, not a hygiene fix.
-        fomo_expiry_symbols  = ctx.thresholds.get("fomo_expiry_day_symbols", 4)
 
         entry_ist = ct.entry_time.astimezone(IST)
 
@@ -2203,33 +2237,32 @@ class BehaviorEngine:
         if ct_parsed.underlying:
             distinct_underlyings.add(ct_parsed.underlying)
 
-        # Determine threshold
+        # The context is REPORTED, never used to move the threshold. Which part
+        # of the session a trade landed in is a fact worth carrying on the
+        # evidence; it is not a reason to count differently.
         if is_expiry_day:
-            threshold = fomo_expiry_symbols
             context_note = "expiry day"
         elif is_open_window:
-            threshold = fomo_open_symbols
             context_note = "market open"
         elif is_close_window:
-            threshold = fomo_close_symbols
             context_note = "pre-close"
         else:
-            threshold = fomo_general
             context_note = None
 
-        if len(distinct_underlyings) >= threshold:
+        if len(distinct_underlyings) >= fomo_threshold:
             label = f" ({context_note})" if context_note else ""
             return DetectedEvent(
                 event_type="fomo_entry",
                 severity="caution",
                 message=(
-                    f"You entered {len(distinct_underlyings)} different instruments "
-                    f"within {fomo_window_min}min{label}: {', '.join(sorted(distinct_underlyings))}. "
-                    f"Scattering across underlyings indicates FOMO — not a focused plan."
+                    f"{len(distinct_underlyings)} different underlyings entered "
+                    f"within {fomo_window_min} min{label}: "
+                    f"{', '.join(sorted(distinct_underlyings))}."
                 ),
                 context={
                     "distinct_underlyings": sorted(distinct_underlyings),
                     "window_minutes": fomo_window_min,
+                    "threshold": fomo_threshold,
                     "is_expiry_day": is_expiry_day,
                     "context_note": context_note,
                 },

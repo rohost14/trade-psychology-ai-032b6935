@@ -15,7 +15,7 @@ const PATTERN_LABEL: Record<string, string> = {
   size_escalation: 'Size escalation', martingale_behaviour: 'Martingale (doubling down)',
   consecutive_loss_streak: 'Trading through a loss streak', panic_exit: 'Panic exit',
   post_loss_recovery_bet: 'Recovery bet after a loss', no_stoploss: 'No stop-loss',
-  fomo_entry: 'FOMO entry', chasing_entry: 'Chasing entries', direction_instability: 'Flip-flopping direction',
+  fomo_entry: 'Several underlyings at once', chasing_entry: 'Chasing entries', direction_instability: 'Flip-flopping direction',
   cooldown_violation: 'Cooldown ignored', winning_streak_overconfidence: 'Overconfidence on a streak',
   early_exit: 'Cutting winners early', profit_giveaway: 'Giving profit back',
   session_meltdown: 'Session meltdown', daily_overtrading: 'Overtrading (daily)',

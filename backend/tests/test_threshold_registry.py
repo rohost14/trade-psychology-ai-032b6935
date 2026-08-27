@@ -68,20 +68,34 @@ def test_definitional_thresholds_name_no_metric():
 
 
 def test_the_flagged_judgements_are_marked_for_mandatory_review():
+    """
+    Any spec still carrying review_required must say why in its provenance.
+
+    Both constants that once satisfied this test have since had their reviews
+    and been deleted, so the set is currently empty and the assertion below is
+    the invariant rather than a headcount:
+
+      * revenge_window_danger_min - deleted 2026-08-24 as unread; the frozen
+        A x B matrix has no danger sub-tier on the reaction axis.
+      * fomo_symbols_at_open - deleted 2026-08-27 by the Pattern #7 review it
+        was flagged for. The flag said "~4:1 over-firing"; measured, it produced
+        29 of the detector's 74 firings at 3.6:1 against the general threshold.
+
+    Both keep their MANDATORY_REVIEW entries so the reasons survive the
+    constants - see the test below.
+    """
     flagged = {k for k, s in THRESHOLD_SPECS.items() if s.review_required}
-    assert "fomo_symbols_at_open" in flagged
-    # revenge_window_danger_min was flagged here until 2026-08-24, when the
-    # constant was deleted as unread - the frozen A x B matrix has no danger
-    # sub-tier on the reaction axis. Its MANDATORY_REVIEW entry is kept so the
-    # reason survives, but it no longer has a spec to carry review_required.
     for k in flagged:
         assert "FLAGGED" in spec_for(k).provenance
 
 
-def test_mandatory_review_set_records_the_retired_constant():
-    """burst_trades_per_15min is gone; the reason it went must not be."""
-    assert "burst_trades_per_15min" in MANDATORY_REVIEW
-    assert "burst_trades_per_15min" not in COLD_START_DEFAULTS
+def test_mandatory_review_set_records_the_retired_constants():
+    """The constants are gone; the reasons they went must not be."""
+    for key in ("burst_trades_per_15min", "revenge_window_danger_min",
+                "fomo_symbols_at_open"):
+        assert key in MANDATORY_REVIEW, f"{key} lost its recorded reason"
+        assert key not in COLD_START_DEFAULTS, f"{key} still resolves"
+        assert key not in THRESHOLD_SPECS, f"{key} still declared"
 
 
 def test_every_spec_carries_provenance():

@@ -286,7 +286,7 @@ def send_weekly_summary(broker_account_id: str):
                     "session_meltdown": "Session Meltdown",
                     "size_escalation": "Size Escalation",
                     "excess_exposure": "Excess Exposure",
-                    "fomo_entry": "FOMO Entry",
+                    "fomo_entry": "Several Underlyings At Once",
                     "no_stoploss": "No Stop-Loss",
                     "early_exit": "Early Exit",
                     "winning_streak_overconfidence": "Overconfidence",

@@ -34,7 +34,7 @@ const LABEL: Record<string, string> = {
   size_escalation: 'oversized entries', martingale_behaviour: 'doubling down',
   consecutive_loss_streak: 'trading through loss streaks', panic_exit: 'panic exits',
   post_loss_recovery_bet: 'recovery bets after a loss', no_stoploss: 'trades without a stop-loss',
-  fomo_entry: 'FOMO entries', chasing_entry: 'chased entries',
+  fomo_entry: 'entering several underlyings at once', chasing_entry: 'chased entries',
   direction_instability: 'flip-flopping direction', cooldown_violation: 'ignored cooldowns',
   winning_streak_overconfidence: 'overconfident sizing', early_exit: 'cutting winners early',
   profit_giveaway: 'giving profit back', session_meltdown: 'session meltdowns',

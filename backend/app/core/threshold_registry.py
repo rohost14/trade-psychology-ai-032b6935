@@ -119,31 +119,31 @@ def _spec(**kw) -> ThresholdSpec:
 # ---------------------------------------------------------------------------
 
 _GROUP_C = [
-    _spec(key="fomo_symbols_in_window", kind=Kind.PERSONAL_BASELINE, fallback=3,
-          meaning="distinct underlyings entered inside a 30-minute window",
-          resolution_source=Source.HISTORY, metric="fomo_underlyings_per_window_p75",
-          percentile=75, maturity=Maturity.SESSIONS_20,
-          provenance="a scatter of 3 is ordinary for a basket trader and extreme for a single-index trader"),
+    # RECLASSIFIED 2026-08-27, Pattern #7. This was PERSONAL_BASELINE resolving
+    # from Source.HISTORY via `fomo_underlyings_per_window_p75` - and that
+    # metric is produced by NOTHING. Not baseline_service, not
+    # behavioral_baseline_service, and `_apply_history_v2` places no fomo key.
+    # Every trader therefore got the fallback of 3, permanently, while the
+    # registry described a personalisation the system does not perform. FALLBACK
+    # is what it actually is: a stand-in until something better exists.
+    #
+    # This is a correction to the CLASSIFICATION, not a decision against
+    # personalising breadth. If the metric is ever produced, this entry is where
+    # that would be declared.
+    _spec(key="fomo_symbols_in_window", kind=Kind.FALLBACK, fallback=3,
+          meaning="distinct underlyings entered inside the rolling window, every context",
+          provenance="unsourced. The Pattern #7 review established which of this detector's "
+                     "constants were wrong and deliberately did not invent a replacement for "
+                     "this one; 3 is unchanged and untested against any alternative"),
 
-    _spec(key="fomo_symbols_at_open", kind=Kind.PERSONAL_BASELINE, fallback=2,
-          meaning="distinct underlyings in the opening 30 minutes",
-          resolution_source=Source.HISTORY, metric="fomo_underlyings_at_open_p75",
-          percentile=75, maturity=Maturity.SESSIONS_20, review_required=True,
-          provenance="FLAGGED: measured ~4:1 over-firing; 2 is the tightest value in the "
-                     "detector and is justified by an assertion about traders in general"),
-
-    _spec(key="fomo_symbols_at_close", kind=Kind.PERSONAL_BASELINE, fallback=3,
-          meaning="distinct underlyings in the closing 30 minutes",
-          resolution_source=Source.HISTORY, metric="fomo_underlyings_at_close_p75",
-          percentile=75, maturity=Maturity.SESSIONS_20,
-          provenance="separated from the open threshold 2026-08-22; a pre-close scramble is "
-                     "plausible but unmeasured"),
-
-    _spec(key="fomo_expiry_day_symbols", kind=Kind.PERSONAL_BASELINE, fallback=4,
-          meaning="distinct underlyings on the instrument's expiry day",
-          resolution_source=Source.HISTORY, metric="fomo_underlyings_expiry_p75",
-          percentile=75, maturity=Maturity.SESSIONS_20,
-          provenance="expiry behaviour differs enough from ordinary days to need its own distribution"),
+    # fomo_symbols_at_open (2), fomo_symbols_at_close (3) and
+    # fomo_expiry_day_symbols (4) were DELETED with the Pattern #7 review. All
+    # three carried the same unproduced-metric problem as the key above, and two
+    # of them could not fire at all: across 142 expiry-day entries the maximum
+    # breadth ever reached was 3 against a threshold of 4, and across 50
+    # pre-close entries the maximum was 2 against a threshold of 3. The open
+    # threshold of 2 produced 39% of the detector's output on its own. Every
+    # context now uses fomo_symbols_in_window. See docs/patterns/07-fomo_entry/.
 
     _spec(key="expiry_overtrading_caution_count", kind=Kind.PERSONAL_BASELINE, fallback=5,
           meaning="trades on one underlying on its expiry day",
@@ -401,6 +401,9 @@ for _key, (_default, _direction, _meaning) in _FLOOR_DIRECTIONS.items():
     )
 
 MANDATORY_REVIEW = frozenset({
+    # Reviewed and DELETED 2026-08-27 (Pattern #7). The flag said "~4:1
+    # over-firing"; measured, it was 29 of 74 firings at 3.6:1 against the
+    # general threshold. Kept here so the reason survives the constant.
     "fomo_symbols_at_open",
     "revenge_window_danger_min",   # retired 2026-08-24; kept so the reason survives
     "premium_loss_caution_pct",   # documented as firing routinely without behavioural failure
