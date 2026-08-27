@@ -72,6 +72,18 @@ The two still silent are correctly excluded by `min_erosion`: 2025-07-25 (peak
 because the self-relative floor had risen above ₹1,304 for that session. **No
 regression on anything that fired before.**
 
+> **CORRECTION, same day.** The alert counts in this section say **~95**. The
+> correct figure is **100**: that simulation modelled the first fire, the
+> severity escalation and the metric re-arm but omitted the **2-hour elapsed
+> window**, which does expire inside a 09:15-15:30 session. See
+> `episode_dedup_analysis.md`, which models `_is_deduped_full` completely.
+>
+> **The conclusion below is also superseded.** The repeat alerts are NOT
+> redundant: 45 of the 100 are same-episode repeats, but each required a
+> monotonic `worst_giveaway` to grow >=20%, so each is a materially worse
+> figure. Suppressing them would cost the trader **Rs 65,769** of unreported
+> deterioration. The volume should stay.
+
 ## What did NOT improve — stated plainly
 
 **Total alerts went from ~38 to ~95, and the per-day rate did not fall** (1.90 →
