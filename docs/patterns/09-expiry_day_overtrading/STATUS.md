@@ -100,9 +100,42 @@ because that map claims the engine still emits the name.
 
 ---
 
-## Replay — 203 sessions
+## Replay — 203 sessions · CLEAN
 
-*(filled in from the confirmation run; see the session report)*
+| detector | before | after | note |
+|---|---|---|---|
+| `adding_to_adverse_position` | 99 | **99** | unchanged |
+| `martingale_behaviour` | 39 | **39** | unchanged |
+| `options_premium_avg_down` · `size_escalation` | 30 · 30 | **30 · 30** | unchanged |
+| `same_symbol_obsession` | 22 | **22** | unchanged |
+| `fomo_entry` | 19 | **19** | unchanged |
+| **`expiry_day_overtrading`** | **28** | **0** | **intended** |
+| `death_spiral` | 20 | 16 | *consequence* — see below |
+| **total** | **330** | **298** | |
+
+203/203 sessions, zero errors.
+
+### `death_spiral` 20 → 16 is arithmetic, and here is why that is settled
+
+`death_spiral` is a **composite**: it counts distinct nature-domains carrying an
+event at danger+. It is explicitly built *from* other detectors, so removing one
+mechanically changes it. `expiry_day_overtrading` was `nature="emotional"` and
+did emit `danger`, so it could and did supply that domain on some days.
+
+**The decisive evidence is that nothing else moved.** Every other detector is
+identical to the alert. If the deletion had broken anything real, a detector that
+measures behaviour would have shifted; none did. The only two changes are the
+detector removed and the composite that counts detectors.
+
+**A day was spent trying to prove the exact magnitude and it was not worth it.**
+The attempted reconciliation compared danger-event counts from a CSV
+reconstruction against the replay's own CompletedTrade builder — different
+inputs, and dedup hides extra danger *events* behind a single danger *alert*, so
+the two were never comparable. Five baseline-replay attempts failed on
+environment (network drop, task reaping ×2, a 3h20m I/O hang, then abandoned).
+**The number was never able to change the decision**, and treating a definitional
+consequence as a possible regression is what turned a closed question into a
+day's work. Recorded as a limitation below, not as a blocker.
 
 ---
 
@@ -132,6 +165,13 @@ errors.**
 ---
 
 ## Limitations, recorded not closed
+
+0. **The exact per-day mechanism of `death_spiral` 20 → 16 was never traced.**
+   It is arithmetic in kind and no other detector moved, which is why the pattern
+   closed; the four specific days were not individually attributed. If a future
+   change makes composite accounting matter, generate a baseline artifact BEFORE
+   the change — `docs/*-replay.json` is gitignored and is destroyed by the next
+   run, which is what made this expensive.
 
 1. **n = 55 eligible positions, 45 expiry-active sessions, one trader.** No
    single test here would be decisive alone. What makes the retirement safe is
