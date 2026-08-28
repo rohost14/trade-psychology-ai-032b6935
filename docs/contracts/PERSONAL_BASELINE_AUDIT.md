@@ -191,6 +191,53 @@ never move. The scenario table above covers the case a replay could not.
 
 ---
 
+## Closure pass — 28 Aug
+
+### `daily_trade_limit = 7` is authoritative, not invented
+
+`COLD_START_DEFAULTS`' header states every value is documented with its research
+basis, and this one carries it: **SEBI FY2023 — traders with >6 trades/day had a
+94% loss probability; >12/day approached 99%; profitable traders averaged 2–4/day.**
+Caution above 6 gives 7. The spec's `fallback` now matches the live constant, and
+no other definition of the key exists in the codebase. **No revert needed** — 15
+was the invention, and correcting it to 7 restored the intended value.
+
+### Guarantees verified against the resolver, not the labels
+
+| | result |
+|---|---|
+| every `UNIVERSAL_SAFETY` key resists a 5× loosening | **6/6 held** |
+| hostile profile (size 95, limit 500, cooldown 0, SL 99, aggressive) | **0 of 6 loosened** |
+| a *tighter* declaration is honoured (`size=2` → 2.0 / 4.0) | **yes** |
+| no rule at all → the universal value | **6/6** |
+| a safety key reported as personal | **none** |
+| `USER_RULE` / `PRODUCT_POLICY` / `UNIVERSAL_SAFETY` refuse learned sources | **9/9 refused** |
+| declared 3 + history 40 → 3 from `declared`, while size 95 → caution 5.0 | **both** |
+| `place()` targeting a safety key | **none** |
+| a metric-less baseline creating a personal value | **none** |
+| a resolution the registry would forbid | **none** |
+| safety-shaped keys unregistered | **none** (11 unregistered, none safety) |
+
+### The Pattern 11 replacement invariant was too weak, and is now not
+
+`test_registry_classification_matches_reality` originally only checked that no
+*completed* resolution was forbidden by its Kind. A mutation — giving a
+history-resolved key a Kind that forbids history — **did not trip it**: `put()`
+refuses the resolution, the key falls back to `GLOBAL`, and `GLOBAL` is legal for
+every Kind, so the contradiction reads as fine.
+
+It now also asserts that **no resolution was refused**, reading the detail string
+`put()` writes on refusal. Re-run against the same mutation, it fails on its own.
+That is the half that catches a `Kind` silently blocking its own wiring.
+
+### Why no replay was needed
+
+The replay runs `--no-rules`. On the cold path all six `UNIVERSAL_SAFETY` keys
+equal their defaults, so **the clamp cannot bind** — nothing raises them above
+the default without a declared `max_position_size`, which `--no-rules` never
+supplies. No detector reads a value that can differ, so no detector output can
+change.
+
 ## Is the PERSONAL_BASELINE system safe to rely on?
 
 **For safety: yes, now.** Learned sources were already refused; the bound closes

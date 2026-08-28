@@ -179,13 +179,33 @@ def test_registry_classification_matches_reality():
     at runtime and fall back, with only a log line.
     """
     warm = resolve_thresholds(profile=_profile(detected_patterns={"baseline": BASELINE_V2}))
-    offenders = []
-    for key, r in warm.meta.items():
-        reason = violates_kind(kind_for(key), r.source)
-        if reason is not None:
-            offenders.append(f"{key}: {kind_for(key).value} <- {r.source.value}")
+    assert len(warm.meta) > 50, "nothing resolved — this test would pass vacuously"
+
+    # 1. nothing that DID resolve is forbidden by its own Kind.
+    offenders = [
+        f"{key}: {kind_for(key).value} <- {r.source.value}"
+        for key, r in warm.meta.items()
+        if violates_kind(kind_for(key), r.source) is not None
+    ]
     assert offenders == [], (
         "the registry forbids a resolution that actually happens: " + "; ".join(offenders)
+    )
+
+    # 2. and nothing was REFUSED on the way.
+    #
+    # (1) alone is not enough, and a mutation proved it: giving a
+    # history-resolved key a Kind that forbids history makes `put()` refuse the
+    # resolution and keep the previous value, so the key ends up on GLOBAL —
+    # which (1) then reads as perfectly legal. The refusal is the failure, and
+    # `put()` records it in the detail string. This is the half that catches a
+    # Kind silently blocking its own wiring.
+    refused = [
+        f"{key}: {r.detail}" for key, r in warm.meta.items()
+        if r.detail and "refused a" in r.detail
+    ]
+    assert refused == [], (
+        "a resolution was refused because the registry's Kind forbade it, and "
+        "the threshold silently fell back: " + "; ".join(refused)
     )
 
 
