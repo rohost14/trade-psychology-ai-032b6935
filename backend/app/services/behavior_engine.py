@@ -676,7 +676,6 @@ class BehaviorEngine:
         "rapid_reentry",
         "no_stoploss",
         "post_loss_recovery_bet",
-        "direction_instability",   # straddle/strangle legs are CE+PE by design
     })
 
     def _run_all_detectors(
@@ -1866,107 +1865,39 @@ class BehaviorEngine:
                      "cooldown_reason": cooldown.reason},
         )
 
-    # ── Pattern 9: Rapid flip (direction reversal) ────────────────────────
-
-    def _detect_direction_instability(self, ctx: EngineContext) -> Optional[DetectedEvent]:
-        """
-        Phase 4 merge of rapid_flip + options_direction_confusion (master §1D.2 doc 1).
-
-        A directional flip = betting the market goes the other way, minutes after
-        betting it went this way. Two flavours, one pattern:
-          Level 1 — exact instrument reversal (LONG→SHORT same symbol)
-          Level 2 — underlying-level reversal (CE→PE / PE→CE on same underlying)
-          Level 3 — 3+ flips this session → danger (whipsaw churn)
-        Context includes the prior position's P&L: flip after a loss is
-        emotional; flip after a profit may be strategy (severity stays caution).
-        """
-        ct = ctx.completed_trade
-        if not ct.entry_time:
-            return None
-
-        from app.services.instrument_parser import parse_symbol as _ps
-        window = ctx.thresholds.get("rapid_flip_min", 10)
-        confusion_window = ctx.thresholds.get("direction_confusion_window_min", 10)
-
-        def _underlying(sym: str) -> str:
-            try:
-                return _ps(sym or "").underlying or sym or ""
-            except Exception:
-                return sym or ""
-
-        def _is_flip(prior, current) -> Optional[str]:
-            """Return 'exact' | 'underlying' | None for a prior→current pair."""
-            if not (prior.exit_time and current.entry_time):
-                return None
-            gap = (current.entry_time - prior.exit_time).total_seconds() / 60
-            if gap < 0:
-                return None
-            # Level 1: same symbol, opposite direction
-            if (prior.tradingsymbol == current.tradingsymbol
-                    and prior.direction and current.direction
-                    and prior.direction != current.direction
-                    and gap < window):
-                return "exact"
-            # Level 2: same underlying, CE↔PE (both LONG option buys)
-            if (prior.instrument_type in ("CE", "PE") and current.instrument_type in ("CE", "PE")
-                    and prior.instrument_type != current.instrument_type
-                    and prior.direction == "LONG" and current.direction == "LONG"
-                    and _underlying(prior.tradingsymbol) == _underlying(current.tradingsymbol)
-                    and gap < confusion_window):
-                return "underlying"
-            return None
-
-        # Does the current trade flip against any recent prior?
-        priors = sorted([t for t in ctx.session_trades if t.id != ct.id and t.exit_time],
-                        key=lambda t: t.exit_time)
-        flip_kind = None
-        flip_prior = None
-        for prior in reversed(priors):
-            kind = _is_flip(prior, ct)
-            if kind:
-                flip_kind, flip_prior = kind, prior
-                break
-        if not flip_kind:
-            return None
-
-        # Level 3: count flips across the whole session (including this one)
-        ordered = priors + [ct]
-        session_flips = 0
-        for i in range(1, len(ordered)):
-            if _is_flip(ordered[i - 1], ordered[i]):
-                session_flips += 1
-
-        gap_min = (ct.entry_time - flip_prior.exit_time).total_seconds() / 60
-        prior_pnl = float(flip_prior.realized_pnl or 0)
-        underlying = _underlying(ct.tradingsymbol)
-
-        if flip_kind == "exact":
-            flip_desc = (f"{ct.tradingsymbol}: direction reversed "
-                         f"{flip_prior.direction}→{ct.direction} within {gap_min:.0f}min")
-        else:
-            flip_desc = (f"{underlying}: flipped {flip_prior.instrument_type}→"
-                         f"{ct.instrument_type} in {gap_min:.0f}min")
-
-        severity = "danger" if session_flips >= 3 else "caution"
-        suffix = (f" — {session_flips} direction changes this session."
-                  if session_flips >= 3 else
-                  (" after a loss on that view." if prior_pnl < 0 else "."))
-
-        return DetectedEvent(
-            event_type="direction_instability",
-            severity=severity,
-            message=flip_desc + suffix,
-            context={
-                "level": 3 if session_flips >= 3 else (1 if flip_kind == "exact" else 2),
-                "flip_kind": flip_kind,
-                "underlying": underlying,
-                "prior_symbol": flip_prior.tradingsymbol,
-                "trigger_symbol": ct.tradingsymbol,
-                "prior_pnl": round(prior_pnl, 2),
-                "gap_minutes": round(gap_min, 1),
-                "session_flips": session_flips,
-            },
-        )
+    # ── RETIRED 2026-08-28 — `direction_instability` ──────────────────────
+    #
+    # Retired because it could not tell an emotional reversal from a change of
+    # view, and what it selected looked like the change of view.
+    #
+    # Every CE<->PE transition on one underlying in the 189-session book: 10 had
+    # OVERLAPPING legs (a hedge or structure — correctly excluded by the negative
+    # gap), 16 were sequential inside 10 minutes (FLAGGED), 48 were sequential
+    # beyond it (not flagged). So the only thing separating a flagged flip from
+    # an unflagged one was the clock — and the clock sorted them backwards:
+    #
+    #   flagged flip trade        n=16  win 56.2%   mean +Rs 276
+    #   not flagged (gap >=10m)   n=48  win 41.7%   mean -Rs  73
+    #   the prior being exited    flagged -Rs 284 / 31% win  vs  +Rs 35 / 54%
+    #
+    # The trader reversed FAST when a position had gone badly and slowly when it
+    # had not: cutting a loser. Sessions containing a flip ended +Rs 1,305
+    # against -Rs 860 for no-flip sessions in the same trade-count band
+    # (p = 0.129), and rest-of-session AFTER the first flip was +Rs 953 against
+    # -Rs 112 matched (p = 0.095) — the premise predicts deterioration and the
+    # measurement showed improvement. Flagged flips were flat-sized (median ratio
+    # 1.03), so there was no escalation story either. `revenge_trade` already
+    # fired on 10 of the 18 firings, so the emotional reading is owned.
+    #
+    # Nothing reached p < 0.05 at n=16, but five independent measures pointed the
+    # same way. An alert that fires on good decisions is worse than one that
+    # fires on noise.
+    #
+    # THE CONCEPT IS NOT RETIRED PERMANENTLY. Level 1 — a same-symbol LONG<->SHORT
+    # reversal — was never testable here: the book is 911 LONG against 1 SHORT,
+    # with zero same-symbol opposite-direction pairs at any gap. It would be the
+    # live branch for a futures trader or an option seller. Revisit with a book
+    # that contains shorts. See docs/patterns/11-direction_instability/.
 
     # ── Pattern 10: Excess exposure ───────────────────────────────────────
 
@@ -2498,7 +2429,8 @@ class BehaviorEngine:
     # CE→PE (or PE→CE) flip on the same underlying within the confusion window.
     # Legitimate reversals require analysis time. < 10 min = confusion, not strategy.
 
-    # options_direction_confusion: MERGED into direction_instability Level 2
+    # options_direction_confusion: MERGED into direction_instability Level 2,
+    # which was itself retired 2026-08-28. Both are gone.
     # (Phase 4, master doc 1). Historical alerts keep the old pattern_type.
 
     # ── Pattern 17: Options premium averaging down ────────────────────────

@@ -69,9 +69,9 @@ def test_no_registry_spec_points_at_the_deleted_method():
 def test_the_engine_counts_are_what_the_retirement_left():
     from app.services.detector_registry import REGISTRY, all_pattern_types
 
-    # 24 / 30 since `size_escalation` was retired 2026-08-27 (Pattern 10).
-    assert len(REGISTRY) == 24
-    assert len(all_pattern_types()) == 30
+    # 23 / 29 since `direction_instability` was retired 2026-08-28 (Pattern 11).
+    assert len(REGISTRY) == 23
+    assert len(all_pattern_types()) == 29
 
 
 def test_it_is_recorded_as_retired():
@@ -200,9 +200,26 @@ def test_death_spiral_still_has_its_emotional_domain():
         if sev & {"danger", "critical"}:
             danger_capable.append(name)
 
-    assert len(danger_capable) >= 5, (
-        f"the emotional domain can no longer contribute to death_spiral: "
-        f"only {danger_capable} can reach danger+"
+    # The SET, not a count. A bare number goes stale on every justified
+    # retirement — that is how `>= 12` and then `>= 5` both broke — and it
+    # cannot catch a substitution. Changing this set means changing what
+    # death_spiral can see, so it must be deliberate.
+    #
+    # 2026-08-28: was five. `direction_instability` (Pattern #11) emitted
+    # `danger` at 3+ session flips and so could contribute; it produced exactly
+    # ONE danger event across the 189-session book, so at most one session could
+    # lose its emotional domain to this retirement. `size_escalation` before it
+    # was caution-only and contributed nothing.
+    EXPECTED_DANGER_CAPABLE = {
+        "overtrading_burst",
+        "winning_streak_overconfidence",
+        "opening_5min_trap",
+        "same_symbol_obsession",
+    }
+
+    assert set(danger_capable) == EXPECTED_DANGER_CAPABLE, (
+        f"the set of emotional detectors that can reach death_spiral changed: "
+        f"{sorted(set(danger_capable) ^ EXPECTED_DANGER_CAPABLE)}"
     )
 
 

@@ -198,6 +198,11 @@ RETIRED_PATTERN_NAMES = (
     # 49.7, p = 0.880). Its gate selected at the rate three random numbers are
     # increasing. martingale_behaviour and post_loss_recovery_bet keep the claim.
     "size_escalation",
+    # Retired 2026-08-28: it could not separate an emotional reversal from a
+    # change of view. Its only discriminator was a 10-minute clock, and trades
+    # inside the window did BETTER (56.2% win, +Rs 276) than the same transition
+    # outside it (41.7%, -Rs 73). Rest-of-session after a flip improved.
+    "direction_instability",
     "tilt_loss_spiral",
     "iv_crush_behavior",
     "options_direction_confusion",

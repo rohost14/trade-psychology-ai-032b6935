@@ -275,39 +275,24 @@ def test_the_floors_contain_both_kinds():
     assert Sensitivity.HIGHER_IS_STRICTER in kinds
 
 
-def test_declaring_direction_never_overwrites_an_existing_classification():
-    """
-    The regression this test exists for, and the reason it is written this way.
-
-    The first cut of F2 rebuilt every floor entry with kind=FALLBACK and silently
-    downgraded two thresholds that were already personal_baseline —
-    revenge_window_danger_min and rapid_flip_min. No value moved, so a
-    threshold-equality check showed nothing: what was lost was classification,
-    which is the one thing this registry exists to hold.
-
-    Worse, the first version of THIS test asserted every floor was FALLBACK, so
-    it passed *because* of the bug. A test that encodes the defect it should
-    catch is worse than no test, so it now names the two keys that carry a prior
-    classification and requires them to keep it.
-    """
-    from app.core.threshold_registry import THRESHOLD_SPECS, Sensitivity
-    from app.core.threshold_resolution import Kind
-    from app.core.trading_defaults import UNIVERSAL_FLOORS
-
-    # revenge_window_danger_min was the second key here until 2026-08-24, when
-    # it was deleted as unread. rapid_flip_min still carries the property.
-    already_classified = {
-        "rapid_flip_min": Kind.PERSONAL_BASELINE,
-    }
-    for key, expected in already_classified.items():
-        spec = THRESHOLD_SPECS[key]
-        assert spec.kind is expected, (
-            f"{key} was {expected.value} and is now {spec.kind.value}; declaring "
-            "a direction must not overwrite a decision someone else made"
-        )
-        assert spec.sensitivity is not Sensitivity.UNKNOWN, (
-            f"{key} kept its Kind but lost its direction"
-        )
+# test_declaring_direction_never_overwrites_an_existing_classification was
+# DELETED 2026-08-28 with its last remaining subject.
+#
+# It named the keys that carried a prior classification and required them to keep
+# it, after a refactor silently downgraded two personal_baseline thresholds to
+# FALLBACK. `revenge_window_danger_min` went in August as unread;
+# `rapid_flip_min` went with `direction_instability` (Pattern #11). The dict was
+# then empty, and the test would have looped over nothing and passed — which its
+# own docstring calls out as worse than no test at all.
+#
+# It is NOT repointed at another key on purpose. The audit in
+# docs/contracts/PERSONAL_BASELINE_AUDIT.md found that the registry's Kind labels
+# and the actual personalisation wiring do not overlap AT ALL: all 6 specs
+# labelled PERSONAL_BASELINE resolve to a hardcoded fallback forever, and the 4
+# thresholds that really are personalised are labelled FALLBACK or absent. Any
+# key chosen today would pin a classification now known to be wrong.
+#
+# RESTORE THIS GUARD as part of the relabel that audit recommends.
 
 
 def test_f2_did_not_classify_anything_as_safety():

@@ -189,11 +189,11 @@ _GROUP_C = [
 
 _GROUP_D = [
 
-    _spec(key="rapid_flip_min", kind=Kind.PERSONAL_BASELINE, fallback=10,
-          meaning="direction reversal on the same symbol inside this many minutes",
-          resolution_source=Source.SESSION, metric="flip_interval_p25",
-          percentile=25, maturity=Maturity.SESSION,
-          provenance="a scalper reverses in seconds as a matter of course"),
+    # rapid_flip_min DELETED 2026-08-28 with `direction_instability`. It was
+    # declared PERSONAL_BASELINE against metric `flip_interval_p25`, which no
+    # code produced - and the resolver never reads `spec.metric` anyway, so the
+    # declaration wired nothing. That defect is registry-wide, not local to this
+    # key: see docs/contracts/PERSONAL_BASELINE_AUDIT.md.
 
     _spec(key="early_exit_winner_max_min", kind=Kind.PERSONAL_BASELINE, fallback=60,
           meaning="a winner held less than this counts as cut short",
@@ -374,8 +374,6 @@ _FLOOR_DIRECTIONS = {
                        "minutes held under which a losing exit reads as panic"),
     "rapid_reentry_min": (5, Sensitivity.HIGHER_IS_STRICTER,
                           "minutes within which a re-entry counts as rapid"),
-    "rapid_flip_min": (10, Sensitivity.HIGHER_IS_STRICTER,
-                       "minutes within which reversing direction counts as a flip"),
 }
 
 for _key, (_default, _direction, _meaning) in _FLOOR_DIRECTIONS.items():

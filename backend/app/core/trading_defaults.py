@@ -116,10 +116,10 @@ COLD_START_DEFAULTS: Dict[str, Any] = {
     # Re-entering in < 5 min is almost never analytical — it's emotional.
     'rapid_reentry_min':                5,
 
-    # ── Rapid flip (direction reversal, same symbol) ──────────────────────
-    # In Indian volatile markets (expiry, news), legitimate 5-min reversals exist.
-    # True emotional whipsaw = under 10 min.
-    'rapid_flip_min':                   10,
+    # rapid_flip_min and direction_confusion_window_min DELETED 2026-08-28 with
+    # `direction_instability`. The 10-minute line was the detector's only
+    # discriminator and it sorted backwards - trades inside it did BETTER than
+    # the same transition outside it. See docs/patterns/11-direction_instability/.
 
     # ── Martingale / averaging down ───────────────────────────────────────
     # "Averaging down" is culturally normalised in India ("lower my average cost").
@@ -261,7 +261,6 @@ COLD_START_DEFAULTS: Dict[str, Any] = {
     # ── Options behavioral patterns ───────────────────────────────────────
     # Direction confusion: CE→PE flip on same underlying within 10 min.
     # Legitimate directional change requires analysis — < 10 min is confusion, not analysis.
-    'direction_confusion_window_min':   10,   # CE→PE on same underlying within 10 min
 
     # Premium averaging down: re-entry on same options underlying after ≥20% loss.
     # SEBI data: traders who averaged down on losing options lost 3× more.
@@ -393,7 +392,6 @@ UNIVERSAL_FLOORS: Dict[str, Any] = {
     'consecutive_loss_caution':         3,    # At least 3 losses before any alert
     'panic_exit_min':                   1,    # Minimum 1 min
     'rapid_reentry_min':                1,    # Minimum 1 min
-    'rapid_flip_min':                   2,    # Minimum 2 min
     'no_stoploss_hold_min':             5,    # Minimum 5 min (primary gate is now exit order type)
     'no_stoploss_loss_pct_caution':     15,   # Minimum 15% loss to trigger
 }

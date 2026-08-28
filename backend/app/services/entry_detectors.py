@@ -53,7 +53,6 @@ ENTRY_DECIDABLE = (
     "martingale_behaviour",
     "fomo_entry",
     "same_symbol_obsession",
-    "direction_instability",
     "winning_streak_overconfidence",
     "options_premium_avg_down",
 )

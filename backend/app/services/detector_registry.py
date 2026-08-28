@@ -163,8 +163,18 @@ REGISTRY: Tuple[DetectorSpec, ...] = (
                  "2.0.0", "risk", "alerting", "entry", 2,
                  consumes=("completed_trade", "position_fills", "strategy_group"),
                  frames=(ReferenceFrame.TRADE, ReferenceFrame.STRUCTURAL)),
-    DetectorSpec("direction_instability", "_detect_direction_instability",
-                 "2.0.0", "emotional", "alerting", "exit", 1),
+    # RETIRED 2026-08-28 - `direction_instability` (which had absorbed v1's
+    # rapid_flip and options_direction_confusion). It could not separate an
+    # emotional reversal from a change of view: its only discriminator was a
+    # 10-minute clock, and the clock sorted backwards. Flagged flips won 56.2%
+    # for +Rs 276 against 41.7% and -Rs 73 for the same transition beyond the
+    # window, the position being exited was -Rs 284 at 31% win, and
+    # rest-of-session AFTER a flip was +Rs 953 against -Rs 112 matched
+    # (p = 0.095) where the premise predicts deterioration. Fast reversals on
+    # this book are loss-cutting. revenge_trade already fired on 10 of the 18.
+    # NOT retired permanently: Level 1 (same-symbol LONG<->SHORT) was untestable
+    # here - 911 LONG against 1 SHORT - and would be live for a futures trader.
+    # See docs/patterns/11-direction_instability/.
     DetectorSpec("excess_exposure", "_detect_excess_exposure",
                  "1.0.0", "risk", "alerting", "exit", 2,
                  uses_constitution=True),
@@ -452,11 +462,9 @@ PATTERN_COPY: Dict[str, PatternCopy] = {
         "Returning to the same instrument after losses on it is persistence with the instrument, "
         "not with the strategy.",
     ),
-    "direction_instability": PatternCopy(
-        "Direction flip-flop",
-        "Switching between long and short on the same underlying in a short window.",
-        "Reversing repeatedly usually tracks the price rather than a view about it.",
-    ),
+    # `direction_instability` copy removed 2026-08-28 with the detector. Its
+    # explanation - "reversing repeatedly usually tracks the price rather than a
+    # view about it" - is the claim this trader's book contradicted.
     "early_exit": PatternCopy(
         "Early exit",
         "Winning positions closed well short of your usual holding time.",

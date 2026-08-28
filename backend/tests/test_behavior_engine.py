@@ -228,35 +228,18 @@ class TestDetectors:
         event = engine._detect_cooldown_violation(ctx)
         assert event is None
 
-    # ── Direction instability (Phase 4: absorbed rapid_flip) ──────────────
-
-    def test_direction_instability_detected(self):
-        now = now_utc()
-        long_trade = make_ct(direction="LONG", pnl=-100)
-        long_trade.exit_time = now - timedelta(minutes=2)
-
-        short_trade = make_ct(direction="SHORT", pnl=50)
-        short_trade.entry_time = now - timedelta(minutes=1)
-
-        ctx = make_ctx(
-            completed_trade=short_trade,
-            session_trades=[long_trade, short_trade],
-        )
-        event = engine._detect_direction_instability(ctx)
-        assert event is not None
-        assert event.event_type == "direction_instability"
-        assert event.context.get("level") == 1  # exact-instrument reversal
-
-    def test_no_flip_on_same_direction(self):
-        now = now_utc()
-        t1 = make_ct(direction="LONG")
-        t1.exit_time = now - timedelta(minutes=2)
-        t2 = make_ct(direction="LONG")
-        t2.entry_time = now - timedelta(minutes=1)
-
-        ctx = make_ctx(completed_trade=t2, session_trades=[t1, t2])
-        event = engine._detect_direction_instability(ctx)
-        assert event is None
+    # ── Direction instability — RETIRED 2026-08-28 (Pattern #11) ─────────
+    #
+    # `test_direction_instability_detected` and `test_no_flip_on_same_direction`
+    # were deleted with their subject. They exercised `_detect_direction_
+    # instability`, which no longer exists, so they could only fail on an
+    # AttributeError. The retirement is covered by
+    # tests/test_direction_instability_retired.py.
+    #
+    # Worth noting what the first of them asserted: `level == 1`, the exact
+    # same-symbol LONG->SHORT reversal. That branch never fired once on the real
+    # book (911 LONG against 1 SHORT), so the only coverage it ever had was
+    # synthetic.
 
     # ── Session meltdown ──────────────────────────────────────────────────
 

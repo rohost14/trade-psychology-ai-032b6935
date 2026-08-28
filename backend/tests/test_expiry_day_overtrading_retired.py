@@ -96,15 +96,15 @@ def test_no_registry_spec_points_at_the_deleted_method():
 
 def test_the_engine_counts_are_what_the_retirement_left():
     """
-    24 detectors, 30 pattern types. Patterns 4, 6, 9 and 10 each took one of
-    each (33 -> 32 -> 31 -> 30); the six aliases are untouched throughout.
+    23 detectors, 29 pattern types. Patterns 4, 6, 9, 10 and 11 each took one
+    of each (33 -> 29); the six aliases are untouched throughout.
     """
     from app.services.detector_registry import ALIASES, REGISTRY, all_pattern_types
 
-    # 24 / 30 since `size_escalation` was retired 2026-08-27 (Pattern 10).
-    assert len(REGISTRY) == 24
+    # 23 / 29 since `direction_instability` was retired 2026-08-28 (Pattern 11).
+    assert len(REGISTRY) == 23
     assert len(ALIASES) == 6
-    assert len(all_pattern_types()) == 30
+    assert len(all_pattern_types()) == 29
 
 
 def test_it_is_recorded_as_retired():
