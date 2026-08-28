@@ -5,7 +5,10 @@ It has the full state, the one open blocker, and the replay operating rules.
 
 ## Immediate
 
-0. **FIRST: `--wipe` the database.** A baseline replay was killed at 145/203 by
+0. **The baseline replay failed three times (145 → 10 → 1 of 203) and the
+   database has been left CLEAN.** Do not retry it inside the agent harness
+   without first disabling sleep and running it in a plain terminal — see the
+   hand-over. **FIRST: `--wipe` the database anyway if any run was killed.** A baseline replay was killed at 145/203 by
    a network drop on 27 Aug and left partial synthetic rows. Any replay run
    before wiping will give wrong counts that look like a regression. See the
    hand-over's HAZARD box.

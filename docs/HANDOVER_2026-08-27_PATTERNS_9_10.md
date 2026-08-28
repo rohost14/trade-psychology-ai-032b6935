@@ -149,6 +149,23 @@ detector guts the very interaction under test.
 **Conclusion: only a real replay can settle the -4.** Do not accept an
 in-process death_spiral number.
 
+### ATTEMPT 3 FAILED — 28 Aug ~11:00. STOPPING.
+
+Died at session **1/203**, no errors in the log, process simply gone. The three
+attempts reached **145 → 10 → 1**: each one is killed sooner than the last, and
+none failed on anything in the code. **This machine cannot currently hold a
+2-hour replay.** Partial rows wiped; the database is clean.
+
+**Do not simply retry.** Three runs cost ~3 hours and produced nothing. Before
+attempt 4, change something about the environment:
+
+- disable sleep / hibernation and screen-lock for the duration
+  (`powercfg /change standby-timeout-ac 0`), and keep the machine on mains
+- confirm the network stays up (attempt 1 died on a DNS failure)
+- run it in a plain terminal outside the agent harness, so no task lifecycle can
+  reap the child — this is the likeliest cause of attempts 2 and 3
+- then follow the wipe-first procedure in the HAZARD box above
+
 ### If it reconciles
 
 1. `cd backend && python -m pytest -q --ignore=tests/production` (expect
