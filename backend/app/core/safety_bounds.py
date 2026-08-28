@@ -60,14 +60,47 @@ def bound_for(key: str) -> Tuple[Optional[float], str]:
     """
     The bound declared for this threshold, and the reason given for it.
 
-    `(None, "")` when no bound is declared — which is every threshold today.
+    `(None, "")` when no bound is declared.
+
+    UNIVERSAL_SAFETY IS ITS OWN BOUND (2026-08-28)
+    ----------------------------------------------
+    A `Kind.UNIVERSAL_SAFETY` threshold with no explicit `safety_bound` is
+    bounded at its own universal value. This is definitional, not a new
+    judgement, and it invents no number: the Kind means "objective danger; never
+    personalised", so the universal value is by definition the loosest the
+    threshold may become. Tightening below it stays allowed — a trader who
+    declares a 3% position cap still gets alerts at 3%.
+
+    It was added because the gap was reachable and proven. `_apply_profile_facts`
+    maps a declared `max_position_size` onto `max_position_pct_caution` and
+    `max_position_pct_danger` — both UNIVERSAL_SAFETY — via `Source.CAPITAL`,
+    which `violates_kind` does not refuse because CAPITAL is not a *learned*
+    source. Measured before the fix: declaring 40 moved the caution line from
+    5.0 to 40.0 and danger from 10.0 to 80.0, so the detector that exists to say
+    "this position is dangerously large" went quiet for exactly the traders
+    taking the largest positions.
+
+    The declared value is not lost: `max_position_size` is a `RULE_FIELD` in
+    `constitution_service`, so it is still enforced as the trader's own rule by
+    `constitution_violation`. What it may no longer do is move a universal
+    safety line.
+
+    An explicit `safety_bound` on a spec still wins, so a detector review can
+    still set a different bound with its own reason.
     """
-    from app.core.threshold_registry import THRESHOLD_SPECS
+    from app.core.threshold_registry import THRESHOLD_SPECS, Kind
 
     spec = THRESHOLD_SPECS.get(key)
-    if spec is None or spec.safety_bound is None:
+    if spec is None:
         return None, ""
-    return float(spec.safety_bound), spec.bound_provenance
+    if spec.safety_bound is not None:
+        return float(spec.safety_bound), spec.bound_provenance
+    if spec.kind is Kind.UNIVERSAL_SAFETY and isinstance(spec.fallback, (int, float)):
+        return float(spec.fallback), (
+            "a universal-safety threshold is its own bound: it may be tightened "
+            "for you, never loosened"
+        )
+    return None, ""
 
 
 def clamp_to_bound(key: str, value: Any) -> Tuple[Any, Optional[str]]:
@@ -81,6 +114,12 @@ def clamp_to_bound(key: str, value: Any) -> Tuple[Any, Optional[str]]:
 
     Refuses to act on a threshold whose direction is undeclared, because a bound
     applied the wrong way silently inverts the guarantee it exists to provide.
+
+    The reason says "this would otherwise have resolved to X", not "your own
+    history would have put this at X". The clamped value does not always come
+    from history — the case that prompted the UNIVERSAL_SAFETY self-bound came
+    from a DECLARED rule via Source.CAPITAL — and a reason that names the wrong
+    origin tells the trader something untrue about their own data.
     """
     bound, why = bound_for(key)
     if bound is None:
@@ -105,13 +144,13 @@ def clamp_to_bound(key: str, value: Any) -> Tuple[Any, Optional[str]]:
 
     if direction is Sensitivity.HIGHER_IS_LOOSER and numeric > bound:
         return bound, (
-            f"held at the safety bound {bound:g} — your own history would have "
-            f"put this at {numeric:g}. {why}".strip()
+            f"held at the safety bound {bound:g} — this would otherwise have "
+            f"resolved to {numeric:g}. {why}".strip()
         )
     if direction is Sensitivity.HIGHER_IS_STRICTER and numeric < bound:
         return bound, (
-            f"held at the safety bound {bound:g} — your own history would have "
-            f"put this at {numeric:g}. {why}".strip()
+            f"held at the safety bound {bound:g} — this would otherwise have "
+            f"resolved to {numeric:g}. {why}".strip()
         )
     return value, None
 

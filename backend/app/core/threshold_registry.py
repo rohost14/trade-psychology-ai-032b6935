@@ -214,8 +214,69 @@ _GROUP_D = [
 ]
 
 
+# ---------------------------------------------------------------------------
+# Group E — the thresholds that are ACTUALLY personalised today.
+#
+# Added 2026-08-28. These four were personalised for months and the registry
+# described none of them: three carried Kind.FALLBACK as an artifact of being
+# auto-generated from _FLOOR_DIRECTIONS, and `daily_trade_limit` was not in the
+# registry at all, so `kind_for()` returned FALLBACK by default.
+#
+# Nothing here changes a value or a resolution. `violates_kind` permits every
+# source these keys already use under PERSONAL_BASELINE exactly as it did under
+# FALLBACK — verified before the change and pinned by
+# test_registry_classification_matches_reality.
+#
+# `personalise` stays False here, and that is correct rather than a compromise.
+# The flag governs the REGISTRY-DRIVEN path — "each detector flips its own at
+# review, behind a replay" — and that path is genuinely not enabled for these
+# keys. They are personalised by hand-written `place()` calls in
+# `_apply_history_v2` that predate the registry and do not consult it. Setting
+# the flag True would swap one false statement for another.
+#
+# So the registry now records what these thresholds ARE (a personal baseline,
+# from this metric, at this percentile) while `personalise=False` records that
+# the declared path is not what supplies them. Making the registry actually drive
+# resolution is a larger change with its own replay; it is written up in
+# docs/contracts/PERSONAL_BASELINE_AUDIT.md rather than attempted here.
+# ---------------------------------------------------------------------------
+
+_GROUP_E = [
+    _spec(key="daily_trade_limit", kind=Kind.PERSONAL_BASELINE, fallback=7,
+          meaning="trades in a day before the count is worth naming",
+          resolution_source=Source.HISTORY, metric="daily_trades_p75",
+          percentile=75, maturity=Maturity.SESSIONS_20,
+          sensitivity=Sensitivity.HIGHER_IS_LOOSER,
+          provenance="wired by hand in _apply_history_v2; a declared rule outranks it"),
+
+    _spec(key="burst_trades_per_30min_caution", kind=Kind.PERSONAL_BASELINE,
+          fallback=5,
+          meaning="trades in 30 minutes before a burst is worth naming",
+          resolution_source=Source.HISTORY, metric="burst_per_30min_p75",
+          percentile=75, maturity=Maturity.SESSIONS_20,
+          sensitivity=Sensitivity.HIGHER_IS_LOOSER,
+          provenance="wired by hand in _apply_history_v2"),
+
+    _spec(key="revenge_window_caution_min", kind=Kind.PERSONAL_BASELINE,
+          fallback=20,
+          meaning="minutes after a loss still counted as a reaction",
+          resolution_source=Source.HISTORY, metric="reentry_after_loss_p25",
+          percentile=25, maturity=Maturity.SESSIONS_20,
+          sensitivity=Sensitivity.HIGHER_IS_STRICTER,
+          provenance="wired by hand in _apply_history_v2; floored at 1 minute"),
+
+    _spec(key="consecutive_loss_caution", kind=Kind.PERSONAL_BASELINE,
+          fallback=3,
+          meaning="losses in a row before the streak is worth naming",
+          resolution_source=Source.HISTORY, metric="loss_streak_p60",
+          percentile=60, maturity=Maturity.SESSIONS_20,
+          sensitivity=Sensitivity.HIGHER_IS_LOOSER,
+          provenance="wired by hand in _apply_history_v2"),
+]
+
+
 THRESHOLD_SPECS: Dict[str, ThresholdSpec] = {
-    s.key: s for s in (_GROUP_C + _GROUP_D)
+    s.key: s for s in (_GROUP_C + _GROUP_D + _GROUP_E)
 }
 
 # ---------------------------------------------------------------------------
