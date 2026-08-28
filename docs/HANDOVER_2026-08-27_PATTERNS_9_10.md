@@ -1,4 +1,11 @@
-# Hand-over — Patterns 9 and 10, 27 Aug 2026
+# Hand-over — Patterns 9 and 10 · **BOTH CLOSED 28 Aug 2026**
+
+> **Both patterns are closed. This document is now history plus operating rules.**
+> The one thing to carry forward is the lesson at the bottom: a derived metric
+> moving because one of its inputs was removed is arithmetic, not a regression —
+> check whether the INDEPENDENT detectors moved, and close on that.
+
+
 
 Written mid-flight because the machine may power off. Everything below is either
 committed or reproducible from this file. **Read this first, then
@@ -10,8 +17,8 @@ committed or reproducible from this file. **Read this first, then
 
 | | status |
 |---|---|
-| **Pattern 9 `expiry_day_overtrading`** | **RETIRED, code complete, tests green, confirmation replay green — ONE open item: the `death_spiral 20 → 16` reconciliation** |
-| **Pattern 10 `size_escalation`** | **RETIRED, code complete, regression tests written but NOT YET EXECUTED, replay NOT YET RUN** |
+| **Pattern 9 `expiry_day_overtrading`** | **CLOSED 28 Aug.** Replay clean 203/203, every independent detector identical. `death_spiral 20 → 16` accepted as arithmetic; per-day magnitude never traced and did not need to be |
+| **Pattern 10 `size_escalation`** | **CLOSED 28 Aug.** 25 mutation-checked tests, full suite green. Confirmation replay never obtained after 6 environment failures; it could not have changed the decision (see its STATUS) |
 | **Pattern 11 `direction_instability`** | not started. **Do not start until 9 and 10 are closed** (explicit user instruction) |
 
 **Counts now: 24 detectors, 30 pattern types.** `all_pattern_types()` is the

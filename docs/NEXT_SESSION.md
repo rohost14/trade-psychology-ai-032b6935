@@ -1,32 +1,30 @@
 # Next session — start here
 
-**27 Aug 2026 (late).** Read `docs/HANDOVER_2026-08-27_PATTERNS_9_10.md` FIRST.
-It has the full state, the one open blocker, and the replay operating rules.
+**28 Aug 2026.** Patterns 9 and 10 are **CLOSED**. Engine is at **24 detectors,
+30 pattern types**; four retirements (4, 6, 9, 10), all on measurement.
 
-## Immediate
+## Next: Pattern 11 `direction_instability`
 
-0. **The baseline replay failed three times (145 → 10 → 1 of 203) and the
-   database has been left CLEAN.** Do not retry it inside the agent harness
-   without first disabling sleep and running it in a plain terminal — see the
-   hand-over. **FIRST: `--wipe` the database anyway if any run was killed.** A baseline replay was killed at 145/203 by
-   a network drop on 27 Aug and left partial synthetic rows. Any replay run
-   before wiping will give wrong counts that look like a regression. See the
-   hand-over's HAZARD box.
-1. **Pattern 9 blocker** — reconcile `death_spiral 20 → 16` against the
-   pre-change baseline replay. The worktree and the exact commands are in the
-   hand-over. Post-change artifact saved at
-   `C:/Users/being/.claude/jobs/33a73186/tmp/after_p9.json` (job-scoped, may be
-   gone — re-run both sides if so). If it reconciles: tests, fill the STATUS
-   replay table, mark CLOSED. If not: **stop and report, do not close.**
-2. **Pattern 10** — run `backend/tests/test_size_escalation_retired.py` (25
-   tests, never executed) and the 203-session replay. Expect
-   `size_escalation` 30 → 0 and a `death_spiral` fall as arithmetic; anything
-   else moving means the run failed.
-3. **Then** Pattern 11 `direction_instability`. Not before.
+Standing protocol: review first → measure against the corrected 189-session /
+912-position book → no code until the behavioural decision is justified →
+explicit approval before implementing. Sections: *Current behaviour · What is
+correct · Problems found · Evidence · Recommended behavioural contract · Exact
+changes required · Verdict*.
 
-**Counts: 24 detectors, 30 pattern types.** Four retirements: 4, 6, 9, 10.
+**Pace, agreed 28 Aug after Patterns 9 and 10 ran long:** review → measure →
+decide → implement → tests → **one** replay. If that replay is clean on the
+**independent** detectors, the pattern closes. Do not run a second replay to
+explain a composite: `death_spiral` counts detectors, so it moves whenever one is
+removed — that is arithmetic, not a regression. If infrastructure eats a replay
+twice, close on the test evidence and record the gap.
+
+**This machine has not completed a 203-session replay in two days** — 6 attempts,
+all environment failures (network drops, task reaping, a 3h20m I/O hang). Budget
+accordingly and do not plan around getting one.
 
 ---
+
+
 
 # Next session — start here
 
