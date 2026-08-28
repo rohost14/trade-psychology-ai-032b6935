@@ -21,7 +21,7 @@ pattern, numbered in review order.
 
 | [10](10-size_escalation/) | `size_escalation` | **RETIRED / COMPLETE** — its claim was ordering, and the real trade order fired *less* than shuffled (42 vs 49.7, p = 0.880); its gate hit the 1-in-6 chance rate; 37 of 42 alerts named an instrument absent from their own evidence. Coverage confirmed: `martingale_behaviour` + `post_loss_recovery_bet` keep the claim. **Closed on 25 mutation-checked tests; the confirmation replay was never obtained (6 environment failures) and could not have changed the decision** | 30 / 30, expect **0** |
 
-| [11](11-direction_instability/) | `direction_instability` | **REVIEW DONE — awaiting decision.** Verdict **MODIFY (registry truthfulness only)**; behaviour KEEP AS-IS, evidence insufficient. First pattern the measurement does NOT condemn: sequence null runs **1.21x above** chance (p = 0.187), where 4/6/10 all ran at or below it. Alert is factual, no invented statistic, 10 alerts / 203 sessions. No demonstrated consequence though (p = 0.892) | 10 / 9 |
+| [11](11-direction_instability/) | `direction_instability` | **REVIEW + DISCRIMINATION FOLLOW-UP DONE — awaiting decision. Verdict DELETE** (reversed from MODIFY). It cannot separate a change of view from emotion — its only discriminator is a 10-minute clock — and the subset it selects performs **better**: flip trade +Rs 276 / 56% vs -Rs 73 / 42% unflagged; sessions +Rs 1,305 vs -Rs 860 matched; rest-of-session +Rs 953 vs -Rs 112 (p = 0.095). `revenge_trade` already fires on 10 of 18 | 10 / 9 |
 
 The live queue for every remaining pattern is the **REVIEW STATUS** table in
 [`00-shared/BEHAVIOURAL_PATTERNS.md`](00-shared/BEHAVIOURAL_PATTERNS.md).
