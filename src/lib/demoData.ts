@@ -330,7 +330,7 @@ export const DEMO_RISK_ALERTS = [
     },
   },
   {
-    id: 'ra-004', pattern_type: 'size_escalation', severity: 'critical',
+    id: 'ra-004', pattern_type: 'martingale_behaviour', severity: 'danger',
     message: 'BANKNIFTY 45500 PE entry at 100 lots — 4× your average size — 8 min after ₹2,600 loss. Win rate on oversized entries: 28% vs 60% baseline.',
     created_at: daysAgo(0, 10, 51), acknowledged: false,
     details: {
@@ -382,6 +382,22 @@ export const DEMO_RISK_ALERTS = [
       win_rate_after_open: 0.54,
       monthly_cost: 9400,
       estimated_cost: 1800,
+    },
+  },
+  {
+    // Exercises `critical`, which only constitution_violation (the 120% tier)
+    // and premium_loss_event can reach. It used to be carried by a
+    // size_escalation fixture at a severity that detector could never emit;
+    // size_escalation was retired 2026-08-27.
+    id: 'ra-008', pattern_type: 'constitution_violation', severity: 'critical',
+    message: 'Daily loss limit breached: ₹12,400 against the ₹10,000 you set. That is 124% of your own line.',
+    created_at: daysAgo(0, 14, 22), acknowledged: false,
+    details: {
+      rule: 'daily_loss',
+      limit: 10000,
+      actual: 12400,
+      pct_of_limit: 1.24,
+      estimated_cost: 2400,
     },
   },
 ];
@@ -1027,7 +1043,7 @@ export const DEMO_BEHAVIORAL_ANALYSIS = {
       description: 'High-frequency trading day correlated with net loss',
     },
     {
-      pattern_type: 'size_escalation', count: 2, severity: 'danger',
+      pattern_type: 'martingale_behaviour', count: 2, severity: 'danger',
       estimated_cost: 6300, last_seen: daysAgo(0, 10, 51),
       description: 'Position size 3–4× average after consecutive losses',
     },
@@ -1140,7 +1156,7 @@ export const DEMO_SESSION_LOG = {
     { date: '2026-07-31', pnl: -1000, trades: 1, alerts: 1,
       tag: 'overtrading', top_patterns: ['overtrading'] },
     { date: '2026-07-30', pnl: -7410, trades: 4, alerts: 5,
-      tag: 'revenge',     top_patterns: ['revenge_trade', 'size_escalation', 'rapid_reentry'] },
+      tag: 'revenge',     top_patterns: ['revenge_trade', 'martingale_behaviour', 'rapid_reentry'] },
     { date: '2026-07-29', pnl: 8550,  trades: 2, alerts: 0,
       tag: 'clean',       top_patterns: [] },
   ],
@@ -1159,7 +1175,7 @@ export const DEMO_BEHAVIOUR_COST = {
   has_data: true,
   patterns: [
     { pattern_type: 'revenge_trade',   alert_count: 3, trade_count: 3, realized_pnl: -13000 },
-    { pattern_type: 'size_escalation', alert_count: 2, trade_count: 2, realized_pnl: -6450  },
+    { pattern_type: 'martingale_behaviour', alert_count: 2, trade_count: 2, realized_pnl: -6450  },
     { pattern_type: 'daily_overtrading',     alert_count: 2, trade_count: 4, realized_pnl: -3750  },
     { pattern_type: 'no_stoploss',     alert_count: 2, trade_count: 2, realized_pnl: -1700  },
     { pattern_type: 'early_exit',      alert_count: 1, trade_count: 1, realized_pnl: 820    },
@@ -1184,7 +1200,7 @@ export const DEMO_ALERT_RESPONSE_STATS = {
   patterns: [
     { pattern: 'revenge_trade',   total: 9, ignored: 6, stopped: 1, took_anyway: 5,
       not_useful: 1, planned: 0, not_useful_rate: 0.11, ack_rate: 0.33 },
-    { pattern: 'size_escalation', total: 7, ignored: 5, stopped: 1, took_anyway: 4,
+    { pattern: 'martingale_behaviour', total: 7, ignored: 5, stopped: 1, took_anyway: 4,
       not_useful: 0, planned: 3, not_useful_rate: 0, ack_rate: 0.29 },
     { pattern: 'no_stoploss',     total: 6, ignored: 4, stopped: 1, took_anyway: 3,
       not_useful: 2, planned: 1, not_useful_rate: 0.33, ack_rate: 0.33 },
@@ -1435,17 +1451,6 @@ export const DEMO_PATTERN_CATALOGUE = {
       "observes": "A position materially larger than your average, entered after a loss on the same underlying.",
       "explanation": "If this one also loses, the combined loss exceeds everything it was meant to recover.",
       "nature": "risk",
-      "disposition": "alerting",
-      "trigger": "exit",
-      "guardian_eligible": false,
-      "version": "1.1.0"
-    },
-    {
-      "pattern_type": "size_escalation",
-      "label": "Rising position size",
-      "observes": "Quantity across consecutive trades on the same underlying while losing.",
-      "explanation": "Larger size on an instrument that is already losing compounds the drawdown rather than recovering it.",
-      "nature": "emotional",
       "disposition": "alerting",
       "trigger": "exit",
       "guardian_eligible": false,

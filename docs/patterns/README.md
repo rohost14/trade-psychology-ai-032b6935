@@ -19,7 +19,7 @@ pattern, numbered in review order.
 | [08](08-premium_loss_event/) | `premium_loss_event` | **COMPLETE** — v3.0.0. No longer a behaviour detector: a real-time **risk-state** detector on the tick path (zero DB on the hot path, sub-second), exit → analytics, declared boundary → `constitution_violation`. `event_contract.md` | exit alerts 41 → **0**; live path covered by 106 tests |
 | [09](09-expiry_day_overtrading/) | `expiry_day_overtrading` | **RETIRED — code+tests green, replay green. ONE OPEN ITEM: the `death_spiral 20→16` reconciliation (see HANDOVER_2026-08-27_PATTERNS_9_10.md).** It never withheld, firing on 55 of the 55 positions it could judge; both trader-facing statistics were unsourced and measured false | was 28 / 28, now **0** |
 
-| [10](10-size_escalation/) | `size_escalation` | **RETIRED — code complete, regression tests written but NOT YET RUN, replay NOT YET RUN.** Its claim was ordering; the real trade order fired *less* than shuffled (42 vs 49.7, p = 0.880) and its gate hit the 1-in-6 chance rate. Coverage confirmed: `martingale_behaviour` + `post_loss_recovery_bet` keep the claim | 30 / 30, expect **0** |
+| [10](10-size_escalation/) | `size_escalation` | **RETIRED — code + 25 tests GREEN (mutation-checked); only the confirmation replay outstanding.** Its claim was ordering; the real trade order fired *less* than shuffled (42 vs 49.7, p = 0.880) and its gate hit the 1-in-6 chance rate. Coverage confirmed: `martingale_behaviour` + `post_loss_recovery_bet` keep the claim | 30 / 30, expect **0** and `death_spiral` **unchanged** |
 
 The live queue for every remaining pattern is the **REVIEW STATUS** table in
 [`00-shared/BEHAVIOURAL_PATTERNS.md`](00-shared/BEHAVIOURAL_PATTERNS.md).

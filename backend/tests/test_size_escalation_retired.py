@@ -275,6 +275,47 @@ def test_the_other_consolidation_families_are_untouched():
     assert BehaviorEngine._COMPOSITES == ("death_spiral",)
 
 
+def test_removing_it_could_not_have_changed_death_spiral():
+    """
+    The replay expectation, proven rather than assumed.
+
+    `death_spiral` counts nature-domains with an event at **danger or above**
+    (`spiral_domain_min_severity = "danger"`). The retired detector emitted
+    exactly ONE severity - `caution` - hardcoded, never escalating; all 42 of its
+    firings across the 189-session book were `caution`.
+
+    A caution event is invisible to death_spiral. So removing `size_escalation`
+    cannot cost any day a domain, and the confirmation replay must show
+    death_spiral **UNCHANGED**. An earlier note predicting "a death_spiral fall
+    as arithmetic" was wrong, and this test exists so it cannot be repeated.
+    """
+    import inspect
+    import re
+
+    from app.core.trading_defaults import COLD_START_DEFAULTS
+    from app.services.behavior_engine import BehaviorEngine
+    from app.services.detector_registry import BY_NAME
+
+    assert COLD_START_DEFAULTS["spiral_domain_min_severity"] == "danger"
+
+    engine = BehaviorEngine()
+    capable = []
+    for name, spec in BY_NAME.items():
+        if spec.nature != "emotional":
+            continue
+        m = getattr(engine, spec.method, None)
+        if m is None:
+            continue
+        body = inspect.getsource(m)
+        sev = set(re.findall(r"severity\s*=\s*[\"']([a-z]+)[\"']", body))
+        sev |= set(re.findall(r"[\"'](caution|danger|critical|info)[\"']\s*if", body))
+        if sev & {"danger", "critical"}:
+            capable.append(name)
+    assert len(capable) >= 5, (
+        f"the emotional domain can no longer reach death_spiral: {capable}"
+    )
+
+
 def test_every_surviving_detector_still_resolves():
     from app.services.behavior_engine import BehaviorEngine
     from app.services.detector_registry import REGISTRY

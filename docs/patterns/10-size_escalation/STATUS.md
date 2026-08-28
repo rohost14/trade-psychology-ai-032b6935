@@ -135,11 +135,22 @@ lost their entries, because each of those asserts the engine still emits it.
 
 ## Replay — 203 sessions
 
-*(filled in from the confirmation run)*
+*Not yet run.* **Expected: `size_escalation` 30 → 0 and `death_spiral`
+UNCHANGED.**
+
+An earlier note in this file predicted "a `death_spiral` fall as arithmetic".
+**That was wrong.** `death_spiral` counts nature-domains with an event at
+**danger or above** (`spiral_domain_min_severity = "danger"`), and the retired
+detector emitted exactly one severity — `caution`, hardcoded, never escalating;
+all 42 firings in the book were `caution`. A caution event is invisible to
+`death_spiral`, so removing this detector **cannot** cost any day a domain.
+`test_removing_it_could_not_have_changed_death_spiral` pins this so the wrong
+expectation cannot come back. Any `death_spiral` movement in the confirmation
+replay is therefore a REGRESSION, not arithmetic.
 
 ---
 
-## Tests
+## Tests — 25, all passing
 
 `tests/test_size_escalation_retired.py`, in four groups:
 
@@ -152,7 +163,35 @@ lost their entries, because each of those asserts the engine still emits it.
 3. **historical rows stay readable** — report label, analytics day-tag, four
    frontend surfaces; `BACKEND_TO_FRONTEND_TYPE` and `_COMMON_PATTERNS` do not
 4. **no other detector moved** — `_WORSEN_METRIC`, the other two families,
-   `_COMPOSITES`, and every surviving spec resolves
+   `_COMPOSITES`, every surviving spec resolves, and the proof that
+   `death_spiral` cannot have changed
+
+**Backend 1,503 passed, 0 failed** (excluding `tests/production`, which needs a
+live server). **Frontend typecheck clean, 102 tests, 0 lint errors.**
+
+### Mutation-checked
+
+25/25 green on the first run is where a suite is most likely to be vacuous, so
+three mutations were introduced and each was caught: `size_escalation` returned
+to `ENTRY_DECIDABLE`, a surviving family member dropped, and `death_spiral`'s
+domain floor lowered to `caution`. All reverted; clean run green.
+
+### Two collateral failures the deletion caused, both fixed at source
+
+1. **`demoData.ts` named a pattern the engine can no longer emit.** Guest-mode
+   fixtures double as smoke fixtures, so this is a real defect, not a test
+   nuisance. The four `size_escalation` fixtures became `martingale_behaviour` —
+   the surviving detector that owns the same claim — and the stale catalogue
+   entry was removed. The swap also dropped a `critical` severity
+   `size_escalation` could never emit, which broke a frontend test guarding that
+   `critical` stays exercised; a `constitution_violation` fixture (the 120% tier,
+   which genuinely reaches `critical`) restores it.
+2. **`test_death_spiral_still_has_its_emotional_domain` asserted `len(emotional)
+   >= 12`** — a raw NAME count that goes stale on every justified retirement and
+   does not measure what `death_spiral` consumes. Rewritten to assert the real
+   property: the emotional domain must retain detectors that can reach
+   **danger+**. Only 5 of 11 can; `size_escalation` was never one of them, so
+   its removal changed that number by zero. Strengthened, not weakened.
 
 ---
 

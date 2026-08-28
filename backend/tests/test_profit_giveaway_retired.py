@@ -166,13 +166,44 @@ def test_the_consolidation_families_are_untouched():
 def test_death_spiral_still_has_its_emotional_domain():
     """
     death_spiral counts nature-domains off the registry. Removing an `emotional`
-    detector must not leave that domain thin: measured on the replay, zero days
-    lose their second domain.
+    detector must not leave that domain unable to contribute.
+
+    REWRITTEN 2026-08-27 (Pattern #10). The assertion was `len(emotional) >= 12`
+    — a raw NAME count, which is the wrong measure and goes stale on every
+    justified retirement. death_spiral only counts events at **danger or above**
+    (`spiral_domain_min_severity = "danger"`), so a `caution`-only or `info`-only
+    detector is invisible to it however many of them exist. Six of the eleven
+    emotional detectors can never contribute at all.
+
+    What actually has to hold is that the domain retains detectors that CAN
+    reach danger+. `size_escalation`, retired that day, emitted exactly one
+    severity — `caution` — so it was never among them and its removal changed
+    this number by zero. Same for `profit_giveaway` before it.
     """
+    import inspect
+    import re
+
+    from app.services.behavior_engine import BehaviorEngine
     from app.services.detector_registry import BY_NAME
 
-    emotional = [n for n, s in BY_NAME.items() if s.nature == "emotional"]
-    assert len(emotional) >= 12, emotional
+    engine = BehaviorEngine()
+    danger_capable = []
+    for name, spec in BY_NAME.items():
+        if spec.nature != "emotional":
+            continue
+        method = getattr(engine, spec.method, None)
+        if method is None:
+            continue
+        src = inspect.getsource(method)
+        sev = set(re.findall(r"""severity\s*=\s*["'](\w+)["']""", src))
+        sev |= set(re.findall(r"""["'](caution|danger|critical|info)["']\s*if""", src))
+        if sev & {"danger", "critical"}:
+            danger_capable.append(name)
+
+    assert len(danger_capable) >= 5, (
+        f"the emotional domain can no longer contribute to death_spiral: "
+        f"only {danger_capable} can reach danger+"
+    )
 
 
 def test_the_capital_ratio_rung_survived_the_deletion():
