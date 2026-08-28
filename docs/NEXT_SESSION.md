@@ -5,6 +5,10 @@ It has the full state, the one open blocker, and the replay operating rules.
 
 ## Immediate
 
+0. **FIRST: `--wipe` the database.** A baseline replay was killed at 145/203 by
+   a network drop on 27 Aug and left partial synthetic rows. Any replay run
+   before wiping will give wrong counts that look like a regression. See the
+   hand-over's HAZARD box.
 1. **Pattern 9 blocker** — reconcile `death_spiral 20 → 16` against the
    pre-change baseline replay. The worktree and the exact commands are in the
    hand-over. Post-change artifact saved at

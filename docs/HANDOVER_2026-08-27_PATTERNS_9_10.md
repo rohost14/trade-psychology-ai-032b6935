@@ -99,6 +99,28 @@ day must show an **emotional-domain danger+ event supplied only by
 `expiry_day_overtrading`**. If any lost day cannot be explained that way, the
 retirement is not clean — **stop and report, do not commit the closure**.
 
+### ATTEMPT 1 FAILED — 27 Aug ~23:15
+
+The baseline run reached **145 of 203** and died on
+`socket.gaierror: [Errno 11001] getaddrinfo failed` — the machine's network
+dropped and Supabase became unreachable. **No `*-replay.json` artifact was
+written**, so there is still no baseline to diff against. Nothing about the code
+is implicated; DNS resolved normally again afterwards.
+
+**HAZARD — read before the next replay of any kind.** That killed run left
+**partial synthetic rows in the shared database**. Any replay started without
+clearing them will produce wrong counts that look like a code regression:
+
+```bash
+# ALWAYS do this first after a killed replay
+rm -f tradedesk/.replay.lock
+python tradedesk/scripts/replay_tradebook.py   docs/tradebook-CY6001-FO2025-26.csv --capital 200000 --wipe
+```
+
+`--wipe` prints what it removed (behavior_events / risk_alerts /
+completed_trades / ledger_entries / trades / sessions / strategy_groups). Only
+then start the real run.
+
 ### If it reconciles
 
 1. `cd backend && python -m pytest -q --ignore=tests/production` (expect
