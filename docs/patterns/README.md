@@ -7,7 +7,7 @@ pattern, numbered in review order.
 
 | # | pattern | status | replay (203 sessions) |
 |---|---|---|---|
-| [00](00-shared/) | *shared* — the pattern baseline (33 types at the time of writing; **30 since Patterns 4, 6, 9 and 10 were retired**), the martingale/adding distinction, the replay close-out | — | **578 alerts / 203 sessions** |
+| [00](00-shared/) | *shared* — the pattern baseline (33 types at the time of writing; **29 since Patterns 4, 6, 9, 10 and 11 were retired**), the martingale/adding distinction, the replay close-out | — | **578 alerts / 203 sessions** |
 | [01](01-martingale_behaviour/) | `martingale_behaviour` | **COMPLETE** | 39 alerts / 36 days |
 | [02](02-adding_to_adverse_position/) | `adding_to_adverse_position` | **COMPLETE** | 99 / 56 |
 | [03](03-same_symbol_obsession/) | `same_symbol_obsession` | **COMPLETE** | 22 / 21 |
@@ -21,7 +21,7 @@ pattern, numbered in review order.
 
 | [10](10-size_escalation/) | `size_escalation` | **RETIRED / COMPLETE** — its claim was ordering, and the real trade order fired *less* than shuffled (42 vs 49.7, p = 0.880); its gate hit the 1-in-6 chance rate; 37 of 42 alerts named an instrument absent from their own evidence. Coverage confirmed: `martingale_behaviour` + `post_loss_recovery_bet` keep the claim. **Closed on 25 mutation-checked tests; the confirmation replay was never obtained (6 environment failures) and could not have changed the decision** | 30 / 30, expect **0** |
 
-| [11](11-direction_instability/) | `direction_instability` | **REVIEW + DISCRIMINATION FOLLOW-UP DONE — awaiting decision. Verdict DELETE** (reversed from MODIFY). It cannot separate a change of view from emotion — its only discriminator is a 10-minute clock — and the subset it selects performs **better**: flip trade +Rs 276 / 56% vs -Rs 73 / 42% unflagged; sessions +Rs 1,305 vs -Rs 860 matched; rest-of-session +Rs 953 vs -Rs 112 (p = 0.095). `revenge_trade` already fires on 10 of 18 | 10 / 9 |
+| [11](11-direction_instability/) | `direction_instability` | **RETIRED / COMPLETE** — it could not separate an emotional reversal from a change of view; its only discriminator was a 10-minute clock and the clock sorted backwards (flagged flips +Rs 276 / 56% vs -Rs 73 / 42% unflagged; rest-of-session after a flip +Rs 953 vs -Rs 112, p = 0.095). **Level 1 untested — 911 LONG vs 1 SHORT — so the concept is not retired permanently** | was 10 / 9, now **0** |
 
 The live queue for every remaining pattern is the **REVIEW STATUS** table in
 [`00-shared/BEHAVIOURAL_PATTERNS.md`](00-shared/BEHAVIOURAL_PATTERNS.md).
