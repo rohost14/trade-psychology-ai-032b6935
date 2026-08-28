@@ -121,6 +121,34 @@ python tradedesk/scripts/replay_tradebook.py   docs/tradebook-CY6001-FO2025-26.c
 completed_trades / ledger_entries / trades / sessions / strategy_groups). Only
 then start the real run.
 
+### ATTEMPT 2 FAILED — 28 Aug ~10:53
+
+Died at session **10/203**: the background task was killed (machine slept). No
+artifact. Partial rows wiped afterwards.
+
+Note on process checking: `Where CommandLine -like '*replay_tradebook*'` **matches
+the probe command itself** and will report a phantom process. Filter on the full
+path — `'*tradedesk/scripts/replay_tradebook.py*'` — or you will conclude a run
+is alive when nothing is.
+
+### A CHEAPER ROUTE WAS TRIED AND DOES NOT WORK
+
+`evaluate_death_spiral(events)` is a pure function over a day's BehaviorEvents,
+so the mechanism looked reproducible in-process: run every detector over the book
+with the pre-change worktree engine, then evaluate death_spiral with and without
+expiry's events. Script: `tmp/ds_reconcile.py`.
+
+**It returned delta 0, and that number is worthless.** The harness produced only
+**8** spiral days against the replay's **20**. Cause:
+**`adding_to_adverse_position` yields 0 in any CSV-based harness** — it reads a
+fill sequence the reconstruction does not carry — and it is a **`risk`**-domain
+detector with 99 alerts in the replay. `death_spiral` needs >=2 danger+ domains
+and its danger tier requires `capital_at_risk` ("risk" present), so losing that
+detector guts the very interaction under test.
+
+**Conclusion: only a real replay can settle the -4.** Do not accept an
+in-process death_spiral number.
+
 ### If it reconciles
 
 1. `cd backend && python -m pytest -q --ignore=tests/production` (expect
