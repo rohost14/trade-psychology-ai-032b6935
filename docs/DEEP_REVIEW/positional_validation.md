@@ -1,3 +1,21 @@
+> **STATUS — audit STARTED 28 Aug 2026, IN PROGRESS.**
+> Working document and live status: [`TRADING_SEMANTICS_AUDIT.md`](TRADING_SEMANTICS_AUDIT.md).
+> Five parallel read-only investigations are running, scoped A–E against the
+> numbered items below. This brief is the source of requirements and is not
+> edited except for this status block.
+>
+> | # | scope | brief items covered | status |
+> |---|---|---|---|
+> | A | position lifecycle, average price & P&L, order intent vs execution | 1, 2, 14 | running |
+> | B | long/short options, futures vs options, capital & margin | 7, 8, 12 | running |
+> | C | hedge recognition & adjustment, strategy geometry, cross-underlying | 3, 4, 6, 10 | running |
+> | D | expiry & rollover, time horizon, trader archetypes | 5, 13, archetypes | running |
+> | E | MTF, portfolio exposure, data failure, multi-account | 9, 11, 15, 16 | running |
+>
+> No code changes are being made. Findings only.
+
+---
+
 Before Pattern 12, pause pattern reviews and perform a cross-pattern Position/Strategy/Hedging Coverage Audit.
 
 Do not change code.
