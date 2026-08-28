@@ -133,20 +133,38 @@ lost their entries, because each of those asserts the engine still emits it.
 
 ---
 
-## Replay — 203 sessions
+## Replay — NOT OBTAINED. Closed without it, deliberately.
 
-*Not yet run.* **Expected: `size_escalation` 30 → 0 and `death_spiral`
-UNCHANGED.**
+**The confirmation replay was never captured.** Six attempts across two days died
+on environment, never on the code: a network drop at 145/203, two task reapings
+at 10 and 1, a 3h20m I/O hang at 122, and a final `getaddrinfo` failure at 6/203.
+The database was wiped clean after each.
 
-An earlier note in this file predicted "a `death_spiral` fall as arithmetic".
-**That was wrong.** `death_spiral` counts nature-domains with an event at
-**danger or above** (`spiral_domain_min_severity = "danger"`), and the retired
-detector emitted exactly one severity — `caution`, hardcoded, never escalating;
-all 42 firings in the book were `caution`. A caution event is invisible to
-`death_spiral`, so removing this detector **cannot** cost any day a domain.
-`test_removing_it_could_not_have_changed_death_spiral` pins this so the wrong
-expectation cannot come back. Any `death_spiral` movement in the confirmation
-replay is therefore a REGRESSION, not arithmetic.
+**The pattern closed anyway, because the replay could not have changed the
+decision.** What it would have shown is already proven:
+
+| | expected | basis |
+|---|---|---|
+| `size_escalation` | **30 → 0** | the detector is deleted; 25 tests assert it cannot fire, be resolved, or be reached from any live list |
+| `death_spiral` | **unchanged** | it counts domains at **danger+**; this detector emitted exactly one severity, `caution`, hardcoded — all 42 firings in the book. A caution event is invisible to it |
+| every other detector | **unchanged** | nothing else reads the deleted code; `_notional` and both surviving sizing detectors are pinned by test |
+
+The `death_spiral` row is the one that mattered, and it is settled by reading the
+code rather than by running anything:
+`test_removing_it_could_not_have_changed_death_spiral` pins both halves —
+`spiral_domain_min_severity == "danger"` and the surviving emotional domain still
+having danger-capable members.
+
+**Precedent from Pattern 9, one day earlier:** a day was spent chasing the exact
+magnitude of `death_spiral 20 → 16` there. The decisive evidence in that case was
+never the composite's number — it was that **every independent detector came back
+byte-identical**. A derived metric moving when one of its inputs is removed is
+arithmetic, not a regression. Applying that lesson here is why this pattern
+closed on test evidence instead of a seventh replay attempt.
+
+**If the replay is ever run** — on a machine that can hold one — the expectation
+above is falsifiable: `size_escalation` 0, `death_spiral` 16, total 298 → 268.
+Any other result is a regression and should reopen this pattern.
 
 ---
 
