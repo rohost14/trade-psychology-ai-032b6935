@@ -347,3 +347,101 @@ registration gap, not a value gap.
 **Suggested order, unchanged from the review except that item 3 is now two
 items:** copy fix → register 40/75 → adopt `account_risk` for the capital figure
 → *separately* decide what replaces the 5%.
+
+---
+
+# What should happen when `daily_loss_limit` is undeclared?
+
+**Traced 30 Aug 2026. No code or values changed.**
+
+## There is no canonical fallback VALUE. There is a canonical POLICY, and it says abstain.
+
+`constitution_service` owns `daily_loss_limit` — it is one of the six
+`RULE_FIELDS`. Asked to generate a starting constitution, it returns
+**`"daily_loss_limit": None`** and puts its recommendation in a separate
+`suggested_daily_loss_limit` key. Its own comment states the decision and the
+evidence behind it:
+
+> *"The money rules are **SUGGESTED, never applied**. They arrive as None so
+> nothing is enforced until the trader writes a number themselves.*
+>
+> *Why: 'risk 1-2% of capital per trade' assumes continuous position sizing. F&O
+> has fixed lot sizes — you cannot buy 0.4 of a NIFTY lot. On ₹50,000 of capital
+> these defaults allow ₹500-1,000 a trade while one option lot costs
+> ₹5,000-15,000, so the minimum tradeable unit is 10-30x the limit and EVERY
+> trade breaches on contact. Replaying a real tradebook produced **212 rule
+> violations across 61 sessions, 54% of all alerts, none of which described
+> behaviour**."*
+
+That is a measured product decision, not a preference. **It directly answers the
+question asked.**
+
+## Two independent confirmations that this is the product's position
+
+**`suggested_daily_loss_limit` has no consumer.** Searched across `app/` and
+`src/`: it is produced at `constitution_service:307` and read by **nothing** —
+not the backend, not the frontend. The onboarding wizard computes its own 2%
+client-side for the slider's starting position. The suggestion is offered to a
+human and never applied by a machine, exactly as the comment says.
+
+**`danger_zone_service` already abstains.** The closest comparable consumer:
+
+```python
+daily_loss_limit = profile.daily_loss_limit if profile else None
+...
+if daily_loss_limit and daily_loss_limit > 0:
+    if today_pnl < 0:
+        daily_loss_used_percent = (abs(today_pnl) / daily_loss_limit) * 100
+```
+
+No `else`, no derivation. Zero occurrences of `0.05` in the file. With no
+declared limit it simply does not compute the percentage.
+
+## The dependency that must not be missed
+
+**The 5% is in two places, and the second one is deliberate.**
+
+| site | |
+|---|---|
+| `behavior_engine:2025` | the detector |
+| **`api/risk.py:196`** | **the dashboard hero** |
+
+`api/risk.py` copies the fallback on purpose. Its comment:
+
+> *"Resolve the user's EFFECTIVE daily limits from the same source the engine's
+> constitution / session-meltdown detectors use, **so the dashboard hero and the
+> alert copy agree on ONE limit** (was: hero fell back to a hardcoded 25,000
+> while the constitution alert used the real profile limit)."*
+
+So the duplication exists to fix an earlier inconsistency. **Removing the
+derivation from the detector alone would re-break exactly the agreement that
+code was written to create** — the hero would display a limit the alert no
+longer uses. Any change has to cover both sites in one step.
+
+## Conclusion
+
+**Abstain.** It is not an invention of a new rule — it is applying the rule the
+product already made, and which two of the three comparable consumers already
+follow. The 5% predates that decision and contradicts it.
+
+Mechanically this is a **deletion, not an addition**: the detector already
+returns `None` when there is neither a declared limit nor capital. Abstaining
+means dropping the derivation so it returns `None` whenever the limit is
+undeclared, full stop.
+
+**The cost, stated plainly so it is a decision and not a side effect.** A trader
+who has entered capital but not a daily loss limit would get **no meltdown
+protection at all**. On the reference book at a ₹50,000 account that is the
+difference between **226 events across 91 sessions and zero**. The mitigation is
+already written: the derived-limit copy says *"You have not set a daily loss
+limit yet"*, and under abstention that prompt has to move somewhere the trader
+will still see it — most naturally the setup nudge, which already tracks
+`daily_loss_limit != null` (`SetupNudgeCard.tsx:49`).
+
+**Not recommended:** adopting 2%, 2.5% or 3% from the experience matrix. Those
+are the *suggested* values the same module deliberately refuses to apply.
+Enforcing them here would re-make the exact mistake its comment documents.
+
+**Scope of the change, when approved:** both the detector and `api/risk.py:196`,
+together, plus wherever the "you have not set a limit" prompt should live. The
+40%/75% thresholds are untouched by this.
