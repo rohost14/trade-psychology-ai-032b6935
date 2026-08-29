@@ -95,6 +95,10 @@ Still open and each needing a decision, not a fix:
 
 ---
 
+**Full deferral reasons — what must be decided or tested, and why — are in
+[`PENDING_AND_TODO.md`](PENDING_AND_TODO.md).** That file supersedes the
+one-line labels above for every open item.
+
 ## Sequence from here
 
 1. ~~confirmed bugs → fix → tests~~ **done** (F15, F16, calendar abstention)
