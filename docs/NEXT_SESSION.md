@@ -1,30 +1,49 @@
 # Next session — start here
 
-**28 Aug 2026.** Patterns 9 and 10 are **CLOSED**. Engine is at **24 detectors,
-30 pattern types**; four retirements (4, 6, 9, 10), all on measurement.
+**30 Aug 2026.** Patterns **12 through 18 are CLOSED**. Engine is at **20
+detectors, 26 pattern types, 6 aliases** — `all_pattern_types()` is the
+authority and the retirement suites pin all three.
 
-## Next: Pattern 11 `direction_instability`
+**Eight retirements** (4, 6, 9, 10, 11, 14, 15, 18), every one on measurement,
+never on taste. Since the last update to this file:
 
-Standing protocol: review first → measure against the corrected 189-session /
-912-position book → no code until the behavioural decision is justified →
-explicit approval before implementing. Sections: *Current behaviour · What is
-correct · Problems found · Evidence · Recommended behavioural contract · Exact
-changes required · Verdict*.
+| # | pattern | outcome |
+|---|---|---|
+| 12 | `no_stoploss` | MODIFIED — the exit mechanism is now stated only when observed |
+| 13 | `rapid_reentry` | KEEP AS-IS — its unreachable CAUTION path is a **design inconsistency, not a bug** |
+| 14 | `panic_exit` | RETIRED — subject did not exist; short holds performed the same as long |
+| 15 | `cooldown_violation` | RETIRED — precondition never occurred live; 0 firings against `constitution_violation`'s 181 |
+| 16 | `excess_exposure` | DEFERRED by decision, pending live broker-margin validation |
+| 17 | `session_meltdown` | MODIFIED — the undocumented 5%-of-capital fallback removed from **both** sites; abstains without a declared limit; **no replacement percentage** |
+| 18 | `early_exit` | RETIRED — right measure, wrong scope; shuffle null **p = 0.610** |
 
-**Pace, agreed 28 Aug after Patterns 9 and 10 ran long:** review → measure →
-decide → implement → tests → **one** replay. If that replay is clean on the
-**independent** detectors, the pattern closes. Do not run a second replay to
-explain a composite: `death_spiral` counts detectors, so it moves whenever one is
-removed — that is arithmetic, not a regression. If infrastructure eats a replay
-twice, close on the test evidence and record the gap.
+## Next: review 19 = source-list #15 `winning_streak_overconfidence`
 
-**This machine has not completed a 203-session replay in two days** — 6 attempts,
-all environment failures (network drops, task reaping, a 3h20m I/O hang). Budget
-accordingly and do not plan around getting one.
+**Review order is not the source-list numbering.** It walks
+`docs/patterns/00-shared/BEHAVIOURAL_PATTERNS.md` ascending and skips what is
+done; review 18 was source #14, so the next unreviewed source entry is #15.
+
+Standing protocol: review first → measure against the real book → **no code
+until the behavioural decision is justified** → explicit approval before
+implementing. Sections: *Current behaviour · What is correct · Problems found ·
+Evidence · Recommended behavioural contract · Exact changes required · Verdict*.
+
+**Pace, agreed 28 Aug and held since:** review → measure → decide → implement →
+tests → **one** replay. If that replay is clean on the **independent**
+detectors, the pattern closes. Never run a second replay to explain a composite:
+`death_spiral` counts detectors, so it moves whenever one is removed — that is
+arithmetic, not a regression. If infrastructure eats a replay twice, close on
+the test evidence and record the gap.
+
+**This machine has never completed a 203-session replay** — 6 attempts over two
+days, all environment failures. Budget accordingly; do not plan around one.
+Patterns 12-18 all closed on in-process measurement plus mutation-checked tests.
+
+**Standing instruction from the user:** pending items go to
+`docs/DEEP_REVIEW/PENDING_AND_TODO.md` for **one consolidated pass after all
+reviews**. Do not interrupt the sequence to fix them.
 
 ---
-
-
 
 # Next session — start here
 

@@ -267,13 +267,58 @@ channel now fails the suite.
 
 ### Analytics-disposition evidence with no reader — still open
 
-`rapid_reentry`, `panic_exit`, `early_exit` and `opening_5min_trap` write
-evidence nothing trader-facing reads. **The visibility question is closed; this
+`rapid_reentry` and `opening_5min_trap` write evidence nothing trader-facing
+reads. The list was four; `panic_exit` was retired 29 Aug and `early_exit` 30
+Aug, and in both cases the unread evidence was *part of the case for retiring
+them*. **The visibility question is closed; this
 one is not.** It asks whether evidence with no reader should be WRITTEN at all,
 which is a separate question about the value of the analytics disposition.
 
 The closed rule does not depend on the answer: if we ever stop writing it, INFO
 events still must not become alerts in the meantime.
+
+## Surfaced by the Pattern 18 review — NOT actioned
+
+**Both were found by the `early_exit` review and deliberately left. Neither is
+`early_exit`'s alone, which is why retiring it did not close them.**
+
+### `trigger="session"` is declared and not honoured
+
+The engine branches on `spec.trigger == "entry"` only. Everything else,
+including `session`, falls through to the per-trade exit loop, so a
+session-scoped finding is recomputed and re-emitted on every qualifying trade
+after the condition first holds. On `early_exit` that produced 1.5 events per
+firing session.
+
+**It affects every detector that declares `trigger="session"`, so it is an
+engine fix, not a pattern fix.** Either the engine honours the field or the
+specs stop claiming it — but the field must not stay declared and ignored.
+
+### `baseline_service` metrics that no threshold spec can reach
+
+`early_exit_winner_max_min` declared `Source.HISTORY` with
+`metric="winner_hold_p50"`. **`winner_hold_p50` is never produced anywhere in
+the codebase** — `baseline_service` emits `avg_winner_hold_min`. So a threshold
+declared PERSONAL_BASELINE sat permanently at its global fallback while
+reporting itself personalised.
+
+**This is the same class as the H1 key-name mismatch already found and fixed
+once**, where two personalised values never reached their reader. That it
+recurred means the declaration is unchecked: nothing asserts that a spec's
+`metric` is a key some producer actually emits. **A contract test over
+`THRESHOLD_SPECS` would close the class**, not just this instance.
+
+### The hold-time asymmetry is computed and unread — a candidate analytics surface
+
+`baseline_service` computes `avg_winner_hold_min` and `avg_loser_hold_min`
+across the trader's full history with counts and confidence — 276 winners and
+413 losers on the reference book, against the 3–5 per side that made the
+detector noise. **Nothing reads them.**
+
+The disposition effect is real, documented and the only observable answer to
+"was that exit early". Retiring the detector removed the wrong *scope*, not the
+question. Recorded as a possible analytics addition; **not proposed, and it is
+half a product decision.**
 
 ## Surfaced by the Pattern 12 review — NOT actioned
 

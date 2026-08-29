@@ -1155,7 +1155,9 @@ Shown as found; not reconciled.
 | DEAD/UNUSED | 2 | `confidence_alert_gate`; computed severity in #19 |
 | UNKNOWN | 1 | `AVERAGING_DOWN_SIZE_INCREASE_PCT` |
 
-**Reviewed: 1 of 33.**
+**Reviewed: 18 of the 27, as of 30 Aug 2026 — see the REVIEW STATUS table
+below, which is the live tracker. This summary is the 22 Aug audit snapshot,
+kept as history; it is NOT current.**
 
 ---
 
@@ -1290,7 +1292,13 @@ Nothing here is fixed. Nothing here is hidden.
 # REVIEW STATUS — updated as each pattern moves
 
 The live tracker. One row per pattern, in review order. Status values:
-**NOT STARTED · IN PROGRESS · ON HOLD · COMPLETE · FROZEN**.
+**NOT STARTED · IN PROGRESS · ON HOLD · COMPLETE · RETIRED · DEFERRED · FROZEN**.
+
+**The `#` column is REVIEW ORDER**, which is not this document's section
+numbering. Review order walks the sections above ascending and skips what is
+already done — so review 18 is section #14 `early_exit`. Every row names its
+section number, because carrying two numberings silently has already caused a
+round of confusion.
 
 Updated at every state change, not at the end. If a pattern goes ON HOLD the
 reason goes in the notes column, not into someone's head.
@@ -1307,29 +1315,29 @@ reason goes in the notes column, not into someone's head.
 | 4 | `consecutive_loss_streak` | **RETIRED — DELETED** | 26 Aug 2026 | 26 Aug 2026 | Trigger is chance: 63 sessions with a 3+ run observed, 63.0 expected of 189. Detector deleted; the trader's own `max_consecutive_losses` rule under `constitution_violation` keeps the behaviour and gained the warning rung that was unreachable at limits 2/3/4 — including the onboarding default of 3. `04-consecutive_loss_streak/STATUS.md` |
 | 7 | `fomo_entry` | **COMPLETE** | 27 Aug 2026 | 27 Aug 2026 | **MODIFY**, and this closes the `fomo_symbols_at_open` MANDATORY_REVIEW. Two thresholds are UNREACHABLE on the book: expiry needs 4 and the max ever seen is 3 (142 entries), pre-close needs 3 and the max is 2 (50 entries). The open threshold of 2 produces **39% of all firings**, 3.6:1 against the general one. The clustering claim is at chance — permutation null 0.94 overall, **1.02** on the open branch. Flagged trades win **45.9% vs a 39.9% baseline**. All four `PERSONAL_BASELINE` metrics are produced by nothing. `07-fomo_entry/` |
 | 8 | `premium_loss_event` | **COMPLETE** | 27 Aug 2026 | 27 Aug 2026 | **KEEP AS-IS** — the first detector to survive its evidence intact. 48 detections / 39 days. Its 48 flagged trades carry **-Rs 238,623 = 35% of the book's entire gross loss from 5% of positions**, and capture 83% of the worst 48 by money. Severity ranks magnitude (critical median -Rs 5,670 vs caution -Rs 3,011). The `premium_loss_caution_pct` MANDATORY_REVIEW flag ("fires routinely") is **REFUTED**: only 6% of long options lose 40%+. NOTE: the old "only source of `critical`" note here was WRONG — `constitution_violation` and `death_spiral` emit it too, and this detector is NOT guardian-eligible. `08-premium_loss_event/` |
-| 9 | `expiry_day_overtrading` | NOT STARTED | — | — | copy breaks the no-unsourced-statistics rule |
-| 10 | `size_escalation` | NOT STARTED | — | — | after #1 decides the family |
-| 11 | `direction_instability` | NOT STARTED | — | — | |
-| 12 | `session_meltdown` | **ON HOLD** | — | — | blocked: capital not stateable for the replay period |
-| 13 | `excess_exposure` | **ON HOLD** | — | — | blocked: same |
-| 14 | `no_stoploss` | **ON HOLD** | — | — | blocked: tradebook has no order-type column |
-| 15 | `rapid_reentry` | NOT STARTED | — | — | analytics-only |
-| 16 | `panic_exit` | **ON HOLD** | — | — | blocked: needs order types |
-| 17 | `early_exit` | NOT STARTED | — | — | analytics-only |
-| 17 | `opening_5min_trap` | NOT STARTED | — | — | three windows in one detector |
-| 18 | `time_of_day_bias` | **ON HOLD** | — | — | blocked: never fired, needs a mature baseline |
-| 19 | `win_rate_collapse` | **ON HOLD** | — | — | blocked: same |
-| 20 | `strategy_breakdown` | **ON HOLD** | — | — | blocked: same |
-| 21 | `cooldown_violation` | NOT STARTED | — | — | cannot fire under `--no-rules` |
-| 22 | `constitution_violation` | NOT STARTED | — | — | 6 rules in one pattern type |
-| 23 | `options_premium_avg_down` | NOT STARTED | — | — | in no consolidation family |
-| 24 | `end_of_session_mis_panic` | NOT STARTED | — | — | 2 alerts |
-| 25 | `winning_streak_overconfidence` | NOT STARTED | — | — | danger tier has never fired |
-| 26 | `post_loss_recovery_bet` | NOT STARTED | — | — | 2 alerts |
-| M | `death_spiral` (meta) | NOT STARTED | — | — | after #1–#4; consumes their output |
-| P | `overexposure` / `portfolio_concentration` / `holding_loser` | NOT STARTED | — | — | separate pipeline, reviewed as a group |
-| H | `capital_mismatch` | NOT STARTED | — | — | housekeeping, not a behaviour detector |
-| 27 | `revenge_trade` | **FROZEN** | 23 Aug 2026 | — | by decision. No new threshold, no episode rule, no score, no replacement, no global confidence gate. `docs/research/REVENGE_FINAL_EVIDENCE_REVIEW.md` |
+| 9 | `expiry_day_overtrading` (§18) | **RETIRED — DELETED** | 27 Aug 2026 | 27 Aug 2026 | It **never withheld** — fired on 55 of the 55 positions it could judge, a contracts-vs-lots units bug having made its only reachable clause always true. Both trader-facing statistics were unsourced and measured false. Replay clean 203/203, every other detector byte-identical. `09-expiry_day_overtrading/` |
+| 10 | `size_escalation` (§4) | **RETIRED — DELETED** | 27 Aug 2026 | 27 Aug 2026 | Its claim was ordering, so the shuffle null decided it: real order fired **LESS** than shuffled, 42 vs 49.7, **p = 0.880**. Its gate hit the 1-in-6 chance rate; 37 of 42 alerts named an instrument absent from their own evidence. `martingale_behaviour` + `post_loss_recovery_bet` keep the claim. Closed on 25 mutation-checked tests; **the confirmation replay was never obtained** (6 environment failures) and could not have changed the decision. `10-size_escalation/` |
+| 11 | `direction_instability` (§9) | **RETIRED — DELETED** | 28 Aug 2026 | 28 Aug 2026 | It could not separate an emotional reversal from a change of view. Its only discriminator was a 10-minute clock and **the clock sorted backwards**: flagged flips +Rs 276 / 56% win against -Rs 73 / 42% unflagged. **Level 1 untested** — the book is 911 LONG vs 1 SHORT — so the concept is not retired permanently. `11-direction_instability/` |
+| 12 | `no_stoploss` (§13) | **COMPLETE — MODIFIED** | 29 Aug 2026 | 29 Aug 2026 | Unblocked: the ON HOLD reason (no order-type column) bounds the *claim*, not the review. Gates withhold (52 of 434 judgeable losses), the 25% gate is selective, and **29% of firings are trades no other detector sees**. One sentence was wrong — *"No stop-loss order detected"* was asserted from the exit fill and checkable on **0 of 52** — so the message now states the mechanism only when observed. Firing set unchanged. `12-no_stoploss/` |
+| 13 | `rapid_reentry` (§5) | **COMPLETE — KEEP AS-IS** | 29 Aug 2026 | 29 Aug 2026 | The window is genuinely selective (17.7% of same-symbol post-loss re-entries against a 20.7 min median gap) and the detector is pure. But **no trader-facing surface reads it**, and `danger_zone`'s CAUTION path is unreachable — recorded as a **design inconsistency, NOT a bug**, so it is not "fixed" into changing the alerting philosophy. Outcome direction matches the copy but **p = 0.508 at n=14 — insufficient**. `13-rapid_reentry/` |
+| 14 | `panic_exit` (§6) | **RETIRED — DELETED** | 29 Aug 2026 | 29 Aug 2026 | **Its subject did not exist.** Sub-5-minute holds won at 38.3% against 39.8% for longer holds. It fired on the losing 60% and **ignored 69 identical-behaviour trades because they made money** — selection on OUTCOME, not behaviour. A sub-5-min hold is 24% of everything this trader does, and it fired on their CHEAPEST losses (median Rs 308). The fast exit **as a neutral fact** is not retired. `14-panic_exit/` |
+| 15 | `cooldown_violation` (§8) | **RETIRED — DELETED** | 29 Aug 2026 | 29 Aug 2026 | **Its precondition never occurred on the live path.** `Cooldown` rows are written only by `danger_zone_service.trigger_intervention`, which no Celery task calls — 0 firings in 175 sessions. `constitution_violation`'s cooldown rule covers the behaviour using the trader's OWN declared value at danger: **181 events on the same book**. Its registry copy described that other detector's mechanism. Shared cooldown infrastructure preserved and pinned. `15-cooldown_violation/` |
+| 16 | `excess_exposure` (§10) | **DEFERRED — not reviewed** | — | — | Deferred **by decision**, and the blocking reason has changed: no longer "capital not stateable" but that F17 rerouted its capital input through the canonical risk layer, which **abstains on futures and short options** until broker margin exists. Live margin capture has never run, so every number behind it is a fixture — reviewing now would judge a temporarily silent detector. Blocked on **live broker-margin validation** |
+| 17 | `session_meltdown` (§11) | **COMPLETE — MODIFIED** | 30 Aug 2026 | 30 Aug 2026 | The §H0 note *"invents a limit at 5% of capital"* is closed. The 5% is gone from **both** the detector and `api/risk.py`; with no declared `daily_loss_limit` it **abstains**. It had no provenance and contradicted the product twice (`constitution_service` suggests 2-3%, onboarding computes 2%) and a decided policy: **money rules are suggested, never applied**. **No replacement percentage was substituted** and tests forbid one. The 40/75 ladder was not part of the change. `17-session_meltdown/` |
+| 18 | `early_exit` (§14) | **RETIRED — DELETED** | 30 Aug 2026 | 30 Aug 2026 | Right measure, wrong scope. Winner-hold vs loser-hold is the standard disposition-effect measure and the only observable answer to "was that exit early" — but at **3-5 trades per side** the ratio is indistinguishable from chance, **shuffle null p = 0.610**. No threshold value fixes an unstable ratio of two small means, so **0.40 was removed, not tuned**. The effect is absent in this book anyway (winners 41.0min vs losers 36.7min, ratio 1.12). **The measurement survives** in `baseline_service` over 276 and 413 trades. `18-early_exit/` |
+| **19** | **`winning_streak_overconfidence` (§15)** | **NEXT** | — | — | Its danger tier has never fired in 203 sessions — the §H0 DEFER note. First question is whether that tier is correctly silent or unreachable |
+| 20 | `options_premium_avg_down` (§16) | NOT STARTED | — | — | in no consolidation family; can fire beside every pattern describing the same re-entry |
+| 21 | `opening_5min_trap` (§19) | NOT STARTED | — | — | three windows in one detector; analytics-only, and one of the **two remaining INFO detectors with no reader** |
+| 22 | `end_of_session_mis_panic` (§20) | NOT STARTED | — | — | 2 alerts |
+| 23 | `post_loss_recovery_bet` (§21) | NOT STARTED | — | — | 2 alerts. Named as covering part of the retired `size_escalation`'s claim, so its own review should confirm that |
+| 24 | `constitution_violation` (§23) | NOT STARTED | — | — | 6 rules in one pattern type, and **three retirements now lean on it** (4, 15, and part of 17's rationale). The most load-bearing unreviewed detector |
+| 25 | `time_of_day_bias` (§25) | **ON HOLD** | — | — | blocked: never fired, needs a mature baseline. Guards pinned so "correctly silent" is distinguishable from "unreachable" |
+| 26 | `win_rate_collapse` (§26) | **ON HOLD** | — | — | blocked: same |
+| 27 | `strategy_breakdown` (§27) | **ON HOLD** | — | — | blocked: same |
+| M | `death_spiral` (§A1, meta) | NOT STARTED | — | — | consumes other detectors' output, so it **moves whenever one is retired** — arithmetic, not a regression, and the reason no retirement re-runs a replay to explain it |
+| P | `overexposure` / `portfolio_concentration` / `holding_loser` (§A2-A4) | NOT STARTED | — | — | separate pipeline, reviewed as a group |
+| H | `capital_mismatch` (§A5) | NOT STARTED | — | — | housekeeping, not a behaviour detector. §H0 F21 confirmed its absence from `_ALIAS_NATURE` is correct |
+| 99 | `revenge_trade` (§2) | **FROZEN** | 23 Aug 2026 | — | by decision. No new threshold, no episode rule, no score, no replacement, no global confidence gate. `docs/research/REVENGE_FINAL_EVIDENCE_REVIEW.md` |
 
 ---
 

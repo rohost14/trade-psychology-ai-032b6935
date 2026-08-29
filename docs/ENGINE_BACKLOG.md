@@ -292,9 +292,15 @@ no bundle cost, but publicly reachable in production.
 - **`typical_drawdown` and `median_position_risk_pct` computed and unread.**
   Claimed by an audit, consistent with the code I have read, but I have not
   personally grepped every reader.
-- **`cooldown_violation` implemented twice** (`behavior_engine.py:2646` and
-  `position_monitor_tasks.py:1175`). Both sites exist; whether they can disagree
-  in practice is unverified.
+- ~~**`cooldown_violation` implemented twice**~~ — **RESOLVED 30 Aug, and the
+  claim was a misreading.** The two sites were never one detector duplicated:
+  `behavior_engine`'s read a SYSTEM-imposed `Cooldown` row, `position_monitor_
+  tasks`' is `constitution_violation`'s cooldown rule reading the trader's OWN
+  declared `cooldown_after_loss`. They could not disagree because they judged
+  different things. The engine-side detector was retired at Pattern 15 (its
+  precondition never occurred on the live path — 0 firings against the rule's
+  181); the declared-value rule is untouched and is now the only one. Verified
+  by grep: no `cooldown_violation` remains in `app/` outside comments.
 
 ---
 
