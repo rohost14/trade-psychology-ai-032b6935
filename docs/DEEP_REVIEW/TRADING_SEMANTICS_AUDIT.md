@@ -1,7 +1,6 @@
 # Trading Semantics & Strategy Coverage Audit
 
-**Status: 4 of 5 areas reported. Area E (MTF / exposure / data failure /
-multi-account) still running.** Started 28 Aug 2026.
+**Status: COMPLETE.** All five areas done, 28-29 Aug 2026.
 
 Brief: [`positional_validation.md`](positional_validation.md). **No code changes
 in this audit.** Findings only.
@@ -345,6 +344,253 @@ weekdays. `is_expiry_day` is wrong for every SENSEX/BANKEX monthly.
 
 ---
 
-## Conclusions
+## Area E — MTF, exposure, data failure, multi-account · DONE DIRECTLY
 
-**Pending Area E.** Written once all five are in.
+The subagent for this area failed on a session limit before starting, so I
+investigated it myself. Everything below is first-hand.
+
+### E1 · MTF is not modelled at all — VERIFIED
+
+Every occurrence of `MTF` in live code:
+
+```
+api/webhooks.py:258            product not in {"MIS","NRML","MTF"}   ingest filter
+services/order_stream_service.py:68   _TRACKED_PRODUCTS             ingest filter
+services/trade_sync_service.py:34     TRACKED_PRODUCTS              ingest filter
+tasks/reconciliation_tasks.py:56      TRACKED_PRODUCTS              ingest filter
+tasks/trade_tasks.py:424              product not in {…}            ingest filter
+models/completed_trade.py:30          product column                storage
+models/position_ledger.py:47          part of the position key      storage
+```
+
+**No detector and no risk function reads it.** `estimate_capital_at_risk`
+(`trading_defaults.py:558-564`) takes `instrument_type, tradingsymbol,
+direction, avg_entry_price, total_quantity` — **there is no `product`
+parameter**, so it cannot distinguish MTF from cash even in principle.
+
+| scenario | status |
+|---|---|
+| cash equity without MTF | **PASS** (notional denominator, correct for delivery) |
+| MTF long / increased / reduced / overnight | **GAP** — indistinguishable from cash equity |
+| MTF + protective option | **UNSUPPORTED** — equity is excluded from strategy grouping entirely |
+| available margin vs deployed capital | **UNSUPPORTED** — no leverage model exists |
+| forced liquidation / broker square-off | **UNSUPPORTED** — no event class represents it |
+
+Consequence: an MTF position's **full market value** is charged against declared
+capital as if it were cash, so `excess_exposure` and
+`constitution_violation`/`max_trade_risk` breach on essentially every MTF trade —
+when leverage is the instrument's entire purpose. The brief's instruction that
+*"MTF must not be treated as an F&O position"* is satisfied only accidentally: it
+is treated as **cash equity**, which is a different wrong answer.
+
+### E2 · There is no netting anywhere — VERIFIED
+
+`grep` for `net_exposure|net_delta|gross_exposure|directional_exposure` across
+`backend/app/` returns **nothing** in live code. Every aggregation uses `abs()`:
+
+```
+position_monitor_tasks.py:211   position_value = current_price * abs(qty)
+position_monitor_tasks.py:396   position_value = current_price * abs(qty)
+position_monitor_tasks.py:1389  ltp * abs(pos.total_quantity)
+```
+
+A short leg **adds** to exposure instead of offsetting it, so a fully hedged or
+delta-neutral book reads as maximally concentrated.
+
+| exposure concept | status |
+|---|---|
+| gross exposure | **PASS** — this is what is computed |
+| net directional exposure | **GAP** — not computed anywhere |
+| underlying exposure | **PASS** — bucketed by underlying |
+| hedge-adjusted exposure | **GAP** |
+| sector exposure | **UNSUPPORTED** — no sector taxonomy exists |
+| correlated exposure | **UNSUPPORTED** — no beta, correlation or index-constituent data |
+
+**Does the data support building these?** Gross, underlying and net-directional
+are computable from what is stored. Sector and correlated exposure are **not** —
+and per the brief, should not be claimed. Hedge-adjusted exposure is computable
+only within one underlying and one expiry, given the grouping limits in area C.
+
+### E3 · Data failure — the live path abstains correctly, but two detectors turn absence into a claim
+
+**The good half — VERIFIED PASS.** `ltp_cache.read` returns `None` when a price
+is missing *or stale*, and staleness is genuinely enforced with a per-price
+timestamp (`_decode`, `ltp_cache.py:44-53`: `if now_ms - int(ts_s) > STALE_MS:
+return None`). The monitor then abstains rather than guessing
+(`position_monitor_tasks.py:171-174`):
+
+```python
+if current_price is None or avg_entry <= 0:
+    # No live price available — KiteTicker not connected or token missing
+    return events
+```
+
+| failure | status |
+|---|---|
+| stale LTP / missing LTP / delayed tick | **PASS** — staleness enforced, monitor abstains |
+| broker disconnect / websocket reconnect / Redis restart | **PASS** — no price → abstain |
+| duplicate fills | **PASS** — unified `idempotency_key` on the Kite order id |
+| out-of-order events | **PASS** — triggers a full ledger replay |
+| market closed / partial session | **PASS** — beat gated 09:15–15:25 IST (though hardcoded NSE hours; MCX evening is never monitored — **GAP**) |
+| app restart | **PASS** — state is in Postgres, rebuilt on demand |
+| position sync delay | **GAP** — a partially-filled-then-cancelled order desyncs `current_qty` (area A) |
+
+**The bad half — the hard principle IS violated, twice.** The brief's rule is
+*"never interpret missing data as trader behaviour"*. Both violations are already
+the headline finding, and this is the frame that makes them one defect rather
+than two:
+
+1. **`no_stoploss`** — an empty `exit_order_types` means *"we could not read the
+   exit order type"*. The detector treats it as *"there was no stop-loss"* and
+   raises an alerting, level-2 behavioural claim.
+2. **`adding_to_adverse_position`** — `num_entries=1` on an overnight backfill
+   means *"the fill count is unknown"* (`trade_sync_service.py:1277` says so in a
+   comment). The detector returns a **negative finding** — "opened in a single
+   fill" — rather than abstaining.
+
+Both are absence rendered as fact. The engine has a proper vocabulary for this —
+`DetectorResult.abstained` with an `Insufficiency` reason — and neither uses it.
+
+### E4 · Behaviour is account-level, not user-level — VERIFIED
+
+Everything scopes on `broker_account_id`: the engine (17 references), the alert
+and dedup path in `trade_tasks.py` (92), `session_facts` (4). `BrokerAccount`
+carries a `user_id` FK with its own index (`models/broker_account.py:21-26`), so
+**one user can hold several broker accounts today**.
+
+| question | answer |
+|---|---|
+| scoping | **account-level** |
+| trader closes in Account A, hedges in Account B | the two are never related — **no false relationship is invented** |
+| but | the hedge is **invisible**, and each account is judged in isolation |
+
+This is the *safe* failure direction — the engine will not fabricate a
+cross-account sequence — but a multi-account trader's risk is systematically
+understated per account and never aggregated. Classify as **GAP**, not
+FALSE-POSITIVE RISK. Note that `user_id`-level aggregation would be a genuine
+design decision, not a bug fix: a hedge held in a different account is still a
+real hedge, but combining accounts would also merge two independent trading
+styles into one behavioural profile.
+
+---
+
+# CONCLUSIONS
+
+## Overall coverage assessment
+
+**The engine models one trader correctly and asserts behaviour about everyone
+else.**
+
+What it does genuinely well, and these are not small things:
+
+- **New-position vs additional-fill discrimination** (`_compute_fill_effect`) is
+  pure, correctly keyed, replay-safe, and derives state from running quantity
+  rather than `transaction_type` — the trap it records having already fallen into
+  once. Weighted average entry, realized P&L and remaining quantity are correct.
+- **`adding_to_adverse_position`** deliberately excludes size, correctly excludes
+  pyramiding, and reports a fact rather than a cause. It is the strongest
+  behavioural detector in the engine on the axis this audit examined.
+- **Three short-option guards are real** — `premium_loss_event`,
+  `options_premium_avg_down` and the two live paths gate `direction != "LONG"`
+  explicitly, with a comment explaining why.
+- **The live path abstains on missing or stale data**, with staleness genuinely
+  enforced.
+- **Cross-underlying hedging is not claimed**, which is the correct answer.
+
+The failures cluster into one shape: **a percentage or a count is computed
+against a denominator or a scope that is only valid for an intraday long-options
+buyer, and the result is stated as a fact about the trader.**
+
+## Highest-priority architectural gaps
+
+**1. Absence is rendered as fact.** `no_stoploss` reads an unreadable exit-order
+type as "no stop-loss existed"; `adding_to_adverse_position` reads an unknown
+fill count as "opened in a single fill". Both are unconditional, silent, and
+invert the product's thesis by scolding disciplined behaviour. The engine already
+has `DetectorResult.abstained` and neither uses it. **This is the one finding
+that is a bug on the current book, for the current trader, today.**
+
+**2. There is no single, labelled definition of "size" or "risk".** Nine
+denominators across four meanings, with `estimate_capital_at_risk` inverting for
+short options and omitting the contract multiplier entirely. `instrument_risk`
+exists precisely to prevent this, labels its answers correctly, and is bypassed
+by the detectors that most need it. Real Kite margin data is fetched and read by
+nothing.
+
+**3. Strategy grouping is unreliable in both directions at once.** It
+over-suppresses (`multi_leg_unknown` earns full hedge suppression; the canonical
+revenge shape falls inside the window that silences it) and under-suppresses (the
+group needs the sibling to have *closed*, so the first leg of every hedge alerts;
+4-leg structures starve; the entry path has no group at all). A "hedge" is
+asserted without reading the hedging leg's direction or any quantity.
+
+**4. Session scope is `exit_time`-only while three detectors say "opened
+today".** Correct for streaks and P&L, wrong for counting decisions, and it
+yields two different counts for one declared rule.
+
+**5. Time is fixed and style is unmodelled.** 26 of 27 windows are constants;
+the only adaptive threshold is a duration by accident. Nothing in the codebase
+represents a trading horizon.
+
+## Which pattern reviews should be revisited
+
+| pattern | why | urgency |
+|---|---|---|
+| **12 `no_stoploss`** | It was next in the queue anyway. It is now the audit's headline defect and **must not be reviewed on the current book** — the false positive is invisible there because the reference trader is intraday with the live-path ID mismatch masking everything. | **blocking** |
+| **1 `martingale_behaviour`** | Verified as taking ratios across denominator *kinds* (`LOSS_CEILING` vs `MARGIN_POSTED`) without reading `.kind`. Its Pattern 1 rewrite specifically fixed the unit-mixing problem and this survived it. | high |
+| **2 `adding_to_adverse_position`** | The detector is sound; its *dispatch* has three silent no-run paths and its entry-time context carries no `strategy_group`. Reviewed as logic, not as wiring. | high |
+| **5 `overtrading_burst`** (deferred, still live) | Counts legs of a structure as separate decisions; 30-minute window fixed for every style. Should not ship without this. | high |
+| **99 `revenge_trade`** (frozen) | The freeze should be **re-examined, not lifted**: it is silenced by `multi_leg_unknown` grouping inside its own window, and its per-instrument-class thresholds do not exist in the codebase. The frozen decision was made without knowing either. | medium |
+| **3 `same_symbol_obsession`** | Conflates expiries and directions into "attempts"; assumes one lot size per underlying, which an NSE lot-size revision breaks. | medium |
+| **8 `premium_loss_event`** | Its own short-option guard is correct. But it reads `ct.pnl_pct`, which is deflated by averaging down and inflated by an over-closing FLIP. The Pattern 8 conclusion holds; the input does not. | medium |
+
+## What can safely be handled now vs what needs more data
+
+**Safe to fix now, no new data required:**
+
+- the `exit_trade_ids` ID-space mismatch (one column, one convention)
+- abstaining instead of asserting when `exit_order_types` or `num_entries` are unknown
+- adding `product` to `estimate_capital_at_risk`, and the contract multiplier to every denominator
+- reading the option leg's direction in the futures-hedge branch
+- testing `strategy_type != MULTI_LEG_UNKNOWN` before granting suppression
+- separating "closed today" from "opened today" in the three detectors that claim the latter
+- passing the already-computed `_open_structures()` into the entry-time context
+
+**Needs data we do not have:**
+
+- correlation / sector / index-constituent relationships → cross-underlying hedging is **UNSUPPORTED** and should stay so
+- true margin per position → available from Kite, fetched, but plumbing it into detectors is a real change
+- order intent (placed / modified / cancelled) → the `orders` table exists but is populated only on manual sync
+- trading style / horizon → not derivable from trades alone without a stated definition
+- equity holdings → not synced at all
+
+## Should anything be fixed before Pattern 12?
+
+**Yes — one thing, and Pattern 12 is the reason.**
+
+Pattern 12 *is* `no_stoploss`. Reviewing it against the reference book would
+measure a detector whose primary safety check has never once executed, on the one
+dataset where that is invisible. Every conclusion drawn would be about the
+degraded behaviour, not the intended one — the same error that made Pattern 9's
+`expiry_day_overtrading` look like a threshold problem when it was a units bug.
+
+**Recommendation: fix the `exit_order_types` plumbing and the
+absence-as-fact handling first, then review Pattern 12 against a detector whose
+primary check can actually fire.** That is a narrow, well-understood change with
+a clear before/after test, and it does not require any of the architectural work
+above.
+
+Everything else in this audit is **recorded, not urgent**. None of the other
+findings can produce a wrong alert for the current single-account intraday
+long-options user; they are latent, and they become live the moment a futures
+trader, an option writer, a spread trader, an MTF user or an overnight holder
+connects an account.
+
+## One caveat on this audit's own evidence
+
+Areas A–D were investigated by subagents; I verified every finding labelled
+VERIFIED against the code myself and marked the rest as claims. Area E I did
+directly. No scenario in this audit was tested against a real multi-product
+tradebook, because we do not have one — the conclusions about futures, short
+options, MTF and overnight behaviour are **read from code, not measured**. They
+are strong claims about what the code will do, not observations of what it did.

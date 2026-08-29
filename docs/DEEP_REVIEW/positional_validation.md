@@ -1,4 +1,4 @@
-> **STATUS — audit STARTED 28 Aug 2026, IN PROGRESS.**
+> **STATUS — audit COMPLETE, 29 Aug 2026.**
 > Working document and live status: [`TRADING_SEMANTICS_AUDIT.md`](TRADING_SEMANTICS_AUDIT.md).
 > Five parallel read-only investigations are running, scoped A–E against the
 > numbered items below. This brief is the source of requirements and is not
@@ -10,9 +10,13 @@
 > | B | long/short options, futures vs options, capital & margin | 7, 8, 12 | **REPORTED** |
 > | C | hedge recognition & adjustment, strategy geometry, cross-underlying | 3, 4, 6, 10 | **REPORTED** |
 > | D | expiry & rollover, time horizon, trader archetypes | 5, 13, archetypes | **REPORTED** |
-> | E | MTF, portfolio exposure, data failure, multi-account | 9, 11, 15, 16 | agent failed (session limit) — **being done directly** |
+> | E | MTF, portfolio exposure, data failure, multi-account | 9, 11, 15, 16 | **DONE DIRECTLY** (agent hit a session limit) |
 >
-> No code changes are being made. Findings only.
+> No code changes were made. Findings only.
+>
+> **Verdict: fix the `exit_order_types` plumbing and the absence-as-fact
+> handling BEFORE Pattern 12 — because Pattern 12 *is* `no_stoploss`, and its
+> primary safety check has never once executed.**
 
 ---
 
