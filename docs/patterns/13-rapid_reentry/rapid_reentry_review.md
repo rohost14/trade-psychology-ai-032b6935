@@ -1,6 +1,9 @@
 # Pattern 13 — `rapid_reentry`
 
-**Review, 29 Aug 2026. Findings only. No code changed.**
+**Review, 29 Aug 2026. CLOSED — KEEP AS-IS.** Approved; no code changed.
+
+The two consumer items below stay on
+[`PENDING_AND_TODO.md`](../../DEEP_REVIEW/PENDING_AND_TODO.md).
 
 Review-order 13. Source-list **#5** in
 [`BEHAVIOURAL_PATTERNS.md`](../00-shared/BEHAVIOURAL_PATTERNS.md) — the
@@ -96,7 +99,7 @@ does not claim to be personalised or evidence-derived.
 
 | consumer | why it never sees this detector |
 |---|---|
-| `danger_zone_service` — upgrades to **CAUTION** on `rapid_reentry` | reads `RiskAlert`; info never written there. **Dead branch** |
+| `danger_zone_service` — upgrades to **CAUTION** on `rapid_reentry` | reads `RiskAlert`; info never written there. **Unreachable — see below** |
 | `analytics.py` day-tag — tags a day **"revenge"** | query filters `BehaviorEvent.severity != "info"` |
 | `behavior_summary` (the `/api/behavioral/` summary) | sourced from `RiskAlert` |
 | `behavior_scores_service` (`death_spiral`) | requires severity ≥ `danger` |
@@ -106,8 +109,17 @@ does not claim to be personalised or evidence-derived.
 
 So the detector writes a `BehaviorEvent` that **no trader-facing surface reads**.
 
-**The `danger_zone_service` CAUTION branch is dead code** and should be recorded
-as such — it is a consumer bug, not this detector's fault.
+**The `danger_zone_service` CAUTION branch is unreachable, and it is NOT a bug.**
+
+Recorded deliberately as a **consumer/design inconsistency**, not a defect:
+`danger_zone` contains a `rapid_reentry` CAUTION path, but INFO events never
+reach `RiskAlert`, so the path cannot be taken. **Activating it requires an
+explicit product decision about INFO evidence visibility** — it is not a
+one-line repair.
+
+Calling it a dead branch invites the wrong fix. Someone "fixing" it would either
+make this detector notify, or make the danger zone read evidence, and both
+change the alerting philosophy rather than correct an error.
 
 ### 2. Total overlap with its own family
 
@@ -205,9 +217,10 @@ Two defects belong to **consumers**, and are recorded rather than fixed:
 
 1. **`danger_zone_service.py:310`** lists `rapid_reentry` in `caution_patterns`,
    but `_get_recent_alerts` reads `RiskAlert` and an info event never creates
-   one. Dead branch. Fixing it is a `danger_zone` change, not a Pattern 13
-   change — and "fixing" it by making the detector notify would be a product
-   decision nobody has taken.
+   one, so the path is unreachable. **Recorded as a consumer/design
+   inconsistency, not a bug** — activating it requires an explicit product
+   decision about INFO evidence visibility, and treating it as a repair would
+   change the alerting philosophy by accident.
 2. **The analytics-disposition question is cross-cutting.** `rapid_reentry`,
    `panic_exit`, `early_exit` and `opening_5min_trap` are all info-only. If
    nothing reads their evidence, the disposition is a write with no reader — for

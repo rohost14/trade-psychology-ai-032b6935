@@ -205,6 +205,36 @@ Not to-do items. Each says what would change it.
 
 ---
 
+## Surfaced by the Pattern 13 review — NOT actioned
+
+### `danger_zone` INFO visibility — a design inconsistency, NOT a bug
+
+`danger_zone_service.py:310` contains a `rapid_reentry` CAUTION path, but INFO
+events never reach `RiskAlert` (`behavior_engine.py:376` skips them), and
+`_get_recent_alerts` queries `RiskAlert`. The path therefore cannot be taken.
+
+**Deliberately not recorded as a dead branch to be repaired.** Activating it
+requires an explicit product decision about INFO evidence visibility, and
+"fixing" it would mean either making an analytics-disposition detector notify or
+making the danger zone read evidence. Both change the alerting philosophy rather
+than correct an error.
+
+**What must be decided:** whether INFO evidence is ever allowed to influence a
+user-facing state. Until that is answered, the path stays as written.
+
+### Analytics-disposition evidence with no reader — one decision, four detectors
+
+`rapid_reentry`, `panic_exit`, `early_exit` and `opening_5min_trap` are all
+`severity="info"` with `disposition=analytics`. Verified across all 15
+`BehaviorEvent` readers: nothing trader-facing consumes them. Every reader
+either filters `severity != "info"` or sources from `RiskAlert`, which an info
+event never reaches. The sole reader is an admin aggregate.
+
+**What must be decided:** whether evidence nobody reads should be written at
+all. This is one product decision spanning four detectors, and it should be
+taken **before** the other three are reviewed individually — the answer changes
+what those reviews are for.
+
 ## Surfaced by the Pattern 12 review — NOT actioned
 
 ### `panic_exit` carries the identical unverifiable claim
