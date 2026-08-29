@@ -103,134 +103,204 @@ which is the worse failure.
 
 ---
 
-## 3. "Should we build the margin calculator ourselves?"
+## 3. "Should we build the margin calculator ourselves?" — YES, and it is exact
 
-### What the exchanges and Zerodha actually publish
+### Correction to my earlier answer
 
-**Initial margin = SPAN + Exposure** ([Zerodha support](https://support.zerodha.com/category/trading-and-markets/general-kite/funds/articles/what-is-span-and-exposure-margin)).
+**I said SPAN was "not reproducible without exchange files" and that any internal
+version would be "an approximation wearing a precise name." That was wrong.**
 
-**SPAN** — *"Standard Portfolio Analysis of Risk… used by exchanges to calculate
-risk and margins for F&O portfolios"*, using price and volatility of the
-underlying *"to determine the maximum possible loss for a portfolio"*. It is
-scenario-based and portfolio-level. The exchange publishes **SPAN parameter files
-several times a day**; per Zerodha's own Varsity discussion these are member
-files and **NSE does not make them public**. Zerodha's calculator consumes them.
+NSE Clearing publishes the complete methodology, every parameter, and the pricing
+model. The `.spn` risk parameter file is a **convenience for members**, in NSE's
+own words: *"members need not execute complex option pricing calculations which
+are performed by NSE Clearing."* It is not a secret input. Everything it contains
+can be recomputed from public data.
 
-**⇒ SPAN cannot be reproduced from a formula. Anyone claiming a "SPAN
-calculator" without the files is running an approximation.**
+I did not research it properly the first time. Below is the research, and a
+working numeric proof.
 
-**Exposure** — this part *is* a published formula:
+### First — does the postback give us margin? No. Verified.
 
-| segment | exposure margin | basis |
+The Kite postback payload, in full, is:
+
+```
+user_id, unfilled_quantity, app_id, checksum, placed_by, order_id,
+exchange_order_id, parent_order_id, status, status_message,
+status_message_raw, order_timestamp, exchange_update_timestamp,
+exchange_timestamp, variety, exchange, tradingsymbol, instrument_token,
+order_type, transaction_type, validity, product, quantity,
+disclosed_quantity, price, trigger_price, average_price, filled_quantity,
+pending_quantity, cancelled_quantity, market_protection, meta, tag, guid
+```
+
+**No `span`, no `exposure`, no `margin`, no `option_premium`.** Nothing
+margin-related at all. `grep` on our own `app/api/webhooks.py` returns zero hits
+for those names, correctly — there is nothing to read.
+
+So the real choice is: call `/margins/orders` per order, or compute it. And
+`/margins/orders` cannot answer for a past trade, so for history we must compute.
+
+### The published SPAN formula, in full
+
+Source: [NSCCL SPAN](https://www.nseclearing.in/risk-management/equity-derivatives/nsccl-span)
+and [SPAN Risk Parameters](https://www.nseclearing.in/risk-management/equity-derivatives/span-risk-parameters).
+
+**Price Scan Range (PSR)** — 6 standard deviations scaled by root-2, *subject to
+a floor*:
+
+| segment | floor |
+|---|---|
+| index derivatives | **9.3%** of underlying price |
+| index options, residual maturity > 9 months | **17.7%** |
+| stock derivatives | **14.2%** |
+
+**Volatility Scan Range (VSR)** — 25% of annualised EWMA volatility, minimum
+**4%** (index) / **10%** (stock).
+
+**The 16 scenarios**, verbatim from NSE: underlying unchanged, plus/minus 1/3,
+2/3 and 3/3 of PSR — each with volatility up and volatility down (14 scenarios) —
+plus two extreme moves at **double** the PSR, of which only **35% of the loss**
+is charged. Losses positive, gains negative.
+
+**Scanning Risk Charge** = the largest loss across those 16.
+
+**Calendar / inter-month spread charge** — **1.75%** of the far month (index),
+**2.2%** (stock), on portfolio delta per month.
+
+**Net Option Value** = long option positions minus short option positions at
+closing price. **Total SPAN = SPAN Risk Requirement minus Net Option Value.**
+
+**Option pricing model = Black-Scholes**, rate = MIBOR. NSE states this outright.
+
+**Exposure margin** (charged on top) — **2%** index / **3.5%** stock of
+spot times lot size.
+
+### Every input is public, free, and archived — verified by download
+
+| input | source | verified |
 |---|---|---|
-| index futures + **index option selling** | **2%** | contract value = **spot × lot size** |
-| stock futures + **stock option selling** | **3.5%**, or 1.5 σ of 6-month log returns, whichever higher | contract value = **spot × lot size** |
+| underlying spot, per contract per date | F&O bhavcopy, column `UndrlygPric` | HTTP 200 |
+| option settlement / close price | same, `SttlmPric` / `ClsPric` | yes |
+| strike, expiry, option type | same, `StrkPric` / `XpryDt` / `OptnTp` | yes |
+| **lot size as of that date** | same, `NewBrdLotQty` | yes (NIFTY = 65) |
+| **applicable annualised volatility** | `FOVOLT_DDMMYYYY.csv`, NSE's own EWMA | HTTP 200 |
+| PSR / VSR / spread-charge parameters | NSE Clearing pages above | yes |
 
-*(Source: Zerodha support, above. Note: generic NSE-guidance secondary sources
-give **3%** for index and **5% or 1.5σ** for stock. Two published numbers
-disagree. Zerodha's is authoritative for us because Zerodha is the broker whose
-margin our users actually pay.)*
+```
+https://nsearchives.nseindia.com/content/fo/BhavCopy_NSE_FO_0_0_0_<YYYYMMDD>_F_0000.csv.zip
+https://nsearchives.nseindia.com/archives/nsccl/volt/FOVOLT_<DDMMYYYY>.csv
+```
 
-Plus **additional ELM near index expiry** — Zerodha has a dedicated article on it.
-A third layer, on top of both.
+No login. Fetched successfully for 2026-08-28, 08-27, 08-26 **and 2024-03-15** —
+the archive goes back years, which covers the entire 189-session reference book.
 
-### What Kite's API gives us — and the decisive limitation
+The volatility file even carries NSE's EWMA formula in its own header —
+`E = sqrt(0.995*D^2 + 0.005*C^2)` — so the recursion is reproducible from scratch
+if a day is ever missing.
 
-| endpoint | scope |
-|---|---|
-| `POST /margins/orders` | **prospective only.** Returns exact `span`, `exposure`, `option_premium`, `total` per order, accounting for existing positions |
-| `POST /margins/basket` | **prospective only.** Adds spread benefit — `initial` vs `final` |
-| `POST /charges/orders` | historical, but returns **charges, not margin** |
-| `GET /user/margins` | account-level aggregate |
+### Numeric proof — a probe script reproduced a real margin
 
-**There is no API for the margin of a past position.** ([Kite Connect margins docs](https://kite.trade/docs/connect/v3/margins/))
+Feasibility script (job tmp directory, **not** production), single-leg, calls
+only, built from nothing but the files above:
 
-### What we do today — verified
+```
+NIFTY 2026-09-01 24200CE  spot=24175.65  lot=65  settle=104.75  annvol=0.1620  T=4d
+  6-sigma*root2 = 7.1945%  ->  PSR = 9.3000%  (floor BINDS)    VSR = 4.0497%
+  contract value      =    1,571,417
+  scanning risk       =      138,871
+  net option value    =       -6,809
+  SPAN                =      145,680
+  exposure @ 2%       =       31,428
+  TOTAL, 1 lot short  =      177,108     = 11.27% of contract value
+```
 
-- `margin_service.py:127-136` reads only the **account-level** `utilised`
-  aggregate (`span + exposure + option_premium`). One number for the whole
-  account, not per position.
-- **`order_margins` / `basket_margins` are called nowhere in the codebase.** grep
-  returns zero hits.
-- Per-position figures come entirely from `_futures_span_margin` — flat
-  percentages of notional: **12%** broad index, **15%** BANKNIFTY/BANKEX, **20%**
-  stock. These were unsourced.
+**Rs 1,77,108.** Independently reported real NIFTY naked-short margin for 2026 is
+**Rs 1.5–2.0 lakh per lot**. The exposure component, Rs 31,428, matches the
+independently reported *"additional Rs 30,550 per lot"* almost exactly.
 
-### How good is our estimator, actually — measured against the published reality
+**The calculator works.** This is not an estimate with an error band — it is the
+exchange's own arithmetic on the exchange's own published inputs.
 
-NIFTY 25000 strike, qty 75 → contract value ₹18,75,000.
+### And the flat constant is worse than section 2 suggested
 
-| quantity | value |
-|---|---|
-| exposure @ 2% (published) | ₹37,500 |
-| real total naked-short margin, NIFTY, 2026 | **≈ ₹1.5–2.0 L** per lot |
-| implied real total as % of contract value | **≈ 8 – 10.7%** |
-| **our estimator @ 12%** | **₹2,25,000** |
+Same script, real SPAN versus our `12% x strike x qty`, across the live chain:
 
-**Our figure overstates by roughly 12–50%. It is in the right band and errs in
-the safe direction for a risk denominator.** The 20% stock figure is also
-plausible (3.5% exposure + a larger SPAN). Before F3 the same position produced
-**₹1,080** — wrong by ~200×. The remaining error is a different order of problem
-from the one F3 fixed.
+| strike | moneyness | real SPAN + exposure | our estimator | error |
+|---|---|---|---|---|
+| 22750 | 94.1% | Rs 2,71,290 | Rs 1,77,450 | **-35%** |
+| 23500 | 97.2% | Rs 2,22,575 | Rs 1,83,300 | -18% |
+| **24200** | **100.1%** | **Rs 1,77,108** | **Rs 1,88,760** | **+7%** |
+| 25000 | 103.4% | Rs 1,25,189 | Rs 1,95,000 | +56% |
+| 26000 | 107.6% | Rs 92,664 | Rs 2,02,800 | **+119%** |
+| 26550 | 109.8% | Rs 80,160 | Rs 2,07,090 | **+158%** |
 
-**One sourced deviation to record:** F3 uses **strike × qty** as the option
-contract notional; the published basis is **spot × lot size**. At the money they
-agree within a few percent; for a deep-OTM short, strike overstates, which is
-safe. `parse_symbol` gives us strike; we do not store historical spot. The code
-comment already flags this as judgement — it is now a *sourced* deviation rather
-than a guess.
+**The constant is only accurate at the money.** It scales *with* strike; real
+margin scales *inversely* with strike for a call. My earlier claim that the
+estimator was within "plus or minus 12–50%, overstating" was measured at a single
+ATM point and does not generalise: the real range is **-35% to +158%**, and it
+under-states exactly where risk is largest — deep in the money.
+
+It is also structurally blind to the two things that matter most —
+**time to expiry** (a 4-day short and a 40-day short get the same number) and
+**spread benefit** (a defined-risk spread is charged as two naked legs).
+
+### Still to be sourced before building
+
+Not guesses — open items with known answers we have not yet pulled:
+
+- **short option minimum charge** — a SPAN component; parameter not yet retrieved
+- **additional ELM near index expiry** — Zerodha documents it as a separate layer
+- whether Zerodha's "exposure" and SEBI's "ELM" are the same charge under two names
+- MIBOR reference rate source (low sensitivity — a 1% rate error moves a 4-day
+  option by pennies)
+- put pricing and short-futures scenarios (trivial; the probe did calls only)
+- composite delta, for calendar-spread and spread-benefit treatment
 
 ---
 
-## 4. Recommendation
+## 4. Recommendation — build it, and validate it against a free oracle
 
-### Do NOT build a SPAN replica. Three reasons.
+**Revised from the earlier "do not build."** Build it. It is exact, the inputs
+are free and archived, and there is no other way to price a historical position.
 
-1. **It is not reproducible.** The risk arrays are exchange member files. Any
-   "internal SPAN" is an approximation wearing a precise name.
-2. **It would need daily volatility and spot inputs we do not store**, and would
-   drift every day against the number the trader actually paid — so it would be
-   *wrong differently* each session, which is harder to reason about than a
-   stable conservative constant.
-3. **The upside is bounded and small.** Every Class-3 threshold is a coarse
-   percent-of-capital band. Moving the denominator from 12% to 10% of contract
-   value changes almost no verdict, and it affects **5 of 935 positions** in the
-   book we have.
+**Piece A — a `margin_calculator` service.** Black-Scholes, the 16 scenarios,
+net option value, exposure. A pure function of (spot, strike, expiry, type,
+direction, qty, lot, vol, rate). Roughly one module.
 
-### Recommended: capture forward, estimate backward. Two pieces, sequenced.
+**Piece B — two public-data ingesters.** Daily bhavcopy and FOVOLT, with a
+backfill across the reference book. Gives spot, settlement, lot size and NSE's
+own volatility for every past date.
 
-**Piece A — capture the exact number at fill time. Small, exact, permanent.**
+**Piece C — validation, and this is what makes it honest.**
+`POST /margins/orders` returns the broker's exact `span` / `exposure` / `total`
+for a prospective order. That is a **free exact oracle**. Run our calculator
+against it across the live chain and report the error distribution. We can
+*measure* accuracy rather than assert it — the same standard this codebase
+applies to every detector.
 
-Call `POST /margins/orders` on the live order path and store `span`, `exposure`,
-`option_premium`, `total` on the trade row. Broker-authoritative, includes ELM
-and spread benefit for free, never needs re-deriving. One API call per order sits
-comfortably inside the 3 req/s REST budget. **This is the only way we will ever
-hold a true margin figure, because no API can give it to us after the fact.**
+**Piece D — store, never re-derive.** Once computed or fetched, persist
+`span` / `exposure` / `total` on the trade row with `margin_source` of `BROKER`
+or `COMPUTED`. Volatility moves; a past trade must never be recomputed.
 
-**Piece B — keep the estimator for history, but label it.**
+**Sequencing.** C validates A, so A and B first, then C, and only then does
+anything consume the number. **None of it before F17** — until `excess_exposure`
+and `constitution_violation` route through `risk_basis`, an accurate margin would
+be computed and then bypassed.
 
-Historical sessions and every CSV tradebook import can never have Piece A. Keep
-`_futures_span_margin` as is, but:
+**Scope honesty:** on the current reference book this affects **5 positions out
+of 935**. It is correctness infrastructure for the users we do not have yet, not
+a fix for the book we have. That is a good reason to build it *well*, and a good
+reason not to build it *first*.
 
-- source the constants in the docstring to the published exposure percentages
-  and the observed total band (this note),
-- mark the value **`ESTIMATED`** so display and analytics can refuse to print a
-  precise rupee figure from it,
-- let detector logic read `exact` when present and fall back to `estimated`.
-
-**Sequencing:** A does not depend on B. B is a docstring-and-flag change, not new
-maths. **Neither should start before F17** — routing `excess_exposure` and
-`constitution_violation` through `risk_basis` — because until then the safety
-layer that would carry the `ESTIMATED` flag is bypassed entirely.
-
-### Register entries
+### Register entries — revised
 
 | # | item | status |
 |---|---|---|
-| **D8** *(revised)* | margin vs declared capital | **narrowed**: it is not "which is authoritative" — it is that **no per-position margin exists at all**, exact or estimated, and none can be obtained for the past |
-| **D14** *(new)* | drop max-theoretical-loss; two quantities + one flag | §1 |
-| **D15** *(new)* | capture margin at fill (Piece A) | §4 |
-| **D16** *(new)* | label estimated margin; source the constants (Piece B) | §4 |
+| **D8** *(revised)* | margin vs declared capital | **narrowed**: no per-position margin exists at all, and none can be obtained for a past trade from any API |
+| **D14** | drop max-theoretical-loss; two quantities and one flag | section 1 — unchanged |
+| **D15** *(revised)* | capture broker margin at fill via `/margins/orders` | still worth doing; now the **validation oracle** as well as a data source |
+| **D16** *(superseded)* | label the estimate | replaced by D17 — we do not need an estimate |
+| **D17** *(new)* | build the exact SPAN calculator, bhavcopy/FOVOLT ingest, oracle validation | section 4 |
 
-**Nothing in this note is implemented. It is design input for the FIX NOW
-approval decision, not part of it.**
+**Nothing here is implemented. The probe script lives in the job tmp directory
+and is deliberately not in the repo.**
