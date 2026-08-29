@@ -139,11 +139,32 @@ def parse_symbol(symbol: str) -> ParsedSymbol:
             expiry_key=expiry_key,
         )
 
-    # 4. Equity / unknown
+    # 4. Equity — or a derivative we failed to read
+    #
+    # FIXED 2026-08-29 (Phase 1, F9). This branch returned "EQ" for everything
+    # it could not parse, so an unreadable derivative silently became equity and
+    # was given a delivery-value denominator. The comment here used to say
+    # "Equity / unknown", which records that the conflation was known.
+    #
+    # The test is deliberately narrow and provable rather than a general
+    # classifier: a symbol that CONTAINS A DIGIT and ENDS IN CE/PE/FUT is not an
+    # NSE equity ticker. Real tickers ending in those letters exist (ACE), which
+    # is why the digit is required; derivative symbols always carry a strike or
+    # an expiry year. Anything else is still EQ, exactly as before.
+    #
+    # `instrument_type=None` routes these to InstrumentClass.UNKNOWN, whose
+    # RiskBasis is non-comparable (F8), so detectors abstain instead of dividing
+    # by a delivery value. A wrong UNKNOWN costs an abstention; a wrong EQ costs
+    # a false claim — the failure directions are not symmetric.
+    upper = symbol.upper()
+    looks_derivative = (
+        any(ch.isdigit() for ch in upper)
+        and (upper.endswith("CE") or upper.endswith("PE") or upper.endswith("FUT"))
+    )
     return ParsedSymbol(
         raw=symbol,
         underlying=symbol,
-        instrument_type="EQ",
+        instrument_type=None if looks_derivative else "EQ",
         expiry_date=None,
         strike=None,
         expiry_key="",
@@ -180,6 +201,12 @@ def _last_thursday_of_month(year: int, month: int) -> date:
     return d
 
 
+#: BSE index derivatives (BFO). Their monthly expiry is NOT NSE's last Thursday,
+#: and this module cannot establish what it is — see is_expiry_day. Listing them
+#: explicitly rather than guessing a rule; the list is not claimed exhaustive.
+_BSE_INDEX_UNDERLYINGS = frozenset({"SENSEX", "BANKEX", "SENSEX50"})
+
+
 def is_expiry_day(symbol: str, trade_date: date) -> bool:
     """
     Return True if trade_date is the expiry date of the given derivative symbol.
@@ -195,14 +222,40 @@ def is_expiry_day(symbol: str, trade_date: date) -> bool:
     Monthly expiry uses _last_thursday_of_month() which already walks back
     past NSE holidays, so holiday-adjusted expiries (e.g. Wednesday when
     last Thursday is a holiday) are handled correctly.
+
+    BSE INDEX MONTHLIES ABSTAIN (Phase 1, F11, 2026-08-29)
+    ------------------------------------------------------
+    The last-Thursday rule is NSE's. It was applied to every underlying and
+    every exchange, so `is_expiry_day("SENSEX25MARFUT", <a Thursday>)` returned
+    True — and `exchange_constants` documents in its own comments that BSE runs
+    different expiry days (SENSEX weekly on Friday, BANKEX weekly on Monday).
+
+    What is provable is that the NSE rule does not apply to a BSE index. What is
+    NOT established here is what the BSE monthly rule IS: this module has no
+    exchange parameter, `exchange_constants` records the weekly days only in
+    prose, and BSE has revised its expiry days more than once. Inventing a
+    weekday would replace a wrong answer with a differently wrong one.
+
+    So a BSE index MONTHLY returns False — no claim — rather than a confident
+    wrong True. The consumers are all modifiers (premium_loss_event's +15pp band
+    shift, no_stoploss's expiry thresholds, fomo_entry's context note), and not
+    applying a leniency is the conservative direction.
+
+    BSE WEEKLIES ARE UNAFFECTED — their symbols carry an exact date, which is
+    matched directly and never goes through the monthly path.
+
+    Sourcing the real BFO monthly rule is recorded as a DESIGN item.
     """
     parsed = parse_symbol(symbol)
     if not parsed.expiry_date:
         return False  # EQ or unrecognised
 
     if len(parsed.expiry_key) == 10:
-        # Weekly: "YYYY-MM-DD" — exact date from symbol
+        # Weekly: "YYYY-MM-DD" — exact date from symbol, exchange-independent
         return parsed.expiry_date == trade_date
+
+    if (parsed.underlying or "").upper() in _BSE_INDEX_UNDERLYINGS:
+        return False
 
     # Monthly: "YYYY-MM" — compute last Thursday of the contract month
     expected_expiry = _last_thursday_of_month(parsed.expiry_date.year, parsed.expiry_date.month)

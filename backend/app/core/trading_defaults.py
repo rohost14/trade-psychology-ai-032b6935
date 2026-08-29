@@ -561,6 +561,7 @@ def estimate_capital_at_risk(
     direction: str,
     avg_entry_price: float,
     total_quantity: int,
+    exchange: Optional[str] = None,
 ) -> float:
     """
     Returns estimated Rs capital at risk for a completed trade.
@@ -569,7 +570,24 @@ def estimate_capital_at_risk(
     For futures/options sellers: SPAN-approximated (conservative).
     Hedged positions will appear over-estimated — acceptable for safety alerts.
     """
+    # CONTRACT MULTIPLIER (Phase 1, F7, 2026-08-29)
+    #
+    # MCX and CDS fills arrive in LOTS, not units — Zerodha's instruments CSV
+    # sets lot_size = 1 for every MCX instrument, and the multiplier is the
+    # number of price-quotation units per lot (ZINC is 5000). `realized_pnl`
+    # has always applied it; no denominator did. So on MCX a loss ratio was
+    # inflated by up to 5000x while the exposure figure was understated by the
+    # same factor.
+    #
+    # NSE/BSE/NFO/BFO always resolve to 1, so passing no exchange keeps the
+    # previous behaviour exactly. Unknown MCX contracts return None, and the
+    # caller — risk_basis — marks the result UNRELIABLE rather than guessing.
     notional = float(avg_entry_price or 0) * int(total_quantity or 0)
+    if exchange:
+        from app.services.mcx_contract_specs import get_lot_multiplier_or_none
+        mult = get_lot_multiplier_or_none(exchange, tradingsymbol or "")
+        if mult:
+            notional *= int(mult)
 
     if instrument_type in ('CE', 'PE'):
         if direction == 'LONG':

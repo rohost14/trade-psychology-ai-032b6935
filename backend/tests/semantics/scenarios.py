@@ -172,6 +172,10 @@ STRUCTURE_SCENARIOS: List[tuple] = [
                                     ("NIFTY25APRFUT", "SHORT")]),
     ("weekly_opt_monthly_fut",     [("NIFTY25MARFUT", "LONG"),
                                     ("NIFTY2532025000PE", "LONG")]),
+    # F11: BSE index monthlies must not inherit NSE's last-Thursday rule
+    ("bse_sensex_monthly",         [("SENSEX25MARFUT", "LONG")]),
+    ("bse_bankex_monthly",         [("BANKEX25MARFUT", "LONG")]),
+    ("bse_sensex_weekly",          [("SENSEX2532025000CE", "LONG")]),
     # equity
     ("covered_call_eq_plus_ce",    [("RELIANCE", "LONG"),
                                     ("RELIANCE25MAR2900CE", "SHORT")]),
@@ -184,18 +188,28 @@ STRUCTURE_SCENARIOS: List[tuple] = [
                                     ("NIFTY25MAR25100CE", "LONG")]),
 ]
 
-#: L1 — capital at risk. (name, instrument_type, symbol, direction, price, qty)
+#: L1 — capital at risk.
+#: (name, instrument_type, symbol, direction, price, qty, exchange)
 RISK_SCENARIOS: List[tuple] = [
-    ("long_option",        "CE",  "NIFTY25MAR25000CE", "LONG",  120.0, 75),
-    ("short_option",       "CE",  "NIFTY25MAR25000CE", "SHORT", 120.0, 75),
-    ("long_put",           "PE",  "NIFTY25MAR25000PE", "LONG",  120.0, 75),
-    ("short_put",          "PE",  "NIFTY25MAR25000PE", "SHORT", 120.0, 75),
-    ("futures_long",       "FUT", "NIFTY25MARFUT",     "LONG",  25000.0, 75),
-    ("futures_short",      "FUT", "NIFTY25MARFUT",     "SHORT", 25000.0, 75),
-    ("equity_long",        "EQ",  "RELIANCE",          "LONG",  2900.0, 100),
-    ("equity_short",       "EQ",  "RELIANCE",          "SHORT", 2900.0, 100),
-    ("mcx_lot_multiplier", "FUT", "ZINC25MARFUT",      "LONG",  280.0, 5),
-    ("unparseable_symbol", None,  "WEIRD~SYMBOL",      "LONG",  100.0, 10),
+    ("long_option",        "CE",  "NIFTY25MAR25000CE", "LONG",  120.0, 75, "NFO"),
+    ("short_option",       "CE",  "NIFTY25MAR25000CE", "SHORT", 120.0, 75, "NFO"),
+    ("long_put",           "PE",  "NIFTY25MAR25000PE", "LONG",  120.0, 75, "NFO"),
+    ("short_put",          "PE",  "NIFTY25MAR25000PE", "SHORT", 120.0, 75, "NFO"),
+    ("futures_long",       "FUT", "NIFTY25MARFUT",     "LONG",  25000.0, 75, "NFO"),
+    ("futures_short",      "FUT", "NIFTY25MARFUT",     "SHORT", 25000.0, 75, "NFO"),
+    ("equity_long",        "EQ",  "RELIANCE",          "LONG",  2900.0, 100, "NSE"),
+    ("equity_short",       "EQ",  "RELIANCE",          "SHORT", 2900.0, 100, "NSE"),
+    ("unparseable_symbol", None,  "WEIRD~SYMBOL",      "LONG",  100.0, 10, "NSE"),
+    # F9: derivative-shaped but unreadable. Must NOT be treated as equity.
+    ("unreadable_option",  None,  "NIFTY99XXX25000CE", "LONG",  120.0, 75, "NFO"),
+    ("unreadable_future",  None,  "GARBAGE123FUT",     "LONG",  25000.0, 75, "NFO"),
+    # F7: MCX/CDS quantities are LOTS. Without the multiplier the denominator
+    # is understated by up to 5000x while realized_pnl already includes it.
+    ("mcx_no_exchange",    "FUT", "ZINC25MARFUT",      "LONG",  280.0, 5, None),
+    ("mcx_zinc_5000x",     "FUT", "ZINC25MARFUT",      "LONG",  280.0, 5, "MCX"),
+    ("mcx_gold_100x",      "FUT", "GOLD25MARFUT",      "LONG",  72000.0, 1, "MCX"),
+    ("mcx_unknown_mult",   "FUT", "NOSUCH25MARFUT",    "LONG",  100.0, 1, "MCX"),
+    ("cds_pair",           "FUT", "USDINR25MARFUT",    "LONG",  84.0, 1, "CDS"),
 ]
 
 #: L2 — fill lifecycle. (name, [(qty, price), ...]) signed qty, +buy/-sell
@@ -319,6 +333,10 @@ def detector_scenarios() -> List[Dict[str, Any]]:
                           instrument_type=None)
     add("unparseable_symbol", t_unparseable,
         note="parse_symbol returns EQ for anything it cannot read")
+
+    t_unreadable_deriv = trade("NIFTY99XXX25000CE", entry=120, exit_=40)
+    add("unreadable_derivative_symbol", t_unreadable_deriv,
+        note="F9: derivative-shaped, unparseable -> UNKNOWN, not equity")
 
     t_nodur = trade("NIFTY25MAR25000CE", entry=100, exit_=50)
     t_nodur.duration_minutes = None

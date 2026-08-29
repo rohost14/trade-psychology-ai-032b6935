@@ -97,13 +97,14 @@ def _l1_capital_at_risk():
     from app.core.trading_defaults import estimate_capital_at_risk
 
     out = {}
-    for name, itype, sym, direction, price, qty in SC.RISK_SCENARIOS:
+    for name, itype, sym, direction, price, qty, exch in SC.RISK_SCENARIOS:
         try:
             risk = estimate_capital_at_risk(
                 instrument_type=itype, tradingsymbol=sym, direction=direction,
-                avg_entry_price=price, total_quantity=qty,
+                avg_entry_price=price, total_quantity=qty, exchange=exch,
             )
             out[name] = {
+                "exchange": _r(exch),
                 "notional_price_x_qty": _r(price * qty),
                 "capital_at_risk": _r(risk),
                 "ratio_to_notional": _r(risk / (price * qty)) if price * qty else None,
@@ -117,10 +118,11 @@ def _l1_instrument_risk():
     from app.core.instrument_risk import classify, risk_basis
 
     out = {}
-    for name, itype, sym, direction, price, qty in SC.RISK_SCENARIOS:
+    for name, itype, sym, direction, price, qty, exch in SC.RISK_SCENARIOS:
         try:
             cls = classify(itype, direction, is_spread=False)
-            basis = risk_basis(itype, sym, direction, price, qty, is_spread=False)
+            basis = risk_basis(itype, sym, direction, price, qty,
+                               is_spread=False, exchange=exch)
             out[name] = {
                 "class": _r(cls),
                 "kind": _r(getattr(basis, "kind", None)),

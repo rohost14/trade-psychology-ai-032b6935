@@ -1,57 +1,109 @@
 {
   "L1_capital_at_risk": {
+    "cds_pair": {
+      "capital_at_risk": 16800.0,
+      "exchange": "CDS",
+      "notional_price_x_qty": 84.0,
+      "ratio_to_notional": 200.0
+    },
     "equity_long": {
       "capital_at_risk": 290000.0,
+      "exchange": "NSE",
       "notional_price_x_qty": 290000.0,
       "ratio_to_notional": 1.0
     },
     "equity_short": {
       "capital_at_risk": 290000.0,
+      "exchange": "NSE",
       "notional_price_x_qty": 290000.0,
       "ratio_to_notional": 1.0
     },
     "futures_long": {
       "capital_at_risk": 225000.0,
+      "exchange": "NFO",
       "notional_price_x_qty": 1875000.0,
       "ratio_to_notional": 0.12
     },
     "futures_short": {
       "capital_at_risk": 225000.0,
+      "exchange": "NFO",
       "notional_price_x_qty": 1875000.0,
       "ratio_to_notional": 0.12
     },
     "long_option": {
       "capital_at_risk": 9000.0,
+      "exchange": "NFO",
       "notional_price_x_qty": 9000.0,
       "ratio_to_notional": 1.0
     },
     "long_put": {
       "capital_at_risk": 9000.0,
+      "exchange": "NFO",
       "notional_price_x_qty": 9000.0,
       "ratio_to_notional": 1.0
     },
-    "mcx_lot_multiplier": {
+    "mcx_gold_100x": {
+      "capital_at_risk": 1440000.0,
+      "exchange": "MCX",
+      "notional_price_x_qty": 72000.0,
+      "ratio_to_notional": 20.0
+    },
+    "mcx_no_exchange": {
       "capital_at_risk": 280.0,
+      "exchange": null,
       "notional_price_x_qty": 1400.0,
       "ratio_to_notional": 0.2
     },
+    "mcx_unknown_mult": {
+      "capital_at_risk": 20.0,
+      "exchange": "MCX",
+      "notional_price_x_qty": 100.0,
+      "ratio_to_notional": 0.2
+    },
+    "mcx_zinc_5000x": {
+      "capital_at_risk": 1400000.0,
+      "exchange": "MCX",
+      "notional_price_x_qty": 1400.0,
+      "ratio_to_notional": 1000.0
+    },
     "short_option": {
       "capital_at_risk": 1080.0,
+      "exchange": "NFO",
       "notional_price_x_qty": 9000.0,
       "ratio_to_notional": 0.12
     },
     "short_put": {
       "capital_at_risk": 1080.0,
+      "exchange": "NFO",
       "notional_price_x_qty": 9000.0,
       "ratio_to_notional": 0.12
     },
     "unparseable_symbol": {
       "capital_at_risk": 1000.0,
+      "exchange": "NSE",
       "notional_price_x_qty": 1000.0,
+      "ratio_to_notional": 1.0
+    },
+    "unreadable_future": {
+      "capital_at_risk": 1875000.0,
+      "exchange": "NFO",
+      "notional_price_x_qty": 1875000.0,
+      "ratio_to_notional": 1.0
+    },
+    "unreadable_option": {
+      "capital_at_risk": 9000.0,
+      "exchange": "NFO",
+      "notional_price_x_qty": 9000.0,
       "ratio_to_notional": 1.0
     }
   },
   "L1_instrument_risk": {
+    "cds_pair": {
+      "amount": 16800.0,
+      "class": "futures",
+      "is_comparable": true,
+      "kind": "margin_posted"
+    },
     "equity_long": {
       "amount": 290000.0,
       "class": "equity",
@@ -88,8 +140,26 @@
       "is_comparable": true,
       "kind": "loss_ceiling"
     },
-    "mcx_lot_multiplier": {
+    "mcx_gold_100x": {
+      "amount": 1440000.0,
+      "class": "futures",
+      "is_comparable": true,
+      "kind": "margin_posted"
+    },
+    "mcx_no_exchange": {
       "amount": 280.0,
+      "class": "futures",
+      "is_comparable": true,
+      "kind": "margin_posted"
+    },
+    "mcx_unknown_mult": {
+      "amount": 20.0,
+      "class": "futures",
+      "is_comparable": false,
+      "kind": "unreliable"
+    },
+    "mcx_zinc_5000x": {
+      "amount": 1400000.0,
       "class": "futures",
       "is_comparable": true,
       "kind": "margin_posted"
@@ -109,11 +179,30 @@
     "unparseable_symbol": {
       "amount": 1000.0,
       "class": "unknown",
-      "is_comparable": true,
+      "is_comparable": false,
+      "kind": "notional"
+    },
+    "unreadable_future": {
+      "amount": 1875000.0,
+      "class": "unknown",
+      "is_comparable": false,
+      "kind": "notional"
+    },
+    "unreadable_option": {
+      "amount": 9000.0,
+      "class": "unknown",
+      "is_comparable": false,
       "kind": "notional"
     }
   },
   "L1_parsing": {
+    "BANKEX25MARFUT": {
+      "expiry_key": "2025-03",
+      "instrument_type": "FUT",
+      "is_expiry_day_on_2026_03_12": false,
+      "strike": null,
+      "underlying": "BANKEX"
+    },
     "NIFTY2532025000PE": {
       "expiry_key": "2025-03-20",
       "instrument_type": "PE",
@@ -232,9 +321,35 @@
       "is_expiry_day_on_2026_03_12": false,
       "strike": null,
       "underlying": "RELIANCE"
+    },
+    "SENSEX2532025000CE": {
+      "expiry_key": "2025-03-20",
+      "instrument_type": "CE",
+      "is_expiry_day_on_2026_03_12": false,
+      "strike": 25000,
+      "underlying": "SENSEX"
+    },
+    "SENSEX25MARFUT": {
+      "expiry_key": "2025-03",
+      "instrument_type": "FUT",
+      "is_expiry_day_on_2026_03_12": false,
+      "strike": null,
+      "underlying": "SENSEX"
     }
   },
   "L1_structure_counting": {
+    "bse_bankex_monthly": {
+      "legs": 1,
+      "structures": 1
+    },
+    "bse_sensex_monthly": {
+      "legs": 1,
+      "structures": 1
+    },
+    "bse_sensex_weekly": {
+      "legs": 1,
+      "structures": 1
+    },
     "butterfly_3leg": {
       "legs": 3,
       "structures": 3
@@ -341,6 +456,18 @@
     }
   },
   "L1_structures": {
+    "bse_bankex_monthly": {
+      "classified": "multi_leg_unknown",
+      "legs": 1
+    },
+    "bse_sensex_monthly": {
+      "classified": "multi_leg_unknown",
+      "legs": 1
+    },
+    "bse_sensex_weekly": {
+      "classified": "multi_leg_unknown",
+      "legs": 1
+    },
     "butterfly_3leg": {
       "classified": "multi_leg_unknown",
       "legs": 3
@@ -994,6 +1121,10 @@
     "unparseable_symbol": {
       "fired": {},
       "note": "parse_symbol returns EQ for anything it cannot read"
+    },
+    "unreadable_derivative_symbol": {
+      "fired": {},
+      "note": "F9: derivative-shaped, unparseable -> UNKNOWN, not equity"
     }
   },
   "_README": "CHARACTERIZATION SNAPSHOT — what the engine DOES today, not what it SHOULD do. Phase 1 fixes will change these values on purpose. See docs/DEEP_REVIEW/SEMANTIC_CONTRACT.md.",

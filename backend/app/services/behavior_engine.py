@@ -1050,7 +1050,7 @@ class BehaviorEngine:
         basis = risk_basis(
             last.instrument_type, last.tradingsymbol or "", last.direction,
             float(last.avg_entry_price or 0), int(last.total_quantity or 0),
-            is_spread=is_spread,
+            is_spread=is_spread, exchange=last.exchange,      # F7
         )
         trade_m = loss_vs_risk_basis(prior_loss, basis)
         measurements["loss_vs_trade"] = trade_m
@@ -1561,7 +1561,7 @@ class BehaviorEngine:
         basis = risk_basis(
             ct.instrument_type, ct.tradingsymbol or "", ct.direction,
             float(ct.avg_entry_price or 0), int(ct.total_quantity or 0),
-            is_spread=ctx.strategy_group is not None,
+            is_spread=ctx.strategy_group is not None, exchange=ct.exchange,   # F7
         )
         if not basis.is_comparable:
             return abstained(
@@ -1591,7 +1591,7 @@ class BehaviorEngine:
         exposure_at_open = risk_basis(
             ct.instrument_type, ct.tradingsymbol or "", ct.direction,
             first.avg_before, first.held_qty,
-            is_spread=False,
+            is_spread=False, exchange=ct.exchange,            # F7
         ).amount
         exposure_now = basis.amount
 
@@ -1757,10 +1757,12 @@ class BehaviorEngine:
         is_spread = ctx.strategy_group is not None
         cur = risk_basis(ct.instrument_type, ct.tradingsymbol or "", ct.direction,
                          float(ct.avg_entry_price or 0),
-                         int(ct.total_quantity or 0), is_spread=is_spread)
+                         int(ct.total_quantity or 0), is_spread=is_spread,
+                         exchange=ct.exchange)                # F7
         prv = risk_basis(previous.instrument_type, previous.tradingsymbol or "",
                          previous.direction, float(previous.avg_entry_price or 0),
-                         int(previous.total_quantity or 0))
+                         int(previous.total_quantity or 0),
+                         exchange=previous.exchange)          # F7
         if not cur.is_comparable or not prv.is_comparable:
             return abstained(
                 "martingale_behaviour", Insufficiency.NOT_APPLICABLE,
@@ -1915,6 +1917,7 @@ class BehaviorEngine:
             direction=ct.direction or "LONG",
             avg_entry_price=float(ct.avg_entry_price or 0),
             total_quantity=ct.total_quantity or 0,
+            exchange=ct.exchange,           # F7: MCX/CDS quantities are lots
         )
         risk_pct = capital_at_risk / capital * 100
         caution_pct = ctx.thresholds.get("max_position_pct_caution", 5.0)
@@ -2185,7 +2188,7 @@ class BehaviorEngine:
                 estimate_capital_at_risk(
                     instrument_type, ct.tradingsymbol or "",
                     ct.direction or "LONG",
-                    float(entry_price), int(qty)
+                    float(entry_price), int(qty), exchange=ct.exchange,
                 )
             ))
             loss_label = "of margin"
@@ -3123,6 +3126,7 @@ class BehaviorEngine:
             risk = estimate_capital_at_risk(
                 ct.instrument_type, ct.tradingsymbol or "", ct.direction or "LONG",
                 float(ct.avg_entry_price or 0), int(ct.total_quantity or 0),
+                exchange=ct.exchange,       # F7
             )
             risk_pct = risk / float(capital) * 100
             ratio = risk_pct / float(risk_pct_limit)

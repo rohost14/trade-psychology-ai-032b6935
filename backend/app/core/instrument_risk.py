@@ -108,8 +108,19 @@ class RiskBasis:
         and for an unclassifiable instrument. In both cases the honest response is
         to abstain rather than to report a ratio that is quietly wrong in a known
         direction.
+
+        FIXED 2026-08-29 (Phase 1, F8). The second half of that promise was not
+        implemented: the check was `kind not in (UNRELIABLE,)`, and an
+        unclassifiable instrument is given `NOTIONAL`, so it read as comparable.
+        Three detectors — revenge_trade, martingale_behaviour and
+        adding_to_adverse_position — relied on the documented behaviour.
+
+        `parse_symbol` returns `EQ` for anything it cannot read, so the UNKNOWN
+        class is reached only when `instrument_type` is genuinely absent. That is
+        exactly the case the docstring meant.
         """
-        return self.kind not in (DenominatorKind.UNRELIABLE,)
+        return (self.kind is not DenominatorKind.UNRELIABLE
+                and self.instrument is not InstrumentClass.UNKNOWN)
 
 
 def classify(instrument_type: Optional[str], direction: Optional[str],
@@ -135,7 +146,8 @@ def classify(instrument_type: Optional[str], direction: Optional[str],
 
 def risk_basis(instrument_type: Optional[str], tradingsymbol: str,
                direction: Optional[str], avg_entry_price: float,
-               total_quantity: int, is_spread: bool = False) -> RiskBasis:
+               total_quantity: int, is_spread: bool = False,
+               exchange: Optional[str] = None) -> RiskBasis:
     """
     Capital at risk, labelled.
 
@@ -147,12 +159,24 @@ def risk_basis(instrument_type: Optional[str], tradingsymbol: str,
 
     amount = estimate_capital_at_risk(
         instrument_type, tradingsymbol, direction or "LONG",
-        avg_entry_price, total_quantity,
+        avg_entry_price, total_quantity, exchange,
     )
     cls = classify(instrument_type, direction, is_spread)
+    kind = _KINDS[cls]
+
+    # An MCX contract we have no multiplier for (Phase 1, F7). The quantity is
+    # in lots and we cannot convert it, so `amount` is understated by an unknown
+    # factor — known to be wrong, in a known direction, which is exactly what
+    # UNRELIABLE means. Guessing 1 is how the pre-fix code produced a ZINC
+    # denominator 5000x too small.
+    if exchange and (exchange or "").upper() in ("MCX", "CDS"):
+        from app.services.mcx_contract_specs import get_lot_multiplier_or_none
+        if get_lot_multiplier_or_none(exchange, tradingsymbol or "") is None:
+            kind = DenominatorKind.UNRELIABLE
+
     return RiskBasis(
         amount=float(amount),
         instrument=cls,
-        kind=_KINDS[cls],
+        kind=kind,
         label=_LABELS[cls],
     )

@@ -365,6 +365,7 @@ async def compute_baseline(
             risk_rupees = estimate_capital_at_risk(
                 t.instrument_type, t.tradingsymbol or "", t.direction or "LONG",
                 float(t.avg_entry_price or 0), int(t.total_quantity or 0),
+                exchange=getattr(t, "exchange", None),        # F7
             )
             if risk_rupees > 0:
                 own_position_risk.append(risk_rupees)
