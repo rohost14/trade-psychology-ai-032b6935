@@ -108,7 +108,7 @@ def run(sessions, th=None):
                 session=SimpleNamespace(session_pnl=Decimal("0"),
                                         session_date=day, market_open=None),
                 completed_trade=ct, session_trades=ts[:i],
-                active_cooldowns=[], thresholds=th or {})
+                thresholds=th or {})
             ev = engine._detect_direction_instability(ctx)
             if ev:
                 fired.append((day, i, ct, ev))

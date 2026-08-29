@@ -119,7 +119,7 @@ def ctx_for(ct, prior, exit_types=None):
         session_date=ct.exit_time.date(), market_open=None)
     return EngineContext(
         broker_account_id=None, session=session, completed_trade=ct,
-        session_trades=list(prior), active_cooldowns=[], thresholds=th,
+        session_trades=list(prior), thresholds=th,
         exit_order_types=exit_types or [])
 
 

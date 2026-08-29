@@ -35,7 +35,7 @@ def main():
         for i, ct in enumerate(ts):
             ctx = EngineContext(broker_account_id=uuid4(),
                 session=SimpleNamespace(session_pnl=Decimal("0"), session_date=day, market_open=None),
-                completed_trade=ct, session_trades=ts[:i], active_cooldowns=[], thresholds={})
+                completed_trade=ct, session_trades=ts[:i], thresholds={})
             ev = engine._detect_expiry_day_overtrading(ctx)
             if ev:
                 fired_ids.add(id(ct)); rows.append((ct, ev))

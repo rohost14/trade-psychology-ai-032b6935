@@ -237,7 +237,7 @@ def main():
                 session=SimpleNamespace(session_pnl=Decimal("0"),
                                         session_date=day, market_open=None),
                 completed_trade=ct, session_trades=ts[:i],
-                active_cooldowns=[], thresholds={})
+                thresholds={})
             if not engine._detect_direction_instability(ctx):
                 continue
             n_fired += 1

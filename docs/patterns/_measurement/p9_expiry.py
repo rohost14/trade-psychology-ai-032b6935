@@ -140,7 +140,7 @@ def main():
                 session=SimpleNamespace(session_pnl=Decimal("0"),
                                         session_date=day, market_open=None),
                 completed_trade=ct, session_trades=ts[:i],
-                active_cooldowns=[], thresholds={})
+                thresholds={})
             ev = engine._detect_expiry_day_overtrading(ctx)
             if ev:
                 c = ev.context

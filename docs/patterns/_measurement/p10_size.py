@@ -113,7 +113,7 @@ def run(sessions, thresholds=None):
                 session=SimpleNamespace(session_pnl=Decimal("0"),
                                         session_date=day, market_open=None),
                 completed_trade=ct, session_trades=ts[:i],
-                active_cooldowns=[], thresholds=thresholds or {})
+                thresholds=thresholds or {})
             ev = engine._detect_size_escalation(ctx)
             if ev:
                 out.append((day, i, ct, ts, ev))
