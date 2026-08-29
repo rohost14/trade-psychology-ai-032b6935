@@ -1284,12 +1284,7 @@
       "note": ""
     },
     "f3_futures_vs_capital": {
-      "fired": {
-        "excess_exposure": {
-          "message": "NIFTY25MARFUT: ₹225,000 at risk — 22.5% of capital on a single trade.",
-          "severity": "danger"
-        }
-      },
+      "fired": {},
       "note": "control: futures unchanged by F3"
     },
     "f3_long_option_vs_capital": {
@@ -1356,10 +1351,6 @@
     },
     "f3_short_option_vs_capital": {
       "fired": {
-        "excess_exposure": {
-          "message": "NIFTY25MAR25000CE: ₹225,000 at risk — 22.5% of capital on a single trade.",
-          "severity": "danger"
-        },
         "no_stoploss": {
           "message": "NIFTY25MAR25000CE: manual exit after 30min with 100% loss of premium (₹9,000). No stop-loss order detected on this trade.",
           "severity": "danger"
@@ -1415,12 +1406,7 @@
       "note": "contract: UNKNOWN must not become a behavioural claim"
     },
     "mtf_equity_position": {
-      "fired": {
-        "excess_exposure": {
-          "message": "RELIANCE: ₹290,000 at risk — 290.0% of capital on a single trade.",
-          "severity": "danger"
-        }
-      },
+      "fired": {},
       "note": "leverage is the instrument's purpose; 2.9L notional on 1L capital"
     },
     "no_add_50pct_loss": {

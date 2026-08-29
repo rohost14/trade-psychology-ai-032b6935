@@ -102,6 +102,10 @@ class ContractSpec:
     lot_size: Optional[int] = None
     contract_multiplier: Optional[int] = None
     tick_size: Optional[float] = None
+    #: MIS | NRML | MTF | CNC. Not a property of the contract but of how it is
+    #: held, and it changes what capital means: an MTF position is part-funded
+    #: by the broker, so its notional is NOT the trader's committed capital.
+    product: Optional[str] = None
 
     source: SpecSource = SpecSource.UNAVAILABLE
     reliability: Reliability = Reliability.UNRELIABLE

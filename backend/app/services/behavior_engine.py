@@ -78,7 +78,7 @@ from app.models.behavior_event import BehaviorEvent as BehaviorEventRecord
 from app.models.strategy_group import StrategyGroup
 from app.services.detector_registry import REGISTRY, BY_NAME
 from app.services.trading_session_service import TradingSessionService
-from app.core.trading_defaults import estimate_capital_at_risk
+from app.core.risk_quantities import quantities_for_trade
 
 logger = logging.getLogger(__name__)
 IST = ZoneInfo("Asia/Kolkata")
@@ -1911,14 +1911,19 @@ class BehaviorEngine:
         if not capital or float(capital) <= 0:
             return None
 
-        capital_at_risk = estimate_capital_at_risk(
-            instrument_type=ct.instrument_type,
-            tradingsymbol=ct.tradingsymbol or "",
-            direction=ct.direction or "LONG",
-            avg_entry_price=float(ct.avg_entry_price or 0),
-            total_quantity=ct.total_quantity or 0,
-            exchange=ct.exchange,           # F7: MCX/CDS quantities are lots
-        )
+        # F17. This used to call estimate_capital_at_risk directly, which meant
+        # risk_basis, is_comparable and every UNRELIABLE marking were unreachable
+        # here - the safety layer existed and this detector never consulted it.
+        # The canonical layer returns the figure WITH its provenance, and a
+        # capital-relative rule has no business firing on a number the layer
+        # could not stand behind.
+        rq = quantities_for_trade(ct)
+        if not rq.usable_for_capital_rules:
+            logger.debug(
+                "excess_exposure abstains on %s: %s",
+                ct.tradingsymbol, rq.capital_requirement.note)
+            return None
+        capital_at_risk = float(rq.capital_requirement.amount)
         risk_pct = capital_at_risk / capital * 100
         caution_pct = ctx.thresholds.get("max_position_pct_caution", 5.0)
         danger_pct  = ctx.thresholds.get("max_position_pct_danger", 10.0)
@@ -3123,11 +3128,16 @@ class BehaviorEngine:
         risk_pct_limit = th.get("max_position_size")
         capital = th.get("trading_capital")
         if risk_pct_limit and capital:
-            risk = estimate_capital_at_risk(
-                ct.instrument_type, ct.tradingsymbol or "", ct.direction or "LONG",
-                float(ct.avg_entry_price or 0), int(ct.total_quantity or 0),
-                exchange=ct.exchange,       # F7
-            )
+            # F17 - same reasoning as excess_exposure. A trader's own per-trade
+            # risk rule is a capital-relative rule, so it must abstain rather
+            # than judge against premium, notional or a percentage stand-in.
+            rq = quantities_for_trade(ct)
+            if not rq.usable_for_capital_rules:
+                logger.debug(
+                    "max_trade_risk abstains on %s: %s",
+                    ct.tradingsymbol, rq.capital_requirement.note)
+                return events or None
+            risk = float(rq.capital_requirement.amount)
             risk_pct = risk / float(capital) * 100
             ratio = risk_pct / float(risk_pct_limit)
             sev = ladder(ratio)

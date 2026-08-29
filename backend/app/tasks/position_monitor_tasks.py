@@ -346,6 +346,35 @@ async def _holding_loser_task(broker_account_id: str, check_number: int) -> dict
     }
 
 
+def _exposure_value(tradingsymbol: str, exchange: str, price: float,
+                    quantity: int, on=None):
+    """
+    Market exposure of a position, with the contract multiplier applied.
+
+    F17. `price * quantity` is right on NSE, where quantities already arrive
+    expanded, and silently wrong on MCX and CDS, where a quantity is lots and
+    the price is quoted per unit. GOLDM is one lot of 100 grams quoted per 10
+    grams, so one lot at 155,999 is 15,59,990 of exposure and not 1,55,999 - a
+    tenfold understatement of a capital-relative figure.
+
+    Returns (value, reliable). `reliable` is False when the contract cannot be
+    resolved, and the caller must abstain rather than alert on a number the
+    layer could not stand behind.
+
+    Deliberately NOT a margin figure. These callers measure market exposure
+    against capital, which is their design; F17 corrects the arithmetic, not
+    the question being asked.
+    """
+    from datetime import date as _date
+    from app.services.instrument_master import resolve
+
+    spec = resolve(tradingsymbol or "", exchange or "", on or _date.today())
+    if not spec.usable:
+        return None, False
+    mult = spec.contract_multiplier or 1
+    return float(price) * abs(int(quantity or 0)) * mult, True
+
+
 @celery_app.task(name="app.tasks.position_monitor_tasks.check_position_overexposure")
 def check_position_overexposure(broker_account_id: str, tradingsymbol: str):
     """
@@ -393,7 +422,12 @@ async def _overexposure_task(broker_account_id: str, tradingsymbol: str) -> dict
     if not capital or capital <= 0 or qty == 0:
         return {"skipped": "no_capital"}
 
-    position_value = current_price * abs(qty)
+    position_value, reliable = _exposure_value(
+        pos.tradingsymbol, pos.exchange, current_price, qty)
+    if not reliable:
+        logger.debug("overexposure abstains on %s: contract unresolved",
+                     pos.tradingsymbol)
+        return {"skipped": "unresolved_contract"}
     exposure_pct = position_value / capital * 100
     max_size = thresholds.get("max_position_size") or 10.0
 
@@ -1390,7 +1424,17 @@ async def _concentration_task(broker_account_id: str) -> dict:
         if ltp is None:
             ltp = float(pos.average_entry_price or 0)
             partial = True
-        by_underlying[u] = by_underlying.get(u, 0.0) + ltp * abs(pos.total_quantity or 0)
+        # F17: multiplier-aware. An MCX leg previously contributed a tenth of
+        # its real weight to the concentration denominator.
+        value, reliable = _exposure_value(pos.tradingsymbol, pos.exchange, ltp,
+                                          pos.total_quantity or 0)
+        if not reliable:
+            # One unresolved leg makes the SHARE wrong for every other leg, so
+            # the whole calculation is abandoned rather than silently skewed.
+            logger.debug("portfolio_concentration abstains: %s unresolved",
+                         pos.tradingsymbol)
+            return {"skipped": "unresolved_contract"}
+        by_underlying[u] = by_underlying.get(u, 0.0) + value
 
     if len(by_underlying) < 2:
         return {"skipped": "single_underlying"}

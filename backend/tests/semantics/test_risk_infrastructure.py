@@ -232,13 +232,17 @@ def test_mtf_is_not_given_an_invented_leverage():
     MTF is identified, never modelled. With no funded-fraction data, capital is
     unavailable rather than a guessed percentage of notional.
     """
-    assert not may_compute_capital("NSE")
-    eq = ContractSpec(tradingsymbol="RELIANCE", exchange="NSE", effective_date=DAY,
-                      segment=Segment.EQUITY, underlying="RELIANCE",
-                      source=SpecSource.EXCHANGE, reliability=Reliability.AUTHORITATIVE,
-                      note="MTF")
-    q = quantities_for(eq, "LONG", 100, 2900.0)
+    cash = ContractSpec(tradingsymbol="RELIANCE", exchange="NSE", effective_date=DAY,
+                        segment=Segment.EQUITY, underlying="RELIANCE", product="CNC",
+                        source=SpecSource.EXCHANGE, reliability=Reliability.AUTHORITATIVE)
+    mtf = ContractSpec(**{**cash.__dict__, "product": "MTF"})
+
+    # Cash equity bought outright: the notional IS the committed capital.
+    assert quantities_for(cash, "LONG", 100, 2900.0).capital_requirement.available
+    # The same position on MTF is part-funded, so committed capital is unknown.
+    q = quantities_for(mtf, "LONG", 100, 2900.0)
     assert not q.capital_requirement.available
+    assert "MTF" in (q.capital_requirement.note or "")
 
 
 # ---------------------------------------------------------------------------
@@ -505,3 +509,74 @@ def test_a_long_only_book_requires_nothing():
         m = _mm(legs, 24231.52, 0.162, MSeg.INDEX)
         assert m.final_margin == 0.0
         assert m.required_margin == 0.0
+
+
+# ---------------------------------------------------------------------------
+# F17 - capital-relative consumers go through the canonical layer
+#
+# The point of F17 is not a better number. It is that a rule which divides by
+# capital must ABSTAIN when capital is unknown, instead of dividing by premium,
+# notional or a percentage stand-in.
+# ---------------------------------------------------------------------------
+
+def _trade(symbol, exchange, direction, qty, price, product="MIS"):
+    from types import SimpleNamespace
+    from datetime import datetime
+    return SimpleNamespace(
+        tradingsymbol=symbol, exchange=exchange, direction=direction,
+        total_quantity=qty, avg_entry_price=price, product=product,
+        exit_time=datetime(2026, 8, 28), instrument_type=None)
+
+
+def test_long_option_capital_is_available_without_any_margin_model():
+    """
+    The definitional case. A bought option's capital IS its premium: the money
+    left the account and nothing further is blocked. No scan range needed, so
+    this must keep working on every exchange whose multiplier we know.
+    """
+    from app.core.risk_quantities import quantities_for_trade
+    q = quantities_for_trade(_trade("NIFTY25MAR25000CE", "NFO", "LONG", 75, 120.0))
+    assert q.usable_for_capital_rules
+    assert q.capital_requirement.amount == pytest.approx(9000.0)
+
+
+@pytest.mark.parametrize("symbol,exchange,direction,qty,price,product,why", [
+    ("NIFTY25MAR25000CE", "NFO", "SHORT", 75, 120.0, "NRML", "short option needs margin"),
+    ("NIFTY25MARFUT",     "NFO", "LONG",  75, 24000.0, "NRML", "future needs margin"),
+    ("RELIANCE",          "NSE", "LONG", 100, 2900.0, "MTF",  "MTF is part-funded"),
+    ("GOLDM26SEPFUT",     "MCX", "LONG",   1, 155999.0, "NRML", "MCX margin unsourced"),
+    ("GARBAGE25XYZ99CE",  "NFO", "LONG",  75, 120.0, "MIS",  "contract unreadable"),
+])
+def test_capital_abstains_rather_than_substituting(symbol, exchange, direction,
+                                                   qty, price, product, why):
+    from app.core.risk_quantities import quantities_for_trade
+    q = quantities_for_trade(_trade(symbol, exchange, direction, qty, price, product))
+    assert not q.usable_for_capital_rules, why
+    assert q.capital_requirement.amount is None
+    # The entry value is still there - abstention is about CAPITAL only, and
+    # premium-based behavioural work must not be collateral damage.
+    assert q.entry_value.amount > 0
+
+
+def test_mcx_entry_value_carries_the_multiplier_into_the_risk_layer():
+    """One GOLDM lot at 155,999 is 15,59,990 of exposure, not 1,55,999."""
+    from app.core.risk_quantities import quantities_for_trade
+    q = quantities_for_trade(_trade("GOLDM26SEPFUT", "MCX", "LONG", 1, 155999.0, "NRML"))
+    assert q.entry_value.amount == pytest.approx(1_559_990.0)
+
+
+def test_exposure_value_helper_applies_the_multiplier():
+    """
+    overexposure and portfolio_concentration measure market exposure, not
+    margin - F17 corrects their arithmetic, not the question they ask. An MCX
+    leg previously contributed a tenth of its real weight.
+    """
+    from app.tasks.position_monitor_tasks import _exposure_value
+    nfo, ok = _exposure_value("NIFTY25MARFUT", "NFO", 24000.0, 75)
+    assert ok and nfo == pytest.approx(1_800_000.0)
+
+    mcx, ok = _exposure_value("GOLDM26SEPFUT", "MCX", 155999.0, 1)
+    assert ok and mcx == pytest.approx(1_559_990.0)
+
+    _, ok = _exposure_value("GARBAGE25XYZ99CE", "NFO", 100.0, 1)
+    assert not ok, "an unresolvable contract must abstain, not contribute a wrong weight"

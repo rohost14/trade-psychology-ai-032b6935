@@ -172,6 +172,41 @@ def quantities_for(
     )
 
 
+def quantities_for_trade(trade, margin: Optional[Capital] = None,
+                         as_of=None) -> RiskQuantities:
+    """
+    The canonical entry point for a detector holding a CompletedTrade.
+
+    F17. Detectors used to call `estimate_capital_at_risk` directly, which meant
+    `risk_basis`, `is_comparable` and every UNRELIABLE marking were unreachable
+    for them - the safety layer existed and was not consulted. Everything now
+    goes through here so the answer arrives with its provenance and reliability
+    attached, and a caller cannot obtain a bare float that hides either.
+
+    Resolution is DERIVED, not exchange-stated: a detector runs on the live path
+    where only a tradingsymbol exists. That is recorded on the spec, not hidden.
+    """
+    from datetime import date as _date
+    from app.services.instrument_master import resolve
+
+    on = as_of or getattr(trade, "exit_time", None) or getattr(trade, "entry_time", None)
+    on = on.date() if hasattr(on, "date") else (on or _date.today())
+
+    spec = resolve(getattr(trade, "tradingsymbol", "") or "",
+                   getattr(trade, "exchange", "") or "", on)
+    product = getattr(trade, "product", None)
+    if product and spec.usable:
+        spec = ContractSpec(**{**spec.__dict__, "product": product})
+
+    return quantities_for(
+        spec,
+        direction=getattr(trade, "direction", None) or "LONG",
+        quantity=int(getattr(trade, "total_quantity", 0) or 0),
+        entry_price=float(getattr(trade, "avg_entry_price", 0) or 0),
+        margin=margin,
+    )
+
+
 def _entry_label(spec: ContractSpec, is_long: bool) -> str:
     if spec.is_option:
         return "premium paid" if is_long else "premium received"
@@ -200,26 +235,53 @@ def _denominator_kind(spec: ContractSpec, is_long: bool) -> DenominatorKind:
 
 def _capital_for(spec: ContractSpec, is_long: bool, entry_value: Money,
                  margin: Optional[Capital]) -> Capital:
-    if not may_compute_capital(spec.exchange):
-        return Capital.unavailable(abstention_reason(spec.exchange) or "unsupported exchange")
+    """
+    Capital splits into two kinds of case, and only one of them needs a margin
+    model at all.
+
+    DEFINITIONAL - a bought option and long cash equity. The money left the
+    account when the trade was put on and nothing further is blocked, so the
+    capital IS the entry value. No scan range, no volatility, no exchange
+    parameters. This holds on any exchange whose contract multiplier we know,
+    including MCX, which is why the exchange-support gate is NOT applied here:
+    a bought GOLDM call costs its premium regardless of MCX's scan ranges being
+    unsourced.
+
+    REQUIRES MARGIN - short options, futures, short equity. There is no way to
+    derive these from the trade alone, and a percentage-of-notional stand-in is
+    what F3 was. Verified: the old constant ran -35% to +158% across a strike
+    ladder, and a price-scan floor understates a high-volatility stock future by
+    about 21% (CDSL scans at 18.9%, not the 14.2% floor). Understating committed
+    capital is the dangerous direction, so absent a real figure this abstains.
+    """
     if spec.reliability is Reliability.UNRELIABLE:
         return Capital.unavailable(spec.note or "contract specification unavailable")
 
-    # A bought option is the one case where capital and entry value coincide:
-    # the premium is paid up front and nothing further is blocked. Verified
-    # against the broker - every long-only position returns exactly 0 margin.
     if spec.is_option and is_long:
         return Capital(amount=entry_value.amount, source=MarginSource.COMPUTED,
                        scope="position", note="premium paid in full")
 
     if spec.segment is Segment.EQUITY and is_long:
+        # MTF is part-funded by the broker, so the notional is NOT the trader's
+        # committed capital. Kite exposes the product tag but no funded amount
+        # or financing figure, and inventing a leverage ratio is exactly what
+        # this layer exists to prevent. Abstain, keeping MTF identified.
+        if (spec.product or "").upper() == "MTF":
+            return Capital.unavailable(
+                "MTF is part-funded by the broker and no funded-amount or "
+                "financing figure is available, so committed capital cannot be "
+                "determined - full notional would overstate it")
         return Capital(amount=entry_value.amount, source=MarginSource.COMPUTED,
                        scope="position", note="cash delivery value")
 
-    # Short options, futures, short equity: capital is MARGIN and there is no
-    # way to derive it from the trade alone.
+    # Everything else is margin. A supplied figure wins; BROKER outranks
+    # COMPUTED and the caller decides which it passes.
     if margin is not None and margin.available:
         return margin
+
+    if not may_compute_capital(spec.exchange):
+        return Capital.unavailable(
+            abstention_reason(spec.exchange) or "unsupported exchange")
     return Capital.unavailable(
         "a short option, future or short equity position requires a margin "
         "figure, which must come from the broker or the margin model - it "
