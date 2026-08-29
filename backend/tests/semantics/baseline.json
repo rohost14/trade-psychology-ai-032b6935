@@ -705,6 +705,122 @@
       "legs": 2
     }
   },
+  "L1_symbol_parsing_defect": {
+    "cannot_parse::ABFRL25JUL80CE": {
+      "expiry_key": "",
+      "instrument_type": null,
+      "strike": null,
+      "underlying": "ABFRL25JUL80CE"
+    },
+    "cannot_parse::ASHOKLEY25AUG122.5CE": {
+      "expiry_key": "",
+      "instrument_type": null,
+      "strike": null,
+      "underlying": "ASHOKLEY25AUG122.5CE"
+    },
+    "cannot_parse::BAJAJ-AUTO25AUG8500CE": {
+      "expiry_key": "",
+      "instrument_type": null,
+      "strike": null,
+      "underlying": "BAJAJ-AUTO25AUG8500CE"
+    },
+    "cannot_parse::BAJAJ-AUTO25NOV9000CE": {
+      "expiry_key": "",
+      "instrument_type": null,
+      "strike": null,
+      "underlying": "BAJAJ-AUTO25NOV9000CE"
+    },
+    "cannot_parse::BAJAJ-AUTO26FEB9500CE": {
+      "expiry_key": "",
+      "instrument_type": null,
+      "strike": null,
+      "underlying": "BAJAJ-AUTO26FEB9500CE"
+    },
+    "cannot_parse::GMRAIRPORT25AUG92CE": {
+      "expiry_key": "",
+      "instrument_type": null,
+      "strike": null,
+      "underlying": "GMRAIRPORT25AUG92CE"
+    },
+    "cannot_parse::IREDA25NOV147.5CE": {
+      "expiry_key": "",
+      "instrument_type": null,
+      "strike": null,
+      "underlying": "IREDA25NOV147.5CE"
+    },
+    "cannot_parse::NHPC25JUL90CE": {
+      "expiry_key": "",
+      "instrument_type": null,
+      "strike": null,
+      "underlying": "NHPC25JUL90CE"
+    },
+    "cannot_parse::NMDC25APR74CE": {
+      "expiry_key": "",
+      "instrument_type": null,
+      "strike": null,
+      "underlying": "NMDC25APR74CE"
+    },
+    "cannot_parse::NYKAA25JUL207.5CE": {
+      "expiry_key": "",
+      "instrument_type": null,
+      "strike": null,
+      "underlying": "NYKAA25JUL207.5CE"
+    },
+    "cannot_parse::SJVN25APR96CE": {
+      "expiry_key": "",
+      "instrument_type": null,
+      "strike": null,
+      "underlying": "SJVN25APR96CE"
+    },
+    "cannot_parse::SUZLON25NOV56CE": {
+      "expiry_key": "",
+      "instrument_type": null,
+      "strike": null,
+      "underlying": "SUZLON25NOV56CE"
+    },
+    "cannot_parse::TATASTEEL25DEC172.5CE": {
+      "expiry_key": "",
+      "instrument_type": null,
+      "strike": null,
+      "underlying": "TATASTEEL25DEC172.5CE"
+    },
+    "cannot_parse::YESBANK25APR18CE": {
+      "expiry_key": "",
+      "instrument_type": null,
+      "strike": null,
+      "underlying": "YESBANK25APR18CE"
+    },
+    "control_parses::M&MFIN25AUG300CE": {
+      "expiry_key": "2025-08",
+      "instrument_type": "CE",
+      "strike": 300,
+      "underlying": "M&MFIN"
+    },
+    "control_parses::NIFTY2532025000PE": {
+      "expiry_key": "2025-03-20",
+      "instrument_type": "PE",
+      "strike": 25000,
+      "underlying": "NIFTY"
+    },
+    "control_parses::NIFTY25MAR25000CE": {
+      "expiry_key": "2025-03",
+      "instrument_type": "CE",
+      "strike": 25000,
+      "underlying": "NIFTY"
+    },
+    "control_parses::NIFTY25MARFUT": {
+      "expiry_key": "2025-03",
+      "instrument_type": "FUT",
+      "strike": null,
+      "underlying": "NIFTY"
+    },
+    "control_parses::RELIANCE25MAR2900CE": {
+      "expiry_key": "2025-03",
+      "instrument_type": "CE",
+      "strike": 2900,
+      "underlying": "RELIANCE"
+    }
+  },
   "L2_lifecycle": {
     "add_then_close": [
       {

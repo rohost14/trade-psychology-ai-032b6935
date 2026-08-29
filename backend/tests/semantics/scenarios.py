@@ -188,6 +188,41 @@ STRUCTURE_SCENARIOS: List[tuple] = [
                                     ("NIFTY25MAR25100CE", "LONG")]),
 ]
 
+#: F15 — real NSE stock-option symbols the parser CANNOT read.
+#: Every one of these is taken verbatim from the 189-session reference book.
+#: They are here to PROVE the defect, not to assert the fixed behaviour: the
+#: baseline records what the engine does today, which is to fail to parse them.
+#:
+#:   _RE_MONTHLY_OPT = ^([A-Z&]+)(\d{2})(JAN|...|DEC)(\d{3,6})(CE|PE)$
+#:     (\d{3,6})  rejects a 2-digit strike      NMDC25APR74CE
+#:     no '.'     rejects a decimal strike      ASHOKLEY25AUG122.5CE
+#:     [A-Z&]+    rejects a hyphen              BAJAJ-AUTO25AUG8500CE
+#:
+#: Expected AFTER the fix: instrument_type CE, underlying/strike/expiry parsed.
+#: Expected TODAY: instrument_type None (was "EQ" before F9).
+UNPARSEABLE_REAL_SYMBOLS = [
+    # 2-digit strike (10 in the book)
+    "NMDC25APR74CE", "YESBANK25APR18CE", "SUZLON25NOV56CE",
+    "NHPC25JUL90CE", "SJVN25APR96CE", "ABFRL25JUL80CE",
+    "GMRAIRPORT25AUG92CE",
+    # decimal strike (4 in the book)
+    "ASHOKLEY25AUG122.5CE", "NYKAA25JUL207.5CE",
+    "IREDA25NOV147.5CE", "TATASTEEL25DEC172.5CE",
+    # hyphenated underlying (3 in the book)
+    "BAJAJ-AUTO25AUG8500CE", "BAJAJ-AUTO25NOV9000CE", "BAJAJ-AUTO26FEB9500CE",
+]
+
+#: A control set: structurally identical symbols the parser DOES read. If the
+#: fix ever breaks these, the regex was widened too far.
+PARSEABLE_CONTROL_SYMBOLS = [
+    "RELIANCE25MAR2900CE",     # >=3-digit strike, plain underlying
+    "NIFTY25MAR25000CE",
+    "M&MFIN25AUG300CE",        # '&' is already allowed
+    "NIFTY25MARFUT",
+    "NIFTY2532025000PE",       # weekly
+]
+
+
 #: L1 — capital at risk.
 #: (name, instrument_type, symbol, direction, price, qty, exchange)
 RISK_SCENARIOS: List[tuple] = [

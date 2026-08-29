@@ -66,6 +66,27 @@ def _r(v):
 # L1 — semantic primitives
 # ---------------------------------------------------------------------------
 
+def _l1_symbol_parsing_defect():
+    """
+    F15 — real symbols from the reference book that the parser cannot read,
+    beside structurally identical ones it can. Characterization only.
+    """
+    from app.services.instrument_parser import parse_symbol
+
+    out = {}
+    for group, syms in (("cannot_parse", SC.UNPARSEABLE_REAL_SYMBOLS),
+                        ("control_parses", SC.PARSEABLE_CONTROL_SYMBOLS)):
+        for sym in syms:
+            p = parse_symbol(sym)
+            out[f"{group}::{sym}"] = {
+                "instrument_type": _r(p.instrument_type),
+                "underlying": _r(p.underlying),
+                "strike": _r(p.strike),
+                "expiry_key": _r(p.expiry_key),
+            }
+    return out
+
+
 def _l1_structures():
     from app.services.strategy_detector import classify_legs
 
@@ -262,6 +283,7 @@ def build_snapshot() -> dict:
             "See docs/DEEP_REVIEW/SEMANTIC_CONTRACT.md."
         ),
         "L1_parsing": _l1_parsing(),
+        "L1_symbol_parsing_defect": _l1_symbol_parsing_defect(),
         "L1_structures": _l1_structures(),
         "L1_structure_counting": _l1_structure_counting(),
         "L1_capital_at_risk": _l1_capital_at_risk(),
