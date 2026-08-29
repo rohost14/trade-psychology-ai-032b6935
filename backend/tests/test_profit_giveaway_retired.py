@@ -69,9 +69,9 @@ def test_no_registry_spec_points_at_the_deleted_method():
 def test_the_engine_counts_are_what_the_retirement_left():
     from app.services.detector_registry import REGISTRY, all_pattern_types
 
-    # 21 / 27 since `cooldown_violation` was retired 2026-08-29 (Pattern 15).
-    assert len(REGISTRY) == 21
-    assert len(all_pattern_types()) == 27
+    # 20 / 26 since `early_exit` was retired 2026-08-30 (Pattern 18).
+    assert len(REGISTRY) == 20
+    assert len(all_pattern_types()) == 26
 
 
 def test_it_is_recorded_as_retired():

@@ -30,7 +30,6 @@ retirements, not omissions; detector_registry.REGISTRY is the authority:
   11. session_meltdown
   12. fomo_entry                  (any-time underlying scatter, not just market open)
   13. no_stoploss                 (expiry-day modifier)
-  14. early_exit                  (disposition effect)
   15. winning_streak_overconfidence
   16. options_direction_confusion (CE→PE flip on same underlying within 10 min)
   17. options_premium_avg_down    (re-entry on same underlying options after prior loss)
@@ -2386,50 +2385,43 @@ class BehaviorEngine:
     # Session-level pattern: winners held significantly less time than losers.
     # Classic loss aversion / disposition effect (Shefrin & Statman, 1985).
 
-    def _detect_early_exit(self, ctx: EngineContext) -> Optional[DetectedEvent]:
-        ct = ctx.completed_trade
-        pnl = Decimal(str(ct.realized_pnl or 0))
-        if pnl <= 0:
-            return None  # Only fire when current trade is a winner
+    # ── RETIRED 2026-08-30 — `early_exit` ─────────────────────────────────
+    #
+    # THE MEASURE WAS RIGHT. THE SCOPE WAS NOT. Read this before reviving it.
+    #
+    # It computed the disposition effect - average winner hold against average
+    # loser hold - which is long-established behavioural finance (Shefrin &
+    # Statman 1985; Odean 1998) and the ONLY observable answer to "was that exit
+    # early". Per trade the question is unanswerable: we see neither the plan
+    # nor what the price did afterwards.
+    #
+    # What failed was computing it over ONE SESSION.
+    #
+    #   the effect is absent in this book
+    #     winners  n=276  mean 41.0 min
+    #     losers   n=413  mean 36.7 min      ratio 1.12 - winners held LONGER
+    #
+    #   and at session sample sizes the ratio is noise
+    #     3 firings, computed from 3-5 trades per side
+    #     shuffling win/loss labels within each qualifying session gives 4+
+    #     sub-0.40 sessions 61% of the time:  p = 0.610
+    #
+    # That is not a threshold needing a better value - at n=3 the ratio of two
+    # small means is unstable by arithmetic - which is why NO replacement was
+    # substituted and 0.40 was not tuned. Raising the sample gate toward
+    # validity raises it toward never firing: n=4 leaves 9 qualifying sessions
+    # of 175, n=5 leaves 3.
+    #
+    # THE MEASURE SURVIVES, AT THE SCOPE WHERE IT WORKS. `baseline_service`
+    # already computes `avg_winner_hold_min` and `avg_loser_hold_min` across
+    # the trader's full history - 276 and 413 trades, not three and four - each
+    # with a sample count and confidence. Those are UNTOUCHED by this
+    # retirement. Nothing reads them yet; they may belong on an analytics
+    # surface rather than as an alert, which is recorded in
+    # docs/DEEP_REVIEW/PENDING_AND_TODO.md and is not decided here.
+    #
+    # Evidence: docs/patterns/18-early_exit/.
 
-        trades = ctx.session_trades
-        min_samples = ctx.thresholds.get("early_exit_min_samples", 3)
-
-        winners = [t for t in trades
-                   if Decimal(str(t.realized_pnl or 0)) > 0 and t.duration_minutes]
-        losers  = [t for t in trades
-                   if Decimal(str(t.realized_pnl or 0)) < 0 and t.duration_minutes]
-
-        if len(winners) < min_samples or len(losers) < min_samples:
-            return None
-
-        avg_winner_hold = sum(t.duration_minutes for t in winners) / len(winners)
-        avg_loser_hold  = sum(t.duration_minutes for t in losers)  / len(losers)
-
-        ratio_threshold    = ctx.thresholds.get("early_exit_ratio", 0.40)
-        # 60-min ceiling covers the classic 25-40 min winner / 2-4 hr loser
-        # disposition-effect pattern. 20 min was too tight and missed it entirely.
-        max_winner_min     = ctx.thresholds.get("early_exit_winner_max_min", 60)
-
-        if avg_winner_hold < avg_loser_hold * ratio_threshold and avg_winner_hold < max_winner_min:
-            ratio = avg_loser_hold / max(avg_winner_hold, 1)
-            return DetectedEvent(
-                event_type="early_exit",
-                severity="info",  # Phase 4: analytics-only — EOD/Journal insight, not an interrupt
-                message=(
-                    f"Today's pattern: winners held {avg_winner_hold:.0f}min avg, "
-                    f"losers held {avg_loser_hold:.0f}min avg ({ratio:.1f}× longer). "
-                    f"Winners are being closed faster than losers."
-                ),
-                context={
-                    "avg_winner_hold_min": round(avg_winner_hold, 1),
-                    "avg_loser_hold_min": round(avg_loser_hold, 1),
-                    "winner_count": len(winners),
-                    "loser_count": len(losers),
-                    "hold_ratio": round(ratio, 1),
-                },
-            )
-        return None
 
     # ── Pattern 15: Winning streak overconfidence ─────────────────────────
     #

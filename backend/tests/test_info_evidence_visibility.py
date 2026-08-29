@@ -132,9 +132,10 @@ def test_the_rapid_reentry_caution_path_stays_unreachable():
 
 # ── 6. no INFO detector has been promoted ──────────────────────────────────
 
-# `panic_exit` was the fourth until it was retired 2026-08-29 (Pattern 14).
+# Was four: `panic_exit` retired 2026-08-29 (Pattern 14) and `early_exit`
+# 2026-08-30 (Pattern 18).
 ANALYTICS_INFO_DETECTORS = (
-    "rapid_reentry", "early_exit", "opening_5min_trap",
+    "rapid_reentry", "opening_5min_trap",
 )
 
 

@@ -178,6 +178,12 @@ def test_no_shipping_module_uses_a_severity_value_outside_the_vocabulary():
 #: against these is dead code that looks alive.
 RETIRED_PATTERN_NAMES = (
     "revenge_sizing",
+    # Retired 2026-08-30 (Pattern 18): the disposition-effect measure was right,
+    # computing it over ONE SESSION was not. The effect is absent in the book
+    # (winners 41.0min vs losers 36.7min) and at 3-5 samples a side the ratio is
+    # chance - shuffle null p = 0.610. baseline_service still computes it over
+    # the full history.
+    "early_exit",
     # Retired 2026-08-29 (Pattern 15): its precondition never occurred on the
     # live path - no Celery task creates a Cooldown - and the behaviour is fully
     # covered by constitution_violation's `cooldown` rule, which uses the

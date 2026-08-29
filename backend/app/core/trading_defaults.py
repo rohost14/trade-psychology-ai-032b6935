@@ -253,9 +253,6 @@ COLD_START_DEFAULTS: Dict[str, Any] = {
     # ── Early exit (disposition effect / cutting winners) ─────────────────
     # SEBI FY2022: retail sold winning positions 2.7× faster than losing positions.
     # Disposition effect is 2-3× stronger in Indian retail vs institutional.
-    'early_exit_ratio':                 0.40, # winner hold < 40% of loser hold
-    'early_exit_winner_max_min':        60,   # avg winner hold must be < 60 min absolute (covers classic 25-40 min winner / 2-4 hr loser disposition pattern)
-    'early_exit_min_samples':           3,    # need 3+ winners AND 3+ losers for signal
 
     # ── Options behavioral patterns ───────────────────────────────────────
     # Direction confusion: CE→PE flip on same underlying within 10 min.

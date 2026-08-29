@@ -195,11 +195,6 @@ _GROUP_D = [
     # declaration wired nothing. That defect is registry-wide, not local to this
     # key: see docs/contracts/PERSONAL_BASELINE_AUDIT.md.
 
-    _spec(key="early_exit_winner_max_min", kind=Kind.PERSONAL_BASELINE, fallback=60,
-          meaning="a winner held less than this counts as cut short",
-          resolution_source=Source.HISTORY, metric="winner_hold_p50",
-          percentile=50, maturity=Maturity.TRADES_20,
-          provenance="60 minutes is a long hold for one trader and a scratch for another"),
 
     _spec(key="opening_trap_quick_exit_min", kind=Kind.PERSONAL_BASELINE, fallback=15,
           meaning="an exit within this many minutes is a reactive exit",
@@ -208,10 +203,6 @@ _GROUP_D = [
           provenance="a reactive exit is relative to how long this trader normally holds, "
                      "so rung 2 personalises it from their own session"),
 
-    _spec(key="early_exit_ratio", kind=Kind.PERSONAL_BASELINE, fallback=0.40,
-          meaning="winner hold as a fraction of loser hold",
-          provenance="ALREADY self-relative - it divides the trader by themselves. Only the "
-                     "0.40 is a judgement, and that is detector-review evidence work"),
 ]
 
 

@@ -345,20 +345,9 @@ export const DEMO_RISK_ALERTS = [
       estimated_cost: 4200,
     },
   },
-  {
-    id: 'ra-005', pattern_type: 'early_exit', severity: 'caution',
-    message: 'NIFTY CE exited at +₹820 after 8 min. Position continued to +₹2,100. You exit 42% early on average — ₹7,680 in unrealised gains left behind this month.',
-    created_at: daysAgo(0, 9, 38), acknowledged: false,
-    details: {
-      symbol: 'NIFTY23000CE',
-      exit_pnl: 820,
-      continued_to: 2100,
-      avg_early_exit_pct: 42,
-      monthly_cost: 7680,
-      times_this_month: 6,
-      estimated_cost: 1280,
-    },
-  },
+  // An `early_exit` fixture stood here at severity `caution`, which that
+  // detector could never emit — it was `info`-only. early_exit was retired
+  // 2026-08-30; `caution` is still exercised by ra-002 and ra-006.
   {
     id: 'ra-006', pattern_type: 'no_stoploss', severity: 'danger',
     message: 'FINNIFTY 19800 CE open 47 min with no stop-loss. Unrealised loss: ₹3,200. Positions without stop-loss average 3× larger final loss for you.',
@@ -582,7 +571,7 @@ export const DEMO_BEHAVIORAL = {
     },
   ],
   summary: {
-    total_behavioral_cost: 45840,
+    total_behavioral_cost: 38160,
     clean_days: 5, flagged_days: 5,
     most_frequent_pattern: 'revenge_trading',
   },
@@ -1048,11 +1037,6 @@ export const DEMO_BEHAVIORAL_ANALYSIS = {
       description: 'Position size 3–4× average after consecutive losses',
     },
     {
-      pattern_type: 'early_exit', count: 6, severity: 'caution',
-      estimated_cost: 7680, last_seen: daysAgo(0, 9, 38),
-      description: 'Exiting profitable positions 42% before their peak on average',
-    },
-    {
       pattern_type: 'no_stoploss', count: 2, severity: 'danger',
       estimated_cost: 5800, last_seen: daysAgo(0, 9, 15),
       description: 'Open positions held 40+ min with no stop-loss defined',
@@ -1150,7 +1134,7 @@ export const DEMO_SESSION_LOG = {
     { date: '2026-08-05', pnl: -2700, trades: 1, alerts: 2,
       tag: 'revenge',     top_patterns: ['revenge_trade', 'no_stoploss'] },
     { date: '2026-08-04', pnl: 6350,  trades: 4, alerts: 1,
-      tag: 'flagged',     top_patterns: ['early_exit'] },
+      tag: 'flagged',     top_patterns: ['opening_5min_trap'] },
     { date: '2026-08-03', pnl: 4200,  trades: 3, alerts: 0,
       tag: 'clean',       top_patterns: [] },
     { date: '2026-07-31', pnl: -1000, trades: 1, alerts: 1,
@@ -1178,9 +1162,8 @@ export const DEMO_BEHAVIOUR_COST = {
     { pattern_type: 'martingale_behaviour', alert_count: 2, trade_count: 2, realized_pnl: -6450  },
     { pattern_type: 'daily_overtrading',     alert_count: 2, trade_count: 4, realized_pnl: -3750  },
     { pattern_type: 'no_stoploss',     alert_count: 2, trade_count: 2, realized_pnl: -1700  },
-    { pattern_type: 'early_exit',      alert_count: 1, trade_count: 1, realized_pnl: 820    },
   ],
-  pattern_totals: { trade_count: 12, realized_pnl: -24080 },
+  pattern_totals: { trade_count: 11, realized_pnl: -24900 },
   rules: [
     { rule: 'max_trades_per_day',  breach_count: 2, trade_count: 3, realized_pnl: -4610 },
     { rule: 'daily_loss_limit',    breach_count: 1, trade_count: 2, realized_pnl: -3000 },
@@ -1376,17 +1359,6 @@ export const DEMO_PATTERN_CATALOGUE = {
       "nature": "emotional",
       "disposition": "alerting",
       "trigger": "exit",
-      "guardian_eligible": false,
-      "version": "2.0.0"
-    },
-    {
-      "pattern_type": "early_exit",
-      "label": "Early exit",
-      "observes": "Winning positions closed well short of your usual holding time.",
-      "explanation": "Winners cut short while losers run is the asymmetry that quietly caps a strategy.",
-      "nature": "performance",
-      "disposition": "analytics",
-      "trigger": "session",
       "guardian_eligible": false,
       "version": "2.0.0"
     },

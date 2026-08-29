@@ -190,8 +190,10 @@ REGISTRY: Tuple[DetectorSpec, ...] = (
     DetectorSpec("no_stoploss", "_detect_no_stoploss",
                  "1.0.0", "risk", "alerting", "exit", 2,
                  consumes=("completed_trade", "exit_order_types", "thresholds")),
-    DetectorSpec("early_exit", "_detect_early_exit",
-                 "2.0.0", "performance", "analytics", "session", 0),
+    # `early_exit` RETIRED 2026-08-30. The disposition-effect measure was
+    # right; computing it over one session was not (shuffle null p = 0.610
+    # at 3-5 samples a side). baseline_service still computes it over the
+    # full history. See docs/patterns/18-early_exit/.
     DetectorSpec("winning_streak_overconfidence", "_detect_winning_streak_overconfidence",
                  "1.1.0", "emotional", "alerting", "exit", 1,
                  uses_baseline=True),
@@ -463,11 +465,6 @@ PATTERN_COPY: Dict[str, PatternCopy] = {
     # `direction_instability` copy removed 2026-08-28 with the detector. Its
     # explanation - "reversing repeatedly usually tracks the price rather than a
     # view about it" - is the claim this trader's book contradicted.
-    "early_exit": PatternCopy(
-        "Early exit",
-        "Winning positions closed well short of your usual holding time.",
-        "Winners cut short while losers run is the asymmetry that quietly caps a strategy.",
-    ),
 
     # ── Performance (analytics) ──────────────────────────────────────────
     "win_rate_collapse": PatternCopy(
