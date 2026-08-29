@@ -207,33 +207,30 @@ Not to-do items. Each says what would change it.
 
 ## Surfaced by the Pattern 13 review — NOT actioned
 
-### `danger_zone` INFO visibility — a design inconsistency, NOT a bug
+### ~~`danger_zone` INFO visibility~~ — **CLOSED 29 Aug 2026**
 
-`danger_zone_service.py:310` contains a `rapid_reentry` CAUTION path, but INFO
-events never reach `RiskAlert` (`behavior_engine.py:376` skips them), and
-`_get_recent_alerts` queries `RiskAlert`. The path therefore cannot be taken.
+Decided, not pending. See
+[`INFO_EVIDENCE_VISIBILITY.md`](INFO_EVIDENCE_VISIBILITY.md).
 
-**Deliberately not recorded as a dead branch to be repaired.** Activating it
-requires an explicit product decision about INFO evidence visibility, and
-"fixing" it would mean either making an analytics-disposition detector notify or
-making the danger zone read evidence. Both change the alerting philosophy rather
-than correct an error.
+INFO patterns are evidence and analytics only. They must not create `RiskAlert`
+rows, must not influence `danger_zone`, severity escalation or any trader-facing
+alert, and the `rapid_reentry` CAUTION path must **not** be activated. Promoting
+an INFO pattern to a trader-facing alert is an explicit future product decision,
+never a bug fix.
 
-**What must be decided:** whether INFO evidence is ever allowed to influence a
-user-facing state. Until that is answered, the path stays as written.
+Enforced by `backend/tests/test_info_evidence_visibility.py` — 12 tests. A change
+that lets an INFO event reach `RiskAlert`, the danger zone or a notification
+channel now fails the suite.
 
-### Analytics-disposition evidence with no reader — one decision, four detectors
+### Analytics-disposition evidence with no reader — still open
 
-`rapid_reentry`, `panic_exit`, `early_exit` and `opening_5min_trap` are all
-`severity="info"` with `disposition=analytics`. Verified across all 15
-`BehaviorEvent` readers: nothing trader-facing consumes them. Every reader
-either filters `severity != "info"` or sources from `RiskAlert`, which an info
-event never reaches. The sole reader is an admin aggregate.
+`rapid_reentry`, `panic_exit`, `early_exit` and `opening_5min_trap` write
+evidence nothing trader-facing reads. **The visibility question is closed; this
+one is not.** It asks whether evidence with no reader should be WRITTEN at all,
+which is a separate question about the value of the analytics disposition.
 
-**What must be decided:** whether evidence nobody reads should be written at
-all. This is one product decision spanning four detectors, and it should be
-taken **before** the other three are reviewed individually — the answer changes
-what those reviews are for.
+The closed rule does not depend on the answer: if we ever stop writing it, INFO
+events still must not become alerts in the meantime.
 
 ## Surfaced by the Pattern 12 review — NOT actioned
 
