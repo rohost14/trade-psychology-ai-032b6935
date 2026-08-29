@@ -28,6 +28,7 @@ from app.models.admin_user import AdminUser
 from app.models.admin_audit_log import AdminAuditLog
 from app.models.generated_report import GeneratedReport
 from app.models.margin_snapshot import MarginSnapshot
+from app.models.position_margin_observation import PositionMarginObservation
 from app.models.broadcast_log import BroadcastLog, BroadcastReceipt
 from app.models.alert_mute import AlertMute
 from app.models.data_quality_event import DataQualityEvent
@@ -63,6 +64,7 @@ __all__ = [
     "AdminAuditLog",
     "GeneratedReport",
     "MarginSnapshot",
+    "PositionMarginObservation",
     "BroadcastLog",
     "BroadcastReceipt",
     "AlertMute",

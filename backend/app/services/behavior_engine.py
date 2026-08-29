@@ -293,6 +293,12 @@ class EngineContext:
     #: metrics. Loaded once in _load_context; previously it was fetched and
     #: then discarded after thresholds were resolved.
     profile: Optional[object] = None
+    #: BROKER margin for this position, captured live while it was open, or
+    #: None. Resolved ONCE per engine run rather than per detector - a detector
+    #: is synchronous and must not issue its own query. None is a normal state,
+    #: not an error: no observation exists for historical trades, and the
+    #: capital-relative detectors then abstain.
+    broker_margin: Optional[object] = None
     #: The fill sequence of THIS position, oldest first, straight from
     #: position_ledger. Empty for a single-entry position - which is ~90% of
     #: them - so only the detectors that need the sequence pay for it.
@@ -647,6 +653,16 @@ class BehaviorEngine:
         except Exception as _sh_err:
             logger.warning(f"[state-shadow] compute failed (non-fatal): {_sh_err}")
 
+        # BROKER margin, if one was captured while this position was open. Never
+        # fatal: a missing observation, an unapplied migration 081 and a failed
+        # query are all simply "no broker figure", and the risk layer abstains.
+        broker_margin = None
+        try:
+            from app.services.broker_margin_service import resolve_for_trade
+            broker_margin = await resolve_for_trade(completed_trade, db)
+        except Exception as _bm_err:                                # noqa: BLE001
+            logger.debug("broker margin unavailable (non-fatal): %s", _bm_err)
+
         return EngineContext(
             broker_account_id=broker_account_id,
             session=session,
@@ -661,6 +677,7 @@ class BehaviorEngine:
             facts=facts,
             account_risk=account_risk,
             profile=profile,
+            broker_margin=broker_margin,
         )
 
     # ── Run all detectors ──────────────────────────────────────────────────
@@ -1917,7 +1934,7 @@ class BehaviorEngine:
         # The canonical layer returns the figure WITH its provenance, and a
         # capital-relative rule has no business firing on a number the layer
         # could not stand behind.
-        rq = quantities_for_trade(ct)
+        rq = quantities_for_trade(ct, margin=ctx.broker_margin)
         if not rq.usable_for_capital_rules:
             logger.debug(
                 "excess_exposure abstains on %s: %s",
@@ -3131,7 +3148,7 @@ class BehaviorEngine:
             # F17 - same reasoning as excess_exposure. A trader's own per-trade
             # risk rule is a capital-relative rule, so it must abstain rather
             # than judge against premium, notional or a percentage stand-in.
-            rq = quantities_for_trade(ct)
+            rq = quantities_for_trade(ct, margin=ctx.broker_margin)
             if not rq.usable_for_capital_rules:
                 logger.debug(
                     "max_trade_risk abstains on %s: %s",

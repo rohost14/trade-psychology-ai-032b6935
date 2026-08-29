@@ -596,6 +596,38 @@ def process_webhook_trade(self, trade_data: Dict[str, Any], broker_account_id: s
                         _fill_entry_type = ledger_entry.entry_type
                         _fill_batch_payload = _classify_fill(ledger_entry)
 
+                        # ── BROKER margin capture ─────────────────────────
+                        # The only moment this figure is obtainable. Kite's
+                        # postback carries no margin field, and /margins/* is
+                        # prospective only, so once the position is closed the
+                        # broker cannot be asked what it required.
+                        #
+                        # Fires on OPEN, INCREASE and FLIP only - not on exits,
+                        # and never on a tick. One call per position-opening
+                        # fill, well inside the 3 req/s REST budget. Entirely
+                        # non-fatal: a failure means the risk layer abstains,
+                        # which is where it already is today.
+                        if is_new:
+                            try:
+                                from app.services.broker_margin_service import (
+                                    capture_for_underlying, should_capture,
+                                )
+                                if should_capture(ledger_entry.entry_type,
+                                                  trade_data.get("product"))                                         and account.access_token:
+                                    from app.services.instrument_parser import parse_symbol
+                                    _u = (parse_symbol(trade.tradingsymbol or "").underlying
+                                          or trade.tradingsymbol)
+                                    await capture_for_underlying(
+                                        broker_account_id=account_id,
+                                        underlying=_u, db=db, account=account,
+                                        access_token=account.decrypt_token(
+                                            account.access_token),
+                                    )
+                            except Exception as _mg_err:
+                                logger.warning(
+                                    "broker margin capture skipped for %s: %s",
+                                    trade.tradingsymbol, _mg_err)
+
                         # If this fill realized P&L, write it back to Trade.pnl
                         # (backward compat for any code still reading Trade.pnl)
                         if is_new and ledger_entry.realized_pnl:
