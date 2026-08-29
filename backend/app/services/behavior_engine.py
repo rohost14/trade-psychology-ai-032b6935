@@ -2225,11 +2225,23 @@ class BehaviorEngine:
         if pnl >= 0:
             return None
 
-        # PRIMARY CHECK: if exit was via SL or SL-M order → stoploss was placed
-        # and triggered.  We skip the alert — the mechanism worked as intended.
-        # Note: if user placed SL then manually exited before it triggered, exit
-        # shows as MKT — that edge case is acceptable; we'd still flag it, which
-        # is benign (they exited consciously anyway).
+        # SCOPE OF THIS CHECK - do not widen it.
+        #
+        # `ctx.exit_order_types` is built in _load_context from
+        # `completed_trade.exit_trade_ids` alone, which are the EXIT FILLS of
+        # THIS trade. It therefore answers exactly one question:
+        #
+        #     "was this exit EXECUTED by a stop order?"
+        #
+        # It cannot contain a resting order, an entry order, or an order
+        # belonging to another position, so an observed stop anywhere else can
+        # never reach here and suppress the alert.
+        #
+        # The distinction that matters and is NOT available: whether a resting
+        # stop EXISTED EARLIER and was cancelled or pre-empted. That needs the
+        # order book, which no detector reads. A trader who placed an SL then
+        # exited manually first shows MKT here and is still flagged - which is
+        # why the message no longer claims they had no stop.
         exit_types = {(ot or "").upper() for ot in (ctx.exit_order_types or [])}
         if exit_types & _STOP_ORDER_TYPES:
             return None

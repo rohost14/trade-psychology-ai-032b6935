@@ -176,3 +176,29 @@ def test_the_registry_copy_no_longer_asserts_absence():
     blob = " ".join(str(x) for x in copy).lower()   # label, observes, explanation
     assert "no stop-loss on record" not in blob
     assert "whether a stop-loss order was on the position" not in blob
+
+
+def test_the_sl_gate_is_scoped_to_this_trades_exit_fills_only():
+    """
+    Guards the distinction between "this exit was executed by a stop" and "a
+    resting stop existed earlier". Only the first is observable.
+
+    exit_order_types is built from completed_trade.exit_trade_ids alone, so an
+    observed stop belonging to an entry, to a resting order, or to another
+    position can never reach the gate and suppress this alert.
+    """
+    import inspect
+
+    from app.services.behavior_engine import BehaviorEngine as _BE
+
+    loader = inspect.getsource(_BE._load_context)
+    block = loader[loader.index("Query 4: exit order types"):][:1400]
+    assert "completed_trade.exit_trade_ids" in block
+    assert "entry_trade_ids" not in block, (
+        "entry fills must never feed the stop-loss gate")
+
+    detector = inspect.getsource(_BE._detect_no_stoploss)
+    assert "ctx.exit_order_types" in detector
+    assert "entry_order_types" not in detector
+    # And the scope note itself must stay, so the next reader does not widen it.
+    assert "SCOPE OF THIS CHECK" in detector
