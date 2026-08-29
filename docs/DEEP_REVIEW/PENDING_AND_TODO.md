@@ -138,6 +138,25 @@ Removing it changes severity, which no cleanup pass may do unasked.
 
 ---
 
+### The "set a daily loss limit" prompt has nowhere to appear
+
+**Created 30 Aug 2026 by the Pattern 17 change. Deliberately not fixed.**
+
+`session_meltdown` used to derive a limit from capital and say so — *"which is
+5% of your capital. You have not set a daily loss limit yet."* That copy was the
+only place a trader with capital but no declared limit was told to set one, and
+it went with the fallback, because it existed to label the invented number.
+
+Those traders now get **no meltdown alert and no prompt**.
+
+**What must be decided:** where the prompt lives instead. The hook already
+exists — `SetupNudgeCard.tsx:49` tracks `daily_loss_limit != null` — so this is
+wiring and copy, not new logic.
+
+**Why not now:** it is a frontend change outside the approved scope of the
+Pattern 17 correction, and it belongs in the consolidated pending-items pass
+after the pattern reviews finish rather than interrupting them.
+
 ## PENDING VALIDATION
 
 ### Patterns 3, 7 and 8 — remeasurement after the instrument-classification fixes
