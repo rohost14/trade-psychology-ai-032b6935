@@ -343,3 +343,66 @@ def test_capital_scope_is_carried_not_collapsed():
     """
     for scope in ("position", "order", "portfolio", "strategy"):
         assert Capital(amount=1.0, source=MarginSource.BROKER, scope=scope).scope == scope
+
+
+# ---------------------------------------------------------------------------
+# Margin model - portfolio shapes the model must REFUSE
+#
+# Both were found by measuring against a real broker, and both fail in the same
+# direction: the model comes out LOW. Understating committed capital is the
+# unsafe direction, so these assert an abstention, not a value.
+# ---------------------------------------------------------------------------
+
+def test_multi_expiry_portfolio_abstains():
+    """No inter-month charge. Measured 29.6% low on a NIFTY SEP/OCT spread."""
+    from app.core.margin_model import Leg, Segment as MSeg, compute_margin
+    m = compute_margin(
+        [Leg("OPT", -65, 351.9, 32, "CE", 24200.0, 65),
+         Leg("OPT", 65, 470.0, 60, "CE", 24200.0, 65)],
+        underlying=24341.9, annualised_vol=0.162, segment=MSeg.INDEX)
+    assert m.calendar_spread_unmodelled
+    assert not m.reliable
+
+
+def test_futures_with_a_long_option_abstains():
+    """
+    HAL SEP future long + 4600 put long. Broker 86,243; model 67,321, 16% low.
+
+    The cause is established: the combination cannot lose more than
+    (F - K) * qty + premium = 46,185, yet the broker's implied scanning risk is
+    60,647. The exchange charges above the arithmetic maximum loss, so it
+    withholds part of the hedge credit by a rule we have not found published.
+    """
+    from app.core.margin_model import Leg, Segment as MSeg, compute_margin
+    m = compute_margin(
+        [Leg("OPT", 150, 32.50, 32, "PE", 4600.0, 150),
+         Leg("FUT", 150, 4875.40, 32, None, None, 150)],
+        underlying=4875.40, annualised_vol=0.3616, segment=MSeg.STOCK)
+    assert m.futures_long_option_hedge
+    assert not m.reliable
+
+
+def test_the_refusal_is_narrow():
+    """
+    Futures with a SHORT option validated at +2.5% and +3.5%, and
+    option-against-option offsets at -0.3% and +0.3%. Neither may be refused -
+    an over-broad abstention silently removes working coverage.
+    """
+    from app.core.margin_model import Leg, Segment as MSeg, compute_margin
+
+    fut_short_put = compute_margin(
+        [Leg("FUT", 65, 24341.9, 32, None, None, 65),
+         Leg("OPT", -65, 300.0, 32, "PE", 24200.0, 65)],
+        underlying=24341.9, annualised_vol=0.162, segment=MSeg.INDEX)
+    assert fut_short_put.reliable
+
+    call_spread = compute_margin(
+        [Leg("OPT", 65, 51.0, 4, "CE", 24300.0, 65),
+         Leg("OPT", -65, 97.2, 4, "CE", 24200.0, 65)],
+        underlying=24231.52, annualised_vol=0.162, segment=MSeg.INDEX)
+    assert call_spread.reliable
+
+    naked_future = compute_margin(
+        [Leg("FUT", 65, 24349.0, 32, None, None, 65)],
+        underlying=24349.0, annualised_vol=0.162, segment=MSeg.INDEX)
+    assert naked_future.reliable

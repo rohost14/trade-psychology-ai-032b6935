@@ -286,3 +286,78 @@ entirely.
 **None of this makes one broker wrong.** It means a margin figure is only
 meaningful with a timestamp, which is why the architecture stores margin at
 capture time and never recomputes a past trade.
+
+---
+
+## LIVE MULTI-LEG VALIDATION — 29 Aug 2026, real Kite account
+
+Three structures read off the user's account. Kite reports **required** (legs
+charged independently) and **final** (spread benefit applied).
+
+| # | structure | Kite required | Kite final | model |
+|---|---|---|---|---|
+| 1 | NIFTY 01SEP buy 24300CE @51 / sell 24200CE @97.2 | 41,430 | 35,112 | 37,998 |
+| 2 | same, sell **2 lots** (ratio, net short 1) | 209,393 | 196,757 | 217,948 |
+| 3 | HAL SEP buy 4600PE @32.50 + buy SEP FUT @4875.40 | 149,570 | 86,243 | 67,321 |
+
+### Finding A — the two Kite numbers decode exactly
+
+`required − final` is **precisely the premium received on the short legs**:
+6,318 = 97.2 × 65, and 12,636 = 97.2 × 130. Two clean data points.
+
+And **our total plus the long premium paid reproduces `required`**:
+
+| case | model total + long premium | Kite required | err |
+|---|---|---|---|
+| 1 | 41,313 | 41,430 | **−0.3%** |
+| 2 | 221,263 | 209,393 | +5.7% |
+
+The +5.7% is the known short-option bias. The **−0.3%** on a defined-risk spread
+is the notable one: the model put scanning risk at **3,494** against a true
+maximum loss of **3,497**, three rupees apart, without containing any notion of
+what a spread is.
+
+**The gap is the long premium.** Our net-option-value term credits premium paid
+on long legs against the requirement; Kite's `required` does not. For a
+*pure* long position both conventions agree — scanning risk equals the premium,
+so the credit cancels it and both give zero, which the earlier run confirmed
+11/11. They diverge only in mixed portfolios.
+
+**Not patched.** Two data points is not enough to redefine net option value, and
+the current form is what NSE publishes. Recorded as an open question.
+
+### Finding B — futures + a LONG option: the model is 16% LOW. Now abstains.
+
+Case 3 is a genuine miss in the unsafe direction, and the cause is established.
+
+Kite's `required` of 149,570 is naked futures margin plus the put premium
+(147,915, **−1.1%**), so the futures leg itself is right and `required` is
+legs-independent. The miss is in the hedge credit:
+
+```
+combination's true MAXIMUM possible loss = (F − K) × qty + premium =  46,185
+broker's implied scanning risk                                    =  60,647
+                                                          difference 14,462
+```
+
+**The exchange charges more than the position can possibly lose.** No price scan
+range can reproduce that while crediting the option in full, because once the
+put is in the money the loss is capped by arithmetic. The exchange is
+deliberately withholding part of the offset, by a rule not present in the
+material we have read.
+
+One hypothesis was tested and **rejected**: pricing the option at the
+underlying's volatility rather than its own implied volatility, on the theory
+that NSE builds risk arrays from the underlying's figure. HAL's put solves to
+22.3% implied against an underlying vol of 36.2%, so the effect looked large.
+Measured, it moved case 3 the **wrong way** — from −23.2% to −25.4% on the scan —
+and left cases 1 and 2 untouched. Reverted.
+
+**`futures_long_option_hedge` now forces `reliable = False`.** The refusal is
+deliberately narrow: futures with a **short** option validated at +2.5% and
++3.5%, and option-against-option offsets at −0.3% and +0.3%, so none of those is
+refused. Only a long option offsetting a futures leg is.
+
+This is the second portfolio shape the model declines, after multi-expiry, and
+both fail the same way — **low**. That is the pattern worth naming: where this
+model is wrong, it is wrong by crediting an offset the exchange does not give.

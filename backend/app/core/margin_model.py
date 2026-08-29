@@ -152,18 +152,43 @@ class MarginBreakdown:
     #: does NOT charge a calendar spread for. The number is then understated.
     calendar_spread_unmodelled: bool = False
 
+    #: True when a futures leg is held alongside a LONG option leg. The exchange
+    #: does not credit that hedge in full and this model does. See `reliable`.
+    futures_long_option_hedge: bool = False
+
     @property
     def reliable(self) -> bool:
         """
         Whether this figure may be used as a capital requirement.
 
-        False for multi-expiry portfolios. Measured: a NIFTY SEP/OCT calendar
-        spread came out at 32,404 against the broker's 46,019 — **29.6% LOW**.
+        Two portfolio shapes are refused, both because the model comes out LOW.
         Understating committed capital is the dangerous direction for every rule
         that asks "how much of my account is tied up", so a flag on a returned
-        number is not enough. Callers must test this and abstain.
+        number is not enough — callers must test this and abstain.
+
+        **Multi-expiry.** No inter-month charge is implemented. Measured: a
+        NIFTY SEP/OCT calendar spread came out at 32,404 against the broker's
+        46,019, **29.6% low**.
+
+        **Futures held with a long option.** Measured against a real Kite
+        account: HAL September futures long plus a long 4600 put came out at
+        67,321 against the broker's 86,243, **16% low on the total and 23% low
+        on the scan**.
+
+        The cause there is established and it is not a bug in the scan. The
+        combination's maximum possible loss is (F - K) x qty + premium =
+        46,185, and the broker's implied scanning risk is 60,647 — the exchange
+        charges **14,462 more than the position can possibly lose**. No price
+        scan range can reproduce that while crediting the option in full,
+        because once the put is in the money the loss is capped by arithmetic.
+        The exchange is deliberately withholding part of the hedge credit, and
+        no rule for how much is published in the material we have read.
+
+        Deliberately narrow. Futures with a SHORT option validated at +2.5% and
+        +3.5%, and option-against-option offsets at -0.3% and +0.3%, so neither
+        is refused. Only a long option offsetting a futures leg is.
         """
-        return not self.calendar_spread_unmodelled
+        return not (self.calendar_spread_unmodelled or self.futures_long_option_hedge)
 
 
 # ---------------------------------------------------------------------------
@@ -371,6 +396,8 @@ def compute_margin(
     exposure = EXPOSURE_RATE[segment] * underlying * exposed_qty
 
     expiries = {round(leg.expiry_days, 6) for leg in legs}
+    has_future = any(leg.kind == "FUT" for leg in legs)
+    has_long_option = any(leg.kind == "OPT" and leg.qty > 0 for leg in legs)
 
     return MarginBreakdown(
         scanning_risk=scanning_risk,
@@ -382,6 +409,7 @@ def compute_margin(
         vsr=vsr,
         source=MarginSource.COMPUTED,
         calendar_spread_unmodelled=len(expiries) > 1,
+        futures_long_option_hedge=has_future and has_long_option,
     )
 
 
@@ -407,6 +435,12 @@ def compute_margin(
 #   additional ELM near index expiry
 #       Zerodha documents an extra margin on index options close to expiry.
 #       Not modelled.
+#
+#   the exchange's partial credit for a long option hedging a future
+#       Measured, not derived: the exchange charges above the combination's
+#       arithmetic maximum loss, so it withholds part of the offset. The rule
+#       is not in the published material we have read. `reliable` is False for
+#       these portfolios rather than returning a number known to be low.
 #
 #   physical delivery margin on stock F&O expiry week
 #       Escalates sharply in the last days for in-the-money stock contracts.
