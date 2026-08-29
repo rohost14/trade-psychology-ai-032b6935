@@ -184,7 +184,7 @@ _GROUP_C = [
 
 # ---------------------------------------------------------------------------
 # Group D — clock and hold time. Rung 2 already does exactly this for
-# panic_exit_min and rapid_reentry_min; these are the ones left behind.
+# rapid_reentry_min; these are the ones left behind.
 # ---------------------------------------------------------------------------
 
 _GROUP_D = [
@@ -205,7 +205,8 @@ _GROUP_D = [
           meaning="an exit within this many minutes is a reactive exit",
           resolution_source=Source.SESSION, metric="hold_minutes_p25",
           percentile=25, maturity=Maturity.SESSION,
-          provenance="same reasoning as panic_exit_min, which rung 2 already personalises"),
+          provenance="a reactive exit is relative to how long this trader normally holds, "
+                     "so rung 2 personalises it from their own session"),
 
     _spec(key="early_exit_ratio", kind=Kind.PERSONAL_BASELINE, fallback=0.40,
           meaning="winner hold as a fraction of loser hold",
@@ -316,8 +317,8 @@ THRESHOLD_SPECS: Dict[str, ThresholdSpec] = {
 #
 # NEUTRAL TODAY, BY VERIFICATION NOT BY HOPE
 #
-# Rung 1 moves seven keys and none is below. Rung 2 moves exactly two,
-# `panic_exit_min` and `rapid_reentry_min`, and neither is below. POPULATION is
+# Rung 1 moves seven keys and none is below. Rung 2 moves exactly one,
+# `rapid_reentry_min`, and it is not below. POPULATION is
 # unused. So the guard now refuses resolutions that do not currently occur - it
 # is a lock on a door nobody is yet trying to open, which is when a lock should
 # be fitted.
@@ -431,8 +432,6 @@ _FLOOR_DIRECTIONS = {
                                    "minutes after a loss still counted as a reaction"),
     "revenge_window_min": (10, Sensitivity.HIGHER_IS_STRICTER,
                            "unified re-entry window, set from a declared cooldown"),
-    "panic_exit_min": (5, Sensitivity.HIGHER_IS_STRICTER,
-                       "minutes held under which a losing exit reads as panic"),
     "rapid_reentry_min": (5, Sensitivity.HIGHER_IS_STRICTER,
                           "minutes within which a re-entry counts as rapid"),
 }

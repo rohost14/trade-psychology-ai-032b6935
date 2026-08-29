@@ -135,7 +135,9 @@ const BACKEND_TO_FRONTEND_TYPE: Record<string, string> = {
   'no_stoploss':       'no_stoploss',
   'early_exit':        'early_exit',
   'winning_streak_overconfidence': 'winning_streak_overconfidence',
-  'panic_exit':        'early_exit',
+  // 'panic_exit' RETIRED 2026-08-29 (Pattern 14). Removed from the routing
+  // map because the engine can no longer emit it; the display name below
+  // stays so stored alert rows still render.
   'rapid_reentry':     'same_instrument_chasing',
   'options_premium_avg_down':    'options_premium_avg_down',
   'opening_5min_trap':           'opening_5min_trap',
@@ -172,6 +174,8 @@ export function formatPatternName(patternType: string): string {
     'rapid_flip':                    'Rapid Direction Flip',
     'loss_aversion':                 'Loss Aversion',
     'early_exit':                    'Early Exit',
+    // Retired 2026-08-29 (Pattern 14). Kept because stored alert rows still
+    // carry it and a history screen must not show a raw key.
     'panic_exit':                    'Panic Exit',
     'no_stoploss':                   'No Stop-Loss',
     'winning_streak_overconfidence': 'Overconfidence (Win Streak)',

@@ -187,26 +187,17 @@ class TestDetectors:
         event = engine._detect_overtrading_burst(ctx)
         assert event is None
 
-    # ── Panic exit ────────────────────────────────────────────────────────
-
-    def test_panic_exit_detected(self):
-        ct = make_ct(pnl=-200, duration_min=1)  # held 1 minute, loss
-        ctx = make_ctx(completed_trade=ct)
-        event = engine._detect_panic_exit(ctx)
-        assert event is not None
-        assert event.event_type == "panic_exit"
-
-    def test_no_panic_exit_on_profitable_quick_trade(self):
-        ct = make_ct(pnl=200, duration_min=1)  # quick but profitable
-        ctx = make_ctx(completed_trade=ct)
-        event = engine._detect_panic_exit(ctx)
-        assert event is None  # Not a panic — it was a winner
-
-    def test_no_panic_exit_on_slow_loss(self):
-        ct = make_ct(pnl=-200, duration_min=30)  # loss but held 30 min
-        ctx = make_ctx(completed_trade=ct)
-        event = engine._detect_panic_exit(ctx)
-        assert event is None
+    # ── Panic exit — RETIRED 2026-08-29 (Pattern 14) ─────────────────────
+    #
+    # `test_panic_exit_detected`, `test_no_panic_exit_on_profitable_quick_trade`
+    # and `test_no_panic_exit_on_slow_loss` were DELETED with their subject.
+    # `_detect_panic_exit` no longer exists, so they could only fail on an
+    # AttributeError and prove nothing.
+    #
+    # Retired because its subject did not exist: sub-5-minute holds won at 38.3%
+    # against 39.8% for longer holds, so it selected the losing half of an
+    # ordinary habit - outcome, not behaviour. Its retirement is held in place by
+    # tests/test_panic_exit_retired.py.
 
     # ── Cooldown violation ────────────────────────────────────────────────
 

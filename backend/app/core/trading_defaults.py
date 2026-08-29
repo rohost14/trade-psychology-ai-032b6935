@@ -109,7 +109,6 @@ COLD_START_DEFAULTS: Dict[str, Any] = {
     # ── Panic exit ────────────────────────────────────────────────────────
     # 5 min is minimum time to assess an options position in volatile market.
     # 2 min (old) falsely flagged legitimate SL hits as panic.
-    'panic_exit_min':                   5,    # hold < 5 min at loss = caution
 
     # ── Rapid re-entry (same symbol) ─────────────────────────────────────
     # Options pricing stabilisation after a move takes ~5 min.
@@ -390,7 +389,6 @@ UNIVERSAL_FLOORS: Dict[str, Any] = {
     'revenge_window_caution_min':       2,    # Minimum 2-min caution window
     'revenge_window_min':               1,    # Unified window floor: minimum 1 min
     'consecutive_loss_caution':         3,    # At least 3 losses before any alert
-    'panic_exit_min':                   1,    # Minimum 1 min
     'rapid_reentry_min':                1,    # Minimum 1 min
     'no_stoploss_hold_min':             5,    # Minimum 5 min (primary gate is now exit order type)
     'no_stoploss_loss_pct_caution':     15,   # Minimum 15% loss to trigger

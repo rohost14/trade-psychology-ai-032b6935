@@ -178,6 +178,13 @@ def test_no_shipping_module_uses_a_severity_value_outside_the_vocabulary():
 #: against these is dead code that looks alive.
 RETIRED_PATTERN_NAMES = (
     "revenge_sizing",
+    # Retired 2026-08-29 (Pattern 14): its subject did not exist. Sub-5-minute
+    # holds won at 38.3% against 39.8% for longer holds, so a fast exit is not a
+    # worse decision - and it fired only on the losing 60%, ignoring 69
+    # identical-behaviour trades because they made money. Selection on OUTCOME,
+    # not behaviour. It also fired on the trader's cheapest losses (median
+    # Rs 308) and its message made three unsupported claims in one sentence.
+    "panic_exit",
     # Retired 2026-08-26: the trigger was chance (63 sessions with a 3+ loss run
     # against 63.0 expected from the win rate alone). The trader's own
     # max_consecutive_losses rule under constitution_violation replaces it.

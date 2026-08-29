@@ -24,7 +24,6 @@ retirements, not omissions; detector_registry.REGISTRY is the authority:
   2.  revenge_trade
   3.  overtrading_burst          (burst + daily count)
   5.  rapid_reentry
-  6.  panic_exit
   7.  martingale_behaviour
   8.  cooldown_violation
   9.  rapid_flip
@@ -1492,33 +1491,42 @@ class BehaviorEngine:
 
     # ── Pattern 6: Panic exit ─────────────────────────────────────────────
 
-    def _detect_panic_exit(self, ctx: EngineContext) -> Optional[DetectedEvent]:
-        ct = ctx.completed_trade
-        if not ct.entry_time or not ct.exit_time:
-            return None
+    # ── RETIRED 2026-08-29 — `panic_exit` ─────────────────────────────────
+    #
+    # Retired because its subject does not exist. It was two conditions -
+    # held under five minutes AND a loss - and "panic" was inferred entirely
+    # from those. Measured against the 175-session book:
+    #
+    #   a sub-5-minute hold is 24% of everything this trader does (180 of 740)
+    #
+    #   THE DECIDING TEST - it fired on short LOSSES and never on short WINS:
+    #     sub-5-min holds        180     win rate 38.3%
+    #     5-min-or-longer holds  560     win rate 39.8%
+    #
+    # Short holds perform the SAME as long holds, so a fast exit is not a worse
+    # decision for this trader. The detector fired on the losing 60% and ignored
+    # 69 identical-behaviour trades purely because they made money - selection on
+    # OUTCOME, not on behaviour. Same shape as `size_escalation`: the claimed
+    # discriminator does not discriminate.
+    #
+    # It also fired on the trader's CHEAPEST losses - median Rs 308, and 69% of
+    # firings were under Rs 500 - flagging plausibly-good risk management as a
+    # psychological failure. (Short losses averaged -473 against -1,053 for
+    # longer ones at p = 0.000, but that comparison is confounded: a longer hold
+    # has more time to accumulate loss. The win-rate result above is the clean
+    # one and carries the argument alone.)
+    #
+    # Its message made three unsupported claims in one sentence: "no stop-loss
+    # order" (the Pattern 12 defect, unverifiable), "quick manual exit"
+    # ("manual" is equally unknowable without an order type), and the event name
+    # itself.
+    #
+    # THE CONCEPT OF A FAST EXIT IS NOT RETIRED as a neutral fact - hold time is
+    # recorded on every CompletedTrade and analytics can read it. What is retired
+    # is treating a short losing hold as a behavioural finding.
+    #
+    # Evidence: docs/patterns/14-panic_exit/ and _measurement/p14_panic.py.
 
-        hold_min = (ct.exit_time - ct.entry_time).total_seconds() / 60
-        pnl = Decimal(str(ct.realized_pnl or 0))
-        window = ctx.thresholds.get("panic_exit_min", 5)
-
-        if not (hold_min < window and pnl < 0):
-            return None
-
-        # If exit was via SL/SL-M order → pre-planned stop, not panic. Skip.
-        exit_types = {(ot or "").upper() for ot in (ctx.exit_order_types or [])}
-        if exit_types & _STOP_ORDER_TYPES:
-            return None
-
-        return DetectedEvent(
-            event_type="panic_exit",
-            severity="info",  # Phase 4: analytics-only — retrospective, never interrupts
-            message=(
-                f"{ct.tradingsymbol}: closed after {hold_min:.0f}min at "
-                f"₹{abs(pnl):,.0f} loss — no stop-loss order, quick manual exit."
-            ),
-            context={"hold_minutes": round(hold_min, 1), "realized_pnl": float(pnl),
-                     "window_min": window, "trigger_symbol": ct.tradingsymbol},
-        )
 
     # ── Adding to an adverse position ─────────────────────────────────────
     #

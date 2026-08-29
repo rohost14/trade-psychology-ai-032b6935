@@ -1462,12 +1462,7 @@
       "note": "writer's loss is 2x premium received; contract says risk != premium"
     },
     "two_unrelated_underlyings": {
-      "fired": {
-        "panic_exit": {
-          "message": "TCS25MAR3500CE: closed after -60min at ₹750 loss — no stop-loss order, quick manual exit.",
-          "severity": "info"
-        }
-      },
+      "fired": {},
       "note": "simultaneous unrelated positions must not interact"
     },
     "unparseable_symbol": {

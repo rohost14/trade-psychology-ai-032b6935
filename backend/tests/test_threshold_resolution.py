@@ -290,24 +290,34 @@ def test_no_session_data_leaves_everything_on_the_global_rung():
     """Every caller that has not been updated must behave exactly as before."""
     for st in (None, [], a_session(10, 1)):   # 1 trade yields 0 gaps, 1 hold
         ts = resolve_thresholds(None, session_trades=st)
-        assert ts["panic_exit_min"] == 5
-        assert ts.explain("panic_exit_min").source is Source.GLOBAL
+        assert ts["rapid_reentry_min"] == 5
+        assert ts.explain("rapid_reentry_min").source is Source.GLOBAL
 
 
-@pytest.mark.parametrize("hold_min,expected", [
-    (3, 1.5),      # scalper: half of a 3-minute normal hold
-    (45, 22.5),    # intraday
-    (240, 120.0),  # positional
+# Retargeted 2026-08-29 from `panic_exit_min` to `rapid_reentry_min`. The rung
+# itself is unchanged and still needs coverage; `panic_exit_min` was merely the
+# vehicle, and it went with Pattern 14. Nine trades yield eight gaps, which is
+# _SESSION_TARGET_N, so confidence reaches 1.0 and the blend is the personal
+# value outright - the same shape the hold-based version tested.
+# The hold-based version had a 240-minute "positional" row. It cannot be
+# expressed on gaps: _derive_from_session caps them at 60 minutes on purpose -
+# "a longer gap is a break, not a re-entry decision" - so a 4-hour gap yields
+# NO samples and the rung correctly does nothing. 50 minutes is the widest
+# meaningful case, and test_a_break_is_not_a_re_entry covers the cap itself.
+@pytest.mark.parametrize("gap_min,expected", [
+    (4, 2.0),      # scalper: half of a 4-minute normal gap
+    (20, 10.0),    # intraday
+    (50, 25.0),    # slow, but still inside the one-hour cap
 ])
-def test_fast_is_measured_against_the_traders_own_pace(hold_min, expected):
+def test_fast_is_measured_against_the_traders_own_pace(gap_min, expected):
     """
-    The point of this rung. A five-minute exit is panic for someone whose normal
-    hold is four hours and routine for someone whose normal is three minutes.
-    One constant cannot serve both; their own median can.
+    The point of this rung. A five-minute re-entry is fast for someone whose
+    normal gap is four hours and routine for someone whose normal is four
+    minutes. One constant cannot serve both; their own median can.
     """
-    ts = resolve_thresholds(None, session_trades=a_session(hold_min, 8))
-    assert ts["panic_exit_min"] == pytest.approx(expected)
-    assert ts.explain("panic_exit_min").source is Source.SESSION
+    ts = resolve_thresholds(None, session_trades=a_session(10, 9, gap_min=gap_min))
+    assert ts["rapid_reentry_min"] == pytest.approx(expected)
+    assert ts.explain("rapid_reentry_min").source is Source.SESSION
 
 
 def test_thin_evidence_barely_moves_the_number():
@@ -315,17 +325,18 @@ def test_thin_evidence_barely_moves_the_number():
     Two trades is not a distribution. Shrinkage must keep the value near the
     default rather than letting a single fast scalp redefine "normal".
     """
-    ts = resolve_thresholds(None, session_trades=a_session(3, 2))
-    r = ts.explain("panic_exit_min")
+    # 3 trades -> 2 gaps, the smallest sample the rung will act on at all.
+    ts = resolve_thresholds(None, session_trades=a_session(10, 3, gap_min=4))
+    r = ts.explain("rapid_reentry_min")
     assert r.confidence == pytest.approx(2 / 8)
-    assert 4.0 < r.value < 5.0        # nudged down from 5, nowhere near 1.5
+    assert 4.0 < r.value < 5.0        # nudged down from 5, nowhere near 2.0
 
 
 def test_confidence_grows_with_the_session():
     seen = [
-        resolve_thresholds(None, session_trades=a_session(3, n))
-        .explain("panic_exit_min").confidence
-        for n in (2, 4, 8, 16)
+        resolve_thresholds(None, session_trades=a_session(10, n, gap_min=4))
+        .explain("rapid_reentry_min").confidence
+        for n in (3, 5, 9, 17)          # n trades -> n-1 gaps
     ]
     assert seen == sorted(seen), "confidence must be non-decreasing in n"
     assert seen[-1] == 1.0
@@ -333,8 +344,8 @@ def test_confidence_grows_with_the_session():
 
 def test_floors_still_win_over_session_evidence():
     """A one-minute median must not drive the threshold below the safety rail."""
-    ts = resolve_thresholds(None, session_trades=a_session(1, 8))
-    assert ts["panic_exit_min"] >= 1        # UNIVERSAL_FLOORS['panic_exit_min']
+    ts = resolve_thresholds(None, session_trades=a_session(10, 9, gap_min=1))
+    assert ts["rapid_reentry_min"] >= 1     # UNIVERSAL_FLOORS['rapid_reentry_min']
 
 
 def test_session_rung_only_touches_analytics_thresholds():
@@ -347,7 +358,8 @@ def test_session_rung_only_touches_analytics_thresholds():
     with_session = resolve_thresholds(None, session_trades=a_session(60, 10))
     moved = {k for k in plain.values
              if plain[k] != with_session[k]}
-    assert moved == {"panic_exit_min", "rapid_reentry_min"}, moved
+    # `panic_exit_min` was the other member until Pattern 14 retired it.
+    assert moved == {"rapid_reentry_min"}, moved
 
 
 def test_a_break_is_not_a_re_entry():

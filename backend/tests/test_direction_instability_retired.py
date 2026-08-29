@@ -93,14 +93,14 @@ def test_no_registry_spec_points_at_the_deleted_method():
 
 def test_the_engine_counts_are_what_the_retirement_left():
     """
-    23 detectors, 29 pattern types. Patterns 4, 6, 9, 10 and 11 each took one of
-    each (33 -> 29); the six aliases are untouched throughout.
+    22 detectors, 28 pattern types. Patterns 4, 6, 9, 10, 11 and 14 each took one of
+    each (33 -> 28); the six aliases are untouched throughout.
     """
     from app.services.detector_registry import ALIASES, REGISTRY, all_pattern_types
 
-    assert len(REGISTRY) == 23
+    assert len(REGISTRY) == 22
     assert len(ALIASES) == 6
-    assert len(all_pattern_types()) == 29
+    assert len(all_pattern_types()) == 28
 
 
 def test_it_is_recorded_as_retired():

@@ -133,9 +133,9 @@ REGISTRY: Tuple[DetectorSpec, ...] = (
     # with the current trade as the subject. See docs/patterns/10-size_escalation/.
     DetectorSpec("rapid_reentry", "_detect_rapid_reentry",
                  "2.0.0", "emotional", "analytics", "exit", 0),
-    DetectorSpec("panic_exit", "_detect_panic_exit",
-                 "2.0.0", "emotional", "analytics", "exit", 0,
-                 consumes=("completed_trade", "exit_order_types", "thresholds")),
+    # `panic_exit` RETIRED 2026-08-29. Short holds won at 38.3% against 39.8%
+    # for longer ones, so it selected the losing half of an ordinary habit -
+    # outcome, not behaviour. See docs/patterns/14-panic_exit/.
     # 2.0.0: Pattern #1 review, 2026-08-24. Escalation across ATTEMPTS after a
     # closed loss - not adding to an open one, which is
     # adding_to_adverse_position and reads a fill sequence this cannot see.
@@ -360,12 +360,6 @@ PATTERN_COPY: Dict[str, PatternCopy] = {
         "Recovery bet",
         "A position materially larger than your average, entered after a loss on the same underlying.",
         "If this one also loses, the combined loss exceeds everything it was meant to recover.",
-    ),
-    "panic_exit": PatternCopy(
-        "Fast manual exit",
-        "A quick manual close at a loss with no stop-loss order on record.",
-        "May be a considered decision or a reaction. Worth reviewing against what you planned "
-        "before entering.",
     ),
     # Copy rewritten 2026-08-27, Pattern #7. It used to say several instruments
     # at once "is usually chasing movement rather than acting on a view" - a

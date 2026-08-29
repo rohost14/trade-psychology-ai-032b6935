@@ -24,8 +24,9 @@ confident it is.
 **What each rung currently covers.** Rung 1 reads a versioned baseline written
 by one service (`baseline_service`); v1 shapes are still read so stored
 baselines keep working until their next recompute. Rung 2
-covers `panic_exit_min` and `rapid_reentry_min` only, both belonging to
-`notification_level=0` detectors, so it cannot change alert volume; extending it
+covers `rapid_reentry_min` only - it had a second key until Pattern 14 was
+retired on 2026-08-29 - belonging to a
+`notification_level=0` detector, so it cannot change alert volume; extending it
 to a threshold that fires alerts needs a replay behind it. Rung 4 covers
 `max_position_pct_*` and the three former rupee floors. Rung 5 is named but not
 built — naming it is what makes its absence visible instead of silently falling
@@ -580,8 +581,9 @@ def _apply_session(session_trades, values: Dict[str, Any], put: Callable) -> Non
     available just as early, cannot be wrong, and moves when they move.
 
     Applied only to thresholds owned by analytics-disposition detectors
-    (`panic_exit`, `rapid_reentry`), which record evidence and never notify — so
-    this rung cannot change alert volume. Extending it to alerting detectors is
+    (`rapid_reentry`; `panic_exit` was the other until it was retired
+    2026-08-29), which record evidence and never notify — so this rung cannot
+    change alert volume. Extending it to alerting detectors is
     a separate change that needs a replay behind it.
     """
     holds, gaps = [], []
@@ -599,8 +601,6 @@ def _apply_session(session_trades, values: Dict[str, Any], put: Callable) -> Non
         if gap is not None and 0 < gap < 60:
             gaps.append(gap)
 
-    _blend_session(values, put, "panic_exit_min", holds,
-                   "your median hold today")
     _blend_session(values, put, "rapid_reentry_min", gaps,
                    "your median gap between trades today")
 

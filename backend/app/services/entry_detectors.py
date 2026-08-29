@@ -22,7 +22,7 @@ Two safety properties, both structural rather than promised:
 
   * **Only whitelisted detectors run.** ENTRY_DECIDABLE lists the ones whose
     decision genuinely does not need the outcome. Everything else — early_exit,
-    panic_exit — would read `realized_pnl` as absent and could only produce
+    for one — would read `realized_pnl` as absent and could only produce
     nonsense, so it is never asked.
   * **Nothing here raises an alert.** Output is written as shadow evidence.
     Promotion is per detector, through the existing `detector_flags` table, and
@@ -42,7 +42,7 @@ logger = logging.getLogger(__name__)
 #: exit_price or duration for the trade being evaluated.
 #:
 #: Not listed, deliberately — these need the outcome and would be answering a
-#: question they cannot see: early_exit, panic_exit,
+#: question they cannot see: early_exit,
 #: premium_loss_event (live variant already ships separately, E4),
 #: win_rate_collapse, strategy_breakdown,
 #: time_of_day_bias, no_stoploss, opening_5min_trap.
