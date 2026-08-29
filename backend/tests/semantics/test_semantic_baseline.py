@@ -68,13 +68,16 @@ def _r(v):
 
 def _l1_symbol_parsing_defect():
     """
-    F15 — real symbols from the reference book that the parser cannot read,
-    beside structurally identical ones it can. Characterization only.
+    F15 — real symbols from the reference book, beside structurally identical
+    controls. The first group USED to be unreadable (2-digit strikes, half-rupee
+    strikes, hyphenated underlyings) and fell through to the equity branch;
+    since the F15 fix on 2026-08-29 they parse. Kept under the original name so
+    the baseline diff stays traceable to the bug it closed.
     """
     from app.services.instrument_parser import parse_symbol
 
     out = {}
-    for group, syms in (("cannot_parse", SC.UNPARSEABLE_REAL_SYMBOLS),
+    for group, syms in (("formerly_unparseable", SC.UNPARSEABLE_REAL_SYMBOLS),
                         ("control_parses", SC.PARSEABLE_CONTROL_SYMBOLS)):
         for sym in syms:
             p = parse_symbol(sym)
@@ -343,6 +346,55 @@ def test_the_harness_actually_exercises_the_engine():
         if isinstance(v, dict) and "error" in v
     ]
     assert errors == [], f"scenarios raised instead of returning: {errors}"
+
+
+def test_real_book_symbols_are_readable():
+    """
+    Hard guard for F15. The characterization baseline records whatever happens;
+    this asserts what MUST happen, so the regex cannot silently narrow again.
+
+    Every symbol here is a real contract from the 189-session reference book.
+    Before the fix all of them were classified EQUITY with the whole symbol as
+    the "underlying" — 17 symbols across 38 fills.
+    """
+    from app.services.instrument_parser import parse_symbol
+
+    for sym in SC.UNPARSEABLE_REAL_SYMBOLS:
+        p = parse_symbol(sym)
+        assert p.instrument_type in ("CE", "PE", "FUT"), f"{sym} -> {p.instrument_type}"
+        assert p.underlying and p.underlying != sym, f"{sym} -> underlying {p.underlying!r}"
+        if p.instrument_type in ("CE", "PE"):
+            assert p.strike, f"{sym} -> no strike"
+
+    # Half-rupee strikes must survive as halves, not be truncated onto the
+    # neighbouring contract.
+    assert parse_symbol("ASHOKLEY25AUG122.5CE").strike == 122.5
+
+    # An equity ticker is still equity, including ones ending in option letters.
+    for sym in ("RELIANCE", "ACE", "TATAMOTORS"):
+        assert parse_symbol(sym).instrument_type == "EQ", sym
+
+    # A derivative-shaped symbol we genuinely cannot read must still ABSTAIN,
+    # never fall back to equity. Widening the regex must not cost us F9.
+    assert parse_symbol("GARBAGE25XYZ99CE").instrument_type is None
+
+
+def test_the_eq_fallback_stays_deleted():
+    """
+    F16. `parse_symbol(...).instrument_type or "EQ"` converted the F9 abstention
+    straight back into equity at two call sites, cancelling the fix. Guard the
+    source so it cannot come back with a well-meaning edit.
+    """
+    import pathlib
+    root = pathlib.Path(__file__).resolve().parents[2] / "app"
+    offenders = [
+        str(f.relative_to(root))
+        for f in root.rglob("*.py")
+        if "_archive" not in f.parts and 'instrument_type or "EQ"' in f.read_text(
+            encoding="utf-8", errors="replace")
+    ]
+    assert offenders == [], (
+        "the EQ fallback is back and it silently undoes F9: " + ", ".join(offenders))
 
 
 if __name__ == "__main__":

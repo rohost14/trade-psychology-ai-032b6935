@@ -42,20 +42,40 @@ _WEEKLY_MONTH_CHARS: dict[str, int] = {
 # Compiled regexes
 # ---------------------------------------------------------------------------
 
+# Underlying character class. Hyphens occur in real NSE F&O underlyings
+# (BAJAJ-AUTO, M&M-FIN), so excluding them silently dropped those contracts.
+_UND = r"[A-Z&][A-Z&\-]*"
+
+# Strike. NOT a fixed digit count: NSE lists 2-digit strikes (YESBANK25APR18CE,
+# NMDC25APR74CE) and half-rupee strikes (ASHOKLEY25AUG122.5CE,
+# NYKAA25JUL207.5CE). The old `\d{3,6}` rejected both, which sent 17 symbols /
+# 38 fills of the reference book down the equity branch. (F15, 2026-08-29.)
+_STRIKE = r"\d+(?:\.\d+)?"
+
 # Monthly option: NIFTY25MAR25000CE  /  BANKNIFTY25APR48000PE
 _RE_MONTHLY_OPT = re.compile(
-    r"^([A-Z&]+)(\d{2})(JAN|FEB|MAR|APR|MAY|JUN|JUL|AUG|SEP|OCT|NOV|DEC)(\d{3,6})(CE|PE)$"
+    rf"^({_UND})(\d{{2}})(JAN|FEB|MAR|APR|MAY|JUN|JUL|AUG|SEP|OCT|NOV|DEC)({_STRIKE})(CE|PE)$"
 )
 
 # Monthly future: BANKNIFTY25APRFUT  /  NIFTY25MARFUT
 _RE_MONTHLY_FUT = re.compile(
-    r"^([A-Z&]+)(\d{2})(JAN|FEB|MAR|APR|MAY|JUN|JUL|AUG|SEP|OCT|NOV|DEC)FUT$"
+    rf"^({_UND})(\d{{2}})(JAN|FEB|MAR|APR|MAY|JUN|JUL|AUG|SEP|OCT|NOV|DEC)FUT$"
 )
 
 # Weekly option: NIFTY2532025000CE  (yy + single-month-char + 2-digit-day)
 _RE_WEEKLY_OPT = re.compile(
-    r"^([A-Z&]+)(\d{2})([1-9ONDond])(\d{2})(\d{3,6})(CE|PE)$"
+    rf"^({_UND})(\d{{2}})([1-9ONDond])(\d{{2}})({_STRIKE})(CE|PE)$"
 )
+
+
+def _parse_strike(strike_str: str) -> float:
+    """
+    Strikes are not always whole rupees. NSE lists half-rupee strikes on several
+    stock options (ASHOKLEY 122.5, NYKAA 207.5), so this returns a float and the
+    caller must not assume an integer. Truncating to int would silently collapse
+    122.5 and 122 onto the same contract. (F15, 2026-08-29.)
+    """
+    return float(strike_str)
 
 
 # ---------------------------------------------------------------------------
@@ -68,7 +88,7 @@ class ParsedSymbol:
     underlying: str            # NIFTY, BANKNIFTY, RELIANCE …
     instrument_type: str       # CE | PE | FUT | EQ
     expiry_date: Optional[date]
-    strike: Optional[int]      # option strike price
+    strike: Optional[float]    # option strike price — float: NSE lists half-rupee strikes
     expiry_key: str            # canonical key for grouping (ISO date or "YYYY-MM" for monthlies)
 
 
@@ -96,7 +116,7 @@ def parse_symbol(symbol: str) -> ParsedSymbol:
             underlying=underlying,
             instrument_type=opt_type,
             expiry_date=date(year, month, 1),       # day=1 proxy (last Thu isn't needed for grouping)
-            strike=int(strike_str),
+            strike=_parse_strike(strike_str),
             expiry_key=expiry_key,
         )
 
@@ -135,7 +155,7 @@ def parse_symbol(symbol: str) -> ParsedSymbol:
             underlying=underlying,
             instrument_type=opt_type,
             expiry_date=expiry,
-            strike=int(strike_str),
+            strike=_parse_strike(strike_str),
             expiry_key=expiry_key,
         )
 

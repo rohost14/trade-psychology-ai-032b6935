@@ -131,7 +131,11 @@ def _instrument_type(symbol: str) -> str:
     from app.services.instrument_parser import parse_symbol
 
     try:
-        return parse_symbol(symbol or "").instrument_type or "EQ"
+        # No `or "EQ"`. That fallback silently undid F9: an unreadable
+        # derivative came back as None and was converted straight back into
+        # equity, with a delivery-value denominator. None means UNKNOWN, and
+        # UNKNOWN must reach the caller so it can abstain. (F16, 2026-08-29.)
+        return parse_symbol(symbol or "").instrument_type
     except Exception:
         return "EQ"
 
