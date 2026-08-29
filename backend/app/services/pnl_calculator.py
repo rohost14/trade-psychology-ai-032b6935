@@ -195,7 +195,12 @@ class PnLCalculator:
         # --- Group trades by symbol ---
         trades_by_symbol: Dict[str, List[Trade]] = {}
         for trade in trades:
-            key = f"{trade.tradingsymbol}|{trade.exchange}"
+            # F10. `product` is part of the position key everywhere else - the
+            # position ledger keys on it and the positions table's unique
+            # constraint includes it - but this FIFO grouping omitted it, so a
+            # symbol held in MIS and NRML at the same time was netted into
+            # rounds that never existed.
+            key = f"{trade.tradingsymbol}|{trade.exchange}|{trade.product or ''}"
             trades_by_symbol.setdefault(key, []).append(trade)
 
         # --- Step 3.3: Timestamp-bounded idempotent deletion ---

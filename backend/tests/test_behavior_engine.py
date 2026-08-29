@@ -213,8 +213,12 @@ class TestDetectors:
     def test_cooldown_violation_detected(self):
         cd = MagicMock(spec=Cooldown)
         cd.expires_at = now_utc() + timedelta(minutes=20)
+        # F18: the detector now reads started_at, so the fixture must supply a
+        # real one. Entry falls INSIDE the cooldown here, which is the violation.
+        cd.started_at = now_utc() - timedelta(minutes=10)
         cd.reason = "3 consecutive losses"
         ctx = make_ctx(active_cooldowns=[cd])
+        ctx.completed_trade.entry_time = now_utc() - timedelta(minutes=5)
         event = engine._detect_cooldown_violation(ctx)
         assert event is not None
         assert event.event_type == "cooldown_violation"
@@ -227,6 +231,32 @@ class TestDetectors:
         ctx = make_ctx(active_cooldowns=[])
         event = engine._detect_cooldown_violation(ctx)
         assert event is None
+
+    def test_no_violation_when_the_position_was_opened_before_the_cooldown(self):
+        """
+        F18. The engine runs on position CLOSE, and this detector used to read
+        only the cooldown - never the trade - so a position opened well before
+        a cooldown began and merely closed during it was reported as
+        "Traded during active cooldown". Closing is what a cooldown wants.
+
+        The decision a cooldown governs is the ENTRY.
+        """
+        cd = MagicMock(spec=Cooldown)
+        cd.expires_at = now_utc() + timedelta(minutes=20)
+        cd.started_at = now_utc() - timedelta(minutes=5)
+        cd.reason = "3 consecutive losses"
+        ctx = make_ctx(active_cooldowns=[cd])
+        ctx.completed_trade.entry_time = now_utc() - timedelta(hours=2)
+        assert engine._detect_cooldown_violation(ctx) is None
+
+    def test_cooldown_violation_survives_missing_timestamps(self):
+        """A detector must not crash on a row with no started_at."""
+        cd = MagicMock(spec=Cooldown)
+        cd.expires_at = now_utc() + timedelta(minutes=20)
+        cd.started_at = None
+        cd.reason = "loss limit"
+        ctx = make_ctx(active_cooldowns=[cd])
+        assert engine._detect_cooldown_violation(ctx) is not None
 
     # ── Direction instability — RETIRED 2026-08-28 (Pattern #11) ─────────
     #

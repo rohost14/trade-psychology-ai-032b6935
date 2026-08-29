@@ -22,6 +22,14 @@ Sources already established and NOT re-derived: `SEMANTIC_CONTRACT.md` ·
 | **F15** | **parser reads 2-digit, half-rupee and hyphenated-underlying strikes** | 17 book symbols; **654 half-rupee strikes exist in one day's universe** |
 | **F16** | **`or "EQ"` deleted at both sites; it was cancelling F9** | source-scanning guard test |
 | **calendar-spread abstention** | multi-expiry margin is now `reliable = False` | measured **−29.6%** understatement |
+| **F17** | four capital-relative consumers routed through the canonical layer | baseline moved by exactly 3 scenarios |
+| **broker margin capture** | `/margins/basket` on OPEN/INCREASE/FLIP, persisted append-only | migration 081 |
+| **F1** | `exit_order_types` lookup matches BOTH identifier spaces | live path matched nothing before |
+| **F10** | `product` added to the FIFO position key | aligns with the ledger + positions unique constraint |
+| **F18** | `cooldown_violation` reads the trade's entry time | closing during a cooldown is no longer a violation |
+| **F19** | `overexposure` cannot raise `MultipleResultsFound` | crash on a dual-product symbol |
+| **F22** | unreachable `_cross` branch deleted from `post_loss_recovery_bet` | `prior` is filtered to one underlying |
+| **F23** | zero baseline no longer makes the danger gate unconditional | `0.0 is not None` |
 
 ## SAFE TO IMPLEMENT NOW — done this phase, wired to nothing
 
@@ -66,12 +74,24 @@ exposure · order intent · target vs discretionary exit · holdings hedging ·
 automated vs manual · simultaneous leg holding · BSE index monthly expiry ·
 **MCX and CDS capital** · **MTF funded fraction**.
 
+## CLOSED AS NOT-A-BUG (verified, 29 Aug)
+
+| # | verdict |
+|---|---|
+| **F21** | `capital_mismatch` is a housekeeping nudge, not a behaviour detector. Excluding it from `death_spiral`'s domains is **correct**, and the consumer already handles the absence (`if not nature: continue`). Now pinned by a test so nobody "fixes" it. |
+| **F24** | `adding_to_adverse_position` is the one `trigger="entry"` detector. The exit loop skips such specs deliberately and the entry-batch flush dispatches it. It **runs**. `ENTRY_DECIDABLE` does not contain it because that list is for a different path. |
+
 ## INTENTIONALLY DEFERRED
 
-**All detector wiring.** F1, F2, F4, F5, F6, F10, F12, F13, F14, F18-F24 are
-detector-visible and out of scope for an infrastructure phase. F21
-(`_ALIAS_NATURE` missing `capital_mismatch`) is deliberately **not** fixed here
-despite being a one-line change, because it alters `death_spiral` composition.
+Still open and each needing a decision, not a fix:
+
+| # | why it is not a mechanical fix |
+|---|---|
+| **F2** | absence rendered as a claim. Depends on F1 landing first, then on deciding what a detector says when it cannot see |
+| **F4 / F5 / F6 / F13** | hedge definition and direction semantics — DESIGN |
+| **F12** | `duration_minutes` has two definitions (wall clock vs market minutes). Choosing the canonical one is a semantic decision |
+| **F14** | copy sits on the D5 session-scope decision |
+| **F20** | `overexposure` reads other detectors' `BehaviorEvent` rows, breaking stated rule A.10 — but the emotional bump is a deliberate product feature, so this is a **rule conflict**: either the code changes or A.10 is amended. Removing it would change severity, which is out of scope |
 
 ---
 

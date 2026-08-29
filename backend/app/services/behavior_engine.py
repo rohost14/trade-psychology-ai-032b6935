@@ -551,12 +551,28 @@ class BehaviorEngine:
         exit_order_types: List[str] = []
         if completed_trade.exit_trade_ids:
             from app.models.trade import Trade as _Trade
-            from sqlalchemy import cast as _cast, String as _String
+            from sqlalchemy import cast as _cast, String as _String, or_ as _or
             try:
+                # F1. `exit_trade_ids` holds TWO identifier spaces depending on
+                # which writer produced the row:
+                #
+                #   live ledger  -> Kite order ids   (position_ledger_service:892
+                #                   writes e.fill_order_id)
+                #   batch FIFO   -> Trade.id UUIDs   (pnl_calculator:570)
+                #
+                # This matched only Trade.id, so on the LIVE path it matched
+                # nothing at all and exit_order_types came back empty for every
+                # trade - silently, because an empty list is indistinguishable
+                # from "no stop-loss was used".
+                #
+                # Matching both columns fixes the live path without rewriting
+                # stored data or breaking rows written by the other writer.
+                # Trade.order_id is indexed.
                 ot_result = await db.execute(
-                    select(_Trade.order_type).where(
-                        _cast(_Trade.id, _String).in_(completed_trade.exit_trade_ids)
-                    )
+                    select(_Trade.order_type).where(_or(
+                        _cast(_Trade.id, _String).in_(completed_trade.exit_trade_ids),
+                        _Trade.order_id.in_(completed_trade.exit_trade_ids),
+                    ))
                 )
                 exit_order_types = [r[0] for r in ot_result.all() if r[0]]
             except Exception as _ot_err:
@@ -1867,6 +1883,27 @@ class BehaviorEngine:
             return None
 
         cooldown = ctx.active_cooldowns[0]
+
+        # F18. This detector read only the cooldown and never the trade, so it
+        # asserted "Traded during active cooldown" from the cooldown's mere
+        # existence. The engine runs on position CLOSE, so a position OPENED
+        # well before the cooldown began and merely closed during it was
+        # reported as a violation - the opposite of the truth, since closing is
+        # what a cooldown wants.
+        #
+        # The decision a cooldown governs is the ENTRY. Judge that.
+        started = getattr(cooldown, "started_at", None)
+        entered = getattr(ctx.completed_trade, "entry_time", None)
+        try:
+            if started and entered and entered < started:
+                return None
+        except TypeError:
+            # Missing or non-comparable timestamps. Fall through rather than
+            # crash: the previous behaviour is the safe default here, since the
+            # cooldown demonstrably exists even if we cannot place the entry
+            # against it.
+            pass
+
         remaining_min = (cooldown.expires_at - datetime.now(timezone.utc)).total_seconds() / 60
 
         # severity="info" — recorded for analytics/risk scoring but never shown as
@@ -2394,7 +2431,10 @@ class BehaviorEngine:
 
         # ── Danger: 5 wins (any instruments) + same-underlying size ≥ 2× avg ──
         if is_win_streak(danger_streak):
-            if avg_baseline is not None and current_qty >= avg_baseline * size_mul_danger:
+            # F23. `avg_baseline is not None` passes for 0.0, which makes the
+            # test `current_qty >= 0` - unconditionally true. A zero baseline is
+            # not a small baseline, it is the absence of one.
+            if avg_baseline and current_qty >= avg_baseline * size_mul_danger:
                 win_trades = prior[-danger_streak:]
                 total_profit = sum(Decimal(str(t.realized_pnl or 0)) for t in win_trades)
                 escalation_pct = (current_qty - avg_baseline) / max(avg_baseline, 1) * 100
@@ -2931,14 +2971,14 @@ class BehaviorEngine:
 
         # Compare current size against the recent average — by quantity within
         # one underlying, by value when the trader has moved between them.
-        _cross = len({(_ps(t.tradingsymbol or "").underlying if t.tradingsymbol else "")
-                      for t in prior[-3:]}) > 1
-        if _cross:
-            recent_qtys = [max(self._notional(t), 1.0) for t in prior[-3:]]
-        else:
-            recent_qtys = [t.total_quantity or 1 for t in prior[-3:]]
+        # F22. This used to branch on `_cross`, testing whether prior[-3:]
+        # spanned more than one underlying. It never could: `prior` is built
+        # above filtered to `== ct_underlying`, so the set always holds exactly
+        # one element and the cross-underlying arm was unreachable. Only the
+        # quantity comparison ever ran, and that is what remains.
+        recent_qtys = [t.total_quantity or 1 for t in prior[-3:]]
         avg_qty = sum(recent_qtys) / len(recent_qtys)
-        current_qty = max(self._notional(ct), 1.0) if _cross else (ct.total_quantity or 1)
+        current_qty = ct.total_quantity or 1
 
         if avg_qty < 1:
             return None

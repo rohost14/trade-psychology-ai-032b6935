@@ -394,6 +394,17 @@ async def _overexposure_task(broker_account_id: str, tradingsymbol: str) -> dict
     from sqlalchemy import select, and_
 
     async with SessionLocal() as db:
+        # F19. This used scalar_one_or_none(), which RAISES MultipleResultsFound
+        # when the same symbol is open under two products. `product` is part of
+        # the position key - the positions table's unique constraint includes it
+        # - so MIS and NRML on one symbol are two legitimate rows and the task
+        # crashed rather than reporting anything.
+        #
+        # Combining them would be a netting decision (whether an MIS long and an
+        # NRML short offset), which is D3 and is NOT decided here. The largest
+        # single position is judged, which is exactly the previous behaviour
+        # whenever there is only one row, and understates rather than overstates
+        # when there are two.
         pos_result = await db.execute(
             select(Position).where(
                 and_(
@@ -403,9 +414,15 @@ async def _overexposure_task(broker_account_id: str, tradingsymbol: str) -> dict
                 )
             )
         )
-        pos = pos_result.scalar_one_or_none()
-        if not pos:
+        open_rows = list(pos_result.scalars().all())
+        if not open_rows:
             return {"skipped": "no_open_position"}
+        if len(open_rows) > 1:
+            logger.info(
+                "%s is open under %d products; judging the largest. Combining "
+                "them across products is a netting decision (D3), not made here.",
+                tradingsymbol, len(open_rows))
+        pos = max(open_rows, key=lambda p: abs(p.total_quantity or 0))
 
         profile_result = await db.execute(
             select(UserProfile).where(UserProfile.broker_account_id == UUID(broker_account_id))

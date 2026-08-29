@@ -183,8 +183,14 @@ def test_notional_survives_because_other_detectors_read_it():
 
     assert hasattr(BehaviorEngine, "_notional")
     src = (APP / "services" / "behavior_engine.py").read_text(encoding="utf-8")
-    # martingale-adjacent and post_loss_recovery_bet both call it
-    assert src.count("self._notional(") >= 3
+    # Was >= 3 when post_loss_recovery_bet also called it. F22 (2026-08-29)
+    # deleted that detector's cross-underlying branch, which was UNREACHABLE -
+    # its `prior` list is filtered to a single underlying, so the set it tested
+    # could never hold more than one element. The two calls it made went with
+    # it. `_notional` still has a live consumer in
+    # winning_streak_overconfidence, which is what this test exists to prove:
+    # the helper was not orphaned when size_escalation was retired.
+    assert src.count("self._notional(") >= 2
 
 
 def test_the_surviving_sizing_thresholds_are_intact():
