@@ -2008,40 +2008,64 @@ class BehaviorEngine:
         session_pnl = Decimal(str(ctx.session.session_pnl or 0))
         daily_loss_limit = ctx.thresholds.get("daily_loss_limit")
 
-        # Whether this limit is the trader's or ours changes what we may claim.
-        # Saying "your ₹2,500 daily limit" about a number invented from their
-        # capital is not true, and it is the same class of thing the landing-page
-        # audit flags: our guess presented as their fact. The alert still fires
-        # either way — a derived limit protects just as well — but the copy has
-        # to say where the number came from, which doubles as the prompt to set
-        # a real one.
-        limit_is_declared = True
+        # THE LIMIT MUST BE THE TRADER'S. Pattern 17, 2026-08-30.
+        #
+        # This used to fall back to `trading_capital * 0.05` when no limit was
+        # declared. That number had no documented provenance - it predates the
+        # visible history and no commit introduces or justifies it - and it
+        # contradicted the product's own answer in two places: the
+        # `constitution_service` experience matrix suggests 2% / 2% / 2.5% / 3%
+        # by experience level, and the onboarding wizard computes 2%. The
+        # detector's fallback was therefore higher than our own "professional"
+        # tier and nearly triple what onboarding offers.
+        #
+        # More importantly it contradicted a DECIDED policy.
+        # `constitution_service` owns `daily_loss_limit` as one of six
+        # RULE_FIELDS and deliberately returns None for it, keeping its
+        # recommendation in a separate `suggested_daily_loss_limit` key that
+        # nothing consumes. Its comment records the decision and the
+        # measurement behind it: money rules are SUGGESTED, NEVER APPLIED,
+        # because F&O lot sizes make a percent-of-capital money rule unusable -
+        # a real replay produced 212 rule violations across 61 sessions, 54% of
+        # all alerts, none describing behaviour.
+        #
+        # `danger_zone_service` already follows that policy: it guards on the
+        # limit being present and has no derivation at all.
+        #
+        # So: no declared limit, no judgement. This is applying the rule the
+        # product already made, not inventing a new one, which is why no
+        # replacement percentage was substituted.
+        #
+        # THE COST, recorded because it was a decision: a trader who has entered
+        # capital but not a daily loss limit now gets no meltdown alert at all.
+        # On the reference book at a Rs 50,000 account that is 226 events across
+        # 91 sessions going to zero. The prompt to set a limit has to live
+        # somewhere the trader still sees it - the setup nudge already tracks
+        # `daily_loss_limit != null`.
+        #
+        # The paired change is `api/risk.py`, which copied this fallback so the
+        # dashboard hero and the alert would agree on ONE limit. Both were
+        # removed together; removing either alone would re-break that agreement.
         if not daily_loss_limit or daily_loss_limit <= 0:
-            limit_is_declared = False
-            capital = ctx.thresholds.get("trading_capital")
-            # Use 5% of capital as daily loss limit for any account size.
-            # The ≥10k floor was wrong — a ₹5k account can still blow up.
-            if capital and float(capital) > 0:
-                daily_loss_limit = float(capital) * 0.05
-            else:
-                return None
+            return None
 
         limit = Decimal(str(daily_loss_limit))
         caution_pct = Decimal(str(ctx.thresholds.get("meltdown_caution_pct", 0.40)))
         danger_pct  = Decimal(str(ctx.thresholds.get("meltdown_danger_pct", 0.75)))
 
+        # The derived-limit branch went with the fallback: with abstention above,
+        # every limit reaching here is the trader's own, so the second copy form
+        # and the "capital_derived" source were unreachable. `limit_source` is
+        # kept - now always "declared" - because stored rows carry it and a
+        # reader should not have to infer it from absence.
         def _message(pct_used: Decimal) -> str:
-            if limit_is_declared:
-                return (f"Today's P&L: ₹{session_pnl:,.0f} — {pct_used:.0f}% of your "
-                        f"₹{limit:,.0f} daily limit used.")
-            return (f"Today's P&L: ₹{session_pnl:,.0f} — that is {pct_used:.0f}% of "
-                    f"₹{limit:,.0f}, which is 5% of your capital. "
-                    f"You have not set a daily loss limit yet.")
+            return (f"Today's P&L: ₹{session_pnl:,.0f} — {pct_used:.0f}% of your "
+                    f"₹{limit:,.0f} daily limit used.")
 
         def _context(pct_used: Decimal) -> dict:
             return {"session_pnl": float(session_pnl),
                     "daily_loss_limit": float(limit),
-                    "limit_source": "declared" if limit_is_declared else "capital_derived",
+                    "limit_source": "declared",
                     "pct_used": round(float(pct_used), 1)}
 
         if session_pnl < -(limit * danger_pct):

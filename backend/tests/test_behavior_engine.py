@@ -256,28 +256,32 @@ class TestDetectors:
         assert "of your" in event.message
         assert event.context["limit_source"] == "declared"
 
-    def test_meltdown_does_not_call_an_invented_limit_theirs(self):
+    def test_meltdown_abstains_when_no_limit_is_declared(self):
         """
-        With no declared limit the detector invents one at 5% of capital. It
-        still fires - a derived limit protects just as well - but calling it
-        "your ₹25,000 daily limit" claims the trader set a number they never
-        saw. The copy has to say where it came from, and that doubles as the
-        prompt to set a real one.
+        REWRITTEN 2026-08-30 with its subject.
+
+        This test previously asserted the OPPOSITE - that with no declared limit
+        the detector invents one at 5% of capital and still fires, because "a
+        derived limit protects just as well". That fallback is gone.
+
+        It had no documented provenance and contradicted a decided policy:
+        `constitution_service` owns `daily_loss_limit` as a RULE_FIELD and
+        deliberately returns None for it, because F&O lot sizes make a
+        percent-of-capital money rule unusable - a real replay produced 212 rule
+        violations across 61 sessions, 54% of all alerts, none describing
+        behaviour. Money rules are suggested, never applied.
+
+        The test is kept rather than deleted because its SUBJECT survives: what
+        the detector may claim about a limit. The answer changed from "say where
+        the number came from" to "there is no number".
         """
-        session = make_session(session_pnl=-21000)   # 84% of 5% of 500000
+        session = make_session(session_pnl=-21000)
         ctx = make_ctx(session=session, thresholds={
             "daily_loss_limit": None, "trading_capital": 500000,
         })
-        event = engine._detect_session_meltdown(ctx)
-        assert event is not None, "a derived limit must still protect the trader"
-        # The forbidden claim is that the LIMIT is theirs, not any use of the
-        # word "your" - the honest message legitimately says "your capital",
-        # which IS a fact about them. So assert on the possessive applied to the
-        # rupee figure: "your Rs 25,000 daily limit" is the lie.
-        assert "your ₹" not in event.message
-        assert "5% of your capital" in event.message
-        assert "not set a daily loss limit" in event.message
-        assert event.context["limit_source"] == "capital_derived"
+        assert engine._detect_session_meltdown(ctx) is None, (
+            "capital is not a loss limit - with none declared there is no "
+            "judgement to make")
 
     def test_meltdown_stays_silent_when_neither_limit_nor_capital_is_known(self):
         session = make_session(session_pnl=-21000)

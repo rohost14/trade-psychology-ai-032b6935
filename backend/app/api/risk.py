@@ -190,11 +190,20 @@ async def get_risk_state(
         )
         profile = prof_result.scalar_one_or_none()
         th = get_thresholds(profile)
+        # No capital-derived fallback. Pattern 17, 2026-08-30.
+        #
+        # This mirrored `session_meltdown`'s `trading_capital * 0.05` so the
+        # hero and the alert copy would agree on ONE limit. That fallback had no
+        # documented provenance and contradicted the product's decided policy -
+        # money rules are suggested, never applied - so it was removed from the
+        # detector, and removing it there alone would have re-broken exactly the
+        # agreement this code exists to hold. Both went together.
+        #
+        # An undeclared limit now reports None here, as it already did in
+        # `danger_zone_service`. The hero must render that as "not set" and not
+        # as a number.
         loss_limit = th.get("daily_loss_limit")
-        if not loss_limit or loss_limit <= 0:
-            cap = th.get("trading_capital")
-            loss_limit = float(cap) * 0.05 if cap and float(cap) > 0 else None
-        daily_loss_limit = float(loss_limit) if loss_limit else None
+        daily_loss_limit = float(loss_limit) if loss_limit and loss_limit > 0 else None
         tl = th.get("daily_trade_limit")
         daily_trade_limit = int(tl) if tl else None
     except Exception as _lim_err:  # never let limit resolution break the risk state
