@@ -140,6 +140,22 @@ class Leg:
 
 @dataclass(frozen=True)
 class MarginBreakdown:
+    """
+    Two margin numbers, because the broker reports two and they are different
+    questions. Collapsing them into one `total` matched neither.
+
+        final_margin     what stays blocked once the position is on. This is
+                         the risk number: scanning risk plus exposure.
+
+        required_margin  what must be available to PUT the position on. Adds
+                         back the premium received on short legs, because that
+                         credit has not arrived yet at the moment of the order.
+
+    For futures and for long-only books the two coincide, which is why the
+    single-number model matched the four live futures cases and missed both
+    option structures. Measured against a real Kite account, a NIFTY bear call
+    spread reproduces at -0.3% on BOTH numbers.
+    """
     scanning_risk: float
     net_option_value: float
     span: float
@@ -147,6 +163,8 @@ class MarginBreakdown:
     total: float
     psr: float
     vsr: float
+    final_margin: float = 0.0
+    required_margin: float = 0.0
     source: MarginSource = MarginSource.COMPUTED
     #: True when the portfolio contains more than one expiry, which this model
     #: does NOT charge a calendar spread for. The number is then understated.
@@ -398,6 +416,25 @@ def compute_margin(
     expiries = {round(leg.expiry_days, 6) for leg in legs}
     has_future = any(leg.kind == "FUT" for leg in legs)
     has_long_option = any(leg.kind == "OPT" and leg.qty > 0 for leg in legs)
+    has_short_option = any(leg.kind == "OPT" and leg.qty < 0 for leg in legs)
+
+    # A book of nothing but bought options requires no margin at all. The
+    # premium was paid in full up front; there is no ongoing obligation to
+    # collateralise. This is a rule, not a rounding: the broker returns exactly
+    # zero for every long-only position, 11 of 11 in the validation set.
+    if not (has_future or has_short_option):
+        final_margin = required_margin = 0.0
+    else:
+        # The risk number. Scanning risk is the worst of the sixteen scenarios;
+        # exposure sits on top of it.
+        final_margin = scanning_risk + exposure
+        # Premium received on short legs is not in hand when the order is
+        # placed, so it must be funded. Measured on a real account: Kite's
+        # "required" minus its "final" was 6,318 on one short lot and 12,636 on
+        # two, which is exactly 97.20 x 65 and 97.20 x 130.
+        short_premium = sum(-leg.qty * leg.price
+                            for leg in legs if leg.kind == "OPT" and leg.qty < 0)
+        required_margin = final_margin + short_premium
 
     return MarginBreakdown(
         scanning_risk=scanning_risk,
@@ -408,6 +445,8 @@ def compute_margin(
         psr=psr,
         vsr=vsr,
         source=MarginSource.COMPUTED,
+        final_margin=final_margin,
+        required_margin=required_margin,
         calendar_spread_unmodelled=len(expiries) > 1,
         futures_long_option_hedge=has_future and has_long_option,
     )

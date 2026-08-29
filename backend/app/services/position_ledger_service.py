@@ -713,14 +713,28 @@ class PositionLedgerService:
         """
         Resolve the contract multiplier used to scale realized P&L.
 
-        Fast path (NSE/BSE/NFO/BFO and known MCX/CDS contracts): returned from the
-        hardcoded table with no DB access. Only an MCX contract missing from the table
-        falls through to a single query for Zerodha's own multiplier, which sync_positions
-        stored on the Position row. Defaults to 1 if still unresolved.
+        PRECEDENCE, corrected 2026-08-29. Zerodha's own per-position `multiplier`
+        now outranks our hardcoded table for MCX and CDS.
+
+        Kite documents the field as "the quantity/lot size multiplier used for
+        calculating P&Ls" and returns it per position, so it is the broker's own
+        current answer for the contract the user actually holds. Our table
+        (`mcx_contract_specs.MCX_MULTIPLIERS`) is a static list whose own
+        docstring records that it came from Z-Connect, a third-party 2024
+        lot-size chart and a product page — not from MCX contract specifications
+        read directly. It also cannot know about a revision: COPPER moved from
+        1 MT to 2500 kg in 2022, and a stale entry there is a silent, permanent
+        P&L error on every fill of that contract.
+
+        The order was previously the other way round, so the authoritative
+        figure was only consulted when the guess was missing.
+
+        NSE/BSE/NFO/BFO are untouched and keep the no-DB fast path — their
+        multiplier is always 1, and quantities already arrive expanded.
         """
-        mult = get_lot_multiplier_or_none(exchange, tradingsymbol)
-        if mult is not None:
-            return Decimal(str(mult))
+        exch = (exchange or "").upper()
+        if exch not in ("MCX", "CDS"):
+            return Decimal(str(get_lot_multiplier_or_none(exchange, tradingsymbol) or 1))
 
         from app.models.position import Position
         result = await db.execute(
@@ -737,10 +751,26 @@ class PositionLedgerService:
         )
         val = result.scalar_one_or_none()
         try:
-            resolved = Decimal(str(val)) if val else Decimal("1")
+            broker_mult = Decimal(str(val)) if val else None
         except Exception:
-            resolved = Decimal("1")
-        return resolved if resolved > 0 else Decimal("1")
+            broker_mult = None
+        if broker_mult and broker_mult > 0:
+            return broker_mult
+
+        # Fall back to the table only when the broker has not told us. Still 1
+        # if neither knows — the pre-existing behaviour, and a KNOWN weakness:
+        # on an untabulated MCX contract that is a silent error of up to 5000x
+        # (ZINC). Recorded in docs/DEEP_REVIEW/RISK_LAYER_ARCHITECTURE.md rather
+        # than changed here, because making P&L refuse is a behavioural change
+        # beyond the infrastructure phase.
+        table = get_lot_multiplier_or_none(exchange, tradingsymbol)
+        if table:
+            return Decimal(str(table))
+        logger.warning(
+            "No contract multiplier for %s on %s from EITHER Zerodha's position "
+            "feed or the local table. Falling back to 1; P&L for this contract "
+            "may be understated by the lot multiplier.", tradingsymbol, exchange)
+        return Decimal("1")
 
     @staticmethod
     async def _get_by_idempotency_key(

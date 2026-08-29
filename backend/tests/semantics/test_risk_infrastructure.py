@@ -439,3 +439,69 @@ def test_the_refusal_is_narrow():
         [Leg("FUT", 65, 24349.0, 32, None, None, 65)],
         underlying=24349.0, annualised_vol=0.162, segment=MSeg.INDEX)
     assert naked_future.reliable
+
+
+# ---------------------------------------------------------------------------
+# Margin model - two numbers, because the broker reports two
+#
+# Every expectation below is a real figure from a live Kite account.
+# ---------------------------------------------------------------------------
+
+def _mm(legs, underlying, vol, seg):
+    from app.core.margin_model import compute_margin
+    return compute_margin(legs, underlying=underlying, annualised_vol=vol, segment=seg)
+
+
+def test_futures_final_and_required_are_the_same_number():
+    """No option premium in play, so there is nothing to fund separately."""
+    from app.core.margin_model import Leg, Segment as MSeg
+    m = _mm([Leg("FUT", 65, 24349.0, 32, None, None, 65)], 24349.0, 0.162, MSeg.INDEX)
+    assert m.final_margin == pytest.approx(m.required_margin)
+    assert m.final_margin == pytest.approx(178_663, rel=0.02)     # Kite: 178,663
+
+
+def test_option_spread_reproduces_BOTH_kite_numbers():
+    """
+    NIFTY 01SEP, buy 24300CE at 51 and sell 24200CE at 97.20, one lot each.
+    Kite: required 41,430, final 35,112. Both to within 0.5%.
+
+    The single-number model matched neither - it sat between them.
+    """
+    from app.core.margin_model import Leg, Segment as MSeg
+    m = _mm([Leg("OPT", 65, 51.0, 4, "CE", 24300.0, 65),
+             Leg("OPT", -65, 97.2, 4, "CE", 24200.0, 65)],
+            24231.52, 0.162, MSeg.INDEX)
+    assert m.final_margin == pytest.approx(35_112, rel=0.005)
+    assert m.required_margin == pytest.approx(41_430, rel=0.005)
+
+
+def test_the_gap_between_them_is_exactly_the_short_premium():
+    """
+    Measured: Kite's required minus final was 6,318 on one short lot and 12,636
+    on two, which is 97.20 x 65 and 97.20 x 130 exactly. It is the premium the
+    trader has not received yet at the moment the order is placed.
+    """
+    from app.core.margin_model import Leg, Segment as MSeg
+    one = _mm([Leg("OPT", 65, 51.0, 4, "CE", 24300.0, 65),
+               Leg("OPT", -65, 97.2, 4, "CE", 24200.0, 65)],
+              24231.52, 0.162, MSeg.INDEX)
+    two = _mm([Leg("OPT", 65, 51.0, 4, "CE", 24300.0, 65),
+               Leg("OPT", -130, 97.2, 4, "CE", 24200.0, 65)],
+              24231.52, 0.162, MSeg.INDEX)
+    assert one.required_margin - one.final_margin == pytest.approx(97.2 * 65)
+    assert two.required_margin - two.final_margin == pytest.approx(97.2 * 130)
+
+
+def test_a_long_only_book_requires_nothing():
+    """
+    The premium was paid in full; there is no ongoing obligation to
+    collateralise. The broker returned exactly zero for 11 of 11 long-only
+    positions, so this is a rule and not a rounding.
+    """
+    from app.core.margin_model import Leg, Segment as MSeg
+    for legs in ([Leg("OPT", 65, 51.0, 4, "CE", 24300.0, 65)],
+                 [Leg("OPT", 65, 51.0, 4, "CE", 24300.0, 65),
+                  Leg("OPT", 65, 60.0, 4, "PE", 24100.0, 65)]):
+        m = _mm(legs, 24231.52, 0.162, MSeg.INDEX)
+        assert m.final_margin == 0.0
+        assert m.required_margin == 0.0

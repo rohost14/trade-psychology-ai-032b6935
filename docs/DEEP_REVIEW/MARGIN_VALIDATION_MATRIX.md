@@ -361,3 +361,54 @@ refused. Only a long option offsetting a futures leg is.
 This is the second portfolio shape the model declines, after multi-expiry, and
 both fail the same way — **low**. That is the pattern worth naming: where this
 model is wrong, it is wrong by crediting an offset the exchange does not give.
+
+---
+
+## THE MODEL NOW REPORTS TWO NUMBERS — 29 Aug 2026
+
+The single `total` matched neither of Kite's figures on an option structure; it
+sat between them. Kite reports two because they answer two questions, and so
+does the model now.
+
+```
+final_margin     what stays blocked once the position is on = scanning risk + exposure
+required_margin  what must be available to PUT it on        = final + premium received on shorts
+```
+
+For futures and for long-only books the two coincide, which is exactly why the
+single-number model matched all four live futures cases and missed both option
+structures.
+
+**A long-only book requires nothing.** The premium was paid in full and there is
+no ongoing obligation to collateralise. That is a rule, not a rounding — the
+broker returned exactly zero for 11 of 11 long-only positions.
+
+### Fit against every independent data point
+
+| case | model final | Kite final | err | model required | Kite required | err |
+|---|---|---|---|---|---|---|
+| NIFTY FUT buy | 178,843 | 178,663 | +0.1% | 178,843 | 178,663 | +0.1% |
+| NIFTY FUT sell | 178,843 | 177,531 | +0.7% | 178,843 | 177,531 | +0.7% |
+| RELIANCE FUT | 114,475 | 114,501 | **−0.0%** | 114,475 | 114,501 | **−0.0%** |
+| CDSL FUT sell | 150,846 | 151,257 | −0.3% | 150,846 | 151,257 | −0.3% |
+| bear call spread | 34,995 | 35,112 | **−0.3%** | 41,313 | 41,430 | **−0.3%** |
+| ratio, net short | 208,626 | 196,757 | +6.0% | 221,262 | 209,393 | +5.7% |
+| long CE only | 0 | 0 | exact | 0 | 0 | exact |
+| long straddle | 0 | 0 | exact | 0 | 0 | exact |
+
+The gap between the two numbers is **exactly the premium received on the short
+legs** — 6,318 on one short lot and 12,636 on two, which is 97.20 × 65 and
+97.20 × 130 to the rupee. The ratio's +6% is the known short-option bias and is
+unchanged by this.
+
+**One earlier check was withdrawn as circular.** A naked short appeared to
+reproduce to −0.0%, but its scanning risk had been derived from the broker's own
+`span − netoptionvalue`. It proves nothing and is excluded.
+
+### What this supersedes
+
+The previous note recorded "our total plus the long premium reproduces Kite's
+required" as an open question, with the long-premium credit called out as the
+unexplained gap. **That is now resolved.** The net-option-value credit for
+premium *paid* was the defect; the premium *received* is the only side that
+belongs in the requirement, and only in `required`, not in `final`.
