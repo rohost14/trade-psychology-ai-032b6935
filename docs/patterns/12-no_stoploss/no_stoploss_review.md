@@ -1,6 +1,10 @@
 # Pattern 12 — `no_stoploss`
 
-**Review, 29 Aug 2026. Findings only. No code changed.**
+**Review, 29 Aug 2026. CLOSED — MODIFIED.**
+
+Points 1 and 2 below were approved and implemented the same day (`8d3c632`);
+the firing set is unchanged at 52 alerts / 42 sessions. Points 3 and 4 remain on
+[`PENDING_AND_TODO.md`](../../DEEP_REVIEW/PENDING_AND_TODO.md).
 
 Review-order 12. Source-list #13 in
 [`BEHAVIOURAL_PATTERNS.md`](../00-shared/BEHAVIOURAL_PATTERNS.md), where it is
