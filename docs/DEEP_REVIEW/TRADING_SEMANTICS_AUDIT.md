@@ -1,6 +1,7 @@
 # Trading Semantics & Strategy Coverage Audit
 
 **Status: COMPLETE.** All five areas done, 28-29 Aug 2026.
+Cross-checked against every requirement in the brief — see *Coverage of the brief*.
 
 Brief: [`positional_validation.md`](positional_validation.md). **No code changes
 in this audit.** Findings only.
@@ -98,6 +99,37 @@ cause it.
 ---
 
 # CROSS-CUTTING FINDINGS
+
+## 0. CE→PE — the brief's flagged concern, answered directly
+
+The brief raises this twice: *"CE→PE is NOT automatically direction instability.
+It can be a genuine reversal, hedge, spread adjustment, or strategy
+construction."*
+
+**On the specific charge: PASS.** `direction_instability` was retired 28 Aug
+2026 after measurement showed the opposite of its premise (flagged flips won
+56.2% for +₹276 against 41.7% and −₹73 unflagged). **`grep` confirms zero
+occurrences of `_detect_direction_instability` in the engine — no detector
+anywhere now claims a CE→PE swap indicates directional instability.**
+
+**But CE→PE is not invisible either, and two detectors still react to it:**
+
+- **`options_premium_avg_down`** — VERIFIED. Its guards
+  (`behavior_engine.py:2443-2464`) require only that both the prior and current
+  trade are `instrument_type in ("CE","PE")`, `direction == "LONG"`, same
+  underlying, prior loss ≥20% of premium. **A CE losing 20% followed by a PE buy
+  satisfies every one.** It does not call this direction instability — it calls
+  it averaging down, and its message says *"after N losing options positions"*.
+  For a genuine reversal that framing is wrong in a different way than the
+  retired detector was.
+- **`same_symbol_obsession`** — counts both legs as "attempts" on the underlying,
+  direction and option type unread.
+
+So the answer is: **the specific misclassification the brief warned about has
+been removed; a CE→PE reversal is now mislabelled as averaging down rather than
+as instability.** Same event, different wrong name, lower severity
+(`notification_level=1` vs the retired detector's, and no `danger` tier).
+
 
 ## 1. Averaging down is measured in the currency it deflates — VERIFIED
 
@@ -317,7 +349,11 @@ weekdays. `is_expiry_day` is wrong for every SENSEX/BANKEX monthly.
 
 | archetype | worst offenders |
 |---|---|
-| intraday directional, long options | **PASS** — the reference book |
+| pure intraday directional | **PASS** — the reference book |
+| **long-options trader** | **PASS** — the other reference archetype; every threshold was fitted to it |
+| **scalper** | `overtrading_burst` (p75 line alerts on ~25% of sessions by construction), `no_stoploss` (the 5-min floor exists to exclude scalps, but a 6-minute scalp at 25% still fires). `rapid_reentry` and `panic_exit` would fire constantly but are `info`-only — **PASS by disposition, not by logic** |
+| **high-frequency / manual rapid** | as scalper, compounded. `burst_per_30min_p75` adapts the *count*; the 30-minute *window* never does |
+| **expiry trader** | **PASS** on the main risk — `expiry_day_overtrading` was retired 27 Aug for exactly this. Residual **GAP**: `is_expiry_day` hardcodes last-Thursday monthly expiry, so it is wrong for every SENSEX/BANKEX monthly |
 | averaging / pyramiding | **PASS by design** — `adding_to_adverse_position` deliberately excludes size and correctly excludes pyramiding. The strongest part of the engine on this axis |
 | short-options seller | `no_stoploss` (wrong denominator), `excess_exposure` (understated ~130×) |
 | futures trader | `overexposure` **critical on every position**, `revenge_trade` on every roll |
@@ -429,6 +465,7 @@ if current_price is None or avg_entry <= 0:
 |---|---|
 | stale LTP / missing LTP / delayed tick | **PASS** — staleness enforced, monitor abstains |
 | broker disconnect / websocket reconnect / Redis restart | **PASS** — no price → abstain |
+| broker API outage | **PASS** for detection — sync simply does not run, so no trades arrive and nothing is inferred. The stale-close risk is that positions closed during the outage are backfilled later via the overnight path, which carries the stubbed fields above |
 | duplicate fills | **PASS** — unified `idempotency_key` on the Kite order id |
 | out-of-order events | **PASS** — triggers a full ledger replay |
 | market closed / partial session | **PASS** — beat gated 09:15–15:25 IST (though hardcoded NSE hours; MCX evening is never monitored — **GAP**) |
@@ -471,6 +508,98 @@ FALSE-POSITIVE RISK. Note that `user_id`-level aggregation would be a genuine
 design decision, not a bug fix: a hedge held in a different account is still a
 real hedge, but combining accounts would also merge two independent trading
 styles into one behavioural profile.
+
+---
+
+# COVERAGE OF THE BRIEF
+
+Every requirement in `positional_validation.md`, mapped to where it is answered.
+Checked line by line, 29 Aug. **"Covered — no issue found" is a real result and
+appears below where that is the honest answer.**
+
+## Opening list
+
+| brief item | where | result |
+|---|---|---|
+| long/short equity | matrix §B | **GAP** — full notional regardless of direction; `EQ` also doubles as the unparseable bucket |
+| long/short futures | matrix §B, archetypes | **FALSE-POSITIVE RISK** |
+| long/short calls and puts | matrix §B, cross-cutting #4 | long **PASS**, short **FALSE-POSITIVE RISK** |
+| CE↔PE reversals | **cross-cutting #0** | **PASS** on the flagged charge; residual mislabelling |
+| partial exits, flips, averaging, pyramiding | matrix §A, cross-cutting #1 | partial exit **GAP**, flip `pnl_pct` **GAP**, averaging **GAP**, pyramiding **PASS by design** |
+| protective hedges (FUT+PUT, FUT short+CALL, stock+option) | cross-cutting #3, matrix §C | FUT+PUT **GAP**, stock+option **UNSUPPORTED** |
+| straddles / strangles | matrix §C | shape **PASS**, provenance **FALSE-POSITIVE RISK** |
+| spreads, calendars, ratio, multi-leg | matrix §C | ratio **GAP (safety)**, calendar/diagonal **GAP**, 4-leg **GAP** |
+| simultaneous / overlapping legs | matrix §C | **FALSE-POSITIVE RISK** — no test that legs were held together |
+| hedge entry / removal / adjustment | cross-cutting #2, §C | entry **GAP** (first leg alerts), adjustment **FALSE-POSITIVE RISK**, removal — closing one leg leaves the other ungrouped, same root cause |
+| intraday vs overnight | cross-cutting #6, matrix §D | **GAP** |
+| MTF and MTF + hedges | area E1 | **GAP** / **UNSUPPORTED** |
+
+## The 16 numbered additions
+
+| # | item | where | result |
+|---|---|---|---|
+| 1 | position lifecycle | matrix §A (17 scenarios) | core discrimination **PASS**; 6 GAPs, 2 FP RISKs |
+| 2 | average price changes | cross-cutting #1, matrix §A | **GAP** — the deflation is real and crosses thresholds |
+| 3 | hedge recognition A/B/C | cross-cutting #3, matrix §C | the three states are **not** separated |
+| 4 | hedge adjustment | cross-cutting #2, archetypes | **FALSE-POSITIVE RISK**, multiple detectors |
+| 5 | expiry / rollover | cross-cutting #8, matrix §D | **GAP** — structurally undetectable |
+| 6 | options strategy geometry | matrix §C (14 structures) | answered as "which detectors misunderstand it", per the brief |
+| 7 | short-option sellers | cross-cutting #4 | 3 genuine guards; the rest **FALSE-POSITIVE RISK** |
+| 8 | futures are not options | matrix §B | **GAP** — `opening_5min_trap` admits FUT then cannot compute for it |
+| 9 | MTF | area E1 | **GAP** — not modelled; no `product` parameter anywhere in risk |
+| 10 | cross-underlying hedges | matrix §C | **UNSUPPORTED**, correctly — not claimed |
+| 11 | portfolio-level exposure | area E2 | gross **PASS**, net/hedge-adjusted **GAP**, sector/correlated **UNSUPPORTED** |
+| 12 | capital / margin semantics | matrix §B | **GAP** — nine denominators, four meanings |
+| 13 | time horizon | cross-cutting #7, matrix §D | **GAP** — 26 of 27 windows fixed |
+| 14 | order intent vs execution | matrix §A, area E3 | **GAP** — intent not ingested; `TRIGGER PENDING` confirmed discarded |
+| 15 | data failure states | area E3 (13 states) | **mostly PASS** — this is the best-handled area; two violations, both the headline |
+| 16 | multi-account / multi-broker | area E4 | **GAP** — account-scoped; safe failure direction |
+| — | trader archetypes (15) | archetype table | all 15 present |
+
+## The seven "be especially strict" rules
+
+| rule | verdict |
+|---|---|
+| CE→PE is not automatically direction instability | **HONOURED** — the detector that made this claim is retired |
+| Opposite positions are not automatically a hedge | **VIOLATED** — but not in the way expected. Nothing infers a hedge from opposition; the futures-hedge branch infers one from option *type* while ignoring the option's *direction* |
+| Adding to a loser can be averaging / pyramiding / strategy / harmful | **HONOURED** by `adding_to_adverse_position`, which deliberately excludes size and correctly excludes pyramiding |
+| Premium loss differs long vs short | **VIOLATED** in `no_stoploss` and `opening_5min_trap`; **HONOURED** in `premium_loss_event`, `options_premium_avg_down` and both live paths |
+| Position-level P&L, avg entry, realized/unrealized, remaining qty correct after fills | **MOSTLY HONOURED** — avg entry, realized P&L and remaining qty are correct. Unrealized/adverse excursion is never stored; `pnl_pct` breaks on an over-closing FLIP |
+| MTF not treated as cash equity or F&O | **VIOLATED** — treated as cash equity |
+| Never infer behaviour from missing/ambiguous data | **VIOLATED twice** — both are the headline finding |
+
+## Required deliverables
+
+| deliverable | status |
+|---|---|
+| PASS / GAP / FALSE-POSITIVE RISK / UNSUPPORTED for every scenario | done — 7 matrix sections |
+| exact detector / service / file / line for every GAP and FP RISK | done |
+| scenarios the brief did not list | done — 8 found |
+| overall coverage assessment | done |
+| highest-priority architectural gaps | done — 5 |
+| pattern reviews to revisit | done — 7, with urgency |
+| safe now vs needs more data | done |
+| fix anything before Pattern 12 | done — **yes, one thing** |
+
+## Checked and found clean — no issue to report
+
+Recorded so the absence is deliberate rather than an omission:
+
+- **Duplicate fills, out-of-order events, app restart, Redis restart** — handled
+  correctly (unified `idempotency_key`, full ledger replay, state in Postgres).
+- **Stale and missing LTP** — staleness genuinely enforced per price; the monitor
+  abstains rather than guessing.
+- **Rejected orders, and cancelled orders with zero fill** — correctly ignored.
+- **Pyramiding** — deliberately and correctly excluded from
+  `adding_to_adverse_position`, with the reasoning written down.
+- **Cross-underlying hedging** — not claimed anywhere, which is the right answer
+  for the data available.
+- **Short options in `premium_loss_event`, `options_premium_avg_down` and both
+  live paths** — properly guarded, with comments explaining why.
+- **Position key** in the ledger — `(broker_account_id, tradingsymbol, exchange,
+  product)` is correct and includes product.
+- **`end_of_session_mis_panic`** — exchange-branched deliberately, with a
+  documented MCX fix; correctly inert for non-intraday products.
 
 ---
 
