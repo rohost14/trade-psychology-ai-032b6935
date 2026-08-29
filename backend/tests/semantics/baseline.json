@@ -1,0 +1,1008 @@
+{
+  "L1_capital_at_risk": {
+    "equity_long": {
+      "capital_at_risk": 290000.0,
+      "notional_price_x_qty": 290000.0,
+      "ratio_to_notional": 1.0
+    },
+    "equity_short": {
+      "capital_at_risk": 290000.0,
+      "notional_price_x_qty": 290000.0,
+      "ratio_to_notional": 1.0
+    },
+    "futures_long": {
+      "capital_at_risk": 225000.0,
+      "notional_price_x_qty": 1875000.0,
+      "ratio_to_notional": 0.12
+    },
+    "futures_short": {
+      "capital_at_risk": 225000.0,
+      "notional_price_x_qty": 1875000.0,
+      "ratio_to_notional": 0.12
+    },
+    "long_option": {
+      "capital_at_risk": 9000.0,
+      "notional_price_x_qty": 9000.0,
+      "ratio_to_notional": 1.0
+    },
+    "long_put": {
+      "capital_at_risk": 9000.0,
+      "notional_price_x_qty": 9000.0,
+      "ratio_to_notional": 1.0
+    },
+    "mcx_lot_multiplier": {
+      "capital_at_risk": 280.0,
+      "notional_price_x_qty": 1400.0,
+      "ratio_to_notional": 0.2
+    },
+    "short_option": {
+      "capital_at_risk": 1080.0,
+      "notional_price_x_qty": 9000.0,
+      "ratio_to_notional": 0.12
+    },
+    "short_put": {
+      "capital_at_risk": 1080.0,
+      "notional_price_x_qty": 9000.0,
+      "ratio_to_notional": 0.12
+    },
+    "unparseable_symbol": {
+      "capital_at_risk": 1000.0,
+      "notional_price_x_qty": 1000.0,
+      "ratio_to_notional": 1.0
+    }
+  },
+  "L1_instrument_risk": {
+    "equity_long": {
+      "amount": 290000.0,
+      "class": "equity",
+      "is_comparable": true,
+      "kind": "notional"
+    },
+    "equity_short": {
+      "amount": 290000.0,
+      "class": "equity",
+      "is_comparable": true,
+      "kind": "notional"
+    },
+    "futures_long": {
+      "amount": 225000.0,
+      "class": "futures",
+      "is_comparable": true,
+      "kind": "margin_posted"
+    },
+    "futures_short": {
+      "amount": 225000.0,
+      "class": "futures",
+      "is_comparable": true,
+      "kind": "margin_posted"
+    },
+    "long_option": {
+      "amount": 9000.0,
+      "class": "long_option",
+      "is_comparable": true,
+      "kind": "loss_ceiling"
+    },
+    "long_put": {
+      "amount": 9000.0,
+      "class": "long_option",
+      "is_comparable": true,
+      "kind": "loss_ceiling"
+    },
+    "mcx_lot_multiplier": {
+      "amount": 280.0,
+      "class": "futures",
+      "is_comparable": true,
+      "kind": "margin_posted"
+    },
+    "short_option": {
+      "amount": 1080.0,
+      "class": "short_option",
+      "is_comparable": true,
+      "kind": "margin_posted"
+    },
+    "short_put": {
+      "amount": 1080.0,
+      "class": "short_option",
+      "is_comparable": true,
+      "kind": "margin_posted"
+    },
+    "unparseable_symbol": {
+      "amount": 1000.0,
+      "class": "unknown",
+      "is_comparable": true,
+      "kind": "notional"
+    }
+  },
+  "L1_parsing": {
+    "NIFTY2532025000PE": {
+      "expiry_key": "2025-03-20",
+      "instrument_type": "PE",
+      "is_expiry_day_on_2026_03_12": false,
+      "strike": 25000,
+      "underlying": "NIFTY"
+    },
+    "NIFTY25APR25000CE": {
+      "expiry_key": "2025-04",
+      "instrument_type": "CE",
+      "is_expiry_day_on_2026_03_12": false,
+      "strike": 25000,
+      "underlying": "NIFTY"
+    },
+    "NIFTY25APR25200CE": {
+      "expiry_key": "2025-04",
+      "instrument_type": "CE",
+      "is_expiry_day_on_2026_03_12": false,
+      "strike": 25200,
+      "underlying": "NIFTY"
+    },
+    "NIFTY25APRFUT": {
+      "expiry_key": "2025-04",
+      "instrument_type": "FUT",
+      "is_expiry_day_on_2026_03_12": false,
+      "strike": null,
+      "underlying": "NIFTY"
+    },
+    "NIFTY25MAR24600PE": {
+      "expiry_key": "2025-03",
+      "instrument_type": "PE",
+      "is_expiry_day_on_2026_03_12": false,
+      "strike": 24600,
+      "underlying": "NIFTY"
+    },
+    "NIFTY25MAR24800CE": {
+      "expiry_key": "2025-03",
+      "instrument_type": "CE",
+      "is_expiry_day_on_2026_03_12": false,
+      "strike": 24800,
+      "underlying": "NIFTY"
+    },
+    "NIFTY25MAR24800PE": {
+      "expiry_key": "2025-03",
+      "instrument_type": "PE",
+      "is_expiry_day_on_2026_03_12": false,
+      "strike": 24800,
+      "underlying": "NIFTY"
+    },
+    "NIFTY25MAR25000CE": {
+      "expiry_key": "2025-03",
+      "instrument_type": "CE",
+      "is_expiry_day_on_2026_03_12": false,
+      "strike": 25000,
+      "underlying": "NIFTY"
+    },
+    "NIFTY25MAR25000PE": {
+      "expiry_key": "2025-03",
+      "instrument_type": "PE",
+      "is_expiry_day_on_2026_03_12": false,
+      "strike": 25000,
+      "underlying": "NIFTY"
+    },
+    "NIFTY25MAR25100CE": {
+      "expiry_key": "2025-03",
+      "instrument_type": "CE",
+      "is_expiry_day_on_2026_03_12": false,
+      "strike": 25100,
+      "underlying": "NIFTY"
+    },
+    "NIFTY25MAR25200CE": {
+      "expiry_key": "2025-03",
+      "instrument_type": "CE",
+      "is_expiry_day_on_2026_03_12": false,
+      "strike": 25200,
+      "underlying": "NIFTY"
+    },
+    "NIFTY25MAR25400CE": {
+      "expiry_key": "2025-03",
+      "instrument_type": "CE",
+      "is_expiry_day_on_2026_03_12": false,
+      "strike": 25400,
+      "underlying": "NIFTY"
+    },
+    "NIFTY25MARFUT": {
+      "expiry_key": "2025-03",
+      "instrument_type": "FUT",
+      "is_expiry_day_on_2026_03_12": false,
+      "strike": null,
+      "underlying": "NIFTY"
+    },
+    "RELIANCE": {
+      "expiry_key": "",
+      "instrument_type": "EQ",
+      "is_expiry_day_on_2026_03_12": false,
+      "strike": null,
+      "underlying": "RELIANCE"
+    },
+    "RELIANCE25MAR2900CE": {
+      "expiry_key": "2025-03",
+      "instrument_type": "CE",
+      "is_expiry_day_on_2026_03_12": false,
+      "strike": 2900,
+      "underlying": "RELIANCE"
+    },
+    "RELIANCE25MAR2900PE": {
+      "expiry_key": "2025-03",
+      "instrument_type": "PE",
+      "is_expiry_day_on_2026_03_12": false,
+      "strike": 2900,
+      "underlying": "RELIANCE"
+    },
+    "RELIANCE25MARFUT": {
+      "expiry_key": "2025-03",
+      "instrument_type": "FUT",
+      "is_expiry_day_on_2026_03_12": false,
+      "strike": null,
+      "underlying": "RELIANCE"
+    }
+  },
+  "L1_structure_counting": {
+    "butterfly_3leg": {
+      "legs": 3,
+      "structures": 3
+    },
+    "calendar_same_direction": {
+      "legs": 2,
+      "structures": 2
+    },
+    "calendar_same_strike": {
+      "legs": 2,
+      "structures": 2
+    },
+    "ce_long_pe_long_straddle": {
+      "legs": 2,
+      "structures": 1
+    },
+    "ce_long_pe_short": {
+      "legs": 2,
+      "structures": 1
+    },
+    "covered_call_eq_plus_ce": {
+      "legs": 2,
+      "structures": 2
+    },
+    "diagonal_diff_strike": {
+      "legs": 2,
+      "structures": 2
+    },
+    "fut_long_pe_SHORT_riskadd": {
+      "legs": 2,
+      "structures": 1
+    },
+    "fut_long_pe_long_hedge": {
+      "legs": 2,
+      "structures": 1
+    },
+    "fut_short_ce_SHORT_riskadd": {
+      "legs": 2,
+      "structures": 1
+    },
+    "fut_short_ce_long_hedge": {
+      "legs": 2,
+      "structures": 1
+    },
+    "futures_rollover": {
+      "legs": 2,
+      "structures": 2
+    },
+    "iron_butterfly_4leg": {
+      "legs": 4,
+      "structures": 1
+    },
+    "iron_condor_4leg": {
+      "legs": 4,
+      "structures": 1
+    },
+    "long_call_alone": {
+      "legs": 1,
+      "structures": 1
+    },
+    "long_put_alone": {
+      "legs": 1,
+      "structures": 1
+    },
+    "nifty_fut_option_hedge": {
+      "legs": 2,
+      "structures": 1
+    },
+    "protective_put_eq_plus_pe": {
+      "legs": 2,
+      "structures": 2
+    },
+    "ratio_spread_1x2": {
+      "legs": 2,
+      "structures": 1
+    },
+    "short_call_alone": {
+      "legs": 1,
+      "structures": 1
+    },
+    "short_call_long_call_spread": {
+      "legs": 2,
+      "structures": 1
+    },
+    "short_put_alone": {
+      "legs": 1,
+      "structures": 1
+    },
+    "short_put_long_put_spread": {
+      "legs": 2,
+      "structures": 1
+    },
+    "strangle_long": {
+      "legs": 2,
+      "structures": 1
+    },
+    "unknown_pair_two_calls": {
+      "legs": 2,
+      "structures": 2
+    },
+    "weekly_opt_monthly_fut": {
+      "legs": 2,
+      "structures": 2
+    }
+  },
+  "L1_structures": {
+    "butterfly_3leg": {
+      "classified": "multi_leg_unknown",
+      "legs": 3
+    },
+    "calendar_same_direction": {
+      "classified": "calendar_spread",
+      "legs": 2
+    },
+    "calendar_same_strike": {
+      "classified": "calendar_spread",
+      "legs": 2
+    },
+    "ce_long_pe_long_straddle": {
+      "classified": "straddle_buy",
+      "legs": 2
+    },
+    "ce_long_pe_short": {
+      "classified": "synthetic_long",
+      "legs": 2
+    },
+    "covered_call_eq_plus_ce": {
+      "classified": "multi_leg_unknown",
+      "legs": 2
+    },
+    "diagonal_diff_strike": {
+      "classified": "calendar_spread",
+      "legs": 2
+    },
+    "fut_long_pe_SHORT_riskadd": {
+      "classified": "futures_hedge_bullish",
+      "legs": 2
+    },
+    "fut_long_pe_long_hedge": {
+      "classified": "futures_hedge_bullish",
+      "legs": 2
+    },
+    "fut_short_ce_SHORT_riskadd": {
+      "classified": "futures_hedge_bearish",
+      "legs": 2
+    },
+    "fut_short_ce_long_hedge": {
+      "classified": "futures_hedge_bearish",
+      "legs": 2
+    },
+    "futures_rollover": {
+      "classified": "multi_leg_unknown",
+      "legs": 2
+    },
+    "iron_butterfly_4leg": {
+      "classified": "iron_condor",
+      "legs": 4
+    },
+    "iron_condor_4leg": {
+      "classified": "iron_condor",
+      "legs": 4
+    },
+    "long_call_alone": {
+      "classified": "multi_leg_unknown",
+      "legs": 1
+    },
+    "long_put_alone": {
+      "classified": "multi_leg_unknown",
+      "legs": 1
+    },
+    "nifty_fut_option_hedge": {
+      "classified": "futures_hedge_bullish",
+      "legs": 2
+    },
+    "protective_put_eq_plus_pe": {
+      "classified": "multi_leg_unknown",
+      "legs": 2
+    },
+    "ratio_spread_1x2": {
+      "classified": "bull_call_spread",
+      "legs": 2
+    },
+    "short_call_alone": {
+      "classified": "multi_leg_unknown",
+      "legs": 1
+    },
+    "short_call_long_call_spread": {
+      "classified": "bear_call_spread",
+      "legs": 2
+    },
+    "short_put_alone": {
+      "classified": "multi_leg_unknown",
+      "legs": 1
+    },
+    "short_put_long_put_spread": {
+      "classified": "bull_put_spread",
+      "legs": 2
+    },
+    "strangle_long": {
+      "classified": "strangle_buy",
+      "legs": 2
+    },
+    "unknown_pair_two_calls": {
+      "classified": "multi_leg_unknown",
+      "legs": 2
+    },
+    "weekly_opt_monthly_fut": {
+      "classified": "multi_leg_unknown",
+      "legs": 2
+    }
+  },
+  "L2_lifecycle": {
+    "add_then_close": [
+      {
+        "avg_after": 100.0,
+        "entry_type": "OPEN",
+        "fill": [
+          75,
+          100.0
+        ],
+        "qty_after": 75,
+        "realized": 0.0
+      },
+      {
+        "avg_after": 80.0,
+        "entry_type": "INCREASE",
+        "fill": [
+          75,
+          60.0
+        ],
+        "qty_after": 150,
+        "realized": 0.0
+      },
+      {
+        "avg_after": null,
+        "entry_type": "CLOSE",
+        "fill": [
+          -150,
+          50.0
+        ],
+        "qty_after": 0,
+        "realized": -4500.0
+      }
+    ],
+    "close_and_reopen_same": [
+      {
+        "avg_after": 100.0,
+        "entry_type": "OPEN",
+        "fill": [
+          75,
+          100.0
+        ],
+        "qty_after": 75,
+        "realized": 0.0
+      },
+      {
+        "avg_after": null,
+        "entry_type": "CLOSE",
+        "fill": [
+          -75,
+          105.0
+        ],
+        "qty_after": 0,
+        "realized": 375.0
+      },
+      {
+        "avg_after": 103.0,
+        "entry_type": "OPEN",
+        "fill": [
+          75,
+          103.0
+        ],
+        "qty_after": 75,
+        "realized": 0.0
+      },
+      {
+        "avg_after": null,
+        "entry_type": "CLOSE",
+        "fill": [
+          -75,
+          108.0
+        ],
+        "qty_after": 0,
+        "realized": 375.0
+      }
+    ],
+    "long_to_short_flip": [
+      {
+        "avg_after": 100.0,
+        "entry_type": "OPEN",
+        "fill": [
+          75,
+          100.0
+        ],
+        "qty_after": 75,
+        "realized": 0.0
+      },
+      {
+        "avg_after": 90.0,
+        "entry_type": "FLIP",
+        "fill": [
+          -150,
+          90.0
+        ],
+        "qty_after": -75,
+        "realized": -750.0
+      },
+      {
+        "avg_after": null,
+        "entry_type": "CLOSE",
+        "fill": [
+          75,
+          85.0
+        ],
+        "qty_after": 0,
+        "realized": 375.0
+      }
+    ],
+    "multi_entry_partial_exits": [
+      {
+        "avg_after": 100.0,
+        "entry_type": "OPEN",
+        "fill": [
+          75,
+          100.0
+        ],
+        "qty_after": 75,
+        "realized": 0.0
+      },
+      {
+        "avg_after": 95.0,
+        "entry_type": "INCREASE",
+        "fill": [
+          75,
+          90.0
+        ],
+        "qty_after": 150,
+        "realized": 0.0
+      },
+      {
+        "avg_after": 95.0,
+        "entry_type": "DECREASE",
+        "fill": [
+          -50,
+          95.0
+        ],
+        "qty_after": 100,
+        "realized": 0.0
+      },
+      {
+        "avg_after": null,
+        "entry_type": "CLOSE",
+        "fill": [
+          -100,
+          85.0
+        ],
+        "qty_after": 0,
+        "realized": -1000.0
+      }
+    ],
+    "net_zero_same_instant": [
+      {
+        "avg_after": 100.0,
+        "entry_type": "OPEN",
+        "fill": [
+          75,
+          100.0
+        ],
+        "qty_after": 75,
+        "realized": 0.0
+      },
+      {
+        "avg_after": null,
+        "entry_type": "CLOSE",
+        "fill": [
+          -75,
+          100.0
+        ],
+        "qty_after": 0,
+        "realized": 0.0
+      }
+    ],
+    "open_then_close": [
+      {
+        "avg_after": 100.0,
+        "entry_type": "OPEN",
+        "fill": [
+          75,
+          100.0
+        ],
+        "qty_after": 75,
+        "realized": 0.0
+      },
+      {
+        "avg_after": null,
+        "entry_type": "CLOSE",
+        "fill": [
+          -75,
+          110.0
+        ],
+        "qty_after": 0,
+        "realized": 750.0
+      }
+    ],
+    "over_closing_flip_2_exits": [
+      {
+        "avg_after": 100.0,
+        "entry_type": "OPEN",
+        "fill": [
+          100,
+          100.0
+        ],
+        "qty_after": 100,
+        "realized": 0.0
+      },
+      {
+        "avg_after": 100.0,
+        "entry_type": "DECREASE",
+        "fill": [
+          -50,
+          90.0
+        ],
+        "qty_after": 50,
+        "realized": -500.0
+      },
+      {
+        "avg_after": 70.0,
+        "entry_type": "FLIP",
+        "fill": [
+          -200,
+          70.0
+        ],
+        "qty_after": -150,
+        "realized": -1500.0
+      }
+    ],
+    "partial_exit_then_close": [
+      {
+        "avg_after": 100.0,
+        "entry_type": "OPEN",
+        "fill": [
+          150,
+          100.0
+        ],
+        "qty_after": 150,
+        "realized": 0.0
+      },
+      {
+        "avg_after": 100.0,
+        "entry_type": "DECREASE",
+        "fill": [
+          -75,
+          110.0
+        ],
+        "qty_after": 75,
+        "realized": 750.0
+      },
+      {
+        "avg_after": null,
+        "entry_type": "CLOSE",
+        "fill": [
+          -75,
+          90.0
+        ],
+        "qty_after": 0,
+        "realized": -750.0
+      }
+    ],
+    "reduce_then_add_then_close": [
+      {
+        "avg_after": 100.0,
+        "entry_type": "OPEN",
+        "fill": [
+          150,
+          100.0
+        ],
+        "qty_after": 150,
+        "realized": 0.0
+      },
+      {
+        "avg_after": 100.0,
+        "entry_type": "DECREASE",
+        "fill": [
+          -50,
+          105.0
+        ],
+        "qty_after": 100,
+        "realized": 250.0
+      },
+      {
+        "avg_after": 98.3333,
+        "entry_type": "INCREASE",
+        "fill": [
+          50,
+          95.0
+        ],
+        "qty_after": 150,
+        "realized": 0.0
+      },
+      {
+        "avg_after": null,
+        "entry_type": "CLOSE",
+        "fill": [
+          -150,
+          98.0
+        ],
+        "qty_after": 0,
+        "realized": -49.995
+      }
+    ],
+    "short_cover_reenter": [
+      {
+        "avg_after": 100.0,
+        "entry_type": "OPEN",
+        "fill": [
+          -75,
+          100.0
+        ],
+        "qty_after": -75,
+        "realized": 0.0
+      },
+      {
+        "avg_after": null,
+        "entry_type": "CLOSE",
+        "fill": [
+          75,
+          95.0
+        ],
+        "qty_after": 0,
+        "realized": 375.0
+      },
+      {
+        "avg_after": 98.0,
+        "entry_type": "OPEN",
+        "fill": [
+          -75,
+          98.0
+        ],
+        "qty_after": -75,
+        "realized": 0.0
+      },
+      {
+        "avg_after": null,
+        "entry_type": "CLOSE",
+        "fill": [
+          75,
+          92.0
+        ],
+        "qty_after": 0,
+        "realized": 450.0
+      }
+    ],
+    "short_to_long_flip": [
+      {
+        "avg_after": 100.0,
+        "entry_type": "OPEN",
+        "fill": [
+          -75,
+          100.0
+        ],
+        "qty_after": -75,
+        "realized": 0.0
+      },
+      {
+        "avg_after": 110.0,
+        "entry_type": "FLIP",
+        "fill": [
+          150,
+          110.0
+        ],
+        "qty_after": 75,
+        "realized": -750.0
+      },
+      {
+        "avg_after": null,
+        "entry_type": "CLOSE",
+        "fill": [
+          -75,
+          115.0
+        ],
+        "qty_after": 0,
+        "realized": 375.0
+      }
+    ]
+  },
+  "L3_detectors": {
+    "averaged_down_worse_money_smaller_pct": {
+      "fired": {
+        "no_stoploss": {
+          "message": "NIFTY25MAR25000CE: manual exit after 30min with 38% loss of premium (₹4,500). No stop-loss order detected on this trade.",
+          "severity": "caution"
+        }
+      },
+      "note": "loses 4,500 - MORE money, smaller percentage"
+    },
+    "cash_equity_no_mtf": {
+      "fired": {
+        "excess_exposure": {
+          "message": "RELIANCE: ₹290,000 at risk — 290.0% of capital on a single trade.",
+          "severity": "danger"
+        }
+      },
+      "note": ""
+    },
+    "ce_loss_then_other_strike_ce": {
+      "fired": {
+        "options_premium_avg_down": {
+          "message": "You entered NIFTY25MAR25100CE after 1 losing options position on NIFTY today (worst loss: 30% of premium).",
+          "severity": "caution"
+        },
+        "revenge_trade": {
+          "severity": "info",
+          "via": "DetectorResult"
+        }
+      },
+      "note": "the canonical revenge shape, 3 min later"
+    },
+    "ce_loss_then_pe_buy_reversal": {
+      "fired": {
+        "options_premium_avg_down": {
+          "message": "You entered NIFTY25MAR25000PE after 1 losing options position on NIFTY today (worst loss: 30% of premium).",
+          "severity": "caution"
+        },
+        "revenge_trade": {
+          "severity": "info",
+          "via": "DetectorResult"
+        }
+      },
+      "note": "CE->PE: brief says this must NOT be direction instability"
+    },
+    "expiry_day_position": {
+      "fired": {
+        "no_stoploss": {
+          "message": "NIFTY2531225000CE: manual exit after 30min with 67% loss of premium (₹3,000). No stop-loss order detected on this trade.",
+          "severity": "danger"
+        },
+        "premium_loss_event": {
+          "message": "Closed NIFTY2531225000CE having lost 67% of the premium paid (₹3,000).",
+          "severity": "info"
+        }
+      },
+      "note": "12 Mar 2026 is this symbol's own expiry"
+    },
+    "futures_long_small_adverse_move": {
+      "fired": {},
+      "note": "0.8% index move; option-style percentage logic must not apply"
+    },
+    "futures_roll_to_next_month": {
+      "fired": {
+        "revenge_trade": {
+          "severity": "info",
+          "via": "DetectorResult"
+        }
+      },
+      "note": "a roll, not a re-entry"
+    },
+    "futures_short_adverse": {
+      "fired": {},
+      "note": ""
+    },
+    "long_option_50pct_loss": {
+      "fired": {
+        "no_stoploss": {
+          "message": "NIFTY25MAR25000CE: manual exit after 30min with 50% loss of premium (₹4,500). No stop-loss order detected on this trade.",
+          "severity": "danger"
+        },
+        "premium_loss_event": {
+          "message": "Closed NIFTY25MAR25000CE having lost 50% of the premium paid (₹4,500).",
+          "severity": "info"
+        }
+      },
+      "note": "baseline: the archetype every threshold was fitted to"
+    },
+    "missing_duration": {
+      "fired": {
+        "premium_loss_event": {
+          "message": "Closed NIFTY25MAR25000CE having lost 50% of the premium paid (₹3,750).",
+          "severity": "info"
+        }
+      },
+      "note": ""
+    },
+    "missing_instrument_type_and_direction": {
+      "fired": {},
+      "note": "contract: UNKNOWN must not become a behavioural claim"
+    },
+    "mtf_equity_position": {
+      "fired": {
+        "excess_exposure": {
+          "message": "RELIANCE: ₹290,000 at risk — 290.0% of capital on a single trade.",
+          "severity": "danger"
+        }
+      },
+      "note": "leverage is the instrument's purpose; 2.9L notional on 1L capital"
+    },
+    "no_add_50pct_loss": {
+      "fired": {
+        "no_stoploss": {
+          "message": "NIFTY25MAR25000CE: manual exit after 30min with 50% loss of premium (₹3,750). No stop-loss order detected on this trade.",
+          "severity": "danger"
+        },
+        "premium_loss_event": {
+          "message": "Closed NIFTY25MAR25000CE having lost 50% of the premium paid (₹3,750).",
+          "severity": "info"
+        }
+      },
+      "note": "loses 3,750"
+    },
+    "opened_and_closed_today": {
+      "fired": {},
+      "note": ""
+    },
+    "opened_yesterday_closed_today": {
+      "fired": {},
+      "note": "closed today, NOT opened today"
+    },
+    "other_account_priors_ignored": {
+      "fired": {
+        "no_stoploss": {
+          "message": "NIFTY25MAR25000CE: manual exit after 30min with 30% loss of premium (₹2,250). No stop-loss order detected on this trade.",
+          "severity": "caution"
+        },
+        "options_premium_avg_down": {
+          "message": "You entered NIFTY25MAR25000CE after 1 losing options position on NIFTY today (worst loss: 30% of premium).",
+          "severity": "caution"
+        }
+      },
+      "note": "engine is account-scoped; B's trades must not affect A"
+    },
+    "same_underlying_different_strike": {
+      "fired": {
+        "options_premium_avg_down": {
+          "message": "You entered NIFTY25MAR25200CE after 1 losing options position on NIFTY today (worst loss: 30% of premium).",
+          "severity": "caution"
+        }
+      },
+      "note": ""
+    },
+    "short_option_premium_tripled": {
+      "fired": {
+        "no_stoploss": {
+          "message": "NIFTY25MAR25000CE: manual exit after 30min with 200% loss of premium (₹18,000). No stop-loss order detected on this trade.",
+          "severity": "danger"
+        }
+      },
+      "note": "writer's loss is 2x premium received; contract says risk != premium"
+    },
+    "two_unrelated_underlyings": {
+      "fired": {
+        "panic_exit": {
+          "message": "TCS25MAR3500CE: closed after -60min at ₹750 loss — no stop-loss order, quick manual exit.",
+          "severity": "info"
+        }
+      },
+      "note": "simultaneous unrelated positions must not interact"
+    },
+    "unparseable_symbol": {
+      "fired": {},
+      "note": "parse_symbol returns EQ for anything it cannot read"
+    }
+  },
+  "_README": "CHARACTERIZATION SNAPSHOT — what the engine DOES today, not what it SHOULD do. Phase 1 fixes will change these values on purpose. See docs/DEEP_REVIEW/SEMANTIC_CONTRACT.md.",
+  "_coverage_limits": {
+    "exit_order_types": "Populated from a DB lookup keyed on exit_trade_ids. The harness sets it explicitly to characterise both branches rather than reproduce the ID-space bug, which is a persistence defect, not a logic one.",
+    "live_tick_path": "live_risk_state is covered by its own end-to-end tests.",
+    "mtf_margin_semantics": "No leverage model exists and broker margin is never consumed, so there is no MTF risk behaviour to baseline - only its absence.",
+    "multi_account_aggregation": "Detectors are account-scoped by construction. The harness can show account A ignores account B's trades, but cross-account aggregation does not exist to be tested.",
+    "partial_exit_emission": "A partial exit produces no CompletedTrade. L2 shows the fill effect; L3 cannot show a detector reaction because none is produced.",
+    "strategy_group_creation": "Requires _find_siblings against stored CompletedTrades. The harness exercises classify_legs directly and passes strategy_group to detectors explicitly."
+  }
+}
