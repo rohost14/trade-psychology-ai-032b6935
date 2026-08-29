@@ -25,7 +25,6 @@ retirements, not omissions; detector_registry.REGISTRY is the authority:
   3.  overtrading_burst          (burst + daily count)
   5.  rapid_reentry
   7.  martingale_behaviour
-  8.  cooldown_violation
   9.  rapid_flip
   10. excess_exposure
   11. session_meltdown
@@ -71,7 +70,6 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.completed_trade import CompletedTrade
 from app.models.trading_session import TradingSession
-from app.models.cooldown import Cooldown
 from app.models.risk_alert import RiskAlert
 from app.models.behavior_event import BehaviorEvent as BehaviorEventRecord
 from app.models.strategy_group import StrategyGroup
@@ -267,7 +265,6 @@ class EngineContext:
     session: TradingSession
     completed_trade: CompletedTrade
     session_trades: List[CompletedTrade]
-    active_cooldowns: List[Cooldown]
     thresholds: Dict[str, Any]
     strategy_group: Optional[StrategyGroup] = None
     # order_type values of the exit fills for the current completed_trade
@@ -527,16 +524,11 @@ class BehaviorEngine:
         _resolved = resolve_thresholds(profile, session_trades=session_trades)
         thresholds = RecordingThresholds(_resolved.values, _resolved.meta)
 
-        # Query 2: active cooldowns
-        now_utc = datetime.now(timezone.utc)
-        cd_result = await db.execute(
-            select(Cooldown).where(and_(
-                Cooldown.broker_account_id == broker_account_id,
-                Cooldown.expires_at > now_utc,
-                Cooldown.skipped == False,  # noqa: E712
-            ))
-        )
-        active_cooldowns = list(cd_result.scalars().all())
+        # Query 2 (active cooldowns) REMOVED 2026-08-29 with `cooldown_violation`.
+        # `ctx.active_cooldowns` had exactly one reader - that detector - so the
+        # query ran on every completed trade to feed something now retired. The
+        # Cooldown model, table, service and API are untouched; only this
+        # per-trade read is gone.
 
         # Query 3: strategy group for this trade (must run before BehaviorEngine)
         strategy_group: Optional[StrategyGroup] = None
@@ -683,7 +675,6 @@ class BehaviorEngine:
             session=session,
             completed_trade=completed_trade,
             session_trades=session_trades,
-            active_cooldowns=active_cooldowns,
             thresholds=thresholds,
             strategy_group=strategy_group,
             exit_order_types=exit_order_types,
@@ -1884,50 +1875,37 @@ class BehaviorEngine:
             },
         )
 
-    # ── Pattern 8: Cooldown violation ─────────────────────────────────────
 
-    def _detect_cooldown_violation(self, ctx: EngineContext) -> Optional[DetectedEvent]:
-        if not ctx.active_cooldowns:
-            return None
+    # ── RETIRED 2026-08-29 — `cooldown_violation` ─────────────────────────
+    #
+    # Retired because its subject does not occur and the behaviour it named is
+    # already covered, better, by a different detector.
+    #
+    # ITS PRECONDITION NEVER OCCURRED ON THE LIVE PATH. Cooldown rows are
+    # written in exactly one place, danger_zone_service.trigger_intervention,
+    # reachable only from POST /danger-zone/trigger-intervention and
+    # POST /sync/all. No Celery task calls it, so the postback pipeline that ran
+    # this detector never created a cooldown. It fired 0 times on the
+    # 175-session book.
+    #
+    # THE BEHAVIOUR IS FULLY COVERED. `constitution_violation`'s `cooldown` rule
+    # reads the trader's OWN declared `cooldown_after_loss`, measures the gap
+    # from the last losing exit, and fires at DANGER. Measured at a 15-minute
+    # declared value it raised 181 events on the same book, against this
+    # detector's 0. `revenge_trade` also reads the declared value to raise its
+    # own severity on a breach.
+    #
+    # Its registry copy - "the cooldown you set" - described that other
+    # detector's mechanism, not this one's: this read a SYSTEM-imposed row and
+    # never touched the declared value.
+    #
+    # SHARED COOLDOWN INFRASTRUCTURE IS UNTOUCHED. `cooldown_service`, the
+    # `Cooldown` model and table, the `/cooldown` API, the danger zone's use of
+    # them, and the trader's `cooldown_after_loss` rule all remain. Only this
+    # detector and the context plumbing that existed solely for it are gone.
+    #
+    # Evidence: docs/patterns/15-cooldown_violation/.
 
-        cooldown = ctx.active_cooldowns[0]
-
-        # F18. This detector read only the cooldown and never the trade, so it
-        # asserted "Traded during active cooldown" from the cooldown's mere
-        # existence. The engine runs on position CLOSE, so a position OPENED
-        # well before the cooldown began and merely closed during it was
-        # reported as a violation - the opposite of the truth, since closing is
-        # what a cooldown wants.
-        #
-        # The decision a cooldown governs is the ENTRY. Judge that.
-        started = getattr(cooldown, "started_at", None)
-        entered = getattr(ctx.completed_trade, "entry_time", None)
-        try:
-            if started and entered and entered < started:
-                return None
-        except TypeError:
-            # Missing or non-comparable timestamps. Fall through rather than
-            # crash: the previous behaviour is the safe default here, since the
-            # cooldown demonstrably exists even if we cannot place the entry
-            # against it.
-            pass
-
-        remaining_min = (cooldown.expires_at - datetime.now(timezone.utc)).total_seconds() / 60
-
-        # severity="info" — recorded for analytics/risk scoring but never shown as
-        # a user-facing alert. Users ignore cooldown reminders; tracking the violation
-        # is enough to feed the personalization engine.
-        return DetectedEvent(
-            event_type="cooldown_violation",
-            severity="info",
-            message=(
-                f"Traded during active cooldown "
-                f"({remaining_min:.0f}min remaining). "
-                f"Reason: {cooldown.reason or 'loss streak'}."
-            ),
-            context={"remaining_minutes": round(remaining_min, 1),
-                     "cooldown_reason": cooldown.reason},
-        )
 
     # ── RETIRED 2026-08-28 — `direction_instability` ──────────────────────
     #

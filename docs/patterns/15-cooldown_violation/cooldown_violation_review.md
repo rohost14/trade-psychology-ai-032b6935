@@ -1,6 +1,12 @@
 # Pattern 15 — `cooldown_violation`
 
-**Review, 29 Aug 2026. Findings only. No code changed.**
+**Review, 29 Aug 2026. CLOSED — DELETED.**
+
+The blocking question below was answered: system-imposed cooldowns will not run
+from the live pipeline, so the detector was retired the same day. Shared cooldown
+infrastructure is untouched — `cooldown_service`, the `Cooldown` model and table,
+the `/cooldown` API, the danger zone's use of them, and the trader's
+`cooldown_after_loss` rule all remain.
 
 Review-order 15. Source-list **#8**, recorded as *"IMPLEMENTED BUT NOT YET
 VERIFIED — cannot fire in replay"*. That note is confirmed below, and the reason
@@ -193,7 +199,7 @@ Recorded for later reviews, **not** fixed here:
 
 ---
 
-## Verdict — **DEFER**
+## Verdict — **DEFER** → **DELETED** (approved same day)
 
 Not KEEP AS-IS: the copy is provably wrong, and a detector whose precondition
 never occurs on the live path is not in a steady state worth confirming.
@@ -219,3 +225,27 @@ pipeline?
 
 I am not answering that on your behalf, and the evidence here cannot answer it
 either.
+
+
+---
+
+## Retirement, 29 Aug 2026
+
+**Removed:** the detector method, its registry spec, its `PATTERN_COPY` entry,
+and the context plumbing that existed solely for it — `EngineContext.active_cooldowns`
+had exactly one reader, so the per-trade `select(Cooldown)` query went with it.
+**One fewer database round-trip on every completed trade.**
+
+**Preserved, and pinned by tests:** `cooldown_service`, the `Cooldown` model,
+table and factory, the `/cooldown` API, `danger_zone_service.trigger_intervention`
+still starting cooldowns, and the trader's `cooldown_after_loss` still resolving
+to `user_cooldown_min` and `revenge_window_min`.
+
+**`constitution_violation`'s cooldown rule is untouched** and a test now proves
+it still fires at `danger` with the trader's own number in the message — that is
+what makes this retirement safe.
+
+Counts: **21 detectors, 27 pattern types.**
+
+Frontend display entries kept, as with every prior retirement, so stored alert
+rows still render a name.

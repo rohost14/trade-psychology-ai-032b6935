@@ -42,7 +42,6 @@ def _ctx(streak: int, limit: int) -> EngineContext:
                                 session_date=date.today(), market_open=None),
         completed_trade=ct,
         session_trades=[],
-        active_cooldowns=[],
         # ONLY the consecutive-loss rule is declared, so nothing else can add an
         # event and the assertions below are about this rule alone.
         thresholds={"max_consecutive_losses": limit},

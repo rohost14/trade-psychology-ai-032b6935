@@ -79,8 +79,7 @@ def ctx(position_fills, *, itype="CE", symbol="NIFTY25AUG24000CE",
         broker_account_id=ct.broker_account_id,
         session=SimpleNamespace(session_pnl=Decimal("0"),
                                 session_date=T0.date(), market_open=None),
-        completed_trade=ct, session_trades=[], active_cooldowns=[],
-        thresholds={}, position_fills=position_fills,
+        completed_trade=ct, session_trades=[], thresholds={}, position_fills=position_fills,
         strategy_group=SimpleNamespace(strategy_type="straddle", net_pnl=None)
         if spread else None,
     )

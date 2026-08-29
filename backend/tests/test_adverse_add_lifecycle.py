@@ -209,8 +209,7 @@ def run(position_fills, direction="LONG", qty=150, entry=45.0):
     )
     ctx = EngineContext(
         broker_account_id=ct.broker_account_id, session=None,
-        completed_trade=ct, session_trades=[], active_cooldowns=[],
-        thresholds={}, position_fills=position_fills,
+        completed_trade=ct, session_trades=[], thresholds={}, position_fills=position_fills,
     )
     return engine._detect_adding_to_adverse_position(ctx)
 
@@ -305,7 +304,7 @@ def _martingale(trades):
         session=SimpleNamespace(session_pnl=Decimal("0"),
                                 session_date=T0.date(), market_open=None),
         completed_trade=trades[-1], session_trades=trades[:-1],
-        active_cooldowns=[], thresholds={},
+        thresholds={},
     )
     return engine._detect_martingale_behaviour(ctx)
 

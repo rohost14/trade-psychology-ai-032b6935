@@ -248,12 +248,11 @@ REGISTRY: Tuple[DetectorSpec, ...] = (
     # is ever to interrupt a session again it must be against a give-back stop
     # the trader DECLARES, which does not exist yet.
     # See docs/patterns/06-profit_giveaway/.
-    # cooldown_violation: system-suggested cooldowns (Cooldown DB records),
-    # analytics-only. Distinct from the constitution cooldown rule below.
-    DetectorSpec("cooldown_violation", "_detect_cooldown_violation",
-                 "1.0.0", "discipline", "analytics", "exit", 0,
-                 uses_constitution=True,
-                 consumes=("active_cooldowns", "completed_trade")),
+    # `cooldown_violation` RETIRED 2026-08-29. Its precondition never occurred
+    # on the live path - no Celery task creates a Cooldown - and the behaviour
+    # is fully covered by constitution_violation's `cooldown` rule, which uses
+    # the trader's OWN declared value at danger (181 events against this
+    # detector's 0). See docs/patterns/15-cooldown_violation/.
     # Constitution violation (Phase 2, Q15): one pattern for every user-declared
     # rule — daily_loss, daily_trades, max_consecutive_losses, cooldown,
     # restricted_window, max_trade_risk. Ladder: 80% caution / 100% danger /
@@ -448,11 +447,6 @@ PATTERN_COPY: Dict[str, PatternCopy] = {
         "Late intraday entries",
         "MIS entries in the run-up to auto square-off.",
         "There is very little time for the position to work, and the exit is not yours to choose.",
-    ),
-    "cooldown_violation": PatternCopy(
-        "Cooldown ignored",
-        "Time between a losing exit and your next entry, against the cooldown you set.",
-        "The cooldown exists to put distance between a loss and the next decision.",
     ),
     "constitution_violation": PatternCopy(
         "Rule breach",

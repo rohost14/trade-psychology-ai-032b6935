@@ -60,7 +60,7 @@ def _run(ct, prior=(), thresholds=None):
         session=SimpleNamespace(session_pnl=Decimal("0"),
                                 session_date=None, market_open=None),
         completed_trade=ct, session_trades=list(prior),
-        active_cooldowns=[], thresholds=thresholds or {},
+        thresholds=thresholds or {},
     )
     return engine._detect_premium_loss_event(ctx)
 

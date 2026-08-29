@@ -47,8 +47,7 @@ def _ctx(ct, exit_types=None):
         broker_account_id=ct.broker_account_id,
         session=SimpleNamespace(session_pnl=Decimal("0"),
                                 session_date=ct.exit_time.date(), market_open=None),
-        completed_trade=ct, session_trades=[ct], active_cooldowns=[],
-        thresholds=dict(COLD_START_DEFAULTS), exit_order_types=exit_types or [])
+        completed_trade=ct, session_trades=[ct], thresholds=dict(COLD_START_DEFAULTS), exit_order_types=exit_types or [])
 
 
 # ── the claim ──────────────────────────────────────────────────────────────

@@ -191,6 +191,8 @@ export function formatPatternName(patternType: string): string {
     'profit_giveaway':               'Profit Giveaway',
     'capital_mismatch': 'Capital out of date',
     'constitution_violation': 'Rule breach',
+    // Retired 2026-08-29 (Pattern 15). Kept because stored alert rows still
+    // carry it. The behaviour now surfaces via constitution_violation.
     'cooldown_violation': 'Cooldown ignored',
     'daily_overtrading': 'Heavy day',
     'death_spiral': 'Multi-domain breakdown',

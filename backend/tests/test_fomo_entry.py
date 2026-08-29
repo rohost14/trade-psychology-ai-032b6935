@@ -73,7 +73,6 @@ def _run(trades, thresholds=None):
                                 session_date=DAY.date(), market_open=None),
         completed_trade=trades[-1],
         session_trades=trades[:-1],
-        active_cooldowns=[],
         thresholds=thresholds if thresholds is not None else {},
     )
     return engine._detect_fomo_entry(ctx)

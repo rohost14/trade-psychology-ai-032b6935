@@ -77,7 +77,6 @@ def ctx(view, trades, session_pnl=-4200.0, thresholds=None):
         session=session(session_pnl),
         completed_trade=view,
         session_trades=trades,
-        active_cooldowns=[],
         thresholds=thresholds or {
             "revenge_window_caution_min": 20,
             "revenge_window_danger_min": 5,

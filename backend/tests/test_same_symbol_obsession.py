@@ -47,7 +47,7 @@ def run(trades):
         session=SimpleNamespace(session_pnl=Decimal("0"),
                                 session_date=T0.date(), market_open=None),
         completed_trade=trades[-1], session_trades=trades[:-1],
-        active_cooldowns=[], thresholds={},
+        thresholds={},
     )
     return engine._detect_same_symbol_obsession(ctx)
 

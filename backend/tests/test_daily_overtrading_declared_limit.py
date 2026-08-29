@@ -76,7 +76,6 @@ def _run(n_positions, thresholds):
                                 session_date=None, market_open=None),
         completed_trade=ct,
         session_trades=trades[:-1],
-        active_cooldowns=[],
         thresholds=thresholds,
     )
     return engine._detect_overtrading_burst(ctx)
@@ -201,7 +200,7 @@ def test_overtrading_burst_still_fires_with_no_declared_limit():
         session=SimpleNamespace(session_pnl=Decimal("-2000"),
                                 session_date=None, market_open=None),
         completed_trade=ct, session_trades=trades[:-1],
-        active_cooldowns=[], thresholds={},
+        thresholds={},
     )
     ev = engine._detect_overtrading_burst(ctx)
     assert ev is not None

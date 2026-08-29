@@ -178,6 +178,11 @@ def test_no_shipping_module_uses_a_severity_value_outside_the_vocabulary():
 #: against these is dead code that looks alive.
 RETIRED_PATTERN_NAMES = (
     "revenge_sizing",
+    # Retired 2026-08-29 (Pattern 15): its precondition never occurred on the
+    # live path - no Celery task creates a Cooldown - and the behaviour is fully
+    # covered by constitution_violation's `cooldown` rule, which uses the
+    # trader's OWN declared value at danger. 181 events against this one's 0.
+    "cooldown_violation",
     # Retired 2026-08-29 (Pattern 14): its subject did not exist. Sub-5-minute
     # holds won at 38.3% against 39.8% for longer holds, so a fast exit is not a
     # worse decision - and it fired only on the losing 60%, ignoring 69

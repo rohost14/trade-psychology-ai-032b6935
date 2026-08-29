@@ -789,7 +789,6 @@ async def _shadow_entry_detection(broker_account_id: str, symbols: list) -> dict
             session=session,
             completed_trade=entry_view_from_position(account_uuid, representative, now_utc),
             session_trades=session_trades,
-            active_cooldowns=[],
             thresholds=get_thresholds(profile),
         )
         all_events = evaluate_entry(engine, ctx)
@@ -1359,7 +1358,7 @@ async def _adverse_add_task(broker_account_id: str, tradingsymbol: str) -> dict:
         ctx = EngineContext(
             broker_account_id=UUID(broker_account_id),
             session=None, completed_trade=view, session_trades=[],
-            active_cooldowns=[], thresholds={},
+            thresholds={},
             position_fills=[PositionFill.from_ledger(r) for r in rows],
         )
         result = behavior_engine._detect_adding_to_adverse_position(ctx)

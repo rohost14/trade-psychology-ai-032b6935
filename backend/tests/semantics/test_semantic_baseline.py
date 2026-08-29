@@ -241,7 +241,7 @@ def _l3_detectors():
         ctx = EngineContext(
             broker_account_id=subject.broker_account_id,
             session=session, completed_trade=subject,
-            session_trades=list(priors), active_cooldowns=[], thresholds=th,
+            session_trades=list(priors), thresholds=th,
         )
 
         fired = {}
