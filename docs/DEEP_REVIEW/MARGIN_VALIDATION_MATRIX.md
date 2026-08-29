@@ -208,3 +208,81 @@ python backend/tests/margin/validate_against_broker.py
 
 Downloads are cached under `$CLAUDE_JOB_DIR/tmp`. Keep the request count modest —
 the oracle is somebody else's public endpoint, not an API we are entitled to.
+
+---
+
+## LIVE VALIDATION AGAINST A REAL KITE ACCOUNT — 29 Aug 2026
+
+The item recorded as blocked in the previous report ("cannot reproduce Kite
+`/margins/orders`, no access token") is now **closed**. The user read four
+positions off their own Kite account and supplied the figures. The model was run
+beforehand, blind, with no adjustment afterwards.
+
+| position | Kite | computed | diff | % err |
+|---|---|---|---|---|
+| NIFTY SEP FUT buy, 1 lot @ 24,349 | 178,663 | 178,843 | +180 | **+0.10%** |
+| NIFTY SEP FUT sell, 1 lot @ 24,349 | 177,531 | 178,843 | +1,312 | **+0.74%** |
+| RELIANCE SEP FUT, 500 @ 1,293.50 | 114,501 | 114,475 | −26 | **−0.02%** |
+| CDSL SEP FUT sell, 475 @ 1,415.60 | 151,257 | 150,842 | −415 | **−0.27%** |
+
+**Max 0.74%, mean 0.28%, all four inside 1%.**
+
+Two things this establishes that the public-calculator run could not:
+
+**The vol-driven branch works.** NIFTY and RELIANCE both sit on the PSR floor
+(9.3% and 14.2%), so their margin is a published constant and says nothing about
+the volatility path. **CDSL does not** — its annualised volatility is 42.6%, so
+6σ×√2 = 18.93% clears the 14.2% floor and the number is genuinely computed from
+NSE's EWMA figure. It came in at **−0.27%**. That was the one case flagged in
+advance as untested, and it is the strongest single result in this document.
+
+**The lot size came from the exchange, not from the user.** The position was
+given as "1 lot" with a price. The instrument master returned **475**, which is
+correct and is not 500. Nothing was guessed.
+
+### The one thing this run does NOT explain
+
+Kite charges **1,132 more for the NIFTY long than for the short** (0.64%). Our
+model is structurally symmetric for futures — the price scan is ±PSR about the
+same reference, so a long and a short produce identical numbers by construction.
+
+**The cause is not established.** The same asymmetry appeared in the public
+calculator run on a different day (147,445 vs 146,311 span, identical exposure),
+so it is a stable property of the broker's number and not noise. It is not in
+the published method as we have read it. Recorded as unexplained rather than
+patched with a fudge factor; our figure sits 0.42% above the midpoint of the two.
+
+### Why two brokers differ by a few hundred rupees
+
+The user observed a few-hundred-rupee gap between Kite and Dhan on the same
+positions. Measured sensitivity explains the scale without needing a
+broker-conspiracy theory:
+
+| underlying | margin move per ₹1 of price | a ₹300 gap corresponds to |
+|---|---|---|
+| NIFTY | ₹7.3 | a **40.8 point** move (0.17%) |
+| RELIANCE | ₹88.5 | a **₹3.4** move (0.26%) |
+| CDSL | ₹106.6 | a **₹2.8** move (0.20%) |
+
+A few hundred rupees is **two tenths of one percent of the underlying**. Any of
+the following produces it:
+
+1. **The snapshot instant.** Margin is computed on the underlying price at the
+   moment of the quote. Two brokers quoting seconds apart on a moving market
+   will differ by this much.
+2. **Which SPAN file.** Zerodha's own documentation states SPAN "is revised by
+   the exchanges throughout the day". Brokers refresh on their own schedule, so
+   two of them can legitimately be on different parameter sets at the same
+   wall-clock time.
+3. **Broker overlay.** A broker may collect above the exchange minimum. Recorded
+   in `RISK_AND_MARGIN_VERIFICATION.md` §10 as not modelled.
+
+For CDSL there is a fourth, and it is the largest: the position is vol-driven, so
+**a one-point change in annualised volatility moves the margin by ₹2,986**. Two
+brokers computing EWMA volatility from data cut at different times will diverge
+far more on CDSL than on NIFTY, whose floor makes it insensitive to volatility
+entirely.
+
+**None of this makes one broker wrong.** It means a margin figure is only
+meaningful with a timestamp, which is why the architecture stores margin at
+capture time and never recomputes a past trade.
