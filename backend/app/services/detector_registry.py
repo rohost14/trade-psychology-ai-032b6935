@@ -397,11 +397,21 @@ PATTERN_COPY: Dict[str, PatternCopy] = {
         "Capital at risk in a single position against the trading capital you declared.",
         "One position large enough to define the session removes the choice of how the session ends.",
     ),
+    # Copy rewritten 2026-08-27... see Pattern 12 review, 2026-08-29.
+    #
+    # It read "No stop-loss on record" / "Whether a stop-loss order was on the
+    # position when it was exited." Neither was knowable: the detector reads the
+    # EXIT FILL's order type, never the resting order book, so it could not say
+    # whether a stop was ON the position. The copy asserted the absence of
+    # something the engine had not looked at.
+    #
+    # What it CAN say is how far a loss was allowed to run before the position
+    # was closed. That is what the copy now says.
     "no_stoploss": PatternCopy(
-        "No stop-loss on record",
-        "Whether a stop-loss order was on the position when it was exited.",
-        "A pre-defined exit is decided before the position moves. Without one, the exit is decided "
-        "while it is moving.",
+        "Large loss held to the exit",
+        "How far a losing position was allowed to run before it was closed.",
+        "An exit decided before a position moves is a different decision from one decided while "
+        "it is moving.",
     ),
     "adding_to_adverse_position": PatternCopy(
         "Added to a losing position",

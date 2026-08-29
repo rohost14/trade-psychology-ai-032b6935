@@ -40,13 +40,19 @@ live for a while.**
 
 ---
 
-### F4 and F13 — direction-aware denominators
+### F4 — direction-aware denominator
 
 `no_stoploss` references `direction` **zero times**, so its
 `entry_price × qty` denominator is premium *paid* for a buyer and premium
 *received* for a writer — two different quantities under one name.
-`opening_5min_trap` admits futures but computes `loss_pct` only for CE/PE, so
-its large-loss branch is unreachable for a futures position.
+
+**F13 has been REMOVED from this list.** It was filed as *"`opening_5min_trap`
+admits futures but computes `loss_pct` only for CE/PE, so its large-loss branch
+is unreachable"*. The Pattern 12 review read the code: the `else` branch
+computes `capital_at_risk` for futures via `estimate_capital_at_risk`, and
+`loss_pct` is computed **after** the branch, for both. Futures reach the loss
+branch. The item was marked *reported* rather than verified in the consolidated
+report and should never have been carried forward. **Not a bug.**
 
 **What must be decided:** the correct direction-aware trading semantics for a
 *loss-relative* denominator. This is **not** the capital question F17 settled.
@@ -198,6 +204,32 @@ Not to-do items. Each says what would change it.
 | cross-underlying hedging · sector exposure · order intent · automated vs manual · simultaneous leg holding | no correlation, sector, intent or timestamp-overlap data exists |
 
 ---
+
+## Surfaced by the Pattern 12 review — NOT actioned
+
+### `panic_exit` carries the identical unverifiable claim
+
+Its message ends *"— no stop-loss order, quick manual exit."* and its registry
+copy reads *"A quick manual close at a loss with no stop-loss order on record."*
+Both are derived from the same `exit_types & _STOP_ORDER_TYPES` test on the exit
+fill, so both assert the absence of something never looked at, and both were
+structurally unknowable in production until F1.
+
+**Deliberately not fixed with Pattern 12** — `panic_exit` is source-list #6 and
+an unrelated, unreviewed pattern. It is recorded here so the defect is not lost.
+It should be handled either in its own review or as an explicitly approved
+copy-only change.
+
+### Resting order book — RESEARCH FURTHER
+
+The only route that would upgrade `no_stoploss` from a factual loss/exit signal
+to a genuine *"a stop was available and was not used"* behavioural signal. Kite
+returns the full day order book including cancelled and rejected orders, and our
+`Order` model already stores `order_type`, `trigger_price`, `status` and
+`pending_quantity`. What is missing is plumbing: `sync_orders_to_db` runs only
+from two manual endpoints, the real-time path filters to `COMPLETE`, and no
+detector reads the `orders` table. Kite's order book is also same-day, so
+nothing can be backfilled.
 
 ## Closed on this pass — recorded so they are not re-raised
 

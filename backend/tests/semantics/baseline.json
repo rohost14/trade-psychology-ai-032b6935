@@ -1199,7 +1199,7 @@
     "averaged_down_worse_money_smaller_pct": {
       "fired": {
         "no_stoploss": {
-          "message": "NIFTY25MAR25000CE: manual exit after 30min with 38% loss of premium (₹4,500). No stop-loss order detected on this trade.",
+          "message": "NIFTY25MAR25000CE: held 30min into a 38% loss of premium (₹4,500).",
           "severity": "caution"
         }
       },
@@ -1243,7 +1243,7 @@
     "expiry_day_position": {
       "fired": {
         "no_stoploss": {
-          "message": "NIFTY2531225000CE: manual exit after 30min with 67% loss of premium (₹3,000). No stop-loss order detected on this trade.",
+          "message": "NIFTY2531225000CE: held 30min into a 67% loss of premium (₹3,000).",
           "severity": "danger"
         },
         "premium_loss_event": {
@@ -1256,7 +1256,7 @@
     "f3_ce_long_half_premium_lost": {
       "fired": {
         "no_stoploss": {
-          "message": "NIFTY25MAR25000CE: manual exit after 30min with 50% loss of premium (₹4,500). No stop-loss order detected on this trade.",
+          "message": "NIFTY25MAR25000CE: held 30min into a 50% loss of premium (₹4,500).",
           "severity": "danger"
         },
         "premium_loss_event": {
@@ -1269,7 +1269,7 @@
     "f3_ce_short_premium_doubled": {
       "fired": {
         "no_stoploss": {
-          "message": "NIFTY25MAR25000CE: manual exit after 30min with 100% loss of premium (₹9,000). No stop-loss order detected on this trade.",
+          "message": "NIFTY25MAR25000CE: held 30min into a 100% loss of premium (₹9,000).",
           "severity": "danger"
         }
       },
@@ -1290,7 +1290,7 @@
     "f3_long_option_vs_capital": {
       "fired": {
         "no_stoploss": {
-          "message": "NIFTY25MAR25000CE: manual exit after 30min with 50% loss of premium (₹4,500). No stop-loss order detected on this trade.",
+          "message": "NIFTY25MAR25000CE: held 30min into a 50% loss of premium (₹4,500).",
           "severity": "danger"
         },
         "premium_loss_event": {
@@ -1303,7 +1303,7 @@
     "f3_pe_long_half_premium_lost": {
       "fired": {
         "no_stoploss": {
-          "message": "NIFTY25MAR25000PE: manual exit after 30min with 50% loss of premium (₹4,500). No stop-loss order detected on this trade.",
+          "message": "NIFTY25MAR25000PE: held 30min into a 50% loss of premium (₹4,500).",
           "severity": "danger"
         },
         "premium_loss_event": {
@@ -1316,7 +1316,7 @@
     "f3_pe_short_premium_doubled": {
       "fired": {
         "no_stoploss": {
-          "message": "NIFTY25MAR25000PE: manual exit after 30min with 100% loss of premium (₹9,000). No stop-loss order detected on this trade.",
+          "message": "NIFTY25MAR25000PE: held 30min into a 100% loss of premium (₹9,000).",
           "severity": "danger"
         }
       },
@@ -1325,7 +1325,7 @@
     "f3_short_averaged_up": {
       "fired": {
         "no_stoploss": {
-          "message": "NIFTY25MAR25000CE: manual exit after 30min with 67% loss of premium (₹18,000). No stop-loss order detected on this trade.",
+          "message": "NIFTY25MAR25000CE: held 30min into a 67% loss of premium (₹18,000).",
           "severity": "danger"
         }
       },
@@ -1334,7 +1334,7 @@
     "f3_short_deep_otm_blowup": {
       "fired": {
         "no_stoploss": {
-          "message": "NIFTY25MAR28000CE: manual exit after 30min with 2900% loss of premium (₹4,350). No stop-loss order detected on this trade.",
+          "message": "NIFTY25MAR28000CE: held 30min into a 2900% loss of premium (₹4,350).",
           "severity": "danger"
         }
       },
@@ -1343,7 +1343,7 @@
     "f3_short_inside_spread": {
       "fired": {
         "no_stoploss": {
-          "message": "NIFTY25MAR25000CE: manual exit after 30min with 100% loss of premium (₹9,000). No stop-loss order detected on this trade.",
+          "message": "NIFTY25MAR25000CE: held 30min into a 100% loss of premium (₹9,000).",
           "severity": "danger"
         }
       },
@@ -1352,7 +1352,7 @@
     "f3_short_option_vs_capital": {
       "fired": {
         "no_stoploss": {
-          "message": "NIFTY25MAR25000CE: manual exit after 30min with 100% loss of premium (₹9,000). No stop-loss order detected on this trade.",
+          "message": "NIFTY25MAR25000CE: held 30min into a 100% loss of premium (₹9,000).",
           "severity": "danger"
         }
       },
@@ -1382,7 +1382,7 @@
     "long_option_50pct_loss": {
       "fired": {
         "no_stoploss": {
-          "message": "NIFTY25MAR25000CE: manual exit after 30min with 50% loss of premium (₹4,500). No stop-loss order detected on this trade.",
+          "message": "NIFTY25MAR25000CE: held 30min into a 50% loss of premium (₹4,500).",
           "severity": "danger"
         },
         "premium_loss_event": {
@@ -1412,7 +1412,7 @@
     "no_add_50pct_loss": {
       "fired": {
         "no_stoploss": {
-          "message": "NIFTY25MAR25000CE: manual exit after 30min with 50% loss of premium (₹3,750). No stop-loss order detected on this trade.",
+          "message": "NIFTY25MAR25000CE: held 30min into a 50% loss of premium (₹3,750).",
           "severity": "danger"
         },
         "premium_loss_event": {
@@ -1433,7 +1433,7 @@
     "other_account_priors_ignored": {
       "fired": {
         "no_stoploss": {
-          "message": "NIFTY25MAR25000CE: manual exit after 30min with 30% loss of premium (₹2,250). No stop-loss order detected on this trade.",
+          "message": "NIFTY25MAR25000CE: held 30min into a 30% loss of premium (₹2,250).",
           "severity": "caution"
         },
         "options_premium_avg_down": {
@@ -1455,7 +1455,7 @@
     "short_option_premium_tripled": {
       "fired": {
         "no_stoploss": {
-          "message": "NIFTY25MAR25000CE: manual exit after 30min with 200% loss of premium (₹18,000). No stop-loss order detected on this trade.",
+          "message": "NIFTY25MAR25000CE: held 30min into a 200% loss of premium (₹18,000).",
           "severity": "danger"
         }
       },

@@ -2208,7 +2208,7 @@ class BehaviorEngine:
             )
         return None
 
-    # ── Pattern 13: No stop-loss ──────────────────────────────────────────
+    # ── Pattern 13: large loss held to the exit ───────────────────────────
     #
     # Long-held option loser: held too long without an exit plan.
     # Expiry-day modifier: theta burns 3-5× faster — lower thresholds.
@@ -2269,14 +2269,25 @@ class BehaviorEngine:
                 _parsed = _parse_sym(ct.tradingsymbol or "")
                 is_monthly_expiry = len(_parsed.expiry_key) == 7
 
+        # WEEKLY-EXPIRY ARM REMOVED, Pattern 12 review 2026-08-29.
+        #
+        # It read `no_stoploss_expiry_loss_pct` (25) and
+        # `no_stoploss_expiry_hold_min` (5), which are the SAME values as the
+        # normal gate below - so it selected exactly the trades the else arm
+        # would have, while labelling them "(expiry day)". Measured: 23 of 52
+        # firings carried that label, telling the trader a different standard
+        # had been applied when none had.
+        #
+        # A weekly-expiry trade now falls through to the normal gate, which is
+        # bit-identical to what the arm produced. Firing behaviour is unchanged.
+        #
+        # The MONTHLY arm is kept: 20% against the normal 25% is a real
+        # difference, so it is not dead code. Giving weekly its own threshold is
+        # a separate, unapproved decision.
         if is_monthly_expiry:
             loss_threshold = ctx.thresholds.get("no_stoploss_monthly_loss_pct", 20)
             hold_threshold = ctx.thresholds.get("no_stoploss_monthly_hold_min", 5)
             expiry_note = " (monthly expiry)"
-        elif is_expiry:
-            loss_threshold = ctx.thresholds.get("no_stoploss_expiry_loss_pct", 25)
-            hold_threshold = ctx.thresholds.get("no_stoploss_expiry_hold_min", 5)
-            expiry_note = " (expiry day)"
         else:
             loss_threshold = ctx.thresholds.get("no_stoploss_loss_pct_caution", 25)
             # Minimum 5 min hold to exclude ultra-fast scalps where no formal SL is intentional.
@@ -2290,13 +2301,49 @@ class BehaviorEngine:
         danger_loss_pct = ctx.thresholds.get("no_stoploss_loss_pct_danger", 50)
         severity = "danger" if loss_pct >= danger_loss_pct else "caution"
 
+        # THE CLAIM, Pattern 12 review 2026-08-29.
+        #
+        # This used to end "No stop-loss order detected on this trade." It was
+        # derived from the EXIT FILL's order type, and it asserted the absence
+        # of something it had not looked at:
+        #
+        #   - in the 175-session reference book, order type is absent for every
+        #     fill, so the claim was checkable on 0 of 52 alerts;
+        #   - in production it was worse. F1 meant exit_trade_ids held Kite
+        #     order ids while the consumer matched Trade.id UUIDs, so the list
+        #     was structurally EMPTY for every live trade. Every alert ever
+        #     raised asserted "no stop-loss detected" from a list that could not
+        #     have contained one.
+        #
+        # Even with F1 fixed, the exit fill answers a different question. "Was
+        # this exit executed by a stop order" is a fact about the fill. "Did the
+        # trader have a resting stop" needs the ORDER BOOK, which Kite provides,
+        # which our Order model can hold, and which no detector reads. A trader
+        # holding a resting SL who exits manually first shows MKT and would be
+        # told they had no stop - the inverse of the truth.
+        #
+        # So the message now states only what is known. The exit mechanism is
+        # mentioned ONLY when it was actually observed; absent that, the alert
+        # says how far the loss ran and stops there. Nothing implies a stop-loss
+        # was available, absent, ignored or detected.
+        #
+        # RESEARCH FURTHER, not abandoned: routing the resting order book to
+        # detectors would upgrade this from a factual loss/exit signal to a
+        # genuine "a stop was available and was not used" behavioural signal.
+        # That is the only thing that would, and it is not done here.
+        mechanism_observed = bool(exit_types)
+        if mechanism_observed:
+            exit_note = (f" Exit was a {'/'.join(sorted(exit_types))} order, "
+                         f"not a stop.")
+        else:
+            exit_note = ""
+
         return DetectedEvent(
             event_type="no_stoploss",
             severity=severity,
             message=(
-                f"{ct.tradingsymbol}{expiry_note}: manual exit after {duration}min "
-                f"with {loss_pct:.0f}% loss {loss_label} (₹{abs(pnl):,.0f}). "
-                f"No stop-loss order detected on this trade."
+                f"{ct.tradingsymbol}{expiry_note}: held {duration}min into a "
+                f"{loss_pct:.0f}% loss {loss_label} (₹{abs(pnl):,.0f}).{exit_note}"
             ),
             context={
                 "duration_minutes": duration,
@@ -2306,6 +2353,9 @@ class BehaviorEngine:
                 "instrument_type": instrument_type,
                 "is_expiry_day": is_expiry,
                 "exit_order_types": list(exit_types),
+                # Whether the exit mechanism was observable at all. False means
+                # the message deliberately says nothing about how it was closed.
+                "exit_mechanism_observed": mechanism_observed,
             },
         )
 
