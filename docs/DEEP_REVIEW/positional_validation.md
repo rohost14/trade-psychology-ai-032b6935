@@ -6,11 +6,11 @@
 >
 > | # | scope | brief items covered | status |
 > |---|---|---|---|
-> | A | position lifecycle, average price & P&L, order intent vs execution | 1, 2, 14 | running |
-> | B | long/short options, futures vs options, capital & margin | 7, 8, 12 | running |
-> | C | hedge recognition & adjustment, strategy geometry, cross-underlying | 3, 4, 6, 10 | running |
-> | D | expiry & rollover, time horizon, trader archetypes | 5, 13, archetypes | running |
-> | E | MTF, portfolio exposure, data failure, multi-account | 9, 11, 15, 16 | running |
+> | A | position lifecycle, average price & P&L, order intent vs execution | 1, 2, 14 | **REPORTED** |
+> | B | long/short options, futures vs options, capital & margin | 7, 8, 12 | **REPORTED** |
+> | C | hedge recognition & adjustment, strategy geometry, cross-underlying | 3, 4, 6, 10 | **REPORTED** |
+> | D | expiry & rollover, time horizon, trader archetypes | 5, 13, archetypes | **REPORTED** |
+> | E | MTF, portfolio exposure, data failure, multi-account | 9, 11, 15, 16 | agent failed (session limit) — **being done directly** |
 >
 > No code changes are being made. Findings only.
 
