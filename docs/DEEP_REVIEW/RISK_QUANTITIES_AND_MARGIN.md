@@ -6,6 +6,14 @@ against the consolidated audit report.**
 External facts below are sourced, not recalled. Where two published sources
 disagree, both are shown.
 
+> **Section 3's accuracy figures are SUPERSEDED.** The "+12-50%, overstates"
+> band came from a single at-the-money point and does not generalise; measured
+> across a full strike ladder the constant runs **-35% to +158%**. The "+0.77%"
+> probe result is **withdrawn** — it compared a 4-day weekly against a 32-day
+> monthly. Sections 1 and 2, on the three concepts and on which detectors need
+> margin, stand. Current figures:
+> [`MARGIN_VALIDATION_MATRIX.md`](MARGIN_VALIDATION_MATRIX.md).
+
 ---
 
 ## 1. "Why do we need three concepts?" — we don't. We need two and a flag.

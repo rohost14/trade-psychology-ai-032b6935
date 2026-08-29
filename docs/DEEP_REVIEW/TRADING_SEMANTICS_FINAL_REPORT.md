@@ -3,6 +3,24 @@
 **29 Aug 2026. Complete. No pattern was reviewed, retired or retuned.
 No FIX NOW item below is implemented. Awaiting approval.**
 
+> **SUPERSEDED IN PART — 29 Aug 2026, later the same day.**
+>
+> Section 5 of this report lists *"true margin per position"* as effectively
+> unobtainable, and the companion note concluded that SPAN could not be
+> reproduced without exchange risk parameter files. **That conclusion was
+> wrong.** NSE Clearing publishes the full methodology, every parameter and the
+> pricing model; the historical inputs are public and archived. A working
+> calculator now reproduces real broker margins — futures within 0.5%, a call
+> spread within 0.3%, long options exactly 0, short options systematically
+> +5-7% high.
+>
+> **The rest of this report stands.** The FIX NOW list, the dependency order and
+> the Pattern 12 verdict are unaffected — Pattern 12 is about the *order book*,
+> not margin. Nothing below has been edited; the correction is recorded at the
+> end under "Superseded conclusions" and in detail in
+> [`RISK_AND_MARGIN_VERIFICATION.md`](RISK_AND_MARGIN_VERIFICATION.md).
+
+
 Sources: [`SEMANTIC_CONTRACT.md`](SEMANTIC_CONTRACT.md) ·
 [`CANONICAL_TRADING_SEMANTICS.md`](CANONICAL_TRADING_SEMANTICS.md) ·
 [`PHASE0_CLASSIFICATION.md`](PHASE0_CLASSIFICATION.md) ·
@@ -359,3 +377,35 @@ having had none — the inverse of the truth.
 
 **A position losing 50% is a measurable fact. "The trader ignored their
 stop-loss" is a behavioural claim the data as wired does not support.**
+
+
+---
+
+# Superseded conclusions — added 29 Aug 2026
+
+Recorded here rather than edited into the text above, so the reasoning that led
+to the wrong answer stays visible.
+
+| # | claim in this report / its companion note | status |
+|---|---|---|
+| 1 | "SPAN cannot be reproduced without exchange risk parameter files" | **WRONG.** The `.spn` file is a convenience so members "need not execute complex option pricing calculations". The method, parameters and model are published; the inputs are public and archived back years |
+| 2 | "any internal calculator is an approximation wearing a precise name" | **WRONG** for futures (−0.2%/+0.5%), spreads (−0.3%) and long options (exact). **Partly right** for short options, which carry a measured, unexplained +5-7% |
+| 3 | "true margin per position — Kite provides it, we drop it" (§8) | **HALF WRONG.** Kite provides margin only for a **prospective** order. No API returns the margin of a past position, so for history it was never ours to drop — it must be computed |
+| 4 | "the 12% constant is accurate to ±12-50%, overstating" | **WRONG.** Measured across a live strike ladder it runs **−35% to +158%**, under-stating deep ITM where risk is largest |
+| 5 | "the probe reproduced a real margin to +0.77%" | **WITHDRAWN.** It compared a 4-day weekly against the oracle's 32-day monthly. Different contracts; the agreement was coincidence |
+| 6 | **F15** — the parser cannot read 17 real symbols | **STILL VALID, but reordered.** For *historical* NSE data it dissolves: the bhavcopy states `FinInstrmTp`, `TckrSymb`, `StrkPric`, `OptnTp`, so nothing is parsed. The regex fix remains necessary on the **live** path, where only a tradingsymbol arrives |
+| 7 | **F11** — monthly expiry hardcoded to last Thursday | **CONFIRMED AND WORSE.** NIFTY's 2026 monthlies are **Tuesdays** (09-29, 10-27, 11-23). The fix is to read `XpryDt`, never to compute a weekday |
+
+**Unaffected:** every other FIX NOW item, the dependency order, the DESIGN /
+UNSUPPORTED / FALSE POSITIVE lists, the Pattern 1-11 impact register, and the
+Pattern 12 verdict.
+
+**Pattern 12 specifically.** Nothing here changes it. Its problem is that the
+resting **order book** is not available to detectors — a different pipeline from
+margin. It remains UNSUPPORTED and unimplemented.
+
+New deliverables: [`RISK_AND_MARGIN_VERIFICATION.md`](RISK_AND_MARGIN_VERIFICATION.md) ·
+[`MARGIN_VALIDATION_MATRIX.md`](MARGIN_VALIDATION_MATRIX.md) ·
+[`INSTRUMENT_MASTER_SPEC.md`](INSTRUMENT_MASTER_SPEC.md) ·
+[`RISK_LAYER_ARCHITECTURE.md`](RISK_LAYER_ARCHITECTURE.md) ·
+[`DETECTOR_RISK_DEPENDENCY_MAP.md`](DETECTOR_RISK_DEPENDENCY_MAP.md)
