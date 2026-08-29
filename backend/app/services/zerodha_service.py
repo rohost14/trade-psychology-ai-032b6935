@@ -237,6 +237,8 @@ class ZerodhaClient(BrokerInterface):
         data: Dict = None,
         params=None,
         timeout: float = 10.0,
+        json_body=None,           # JSON request body — /margins/* take an ARRAY, not a form
+
         broker_account_id=None,   # Optional — enables circuit breaker when provided
     ) -> Dict[str, Any]:
         """Make rate-limited API request using persistent client."""
@@ -261,7 +263,13 @@ class ZerodhaClient(BrokerInterface):
             if method == "GET":
                 response = await client.get(url, headers=headers, params=params, timeout=timeout)
             elif method == "POST":
-                response = await client.post(url, data=data, headers=headers, timeout=timeout)
+                if json_body is not None:
+                    # Kite's margin endpoints take a JSON array of order objects.
+                    # The form-encoded path below cannot express that.
+                    response = await client.post(
+                        url, json=json_body, headers=headers, timeout=timeout)
+                else:
+                    response = await client.post(url, data=data, headers=headers, timeout=timeout)
             elif method == "DELETE":
                 response = await client.delete(url, headers=headers, timeout=timeout)
             else:
@@ -506,6 +514,54 @@ class ZerodhaClient(BrokerInterface):
 
         result = await self._request("GET", url, access_token)
         return result.get("data", {})
+
+    async def get_order_margins(
+        self,
+        access_token: str,
+        orders: List[Dict[str, Any]],
+        mode: str = "orders",
+        broker_account_id=None,
+    ) -> List[Dict[str, Any]]:
+        """
+        Broker margin for prospective orders — the ONLY exact margin Kite gives.
+
+        This is the source of `MarginSource.BROKER`. It is deliberately not used
+        to value a past trade, because it cannot: Kite has no endpoint that
+        returns the margin of a position that is already closed. Anything
+        historical must be reconstructed and tagged `COMPUTED`.
+
+        Args:
+            orders: one dict per leg, each with exchange, tradingsymbol,
+                transaction_type, variety, product, order_type, quantity, price
+                and trigger_price.
+            mode: "orders" charges each leg independently; "basket" applies
+                spread benefit across the legs. **For any hedged position the
+                two differ enormously** — measured on a NIFTY call spread, the
+                broker charges Rs 64,174 against Rs 175,747 for the short leg
+                alone. Use "basket" whenever the legs are held together, or the
+                figure overstates committed capital by a factor of three.
+
+        Returns the per-order breakdown: span, exposure, option_premium,
+        additional, bo, cash, var, total.
+        """
+        endpoint = "basket" if mode == "basket" else "orders"
+        url = f"{self.BASE_URL}/margins/{endpoint}"
+
+        logger.info(f"Fetching {endpoint} margin from Kite for {len(orders)} leg(s)")
+
+        result = await self._request(
+            "POST", url, access_token, json_body=orders,
+            broker_account_id=broker_account_id,
+        )
+        data = result.get("data", [])
+        # /margins/basket answers with {initial, final, orders}; /margins/orders
+        # answers with a bare list. Normalise to the per-order list, but keep
+        # `final` for basket mode because that is the one with spread benefit
+        # applied and therefore the one that reflects real committed capital.
+        if isinstance(data, dict):
+            return {"initial": data.get("initial"), "final": data.get("final"),
+                    "orders": data.get("orders", [])}
+        return data
 
     async def get_instruments(self, exchange: str = None, access_token: str = None) -> List[Dict[str, Any]]:
         """

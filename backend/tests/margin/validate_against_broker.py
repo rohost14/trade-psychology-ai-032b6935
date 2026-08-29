@@ -235,6 +235,55 @@ def build_cases(rows, vols):
     two_leg("short strangle (sell OTM CE + OTM PE)", ("CE", atm + 500, -65), ("PE", atm - 500, -65))
     two_leg("long straddle (buy ATM CE + ATM PE)", ("CE", atm, 65), ("PE", atm, 65))
     two_leg("ratio spread (sell 2 OTM CE / buy 1 ATM CE)", ("CE", atm + 500, -130), ("CE", atm, 65))
+    two_leg("short CE + long higher-strike CE", ("CE", atm, -65), ("CE", atm + 1000, 65))
+    two_leg("short PE + long lower-strike PE", ("PE", atm, -65), ("PE", atm - 1000, 65))
+    two_leg("multiple positions, same underlying, same expiry",
+            ("CE", atm + 500, -65), ("PE", atm - 500, -65))
+
+    # N-leg structures and futures/option combinations
+    def n_leg(name, legs_spec, expiry="26SEP"):
+        rows, broker, model = [], [], []
+        for kind, strike, signed in legs_spec:
+            if kind == "FUT":
+                row = fut("NIFTY", expiry)
+                broker.append(dict(exchange="NFO", product="FUT", scrip=f"NIFTY{expiry}",
+                                   option_type="CE", strike="", qty=abs(signed),
+                                   trade="sell" if signed < 0 else "buy"))
+            else:
+                row = opt("NIFTY", expiry, kind, float(strike))
+                broker.append(dict(exchange="NFO", product="OPT", scrip=f"NIFTY{expiry}",
+                                   option_type=kind, strike=int(strike),
+                                   qty=abs(signed), trade="sell" if signed < 0 else "buy"))
+            if row is None:
+                return
+            model.append((row, signed))
+        cases.append(dict(name=name, segment=Segment.INDEX, sym="NIFTY",
+                          spot=ref("NIFTY", expiry), legs=model, broker=broker))
+
+    n_leg("long future + short put", [("FUT", None, 65), ("PE", atm, -65)])
+    n_leg("short future + short call", [("FUT", None, -65), ("CE", atm, -65)])
+    n_leg("iron butterfly (short ATM straddle + long wings)",
+          [("CE", atm, -65), ("PE", atm, -65),
+           ("CE", atm + 500, 65), ("PE", atm - 500, 65)])
+    n_leg("iron condor",
+          [("CE", atm + 500, -65), ("PE", atm - 500, -65),
+           ("CE", atm + 1000, 65), ("PE", atm - 1000, 65)])
+    n_leg("call butterfly (1 / -2 / 1)",
+          [("CE", atm - 500, 65), ("CE", atm, -130), ("CE", atm + 500, 65)])
+
+    # Different expiries - the model does NOT charge a calendar spread and must
+    # say so rather than quietly understating.
+    ra = opt("NIFTY", "26SEP", "CE", float(atm))
+    rb = opt("NIFTY", "26OCT", "CE", float(atm))
+    if ra and rb:
+        cases.append(dict(
+            name="calendar spread (sell SEP CE / buy OCT CE) - UNMODELLED",
+            segment=Segment.INDEX, sym="NIFTY", spot=ref("NIFTY", "26SEP"),
+            legs=[(ra, -65), (rb, 65)],
+            broker=[dict(exchange="NFO", product="OPT", scrip="NIFTY26SEP",
+                         option_type="CE", strike=int(atm), qty=65, trade="sell"),
+                    dict(exchange="NFO", product="OPT", scrip="NIFTY26OCT",
+                         option_type="CE", strike=int(atm), qty=65, trade="buy")]))
     return cases
 
 
@@ -251,7 +300,7 @@ def main():
     print(header)
     print("|---|---|---|---|---|---|---|---|")
 
-    errors, failures, zero_cases = [], [], []
+    errors, failures, zero_cases, unreliable = [], [], [], []
     for case in cases:
         try:
             broker = ask_broker(case["broker"])
@@ -279,6 +328,14 @@ def main():
                              annualised_vol=vols[case["sym"]],
                              segment=case["segment"])
         bt, ct = float(broker["total"]), got.total
+        if not got.reliable:
+            # The model declines to answer. Recorded, shown, and NOT scored -
+            # averaging in a case the model refused would flatter the result.
+            unreliable.append((case["name"], bt, ct))
+            qty = sum(abs(q) for _, q in case["legs"])
+            print(f"| {case['name']} | {qty} | {float(broker['span']):,.0f} | {bt:,.0f} "
+                  f"| ABSTAINS | ABSTAINS | - | - |")
+            continue
         err = ct - bt
         if bt == 0:
             # Long-only positions: the broker blocks nothing. A percentage is
@@ -293,6 +350,11 @@ def main():
               f"| {got.span:,.0f} | {ct:,.0f} | {err:+,.0f} | {pct:+.1f}% |")
 
     print()
+    if unreliable:
+        print(f"abstained (unreliable): {len(unreliable)}")
+        for name, bt, ct in unreliable:
+            print(f"    broker {bt:>12,.0f}   model declines "
+                  f"(would have said {ct:,.0f}, {ct/bt-1:+.1%})   {name}")
     if zero_cases:
         exact = sum(1 for _, ct in zero_cases if abs(ct) < 1e-6)
         print(f"zero-margin cases   : {exact}/{len(zero_cases)} computed exactly 0"

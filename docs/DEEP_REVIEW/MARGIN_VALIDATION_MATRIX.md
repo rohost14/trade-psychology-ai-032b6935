@@ -60,15 +60,26 @@ agreement, not as precision.**
 | short strangle (sell OTM CE + OTM PE) | 130 | 113,718 | 176,111 | 123,846 | 187,135 | +11,024 | +6.3% |
 | long straddle (buy ATM CE + ATM PE) | 130 | 0 | 0 | 0 | 0 | +0 | +nan% |
 | ratio spread (sell 2 OTM CE / buy 1 ATM CE) | 195 | 0 | 31,197 | 91,870 | 155,159 | +123,962 | +397.4% |
+| short CE + long higher-strike CE | 130 | 60,860 | 92,056 | 64,642 | 96,286 | +4,230 | +4.6% |
+| short PE + long lower-strike PE | 130 | 54,847 | 86,044 | 64,501 | 96,146 | +10,102 | +11.7% |
+| multiple positions, same underlying, same expiry | 130 | 113,718 | 176,111 | 123,846 | 187,135 | +11,024 | +6.3% |
+| long future + short put | 130 | 276,486 | 339,327 | 284,507 | 347,796 | +8,469 | +2.5% |
+| short future + short call | 130 | 290,862 | 353,703 | 302,851 | 366,140 | +12,438 | +3.5% |
+| iron butterfly (short ATM straddle + long wings) | 260 | 32,977 | 95,370 | 32,321 | 95,610 | +240 | +0.3% |
+| iron condor | 260 | 27,882 | 90,276 | 32,321 | 95,610 | +5,334 | +5.9% |
+| call butterfly (1 / -2 / 1) | 260 | 0 | 62,393 | 0 | 63,289 | +896 | +1.4% |
+| calendar spread (sell SEP CE / buy OCT CE) - UNMODELLED | 130 | 14,822 | 46,019 | ABSTAINS | ABSTAINS | - | - |
 
 ```
+abstained (unreliable): 1
+    broker       46,019   model declines (would have said 32,404, -29.6%)   calendar spread (sell SEP CE / buy OCT CE) - UNMODELLED
 zero-margin cases   : 11/11 computed exactly 0
-cases compared      : 24
+cases compared      : 32
 median |error|      : 4.0%
 90th pct |error|    : 7.3%
 max |error|         : 397.4%
-within 5%           : 14/24
-within 15%          : 23/24
+within 5%           : 19/32
+within 15%          : 31/32
 ```
 
 *(`nan%` marks a case where the broker blocks nothing, so a percentage is
@@ -77,6 +88,32 @@ undefined. Those are scored exactly instead — see below.)*
 ---
 
 ## What the distribution says
+
+**Structure coverage (added 29 Aug, second pass):**
+
+| structure | error |
+|---|---|
+| iron butterfly (4 legs) | **+0.3%** |
+| bull call spread | **−0.3%** |
+| call butterfly 1/−2/1 | +1.4% |
+| long future + short put | +2.5% |
+| short future + short call | +3.5% |
+| short CE + long higher CE | +4.6% |
+| iron condor | +5.9% |
+| short straddle / strangle | +5.9% / +6.3% |
+| short PE + long lower PE | +11.7% |
+| **calendar spread (SEP/OCT)** | **model ABSTAINS** |
+
+Every one of these is produced by scanning the legs jointly. **There is no
+per-structure rule and no hedge ratio anywhere in the model** — it does not know
+what an iron butterfly is, and reproduces one to 0.3%.
+
+**The calendar spread earned a code change.** It came out at 32,404 against the
+broker's 46,019 — **29.6% LOW**, because the inter-month charge is not
+implemented. Understating committed capital is the dangerous direction for every
+rule that asks how much of the account is tied up, so a flag on a returned
+number was not enough: `MarginBreakdown.reliable` is now False for any
+multi-expiry portfolio and callers must abstain.
 
 **Excellent — at the noise floor:**
 

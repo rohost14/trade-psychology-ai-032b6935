@@ -152,6 +152,19 @@ class MarginBreakdown:
     #: does NOT charge a calendar spread for. The number is then understated.
     calendar_spread_unmodelled: bool = False
 
+    @property
+    def reliable(self) -> bool:
+        """
+        Whether this figure may be used as a capital requirement.
+
+        False for multi-expiry portfolios. Measured: a NIFTY SEP/OCT calendar
+        spread came out at 32,404 against the broker's 46,019 — **29.6% LOW**.
+        Understating committed capital is the dangerous direction for every rule
+        that asks "how much of my account is tied up", so a flag on a returned
+        number is not enough. Callers must test this and abstain.
+        """
+        return not self.calendar_spread_unmodelled
+
 
 # ---------------------------------------------------------------------------
 # Option pricing
