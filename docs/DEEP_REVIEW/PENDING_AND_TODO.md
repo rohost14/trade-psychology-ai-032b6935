@@ -162,6 +162,30 @@ are worth folding into the same pass only because the replay is already running.
 an arithmetic identity, a shuffle null or an outcome comparison, none of which
 instrument typing can reach.
 
+### Pattern 16 `excess_exposure` — review DEFERRED
+
+**Deferred 29 Aug 2026, before review, by decision.** Not reviewed, not
+modified, not deleted.
+
+**Why:** F17 changed its capital input two days earlier. It now takes the
+capital requirement from the canonical risk layer, and that layer **abstains on
+futures and short options** until a broker margin figure exists. Live broker
+margin capture is implemented but has never run — every number in its 21 tests
+is a fixture.
+
+So the detector is currently silent on exactly the instruments where its
+question matters most. **Reviewing it now would measure a temporarily incomplete
+detector** and reach a verdict about a state it is not going to stay in.
+
+**What must happen first:** the live broker-margin validation immediately below.
+Once a real `OPEN` fill has produced a `position_margin_observations` row and
+that figure has reached `excess_exposure` as `MarginSource.BROKER`, the detector
+is in its intended state and can be judged.
+
+**Nothing is assumed about the outcome.** The original audit recorded it as
+*"IMPLEMENTED, NOT VERIFIED — zero test mentions AND excluded from replay"*,
+which is a separate problem from the F17 change and is still open.
+
 ### Live Kite broker-margin validation
 
 Migration 081 is **applied**. The capture path, persistence, resolution and
