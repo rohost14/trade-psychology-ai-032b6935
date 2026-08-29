@@ -108,28 +108,38 @@ _CDS = ExchangeSupport(
 
 _MCX = ExchangeSupport(
     exchange="MCX",
-    support=Support.UNSUPPORTED,
+    support=Support.IDENTITY_ONLY,
     verified=(
+        "price quotation and trading unit ARE published per contract in MCX's "
+        "own contract specifications. GOLDM: trading unit 100 grams, price "
+        "quoted per 10 grams, tick Re 1 per 10 grams - so the multiplier is 10, "
+        "which is what MCX_MULTIPLIERS already carries",
+        "expiry is published as a contract-launch/expiry calendar and is NOT a "
+        "weekday rule: GOLDM's September 2026 contract expires 2026-09-04, i.e. "
+        "the 5th of the expiry month or the prior working day. It must be READ, "
+        "never computed - the same lesson as NSE's non-Thursday expiries",
+        "instrument identity parses correctly (GOLDM26SEPFUT, "
+        "GOLDM26SEP160000CE resolve to underlying GOLDM with the right type)",
         "Kite's instruments dump reports lot_size = 1 for every MCX instrument",
     ),
     unknown=(
+        "MCX's own SPAN scan ranges and exposure margin rates. MCX publishes "
+        "these separately from NSE Clearing and they have NOT been retrieved - "
+        "mcxindia.com returns HTTP 403 to automated fetches. NSE's 9.3%/14.2% "
+        "floors are equity-derivative parameters and do NOT apply to bullion",
         "whether Kite's fill quantity for MCX is LOTS or UNITS, confirmed "
         "against a real fill rather than a forum post",
-        "whether lot_size = 1 is a data gap or a deliberate encoding",
-        "the multipliers themselves: app/services/mcx_contract_specs.py carries "
-        "a hardcoded table sourced from Z-Connect, a third-party 2024 lot-size "
-        "chart and mcxindia.com/products - NOT from MCX contract specifications "
-        "read directly",
         "how multiplier revisions are dated (COPPER moved from 1 MT to 2500 kg "
         "in 2022; under effective dating, pre-2022 trades must keep the old "
         "value)",
-        "tick value and price quotation unit per contract",
     ),
     note=(
-        "MCX stays UNSUPPORTED until quantity and multiplier semantics are "
-        "verified from MCX primary sources. The existing behaviour - abstain on "
-        "unknown contracts - is correct and must not be loosened to improve "
-        "coverage. A wrong multiplier is a 5000x error on ZINC."
+        "Identity and ENTRY VALUE are now correct, because the multiplier is "
+        "sourced from MCX's published contract specification. CAPITAL REQUIREMENT "
+        "stays unavailable: MCX sets its own scan ranges and applying NSE's "
+        "equity-derivative parameters to bullion would be a fabrication. A "
+        "contract whose multiplier is not tabulated still abstains entirely - a "
+        "wrong multiplier is a 5000x error on ZINC."
     ),
 )
 

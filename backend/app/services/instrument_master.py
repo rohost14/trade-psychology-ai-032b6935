@@ -203,6 +203,18 @@ def derive_spec(tradingsymbol: str, exchange: str, on: date) -> ContractSpec:
     p = parse_symbol(tradingsymbol or "")
     itype = p.instrument_type
 
+    # Contract multiplier. NSE/BSE resolve to 1; MCX and CDS quote a price per
+    # unit that is not the trading unit (GOLDM trades in 100g lots and quotes
+    # per 10g, so 10), and an unknown MCX contract returns None. None must
+    # abstain rather than fall back to 1, because on ZINC that is a 5000x error.
+    from app.services.mcx_contract_specs import get_lot_multiplier_or_none
+    multiplier = get_lot_multiplier_or_none(exchange, tradingsymbol or "")
+    if multiplier is None:
+        return ContractSpec.unavailable(
+            tradingsymbol, exchange, on,
+            "no contract multiplier is tabulated for this instrument, so its "
+            "entry value cannot be computed")
+
     if itype is None:
         # F9/F16: an unreadable derivative is UNKNOWN. It is not equity.
         return ContractSpec.unavailable(
@@ -214,6 +226,7 @@ def derive_spec(tradingsymbol: str, exchange: str, on: date) -> ContractSpec:
         return ContractSpec(
             tradingsymbol=tradingsymbol, exchange=exchange, effective_date=on,
             segment=Segment.EQUITY, underlying=p.underlying,
+            contract_multiplier=multiplier,
             source=SpecSource.DERIVED, reliability=Reliability.DERIVED)
 
     is_index = (p.underlying or "").upper() in _INDEX_UNDERLYINGS
@@ -225,6 +238,7 @@ def derive_spec(tradingsymbol: str, exchange: str, on: date) -> ContractSpec:
         strike=p.strike,
         option_type=itype if itype in ("CE", "PE") else None,
         lot_size=None,        # not derivable from a symbol
+        contract_multiplier=multiplier,
         source=SpecSource.DERIVED, reliability=Reliability.DERIVED,
         note="derived from the tradingsymbol; expiry date and lot size unknown",
     )

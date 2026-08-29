@@ -168,7 +168,8 @@ def test_unknown_contract_abstains_and_is_never_equity():
     ("NSE", Support.IDENTITY_ONLY),
     ("BFO", Support.IDENTITY_ONLY),
     ("CDS", Support.UNSUPPORTED),
-    ("MCX", Support.UNSUPPORTED),
+    ("MCX", Support.IDENTITY_ONLY),   # was UNSUPPORTED; multiplier now sourced
+                                      # from MCX contract specs. Capital still refused.
     (None, Support.UNSUPPORTED),
     ("NONSENSE", Support.UNSUPPORTED),
 ])
@@ -182,18 +183,48 @@ def test_only_nfo_may_compute_capital():
         assert not may_compute_capital(x), x
 
 
-def test_mcx_stays_unsupported_until_primary_sources_are_read():
+def test_mcx_identity_works_but_capital_still_abstains():
     """
-    Guard, not a characterization. MCX quantity semantics are unverified and a
-    wrong multiplier is a 5000x error on ZINC. Flipping this on needs the
-    research, not an edit here.
+    MCX moved to IDENTITY_ONLY once the multiplier was sourced from MCX's own
+    published contract specification (GOLDM: 100 gram trading unit, price quoted
+    per 10 grams, so multiplier 10).
+
+    Entry value is now right and capital is still refused, because MCX sets its
+    own scan ranges and NSE's 9.3%/14.2% equity-derivative floors do not apply
+    to bullion. Applying them would be a fabrication.
     """
     mcx = support_for("MCX")
-    assert mcx.support is Support.UNSUPPORTED
-    assert any("LOTS or UNITS" in u for u in mcx.unknown)
-    q = quantities_for(spec(Segment.STOCK_FUTURE, exchange="MCX"), "LONG",
-                       1, 700.0, margin=MARGIN)
+    assert mcx.support is Support.IDENTITY_ONLY
+    assert not may_compute_capital("MCX")
+
+    got = resolve("GOLDM26SEPFUT", "MCX", DAY)
+    assert got.contract_multiplier == 10
+    q = quantities_for(got, "LONG", 1, 155999.0)
+    # 1 lot = 100 grams, quoted per 10 grams -> 155,999 x 10, NOT 155,999.
+    assert q.entry_value.amount == pytest.approx(1_559_990.0)
     assert not q.capital_requirement.available
+
+
+def test_an_mcx_contract_with_no_tabulated_multiplier_abstains_entirely():
+    """
+    The guard that must never be loosened for coverage. Falling back to a
+    multiplier of 1 is a 5000x error on ZINC.
+    """
+    got = resolve("SOMETHINGNEW26SEPFUT", "MCX", DAY)
+    assert got.reliability is Reliability.UNRELIABLE
+    assert got.contract_multiplier is None
+    q = quantities_for(got, "LONG", 1, 700.0)
+    assert not q.usable_for_capital_rules
+
+
+def test_mcx_expiry_is_never_computed_from_a_weekday_rule():
+    """
+    GOLDM's September 2026 contract expires 2026-09-04 - the 5th of the expiry
+    month, not any weekday rule. A derived spec must therefore claim no expiry
+    DATE at all, the same discipline that NSE's Tuesday expiries forced.
+    """
+    got = resolve("GOLDM26SEPFUT", "MCX", DAY)
+    assert got.expiry is None
 
 
 def test_mtf_is_not_given_an_invented_leverage():
@@ -314,7 +345,9 @@ def test_derived_unreadable_derivative_is_unavailable_not_equity():
 
 
 def test_unsupported_exchange_short_circuits_resolution():
-    got = resolve("GOLDM25SEPFUT", "MCX", DAY)
+    # CDS, not MCX. MCX moved to IDENTITY_ONLY once its multiplier was sourced;
+    # CDS is still genuinely unresearched, so it is the honest example here.
+    got = resolve("USDINR26SEPFUT", "CDS", DAY)
     assert got.reliability is Reliability.UNRELIABLE
     assert got.source is SpecSource.UNAVAILABLE
 
