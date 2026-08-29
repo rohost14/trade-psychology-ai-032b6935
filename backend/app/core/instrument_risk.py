@@ -174,6 +174,16 @@ def risk_basis(instrument_type: Optional[str], tradingsymbol: str,
         if get_lot_multiplier_or_none(exchange, tradingsymbol or "") is None:
             kind = DenominatorKind.UNRELIABLE
 
+    # A short option whose strike we cannot read (Phase 1, F3). Its denominator
+    # falls back to a percentage of the premium received, which is known to be
+    # ~200x too small. Same reasoning as the MCX case above: known to be wrong,
+    # in a known direction, so abstain rather than report it.
+    if cls is InstrumentClass.SHORT_OPTION:
+        from app.core.trading_defaults import _option_contract_notional
+        if _option_contract_notional(tradingsymbol or "", total_quantity,
+                                     exchange) is None:
+            kind = DenominatorKind.UNRELIABLE
+
     return RiskBasis(
         amount=float(amount),
         instrument=cls,

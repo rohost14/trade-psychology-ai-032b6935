@@ -149,7 +149,30 @@ def test_the_same_loss_means_different_things_by_class():
     as_short = loss_vs_risk_basis(lost, short_opt)
 
     assert as_long.value == pytest.approx(0.8), "80% of the premium paid"
-    assert as_short.value > 5, "several times the margin posted"
+
+    # UPDATED 2026-08-29 (Phase 1, F3). This line used to read
+    #     assert as_short.value > 5, "several times the margin posted"
+    # and it passed only because the short-option denominator was 12% of the
+    # premium RECEIVED — Rs 1,200 for a full NIFTY lot, against a real SPAN
+    # margin of roughly Rs 1.2-1.5 lakh. The assertion encoded the defect that
+    # sat next to it: a writer's "margin posted" was two orders of magnitude too
+    # small, which is exactly why every capital-relative rule went silent for
+    # short options.
+    #
+    # With the denominator corrected to SPAN of CONTRACT notional
+    # (strike x qty), the same Rs 8,000 is ~5.6% of margin — which is what a
+    # modest drawdown on a short position actually is.
+    #
+    # The finding this test exists for is unchanged, and is now asserted
+    # directly rather than through a magnitude that happened to be wrong.
+    assert as_short.value == pytest.approx(8000.0 / 144000.0, rel=1e-3), (
+        "8,000 against SPAN margin on a 24000-strike lot of 50"
+    )
+    assert as_long.value / as_short.value > 10, (
+        "the same rupee loss must read very differently by class — one "
+        "threshold cannot span the two, which is why this module exists"
+    )
+
     assert as_long.denominator_kind == DenominatorKind.LOSS_CEILING.value
     assert as_short.denominator_kind == DenominatorKind.MARGIN_POSTED.value
 

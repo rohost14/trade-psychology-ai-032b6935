@@ -24,6 +24,7 @@ from __future__ import annotations
 
 import json
 import sys
+from enum import Enum
 from datetime import timezone
 from decimal import Decimal
 from pathlib import Path
@@ -41,6 +42,13 @@ BASELINE = Path(__file__).parent / "baseline.json"
 # ---------------------------------------------------------------------------
 
 def _r(v):
+    # Enum FIRST. DenominatorKind and InstrumentClass are `str` subclasses, so an
+    # isinstance(str) check catches them and returns the live member, which reads
+    # as "DenominatorKind.MARGIN_POSTED" in a diff while the stored JSON holds
+    # "margin_posted". They compare equal, so nothing was wrong — but the diff
+    # was unreadable, which defeats the point of a reviewable snapshot.
+    if isinstance(v, Enum):
+        return str(v.value)
     if v is None or isinstance(v, (bool, int, str)):
         return v
     if isinstance(v, float):
@@ -51,8 +59,6 @@ def _r(v):
         return [_r(x) for x in v]
     if isinstance(v, dict):
         return {str(k): _r(v[k]) for k in sorted(v, key=str)}
-    if hasattr(v, "value"):          # Enum
-        return str(v.value)
     return str(v)
 
 

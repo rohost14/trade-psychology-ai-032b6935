@@ -592,13 +592,73 @@ def estimate_capital_at_risk(
     if instrument_type in ('CE', 'PE'):
         if direction == 'LONG':
             return notional  # Premium paid = exact capital at risk
-        else:
-            return _futures_span_margin(tradingsymbol, notional)
+
+        # SHORT OPTION (Phase 1, F3, 2026-08-29)
+        # ---------------------------------------
+        # This branch used to hand `notional` — premium x qty — to
+        # _futures_span_margin, which returns a PERCENTAGE of whatever it is
+        # given. So a writer's "capital at risk" was ~12-20% of the premium they
+        # RECEIVED: 1,080 on a 9,000 premium, and 18 rupees on a deep-OTM NIFTY
+        # call. The one position class with unbounded downside got the smallest
+        # number in the system, and every capital-relative rule went quiet for it.
+        #
+        # The function was not wrong; its INPUT was. SPAN is defined on contract
+        # notional, which is what the futures branch below already passes. For an
+        # option the contract notional is strike x quantity, and `parse_symbol`
+        # gives us the strike.
+        #
+        # Judgement, stated rather than buried: strike is used as the notional
+        # proxy because it is what the symbol carries — spot is not available in
+        # this pure function. Near the money the two are within a few percent;
+        # for a deep OTM short, strike OVER-states slightly, which is the safe
+        # direction for a risk denominator.
+        #
+        # Deliberately narrow: only an explicit 'SHORT' takes the new path. A
+        # missing or unrecognised direction keeps the previous behaviour, because
+        # deciding what an unknown direction means is direction semantics (F4),
+        # not a denominator fix, and widening it here would silently turn an
+        # ambiguity into a 200x larger number.
+        if (direction or '').upper() == 'SHORT':
+            contract_notional = _option_contract_notional(
+                tradingsymbol, total_quantity, exchange
+            )
+            if contract_notional is not None:
+                return _futures_span_margin(tradingsymbol, contract_notional)
+            # strike unreadable — no better estimate exists here. The figure is
+            # known to be wrong, and `risk_basis` marks it UNRELIABLE so nothing
+            # compares it. Returning the old number rather than a guess.
+        return _futures_span_margin(tradingsymbol, notional)
 
     elif instrument_type == 'FUT':
         return _futures_span_margin(tradingsymbol, notional)
 
     # EQ delivery or unknown — use notional (conservative)
+    return notional
+
+
+def _option_contract_notional(tradingsymbol: str, total_quantity: int,
+                              exchange: Optional[str] = None) -> Optional[float]:
+    """
+    The underlying contract value of an option position — strike x quantity.
+
+    None when the strike cannot be read, which is the signal to abstain rather
+    than substitute a number. Applies the MCX/CDS lot multiplier (F7) for the
+    same reason the premium path does: those quantities are lots, not units.
+    """
+    try:
+        from app.services.instrument_parser import parse_symbol
+        strike = parse_symbol(tradingsymbol or "").strike
+    except Exception:
+        return None
+    if not strike or not total_quantity:
+        return None
+
+    notional = float(strike) * abs(int(total_quantity))
+    if exchange:
+        from app.services.mcx_contract_specs import get_lot_multiplier_or_none
+        mult = get_lot_multiplier_or_none(exchange, tradingsymbol or "")
+        if mult:
+            notional *= int(mult)
     return notional
 
 

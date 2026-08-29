@@ -18,6 +18,72 @@
       "notional_price_x_qty": 290000.0,
       "ratio_to_notional": 1.0
     },
+    "f3_banknifty_short": {
+      "capital_at_risk": 273000.0,
+      "exchange": "NFO",
+      "notional_price_x_qty": 10500.0,
+      "ratio_to_notional": 26.0
+    },
+    "f3_deep_otm_short": {
+      "capital_at_risk": 252000.0,
+      "exchange": "NFO",
+      "notional_price_x_qty": 150.0,
+      "ratio_to_notional": 1680.0
+    },
+    "f3_nifty_ce_long": {
+      "capital_at_risk": 9000.0,
+      "exchange": "NFO",
+      "notional_price_x_qty": 9000.0,
+      "ratio_to_notional": 1.0
+    },
+    "f3_nifty_ce_short": {
+      "capital_at_risk": 225000.0,
+      "exchange": "NFO",
+      "notional_price_x_qty": 9000.0,
+      "ratio_to_notional": 25.0
+    },
+    "f3_nifty_pe_long": {
+      "capital_at_risk": 9000.0,
+      "exchange": "NFO",
+      "notional_price_x_qty": 9000.0,
+      "ratio_to_notional": 1.0
+    },
+    "f3_nifty_pe_short": {
+      "capital_at_risk": 225000.0,
+      "exchange": "NFO",
+      "notional_price_x_qty": 9000.0,
+      "ratio_to_notional": 25.0
+    },
+    "f3_none_direction": {
+      "capital_at_risk": 1080.0,
+      "exchange": "NFO",
+      "notional_price_x_qty": 9000.0,
+      "ratio_to_notional": 0.12
+    },
+    "f3_short_no_strike": {
+      "capital_at_risk": 1080.0,
+      "exchange": "NFO",
+      "notional_price_x_qty": 9000.0,
+      "ratio_to_notional": 0.12
+    },
+    "f3_stock_opt_short": {
+      "capital_at_risk": 290000.0,
+      "exchange": "NFO",
+      "notional_price_x_qty": 20000.0,
+      "ratio_to_notional": 14.5
+    },
+    "f3_zero_price": {
+      "capital_at_risk": 225000.0,
+      "exchange": "NFO",
+      "notional_price_x_qty": 0.0,
+      "ratio_to_notional": null
+    },
+    "f3_zero_qty": {
+      "capital_at_risk": 0.0,
+      "exchange": "NFO",
+      "notional_price_x_qty": 0.0,
+      "ratio_to_notional": null
+    },
     "futures_long": {
       "capital_at_risk": 225000.0,
       "exchange": "NFO",
@@ -67,16 +133,16 @@
       "ratio_to_notional": 1000.0
     },
     "short_option": {
-      "capital_at_risk": 1080.0,
+      "capital_at_risk": 225000.0,
       "exchange": "NFO",
       "notional_price_x_qty": 9000.0,
-      "ratio_to_notional": 0.12
+      "ratio_to_notional": 25.0
     },
     "short_put": {
-      "capital_at_risk": 1080.0,
+      "capital_at_risk": 225000.0,
       "exchange": "NFO",
       "notional_price_x_qty": 9000.0,
-      "ratio_to_notional": 0.12
+      "ratio_to_notional": 25.0
     },
     "unparseable_symbol": {
       "capital_at_risk": 1000.0,
@@ -115,6 +181,72 @@
       "class": "equity",
       "is_comparable": true,
       "kind": "notional"
+    },
+    "f3_banknifty_short": {
+      "amount": 273000.0,
+      "class": "short_option",
+      "is_comparable": true,
+      "kind": "margin_posted"
+    },
+    "f3_deep_otm_short": {
+      "amount": 252000.0,
+      "class": "short_option",
+      "is_comparable": true,
+      "kind": "margin_posted"
+    },
+    "f3_nifty_ce_long": {
+      "amount": 9000.0,
+      "class": "long_option",
+      "is_comparable": true,
+      "kind": "loss_ceiling"
+    },
+    "f3_nifty_ce_short": {
+      "amount": 225000.0,
+      "class": "short_option",
+      "is_comparable": true,
+      "kind": "margin_posted"
+    },
+    "f3_nifty_pe_long": {
+      "amount": 9000.0,
+      "class": "long_option",
+      "is_comparable": true,
+      "kind": "loss_ceiling"
+    },
+    "f3_nifty_pe_short": {
+      "amount": 225000.0,
+      "class": "short_option",
+      "is_comparable": true,
+      "kind": "margin_posted"
+    },
+    "f3_none_direction": {
+      "amount": 9000.0,
+      "class": "short_option",
+      "is_comparable": true,
+      "kind": "margin_posted"
+    },
+    "f3_short_no_strike": {
+      "amount": 1080.0,
+      "class": "short_option",
+      "is_comparable": false,
+      "kind": "unreliable"
+    },
+    "f3_stock_opt_short": {
+      "amount": 290000.0,
+      "class": "short_option",
+      "is_comparable": true,
+      "kind": "margin_posted"
+    },
+    "f3_zero_price": {
+      "amount": 225000.0,
+      "class": "short_option",
+      "is_comparable": true,
+      "kind": "margin_posted"
+    },
+    "f3_zero_qty": {
+      "amount": 0.0,
+      "class": "short_option",
+      "is_comparable": false,
+      "kind": "unreliable"
     },
     "futures_long": {
       "amount": 225000.0,
@@ -165,13 +297,13 @@
       "kind": "margin_posted"
     },
     "short_option": {
-      "amount": 1080.0,
+      "amount": 225000.0,
       "class": "short_option",
       "is_comparable": true,
       "kind": "margin_posted"
     },
     "short_put": {
-      "amount": 1080.0,
+      "amount": 225000.0,
       "class": "short_option",
       "is_comparable": true,
       "kind": "margin_posted"
@@ -1004,6 +1136,124 @@
         }
       },
       "note": "12 Mar 2026 is this symbol's own expiry"
+    },
+    "f3_ce_long_half_premium_lost": {
+      "fired": {
+        "no_stoploss": {
+          "message": "NIFTY25MAR25000CE: manual exit after 30min with 50% loss of premium (₹4,500). No stop-loss order detected on this trade.",
+          "severity": "danger"
+        },
+        "premium_loss_event": {
+          "message": "Closed NIFTY25MAR25000CE having lost 50% of the premium paid (₹4,500).",
+          "severity": "info"
+        }
+      },
+      "note": "long: premium paid is the loss ceiling"
+    },
+    "f3_ce_short_premium_doubled": {
+      "fired": {
+        "no_stoploss": {
+          "message": "NIFTY25MAR25000CE: manual exit after 30min with 100% loss of premium (₹9,000). No stop-loss order detected on this trade.",
+          "severity": "danger"
+        }
+      },
+      "note": "writer: loss is unbounded; premium is not the denominator"
+    },
+    "f3_futures_long": {
+      "fired": {},
+      "note": ""
+    },
+    "f3_futures_short": {
+      "fired": {},
+      "note": ""
+    },
+    "f3_futures_vs_capital": {
+      "fired": {
+        "excess_exposure": {
+          "message": "NIFTY25MARFUT: ₹225,000 at risk — 22.5% of capital on a single trade.",
+          "severity": "danger"
+        }
+      },
+      "note": "control: futures unchanged by F3"
+    },
+    "f3_long_option_vs_capital": {
+      "fired": {
+        "no_stoploss": {
+          "message": "NIFTY25MAR25000CE: manual exit after 30min with 50% loss of premium (₹4,500). No stop-loss order detected on this trade.",
+          "severity": "danger"
+        },
+        "premium_loss_event": {
+          "message": "Closed NIFTY25MAR25000CE having lost 50% of the premium paid (₹4,500).",
+          "severity": "info"
+        }
+      },
+      "note": "control: long option unchanged by F3"
+    },
+    "f3_pe_long_half_premium_lost": {
+      "fired": {
+        "no_stoploss": {
+          "message": "NIFTY25MAR25000PE: manual exit after 30min with 50% loss of premium (₹4,500). No stop-loss order detected on this trade.",
+          "severity": "danger"
+        },
+        "premium_loss_event": {
+          "message": "Closed NIFTY25MAR25000PE having lost 50% of the premium paid (₹4,500).",
+          "severity": "info"
+        }
+      },
+      "note": "long: premium paid is the loss ceiling"
+    },
+    "f3_pe_short_premium_doubled": {
+      "fired": {
+        "no_stoploss": {
+          "message": "NIFTY25MAR25000PE: manual exit after 30min with 100% loss of premium (₹9,000). No stop-loss order detected on this trade.",
+          "severity": "danger"
+        }
+      },
+      "note": "writer: loss is unbounded; premium is not the denominator"
+    },
+    "f3_short_averaged_up": {
+      "fired": {
+        "no_stoploss": {
+          "message": "NIFTY25MAR25000CE: manual exit after 30min with 67% loss of premium (₹18,000). No stop-loss order detected on this trade.",
+          "severity": "danger"
+        }
+      },
+      "note": "added to a losing short; blended entry rises"
+    },
+    "f3_short_deep_otm_blowup": {
+      "fired": {
+        "no_stoploss": {
+          "message": "NIFTY25MAR28000CE: manual exit after 30min with 2900% loss of premium (₹4,350). No stop-loss order detected on this trade.",
+          "severity": "danger"
+        }
+      },
+      "note": "2 -> 60 is a 30x premium move; tiny premium, real risk"
+    },
+    "f3_short_inside_spread": {
+      "fired": {
+        "no_stoploss": {
+          "message": "NIFTY25MAR25000CE: manual exit after 30min with 100% loss of premium (₹9,000). No stop-loss order detected on this trade.",
+          "severity": "danger"
+        }
+      },
+      "note": "spread leg — is_spread is set by strategy_group, absent here"
+    },
+    "f3_short_option_vs_capital": {
+      "fired": {
+        "excess_exposure": {
+          "message": "NIFTY25MAR25000CE: ₹225,000 at risk — 22.5% of capital on a single trade.",
+          "severity": "danger"
+        },
+        "no_stoploss": {
+          "message": "NIFTY25MAR25000CE: manual exit after 30min with 100% loss of premium (₹9,000). No stop-loss order detected on this trade.",
+          "severity": "danger"
+        }
+      },
+      "note": "F3: 225,000 margin on 10L capital = 22.5%, not 0.1%"
+    },
+    "f3_zero_entry_price": {
+      "fired": {},
+      "note": "must not divide by zero"
     },
     "futures_long_small_adverse_move": {
       "fired": {},

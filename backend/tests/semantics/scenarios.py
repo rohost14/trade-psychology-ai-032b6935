@@ -210,6 +210,23 @@ RISK_SCENARIOS: List[tuple] = [
     ("mcx_gold_100x",      "FUT", "GOLD25MARFUT",      "LONG",  72000.0, 1, "MCX"),
     ("mcx_unknown_mult",   "FUT", "NOSUCH25MARFUT",    "LONG",  100.0, 1, "MCX"),
     ("cds_pair",           "FUT", "USDINR25MARFUT",    "LONG",  84.0, 1, "CDS"),
+
+    # F3 — short-option denominator. Premium x qty is NOT contract notional.
+    # Paired long/short so the asymmetry is visible in one diff.
+    ("f3_nifty_ce_long",   "CE",  "NIFTY25MAR25000CE", "LONG",  120.0, 75, "NFO"),
+    ("f3_nifty_ce_short",  "CE",  "NIFTY25MAR25000CE", "SHORT", 120.0, 75, "NFO"),
+    ("f3_nifty_pe_long",   "PE",  "NIFTY25MAR25000PE", "LONG",  120.0, 75, "NFO"),
+    ("f3_nifty_pe_short",  "PE",  "NIFTY25MAR25000PE", "SHORT", 120.0, 75, "NFO"),
+    ("f3_banknifty_short", "CE",  "BANKNIFTY25MAR52000CE", "SHORT", 300.0, 35, "NFO"),
+    ("f3_stock_opt_short", "CE",  "RELIANCE25MAR2900CE", "SHORT", 40.0, 500, "NFO"),
+    # deep OTM: premium tiny, strike large — the widest divergence
+    ("f3_deep_otm_short",  "CE",  "NIFTY25MAR28000CE", "SHORT", 2.0, 75, "NFO"),
+    # a short option whose strike cannot be read -> must not be guessed
+    ("f3_short_no_strike", "CE",  "NIFTY99XXXCE",      "SHORT", 120.0, 75, "NFO"),
+    # zero / missing inputs
+    ("f3_zero_price",      "CE",  "NIFTY25MAR25000CE", "SHORT", 0.0, 75, "NFO"),
+    ("f3_zero_qty",        "CE",  "NIFTY25MAR25000CE", "SHORT", 120.0, 0, "NFO"),
+    ("f3_none_direction",  "CE",  "NIFTY25MAR25000CE", None,    120.0, 75, "NFO"),
 ]
 
 #: L2 — fill lifecycle. (name, [(qty, price), ...]) signed qty, +buy/-sell
@@ -333,6 +350,57 @@ def detector_scenarios() -> List[Dict[str, Any]]:
                           instrument_type=None)
     add("unparseable_symbol", t_unparseable,
         note="parse_symbol returns EQ for anything it cannot read")
+
+    # ── F3/F4: long vs short, calls and puts, matched pairs ──────────────
+    for opt, sym in (("ce", "NIFTY25MAR25000CE"), ("pe", "NIFTY25MAR25000PE")):
+        add(f"f3_{opt}_long_half_premium_lost",
+            trade(sym, direction="LONG", entry=120, exit_=60),
+            note="long: premium paid is the loss ceiling")
+        add(f"f3_{opt}_short_premium_doubled",
+            trade(sym, direction="SHORT", entry=120, exit_=240),
+            note="writer: loss is unbounded; premium is not the denominator")
+
+    # WITH capital declared, so excess_exposure and max_trade_risk actually run.
+    # Without this, F3's effect on detectors is invisible.
+    add("f3_short_option_vs_capital",
+        trade("NIFTY25MAR25000CE", direction="SHORT", entry=120, exit_=240),
+        thresholds={"trading_capital": 1000000.0},
+        note="F3: 225,000 margin on 10L capital = 22.5%, not 0.1%")
+    add("f3_long_option_vs_capital",
+        trade("NIFTY25MAR25000CE", direction="LONG", entry=120, exit_=60),
+        thresholds={"trading_capital": 1000000.0},
+        note="control: long option unchanged by F3")
+    add("f3_futures_vs_capital",
+        trade("NIFTY25MARFUT", direction="LONG", entry=25000, exit_=24700, qty=75),
+        thresholds={"trading_capital": 1000000.0},
+        note="control: futures unchanged by F3")
+
+    add("f3_short_deep_otm_blowup",
+        trade("NIFTY25MAR28000CE", direction="SHORT", entry=2, exit_=60, qty=75),
+        note="2 -> 60 is a 30x premium move; tiny premium, real risk")
+
+    # hedged: same short leg, but inside a recognised structure
+    add("f3_short_inside_spread",
+        trade("NIFTY25MAR25000CE", direction="SHORT", entry=120, exit_=240),
+        priors=[trade("NIFTY25MAR25200CE", direction="LONG", entry=60, exit_=90,
+                      entry_at=_t(9, 31), exit_at=_t(10, 1))],
+        note="spread leg — is_spread is set by strategy_group, absent here")
+
+    # averaging into a short
+    add("f3_short_averaged_up",
+        trade("NIFTY25MAR25000CE", direction="SHORT", entry=180, exit_=300,
+              qty=150, num_entries=2),
+        note="added to a losing short; blended entry rises")
+
+    # futures both directions, for the same denominator question
+    add("f3_futures_long", trade("NIFTY25MARFUT", direction="LONG",
+                                 entry=25000, exit_=24700, qty=75))
+    add("f3_futures_short", trade("NIFTY25MARFUT", direction="SHORT",
+                                  entry=25000, exit_=25300, qty=75))
+
+    # zero / missing
+    t_zero = trade("NIFTY25MAR25000CE", direction="SHORT", entry=0, exit_=0)
+    add("f3_zero_entry_price", t_zero, note="must not divide by zero")
 
     t_unreadable_deriv = trade("NIFTY99XXX25000CE", entry=120, exit_=40)
     add("unreadable_derivative_symbol", t_unreadable_deriv,
