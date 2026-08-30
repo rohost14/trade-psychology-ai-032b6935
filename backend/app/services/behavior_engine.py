@@ -506,9 +506,19 @@ class BehaviorEngine:
 
         # Query 1: this session's completed trades, excluding the one being
         # analysed — it travels separately as ctx.completed_trade.
+        #
+        # `as_of` bounds the load at THIS trade's exit, which is the moment the
+        # engine is reconstructing. Without it the bulk-sync replay
+        # (`run_behavior_engine_full_session`) showed every detector the rest of
+        # the day — 50% of what they were handed on the reference book had not
+        # happened yet — while the live postback path saw only what had closed.
+        # Two paths, two answers, from one engine. This makes them the same
+        # path. See `load_session_trades` for the measurement and for why the
+        # bound is on exit and not on entry.
         session_trades = await session_facts.load_session_trades(
             db, broker_account_id, session.session_date,
             exclude_id=completed_trade.id,
+            as_of=getattr(completed_trade, "exit_time", None),
         )
 
         # Thresholds resolve AFTER today's trades are loaded, so the ladder can

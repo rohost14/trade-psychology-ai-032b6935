@@ -301,19 +301,40 @@ route together. Both are product calls. Pinned by
 `test_the_options_behavior_endpoint_is_kept_for_historical_rows` so a later pass
 cannot quietly repoint it.
 
-### `session_trades` is EXIT-ordered while detectors read it as decision-ordered
+### ~~`session_trades` is EXIT-ordered~~ — **FIXED 30 Aug**, and the real cause was bigger
 
-`ctx.session_trades` is `trades[:i]` in **exit** order, so a "prior" trade can
-have been **still open** when the current one was entered. `options_premium_avg_down`
-used those priors' realised losses to describe a decision taken before the loss
-existed — **5 of its 44 firings**, where *"You entered X after N losing
-positions"* was simply false.
+Traced and closed. **The root cause was not ordering — it was the absence of any
+upper bound.** `load_session_trades` filtered on `exit_time >= session_start`
+with no ceiling, so it returned the whole day in both directions.
 
-**The ordering is shared, so the exposure may be too.** Any session-scope
-detector that reads a prior's *outcome* rather than its *existence* has the same
-defect available to it. **Not swept for** — this is an engine-level contract
-question, not a Pattern 20 defect, and the sweep should be one deliberate pass
-rather than a side effect of a retirement.
+Live was accidentally safe: a trade that has not closed has no `CompletedTrade`
+row, so the bound was implicit in the data. **The bulk path was not.**
+`run_behavior_engine_full_session` runs after every row exists, so analysing
+trade 3 of 10 handed the detectors trades 4 through 10. Measured: **1,808 of
+3,616 entries — 50% — had not happened yet**, across 565 of 740 trades. The two
+paths produced different alerts from the same session: `overtrading_burst` 248
+against 13, `same_symbol_obsession` 111 against 49.
+
+Fixed with `as_of` at the boundary. See `test_session_trades_ordering.py`.
+
+**What the fix does NOT do, recorded so it is not assumed:** it does not remove
+the look-ahead class where a prior closed before this trade closed but after it
+was *entered*. Measured on the retired detector's own predicate, look-ahead went
+70 → 5, and a stricter entry bound would only reach 3 — so **no boundary rule
+can close it.** That is a per-detector obligation: any detector using a prior's
+OUTCOME to describe a DECISION must compare against `ct.entry_time` itself.
+`revenge_trade`, `constitution_violation`'s cooldown and `fomo_entry` do;
+`options_premium_avg_down` did not, which is why 5 of its 44 firings cited a
+loss that had not happened. Pinned by tests, not by the boundary.
+
+### `position_monitor_tasks` writes its own session-trades query
+
+`position_monitor_tasks.py:755` builds the same fact with its own
+`select(CompletedTrade)` instead of `session_facts.load_session_trades`. It is
+**correct today** — the entry path evaluates an open position *now*, so nothing
+future exists — but it is a second definition of a fact `session_facts` was
+created to own, and it would not inherit a future boundary change. Recorded, not
+changed.
 
 ### A third unsourced statistic in a threshold comment
 

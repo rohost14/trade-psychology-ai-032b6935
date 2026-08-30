@@ -252,17 +252,52 @@ async def load_session_trades(
     session_date: date,
     *,
     exclude_id=None,
+    as_of: Optional[datetime] = None,
 ) -> List[CompletedTrade]:
     """
     This session's completed trades, oldest close first.
 
     `exclude_id` exists for the engine, which holds the trade being analysed
     separately and must not load it twice.
+
+    `as_of` IS THE TEMPORAL BOUNDARY, and it exists because there was not one.
+    ─────────────────────────────────────────────────────────────────────────
+    Without it this query returns EVERY completed trade of the day, in both
+    directions from the caller's position in the session.
+
+    On the live postback path that is harmless: the engine runs when a trade
+    closes, and a trade that has not closed yet has no CompletedTrade row, so
+    the bound was implicit in the data. On the BULK path
+    (`run_behavior_engine_full_session`, used when trades arrive by REST sync
+    because the trader was not in the app) every row of the day already
+    exists — so analysing trade 3 of 10 handed the detectors trades 4 to 10.
+
+    Measured on the 175-session reference book: **1,808 of the 3,616 entries
+    the detectors were given had not happened yet — 50%**, touching 565 of 740
+    trades, up to 13 future trades on a single one. The divergence is not
+    theoretical either; the same session produced 248 `overtrading_burst`
+    firings through the bulk path against 13 through the live one.
+
+    So pass `as_of=<the trade's exit_time>` when reconstructing what was known
+    at a moment. Callers that legitimately want the whole day — the coach, the
+    constitution screen, `load_facts`, early warning — pass nothing and are
+    unaffected.
+
+    NOT bounded by entry time. A trade entered after this one but closed before
+    it HAS happened by the time the engine fires, and for counting detectors it
+    is plainly one of today's trades. Detectors that instead use a prior's
+    OUTCOME to describe a DECISION must compare against `ct.entry_time`
+    themselves, and `revenge_trade`, `constitution_violation`'s cooldown rule
+    and `fomo_entry` already do. Applying an entry bound here instead was
+    measured and rejected: it changes live firing for four detectors
+    (`overtrading_burst` 13 -> 2) and breaks count semantics.
     """
     conditions = [
         CompletedTrade.broker_account_id == broker_account_id,
         CompletedTrade.exit_time >= session_start(session_date),
     ]
+    if as_of is not None:
+        conditions.append(CompletedTrade.exit_time <= as_of)
     if exclude_id is not None:
         conditions.append(CompletedTrade.id != exclude_id)
 
