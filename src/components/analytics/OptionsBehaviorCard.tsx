@@ -1,7 +1,17 @@
 // Options-specific behavioural summary — F&O patterns brokers don't surface.
-// Data: GET /api/analytics/options-behavior (aggregates risk_alerts rows emitted by
-// the options_direction_confusion / options_premium_avg_down / iv_crush_behavior detectors).
+// Data: GET /api/analytics/options-behavior (aggregates stored risk_alerts rows).
 // All figures are counts or realized rupees — no attribution, no estimation.
+//
+// HISTORICAL ONLY as of 2026-08-30. All three sections were fed by detectors
+// that no longer emit: options_direction_confusion and iv_crush_behavior were
+// engine-v1 names the endpoint never repointed, and options_premium_avg_down
+// was retired at Pattern 20. Stored rows still render truthfully inside the
+// lookback; once they age out `has_data` is false forever and this card
+// renders NOTHING (see the guard below), which is why no misleading empty
+// surface appears. Repointing it at premium_loss_event — the one live options
+// detector — would change what these sections mean, so it is a product
+// decision, recorded in docs/DEEP_REVIEW/PENDING_AND_TODO.md and deliberately
+// not taken as part of a detector retirement.
 
 import { useState, useEffect } from 'react';
 import { Repeat, TrendingDown, Hourglass } from 'lucide-react';

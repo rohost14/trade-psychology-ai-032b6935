@@ -49,9 +49,16 @@ def classify_scale_in(
 
     These are opposite behaviours in the same shape. Adding to a winner is
     pyramiding into strength; adding to a loser is averaging down, which is what
-    martingale_behaviour and options_premium_avg_down exist to catch. Collapsing
-    them into one "add" category would false-positive on every disciplined
-    scale-in.
+    adding_to_adverse_position and martingale_behaviour exist to catch.
+    Collapsing them into one "add" category would false-positive on every
+    disciplined scale-in.
+
+    Corrected 2026-08-30: this used to name `options_premium_avg_down` as the
+    second consumer. That detector never read this classification and never saw
+    an open position - it was retired at Pattern 20 for exactly that. The
+    detector that DOES read this sequence is `adding_to_adverse_position`, and
+    naming it here keeps the justification for this function attached to the
+    code that depends on it.
 
     The test is the fill price against the position's average, and it needs no
     price feed. `avg_entry_price_after` is a weighted average of the price

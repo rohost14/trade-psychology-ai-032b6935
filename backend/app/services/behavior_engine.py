@@ -32,7 +32,6 @@ retirements, not omissions; detector_registry.REGISTRY is the authority:
   13. no_stoploss                 (expiry-day modifier)
   15. winning_streak_overconfidence
   16. options_direction_confusion (CE→PE flip on same underlying within 10 min)
-  17. options_premium_avg_down    (re-entry on same underlying options after prior loss)
   18. iv_crush_behavior           (fast large premium loss = buying into high IV)
   20. opening_5min_trap           (derivative entry 09:15–09:20 IST)
   21. end_of_session_mis_panic    (MIS entries after 15:10 IST — forced 10-min exit)
@@ -2504,59 +2503,54 @@ class BehaviorEngine:
     # Re-entering the same underlying options after a prior losing options position today.
     # Unlike equity averaging down, options premium erodes via theta — the hole gets bigger.
 
-    def _detect_options_premium_avg_down(self, ctx: EngineContext) -> Optional[DetectedEvent]:
-        ct = ctx.completed_trade
-        if ct.instrument_type not in ("CE", "PE") or ct.direction != "LONG":
-            return None
+    # ── RETIRED 2026-08-30 — `options_premium_avg_down` ───────────────────
+    #
+    # Pattern 20. IT WAS NOT AN AVERAGE-DOWN. NOT ONCE.
+    #
+    # It fired on a NEW long option entry when any OTHER long option on the
+    # same UNDERLYING had closed that session with a realised loss >= 20% of
+    # premium. Not the same contract, not the same strike, not even the same
+    # option type; no open position, no fill sequence.
+    #
+    #     firings where any "prior loser" was still an OPEN position:  0 of 44
+    #
+    # Averaging down means adding to a position you still hold, so by
+    # construction this detector could never observe it. Its own threshold
+    # comment said so plainly - "re-entry on same options underlying after
+    # >=20% loss" - and so did the index at the top of this file. Only the
+    # trader-facing copy claimed otherwise, and it claimed ANOTHER DETECTOR'S
+    # mechanism: "Additional quantity on an option position already down on
+    # premium." That is `adding_to_adverse_position`, verbatim. The same
+    # failure retired `cooldown_violation` at Pattern 15.
+    #
+    # AND THAT OTHER DETECTOR ALREADY IS THE OPTION-PREMIUM-AVERAGING ONE.
+    # All 64 of its 64 firings on the book are LONG options - quantity added
+    # to an open long option that had already lost premium. So there was
+    # nothing to consolidate: the option case is not a subset of this
+    # detector's output, it is the whole of the other one's.
+    #
+    # What the 44 firings actually were:
+    #     21  a prior loser was the same contract, re-entered after closing
+    #     23  a prior loser was a different option entirely
+    #      9  EVERY prior loser was the opposite type - a CE after a PE lost,
+    #         which is a change of view, not an average-down. That is the call
+    #         `direction_instability` was retired for being unable to make.
+    #      5  LOOK-AHEAD: `session_trades` is EXIT-ordered, so a "prior"
+    #         position can still have been OPEN when this trade was entered.
+    #         For those the message "You entered X AFTER N losing positions"
+    #         was false - the loss it cited had not happened yet.
+    #
+    # Its real subject was re-entry after a loss, and that is owned elsewhere:
+    # `same_symbol_obsession` saw 70% of these firings and `revenge_trade`
+    # 48%. It fired alone 7 times in 175 sessions, of which 3 were direction
+    # changes and 2 were look-ahead - leaving TWO coherent firings, both of
+    # which `same_symbol_obsession` already sees at contract level.
+    #
+    # NOT REPLACED. No narrowed same-contract variant was built: at that scope
+    # it produces 2 events in 175 sessions and duplicates an existing detector.
+    #
+    # Evidence: docs/patterns/20-options_premium_avg_down/.
 
-        from app.services.instrument_parser import parse_symbol
-        ct_parsed = parse_symbol(ct.tradingsymbol or "")
-        if not ct_parsed.underlying:
-            return None
-
-        loss_threshold_pct = ctx.thresholds.get("premium_avg_down_loss_pct", 20)
-        prior_losers = []
-
-        for prior in ctx.session_trades:
-            if prior.id == ct.id:
-                continue
-            if prior.instrument_type not in ("CE", "PE") or prior.direction != "LONG":
-                continue
-            prior_pnl = Decimal(str(prior.realized_pnl or 0))
-            if prior_pnl >= 0:
-                continue
-            prior_parsed = parse_symbol(prior.tradingsymbol or "")
-            if prior_parsed.underlying != ct_parsed.underlying:
-                continue
-            prior_premium = Decimal(str(prior.avg_entry_price or 0)) * (prior.total_quantity or 1)
-            if prior_premium <= 0:
-                continue
-            prior_loss_pct = abs(prior_pnl) / prior_premium * 100
-            if prior_loss_pct >= Decimal(str(loss_threshold_pct)):
-                prior_losers.append((prior, float(prior_loss_pct)))
-
-        if not prior_losers:
-            return None
-
-        _, worst_pct = max(prior_losers, key=lambda x: x[1])
-        current_premium = Decimal(str(ct.avg_entry_price or 0)) * (ct.total_quantity or 1)
-
-        return DetectedEvent(
-            event_type="options_premium_avg_down",
-            severity="caution",
-            message=(
-                f"You entered {ct.tradingsymbol} after "
-                f"{len(prior_losers)} losing options position"
-                f"{'s' if len(prior_losers) > 1 else ''} on {ct_parsed.underlying} today "
-                f"(worst loss: {worst_pct:.0f}% of premium)."
-            ),
-            context={
-                "underlying": ct_parsed.underlying,
-                "prior_losing_count": len(prior_losers),
-                "worst_loss_pct": round(worst_pct, 1),
-                "current_premium_paid": round(float(current_premium)),
-            },
-        )
 
     # ── Pattern 18: IV crush behavior ─────────────────────────────────────
     #

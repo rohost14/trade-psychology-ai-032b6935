@@ -143,7 +143,9 @@ const BACKEND_TO_FRONTEND_TYPE: Record<string, string> = {
   // map because the engine can no longer emit it; the display name below
   // stays so stored alert rows still render.
   'rapid_reentry':     'same_instrument_chasing',
-  'options_premium_avg_down':    'options_premium_avg_down',
+  // 'options_premium_avg_down' RETIRED 2026-08-30 (Pattern 20). Removed from
+  // the routing map because the engine can no longer emit it; the display
+  // name below stays so stored alert rows still render.
   'opening_5min_trap':           'opening_5min_trap',
   'end_of_session_mis_panic':    'end_of_session_mis_panic',
   'post_loss_recovery_bet':      'post_loss_recovery_bet',
@@ -191,6 +193,10 @@ export function formatPatternName(patternType: string): string {
     'session_meltdown':              'Session Meltdown',
     'capital_drawdown':              'Capital Drawdown',
     'options_direction_confusion':   'Direction Confusion',
+    // Retired 2026-08-30 (Pattern 20). Kept because stored alert rows still
+    // carry it. The name was always wrong - it never observed an average-down
+    // - but it is what those rows were shown as, so it is what they must
+    // still render as.
     'options_premium_avg_down':      'Premium Averaging Down',
     'iv_crush_behavior':             'IV Crush',
     'premium_destruction':           'Premium Destroyed',

@@ -1340,7 +1340,7 @@ async def run_behavior_engine_full_session(broker_account_id: UUID, db) -> int:
 
     Used by the REST sync path when trades arrive in bulk (user was not in the
     app while trading).  Running the engine only on the *most recent* trade
-    misses patterns like session_meltdown and options_premium_avg_down
+    misses patterns like session_meltdown and same_symbol_obsession
     that fire on the 2nd/3rd loss in a sequence — not on a later winner.
 
     Returns the number of new alerts saved.

@@ -255,10 +255,12 @@ COLD_START_DEFAULTS: Dict[str, Any] = {
     # Direction confusion: CE→PE flip on same underlying within 10 min.
     # Legitimate directional change requires analysis — < 10 min is confusion, not analysis.
 
-    # Premium averaging down: re-entry on same options underlying after ≥20% loss.
-    # SEBI data: traders who averaged down on losing options lost 3× more.
-    # 20% floor to exclude scratch trades that hit SL cleanly.
-    'premium_avg_down_loss_pct':        20,   # prior options position must have lost ≥20%
+    # `premium_avg_down_loss_pct` REMOVED 2026-08-30 with
+    # `options_premium_avg_down`. It never had a THRESHOLD_SPECS record, and the
+    # comment justifying it - "SEBI data: traders who averaged down on losing
+    # options lost 3x more" - had no source anywhere in the repository. Third
+    # instance of that class after expiry_day_overtrading and the hot-hand
+    # claim. Not replaced.
 
     # iv_crush_proxy_{hold_min,loss_pct} removed 2026-08-13: the iv_crush_behavior
     # detector was merged into premium_loss_event, and these were left behind

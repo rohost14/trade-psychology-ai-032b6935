@@ -1216,10 +1216,6 @@
     },
     "ce_loss_then_other_strike_ce": {
       "fired": {
-        "options_premium_avg_down": {
-          "message": "You entered NIFTY25MAR25100CE after 1 losing options position on NIFTY today (worst loss: 30% of premium).",
-          "severity": "caution"
-        },
         "revenge_trade": {
           "severity": "info",
           "via": "DetectorResult"
@@ -1229,10 +1225,6 @@
     },
     "ce_loss_then_pe_buy_reversal": {
       "fired": {
-        "options_premium_avg_down": {
-          "message": "You entered NIFTY25MAR25000PE after 1 losing options position on NIFTY today (worst loss: 30% of premium).",
-          "severity": "caution"
-        },
         "revenge_trade": {
           "severity": "info",
           "via": "DetectorResult"
@@ -1435,21 +1427,12 @@
         "no_stoploss": {
           "message": "NIFTY25MAR25000CE: held 30min into a 30% loss of premium (₹2,250).",
           "severity": "caution"
-        },
-        "options_premium_avg_down": {
-          "message": "You entered NIFTY25MAR25000CE after 1 losing options position on NIFTY today (worst loss: 30% of premium).",
-          "severity": "caution"
         }
       },
       "note": "engine is account-scoped; B's trades must not affect A"
     },
     "same_underlying_different_strike": {
-      "fired": {
-        "options_premium_avg_down": {
-          "message": "You entered NIFTY25MAR25200CE after 1 losing options position on NIFTY today (worst loss: 30% of premium).",
-          "severity": "caution"
-        }
-      },
+      "fired": {},
       "note": ""
     },
     "short_option_premium_tripled": {

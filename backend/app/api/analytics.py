@@ -1799,8 +1799,28 @@ async def get_options_behavior(
     # repointed: the nearest v2 equivalents are `direction_instability` and
     # `premium_loss_event`, and pointing them here would silently change what
     # those sections mean. That is a product decision, not a rename.
+    #
+    # 2026-08-30: `options_premium_avg_down` was RETIRED (Pattern 20), so the
+    # third and last section now has no live emitter either. THE QUERY IS
+    # DELIBERATELY UNCHANGED and the endpoint deliberately kept:
+    #
+    #   * stored `RiskAlert` rows with this pattern_type still exist and are
+    #     still true about what happened. Within the lookback the card renders
+    #     real history, not a lie.
+    #   * once those rows age out, `has_data` is False forever. The card
+    #     handles that by rendering NOTHING (`if (!data?.has_data) return null`)
+    #     and BehaviorTab folds `onHasData` into its own empty state, so no
+    #     misleading empty surface appears — the section simply stops existing.
+    #   * `direction_instability` is itself retired now; `premium_loss_event`
+    #     is the one live options detector that could feed this card. Pointing
+    #     it here is the SAME product decision the note above declined to make,
+    #     and a detector retirement is not the place to make it.
+    #
+    # So this endpoint is dead on a timer, not broken. Recorded in
+    # PENDING_AND_TODO.md as a product decision: repoint to
+    # `premium_loss_event`, or archive the card and this route together.
     OPTIONS_PATTERNS = (
-        "options_premium_avg_down",
+        "options_premium_avg_down",   # retired; historical rows only
     )
     try:
         cutoff = datetime.now(timezone.utc) - timedelta(days=days)
@@ -1813,15 +1833,22 @@ async def get_options_behavior(
         )
         alerts = result.scalars().all()
 
-        # Bucket by pattern
+        # Bucket by pattern.
+        #
+        # 2026-08-30: this used to loop over `alerts` and test each row's
+        # pattern_type against the retired name as a string literal. That
+        # comparison was always redundant - the query above filters
+        # `pattern_type.in_(OPTIONS_PATTERNS)` and that tuple holds exactly the
+        # one name - and once the pattern was retired it became the defect
+        # `test_no_shipping_module_compares_against_a_retired_pattern_name`
+        # exists to catch: a branch that compiles, never matches a new row, and
+        # fails silently. The filter is the single source of truth for which
+        # rows arrive here, so the bucket is just those rows.
         direction: list[RiskAlert] = []
-        avg_down: list[RiskAlert] = []
         iv_crush: list[RiskAlert] = []
         # direction / iv_crush stay empty — see OPTIONS_PATTERNS above. The
         # response shape is unchanged so the frontend card keeps working.
-        for a in alerts:
-            if a.pattern_type == "options_premium_avg_down":
-                avg_down.append(a)
+        avg_down: list[RiskAlert] = list(alerts)
 
         # ── Direction confusion ──────────────────────────────────────────
         underlying_counts: dict[str, int] = defaultdict(int)

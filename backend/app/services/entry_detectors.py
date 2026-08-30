@@ -53,8 +53,8 @@ ENTRY_DECIDABLE = (
     "martingale_behaviour",
     "fomo_entry",
     "same_symbol_obsession",
-    # `winning_streak_overconfidence` removed 2026-08-30 with its detector.
-    "options_premium_avg_down",
+    # `winning_streak_overconfidence` and `options_premium_avg_down` both
+    # removed 2026-08-30 with their detectors.
 )
 
 #: An inferred pattern raised from a position that has not resolved is a claim

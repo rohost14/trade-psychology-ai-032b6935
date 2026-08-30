@@ -201,8 +201,13 @@ REGISTRY: Tuple[DetectorSpec, ...] = (
     # instead, which `martingale_behaviour` covers. Shuffle null p = 0.582.
     # Its `uses_baseline=True` was false - it read no baseline.
     # See docs/patterns/19-winning_streak_overconfidence/.
-    DetectorSpec("options_premium_avg_down", "_detect_options_premium_avg_down",
-                 "1.0.0", "emotional", "alerting", "exit", 1),
+    # `options_premium_avg_down` RETIRED 2026-08-30. It was not an average-down:
+    # 0 of 44 firings involved an open position, because its "prior losers" were
+    # CLOSED rounds on the same UNDERLYING, not the same contract. Its copy
+    # described `adding_to_adverse_position`, which already covers option
+    # premium averaging on 100% of its 64 firings. Real subject was re-entry
+    # after a loss - `same_symbol_obsession` saw 70%, `revenge_trade` 48%.
+    # See docs/patterns/20-options_premium_avg_down/.
     # 3.0.0 (2026-08-27): Pattern #8 stopped being a behaviour detector and
     # became a real-time RISK-STATE detector. The alerting half moved onto the
     # tick path (`services/live_risk_state.py`), which raises a band crossing
@@ -415,11 +420,12 @@ PATTERN_COPY: Dict[str, PatternCopy] = {
         "lowers the price at which it has to come back, and raises what it costs if it "
         "does not.",
     ),
-    "options_premium_avg_down": PatternCopy(
-        "Adding to a losing option",
-        "Additional quantity on an option position already down on premium.",
-        "Averaging down an option fights both direction and time decay.",
-    ),
+    # `options_premium_avg_down` copy removed 2026-08-30 with the detector. It
+    # is worth recording WHAT it said, because the copy is why the detector
+    # survived four earlier audits: "Adding to a losing option / Additional
+    # quantity on an option position already down on premium." No part of that
+    # was true of the code, and all of it is true of
+    # `adding_to_adverse_position` below.
     # Copy rewritten 2026-08-27, Pattern #8. "Premium destruction" and "the
     # position needs a move it was never sized for" both read as a verdict on the
     # trade. This is a risk STATE - how much of the premium is gone - and the

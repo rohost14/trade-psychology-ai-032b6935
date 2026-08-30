@@ -98,9 +98,9 @@ def test_the_engine_counts_are_what_the_retirement_left():
     """
     from app.services.detector_registry import ALIASES, REGISTRY, all_pattern_types
 
-    assert len(REGISTRY) == 19
+    assert len(REGISTRY) == 18
     assert len(ALIASES) == 6
-    assert len(all_pattern_types()) == 25
+    assert len(all_pattern_types()) == 24
 
 
 def test_it_is_recorded_as_retired():
@@ -169,7 +169,9 @@ def test_revenge_trade_survives_and_is_still_frozen():
 @pytest.mark.parametrize("name,method", [
     ("same_symbol_obsession", "_detect_same_symbol_obsession"),
     ("rapid_reentry", "_detect_rapid_reentry"),
-    ("options_premium_avg_down", "_detect_options_premium_avg_down"),
+    # `options_premium_avg_down` was the third adjacent detector here. It was
+    # retired 2026-08-30 (Pattern 20) - it never observed an average-down, and
+    # 9 of its 44 firings were the CE-after-PE call THIS retirement was about.
 ])
 def test_the_adjacent_detectors_survive(name, method):
     from app.services.behavior_engine import BehaviorEngine

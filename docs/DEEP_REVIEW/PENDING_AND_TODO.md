@@ -277,6 +277,53 @@ which is a separate question about the value of the analytics disposition.
 The closed rule does not depend on the answer: if we ever stop writing it, INFO
 events still must not become alerts in the meantime.
 
+## Surfaced by the Pattern 20 review — NOT actioned
+
+### `/api/analytics/options-behavior` + `OptionsBehaviorCard` are dead on a timer
+
+**A product decision, deliberately not taken as part of a detector retirement.**
+
+All three sections of that card were fed by detectors that no longer emit:
+`options_direction_confusion` and `iv_crush_behavior` were engine-v1 names the
+endpoint never repointed (an earlier pass declined that on the same grounds),
+and `options_premium_avg_down` was retired 30 Aug.
+
+**It is not broken and not misleading.** Stored `RiskAlert` rows still exist and
+are still true, so inside the lookback the card renders real history. Once they
+age out, `has_data` is false forever and the card renders **nothing** —
+`if (!data?.has_data) return null` — with `BehaviorTab` folding `onHasData` into
+its own empty state. No permanently-empty surface appears; the section simply
+stops existing.
+
+**The two options:** repoint it at `premium_loss_event`, the one live options
+detector — which changes what those sections mean — or archive the card and the
+route together. Both are product calls. Pinned by
+`test_the_options_behavior_endpoint_is_kept_for_historical_rows` so a later pass
+cannot quietly repoint it.
+
+### `session_trades` is EXIT-ordered while detectors read it as decision-ordered
+
+`ctx.session_trades` is `trades[:i]` in **exit** order, so a "prior" trade can
+have been **still open** when the current one was entered. `options_premium_avg_down`
+used those priors' realised losses to describe a decision taken before the loss
+existed — **5 of its 44 firings**, where *"You entered X after N losing
+positions"* was simply false.
+
+**The ordering is shared, so the exposure may be too.** Any session-scope
+detector that reads a prior's *outcome* rather than its *existence* has the same
+defect available to it. **Not swept for** — this is an engine-level contract
+question, not a Pattern 20 defect, and the sweep should be one deliberate pass
+rather than a side effect of a retirement.
+
+### A third unsourced statistic in a threshold comment
+
+*"SEBI data: traders who averaged down on losing options lost 3× more"*, with no
+source anywhere in the repository. Removed with its threshold. Following
+`expiry_day_overtrading` (which **shipped** its unsourced statistics to traders)
+and `winning_streak_overconfidence`'s hot-hand claim. **Three instances is a
+pattern, not three accidents** — worth a sweep of the remaining threshold
+comments for claims that cite evidence nobody can produce.
+
 ## Surfaced by the Pattern 19 review — NOT actioned
 
 ### `BehaviorEngine._notional` now has zero callers
