@@ -148,11 +148,23 @@ def test_no_as_of_leaves_the_query_open_ended():
 # firings cited a loss that had not happened at the moment it described.
 
 def test_revenge_trade_compares_the_prior_close_to_this_entry():
-    from app.services.behavior_engine import BehaviorEngine
+    """
+    UPDATED 2026-08-30: it used to spell `t.exit_time < ct.entry_time` inline,
+    and this test asserted that literal. The predicate has not changed - it moved
+    to `EngineContext.concluded_before_entry`, so the two detectors that had the
+    guard and the two that lacked it now share one definition. The guarantee is
+    stronger, not weaker; its edges are pinned in test_temporal_contract.py and
+    its firing set is unchanged at 182 on the reference book.
+    """
+    from app.services.behavior_engine import BehaviorEngine, EngineContext
 
     src = inspect.getsource(BehaviorEngine._detect_revenge_trade)
-    assert re.search(r"t\.exit_time\s*<\s*ct\.entry_time", src), (
+    assert "ctx.concluded_before_entry" in src, (
         "a revenge trade is a reaction to a loss that had already happened")
+
+    relation = inspect.getsource(EngineContext.concluded_before_entry.fget)
+    assert "t.exit_time < entry" in relation, (
+        "and the shared relation must still be the strict one")
 
 
 def test_the_constitution_cooldown_rule_compares_against_this_entry():

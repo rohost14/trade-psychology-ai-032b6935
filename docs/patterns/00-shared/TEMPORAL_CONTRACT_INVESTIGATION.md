@@ -1,6 +1,16 @@
 # The temporal contract of "prior trade"
 
-**Investigation, 30 Aug 2026. Findings only. NO CODE CHANGED.**
+**Investigation, 30 Aug 2026.**
+
+> **IMPLEMENTED 30 Aug, approved.** `EngineContext.concluded_before_entry`
+> provides CONCLUDED once. `martingale_behaviour` and `post_loss_recovery_bet`
+> were migrated as the defects; `revenge_trade` and `rapid_reentry` moved onto
+> the same relation with firing sets provably unchanged. Existence detectors
+> untouched. Measured on the real book, every prediction in §5 matched exactly:
+> martingale **32 → 26**, post_loss 7 → 7, revenge 182 → 182, rapid_reentry
+> 14 → 14, and all eight existence detectors unmoved. The semantic baseline is
+> byte-identical. Pinned by `backend/tests/test_temporal_contract.py` (22 tests,
+> including all five shapes below). **CONCURRENT remains unnamed and open.**
 
 Opened because the `as_of` boundary fix (`dfb4456`) removed every *future*
 trade from `session_trades` but left 5 look-ahead cases in the retired Pattern

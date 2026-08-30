@@ -312,6 +312,50 @@ class EngineContext:
                 list(self.session_trades) + [self.completed_trade]
             )
 
+    @property
+    def concluded_before_entry(self) -> List[CompletedTrade]:
+        """
+        Today's trades whose OUTCOME WAS KNOWN when this trade was entered.
+
+        `session_trades` answers "did this happen in the session by now" -
+        OCCURRED. It is the right relation for counting, and a trade entered
+        after this one but closed before it is still one of today's trades.
+
+        It is the WRONG relation for a causal claim. A detector whose message
+        says "after X, you did Y" is asserting that the trader could see X when
+        they decided Y, and that is only true if X had CLOSED STRICTLY BEFORE
+        this position was ENTERED.
+
+        The distinction is not academic. Before this property existed,
+        `martingale_behaviour` built its run of consecutive losses straight from
+        `session_trades`, and 9 of its 32 firings on the reference book rested on
+        a loss that concluded AFTER the entry it explained - one of them by 125
+        minutes. A live danger-tier alert named a cause that had not happened.
+
+        Strictly `<`, not `<=`. A position closed in the same instant as the next
+        was entered was not information the trader acted on.
+        (`constitution_violation`'s cooldown rule still spells this `<=` inline;
+        the two disagree only at identical timestamps, and which is right is
+        recorded as open rather than decided here.)
+
+        WHAT THIS DELIBERATELY DOES NOT COVER: concurrency. Two legs of a
+        straddle entered in the same minute are one decision expressed as two
+        rows, and are neither prior nor subsequent. They are excluded here
+        because they did not conclude first - which is correct - but nothing yet
+        NAMES them. See docs/patterns/00-shared/TEMPORAL_CONTRACT_INVESTIGATION.md.
+        """
+        entry = getattr(self.completed_trade, "entry_time", None)
+        if entry is None:
+            return []
+        ct_id = getattr(self.completed_trade, "id", None)
+        return sorted(
+            (t for t in self.session_trades
+             if t.id != ct_id
+             and getattr(t, "exit_time", None) is not None
+             and t.exit_time < entry),
+            key=lambda t: t.exit_time,
+        )
+
 
 # ---------------------------------------------------------------------------
 # BehaviorEngine
@@ -1029,8 +1073,11 @@ class BehaviorEngine:
         measurements = {}
 
         # ── Structural gate ───────────────────────────────────────────────
-        prior = [t for t in ctx.session_trades
-                 if t.exit_time and ct.entry_time and t.exit_time < ct.entry_time]
+        # Was this exact predicate spelled inline. Same semantics, one
+        # definition - this detector was already right and its firing set must
+        # not move (182 on the reference book, asserted in
+        # tests/test_temporal_contract.py).
+        prior = ctx.concluded_before_entry
         if not ct.entry_time or not prior:
             return not_detected("revenge_trade", "no closed trade to react to")
 
@@ -1461,9 +1508,14 @@ class BehaviorEngine:
         if not ct.entry_time:
             return None
 
-        prior_same = [t for t in ctx.session_trades
-                      if t.tradingsymbol == ct.tradingsymbol
-                      and t.id != ct.id and t.exit_time]
+        # Was filtered from `session_trades`, and protected only INCIDENTALLY:
+        # an unconcluded prior yields a negative `gap_min`, which the `0 <=`
+        # below rejects. That reads as a range bound, not a temporal contract,
+        # so the guarantee is stated here instead. The `0 <=` stays - it is now
+        # belt-and-braces rather than the only protection. Firing set unchanged
+        # (14 on the reference book).
+        prior_same = [t for t in ctx.concluded_before_entry
+                      if t.tradingsymbol == ct.tradingsymbol]
         if not prior_same:
             return None
 
@@ -1778,10 +1830,13 @@ class BehaviorEngine:
         from app.core.instrument_risk import risk_basis
 
         ct = ctx.completed_trade
-        prior = sorted(
-            [t for t in ctx.session_trades if t.id != ct.id and t.exit_time],
-            key=lambda t: t.exit_time,
-        )
+        # CONCLUDED, not OCCURRED. This detector's claim is causal - size
+        # escalated AFTER a run of losses - so the run may only contain losses
+        # the trader could actually see when they entered. Reading
+        # `session_trades` here put 9 of 32 firings on the reference book behind
+        # a loss that closed after the entry they explained, the worst by 125
+        # minutes. Thresholds and the ladder are untouched.
+        prior = ctx.concluded_before_entry
         min_losses = int(ctx.thresholds.get("martingale_min_losses", 2))
         if len(prior) < min_losses:
             return not_detected(
@@ -2960,12 +3015,14 @@ class BehaviorEngine:
         except Exception:
             ct_underlying = ct.tradingsymbol or ""
 
-        prior = sorted(
-            [t for t in trades
-             if t.id != ct.id and t.exit_time
-             and (_ps(t.tradingsymbol or "").underlying if t.tradingsymbol else "") == ct_underlying],
-            key=lambda t: t.exit_time,
-        )
+        # CONCLUDED, for the same reason as martingale_behaviour: "after 2+
+        # losses, one oversized bet" is a causal claim. This detector happened to
+        # be unaffected on the reference book - 0 of 7 firings - but the code had
+        # the identical unguarded shape, so that was luck rather than protection.
+        prior = [
+            t for t in ctx.concluded_before_entry
+            if (_ps(t.tradingsymbol or "").underlying if t.tradingsymbol else "") == ct_underlying
+        ]
         if len(prior) < 2:
             return None
 

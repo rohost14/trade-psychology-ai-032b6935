@@ -317,15 +317,42 @@ against 13, `same_symbol_obsession` 111 against 49.
 
 Fixed with `as_of` at the boundary. See `test_session_trades_ordering.py`.
 
-**What the fix does NOT do, recorded so it is not assumed:** it does not remove
-the look-ahead class where a prior closed before this trade closed but after it
-was *entered*. Measured on the retired detector's own predicate, look-ahead went
-70 → 5, and a stricter entry bound would only reach 3 — so **no boundary rule
-can close it.** That is a per-detector obligation: any detector using a prior's
-OUTCOME to describe a DECISION must compare against `ct.entry_time` itself.
-`revenge_trade`, `constitution_violation`'s cooldown and `fomo_entry` do;
-`options_premium_avg_down` did not, which is why 5 of its 44 firings cited a
-loss that had not happened. Pinned by tests, not by the boundary.
+**The remaining class was investigated and CLOSED 30 Aug** — see
+`docs/patterns/00-shared/TEMPORAL_CONTRACT_INVESTIGATION.md`. No boundary rule
+could close it (look-ahead 70 → 5 under the exit bound, and only → 3 under a
+stricter entry bound), because it is not a boundary property. "Prior" is **three
+relations** — OCCURRED, CONCLUDED, CONCURRENT — and the engine had one word for
+all three.
+
+`EngineContext.concluded_before_entry` now provides CONCLUDED once. The
+investigation found the real defect was **not** the retired detector but
+**`martingale_behaviour`, live and danger-tier: 9 of 32 firings rested on a loss
+that concluded after the entry it explained**, the worst by 125 minutes.
+Migrated along with `post_loss_recovery_bet` (same shape, latent);
+`revenge_trade` and `rapid_reentry` moved onto the shared relation with their
+firing sets provably unchanged. **32 → 26** martingale firings on the reference
+book, exactly as predicted.
+
+### CONCURRENT has no name in the engine — still open
+
+The temporal investigation identified three relations and the engine now names
+two. **CONCURRENT — overlapping lifetimes, one decision expressed as several
+rows — is unnamed.** Three of the five Pattern 20 cases were straddle or spread
+legs entered in the same minute and read as a sequence; `concluded_before_entry`
+excludes them correctly, but only as a side effect of them not having concluded.
+
+`strategy_group` already exists for structures and `session_trades` does not
+express it. **No live detector was measured as affected**, which is why nothing
+was built — a relation nothing consumes would be speculative.
+
+### `constitution_violation`'s cooldown spells CONCLUDED as `<=`
+
+`revenge_trade` used `<` and the shared relation is `<`. The cooldown rule still
+spells its own `t.exit_time <= ct.entry_time` inline. **They disagree only at
+identical timestamps** — a close and an entry in the same instant — and nothing
+decides which is right. Deliberately not migrated: `constitution_violation` was
+outside the approved scope, and changing `<=` to `<` there is a behaviour
+question, not a refactor.
 
 ### `position_monitor_tasks` writes its own session-trades query
 
