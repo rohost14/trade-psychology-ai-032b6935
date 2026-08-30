@@ -1,10 +1,10 @@
 # Next session — start here
 
-**30 Aug 2026.** Patterns **12 through 18 are CLOSED**. Engine is at **20
-detectors, 26 pattern types, 6 aliases** — `all_pattern_types()` is the
+**30 Aug 2026.** Patterns **12 through 19 are CLOSED**. Engine is at **19
+detectors, 25 pattern types, 6 aliases** — `all_pattern_types()` is the
 authority and the retirement suites pin all three.
 
-**Eight retirements** (4, 6, 9, 10, 11, 14, 15, 18), every one on measurement,
+**Nine retirements** (4, 6, 9, 10, 11, 14, 15, 18, 19), every one on measurement,
 never on taste. Since the last update to this file:
 
 | # | pattern | outcome |
@@ -16,12 +16,19 @@ never on taste. Since the last update to this file:
 | 16 | `excess_exposure` | DEFERRED by decision, pending live broker-margin validation |
 | 17 | `session_meltdown` | MODIFIED — the undocumented 5%-of-capital fallback removed from **both** sites; abstains without a declared limit; **no replacement percentage** |
 | 18 | `early_exit` | RETIRED — right measure, wrong scope; shuffle null **p = 0.610** |
+| 19 | `winning_streak_overconfidence` | RETIRED — right concept, **wrong sign**: sizing up is LESS likely after a win run (21.4% vs 30.4%, rho = −0.076). Covered inverted by `martingale_behaviour` |
 
-## Next: review 19 = source-list #15 `winning_streak_overconfidence`
+## Next: review 20 = source-list #16 `options_premium_avg_down`
 
 **Review order is not the source-list numbering.** It walks
 `docs/patterns/00-shared/BEHAVIOURAL_PATTERNS.md` ascending and skips what is
-done; review 18 was source #14, so the next unreviewed source entry is #15.
+done; review 19 was source #15, so the next unreviewed source entry is #16.
+
+**First thing to measure there**, from the §H0 audit: it sits in **no
+consolidation family**, so it can fire beside every other pattern describing the
+same re-entry. Overlap is the opening question, not an afterthought —
+`winning_streak_overconfidence` fired ALONE on 6 of 6, and that uniqueness was
+the one argument against retiring it.
 
 Standing protocol: review first → measure against the real book → **no code
 until the behavioural decision is justified** → explicit approval before

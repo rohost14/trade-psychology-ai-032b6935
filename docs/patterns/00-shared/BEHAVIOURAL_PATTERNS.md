@@ -1155,7 +1155,7 @@ Shown as found; not reconciled.
 | DEAD/UNUSED | 2 | `confidence_alert_gate`; computed severity in #19 |
 | UNKNOWN | 1 | `AVERAGING_DOWN_SIZE_INCREASE_PCT` |
 
-**Reviewed: 18 of the 27, as of 30 Aug 2026 — see the REVIEW STATUS table
+**Reviewed: 19 of the 27, as of 30 Aug 2026 — see the REVIEW STATUS table
 below, which is the live tracker. This summary is the 22 Aug audit snapshot,
 kept as history; it is NOT current.**
 
@@ -1325,8 +1325,8 @@ reason goes in the notes column, not into someone's head.
 | 16 | `excess_exposure` (§10) | **DEFERRED — not reviewed** | — | — | Deferred **by decision**, and the blocking reason has changed: no longer "capital not stateable" but that F17 rerouted its capital input through the canonical risk layer, which **abstains on futures and short options** until broker margin exists. Live margin capture has never run, so every number behind it is a fixture — reviewing now would judge a temporarily silent detector. Blocked on **live broker-margin validation** |
 | 17 | `session_meltdown` (§11) | **COMPLETE — MODIFIED** | 30 Aug 2026 | 30 Aug 2026 | The §H0 note *"invents a limit at 5% of capital"* is closed. The 5% is gone from **both** the detector and `api/risk.py`; with no declared `daily_loss_limit` it **abstains**. It had no provenance and contradicted the product twice (`constitution_service` suggests 2-3%, onboarding computes 2%) and a decided policy: **money rules are suggested, never applied**. **No replacement percentage was substituted** and tests forbid one. The 40/75 ladder was not part of the change. `17-session_meltdown/` |
 | 18 | `early_exit` (§14) | **RETIRED — DELETED** | 30 Aug 2026 | 30 Aug 2026 | Right measure, wrong scope. Winner-hold vs loser-hold is the standard disposition-effect measure and the only observable answer to "was that exit early" — but at **3-5 trades per side** the ratio is indistinguishable from chance, **shuffle null p = 0.610**. No threshold value fixes an unstable ratio of two small means, so **0.40 was removed, not tuned**. The effect is absent in this book anyway (winners 41.0min vs losers 36.7min, ratio 1.12). **The measurement survives** in `baseline_service` over 276 and 413 trades. `18-early_exit/` |
-| **19** | **`winning_streak_overconfidence` (§15)** | **NEXT** | — | — | Its danger tier has never fired in 203 sessions — the §H0 DEFER note. First question is whether that tier is correctly silent or unreachable |
-| 20 | `options_premium_avg_down` (§16) | NOT STARTED | — | — | in no consolidation family; can fire beside every pattern describing the same re-entry |
+| 19 | `winning_streak_overconfidence` (§15) | **RETIRED — DELETED** | 30 Aug 2026 | 30 Aug 2026 | The §H0 DEFER note asked whether the never-firing danger tier was correctly silent. **Neither** — only 1 trade of 740 ever had a 5-win run behind it. The deeper failure is the caution tier: its claim was that the winning RUN causes the SIZE, and sizing up is **LESS** likely after a run (21.4% vs 30.4%, monotone, rho = −0.076, shuffle null p = 0.582). The trader sizes up after **LOSSES** instead — `martingale_behaviour`'s subject, already covered. Concept **not** retired permanently. `19-winning_streak_overconfidence/` |
+| **20** | **`options_premium_avg_down` (§16)** | **NEXT** | — | — | In no consolidation family — it can fire beside every pattern describing the same re-entry, which is the first thing to measure |
 | 21 | `opening_5min_trap` (§19) | NOT STARTED | — | — | three windows in one detector; analytics-only, and one of the **two remaining INFO detectors with no reader** |
 | 22 | `end_of_session_mis_panic` (§20) | NOT STARTED | — | — | 2 alerts |
 | 23 | `post_loss_recovery_bet` (§21) | NOT STARTED | — | — | 2 alerts. Named as covering part of the retired `size_escalation`'s claim, so its own review should confirm that |
