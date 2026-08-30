@@ -1,10 +1,10 @@
 # Next session — start here
 
-**30 Aug 2026.** Patterns **12 through 19 are CLOSED**. Engine is at **19
-detectors, 25 pattern types, 6 aliases** — `all_pattern_types()` is the
+**30 Aug 2026.** Patterns **12 through 20 are CLOSED**. Engine is at **18
+detectors, 24 pattern types, 6 aliases** — `all_pattern_types()` is the
 authority and the retirement suites pin all three.
 
-**Nine retirements** (4, 6, 9, 10, 11, 14, 15, 18, 19), every one on measurement,
+**Ten retirements** (4, 6, 9, 10, 11, 14, 15, 18, 19, 20), every one on measurement,
 never on taste. Since the last update to this file:
 
 | # | pattern | outcome |
@@ -17,18 +17,25 @@ never on taste. Since the last update to this file:
 | 17 | `session_meltdown` | MODIFIED — the undocumented 5%-of-capital fallback removed from **both** sites; abstains without a declared limit; **no replacement percentage** |
 | 18 | `early_exit` | RETIRED — right measure, wrong scope; shuffle null **p = 0.610** |
 | 19 | `winning_streak_overconfidence` | RETIRED — right concept, **wrong sign**: sizing up is LESS likely after a win run (21.4% vs 30.4%, rho = −0.076). Covered inverted by `martingale_behaviour` |
+| 20 | `options_premium_avg_down` | RETIRED — **never an average-down**: 0 of 44 firings had an open position. Its copy described `adding_to_adverse_position`, which already covers the option case on 64 of 64 firings |
 
-## Next: review 20 = source-list #16 `options_premium_avg_down`
+## Next: review 21 = source-list #19 `opening_5min_trap`
 
 **Review order is not the source-list numbering.** It walks
 `docs/patterns/00-shared/BEHAVIOURAL_PATTERNS.md` ascending and skips what is
-done; review 19 was source #15, so the next unreviewed source entry is #16.
+done; review 20 was source #16, so the next unreviewed source entry is #19
+(#17 `premium_loss_event` and #18 `expiry_day_overtrading` are already done).
 
-**First thing to measure there**, from the §H0 audit: it sits in **no
-consolidation family**, so it can fire beside every other pattern describing the
-same re-entry. Overlap is the opening question, not an afterthought —
-`winning_streak_overconfidence` fired ALONE on 6 of 6, and that uniqueness was
-the one argument against retiring it.
+**What it is:** three windows in one detector, `info`/analytics-only. With
+`options_premium_avg_down` gone it is now **one of the last two INFO detectors
+with no reader**, the other being `rapid_reentry` — reviewed at Pattern 13 and
+KEPT. Read that precedent first: the question there was not whether the window
+was selective (it was) but whether an `info` event nothing consumes is worth
+emitting, and that was left open.
+
+**A caution carried forward from Pattern 20:** check what the detector actually
+does before trusting its name or its copy. Two retirements in a row turned on
+copy that described a different mechanism than the code.
 
 Standing protocol: review first → measure against the real book → **no code
 until the behavioural decision is justified** → explicit approval before
