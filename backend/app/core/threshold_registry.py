@@ -169,16 +169,15 @@ _GROUP_C = [
           percentile=90, maturity=Maturity.SESSIONS_20,
           provenance="upper tail of the same distribution"),
 
-    # Definitional despite being counts — see the inventory. Personalising a
-    # streak length gives the absurd result that a trader with many streaks
-    # needs a LONGER streak before anyone mentions it.
-    _spec(key="overconfidence_win_streak_caution", kind=Kind.DEFINITIONAL, fallback=3,
-          meaning="consecutive winning trades before size is checked",
-          provenance="three wins in a row is a definition, not a claim about what is normal"),
-
-    _spec(key="overconfidence_win_streak_danger", kind=Kind.DEFINITIONAL, fallback=5,
-          meaning="consecutive wins, higher bar",
-          provenance="as above"),
+    # The two `overconfidence_win_streak_*` specs went with their detector on
+    # 2026-08-30. Their reasoning is kept here because it applies to ANY future
+    # streak threshold and is the point most likely to be re-litigated:
+    # personalising a streak length gives the absurd result that a trader with
+    # many streaks needs a LONGER streak before anyone mentions it. Streak
+    # lengths are DEFINITIONAL, not PERSONAL_BASELINE.
+    #
+    # The two size multipliers that gated the same detector never had specs at
+    # all - the same gap `early_exit_min_samples` had.
 ]
 
 

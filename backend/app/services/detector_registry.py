@@ -194,9 +194,13 @@ REGISTRY: Tuple[DetectorSpec, ...] = (
     # right; computing it over one session was not (shuffle null p = 0.610
     # at 3-5 samples a side). baseline_service still computes it over the
     # full history. See docs/patterns/18-early_exit/.
-    DetectorSpec("winning_streak_overconfidence", "_detect_winning_streak_overconfidence",
-                 "1.1.0", "emotional", "alerting", "exit", 1,
-                 uses_baseline=True),
+    # `winning_streak_overconfidence` RETIRED 2026-08-30. The concept is real
+    # literature; the conditioning variable had the wrong sign on this book.
+    # Sizing up was LESS likely after a 3+ win run (21.4% vs 30.4%), monotone
+    # across run lengths, rho = -0.076. The trader sizes up after LOSSES
+    # instead, which `martingale_behaviour` covers. Shuffle null p = 0.582.
+    # Its `uses_baseline=True` was false - it read no baseline.
+    # See docs/patterns/19-winning_streak_overconfidence/.
     DetectorSpec("options_premium_avg_down", "_detect_options_premium_avg_down",
                  "1.0.0", "emotional", "alerting", "exit", 1),
     # 3.0.0 (2026-08-27): Pattern #8 stopped being a behaviour detector and
@@ -372,11 +376,6 @@ PATTERN_COPY: Dict[str, PatternCopy] = {
         "Distinct underlyings entered inside a short window, counting strikes of the same "
         "underlying as one.",
         "Breadth is worth seeing on its own. It is not evidence about why the trades were taken.",
-    ),
-    "winning_streak_overconfidence": PatternCopy(
-        "Size up after wins",
-        "Position size after a run of winning trades, against your session average.",
-        "Size raised because recent trades worked is size raised on a sample, not on an edge.",
     ),
 
     # ── Risk / sizing ────────────────────────────────────────────────────

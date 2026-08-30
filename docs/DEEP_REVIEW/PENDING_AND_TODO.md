@@ -277,6 +277,64 @@ which is a separate question about the value of the analytics disposition.
 The closed rule does not depend on the answer: if we ever stop writing it, INFO
 events still must not become alerts in the meantime.
 
+## Surfaced by the Pattern 19 review — NOT actioned
+
+### `BehaviorEngine._notional` now has zero callers
+
+The last one was `winning_streak_overconfidence`, retired 30 Aug. The
+`size_escalation` retirement had explicitly kept the helper *because* other
+detectors read it — that premise is now false, and
+`test_notional_is_now_readerless_and_kept_deliberately` pins the new fact
+rather than hiding it.
+
+**Kept rather than deleted, as a decision.** Removing a shared helper is a
+judgement beyond a detector retirement, and its docstring carries the
+cross-instrument comparability argument every sizing detector needed: quantity
+is not comparable across instruments, rupees are. **Deleting it is one option
+for the consolidated pass; reviving it for a future sizing detector is the
+other.** `alert_outcome_service` has its own separate `_notional` — live and
+unrelated.
+
+### The F23 bug class is open — `is not None` on a numeric baseline
+
+F23 was `avg_baseline is not None` passing for `0.0`, which turned a danger
+gate into `current_qty >= 0` — unconditionally true. The fix was correct and
+lived in `winning_streak_overconfidence` to the end, so **retiring the detector
+removed the instance without closing the class.** Any `is not None` guard on a
+numeric baseline elsewhere has the same defect. Not swept for; recorded.
+
+### `danger_zone`'s pattern-driven CAUTION path is now fully unreachable
+
+`caution_patterns` held two names. `rapid_reentry` emits `info`, which by the
+closed INFO/evidence rule never becomes a `RiskAlert`, and `patterns_active` is
+built from `RiskAlert` rows — so it could never reach the set. The only member
+that could was retired 30 Aug.
+
+**The set is deliberately left in place.** Pattern 13 classified the dead
+`rapid_reentry` branch as a consumer/design inconsistency and **not** a bug,
+precisely so it would not later be "fixed" into changing the alerting
+philosophy. Deleting the pattern-driven CAUTION path is that same change by
+another route. **It belongs to a danger-zone review, not to a detector
+retirement**, and it is now the second detector review to arrive at this same
+question.
+
+### Orphaned comment block in `trading_defaults.py`
+
+The *"Early exit (disposition effect / cutting winners)"* header and its two
+SEBI claims survive at lines ~253-255, but the three keys beneath them went
+with Pattern 18. **This is leftover from retirement commit `13755b4` — my own
+change, not a pre-existing defect.**
+
+### `uses_baseline` is a declaration nothing checks — second instance
+
+`winning_streak_overconfidence` declared `uses_baseline=True` and read no
+baseline at all; its "baseline" was an inline average over today's session.
+The field has **zero readers**, so nothing broke.
+
+This is the same class as `early_exit_winner_max_min` naming a metric nothing
+produces, already recorded above. **Two instances now.** The fix is one
+contract test over the spec declarations, not two corrections.
+
 ## Surfaced by the Pattern 18 review — NOT actioned
 
 **Both were found by the `early_exit` review and deliberately left. Neither is

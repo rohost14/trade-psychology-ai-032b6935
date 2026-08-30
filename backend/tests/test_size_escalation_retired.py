@@ -102,9 +102,9 @@ def test_the_engine_counts_are_what_the_retirement_left():
     from app.services.detector_registry import ALIASES, REGISTRY, all_pattern_types
 
     # 20 / 26 since `early_exit` was retired 2026-08-30 (Pattern 18).
-    assert len(REGISTRY) == 20
+    assert len(REGISTRY) == 19
     assert len(ALIASES) == 6
-    assert len(all_pattern_types()) == 26
+    assert len(all_pattern_types()) == 25
 
 
 def test_it_is_recorded_as_retired():
@@ -178,19 +178,36 @@ def test_the_sizing_family_kept_its_two_members_in_order():
     assert members == ("martingale_behaviour", "post_loss_recovery_bet")
 
 
-def test_notional_survives_because_other_detectors_read_it():
+def test_notional_is_now_readerless_and_kept_deliberately():
+    """
+    THIS TEST'S PREMISE WAS FALSIFIED, and the new fact is pinned rather than
+    hidden.
+
+    It used to assert `>= 2` callers and was named
+    `test_notional_survives_because_other_detectors_read_it` - its whole point
+    being that retiring `size_escalation` had not orphaned the helper. That was
+    true until 2026-08-30: the last caller was
+    `winning_streak_overconfidence`, retired at Pattern 19.
+
+    `BehaviorEngine._notional` now has ZERO callers.
+
+    It is kept, not deleted, and that is a decision rather than an oversight.
+    Removing a shared helper is a judgement beyond a detector retirement, the
+    `size_escalation` retirement deliberately chose to keep it, and its
+    docstring carries the cross-instrument comparability argument that every
+    sizing detector needed. Recorded in PENDING_AND_TODO.md for the
+    consolidated pass, where deleting it is one of the options.
+
+    `alert_outcome_service` has its own separate `_notional`; that one is live
+    and unrelated.
+    """
     from app.services.behavior_engine import BehaviorEngine
 
     assert hasattr(BehaviorEngine, "_notional")
     src = (APP / "services" / "behavior_engine.py").read_text(encoding="utf-8")
-    # Was >= 3 when post_loss_recovery_bet also called it. F22 (2026-08-29)
-    # deleted that detector's cross-underlying branch, which was UNREACHABLE -
-    # its `prior` list is filtered to a single underlying, so the set it tested
-    # could never hold more than one element. The two calls it made went with
-    # it. `_notional` still has a live consumer in
-    # winning_streak_overconfidence, which is what this test exists to prove:
-    # the helper was not orphaned when size_escalation was retired.
-    assert src.count("self._notional(") >= 2
+    assert src.count("self._notional(") == 0, (
+        "if a caller came back, this helper is live again and the pending item "
+        "should be closed rather than acted on")
 
 
 def test_the_surviving_sizing_thresholds_are_intact():
@@ -328,9 +345,14 @@ def test_removing_it_could_not_have_changed_death_spiral():
     # ONE danger event across the 189-session book, so at most one session could
     # lose its emotional domain to this retirement. `size_escalation` before it
     # was caution-only and contributed nothing.
+    # 2026-08-30: was four. `winning_streak_overconfidence` (Pattern #19) had a
+    # `danger` branch in code and so counted as capable, but it produced
+    # **ZERO** danger events across the book - only 1 trade of 740 ever had the
+    # required 5-win run behind it, and that one missed the 2.0x size gate. So
+    # no session can lose its emotional domain to this retirement, and the
+    # death_spiral change is nil rather than merely small.
     EXPECTED_DANGER_CAPABLE = {
         "overtrading_burst",
-        "winning_streak_overconfidence",
         "opening_5min_trap",
         "same_symbol_obsession",
     }

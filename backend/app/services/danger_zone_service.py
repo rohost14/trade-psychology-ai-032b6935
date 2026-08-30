@@ -305,9 +305,20 @@ class DangerZoneService:
                 if pattern in danger_patterns:
                     triggers.append(f"pattern_{pattern}")
 
+        # NOTE, 2026-08-30: this set is now UNREACHABLE, and that is recorded
+        # rather than resolved. `patterns_active` is built from RiskAlert rows
+        # (line ~195) and `rapid_reentry` emits `info`, which by the closed
+        # INFO/evidence rule never becomes an alert. The only member that could
+        # reach it was `winning_streak_overconfidence`, retired today.
+        #
+        # The set is DELIBERATELY LEFT IN PLACE. Pattern 13 classified the dead
+        # `rapid_reentry` branch as a consumer/design inconsistency and NOT a
+        # bug, precisely so it would not later be "fixed" into changing the
+        # alerting philosophy. Deleting the pattern-driven CAUTION path is that
+        # same change by another route. It belongs to a danger-zone review, not
+        # to a detector retirement.
         caution_patterns = {
-            "winning_streak_overconfidence",  # BehaviorEngine
-            "rapid_reentry",                  # BehaviorEngine
+            "rapid_reentry",                  # BehaviorEngine — emits `info`
         }
         if any(p in caution_patterns for p in patterns_active):
             level = _upgrade_level(level, DangerLevel.CAUTION)

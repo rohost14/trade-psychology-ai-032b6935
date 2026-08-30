@@ -136,7 +136,9 @@ const BACKEND_TO_FRONTEND_TYPE: Record<string, string> = {
   // 'early_exit' RETIRED 2026-08-30 (Pattern 18). Removed from the routing
   // map because the engine can no longer emit it; the display name below
   // stays so stored alert rows still render.
-  'winning_streak_overconfidence': 'winning_streak_overconfidence',
+  // 'winning_streak_overconfidence' RETIRED 2026-08-30 (Pattern 19). Removed
+  // from the routing map because the engine can no longer emit it; the
+  // display name below stays so stored alert rows still render.
   // 'panic_exit' RETIRED 2026-08-29 (Pattern 14). Removed from the routing
   // map because the engine can no longer emit it; the display name below
   // stays so stored alert rows still render.
@@ -182,6 +184,9 @@ export function formatPatternName(patternType: string): string {
     // carry it and a history screen must not show a raw key.
     'panic_exit':                    'Panic Exit',
     'no_stoploss':                   'No Stop-Loss',
+    // Retired 2026-08-30 (Pattern 19). Kept because stored alert rows still
+    // carry it. The inverted behaviour this trader actually shows - sizing up
+    // after LOSSES - is covered by martingale_behaviour.
     'winning_streak_overconfidence': 'Overconfidence (Win Streak)',
     'session_meltdown':              'Session Meltdown',
     'capital_drawdown':              'Capital Drawdown',

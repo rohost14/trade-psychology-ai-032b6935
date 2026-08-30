@@ -101,31 +101,24 @@ def test_f22_the_unreachable_cross_underlying_branch_is_gone():
     assert "self._notional(" not in src, "the dead branch's only caller"
 
 
-def test_f22_left_the_reachable_cross_branch_in_the_other_detector_alone():
-    """
-    winning_streak_overconfidence has its own `_cross`, and that one IS
-    reachable - it tests whether the same-underlying pool is too small. It must
-    not be swept up.
-    """
-    from app.services.behavior_engine import BehaviorEngine
-
-    src = inspect.getsource(BehaviorEngine._detect_winning_streak_overconfidence)
-    assert "_cross = len(prior_same) < 2" in src
-    assert "self._notional(" in src
-
-
-# ── F23: zero baseline made the danger test unconditional ──────────────────
-
-def test_f23_a_zero_baseline_is_treated_as_no_baseline():
-    """
-    `avg_baseline is not None` passes for 0.0, turning the gate into
-    `current_qty >= 0` - true for every trade.
-    """
-    from app.services.behavior_engine import BehaviorEngine
-
-    src = inspect.getsource(BehaviorEngine._detect_winning_streak_overconfidence)
-    assert "if avg_baseline and current_qty >=" in src
-    assert "if avg_baseline is not None and current_qty >=" not in src
+# Two tests were deleted here on 2026-08-30 because their subject was
+# `winning_streak_overconfidence`, retired that day:
+#
+#   test_f22_left_the_reachable_cross_branch_in_the_other_detector_alone
+#       It pinned the distinction that F22's fix must NOT be swept into the
+#       other detector, whose `_cross` branch WAS reachable. It did its job -
+#       the branch survived F22 - and F22's own fix stays pinned by
+#       `test_f22_the_unreachable_cross_underlying_branch_is_gone` above.
+#
+#   test_f23_a_zero_baseline_is_treated_as_no_baseline
+#       F23 was `avg_baseline is not None` passing for 0.0, which made the
+#       danger gate `current_qty >= 0` - unconditionally true. The fix was
+#       correct and lived in that detector to the end. THE BUG CLASS IS NOT
+#       CLOSED by deleting the test: any `x is not None` guard on a numeric
+#       baseline elsewhere has the same defect. Recorded, not swept for.
+#
+# Both are reproduced in tests/test_winning_streak_retired.py so the reasoning
+# survives the detector.
 
 
 # ── F21 / F24: classified, verified, NOT bugs ──────────────────────────────

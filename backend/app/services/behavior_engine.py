@@ -1433,8 +1433,17 @@ class BehaviorEngine:
     # where every step stays under martingale's 1.5x and the current trade under
     # recovery's 2.0x of the recent mean — occurs 0 times in 3-trade windows
     # across 189 sessions (once each at 4 and 5 trades), so no replacement was
-    # built. `_notional` stays: martingale-adjacent detectors at 2473 and 3033
-    # read it. See docs/patterns/10-size_escalation/.
+    # built. See docs/patterns/10-size_escalation/.
+    #
+    # AMENDED 2026-08-30: this note used to say "`_notional` stays: detectors at
+    # 2473 and 3033 read it". Both readers are now gone - the last was
+    # `winning_streak_overconfidence`, retired at Pattern 19 - so
+    # `BehaviorEngine._notional` has NO callers. It is deliberately left in
+    # place rather than deleted: removing a shared helper is a judgement beyond
+    # a detector retirement, and the size_escalation retirement chose to keep
+    # it. Recorded in PENDING_AND_TODO.md for the consolidated pass.
+    # (`alert_outcome_service` has its own separate `_notional`; that one is
+    # live and unrelated.)
 
     # ── Pattern 5: Rapid re-entry (same symbol) ───────────────────────────
 
@@ -2423,134 +2432,62 @@ class BehaviorEngine:
     # Evidence: docs/patterns/18-early_exit/.
 
 
-    # ── Pattern 15: Winning streak overconfidence ─────────────────────────
+    # ── RETIRED 2026-08-30 — `winning_streak_overconfidence` ──────────────
     #
-    # "Hot hand fallacy": consecutive wins create overconfidence.
-    # After 5 wins, the danger is extreme regardless of size.
-
-    def _detect_winning_streak_overconfidence(self, ctx: EngineContext) -> Optional[DetectedEvent]:
-        ct = ctx.completed_trade
-        trades = ctx.session_trades
-
-        # All prior session trades (any instrument) — streak check only.
-        # Streak = last N exits, any instrument, all won.
-        prior = sorted(
-            [t for t in trades if t.id != ct.id and t.exit_time],
-            key=lambda t: t.exit_time,
-        )
-
-        caution_streak   = ctx.thresholds.get("overconfidence_win_streak_caution", 3)
-        danger_streak    = ctx.thresholds.get("overconfidence_win_streak_danger", 5)
-        size_mul_caution = ctx.thresholds.get("overconfidence_size_mul_caution", 1.3)
-        size_mul_danger  = ctx.thresholds.get("overconfidence_size_mul_danger", 2.0)
-
-        def is_win_streak(n: int) -> bool:
-            if len(prior) < n:
-                return False
-            return all(Decimal(str(t.realized_pnl or 0)) > 0 for t in prior[-n:])
-
-        # Size baseline: avg qty of ALL prior trades on the SAME underlying today.
-        # Cross-instrument raw qty comparison is meaningless — NIFTY lot ≠ BANKNIFTY lot
-        # ≠ stock option lot. Same underlying guarantees lot size is identical across
-        # all compared trades (different expiries of same underlying share the same lot).
-        from app.services.instrument_parser import parse_symbol as _ps
-        try:
-            ct_underlying = _ps(ct.tradingsymbol or "").underlying or ct.tradingsymbol or ""
-        except Exception:
-            ct_underlying = ct.tradingsymbol or ""
-
-        prior_same = [
-            t for t in prior
-            if t.tradingsymbol and (
-                (_ps(t.tradingsymbol).underlying or t.tradingsymbol) == ct_underlying
-            )
-        ]
-        # The fourth sizing detector with the single-underlying restriction, and
-        # the one missed when the other three were fixed. Sizing up after a
-        # winning run is the same decision whether the trader stays in NIFTY or
-        # moves to BANKNIFTY — restricted to one symbol it saw nothing across 61
-        # real sessions. Falls back to notional value, which is comparable
-        # across instruments where quantity is not.
-        _cross = len(prior_same) < 2
-        _pool = prior if _cross else prior_same
-        if _cross:
-            avg_baseline = (sum(self._notional(t) for t in _pool) / len(_pool)
-                            if _pool else None)
-            current_qty = max(self._notional(ct), 1.0)
-        else:
-            avg_baseline = (sum(t.total_quantity or 1 for t in _pool) / len(_pool)
-                            if _pool else None)
-            current_qty = ct.total_quantity or 1
-
-        def _streak_trade_list(win_list):
-            return [
-                {
-                    "symbol": t.tradingsymbol or "—",
-                    "qty": t.total_quantity or 0,
-                    "pnl": float(Decimal(str(t.realized_pnl or 0))),
-                    "exit_time": t.exit_time.isoformat() if t.exit_time else None,
-                }
-                for t in win_list
-            ]
-
-        # ── Danger: 5 wins (any instruments) + same-underlying size ≥ 2× avg ──
-        if is_win_streak(danger_streak):
-            # F23. `avg_baseline is not None` passes for 0.0, which makes the
-            # test `current_qty >= 0` - unconditionally true. A zero baseline is
-            # not a small baseline, it is the absence of one.
-            if avg_baseline and current_qty >= avg_baseline * size_mul_danger:
-                win_trades = prior[-danger_streak:]
-                total_profit = sum(Decimal(str(t.realized_pnl or 0)) for t in win_trades)
-                escalation_pct = (current_qty - avg_baseline) / max(avg_baseline, 1) * 100
-                return DetectedEvent(
-                    event_type="winning_streak_overconfidence",
-                    severity="danger",
-                    message=(
-                        f"{danger_streak} consecutive wins, then {ct_underlying} position jumped "
-                        f"{escalation_pct:.0f}% above your session average "
-                        f"({avg_baseline:.0f}→{current_qty} qty)."
-                    ),
-                    context={
-                        "win_streak": danger_streak,
-                        "streak_profit": float(total_profit),
-                        "avg_baseline_qty": round(avg_baseline, 1),
-                        "current_qty": current_qty,
-                        "escalation_pct": round(escalation_pct, 1),
-                        "underlying": ct_underlying,
-                        "trigger_symbol": ct.tradingsymbol,
-                        "streak_trades": _streak_trade_list(win_trades),
-                    },
-                )
-            # 5 wins but size not ≥ 2× (or no baseline) — fall through to caution check
-
-        # ── Caution: 3 wins (any instruments) + same-underlying size ≥ 1.3× avg ──
-        if is_win_streak(caution_streak):
-            if avg_baseline is None:
-                return None  # first trade on this underlying today — no baseline to compare
-            if current_qty >= avg_baseline * size_mul_caution:
-                win_trades = prior[-caution_streak:]
-                total_profit = sum(Decimal(str(t.realized_pnl or 0)) for t in win_trades)
-                escalation_pct = (current_qty - avg_baseline) / max(avg_baseline, 1) * 100
-                return DetectedEvent(
-                    event_type="winning_streak_overconfidence",
-                    severity="caution",
-                    message=(
-                        f"Last {caution_streak} trades all won. {ct_underlying} position jumped "
-                        f"{escalation_pct:.0f}% above your session average "
-                        f"({avg_baseline:.0f}→{current_qty} qty)."
-                    ),
-                    context={
-                        "win_streak": caution_streak,
-                        "streak_profit": float(total_profit),
-                        "avg_baseline_qty": round(avg_baseline, 1),
-                        "current_qty": current_qty,
-                        "escalation_pct": round(escalation_pct, 1),
-                        "underlying": ct_underlying,
-                        "trigger_symbol": ct.tradingsymbol,
-                        "streak_trades": _streak_trade_list(win_trades),
-                    },
-                )
-        return None
+    # Pattern 19. THE CONCEPT IS REAL. THE CONDITIONING VARIABLE HAD THE
+    # WRONG SIGN.
+    #
+    # It fired when the last N session exits all won AND the position was
+    # >= M x the average size of prior trades. Neither half is a behaviour on
+    # its own - traders have winning runs and traders vary size - so the whole
+    # claim was that the RUN is why the SIZE went up. That is an ordering
+    # claim, and it was measured directly.
+    #
+    #     P(size >= 1.3x baseline)
+    #         after a 3+ win run        21.4%   (n=28)
+    #         every other comparable    30.4%   (n=263)
+    #
+    # SIZING UP IS LESS LIKELY AFTER A WINNING RUN, and it is monotone across
+    # run lengths - 32.1%, 27.9%, 27.0%, 28.6%, 0.0% for runs of 0 to 4.
+    # Spearman rho(run length, size ratio) = -0.076, p = 0.902. The detector's
+    # theory predicts a POSITIVE correlation.
+    #
+    # The response to a run does exist in this book, inverted: after LOSING
+    # runs of 0 to 4 the same probability rises 26.0%, 28.4%, 30.6%, 40.0%,
+    # 53.8%. THIS TRADER SIZES UP AFTER LOSSES AND DOWN AFTER WINS - which is
+    # `martingale_behaviour`'s subject, and it already covers it. Nothing about
+    # this trader's sizing goes unwatched by this removal.
+    #
+    # The shuffle null agrees: 6 real firings against a shuffled mean of 6.2,
+    # p = 0.582. The same test retired `size_escalation` (0.880) and
+    # `early_exit` (0.610).
+    #
+    # The danger tier never fired in 175 sessions and was not "correctly
+    # silent" - only 1 trade of 740 ever had a 5-win run behind it, and it was
+    # under 2.0x. Meanwhile the SIZE half of that tier was satisfied twice
+    # (ratios 2.22 and 2.65), both emitting caution because the streak was 3.
+    # The tier was gated by the half with no evidence behind it.
+    #
+    # THE CONCEPT IS NOT RETIRED PERMANENTLY. Overconfidence after wins is
+    # established literature (Barber & Odean; Statman, Thorley & Vorkink).
+    # This is one trader's answer to "is it present", not an answer to "does
+    # the detector work when it is" - the same qualification recorded for
+    # `direction_instability`'s Level 1. n=28 after a 3+ win run cannot exclude
+    # a modest real effect; what it can exclude is this implementation.
+    #
+    # Two defects went with it and are recorded so they are not reintroduced:
+    # the `_cross` branch compared RUPEES of notional while the message said
+    # "qty" (3 of 6 firings, e.g. "10556 -> 23484.4935 qty"), which is the
+    # defect the 24 Aug hygiene pass fixed in `size_escalation` and left here;
+    # and `uses_baseline=True` was declared while the detector read no
+    # baseline at all.
+    #
+    # PRESERVED, because it is the best provenance note in the registry and
+    # applies to any future streak threshold: personalising a streak length
+    # gives the absurd result that a trader with many streaks needs a LONGER
+    # streak before anyone mentions it. Streak lengths are DEFINITIONAL.
+    #
+    # Evidence: docs/patterns/19-winning_streak_overconfidence/.
 
 
     # ── Pattern 16: Options direction confusion ───────────────────────────

@@ -76,9 +76,9 @@ def test_no_registry_spec_points_at_the_deleted_method():
 def test_the_engine_counts_are_what_the_retirement_left():
     from app.services.detector_registry import ALIASES, REGISTRY, all_pattern_types
 
-    assert len(REGISTRY) == 20
+    assert len(REGISTRY) == 19
     assert len(ALIASES) == 6
-    assert len(all_pattern_types()) == 26
+    assert len(all_pattern_types()) == 25
 
 
 def test_it_is_recorded_as_retired():

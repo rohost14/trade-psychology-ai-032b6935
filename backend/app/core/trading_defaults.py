@@ -240,15 +240,12 @@ COLD_START_DEFAULTS: Dict[str, Any] = {
     'no_stoploss_monthly_hold_min':      5,
     'no_stoploss_monthly_loss_pct':      20,
 
-    # ── Win streak overconfidence ─────────────────────────────────────────
-    # "Hot hand fallacy": after 3 wins, retail traders increase size 40-80%.
-    # Streak check: last N session trades (any instrument) all won.
-    # Size check: same underlying only — cross-instrument lot sizes are not comparable.
-    # No same-underlying baseline → no alert (can't assess size without history).
-    'overconfidence_win_streak_caution':    3,   # 3 wins → check size (same underlying)
-    'overconfidence_win_streak_danger':     5,   # 5 wins → check size (same underlying, higher threshold)
-    'overconfidence_size_mul_caution':      1.3, # same-underlying size ≥ 1.3× session avg = caution
-    'overconfidence_size_mul_danger':       2.0, # same-underlying size ≥ 2.0× session avg = danger
+    # `overconfidence_*` (4 keys) REMOVED 2026-08-30 with
+    # `winning_streak_overconfidence`. The comment here claimed "after 3 wins,
+    # retail traders increase size 40-80%" with no source anywhere in the repo,
+    # and the multipliers did not even match it - 1.3 is +30%, 2.0 is +100%,
+    # neither endpoint of the cited range. Not replaced: the measurement said
+    # the gate was aimed the wrong way, not that 1.3 was the wrong number.
 
     # ── Early exit (disposition effect / cutting winners) ─────────────────
     # SEBI FY2022: retail sold winning positions 2.7× faster than losing positions.

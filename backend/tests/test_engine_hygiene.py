@@ -308,36 +308,10 @@ class TestSameSymbolObsession:
         assert ev.context["size_rising"] is True
 
 
-class TestWinningStreakOverconfidence:
-    """Fires 6 times in the replay; the danger tier never fired at all."""
-
-    def _run(self, n_wins, current_qty, prior_qty=50):
-        priors = []
-        for i in range(n_wins):
-            t = make_ct(symbol="NIFTY25AUGFUT", pnl=400.0, entry_offset_min=-200 + i * 20)
-            t.total_quantity = prior_qty
-            priors.append(t)
-        ct = make_ct(symbol="NIFTY25AUGFUT", pnl=100.0, entry_offset_min=-5)
-        ct.total_quantity = current_qty
-        return engine._detect_winning_streak_overconfidence(
-            make_ctx(completed_trade=ct, session_trades=priors))
-
-    def test_streak_without_size_increase_is_silent(self):
-        assert self._run(3, 50) is None
-
-    def test_caution_at_three_wins_and_1_3x(self):
-        ev = self._run(3, 70)
-        assert ev is not None and ev.severity == "caution"
-        assert ev.context["win_streak"] == 3
-
-    def test_danger_at_five_wins_and_2x(self):
-        ev = self._run(5, 100)
-        assert ev is not None and ev.severity == "danger"
-        assert ev.context["win_streak"] == 5
-
-    def test_five_wins_but_small_size_falls_through_to_caution(self):
-        ev = self._run(5, 70)
-        assert ev is not None and ev.severity == "caution"
+# `TestWinningStreakOverconfidence` (4 tests) deleted 2026-08-30 with the
+# detector they exercised. They asserted the caution/danger ladder and the
+# five-wins-small-size fall-through; all three behaviours no longer exist.
+# The retirement itself is pinned by tests/test_winning_streak_retired.py.
 
 
 class TestPostLossRecoveryBet:

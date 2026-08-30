@@ -70,8 +70,8 @@ def test_the_engine_counts_are_what_the_retirement_left():
     from app.services.detector_registry import REGISTRY, all_pattern_types
 
     # 20 / 26 since `early_exit` was retired 2026-08-30 (Pattern 18).
-    assert len(REGISTRY) == 20
-    assert len(all_pattern_types()) == 26
+    assert len(REGISTRY) == 19
+    assert len(all_pattern_types()) == 25
 
 
 def test_it_is_recorded_as_retired():
@@ -210,9 +210,14 @@ def test_death_spiral_still_has_its_emotional_domain():
     # ONE danger event across the 189-session book, so at most one session could
     # lose its emotional domain to this retirement. `size_escalation` before it
     # was caution-only and contributed nothing.
+    # 2026-08-30: was four. `winning_streak_overconfidence` (Pattern #19) had a
+    # `danger` branch in code and so counted as capable, but it produced
+    # **ZERO** danger events across the book - only 1 trade of 740 ever had the
+    # required 5-win run behind it, and that one missed the 2.0x size gate. So
+    # no session can lose its emotional domain to this retirement, and the
+    # death_spiral change is nil rather than merely small.
     EXPECTED_DANGER_CAPABLE = {
         "overtrading_burst",
-        "winning_streak_overconfidence",
         "opening_5min_trap",
         "same_symbol_obsession",
     }

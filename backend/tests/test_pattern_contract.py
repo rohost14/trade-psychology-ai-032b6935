@@ -178,6 +178,12 @@ def test_no_shipping_module_uses_a_severity_value_outside_the_vocabulary():
 #: against these is dead code that looks alive.
 RETIRED_PATTERN_NAMES = (
     "revenge_sizing",
+    # Retired 2026-08-30 (Pattern 19): the concept is real literature but the
+    # conditioning variable had the wrong sign. Sizing up was LESS likely after
+    # a 3+ win run (21.4% vs 30.4%), monotone across run lengths, rho = -0.076.
+    # This trader sizes up after LOSSES instead - martingale_behaviour's
+    # subject. Shuffle null p = 0.582; danger never fired in 175 sessions.
+    "winning_streak_overconfidence",
     # Retired 2026-08-30 (Pattern 18): the disposition-effect measure was right,
     # computing it over ONE SESSION was not. The effect is absent in the book
     # (winners 41.0min vs losers 36.7min) and at 3-5 samples a side the ratio is
