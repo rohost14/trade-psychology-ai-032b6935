@@ -329,6 +329,43 @@ which is a separate question about the value of the analytics disposition.
 The closed rule does not depend on the answer: if we ever stop writing it, INFO
 events still must not become alerts in the meantime.
 
+## Surfaced by the Pattern 24 review — NOT actioned
+
+### Multi-rule breaches are not grouped — a separate product decision
+
+`constitution_violation` returns a LIST, and **41% of firing trades breach more
+than one rule at once**:
+
+| rules on one trade | trades | share |
+|---|---|---|
+| 1 | 425 | 59% |
+| 2 | 185 | 26% |
+| 3 | 88 | 12% |
+| 4 | 21 | 3% |
+| 5 | 2 | 0% |
+
+Per-rule dedup is correct and must stay — a cooldown breach must not suppress a
+later daily-loss breach, which `_pattern_dedup_key` documents. But nothing
+turns "you broke three of your own rules on this trade" into one statement, and
+each event is a separate `RiskAlert` row at `notification_level=4`.
+
+**Deliberately not implemented at Pattern 24.** Grouping changes what a trader
+receives, so it is a product decision about alert presentation, not a detector
+fix. Recorded with the numbers so it can be decided rather than re-measured.
+
+### `constitution_violation` is the largest alert source in the engine
+
+**383 alerts after per-rule dedup** (a lower bound — the `_worsened` re-arm is
+not modelled) across **126 of 175 sessions**, against **457 firings for every
+other detector combined**. Roughly **46% of all alerts**, at the highest
+notification level.
+
+Not obviously wrong — a breach of your own declared rule *is* a breach, and the
+copy is right that these are the trader's own numbers. **But it is the same
+shape as the 54%-of-all-alerts figure that caused `daily_loss_limit` to be
+pulled from `generate_defaults`, and it has never been asked as a product
+question.** Recorded so it is asked deliberately.
+
 ## Surfaced by the Pattern 23 review — NOT actioned
 
 **`post_loss_recovery_bet` was KEPT AS-IS on 1 Sep 2026.** Nothing below is a

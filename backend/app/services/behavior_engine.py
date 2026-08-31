@@ -3164,9 +3164,19 @@ class BehaviorEngine:
         # ── Rule: cooldown after loss (binary) ────────────────────────────
         cooldown_min = th.get("user_cooldown_min")
         if cooldown_min and ct.entry_time:
-            prior_losses = [t for t in ctx.session_trades
-                            if t.exit_time and t.exit_time <= ct.entry_time
-                            and Decimal(str(t.realized_pnl or 0)) < 0]
+            # CONCLUDED, from the shared relation. This spelled the predicate
+            # inline as `t.exit_time <= ct.entry_time` while
+            # `EngineContext.concluded_before_entry` uses `<`, so the two
+            # disagreed at identical timestamps and nothing decided which was
+            # right. Measured before the change: the two select different sets
+            # on 0 of 740 trades, so this is a consistency fix with no
+            # behavioural change - the firing set is unchanged at 181 events
+            # against a declared 15-minute cooldown.
+            #
+            # `<` is the right one: a position closed in the same instant the
+            # next was entered was not information the trader acted on.
+            prior_losses = [t for t in ctx.concluded_before_entry
+                            if Decimal(str(t.realized_pnl or 0)) < 0]
             if prior_losses:
                 last_loss = max(prior_losses, key=lambda t: t.exit_time)
                 gap_min = (ct.entry_time - last_loss.exit_time).total_seconds() / 60
@@ -3207,21 +3217,30 @@ class BehaviorEngine:
             # than judge against premium, notional or a percentage stand-in.
             rq = quantities_for_trade(ct, margin=ctx.broker_margin)
             if not rq.usable_for_capital_rules:
+                # ABSTAIN, and fall through to whatever follows.
+                #
+                # This was `return events or None`, which was correct only
+                # because max_trade_risk happens to be the LAST rule. A rule
+                # added below it would have been silently skipped whenever
+                # capital was not determinable - on 2% of trades today, and on
+                # 100% of them for an exchange the risk layer must abstain on
+                # (MCX, CDS, BFO). Abstaining from ONE rule must never abstain
+                # from the others.
                 logger.debug(
                     "max_trade_risk abstains on %s: %s",
                     ct.tradingsymbol, rq.capital_requirement.note)
-                return events or None
-            risk = float(rq.capital_requirement.amount)
-            risk_pct = risk / float(capital) * 100
-            ratio = risk_pct / float(risk_pct_limit)
-            sev = ladder(ratio)
-            if sev:
-                verb = "breached" if ratio >= 1.0 else "approaching"
-                add("max_trade_risk", sev,
-                    f"Your per-trade risk rule {verb}: {ct.tradingsymbol} risked "
-                    f"{risk_pct:.1f}% of capital (your limit: {float(risk_pct_limit):.0f}%).",
-                    {"limit_pct": float(risk_pct_limit), "current_pct": round(risk_pct, 2),
-                     "ratio": round(ratio, 2), "capital_at_risk": round(risk, 2)})
+            else:
+                risk = float(rq.capital_requirement.amount)
+                risk_pct = risk / float(capital) * 100
+                ratio = risk_pct / float(risk_pct_limit)
+                sev = ladder(ratio)
+                if sev:
+                    verb = "breached" if ratio >= 1.0 else "approaching"
+                    add("max_trade_risk", sev,
+                        f"Your per-trade risk rule {verb}: {ct.tradingsymbol} risked "
+                        f"{risk_pct:.1f}% of capital (your limit: {float(risk_pct_limit):.0f}%).",
+                        {"limit_pct": float(risk_pct_limit), "current_pct": round(risk_pct, 2),
+                         "ratio": round(ratio, 2), "capital_at_risk": round(risk, 2)})
 
         return events or None
 

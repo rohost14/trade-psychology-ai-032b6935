@@ -370,6 +370,42 @@ _PRODUCT_POLICY = {
     "guardian_monthly_budget": (3, "guardian messages a month"),
 }
 
+# ── The constitution ladder ────────────────────────────────────────────────
+#
+# Classified 1 Sep 2026 (Pattern 24). VALUES UNCHANGED - 0.80 and 1.20 are
+# exactly what shipped; only their Kind and provenance are recorded.
+#
+# These are the ONLY two numbers `constitution_violation` chooses. Every other
+# input it reads is the trader's own declared rule, so these decide the one
+# thing the product decides there: how close to your own line counts as a
+# warning, and how far past it counts as severe.
+#
+# PRODUCT_POLICY, not a trading threshold and not personalisable. A trader must
+# not be able to move the point at which breaking their own rule is reported -
+# that would let the rule be softened without editing the rule, which is the
+# thing `constitution_service`'s tighten-instant/loosen-409 gate exists to
+# prevent. `violates_kind` enforces it: neither may resolve from HISTORY,
+# SESSION or POPULATION.
+_CONSTITUTION_LADDER = {
+    "constitution_approaching_pct": (
+        0.80, "share of your own limit at which a warning is raised"),
+    "constitution_severe_pct": (
+        1.20, "multiple of your own limit at which the breach is severe"),
+}
+
+for _key, (_default, _meaning) in _CONSTITUTION_LADDER.items():
+    THRESHOLD_SPECS[_key] = ThresholdSpec(
+        key=_key,
+        kind=Kind.PRODUCT_POLICY,
+        fallback=_default,
+        meaning=_meaning,
+        provenance=(
+            "product policy on reporting a trader's OWN rule, not a claim about "
+            "trading. The rule is theirs; only the run-up and the severity step "
+            "are ours. Values unchanged from ship; classified at Pattern 24"),
+    )
+
+
 for _key, (_default, _meaning) in _PRODUCT_POLICY.items():
     THRESHOLD_SPECS[_key] = ThresholdSpec(
         key=_key,
