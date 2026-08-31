@@ -1,10 +1,10 @@
 # Next session — start here
 
-**30 Aug 2026.** Patterns **12 through 20 are CLOSED**. Engine is at **18
-detectors, 24 pattern types, 6 aliases** — `all_pattern_types()` is the
+**30 Aug 2026.** Patterns **12 through 21 are CLOSED**. Engine is at **17
+detectors, 23 pattern types, 6 aliases** — `all_pattern_types()` is the
 authority and the retirement suites pin all three.
 
-**Ten retirements** (4, 6, 9, 10, 11, 14, 15, 18, 19, 20), every one on measurement,
+**Eleven retirements** (4, 6, 9, 10, 11, 14, 15, 18, 19, 20, 21), every one on measurement,
 never on taste. Since the last update to this file:
 
 | # | pattern | outcome |
@@ -18,8 +18,10 @@ never on taste. Since the last update to this file:
 | 18 | `early_exit` | RETIRED — right measure, wrong scope; shuffle null **p = 0.610** |
 | 19 | `winning_streak_overconfidence` | RETIRED — right concept, **wrong sign**: sizing up is LESS likely after a win run (21.4% vs 30.4%, rho = −0.076). Covered inverted by `martingale_behaviour` |
 | 20 | `options_premium_avg_down` | RETIRED — **never an average-down**: 0 of 44 firings had an open position. Its copy described `adding_to_adverse_position`, which already covers the option case on 64 of 64 firings |
+| 21 | `opening_5min_trap` | RETIRED — the window was **not worse**: 39.4% win inside vs 39.5% outside, and it discarded 42% of window entries for winning |
+| 21b | `end_of_session_mis_panic` | **DEFERRED** — evidence absent, not contrary. Gates on `product`; the tradebook has no such column |
 
-## Next: review 21 = source-list #19 `opening_5min_trap`
+## Next: review 23 = source-list #21 `post_loss_recovery_bet`
 
 **Review order is not the source-list numbering.** It walks
 `docs/patterns/00-shared/BEHAVIOURAL_PATTERNS.md` ascending and skips what is
