@@ -18,6 +18,7 @@ import { TradebookImportCard } from '@/components/settings/TradebookImportCard';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { Checkbox } from '@/components/ui/checkbox';
 import { Switch } from '@/components/ui/switch';
 import { Slider } from '@/components/ui/slider';
 import {
@@ -45,12 +46,28 @@ interface OnboardingData {
   preferred_instruments: string[];
   trading_hours_start: string;
   trading_hours_end: string;
-  daily_loss_limit: number;
+  // MONEY RULES ARE NULLABLE AND OFF BY DEFAULT.
+  //
+  // `constitution_service.generate_defaults` returns null for both and offers
+  // `suggested_*` beside them: the server suggests, the trader decides, and
+  // only then does it become an enforced Rule. This form used to defeat that -
+  // it carried its own defaults (`daily_loss_limit: 5000`,
+  // `max_position_size: 50000`) which survived the merge because the server's
+  // null lost to `??`, so every trader was silently given a loss limit they
+  // never chose and a per-trade risk rule in the WRONG UNIT: 50000 was a rupee
+  // figure written into a field the backend, MyRules and the detector all read
+  // as a PERCENTAGE of capital.
+  //
+  // See docs/patterns/24-constitution_violation/.
+  daily_loss_limit: number | null;
   daily_trade_limit: number;
-  max_position_size: number;
+  max_position_size: number | null;
   cooldown_after_loss: number;
   max_consecutive_losses: number;
   trading_capital: number | null;
+  //: Explicit opt-in. Unchecked -> the rule stays null and is never enforced.
+  enable_daily_loss_limit: boolean;
+  enable_max_position_size: boolean;
   known_weaknesses: string[];
   push_enabled: boolean;
   whatsapp_enabled: boolean;
@@ -118,12 +135,14 @@ export default function OnboardingWizard({ brokerAccountId, onComplete, onSkip }
     preferred_instruments: ['NIFTY', 'BANKNIFTY'],
     trading_hours_start: '09:15',
     trading_hours_end: '15:30',
-    daily_loss_limit: 5000,
+    daily_loss_limit: null,          // off until the trader opts in
     daily_trade_limit: 10,
-    max_position_size: 50000,
+    max_position_size: null,         // off until the trader opts in
     cooldown_after_loss: 15,
     max_consecutive_losses: 3,
     trading_capital: null,
+    enable_daily_loss_limit: false,
+    enable_max_position_size: false,
     known_weaknesses: [],
     push_enabled: true,
     whatsapp_enabled: false,
@@ -141,36 +160,64 @@ export default function OnboardingWizard({ brokerAccountId, onComplete, onSkip }
   // review screen showed four of the five recommended rules and the fifth stayed
   // whatever the form defaulted to. The backend owns the matrix
   // (ConstitutionService.generate_defaults); this asks it.
+  // The server's suggested money rules, shown but never applied on their own.
+  // Calculated ONCE, in `constitution_service.generate_defaults`; this form
+  // deliberately does not recompute them - a local copy of that matrix already
+  // existed here once and had drifted.
+  const [suggested, setSuggested] = useState<{
+    daily_loss_limit: number | null;
+    max_position_size: number | null;
+  }>({ daily_loss_limit: null, max_position_size: null });
+
   const prefilledRef = useRef(false);
   useEffect(() => {
-    if (currentStep !== 4 || prefilledRef.current) return;
-    prefilledRef.current = true;
+    if (currentStep !== 4) return;
+    // Re-runs when capital changes, because the SUGGESTED daily loss limit is
+    // derived from it and capital is entered on this very screen — it is not
+    // persisted until this step is submitted, so the server is told the value
+    // rather than asked to look it up. The count/time prefill below is guarded
+    // by `prefilledRef` so it still happens exactly once and never overwrites
+    // a slider the trader has already moved.
+    const capital = data.trading_capital;
+    const t = setTimeout(() => {
     (async () => {
       try {
-        const res = await api.post('/api/constitution/generate', {});
+        const res = await api.post('/api/constitution/generate',
+          capital != null ? { trading_capital: capital } : {});
         const rec = res.data?.recommended;
         if (!rec) return;
+        // The SUGGESTED money rules are displayed; they are not applied.
+        setSuggested({
+          daily_loss_limit: rec.suggested_daily_loss_limit ?? null,
+          max_position_size: rec.suggested_max_position_size ?? null,
+        });
+        if (prefilledRef.current) return;
+        prefilledRef.current = true;
         setData(d => ({
           ...d,
-          // The server returns null for ₹ rules when capital is unknown; keep
-          // whatever the user already typed rather than blanking the field.
-          daily_loss_limit: rec.daily_loss_limit ?? d.daily_loss_limit,
+          // Count and time rules are enforced defaults — they are not shares of
+          // capital, so "more than 10 trades today" means the same at any
+          // account size and the server ships them set.
           daily_trade_limit: rec.daily_trade_limit ?? d.daily_trade_limit,
           cooldown_after_loss: rec.cooldown_after_loss ?? d.cooldown_after_loss,
           max_consecutive_losses: rec.max_consecutive_losses ?? d.max_consecutive_losses,
-          max_position_size: rec.max_position_size ?? d.max_position_size,
+          // daily_loss_limit and max_position_size are deliberately NOT taken
+          // from `rec` — the server returns null for both on purpose. They are
+          // set only by the opt-in below.
         }));
       } catch {
         // A failed recommendation must not block onboarding — the review step
-        // still works, the user just types their own numbers.
-        //
-        // No retry flag here: resetting prefilledRef looked like it enabled one,
-        // but the effect only depends on currentStep, which does not change
-        // while the user sits on step 4. It was dead code pretending to be a
-        // recovery path. The defaults already in the form are the fallback.
+        // still works. The money rules simply stay off and un-suggested, which
+        // is the correct fallback: they are opt-in, so "no suggestion" costs
+        // the trader nothing and enforces nothing.
       }
     })();
-  }, [currentStep]);
+    }, 400);   // debounce: capital is typed a digit at a time
+    return () => clearTimeout(t);
+    // `data.trading_capital` is a dependency on purpose — the suggested loss
+    // limit is derived from it. Depending on the whole `data` object would
+    // refetch on every slider move.
+  }, [currentStep, data.trading_capital]);
 
   const handleNext = async () => {
     setIsLoading(true);
@@ -231,9 +278,13 @@ export default function OnboardingWizard({ brokerAccountId, onComplete, onSkip }
         };
       case 4:
         return {
-          daily_loss_limit: data.daily_loss_limit,
+          // null unless explicitly enabled. The backend drops nulls
+          // (`{k: v for k, v in rules.items() if v is not None}`), so an
+          // un-opted rule is never written and `constitution_violation`
+          // abstains on it.
+          daily_loss_limit: data.enable_daily_loss_limit ? data.daily_loss_limit : null,
           daily_trade_limit: data.daily_trade_limit,
-          max_position_size: data.max_position_size,
+          max_position_size: data.enable_max_position_size ? data.max_position_size : null,
           cooldown_after_loss: data.cooldown_after_loss,
           max_consecutive_losses: data.max_consecutive_losses,
           trading_capital: data.trading_capital,
@@ -495,11 +546,12 @@ export default function OnboardingWizard({ brokerAccountId, onComplete, onSkip }
                       value={data.trading_capital ?? ''}
                       onChange={(e) => {
                         const cap = e.target.value === '' ? null : Number(e.target.value);
-                        setData(d => ({
-                          ...d,
-                          trading_capital: cap,
-                          daily_loss_limit: cap ? Math.max(1000, Math.round(cap * 0.02 / 500) * 500) : d.daily_loss_limit,
-                        }));
+                        // Capital alone sets no rule. It feeds the server's
+                        // SUGGESTION, which the trader may then enable below.
+                        // This used to compute `cap * 0.02` here — a second
+                        // copy of the backend matrix, and the path by which a
+                        // loss limit was applied without anyone choosing it.
+                        setData(d => ({ ...d, trading_capital: cap }));
                       }}
                     />
                     <p className="text-xs text-muted-foreground">
@@ -507,21 +559,129 @@ export default function OnboardingWizard({ brokerAccountId, onComplete, onSkip }
                     </p>
                   </div>
 
-                  <div className="space-y-3">
-                    <div className="flex justify-between">
-                      <Label className="flex items-center gap-2">
+                  {/*
+                    MONEY RULES — OPTIONAL, OFF BY DEFAULT.
+
+                    The count and time rules above are enforced defaults; these
+                    two are not. The distinction is the product's, not this
+                    screen's: `constitution_service.generate_defaults` returns
+                    null for both and offers a `suggested_*` value beside each,
+                    because a share-of-capital rule cannot be chosen for someone
+                    else. F&O lot sizes are fixed — on ₹50,000 a 2% per-trade
+                    rule allows ₹1,000 while one option lot costs ₹5,000-15,000,
+                    so an auto-applied limit breaches on contact and teaches the
+                    trader to ignore the alert.
+
+                    Suggestion → trader decides → Rule becomes active.
+                  */}
+                  <div className="space-y-4 rounded-lg border border-border p-4">
+                    <div className="space-y-1">
+                      <Label className="flex items-center gap-2 text-sm font-semibold">
                         <Wallet className="h-4 w-4" />
-                        Daily Loss Limit
+                        Set your money rules
                       </Label>
-                      <span className="text-sm font-medium">₹{data.daily_loss_limit.toLocaleString()}</span>
+                      <p className="text-xs text-muted-foreground">
+                        Optional limits you can choose to enforce. Left off, nothing
+                        is enforced and no alerts are raised against them.
+                      </p>
                     </div>
-                    <Slider
-                      value={[data.daily_loss_limit]}
-                      onValueChange={([value]) => setData({ ...data, daily_loss_limit: value })}
-                      min={1000}
-                      max={100000}
-                      step={1000}
-                    />
+
+                    {/* Daily loss limit */}
+                    <div className="space-y-2">
+                      <div className="flex items-start gap-3">
+                        <Checkbox
+                          id="enable-daily-loss"
+                          checked={data.enable_daily_loss_limit}
+                          disabled={suggested.daily_loss_limit === null}
+                          onCheckedChange={(checked) =>
+                            setData(d => ({
+                              ...d,
+                              enable_daily_loss_limit: checked === true,
+                              daily_loss_limit: checked === true
+                                ? (d.daily_loss_limit ?? suggested.daily_loss_limit)
+                                : null,
+                            }))}
+                        />
+                        <div className="space-y-0.5">
+                          <Label htmlFor="enable-daily-loss" className="text-sm">
+                            Enable daily loss limit
+                          </Label>
+                          <p className="text-xs text-muted-foreground">
+                            {suggested.daily_loss_limit !== null
+                              ? `Suggested: ₹${suggested.daily_loss_limit.toLocaleString()} — based on your account size.`
+                              : 'Enter your trading capital above to see a suggestion.'}
+                          </p>
+                        </div>
+                      </div>
+                      {data.enable_daily_loss_limit && data.daily_loss_limit !== null && (
+                        <div className="space-y-2 pl-7">
+                          <div className="flex justify-between">
+                            <span className="text-xs text-muted-foreground">Your limit</span>
+                            <span className="text-sm font-medium">
+                              ₹{data.daily_loss_limit.toLocaleString()}
+                            </span>
+                          </div>
+                          <Slider
+                            value={[data.daily_loss_limit]}
+                            onValueChange={([value]) => setData({ ...data, daily_loss_limit: value })}
+                            min={1000}
+                            max={100000}
+                            step={1000}
+                          />
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Max risk per trade — a PERCENTAGE of capital */}
+                    <div className="space-y-2">
+                      <div className="flex items-start gap-3">
+                        <Checkbox
+                          id="enable-max-risk"
+                          checked={data.enable_max_position_size}
+                          disabled={suggested.max_position_size === null}
+                          onCheckedChange={(checked) =>
+                            setData(d => ({
+                              ...d,
+                              enable_max_position_size: checked === true,
+                              max_position_size: checked === true
+                                ? (d.max_position_size ?? suggested.max_position_size)
+                                : null,
+                            }))}
+                        />
+                        <div className="space-y-0.5">
+                          <Label htmlFor="enable-max-risk" className="text-sm">
+                            Enable max risk per trade
+                          </Label>
+                          <p className="text-xs text-muted-foreground">
+                            {suggested.max_position_size !== null
+                              ? `Suggested: ${suggested.max_position_size}% of capital per trade.`
+                              : 'No suggestion available.'}
+                          </p>
+                        </div>
+                      </div>
+                      {data.enable_max_position_size && data.max_position_size !== null && (
+                        <div className="space-y-2 pl-7">
+                          <div className="flex justify-between">
+                            <span className="text-xs text-muted-foreground">Your limit</span>
+                            <span className="text-sm font-medium">
+                              {data.max_position_size}% of capital
+                            </span>
+                          </div>
+                          <Slider
+                            value={[data.max_position_size]}
+                            onValueChange={([value]) => setData({ ...data, max_position_size: value })}
+                            min={0.5}
+                            max={10}
+                            step={0.5}
+                          />
+                        </div>
+                      )}
+                    </div>
+
+                    <p className="text-xs text-muted-foreground">
+                      You can turn these on, off or change them any time in{' '}
+                      <span className="font-medium text-foreground">My Rules</span>.
+                    </p>
                   </div>
 
                   <div className="space-y-3">

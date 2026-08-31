@@ -130,20 +130,38 @@ async def get_rule_suggestions(
     )
 
 
+class GenerateRequest(BaseModel):
+    #: Capital to base the SUGGESTED money rules on, when it is not yet saved.
+    #:
+    #: The onboarding wizard collects capital on the same screen that shows the
+    #: suggestions, and it is not persisted until that step is submitted — so
+    #: without this the server could only ever answer "no suggestion", and the
+    #: opt-in checkbox for the daily loss limit could never be ticked during
+    #: onboarding. Defaults to the stored value, so `POST {}` is unchanged.
+    #:
+    #: This passes an argument `generate_defaults` already takes. It does not
+    #: change what is suggested, and it still returns the money rules as null —
+    #: suggestions, not rules.
+    trading_capital: Optional[float] = None
+
+
 @router.post("/generate")
 async def generate_recommended(
+    body: Optional[GenerateRequest] = None,
     broker_account_id: UUID = Depends(get_verified_broker_account_id),
     db: AsyncSession = Depends(get_db),
 ):
     """Recommended constitution from profile (onboarding step 2 — §1C.5)."""
     profile = await _get_profile(broker_account_id, db)
+    capital = (body.trading_capital if body and body.trading_capital is not None
+               else profile.trading_capital)
     return {
         "recommended": ConstitutionService.generate_defaults(
-            profile.experience_level, profile.trading_capital
+            profile.experience_level, capital
         ),
         "based_on": {
             "experience_level": profile.experience_level,
-            "trading_capital": profile.trading_capital,
+            "trading_capital": capital,
         },
     }
 
