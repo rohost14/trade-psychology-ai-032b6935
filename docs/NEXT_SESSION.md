@@ -19,7 +19,7 @@ never on taste. Since the last update to this file:
 | 19 | `winning_streak_overconfidence` | RETIRED — right concept, **wrong sign**: sizing up is LESS likely after a win run (21.4% vs 30.4%, rho = −0.076). Covered inverted by `martingale_behaviour` |
 | 20 | `options_premium_avg_down` | RETIRED — **never an average-down**: 0 of 44 firings had an open position. Its copy described `adding_to_adverse_position`, which already covers the option case on 64 of 64 firings |
 | 21 | `opening_5min_trap` | RETIRED — the window was **not worse**: 39.4% win inside vs 39.5% outside, and it discarded 42% of window entries for winning |
-| 21b | `end_of_session_mis_panic` | **DEFERRED** — evidence absent, not contrary. Gates on `product`; the tradebook has no such column |
+| 22 | `end_of_session_mis_panic` | **DEFERRED** — evidence absent, not contrary. Gates on `product`; the tradebook has no such column |
 
 ## Next: review 23 = source-list #21 `post_loss_recovery_bet`
 

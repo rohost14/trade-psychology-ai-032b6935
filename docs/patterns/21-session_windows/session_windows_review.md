@@ -1,8 +1,11 @@
-# Pattern 21 — `opening_5min_trap` + `end_of_session_mis_panic`
+# Patterns 21 + 22 — `opening_5min_trap` + `end_of_session_mis_panic`
 
 **Review, 30 Aug 2026. Findings only. NO CODE CHANGED.**
 
-Review-order 21. Source-list **#19** and **#20**. Reviewed together because they
+**Review-order 21 = `opening_5min_trap` (source-list #19); review-order 22 =
+`end_of_session_mis_panic` (source-list #20).** They share one folder because
+they were reviewed in one pass, not because they are one pattern — each has
+its own number, its own verdict and its own row in the REVIEW STATUS table. Reviewed together because they
 share session-boundary mechanics — both compare a trade's **entry** against an
 exchange session edge — and because they contradict each other on how that edge
 is derived. **They are not assumed to be the same behaviour, and each gets its
