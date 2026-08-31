@@ -329,6 +329,72 @@ which is a separate question about the value of the analytics disposition.
 The closed rule does not depend on the answer: if we ever stop writing it, INFO
 events still must not become alerts in the meantime.
 
+## Surfaced by the Pattern 23 review — NOT actioned
+
+**`post_loss_recovery_bet` was KEPT AS-IS on 1 Sep 2026.** Nothing below is a
+defect serious enough to have changed it; all five are recorded deliberately.
+
+### 1. No floor on the prior loss — the one substantive gap
+
+Nothing requires the losses being "recovered" to be material. The seven firings'
+total prior loss: **₹477, ₹478, ₹739, ₹1,361, ₹1,751, ₹1,990, ₹5,212** — two of
+seven under ₹500, in a book where **42% of the 434 losing rounds are under ₹500**
+and the median loss is ₹628.
+
+The **size** observation stays true — a 4.0× position is a 4.0× position — but
+the **recovery framing** does not fit. "Make it all back in one trade" after
+₹478 describes a bet, not a recovery, and the message leads with the ₹478.
+
+**`revenge_trade`'s `revenge_min_loss_inr = 500` is the nearest precedent and
+was DELIBERATELY NOT borrowed.** Importing a sibling's constant is not deriving
+one, and **7 firings cannot locate a floor**. Settling this needs more firings,
+i.e. more data — not more analysis of this book.
+
+### 2. The size baseline mixes a winner into a "post-loss" average
+
+The loss test reads `prior[-2:]`; the size average reads `prior[-3:]`. **3 of 7
+firings had a WIN as the third-from-last prior**, so "your recent average" is
+partly the size of a trade that worked.
+
+Aligning the two windows is a one-line change that **alters firing**, so it
+needs its own before/after rather than being folded into a cleanup.
+
+### 3. Neither multiplier has a `THRESHOLD_SPECS` record
+
+`recovery_bet_caution_mul` (2.0) and `recovery_bet_danger_mul` (3.0) exist only
+in `COLD_START_DEFAULTS` with an inline comment — no `Kind`, no provenance, no
+maturity.
+
+**Distinct from the earlier instances of this class: the values themselves
+measure well.** The 2.0× line sits at roughly p78 of the post-loss size-ratio
+distribution (median 1.20, only 24% reach 2.0×), so this is a bookkeeping gap,
+not a calibration one. **Seventh known instance** of a missing or dead threshold
+declaration across the review sequence.
+
+### 4. The copy says "a loss"; the code requires two
+
+*"A position materially larger than your average, entered after **a loss** on
+the same underlying"* — the gate is `all(p < 0 for p in prior[-2:])`.
+
+### 5. Overlap and consequence — evidence recorded, not acted on
+
+**Unique coverage across the whole engine is zero.** All 7 firings are already
+visible to something else — `same_symbol_obsession` 6/7, `revenge_trade` 5/7,
+`adding_to_adverse_position` 2/7. Its contribution is the **size reading** at
+`notification_level=2`, not coverage nothing else has. It IS distinct from the
+other size detector: 4 of 7 fire alone against `martingale_behaviour`.
+
+**Consequence runs opposite to the alert's implication.** Flagged trades won
+**57.1%** at **+₹344** mean against −₹55 for the rest, permutation **p = 0.224**.
+The copy's conditional framing — *"if this one also loses"* — is untouched by
+this, and by the design of record rest-of-session P&L ranks rather than judges.
+**But it cannot support the detector either**, and that is recorded in both
+directions.
+
+**If a future pass asks whether the size reading deserves its own alert, decide
+it on the reading — not on these seven rows.** n = 7 means this detector is not
+validated by this book; it is also not refuted.
+
 ## Surfaced by the Pattern 20 review — NOT actioned
 
 ### `/api/analytics/options-behavior` + `OptionsBehaviorCard` are dead on a timer
