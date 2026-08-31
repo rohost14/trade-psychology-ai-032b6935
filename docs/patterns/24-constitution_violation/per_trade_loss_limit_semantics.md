@@ -69,6 +69,25 @@ rule evadable by exit style rather than by risk taken.
 
 > **DECISION 3.** Position-level. One `CompletedTrade`, one comparison.
 
+**Verified on the book, not assumed.** A `CompletedTrade` is written only when
+quantity returns to zero, so every exit tranche sits inside the same row with one
+summed `realized_pnl`:
+
+| exit fills in one round | rounds |
+|---|---|
+| 1 | 732 |
+| 2 | 8 |
+
+**8 of 740 rounds (1%) closed in more than one tranche, and all are single
+rows.** Splitting an exit therefore cannot evade the limit — the aggregation the
+brief asks for is a property of the data model, not something the rule enforces.
+
+**The real boundary is re-opening, not splitting.** A symbol closed and then
+re-opened the same day produces **two** rows and two separate comparisons —
+**104 such cases** here. That is correct: two positions, taken at two moments,
+and repeated re-entry is already `same_symbol_obsession`'s and `revenge_trade`'s
+subject. Recorded so it is not later mistaken for an evasion route.
+
 **But note what A cannot do:** it cannot warn *during* the scale-out, because the
 row does not exist until the position is flat. See Q1.
 
@@ -100,7 +119,65 @@ per-trade-loss alert, and something must decide which leg carries it (proposed:
 the leg the engine is analysing when the structure's net first breaches, which
 is deterministic but arbitrary).
 
-> **DECISION 4 — OPEN. I will not choose this alone.**
+### RESOLVED 1 Sep 2026 — (ii) was approved, and the verification says it cannot be used
+
+Netting was approved **conditional on reliable grouping existing**. It does not.
+Measured with `strategy_detector`'s own criteria on the 175-session book
+(`_measurement/p24b_grouping.py`):
+
+**The grouping rule is "same underlying, entered within +/- 15 minutes"** — the
+assumption the brief warned against, stated in `_find_siblings` itself.
+
+| finding | number |
+|---|---|
+| rounds with any candidate sibling | **73 of 740 (10%)** |
+| candidate pairs that are **same option type** (CE+CE / PE+PE) | **29 of 48** |
+| pairs closing **more than 30 min apart** | 11 of 48 (23%) |
+| **grouped rounds with NO sibling closed yet at their own exit** | **33 of 73 (45%)** |
+| losing rounds whose net would flip to >= 0 | **2** |
+
+**Two disqualifying problems.**
+
+**1. The group does not exist when the first leg closes.** `_find_siblings`
+queries `CompletedTrade`, so a sibling only counts once it has *closed*. The
+detector's own docstring says it: *"The FIRST leg of a strategy may still fire
+some alerts (we don't know it's a strategy leg until the second leg closes)."*
+
+Measured: **45% of grouped rounds have no closed sibling at their own exit.** The
+same structure would be judged **leg-level at its first exit and net-level at
+the next** — the answer would depend on the order the legs happened to close in.
+For a rule that tells a trader "you broke your Rs 4,000 limit", that is not a
+defensible inconsistency.
+
+**2. The criteria cannot tell a spread from two independent bets.** 29 of 48
+candidate pairs are the *same* option type on one underlying. A CE bought at
+10:00 and another CE at 10:10 is a vertical spread — or two directional bets.
+Nothing in the data separates them, and 23% of pairs close more than half an
+hour apart, which does not look like a managed structure.
+
+**Why `session_meltdown`'s precedent does not carry over.** That detector uses
+`strategy_group` to **SUPPRESS** — a losing leg inside a net-profitable
+structure is not a meltdown. Suppression on partial information fails safe: the
+worst case is a missed alert. This rule would use the group to **MEASURE**,
+choosing *which number* to compare, where being wrong makes a false statement to
+the trader in either direction. Same data, different tolerance for error.
+
+**The netting would also barely matter:** only **2** losing rounds in 740 would
+flip to net-positive.
+
+> **DECISION 4 — RESOLVED: POSITION-LEVEL.** Per the brief's own fallback: no
+> grouping logic is invented, the rule is explicitly position-level for
+> single-instrument trades, and multi-leg strategies are recorded as an
+> observability limitation needing a separate product decision.
+> `strategy_group` is **not read** by this rule.
+>
+> **The limitation, stated plainly for the copy and the docs:** on a multi-leg
+> structure this rule measures each leg separately. A hedged position whose
+> short leg loses more than the limit will report a breach even if the structure
+> as a whole made money. Traders who work spreads should set the limit with that
+> in mind or leave the rule off. Fixing it properly needs **entry-time strategy
+> grouping** — grouping open positions before any leg closes — which is the
+> Phase 2 improvement `strategy_detector` already names.
 
 ---
 
@@ -184,14 +261,18 @@ storm.
 | 1 | exit-time only, no live-path enforcement yet | **proposed** |
 | 2 | `abs(realized_pnl)` when negative | **proposed** |
 | 3 | position-level, not fill-level | **proposed** |
-| 4 | **multi-leg: net vs per-leg vs abstain** | **OPEN — needs your call** |
+| 4 | multi-leg: net vs per-leg vs abstain | **RESOLVED — position-level.** Netting approved, grouping measured unreliable |
 | 5 | no futures/options branch | **proposed** |
 | 6 | raw P&L, charges excluded | **settled by the charter** |
 
-**Q4 is the blocker.** Everything else follows from existing structures or
-existing project rules; Q4 is a genuine product choice about what "a trade"
-means for a spread trader, and choosing it silently would be exactly the kind of
-invented definition the brief forbids.
+**All six are now settled.** Q4 was approved as "use net strategy P&L"
+*conditional on reliable grouping existing*; the verification showed it does
+not, so the brief's own fallback applies and the rule is position-level.
+Nothing was invented and no grouping logic was written.
+
+**The rule is ready to build, and is not built.** The standing instruction was
+not to code it until the semantics were approved, and Q4 resolved by measurement
+rather than by decision — so the go-ahead is yours.
 
 ---
 
