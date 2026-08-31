@@ -303,9 +303,22 @@ class ConstitutionService:
         # account size.
         capital = float(trading_capital or 0)
         return {
-            # Suggested, not set. The UI offers these; the trader confirms.
+            # Suggested, not set. The UI offers this; the trader confirms.
             "suggested_daily_loss_limit": round(capital * m["loss_pct"]) if capital else None,
-            "suggested_max_position_size": m["risk_pct"],
+            #
+            # `suggested_max_position_size` was REMOVED 1 Sep 2026. It returned
+            # `m["risk_pct"]` - 1.0/2.0/2.5/3.0 - a generic "risk 1-3% of
+            # capital per trade" figure, and this product is specifically for
+            # F&O futures and options traders where that number has no standing.
+            #
+            # Pattern 24 measured why it is not merely unhelpful but wrong here:
+            # the median position on the reference book needs Rs 7,580 of
+            # margin, so a 2% rule is unsatisfiable below roughly Rs 379,000 of
+            # capital - it would describe account size, not discipline.
+            #
+            # The rule itself is unchanged and still available. What is gone is
+            # our recommending a number for it without evidence. A trader who
+            # wants an exposure cap types their own.
             "daily_loss_limit": None,
             "max_position_size": None,
             "daily_trade_limit": m["max_trades"],

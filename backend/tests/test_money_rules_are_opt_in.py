@@ -61,22 +61,28 @@ def test_generate_defaults_never_sets_a_money_rule(level):
 
 
 @pytest.mark.parametrize("level", ["beginner", "intermediate", "experienced", "professional"])
-def test_it_does_suggest_them(level):
+def test_the_daily_loss_limit_is_still_suggested(level):
     """Suggested, so the trader has something to accept or reject."""
     d = constitution_service.generate_defaults(level, 500_000)
 
     assert d["suggested_daily_loss_limit"] is not None
-    assert d["suggested_max_position_size"] is not None
 
 
-def test_the_suggested_risk_is_a_PERCENTAGE_not_rupees():
+@pytest.mark.parametrize("level", ["beginner", "intermediate", "experienced", "professional"])
+def test_the_exposure_rule_is_NOT_suggested(level):
     """
-    The whole units defect. 1.0-3.0 is a share of capital; the wizard used to
-    submit 50000, a rupee figure, into the same field.
+    Removed 1 Sep 2026. It returned a generic 1-3% "risk per trade", and this
+    product is for F&O traders: the median position on the reference book needs
+    Rs 7,580 of margin, so a 2% rule is unsatisfiable below roughly Rs 379,000
+    of capital - it would describe account size, not discipline.
+
+    The RULE is unchanged and still available. What is gone is our recommending
+    a number for it without evidence.
     """
-    for level in ("beginner", "intermediate", "experienced", "professional"):
-        pct = constitution_service.generate_defaults(level, 500_000)["suggested_max_position_size"]
-        assert 0 < pct <= 10, f"{level}: {pct} is not a percentage of capital"
+    d = constitution_service.generate_defaults(level, 500_000)
+
+    assert "suggested_max_position_size" not in d
+    assert d["max_position_size"] is None, "the rule itself stays offered, unset"
 
 
 def test_the_suggested_loss_limit_needs_capital_and_says_so():

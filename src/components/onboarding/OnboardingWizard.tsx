@@ -164,10 +164,15 @@ export default function OnboardingWizard({ brokerAccountId, onComplete, onSkip }
   // Calculated ONCE, in `constitution_service.generate_defaults`; this form
   // deliberately does not recompute them - a local copy of that matrix already
   // existed here once and had drifted.
+  // Only the DAILY LOSS LIMIT is suggested. `suggested_max_position_size` was
+  // removed from the backend on 1 Sep 2026: it returned a generic 1-3% "risk
+  // per trade", and this product is for F&O traders, where the median position
+  // needs Rs 7,580 of margin and a 2% rule is unsatisfiable below roughly
+  // Rs 379,000 of capital. The exposure rule is still offered — we simply do
+  // not put a number in the trader's mouth.
   const [suggested, setSuggested] = useState<{
     daily_loss_limit: number | null;
-    max_position_size: number | null;
-  }>({ daily_loss_limit: null, max_position_size: null });
+  }>({ daily_loss_limit: null });
 
   const prefilledRef = useRef(false);
   useEffect(() => {
@@ -187,10 +192,7 @@ export default function OnboardingWizard({ brokerAccountId, onComplete, onSkip }
         const rec = res.data?.recommended;
         if (!rec) return;
         // The SUGGESTED money rules are displayed; they are not applied.
-        setSuggested({
-          daily_loss_limit: rec.suggested_daily_loss_limit ?? null,
-          max_position_size: rec.suggested_max_position_size ?? null,
-        });
+        setSuggested({ daily_loss_limit: rec.suggested_daily_loss_limit ?? null });
         if (prefilledRef.current) return;
         prefilledRef.current = true;
         setData(d => ({
@@ -284,6 +286,8 @@ export default function OnboardingWizard({ brokerAccountId, onComplete, onSkip }
           // abstains on it.
           daily_loss_limit: data.enable_daily_loss_limit ? data.daily_loss_limit : null,
           daily_trade_limit: data.daily_trade_limit,
+          // Enabled AND filled in. A ticked box with an empty field enforces
+          // nothing - the rule needs a number, and we do not supply one.
           max_position_size: data.enable_max_position_size ? data.max_position_size : null,
           cooldown_after_loss: data.cooldown_after_loss,
           max_consecutive_losses: data.max_consecutive_losses,
@@ -638,42 +642,48 @@ export default function OnboardingWizard({ brokerAccountId, onComplete, onSkip }
                         <Checkbox
                           id="enable-max-risk"
                           checked={data.enable_max_position_size}
-                          disabled={suggested.max_position_size === null}
                           onCheckedChange={(checked) =>
                             setData(d => ({
                               ...d,
                               enable_max_position_size: checked === true,
-                              max_position_size: checked === true
-                                ? (d.max_position_size ?? suggested.max_position_size)
-                                : null,
+                              max_position_size: checked === true ? d.max_position_size : null,
                             }))}
                         />
                         <div className="space-y-0.5">
                           <Label htmlFor="enable-max-risk" className="text-sm">
-                            Enable max risk per trade
+                            Enable capital exposure limit
                           </Label>
                           <p className="text-xs text-muted-foreground">
-                            {suggested.max_position_size !== null
-                              ? `Suggested: ${suggested.max_position_size}% of capital per trade.`
-                              : 'No suggestion available.'}
+                            The most of your capital a single position may commit
+                            as margin. We do not suggest a number — F&amp;O lot
+                            sizes are fixed, so the right limit depends on your
+                            account and your instruments.
                           </p>
                         </div>
                       </div>
-                      {data.enable_max_position_size && data.max_position_size !== null && (
+                      {data.enable_max_position_size && (
                         <div className="space-y-2 pl-7">
-                          <div className="flex justify-between">
-                            <span className="text-xs text-muted-foreground">Your limit</span>
-                            <span className="text-sm font-medium">
-                              {data.max_position_size}% of capital
-                            </span>
-                          </div>
-                          <Slider
-                            value={[data.max_position_size]}
-                            onValueChange={([value]) => setData({ ...data, max_position_size: value })}
-                            min={0.5}
-                            max={10}
+                          <Label htmlFor="max-risk-value" className="text-xs text-muted-foreground">
+                            Your limit (% of capital per position)
+                          </Label>
+                          <Input
+                            id="max-risk-value"
+                            type="number"
+                            min={0.1}
+                            max={100}
                             step={0.5}
+                            placeholder="e.g. 25"
+                            value={data.max_position_size ?? ''}
+                            onChange={(e) =>
+                              setData(d => ({
+                                ...d,
+                                max_position_size: e.target.value === '' ? null : Number(e.target.value),
+                              }))}
                           />
+                          <p className="text-xs text-muted-foreground">
+                            Leave blank to skip — the rule is only enforced once
+                            you enter a number.
+                          </p>
                         </div>
                       )}
                     </div>
