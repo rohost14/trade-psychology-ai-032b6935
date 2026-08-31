@@ -33,7 +33,6 @@ retirements, not omissions; detector_registry.REGISTRY is the authority:
   15. winning_streak_overconfidence
   16. options_direction_confusion (CE→PE flip on same underlying within 10 min)
   18. iv_crush_behavior           (fast large premium loss = buying into high IV)
-  20. opening_5min_trap           (derivative entry 09:15–09:20 IST)
   21. end_of_session_mis_panic    (MIS entries after 15:10 IST — forced 10-min exit)
   22. post_loss_recovery_bet      (one oversized position after 2+ consecutive losses)
 """
@@ -2805,97 +2804,53 @@ class BehaviorEngine:
     # First 5 minutes: gaps resolve, order books stabilise, premium pricing is distorted.
     # NSE data: 78% of retail opening-5-min derivative trades are unprofitable.
 
-    def _detect_opening_5min_trap(self, ctx: EngineContext) -> Optional[DetectedEvent]:
-        """
-        Flags reactive/impulsive entries in the first 5 minutes of market open.
+    # ── RETIRED 2026-08-30 — `opening_5min_trap` ──────────────────────────
+    #
+    # Pattern 21. THE OPENING WINDOW WAS NOT A WORSE PLACE TO TRADE.
+    #
+    # It fired on an entry within 10 minutes of 09:15 that LOST and either
+    # exited within 15 minutes or lost >= 30% of premium. Its premise was that
+    # price discovery makes the opening hazardous. Measured on 175 sessions:
+    #
+    #     inside 09:15-09:25   n=33   win 39.4%   mean +Rs 99
+    #     rest of day          n=707  win 39.5%   mean -Rs 59
+    #
+    # Win rates 0.1 percentage points apart, and on money the window was
+    # BETTER - permutation p = 0.274, so not a real edge in either direction.
+    # The window is indistinguishable from the rest of the day for this trader.
+    #
+    # It reached its finding only by discarding 14 of 33 window entries (42%)
+    # for having made money, before any behaviour was examined. That is
+    # SELECTION ON OUTCOME - the shape that retired `panic_exit` - and the
+    # code's own comment conceded it: "a profitable opening trade could be a
+    # deliberate strategy". If the behaviour is indistinguishable and only the
+    # result differs, the result is what was being flagged.
+    #
+    # Its message explained the loss with a mechanism it never measured -
+    # "the widest bid-ask spreads of the day". Fairly stated that is market
+    # microstructure rather than a fabricated statistic, and it is broadly
+    # true; but we store no spread data, and the outcome the detector DOES
+    # measure was not worse in that window.
+    #
+    # Three windows disagreed: the name said 5 minutes, the threshold said 10,
+    # the copy said 09:15-09:25. Market open was hardcoded 09:15 while
+    # `end_of_session_mis_panic` - reviewed alongside it - derives the
+    # equivalent boundary from `exchange_constants`, having fixed exactly that
+    # defect for MCX. `opening_trap_quick_exit_min` declared Source.SESSION
+    # with metric `hold_minutes_p25`, which `_apply_session` computes and then
+    # discards, so it could never personalise.
+    #
+    # DISTINGUISHED FROM `rapid_reentry`, kept at Pattern 13 while also being
+    # info-with-no-reader: that detector's window WAS genuinely selective and
+    # only its consumer was missing. This one's window was not selective on
+    # anything measurable.
+    #
+    # THE CONCEPT IS NOT RETIRED PERMANENTLY. Opening spreads are real. What
+    # would test it is spread and premium-stability data per fill, which we do
+    # not store - recorded rather than proposed.
+    #
+    # Evidence: docs/patterns/21-session_windows/.
 
-        Only fires on LOSING trades — a profitable opening trade could be a
-        deliberate strategy (opening range breakout, pre-planned level). Firing
-        on every opening trade regardless of outcome creates noise.
-
-        Two triggers:
-        A) Quick reactive exit: entry 09:15–09:20 + exit within 15 min + loss
-           → spread damage / impulse entry that immediately reversed
-        B) Large loss: entry 09:15–09:20 + loss > 30% of premium
-           → price discovery ran heavily against the position
-        """
-        ct = ctx.completed_trade
-        if not ct.entry_time or ct.instrument_type not in ("CE", "PE", "FUT"):
-            return None
-
-        entry_ist = ct.entry_time.astimezone(IST)
-        market_open = entry_ist.replace(hour=9, minute=15, second=0, microsecond=0)
-        trap_window_end_min = ctx.thresholds.get("opening_trap_window_end_min", 10)
-        trap_end = market_open + timedelta(minutes=trap_window_end_min)
-
-        if not (market_open <= entry_ist <= trap_end):
-            return None
-
-        pnl = Decimal(str(ct.realized_pnl or 0))
-        # Skip profitable opening trades — those may be deliberate strategy.
-        if pnl >= 0:
-            return None
-
-        duration = ct.duration_minutes or 0
-        entry_price = Decimal(str(ct.avg_entry_price or 0))
-        qty = ct.total_quantity or 1
-
-        loss_pct = Decimal("0")
-        if ct.instrument_type in ("CE", "PE") and entry_price > 0 and qty > 0:
-            loss_pct = abs(pnl) / (entry_price * qty) * 100
-
-        quick_exit_min  = ctx.thresholds.get("opening_trap_quick_exit_min", 15)
-        large_loss_pct  = ctx.thresholds.get("opening_trap_large_loss_pct", 30)
-        is_quick_reactive = duration <= quick_exit_min
-        is_large_loss = loss_pct >= large_loss_pct
-
-        if not (is_quick_reactive or is_large_loss):
-            return None
-
-        mins_after_open = int((entry_ist - market_open).total_seconds() / 60)
-        # A `severity = "danger" if ... else "caution"` was computed here and
-        # never used - the event below has returned a hardcoded "info" since the
-        # Phase 4 flip to analytics disposition. Removed 2026-08-24; the two
-        # flags still select the message. Whether this detector should alert at
-        # all is a question for its pattern review.
-
-        if is_quick_reactive and is_large_loss:
-            detail = (
-                f"entered at {entry_ist.strftime('%H:%M')}, "
-                f"exited in {duration}min with {loss_pct:.0f}% loss — "
-                f"reactive entry hit by wide spreads and price discovery"
-            )
-        elif is_large_loss:
-            detail = (
-                f"entered at {entry_ist.strftime('%H:%M')}, "
-                f"lost {loss_pct:.0f}% of premium — "
-                f"price discovery moved heavily against the position"
-            )
-        else:
-            detail = (
-                f"entered at {entry_ist.strftime('%H:%M')}, "
-                f"exited in {duration}min at a loss — "
-                f"opening volatility reversed the move"
-            )
-
-        return DetectedEvent(
-            event_type="opening_5min_trap",
-            severity="info",  # Phase 4: analytics-only — trade already closed when this fires
-            message=(
-                f"{ct.tradingsymbol}: {detail}. "
-                f"The 09:15–09:25 window has the widest bid-ask spreads of the day "
-                f"as gaps resolve and order books stabilise."
-            ),
-            context={
-                "entry_time_ist": entry_ist.strftime("%H:%M"),
-                "mins_after_open": mins_after_open,
-                "duration_minutes": duration,
-                "loss_pct": round(float(loss_pct), 1),
-                "realized_pnl": float(pnl),
-                "is_quick_reactive": is_quick_reactive,
-                "is_large_loss": bool(is_large_loss),
-            },
-        )
 
     # ── Pattern 21: End-of-session MIS panic ──────────────────────────────
     #

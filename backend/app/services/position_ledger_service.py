@@ -676,11 +676,10 @@ class PositionLedgerService:
             # supply it: a Kite postback carries no instrument type, and this
             # builder replaced the FIFO calculator that used to set it. Every
             # CompletedTrade created live therefore had instrument_type NULL,
-            # and TWELVE guards in behavior_engine read it — premium_loss_event,
-            # options_premium_avg_down and expiry_day_overtrading (both retired,
-            # 2026-08-30 / 08-27), fomo_entry and opening_5min_trap among them. Those fired on
-            # bulk-synced trades (sync sets the field) and silently never fired
-            # on live ones. Found by alertlab scenario E-05.
+            # and TWELVE guards in behavior_engine read it — premium_loss_event
+            # and fomo_entry among them (three others have since been retired).
+            # Those fired on bulk-synced trades (sync sets the field) and
+            # silently never fired on live ones. Found by alertlab E-05.
             instrument_type=_instrument_type_for(close_entry.tradingsymbol),
             direction=fields["direction"],
             total_quantity=fields["total_quantity"],

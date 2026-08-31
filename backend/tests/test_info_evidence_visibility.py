@@ -135,7 +135,10 @@ def test_the_rapid_reentry_caution_path_stays_unreachable():
 # Was four: `panic_exit` retired 2026-08-29 (Pattern 14) and `early_exit`
 # 2026-08-30 (Pattern 18).
 ANALYTICS_INFO_DETECTORS = (
-    "rapid_reentry", "opening_5min_trap",
+    # `opening_5min_trap` was the second member until it was retired
+    # 2026-08-30 (Pattern 21). `rapid_reentry` is now the ONLY analytics
+    # detector left, and the only one this rule governs.
+    "rapid_reentry",
 )
 
 

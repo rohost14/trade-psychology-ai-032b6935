@@ -161,6 +161,12 @@ def test_outcome_dependent_detectors_are_never_asked():
     so the whitelist never offers them the question.
 
     profit_giveaway left this list on 2026-08-27 with the detector itself.
+
+    Most of the names below are now retired detectors (early_exit P18,
+    panic_exit P14, opening_5min_trap P21). The assertion is kept as-is: it
+    costs nothing, and it records WHY each was never entry-decidable — every
+    one of them reads a completed outcome. opening_5min_trap's outcome gate is
+    precisely what retired it.
     """
     for name in ("early_exit", "panic_exit",
                  "no_stoploss", "opening_5min_trap"):

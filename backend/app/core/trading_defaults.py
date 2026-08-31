@@ -190,9 +190,11 @@ COLD_START_DEFAULTS: Dict[str, Any] = {
     # ── Opening 10-minute trap ────────────────────────────────────────────
     # 09:15-09:25 IST: widest spreads, most distorted option pricing of the day.
     # NSE data: 78% of retail opening-10-min derivative trades are unprofitable.
-    'opening_trap_window_end_min':      10,   # minutes after 09:15 that the trap window closes (→ 09:25)
-    'opening_trap_quick_exit_min':      15,   # hold ≤ this = "quick reactive exit" trigger
-    'opening_trap_large_loss_pct':      30,   # loss ≥ this % of premium = "large loss" trigger
+    # `opening_trap_*` (3 keys) REMOVED 2026-08-30 with `opening_5min_trap`.
+    # The window they defined was not a worse place to trade - 39.4% win inside
+    # against 39.5% outside - so no replacement window was substituted. Two of
+    # the three never had a THRESHOLD_SPECS record, and the third declared a
+    # session metric that was computed and discarded.
 
     # ── End-of-session MIS panic ──────────────────────────────────────────
     # MIS trades entered after 15:00 IST face auto-square-off at ~15:20.

@@ -178,6 +178,12 @@ def test_no_shipping_module_uses_a_severity_value_outside_the_vocabulary():
 #: against these is dead code that looks alive.
 RETIRED_PATTERN_NAMES = (
     "revenge_sizing",
+    # Retired 2026-08-30 (Pattern 21): the opening window was not a worse place
+    # to trade - 39.4% win inside 09:15-09:25 against 39.5% for the rest of the
+    # day, and BETTER on money (p = 0.274). It reached its finding by discarding
+    # 42% of window entries for having made money: selection on outcome, the
+    # shape that retired panic_exit.
+    "opening_5min_trap",
     # Retired 2026-08-30 (Pattern 20): it was never an average-down. 0 of 44
     # firings involved an open position - its "prior losers" were CLOSED rounds
     # on the same UNDERLYING. Its copy described adding_to_adverse_position,

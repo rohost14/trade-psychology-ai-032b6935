@@ -195,12 +195,12 @@ _GROUP_D = [
     # key: see docs/contracts/PERSONAL_BASELINE_AUDIT.md.
 
 
-    _spec(key="opening_trap_quick_exit_min", kind=Kind.PERSONAL_BASELINE, fallback=15,
-          meaning="an exit within this many minutes is a reactive exit",
-          resolution_source=Source.SESSION, metric="hold_minutes_p25",
-          percentile=25, maturity=Maturity.SESSION,
-          provenance="a reactive exit is relative to how long this trader normally holds, "
-                     "so rung 2 personalises it from their own session"),
+    # `opening_trap_quick_exit_min` went with its detector on 2026-08-30. Worth
+    # recording why it never worked: it declared Source.SESSION with metric
+    # `hold_minutes_p25`, and `_apply_session` computes a `holds` list then
+    # blends ONLY `rapid_reentry_min`. The metric was computed and discarded, so
+    # a PERSONAL_BASELINE sat permanently at its global fallback. Third instance
+    # of that class after `winner_hold_p50` and `late_mis_entries_p75/p90`.
 
 ]
 

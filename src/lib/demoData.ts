@@ -360,19 +360,11 @@ export const DEMO_RISK_ALERTS = [
       estimated_cost: 5800,
     },
   },
-  {
-    id: 'ra-007', pattern_type: 'opening_5min_trap', severity: 'caution',
-    message: 'NIFTY CE entry at 09:17 — within opening 5-min window. Your win rate on opening entries is 19% vs 54% after 09:30. This pattern cost ₹9,400 last month.',
-    created_at: daysAgo(1, 9, 20), acknowledged: true,
-    details: {
-      symbol: 'NIFTY23000CE',
-      entry_time: '09:17',
-      win_rate_opening: 0.19,
-      win_rate_after_open: 0.54,
-      monthly_cost: 9400,
-      estimated_cost: 1800,
-    },
-  },
+  // An `opening_5min_trap` fixture stood here. It carried invented statistics
+  // ("win rate on opening entries is 19% vs 54%", "cost Rs 9,400 last month")
+  // and severity `caution`, which that detector - info-only - could never
+  // emit. It was retired 2026-08-30 because the opening window measured 39.4%
+  // win against 39.5% for the rest of the day.
   {
     // Exercises `critical`, which only constitution_violation (the 120% tier)
     // and premium_loss_event can reach. It used to be carried by a
@@ -571,7 +563,7 @@ export const DEMO_BEHAVIORAL = {
     },
   ],
   summary: {
-    total_behavioral_cost: 38160,
+    total_behavioral_cost: 33360,
     clean_days: 5, flagged_days: 5,
     most_frequent_pattern: 'revenge_trading',
   },
@@ -665,7 +657,6 @@ export const DEMO_RISK_METRICS = {
     { pattern_type: 'revenge_trade',           count: 3, last_detected: daysAgo(1, 14, 40) },
     { pattern_type: 'daily_overtrading',             count: 2, last_detected: daysAgo(6, 11, 55) },
     { pattern_type: 'no_stoploss',             count: 2, last_detected: daysAgo(3, 12, 10) },
-    { pattern_type: 'opening_5min_trap',       count: 1, last_detected: daysAgo(6, 9, 18) },
     { pattern_type: 'constitution_violation', count: 1, last_detected: daysAgo(1, 15, 5) },
   ],
   recent_alerts: [],
@@ -1041,11 +1032,6 @@ export const DEMO_BEHAVIORAL_ANALYSIS = {
       estimated_cost: 5800, last_seen: daysAgo(0, 9, 15),
       description: 'Open positions held 40+ min with no stop-loss defined',
     },
-    {
-      pattern_type: 'opening_5min_trap', count: 3, severity: 'caution',
-      estimated_cost: 4800, last_seen: daysAgo(1, 9, 20),
-      description: 'Entries within opening 5-min window — 19% win rate vs 54% baseline',
-    },
   ],
   total_behavioral_cost: 45840,
   clean_days_pct: 52,
@@ -1134,7 +1120,7 @@ export const DEMO_SESSION_LOG = {
     { date: '2026-08-05', pnl: -2700, trades: 1, alerts: 2,
       tag: 'revenge',     top_patterns: ['revenge_trade', 'no_stoploss'] },
     { date: '2026-08-04', pnl: 6350,  trades: 4, alerts: 1,
-      tag: 'flagged',     top_patterns: ['opening_5min_trap'] },
+      tag: 'flagged',     top_patterns: ['no_stoploss'] },
     { date: '2026-08-03', pnl: 4200,  trades: 3, alerts: 0,
       tag: 'clean',       top_patterns: [] },
     { date: '2026-07-31', pnl: -1000, trades: 1, alerts: 1,
@@ -1394,17 +1380,6 @@ export const DEMO_PATTERN_CATALOGUE = {
       "trigger": "exit",
       "guardian_eligible": false,
       "version": "1.0.0"
-    },
-    {
-      "pattern_type": "opening_5min_trap",
-      "label": "Opening-minutes entry",
-      "observes": "Entries in the first minutes after open that closed quickly at a loss, or lost heavily.",
-      "explanation": "Spreads are widest and option premiums least settled while the market is still finding its level.",
-      "nature": "emotional",
-      "disposition": "analytics",
-      "trigger": "exit",
-      "guardian_eligible": false,
-      "version": "2.0.0"
     },
     {
       "pattern_type": "premium_loss_event",

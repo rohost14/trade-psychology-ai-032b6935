@@ -181,6 +181,58 @@ are worth folding into the same pass only because the replay is already running.
 an arithmetic identity, a shuffle null or an outcome comparison, none of which
 instrument typing can reach.
 
+### Pattern 21 `end_of_session_mis_panic` — review DEFERRED
+
+**Reviewed 30 Aug 2026 alongside `opening_5min_trap`, which was retired. This
+one was NOT, and the distinction is the point: its evidence is ABSENT, not
+contrary.**
+
+Why it survived the review:
+
+* Its subject is **mechanically checkable**, not inferred — "did you enter MIS
+  20 minutes before a forced square-off" is a fact.
+* Its **exchange-aware square-off is correct work** and fixed a real defect: a
+  flat 15:00 `panic_start` flagged *every* evening MCX entry as panic, because
+  MCX trades to 23:30. It derives from `exchange_constants`, not a second
+  hardcoded constant.
+* The effect points the **right way** — late entries won 23.1% against 39.8%
+  for the rest of the day.
+
+**THE EXACT UNBLOCK CONDITION: a dataset that carries `product`.**
+
+The detector's very first gate is `ct.product not in ("MIS","INTRADAY") →
+return None`. The reference tradebook (`docs/tradebook-CY6001-FO2025-26.csv`)
+has **no `product` column** — its header is
+`symbol,isin,trade_date,exchange,segment,series,trade_type,auction,quantity,price,trade_id,order_id,order_execution_time,expiry_date`
+— so the harness must assume all-MIS and every number is an **upper bound**. A
+detector whose primary gate is invisible to the dataset cannot be judged on it.
+
+**Live `CompletedTrade` rows DO carry `product`**, so the unblock is a replay or
+measurement against production data rather than the Console export. No new
+capability is needed — only data that has the column.
+
+What the deferred review must then answer, recorded so it is not re-derived:
+
+1. **Is the danger tier reachable?** `danger_count = 3` was never reached in 175
+   sessions *even under the inflating all-MIS assumption* (0 sessions with 3+
+   late entries; 2 reached 2). Same question `winning_streak_overconfidence`'s
+   danger tier failed.
+2. **Does the effect survive a real sample?** n = 13, permutation p = 0.185.
+   Direction right, significance absent.
+3. **Half the copy is contradicted by its own firings.** *"There is very little
+   time for the position to work, and the exit is not yours to choose."* Median
+   late hold is **2 minutes** and **9 of 13 were closed by the trader**, well
+   before square-off. The first clause stands; the second does not.
+4. **Both thresholds declare metrics that do not exist.**
+   `end_session_mis_caution_count` and `_danger_count` declare
+   `Source.HISTORY` with `late_mis_entries_p75` / `_p90`, and neither appears
+   anywhere in the codebase. They sit permanently at their 2/3 fallbacks while
+   reporting themselves personalised.
+
+**Nothing about this detector — code, thresholds, copy, severity or
+architecture — was modified.** It is the second detector deferred on a data gap
+rather than a decision.
+
 ### Pattern 16 `excess_exposure` — review DEFERRED
 
 **Deferred 29 Aug 2026, before review, by decision.** Not reviewed, not

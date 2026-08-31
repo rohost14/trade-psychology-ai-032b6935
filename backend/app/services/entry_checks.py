@@ -12,13 +12,21 @@ pattern-name and severity bugs elsewhere in this codebase.
 
 Deliberately NOT here — and this is the substance of E3 rather than an omission:
 
-  **opening_5min_trap does not move to entry.** Its raw condition is "entered in
-  the first ten minutes", which is a very common and entirely innocent thing to
-  do. The exit-time detector refuses to fire on that alone and its docstring
-  says why: "Only fires on LOSING trades — a profitable opening trade could be a
-  deliberate strategy (opening range breakout, pre-planned level). Firing on
-  every opening trade regardless of outcome creates noise." Firing it at entry
-  would reintroduce precisely the noise its author removed. It stays at exit.
+  **opening_5min_trap was RETIRED 2026-08-30 (Pattern 21).** This note is kept
+  because its reasoning generalises and was, in the end, the reason the detector
+  went. It said: the raw condition is "entered in the first ten minutes", which
+  is a very common and entirely innocent thing to do, so the exit-time detector
+  refuses to fire on that alone — "Only fires on LOSING trades — a profitable
+  opening trade could be a deliberate strategy". Firing it at entry would
+  reintroduce the noise its author removed, so it stayed at exit.
+
+  That outcome gate is exactly what retired it. If the behaviour is innocent and
+  only the result distinguishes a firing, the result is what is being flagged:
+  it discarded 42% of window entries for having made money, and the window
+  measured 39.4% win against 39.5% for the rest of the day. The generalisable
+  rule for E3 stands — a detector that must read an OUTCOME cannot move to
+  entry — and a detector that can ONLY separate cases by outcome should be
+  looked at hard. See docs/patterns/21-session_windows/.
 """
 from __future__ import annotations
 

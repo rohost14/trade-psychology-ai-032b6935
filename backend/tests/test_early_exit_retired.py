@@ -76,9 +76,9 @@ def test_no_registry_spec_points_at_the_deleted_method():
 def test_the_engine_counts_are_what_the_retirement_left():
     from app.services.detector_registry import ALIASES, REGISTRY, all_pattern_types
 
-    assert len(REGISTRY) == 18
+    assert len(REGISTRY) == 17
     assert len(ALIASES) == 6
-    assert len(all_pattern_types()) == 24
+    assert len(all_pattern_types()) == 23
 
 
 def test_it_is_recorded_as_retired():
@@ -168,7 +168,9 @@ def test_the_last_analytics_detectors_are_untouched():
     from app.services.detector_registry import BY_NAME
 
     engine = BehaviorEngine()
-    for name in ("rapid_reentry", "opening_5min_trap"):
+    # `opening_5min_trap` was the other survivor here until Pattern 21 retired
+    # it 2026-08-30. `rapid_reentry` is the last analytics detector.
+    for name in ("rapid_reentry",):
         assert name in BY_NAME, name
         assert BY_NAME[name].disposition == "analytics", name
         assert hasattr(engine, BY_NAME[name].method), name

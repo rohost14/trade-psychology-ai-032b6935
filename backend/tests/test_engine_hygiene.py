@@ -84,43 +84,14 @@ def test_stop_order_types_defined_once():
 
 
 # ---------------------------------------------------------------------------
-# 2. opening_5min_trap — severity is info, and that is the whole answer
-# ---------------------------------------------------------------------------
-
-class TestOpeningTrapSeverity:
-    """
-    A `severity = "danger" if ... else "caution"` was computed and thrown away;
-    the event has returned a hardcoded "info" since the Phase 4 analytics flip.
-    Both branches are pinned so the dead line cannot come back unnoticed.
-    """
-
-    def _trap(self, *, duration, pnl, qty=100, price=10.0):
-        ct = make_ct(symbol="NIFTY25AUG24000CE", instrument_type="CE",
-                     pnl=pnl, duration_min=duration)
-        ct.avg_entry_price = Decimal(str(price))
-        ct.total_quantity = qty
-        ct.duration_minutes = duration
-        # entry inside the opening window
-        entry = ct.entry_time.astimezone(engine and __import__("zoneinfo").ZoneInfo("Asia/Kolkata"))
-        ct.entry_time = ct.entry_time.replace(
-            hour=3, minute=47, second=0, microsecond=0)  # 09:17 IST in UTC
-        ct.exit_time = ct.entry_time + timedelta(minutes=duration)
-        return engine._detect_opening_5min_trap(make_ctx(completed_trade=ct))
-
-    def test_quick_and_large_loss_is_still_info(self):
-        ev = self._trap(duration=5, pnl=-600.0)   # 60% of a 1000 premium
-        assert ev is not None
-        assert ev.severity == "info"
-        assert ev.context["is_quick_reactive"] and ev.context["is_large_loss"]
-
-    def test_large_loss_alone_is_info(self):
-        ev = self._trap(duration=40, pnl=-600.0)
-        assert ev is not None and ev.severity == "info"
-        assert ev.context["is_large_loss"] and not ev.context["is_quick_reactive"]
-
-    def test_profitable_opening_trade_is_not_flagged(self):
-        assert self._trap(duration=5, pnl=250.0) is None
-
+# 2. opening_5min_trap — RETIRED 2026-08-30 (Pattern 21)
+#
+# `TestOpeningTrapSeverity` (3 tests) is deleted with it. They pinned that the
+# detector returns a hardcoded `info` on both trigger branches and stays silent
+# on a profitable opening trade — and that last one turned out to be the reason
+# it was retired: the outcome gate discarded 42% of window entries for having
+# made money, while the window measured 39.4% win against 39.5% for the rest of
+# the day. See tests/test_opening_5min_trap_retired.py.
 
 # ---------------------------------------------------------------------------
 # 3. size_escalation — RETIRED 2026-08-27 (Pattern #10)

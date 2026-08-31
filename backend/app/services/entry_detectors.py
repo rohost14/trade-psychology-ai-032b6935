@@ -45,7 +45,8 @@ logger = logging.getLogger(__name__)
 #: question they cannot see:
 #: premium_loss_event (live variant already ships separately, E4),
 #: win_rate_collapse, strategy_breakdown,
-#: time_of_day_bias, no_stoploss, opening_5min_trap.
+#: time_of_day_bias, no_stoploss.
+#: (`opening_5min_trap` was in this list until it was retired 2026-08-30.)
 ENTRY_DECIDABLE = (
     "revenge_trade",
     "rapid_reentry",

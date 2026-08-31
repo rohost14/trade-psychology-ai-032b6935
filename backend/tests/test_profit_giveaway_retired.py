@@ -70,8 +70,8 @@ def test_the_engine_counts_are_what_the_retirement_left():
     from app.services.detector_registry import REGISTRY, all_pattern_types
 
     # 20 / 26 since `early_exit` was retired 2026-08-30 (Pattern 18).
-    assert len(REGISTRY) == 18
-    assert len(all_pattern_types()) == 24
+    assert len(REGISTRY) == 17
+    assert len(all_pattern_types()) == 23
 
 
 def test_it_is_recorded_as_retired():
@@ -216,9 +216,16 @@ def test_death_spiral_still_has_its_emotional_domain():
     # required 5-win run behind it, and that one missed the 2.0x size gate. So
     # no session can lose its emotional domain to this retirement, and the
     # death_spiral change is nil rather than merely small.
+    # 2026-08-30: was three. `opening_5min_trap` was retired (Pattern 21), and
+    # its removal exposes an error in this set rather than merely shrinking it.
+    # That detector returned a HARDCODED `info` on every branch and could never
+    # reach death_spiral at all. It appeared here because the scan above regexes
+    # the method source for `severity = "..."`, and its body carried a COMMENT
+    # recording a dead computation — `severity = "danger" if ... else "caution"`
+    # — removed in the 24 Aug hygiene pass. The scan matched the comment.
+    # Practical impact of the correction: nil, because it never contributed.
     EXPECTED_DANGER_CAPABLE = {
         "overtrading_burst",
-        "opening_5min_trap",
         "same_symbol_obsession",
     }
 

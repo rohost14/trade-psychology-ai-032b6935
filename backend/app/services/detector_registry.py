@@ -233,8 +233,13 @@ REGISTRY: Tuple[DetectorSpec, ...] = (
     # they were not fixed. Expiry-day-ness stays as a MODIFIER inside
     # premium_loss_event, no_stoploss and fomo_entry, which is where it works.
     # See docs/patterns/09-expiry_day_overtrading/.
-    DetectorSpec("opening_5min_trap", "_detect_opening_5min_trap",
-                 "2.0.0", "emotional", "analytics", "exit", 0),
+    # `opening_5min_trap` RETIRED 2026-08-30. The opening window was not a worse
+    # place to trade: win 39.4% inside 09:15-09:25 against 39.5% for the rest of
+    # the day, and BETTER on money (p = 0.274). It reached its finding by
+    # discarding 42% of window entries for having made money - selection on
+    # outcome, the shape that retired `panic_exit`. Not retired permanently:
+    # spreads are real, but testing that needs per-fill spread data we do not
+    # store. See docs/patterns/21-session_windows/.
     DetectorSpec("end_of_session_mis_panic", "_detect_end_of_session_mis_panic",
                  "2.0.0", "emotional", "alerting", "exit", 1),
     DetectorSpec("post_loss_recovery_bet", "_detect_post_loss_recovery_bet",
@@ -445,11 +450,11 @@ PATTERN_COPY: Dict[str, PatternCopy] = {
     # `expiry_day_overtrading` copy removed 2026-08-27 with the detector. The
     # copy here was never the problem - it carried no statistic. The two invented
     # ones lived in the detector's `message`, which this contract does not cover.
-    "opening_5min_trap": PatternCopy(
-        "Opening-minutes entry",
-        "Entries in the first minutes after open that closed quickly at a loss, or lost heavily.",
-        "Spreads are widest and option premiums least settled while the market is still finding its level.",
-    ),
+    # `opening_5min_trap` copy removed 2026-08-30 with the detector. Its
+    # explanation - "Spreads are widest and option premiums least settled while
+    # the market is still finding its level" - was a mechanism the detector
+    # never measured, and the outcome it did measure was not worse inside that
+    # window.
     "end_of_session_mis_panic": PatternCopy(
         "Late intraday entries",
         "MIS entries in the run-up to auto square-off.",

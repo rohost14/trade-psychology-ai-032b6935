@@ -146,7 +146,9 @@ const BACKEND_TO_FRONTEND_TYPE: Record<string, string> = {
   // 'options_premium_avg_down' RETIRED 2026-08-30 (Pattern 20). Removed from
   // the routing map because the engine can no longer emit it; the display
   // name below stays so stored alert rows still render.
-  'opening_5min_trap':           'opening_5min_trap',
+  // 'opening_5min_trap' RETIRED 2026-08-30 (Pattern 21). Removed from the
+  // routing map because the engine can no longer emit it; the display name
+  // below stays so stored alert rows still render.
   'end_of_session_mis_panic':    'end_of_session_mis_panic',
   'post_loss_recovery_bet':      'post_loss_recovery_bet',
 };
@@ -200,6 +202,9 @@ export function formatPatternName(patternType: string): string {
     'options_premium_avg_down':      'Premium Averaging Down',
     'iv_crush_behavior':             'IV Crush',
     'premium_destruction':           'Premium Destroyed',
+    // Retired 2026-08-30 (Pattern 21). Kept because stored alert rows still
+    // carry it. The name itself was part of the finding - it said 5 minutes
+    // while the threshold was 10 - but it is what those rows were shown as.
     'opening_5min_trap':             'Opening 5-Min Trap',
     'end_of_session_mis_panic':      'End-of-Session Panic',
     'post_loss_recovery_bet':        'Recovery Bet',
