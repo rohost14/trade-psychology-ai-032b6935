@@ -709,9 +709,123 @@ from two manual endpoints, the real-time path filters to `COMPLETE`, and no
 detector reads the `orders` table. Kite's order book is also same-day, so
 nothing can be backfilled.
 
-## Surfaced by the `time_of_day_bias` retirement (Reviews 25-27) — NOT actioned
+## Surfaced by the `time_of_day_bias` retirement (Reviews 25-27)
 
-### ~~THE ONE OPEN DECISION: `_calculate_readiness_score`'s danger-day factor~~ — **CLOSED 2026-09-01**
+**Reviews 25-27 are CLOSED.** `time_of_day_bias` RETIRED, `win_rate_collapse`
+KEEP AS-IS, `strategy_breakdown` DEFERRED. Everything below is recorded, not
+actioned.
+
+---
+
+# DEFERRED BY DECISION — three items, 2026-09-01
+
+**Do not change any of these without a fresh decision.** Each is deferred for a
+stated reason with the evidence behind it, not left over by accident. They are
+grouped here so they are not mistaken for the incidental findings further down.
+
+## 1. `best_hours` and `best_days` — insufficient evidence, do NOT use as behavioural signals
+
+**Both surfaces are already removed** with the rest of the retirement. What is
+deferred is any future revival: **neither may be used as a behavioural signal
+until it is validated on its own.**
+
+**They are NOT the same finding, and collapsing them would misstate the
+evidence.** Each was measured separately with its own filter (`> 55%` win rate,
+`n >= 5`), split across the two halves of the reference book:
+
+| signal | full book | first half | second half | **in BOTH** | status |
+|---|---|---|---|---|---|
+| `best_hours` | `[14]` | `[]` | `[14]` | **NONE** | **MEASURED, UNSTABLE** |
+| `best_days` | `[]` | `[]` | `[]` | **NONE** | **UNVALIDATED, NOT INVALIDATED** |
+
+**`best_hours` — measured and unstable.** One hour, 14:00, and it appears in the
+second half only, absent from the first. Chance p = 0.138 is not damning on its
+own, but a signal present in one half and not the other cannot support a claim
+about a trader's habits. Its n is also thin: hour 14 carries 18 trades in the
+first half and 30 in the second.
+
+**`best_days` — no evidence either way.** It fires **zero times at every slice**
+of this book. That is not a finding against it; the book simply never triggers
+it. Its surface was removed because it shares a methodology with signals that
+were measured and contradicted, **not** because it was itself measured and found
+wanting.
+
+**Why deferred rather than decided.** The mirror-image evidence is what governs
+both: for the *danger* direction the ranking does not persist at all — Spearman
+rho between the two halves' hourly win-rate rankings is **+0.071** — and a "best"
+list is the same ranking read from the other end. Validating either would need a
+**persistence test across periods**, not merely a bigger sample: at 95%
+confidence, separating a 55% hour from a 40% baseline needs roughly **n ≈ 100
+trades in that hour**, against a producer gate of `n >= 5` where the interval is
+**±43 points**. Choosing the required precision is a product judgement, and
+nothing in this book decides it.
+
+**Kept:** `_learn_time_patterns` still computes and stores both lists nightly, so
+a future evidence pass has the data. `hourly_breakdown` and `daily_breakdown`
+remain on `/time-analysis` as raw counts with **no classification attached** and
+no reader today. **If a future surface renders them, the stability finding
+applies again.**
+
+## 2. `api/my_record.py`'s independent hourly signal — separate product decision
+
+**Excluded from this pass by explicit instruction, and recorded so the resulting
+inconsistency is a decision rather than an oversight.** It is a SECOND,
+INDEPENDENT implementation that does not read `time_patterns` at all — it
+computes from trades directly.
+
+> *"Right now is your weakest window on NIFTY: 5 trades, 20% win rate, −₹14,270
+> net."*
+
+| | `time_patterns` path (retired) | `my_record.py` |
+|---|---|---|
+| timezone | IST-derived, compared to **browser-local** in the strip | **`now_ist.hour`** — correct |
+| sample gate | `n >= 5`, invisible to the trader | `MIN_SAMPLE = 5`, and the count is **in the sentence** |
+| delivery | **push** — alert, dashboard strip, daily report | **pull** — the trader opens My Record and asks |
+| claim | *"You historically lose at 14:00"* | *"Right now is your weakest window… 5 trades"* |
+
+**Why deferred rather than removed.** It carries **the same instability risk** —
+"weakest window" is a ranking, and rankings are exactly what rho = +0.071 says do
+not hold. But it is materially different in product terms on three axes at once:
+the trader asked for it, the answer states its own sample, and the clock is
+right. Whether a pull surface that shows its working is held to the same bar as a
+push surface that does not is a product question, and it was not put.
+
+Pinned untouched by `test_my_record_is_out_of_scope_and_untouched`, which asserts
+it still never reads `time_patterns`, still uses `now_ist`, and still gates on
+`MIN_SAMPLE`.
+
+## 3. Readiness-score `warning` band — unreachable, needs a band decision
+
+`_calculate_readiness_score`'s three bands are `ready` (≥ 80), `caution` (≥ 60)
+and `warning` (below 60). With the danger-day −20 removed, **the remaining
+penalties total at most 40** — `large_recent_loss` 20, `losing_streak` 15,
+`expiry_day` 5 — so the floor is **exactly 60**, which is the `caution` cut.
+
+| | before | after |
+|---|---|---|
+| reachable score range | 40 – 100 | **60 – 100** |
+| `warning` cases in the 489,951-case sweep | 4,564 | **0** |
+
+Every one of the 4,564 required the removed −20.
+
+**DO NOT INVENT A REPLACEMENT FACTOR.** Substituting something to keep the band
+alive would be choosing a threshold to preserve a scale, which is precisely the
+move the retirement exists to stop. This is a consequence of the removal, not a
+defect introduced by it.
+
+**The open question is about the BAND, not the signal.** Either the remaining
+penalties are too small for a three-band scale, or the scale should be two bands.
+Both are product decisions with no evidence behind them, and neither was taken.
+`Reports.tsx:192` still carries the `warning` branch and its `text-tm-loss`
+colour, harmlessly. Pinned by
+`test_the_warning_band_is_now_unreachable_and_that_is_recorded`, so the dead band
+is a recorded fact rather than a later surprise.
+
+---
+
+# Incidental findings from the same pass — recorded, not actioned
+
+### ~~`_calculate_readiness_score`'s danger-day factor~~ — **CLOSED 2026-09-01**
 
 **Decided: remove the factor.** A readiness score is a trader-facing decision
 signal, so the rule that retired the alert applies to it too. The penalty is
@@ -723,61 +837,8 @@ itself. No replacement day or time factor was substituted.
 Measured over all **489,951** reachable inputs: **54,439 (11.1%) move, every one
 by exactly +20**; 435,512 (88.9%) identical; the surviving factors match case for
 case. Bands: `caution → ready` 41,121 · `ready → ready` 8,754 ·
-`warning → caution` 4,564.
-
-### NEW, and it falls out of that removal: the `warning` band is now unreachable
-
-`_calculate_readiness_score`'s three status bands are `ready` (≥ 80), `caution`
-(≥ 60) and `warning` (below 60). With the danger-day −20 gone, **the remaining
-penalties total at most 40** — `large_recent_loss` 20, `losing_streak` 15,
-`expiry_day` 5 — so the floor is **exactly 60**, which is the `caution` cut.
-
-| | before | after |
-|---|---|---|
-| reachable score range | 40 – 100 | **60 – 100** |
-| `warning` cases in the sweep | 4,564 | **0** |
-
-All 4,564 required the removed −20. **This is a consequence, not a defect
-introduced by the removal, and not a reason to substitute a replacement factor** —
-that would be inventing a threshold, which is the thing the retirement exists to
-stop. It is pinned by
-`test_the_warning_band_is_now_unreachable_and_that_is_recorded` so it is a known
-recorded fact rather than a later surprise.
-
-**The open product question is about the band, not the signal:** either the
-remaining penalties are too small for a three-band scale, or the scale should be
-two bands. Both are product decisions with no evidence behind them yet, and
-neither was taken. `Reports.tsx:192` still carries the `warning` branch and its
-`text-tm-loss` colour, harmlessly.
-
-### `api/my_record.py` needs its own product review
-
-**Excluded from this pass by explicit instruction, and recorded so the
-inconsistency is a decision rather than an oversight.** It is a SECOND,
-INDEPENDENT hourly implementation that does not read `time_patterns` at all — it
-computes from trades directly.
-
-> *"Right now is your weakest window on NIFTY: 5 trades, 20% win rate, −₹14,270
-> net."*
-
-| | `time_patterns` path (retired) | `my_record.py` |
-|---|---|---|
-| timezone | IST-derived, compared to **browser-local** in the strip | **`now_ist.hour`** — correct |
-| sample gate | `n >= 5`, invisible to the trader | `MIN_SAMPLE = 5`, and the count is **in the sentence** |
-| delivery | **push** — alert, dashboard strip, daily report | **pull** — the trader opens My Record and asks |
-
-**It carries the same instability risk** — "weakest window" is a ranking, and
-rankings are what rho = +0.071 says do not hold. But it is materially different
-in product terms: the trader asked, and the answer states its own sample. Pinned
-untouched by `test_my_record_is_out_of_scope_and_untouched`.
-
-### `best_days` is UNVALIDATED, not invalidated
-
-It fires **zero times at every slice** of the reference book. That is *no
-evidence either way* about whether the concept works. Its surface was removed
-because it shares a methodology with signals that were measured and
-contradicted — not because it was itself measured and found wanting. If it is
-ever revived, it needs its own measurement.
+`warning → caution` 4,564. A trader affected only by this factor goes 80 → 100,
+**both `ready`** — the cut is `>= 80`. Its one consequence is item 3 above.
 
 ### `POST /profile/detect-style` clobbers `detected_patterns`
 
