@@ -76,6 +76,10 @@ class UserProfile(Base):
     # change-controlled by ConstitutionService (tighten instant, loosen =
     # friction + history + next-session effect). Migration 065.
     daily_loss_limit = Column(Float, nullable=True)       # Max loss per day (₹)
+    # Max RAW realised loss on ONE position (₹). NULL = rule not set.
+    # Opt-in, never suggested — see migration 082 and
+    # docs/patterns/24-constitution_violation/per_trade_loss_limit_semantics.md
+    per_trade_loss_limit = Column(Float, nullable=True)
     daily_trade_limit = Column(Integer, nullable=True)    # Max trades per day
     max_position_size = Column(Float, nullable=True)      # Max capital-at-risk per trade (% of capital, e.g. 10.0)
     cooldown_after_loss = Column(Integer, default=15)     # Minutes to wait after loss
@@ -136,6 +140,7 @@ class UserProfile(Base):
             "trading_hours_start": self.trading_hours_start,
             "trading_hours_end": self.trading_hours_end,
             "daily_loss_limit": self.daily_loss_limit,
+            "per_trade_loss_limit": self.per_trade_loss_limit,
             "daily_trade_limit": self.daily_trade_limit,
             "max_position_size": self.max_position_size,
             "cooldown_after_loss": self.cooldown_after_loss,

@@ -63,6 +63,7 @@ def _compute_lifecycle(
 class LimitsUpdate(BaseModel):
     daily_trade_limit:  Optional[int]   = Field(None, ge=1, le=500)
     daily_loss_limit:   Optional[float] = Field(None, ge=0)
+    per_trade_loss_limit: Optional[float] = Field(None, ge=0)
     cooldown_after_loss: Optional[int]  = Field(None, ge=0, le=1440)
     max_position_size:  Optional[float] = Field(None, ge=0.1, le=100)
 

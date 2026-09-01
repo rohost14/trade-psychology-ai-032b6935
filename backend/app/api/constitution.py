@@ -34,6 +34,7 @@ IST = ZoneInfo("Asia/Kolkata")
 
 class ConstitutionUpdate(BaseModel):
     daily_loss_limit: Optional[float] = Field(None, ge=0)
+    per_trade_loss_limit: Optional[float] = Field(None, ge=0)
     daily_trade_limit: Optional[int] = Field(None, ge=1, le=200)
     max_position_size: Optional[float] = Field(None, ge=0.1, le=100)
     cooldown_after_loss: Optional[int] = Field(None, ge=0, le=240)
@@ -178,6 +179,7 @@ _RULE_TO_THRESHOLD = {
     "daily_trade_limit":      "daily_trade_limit",
     "cooldown_after_loss":    "revenge_window_min",
     "daily_loss_limit":       "daily_loss_limit",
+    "per_trade_loss_limit":   "per_trade_loss_limit",
     "max_position_size":      "max_position_size",
     "max_consecutive_losses": "max_consecutive_losses",
 }

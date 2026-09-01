@@ -498,6 +498,9 @@ def _get_thresholds_pre_ladder(profile=None) -> Dict[str, Any]:
         result['trading_capital']   = getattr(profile, 'trading_capital', None)
         result['daily_loss_limit']  = getattr(profile, 'daily_loss_limit', None)
         result['max_position_size'] = getattr(profile, 'max_position_size', None)
+        # getattr with a default: migration 082 may not be applied yet, and an
+        # absent column must read as "rule not set" rather than raise.
+        result['per_trade_loss_limit'] = getattr(profile, 'per_trade_loss_limit', None)
         # Constitution rules (Engine v2 Phase 2) — raw declared values
         result['max_consecutive_losses'] = getattr(profile, 'max_consecutive_losses', None)
         result['restricted_windows']     = getattr(profile, 'restricted_windows', None) or []
@@ -526,6 +529,7 @@ def _get_thresholds_pre_ladder(profile=None) -> Dict[str, Any]:
         # Cold start: no profile — capital fields are unknown
         result['trading_capital']    = None
         result['daily_loss_limit']   = None
+        result['per_trade_loss_limit'] = None
         result['max_position_size']  = None
         result['max_consecutive_losses'] = None
         result['restricted_windows']     = []

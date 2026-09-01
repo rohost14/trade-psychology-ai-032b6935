@@ -3113,6 +3113,52 @@ class BehaviorEngine:
                     {"limit": float(loss_limit), "current": round(loss, 2),
                      "ratio": round(ratio, 2)})
 
+        # ── Rule: per-trade loss limit ────────────────────────────────────
+        #
+        # The most the trader is willing to lose on ONE position, in rupees.
+        # Added 1 Sep 2026 (Pattern 24). Opt-in, no suggested value.
+        #
+        # POSITION-LEVEL, NOT FILL-LEVEL, and that is free rather than enforced:
+        # a CompletedTrade is written only when the position returns to zero, so
+        # `realized_pnl` already sums every exit tranche. Splitting an exit
+        # cannot evade the limit. (Measured: 8 of 740 rounds on the reference
+        # book closed in more than one tranche, all as single rows.)
+        #
+        # MULTI-LEG IS A KNOWN LIMITATION, DELIBERATELY NOT SOLVED HERE. Netting
+        # a structure's legs was approved in principle and then measured as
+        # unusable: `strategy_detector` groups on "same underlying, entered
+        # within 15 minutes", which cannot separate a vertical spread from two
+        # independent bets (29 of 48 candidate pairs are the same option type),
+        # and 45% of grouped rounds have no closed sibling at their own exit -
+        # so the same structure would be judged leg-level at one exit and
+        # net-level at the next. `session_meltdown` reads `strategy_group` to
+        # SUPPRESS, which fails safe; using it to MEASURE would make a false
+        # statement to the trader in either direction. So this rule does NOT
+        # read `ctx.strategy_group`: it measures each leg separately, and that
+        # is recorded as an observability limitation rather than papered over.
+        #
+        # RAW P&L, like every other figure in the product - no brokerage, no
+        # STT, no tax.
+        per_trade_limit = th.get("per_trade_loss_limit")
+        if per_trade_limit:
+            trade_pnl = Decimal(str(ct.realized_pnl or 0))
+            # Only a LOSS can breach a loss limit. A winning trade is not a
+            # small breach, it is not a breach.
+            if trade_pnl < 0:
+                trade_loss = float(-trade_pnl)
+                ratio = trade_loss / float(per_trade_limit)
+                sev = ladder(ratio)
+                if sev:
+                    verb = "breached" if ratio >= 1.0 else "approaching"
+                    add("per_trade_loss", sev,
+                        f"Your per-trade loss limit {verb}: {ct.tradingsymbol} lost "
+                        f"₹{trade_loss:,.0f} of your ₹{float(per_trade_limit):,.0f} "
+                        f"limit ({ratio*100:.0f}%).",
+                        {"limit": float(per_trade_limit),
+                         "current": round(trade_loss, 2),
+                         "ratio": round(ratio, 2),
+                         "trigger_symbol": ct.tradingsymbol})
+
         # ── Rule: max trades per day ──────────────────────────────────────
         trade_limit = th.get("user_daily_trade_limit")
         if trade_limit:

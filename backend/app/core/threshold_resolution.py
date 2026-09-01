@@ -488,8 +488,10 @@ def _apply_declared(profile, values: Dict[str, Any], put: Callable) -> None:
 
 def _apply_profile_facts(profile, values: Dict[str, Any], put: Callable) -> None:
     """Facts read straight off the profile, plus the one capital-derived pair."""
-    for key in ("trading_capital", "daily_loss_limit", "max_position_size",
-                "max_consecutive_losses"):
+    # `per_trade_loss_limit` is read with getattr's default because migration
+    # 082 may not be applied yet; an absent column reads as "rule not set".
+    for key in ("trading_capital", "daily_loss_limit", "per_trade_loss_limit",
+                "max_position_size", "max_consecutive_losses"):
         put(key, getattr(profile, key, None), Source.FACT, 1.0, "declared")
 
     put("restricted_windows", getattr(profile, "restricted_windows", None) or [],
@@ -671,7 +673,8 @@ def _apply_capital_ratios(values: Dict[str, Any], put: Callable) -> None:
 
 def _apply_cold_start(put: Callable) -> None:
     """No profile at all — capital and rule fields are unknown, not defaulted."""
-    for key in ("trading_capital", "daily_loss_limit", "max_position_size",
+    for key in ("trading_capital", "daily_loss_limit", "per_trade_loss_limit",
+                "max_position_size",
                 "max_consecutive_losses", "user_daily_trade_limit",
                 "user_cooldown_min", "baseline_win_rate", "baseline_profit_factor"):
         put(key, None, Source.GLOBAL, 0.0, "unknown — no profile")

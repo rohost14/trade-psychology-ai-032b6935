@@ -60,6 +60,8 @@ interface OnboardingData {
   //
   // See docs/patterns/24-constitution_violation/.
   daily_loss_limit: number | null;
+  //: Max RAW realised loss on ONE position, in rupees. Opt-in, never suggested.
+  per_trade_loss_limit: number | null;
   daily_trade_limit: number;
   max_position_size: number | null;
   cooldown_after_loss: number;
@@ -67,6 +69,7 @@ interface OnboardingData {
   trading_capital: number | null;
   //: Explicit opt-in. Unchecked -> the rule stays null and is never enforced.
   enable_daily_loss_limit: boolean;
+  enable_per_trade_loss_limit: boolean;
   enable_max_position_size: boolean;
   known_weaknesses: string[];
   push_enabled: boolean;
@@ -136,12 +139,14 @@ export default function OnboardingWizard({ brokerAccountId, onComplete, onSkip }
     trading_hours_start: '09:15',
     trading_hours_end: '15:30',
     daily_loss_limit: null,          // off until the trader opts in
+    per_trade_loss_limit: null,      // off until the trader opts in
     daily_trade_limit: 10,
     max_position_size: null,         // off until the trader opts in
     cooldown_after_loss: 15,
     max_consecutive_losses: 3,
     trading_capital: null,
     enable_daily_loss_limit: false,
+    enable_per_trade_loss_limit: false,
     enable_max_position_size: false,
     known_weaknesses: [],
     push_enabled: true,
@@ -285,6 +290,7 @@ export default function OnboardingWizard({ brokerAccountId, onComplete, onSkip }
           // un-opted rule is never written and `constitution_violation`
           // abstains on it.
           daily_loss_limit: data.enable_daily_loss_limit ? data.daily_loss_limit : null,
+          per_trade_loss_limit: data.enable_per_trade_loss_limit ? data.per_trade_loss_limit : null,
           daily_trade_limit: data.daily_trade_limit,
           // Enabled AND filled in. A ticked box with an empty field enforces
           // nothing - the rule needs a number, and we do not supply one.
@@ -632,6 +638,56 @@ export default function OnboardingWizard({ brokerAccountId, onComplete, onSkip }
                             max={100000}
                             step={1000}
                           />
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Per-trade loss limit — RUPEES, and no suggestion */}
+                    <div className="space-y-2">
+                      <div className="flex items-start gap-3">
+                        <Checkbox
+                          id="enable-per-trade-loss"
+                          checked={data.enable_per_trade_loss_limit}
+                          onCheckedChange={(checked) =>
+                            setData(d => ({
+                              ...d,
+                              enable_per_trade_loss_limit: checked === true,
+                              per_trade_loss_limit: checked === true ? d.per_trade_loss_limit : null,
+                            }))}
+                        />
+                        <div className="space-y-0.5">
+                          <Label htmlFor="enable-per-trade-loss" className="text-sm">
+                            Enable per-trade loss limit
+                          </Label>
+                          <p className="text-xs text-muted-foreground">
+                            The most you are willing to lose on a single position.
+                            We do not suggest a number.
+                          </p>
+                        </div>
+                      </div>
+                      {data.enable_per_trade_loss_limit && (
+                        <div className="space-y-2 pl-7">
+                          <Label htmlFor="per-trade-loss-value" className="text-xs text-muted-foreground">
+                            Your limit (₹ per trade)
+                          </Label>
+                          <Input
+                            id="per-trade-loss-value"
+                            type="number"
+                            min={100}
+                            step={100}
+                            placeholder="e.g. 4000"
+                            value={data.per_trade_loss_limit ?? ''}
+                            onChange={(e) =>
+                              setData(d => ({
+                                ...d,
+                                per_trade_loss_limit: e.target.value === '' ? null : Number(e.target.value),
+                              }))}
+                          />
+                          <p className="text-xs text-muted-foreground">
+                            Checked after a position closes, on its realised loss.
+                            On a multi-leg strategy each leg is measured
+                            separately.
+                          </p>
                         </div>
                       )}
                     </div>

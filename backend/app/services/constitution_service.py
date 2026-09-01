@@ -14,6 +14,7 @@ The constitution is the trader's own rulebook, stored on UserProfile
 
 Rule fields and their tighten direction:
   daily_loss_limit        lower  = tighter   (₹/day)
+  per_trade_loss_limit    lower  = tighter   (₹/trade)
   daily_trade_limit       lower  = tighter   (count/day)
   max_position_size       lower  = tighter   (% capital per trade)
   cooldown_after_loss     higher = tighter   (minutes)
@@ -38,6 +39,11 @@ IST = ZoneInfo("Asia/Kolkata")
 
 RULE_FIELDS = (
     "daily_loss_limit",
+    # Added 1 Sep 2026 (Pattern 24). The third money rule: the day, the single
+    # trade, and the capital committed. Opt-in with NO suggested value — this
+    # product is for F&O traders and there is no evidence for a recommended
+    # per-trade loss figure, so none is offered.
+    "per_trade_loss_limit",
     "daily_trade_limit",
     "max_position_size",
     "cooldown_after_loss",
@@ -55,6 +61,7 @@ RULE_FIELDS = (
 # direction: +1 means numerically higher = tighter, -1 means lower = tighter
 _TIGHTEN_DIRECTION = {
     "daily_loss_limit": -1,
+    "per_trade_loss_limit": -1,   # a smaller allowed loss is a tighter promise
     "daily_trade_limit": -1,
     "max_position_size": -1,
     "cooldown_after_loss": +1,
@@ -321,6 +328,11 @@ class ConstitutionService:
             # wants an exposure cap types their own.
             "daily_loss_limit": None,
             "max_position_size": None,
+            # Third money rule. No `suggested_per_trade_loss_limit` accompanies
+            # it: unlike the daily limit there is no capital-derived figure with
+            # any standing, and inventing one is exactly what this whole pass
+            # removed. The trader types their own or leaves it off.
+            "per_trade_loss_limit": None,
             "daily_trade_limit": m["max_trades"],
             "cooldown_after_loss": m["cooldown"],
             "max_consecutive_losses": m["consec"],

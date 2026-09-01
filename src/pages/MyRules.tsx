@@ -18,6 +18,7 @@ import { cn } from '@/lib/utils';
 
 interface Rules {
   daily_loss_limit: number | null;
+  per_trade_loss_limit: number | null;
   daily_trade_limit: number | null;
   max_position_size: number | null;
   cooldown_after_loss: number | null;
@@ -67,6 +68,7 @@ interface ViolationsResponse {
 const RULE_LABELS: Record<string, string> = {
   daily_loss: 'Daily loss limit',
   daily_loss_limit: 'Daily loss limit',
+  per_trade_loss_limit: 'Per-trade loss limit',
   daily_trades: 'Max trades per day',
   daily_trade_limit: 'Max trades per day',
   max_consecutive_losses: 'Stop after consecutive losses',
@@ -353,6 +355,7 @@ export default function MyRules() {
           <div className="space-y-3">
             {([
               ['daily_loss_limit', 'Daily loss limit (₹)', 100],
+              ['per_trade_loss_limit', 'Per-trade loss limit (₹)', 100],
               ['daily_trade_limit', 'Max trades per day', 1],
               ['max_position_size', 'Max risk per trade (% of capital)', 0.5],
               ['cooldown_after_loss', 'Cooldown after a loss (minutes)', 5],

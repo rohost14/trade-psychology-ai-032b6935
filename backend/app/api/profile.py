@@ -61,6 +61,7 @@ class OnboardingStep3(BaseModel):
 class OnboardingStep4(BaseModel):
     """Risk management — the constitution review step (Engine v2 Q24)"""
     daily_loss_limit: Optional[float] = None
+    per_trade_loss_limit: Optional[float] = None
     daily_trade_limit: Optional[int] = None
     max_position_size: Optional[float] = None
     cooldown_after_loss: int = 15
@@ -113,6 +114,7 @@ class ProfileUpdate(BaseModel):
     trading_hours_start: Optional[str] = None
     trading_hours_end: Optional[str] = None
     daily_loss_limit: Optional[float] = None
+    per_trade_loss_limit: Optional[float] = None
     daily_trade_limit: Optional[int] = None
     max_position_size: Optional[float] = None
     cooldown_after_loss: Optional[int] = None
@@ -409,6 +411,7 @@ async def onboarding_step4(
         from app.services.constitution_service import ConstitutionService
         rules = {
             "daily_loss_limit": data.daily_loss_limit,
+            "per_trade_loss_limit": data.per_trade_loss_limit,
             "daily_trade_limit": data.daily_trade_limit,
             "max_position_size": data.max_position_size,
             "cooldown_after_loss": data.cooldown_after_loss,
