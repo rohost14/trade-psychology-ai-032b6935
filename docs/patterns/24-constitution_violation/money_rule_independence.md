@@ -2,6 +2,12 @@
 
 **1 Sep 2026. INVESTIGATION ONLY. NO CODE CHANGED.**
 
+> ## VERDICT: PASS — architecture safe, keep as is
+>
+> Reviewed and accepted 1 Sep 2026. **No detector is to be modified because of
+> this investigation.** The two items it surfaced are recorded in
+> `docs/DEEP_REVIEW/PENDING_AND_TODO.md` and neither is a code fault.
+
 The principle under test: **user-configured money rules are optional guardrails,
 not prerequisites for the rest of the engine.**
 
@@ -167,7 +173,21 @@ unresolved, so it abstains twice over today."*
 
 ---
 
-## 5. The one real dependency, and it is NOT a money rule
+## 5. `excess_exposure` needs capital — and that is ITS dependency, not the engine's
+
+**Read this section carefully, because it is the easiest finding here to
+misquote.**
+
+> "Capital is required for **exposure detection**" is true.
+> "Capital is required for **the behavioural engine**" is **false**, and this
+> investigation is the evidence.
+
+Exactly one detector of seventeen needs `trading_capital`, for the one reason a
+detector could: it reports a percentage of capital, and that cannot be computed
+without capital. Every other detector — revenge, martingale, overtrading, FOMO,
+no-stop-loss, adding-to-adverse, premium loss, same-symbol, rapid re-entry,
+post-loss recovery, end-of-session, and the consecutive-loss rule — is
+**unaffected**, measured below.
 
 `excess_exposure` needs **`trading_capital`**, which is a separate onboarding
 field, not one of the three rules:
@@ -188,7 +208,8 @@ worse than no answer. But the consequence is worth stating plainly:
 > and nothing on screen saying why.
 
 That is a **product** question about whether capital should be required or
-prompted, not a bug in any detector. Recorded, not fixed.
+prompted, not a bug in any detector, and **not a reason to change anything in
+the engine**. Recorded, not fixed.
 
 ---
 
@@ -226,7 +247,8 @@ The principle holds, measured rather than asserted:
 * `session_meltdown` and the three money rules abstain cleanly when unset — no
   invented defaults, no derived limits.
 
-**Two things to decide, neither urgent and neither a code fault:**
+**Accepted 1 Sep 2026: keep the current architecture.** Two things recorded in
+the pending register, neither urgent and neither a code fault:
 
 1. **`trading_capital` is a single point of failure for `excess_exposure`.**
    Skipping it removes the only unconditional over-exposure protection, silently.

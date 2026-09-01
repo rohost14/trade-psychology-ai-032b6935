@@ -329,6 +329,61 @@ which is a separate question about the value of the analytics disposition.
 The closed rule does not depend on the answer: if we ever stop writing it, INFO
 events still must not become alerts in the meantime.
 
+## Surfaced by the money-rule independence validation — NOT actioned
+
+**That investigation PASSED on 1 Sep 2026 and the architecture is unchanged.**
+Neither item below is a code fault, and neither is a reason to modify a detector.
+
+### 1. `trading_capital` is a single point of failure for `excess_exposure`
+
+Measured with no money rules set:
+
+| | `excess_exposure` firings |
+|---|---|
+| capital unset | **0** |
+| capital ₹200,000 | **231** |
+
+Every other detector is identical either way.
+
+**The abstention is correct** — a percentage of capital cannot be computed
+without capital, and the risk layer's standing rule is that a wrong confident
+answer is worse than no answer. The consequence is what needs a decision:
+
+> A trader who skips the capital field gets **no over-exposure protection at
+> all** — not the universal 5%/10% safety band, not their own rule — silently,
+> with nothing on screen saying why.
+
+**State this precisely when it is picked up.** "Capital is required for
+*exposure detection*" is true. "Capital is required for *the behavioural
+engine*" is **false** — one detector of seventeen depends on it, and the
+validation measured the other sixteen as unaffected.
+
+**The product question:** should onboarding require capital, or should the UI
+say what is lost by skipping it? Not a detector change either way.
+
+### 2. `EngineContext.account_risk` has a stale docstring
+
+It says:
+
+> *"Detectors do NOT read this yet - no detector has been migrated."*
+
+`revenge_trade` reads it — `loss_vs_account(prior_loss, ctx.account_risk)`. True
+when written, false now.
+
+**Effect is nil**, measured: 182 firings with an identical severity split
+whether `account_risk` is None or a usable ₹200,000. The account frame can only
+record `a_level = 1`, which the trade frame already reaches without capital, and
+`revenge_account_loss_pct` (S1) is absent from the threshold set entirely.
+
+**Why it is worth fixing anyway:** it is the kind of comment that stops someone
+checking. This validation only found the read because a static scan contradicted
+the prose.
+
+**Fix:** correct the docstring to say `revenge_trade` consumes it for the
+account frame, that the frame records a measurement and an abstention rather
+than gating, and that it cannot influence severity until S1 is decided. One
+comment, no behaviour.
+
 ## Surfaced by the Pattern 24 review — NOT actioned
 
 ### Multi-rule breaches are not grouped — a separate product decision
