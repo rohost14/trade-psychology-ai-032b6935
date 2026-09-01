@@ -24,7 +24,25 @@ type Source = 'declared' | 'learned' | 'default' | 'unset';
 
 interface RuleRow { declared: number | null; effective: number | null; source: Source; overridden: boolean }
 interface Effective { has_baseline: boolean; rules: Record<string, RuleRow>; ungoverned: Record<string, number> }
-interface StatusRow { rule: string; current?: number; limit?: number | null; active?: boolean; remaining_min?: number }
+interface StatusRow {
+  rule: string;
+  current?: number | null;
+  limit?: number | null;
+  /**
+   * How today's number relates to the limit, set by the API.
+   *
+   *   cumulative  the session spends it down - loss taken, trades placed,
+   *               losses in a row. "3 of 5" means 2 remain, and a progress bar
+   *               is the right picture.
+   *   peak        a PER-TRADE rule, reported as the session's worst single
+   *               instance. Nothing is consumed: the worst trade so far
+   *               reaching 67% of the line leaves the next trade its whole
+   *               allowance, so a progress bar would state something false.
+   */
+  kind?: 'cumulative' | 'peak';
+  active?: boolean;
+  remaining_min?: number;
+}
 
 const LABEL: Record<string, string> = {
   daily_loss_limit:       'Daily loss limit',
@@ -40,6 +58,16 @@ const TODAY_KEY: Record<string, string> = {
   daily_loss_limit: 'daily_loss',
   daily_trade_limit: 'daily_trades',
   max_consecutive_losses: 'max_consecutive_losses',
+  // Both added 2026-09-02. These two rules had a limit and no usage, so the
+  // page named a rule and said nothing about the trader's day against it.
+  per_trade_loss_limit: 'per_trade_loss',
+  max_position_size: 'max_trade_risk',
+};
+
+/** What today's number IS, for a rule where "used" would misdescribe it. */
+const PEAK_LABEL: Record<string, string> = {
+  per_trade_loss_limit: 'Worst trade today',
+  max_position_size: 'Largest position today',
 };
 
 const MONEY = new Set(['daily_loss_limit', 'per_trade_loss_limit']);
@@ -100,7 +128,11 @@ export default function EnforcedRules({ status = [] }: { status?: StatusRow[] })
           const today = byRule.get(TODAY_KEY[key] ?? key);
           const used = today?.current;
           const limit = r.effective;
-          const pct = used != null && limit ? Math.min((used / limit) * 100, 100) : null;
+          const isPeak = today?.kind === 'peak';
+          // No bar for a peak: a progress bar reads as "this much of your
+          // budget is gone", and a per-trade limit has no budget to spend.
+          const pct = !isPeak && used != null && limit
+            ? Math.min((used / limit) * 100, 100) : null;
           const over = used != null && limit != null && used > limit;
 
           return (
@@ -119,6 +151,24 @@ export default function EnforcedRules({ status = [] }: { status?: StatusRow[] })
                   </span>
                 </span>
               </div>
+
+              {/* A peak needs saying what it IS. "1,350 of 2,000" reads as a
+                  budget; "Worst trade today" is the fact. */}
+              {isPeak && used != null && PEAK_LABEL[key] && (
+                <p className="text-[11.5px] text-muted-foreground mt-1">
+                  {PEAK_LABEL[key]}
+                </p>
+              )}
+
+              {/* Largest-position-today is withheld whenever the risk layer
+                  could not size every trade of the session - a maximum over a
+                  subset is not the maximum. The API decides; the page says why
+                  the number is missing rather than leaving a blank. */}
+              {isPeak && used == null && limit != null && (
+                <p className="text-[11.5px] text-muted-foreground mt-1">
+                  No figure for today — not every trade could be sized.
+                </p>
+              )}
 
               {pct != null && (
                 <div className="mt-1.5 h-1 rounded-full bg-muted overflow-hidden" aria-hidden>

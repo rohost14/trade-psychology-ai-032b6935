@@ -1303,11 +1303,19 @@ export const DEMO_CONSTITUTION = {
   accepted_at: daysAgo(21, 19, 30),
 };
 
+// `kind` mirrors the API exactly. `cumulative` is a budget the session spends
+// down; `peak` is a per-trade rule reported as the session's worst single
+// instance, which is NOT consumed and so gets no progress bar. The
+// `max_trade_risk` row carries `current: null` deliberately: that is what the
+// endpoint sends when the risk layer could not size every trade of the day,
+// and a maximum over a subset is not the maximum.
 export const DEMO_CONSTITUTION_STATUS = {
   status: [
-    { rule: 'daily_loss',            current: 8455, limit: 25000, ratio: 0.34 },
-    { rule: 'daily_trades',          current: 9,    limit: 5,     ratio: 1.8  },
-    { rule: 'max_consecutive_losses', current: 2,   limit: 3,     ratio: 0.67 },
+    { rule: 'daily_loss',            kind: 'cumulative', current: 8455, limit: 25000, ratio: 0.34 },
+    { rule: 'daily_trades',          kind: 'cumulative', current: 9,    limit: 5,     ratio: 1.8  },
+    { rule: 'max_consecutive_losses', kind: 'cumulative', current: 2,   limit: 3,     ratio: 0.67 },
+    { rule: 'per_trade_loss',        kind: 'peak',       current: 4050, limit: 6000,  ratio: 0.68 },
+    { rule: 'max_trade_risk',        kind: 'peak',       current: 7.4,  limit: 10,    ratio: 0.74 },
     { rule: 'restricted_windows',    windows: ['09:15-09:30'] },
   ],
 };

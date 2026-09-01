@@ -23,12 +23,17 @@
  * had no editor and `sl_percent_options` could not survive PUT /api/constitution/.
  */
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { render, screen, waitFor } from '@testing-library/react';
+import { render as rtlRender, screen, waitFor, fireEvent, act } from '@testing-library/react';
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import { MemoryRouter } from 'react-router-dom';
+import type { ReactElement } from 'react';
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 
-// ── /api/constitution/effective, controlled per test ──────────────────────
+// ── the constitution endpoints, controlled per test ───────────────────────
 let effectivePayload: unknown = null;
+let rulesPayload: Record<string, unknown> = {};
+const putCalls: Array<Record<string, unknown>> = [];
 
 vi.mock('@/lib/api', () => ({
   api: {
@@ -36,84 +41,87 @@ vi.mock('@/lib/api', () => ({
       if (url === '/api/constitution/effective') {
         return Promise.resolve({ data: effectivePayload });
       }
+      if (url === '/api/constitution/') {
+        return Promise.resolve({
+          data: { rules: rulesPayload, pending: null, accepted_at: null },
+        });
+      }
+      if (url === '/api/constitution/status') return Promise.resolve({ data: { status: [] } });
+      if (url === '/api/constitution/violations') {
+        return Promise.resolve({ data: { today: [], total: 0, by_rule: {} } });
+      }
+      if (url === '/api/constitution/history') return Promise.resolve({ data: { history: [] } });
       return Promise.resolve({ data: {} });
     },
+    put: (_url: string, body: Record<string, unknown>) => {
+      putCalls.push(body);
+      return Promise.resolve({ data: { change_type: 'tighten', applied: body, pending: {} } });
+    },
   },
+  apiDetailString: (_d: unknown, fallback: string) => fallback,
+}));
+
+vi.mock('sonner', () => ({
+  toast: { success: vi.fn(), error: vi.fn(), info: vi.fn() },
 }));
 
 import { ProfileTab } from '@/components/settings/ProfileTab';
 import EnforcedRules from '@/components/rules/EnforcedRules';
+import MyRules from '@/pages/MyRules';
 import type { UserProfile } from '@/lib/settingsConstants';
 
 const blank = (over: Partial<UserProfile> = {}): UserProfile =>
   ({ display_name: '', ...over } as UserProfile);
 
-describe('ProfileTab — an unset rule is shown as unset', () => {
-  it('does not highlight any options-exit preset when the value is NULL', () => {
-    render(<ProfileTab profile={blank({ sl_percent_options: null })} setProfile={() => {}} />);
+// ProfileTab now links to My Rules, so it needs a router.
+const render = (ui: ReactElement) => rtlRender(<MemoryRouter>{ui}</MemoryRouter>);
 
-    // "Not set" is a real option, and it is the selected one.
-    const notSet = screen.getByRole('button', { name: 'Not set' });
-    expect(notSet.className).toContain('bg-tm-brand');
-
-    // No preset may claim to be the trader's choice.
-    for (const pct of ['30%', '50%', '70%', '100%']) {
-      expect(screen.getByRole('button', { name: pct }).className).not.toContain('bg-tm-brand');
-    }
-  });
-
-  it('highlights exactly the declared preset when one is set', () => {
-    render(<ProfileTab profile={blank({ sl_percent_options: 30 })} setProfile={() => {}} />);
-
-    expect(screen.getByRole('button', { name: '30%' }).className).toContain('bg-tm-brand');
-    expect(screen.getByRole('button', { name: '50%' }).className).not.toContain('bg-tm-brand');
-    expect(screen.getByRole('button', { name: 'Not set' }).className).not.toContain('bg-tm-brand');
-  });
-
-  it('shows a value that is not one of its presets, rather than nothing', () => {
-    // My Rules accepts any value in 0.1-100. A 45% rule matched no preset, so
-    // this control would have rendered a real declared rule as unselected -
-    // the fabrication defect in reverse, and the worse direction of it.
-    render(<ProfileTab profile={blank({ sl_percent_options: 45 })} setProfile={() => {}} />);
-
-    expect(screen.getByRole('button', { name: '45%' }).className).toContain('bg-tm-brand');
-    expect(screen.getByRole('button', { name: 'Not set' }).className).not.toContain('bg-tm-brand');
-  });
-
-  it('clears the rule to null rather than to a number', () => {
-    const seen: Array<UserProfile> = [];
+describe('ProfileTab — no longer edits any rule', () => {
+  /**
+   * WHERE THE SIX TESTS THAT STOOD HERE WENT.
+   *
+   * They exercised this tab's options-exit presets and exposure slider: that
+   * NULL highlighted nothing, that "Not set" cleared to null, that a 45% value
+   * from My Rules still displayed. Every one of those controls was removed on
+   * 2026-09-02, because two editors for one rule had already diverged in what
+   * they could express - this tab had four presets against My Rules' full
+   * 0.1-100 range, and could not clear a rule at all, since clearing is a
+   * loosen and needs an override confirmation only My Rules performs.
+   *
+   * The invariants are not dropped. They are asserted below against My Rules,
+   * which is now the single editing surface. What remains to check here is
+   * that the duplicate really is gone.
+   */
+  it('renders no rule control', () => {
     render(
       <ProfileTab
-        profile={blank({ sl_percent_options: 50 })}
-        setProfile={(p) => seen.push(p)}
-      />,
-    );
-
-    screen.getByRole('button', { name: 'Not set' }).click();
-    expect(seen).toHaveLength(1);
-    expect(seen[0].sl_percent_options).toBeNull();
-  });
-
-  it('says "Not set" for an undeclared exposure rule instead of showing 10%', () => {
-    render(
-      <ProfileTab
-        profile={blank({ max_position_size: null, sl_percent_options: 30 })}
+        profile={blank({ sl_percent_options: null, max_position_size: null })}
         setProfile={() => {}}
       />,
     );
 
-    // Scoped to the slider's readout: the options-exit control renders a "Not
-    // set" BUTTON unconditionally, because it is an option there rather than a
-    // state. This one is the value display, and it must not read "10%".
-    expect(screen.getByText('Not set', { selector: 'span' })).toBeTruthy();
-    expect(screen.queryByText('10%')).toBeNull();
-    // The caption must not describe a default the trader has not accepted.
-    expect(screen.queryByText(/Default: 10%/)).toBeNull();
+    expect(screen.queryByText(/I exit options when premium drops by/)).toBeNull();
+    expect(screen.queryByText(/Max per options trade/)).toBeNull();
+    expect(screen.queryByLabelText(/My max trades per day/)).toBeNull();
   });
 
-  it('shows the declared exposure rule when there is one', () => {
-    render(<ProfileTab profile={blank({ max_position_size: 4 })} setProfile={() => {}} />);
-    expect(screen.getByText('4%')).toBeTruthy();
+  it('cannot fabricate a rule value, because it holds none', () => {
+    const seen: UserProfile[] = [];
+    render(
+      <ProfileTab
+        profile={blank({ sl_percent_options: null, max_position_size: null })}
+        setProfile={(p) => seen.push(p)}
+      />,
+    );
+
+    // No control on this tab writes a rule field at all.
+    expect(screen.queryByRole('button', { name: 'Not set' })).toBeNull();
+    expect(seen).toHaveLength(0);
+  });
+
+  it('keeps trading capital, which is not a rule', () => {
+    render(<ProfileTab profile={blank({ trading_capital: 500000 })} setProfile={() => {}} />);
+    expect(screen.getByLabelText(/My trading capital/)).toBeTruthy();
   });
 });
 
@@ -169,6 +177,75 @@ describe('EnforcedRules — every rule, in its own unit', () => {
 
     await waitFor(() => expect(screen.getByText('Daily loss limit')).toBeTruthy());
     expect(screen.queryByText('Cooldown after a loss')).toBeNull();
+  });
+});
+
+describe('MyRules — the invariants that moved here from Settings', () => {
+  /**
+   * These are the assertions the ProfileTab block used to make. They test the
+   * same promises against the surface that now keeps them: an unset rule shows
+   * nothing rather than a number, a set rule shows its own value whatever it
+   * is, and clearing sends an explicit null rather than a default.
+   */
+  const openEditor = async () => {
+    const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+    rtlRender(
+      <MemoryRouter>
+        <QueryClientProvider client={qc}>
+          <MyRules />
+        </QueryClientProvider>
+      </MemoryRouter>,
+    );
+    const edit = await screen.findByRole('button', { name: /edit rules/i });
+    await act(async () => { fireEvent.click(edit); });
+    return screen.getByLabelText(/Exit a losing option at/i) as HTMLInputElement;
+  };
+
+  beforeEach(() => { putCalls.length = 0; });
+
+  it('shows an EMPTY field for an unset rule, never a default', async () => {
+    rulesPayload = { sl_percent_options: null, restricted_windows: [] };
+    const input = await openEditor();
+
+    // The defect this replaces: ProfileTab highlighted "50%" for exactly this
+    // state, presenting a value that was in no database as the trader's own.
+    expect(input.value).toBe('');
+  });
+
+  it('shows a value that no preset could have expressed', async () => {
+    // ProfileTab offered 30/50/70/100 only, so a 45% rule was unrepresentable
+    // there - the reason one editor had to win.
+    rulesPayload = { sl_percent_options: 45, restricted_windows: [] };
+    const input = await openEditor();
+    expect(input.value).toBe('45');
+  });
+
+  it('clears a rule to null rather than to a number', async () => {
+    rulesPayload = { sl_percent_options: 50, restricted_windows: [] };
+    const input = await openEditor();
+
+    await act(async () => { fireEvent.change(input, { target: { value: '' } }); });
+    await act(async () => {
+      fireEvent.click(screen.getByRole('button', { name: /save rules/i }));
+    });
+
+    await waitFor(() => expect(putCalls.length).toBe(1));
+    expect(putCalls[0].sl_percent_options).toBeNull();
+  });
+
+  it('sends a set value through the change gate', async () => {
+    rulesPayload = { sl_percent_options: null, restricted_windows: [] };
+    const input = await openEditor();
+
+    await act(async () => { fireEvent.change(input, { target: { value: '30' } }); });
+    await act(async () => {
+      fireEvent.click(screen.getByRole('button', { name: /save rules/i }));
+    });
+
+    await waitFor(() => expect(putCalls.length).toBe(1));
+    expect(putCalls[0].sl_percent_options).toBe(30);
+    // Blank window rows never reach the API - see the validator.
+    expect(putCalls[0].restricted_windows).toEqual([]);
   });
 });
 

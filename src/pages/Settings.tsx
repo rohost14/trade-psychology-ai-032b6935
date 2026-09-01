@@ -55,11 +55,11 @@ export default function Settings() {
     experience_level: 'intermediate',
     trading_style: 'intraday',
     risk_tolerance: 'moderate',
-    daily_loss_limit: undefined,
-    daily_trade_limit: undefined,
-    max_position_size: 10,
+    // NO RULE FIELDS SEEDED. This is where `max_position_size: 10` and
+    // `sl_percent_options: 50.0` lived - two values that were never in any
+    // database and that the form presented as the trader's own. They are gone
+    // with the controls that rendered them; My Rules edits every rule now.
     trading_capital: undefined,
-    sl_percent_options: 50.0,
     trading_hours_start: '09:15',
     trading_hours_end: '15:30',
     push_enabled: true,
@@ -128,11 +128,12 @@ export default function Settings() {
         preferred_instruments: profile.preferred_instruments,
         trading_hours_start: profile.trading_hours_start,
         trading_hours_end: profile.trading_hours_end,
-        daily_loss_limit: profile.daily_loss_limit,
-        daily_trade_limit: profile.daily_trade_limit,
-        max_position_size: profile.max_position_size,
+        // Rule fields are NOT sent from this page. They are edited in My
+        // Rules, through PUT /api/constitution/, which is the only path with
+        // the tighten/loosen gate, the override confirmation and the audit
+        // row. `trading_capital` is not a rule - nothing enforces it - and
+        // stays here as the denominator the percentage rules divide by.
         trading_capital: profile.trading_capital,
-        sl_percent_options: profile.sl_percent_options,
         known_weaknesses: profile.known_weaknesses,
         push_enabled: profile.push_enabled,
         whatsapp_enabled: profile.whatsapp_enabled,
@@ -333,8 +334,10 @@ export default function Settings() {
       {/* THE FABRICATION RACE, fixed 2026-09-02.
           =====================================
           This form's initial state is a set of hardcoded values - among them
-          max_position_size 10, sl_percent_options 50, sl_percent_futures 1.0,
-          cooldown_after_loss 15, guardian_enabled false, whatsapp_enabled false.
+          guardian_enabled false and whatsapp_enabled false. It also held
+          max_position_size 10, sl_percent_options 50, sl_percent_futures 1.0
+          and cooldown_after_loss 15; ALL FOUR ARE NOW GONE, along with every
+          rule control on this page, because rules are edited in My Rules.
 
           The guard above already refused to render after a FAILED load, for
           exactly the right reason. What it did not cover was a PENDING one: the
@@ -343,7 +346,7 @@ export default function Settings() {
           set `isDirty`, which permanently disables the seeding effect, so the
           server values never arrived - and Save wrote the defaults.
 
-          Thirteen fields could be written that way. Three are RULE_FIELDS
+          Thirteen fields could be written that way. Three were RULE_FIELDS
           (max_position_size, sl_percent_options, cooldown_after_loss), and
           because 10 and 50 are TIGHTER than nothing the constitution gate
           accepted them instantly with no friction - only loosening raises a 409.
@@ -352,10 +355,10 @@ export default function Settings() {
           trading_capital escaped only because they happened to be seeded
           `undefined`, which JSON.stringify drops.
 
-          `!isLoadingProfile` closes the window for all thirteen at once. The
-          hardcoded defaults are deliberately left in place - they are what the
-          controls render before any data exists, and removing them is a larger
-          change than this bug needs.
+          `!isLoadingProfile` closes the window for all thirteen at once, and it
+          is still the fix - the remaining seeded values can still be written by
+          this form. What has changed is that NO RULE can be: this page no
+          longer seeds, renders or sends one.
 
           Evidence: docs/DEEP_REVIEW/SETTINGS_LIFECYCLE_INVESTIGATION.md */}
       {isConnected && !profileError && isLoadingProfile && (

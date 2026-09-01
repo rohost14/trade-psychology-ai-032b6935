@@ -70,6 +70,9 @@ interface ViolationsResponse {
 const RULE_LABELS: Record<string, string> = {
   daily_loss: 'Daily loss limit',
   daily_loss_limit: 'Daily loss limit',
+  // The engine emits `per_trade_loss`; only the FIELD name was mapped, so a
+  // per-trade-loss violation rendered as the raw string "per_trade_loss".
+  per_trade_loss: 'Per-trade loss limit',
   per_trade_loss_limit: 'Per-trade loss limit',
   daily_trades: 'Max trades per day',
   daily_trade_limit: 'Max trades per day',
@@ -80,6 +83,28 @@ const RULE_LABELS: Record<string, string> = {
   max_position_size: 'Max risk per trade',
   restricted_window: 'No-trade window',
   restricted_windows: 'No-trade windows',
+};
+
+/**
+ * Rules that no longer exist, but whose violations are still on record.
+ *
+ * The rows are legitimate history and are NOT deleted - the trader really did
+ * break that rule on that day, and `constitution_history` may hold their own
+ * decision to change it. The problem is only what the page implies: a
+ * violation listed with the same styling as a live one reads as "TradeMentor
+ * currently has a cooldown rule configured for me", which has been untrue
+ * since `cooldown_after_loss` stopped being a user rule on 2026-09-02. There
+ * is 1 such row in the live database.
+ *
+ * So the history keeps it and labels it. Anything added here must also stay in
+ * RULE_LABELS, or the name disappears from rows that already exist.
+ */
+const RETIRED_RULES = new Set(['cooldown', 'cooldown_after_loss']);
+
+const ruleLabel = (rule: string | null | undefined): string => {
+  const key = rule || '';
+  const name = RULE_LABELS[key] || key;
+  return RETIRED_RULES.has(key) ? `${name} (retired rule)` : name;
 };
 
 function ratioColor(ratio: number | null | undefined): string {
@@ -254,7 +279,7 @@ export default function MyRules() {
             <span className="font-medium">
               {Object.entries(pending)
                 .filter(([k]) => !k.startsWith('_'))
-                .map(([k, v]) => `${RULE_LABELS[k] || k}: ${String(v)}`)
+                .map(([k, v]) => `${ruleLabel(k)}: ${String(v)}`)
                 .join(' · ')}
             </span>
           </p>
@@ -322,7 +347,7 @@ export default function MyRules() {
                   <div className="min-w-0">
                     <p className="text-sm text-foreground">{v.message}</p>
                     <p className="text-[11px] text-muted-foreground">
-                      {RULE_LABELS[v.rule || ''] || v.rule}
+                      {ruleLabel(v.rule)}
                       {v.detected_at && ' · ' + new Date(v.detected_at).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' })}
                     </p>
                   </div>
@@ -334,7 +359,7 @@ export default function MyRules() {
             <div className="mt-4 pt-4 border-t border-border flex flex-wrap gap-2">
               {Object.entries(byRule).map(([rule, count]) => (
                 <span key={rule} className="text-[11px] px-2 py-1 rounded-md bg-muted text-muted-foreground">
-                  {RULE_LABELS[rule] || rule}: {count}
+                  {ruleLabel(rule)}: {count}
                 </span>
               ))}
             </div>
@@ -378,7 +403,7 @@ export default function MyRules() {
                     </div>
                     <p className="text-muted-foreground text-[13px] mt-1">
                       {Object.entries(h.changes || {}).map(([f, c]) =>
-                        `${RULE_LABELS[f] || f}: ${c.old ?? 'none'} to ${c.new ?? 'none'}`
+                        `${ruleLabel(f)}: ${c.old ?? 'none'} to ${c.new ?? 'none'}`
                       ).join(' · ')}
                     </p>
                   </li>
@@ -409,8 +434,14 @@ export default function MyRules() {
               ['sl_percent_options', 'Exit a losing option at (% of premium)', 5],
             ] as const).map(([field, label, step]) => (
               <div key={field}>
-                <label className="text-xs font-medium text-muted-foreground">{label}</label>
+                {/* The label was not associated with its input - no htmlFor, no
+                    id - so a screen reader announced an unlabelled number box,
+                    and five of the seven rules were indistinguishable. */}
+                <label htmlFor={`rule-${field}`} className="text-xs font-medium text-muted-foreground">
+                  {label}
+                </label>
                 <Input
+                  id={`rule-${field}`}
                   type="number"
                   step={step}
                   value={draft[field] ?? ''}
@@ -436,7 +467,7 @@ export default function MyRules() {
                 tightens, any removal loosens), so it attracts the same override
                 confirmation as relaxing any other rule. */}
             <div>
-              <label className="text-xs font-medium text-muted-foreground">
+              <label htmlFor="rule-restricted-windows-add" className="text-xs font-medium text-muted-foreground">
                 No-trade windows (IST)
               </label>
               <div className="mt-1 space-y-2">
@@ -465,6 +496,7 @@ export default function MyRules() {
                   </div>
                 ))}
                 <Button
+                  id="rule-restricted-windows-add"
                   type="button" variant="outline" size="sm"
                   onClick={() => setDraft(d => ({
                     ...d,

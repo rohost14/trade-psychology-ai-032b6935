@@ -58,6 +58,15 @@ inline wherever it is needed.
 *longest_loss_run* — the longest losing run anywhere in the session, as against
 `consecutive_losses`, which is the run still going at the end.
 
+*worst_trade_pnl* — the single worst CompletedTrade of the session, as a
+NEGATIVE number, or None when nothing lost money. This is the per-trade
+analogue of `pnl`, and it is what `per_trade_loss_limit` is measured against:
+that rule is not a budget the session spends down, it is a line each individual
+trade is either inside or outside, so the session's relationship to it is its
+WORST trade and nothing else. A session of forty small losses has a `pnl` deep
+in the red and a `worst_trade_pnl` that never came near the limit; those are
+different facts about different rules and neither substitutes for the other.
+
 WHAT IS DELIBERATELY NOT HERE
 
 Order-velocity counts ("how many orders in the last 30 minutes") are a different
@@ -106,6 +115,9 @@ class SessionFacts:
     longest_loss_run: int
     winners: int
     losers: int
+    #: The worst single trade, negative, or None if none lost. What
+    #: `per_trade_loss_limit` is judged against - see the module docstring.
+    worst_trade_pnl: Optional[Decimal]
     last_trade_pnl: Optional[Decimal]
     last_exit_time: Optional[datetime]
 
@@ -125,6 +137,7 @@ EMPTY = SessionFacts(
     longest_loss_run=0,
     winners=0,
     losers=0,
+    worst_trade_pnl=None,
     last_trade_pnl=None,
     last_exit_time=None,
 )
@@ -163,9 +176,12 @@ def derive(trades: Iterable[CompletedTrade]) -> SessionFacts:
     max_dd = Decimal("0")
     run = longest_run = 0
     winners = losers = 0
+    worst: Optional[Decimal] = None
     for t in ordered:
         p = _pnl(t)
         running += p
+        if p < 0 and (worst is None or p < worst):
+            worst = p
         if running > peak:
             peak = running
         if peak - running > max_dd:
@@ -206,6 +222,7 @@ def derive(trades: Iterable[CompletedTrade]) -> SessionFacts:
         longest_loss_run=longest_run,
         winners=winners,
         losers=losers,
+        worst_trade_pnl=worst,
         last_trade_pnl=_pnl(last),
         last_exit_time=last.exit_time,
     )

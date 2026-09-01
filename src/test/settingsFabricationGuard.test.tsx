@@ -122,9 +122,25 @@ describe('Settings — the profile-pending guard', () => {
     expect(screen.queryByTestId('settings-loading')).toBeNull();
   });
 
-  it('an unrelated save does NOT manufacture the optional rules from NULL', async () => {
-    // The whole point. Server says "no rule set"; the trader edits something
-    // else entirely; the optional rules must not acquire 10 / 50 / 1.0.
+  it('SENDS NO CONSTITUTION RULE AT ALL', async () => {
+    // STRICTLY STRONGER THAN WHAT THIS REPLACED.
+    //
+    // Three tests stood here. Two asserted that the save payload carried the
+    // stored rule values faithfully - `max_position_size` null when null, 25
+    // when 25 - and the third clicked the 70% options-exit preset and checked
+    // it persisted. All three were about a page that could write rules.
+    //
+    // It cannot any more. Every rule control moved to My Rules on 2026-09-02,
+    // because two editors for one rule had already diverged: this page offered
+    // four options-exit presets while My Rules accepts any value in 0.1-100,
+    // and only My Rules can CLEAR a rule, since clearing is a loosen and needs
+    // the override confirmation and audit row that only its flow provides.
+    //
+    // So the invariant those tests protected - an unset rule is never
+    // manufactured here - is now guaranteed by a stronger fact: no rule field
+    // is seeded, rendered or sent by this page at all. A key that is absent
+    // cannot be fabricated. The editing behaviour they exercised is tested at
+    // its new home, in userRuleSurfaces.test.tsx.
     profilePayload = {
       max_position_size: null,
       sl_percent_options: null,
@@ -144,49 +160,36 @@ describe('Settings — the profile-pending guard', () => {
     await waitFor(() => expect(putCalls.length).toBe(1));
     const body = putCalls[0];
 
-    expect(body.max_position_size).toBeNull();
-    expect(body.sl_percent_options).toBeNull();
+    for (const rule of [
+      'daily_loss_limit', 'per_trade_loss_limit', 'daily_trade_limit',
+      'max_position_size', 'max_consecutive_losses', 'sl_percent_options',
+      'restricted_windows',
+    ]) {
+      expect(rule in body).toBe(false);
+    }
 
-    // and the values that WERE set round-trip untouched
+    // Everything this page still owns round-trips untouched.
     expect(body.guardian_enabled).toBe(true);
     expect(body.whatsapp_enabled).toBe(true);
     expect(body.alert_sensitivity).toBe('high');
     expect(body.experience_level).toBe('professional');
+    // trading_capital is NOT a rule - nothing enforces it - and stays here as
+    // the denominator every percentage-of-capital rule divides by.
+    expect('trading_capital' in body).toBe(true);
   });
 
-  it('stored optional-rule values round-trip unchanged', async () => {
-    profilePayload = {
-      max_position_size: 25,
-      sl_percent_options: 70,
-    };
-    renderSettings();
-    await screen.findByTestId('settings-loading');
-    resolveProfile?.(null);
-
-    const save = await screen.findByRole('button', { name: /save all settings/i });
-    await act(async () => { fireEvent.click(save); });
-
-    await waitFor(() => expect(putCalls.length).toBe(1));
-    expect(putCalls[0].max_position_size).toBe(25);
-    expect(putCalls[0].sl_percent_options).toBe(70);
-  });
-
-  it('an explicit selection still persists', async () => {
-    profilePayload = { sl_percent_options: null, max_position_size: null };
+  it('renders no rule control, so none can be edited from here', async () => {
+    profilePayload = { max_position_size: null, sl_percent_options: null };
     renderSettings();
     await screen.findByTestId('settings-loading');
     resolveProfile?.(null);
     await screen.findByRole('button', { name: /save all settings/i });
 
-    // Click the 70% preset under "I exit options when premium drops by".
-    const seventy = screen.getAllByRole('button', { name: '70%' })[0];
-    await act(async () => { fireEvent.click(seventy); });
-    await act(async () => { fireEvent.click(screen.getByRole('button', { name: /save all settings/i })); });
-
-    await waitFor(() => expect(putCalls.length).toBe(1));
-    expect(putCalls[0].sl_percent_options).toBe(70);
-    // the rule the trader did NOT touch stays unset
-    expect(putCalls[0].max_position_size).toBeNull();
+    expect(screen.queryByText(/I exit options when premium drops by/i)).toBeNull();
+    expect(screen.queryByText(/Max per options trade/i)).toBeNull();
+    expect(screen.queryByLabelText(/My max trades per day/i)).toBeNull();
+    // and it points at the one place they live
+    expect(screen.getByRole('link', { name: 'My Rules' })).toBeTruthy();
   });
 
   it('no longer exposes the removed user inputs', async () => {

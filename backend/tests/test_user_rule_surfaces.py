@@ -201,6 +201,14 @@ def test_no_surface_dresses_an_unset_rule_as_a_chosen_one():
     """
     The fabrication class. `?? 50` highlighted a preset the trader never picked
     and `?? 10` showed a limit they never set.
+
+    Settings held both. It now holds NEITHER THE FALLBACKS NOR THE CONTROLS:
+    every rule editor moved to My Rules later the same day, because two editors
+    for one rule had already diverged in what they could express. An absent
+    control cannot fabricate a value, which is why the assertion here is that
+    the whole surface is gone. The positive form of the invariant - an unset
+    rule renders as an EMPTY field, a set one renders its own value - is
+    asserted against My Rules in src/test/userRuleSurfaces.test.tsx.
     """
     p = SRC / "components" / "settings" / "ProfileTab.tsx"
     if not p.exists():
@@ -208,7 +216,8 @@ def test_no_surface_dresses_an_unset_rule_as_a_chosen_one():
     t = p.read_text(encoding="utf-8")
     assert "sl_percent_options ?? 50" not in t
     assert "max_position_size ?? 10}%" not in t
-    assert "profile.sl_percent_options == null" in t      # an explicit Not set
+    for rule in ("sl_percent_options", "max_position_size", "daily_trade_limit"):
+        assert f"setProfile({{ ...profile, {rule}" not in t, rule
 
 
 def test_the_rules_page_shows_a_percent_rule_as_a_percent():

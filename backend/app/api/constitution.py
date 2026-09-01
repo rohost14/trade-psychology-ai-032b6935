@@ -22,6 +22,7 @@ from app.models.user_profile import UserProfile
 from app.models.constitution_history import ConstitutionHistory
 from app.models.risk_alert import RiskAlert
 from app.core import session_facts
+from app.core.risk_quantities import quantities_for_trade
 from app.services.constitution_service import (
     ConstitutionService, LoosenRequiresOverride, RULE_FIELDS,
 )
@@ -350,10 +351,63 @@ async def constitution_status(
     # limit to count down against and nothing is invented in its place.
 
     def usage(rule_key, current, limit):
+        """A rule the session SPENDS DOWN. `current` climbs and cannot be undone."""
         return {
             "rule": rule_key, "current": current, "limit": limit,
+            "kind": "cumulative",
             "ratio": round(current / limit, 2) if limit else None,
         }
+
+    def peak(rule_key, current, limit):
+        """
+        A PER-TRADE rule, reported as the session's worst single instance.
+
+        NOT A BUDGET, and the distinction is the whole reason this second
+        shape exists. A daily loss limit is consumed: lose 8,455 of 25,000 and
+        16,545 remain. A per-trade limit is not consumed by anything - the
+        worst trade so far reaching 67% of the line leaves the NEXT trade its
+        full allowance. Reporting these through `usage` would put them behind a
+        progress bar that says "you have 33% left", which is false.
+
+        `kind` is what the client reads to decide that, so the semantics travel
+        with the number instead of living in a hardcoded list on the page.
+        """
+        return {
+            "rule": rule_key, "current": current, "limit": limit,
+            "kind": "peak",
+            "ratio": round(current / limit, 2) if limit and current is not None else None,
+        }
+
+    # ── Largest capital at risk today ─────────────────────────────────────
+    #
+    # REPORTED ONLY WHEN EVERY TRADE OF THE SESSION COULD BE SIZED. The risk
+    # layer is allowed to abstain - `usable_for_capital_rules` is False for,
+    # among others, short equity - and on the real book it abstains on 21.3% of
+    # 5,011 trades, with 46.2% OF SESSIONS containing at least one such trade.
+    #
+    # A maximum taken over a subset is not the maximum. On those sessions the
+    # page would state "your largest position today was 7.6%" while the actual
+    # largest was a trade nobody sized, which is the wrong-confident-answer
+    # failure this codebase refuses. So: complete coverage or no number. The
+    # rule row still renders, with its limit and no usage.
+    #
+    # This matches what the ALERT does - `max_trade_risk` judges only trades it
+    # can size - so the two cannot disagree about the same trade.
+    largest_risk_pct = None
+    risk_limit = rules.get("max_position_size")
+    capital = getattr(profile, "trading_capital", None)
+    if risk_limit and capital:
+        pcts, complete = [], True
+        for t in trades:
+            rq = quantities_for_trade(t, margin=None)
+            if rq.usable_for_capital_rules:
+                pcts.append(float(rq.capital_requirement.amount) / float(capital) * 100)
+            else:
+                complete = False
+        if pcts and complete:
+            largest_risk_pct = round(max(pcts), 2)
+
+    worst = facts.worst_trade_pnl
 
     return {
         "session_date": ist_now.date().isoformat(),
@@ -361,6 +415,11 @@ async def constitution_status(
             usage("daily_loss", round(loss, 2), rules.get("daily_loss_limit")),
             usage("daily_trades", facts.trades, rules.get("daily_trade_limit")),
             usage("max_consecutive_losses", streak, rules.get("max_consecutive_losses")),
+            # Worst single trade of the session, as a positive rupee figure so
+            # it reads against the limit the same way `daily_loss` does.
+            peak("per_trade_loss", round(abs(float(worst)), 2) if worst else 0.0,
+                 rules.get("per_trade_loss_limit")),
+            peak("max_trade_risk", largest_risk_pct, risk_limit),
             {"rule": "restricted_windows", "windows": rules.get("restricted_windows") or []},
         ],
     }

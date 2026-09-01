@@ -1,4 +1,5 @@
 import { Shield } from 'lucide-react';
+import { Link } from 'react-router-dom';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import {
@@ -133,10 +134,10 @@ export function ProfileTab({ profile, setProfile }: ProfileTabProps) {
         <div className="px-5 py-3.5 border-b border-border">
           <p className="text-sm font-semibold text-foreground flex items-center gap-2">
             <Shield className="h-4 w-4" />
-            Trading Limits
+            Trading Capital
           </p>
           <p className="text-xs text-muted-foreground mt-0.5">
-            These calibrate pattern detection to your actual trading style — alerts become more accurate.
+            The denominator for every rule expressed as a percentage of capital.
           </p>
         </div>
         <div className="p-5 space-y-6">
@@ -155,112 +156,37 @@ export function ProfileTab({ profile, setProfile }: ProfileTabProps) {
             </p>
           </div>
 
-          {/* Max position size (% of capital).
+          {/* THE RULES THEMSELVES ARE NOT EDITED HERE.
 
-              AN UNSET RULE MUST NOT LOOK CHOSEN. This slider read
-              `?? 10` and its copy said "Default: 10%", so a trader who had
-              declared no exposure limit saw 10% sitting there as if they had
-              picked it. NULL means NO DECLARED EXPOSURE RULE - Pattern 28 rests
-              on that - and the control now says so. Clearing lives in My Rules,
-              which is the single editor for every rule. */}
-          <div className="space-y-2">
-            <Label>Max per options trade — % of capital as premium</Label>
-            <div className="flex items-center gap-3">
-              <input
-                type="range"
-                min={1}
-                max={30}
-                step={1}
-                value={profile.max_position_size ?? 1}
-                onChange={(e) => setProfile({ ...profile, max_position_size: Number(e.target.value) })}
-                className="w-full accent-[#0D9488]"
-                aria-label="Max per options trade, percent of capital"
-              />
-              <span className="text-sm font-medium w-16 text-right">
-                {profile.max_position_size == null ? 'Not set' : `${profile.max_position_size}%`}
-              </span>
-            </div>
-            <p className="text-xs text-muted-foreground">
-              {profile.max_position_size == null
-                ? 'No exposure rule set. Move the slider to set one, or manage it in My Rules.'
-                : 'Alert fires when a single trade exceeds this % of your capital.'}
+              `max_position_size`, `sl_percent_options` and `daily_trade_limit`
+              had controls on this tab and controls in My Rules. Two editors for
+              one rule diverge, and these already had: My Rules accepts any
+              options-exit value in 0.1-100 while this tab offered four presets,
+              so a 45% rule set there could not be represented here. They also
+              differed in what they could express - only My Rules can clear a
+              rule, because clearing is a LOOSEN and needs the override
+              confirmation and the audit row that only its flow provides. This
+              tab's own 409 handler proved the split: it caught the gate and
+              told the trader to go to My Rules to finish.
+
+              So the rule editors are gone from here and My Rules is the single
+              surface. `trading_capital` stays: it is not a rule, nothing
+              enforces it, and it is the denominator every capital-relative rule
+              divides by.
+
+              Onboarding still writes the initial rules. That is rule CREATION
+              through the same service, not a second editor. */}
+          <div className="rounded-lg border border-border px-4 py-3">
+            <p className="text-[13px] text-foreground">
+              Your loss limits, trade limits, position size, options exit and
+              no-trade windows live in{' '}
+              <Link to="/my-rules" className="text-tm-brand font-medium hover:underline">
+                My Rules
+              </Link>.
             </p>
-          </div>
-
-          {/* SL % options.
-
-              TWO FIXES HERE.
-
-              1. `?? 50` highlighted the 50% preset whenever the value was NULL,
-                 so an unset rule looked like a deliberate choice - and one
-                 stored 50 in the live database is now permanently ambiguous
-                 because of it. Nothing is highlighted when the rule is unset,
-                 and "Not set" is a real, selectable option, so the trader can
-                 remove the rule from here as well as from My Rules.
-
-              2. The copy claimed "Used to detect holding losers too long on
-                 options buys". That describes `holding_loser`. This value is
-                 the trader's own exit rule: `live_risk_state` raises it as a
-                 DECLARED band beside - never instead of - the universal
-                 severe-loss ladder. */}
-          <div className="space-y-2">
-            <Label>I exit options when premium drops by</Label>
-            <div className="flex flex-wrap gap-2">
-              <button
-                type="button"
-                className={`px-3 py-1.5 rounded-md border text-sm font-medium transition-all ${
-                  profile.sl_percent_options == null
-                    ? 'border-tm-brand bg-tm-brand text-white'
-                    : 'border-border hover:border-tm-brand/50'
-                }`}
-                onClick={() => setProfile({ ...profile, sl_percent_options: null })}
-              >
-                Not set
-              </button>
-              {/* The presets, PLUS whatever the trader actually has. My Rules
-                  accepts any value in 0.1-100, so a rule of 45% would match no
-                  preset and this control would have shown nothing selected -
-                  the same "unset rule looks chosen" defect in reverse, and a
-                  worse one, because a real declared rule would read as absent. */}
-              {Array.from(new Set([
-                ...[30, 50, 70, 100],
-                ...(profile.sl_percent_options != null ? [profile.sl_percent_options] : []),
-              ])).sort((a, b) => a - b).map((pct) => (
-                <button
-                  key={pct}
-                  type="button"
-                  className={`px-3 py-1.5 rounded-md border text-sm font-medium transition-all ${
-                    profile.sl_percent_options === pct
-                      ? 'border-tm-brand bg-tm-brand text-white'
-                      : 'border-border hover:border-tm-brand/50'
-                  }`}
-                  onClick={() => setProfile({ ...profile, sl_percent_options: pct })}
-                >
-                  {pct}%
-                </button>
-              ))}
-            </div>
-            <p className="text-xs text-muted-foreground">
-              {profile.sl_percent_options == null
-                ? 'No exit rule set. The universal severe-loss warnings still apply.'
-                : 'Your own exit line. Reported beside the universal severe-loss warnings, never instead of them.'}
-            </p>
-          </div>
-
-          {/* Daily trade limit */}
-          <div className="space-y-2">
-            <Label htmlFor="daily-trade-limit">My max trades per day</Label>
-            <Input
-              id="daily-trade-limit"
-              type="number"
-              min={1}
-              max={50}
-              placeholder="e.g. 10"
-              value={profile.daily_trade_limit ?? ''}
-              onChange={(e) => setProfile({ ...profile, daily_trade_limit: e.target.value ? Number(e.target.value) : undefined })}
-            />
-            <p className="text-xs text-muted-foreground">
-              Overtrading alert fires when you exceed this. Scales with your style.
+            <p className="text-xs text-muted-foreground mt-1">
+              Tightening a rule applies at once; relaxing or removing one asks
+              for confirmation and is recorded.
             </p>
           </div>
 
