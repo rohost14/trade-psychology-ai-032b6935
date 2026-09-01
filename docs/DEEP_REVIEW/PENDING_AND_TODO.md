@@ -823,6 +823,90 @@ is a recorded fact rather than a later surprise.
 
 ---
 
+# BLOCKING — `sl_percent_options` invents a USER RULE. Found 2026-09-01.
+
+**Raised during the exposure-hierarchy verification, blocking that
+implementation. Not fixed — it needs approval, and it is not an exposure
+threshold.**
+
+`threshold_resolution.py:527`:
+
+```python
+put("sl_percent_options", getattr(profile, "sl_percent_options", None) or 50.0,
+    Source.FACT, 1.0, None)
+```
+
+`UserProfile.sl_percent_options` is **nullable** — `None` until the trader sets
+it. When unset this invents **50.0** and marks it **`Source.FACT`, confidence
+1.0** — the provenance reserved for something the trader declared.
+
+**It is registered as a USER RULE, not a default.** `constitution_service`
+lists it in `RULE_FIELDS`; `live_risk_state`'s own docstring calls it
+*"`declared` — the exit rule the trader wrote down … `Kind.USER_RULE`"*.
+
+**A trader who configured nothing is told they configured something.**
+`position_monitor_tasks.py:952-958` emits `pattern_type="constitution_violation"`
+(`notification_level=4`, the highest in the engine) with:
+
+> **"You set your options exit at 50% of premium. NIFTY…CE is 70% down."**
+
+Verified live in case G of `hierarchy_verification.md` — profile with nothing
+declared, and the DECLARED band fires at `boundary 50.0`.
+
+### It also shadows the universal safety layer
+
+The two layers exist to stay separate, and `_fire_position_alert` gives the
+DECLARED crossing precedence, carrying the universal one only as
+`details["also_crossed"]`. Because the invented 50 sits **between** universal
+caution (40) and danger (60), the fabricated "user rule" fires first and demotes
+the real safety finding to a sub-field.
+
+Measured on the reference book (closed-round final loss, a **lower bound** on
+live crossings — a round ending at −70% certainly crossed 50 and 60 intraday):
+
+| band | rounds | share of 724 long-option rounds |
+|---|---|---|
+| ≥ 40% — universal caution | 26 | 3.6% |
+| **≥ 50% — the invented "declared" band** | **16** | **2.2%** |
+| ≥ 60% — universal danger | 10 | 1.4% |
+| ≥ 80% — universal critical | 4 | 0.6% |
+
+**On all 10 rounds that reach the real 60% danger band, the invented rule
+pre-empts it.**
+
+### The two resolvers disagree, and the wrong way round
+
+| path | provenance |
+|---|---|
+| profile present, nothing declared (`:527`) | **`Source.FACT`, confidence 1.0** |
+| no profile at all (`:683`) | `Source.GLOBAL`, confidence 0.0, *"repo default"* |
+
+Having a profile makes the claim **stronger**. The cold-start path is honest; the
+profile path is not.
+
+### Class, and why it matters
+
+This is the shape Pattern 24 fixed (the wizard writing `max_position_size:
+50000`), Pattern 17 fixed (`session_meltdown`'s undocumented `capital * 0.05`),
+and H1 closed for the daily limit — *"an invented daily limit is no longer
+described as 'yours'"*. **This key was not covered by that sweep.**
+
+`sl_percent_futures … or 1.0` at `:526` has the **identical shape and the same
+`Source.FACT`**. Nothing reads it today, so it is latent.
+
+### Scope
+
+**Long options only** — `build_watches` gates on `CE`/`PE` and `qty > 0`.
+Futures and naked shorts are unaffected because they have no severe-loss
+coverage at all.
+
+### NOT proposed here
+
+Whether the fix is to abstain when unset, to re-provenance it as `GLOBAL`, or to
+keep 50 as an explicit universal band under a different name is a **product
+decision about the severe-loss layer**, which the exposure work was told not to
+touch. **The 40/60/80 thresholds are not implicated and must not move.**
+
 # Incidental findings from the same pass — recorded, not actioned
 
 ### ~~`_calculate_readiness_score`'s danger-day factor~~ — **CLOSED 2026-09-01**
