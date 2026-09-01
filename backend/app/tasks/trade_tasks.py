@@ -790,7 +790,6 @@ def process_webhook_trade(self, trade_data: Dict[str, Any], broker_account_id: s
                         check_holding_loser_scheduled,
                         flush_entry_batch,
                         _overexposure_task,
-                        _concentration_task,
                         _entry_rules_task,
                     )
                     # Entry-time checks run on fills that OPEN or GROW a position.
@@ -855,10 +854,9 @@ def process_webhook_trade(self, trade_data: Dict[str, Any], broker_account_id: s
                                 await _overexposure_task(broker_account_id, trade.tradingsymbol or "")
                             except Exception as _oe:
                                 logger.warning(f"overexposure inline check failed: {_oe}")
-                            try:
-                                await _concentration_task(broker_account_id)
-                            except Exception as _ce:
-                                logger.warning(f"concentration inline check failed: {_ce}")
+                            # `_concentration_task` ran here as the inline
+                            # fallback until 2026-09-01. portfolio_concentration
+                            # is retired; see the note in position_monitor_tasks.
                             try:
                                 await _entry_rules_task(broker_account_id, trade.tradingsymbol or "")
                             except Exception as _ee:

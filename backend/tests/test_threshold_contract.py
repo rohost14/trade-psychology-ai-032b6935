@@ -61,42 +61,22 @@ ACTUALLY_PERSONALISED = {
 
 # ── 1. safety cannot be loosened ───────────────────────────────────────────
 
-def test_a_declared_size_cannot_loosen_the_universal_safety_line():
-    """
-    THE BUG THIS FILE WAS WRITTEN FOR.
-
-    `_apply_profile_facts` maps a declared `max_position_size` onto
-    `max_position_pct_caution` / `_danger`, both Kind.UNIVERSAL_SAFETY, using
-    Source.CAPITAL. `violates_kind` does not refuse it, because CAPITAL is not a
-    *learned* source. Measured before the fix: declaring 40 moved caution from
-    5.0 to 40.0 and danger from 10.0 to 80.0 — the detector that says "this
-    position is dangerously large" went quiet for exactly the traders taking the
-    largest positions.
-    """
-    loose = resolve_thresholds(profile=_profile(max_position_size=40))
-    assert loose.get("max_position_pct_caution") == 5.0
-    assert loose.get("max_position_pct_danger") == 10.0
-
-    why = loose.explain("max_position_pct_caution").detail or ""
-    assert "safety bound" in why, "a held threshold must say that it was held"
-
-
-def test_a_declared_size_may_still_tighten():
-    """
-    The fix bounds looseness only. A trader who declares a 3% cap still gets
-    alerts at 3% — removing that would be silently dropping working behaviour.
-    """
-    tight = resolve_thresholds(profile=_profile(max_position_size=3))
-    assert tight.get("max_position_pct_caution") == 3.0
-    assert tight.get("max_position_pct_danger") == 6.0
-
-
-@pytest.mark.parametrize("declared,expected_caution", [
-    (3, 3.0), (4, 4.0), (5, 5.0), (10, 5.0), (25, 5.0), (40, 5.0),
-])
-def test_the_safety_line_is_monotone_and_capped(declared, expected_caution):
-    ts = resolve_thresholds(profile=_profile(max_position_size=declared))
-    assert ts.get("max_position_pct_caution") == expected_caution
+# `test_a_declared_size_cannot_loosen_the_universal_safety_line`,
+# `test_a_declared_size_may_still_tighten` and
+# `test_the_safety_line_is_monotone_and_capped` were DELETED 2026-09-01.
+#
+# THEIR SUBJECT WAS REMOVED, not their assertion weakened. All three keyed on
+# `max_position_pct_caution` / `_danger`, which went with `excess_exposure`:
+# there is no universal exposure threshold any more and none replaced it.
+#
+# `max_position_size` was the ONLY declared value that mapped onto a
+# UNIVERSAL_SAFETY key, so there is no surviving instance of that specific
+# interaction to repoint them at. What they protected is still protected in
+# general by `test_every_universal_safety_threshold_is_its_own_bound` below,
+# which iterates every UNIVERSAL_SAFETY spec and now covers the premium-loss
+# ladder - the severe-loss layer, which is deliberately unchanged.
+#
+# The `clamp_to_bound` mechanism itself is untouched.
 
 
 def test_every_universal_safety_threshold_is_its_own_bound():

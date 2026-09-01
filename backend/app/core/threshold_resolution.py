@@ -522,19 +522,54 @@ def _apply_profile_facts(profile, values: Dict[str, Any], put: Callable) -> None
             1.0 if val is not None else 0.0,
             None if val is not None else "not computed yet")
 
-    put("sl_percent_futures", getattr(profile, "sl_percent_futures", None) or 1.0,
-        Source.FACT, 1.0, None)
-    put("sl_percent_options", getattr(profile, "sl_percent_options", None) or 50.0,
-        Source.FACT, 1.0, None)
+    # AN UNDECLARED RULE IS NOT A FACT. 2026-09-01.
+    #
+    # These were `getattr(...) or 50.0` marked Source.FACT confidence 1.0. Both
+    # columns are NULLABLE, so a trader who had configured nothing got an
+    # invented number carrying the provenance reserved for something they
+    # declared - and `sl_percent_options` is a RULE_FIELD that
+    # `live_risk_state` treats as "the exit rule the trader wrote down".
+    #
+    # The consequence was a constitution_violation at notification_level 4
+    # reading "You set your options exit at 50% of premium" to a trader who set
+    # nothing, and - because the invented 50 sits between the universal
+    # severe-loss bands of 40 and 60 - it PRE-EMPTED the real safety finding,
+    # which `_fire_position_alert` then carried only as details["also_crossed"].
+    # Measured on 724 long-option rounds: all 10 that reached the universal 60%
+    # band were pre-empted by the fabricated rule.
+    #
+    # Same class as Pattern 24's `max_position_size: 50000`, Pattern 17's
+    # `capital * 0.05`, and H1's daily limit. This key was missed by that sweep.
+    #
+    # None when undeclared. `live_risk_state.build_watches` already gates on
+    # `if declared_raw:`, so None simply means no declared band - the universal
+    # 40/60/80 ladder is untouched and still fires on its own.
+    _slf = getattr(profile, "sl_percent_futures", None)
+    _slo = getattr(profile, "sl_percent_options", None)
+    put("sl_percent_futures", _slf if _slf else None,
+        Source.FACT if _slf else Source.GLOBAL,
+        1.0 if _slf else 0.0,
+        None if _slf else "not declared")
+    put("sl_percent_options", _slo if _slo else None,
+        Source.FACT if _slo else Source.GLOBAL,
+        1.0 if _slo else 0.0,
+        None if _slo else "not declared")
     put("risk_tolerance", getattr(profile, "risk_tolerance", None) or "moderate",
         Source.FACT, 1.0, None)
 
-    if values.get("max_position_size"):
-        size = float(values["max_position_size"])
-        put("max_position_pct_caution", size, Source.CAPITAL, 1.0,
-            "your declared max position size")
-        put("max_position_pct_danger", size * 2.0, Source.CAPITAL, 1.0,
-            "2x your declared max position size")
+    # The declared `max_position_size` was mapped onto max_position_pct_caution
+    # and _danger here, and `safety_bounds` then clamped it so it could only
+    # tighten. Both keys are gone with `excess_exposure` (2026-09-01).
+    #
+    # The clamp was correct and its reason still stands - a declared value must
+    # never LOOSEN a universal safety line. What it could not decide was what
+    # the safety line should SAY once the trader had a looser rule of their own,
+    # and the answer measured was: nothing useful. A trader declaring 40% was
+    # told DANGER at 35%, inside their own rule, and the alert could not
+    # distinguish 35% from 45%.
+    #
+    # `max_position_size` is still resolved above and is read directly by
+    # `constitution_violation`'s max_trade_risk rule.
 
     _apply_capital_ratios(values, put)
 
@@ -679,6 +714,11 @@ def _apply_cold_start(put: Callable) -> None:
         put(key, None, Source.GLOBAL, 0.0, "unknown — no profile")
     put("restricted_windows", [], Source.GLOBAL, 0.0, "unknown — no profile")
     put("baseline_sessions", 0, Source.GLOBAL, 0.0, "unknown — no profile")
-    put("sl_percent_futures", 1.0, Source.GLOBAL, 0.0, "repo default")
-    put("sl_percent_options", 50.0, Source.GLOBAL, 0.0, "repo default")
+    # No profile at all, so nothing was declared. These were 1.0 and 50.0 with
+    # honest GLOBAL provenance, but the VALUE was still truthy, and
+    # `build_watches` gates on truthiness - so the cold-start path built the
+    # same fabricated "declared" band. None is the only reading that matches
+    # the fact.
+    put("sl_percent_futures", None, Source.GLOBAL, 0.0, "not declared")
+    put("sl_percent_options", None, Source.GLOBAL, 0.0, "not declared")
     put("risk_tolerance", "moderate", Source.GLOBAL, 0.0, "repo default")

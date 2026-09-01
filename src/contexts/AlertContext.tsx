@@ -130,7 +130,9 @@ const BACKEND_TO_FRONTEND_TYPE: Record<string, string> = {
   'revenge_trade':     'revenge_trading',
   'martingale_behaviour': 'position_sizing',
   'adding_to_adverse_position': 'position_sizing',
-  'excess_exposure':   'position_sizing',
+  // 'excess_exposure' RETIRED 2026-09-01. Removed from the routing map
+  // because the engine can no longer emit it; the display name below stays
+  // so stored alert rows still render.
   'session_meltdown':  'capital_drawdown',
   'no_stoploss':       'no_stoploss',
   // 'early_exit' RETIRED 2026-08-30 (Pattern 18). Removed from the routing

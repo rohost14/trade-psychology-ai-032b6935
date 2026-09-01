@@ -1206,12 +1206,7 @@
       "note": "loses 4,500 - MORE money, smaller percentage"
     },
     "cash_equity_no_mtf": {
-      "fired": {
-        "excess_exposure": {
-          "message": "RELIANCE: ₹290,000 at risk — 290.0% of capital on a single trade.",
-          "severity": "danger"
-        }
-      },
+      "fired": {},
       "note": ""
     },
     "ce_loss_then_other_strike_ce": {

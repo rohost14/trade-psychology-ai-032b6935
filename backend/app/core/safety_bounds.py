@@ -71,19 +71,25 @@ def bound_for(key: str) -> Tuple[Optional[float], str]:
     threshold may become. Tightening below it stays allowed — a trader who
     declares a 3% position cap still gets alerts at 3%.
 
-    It was added because the gap was reachable and proven. `_apply_profile_facts`
-    maps a declared `max_position_size` onto `max_position_pct_caution` and
-    `max_position_pct_danger` — both UNIVERSAL_SAFETY — via `Source.CAPITAL`,
-    which `violates_kind` does not refuse because CAPITAL is not a *learned*
-    source. Measured before the fix: declaring 40 moved the caution line from
-    5.0 to 40.0 and danger from 10.0 to 80.0, so the detector that exists to say
-    "this position is dangerously large" went quiet for exactly the traders
-    taking the largest positions.
+    THE CASE THAT PROVED IT IS NOW HISTORY, and the history is worth keeping.
+    `_apply_profile_facts` used to map a declared position-size limit onto two
+    UNIVERSAL_SAFETY exposure keys via `Source.CAPITAL`, which `violates_kind`
+    does not refuse because CAPITAL is not a *learned* source. Declaring 40
+    moved the caution line from 5.0 to 40.0 and danger from 10.0 to 80.0, so the
+    detector meant to say "this position is dangerously large" went quiet for
+    exactly the traders taking the largest positions. The bound closed that.
 
-    The declared value is not lost: `max_position_size` is a `RULE_FIELD` in
-    `constitution_service`, so it is still enforced as the trader's own rule by
-    `constitution_violation`. What it may no longer do is move a universal
-    safety line.
+    BOTH OF THOSE KEYS WERE REMOVED ON 2026-09-01, with `excess_exposure`.
+    There is no universal exposure threshold any more and none replaced it:
+    how much of their own capital a trader commits to one position is a
+    decision, not objective danger, and the bound could only ever say "5%" to
+    someone who had declared 40%. Single-position exposure is now exactly one
+    thing - a breach of the limit the trader declared - enforced by
+    `constitution_violation`'s max_trade_risk rule.
+
+    THE BOUND ITSELF IS UNCHANGED AND STILL GOVERNS every remaining
+    UNIVERSAL_SAFETY threshold, chiefly the severe-loss ladder, which stays
+    universal because a large loss IS objective danger.
 
     An explicit `safety_bound` on a spec still wins, so a detector review can
     still set a different bound with its own reason.

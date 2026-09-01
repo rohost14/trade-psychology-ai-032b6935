@@ -93,11 +93,19 @@ COLD_START_DEFAULTS: Dict[str, Any] = {
     # absolute value below is only the no-capital fallback. The percentage is
     # calibrated so a Rs 50,000 account resolves to the same 500 it had before.
 
-    # ── Position sizing / excess exposure ────────────────────────────────
-    # Kelly criterion for 45% win rate, 1.5:1 R:R → ~13% optimal, half-Kelly = 6%.
-    # SEBI: profitable traders averaged 4-6% per trade; loss-makers averaged 20-50%.
-    'max_position_pct_caution':         5.0,  # 5% capital-at-risk = caution
-    'max_position_pct_danger':          10.0, # 10% capital-at-risk = danger
+    # ── Position sizing / excess exposure — REMOVED 2026-09-01 ───────────
+    # `max_position_pct_caution` (5.0) and `max_position_pct_danger` (10.0) are
+    # gone with `excess_exposure`. THERE IS NO UNIVERSAL EXPOSURE THRESHOLD and
+    # none was substituted: how much of their own capital a trader commits to
+    # one position is theirs to decide, and the only exposure alert is a breach
+    # of a limit they declared themselves - `constitution_violation`'s
+    # `max_trade_risk` rule, which reads `max_position_size`.
+    #
+    # Their stated source was "Kelly ... half-Kelly = 6%" (real arithmetic) and
+    # "SEBI: profitable traders averaged 4-6% per trade" - which has NO source
+    # anywhere in the repository, the fourth such claim after
+    # expiry_day_overtrading, winning_streak_overconfidence and the Pattern 20
+    # averaging-down statistic.
 
     # ── Session meltdown ─────────────────────────────────────────────────
     # Prospect theory: "break-even effect" / risky recovery seeking starts at ~50% loss.
@@ -516,14 +524,16 @@ def _get_thresholds_pre_ladder(profile=None) -> Dict[str, Any]:
         _blm = _bl.get('metrics') or {}
         result['baseline_win_rate'] = _blm.get('win_rate')          # {value, confidence, n} | None
         result['baseline_profit_factor'] = _blm.get('profit_factor')
-        result['sl_percent_futures'] = getattr(profile, 'sl_percent_futures', None) or 1.0
-        result['sl_percent_options'] = getattr(profile, 'sl_percent_options', None) or 50.0
+        # An undeclared rule is not a fact - see the long note in
+        # threshold_resolution. None when the trader declared nothing.
+        result['sl_percent_futures'] = getattr(profile, 'sl_percent_futures', None) or None
+        result['sl_percent_options'] = getattr(profile, 'sl_percent_options', None) or None
         result['risk_tolerance']    = getattr(profile, 'risk_tolerance', None) or 'moderate'
 
-        # User-declared max_position_size maps to the caution threshold
-        if result.get('max_position_size'):
-            result['max_position_pct_caution'] = float(result['max_position_size'])
-            result['max_position_pct_danger']  = float(result['max_position_size']) * 2.0
+        # `max_position_size` used to be mapped onto max_position_pct_caution /
+        # _danger here. Both are gone: the declared value is read directly by
+        # `constitution_violation`'s max_trade_risk rule, which is the single
+        # canonical consumer of the trader's own exposure limit.
 
     else:
         # Cold start: no profile — capital fields are unknown
@@ -538,8 +548,8 @@ def _get_thresholds_pre_ladder(profile=None) -> Dict[str, Any]:
         result['baseline_sessions']      = 0
         result['baseline_win_rate']      = None
         result['baseline_profit_factor'] = None
-        result['sl_percent_futures'] = 1.0
-        result['sl_percent_options'] = 50.0
+        result['sl_percent_futures'] = None
+        result['sl_percent_options'] = None
         result['risk_tolerance']     = 'moderate'
 
     # Apply Tier 3 universal floors — never go below these

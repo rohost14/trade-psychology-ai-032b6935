@@ -175,9 +175,11 @@ REGISTRY: Tuple[DetectorSpec, ...] = (
     # NOT retired permanently: Level 1 (same-symbol LONG<->SHORT) was untestable
     # here - 911 LONG against 1 SHORT - and would be live for a futures trader.
     # See docs/patterns/11-direction_instability/.
-    DetectorSpec("excess_exposure", "_detect_excess_exposure",
-                 "1.0.0", "risk", "alerting", "exit", 2,
-                 uses_constitution=True),
+    # `excess_exposure` RETIRED 2026-09-01. There is no universal exposure
+    # threshold any more and none replaced it: single-position exposure is a
+    # breach of the trader's OWN declared limit, which `constitution_violation`'s
+    # max_trade_risk rule already owns with the same quantity and its own dedup
+    # key. See docs/patterns/28-position-monitor/.
     DetectorSpec("session_meltdown", "_detect_session_meltdown",
                  "1.0.0", "risk", "alerting", "exit", 4, guardian_eligible=True,
                  uses_constitution=True,
@@ -311,7 +313,9 @@ ALIASES = {
     "death_spiral": "1.0.0",
     # Position-monitor (entry-time) patterns - Phase 6
     "overexposure": "2.0.0",
-    "portfolio_concentration": "1.0.0",
+    # `portfolio_concentration` RETIRED 2026-09-01 - it measured how few
+    # positions were open, not concentration. A two-position book has a
+    # 50% floor against a 40% cut and could never withhold.
     "holding_loser": "1.0.0",
     # Housekeeping nudge from maintenance_tasks, not a behaviour detector — but
     # it IS written to risk_alerts.pattern_type, so it is part of the vocabulary
@@ -400,11 +404,8 @@ PATTERN_COPY: Dict[str, PatternCopy] = {
         "Position size increasing after consecutive losses on the same instrument.",
         "Each step raises the total at risk in the session, not just the cost of this trade.",
     ),
-    "excess_exposure": PatternCopy(
-        "Oversized exposure",
-        "Capital at risk in a single position against the trading capital you declared.",
-        "One position large enough to define the session removes the choice of how the session ends.",
-    ),
+    # `excess_exposure` copy removed 2026-09-01 with the detector. Its display
+    # name stays in AlertContext.formatPatternName so stored rows still render.
     # Copy rewritten 2026-08-27... see Pattern 12 review, 2026-08-29.
     #
     # It read "No stop-loss on record" / "Whether a stop-loss order was on the
@@ -521,11 +522,8 @@ ALIAS_COPY: Dict[str, PatternCopy] = {
         "The size of a position you have just opened against your capital.",
         "Raised while the position is open, because that is while it can still be acted on.",
     ),
-    "portfolio_concentration": PatternCopy(
-        "Concentrated exposure",
-        "Share of your open exposure sitting in one underlying.",
-        "Several positions in one underlying is one position wearing several names.",
-    ),
+    # `portfolio_concentration` copy removed 2026-09-01 with the alias. Its
+    # display name stays in AlertContext.formatPatternName for stored rows.
     "holding_loser": PatternCopy(
         "Holding a loser",
         "How long an open position has been held while down.",

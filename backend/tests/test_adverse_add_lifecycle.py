@@ -94,7 +94,8 @@ async def _flush(monkeypatch, fills):
     async def spy(_acct, symbol):
         seen.append(symbol)
 
-    monkeypatch.setattr(pm, "_concentration_task", noop)
+    # `_concentration_task` was patched here until 2026-09-01.
+    # `portfolio_concentration` is retired, so the flush no longer calls it.
     monkeypatch.setattr(pm, "_entry_rules_task", noop)
     monkeypatch.setattr(pm, "_overexposure_task", noop)
     monkeypatch.setattr(pm, "_shadow_entry_detection", noop)
@@ -158,7 +159,7 @@ class TestFlushWiring:
             return None
 
         monkeypatch.setattr(pm, "_adverse_add_task", boom)
-        monkeypatch.setattr(pm, "_concentration_task", noop)
+        # concentration task retired 2026-09-01; nothing to patch.
         monkeypatch.setattr(pm, "_overexposure_task", noop)
         monkeypatch.setattr(pm, "_shadow_entry_detection", noop)
         monkeypatch.setattr(pm, "_entry_rules_task", rules)

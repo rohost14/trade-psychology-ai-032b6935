@@ -243,7 +243,7 @@ def test_empty_batch_still_describes_something():
 
 async def test_flush_evaluates_a_four_leg_window_once(monkeypatch):
     """
-    The point of E1. Four legs in one window must produce ONE concentration
+    The point of E1. Four legs in one window must produce ONE account-level
     check and ONE entry-rules check, not four of each — while exposure stays
     per instrument, because each leg is its own position.
     """
@@ -255,10 +255,7 @@ async def test_flush_evaluates_a_four_leg_window_once(monkeypatch):
 
     monkeypatch.setattr(pm, "_get_redis", lambda: r)
 
-    calls = {"concentration": 0, "exposure": [], "rules": []}
-
-    async def fake_concentration(_acct):
-        calls["concentration"] += 1
+    calls = {"exposure": [], "rules": []}
 
     async def fake_exposure(_acct, symbol):
         calls["exposure"].append(symbol)
@@ -266,14 +263,15 @@ async def test_flush_evaluates_a_four_leg_window_once(monkeypatch):
     async def fake_rules(_acct, symbols):
         calls["rules"].append(symbols)
 
-    monkeypatch.setattr(pm, "_concentration_task", fake_concentration)
+    # `_concentration_task` was patched here until 2026-09-01.
+    # `portfolio_concentration` is retired, so the flush no longer calls it.
     monkeypatch.setattr(pm, "_overexposure_task", fake_exposure)
     monkeypatch.setattr(pm, "_entry_rules_task", fake_rules)
 
     result = await pm._flush_entry_batch(ACCOUNT)
 
     assert result == {"fills": 4, "symbols": 4}
-    assert calls["concentration"] == 1
+    # the concentration call was asserted here until 2026-09-01; retired.
     assert calls["exposure"] == ["N24500CE", "N24700CE", "N24300PE", "N24100PE"]
     assert calls["rules"] == [["N24500CE", "N24700CE", "N24300PE", "N24100PE"]]
 
@@ -295,7 +293,8 @@ async def test_flush_of_partial_fills_checks_one_instrument(monkeypatch):
     async def fake_exposure(_acct, symbol):
         seen.append(symbol)
 
-    monkeypatch.setattr(pm, "_concentration_task", noop)
+    # `_concentration_task` was patched here until 2026-09-01.
+    # `portfolio_concentration` is retired, so the flush no longer calls it.
     monkeypatch.setattr(pm, "_entry_rules_task", noop)
     monkeypatch.setattr(pm, "_overexposure_task", fake_exposure)
 
@@ -316,7 +315,7 @@ async def test_flush_of_an_empty_window_does_nothing(monkeypatch):
     async def boom(*_a, **_k):
         called.append(1)
 
-    monkeypatch.setattr(pm, "_concentration_task", boom)
+    # concentration task retired 2026-09-01; nothing to patch.
     monkeypatch.setattr(pm, "_overexposure_task", boom)
     monkeypatch.setattr(pm, "_entry_rules_task", boom)
 
@@ -334,8 +333,6 @@ async def test_one_failing_check_does_not_stop_the_others(monkeypatch):
 
     ran = []
 
-    async def fake_concentration(_acct):
-        ran.append("concentration")
 
     async def broken_exposure(_acct, _symbol):
         raise RuntimeError("LTP cache down")
@@ -343,9 +340,12 @@ async def test_one_failing_check_does_not_stop_the_others(monkeypatch):
     async def fake_rules(_acct, _symbols):
         ran.append("rules")
 
-    monkeypatch.setattr(pm, "_concentration_task", fake_concentration)
+    # `_concentration_task` was patched here until 2026-09-01.
+    # `portfolio_concentration` is retired, so the flush no longer calls it.
     monkeypatch.setattr(pm, "_overexposure_task", broken_exposure)
     monkeypatch.setattr(pm, "_entry_rules_task", fake_rules)
 
     await pm._flush_entry_batch(ACCOUNT)
-    assert ran == ["concentration", "rules"]
+    # Was ["concentration", "rules"]. portfolio_concentration retired
+    # 2026-09-01, so ordering is now asserted on what remains.
+    assert ran == ["rules"]

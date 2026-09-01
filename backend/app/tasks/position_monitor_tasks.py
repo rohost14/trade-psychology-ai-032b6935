@@ -205,27 +205,17 @@ async def _check_position(position, thresholds: dict, db) -> List[dict]:
                     }
                 })
 
-    # ── Overexposure ───────────────────────────────────────────────────
-    capital = thresholds.get("trading_capital")
-    if capital and capital > 0:
-        position_value = current_price * abs(qty)
-        exposure_pct = position_value / capital * 100
-        max_size = thresholds.get("max_position_size") or 10.0
-        if exposure_pct > max_size * 1.5:
-            events.append({
-                "pattern": "overexposure",
-                "symbol": symbol,
-                "message": (
-                    f"{symbol}: ₹{position_value:,.0f} exposure "
-                    f"({exposure_pct:.1f}% of capital, limit {max_size:.0f}%)"
-                ),
-                "context": {
-                    "symbol": symbol,
-                    "position_value": round(position_value),
-                    "exposure_pct": round(exposure_pct, 1),
-                    "limit_pct": max_size,
-                }
-            })
+    # An overexposure block sat here until 2026-09-01, in the legacy
+    # `monitor_open_positions` beat that is no longer registered. It computed
+    # `current_price * abs(qty)` with NO contract multiplier and NO abstention -
+    # the exact defect F17 fixed in `_exposure_value`, whose docstring records
+    # it: "GOLDM is one lot of 100 grams quoted per 10 grams, so one lot at
+    # 155,999 is 15,59,990 of exposure and not 1,55,999 - a tenfold
+    # understatement." It also invented a 10% limit and had no severity ladder.
+    #
+    # Removed with the exposure rework rather than fixed: a second, divergent
+    # implementation of a pattern name is how the two threshold resolvers
+    # drifted, and exposure is now the trader's declared rule alone.
 
     return events
 
@@ -434,81 +424,129 @@ async def _overexposure_task(broker_account_id: str, tradingsymbol: str) -> dict
     if current_price is None:
         return {"skipped": "no_ltp"}
 
+    # ── ENTRY-TIME ARM OF THE TRADER'S OWN EXPOSURE RULE. 2026-09-01. ──────
+    #
+    # This used to be its own `overexposure` pattern, comparing NOTIONAL
+    # (price x qty x multiplier) against an invented 10% limit. Three things
+    # were wrong and all three are fixed here.
+    #
+    # 1. THE QUANTITY. Futures are margined at roughly 10-15% of notional, so
+    #    notional/capital fired on 100% of futures entries (4 of 4 on the
+    #    reference book) and told the trader "CIPLA26JANFUT Rs 574,950 exposure
+    #    (575.0% of capital)". A position cannot cost more capital than the
+    #    account holds. It now asks `quantities_for_trade` for the capital
+    #    REQUIREMENT and ABSTAINS when that is not available - which is the case
+    #    for futures and short options today, because
+    #    `position_margin_observations` is empty. Silence beats a wrong number.
+    #
+    # 2. THE INVENTED LIMIT. `thresholds.get("max_position_size") or 10.0`
+    #    described a number the trader never chose as "your limit 10%". There is
+    #    no universal exposure threshold any more. NO DECLARED RULE, NO ALERT.
+    #
+    # 3. THE DUPLICATE. `constitution_violation`'s max_trade_risk rule already
+    #    evaluates exactly this - same declared limit, same capital_requirement,
+    #    same capital - at EXIT. A second pattern type meant two alerts for one
+    #    breach, because `_pattern_dedup_key` cannot join different pattern
+    #    types. Emitting `constitution_violation` with rule="max_trade_risk"
+    #    puts both arms under one dedup key, so the exit repeat is suppressed
+    #    unless it escalates. The `sl_percent_options` path below already used
+    #    this shape.
+    #
+    # What this arm adds that max_trade_risk cannot: TIMING. max_trade_risk runs
+    # on a CompletedTrade, so the rule was never enforced while the position was
+    # open - the only moment it can be acted on.
+    #
+    # THE LADDER IS THE CONSTITUTION LADDER (0.80 approaching / 1.00 breached /
+    # 1.20 severe), not a new one. The old 1.5x / 2x / 30% / 50% rungs and the
+    # "ALL-IN BET" label are gone with the notional they were calibrated on.
+    from app.core.risk_quantities import quantities_for_trade
+    from app.core.trading_defaults import COLD_START_DEFAULTS
+
     capital = thresholds.get("trading_capital")
     qty = pos.total_quantity or 0
     if not capital or capital <= 0 or qty == 0:
         return {"skipped": "no_capital"}
 
-    position_value, reliable = _exposure_value(
-        pos.tradingsymbol, pos.exchange, current_price, qty)
-    if not reliable:
-        logger.debug("overexposure abstains on %s: contract unresolved",
-                     pos.tradingsymbol)
-        return {"skipped": "unresolved_contract"}
-    exposure_pct = position_value / capital * 100
-    max_size = thresholds.get("max_position_size") or 10.0
+    declared_limit = thresholds.get("max_position_size")
+    if not declared_limit:
+        # The trader has declared no exposure rule. Nothing to breach.
+        return {"skipped": "no_declared_exposure_rule"}
 
-    if exposure_pct > max_size * 1.5:
-        # Phase 6 All-In ladder (master 1D.8 - one detector, presentation tier):
-        #   caution  1.5-2x limit
-        #   danger   >2x limit
-        #   critical >=30% of capital - and >=50% presents as ALL-IN BET
-        all_in = exposure_pct >= 50.0
-        if exposure_pct >= 30.0:
-            severity = "critical"
-        elif exposure_pct > max_size * 2:
-            severity = "danger"
-        else:
-            severity = "caution"
+    rq = quantities_for_trade(pos, margin=None)
+    if not rq.usable_for_capital_rules:
+        logger.debug("entry exposure abstains on %s: %s",
+                     pos.tradingsymbol, rq.capital_requirement.note)
+        return {"skipped": "capital_requirement_unavailable"}
 
-        # Emotional multiplier (doc 4 P32): recent emotional danger events
-        # (recovery bet / martingale / revenge) bump severity one level -
-        # oversized AFTER losses is the "make it back" bet.
-        emotional_bump = False
-        async with SessionLocal() as ev_db:
-            from app.models.behavior_event import BehaviorEvent
-            from sqlalchemy import select as _sel, and_ as _and
-            ist_now = datetime.now(timezone.utc)
-            day_start = ist_now - timedelta(hours=12)
-            ev_res = await ev_db.execute(_sel(BehaviorEvent).where(_and(
-                BehaviorEvent.broker_account_id == UUID(broker_account_id),
-                BehaviorEvent.detected_at >= day_start,
-                BehaviorEvent.detector.in_(
-                    ("post_loss_recovery_bet", "martingale_behaviour", "revenge_trade")),
-                BehaviorEvent.severity.in_(("danger", "critical")),
-            )))
-            if ev_res.scalars().first():
-                emotional_bump = True
-        if emotional_bump and severity == "caution":
-            severity = "danger"
-        elif emotional_bump and severity == "danger":
-            severity = "critical"
+    capital_required = float(rq.capital_requirement.amount)
+    exposure_pct = capital_required / float(capital) * 100
+    ratio = exposure_pct / float(declared_limit)
 
-        label = "ALL-IN BET" if all_in else "Overexposure"
-        async with SessionLocal() as alert_db:
-            await _fire_position_alert(
-                broker_account_id=broker_account_id,
-                pattern_type="overexposure",
-                severity=severity,
-                message=(
-                    f"{label}: {tradingsymbol} ₹{position_value:,.0f} exposure "
-                    f"({exposure_pct:.1f}% of capital, your limit {max_size:.0f}%)"
-                    + (" after recent loss-chasing behavior." if emotional_bump else ".")
-                ),
-                details={
-                    "symbol": tradingsymbol,
-                    "position_value": round(position_value),
-                    "exposure_pct": round(exposure_pct, 1),
-                    "limit_pct": max_size,
-                    "all_in": all_in,
-                    "emotional_bump": emotional_bump,
-                    "_confidence": 95.0,
-                },
-                db=alert_db,
-            )
-        return {"symbol": tradingsymbol, "exposure_pct": round(exposure_pct, 1), "alerted": True}
+    approaching = float(COLD_START_DEFAULTS.get("constitution_approaching_pct", 0.80))
+    severe = float(COLD_START_DEFAULTS.get("constitution_severe_pct", 1.20))
+    if ratio >= severe:
+        severity = "critical"
+    elif ratio >= 1.0:
+        severity = "danger"
+    elif ratio >= approaching:
+        severity = "caution"
+    else:
+        return {"symbol": tradingsymbol, "exposure_pct": round(exposure_pct, 1),
+                "alerted": False}
 
-    return {"symbol": tradingsymbol, "exposure_pct": round(exposure_pct, 1), "alerted": False}
+    # Emotional multiplier (doc 4 P32): recent emotional danger events
+    # (recovery bet / martingale / revenge) bump severity one level -
+    # oversized AFTER losses is the "make it back" bet. PRESERVED VERBATIM
+    # through the 2026-09-01 rework. NOT statistically validated; it is kept
+    # because it is well motivated and removing it was never approved.
+    emotional_bump = False
+    async with SessionLocal() as ev_db:
+        from app.models.behavior_event import BehaviorEvent
+        from sqlalchemy import select as _sel, and_ as _and
+        ist_now = datetime.now(timezone.utc)
+        day_start = ist_now - timedelta(hours=12)
+        ev_res = await ev_db.execute(_sel(BehaviorEvent).where(_and(
+            BehaviorEvent.broker_account_id == UUID(broker_account_id),
+            BehaviorEvent.detected_at >= day_start,
+            BehaviorEvent.detector.in_(
+                ("post_loss_recovery_bet", "martingale_behaviour", "revenge_trade")),
+            BehaviorEvent.severity.in_(("danger", "critical")),
+        )))
+        if ev_res.scalars().first():
+            emotional_bump = True
+    if emotional_bump and severity == "caution":
+        severity = "danger"
+    elif emotional_bump and severity == "danger":
+        severity = "critical"
+
+    verb = "breached" if ratio >= 1.0 else "approaching"
+    async with SessionLocal() as alert_db:
+        await _fire_position_alert(
+            broker_account_id=broker_account_id,
+            pattern_type="constitution_violation",
+            severity=severity,
+            message=(
+                f"Your per-trade risk rule {verb} while the position is open: "
+                f"{tradingsymbol} needs ₹{capital_required:,.0f} of capital "
+                f"— {exposure_pct:.1f}% against your {float(declared_limit):.0f}% limit"
+                + (" after recent loss-chasing behaviour." if emotional_bump else ".")
+            ),
+            details={
+                "rule": "max_trade_risk",
+                "symbol": tradingsymbol,
+                "limit_pct": float(declared_limit),
+                "current_pct": round(exposure_pct, 2),
+                "ratio": round(ratio, 2),
+                "capital_at_risk": round(capital_required, 2),
+                "emotional_bump": emotional_bump,
+                "at_entry": True,
+                "live": True,
+                "_confidence": 95.0,
+            },
+            db=alert_db,
+        )
+    return {"symbol": tradingsymbol, "exposure_pct": round(exposure_pct, 1),
+            "alerted": True}
 
 
 async def _fire_position_alert(
@@ -1250,11 +1288,11 @@ async def _flush_entry_batch(broker_account_id: str) -> dict:
     except Exception as e:
         logger.warning(f"[entry_batch] shadow entry detection skipped: {e}")
 
-    # Account-level: one check per window regardless of how many legs landed.
-    try:
-        await _concentration_task(broker_account_id)
-    except Exception as e:
-        logger.warning(f"concentration check failed: {e}")
+    # An account-level concentration check ran here, once per window, until
+    # 2026-09-01. `portfolio_concentration` is retired: with n open positions the
+    # top underlying's share is at least 1/n, so a two-position book had a 50%
+    # floor against a 40% cut and could never withhold. See the note on the
+    # retired task above.
 
     # Position-level: genuinely per instrument — each leg is its own position
     # and its own exposure. The 30-minute dedup in _fire_position_alert keeps
@@ -1400,97 +1438,44 @@ def _instrument_type_of(symbol: str) -> str:
         return "EQ"
 
 
-@celery_app.task(name="app.tasks.position_monitor_tasks.check_portfolio_concentration")
-def check_portfolio_concentration(broker_account_id: str):
-    """
-    Entry-time concentration check (master 10b / doc 4 P31):
-    largest underlying exposure / total exposure, levels 40/60/80%.
-    Requires 2+ open underlyings — a single position is overexposure's job.
-    LTP from Redis cache; falls back to entry price (data quality PARTIAL).
-    """
-    import asyncio
-    return asyncio.run(_concentration_task(broker_account_id))
-
-
-async def _concentration_task(broker_account_id: str) -> dict:
-    from app.models.position import Position
-    from app.services.instrument_parser import parse_symbol
-    from sqlalchemy import select, and_
-
-    async with SessionLocal() as db:
-        result = await db.execute(
-            select(Position).where(and_(
-                Position.broker_account_id == UUID(broker_account_id),
-                Position.total_quantity != 0,
-            ))
-        )
-        positions = list(result.scalars().all())
-
-    if len(positions) < 2:
-        return {"skipped": "single_position"}
-
-    by_underlying: dict = {}
-    partial = False
-    for pos in positions:
-        try:
-            u = parse_symbol(pos.tradingsymbol or "").underlying or pos.tradingsymbol
-        except Exception:
-            u = pos.tradingsymbol
-        ltp = get_cached_ltp(pos.instrument_token) if pos.instrument_token else None
-        if ltp is None:
-            ltp = float(pos.average_entry_price or 0)
-            partial = True
-        # F17: multiplier-aware. An MCX leg previously contributed a tenth of
-        # its real weight to the concentration denominator.
-        value, reliable = _exposure_value(pos.tradingsymbol, pos.exchange, ltp,
-                                          pos.total_quantity or 0)
-        if not reliable:
-            # One unresolved leg makes the SHARE wrong for every other leg, so
-            # the whole calculation is abandoned rather than silently skewed.
-            logger.debug("portfolio_concentration abstains: %s unresolved",
-                         pos.tradingsymbol)
-            return {"skipped": "unresolved_contract"}
-        by_underlying[u] = by_underlying.get(u, 0.0) + value
-
-    if len(by_underlying) < 2:
-        return {"skipped": "single_underlying"}
-    total = sum(by_underlying.values())
-    if total <= 0:
-        return {"skipped": "zero_exposure"}
-
-    top_u, top_v = max(by_underlying.items(), key=lambda kv: kv[1])
-    pct = top_v / total * 100
-
-    if pct >= 80:
-        severity = "critical"
-    elif pct >= 60:
-        severity = "danger"
-    elif pct >= 40:
-        severity = "caution"
-    else:
-        return {"underlying": top_u, "pct": round(pct, 1), "alerted": False}
-
-    async with SessionLocal() as alert_db:
-        fired = await _fire_position_alert(
-            broker_account_id=broker_account_id,
-            pattern_type="portfolio_concentration",
-            severity=severity,
-            message=(
-                f"{top_u} is {pct:.0f}% of your open exposure "
-                f"(₹{top_v:,.0f} of ₹{total:,.0f} across "
-                f"{len(by_underlying)} underlyings). Looks diversified, is not."
-            ),
-            details={
-                "top_underlying": top_u,
-                "top_pct": round(pct, 1),
-                "total_exposure": round(total),
-                "by_underlying": {k: round(v) for k, v in by_underlying.items()},
-                "_confidence": 75.0 if partial else 95.0,
-                "_data_quality": "PARTIAL" if partial else "GOOD",
-            },
-            db=alert_db,
-        )
-    return {"underlying": top_u, "pct": round(pct, 1), "alerted": fired}
+# ── RETIRED 2026-09-01 — `portfolio_concentration` ─────────────────────────
+#
+# IT MEASURED HOW FEW POSITIONS WERE OPEN, NOT CONCENTRATION.
+#
+# It alerted on the top underlying's share of open exposure: caution >= 40%,
+# danger >= 60%, critical >= 80%. With n open positions that share is at least
+# 1/n, so a TWO-position book has a floor of 50% against a 40% cut and CANNOT
+# withhold. Reconstructed on the reference book:
+#
+#     n=2   206 evaluations   206 fired   100.0%   min share 50.0%
+#     n=3    99                80          80.8%
+#     n=4    22                12          54.5%
+#     n=5     3                 0           0.0%
+#
+# Withhold rate on a two-position book: 0.0%. 69.1% of all firings (206 of 298)
+# came from one. The rate falls MONOTONICALLY as the book diversifies - it
+# alerted hardest where there was least to measure. And 705 of 1,071 opening
+# fills (65.8%) abstained as single_position, so the population it judged was
+# overwhelmingly "exactly two positions", where it always fired.
+#
+# This is the `profit_giveaway` shape (a drawdown from the session peak is
+# arithmetic) and the `expiry_day_overtrading` shape (it never withheld, 55 of
+# 55). The finding does not depend on any price: the 1/n floor is arithmetic.
+#
+# NOT A MIS-SET THRESHOLD. Raising the cut past 50% would make the measure
+# meaningless on the same books, because a concentration measure has to control
+# for BOOK SIZE - the comparison is against what a diversified book OF THAT SIZE
+# looks like. That is new methodology and this review did not invent it.
+#
+# Concentration risk is real. What is retired is a fixed-percentage share test
+# applied to a 1-5 position book. COMPOSITION MAY STILL BE SHOWN AS INFORMATION
+# - a display sets no threshold - but never as an alert.
+#
+# The best part of it was the abstention: one unresolved leg makes the share
+# wrong for EVERY leg, so it abandoned the whole calculation rather than skew
+# it. Worth copying if the concept ever returns.
+#
+# Evidence: docs/patterns/28-position-monitor/review.md.
 
 
 @celery_app.task(name="app.tasks.position_monitor_tasks.check_entry_rules")

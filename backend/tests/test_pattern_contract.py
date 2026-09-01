@@ -178,6 +178,18 @@ def test_no_shipping_module_uses_a_severity_value_outside_the_vocabulary():
 #: against these is dead code that looks alive.
 RETIRED_PATTERN_NAMES = (
     "revenge_sizing",
+    # Retired 2026-09-01 (Pattern 28): there is no universal exposure threshold
+    # any more and none replaced its 5/10. A trader who DECLARED 40% was told
+    # DANGER at 35% - inside their own rule - because safety_bounds clamps a
+    # declared value so it may only tighten. Single-position exposure is now a
+    # breach of the trader's OWN limit, which constitution_violation's
+    # max_trade_risk rule already owned with the same quantity.
+    "excess_exposure",
+    # Retired 2026-09-01 (Pattern 28): it measured how FEW positions were open.
+    # With n positions the top underlying's share is at least 1/n, so a
+    # two-position book had a 50% floor against a 40% cut and could never
+    # withhold - 206 of 206 fired, 69% of all firings.
+    "portfolio_concentration",
     # Retired 2026-09-01 (Reviews 25-27): the learned "danger hours" it alerted
     # on do not survive into a second time period - full book [12, 15], first
     # half [11, 12, 15], SECOND HALF none at all, and not one hour flagged in

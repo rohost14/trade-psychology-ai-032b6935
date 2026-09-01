@@ -178,15 +178,12 @@ def test_floor_records_that_it_overrode():
     assert r.value == 2              # UNIVERSAL_FLOORS['revenge_window_caution_min']
 
 
-def test_capital_derived_pair_is_marked_capital():
-    ts = resolve_thresholds(PROFILES["declared_rules_only"])
-    assert ts.explain("max_position_pct_caution").source is Source.CAPITAL
-    assert ts.explain("max_position_pct_danger").value == 8.0   # 2x declared 4
+# `test_capital_derived_pair_is_marked_capital` was DELETED 2026-09-01 with its
+# subject. It asserted that a declared `max_position_size` resolved
+# `max_position_pct_caution` at Source.CAPITAL and `_danger` at 2x. Both keys
+# went with `excess_exposure`; the declared value is now read directly by
+# `constitution_violation`'s max_trade_risk rule, which has its own coverage.
 
-
-# ---------------------------------------------------------------------------
-# ThresholdSet behaves as the dict detectors already expect
-# ---------------------------------------------------------------------------
 
 def test_threshold_set_is_dict_compatible():
     ts = resolve_thresholds(PROFILES["empty_profile"])

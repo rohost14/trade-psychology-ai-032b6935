@@ -326,10 +326,11 @@ THRESHOLD_SPECS: Dict[str, ThresholdSpec] = {
 # about objective loss magnitude, and a wrong number of the right kind is still
 # the right kind.
 _UNIVERSAL_SAFETY = {
-    "max_position_pct_caution": (5.0, Sensitivity.HIGHER_IS_LOOSER,
-                                 "percent of the account in one position"),
-    "max_position_pct_danger": (10.0, Sensitivity.HIGHER_IS_LOOSER,
-                                "percent of the account in one position"),
+    # `max_position_pct_caution` (5.0) and `max_position_pct_danger` (10.0) were
+    # here until 2026-09-01. Removed with `excess_exposure`, unreplaced: there is
+    # no universal exposure threshold, because how much of their own capital a
+    # trader commits to one position is a decision, not an objective danger. The
+    # severe-LOSS ladder below stays universal, because a large loss is.
     "premium_loss_caution_pct": (40, Sensitivity.HIGHER_IS_LOOSER,
                                  "percent of the premium paid that has been lost"),
     "premium_loss_danger_pct": (60, Sensitivity.HIGHER_IS_LOOSER,

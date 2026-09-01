@@ -2014,57 +2014,47 @@ class BehaviorEngine:
 
     # ── Pattern 10: Excess exposure ───────────────────────────────────────
 
-    def _detect_excess_exposure(self, ctx: EngineContext) -> Optional[DetectedEvent]:
-        ct = ctx.completed_trade
-        capital = ctx.thresholds.get("trading_capital")
-        # Require a known (non-zero) capital figure but drop the ₹10 000 floor —
-        # under-capitalised accounts are the ones most at risk of over-exposure.
-        if not capital or float(capital) <= 0:
-            return None
+    # ── RETIRED 2026-09-01 — `excess_exposure` ────────────────────────────
+    #
+    # THERE IS NO UNIVERSAL EXPOSURE THRESHOLD ANY MORE, AND NONE REPLACED IT.
+    #
+    # It fired when a position's capital requirement passed 5% (caution) or 10%
+    # (danger) of declared capital. Its QUANTITY was correct - F17 moved it onto
+    # `quantities_for_trade().capital_requirement` with a real abstention - and
+    # that is not why it went.
+    #
+    # It went because a universal line cannot say anything useful about how much
+    # of their own capital a trader chooses to commit to one position. Measured
+    # against live resolution: a trader who DECLARED a 40% limit was told DANGER
+    # at 35% - inside their own rule - because `safety_bounds` clamps a declared
+    # value so it may only tighten, and the alert could not distinguish 35% from
+    # 45%. On a declared 80% limit it fired DANGER at 75%.
+    #
+    # The outcome evidence never supported it either. Per round on 912 rounds:
+    # 0-5% of capital won 40.2%, 5-10% 37.4%, 10-15% 43.1%, 15-25% 43.9% - no
+    # trend. Only 25%+ separated, at n=10, with 81% of that bucket's net loss
+    # coming from ONE position. INSUFFICIENT EVIDENCE, not a refutation: this
+    # trader almost never takes a large single position.
+    #
+    # WHAT REPLACES IT: nothing universal, on purpose. Single-position exposure
+    # is now exactly one thing - a breach of the limit the trader declared -
+    # and `constitution_violation`'s `max_trade_risk` rule already owned that,
+    # with the same `capital_requirement / trading_capital` quantity, the same
+    # abstention, and a per-rule dedup key. Adding a second detector for it
+    # would have produced two alerts for one breach: 820 / 453 / 215 duplicate
+    # entry-time firings at declared limits of 5 / 10 / 15%.
+    #
+    # NOT RETIRED: the severe-LOSS ladder (40/60/80 of premium, in
+    # `live_risk_state`), which is a different concept and stays universal
+    # because a large loss IS objective danger. It is independent of any
+    # exposure rule, verified: a declared exposure limit does not suppress it.
+    #
+    # Portfolio utilisation - capital deployed against capital - stays
+    # INFORMATION ONLY. `MarginSnapshot.equity_utilization_pct` already carries
+    # it and no detector reads it.
+    #
+    # Evidence: docs/patterns/28-position-monitor/.
 
-        # F17. This used to call estimate_capital_at_risk directly, which meant
-        # risk_basis, is_comparable and every UNRELIABLE marking were unreachable
-        # here - the safety layer existed and this detector never consulted it.
-        # The canonical layer returns the figure WITH its provenance, and a
-        # capital-relative rule has no business firing on a number the layer
-        # could not stand behind.
-        rq = quantities_for_trade(ct, margin=ctx.broker_margin)
-        if not rq.usable_for_capital_rules:
-            logger.debug(
-                "excess_exposure abstains on %s: %s",
-                ct.tradingsymbol, rq.capital_requirement.note)
-            return None
-        capital_at_risk = float(rq.capital_requirement.amount)
-        risk_pct = capital_at_risk / capital * 100
-        caution_pct = ctx.thresholds.get("max_position_pct_caution", 5.0)
-        danger_pct  = ctx.thresholds.get("max_position_pct_danger", 10.0)
-
-        if risk_pct > danger_pct:
-            return DetectedEvent(
-                event_type="excess_exposure",
-                severity="danger",
-                message=(
-                    f"{ct.tradingsymbol}: ₹{capital_at_risk:,.0f} at risk "
-                    f"— {risk_pct:.1f}% of capital on a single trade."
-                ),
-                context={"capital_at_risk": round(capital_at_risk),
-                         "risk_pct": round(risk_pct, 1),
-                         "caution_pct": caution_pct, "danger_pct": danger_pct},
-            )
-        if risk_pct > caution_pct:
-            return DetectedEvent(
-                event_type="excess_exposure",
-                severity="caution",
-                message=(
-                    f"Your {ct.tradingsymbol} trade put {risk_pct:.1f}% of capital at risk "
-                    f"(₹{capital_at_risk:,.0f}). "
-                    f"Recommended maximum: {caution_pct:.0f}% per trade."
-                ),
-                context={"capital_at_risk": round(capital_at_risk),
-                         "risk_pct": round(risk_pct, 1),
-                         "caution_pct": caution_pct, "danger_pct": danger_pct},
-            )
-        return None
 
     # ── Pattern 11: Session meltdown ──────────────────────────────────────
 
