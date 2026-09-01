@@ -1516,9 +1516,8 @@ async def _entry_rules_task(broker_account_id: str, tradingsymbol) -> dict:
 async def __entry_rules_impl(broker_account_id: str, entered: str, symbols: list) -> dict:
     from zoneinfo import ZoneInfo as _ZI
     from app.models.user_profile import UserProfile
-    from app.models.completed_trade import CompletedTrade
     from app.core.trading_defaults import get_thresholds
-    from sqlalchemy import select, and_, desc
+    from sqlalchemy import select, and_
 
     IST = _ZI("Asia/Kolkata")
     now_utc = datetime.now(timezone.utc)
@@ -1563,39 +1562,15 @@ async def __entry_rules_impl(broker_account_id: str, entered: str, symbols: list
                 fired.append("restricted_window")
                 break
 
-        # Rule: cooldown after loss (binary)
-        cooldown_min = th.get("user_cooldown_min")
-        if cooldown_min:
-            loss_res = await db.execute(
-                select(CompletedTrade).where(and_(
-                    CompletedTrade.broker_account_id == UUID(broker_account_id),
-                    CompletedTrade.realized_pnl < 0,
-                    CompletedTrade.exit_time >= now_utc - timedelta(minutes=int(cooldown_min)),
-                )).order_by(desc(CompletedTrade.exit_time)).limit(1)
-            )
-            last_loss = loss_res.scalar_one_or_none()
-            if last_loss and last_loss.exit_time:
-                gap = (now_utc - last_loss.exit_time).total_seconds() / 60
-                await _fire_position_alert(
-                    broker_account_id=broker_account_id,
-                    pattern_type="constitution_violation",
-                    severity="danger",
-                    message=(
-                        f"Your {int(cooldown_min)}-minute cooldown violated: entered "
-                        f"{entered} {gap:.0f} min after a "
-                        f"₹{abs(float(last_loss.realized_pnl or 0)):,.0f} loss - "
-                        f"position is OPEN."
-                    ),
-                    details={"rule": "cooldown", "gap_min": round(gap, 1),
-                             "limit_min": int(cooldown_min),
-                             "prior_loss": float(last_loss.realized_pnl or 0),
-                             "prior_symbol": last_loss.tradingsymbol,
-                             "symbol": symbols[0] if symbols else None,
-                             "symbols": symbols, "at_entry": True,
-                             "_confidence": 100.0},
-                    db=db,
-                )
-                fired.append("cooldown")
+        # A declared-cooldown check stood here until 2026-09-02. It read
+        # `th["user_cooldown_min"]`, which NO RESOLVER PUBLISHES any more -
+        # `cooldown_after_loss` stopped being a user rule in the same pass that
+        # removed the exit-time twin from the engine's constitution detector,
+        # and this entry-time copy was missed. It was unreachable, not merely
+        # unused: `th.get` returned None and the block never entered. The
+        # PROTECTION is unaffected - `revenge_trade` and `rapid_reentry` carry
+        # their own `revenge_window_min` / `revenge_window_caution_min`, which
+        # the declared cooldown only ever overrode.
 
         # ── E3: rules that are pure arithmetic at entry ───────────────────
         # Trade limit, loss limit and the MIS square-off run-up. All three are

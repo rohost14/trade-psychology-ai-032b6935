@@ -21,8 +21,10 @@ interface Rules {
   per_trade_loss_limit: number | null;
   daily_trade_limit: number | null;
   max_position_size: number | null;
-  cooldown_after_loss: number | null;
   max_consecutive_losses: number | null;
+  //: % of premium at which the trader exits a losing option. NULL = not set.
+  sl_percent_options: number | null;
+  //: ["13:00-14:00"] IST windows the trader will not trade in. [] = none.
   restricted_windows: string[];
 }
 
@@ -139,7 +141,16 @@ export default function MyRules() {
   const save = async (overrideConfirmed = false) => {
     setIsSaving(true);
     try {
-      const payload: Record<string, unknown> = { ...draft, override_confirmed: overrideConfirmed };
+      // A blank row is a half-typed window, not a rule. Dropping them here
+      // means "added a row and changed my mind" is not a change at all, and
+      // clearing every row sends [] - which `classify_change` reads as a
+      // removal and therefore a loosen.
+      const payload: Record<string, unknown> = {
+        ...draft,
+        restricted_windows: (draft.restricted_windows ?? [])
+          .map(w => w.trim()).filter(Boolean),
+        override_confirmed: overrideConfirmed,
+      };
       const res = await api.put('/api/constitution/', payload);
       const outcome = res.data;
       if (outcome.pending && Object.keys(outcome.pending).length > 0) {
@@ -210,9 +221,10 @@ export default function MyRules() {
     );
   }
 
-  const numericStatus = status.filter(s => ['daily_loss', 'daily_trades', 'max_consecutive_losses'].includes(s.rule));
-  const cooldownStatus = status.find(s => s.rule === 'cooldown');
-  const windowStatus = status.find(s => s.rule === 'restricted_windows');
+  // `numericStatus` was computed here and never read - EnforcedRules takes the
+  // whole `status` array and does its own lookup. `cooldownStatus` looked for a
+  // 'cooldown' row the API stopped emitting on 2026-09-02. Both removed.
+  const windows = (status.find(s => s.rule === 'restricted_windows')?.windows) ?? [];
 
   return (
     <div className="max-w-3xl mx-auto space-y-5 pb-12">
@@ -250,6 +262,36 @@ export default function MyRules() {
       )}
 
       <EnforcedRules status={status} />
+
+      {/* No-trade windows. A list, so it does not belong in the numeric rules
+          card. Rendered whether or not any are set: a trader who has just set
+          one needs to see it took, and one who has none needs to know the rule
+          exists before the edit dialog offers it. */}
+      <section className="tm-card overflow-hidden">
+        <div className="px-5 py-3.5 border-b border-border flex items-center gap-2">
+          <Clock className="h-4 w-4 text-muted-foreground" />
+          <p className="font-semibold text-[14px]">No-trade windows</p>
+        </div>
+        <div className="px-5 py-3">
+          {windows.length === 0 ? (
+            <p className="text-sm text-muted-foreground">
+              Not set. Add a window in Edit rules and entries inside it are
+              flagged as a rule violation.
+            </p>
+          ) : (
+            <div className="flex flex-wrap gap-2">
+              {windows.map((w) => (
+                <span
+                  key={w}
+                  className="rounded-md border border-border px-2 py-1 text-[13px] font-tabular"
+                >
+                  {w}
+                </span>
+              ))}
+            </div>
+          )}
+        </div>
+      </section>
 
       <RuleSuggestions />
 
@@ -364,6 +406,7 @@ export default function MyRules() {
               ['daily_trade_limit', 'Max trades per day', 1],
               ['max_position_size', 'Max risk per trade (% of capital)', 0.5],
               ['max_consecutive_losses', 'Stop after consecutive losses', 1],
+              ['sl_percent_options', 'Exit a losing option at (% of premium)', 5],
             ] as const).map(([field, label, step]) => (
               <div key={field}>
                 <label className="text-xs font-medium text-muted-foreground">{label}</label>
@@ -379,6 +422,69 @@ export default function MyRules() {
                 />
               </div>
             ))}
+
+            {/* NO-TRADE WINDOWS.
+                `restricted_windows` has been a RULE_FIELD since the
+                constitution shipped - enforced at entry by
+                position_monitor_tasks and at exit by the engine, both as a
+                `danger` constitution_violation - but NOTHING HAS EVER BEEN
+                ABLE TO SET IT. Every profile holds [], no alert has ever
+                fired, and no history row mentions it. This is that editor.
+
+                A list, not a number, so it gets its own control. Removing a
+                window is a LOOSEN by `classify_change`'s set rule (a superset
+                tightens, any removal loosens), so it attracts the same override
+                confirmation as relaxing any other rule. */}
+            <div>
+              <label className="text-xs font-medium text-muted-foreground">
+                No-trade windows (IST)
+              </label>
+              <div className="mt-1 space-y-2">
+                {(draft.restricted_windows ?? []).map((w, i) => (
+                  <div key={i} className="flex items-center gap-2">
+                    <Input
+                      value={w}
+                      placeholder="13:00-14:00"
+                      onChange={(e) => setDraft(d => {
+                        const next = [...(d.restricted_windows ?? [])];
+                        next[i] = e.target.value;
+                        return { ...d, restricted_windows: next };
+                      })}
+                    />
+                    <Button
+                      type="button" variant="ghost" size="sm"
+                      aria-label={`Remove window ${w}`}
+                      onClick={() => setDraft(d => ({
+                        ...d,
+                        restricted_windows: (d.restricted_windows ?? [])
+                          .filter((_, j) => j !== i),
+                      }))}
+                    >
+                      <X className="h-3.5 w-3.5" />
+                    </Button>
+                  </div>
+                ))}
+                <Button
+                  type="button" variant="outline" size="sm"
+                  onClick={() => setDraft(d => ({
+                    ...d,
+                    restricted_windows: [...(d.restricted_windows ?? []), ''],
+                  }))}
+                >
+                  Add a window
+                </Button>
+                {(draft.restricted_windows ?? []).length === 0 && (
+                  <p className="text-xs text-muted-foreground">
+                    None set - you have no no-trade windows.
+                  </p>
+                )}
+              </div>
+            </div>
+
+            <p className="text-xs text-muted-foreground pt-1">
+              Leave a field empty to remove that rule. Removing a rule relaxes
+              your constitution, so it asks for confirmation.
+            </p>
           </div>
           <DialogFooter>
             <Button variant="ghost" onClick={() => setEditing(false)} disabled={isSaving}>

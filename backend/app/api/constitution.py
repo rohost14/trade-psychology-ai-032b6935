@@ -12,7 +12,7 @@ from uuid import UUID
 from zoneinfo import ZoneInfo
 
 from fastapi import APIRouter, Depends, HTTPException
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
 from sqlalchemy import select, and_, desc
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -38,8 +38,56 @@ class ConstitutionUpdate(BaseModel):
     daily_trade_limit: Optional[int] = Field(None, ge=1, le=200)
     max_position_size: Optional[float] = Field(None, ge=0.1, le=100)
     max_consecutive_losses: Optional[int] = Field(None, ge=1, le=20)
+    # Added 2026-09-02. THIS FIELD'S ABSENCE WAS THE BUG: `sl_percent_options`
+    # is a RULE_FIELD, `snapshot` returns it, `classify_change` ranks it and the
+    # engine reads it - but the only endpoint that routes through the
+    # tighten/loosen gate had no field for it, so pydantic dropped the key and
+    # the rule could be neither set nor cleared here. Bounds copied from the
+    # profile endpoint's existing `validate_percent` (0.1-100), which is where
+    # the value used to be set; no new range is invented.
+    sl_percent_options: Optional[float] = Field(None, ge=0.1, le=100)
     restricted_windows: Optional[List[str]] = None
     override_confirmed: bool = False
+
+    @field_validator("restricted_windows")
+    @classmethod
+    def validate_windows(cls, v: Optional[List[str]]) -> Optional[List[str]]:
+        """
+        A window must be "HH:MM-HH:MM" IST, or it enforces NOTHING.
+
+        Both enforcement sites - `BehaviorEngine._detect_constitution_violation`
+        and `_check_entry_rules` - parse with `split("-")` / `split(":")` inside
+        a try, and `continue` past anything that raises. So an unparseable
+        window is stored, listed back to the trader as one of their rules, and
+        silently skipped every time it should fire. That is worse than having no
+        rule: the page promises a protection that does not exist. Rejecting it
+        at the boundary is the only place the trader can be told.
+        """
+        if v is None:
+            return v
+        clean: List[str] = []
+        for raw in v:
+            w = (raw or "").strip()
+            if not w:
+                continue                      # a blank row is not a window
+            try:
+                start_s, end_s = w.split("-")
+                sh, sm = map(int, start_s.strip().split(":"))
+                eh, em = map(int, end_s.strip().split(":"))
+            except (ValueError, AttributeError):
+                raise ValueError(
+                    f"'{raw}' is not a time window. Use HH:MM-HH:MM, "
+                    f"for example 13:00-14:00."
+                )
+            if not (0 <= sh < 24 and 0 <= eh < 24 and 0 <= sm < 60 and 0 <= em < 60):
+                raise ValueError(f"'{raw}' is not a real time of day.")
+            if sh * 60 + sm > eh * 60 + em:
+                raise ValueError(f"'{raw}' ends before it starts.")
+            clean.append(f"{sh:02d}:{sm:02d}-{eh:02d}:{em:02d}")
+        # Normalised and de-duplicated, order kept. Normalising matters for
+        # change detection: "9:15-9:30" and "09:15-09:30" are one window, and
+        # `classify_change` compares them as SETS.
+        return list(dict.fromkeys(clean))
     # onboarding flows: "initial" (auto-generated) or "accept" (review screen)
     change_type: Optional[str] = None
 
@@ -195,6 +243,12 @@ _RULE_TO_THRESHOLD = {
     "per_trade_loss_limit":   "per_trade_loss_limit",
     "max_position_size":      "max_position_size",
     "max_consecutive_losses": "max_consecutive_losses",
+    # Added 2026-09-02. `sl_percent_options` has always been a RULE_FIELD and
+    # has always resolved (Source.FACT when declared, absent otherwise), but it
+    # was missing here, so the one page that reports what is enforced never
+    # mentioned it. Its threshold key is None when undeclared, which this
+    # endpoint already renders as "unset" - no default is implied.
+    "sl_percent_options":     "sl_percent_options",
 }
 
 #: Thresholds the engine enforces that no rule can set. Surfaced so the rules

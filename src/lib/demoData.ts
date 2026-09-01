@@ -1283,12 +1283,20 @@ export const DEMO_JOURNAL_ENTRIES = {
 // and complete onboarding first." — a failure message shown to a demo user who
 // has no broker to connect. Limits line up with DEMO_RISK_STATE.
 export const DEMO_CONSTITUTION = {
+  // `max_position_size` HELD 200000 HERE - rupees in a field the model defines
+  // as a PERCENT of capital (`user_profile.py:84`). The same confusion put
+  // 50000 into a real trader's profile through the onboarding wizard and made
+  // `max_trade_risk` fire zero times ever. It is a percent: 10 means 10%.
+  // `cooldown_after_loss` left this fixture with the user rule on 2026-09-02;
+  // `per_trade_loss_limit` and `sl_percent_options` are the two rule fields the
+  // endpoint returns that were never mirrored here.
   rules: {
     daily_loss_limit: 25000,
+    per_trade_loss_limit: 6000,
     daily_trade_limit: 5,
-    max_position_size: 200000,
-    cooldown_after_loss: 15,
+    max_position_size: 10,
     max_consecutive_losses: 3,
+    sl_percent_options: 30,
     restricted_windows: ['09:15-09:30'],
   },
   pending: null,
@@ -1299,8 +1307,6 @@ export const DEMO_CONSTITUTION_STATUS = {
   status: [
     { rule: 'daily_loss',            current: 8455, limit: 25000, ratio: 0.34 },
     { rule: 'daily_trades',          current: 9,    limit: 5,     ratio: 1.8  },
-    { rule: 'max_position_size',     current: 186000, limit: 200000, ratio: 0.93 },
-    { rule: 'cooldown_after_loss',   active: true,  remaining_min: 7, limit_min: 15 },
     { rule: 'max_consecutive_losses', current: 2,   limit: 3,     ratio: 0.67 },
     { rule: 'restricted_windows',    windows: ['09:15-09:30'] },
   ],
@@ -1309,7 +1315,10 @@ export const DEMO_CONSTITUTION_STATUS = {
 export const DEMO_CONSTITUTION_VIOLATIONS = {
   today: [
     { rule: 'daily_trade_limit',   severity: 'danger',  message: '9 trades today against a limit of 5.',            detected_at: daysAgo(0, 14, 22) },
-    { rule: 'cooldown_after_loss', severity: 'caution', message: 'Re-entered 6 min after a loss; cooldown is 15.',   detected_at: daysAgo(0, 13, 40) },
+    // Was a cooldown violation, which nothing can produce since the rule was
+    // removed. A no-trade window breach is the honest replacement: it is the
+    // rule that just became settable, and both enforcement sites emit it.
+    { rule: 'restricted_window',   severity: 'danger',  message: 'Your no-trade window (09:15-09:30 IST) violated: entered NIFTY26FEB24000CE at 09:21.', detected_at: daysAgo(0, 9, 21) },
   ],
   total: 11,
   by_rule: {
@@ -1535,11 +1544,13 @@ export const DEMO_CONSTITUTION_HISTORY = {
 export const DEMO_CONSTITUTION_EFFECTIVE = {
   has_baseline: true,
   rules: {
-    daily_trade_limit:      { declared: 50,     effective: 6,      source: 'learned',  overridden: true  },
-    cooldown_after_loss:    { declared: 15,     effective: 15,     source: 'declared', overridden: false },
-    daily_loss_limit:       { declared: 25000,  effective: 25000,  source: 'declared', overridden: false },
-    max_position_size:      { declared: 200000, effective: 200000, source: 'declared', overridden: false },
-    max_consecutive_losses: { declared: null,   effective: 3,      source: 'default',  overridden: false },
+    daily_trade_limit:      { declared: 50,    effective: 6,     source: 'learned',  overridden: true  },
+    daily_loss_limit:       { declared: 25000, effective: 25000, source: 'declared', overridden: false },
+    per_trade_loss_limit:   { declared: 6000,  effective: 6000,  source: 'declared', overridden: false },
+    max_position_size:      { declared: 10,    effective: 10,    source: 'declared', overridden: false },
+    max_consecutive_losses: { declared: null,  effective: 3,     source: 'default',  overridden: false },
+    // The unset case, which is the one the page must not dress up as a value.
+    sl_percent_options:     { declared: null,  effective: null,  source: 'unset',    overridden: false },
   },
   ungoverned: {
     burst_trades_per_30min_caution: 4,

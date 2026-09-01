@@ -24,10 +24,13 @@ import { DangerZoneTab } from '@/components/settings/DangerZoneTab';
 const RULE_FIELD_LABELS: Record<string, string> = {
   daily_loss_limit:       'Daily loss limit',
   daily_trade_limit:      'Max trades per day',
-  max_position_size:      'Max position size',
-  cooldown_after_loss:    'Cooldown after a loss',
+  per_trade_loss_limit:   'Per-trade loss limit',
+  max_position_size:      'Max risk per trade',
   max_consecutive_losses: 'Max consecutive losses',
-  restricted_windows:     'Restricted trading windows',
+  restricted_windows:     'No-trade windows',
+  // Settings can now clear this one, and clearing is a loosen - so it can
+  // reach this list, which is exactly when the message must name it.
+  sl_percent_options:     'Options exit level',
 };
 
 // Deep-linkable tabs. Anything else in ?tab= falls back to profile rather than

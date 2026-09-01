@@ -155,7 +155,14 @@ export function ProfileTab({ profile, setProfile }: ProfileTabProps) {
             </p>
           </div>
 
-          {/* Max position size (% of capital) */}
+          {/* Max position size (% of capital).
+
+              AN UNSET RULE MUST NOT LOOK CHOSEN. This slider read
+              `?? 10` and its copy said "Default: 10%", so a trader who had
+              declared no exposure limit saw 10% sitting there as if they had
+              picked it. NULL means NO DECLARED EXPOSURE RULE - Pattern 28 rests
+              on that - and the control now says so. Clearing lives in My Rules,
+              which is the single editor for every rule. */}
           <div className="space-y-2">
             <Label>Max per options trade — % of capital as premium</Label>
             <div className="flex items-center gap-3">
@@ -164,27 +171,66 @@ export function ProfileTab({ profile, setProfile }: ProfileTabProps) {
                 min={1}
                 max={30}
                 step={1}
-                value={profile.max_position_size ?? 10}
+                value={profile.max_position_size ?? 1}
                 onChange={(e) => setProfile({ ...profile, max_position_size: Number(e.target.value) })}
                 className="w-full accent-[#0D9488]"
+                aria-label="Max per options trade, percent of capital"
               />
-              <span className="text-sm font-medium w-12 text-right">{profile.max_position_size ?? 10}%</span>
+              <span className="text-sm font-medium w-16 text-right">
+                {profile.max_position_size == null ? 'Not set' : `${profile.max_position_size}%`}
+              </span>
             </div>
             <p className="text-xs text-muted-foreground">
-              Alert fires when a single trade exceeds this % of your capital. Default: 10%.
+              {profile.max_position_size == null
+                ? 'No exposure rule set. Move the slider to set one, or manage it in My Rules.'
+                : 'Alert fires when a single trade exceeds this % of your capital.'}
             </p>
           </div>
 
-          {/* SL % options */}
+          {/* SL % options.
+
+              TWO FIXES HERE.
+
+              1. `?? 50` highlighted the 50% preset whenever the value was NULL,
+                 so an unset rule looked like a deliberate choice - and one
+                 stored 50 in the live database is now permanently ambiguous
+                 because of it. Nothing is highlighted when the rule is unset,
+                 and "Not set" is a real, selectable option, so the trader can
+                 remove the rule from here as well as from My Rules.
+
+              2. The copy claimed "Used to detect holding losers too long on
+                 options buys". That describes `holding_loser`. This value is
+                 the trader's own exit rule: `live_risk_state` raises it as a
+                 DECLARED band beside - never instead of - the universal
+                 severe-loss ladder. */}
           <div className="space-y-2">
             <Label>I exit options when premium drops by</Label>
             <div className="flex flex-wrap gap-2">
-              {[30, 50, 70, 100].map((pct) => (
+              <button
+                type="button"
+                className={`px-3 py-1.5 rounded-md border text-sm font-medium transition-all ${
+                  profile.sl_percent_options == null
+                    ? 'border-tm-brand bg-tm-brand text-white'
+                    : 'border-border hover:border-tm-brand/50'
+                }`}
+                onClick={() => setProfile({ ...profile, sl_percent_options: null })}
+              >
+                Not set
+              </button>
+              {/* The presets, PLUS whatever the trader actually has. My Rules
+                  accepts any value in 0.1-100, so a rule of 45% would match no
+                  preset and this control would have shown nothing selected -
+                  the same "unset rule looks chosen" defect in reverse, and a
+                  worse one, because a real declared rule would read as absent. */}
+              {Array.from(new Set([
+                ...[30, 50, 70, 100],
+                ...(profile.sl_percent_options != null ? [profile.sl_percent_options] : []),
+              ])).sort((a, b) => a - b).map((pct) => (
                 <button
                   key={pct}
                   type="button"
                   className={`px-3 py-1.5 rounded-md border text-sm font-medium transition-all ${
-                    (profile.sl_percent_options ?? 50) === pct
+                    profile.sl_percent_options === pct
                       ? 'border-tm-brand bg-tm-brand text-white'
                       : 'border-border hover:border-tm-brand/50'
                   }`}
@@ -195,7 +241,9 @@ export function ProfileTab({ profile, setProfile }: ProfileTabProps) {
               ))}
             </div>
             <p className="text-xs text-muted-foreground">
-              Used to detect holding losers too long on options buys.
+              {profile.sl_percent_options == null
+                ? 'No exit rule set. The universal severe-loss warnings still apply.'
+                : 'Your own exit line. Reported beside the universal severe-loss warnings, never instead of them.'}
             </p>
           </div>
 

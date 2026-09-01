@@ -28,10 +28,11 @@ interface StatusRow { rule: string; current?: number; limit?: number | null; act
 
 const LABEL: Record<string, string> = {
   daily_loss_limit:       'Daily loss limit',
+  per_trade_loss_limit:   'Per-trade loss limit',
   daily_trade_limit:      'Trades per day',
-  max_position_size:      'Position size',
-  cooldown_after_loss:    'Cooldown after a loss',
+  max_position_size:      'Max risk per trade',
   max_consecutive_losses: 'Losses in a row',
+  sl_percent_options:     'I exit a losing option at',
 };
 
 /** Rule key -> the status key reporting today's use of it. */
@@ -39,15 +40,23 @@ const TODAY_KEY: Record<string, string> = {
   daily_loss_limit: 'daily_loss',
   daily_trade_limit: 'daily_trades',
   max_consecutive_losses: 'max_consecutive_losses',
-  cooldown_after_loss: 'cooldown_after_loss',
 };
 
-const MONEY = new Set(['daily_loss_limit', 'max_position_size']);
-const MINUTES = new Set(['cooldown_after_loss', 'revenge_window_caution_min']);
+const MONEY = new Set(['daily_loss_limit', 'per_trade_loss_limit']);
+/**
+ * `max_position_size` IS A PERCENT OF CAPITAL, not an amount — the model says
+ * so (`user_profile.py:84`) and the entry check divides a capital requirement
+ * by `trading_capital` to compare against it. It sat in MONEY, so a trader who
+ * had capped a trade at 10% of capital was told their limit was "₹10". A rule
+ * shown in the wrong unit is a wrong rule.
+ */
+const PERCENT = new Set(['max_position_size', 'sl_percent_options']);
+const MINUTES = new Set(['revenge_window_caution_min']);
 
 function fmt(key: string, v: number | null | undefined): string {
-  if (v == null) return '—';
+  if (v == null) return 'Not set';
   if (MONEY.has(key)) return formatCurrencyWhole(v).replace('+', '');
+  if (PERCENT.has(key)) return `${v}%`;
   if (MINUTES.has(key)) return `${v} min`;
   return String(v);
 }
