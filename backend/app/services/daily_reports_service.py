@@ -864,12 +864,50 @@ class DailyReportsService:
         score = 100
         factors = []
 
-        # Factor 1: Historically bad day of week
-        if profile and profile.detected_patterns:
-            for danger in profile.detected_patterns.get("time_patterns", {}).get("danger_days", []):
-                if danger["day"] == day_name:
-                    score -= 20
-                    factors.append({"factor": "danger_day", "impact": -20, "detail": f"{day_name} has low win rate historically"})
+        # Factor 1 was "historically bad day of week" - a flat -20 whenever today
+        # matched a learned `danger_day`. REMOVED 2026-09-01, after the rest of
+        # the `time_of_day_bias` retirement and deliberately as a second step.
+        #
+        # It was the last thing in the product reading a retired list. The rest
+        # of that retirement removed sentences; this one moved a NUMBER, which
+        # can flip the status band, so it was raised as a product decision rather
+        # than folded into the same pass.
+        #
+        # THE DECISION: a readiness score is a trader-facing decision signal, so
+        # the rule that retired the alert applies here too. `danger_days` is not
+        # stable enough to name a bad day - the day-of-week win rates span
+        # 36.0-42.6% around a 39.5% book rate, nothing reaches the producer's
+        # 35% cut on the full book, and the Friday/Wednesday flags the first half
+        # of the book produced did not survive into the second.
+        #
+        # The penalty is GONE, not hidden. Keeping the arithmetic while dropping
+        # only the visible detail string was the other option and the worse one:
+        # an unsupported signal moving a decision number invisibly is harder to
+        # audit than one that at least states itself.
+        #
+        # MEASURED over all 489,951 reachable inputs (every 5-trade P&L vector
+        # across the -3000 / -1500 / sign boundaries, x 7 weekdays, x profile
+        # absent / matching / non-matching):
+        #
+        #   54,439 cases (11.1%) move, every one by exactly +20; 435,512 (88.9%)
+        #   are byte-identical. The surviving factors match case for case.
+        #   Bands:  caution -> ready 41,121 | ready -> ready 8,754
+        #           warning -> caution 4,564
+        #   A trader affected ONLY by this factor goes 80 -> 100, both `ready`
+        #   (the cut is score >= 80).
+        #
+        # ONE CONSEQUENCE WORTH KNOWING, and it is not a defect introduced here:
+        # the `warning` band (score < 60) is now UNREACHABLE. The remaining
+        # penalties total at most 40 - large_recent_loss 20, losing_streak 15,
+        # expiry_day 5 - so the floor is exactly 60, the `caution` cut. All 4,564
+        # warning cases required this -20. Substituting a replacement factor to
+        # keep the band alive would be inventing a threshold, which is the thing
+        # the retirement exists to stop. Recorded in PENDING_AND_TODO.md as a
+        # product question about the band, not a reason to keep the signal.
+        #
+        # NO replacement day or time factor was substituted. The raw time/day
+        # learning is still computed and stored nightly for future research.
+        # See docs/patterns/25-27-performance-trio/.
 
         # Factor 2: Recent PnL in last 5 trades
         if recent_positions:

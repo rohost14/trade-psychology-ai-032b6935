@@ -86,12 +86,8 @@ detector body mentions any of the four signals.
 **`api/my_record.py`.** Excluded by instruction, recorded as a separate product
 review in `PENDING_AND_TODO.md`, and pinned untouched by a test.
 
-**One consumer left in place and raised instead:**
-`daily_reports_service._calculate_readiness_score` subtracts 20 from a numeric
-0–100 score on a learned danger day. Removing it changes the score and can flip
-its status band — a product behaviour change outside this decision's scope. It
-is the only site in the product still reading a retired list, and a test pins
-that it stays the only one. Detail in `PENDING_AND_TODO.md`.
+**One consumer was left in place and raised instead, then closed in a second
+step — see §6.**
 
 ---
 
@@ -101,7 +97,7 @@ that it stays the only one. Detail in `PENDING_AND_TODO.md`.
 |---|---|
 | all-detector replay, real book | **457 firings, sha256 `5af4ec6bfd150de9` — byte-identical to the baseline** |
 | per-detector counts | unchanged: `revenge_trade` 182, `adding_to_adverse_position` 64, `no_stoploss` 52, `same_symbol_obsession` 49, `fomo_entry` 32, `martingale_behaviour` 26, `premium_loss_event` 17, `rapid_reentry` 14, `overtrading_burst` 13, `post_loss_recovery_bet` 7, `end_of_session_mis_panic` 1 |
-| backend tests | **1,882 passed** (was 1,854; +28 from the new retirement suite) |
+| backend tests | **1,885 passed** (was 1,854; +31 from the new retirement suite) |
 | frontend tests | **102 passed** |
 | typecheck | clean |
 | lint | **0 errors**, 71 warnings — unchanged from before |
@@ -154,3 +150,77 @@ seriousness: the first review called this detector mis-wired and dead on arrival
 claiming `detected_patterns["time_patterns"]` had no writer. **That was wrong.**
 It is written on a nightly beat. The detector was live and firing on a signal
 measured here as chance.
+
+
+---
+
+## 6. Second step — `_calculate_readiness_score`, closed 1 Sep 2026
+
+The rest of this retirement removed **sentences**. This one moved a **number**,
+so it was raised rather than folded in: `_calculate_readiness_score` subtracted a
+flat 20 from a 0–100 readiness score whenever today matched a learned
+`danger_day`.
+
+**Decided: remove it.** A readiness score is a trader-facing decision signal, so
+the rule that retired the alert applies here too. The penalty is **gone, not
+hidden** — keeping the arithmetic while dropping only the visible detail string
+was the rejected option, because an unsupported signal moving a decision number
+invisibly is harder to audit than one that at least states itself. **No
+replacement day or time factor was substituted.**
+
+### The instrument
+
+The detector replay **cannot see this function**. No detector reads it, and the
+reference book carries no `UserProfile`, so `danger_days` is empty there and the
+factor fires zero times regardless. The replay was run anyway and came back
+byte-identical — **457 firings, sha256 `5af4ec6bfd150de9`** — which confirms no
+detector moved but says nothing about the score.
+
+So the score was measured directly, by **exhaustive enumeration over its whole
+input space**: every 5-trade P&L vector over a value set straddling each boundary
+the function tests (the ₹3,000 and ₹1,500 sums and the sign test for the streak),
+plus the no-positions case, × all 7 weekdays, × profile absent / matching /
+non-matching. **489,951 cases.**
+
+### Exact impact
+
+| | before | after |
+|---|---|---|
+| cases unchanged | — | **435,512 (88.9%)** |
+| cases moved | — | **54,439 (11.1%)**, every one by **exactly +20** |
+| cases where the surviving factor set differs | — | **0** |
+| `ready` / `caution` / `warning` | 407,754 / 77,633 / 4,564 | 448,875 / 41,076 / **0** |
+| reachable score range | 40 – 100 | **60 – 100** |
+
+Band transitions among the 54,439 affected:
+
+| transition | cases |
+|---|---|
+| `caution` → `ready` | 41,121 |
+| `ready` → `ready` | 8,754 |
+| `warning` → `caution` | 4,564 |
+
+**A trader affected only by this factor goes 80 → 100, both `ready`** — the cut
+is `score >= 80`, so 80 was already `ready`. *(An earlier note in this session
+said 80 was `caution`. It was not; corrected here and in the code comment.)*
+
+### The consequence worth knowing: `warning` is now unreachable
+
+The remaining penalties total at most **40** — `large_recent_loss` 20,
+`losing_streak` 15, `expiry_day` 5 — so the floor is exactly **60**, the
+`caution` cut. Every one of the 4,564 cases that reached `warning` required the
+removed −20.
+
+**This is a consequence of the removal, not a defect introduced by it, and not a
+reason to substitute a replacement factor** — that would be inventing a
+threshold, which is what the retirement exists to stop. Pinned by
+`test_the_warning_band_is_now_unreachable_and_that_is_recorded`, and recorded in
+`PENDING_AND_TODO.md` as a product question about the **band**, not the signal.
+
+### Verification
+
+Backend **1,885 tests** · frontend **102** · typecheck clean · **0 lint errors**,
+71 warnings · detector replay byte-identical. The only live references to the
+four signals that remain anywhere in `backend/app` or `src` are inside
+`_learn_time_patterns` itself — the learner that is deliberately kept.
+`my_record.py` untouched and still pinned so.

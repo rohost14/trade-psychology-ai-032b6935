@@ -711,38 +711,44 @@ nothing can be backfilled.
 
 ## Surfaced by the `time_of_day_bias` retirement (Reviews 25-27) — NOT actioned
 
-### THE ONE OPEN DECISION: `_calculate_readiness_score`'s danger-day factor
+### ~~THE ONE OPEN DECISION: `_calculate_readiness_score`'s danger-day factor~~ — **CLOSED 2026-09-01**
 
-`daily_reports_service.py:_calculate_readiness_score` subtracts **20 points from
-a numeric 0–100 readiness score** when today is a learned `danger_day`, and
-appends a factor row whose detail reads *"{day} has low win rate historically"*.
+**Decided: remove the factor.** A readiness score is a trader-facing decision
+signal, so the rule that retired the alert applies to it too. The penalty is
+**gone, not hidden** — keeping the arithmetic while dropping only the visible
+detail string was the rejected option, because an unsupported signal moving a
+decision number invisibly is harder to audit than one that at least states
+itself. No replacement day or time factor was substituted.
 
-**It was deliberately left in place**, and it is the only site in the product
-that still reads a retired list. Removing it does not merely delete a sentence —
-it changes the score and can flip its status band:
+Measured over all **489,951** reachable inputs: **54,439 (11.1%) move, every one
+by exactly +20**; 435,512 (88.9%) identical; the surviving factors match case for
+case. Bands: `caution → ready` 41,121 · `ready → ready` 8,754 ·
+`warning → caution` 4,564.
 
-| | today |
-|---|---|
-| max penalty across all factors | 60 (danger_day −20, recent loss −20, streak −15, expiry −5) |
-| max penalty with the factor gone | 40 |
-| a trader on a flagged day, no other factor | score 80, status **caution** → score 100, status **ready** |
+### NEW, and it falls out of that removal: the `warning` band is now unreachable
 
-The bands are 80 (`ready`) and 60 (`caution`); the score is rendered on
-`Reports.tsx` as `{score}/100` with a colour driven by `status`.
+`_calculate_readiness_score`'s three status bands are `ready` (≥ 80), `caution`
+(≥ 60) and `warning` (below 60). With the danger-day −20 gone, **the remaining
+penalties total at most 40** — `large_recent_loss` 20, `losing_streak` 15,
+`expiry_day` 5 — so the floor is **exactly 60**, which is the `caution` cut.
 
-**This is a product behaviour change outside the approved Option B scope**, so
-it was raised rather than guessed at. Pinned by
-`test_the_readiness_score_is_the_only_thing_still_pending` — if a second site
-starts reading a retired list, that test fails.
+| | before | after |
+|---|---|---|
+| reachable score range | 40 – 100 | **60 – 100** |
+| `warning` cases in the sweep | 4,564 | **0** |
 
-**Two options, neither taken:**
+All 4,564 required the removed −20. **This is a consequence, not a defect
+introduced by the removal, and not a reason to substitute a replacement factor** —
+that would be inventing a threshold, which is the thing the retirement exists to
+stop. It is pinned by
+`test_the_warning_band_is_now_unreachable_and_that_is_recorded` so it is a known
+recorded fact rather than a later surprise.
 
-1. **Remove the factor.** Consistent with the retirement, and the honest reading:
-   a 20-point penalty resting on a signal measured as chance is worse than no
-   penalty. Scores rise by 20 on previously-flagged days.
-2. **Keep the arithmetic, drop the visible detail string.** Preserves every
-   score, but keeps an unsupported signal driving a trader-facing number
-   invisibly — which is the worse half of the two.
+**The open product question is about the band, not the signal:** either the
+remaining penalties are too small for a three-band scale, or the scale should be
+two bands. Both are product decisions with no evidence behind them yet, and
+neither was taken. `Reports.tsx:192` still carries the `warning` branch and its
+`text-tm-loss` colour, harmlessly.
 
 ### `api/my_record.py` needs its own product review
 

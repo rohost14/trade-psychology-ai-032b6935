@@ -296,58 +296,156 @@ def test_no_predictive_window_or_alert_is_built_from_time_patterns():
             assert f'get("{signal}"' not in body, f"{fn.__name__} still reads {signal}"
 
 
-#: The ONE site in the daily report that still reads a retired list. It is not
-#: an oversight - it is an open product decision, deliberately not taken in this
-#: pass.
-#:
-#: `_calculate_readiness_score` subtracts 20 from a numeric 0-100 score when
-#: today is a learned danger_day. Removing it does not merely delete a sentence:
-#: it changes the score itself and can flip its status band (80 is the "ready"
-#: cut, 60 the "caution" cut), so a trader on a previously-flagged day would see
-#: 80 become 100 and "caution" become "ready". That is a product behaviour
-#: change outside the approved scope, so the signal was left in place and the
-#: consumer raised instead of guessed at.
-#:
-#: When the decision is taken, delete this allowance - do not widen it.
-READINESS_SCORE_ALLOWANCE = "_calculate_readiness_score"
-
-
-def test_the_daily_report_makes_no_hour_or_day_claim_except_the_open_one():
+def test_the_daily_report_makes_no_hour_or_day_claim_anywhere():
+    """
+    NO allowance. `_calculate_readiness_score`'s danger-day factor was the one
+    site left open when the rest of this retirement shipped, and it was closed
+    on 2026-09-01 by decision: a readiness score is a trader-facing decision
+    signal, so the rule that retired the alert applies to it too.
+    """
     from app.services import daily_reports_service
 
     path = Path(daily_reports_service.__file__)
-    lines = path.read_text(encoding="utf-8").splitlines()
-
-    def enclosing_def(idx):
-        for i in range(idx, -1, -1):
-            stripped = lines[i].lstrip()
-            if stripped.startswith("def "):
-                return stripped[4:].split("(")[0]
-        return "<module>"
-
     offenders = []
     for lineno, line in _code_lines(path):
         for signal in SIGNALS:
             if f'"{signal}"' in line:
-                if enclosing_def(lineno - 1) == READINESS_SCORE_ALLOWANCE:
-                    continue
                 offenders.append(f"{lineno}: {line.strip()}")
     assert offenders == [], f"daily report still reads the retired lists: {offenders}"
 
 
-def test_the_readiness_score_is_the_only_thing_still_pending():
+def test_the_readiness_score_has_no_day_or_time_factor():
     """
-    Pins the open decision so it cannot quietly become two. If a second site
-    starts reading a retired list, this fails.
+    The penalty is GONE, not hidden. Keeping the arithmetic while dropping only
+    the visible detail string was the rejected option: an unsupported signal
+    moving a decision number invisibly is harder to audit than one that at least
+    states itself. So this asserts on the SCORE, not on the copy.
     """
-    from app.services import daily_reports_service
+    from datetime import datetime, timedelta
+    from types import SimpleNamespace
 
-    path = Path(daily_reports_service.__file__)
-    hits = [
-        lineno for lineno, line in _code_lines(path)
-        if any(f'"{s}"' in line for s in SIGNALS)
-    ]
-    assert len(hits) == 1, f"expected exactly the readiness-score site, got {hits}"
+    from app.services.daily_reports_service import DailyReportsService
+
+    svc = DailyReportsService()
+    days = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday",
+            "Saturday", "Sunday"]
+
+    for day in days:
+        flagged = SimpleNamespace(detected_patterns={"time_patterns": {
+            "danger_days": [{"day": day, "win_rate": 31.2}],
+            "best_days": [{"day": day, "win_rate": 61.0}],
+            "danger_hours": [{"hour": 12, "win_rate": 29.9, "trades": 68}],
+            "best_hours": [{"hour": 14, "win_rate": 60.0, "trades": 30}],
+        }})
+        clean = SimpleNamespace(detected_patterns={})
+
+        with_signal = svc._calculate_readiness_score(flagged, [], day)
+        without = svc._calculate_readiness_score(clean, [], day)
+
+        assert with_signal == without, (
+            f"{day}: a learned danger_day still changes the readiness score")
+        assert not any(f["factor"] == "danger_day"
+                       for f in with_signal["factors"]), day
+
+
+def test_no_replacement_day_or_time_factor_was_substituted():
+    """
+    The instruction was explicit: do not replace it with another time/day factor
+    or a new threshold. The three surviving factors are recent P&L, losing streak
+    and expiry day - and `expiry_day` is a MARKET fact (weekly expiry), not a
+    learned property of the trader, so it is not a substitute.
+    """
+    import inspect
+
+    from app.services.daily_reports_service import DailyReportsService
+
+    body = "\n".join(
+        l for l in inspect.getsource(
+            DailyReportsService._calculate_readiness_score).splitlines()
+        if not l.lstrip().startswith("#")
+    )
+    for signal in SIGNALS:
+        assert signal not in body, signal
+    assert "time_patterns" not in body
+    assert "detected_patterns" not in body
+
+    emitted = {
+        "large_recent_loss", "moderate_recent_loss", "losing_streak",
+        "expiry_day",
+    }
+    found = set()
+    for line in body.splitlines():
+        if '"factor":' in line:
+            found.add(line.split('"factor":')[1].split('"')[1])
+    assert found == emitted, f"the factor set changed: {found}"
+
+
+def test_the_surviving_factors_are_untouched():
+    """
+    Measured over all 489,951 reachable inputs: 435,512 cases (88.9%) are
+    identical and the other 54,439 move by exactly +20. Nothing else shifted.
+    These are the boundary cases from that sweep.
+    """
+    from datetime import datetime, timedelta
+    from types import SimpleNamespace
+
+    from app.services.daily_reports_service import DailyReportsService
+
+    svc = DailyReportsService()
+    base = datetime(2026, 9, 1, 15, 0, 0)
+
+    def pos(pnls):
+        return [SimpleNamespace(last_exit_time=base - timedelta(minutes=i),
+                                realized_pnl=p, pnl=None)
+                for i, p in enumerate(pnls)]
+
+    # large_recent_loss: sum < -3000
+    r = svc._calculate_readiness_score(None, pos([-900.0] * 5), "Monday")
+    assert ("large_recent_loss", -20) in [(f["factor"], f["impact"]) for f in r["factors"]]
+    assert ("losing_streak", -15) in [(f["factor"], f["impact"]) for f in r["factors"]]
+    assert r["score"] == 65
+
+    # moderate_recent_loss: -3000 <= sum < -1500
+    r = svc._calculate_readiness_score(None, pos([-400.0] * 5), "Monday")
+    assert ("moderate_recent_loss", -10) in [(f["factor"], f["impact"]) for f in r["factors"]]
+    assert r["score"] == 75
+
+    # no loss at all, and the expiry-day branch is a MARKET fact, not learned
+    r = svc._calculate_readiness_score(None, pos([2000.0] * 5), "Monday")
+    assert r["score"] == 100 and r["status"] == "ready"
+    r = svc._calculate_readiness_score(None, pos([2000.0] * 5), "Thursday")
+    assert r["score"] == 95
+    assert [(f["factor"], f["impact"]) for f in r["factors"]] == [("expiry_day", -5)]
+
+
+def test_the_warning_band_is_now_unreachable_and_that_is_recorded():
+    """
+    A consequence of the removal, not a defect introduced by it, and NOT a reason
+    to substitute a replacement factor - that would be inventing a threshold,
+    which is the thing this retirement exists to stop.
+
+    The remaining penalties total at most 40 (large_recent_loss 20 + streak 15 +
+    expiry 5), so the floor is exactly 60 - the `caution` cut. All 4,564 cases
+    that reached `warning` in the pre-change sweep required the removed -20.
+
+    Pinned so the dead band is a known, recorded product question rather than
+    something discovered later as a surprise. See PENDING_AND_TODO.md.
+    """
+    from datetime import datetime, timedelta
+    from types import SimpleNamespace
+
+    from app.services.daily_reports_service import DailyReportsService
+
+    svc = DailyReportsService()
+    base = datetime(2026, 9, 1, 15, 0, 0)
+    worst = [SimpleNamespace(last_exit_time=base - timedelta(minutes=i),
+                             realized_pnl=-100000.0, pnl=None)
+             for i in range(5)]
+
+    r = svc._calculate_readiness_score(None, worst, "Thursday")
+    assert r["score"] == 60, "the worst reachable score is no longer 40"
+    assert r["status"] == "caution"
+    assert sum(f["impact"] for f in r["factors"]) == -40
 
 
 def test_the_day_warning_banner_is_gone_from_the_briefing():
