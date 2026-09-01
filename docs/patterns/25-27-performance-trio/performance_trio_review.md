@@ -2,6 +2,23 @@
 
 **1 Sep 2026. INVESTIGATION ONLY. NO CODE CHANGED.**
 
+> ## ⚠ SECTION 25 CONTAINS A FINDING THAT WAS WRONG — see `time_of_day_bias_design.md`
+>
+> This review states that `detected_patterns["time_patterns"]` **has no writer**
+> and calls `time_of_day_bias` *"mis-wired / dead on arrival"*. **That is false.**
+> `_store_learned_patterns` writes the whole dict at
+> `ai_personalization_service.py:142`, on a nightly Celery beat, and the chain is
+> live end to end. I grepped for `["time_patterns"] =` and a whole-dict
+> assignment could not match it.
+>
+> **The corrected picture is more serious, not less:** the detector is live and
+> firing today for traders with 30+ sessions, and the danger hours it fires on
+> are **not stable** — no hour survives into the second half of the book, and
+> chance reproduces the flagged count 31% of the time.
+>
+> **Verdicts 26 (KEEP AS-IS) and 27 (DEFER) are unaffected** and were confirmed
+> independently.
+
 Source-list #25, #26, #27. All three recorded as *"IMPLEMENTED, NEVER FIRED"* and
 ON HOLD for the same stated reason. Reviewed in one pass because they share that
 status — **each gets its own analysis and its own verdict**, and the combined
@@ -177,7 +194,15 @@ site rather than never computed.
 2. **But not before P2 and P3 are settled** — the fix turns on 81 alerting
    events and rests on an uncorrected multiple-comparisons cut.
 
-## Verdict — **MODIFY**, with the wiring fix explicitly gated
+## Verdict — **WITHDRAWN.** See `time_of_day_bias_design.md`
+
+The MODIFY verdict below rested on the wiring claim, which was wrong. There is
+nothing to wire. The corrected question is whether a live `caution` alert should
+be driven by a filter measured as chance-like and unstable across periods.
+
+*(Original text retained below for the record.)*
+
+### ~~Verdict — MODIFY, with the wiring fix explicitly gated~~
 
 The defect is certain and the remedy is one line. The volume and the statistics
 are not settled, and shipping the line alone would take a detector from silent to
