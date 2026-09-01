@@ -968,6 +968,33 @@ explicitly told not to modify ladders. Changing it for exposure alone would make
 that rule inconsistent with the others; changing it for all of them is a separate
 product decision. **Left exactly as it was.**
 
+### `_is_contract_expired` misreads a real 1st-of-month expiry — found 2026-09-02
+
+`reconciliation_tasks._is_contract_expired` branches on `expiry_date.day == 1`
+to detect `instrument_parser`'s **monthly proxy** date, and then refuses to
+expire the contract until the whole month has passed.
+
+**A weekly contract that genuinely expires on the 1st is indistinguishable from
+that proxy**, so it stays "live" for up to another month and
+`_expire_stale_positions` will not zero it.
+
+Surfaced because two tests in `test_integration.py::TestOptionsExpiryCleanup`
+construct `yesterday = date.today() - 1` and assert it is expired — which is
+true on 29 days a month and **false on the 2nd**, when yesterday is the 1st:
+
+```
+today=2026-09-02  yesterday=2026-09-01 (day=1)  -> expired? False
+today=2026-09-03  yesterday=2026-09-02 (day=2)  -> expired? True
+```
+
+**Two separate things here, both recorded and neither fixed:** the tests are
+date-dependent and will fail on the 2nd of every month, and the predicate has a
+real collision between the proxy convention and genuine 1st-of-month expiries.
+The proxy exists because the parser does not resolve the exact last-Thursday;
+fixing it properly means resolving real expiry dates, not adjusting the branch.
+**Out of scope** — found while verifying migration 083, which touches no date,
+position or expiry code.
+
 # Incidental findings from the same pass — recorded, not actioned
 
 ### ~~`_calculate_readiness_score`'s danger-day factor~~ — **CLOSED 2026-09-01**
