@@ -3394,45 +3394,58 @@ class BehaviorEngine:
             },
         )
 
-    # ── Time-of-day bias (Phase 4, doc 4 P28) ──
+    # ── RETIRED 2026-09-01 — `time_of_day_bias` ─────────────────────
     #
-    # The learned danger_hours (learn_patterns, nightly) finally consumed in
-    # real time: trade entered inside a historically losing hour → nudge with
-    # the user's own numbers. Needs 30+ sessions of history (config).
-
-    def _detect_time_of_day_bias(self, ctx: EngineContext) -> Optional[DetectedEvent]:
-        ct = ctx.completed_trade
-        if not ct.entry_time:
-            return None
-        danger_hours = ctx.thresholds.get("danger_hours") or []
-        if not danger_hours:
-            return None
-        if ctx.thresholds.get("baseline_sessions", 0) < ctx.thresholds.get("tod_bias_min_sessions", 30):
-            return None
-
-        entry_hour = ct.entry_time.astimezone(IST).hour
-        hit = next((d for d in danger_hours if d.get("hour") == entry_hour), None)
-        if not hit:
-            return None
-
-        h12 = entry_hour % 12 or 12
-        ampm = "AM" if entry_hour < 12 else "PM"
-        return DetectedEvent(
-            event_type="time_of_day_bias",
-            severity="caution",
-            message=(
-                f"Entered {ct.tradingsymbol} at {ct.entry_time.astimezone(IST).strftime('%H:%M')} — "
-                f"historically your {h12} {ampm} hour runs a {hit.get('win_rate', 0):.0f}% win rate "
-                f"over {hit.get('trades', 0)} trades (avg ₹{hit.get('avg_pnl', 0):,.0f})."
-            ),
-            context={
-                "entry_hour_ist": entry_hour,
-                "historical_win_rate": hit.get("win_rate"),
-                "historical_trades": hit.get("trades"),
-                "historical_avg_pnl": hit.get("avg_pnl"),
-                "trigger_symbol": ct.tradingsymbol,
-            },
-        )
+    # Reviews 25-27. THE SIGNAL IT ALERTED ON DOES NOT SURVIVE INTO A SECOND
+    # TIME PERIOD.
+    #
+    # It fired when a trade was entered in an hour the nightly learner had
+    # marked "dangerous" - win rate under 35% with at least 5 trades in that
+    # hour, over a 90-day window - gated on 30+ sessions of history.
+    #
+    # MEASURED, 175 sessions / 740 rounds of the reference book:
+    #
+    #   danger hours, full book     [12, 15]
+    #   first half                  [11, 12, 15]
+    #   SECOND HALF                 []             <- none at all
+    #   flagged in BOTH halves      NONE
+    #   by quarter                  [9,11]  [11,12,15]  [12,13]  []
+    #
+    # Five different hours across four quarters and not one persists. A trader
+    # told about their 12 PM hour in month 3 would have had it silently
+    # withdrawn by month 6, with no message saying so.
+    #
+    # Shuffling the hour labels across trades, keeping each trade's own result,
+    # and re-applying the learner's own filter flags 2+ hours 31% of the time.
+    # The real book flags 2 - the single most likely outcome under pure noise.
+    # That is a LOWER bound: trades within a session are not independent.
+    #
+    # The descriptive fallback ("drop the label, show the numbers") fails too.
+    # Hourly win rates between the two halves rank-correlate at Spearman
+    # rho = +0.071. Hour 11 goes 28.3% -> 52.9%; hour 15 goes 18.2% -> 50.0%.
+    #
+    # Sample arithmetic, not a chosen threshold: separating a 30% hour from a
+    # 40% baseline at 95% confidence needs n ~ 100 trades IN THAT HOUR. The
+    # learner's gate is n >= 5, where the interval is +/-43 points - wider than
+    # the whole plausible range of win rates. Even hour 12's 68 trades cannot
+    # make the separation.
+    #
+    # THIS IS INSUFFICIENT EVIDENCE, NOT PROOF THAT TIME-OF-DAY EFFECTS DO NOT
+    # EXIST. Intraday seasonality is real in markets and plausible in traders.
+    # What is retired is this METHOD of finding it on this book. The learning
+    # and the storage are DELIBERATELY KEPT: `_learn_time_patterns` still
+    # computes danger_hours / best_hours / danger_days / best_days and
+    # `_store_learned_patterns` still persists all four, so a future evidence
+    # pass has the data. What is gone is the trader-facing interpretation.
+    #
+    # A CORRECTION BELONGS IN THIS RECORD. The first review called this
+    # detector mis-wired and dead on arrival, claiming
+    # `detected_patterns["time_patterns"]` had no writer. THAT WAS WRONG - it
+    # is written at ai_personalization_service.py:142 on a nightly 18:15 IST
+    # beat. The detector was LIVE and firing for any trader with 30+ sessions.
+    # Its zero in replay was only that a CSV tradebook carries no profile.
+    #
+    # Evidence: docs/patterns/25-27-performance-trio/.
 
 
     # ── Win rate collapse (Phase 7, doc 4 P29 — ANALYTICS-ONLY) ─────────────

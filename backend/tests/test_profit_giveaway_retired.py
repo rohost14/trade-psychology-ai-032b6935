@@ -70,8 +70,8 @@ def test_the_engine_counts_are_what_the_retirement_left():
     from app.services.detector_registry import REGISTRY, all_pattern_types
 
     # 20 / 26 since `early_exit` was retired 2026-08-30 (Pattern 18).
-    assert len(REGISTRY) == 17
-    assert len(all_pattern_types()) == 23
+    assert len(REGISTRY) == 16
+    assert len(all_pattern_types()) == 22
 
 
 def test_it_is_recorded_as_retired():

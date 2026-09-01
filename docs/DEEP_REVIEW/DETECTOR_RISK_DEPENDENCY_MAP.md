@@ -32,7 +32,7 @@ account size and is exactly the behavioural signal wanted.
 | `daily_overtrading` *(alias)* | count | |
 | `session_meltdown` | B | session aggregate |
 | `win_rate_collapse` | B | |
-| `time_of_day_bias` | B + time | |
+| ~~`time_of_day_bias`~~ | — | RETIRED 2026-09-01 (Reviews 25-27) — the learned danger hours do not survive into a second period |
 | `strategy_breakdown` | B | |
 | `end_of_session_mis_panic` | B + time | product-scoped |
 | `fomo_entry` | time + count | |

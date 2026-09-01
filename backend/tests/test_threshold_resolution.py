@@ -372,13 +372,18 @@ def test_a_break_is_not_a_re_entry():
 
 def test_empty_learned_values_are_not_claimed_as_personal():
     """
-    An empty baseline is not knowledge about the trader. Marking danger_hours=[]
-    or baseline_win_rate=None as HISTORY made personal_keys() claim we knew
+    An empty baseline is not knowledge about the trader. Marking
+    baseline_win_rate=None as HISTORY made personal_keys() claim we knew
     something we did not — and the Rules page would have shown it as "your
     number". Provenance that overclaims is worse than none.
+
+    `danger_hours` was the third key checked here until 2026-09-01. It is no
+    longer resolved as a threshold at all — `time_of_day_bias` was retired — so
+    it is dropped from the list rather than the assertion being relaxed. The
+    invariant itself is unchanged and still enforced on the baseline keys.
     """
     ts = resolve_thresholds(FakeProfile(trading_capital=50000))
-    for key in ("danger_hours", "baseline_win_rate", "baseline_profit_factor"):
+    for key in ("baseline_win_rate", "baseline_profit_factor"):
         r = ts.explain(key)
         assert r.source is Source.GLOBAL, f"{key} claims {r.source} while empty"
         assert not r.is_personal
@@ -389,10 +394,13 @@ def test_empty_learned_values_are_not_claimed_as_personal():
 def test_populated_learned_values_are_personal():
     """The converse: once something IS learned, it must be claimed."""
     ts = resolve_thresholds(FakeProfile(detected_patterns={
+        # A populated "time_patterns" is still supplied on purpose: the learner
+        # keeps writing it nightly, and resolution must ignore it rather than
+        # fail on it now that no threshold reads it.
         "time_patterns": {"danger_hours": [{"hour": 13}]},
         "baseline": {"metrics": {"win_rate": {"value": 41.0, "confidence": 1.0}}},
     }))
-    assert ts.explain("danger_hours").source is Source.HISTORY
+    assert ts.explain("danger_hours") is None
     assert ts.explain("baseline_win_rate").source is Source.HISTORY
 
 

@@ -470,11 +470,11 @@ class DailyReportsService:
             focus["rule"] = "Take fewer trades. Don't give back your green day."
             focus["affirmation"] = "Big win days are often followed by revenge if you try to repeat."
 
-        # Time-based avoidance from detected patterns
+        # `avoid_times` was filled from the learned danger hours until
+        # 2026-09-01. It stays initialised to [] - the key is part of the
+        # report contract - but nothing writes an hour into it any more.
+        # See docs/patterns/25-27-performance-trio/.
         if profile and profile.detected_patterns:
-            danger_hours = profile.detected_patterns.get("time_patterns", {}).get("danger_hours", [])
-            focus["avoid_times"] = [f"{h['hour']:02d}:00 IST" for h in danger_hours[:2]]
-
             problem_symbols = profile.detected_patterns.get("symbol_patterns", {}).get("problem_symbols", [])
             focus["avoid_symbols"] = [s["symbol"] for s in problem_symbols[:2]]
 
@@ -576,7 +576,6 @@ class DailyReportsService:
         positions_30d = list(trend_30d_result.scalars().all())
 
         # Generate briefing sections
-        day_warning = self._generate_day_warning(day_name, profile)
         recent_summary = self._generate_recent_summary(yesterday_positions, yesterday_alerts)
         watch_outs = self._generate_watch_outs(profile, recent_positions, day_name, yesterday_alerts)
         readiness_checklist = self._generate_readiness_checklist(profile, yesterday_positions, yesterday_alerts)
@@ -593,7 +592,6 @@ class DailyReportsService:
             "generated_at": datetime.now(timezone.utc).isoformat(),
 
             "readiness_score": readiness_score,
-            "day_warning": day_warning,
             "recent_summary": recent_summary,
             "watch_outs": watch_outs,
             "checklist": readiness_checklist,
@@ -642,34 +640,26 @@ class DailyReportsService:
             "trend": trend,
         }
 
-    def _generate_day_warning(self, day_name: str, profile: Optional[UserProfile]) -> Optional[Dict]:
-        """Generate warning if today is historically a bad day."""
-        if not profile or not profile.detected_patterns:
-            return None
-
-        time_patterns = profile.detected_patterns.get("time_patterns", {})
-
-        for danger in time_patterns.get("danger_days", []):
-            if danger["day"] == day_name:
-                return {
-                    "is_danger_day": True,
-                    "day": day_name,
-                    "win_rate": danger["win_rate"],
-                    "message": f"{day_name} is historically your WORST trading day ({danger['win_rate']}% win rate). Consider smaller size or sitting out.",
-                    "recommendation": "reduce_size"
-                }
-
-        for best in time_patterns.get("best_days", []):
-            if best["day"] == day_name:
-                return {
-                    "is_danger_day": False,
-                    "day": day_name,
-                    "win_rate": best["win_rate"],
-                    "message": f"{day_name} is historically your BEST day ({best['win_rate']}% win rate). Stay disciplined and don't over-trade it!",
-                    "recommendation": "stay_disciplined"
-                }
-
-        return None
+    # `_generate_day_warning` was removed 2026-09-01. It returned a banner
+    # saying "{day} is historically your WORST trading day ({rate}% win rate).
+    # Consider smaller size or sitting out." - or the BEST-day mirror of it -
+    # from the learned danger_days / best_days.
+    #
+    # Both lists are retired as trader-facing claims. Measured over 175
+    # sessions of the reference book the day-of-week distribution is flat -
+    # Monday 41.8%, Tuesday 41.3%, Wednesday 36.0%, Thursday 42.6%,
+    # Friday 37.8%, against a 39.5% book rate - and nothing reaches the
+    # producer's 35% cut on the full sample. The first half alone did flag
+    # Friday and Wednesday, and neither survived into the second, so the
+    # methodology fires on subsets and its output does not hold.
+    #
+    # `best_days` is a separate case and is recorded as such: it fires zero
+    # times at every slice of this book, so there is NO evidence either way
+    # about it. It is unvalidated, not invalidated.
+    #
+    # The learning and storage are untouched - `_learn_time_patterns` still
+    # computes and persists all four lists for future research.
+    # See docs/patterns/25-27-performance-trio/.
 
     def _generate_recent_summary(
         self,
@@ -752,18 +742,11 @@ class DailyReportsService:
         """Generate personalised watch-outs for today."""
         watch_outs = []
 
-        # 1. Time-based watch-outs from detected patterns (IST hours)
+        # 1. An hour-based watch-out ("Avoid 12:00-12:59 IST - your win rate
+        #    drops to 30% in this window") was emitted here until 2026-09-01.
+        #    Retired with `time_of_day_bias`: the hours it named do not survive
+        #    into a second period. See docs/patterns/25-27-performance-trio/.
         if profile and profile.detected_patterns:
-            time_patterns = profile.detected_patterns.get("time_patterns", {})
-            for danger in time_patterns.get("danger_hours", [])[:2]:
-                h = danger["hour"]
-                watch_outs.append({
-                    "type": "time",
-                    "icon": "⏰",
-                    "message": f"Avoid {h:02d}:00–{h:02d}:59 IST — your win rate drops to {danger['win_rate']}% in this window",
-                    "severity": "high" if danger["win_rate"] < 30 else "medium"
-                })
-
             symbol_patterns = profile.detected_patterns.get("symbol_patterns", {})
             for problem in symbol_patterns.get("problem_symbols", [])[:2]:
                 watch_outs.append({

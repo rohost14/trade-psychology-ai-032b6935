@@ -137,14 +137,16 @@ async def get_time_analysis(
 
     time_patterns = patterns.get("time_patterns", {})
 
+    # The four classified lists - danger_hours, danger_days, best_hours,
+    # best_days - were returned here until 2026-09-01. They are still computed
+    # and stored nightly for research; they are no longer served, because none
+    # of the four produces a signal present in both halves of the reference
+    # book. The raw breakdowns carry no classification and stay.
+    # See docs/patterns/25-27-performance-trio/.
     return {
         "has_data": True,
         "hourly_breakdown": time_patterns.get("hourly_breakdown", {}),
         "daily_breakdown": time_patterns.get("daily_breakdown", {}),
-        "danger_hours": time_patterns.get("danger_hours", []),
-        "danger_days": time_patterns.get("danger_days", []),
-        "best_hours": time_patterns.get("best_hours", []),
-        "best_days": time_patterns.get("best_days", [])
     }
 
 

@@ -178,6 +178,14 @@ def test_no_shipping_module_uses_a_severity_value_outside_the_vocabulary():
 #: against these is dead code that looks alive.
 RETIRED_PATTERN_NAMES = (
     "revenge_sizing",
+    # Retired 2026-09-01 (Reviews 25-27): the learned "danger hours" it alerted
+    # on do not survive into a second time period - full book [12, 15], first
+    # half [11, 12, 15], SECOND HALF none at all, and not one hour flagged in
+    # both. Chance reproduces 2+ flagged hours 31% of the time. The descriptive
+    # fallback fails too: the two halves' hourly ranks correlate at rho =
+    # +0.071. Insufficient evidence, NOT proof that time-of-day effects do not
+    # exist; the nightly learning and storage are kept for future research.
+    "time_of_day_bias",
     # Retired 2026-08-30 (Pattern 21): the opening window was not a worse place
     # to trade - 39.4% win inside 09:15-09:25 against 39.5% for the rest of the
     # day, and BETTER on money (p = 0.274). It reached its finding by discarding

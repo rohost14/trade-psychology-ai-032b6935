@@ -286,9 +286,13 @@ REGISTRY: Tuple[DetectorSpec, ...] = (
     DetectorSpec("same_symbol_obsession", "_detect_same_symbol_obsession",
                  "2.0.0", "emotional", "alerting", "exit", 2,
                  frames=(ReferenceFrame.STRUCTURAL,)),
-    DetectorSpec("time_of_day_bias", "_detect_time_of_day_bias",
-                 "1.0.0", "performance", "alerting", "exit", 1,
-                 uses_baseline=True),
+    # `time_of_day_bias` RETIRED 2026-09-01. The learned "danger hours" it
+    # alerted on do not survive into a second time period - not one hour
+    # flagged in the first half of the reference book is flagged in the
+    # second, and chance reproduces the flagged count 31% of the time.
+    # Insufficient evidence, NOT proof that time-of-day effects do not exist;
+    # the nightly learning and its storage are kept untouched.
+    # See docs/patterns/25-27-performance-trio/.
     # Phase 7: performance analytics (info-only, feed the Strategy driver)
     DetectorSpec("win_rate_collapse", "_detect_win_rate_collapse",
                  "1.0.0", "performance", "analytics", "session", 0,
@@ -488,11 +492,9 @@ PATTERN_COPY: Dict[str, PatternCopy] = {
         "Results grouped by the strategy structure you traded.",
         "Separates a losing day from a structure that has stopped working.",
     ),
-    "time_of_day_bias": PatternCopy(
-        "Time-of-day pattern",
-        "Results grouped by the hour you entered.",
-        "Most traders have hours that work and hours that do not. Yours are in your own record.",
-    ),
+    # `time_of_day_bias` copy removed 2026-09-01 with the detector. Its
+    # display name stays in AlertContext.formatPatternName so stored rows
+    # still render.
 }
 
 #: Copy for the event types emitted under a name that is not a registry spec.

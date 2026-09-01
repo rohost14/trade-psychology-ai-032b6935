@@ -227,6 +227,9 @@ export function formatPatternName(patternType: string): string {
     'premium_loss_event': 'Premium destruction',
     'same_symbol_obsession': 'Repeated same instrument',
     'strategy_breakdown': 'Strategy underperforming',
+    // Retired 2026-09-01 (Reviews 25-27). Never in the routing map above, so
+    // nothing had to be removed there. Kept here because stored alert rows
+    // still carry it and a missing key renders as a title-cased raw key.
     'time_of_day_bias': 'Time-of-day pattern',
     'win_rate_collapse': 'Win rate below baseline',
   };

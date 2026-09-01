@@ -501,16 +501,15 @@ def _apply_profile_facts(profile, values: Dict[str, Any], put: Callable) -> None
     put("user_cooldown_min", getattr(profile, "cooldown_after_loss", None),
         Source.FACT, 1.0, "declared")
 
-    # An EMPTY learned value is not personal knowledge. Marking [] or None as
-    # HISTORY made `personal_keys()` claim we knew something about a trader we
-    # knew nothing about — the exact thing provenance exists to prevent, and the
-    # Rules page would have rendered it as "your number".
+    # `danger_hours` was resolved here for `time_of_day_bias`, retired
+    # 2026-09-01 — the hours it named did not survive into a second period.
+    # The nightly learner still computes and stores them; nothing reads them as
+    # a threshold. The note it carried is kept, because it applies to every
+    # learned key: an EMPTY learned value is not personal knowledge. Marking []
+    # or None as HISTORY made `personal_keys()` claim we knew something about a
+    # trader we knew nothing about — the exact thing provenance exists to
+    # prevent, and the Rules page would have rendered it as "your number".
     dp = getattr(profile, "detected_patterns", None) or {}
-    hours = (dp.get("time_patterns") or {}).get("danger_hours") or []
-    put("danger_hours", hours,
-        Source.HISTORY if hours else Source.GLOBAL,
-        1.0 if hours else 0.0,
-        "learned danger hours" if hours else "none learned yet")
 
     bl = dp.get("baseline") or {}
     blm = bl.get("metrics") or {}
@@ -679,7 +678,6 @@ def _apply_cold_start(put: Callable) -> None:
                 "user_cooldown_min", "baseline_win_rate", "baseline_profit_factor"):
         put(key, None, Source.GLOBAL, 0.0, "unknown — no profile")
     put("restricted_windows", [], Source.GLOBAL, 0.0, "unknown — no profile")
-    put("danger_hours", [], Source.GLOBAL, 0.0, "unknown — no profile")
     put("baseline_sessions", 0, Source.GLOBAL, 0.0, "unknown — no profile")
     put("sl_percent_futures", 1.0, Source.GLOBAL, 0.0, "repo default")
     put("sl_percent_options", 50.0, Source.GLOBAL, 0.0, "repo default")

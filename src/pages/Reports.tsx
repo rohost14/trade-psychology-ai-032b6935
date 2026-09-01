@@ -186,7 +186,6 @@ function MorningBriefDetail({ data }: { data: Record<string, any> }) {
   const watchOuts = data.watch_outs || [];
   const checklist = data.checklist || [];
   const recent = data.recent_summary || {};
-  const dayWarning = data.day_warning;
   const trend = data.trend_stats;
 
   const scoreColor = readiness.status === 'warning' ? 'text-tm-loss' :
@@ -203,17 +202,10 @@ function MorningBriefDetail({ data }: { data: Record<string, any> }) {
         <div className="flex-1 text-[14px] text-muted-foreground">{readiness.message}</div>
       </div>
 
-      {/* Day warning */}
-      {dayWarning && (
-        <div className={cn(
-          'rounded-lg border p-3 text-[14px]',
-          dayWarning.is_danger_day
-            ? 'bg-tm-loss/10 border-tm-loss/20 text-red-800 dark:text-red-300'
-            : 'bg-tm-profit/10 border-tm-profit/20 text-green-800 dark:text-green-300'
-        )}>
-          {dayWarning.message}
-        </div>
-      )}
+      {/* The day_warning banner - "Friday is historically your WORST trading
+          day" / the BEST-day mirror - was removed 2026-09-01 with the retirement
+          of the learned danger_days / best_days.
+          See docs/patterns/25-27-performance-trio/. */}
 
       {/* Recent summary */}
       {recent.has_recent_trades && (

@@ -304,8 +304,8 @@ COLD_START_DEFAULTS: Dict[str, Any] = {
     # attempts >= 3 implies reentries >= 2. Minimum attempts observed
     # across the whole reference book: 3.
 
-    # ── Time-of-day bias (doc 4 P28) ─────────────────────────────────────
-    'tod_bias_min_sessions':           30,   # need 30 sessions of history
+    # 'tod_bias_min_sessions' (30) REMOVED 2026-09-01 with the retirement
+    # of `time_of_day_bias`.
 
     # ── Behavioral scores — REMOVED 2026-08-13 ───────────────────────────
     # score_halflife_min, the four score_sev_mult_*, the three score_band_*
@@ -507,10 +507,10 @@ def _get_thresholds_pre_ladder(profile=None) -> Dict[str, Any]:
         result['user_daily_trade_limit'] = getattr(profile, 'daily_trade_limit', None)
         result['user_cooldown_min']      = getattr(profile, 'cooldown_after_loss', None)
 
-        # Learned danger hours (Phase 4 time_of_day_bias): [{"hour": 13, ...}]
+        # 'danger_hours' was resolved here for `time_of_day_bias`, retired
+        # 2026-09-01. `time_patterns` is still learned and stored nightly; no
+        # threshold reads it any more.
         dp = getattr(profile, 'detected_patterns', None) or {}
-        tp = dp.get('time_patterns') or {}
-        result['danger_hours'] = tp.get('danger_hours') or []
         _bl = dp.get('baseline') or {}
         result['baseline_sessions'] = _bl.get('sessions_analyzed', 0)
         _blm = _bl.get('metrics') or {}
@@ -535,7 +535,6 @@ def _get_thresholds_pre_ladder(profile=None) -> Dict[str, Any]:
         result['restricted_windows']     = []
         result['user_daily_trade_limit'] = None
         result['user_cooldown_min']      = None
-        result['danger_hours']           = []
         result['baseline_sessions']      = 0
         result['baseline_win_rate']      = None
         result['baseline_profit_factor'] = None

@@ -2,14 +2,20 @@
  * PredictiveContextStrip
  *
  * Thin, dismissable context rows placed between the session hero and alerts.
- * Shows pattern-based risk context (danger hour, danger day, revenge window).
+ * Shows pattern-based risk context (revenge window, problem symbol).
+ *
+ * The "Danger hour" and "<day> — danger day" rows were removed 2026-09-01 with
+ * the retirement of `time_of_day_bias`. They prescribed ("Trade smaller or wait
+ * it out"), cited no sample, and compared IST-derived hours against
+ * `new Date().getHours()` — browser-local. See
+ * docs/patterns/25-27-performance-trio/.
  * Mental model: "here's the risk environment right now" — NOT "you just did something wrong".
  *
  * Dismissed entries survive until page reload (sessionStorage).
  */
 
 import { useState, useEffect } from 'react';
-import { Clock, AlertTriangle, Zap, TrendingDown, X } from 'lucide-react';
+import { Zap, TrendingDown, X } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { api } from '@/lib/api';
 import { useWebSocket } from '@/contexts/WebSocketContext';
@@ -18,15 +24,13 @@ const SESSION_DISMISSED_KEY = 'tm_pred_dismissed';
 
 interface PredictiveItem {
   id: string;
-  type: 'danger_hour' | 'danger_day' | 'revenge_window' | 'problem_symbol';
+  type: 'revenge_window' | 'problem_symbol';
   label: string;
   detail: string;
   danger: boolean;
 }
 
 const ICONS = {
-  danger_hour:    Clock,
-  danger_day:     AlertTriangle,
   revenge_window: Zap,
   problem_symbol: TrendingDown,
 };
@@ -69,7 +73,7 @@ export function PredictiveContextStrip({ brokerAccountId }: Props) {
         api.get('/api/personalization/insights'),
         api.post('/api/personalization/predictive-check', {}),
       ]);
-      const ins  = insRes.data;   // {has_data, danger_hours: int[], danger_days: str[], revenge_window_minutes: number|null}
+      const ins  = insRes.data;   // {has_data, revenge_window_minutes: number|null}
       const chk  = chkRes.data;
       const next: PredictiveItem[] = [];
 
@@ -82,31 +86,6 @@ export function PredictiveContextStrip({ brokerAccountId }: Props) {
         }
         setItems([]);
         return;
-      }
-
-      // danger_hours: list[int] e.g. [9, 14, 15]
-      const nowHour = new Date().getHours();
-      if (ins.danger_hours?.includes(nowHour)) {
-        next.push({
-          id: 'danger-hour',
-          type: 'danger_hour',
-          label: 'Danger hour',
-          detail: `You historically lose at ${nowHour}:00. Trade smaller or wait it out.`,
-          danger: true,
-        });
-      }
-
-      // danger_days: list[str] e.g. ["Friday", "Monday"]
-      const days = ['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'];
-      const today = days[new Date().getDay()];
-      if (ins.danger_days?.includes(today)) {
-        next.push({
-          id: 'danger-day',
-          type: 'danger_day',
-          label: `${today} — danger day`,
-          detail: `Win rate below 35% on ${today}s historically. Trade with extra caution.`,
-          danger: true,
-        });
       }
 
       // revenge_window_minutes: number | null, combined with real-time check
@@ -124,7 +103,7 @@ export function PredictiveContextStrip({ brokerAccountId }: Props) {
       if (chk.alert && !next.find(n => n.id === 'predictive-check')) {
         next.push({
           id: 'predictive-check',
-          type: chk.alert.type || 'danger_hour',
+          type: chk.alert.type || 'problem_symbol',
           label: chk.alert.title,
           detail: chk.alert.message,
           danger: chk.alert.severity === 'danger',

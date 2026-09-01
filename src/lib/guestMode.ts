@@ -220,14 +220,14 @@ export function getGuestResponse(url: string, method = 'GET'): unknown | undefin
       last_updated: new Date(Date.now() - 3600_000).toISOString(),
       trades_analyzed: 87,
       insights: [
-        { type: 'danger_time',    icon: '⏰', title: 'Your Danger Hour',   value: '14:00',  detail: '28% win rate', recommendation: 'Avoid trading at 14:00 — historically your worst hour' },
-        { type: 'best_time',      icon: '✨', title: 'Your Best Hour',     value: '09:00',  detail: '68% win rate', recommendation: 'Focus your high-conviction trades at market open' },
+        // The 'danger_time' and 'best_time' cards were dropped 2026-09-01 with
+        // the retirement of the learned hour signal. This fixture doubles as a
+        // smoke fixture, so it must mirror what the real endpoint now returns.
         { type: 'problem_symbol', icon: '🚫', title: 'Avoid This',         value: 'BANKNIFTY', detail: '24% win rate', recommendation: 'Consider removing BANKNIFTY from your watchlist' },
         { type: 'strong_symbol',  icon: '💪', title: 'Your Edge',          value: 'NIFTY',  detail: '62% win rate', recommendation: 'Focus more on NIFTY — consistent edge detected' },
         { type: 'revenge_window', icon: '⏱️', title: 'Your Revenge Window', value: '8 min', detail: 'Typical re-entry after a loss', recommendation: 'Set cooldown to at least 12 minutes to break the pattern' },
       ],
       predictive_alerts: [
-        { type: 'time_warning',   message: 'Heads up: 14:00–15:00 is historically your weakest hour (28% win rate)', severity: 'caution' },
         { type: 'symbol_warning', message: 'Warning: Your win rate on BANKNIFTY is only 24%. Consider avoiding or reducing size.', severity: 'danger' },
       ],
     };

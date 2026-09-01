@@ -71,16 +71,12 @@ def send_morning_intent_push(self):
                     rules = " · ".join(parts)
                     body = f"Market opens in 45 min. Your rules: {rules}. Ready to commit?"
 
-                    # Append danger-day context if today is a historically bad day
-                    try:
-                        from app.services.ai_personalization_service import ai_personalization_service
-                        ins = await ai_personalization_service.get_personalized_insights(account.id, db)
-                        if ins.get("has_data"):
-                            today_name = datetime.now(IST).strftime("%A")
-                            if today_name in (ins.get("danger_days") or []):
-                                body += f" ⚠️ {today_name} is your worst trading day historically — trade smaller."
-                    except Exception:
-                        pass  # Non-critical — push still goes without danger-day context
+                    # A danger-day line ("Friday is your worst trading day
+                    # historically - trade smaller.") was appended here until
+                    # 2026-09-01. Retired with `time_of_day_bias`: the days it
+                    # named do not survive into a second period, and the flagged
+                    # count is what chance produces.
+                    # See docs/patterns/25-27-performance-trio/.
 
                     await push_service.send_notification(
                         broker_account_id=account.id,

@@ -1,11 +1,11 @@
 # Next session — start here
 
-**1 Sep 2026.** Patterns **12 through 23 are CLOSED**. Engine is at **17
-detectors, 23 pattern types, 6 aliases** — `all_pattern_types()` is the
+**1 Sep 2026.** Patterns **12 through 27 are CLOSED**. Engine is at **16
+detectors, 22 pattern types, 6 aliases** — `all_pattern_types()` is the
 authority and the retirement suites pin all three.
 
-**Eleven retirements** (4, 6, 9, 10, 11, 14, 15, 18, 19, 20, 21), every one on measurement,
-never on taste. Since the last update to this file:
+**Twelve retirements** (4, 6, 9, 10, 11, 14, 15, 18, 19, 20, 21, 25), every one on
+measurement, never on taste. Since the last update to this file:
 
 | # | pattern | outcome |
 |---|---|---|
@@ -388,7 +388,11 @@ guesser.
 ### 5. Cheap items that fall out along the way
 
 - Retire `post_loss_recovery_bet` (duplicate of revenge, 4% recall).
-- `time_of_day_bias` is dispositioned `alerting` and should be `analytics`.
+- ~~`time_of_day_bias` is dispositioned `alerting` and should be `analytics`.~~
+  RESOLVED 2026-09-01, and neither disposition was the answer: the detector is
+  RETIRED. Demoting it to `analytics` would have kept computing a signal that
+  does not survive into a second time period; the measurement is kept in the
+  nightly learner instead, where it is research rather than product.
 - A readable one-page replay report — the current one is 2,379 lines.
 - 5 open `flood` findings from the alert audit.
 - 3 unresolved assumptions in `DETECTOR_ASSUMPTIONS.md`.

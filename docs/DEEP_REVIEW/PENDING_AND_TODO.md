@@ -709,6 +709,100 @@ from two manual endpoints, the real-time path filters to `COMPLETE`, and no
 detector reads the `orders` table. Kite's order book is also same-day, so
 nothing can be backfilled.
 
+## Surfaced by the `time_of_day_bias` retirement (Reviews 25-27) — NOT actioned
+
+### THE ONE OPEN DECISION: `_calculate_readiness_score`'s danger-day factor
+
+`daily_reports_service.py:_calculate_readiness_score` subtracts **20 points from
+a numeric 0–100 readiness score** when today is a learned `danger_day`, and
+appends a factor row whose detail reads *"{day} has low win rate historically"*.
+
+**It was deliberately left in place**, and it is the only site in the product
+that still reads a retired list. Removing it does not merely delete a sentence —
+it changes the score and can flip its status band:
+
+| | today |
+|---|---|
+| max penalty across all factors | 60 (danger_day −20, recent loss −20, streak −15, expiry −5) |
+| max penalty with the factor gone | 40 |
+| a trader on a flagged day, no other factor | score 80, status **caution** → score 100, status **ready** |
+
+The bands are 80 (`ready`) and 60 (`caution`); the score is rendered on
+`Reports.tsx` as `{score}/100` with a colour driven by `status`.
+
+**This is a product behaviour change outside the approved Option B scope**, so
+it was raised rather than guessed at. Pinned by
+`test_the_readiness_score_is_the_only_thing_still_pending` — if a second site
+starts reading a retired list, that test fails.
+
+**Two options, neither taken:**
+
+1. **Remove the factor.** Consistent with the retirement, and the honest reading:
+   a 20-point penalty resting on a signal measured as chance is worse than no
+   penalty. Scores rise by 20 on previously-flagged days.
+2. **Keep the arithmetic, drop the visible detail string.** Preserves every
+   score, but keeps an unsupported signal driving a trader-facing number
+   invisibly — which is the worse half of the two.
+
+### `api/my_record.py` needs its own product review
+
+**Excluded from this pass by explicit instruction, and recorded so the
+inconsistency is a decision rather than an oversight.** It is a SECOND,
+INDEPENDENT hourly implementation that does not read `time_patterns` at all — it
+computes from trades directly.
+
+> *"Right now is your weakest window on NIFTY: 5 trades, 20% win rate, −₹14,270
+> net."*
+
+| | `time_patterns` path (retired) | `my_record.py` |
+|---|---|---|
+| timezone | IST-derived, compared to **browser-local** in the strip | **`now_ist.hour`** — correct |
+| sample gate | `n >= 5`, invisible to the trader | `MIN_SAMPLE = 5`, and the count is **in the sentence** |
+| delivery | **push** — alert, dashboard strip, daily report | **pull** — the trader opens My Record and asks |
+
+**It carries the same instability risk** — "weakest window" is a ranking, and
+rankings are what rho = +0.071 says do not hold. But it is materially different
+in product terms: the trader asked, and the answer states its own sample. Pinned
+untouched by `test_my_record_is_out_of_scope_and_untouched`.
+
+### `best_days` is UNVALIDATED, not invalidated
+
+It fires **zero times at every slice** of the reference book. That is *no
+evidence either way* about whether the concept works. Its surface was removed
+because it shares a methodology with signals that were measured and
+contradicted — not because it was itself measured and found wanting. If it is
+ever revived, it needs its own measurement.
+
+### `POST /profile/detect-style` clobbers `detected_patterns`
+
+Three writers touch the JSONB column and they do not agree on whether to merge.
+`behavioral_baseline_service:143` **merges**; `ai_personalization_service`
+**replaces** the whole dict; `api/profile.py:637` **replaces** it with an
+incompatible three-key dict, destroying `time_patterns` **and** `baseline`. The
+next nightly run would restore only the first. **It has no callers** — grep
+across `src/` returns nothing — so it is latent, the same class as
+`pre-trade-check`. **No test asserts which keys `detected_patterns` must
+contain**, and that gap is what let a grep mislead the first review into calling
+a live detector dead.
+
+### `ai_personalization_service` computes its own `baseline` alongside the real one
+
+It replaces rather than merges, so it will overwrite a fresher baseline from
+`behavioral_baseline_service` if it runs later. Both derive it identically
+today, so this is redundancy rather than a bug — and fragile if either changes.
+
+### `PredictiveContextStrip` reads `chk.alert.title`, which the API never sends
+
+`get_predictive_alert` returns `alerts[0]`, and no alert dict it builds has a
+`title` key — so the strip's `label` is `undefined` for the server-side
+predictive check. Pre-existing, unrelated to the retirement, found while tracing
+its consumers. One-line fix in either direction; not taken here.
+
+### Sunday, n = 14, in the day-of-week breakdown
+
+Indian equity/F&O markets do not trade Sundays. Either these are a special
+session or there is a timestamp defect. **Not investigated.**
+
 ## Closed on this pass — recorded so they are not re-raised
 
 | # | verdict |

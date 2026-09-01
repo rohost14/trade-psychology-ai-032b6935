@@ -285,10 +285,21 @@ no bundle cost, but publicly reachable in production.
 - **How often `fomo_entry`'s pre-close path fires.** The bug is verified in code;
   the frequency is not. The existing replay report is a summary only and predates
   the harness repair. Needs a replay.
-- **Whether the three never-firing detectors (`time_of_day_bias`,
+- ~~**Whether the three never-firing detectors (`time_of_day_bias`,
   `win_rate_collapse`, `strategy_breakdown`) are silent because the trader is
-  clean or because they are blind.** Raised in `DETECTOR_ASSUMPTIONS.md` against
-  61 sessions; the 203-session book has been run but this was never recomputed.
+  clean or because they are blind.**~~ **ANSWERED 2026-09-01, Reviews 25-27, and
+  the three answers differ.** Each was measured twice — as the engine sees it
+  today, and with the baseline supplied from the book's own history, which is
+  what a mature trader would present.
+  • `time_of_day_bias` was **neither**: it was LIVE and firing for any trader
+  with 30+ sessions, and its zero in replay was only that a CSV tradebook
+  carries no profile. Supplied with a baseline it fires the equivalent of 81
+  alerts on a signal that does not survive into a second time period. **RETIRED.**
+  • `win_rate_collapse` is silent for the same artefact reason and its guards
+  are sound. **KEEP AS-IS.**
+  • `strategy_breakdown` is **DEFERRED**, unblocked only by sessions where its
+  win-rate and profit-factor conditions disagree.
+  Evidence: `docs/patterns/25-27-performance-trio/`.
 - **`typical_drawdown` and `median_position_risk_pct` computed and unread.**
   Claimed by an audit, consistent with the code I have read, but I have not
   personally grepped every reader.

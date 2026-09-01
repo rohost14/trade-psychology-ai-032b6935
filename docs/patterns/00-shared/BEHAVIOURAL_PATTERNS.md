@@ -85,7 +85,7 @@ mention, not proof of a behavioural test — see §13 of each entry).
 | 22 | `profit_giveaway` | emotional | alerting | exit | 26 / 12 | 2 | IMPLEMENTED AND VERIFIED | **inline default 1000 contradicts config 1500** |
 | 23 | `constitution_violation` | discipline | alerting | exit | 0 (rules off) | 1 | IMPLEMENTED BUT NOT YET VERIFIED | cannot fire in replay; 6 rules in one pattern type |
 | 24 | `same_symbol_obsession` | emotional | alerting | exit | 29 / 20 | 0 | IMPLEMENTED, NOT TESTED | 20 danger alerts, zero test mentions |
-| 25 | `time_of_day_bias` | performance | alerting | exit | 0 | 0 | IMPLEMENTED, NEVER FIRED | needs 30+ sessions of baseline; `baseline_sessions` has no config key |
+| ~~25~~ | ~~`time_of_day_bias`~~ | performance | — | — | — | — | **RETIRED 2026-09-01** | the learned danger hours do not survive into a second time period; the nightly learning is KEPT |
 | 26 | `win_rate_collapse` | performance | analytics | session | 0 | 0 | IMPLEMENTED, NEVER FIRED | hardcoded `0.4` and `0.5`, no keys |
 | 27 | `strategy_breakdown` | performance | analytics | session | 0 | 0 | IMPLEMENTED, NEVER FIRED | hardcoded `0.4`, `0.5`, `8`, no keys |
 | A1 | `death_spiral` (L2 meta) | emotional | alerting | session | 29 / 29 | 1 | IMPLEMENTED AND VERIFIED | absorbs every other alert when it fires |
@@ -773,7 +773,27 @@ No test.
 
 **Status: IMPLEMENTED, NOT TESTED.**
 
-## 25. `time_of_day_bias`
+## 25. `time_of_day_bias` — **RETIRED 2026-09-01**
+
+> **Everything below describes the detector as it stood before Reviews 25-27.**
+> It was retired because the learned "danger hours" it alerted on do not survive
+> into a second time period — full book `[12, 15]`, first half `[11, 12, 15]`,
+> **second half none at all**, and not one hour flagged in both. Chance
+> reproduces 2+ flagged hours 31% of the time and the real book flags 2. The
+> descriptive fallback fails too: the two halves' hourly ranks correlate at
+> Spearman rho = +0.071.
+>
+> **The "NEVER FIRED" status recorded below was an artefact, and correcting it
+> made the finding worse.** A CSV tradebook carries no profile, so replay could
+> not reach the detector. It was LIVE, and firing for any trader with 30+
+> sessions. The claim that `detected_patterns["time_patterns"]` had no writer
+> was WRONG — it is written on a nightly 18:15 IST beat.
+>
+> **The nightly learning and storage are DELIBERATELY KEPT** so a future
+> evidence pass has the data. Insufficient evidence is not proof that
+> time-of-day effects do not exist.
+>
+> Evidence: `docs/patterns/25-27-performance-trio/`.
 
 **Family** performance · alerting · exit · level 1 · `uses_baseline`
 
@@ -1330,10 +1350,10 @@ reason goes in the notes column, not into someone's head.
 | 21 | `opening_5min_trap` (§19) | **RETIRED — DELETED** | 30 Aug 2026 | 30 Aug 2026 | The §H0 note said three windows in one detector; measuring found all three sit on the same undifferentiated distribution. **The window was not a worse place to trade** — 39.4% win inside against 39.5% outside, BETTER on money (p = 0.274) — and it reached its finding by discarding **42% of window entries for having made money**, the `panic_exit` shape its own comment conceded. Market open was hardcoded 09:15 while its review partner derives the same boundary properly. `rapid_reentry` is now the LAST analytics detector. `21-session_windows/` |
 | 22 | `end_of_session_mis_panic` (§20) | **DEFERRED — data gap** | 30 Aug 2026 | — | Reviewed with 21, **not retired**: subject mechanically checkable, exchange-aware square-off is correct work that fixed a real MCX defect, effect points the RIGHT way (23.1% vs 39.8% win). But its first gate is `product`, the tradebook has **no product column**, and every number is an upper bound — danger tier never reached in 175 sessions, n = 13, p = 0.185. **Unblock: measure against live `CompletedTrade` rows, which carry `product`.** `21-session_windows/` |
 | 23 | `post_loss_recovery_bet` (§21) | **COMPLETE — KEEP AS-IS** | 1 Sep 2026 | 1 Sep 2026 | The §H0 note said "zero test mentions, near-zero evidence"; the first half is **stale** (eight test files reference it). The first KEEP since 13, earned on structure: **not selected on outcome** (4 of 7 flagged trades won), gates withhold 76%, the 2.0× line sits at ~p78 of the post-loss ratio distribution, both tiers reachable, and 4 of 7 fire alone against `martingale_behaviour` — the docstring's claimed distinction is real. Shuffle null **p = 0.088**, the first in the sequence pointing the predicted way. **Not validated at n = 7, not refuted.** No ₹500 floor added. `23-post_loss_recovery_bet/` |
-| **24** | **`constitution_violation` (§23)** | **NEXT** | — | — | 6 rules in one pattern type, `notification_level=4`, and **three retirements lean on it** (4, 15, and part of 17's rationale). The most load-bearing unreviewed detector. Still spells CONCLUDED as `<=` inline |
-| 25 | `time_of_day_bias` (§25) | **ON HOLD** | — | — | blocked: never fired, needs a mature baseline. Guards pinned so "correctly silent" is distinguishable from "unreachable" |
-| 26 | `win_rate_collapse` (§26) | **ON HOLD** | — | — | blocked: same |
-| 27 | `strategy_breakdown` (§27) | **ON HOLD** | — | — | blocked: same |
+| 24 | `constitution_violation` (§23) | **COMPLETE — KEEP AS-IS** | 1 Sep 2026 | 1 Sep 2026 | 6 rules in one pattern type, `notification_level=4`, and **three retirements lean on it** (4, 15, and part of 17's rationale). Kept unchanged; the fixes that followed were the `max_position_size` units contradiction end-to-end and the new opt-in `per_trade_loss_limit` rule, not the detector's logic. Still spells CONCLUDED as `<=` inline. `24-constitution_violation/` |
+| 25 | `time_of_day_bias` (§25) | **RETIRED — DELETED** | 1 Sep 2026 | 1 Sep 2026 | "Never fired" was an artefact — a CSV book carries no profile. It was **LIVE** for any trader with 30+ sessions. Danger hours full book `[12, 15]`, first half `[11, 12, 15]`, **second half none**, **nothing in both**; five hours across four quarters, none persisting. Shuffle p = 0.309. Descriptive fallback also fails, rho = +0.071. n ≥ 5 gives ±43pp where n ≈ 100 is needed. All four lists measured separately — `best_days` UNVALIDATED, not invalidated. **Learning and storage KEPT.** `25-27-performance-trio/` |
+| 26 | `win_rate_collapse` (§26) | **COMPLETE — KEEP AS-IS** | 1 Sep 2026 | 1 Sep 2026 | Reviewed with 25. Silent for the same artefact reason, and its guards are sound: it needs a baseline with confidence ≥ 0.5 and an 8-trade day. No change. `25-27-performance-trio/` |
+| 27 | `strategy_breakdown` (§27) | **DEFERRED** | 1 Sep 2026 | — | Reviewed with 25. Not retired and not kept: its two conditions (win-rate drop, profit-factor drop) never disagree in this book, so there is nothing to separate. **Unblock: sessions where they disagree.** `25-27-performance-trio/` |
 | M | `death_spiral` (§A1, meta) | NOT STARTED | — | — | consumes other detectors' output, so it **moves whenever one is retired** — arithmetic, not a regression, and the reason no retirement re-runs a replay to explain it |
 | P | `overexposure` / `portfolio_concentration` / `holding_loser` (§A2-A4) | NOT STARTED | — | — | separate pipeline, reviewed as a group |
 | H | `capital_mismatch` (§A5) | NOT STARTED | — | — | housekeeping, not a behaviour detector. §H0 F21 confirmed its absence from `_ALIAS_NATURE` is correct |

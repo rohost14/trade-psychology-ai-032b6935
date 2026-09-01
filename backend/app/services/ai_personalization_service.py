@@ -19,11 +19,8 @@ import logging
 IST = timezone(timedelta(hours=5, minutes=30))
 
 
-def _fmt_hour(hour: int) -> str:
-    """Format 0-23 IST hour as 12-hour clock string: '9:00 AM', '1:00 PM'."""
-    suffix = "AM" if hour < 12 else "PM"
-    h = hour % 12 or 12
-    return f"{h}:00 {suffix}"
+# `_fmt_hour` was removed 2026-09-01. Its only callers were the danger-hour and
+# best-hour copy retired with `time_of_day_bias`.
 
 from app.models.trade import Trade
 from app.models.risk_alert import RiskAlert
@@ -473,34 +470,21 @@ class AIPersonalizationService:
 
     def _calculate_predictive_windows(
         self,
-        time_patterns: Dict,
+        time_patterns: Dict,   # noqa: ARG002 - kept: still the learner's output shape
         symbol_patterns: Dict
     ) -> Dict:
         """
         Calculate when to send predictive alerts.
-        Alert BEFORE the trader's typical danger windows.
+        Symbol-based only since 2026-09-01 - see the note in the body.
         """
         predictive_alerts = []
 
-        # Time-based predictions — hours are already stored as IST integers
-        for danger_hour in time_patterns.get("danger_hours", []):
-            hour = danger_hour["hour"]
-            next_hour = (hour + 1) % 24
-            predictive_alerts.append({
-                "type": "time_warning",
-                "trigger_time": f"{(hour - 1) % 24}:45",  # 15 min before danger hour (IST)
-                "message": f"Heads up: {_fmt_hour(hour)}–{_fmt_hour(next_hour)} is historically your weakest hour ({danger_hour['win_rate']}% win rate)",
-                "severity": "caution" if danger_hour["win_rate"] > 25 else "danger"
-            })
-
-        for danger_day in time_patterns.get("danger_days", []):
-            predictive_alerts.append({
-                "type": "day_warning",
-                "trigger_time": "09:10",  # Just before market open
-                "trigger_day": danger_day["day"],
-                "message": f"{danger_day['day']} is historically your worst trading day ({danger_day['win_rate']}% win rate). Consider trading smaller.",
-                "severity": "caution"
-            })
+        # The hour and day windows were built here until 2026-09-01. Both are
+        # retired as trader-facing claims: no hour flagged in the first half of
+        # the reference book is flagged in the second, and chance reproduces the
+        # flagged count 31% of the time. `time_patterns` is still learned and
+        # stored - it is simply no longer turned into a prediction.
+        # See docs/patterns/25-27-performance-trio/.
 
         # Symbol-based predictions
         for problem in symbol_patterns.get("problem_symbols", []):
@@ -558,33 +542,17 @@ class AIPersonalizationService:
         if patterns.get("insufficient_data"):
             return None
 
-        now_utc = context.get("current_time", datetime.now(timezone.utc)) if context else datetime.now(timezone.utc)
-        now_ist = now_utc.astimezone(IST)
-        current_hour = now_ist.hour   # stored danger_hour values are IST
-        current_day = now_ist.strftime("%A")  # stored danger_day values are IST weekday
+        # The IST clock was read here to match the current hour and weekday
+        # against the learned danger lists. With those retired the only thing
+        # this check still needs from the context is the proposed symbol.
         proposed_symbol = context.get("proposed_symbol") if context else None
 
         alerts = []
 
-        # Check time-based warnings
-        time_patterns = patterns.get("time_patterns", {})
-        for danger in time_patterns.get("danger_hours", []):
-            if danger["hour"] == current_hour or danger["hour"] == current_hour + 1:
-                alerts.append({
-                    "type": "time_warning",
-                    "message": f"⚠️ {_fmt_hour(danger['hour'])} is YOUR danger hour ({danger['win_rate']}% win rate). Trade carefully!",
-                    "severity": "caution",
-                    "data": danger
-                })
-
-        for danger in time_patterns.get("danger_days", []):
-            if danger["day"] == current_day:
-                alerts.append({
-                    "type": "day_warning",
-                    "message": f"⚠️ {current_day} is YOUR worst day ({danger['win_rate']}% win rate). Consider smaller positions.",
-                    "severity": "caution",
-                    "data": danger
-                })
+        # The "YOUR danger hour" and "YOUR worst day" warnings were raised here
+        # until 2026-09-01. Retired with `time_of_day_bias`: the hours and days
+        # they named do not survive into a second period.
+        # See docs/patterns/25-27-performance-trio/.
 
         # Check symbol-based warnings
         if proposed_symbol:
@@ -632,29 +600,11 @@ class AIPersonalizationService:
         # Build insights
         insights = []
 
-        # Time insights
-        time_patterns = patterns.get("time_patterns", {})
-        if time_patterns.get("danger_hours"):
-            worst = time_patterns["danger_hours"][0]
-            insights.append({
-                "type": "danger_time",
-                "icon": "⏰",
-                "title": "Your Danger Hour",
-                "value": _fmt_hour(worst["hour"]),
-                "detail": f"{worst['win_rate']}% win rate · {worst['trades']} trades",
-                "recommendation": f"Avoid trading at {_fmt_hour(worst['hour'])} (IST)"
-            })
-
-        if time_patterns.get("best_hours"):
-            best = time_patterns["best_hours"][0]
-            insights.append({
-                "type": "best_time",
-                "icon": "✨",
-                "title": "Your Best Hour",
-                "value": _fmt_hour(best["hour"]),
-                "detail": f"{best['win_rate']}% win rate · {best['trades']} trades",
-                "recommendation": f"Focus your trading around {_fmt_hour(best['hour'])} (IST)"
-            })
+        # The "Your Danger Hour" and "Your Best Hour" insight cards were built
+        # here until 2026-09-01. Both prescribed - "Avoid trading at 12 PM",
+        # "Focus your trading around 2 PM" - on a ranking that rank-correlates
+        # at rho = +0.071 between the two halves of the reference book.
+        # See docs/patterns/25-27-performance-trio/.
 
         # Symbol insights
         symbol_patterns = patterns.get("symbol_patterns", {})
@@ -692,11 +642,12 @@ class AIPersonalizationService:
                 "recommendation": f"Set cooldown to at least {int(intervention['personal_revenge_window_minutes'] * 1.5)} minutes"
             })
 
-        # Flat lookup fields for the predictive context strip (avoid re-parsing insights array)
-        time_p = patterns.get("time_patterns", {})
+        # Flat lookup fields for the predictive context strip (avoid re-parsing insights array).
+        # `danger_hours` and `danger_days` were flattened here for the strip
+        # until 2026-09-01, and the strip compared them against BROWSER-LOCAL
+        # time while the stored values are IST. Both the claim and the timezone
+        # defect went with the retirement.
         int_p  = patterns.get("intervention_timing", {})
-        danger_hours_flat = [d["hour"] for d in time_p.get("danger_hours", [])]
-        danger_days_flat  = [d["day"]  for d in time_p.get("danger_days", [])]
         revenge_window    = int_p.get("personal_revenge_window_minutes")
 
         return {
@@ -705,9 +656,7 @@ class AIPersonalizationService:
             "trades_analyzed": patterns.get("trades_analyzed", 0),
             "insights": insights,
             "predictive_alerts": patterns.get("predictive_windows", {}).get("alerts", []),
-            # Flat arrays consumed by PredictiveContextStrip
-            "danger_hours": danger_hours_flat,          # list[int]: hours like [9, 14]
-            "danger_days":  danger_days_flat,           # list[str]: days like ["Friday"]
+            # Flat field consumed by PredictiveContextStrip
             "revenge_window_minutes": revenge_window,   # float | null
         }
 
