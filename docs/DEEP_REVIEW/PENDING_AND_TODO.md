@@ -907,6 +907,67 @@ keep 50 as an explicit universal band under a different name is a **product
 decision about the severe-loss layer**, which the exposure work was told not to
 touch. **The 40/60/80 thresholds are not implicated and must not move.**
 
+# Surfaced by the Pattern 28 final verification — NOT actioned
+
+### `equity_utilization_pct` is broker margin / live balance, NOT capital deployed / declared capital
+
+Verified in `margin_service._analyze_segment`:
+
+```
+utilization_pct = net_blocked / live_balance * 100
+net_blocked     = max(0, exposure + span + option_premium)   # BROKER-reported
+live_balance    = the account's liquid funds
+```
+
+**Numerator:** real blocked margin as the exchange holds it — better than
+anything we compute. **Denominator:** the broker's live balance, **not** the
+self-reported `trading_capital` that `capital_mismatch` exists to nudge about.
+
+So the informational surface can honestly say *"₹40,000 of ₹50,000 of your
+account is blocked as margin — 80% utilised"*. It **cannot** say *"80% of your
+declared capital is deployed"* without changing the denominator. **The two are
+related but different questions.** No detector reads either, so nothing is
+mis-firing; this governs the **wording** of the UI when it is built.
+
+Also noted: the model's own comment warns that `equity_total` stores
+`live_balance`, which moves with utilisation, and that
+`equity_opening_balance` is the canonical account-risk denominator. Whichever
+the UI uses must be stated.
+
+### `instrument_master.resolve` classifies an unparseable NFO symbol as cash equity
+
+`resolve("ZZZGARBAGE99", "NFO")` returns `Segment.EQUITY`, `usable=True`,
+`multiplier=1` — so `quantities_for_trade` gives it a **NOTIONAL** capital
+requirement (`"cash delivery value"`) instead of abstaining, and the old
+`_exposure_value` accepted it too.
+
+**Pre-existing, in the instrument layer — not introduced by Pattern 28**, and not
+reachable from real data, because live symbols come from Kite and parse. But an
+unparseable symbol *on an F&O exchange* should abstain rather than silently
+become equity. Recorded for the instrument-master owner; **not fixed here**,
+because it is outside a verification pass.
+
+### The constitution ladder fires `caution` at 0.80 of a declared exposure limit
+
+**A semantic mismatch to decide, not a defect.** The stated expectation was
+*"user rule = 80% → position at 75% does not alert"*. Measured:
+
+| position | ratio | outcome |
+|---|---|---|
+| 60% | 0.75 | silent |
+| **75%** | **0.94** | **`caution` — "approaching"** |
+| 80% | 1.00 | `danger` — breached |
+| 85% | 1.06 | `danger` — breached |
+
+`caution` is **not notifiable** (`NOTIFIABLE = {danger, critical}` in
+`core/severity.py`), so there is **no push** — but a `RiskAlert` row is written.
+
+This is the **pre-existing** 0.80 / 1.00 / 1.20 ladder that governs *every*
+constitution rule — daily loss, per-trade loss, cooldown — and Pattern 28 was
+explicitly told not to modify ladders. Changing it for exposure alone would make
+that rule inconsistent with the others; changing it for all of them is a separate
+product decision. **Left exactly as it was.**
+
 # Incidental findings from the same pass — recorded, not actioned
 
 ### ~~`_calculate_readiness_score`'s danger-day factor~~ — **CLOSED 2026-09-01**

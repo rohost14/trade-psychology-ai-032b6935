@@ -2049,9 +2049,19 @@ class BehaviorEngine:
     # because a large loss IS objective danger. It is independent of any
     # exposure rule, verified: a declared exposure limit does not suppress it.
     #
-    # Portfolio utilisation - capital deployed against capital - stays
-    # INFORMATION ONLY. `MarginSnapshot.equity_utilization_pct` already carries
-    # it and no detector reads it.
+    # Portfolio utilisation stays INFORMATION ONLY, and no detector reads it.
+    #
+    # PRECISION MATTERS HERE, and my first note got it wrong.
+    # `MarginSnapshot.equity_utilization_pct` is NOT "capital deployed against
+    # declared trading_capital". Verified in margin_service: it is
+    #     net_blocked / live_balance
+    # where net_blocked = max(0, exposure + span + option_premium) as the
+    # BROKER reports it, and live_balance is the account's liquid funds. So the
+    # numerator is real blocked margin (better than anything we compute) and the
+    # denominator is the broker's balance, NOT the self-reported figure that
+    # `capital_mismatch` exists to nudge about. The two answer related but
+    # different questions, and an informational surface must say which one it
+    # is showing.
     #
     # Evidence: docs/patterns/28-position-monitor/.
 
