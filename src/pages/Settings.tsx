@@ -282,11 +282,15 @@ export default function Settings() {
             Manage your broker, profile, and preferences
           </p>
         </div>
-        {/* Hidden while the profile failed to load — the form below is hidden too,
-            so Save would be writing the component's hardcoded defaults over the
-            trader's real rules. Hiding the form without hiding Save leaves exactly
-            that trap one click away. */}
-        {isConnected && !profileError && (
+        {/* Hidden while the profile failed to load OR IS STILL LOADING — the form
+            below is hidden too, so Save would be writing the component's hardcoded
+            defaults over the trader's real rules. Hiding the form without hiding
+            Save leaves exactly that trap one click away.
+
+            `!isLoadingProfile` added 2026-09-02. The error half of this guard was
+            here from the start; the PENDING half was missing, and that was the
+            whole bug. See the block comment on the tabs below. */}
+        {isConnected && !profileError && !isLoadingProfile && (
           <div className="flex items-center gap-3">
             {isDirty && !isSaving && (
               <span className="text-[11px] text-muted-foreground">Unsaved changes</span>
@@ -327,8 +331,43 @@ export default function Settings() {
         />
       )}
 
-      {/* Only show other settings if connected */}
-      {isConnected && !profileError && (
+      {/* THE FABRICATION RACE, fixed 2026-09-02.
+          =====================================
+          This form's initial state is a set of hardcoded values - among them
+          max_position_size 10, sl_percent_options 50, sl_percent_futures 1.0,
+          cooldown_after_loss 15, guardian_enabled false, whatsapp_enabled false.
+
+          The guard above already refused to render after a FAILED load, for
+          exactly the right reason. What it did not cover was a PENDING one: the
+          broker context often resolves first, so the form rendered from those
+          hardcoded values while the profile was still in flight. Any edit then
+          set `isDirty`, which permanently disables the seeding effect, so the
+          server values never arrived - and Save wrote the defaults.
+
+          Thirteen fields could be written that way. Three are RULE_FIELDS
+          (max_position_size, sl_percent_options, cooldown_after_loss), and
+          because 10 and 50 are TIGHTER than nothing the constitution gate
+          accepted them instantly with no friction - only loosening raises a 409.
+          Two others silently switched protections OFF: guardian_enabled and
+          whatsapp_enabled. daily_loss_limit, daily_trade_limit and
+          trading_capital escaped only because they happened to be seeded
+          `undefined`, which JSON.stringify drops.
+
+          `!isLoadingProfile` closes the window for all thirteen at once. The
+          hardcoded defaults are deliberately left in place - they are what the
+          controls render before any data exists, and removing them is a larger
+          change than this bug needs.
+
+          Evidence: docs/DEEP_REVIEW/SETTINGS_LIFECYCLE_INVESTIGATION.md */}
+      {isConnected && !profileError && isLoadingProfile && (
+        <div className="space-y-4" data-testid="settings-loading">
+          <Skeleton className="h-10 w-full rounded-lg" />
+          <Skeleton className="h-64 rounded-lg" />
+        </div>
+      )}
+
+      {/* Only show other settings if connected, loaded and error-free */}
+      {isConnected && !profileError && !isLoadingProfile && (
         <Tabs defaultValue={initialTab} className="space-y-5">
           <TabsList className="inline-flex h-auto bg-transparent p-0 gap-1 border-b border-border w-full rounded-none">
             <TabsTrigger value="profile" className="rounded-none px-3 pb-3 text-sm font-medium text-muted-foreground data-[state=active]:bg-transparent data-[state=active]:text-foreground data-[state=active]:border-b-2 data-[state=active]:border-tm-brand transition-colors flex items-center gap-1.5">

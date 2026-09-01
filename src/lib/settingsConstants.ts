@@ -74,18 +74,30 @@ export const ALERT_SENSITIVITY = [
   { value: 'high', label: 'High', description: 'All detected patterns' },
 ];
 
+// NULL IS A VALID STATE FOR AN OPTIONAL RULE. 2026-09-02.
+//
+// Every one of these was `.optional().or(z.undefined())`, which accepts
+// `undefined` but REJECTS `null` - and the server sends explicit `null` for an
+// unset rule (`to_dict()` emits every key, no exclude_none). So a trader with
+// no declared exposure limit, no options stop and no declared capital could not
+// save Settings AT ALL: validation failed on the first null field and the save
+// aborted with a toast before any request was made.
+//
+// `.nullable()` states the fact the product already relies on: unset is a
+// legitimate value, distinct from a bad one. The RANGES are untouched, so an
+// out-of-range number is still rejected exactly as before.
 export const profileSchema = z.object({
-  daily_loss_limit: z.number().positive('Daily loss limit must be positive').optional().or(z.undefined()),
-  daily_trade_limit: z.number().int('Must be a whole number').positive('Must be positive').optional().or(z.undefined()),
-  max_position_size: z.number().min(0.1, 'Min 0.1%').max(100, 'Max 100%').optional().or(z.undefined()),
-  cooldown_after_loss: z.number().int('Must be a whole number').min(0, 'Min 0 minutes').max(480, 'Max 8 hours').optional().or(z.undefined()),
-  trading_capital: z.number().positive('Capital must be positive').optional().or(z.undefined()),
-  sl_percent_futures: z.number().min(0.1, 'Min 0.1%').max(100, 'Max 100%').optional().or(z.undefined()),
-  sl_percent_options: z.number().min(1, 'Min 1%').max(100, 'Max 100%').optional().or(z.undefined()),
-  trading_hours_start: z.string().regex(/^\d{2}:\d{2}$/, 'Use HH:MM format').optional().or(z.undefined()),
-  trading_hours_end: z.string().regex(/^\d{2}:\d{2}$/, 'Use HH:MM format').optional().or(z.undefined()),
-  guardian_phone: z.string().regex(/^\+\d{10,15}$/, 'Use international format: +919876543210').optional().or(z.literal('')).or(z.undefined()),
-  guardian_loss_limit: z.number().positive('Guardian loss limit must be positive').optional().or(z.undefined()),
-  eod_report_time: z.string().regex(/^\d{2}:\d{2}$/, 'Use HH:MM format').optional().or(z.undefined()),
-  morning_brief_time: z.string().regex(/^\d{2}:\d{2}$/, 'Use HH:MM format').optional().or(z.undefined()),
+  daily_loss_limit: z.number().positive('Daily loss limit must be positive').nullable().optional(),
+  daily_trade_limit: z.number().int('Must be a whole number').positive('Must be positive').nullable().optional(),
+  max_position_size: z.number().min(0.1, 'Min 0.1%').max(100, 'Max 100%').nullable().optional(),
+  cooldown_after_loss: z.number().int('Must be a whole number').min(0, 'Min 0 minutes').max(480, 'Max 8 hours').nullable().optional(),
+  trading_capital: z.number().positive('Capital must be positive').nullable().optional(),
+  sl_percent_futures: z.number().min(0.1, 'Min 0.1%').max(100, 'Max 100%').nullable().optional(),
+  sl_percent_options: z.number().min(1, 'Min 1%').max(100, 'Max 100%').nullable().optional(),
+  trading_hours_start: z.string().regex(/^\d{2}:\d{2}$/, 'Use HH:MM format').nullable().optional(),
+  trading_hours_end: z.string().regex(/^\d{2}:\d{2}$/, 'Use HH:MM format').nullable().optional(),
+  guardian_phone: z.string().regex(/^\+\d{10,15}$/, 'Use international format: +919876543210').or(z.literal('')).nullable().optional(),
+  guardian_loss_limit: z.number().positive('Guardian loss limit must be positive').nullable().optional(),
+  eod_report_time: z.string().regex(/^\d{2}:\d{2}$/, 'Use HH:MM format').nullable().optional(),
+  morning_brief_time: z.string().regex(/^\d{2}:\d{2}$/, 'Use HH:MM format').nullable().optional(),
 }).passthrough();
