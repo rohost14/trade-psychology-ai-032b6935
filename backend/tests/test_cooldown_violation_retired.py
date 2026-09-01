@@ -140,61 +140,52 @@ def test_the_danger_zone_still_starts_cooldowns():
     assert "cooldown_service.start_cooldown" in src
 
 
-def test_the_traders_declared_cooldown_rule_still_resolves():
-    from app.core.trading_defaults import get_thresholds
+# ── THE RETIREMENT'S ORIGINAL JUSTIFICATION NO LONGER HOLDS. 2026-09-02. ──
+#
+# `cooldown_violation` was retired on 2026-08-29 BECAUSE `constitution_violation`
+# carried the same behaviour: the trader's declared cooldown was enforced there
+# at DANGER, with their own number in the message, 181 firings against this
+# detector's 0.
+#
+# On 2026-09-02 `cooldown_after_loss` stopped being a user-configurable rule by
+# product decision, and that constitution rule went with it. So the behaviour
+# this retirement pointed at as its replacement IS ALSO GONE.
+#
+# TWO TESTS WERE DELETED HERE, NOT WEAKENED - their subject no longer exists:
+#   test_the_traders_declared_cooldown_rule_still_resolves
+#   test_constitution_violation_still_owns_the_behaviour
+#
+# THIS DOES NOT REOPEN THE RETIREMENT. `cooldown_violation`'s own finding stands
+# on its own evidence and is untouched: its precondition never occurred on the
+# live path, because `Cooldown` rows are written only by
+# `danger_zone_service.trigger_intervention`, which no Celery task calls. It
+# fired 0 times in 175 sessions and would still fire 0 times today.
+#
+# WHAT REMAINS OF POST-LOSS PROTECTION, and it is not a rule:
+#   `revenge_trade` and `rapid_reentry` judge re-entry after a loss against
+#   `revenge_window_min` / `revenge_window_caution_min`, which carry their own
+#   resolved values (10 and 20). They were only ever OVERRIDDEN by the declared
+#   cooldown, never sourced from it, so they are unaffected.
+#
+# Pinned by test_rule_clearing_and_removals::
+#   test_THE_PROTECTION_SURVIVES_at_its_own_value
+
+
+def test_the_declared_cooldown_rule_is_gone_and_the_window_remains():
+    """The replacement behaviour is gone; the engine's own window is not."""
+    from app.core.trading_defaults import COLD_START_DEFAULTS, get_thresholds
 
     class _Profile:
-        cooldown_after_loss = 15
+        cooldown_after_loss = 15          # even if the legacy column holds one
 
         def __getattr__(self, _):
             return None
 
     th = get_thresholds(_Profile())
-    assert th["user_cooldown_min"] == 15
-    assert th["revenge_window_min"] == 15, (
-        "the declared cooldown also drives revenge_trade's window")
+    assert "user_cooldown_min" not in th, "the declared cooldown is still resolved"
+    assert th["revenge_window_min"] == COLD_START_DEFAULTS["revenge_window_min"]
+    assert th["revenge_window_caution_min"] ==         COLD_START_DEFAULTS["revenge_window_caution_min"]
 
-
-def test_constitution_violation_still_owns_the_behaviour():
-    """
-    The reason this retirement is safe. The trader's declared cooldown is
-    enforced here, at DANGER, with their own number in the message.
-    """
-    from app.core.trading_defaults import COLD_START_DEFAULTS
-    from app.services.behavior_engine import BehaviorEngine, EngineContext
-
-    engine = BehaviorEngine()
-    now = datetime(2026, 4, 15, 10, 0, tzinfo=timezone.utc)
-
-    def _ct(entry, exit_, pnl):
-        return SimpleNamespace(
-            id=uuid4(), broker_account_id=uuid4(), tradingsymbol="NIFTY25APR24000CE",
-            exchange="NFO", product="MIS", instrument_type="CE", direction="LONG",
-            total_quantity=75, avg_entry_price=Decimal("100"),
-            avg_exit_price=Decimal("90"), realized_pnl=Decimal(str(pnl)),
-            duration_minutes=10, entry_time=entry, exit_time=exit_,
-            num_entries=1, num_exits=1, status="closed")
-
-    loss = _ct(now - timedelta(minutes=20), now - timedelta(minutes=10), -2400)
-    reentry = _ct(now - timedelta(minutes=7), now, -500)   # 3 min after the loss
-
-    th = dict(COLD_START_DEFAULTS)
-    th["user_cooldown_min"] = 15
-    ctx = EngineContext(
-        broker_account_id=reentry.broker_account_id,
-        session=SimpleNamespace(session_pnl=Decimal("-2900"),
-                                session_date=now.date(), market_open=None),
-        completed_trade=reentry, session_trades=[loss, reentry],
-        thresholds=th)
-
-    events = engine._detect_constitution_violation(ctx) or []
-    cooldown_events = [e for e in events if "cooldown" in (e.message or "").lower()]
-    assert cooldown_events, "the declared cooldown rule must still fire"
-    assert cooldown_events[0].severity == "danger"
-    assert "15-minute cooldown rule violated" in cooldown_events[0].message
-
-
-# ── 4. historical rows stay readable ───────────────────────────────────────
 
 def test_the_frontend_can_still_name_a_stored_row():
     ctx = Path(__file__).resolve().parents[2] / "src" / "contexts" / "AlertContext.tsx"

@@ -12,9 +12,7 @@ export interface UserProfile {
   daily_loss_limit?: number;
   daily_trade_limit?: number;
   max_position_size?: number;     // % of capital per trade (e.g., 10 = 10%)
-  cooldown_after_loss?: number;   // minutes
   trading_capital?: number;       // Rs capital deployed for trading
-  sl_percent_futures?: number;    // typical SL % of notional for futures
   sl_percent_options?: number;    // % of premium to exit losing options
   known_weaknesses?: string[];
   push_enabled?: boolean;
@@ -90,9 +88,7 @@ export const profileSchema = z.object({
   daily_loss_limit: z.number().positive('Daily loss limit must be positive').nullable().optional(),
   daily_trade_limit: z.number().int('Must be a whole number').positive('Must be positive').nullable().optional(),
   max_position_size: z.number().min(0.1, 'Min 0.1%').max(100, 'Max 100%').nullable().optional(),
-  cooldown_after_loss: z.number().int('Must be a whole number').min(0, 'Min 0 minutes').max(480, 'Max 8 hours').nullable().optional(),
   trading_capital: z.number().positive('Capital must be positive').nullable().optional(),
-  sl_percent_futures: z.number().min(0.1, 'Min 0.1%').max(100, 'Max 100%').nullable().optional(),
   sl_percent_options: z.number().min(1, 'Min 1%').max(100, 'Max 100%').nullable().optional(),
   trading_hours_start: z.string().regex(/^\d{2}:\d{2}$/, 'Use HH:MM format').nullable().optional(),
   trading_hours_end: z.string().regex(/^\d{2}:\d{2}$/, 'Use HH:MM format').nullable().optional(),

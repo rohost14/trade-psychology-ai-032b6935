@@ -175,30 +175,6 @@ export function ProfileTab({ profile, setProfile }: ProfileTabProps) {
             </p>
           </div>
 
-          {/* SL % futures */}
-          <div className="space-y-2">
-            <Label>My typical stop-loss on futures (% of notional)</Label>
-            <div className="flex flex-wrap gap-2">
-              {[0.5, 1, 1.5, 2, 3].map((pct) => (
-                <button
-                  key={pct}
-                  type="button"
-                  className={`px-3 py-1.5 rounded-md border text-sm font-medium transition-all ${
-                    (profile.sl_percent_futures ?? 1.0) === pct
-                      ? 'border-tm-brand bg-tm-brand text-white'
-                      : 'border-border hover:border-tm-brand/50'
-                  }`}
-                  onClick={() => setProfile({ ...profile, sl_percent_futures: pct })}
-                >
-                  {pct}%
-                </button>
-              ))}
-            </div>
-            <p className="text-xs text-muted-foreground">
-              Used to detect no-stop-loss behavior on futures trades.
-            </p>
-          </div>
-
           {/* SL % options */}
           <div className="space-y-2">
             <Label>I exit options when premium drops by</Label>
@@ -240,29 +216,6 @@ export function ProfileTab({ profile, setProfile }: ProfileTabProps) {
             </p>
           </div>
 
-          {/* Cooldown after loss */}
-          <div className="space-y-2">
-            <Label>I wait after a loss before re-entering</Label>
-            <div className="flex flex-wrap gap-2">
-              {[0, 5, 10, 15, 30, 60].map((mins) => (
-                <button
-                  key={mins}
-                  type="button"
-                  className={`px-3 py-1.5 rounded-md border text-sm font-medium transition-all ${
-                    (profile.cooldown_after_loss ?? 15) === mins
-                      ? 'border-tm-brand bg-tm-brand text-white'
-                      : 'border-border hover:border-tm-brand/50'
-                  }`}
-                  onClick={() => setProfile({ ...profile, cooldown_after_loss: mins })}
-                >
-                  {mins === 0 ? 'None' : `${mins} min`}
-                </button>
-              ))}
-            </div>
-            <p className="text-xs text-muted-foreground">
-              Revenge trading alert window. If you say 15 min, re-entries at 12 min will fire.
-            </p>
-          </div>
         </div>
       </div>
 

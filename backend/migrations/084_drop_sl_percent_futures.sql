@@ -1,0 +1,71 @@
+-- Migration 084: drop `user_profiles.sl_percent_futures`.
+--
+-- WHY IT GOES
+--
+-- Product decision, 2026-09-02: `sl_percent_futures` is not a user input. It was
+-- collected in Settings, range-validated, gated, stored, and displayed with the
+-- claim "Used to detect no-stop-loss behavior on futures trades" - and READ BY
+-- NOTHING. `_detect_no_stoploss` works from instrument_type, pnl,
+-- ctx.exit_order_types and its own `no_stoploss_loss_pct_danger`; it never
+-- touched this field. No behaviour is created for it in its place.
+--
+-- Every producer and consumer has been removed first, in this order: the
+-- Settings control and its copy, the Settings save payload, the TypeScript
+-- interface and zod schema, the AlertContext type, the FastAPI request schema
+-- and its range validator, both threshold resolvers, and the SQLAlchemy model
+-- column and `to_dict` entry. A test now fails if any runtime path mentions it
+-- again (`test_rule_clearing_and_removals::
+-- test_sl_percent_futures_is_gone_from_every_runtime_path`).
+--
+-- WHY DROPPING IS SAFE HERE, when the project's rule is archive-never-delete
+--
+-- THE COLUMN IS EMPTY. Verified immediately before writing this migration:
+--
+--     SELECT sl_percent_futures, count(*) FROM user_profiles GROUP BY 1;
+--       -> {None: 3}
+--     SELECT count(*) FROM user_profiles WHERE sl_percent_futures IS NOT NULL;
+--       -> 0
+--
+-- Its one non-null value was a migration-028 backfill artefact, not a trader's
+-- choice, and migration 083 nulled it on 2026-09-01 for that reason. So there is
+-- no user data to lose - dropping removes an empty column, not a record.
+--
+-- AFFECTED: 1 column, 0 rows of data.
+--
+-- REVERSIBILITY: the down statement is below and restores the column exactly.
+-- What it cannot restore is data, and there is none to restore.
+--
+-- CONTRAST - `cooldown_after_loss` IS DELIBERATELY KEPT
+--
+-- It stopped being a user-configurable rule in the same pass, and every reader
+-- of it is gone too. The column is NOT dropped, and the reason is that it is NOT
+-- empty: it holds 0, 0 and 1 across the three profiles, and one of those is a
+-- deliberate trader choice recorded in `constitution_history` as an explicit
+-- loosen with `override_flag=True` (10 -> 0). Dropping would destroy a decision
+-- the trader made and the audit row that proves it. An unread column costs
+-- nothing; an unrecoverable deletion of a user's own history is not worth
+-- tidiness. Revisit only if that data is ever migrated or deliberately purged.
+--
+-- APPLIED 2026-09-02. Verified after running:
+--   sl_percent_futures        column DROPPED (0 rows of data lost)
+--   sl_percent_options        UNCHANGED - {50.0: 1, None: 2}
+--   cooldown_after_loss       UNCHANGED - {0: 2, 1: 1}, column KEPT
+--
+-- Evidence: docs/DEEP_REVIEW/RULE_CLEARING_INVESTIGATION.md
+--           docs/DEEP_REVIEW/NON_NULL_DEFAULTS_INVESTIGATION.md
+
+BEGIN;
+
+ALTER TABLE user_profiles DROP COLUMN IF EXISTS sl_percent_futures;
+
+COMMIT;
+
+-- ---------------------------------------------------------------------------
+-- DOWN (not run automatically)
+--
+--   ALTER TABLE user_profiles ADD COLUMN sl_percent_futures FLOAT;
+--
+-- Deliberately WITHOUT the `DEFAULT 1.0` that migration 028 carried: that
+-- default backfilled every existing row and is what created the phantom value
+-- in the first place. Migration 083 removed it.
+-- ---------------------------------------------------------------------------

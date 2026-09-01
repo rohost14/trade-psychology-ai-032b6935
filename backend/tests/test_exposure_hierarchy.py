@@ -420,7 +420,9 @@ def test_an_exposure_rule_does_not_suppress_severe_loss():
 
 # ══ 7. sl_percent_* : AN UNDECLARED RULE IS NOT A FACT ═════════════════════
 
-@pytest.mark.parametrize("key", ["sl_percent_options", "sl_percent_futures"])
+# `sl_percent_futures` was removed as a user input 2026-09-02, so only the
+# surviving optional stop rule is checked here.
+@pytest.mark.parametrize("key", ["sl_percent_options"])
 def test_an_undeclared_stop_rule_resolves_to_none_not_a_number(key):
     """
     It was `... or 50.0` / `or 1.0` marked Source.FACT confidence 1.0 - the

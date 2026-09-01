@@ -307,59 +307,10 @@ def suggest_max_consecutive_losses(
     return None
 
 
-def suggest_cooldown_after_loss(
-    sessions: Dict[Any, List[CompletedTrade]],
-    current: Optional[int],
-) -> Optional[Suggestion]:
-    """
-    Find how long after a loss the user's next trade is still impaired.
-
-    Compares trades entered within m minutes of a losing exit against those
-    entered later. The smallest m where the near side is materially worse is the
-    cooldown the data supports.
-    """
-    gaps: List[tuple] = []   # (minutes_since_loss, was_win)
-    for rows in sessions.values():
-        for prev, nxt in zip(rows, rows[1:]):
-            if _pnl(prev) >= 0 or not prev.exit_time or not nxt.entry_time:
-                continue
-            minutes = (nxt.entry_time - prev.exit_time).total_seconds() / 60
-            if minutes < 0:
-                continue  # overlapping rounds — not a re-entry decision
-            gaps.append((minutes, _pnl(nxt) > 0))
-
-    if len(gaps) < MIN_TRADES // 2 or len(sessions) < MIN_SESSIONS:
-        return None
-
-    for m in (5, 10, 15, 20, 30):
-        near = [w for mins, w in gaps if mins <= m]
-        far = [w for mins, w in gaps if mins > m]
-        if len(near) < MIN_BUCKET or len(far) < MIN_BUCKET:
-            continue
-        if _rate(far) - _rate(near) < MIN_SEPARATION:
-            continue
-        if current is not None and m <= current:
-            # Not tighter than what they already have — but a LARGER window
-            # further up this loop might be. `return None` here abandoned the
-            # search on the first non-improvement: a trader on a 10-minute
-            # cooldown whose data supported 15 was told nothing, because 5
-            # qualified first and 5 is not an improvement on 10.
-            continue
-        return Suggestion(
-            field="cooldown_after_loss",
-            current_value=current,
-            suggested_value=m,
-            headline=f"Wait {m} minutes after a loss before re-entering",
-            evidence=[
-                {"label": f"Trades taken within {m} min of a loss",
-                 "value": f"{len(near)} trades · {_pct(_rate(near))} won"},
-                {"label": f"Trades taken after {m} min",
-                 "value": f"{len(far)} trades · {_pct(_rate(far))} won"},
-            ],
-            confidence=_confidence(len(gaps), MIN_TRADES // 2),
-            sample={"re_entries": len(gaps), "sessions": len(sessions), "window_days": WINDOW_DAYS},
-        )
-    return None
+# `suggest_cooldown_after_loss` was removed 2026-09-02 with the user input.
+# `cooldown_after_loss` is no longer a user-configurable rule, so there is
+# nothing to suggest a value for. The engine keeps its own revenge window
+# (`revenge_window_min`, fallback 10), which the trader never set.
 
 
 # ── Entry point ──────────────────────────────────────────────────────────────
@@ -420,7 +371,6 @@ async def build_suggestions(
     for builder, key in (
         (suggest_daily_loss_limit, "daily_loss_limit"),
         (suggest_max_consecutive_losses, "max_consecutive_losses"),
-        (suggest_cooldown_after_loss, "cooldown_after_loss"),
     ):
         try:
             s = builder(sessions, current_rules.get(key))

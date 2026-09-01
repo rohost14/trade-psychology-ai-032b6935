@@ -101,7 +101,9 @@ def test_the_count_and_time_rules_ARE_set():
     d = constitution_service.generate_defaults("intermediate", None)
 
     assert d["daily_trade_limit"] == 10
-    assert d["cooldown_after_loss"] == 10
+    # `cooldown_after_loss` was asserted here until 2026-09-02. It is no longer
+    # offered by generate_defaults because it is no longer a user rule.
+    assert "cooldown_after_loss" not in d
     assert d["max_consecutive_losses"] == 4
 
 

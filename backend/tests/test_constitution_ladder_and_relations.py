@@ -47,6 +47,13 @@ DAY = datetime(2026, 4, 15, tzinfo=timezone.utc)
 ACCT = uuid4()
 
 
+# Two cooldown tests were DELETED 2026-09-02 WITH THEIR SUBJECT. `cooldown_after_loss` stopped being a user-configurable rule on
+# 2026-09-02, so there is no declared cooldown to measure against. The
+# engine keeps its own revenge window (`revenge_window_min`, fallback 10),
+# pinned by test_rule_clearing_and_removals::
+# test_THE_PROTECTION_SURVIVES_at_its_own_value.
+
+
 def at(h, m):
     return DAY.replace(hour=h, minute=m)
 
@@ -78,29 +85,6 @@ def rules_fired(evs):
 
 
 # ── 1. the cooldown rule reads the shared relation ─────────────────────────
-
-def test_the_cooldown_rule_uses_the_shared_relation():
-    src = inspect.getsource(BehaviorEngine._detect_constitution_violation)
-    assert "ctx.concluded_before_entry" in src
-    # Comments stripped: the retirement note quotes the old predicate in order
-    # to record what changed, so a raw substring search matches its own
-    # explanation. What must be gone is the CODE.
-    code = "\n".join(l for l in src.splitlines() if not l.lstrip().startswith("#"))
-    assert "t.exit_time <= ct.entry_time" not in code, (
-        "the inline spelling must be gone - one definition of CONCLUDED")
-
-
-def test_cooldown_still_fires_on_a_concluded_loss():
-    loss = trade(at(10, 0), at(10, 20), -3000)
-    reentry = trade(at(10, 25), at(10, 40), -500)      # 5 min after, limit 15
-
-    evs = engine._detect_constitution_violation(
-        ctx(reentry, [loss], user_cooldown_min=15))
-    assert "cooldown" in rules_fired(evs)
-    ev = next(e for e in evs if e.context["rule"] == "cooldown")
-    assert ev.severity == "danger"
-    assert ev.context["gap_min"] == 5.0
-
 
 def test_cooldown_is_silent_once_the_window_has_passed():
     loss = trade(at(10, 0), at(10, 20), -3000)
@@ -152,8 +136,13 @@ def test_the_abstain_path_does_not_return_early():
 
 def test_other_rules_still_fire_when_the_risk_rule_abstains():
     """
-    An MCX trade: the risk layer must abstain on that exchange, and the cooldown
-    breach beside it must still be reported.
+    An MCX trade: the risk layer must abstain on that exchange, and the rule
+    beside it must still be reported.
+
+    THE INVARIANT IS UNCHANGED - an abstention on ONE rule must never abstain
+    from the others. Only the companion rule moved: this used the cooldown
+    breach until `cooldown_after_loss` stopped being a user rule on 2026-09-02,
+    and now uses the daily loss limit, which is a rule the trader still sets.
     """
     loss = trade(at(10, 0), at(10, 20), -3000)
     reentry = trade(at(10, 25), at(10, 40), -500)
@@ -163,11 +152,12 @@ def test_other_rules_still_fire_when_the_risk_rule_abstains():
 
     evs = engine._detect_constitution_violation(
         ctx(reentry, [loss],
-            user_cooldown_min=15, max_position_size=2.0, trading_capital=500_000))
+            daily_loss_limit=3000.0, max_position_size=2.0,
+            trading_capital=500_000))
 
     fired = rules_fired(evs)
-    assert "cooldown" in fired, (
-        "an abstention on the risk rule must not suppress the cooldown breach")
+    assert "daily_loss" in fired, (
+        "an abstention on the risk rule must not suppress the other rules")
     assert "max_trade_risk" not in fired, "the risk rule itself must abstain"
 
 

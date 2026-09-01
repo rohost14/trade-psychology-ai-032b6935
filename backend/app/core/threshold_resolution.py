@@ -473,13 +473,15 @@ def _apply_declared(profile, values: Dict[str, Any], put: Callable) -> None:
         put("daily_trade_danger", int(values["daily_trade_limit"] * 1.5),
             Source.DECLARED, 1.0, "derived from daily_trade_limit")
 
-    if getattr(profile, "cooldown_after_loss", None):
-        user_cooldown = int(profile.cooldown_after_loss)
-        if user_cooldown > values["revenge_window_caution_min"]:
-            put("revenge_window_caution_min", user_cooldown, Source.DECLARED, 1.0,
-                "your cooldown rule (longer than resolved)")
-        put("revenge_window_min", user_cooldown, Source.DECLARED, 1.0,
-            "your cooldown rule")
+    # A DECLARED COOLDOWN USED TO OVERRIDE THE REVENGE WINDOW HERE.
+    # Removed 2026-09-02 with `cooldown_after_loss` as a user input.
+    #
+    # THE PROTECTION IS NOT REMOVED, only the trader's ability to move it.
+    # `revenge_window_min` and `revenge_window_caution_min` carry their own
+    # THRESHOLD_SPECS fallbacks (10 and 20), so the engine keeps its own window.
+    # Measured: declaring 15 resolved revenge_window_min to 15/DECLARED; with
+    # nothing declared it resolves to 10/GLOBAL, and the caution window was
+    # 20/GLOBAL either way.
 
 
 # ---------------------------------------------------------------------------
@@ -497,8 +499,6 @@ def _apply_profile_facts(profile, values: Dict[str, Any], put: Callable) -> None
     put("restricted_windows", getattr(profile, "restricted_windows", None) or [],
         Source.FACT, 1.0, "declared")
     put("user_daily_trade_limit", getattr(profile, "daily_trade_limit", None),
-        Source.FACT, 1.0, "declared")
-    put("user_cooldown_min", getattr(profile, "cooldown_after_loss", None),
         Source.FACT, 1.0, "declared")
 
     # `danger_hours` was resolved here for `time_of_day_bias`, retired
@@ -544,12 +544,14 @@ def _apply_profile_facts(profile, values: Dict[str, Any], put: Callable) -> None
     # None when undeclared. `live_risk_state.build_watches` already gates on
     # `if declared_raw:`, so None simply means no declared band - the universal
     # 40/60/80 ladder is untouched and still fires on its own.
-    _slf = getattr(profile, "sl_percent_futures", None)
+    # `sl_percent_futures` was removed as a user input 2026-09-02.
+    #
+    # It was collected, validated, stored and displayed with the claim "Used to
+    # detect no-stop-loss behavior on futures trades" - and read by NOTHING.
+    # `_detect_no_stoploss` uses instrument_type, pnl, ctx.exit_order_types and
+    # its own no_stoploss_loss_pct_danger; it never touched this field. No
+    # behaviour is created for it in its place.
     _slo = getattr(profile, "sl_percent_options", None)
-    put("sl_percent_futures", _slf if _slf else None,
-        Source.FACT if _slf else Source.GLOBAL,
-        1.0 if _slf else 0.0,
-        None if _slf else "not declared")
     put("sl_percent_options", _slo if _slo else None,
         Source.FACT if _slo else Source.GLOBAL,
         1.0 if _slo else 0.0,
@@ -710,7 +712,7 @@ def _apply_cold_start(put: Callable) -> None:
     for key in ("trading_capital", "daily_loss_limit", "per_trade_loss_limit",
                 "max_position_size",
                 "max_consecutive_losses", "user_daily_trade_limit",
-                "user_cooldown_min", "baseline_win_rate", "baseline_profit_factor"):
+                "baseline_win_rate", "baseline_profit_factor"):
         put(key, None, Source.GLOBAL, 0.0, "unknown — no profile")
     put("restricted_windows", [], Source.GLOBAL, 0.0, "unknown — no profile")
     put("baseline_sessions", 0, Source.GLOBAL, 0.0, "unknown — no profile")
@@ -719,6 +721,5 @@ def _apply_cold_start(put: Callable) -> None:
     # `build_watches` gates on truthiness - so the cold-start path built the
     # same fabricated "declared" band. None is the only reading that matches
     # the fact.
-    put("sl_percent_futures", None, Source.GLOBAL, 0.0, "not declared")
     put("sl_percent_options", None, Source.GLOBAL, 0.0, "not declared")
     put("risk_tolerance", "moderate", Source.GLOBAL, 0.0, "repo default")

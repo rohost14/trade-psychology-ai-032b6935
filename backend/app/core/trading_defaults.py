@@ -493,14 +493,11 @@ def _get_thresholds_pre_ladder(profile=None) -> Dict[str, Any]:
             # More restrictive = lower number; pick the tighter of user vs current
             result['daily_trade_limit'] = min(user_limit, result['daily_trade_limit'])
             result['daily_trade_danger'] = int(result['daily_trade_limit'] * 1.5)
-        if getattr(profile, 'cooldown_after_loss', None):
-            user_cooldown = int(profile.cooldown_after_loss)
-            # More restrictive = longer cooldown; pick the longer of user vs current
-            result['revenge_window_caution_min'] = max(
-                user_cooldown, result['revenge_window_caution_min']
-            )
-            # Unified key used by RiskDetector + BehavioralEvaluator: honour user's declared cooldown directly
-            result['revenge_window_min'] = user_cooldown
+        # A DECLARED COOLDOWN USED TO OVERRIDE THE REVENGE WINDOW HERE.
+        # Removed 2026-09-02 with `cooldown_after_loss` as a user input. The
+        # PROTECTION is untouched - `revenge_window_min` and
+        # `revenge_window_caution_min` keep their own resolved values (10 and
+        # 20); only the trader's ability to move them is gone.
 
         # Capital-derived thresholds (always from profile, no style default)
         result['trading_capital']   = getattr(profile, 'trading_capital', None)
@@ -513,7 +510,6 @@ def _get_thresholds_pre_ladder(profile=None) -> Dict[str, Any]:
         result['max_consecutive_losses'] = getattr(profile, 'max_consecutive_losses', None)
         result['restricted_windows']     = getattr(profile, 'restricted_windows', None) or []
         result['user_daily_trade_limit'] = getattr(profile, 'daily_trade_limit', None)
-        result['user_cooldown_min']      = getattr(profile, 'cooldown_after_loss', None)
 
         # 'danger_hours' was resolved here for `time_of_day_bias`, retired
         # 2026-09-01. `time_patterns` is still learned and stored nightly; no
@@ -526,7 +522,6 @@ def _get_thresholds_pre_ladder(profile=None) -> Dict[str, Any]:
         result['baseline_profit_factor'] = _blm.get('profit_factor')
         # An undeclared rule is not a fact - see the long note in
         # threshold_resolution. None when the trader declared nothing.
-        result['sl_percent_futures'] = getattr(profile, 'sl_percent_futures', None) or None
         result['sl_percent_options'] = getattr(profile, 'sl_percent_options', None) or None
         result['risk_tolerance']    = getattr(profile, 'risk_tolerance', None) or 'moderate'
 
@@ -544,11 +539,9 @@ def _get_thresholds_pre_ladder(profile=None) -> Dict[str, Any]:
         result['max_consecutive_losses'] = None
         result['restricted_windows']     = []
         result['user_daily_trade_limit'] = None
-        result['user_cooldown_min']      = None
         result['baseline_sessions']      = 0
         result['baseline_win_rate']      = None
         result['baseline_profit_factor'] = None
-        result['sl_percent_futures'] = None
         result['sl_percent_options'] = None
         result['risk_tolerance']     = 'moderate'
 

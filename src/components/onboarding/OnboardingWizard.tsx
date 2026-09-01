@@ -64,7 +64,6 @@ interface OnboardingData {
   per_trade_loss_limit: number | null;
   daily_trade_limit: number;
   max_position_size: number | null;
-  cooldown_after_loss: number;
   max_consecutive_losses: number;
   trading_capital: number | null;
   //: Explicit opt-in. Unchecked -> the rule stays null and is never enforced.
@@ -142,7 +141,6 @@ export default function OnboardingWizard({ brokerAccountId, onComplete, onSkip }
     per_trade_loss_limit: null,      // off until the trader opts in
     daily_trade_limit: 10,
     max_position_size: null,         // off until the trader opts in
-    cooldown_after_loss: 15,
     max_consecutive_losses: 3,
     trading_capital: null,
     enable_daily_loss_limit: false,
@@ -206,7 +204,6 @@ export default function OnboardingWizard({ brokerAccountId, onComplete, onSkip }
           // capital, so "more than 10 trades today" means the same at any
           // account size and the server ships them set.
           daily_trade_limit: rec.daily_trade_limit ?? d.daily_trade_limit,
-          cooldown_after_loss: rec.cooldown_after_loss ?? d.cooldown_after_loss,
           max_consecutive_losses: rec.max_consecutive_losses ?? d.max_consecutive_losses,
           // daily_loss_limit and max_position_size are deliberately NOT taken
           // from `rec` — the server returns null for both on purpose. They are
@@ -295,7 +292,6 @@ export default function OnboardingWizard({ brokerAccountId, onComplete, onSkip }
           // Enabled AND filled in. A ticked box with an empty field enforces
           // nothing - the rule needs a number, and we do not supply one.
           max_position_size: data.enable_max_position_size ? data.max_position_size : null,
-          cooldown_after_loss: data.cooldown_after_loss,
           max_consecutive_losses: data.max_consecutive_losses,
           trading_capital: data.trading_capital,
           known_weaknesses: data.known_weaknesses,
@@ -764,23 +760,6 @@ export default function OnboardingWizard({ brokerAccountId, onComplete, onSkip }
                       min={1}
                       max={50}
                       step={1}
-                    />
-                  </div>
-
-                  <div className="space-y-3">
-                    <div className="flex justify-between">
-                      <Label className="flex items-center gap-2">
-                        <Clock className="h-4 w-4" />
-                        Cooldown After Loss
-                      </Label>
-                      <span className="text-sm font-medium">{data.cooldown_after_loss} min</span>
-                    </div>
-                    <Slider
-                      value={[data.cooldown_after_loss]}
-                      onValueChange={([value]) => setData({ ...data, cooldown_after_loss: value })}
-                      min={5}
-                      max={60}
-                      step={5}
                     />
                   </div>
 

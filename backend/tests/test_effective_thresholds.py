@@ -46,13 +46,11 @@ def test_declared_trade_limit_is_NOT_used_when_looser_than_baseline():
     assert get_thresholds(p)["daily_trade_limit"] <= 6
 
 
-def test_cooldown_takes_the_longer_of_declared_and_current():
-    """Cooldown tightens upward, unlike the limits — longer is stricter."""
-    default = get_thresholds(profile())["revenge_window_caution_min"]
-    got = get_thresholds(profile(cooldown_after_loss=int(default) + 30))
-    assert got["revenge_window_caution_min"] >= default
-    # The unified key honours the declared value directly.
-    assert got["revenge_window_min"] == int(default) + 30
+# `test_cooldown_takes_the_longer_of_declared_and_current` was DELETED
+# 2026-09-02 WITH ITS SUBJECT. It asserted that a declared cooldown
+# raised the revenge window. `cooldown_after_loss` stopped being a user-configurable rule on 2026-09-02. The engine keeps its own revenge window (`revenge_window_min`, fallback 10); the trader no longer sets it. The window itself is now
+# pinned by test_rule_clearing_and_removals::
+# test_THE_PROTECTION_SURVIVES_at_its_own_value.
 
 
 def test_loss_and_capital_limits_pass_through_as_declared():

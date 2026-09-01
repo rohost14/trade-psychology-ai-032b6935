@@ -30,7 +30,6 @@ class UserProfileBase(BaseModel):
     max_position_size: Optional[float] = None
     cooldown_after_loss: int = 15
     trading_capital: Optional[float] = None
-    sl_percent_futures: Optional[float] = None
     sl_percent_options: Optional[float] = None
 
     # Known weaknesses
@@ -71,7 +70,6 @@ class UserProfileUpdate(BaseModel):
     max_position_size: Optional[float] = None
     cooldown_after_loss: Optional[int] = None
     trading_capital: Optional[float] = None
-    sl_percent_futures: Optional[float] = None
     sl_percent_options: Optional[float] = None
     known_weaknesses: Optional[List[str]] = None
     push_enabled: Optional[bool] = None

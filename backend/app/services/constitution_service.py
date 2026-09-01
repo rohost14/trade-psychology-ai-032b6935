@@ -46,7 +46,9 @@ RULE_FIELDS = (
     "per_trade_loss_limit",
     "daily_trade_limit",
     "max_position_size",
-    "cooldown_after_loss",
+    # `cooldown_after_loss` was a RULE_FIELD until 2026-09-02. It is no longer
+    # user-configurable: the engine keeps its own revenge window
+    # (`revenge_window_min`, fallback 10) and the trader does not set it.
     "max_consecutive_losses",
     "restricted_windows",
     # Added 2026-08-27 (Pattern #8). Settings has asked "I exit options when
@@ -64,7 +66,6 @@ _TIGHTEN_DIRECTION = {
     "per_trade_loss_limit": -1,   # a smaller allowed loss is a tighter promise
     "daily_trade_limit": -1,
     "max_position_size": -1,
-    "cooldown_after_loss": +1,
     "max_consecutive_losses": -1,
     # Exiting sooner is tighter: 25% is a stricter promise than 50%.
     "sl_percent_options": -1,
@@ -334,7 +335,6 @@ class ConstitutionService:
             # removed. The trader types their own or leaves it off.
             "per_trade_loss_limit": None,
             "daily_trade_limit": m["max_trades"],
-            "cooldown_after_loss": m["cooldown"],
             "max_consecutive_losses": m["consec"],
             "restricted_windows": [],
         }

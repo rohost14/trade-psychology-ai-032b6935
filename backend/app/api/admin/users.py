@@ -64,7 +64,6 @@ class LimitsUpdate(BaseModel):
     daily_trade_limit:  Optional[int]   = Field(None, ge=1, le=500)
     daily_loss_limit:   Optional[float] = Field(None, ge=0)
     per_trade_loss_limit: Optional[float] = Field(None, ge=0)
-    cooldown_after_loss: Optional[int]  = Field(None, ge=0, le=1440)
     max_position_size:  Optional[float] = Field(None, ge=0.1, le=100)
 
 
@@ -551,9 +550,6 @@ async def update_user_limits(
     if body.daily_loss_limit is not None:
         changed["daily_loss_limit"] = (profile.daily_loss_limit, body.daily_loss_limit)
         profile.daily_loss_limit = body.daily_loss_limit
-    if body.cooldown_after_loss is not None:
-        changed["cooldown_after_loss"] = (profile.cooldown_after_loss, body.cooldown_after_loss)
-        profile.cooldown_after_loss = body.cooldown_after_loss
     if body.max_position_size is not None:
         changed["max_position_size"] = (profile.max_position_size, body.max_position_size)
         profile.max_position_size = body.max_position_size

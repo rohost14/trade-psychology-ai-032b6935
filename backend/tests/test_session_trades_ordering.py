@@ -51,6 +51,13 @@ IST_OPEN = datetime(2026, 4, 15, 9, 15, tzinfo=timezone.utc)
 
 # ── 1. the boundary exists and is applied ──────────────────────────────────
 
+# One cooldown test was DELETED 2026-09-02 WITH ITS SUBJECT. `cooldown_after_loss` stopped being a user-configurable rule on
+# 2026-09-02, so there is no declared cooldown to measure against. The
+# engine keeps its own revenge window (`revenge_window_min`, fallback 10),
+# pinned by test_rule_clearing_and_removals::
+# test_THE_PROTECTION_SURVIVES_at_its_own_value.
+
+
 def test_load_session_trades_accepts_an_as_of_bound():
     from app.core.session_facts import load_session_trades
 
@@ -165,14 +172,6 @@ def test_revenge_trade_compares_the_prior_close_to_this_entry():
     relation = inspect.getsource(EngineContext.concluded_before_entry.fget)
     assert "t.exit_time < entry" in relation, (
         "and the shared relation must still be the strict one")
-
-
-def test_the_constitution_cooldown_rule_compares_against_this_entry():
-    from app.services.behavior_engine import BehaviorEngine
-
-    src = inspect.getsource(BehaviorEngine._detect_constitution_violation)
-    assert re.search(r"t\.exit_time\s*<=\s*ct\.entry_time", src), (
-        "the cooldown measures the gap from a loss that had already closed")
 
 
 def test_fomo_entry_bounds_its_window_at_this_entry():

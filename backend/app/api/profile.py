@@ -64,7 +64,6 @@ class OnboardingStep4(BaseModel):
     per_trade_loss_limit: Optional[float] = None
     daily_trade_limit: Optional[int] = None
     max_position_size: Optional[float] = None
-    cooldown_after_loss: int = 15
     max_consecutive_losses: Optional[int] = None
     trading_capital: Optional[float] = None
     known_weaknesses: List[str] = []  # Self-reported weaknesses
@@ -117,9 +116,7 @@ class ProfileUpdate(BaseModel):
     per_trade_loss_limit: Optional[float] = None
     daily_trade_limit: Optional[int] = None
     max_position_size: Optional[float] = None
-    cooldown_after_loss: Optional[int] = None
     trading_capital: Optional[float] = None
-    sl_percent_futures: Optional[float] = None
     sl_percent_options: Optional[float] = None
     known_weaknesses: Optional[List[str]] = None
     push_enabled: Optional[bool] = None
@@ -202,18 +199,11 @@ class ProfileUpdate(BaseModel):
             raise ValueError("Value must be positive")
         return v
 
-    @field_validator("max_position_size", "sl_percent_futures", "sl_percent_options")
+    @field_validator("max_position_size", "sl_percent_options")
     @classmethod
     def validate_percent(cls, v: Optional[float]) -> Optional[float]:
         if v is not None and not (0.1 <= v <= 100):
             raise ValueError("Percentage must be between 0.1 and 100")
-        return v
-
-    @field_validator("cooldown_after_loss")
-    @classmethod
-    def validate_cooldown(cls, v: Optional[int]) -> Optional[int]:
-        if v is not None and not (0 <= v <= 480):
-            raise ValueError("Cooldown must be 0–480 minutes")
         return v
 
     @field_validator("daily_trade_limit")
@@ -414,7 +404,6 @@ async def onboarding_step4(
             "per_trade_loss_limit": data.per_trade_loss_limit,
             "daily_trade_limit": data.daily_trade_limit,
             "max_position_size": data.max_position_size,
-            "cooldown_after_loss": data.cooldown_after_loss,
             "max_consecutive_losses": data.max_consecutive_losses,
         }
         await ConstitutionService.apply_changes(
@@ -526,8 +515,14 @@ async def update_profile(
         from app.services.constitution_service import (
             ConstitutionService, LoosenRequiresOverride, RULE_FIELDS,
         )
+        # `exclude_unset=True` above already means update_data holds only keys
+        # the client actually sent, so an explicit null IS distinguishable from
+        # an omitted field here - the `is not None` filter that used to sit on
+        # this line threw that distinction away and made rules unremovable.
+        # 2026-09-02: a sent null is now a removal, routed through
+        # ConstitutionService like any other loosening.
         rule_changes = {f: update_data.pop(f) for f in list(update_data)
-                        if f in RULE_FIELDS and update_data[f] is not None}
+                        if f in RULE_FIELDS}
         if rule_changes:
             try:
                 await ConstitutionService.apply_changes(profile, db, rule_changes)
@@ -541,6 +536,9 @@ async def update_profile(
                     },
                 )
 
+        # NON-RULE fields keep the `is not None` guard. They have no removal
+        # semantics, no history row and no override flow, so a null here would
+        # silently blank a display field rather than clear a rule.
         for field, value in update_data.items():
             if hasattr(profile, field) and value is not None:
                 setattr(profile, field, value)

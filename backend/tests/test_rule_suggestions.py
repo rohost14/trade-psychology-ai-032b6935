@@ -16,7 +16,6 @@ import pytest
 from app.services.rule_suggestion_service import (
     MIN_SESSIONS,
     _group_by_session,
-    suggest_cooldown_after_loss,
     suggest_daily_loss_limit,
     suggest_daily_trade_limit,
     suggest_max_consecutive_losses,
@@ -134,33 +133,11 @@ def test_consecutive_losses_respects_a_tighter_existing_rule():
     assert suggest_max_consecutive_losses(sessions_from(trades), current=2) is None
 
 
-# ── cooldown_after_loss ──────────────────────────────────────────────────────
-
-def test_cooldown_detects_impaired_reentry_window():
-    """Re-entries inside 5 minutes lose; patient ones win."""
-    trades = []
-    for d in range(12):
-        trades.append(trade(d, minute=0, pnl=-500, duration=1))
-        trades.append(trade(d, minute=3, pnl=-400, duration=1))    # 2 min gap
-        trades.append(trade(d, minute=10, pnl=-500, duration=1))
-        trades.append(trade(d, minute=60, pnl=700, duration=1))    # 49 min gap
-    out = suggest_cooldown_after_loss(sessions_from(trades), current=None)
-    assert out is not None
-    assert out.suggested_value in (5, 10, 15, 20, 30)
-    assert out.field == "cooldown_after_loss"
-
-
-def test_cooldown_not_suggested_below_existing_rule():
-    trades = []
-    for d in range(12):
-        trades.append(trade(d, minute=0, pnl=-500, duration=1))
-        trades.append(trade(d, minute=3, pnl=-400, duration=1))
-        trades.append(trade(d, minute=10, pnl=-500, duration=1))
-        trades.append(trade(d, minute=60, pnl=700, duration=1))
-    assert suggest_cooldown_after_loss(sessions_from(trades), current=60) is None
-
-
-# ── multi-leg guard ──────────────────────────────────────────────────────────
+# `cooldown_after_loss` suggestions were REMOVED 2026-09-02 with the user input.
+# Three tests went with `suggest_cooldown_after_loss`: their subject no longer
+# exists, so they were deleted rather than weakened. The rule is not
+# user-configurable any more - the engine keeps its own revenge window
+# (`revenge_window_min`, fallback 10), which the trader never set.
 
 def test_multi_leg_detected_for_simultaneous_same_underlying_entries():
     legs = [
@@ -186,23 +163,3 @@ def test_different_underlyings_at_the_same_moment_are_not_a_spread():
     assert uses_multi_leg(pair) is False
 
 
-def test_cooldown_keeps_looking_past_a_window_that_is_not_an_improvement():
-    """
-    The loop returned None the moment a qualifying window was not tighter than
-    the user's current setting, abandoning the search. A trader on a 10-minute
-    cooldown whose data supported 15 was told nothing, because 5 qualified first
-    and 5 is not an improvement on 10.
-
-    Losses inside 15 minutes, wins after — so both 5 and 15 separate, and only
-    15 is a genuine tightening.
-    """
-    trades = []
-    for d in range(12):
-        trades.append(trade(d, minute=0, pnl=-500, duration=1))
-        trades.append(trade(d, minute=3, pnl=-400, duration=1))    # 2 min gap
-        trades.append(trade(d, minute=10, pnl=-450, duration=1))   # 6 min gap
-        trades.append(trade(d, minute=60, pnl=700, duration=1))    # 49 min gap
-
-    out = suggest_cooldown_after_loss(sessions_from(trades), current=10)
-    assert out is not None, "abandoned the search instead of looking further"
-    assert out.suggested_value > 10

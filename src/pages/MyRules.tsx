@@ -148,6 +148,11 @@ export default function MyRules() {
         toast.success('Rules tightened. Effective immediately.');
       } else if (outcome.change_type !== 'none') {
         toast.success('Rules updated.');
+      } else {
+        // NO SILENT SUCCESS. Before 2026-09-02 a save that changed nothing fell
+        // through this chain without a word - which is how "clear a rule" looked
+        // like it worked while the API was dropping the null.
+        toast.info('No changes to save.');
       }
       setEditing(false);
       setOverrideFields(null);
@@ -358,7 +363,6 @@ export default function MyRules() {
               ['per_trade_loss_limit', 'Per-trade loss limit (₹)', 100],
               ['daily_trade_limit', 'Max trades per day', 1],
               ['max_position_size', 'Max risk per trade (% of capital)', 0.5],
-              ['cooldown_after_loss', 'Cooldown after a loss (minutes)', 5],
               ['max_consecutive_losses', 'Stop after consecutive losses', 1],
             ] as const).map(([field, label, step]) => (
               <div key={field}>

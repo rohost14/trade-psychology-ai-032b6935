@@ -86,7 +86,14 @@ class UserProfile(Base):
     max_consecutive_losses = Column(Integer, nullable=True)  # Stop after N losses in a row
     restricted_windows = Column(JSONB, default=list)      # ["13:00-14:00"] IST no-trade windows
     trading_capital = Column(Float, nullable=True)        # Rs amount of capital deployed for trading
-    sl_percent_futures = Column(Float, nullable=True)     # Typical SL % of notional for futures (e.g., 1.0)
+    # `sl_percent_futures` was removed as a user input 2026-09-02.
+    #
+    # It was collected, validated, stored and displayed with the claim "Used to
+    # detect no-stop-loss behavior on futures trades" - and read by NOTHING.
+    # `_detect_no_stoploss` uses instrument_type, pnl, ctx.exit_order_types and
+    # its own no_stoploss_loss_pct_danger; it never touched this field. No
+    # behaviour is created for it in its place.
+    # Column dropped by migration 084.
     sl_percent_options = Column(Float, nullable=True)     # % of premium to exit losing options (e.g., 50.0)
 
     # Constitution lock/override metadata (§1C.3, migration 065)
@@ -150,7 +157,6 @@ class UserProfile(Base):
             "constitution_locked_until": self.constitution_locked_until.isoformat() if self.constitution_locked_until else None,
             "constitution_pending": self.constitution_pending,
             "trading_capital": self.trading_capital,
-            "sl_percent_futures": self.sl_percent_futures,
             "sl_percent_options": self.sl_percent_options,
             "known_weaknesses": self.known_weaknesses or [],
             "push_enabled": self.push_enabled,

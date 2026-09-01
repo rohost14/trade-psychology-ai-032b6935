@@ -4,8 +4,9 @@
  * THE BUG THIS EXISTS TO PREVENT
  *
  * `Settings.tsx` seeds its editable state with hardcoded values - among them
- * max_position_size 10, sl_percent_options 50, sl_percent_futures 1.0,
- * cooldown_after_loss 15, guardian_enabled false, whatsapp_enabled false.
+ * max_position_size 10, sl_percent_options 50, guardian_enabled false and
+ * whatsapp_enabled false. (sl_percent_futures and cooldown_after_loss were
+ * in this list until they were removed as user inputs on 2026-09-02.)
  *
  * The render guard already refused to show the form after a FAILED profile
  * load, for exactly the right reason - the comment in the file says so. What it
@@ -96,7 +97,6 @@ describe('Settings — the profile-pending guard', () => {
 
     // None of the fabricable controls may exist yet.
     expect(screen.queryByText(/I exit options when premium drops by/i)).toBeNull();
-    expect(screen.queryByText(/My typical stop-loss on futures/i)).toBeNull();
     expect(screen.queryByText(/Max per options trade/i)).toBeNull();
   });
 
@@ -128,9 +128,7 @@ describe('Settings — the profile-pending guard', () => {
     profilePayload = {
       max_position_size: null,
       sl_percent_options: null,
-      sl_percent_futures: null,
       daily_loss_limit: null,
-      cooldown_after_loss: 20,
       guardian_enabled: true,
       whatsapp_enabled: true,
       alert_sensitivity: 'high',
@@ -148,10 +146,8 @@ describe('Settings — the profile-pending guard', () => {
 
     expect(body.max_position_size).toBeNull();
     expect(body.sl_percent_options).toBeNull();
-    expect(body.sl_percent_futures).toBeNull();
 
     // and the values that WERE set round-trip untouched
-    expect(body.cooldown_after_loss).toBe(20);
     expect(body.guardian_enabled).toBe(true);
     expect(body.whatsapp_enabled).toBe(true);
     expect(body.alert_sensitivity).toBe('high');
@@ -162,8 +158,6 @@ describe('Settings — the profile-pending guard', () => {
     profilePayload = {
       max_position_size: 25,
       sl_percent_options: 70,
-      sl_percent_futures: 3,
-      cooldown_after_loss: 5,
     };
     renderSettings();
     await screen.findByTestId('settings-loading');
@@ -175,8 +169,6 @@ describe('Settings — the profile-pending guard', () => {
     await waitFor(() => expect(putCalls.length).toBe(1));
     expect(putCalls[0].max_position_size).toBe(25);
     expect(putCalls[0].sl_percent_options).toBe(70);
-    expect(putCalls[0].sl_percent_futures).toBe(3);
-    expect(putCalls[0].cooldown_after_loss).toBe(5);
   });
 
   it('an explicit selection still persists', async () => {
@@ -197,21 +189,23 @@ describe('Settings — the profile-pending guard', () => {
     expect(putCalls[0].max_position_size).toBeNull();
   });
 
-  it('cooldown_after_loss still behaves as an always-configured field', async () => {
-    // Its column is never NULL by design (model default 15), so a stored value
-    // must render and round-trip. This pins that the fix did not turn it into
-    // an opt-in rule.
-    profilePayload = { cooldown_after_loss: 30, max_position_size: null };
+  it('no longer exposes the removed user inputs', async () => {
+    // sl_percent_futures and cooldown_after_loss stopped being user inputs on
+    // 2026-09-02. The controls are gone and the payload must not carry them -
+    // a leftover key would keep writing a value nobody can see or change.
+    profilePayload = { max_position_size: null, sl_percent_options: null };
     renderSettings();
     await screen.findByTestId('settings-loading');
     resolveProfile?.(null);
 
     const save = await screen.findByRole('button', { name: /save all settings/i });
-    await act(async () => { fireEvent.click(save); });
+    expect(screen.queryByText(/My typical stop-loss on futures/i)).toBeNull();
+    expect(screen.queryByText(/I wait after a loss before re-entering/i)).toBeNull();
 
+    await act(async () => { fireEvent.click(save); });
     await waitFor(() => expect(putCalls.length).toBe(1));
-    expect(putCalls[0].cooldown_after_loss).toBe(30);
-    expect(putCalls[0].cooldown_after_loss).not.toBeNull();
+    expect('sl_percent_futures' in putCalls[0]).toBe(false);
+    expect('cooldown_after_loss' in putCalls[0]).toBe(false);
   });
 });
 

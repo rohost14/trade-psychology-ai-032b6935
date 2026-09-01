@@ -53,7 +53,6 @@ export interface UserProfileThresholds {
   cooldown_after_loss?: number;
   trading_capital?: number;
   max_position_size?: number;
-  sl_percent_futures?: number;
   sl_percent_options?: number;
 }
 

@@ -37,7 +37,6 @@ class ConstitutionUpdate(BaseModel):
     per_trade_loss_limit: Optional[float] = Field(None, ge=0)
     daily_trade_limit: Optional[int] = Field(None, ge=1, le=200)
     max_position_size: Optional[float] = Field(None, ge=0.1, le=100)
-    cooldown_after_loss: Optional[int] = Field(None, ge=0, le=240)
     max_consecutive_losses: Optional[int] = Field(None, ge=1, le=20)
     restricted_windows: Optional[List[str]] = None
     override_confirmed: bool = False
@@ -84,14 +83,29 @@ async def update_constitution(
     hours).
     """
     profile = await _get_profile(broker_account_id, db)
+    # OMITTED vs EXPLICITLY NULL. 2026-09-02.
+    #
+    # This used to keep only `is not None` values, so an explicit
+    # `{"max_position_size": null}` was indistinguishable from not sending the
+    # field at all - and a rule could be set or changed but never REMOVED. The
+    # note that stood here scoped removal out of Phase 2; this is that later
+    # iteration.
+    #
+    # `model_fields_set` is the distinction pydantic already carries: a key the
+    # client actually sent is in it, an omitted one is not. So a null that was
+    # SENT becomes a removal, and a field that was never mentioned is left
+    # alone - which is what stops an unrelated save from clearing every rule.
+    #
+    # Nothing else is needed. `classify_change` has always returned "loosen"
+    # for value -> None, so a removal routes through the same override
+    # confirmation and next-session queue as any other relaxation, and writes
+    # the same ConstitutionHistory row.
+    sent = payload.model_fields_set
     new_values = {
         f: getattr(payload, f)
         for f in RULE_FIELDS
-        if getattr(payload, f, None) is not None or f == "restricted_windows" and payload.restricted_windows is not None
+        if f in sent
     }
-    # Explicit None handling: pydantic None means "not provided" here — rule
-    # REMOVAL goes through restricted PUT with explicit override in a later
-    # iteration; out of scope for Phase 2 backend.
     try:
         outcome = await ConstitutionService.apply_changes(
             profile, db, new_values,
@@ -177,7 +191,6 @@ async def generate_recommended(
 #: that relationship is written down.
 _RULE_TO_THRESHOLD = {
     "daily_trade_limit":      "daily_trade_limit",
-    "cooldown_after_loss":    "revenge_window_min",
     "daily_loss_limit":       "daily_loss_limit",
     "per_trade_loss_limit":   "per_trade_loss_limit",
     "max_position_size":      "max_position_size",
@@ -278,15 +291,9 @@ async def constitution_status(
     session_pnl = float(facts.pnl)
     loss = -session_pnl if session_pnl < 0 else 0.0
     streak = facts.consecutive_losses
-    last_loss = next((t for t in reversed(trades) if float(t.realized_pnl or 0) < 0), None)
-    cooldown_active = False
-    cooldown_remaining_min = 0
-    if last_loss and rules.get("cooldown_after_loss") and last_loss.exit_time:
-        elapsed = (datetime.now(timezone.utc) - last_loss.exit_time).total_seconds() / 60
-        remaining = float(rules["cooldown_after_loss"]) - elapsed
-        if remaining > 0:
-            cooldown_active = True
-            cooldown_remaining_min = round(remaining, 1)
+    # A declared-cooldown countdown was reported here until 2026-09-02.
+    # `cooldown_after_loss` is no longer a user rule, so there is no declared
+    # limit to count down against and nothing is invented in its place.
 
     def usage(rule_key, current, limit):
         return {
@@ -300,9 +307,6 @@ async def constitution_status(
             usage("daily_loss", round(loss, 2), rules.get("daily_loss_limit")),
             usage("daily_trades", facts.trades, rules.get("daily_trade_limit")),
             usage("max_consecutive_losses", streak, rules.get("max_consecutive_losses")),
-            {"rule": "cooldown", "active": cooldown_active,
-             "remaining_min": cooldown_remaining_min,
-             "limit_min": rules.get("cooldown_after_loss")},
             {"rule": "restricted_windows", "windows": rules.get("restricted_windows") or []},
         ],
     }

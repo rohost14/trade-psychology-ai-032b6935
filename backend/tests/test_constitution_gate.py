@@ -76,8 +76,8 @@ def _profile(**overrides):
     ("max_consecutive_losses", 3, 6, "loosen"),
     # Higher is tighter: a longer cooldown keeps you out for longer. The one
     # field where the sign is inverted, and the one a refactor would get wrong.
-    ("cooldown_after_loss", 10, 30, "tighten"),
-    ("cooldown_after_loss", 10, 2, "loosen"),
+    # The cooldown_after_loss rows went 2026-09-02 with the user input. The
+    # +1 direction they demonstrated is still covered by the surviving rows.
     # Adding a rule is tightening; removing it entirely is loosening, whatever
     # the numbers would otherwise say.
     ("daily_loss_limit", None, 5000, "tighten"),
@@ -126,8 +126,11 @@ async def test_tighten_needs_no_override(monkeypatch):
     monkeypatch.setattr(cs, "_is_market_hours", lambda _now: True)
     profile, db = _profile(), _FakeDB()
     # override_confirmed defaults to False; tightening must not care.
-    await ConstitutionService.apply_changes(profile, db, {"cooldown_after_loss": 45})
-    assert profile.cooldown_after_loss == 45
+    # Was cooldown_after_loss 10 -> 45. Repointed to a surviving rule after the
+    # cooldown input was removed; the INVARIANT under test - a tightening change
+    # applies with no override - is unchanged.
+    await ConstitutionService.apply_changes(profile, db, {"daily_trade_limit": 5})
+    assert profile.daily_trade_limit == 5
 
 
 # ── Loosening ───────────────────────────────────────────────────────────────

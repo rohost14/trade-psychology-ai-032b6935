@@ -1200,12 +1200,17 @@ class BehaviorEngine:
 
         severity = self._RT_MATRIX[a_level][b_level]
 
-        # A declared cooldown breach is a fact about a COMMITMENT, not about harm.
-        # It raises severity to at least caution and never on its own to danger.
-        declared = ctx.thresholds.get("user_cooldown_min")
-        declared_breach = bool(declared and gap_min < float(declared))
-        if declared_breach and SEVERITY_ORDER.index(severity) < SEVERITY_ORDER.index("caution"):
-            severity = "caution"
+        # A DECLARED-COOLDOWN BREACH USED TO RAISE SEVERITY TO AT LEAST CAUTION
+        # here - "a fact about a COMMITMENT, not about harm". Removed 2026-09-02
+        # with `cooldown_after_loss` as a user input: there is no declared
+        # cooldown any more, so `user_cooldown_min` no longer resolves and the
+        # branch could only ever have been dead.
+        #
+        # `revenge_trade` IS FROZEN, and this is the one change made to it. It is
+        # an unavoidable consequence of removing the user input rather than a
+        # tuning decision: the bump had no input left to read. Its own
+        # `_RT_MATRIX` is untouched, and on the reference book nothing moves -
+        # replay carries no profile, so the bump never applied there.
 
         # Confidence answers how well we could SEE this, never how bad it is.
         conf = _confidence.from_observables(
@@ -1240,7 +1245,6 @@ class BehaviorEngine:
                 "b_level": b_level,
                 "instrument_class": basis.instrument.value,
                 "denominator_kind": basis.kind.value,
-                "declared_breach": declared_breach,
                 "abstained_frames": abstentions,
             },
         )
@@ -3215,33 +3219,18 @@ class BehaviorEngine:
                 add("max_consecutive_losses", sev, msg,
                     {"limit": limit, "current": streak, "ratio": round(ratio, 2)})
 
-        # ── Rule: cooldown after loss (binary) ────────────────────────────
-        cooldown_min = th.get("user_cooldown_min")
-        if cooldown_min and ct.entry_time:
-            # CONCLUDED, from the shared relation. This spelled the predicate
-            # inline as `t.exit_time <= ct.entry_time` while
-            # `EngineContext.concluded_before_entry` uses `<`, so the two
-            # disagreed at identical timestamps and nothing decided which was
-            # right. Measured before the change: the two select different sets
-            # on 0 of 740 trades, so this is a consistency fix with no
-            # behavioural change - the firing set is unchanged at 181 events
-            # against a declared 15-minute cooldown.
-            #
-            # `<` is the right one: a position closed in the same instant the
-            # next was entered was not information the trader acted on.
-            prior_losses = [t for t in ctx.concluded_before_entry
-                            if Decimal(str(t.realized_pnl or 0)) < 0]
-            if prior_losses:
-                last_loss = max(prior_losses, key=lambda t: t.exit_time)
-                gap_min = (ct.entry_time - last_loss.exit_time).total_seconds() / 60
-                if 0 <= gap_min < float(cooldown_min):
-                    add("cooldown", "danger",
-                        f"Your {int(cooldown_min)}-minute cooldown rule violated: entered "
-                        f"{ct.tradingsymbol} {gap_min:.0f} min after a "
-                        f"₹{abs(float(last_loss.realized_pnl or 0)):,.0f} loss.",
-                        {"limit_min": int(cooldown_min), "gap_min": round(gap_min, 1),
-                         "prior_loss": float(last_loss.realized_pnl or 0),
-                         "prior_symbol": last_loss.tradingsymbol})
+        # ── Rule: cooldown after loss — REMOVED 2026-09-02 ────────────────
+        #
+        # `cooldown_after_loss` is no longer a user-configurable rule, so there
+        # is no declared cooldown to breach. The rule fired 181 times on the
+        # reference book against a supplied 15-minute cooldown and 0 times in
+        # replay, where no profile exists.
+        #
+        # THE PROTECTION IS NOT GONE, only the user-declared version of it.
+        # `revenge_trade` and `rapid_reentry` still judge re-entry after a loss
+        # against `revenge_window_min` / `revenge_window_caution_min`, which
+        # carry their own resolved values (10 and 20) and were only ever
+        # OVERRIDDEN by the declared cooldown, never sourced from it.
 
         # ── Rule: restricted windows (binary) ─────────────────────────────
         windows = th.get("restricted_windows") or []
