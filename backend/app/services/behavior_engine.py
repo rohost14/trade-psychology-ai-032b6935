@@ -3078,12 +3078,20 @@ class BehaviorEngine:
         severe = float(th.get("constitution_severe_pct", 1.20))
         events: List[DetectedEvent] = []
 
-        def ladder(ratio: float) -> Optional[str]:
+        def ladder(ratio: float, *, allow_approaching: bool = True) -> Optional[str]:
+            """
+            The shared constitution ladder. `approaching` / 1.00 / `severe`.
+
+            `allow_approaching=False` drops the PRE-BREACH rung for one rule
+            without touching the numbers or any other rule. Added 2026-09-01 for
+            `max_trade_risk`, and the reason is specific to what that rule
+            measures - see its call site. Every other rule keeps all three rungs.
+            """
             if ratio >= severe:
                 return "critical"
             if ratio >= 1.0:
                 return "danger"
-            if ratio >= approaching:
+            if allow_approaching and ratio >= approaching:
                 return "caution"
             return None
 
@@ -3279,11 +3287,31 @@ class BehaviorEngine:
                 risk = float(rq.capital_requirement.amount)
                 risk_pct = risk / float(capital) * 100
                 ratio = risk_pct / float(risk_pct_limit)
-                sev = ladder(ratio)
+
+                # NO PRE-BREACH RUNG FOR THIS RULE. 2026-09-01.
+                #
+                # The other constitution rules measure a quantity that CLIMBS
+                # through the session toward a line the trader cannot un-cross:
+                # loss taken, trades placed, losses in a row. For those,
+                # "you are at 80% of your daily loss limit" is a warning about
+                # something still in motion, and the pre-breach rung earns its
+                # place.
+                #
+                # POSITION SIZE IS NOT THAT SHAPE. It is chosen once, at entry,
+                # and a trader who declared an 80% limit and took 75% did
+                # exactly what they said they would. Telling them they are
+                # "approaching" their own rule is reporting compliance as a
+                # finding - and `caution` writes a real RiskAlert row
+                # (trade_tasks skips only `info`), so it reaches the Alerts
+                # screen even though it is not notifiable.
+                #
+                # So this rule alerts ON or PAST the declared limit and nowhere
+                # else. The ladder's numbers are untouched and every other rule
+                # keeps all three rungs.
+                sev = ladder(ratio, allow_approaching=False)
                 if sev:
-                    verb = "breached" if ratio >= 1.0 else "approaching"
                     add("max_trade_risk", sev,
-                        f"Your per-trade risk rule {verb}: {ct.tradingsymbol} risked "
+                        f"Your per-trade risk rule breached: {ct.tradingsymbol} risked "
                         f"{risk_pct:.1f}% of capital (your limit: {float(risk_pct_limit):.0f}%).",
                         {"limit_pct": float(risk_pct_limit), "current_pct": round(risk_pct, 2),
                          "ratio": round(ratio, 2), "capital_at_risk": round(risk, 2)})

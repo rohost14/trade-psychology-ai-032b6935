@@ -482,14 +482,15 @@ async def _overexposure_task(broker_account_id: str, tradingsymbol: str) -> dict
     exposure_pct = capital_required / float(capital) * 100
     ratio = exposure_pct / float(declared_limit)
 
-    approaching = float(COLD_START_DEFAULTS.get("constitution_approaching_pct", 0.80))
+    # NO PRE-BREACH RUNG, matching the exit-time rule exactly. 2026-09-01.
+    # Both arms are the same rule under the same dedup key, so a rung here that
+    # the engine does not have would fire at entry and never be reconciled at
+    # exit. See the note at `max_trade_risk` in behavior_engine.
     severe = float(COLD_START_DEFAULTS.get("constitution_severe_pct", 1.20))
     if ratio >= severe:
         severity = "critical"
     elif ratio >= 1.0:
         severity = "danger"
-    elif ratio >= approaching:
-        severity = "caution"
     else:
         return {"symbol": tradingsymbol, "exposure_pct": round(exposure_pct, 1),
                 "alerted": False}
@@ -514,19 +515,20 @@ async def _overexposure_task(broker_account_id: str, tradingsymbol: str) -> dict
         )))
         if ev_res.scalars().first():
             emotional_bump = True
-    if emotional_bump and severity == "caution":
-        severity = "danger"
-    elif emotional_bump and severity == "danger":
+    # The bump used to have a caution -> danger step as well. With the
+    # pre-breach rung gone this rule can only be danger or critical, so that
+    # branch became unreachable and was removed rather than left as dead code
+    # that reads like a live path. danger -> critical is unchanged.
+    if emotional_bump and severity == "danger":
         severity = "critical"
 
-    verb = "breached" if ratio >= 1.0 else "approaching"
     async with SessionLocal() as alert_db:
         await _fire_position_alert(
             broker_account_id=broker_account_id,
             pattern_type="constitution_violation",
             severity=severity,
             message=(
-                f"Your per-trade risk rule {verb} while the position is open: "
+                f"Your per-trade risk rule breached while the position is open: "
                 f"{tradingsymbol} needs ₹{capital_required:,.0f} of capital "
                 f"— {exposure_pct:.1f}% against your {float(declared_limit):.0f}% limit"
                 + (" after recent loss-chasing behaviour." if emotional_bump else ".")

@@ -503,3 +503,133 @@ def test_the_surviving_detectors_are_exactly_these():
         "constitution_violation", "same_symbol_obsession",
         "win_rate_collapse", "strategy_breakdown",
     }
+
+
+# ══ 9. max_trade_risk HAS NO PRE-BREACH RUNG ═══════════════════════════════
+#
+# Added 2026-09-01. A trader who declared an 80% limit and took 75% did exactly
+# what they said they would; reporting that as "approaching" turns compliance
+# into a finding. `caution` writes a real RiskAlert (trade_tasks skips only
+# `info`), so it reached the Alerts screen even though it is not notifiable.
+#
+# The shared ladder's NUMBERS are untouched and every other rule keeps all
+# three rungs - see the daily-loss and per-trade-loss tests below.
+
+from datetime import datetime, timezone
+
+
+def _ctx(thresholds, ct, session_pnl=0.0):
+    return SimpleNamespace(
+        completed_trade=ct, thresholds=thresholds, broker_margin=None,
+        session=SimpleNamespace(session_pnl=session_pnl, trade_count=0),
+        strategy_group=None, session_trades=[], concluded_before_entry=[],
+        account_risk=None,
+    )
+
+
+def _exposure_events(declared_limit, pct_of_capital):
+    """Run the REAL detector and return only its max_trade_risk events."""
+    from app.services.behavior_engine import BehaviorEngine
+
+    # price 100 so every percentage lands on an exact integer quantity -
+    # at 75.0 the rounding put "40%" at 39.975% and the boundary case passed
+    # for the wrong reason.
+    qty = round(CAP * pct_of_capital / 100 / 100.0)
+    ct = a_position(qty=qty, entry=100.0)
+    ct.realized_pnl = Decimal("0")
+    ct.entry_time = datetime(2026, 2, 2, 4, 0, tzinfo=timezone.utc)
+    ct.exit_time = datetime(2026, 2, 2, 5, 0, tzinfo=timezone.utc)
+
+    th = get_thresholds(Prof(max_position_size=declared_limit))
+    got = BehaviorEngine()._detect_constitution_violation(_ctx(th, ct)) or []
+    return [e for e in got if (e.context or {}).get("rule") == "max_trade_risk"]
+
+
+@pytest.mark.parametrize("limit,size,expect", [
+    # 40% rule
+    (40.0, 39.9, None),
+    (40.0, 40.0, "danger"),
+    (40.0, 45.0, "danger"),
+    (40.0, 50.0, "critical"),        # 1.25x - the severe rung is unchanged
+    # 80% rule
+    (80.0, 75.0, None),              # THE CASE THIS FIX EXISTS FOR
+    (80.0, 79.9, None),
+    (80.0, 80.0, "danger"),
+    (80.0, 85.0, "danger"),
+    (80.0, 96.0, "critical"),        # 1.20x
+    # a tight rule behaves the same way
+    (5.0, 4.9, None),
+    (5.0, 5.0, "danger"),
+])
+def test_the_exposure_rule_alerts_only_at_or_past_the_declared_limit(
+        limit, size, expect):
+    events = _exposure_events(limit, size)
+    if expect is None:
+        assert events == [], (
+            f"{size}% against a {limit}% limit produced {[e.severity for e in events]}"
+            " - the trader is inside their own rule")
+    else:
+        assert len(events) == 1, [e.severity for e in events]
+        assert events[0].severity == expect
+        assert "breached" in events[0].message
+        assert "approaching" not in events[0].message
+
+
+def test_no_declared_exposure_rule_produces_nothing_at_any_size():
+    for size in (20, 50, 75, 90, 100, 150):
+        assert _exposure_events(None, size) == [], size
+
+
+def test_the_entry_arm_uses_the_same_two_rungs():
+    """
+    Both arms are one rule under one dedup key. A rung at entry that the exit
+    rule does not have would fire once and never be reconciled.
+    """
+    import app.tasks.position_monitor_tasks as pm
+
+    consts = _consts(pm._overexposure_task)
+    assert "critical" in consts and "danger" in consts
+    assert "caution" not in consts, "the entry arm kept a pre-breach rung"
+    assert "constitution_approaching_pct" not in consts
+    assert "constitution_severe_pct" in consts
+
+
+# ── the other constitution rules KEEP all three rungs ──────────────────────
+
+def test_daily_loss_keeps_its_approaching_rung():
+    from app.services.behavior_engine import BehaviorEngine
+
+    ct = a_position(qty=100)
+    ct.realized_pnl = Decimal("-100")
+    ct.entry_time = datetime(2026, 2, 2, 4, 0, tzinfo=timezone.utc)
+    ct.exit_time = datetime(2026, 2, 2, 5, 0, tzinfo=timezone.utc)
+    th = get_thresholds(Prof(daily_loss_limit=10_000.0))
+
+    # 85% of the daily loss limit used - still climbing, still worth saying
+    got = BehaviorEngine()._detect_constitution_violation(
+        _ctx(th, ct, session_pnl=-8_500.0)) or []
+    daily = [e for e in got if (e.context or {}).get("rule") == "daily_loss"]
+    assert len(daily) == 1
+    assert daily[0].severity == "caution"
+    assert "approaching" in daily[0].message.lower()
+
+
+def test_per_trade_loss_keeps_its_approaching_rung():
+    from app.services.behavior_engine import BehaviorEngine
+
+    ct = a_position(qty=100)
+    ct.realized_pnl = Decimal("-4250")          # 85% of a Rs 5,000 limit
+    ct.entry_time = datetime(2026, 2, 2, 4, 0, tzinfo=timezone.utc)
+    ct.exit_time = datetime(2026, 2, 2, 5, 0, tzinfo=timezone.utc)
+    th = get_thresholds(Prof(per_trade_loss_limit=5_000.0))
+
+    got = BehaviorEngine()._detect_constitution_violation(_ctx(th, ct)) or []
+    per = [e for e in got if (e.context or {}).get("rule") == "per_trade_loss"]
+    assert len(per) == 1
+    assert per[0].severity == "caution"
+    assert "approaching" in per[0].message.lower()
+
+
+def test_the_ladder_numbers_did_not_move():
+    assert COLD_START_DEFAULTS["constitution_approaching_pct"] == 0.80
+    assert COLD_START_DEFAULTS["constitution_severe_pct"] == 1.20
