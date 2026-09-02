@@ -303,7 +303,6 @@ export const DEMO_RISK_ALERTS = [
       prior_loss: 13000,
       prior_symbol: 'SOLARINDS',
       danger_window: 20,
-      estimated_cost: 2700,
     },
   },
   {
@@ -314,7 +313,6 @@ export const DEMO_RISK_ALERTS = [
       daily_count: 5,
       declared_limit: 4,
       trades_in_window: 5,
-      estimated_cost: 0,
     },
   },
   {
@@ -326,7 +324,6 @@ export const DEMO_RISK_ALERTS = [
       size_sequence: [1, 1, 3],
       max_ratio: 3,
       consecutive_losses: 3,
-      estimated_cost: 4500,
     },
   },
   {
@@ -342,7 +339,6 @@ export const DEMO_RISK_ALERTS = [
       prior_loss: 2600,
       win_rate_oversized: 0.28,
       win_rate_normal: 0.60,
-      estimated_cost: 4200,
     },
   },
   // An `early_exit` fixture stood here at severity `caution`, which that
@@ -357,7 +353,6 @@ export const DEMO_RISK_ALERTS = [
       open_minutes: 47,
       unrealised_loss: 3200,
       loss_multiplier: 3,
-      estimated_cost: 5800,
     },
   },
   // An `opening_5min_trap` fixture stood here. It carried invented statistics
@@ -378,7 +373,6 @@ export const DEMO_RISK_ALERTS = [
       limit: 10000,
       actual: 12400,
       pct_of_limit: 1.24,
-      estimated_cost: 2400,
     },
   },
 ];
@@ -545,13 +539,11 @@ export const DEMO_BEHAVIORAL = {
   patterns: [
     {
       pattern_type: 'revenge_trade', frequency: 3, severity: 'danger',
-      estimated_cost: 8400,
       description: 'You entered positions within 30 min of a significant loss 3 times this month.',
       examples: ['NIFTY23000CE after SOLARINDS loss', 'NIFTY23200PE after BANKNIFTY loss'],
     },
     {
       pattern_type: 'daily_overtrading', frequency: 1, severity: 'caution',
-      estimated_cost: 3660,
       // The trailing "High-frequency days correlate with net losses" was cut
       // 2026-09-03: an asserted correlation, and guest fixtures are shown to
       // real visitors. The count against the trader's own average stays.
@@ -1006,23 +998,23 @@ export const DEMO_BEHAVIORAL_ANALYSIS = {
   patterns_detected: [
     {
       pattern_type: 'revenge_trade', count: 3, severity: 'danger',
-      estimated_cost: 8400, last_seen: daysAgo(1, 14, 35),
+      last_seen: daysAgo(1, 14, 35),
       description: 'Quick re-entry after significant loss',
     },
     {
       pattern_type: 'daily_overtrading', count: 1, severity: 'caution',
-      estimated_cost: 3660, last_seen: daysAgo(6, 11, 50),
+      last_seen: daysAgo(6, 11, 50),
       // Was: 'High-frequency trading day correlated with net loss'. Same cut.
       description: '5 trades against a 2.5 average, and the day closed red',
     },
     {
       pattern_type: 'martingale_behaviour', count: 2, severity: 'danger',
-      estimated_cost: 6300, last_seen: daysAgo(0, 10, 51),
+      last_seen: daysAgo(0, 10, 51),
       description: 'Position size 3–4× average after consecutive losses',
     },
     {
       pattern_type: 'no_stoploss', count: 2, severity: 'danger',
-      estimated_cost: 5800, last_seen: daysAgo(0, 9, 15),
+      last_seen: daysAgo(0, 9, 15),
       description: 'Open positions held 40+ min with no stop-loss defined',
     },
   ],

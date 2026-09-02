@@ -58,9 +58,12 @@ export interface BehaviorPattern {
   frequency_this_week: number;
   frequency_this_month: number;
   
-  // Financial impact
-  estimated_cost: number; // ₹ impact of this pattern
-  
+  // No `estimated_cost` here. It was removed 2026-09-03: nothing in
+  // backend/app ever wrote it, both frontend mappers resolved it to `?? 0`,
+  // and no component rendered it. The name was also the banned vocabulary -
+  // behaviour-to-money is the REALISED P&L of flagged trades, reached through
+  // trigger_completed_trade_id, never an estimate.
+
   // Actionable insight (not a command, just information)
   insight: string;
 }

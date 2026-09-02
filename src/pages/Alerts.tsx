@@ -498,7 +498,6 @@ function HistoryTab({ onOpen }: { onOpen: (a: AlertNotification) => void }) {
           detected_at:         a.detected_at || a.created_at,
           insight:             a.details?.insight || '',
           historical_insight:  a.details?.historical_insight || '',
-          estimated_cost:      (a.details?.estimated_cost as number) ?? 0,
           trades_involved:     [],
           frequency_this_week:  0,
           frequency_this_month: 0,

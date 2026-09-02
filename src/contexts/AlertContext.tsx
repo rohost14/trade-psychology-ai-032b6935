@@ -69,7 +69,6 @@ export interface AlertNotification {
     detected_at: string | undefined;
     insight: unknown;
     historical_insight: unknown;
-    estimated_cost: number;
     trades_involved: string[];
     frequency_this_week: number;
     frequency_this_month: number;
@@ -309,7 +308,6 @@ function mapBackendAlert(a: BackendAlert): AlertNotification {
       detected_at,
       insight:             a.details?.insight || '',
       historical_insight:  a.details?.historical_insight || '',
-      estimated_cost:      (a.details?.estimated_cost as number) ?? 0,
       trades_involved:     [],
       frequency_this_week:  0,
       frequency_this_month: 0,

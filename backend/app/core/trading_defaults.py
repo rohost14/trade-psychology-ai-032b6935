@@ -12,7 +12,7 @@ and roughly 95 without.
 The distribution is not random. Where a pair exists, the CAUTION value is
 usually sourced and the DANGER value beside it is not:
 
-    daily_trade_limit        7   SEBI FY2023 (>6/day → 94% loss probability)
+    daily_trade_limit        7   attributed to SEBI FY2023 — NOT LOCATABLE
     daily_trade_danger      12   no source
     consecutive_loss_caution 3   tilt onset, poker + trading research
     consecutive_loss_danger  5   no source
@@ -27,9 +27,20 @@ So: some values below ARE research-backed and say so in a comment naming the
 study. Everything else is a judgement someone made once. Both kinds are marked.
 An unmarked number is unsourced — treat it as a hypothesis, not a finding.
 
-Sources that ARE used, where cited: SEBI FY2022/23/24 retail F&O studies; NSE
-microstructure data; behavioural finance (Kahneman, Shefrin, Coates); cortisol
-research applied to financial decision-making.
+A 2026-09-03 external check makes this worse than the paragraph above says.
+Every SEBI attribution in this file was looked for in SEBI's own publications
+and NONE was found: not ">6 trades/day → 94%", not "73% of trades within 15 min
+of a loss", not the averaging-down 3x, not the 38% giveback. SEBI publishes a
+headline loss rate for all individual F&O traders (93% FY22-FY24, 87.7% FY26)
+and a frequency breakdown at >500 trades per YEAR. So the "sourced" 14 are
+fewer than 14, and a comment naming a study is NOT a citation — several name
+studies that do not contain the number beside them. Each site is now marked
+UNSOURCED in place. No value was changed: they are judgements that remain in
+force, and the point is that a reader can now see which is which.
+
+Attributions that survive as real publications, though not as evidence for the
+specific constant next to them: Coates & Herbert (Cambridge, 2008) on cortisol;
+Kahneman and Shefrin on prospect theory and the disposition effect.
 
 3-tier hierarchy:
   Tier 1: User-declared values in UserProfile (only 6 inputs, and only when
@@ -52,14 +63,21 @@ from typing import Optional, Dict, Any
 # ---------------------------------------------------------------------------
 # Tier 2: Research-backed cold-start defaults
 #
-# Every value documented with its research basis.
-# Do NOT change these casually — they reflect Indian F&O market study.
+# NOT every value is documented with a research basis — read the docstring.
+# Roughly 14 of 109 have a source attached; the rest are judgement calls.
+# Do NOT change these casually, and do NOT treat a comment as a citation.
 # ---------------------------------------------------------------------------
 COLD_START_DEFAULTS: Dict[str, Any] = {
 
     # ── Session / overtrading ─────────────────────────────────────────────
-    # SEBI FY2023: traders with >6 trades/day had 94% loss probability.
-    # >12/day approached 99%. Profitable traders averaged 2-4/day.
+    # UNSOURCED. This comment read "SEBI FY2023: traders with >6 trades/day
+    # had 94% loss probability. >12/day approached 99%. Profitable traders
+    # averaged 2-4/day." An external check on 2026-09-03 could not locate any
+    # of the three figures in a SEBI publication. What SEBI does publish is a
+    # headline loss rate for ALL individual F&O traders (93% FY22-FY24, 87.7%
+    # FY26) and a FREQUENCY breakdown at >500 trades per YEAR, not per day.
+    # The values below are unchanged and stay in force - they are a judgement,
+    # and are now marked as one.
     'daily_trade_limit':                7,    # caution above this (session total)
     'daily_trade_danger':               12,   # danger above this
 
@@ -81,7 +99,11 @@ COLD_START_DEFAULTS: Dict[str, Any] = {
 
     # ── Revenge trade ─────────────────────────────────────────────────────
     # Cortisol stays elevated for 20-35 min post-loss (Coates & Herbert, Cambridge 2008).
-    # SEBI data: 73% of trades within 15 min of a loss are also losing trades.
+    # UNSOURCED. "SEBI data: 73% of trades within 15 min of a loss are also
+    # losing trades" was not locatable in any SEBI publication (2026-09-03);
+    # SEBI publishes no post-loss re-entry statistic at all. The Coates &
+    # Herbert line above is a real paper; that it implies a 20-minute trading
+    # window is this repository's inference, not the paper's finding.
     # The "loss recovery" impulse peaks at 3-8 min (immediate = danger).
     'revenge_window_caution_min':       20,   # entry within 20 min of loss = caution
     # Unified revenge window used by RiskDetector + BehavioralEvaluator.
@@ -130,7 +152,10 @@ COLD_START_DEFAULTS: Dict[str, Any] = {
 
     # ── Martingale / averaging down ───────────────────────────────────────
     # "Averaging down" is culturally normalised in India ("lower my average cost").
-    # SEBI: traders who averaged down on losing options lost 3× more than those who didn't.
+    # UNSOURCED. "SEBI: traders who averaged down on losing options lost 3x
+    # more than those who didn't" was not locatable (2026-09-03). The cultural
+    # observation above is an observation, not a measurement, and is fine as
+    # motivation - it is not evidence for 1.5x or 2.0x.
     # Danger starts at 1.5× (initial escalation), not 1.8× (too late).
     'martingale_caution_multiplier':    1.5,  # 1.5× size on consecutive losses = caution
     'martingale_danger_multiplier':     2.0,  # 2.0× (full double) = danger
@@ -217,8 +242,12 @@ COLD_START_DEFAULTS: Dict[str, Any] = {
     'recovery_bet_danger_mul':           3.0,  # 3× recent average size = danger
 
     # ── Profit giveaway (peak P&L erosion) ────────────────────────────────
-    # SEBI/NSE data: 38% of retail intraday traders with a profitable session give back
-    # >50% of peak gains in a single subsequent trade. Most common at end of day.
+    # UNSOURCED, and the detector it justified is RETIRED. "SEBI/NSE data:
+    # 38% of retail intraday traders with a profitable session give back >50%
+    # of peak gains" was not locatable (2026-09-03). `profit_giveaway` was
+    # retired 2026-08-27 anyway: a drawdown from the session peak is
+    # arithmetic, and shuffling trade order produced MORE firings than the real
+    # order. Kept only because stored rows still reference these keys.
     # Pattern: built significant profit → one trade erodes a large % of it.
     # Fires exactly once per threshold crossing (not on every subsequent loss).
     # Same reasoning as revenge_min_loss_inr: a rupee floor cannot be universal.
