@@ -87,13 +87,20 @@ const GLOBAL_CSS = `
 `;
 
 // ── data ────────────────────────────────────────────────────────────────────
+// EXAMPLE alerts. Every line is an OBSERVATION of something that happened —
+// no prediction, no population statistic, no invented outcome.
+//
+// Removed 2026-09-03: "Win rate drops to 22% at this pace" (invented
+// statistic); "data says you won't recover" and "Historical: things get worse
+// from here" (both forecast the trader's next hour, which this product does
+// not do); and the `Early Exit` example, whose detector was RETIRED 2026-08-30
+// — the page was advertising a capability that no longer exists.
 const ALERTS = [
-  { type: 'Revenge Trading', sev: 'DANGER',   key: 'red',    msg: 'Re-entered NIFTY CE 3× in 18 min after losses. −₹14,200.' },
-  { type: 'Overtrading',     sev: 'WARNING',  key: 'orange', msg: '9 trades in 45 min. Win rate drops to 22% at this pace.' },
+  { type: 'Revenge Trading', sev: 'DANGER',   key: 'red',    msg: 'Re-entered NIFTY CE 3× in 18 min after two losses on it.' },
+  { type: 'Overtrading',     sev: 'WARNING',  key: 'orange', msg: '9 trades in 45 min — well above your normal pace.' },
   { type: 'FOMO Entry',      sev: 'CAUTION',  key: 'yellow', msg: 'Entered BANKNIFTY 14 min after a breakout you did not plan.' },
-  { type: 'Blowup Risk',     sev: 'CRITICAL', key: 'red',    msg: '78% of daily loss limit hit. Stop here — data says you won\'t recover.' },
-  { type: 'Loss Streak',     sev: 'WARNING',  key: 'orange', msg: '4 consecutive losses. Historical: things get worse from here.' },
-  { type: 'Early Exit',      sev: 'CAUTION',  key: 'yellow', msg: 'Cut winner at ₹1,800. It ran ₹4,100 more. 7× this week.' },
+  { type: 'Adding to a loser', sev: 'CRITICAL', key: 'red',  msg: 'Added twice to NIFTY PE while the position was 22% down.' },
+  { type: 'No Stop-Loss',    sev: 'WARNING',  key: 'orange', msg: 'Closed at a 40% loss on premium with no stop recorded.' },
 ];
 
 const FEATURES = [
@@ -116,8 +123,12 @@ const PATTERNS = [
   { name: 'Overtrading',      sev: 'WARNING',  key: 'orange',  desc: 'Trade count climbing well past your own usual day, in bursts rather than spaced out.' },
   { name: 'FOMO Entry',       sev: 'CAUTION',  key: 'yellow',    desc: 'Entering after a move — you\'re buying at peak momentum, someone else\'s exit.' },
   { name: 'No Stop-Loss',     sev: 'WARNING',  key: 'orange', desc: 'One uncapped position can erase 3 weeks of disciplined profits.' },
-  { name: 'Meltdown Cascade', sev: 'CRITICAL', key: 'red', desc: 'Loss streak + increasing position sizes = exponential, not arithmetic damage.' },
-  { name: 'Early Exit',       sev: 'CAUTION',  key: 'yellow', desc: 'Cutting winners short out of anxiety while letting losers run — the slow bleed.' },
+  // `Meltdown Cascade` (death_spiral) and `Early Exit` were listed here until
+  // 2026-09-03. Both detectors are RETIRED — death_spiral 2026-09-02 as a
+  // summary of alerts already delivered, early_exit 2026-08-30 because a single
+  // session cannot supply the sample the measure needs. A landing page must not
+  // advertise a capability the product no longer has.
+  { name: 'Adding to a loser', sev: 'CRITICAL', key: 'red', desc: 'Putting more money into a position that has already gone against you.' },
 ];
 
 
@@ -231,12 +242,15 @@ function ProductCard({ c }: { c: C }) {
         </div>
       </div>
 
-      {/* Stats */}
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', borderBottom: `1px solid ${c.border}` }}>
+      {/* Stats — two columns since the fabricated P&L Impact tile was removed */}
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', borderBottom: `1px solid ${c.border}` }}>
         {[
-          { label: 'P&L Impact', value: '−₹18,400', col: c.red },
-          { label: 'Patterns',   value: '3',         col: c.primary },
-          { label: 'Alerts',     value: '7',         col: c.sub },
+          // "P&L Impact −₹18,400" was here until 2026-09-03: a fabricated
+          // per-pattern cost, tied to none of the trades shown beside it. The
+          // two counts that remain describe the example alerts actually
+          // rendered in this mock.
+          { label: 'Patterns', value: '3', col: c.primary },
+          { label: 'Alerts',   value: '7', col: c.sub },
         ].map(({ label, value, col }) => (
           <div key={label} style={{ padding: '10px 14px', borderRight: `1px solid ${c.border}` }}>
             <div style={{ fontFamily: 'Geist,Inter,system-ui,sans-serif', fontSize: '0.625rem', color: c.dim, marginBottom: 3, fontWeight: 500 }}>{label}</div>
@@ -387,7 +401,9 @@ export default function Welcome() {
             <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full border border-border bg-background/60 backdrop-blur-sm self-start">
               <span className="h-1.5 w-1.5 rounded-full bg-loss animate-pulse" />
               <span className="text-[12px] font-medium text-muted-foreground tracking-tight">
-                ₹46,000 leaked per trader this year. Mostly to themselves.
+                {/* "₹46,000 leaked per trader this year" stood here until
+                    2026-09-03. Unsourced, and not replaced with another figure. */}
+                Your broker shows you what you lost. Not why.
               </span>
             </div>
 
@@ -451,9 +467,16 @@ export default function Welcome() {
       <div style={{ background: c.bg2, borderTop: `1px solid ${c.border}`, borderBottom: `1px solid ${c.border}` }}>
         <div style={{ ...wrap, display: 'grid', gridTemplateColumns: 'repeat(3,1fr)' }}>
           {[
-            { v: '₹4.8Cr+', label: 'Estimated losses prevented' },
-            { v: '12,400+', label: 'Behavioral alerts sent' },
-            { v: '15',      label: 'Behavioral pattern detectors' },
+            // "₹4.8Cr+ Estimated losses prevented" and "12,400+ Behavioral
+            // alerts sent" stood here until 2026-09-03. Both were fabricated —
+            // there are no real users yet — and the first is a COUNTERFACTUAL,
+            // which the product's own rule bans outright: behaviour-to-money is
+            // the realised P&L of flagged trades, never an estimated saving.
+            // Not replaced with other numbers; the only honest counts here are
+            // the ones about the product itself.
+            { v: '14',  label: 'Behavioural pattern detectors' },
+            { v: '23',  label: 'Detectors retired on evidence' },
+            { v: 'RAW', label: 'P&L, before brokerage and tax' },
           ].map(({ v, label }) => (
             <div key={label} style={{ padding: '1.5rem clamp(1rem,2vw,1.75rem)', textAlign: 'center', borderRight: `1px solid ${c.border}` }}>
               <div style={{ fontFamily: mono, fontSize: 'clamp(1.375rem,2.5vw,2rem)', fontWeight: 600, color: c.primary, letterSpacing: '-0.025em' }}>{v}</div>

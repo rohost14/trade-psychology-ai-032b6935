@@ -99,24 +99,44 @@ export default function ClosedPositionsCard({ sinceIso, roundTrips, journaledIds
   }
 
   if (!rows || rows.length === 0) {
-    const stats = [
-      { stat: '94%', label: 'of traders taking >7 trades/day lose money', source: 'SEBI FY2023' },
-      { stat: '73%', label: 'of trades placed within 15 min of a loss also lose', source: 'SEBI data' },
-      { stat: '2.7×', label: 'faster: retail closes winners vs holding losers', source: 'SEBI FY2022' },
-      { stat: '3 losses', label: 'in a row is when emotional impairment measurably starts', source: 'Behavioral research' },
+    // Four attributed statistics stood here until 2026-09-03 — "94% of traders
+    // taking >7 trades/day lose money" (SEBI FY2023), "73% of trades within 15
+    // min of a loss also lose" (SEBI data), "2.7× faster: retail closes winners
+    // vs holding losers" (SEBI FY2022) and "3 losses in a row is when emotional
+    // impairment measurably starts" (Behavioral research).
+    //
+    // An external-source audit could not find a primary source for ANY of them.
+    // SEBI's published figures are 93% of ALL individual F&O traders (FY22-FY24)
+    // and 87.7% (FY26); its frequency breakdown is 80% at >500 trades/YEAR.
+    // There is no ">7 trades/day" band, no post-loss re-entry statistic, and no
+    // averaging-down statistic in any SEBI publication located. The 2.7× is not
+    // SEBI at all — the nearest real finding is Odean (1998), US discount
+    // brokerage 1987-93, where winners were realised at roughly 1.5× the rate of
+    // losers. Our own reference book contradicts even the direction: the
+    // winner/loser hold ratio flips sign between halves (0.62 vs 2.54) and is
+    // 1.04 intraday at p = 0.343, which is why `holding_loser` was retired.
+    //
+    // NOT REPLACED with other statistics. An empty state is where a product is
+    // most tempted to borrow authority it has not earned. This one now says what
+    // TradeMentor will do with the trader's OWN trades, which is the only
+    // evidence it will ever actually have.
+    const capabilities = [
+      { title: 'Every round, entry to exit', body: 'Each position is rebuilt from your fills — average entry, average exit, realised P&L.' },
+      { title: 'Patterns in your own trades', body: 'Repeated entries, size after losses, adding to a position that has gone against you.' },
+      { title: 'Your rules, your numbers', body: 'Limits you set yourself. Nothing is enforced until you write it down.' },
+      { title: 'Facts, not forecasts', body: 'What happened and what it cost. TradeMentor does not predict your next trade.' },
     ];
     return (
       <section className="overflow-hidden">
         <div className="card-head"><span className="text-[11px] uppercase tracking-[0.12em] font-medium text-muted-foreground">Closed Positions</span></div>
         <div className="px-5 sm:px-6 py-8">
           <p className="text-sm font-medium text-foreground mb-1">Waiting for your first trade</p>
-          <p className="text-[13px] text-muted-foreground mb-5">Once you trade, we'll analyze every round — entry to exit — and watch for these patterns in real time.</p>
+          <p className="text-[13px] text-muted-foreground mb-5">Everything here is built from your own trades. Until you have some, there is nothing to show — and nothing worth claiming.</p>
           <div className="grid grid-cols-2 gap-3">
-            {stats.map((it, i) => (
+            {capabilities.map((it, i) => (
               <div key={i} className="p-3 rounded-lg bg-muted/50 border border-border">
-                <p className="text-base font-bold text-primary font-tabular">{it.stat}</p>
-                <p className="text-xs text-foreground mt-0.5 leading-snug">{it.label}</p>
-                <p className="text-[10px] text-muted-foreground mt-1">{it.source}</p>
+                <p className="text-xs font-semibold text-foreground leading-snug">{it.title}</p>
+                <p className="text-xs text-muted-foreground mt-1 leading-snug">{it.body}</p>
               </div>
             ))}
           </div>

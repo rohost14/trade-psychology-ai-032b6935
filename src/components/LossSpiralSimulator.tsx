@@ -119,7 +119,18 @@ const LossSpiralSimulator = ({ id }: { id?: string }) => {
               It's the next four.
             </h2>
             <p className="mt-5 text-[16px] leading-[1.6] text-muted-foreground max-w-[480px]">
-              Watch a real revenge-trading spiral play out — the kind that turns a planned −₹2,000 stop into a −₹18,400 wipeout in twenty minutes. If this feels familiar, you're not alone. It's the same loop happening to ~90% of retail traders, every single day.
+              {/* Until 2026-09-03 this read: "Watch a REAL revenge-trading
+                  spiral … turns a planned −₹2,000 stop into a −₹18,400 wipeout
+                  … the same loop happening to ~90% of retail traders, every
+                  single day."
+                  Three problems: "~90% of retail traders" is an unsourced
+                  population statistic; "a real spiral" presented an INVENTED
+                  scenario as an observed one; and the two rupee figures were
+                  quoted in prose as fact when they are this component's own
+                  demo data. Not replaced with another statistic. */}
+              An example spiral, played step by step: one stop that was moved,
+              then the trades that followed. Every figure below comes from this
+              example — not from research, and not from anyone's account.
             </p>
             <p className="mt-5 text-[15px] leading-[1.6] text-foreground font-medium max-w-[460px]">
               TradeMentor sits between step 1 and step 2 — and refuses to let you click.
@@ -172,8 +183,11 @@ const LossSpiralSimulator = ({ id }: { id?: string }) => {
                 />
               </div>
               <div className="mt-1.5 flex items-center justify-between text-[10.5px] text-muted-foreground font-tabular">
-                <span>Planned stop · −₹2,000</span>
-                <span>Actual blow · −₹18,400</span>
+                {/* Derived from STEPS, not typed twice: these were hardcoded
+                    strings that could silently drift from the data animating
+                    beside them. */}
+                <span>First stop · −₹{Math.abs(STEPS[0].delta).toLocaleString('en-IN')}</span>
+                <span>Example total · −₹{Math.abs(finalLoss).toLocaleString('en-IN')}</span>
               </div>
             </div>
 

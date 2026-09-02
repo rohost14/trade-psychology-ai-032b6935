@@ -56,11 +56,21 @@ export default function ClosedTradesTable({
   }
 
   if (!trades.length) {
-    const stats = [
-      { stat: '94%', label: 'of traders taking >7 trades/day lose money', source: 'SEBI FY2023' },
-      { stat: '73%', label: 'of trades placed within 15 min of a loss also lose', source: 'SEBI data' },
-      { stat: '2.7×', label: 'faster: retail closes winners vs holding losers', source: 'SEBI FY2022' },
-      { stat: '3 losses', label: 'in a row is when emotional impairment measurably starts', source: 'Behavioral research' },
+    // The four SEBI/behavioural statistics that stood here were REMOVED
+    // 2026-09-03. An external-source audit found no primary source for any of
+    // them: SEBI publishes 93% for ALL individual F&O traders (FY22-FY24) and
+    // 80% at >500 trades/YEAR — there is no ">7 trades/day" band, no
+    // post-loss re-entry figure and no averaging-down figure in any located
+    // publication, and the 2.7x is not SEBI at all (nearest real finding:
+    // Odean 1998, US brokerage, ~1.5x). Removed here even though this
+    // component currently has NO importer — "unreachable" is not a reason to
+    // keep an invalid claim that becomes live the moment someone imports it.
+    // Not replaced with other statistics.
+    const capabilities = [
+      { title: 'Every round, entry to exit', body: 'Each position is rebuilt from your fills — average entry, average exit, realised P&L.' },
+      { title: 'Patterns in your own trades', body: 'Repeated entries, size after losses, adding to a position that has gone against you.' },
+      { title: 'Your rules, your numbers', body: 'Limits you set yourself. Nothing is enforced until you write it down.' },
+      { title: 'Facts, not forecasts', body: 'What happened and what it cost. TradeMentor does not predict your next trade.' },
     ];
     return (
       <section className="desk-card overflow-hidden">
@@ -70,14 +80,14 @@ export default function ClosedTradesTable({
         <div className="px-5 sm:px-6 py-8">
           <p className="text-sm font-medium text-foreground mb-1">Waiting for your first trade</p>
           <p className="text-[13px] text-muted-foreground mb-5">
-            Once you trade, we'll analyze every round — entry to exit — and watch for these patterns in real time.
+            Everything here is built from your own trades. Until you have some,
+            there is nothing to show — and nothing worth claiming.
           </p>
           <div className="grid grid-cols-2 gap-3">
-            {stats.map((item, i) => (
+            {capabilities.map((it, i) => (
               <div key={i} className="p-3 rounded-lg bg-muted/50 border border-border">
-                <p className="text-base font-bold text-primary font-tabular">{item.stat}</p>
-                <p className="text-xs text-foreground mt-0.5 leading-snug">{item.label}</p>
-                <p className="text-[10px] text-muted-foreground mt-1">{item.source}</p>
+                <p className="text-xs font-semibold text-foreground leading-snug">{it.title}</p>
+                <p className="text-xs text-muted-foreground mt-1 leading-snug">{it.body}</p>
               </div>
             ))}
           </div>

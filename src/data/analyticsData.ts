@@ -147,7 +147,14 @@ export const expandablePatterns: ExpandablePattern[] = [
     description: 'Consistently honoring pre-set stop losses without moving them.',
     lastDetected: '30 minutes ago',
     frequency: 18,
-    aiAdvice: 'Excellent discipline! This habit has prevented an estimated ₹8,200 in additional losses.',
+    // Was: "This habit has prevented an estimated ₹8,200 in additional losses."
+    // Removed 2026-09-03 — a fabricated COUNTERFACTUAL, the same class as the
+    // "₹4.8Cr+ estimated losses prevented" tile taken off the landing page. The
+    // product's rule is that behaviour-to-money is the REALISED P&L of flagged
+    // trades, never a saving that cannot be observed. Not replaced with another
+    // estimate. Removed even though this file has no importer: an invalid claim
+    // sitting in the data layer is one import away from being live.
+    aiAdvice: 'Stop losses honoured as set, without being moved.',
     icon: 'Shield',
   },
   {

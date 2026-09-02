@@ -88,16 +88,28 @@ export function PredictiveContextStrip({ brokerAccountId }: Props) {
         return;
       }
 
-      // revenge_window_minutes: number | null, combined with real-time check
-      if (ins.revenge_window_minutes && chk.has_warning) {
-        next.push({
-          id: 'revenge-window',
-          type: 'revenge_window',
-          label: 'Revenge window',
-          detail: `You typically trade impulsively within ${Math.round(ins.revenge_window_minutes)}min of a loss. Step back.`,
-          danger: false,
-        });
-      }
+      // REMOVED 2026-09-03. A "Revenge window" item said:
+      //
+      //     "You typically trade impulsively within {n}min of a loss."
+      //
+      // Two problems, and the second is why it is deleted rather than reworded.
+      //
+      // 1. It was ALREADY DEAD. `/api/personalization/insights` returns only
+      //    `has_data`, `hourly_breakdown` and `daily_breakdown` — it has never
+      //    sent `revenge_window_minutes`, so the guard was always falsy and
+      //    this never rendered. The comment above it described a response
+      //    shape the endpoint does not have.
+      //
+      // 2. Had it been wired up, it would have asserted a PERSONAL HABIT from
+      //    a number that can be a constant: the sibling `/timing` endpoint
+      //    falls back to a hardcoded 12 minutes when the learner has produced
+      //    nothing (`api/personalization.py:219`). "You typically…" is a claim
+      //    about this trader, and a default is not evidence about anyone.
+      //
+      // Deleted so that restoring the API field cannot silently switch an
+      // unsupported personal claim back on. If this insight returns, it needs
+      // the endpoint to send the value AND a confidence, and to stay hidden
+      // when the learner has not produced one.
 
       // Additional predictive alert from server-side check
       if (chk.alert && !next.find(n => n.id === 'predictive-check')) {

@@ -37,7 +37,13 @@ const TEMPLATES: { title: string; category: string; body: string }[] = [
   { title: 'Welcome back', category: 'Re-engagement', body: "We haven't seen you trade in a while. Markets change, but your trading psychology is what you can control. Your TradeMentor account is waiting — pick up where you left off." },
   { title: 'Risk awareness', category: 'Intervention', body: "Heads up: our system detected elevated risk in your recent sessions. Please review your loss limits and position sizing before tomorrow's session. Your capital protection matters." },
   { title: 'Feature announcement', category: 'Product', body: "New on TradeMentor: we've upgraded our behavioral analysis engine. Your alerts are now more precise and actionable. Log in to see your updated pattern insights." },
-  { title: 'Expiry day reminder', category: 'Daily', body: "Today is expiry day. Historical data shows F&O traders make more impulsive decisions near expiry. Stick to your pre-defined rules — exits included. Trade the plan." },
+  // "Historical data shows F&O traders make more impulsive decisions near
+  // expiry" was removed 2026-09-03. These templates are SENT TO TRADERS over
+  // push and WhatsApp, so an unsourced population claim here reaches them the
+  // same way any other copy does — and no source was found for it. Replaced
+  // with a statement about the day and the trader's own rules, which asserts
+  // nothing about anyone else.
+  { title: 'Expiry day reminder', category: 'Daily', body: "Today is expiry day — often a faster session than usual. Before you increase activity, check the limits you set for yourself. Trade the plan, exits included." },
 ];
 
 const STATUS_ACCENT: Record<string, Accent> = { sent: 'profit', failed: 'loss', queued: 'warning' };
