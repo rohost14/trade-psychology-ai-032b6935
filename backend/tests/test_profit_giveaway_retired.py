@@ -71,7 +71,9 @@ def test_the_engine_counts_are_what_the_retirement_left():
 
     # 20 / 26 since `early_exit` was retired 2026-08-30 (Pattern 18).
     assert len(REGISTRY) == 15
-    assert len(all_pattern_types()) == 20
+    # 2026-09-02: 5 -> 4 aliases and 20 -> 19 pattern types. `death_spiral`
+    # was retired - a summary of alerts already delivered, not a state.
+    assert len(all_pattern_types()) == 19
 
 
 def test_it_is_recorded_as_retired():
@@ -163,7 +165,7 @@ def test_the_consolidation_families_are_untouched():
     assert "martingale_behaviour" in names and "same_symbol_obsession" in names
 
 
-def test_death_spiral_still_has_its_emotional_domain():
+def test_the_emotional_domain_keeps_a_notifiable_detector():
     """
     death_spiral counts nature-domains off the registry. Removing an `emotional`
     detector must not leave that domain unable to contribute.
@@ -230,7 +232,7 @@ def test_death_spiral_still_has_its_emotional_domain():
     }
 
     assert set(danger_capable) == EXPECTED_DANGER_CAPABLE, (
-        f"the set of emotional detectors that can reach death_spiral changed: "
+        f"the set of emotional detectors that can reach a NOTIFIABLE severity changed: "
         f"{sorted(set(danger_capable) ^ EXPECTED_DANGER_CAPABLE)}"
     )
 

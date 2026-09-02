@@ -154,6 +154,30 @@ const BACKEND_TO_FRONTEND_TYPE: Record<string, string> = {
   'post_loss_recovery_bet':      'post_loss_recovery_bet',
 };
 
+/**
+ * Pattern types no detector can produce any more.
+ *
+ * Their alerts are still in the database and still render - deleting a
+ * trader's history to tidy a vocabulary would be worse than keeping a name -
+ * but a stored row must not read as a rule that is currently watching them.
+ * `formatPatternName` keeps the display name; this marks it as history.
+ *
+ * An explicit list rather than "absent from the live catalogue", because the
+ * catalogue is fetched and a row must render correctly before it arrives.
+ *
+ * Kept deliberately narrow: only detectors whose REMOVAL a trader could
+ * misread as an active rule. The full retirement record is in
+ * `docs/patterns/README.md`.
+ */
+export const RETIRED_PATTERN_TYPES = new Set<string>([
+  // Retired 2026-09-02. A summary of alerts already delivered, not a state.
+  'death_spiral',
+]);
+
+export function isRetiredPattern(patternType: string | undefined | null): boolean {
+  return !!patternType && RETIRED_PATTERN_TYPES.has(patternType);
+}
+
 export function formatPatternName(patternType: string): string {
   const names: Record<string, string> = {
     'consecutive_loss':              'Consecutive Loss Spiral',
@@ -216,6 +240,10 @@ export function formatPatternName(patternType: string): string {
     // carry it. The behaviour now surfaces via constitution_violation.
     'cooldown_violation': 'Cooldown ignored',
     'daily_overtrading': 'Heavy day',
+    // Retired 2026-09-02. Kept because stored alert rows still carry this
+    // pattern_type and a missing key renders as a title-cased raw key. The
+    // detector is gone; these rows are history. `isRetiredPattern` below is
+    // what keeps them visibly historical rather than looking like a live rule.
     'death_spiral': 'Multi-domain breakdown',
     'direction_instability': 'Direction flip-flop',
     // Retired 2026-08-27. The display name stays: stored alerts still carry

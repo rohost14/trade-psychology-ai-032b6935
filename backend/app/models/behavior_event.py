@@ -57,7 +57,8 @@ class BehaviorEvent(Base):
 
     # Idempotency (migration 066): detector:trigger_trade_id:rule — makes
     # webhook retries and bulk-sync re-processing insert-safe (ON CONFLICT
-    # DO NOTHING). NULL for events without a trigger trade (death_spiral,
+    # DO NOTHING). NULL for events without a trigger trade (historical
+    # death_spiral rows, retired 2026-09-02;
     # position monitor) which carry their own dedup.
     idempotency_key = Column(Text)
 

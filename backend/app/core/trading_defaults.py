@@ -329,10 +329,11 @@ COLD_START_DEFAULTS: Dict[str, Any] = {
     #   critical = 3+ independent domains + CONTINUED ESCALATION (trader still
     #              opening trades after the discipline/risk breach) within the
     #              compression window
-    'spiral_domain_min_severity':      'danger',  # a domain "deteriorates" on danger+
-    'spiral_warning_domains':          2,
-    'spiral_critical_domains':         3,
-    'spiral_window_min':               180,   # time compression: domains must fire within 3h
+    # The four `spiral_*` constants were REMOVED 2026-09-02 with death_spiral,
+    # their only reader. None was ever classified in `threshold_registry`, and
+    # none had provenance. The 180-minute compression window in particular never
+    # bound: the two `critical` sessions it ever produced spanned 67 and 39
+    # minutes. No replacement was substituted.
     'guardian_monthly_budget':         3,     # hard cap on guardian sends per month (§1B.8)
 
     # ── Baseline confidence targets (Engine v2 Phase 3, master §1B.4) ────

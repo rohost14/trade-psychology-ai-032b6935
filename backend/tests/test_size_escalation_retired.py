@@ -103,8 +103,10 @@ def test_the_engine_counts_are_what_the_retirement_left():
 
     # 20 / 26 since `early_exit` was retired 2026-08-30 (Pattern 18).
     assert len(REGISTRY) == 15
-    assert len(ALIASES) == 5
-    assert len(all_pattern_types()) == 20
+    # 2026-09-02: 5 -> 4 aliases and 20 -> 19 pattern types. `death_spiral`
+    # was retired - a summary of alerts already delivered, not a state.
+    assert len(ALIASES) == 4
+    assert len(all_pattern_types()) == 19
 
 
 def test_it_is_recorded_as_retired():
@@ -296,10 +298,16 @@ def test_the_other_consolidation_families_are_untouched():
     assert fam["the position is too big"] == (
         "excess_exposure", "overexposure", "portfolio_concentration",
         "capital_mismatch")
-    assert BehaviorEngine._COMPOSITES == ("death_spiral",)
+    # Was `assert BehaviorEngine._COMPOSITES == ("death_spiral",)`. Both the
+    # attribute and its consolidation branch were removed 2026-09-02, so this
+    # asserts the STRONGER thing: no composite mechanism exists at all, and
+    # nothing can silently start absorbing other detectors' alerts again.
+    assert not hasattr(BehaviorEngine, "_COMPOSITES")
+    import inspect as _inspect
+    assert "absorbed:" not in _inspect.getsource(BehaviorEngine._consolidate)
 
 
-def test_removing_it_could_not_have_changed_death_spiral():
+def test_the_emotional_domain_keeps_a_notifiable_detector():
     """
     The replay expectation, proven rather than assumed.
 
@@ -316,11 +324,17 @@ def test_removing_it_could_not_have_changed_death_spiral():
     import inspect
     import re
 
-    from app.core.trading_defaults import COLD_START_DEFAULTS
+    from app.core.severity import NOTIFIABLE
     from app.services.behavior_engine import BehaviorEngine
     from app.services.detector_registry import BY_NAME
 
-    assert COLD_START_DEFAULTS["spiral_domain_min_severity"] == "danger"
+    # Was `COLD_START_DEFAULTS["spiral_domain_min_severity"] == "danger"`, the
+    # gate death_spiral applied before counting a domain. That constant went
+    # with the detector on 2026-09-02. The same danger+ line still decides
+    # whether a detection reaches the trader at all, and it is now asserted
+    # against the authority for it rather than against a detector's private
+    # copy - a strictly better source.
+    assert NOTIFIABLE == frozenset({"danger", "critical"})
 
     engine = BehaviorEngine()
     capable = []
@@ -365,7 +379,7 @@ def test_removing_it_could_not_have_changed_death_spiral():
     }
 
     assert set(capable) == EXPECTED_DANGER_CAPABLE, (
-        f"the set of emotional detectors that can reach death_spiral changed: "
+        f"the set of emotional detectors that can reach a NOTIFIABLE severity changed: "
         f"{sorted(set(capable) ^ EXPECTED_DANGER_CAPABLE)}"
     )
 

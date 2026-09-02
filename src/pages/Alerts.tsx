@@ -32,7 +32,7 @@ import ErrorState from '@/components/ErrorState';
 import { cn } from '@/lib/utils';
 import { api } from '@/lib/api';
 import { useApiQuery } from '@/hooks/useApiQuery';
-import { useAlerts, AlertNotification, formatPatternName } from '@/contexts/AlertContext';
+import { useAlerts, AlertNotification, formatPatternName, isRetiredPattern } from '@/contexts/AlertContext';
 import { PatternSeverity } from '@/types/patterns';
 import AlertDetailSheet from '@/components/alerts/AlertDetailSheet';
 import {
@@ -235,6 +235,17 @@ function AlertRow({
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-2 flex-wrap mb-1">
             <span className="text-[13px] font-medium text-foreground">{alert.pattern.name}</span>
+            {/* A detector we no longer run. The row stays - it is the trader's
+                own history - but it must not look like something still
+                watching them. */}
+            {isRetiredPattern(alert.pattern.backend_type) && (
+              <span
+                className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground border border-border rounded px-1.5 py-0.5"
+                title="This check was retired. The alert is kept as history."
+              >
+                Retired
+              </span>
+            )}
             {/* The category is the primary scan target, GitHub-inbox style:
                 a reason label lets dozens of rows be triaged in seconds. */}
             <span className={cn('text-[10px] font-semibold uppercase tracking-wider', SEV_LABEL_COLOR[sev])}>

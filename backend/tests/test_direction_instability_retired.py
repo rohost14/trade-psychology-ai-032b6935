@@ -99,8 +99,10 @@ def test_the_engine_counts_are_what_the_retirement_left():
     from app.services.detector_registry import ALIASES, REGISTRY, all_pattern_types
 
     assert len(REGISTRY) == 15
-    assert len(ALIASES) == 5
-    assert len(all_pattern_types()) == 20
+    # 2026-09-02: 5 -> 4 aliases and 20 -> 19 pattern types. `death_spiral`
+    # was retired - a summary of alerts already delivered, not a state.
+    assert len(ALIASES) == 4
+    assert len(all_pattern_types()) == 19
 
 
 def test_it_is_recorded_as_retired():
@@ -241,7 +243,13 @@ def test_the_other_consolidation_families_are_untouched():
     assert fam["the position is too big"] == (
         "excess_exposure", "overexposure", "portfolio_concentration",
         "capital_mismatch")
-    assert BehaviorEngine._COMPOSITES == ("death_spiral",)
+    # Was `assert BehaviorEngine._COMPOSITES == ("death_spiral",)`. Both the
+    # attribute and its consolidation branch were removed 2026-09-02, so this
+    # asserts the STRONGER thing: no composite mechanism exists at all, and
+    # nothing can silently start absorbing other detectors' alerts again.
+    assert not hasattr(BehaviorEngine, "_COMPOSITES")
+    import inspect as _inspect
+    assert "absorbed:" not in _inspect.getsource(BehaviorEngine._consolidate)
 
 
 def test_the_strategy_suppression_set_kept_its_other_members():

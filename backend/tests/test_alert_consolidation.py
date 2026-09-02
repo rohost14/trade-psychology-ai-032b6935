@@ -79,7 +79,12 @@ class _FakeDb:
 async def test_critical_survives_the_cap():
     """The ninth alert of a bad session is the one most worth delivering."""
     account = uuid.uuid4()
-    alerts = [_alert("death_spiral", "critical"), _alert("fomo_entry", "caution")]
+    # Was `death_spiral`, purely as a convenient `critical` fixture; that
+    # detector was retired 2026-09-02. `constitution_violation` is a real
+    # detector that genuinely reaches critical (the 1.20x severe rung), so the
+    # test now exercises the cap with something the engine can actually emit.
+    # The subject - a critical survives the cap - is unchanged.
+    alerts = [_alert("constitution_violation", "critical"), _alert("fomo_entry", "caution")]
     # 8 already fired + these 2 → UPDATE returns 10, so `before` is 8.
     db = _FakeDb(budget_after=10)
 

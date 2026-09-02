@@ -62,7 +62,6 @@ TIMINGS = (
     "alert_e2e_lag_ms",      # trade exit -> detection persisted (the SLO)
     "analyze_ms",            # context load + detectors
     "persist_ms",            # alerts + events write
-    "death_spiral_ms",
 )
 
 

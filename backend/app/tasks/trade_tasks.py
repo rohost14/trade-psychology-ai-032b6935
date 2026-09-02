@@ -256,83 +256,15 @@ def _already_delivered(alert, channel: str) -> bool:
     return getattr(alert, column, None) is not None
 
 
-async def _run_death_spiral(broker_account_id: UUID, db, latest_trade_time=None):
-    """
-    Phase 5 meta-detector (L2): evaluates today's BehaviorEvents for the
-    death-spiral state and persists alert + evidence when it fires.
-    Dedup: severity-escalation-only within the day (warning->danger->critical
-    each fire once). Returns the new RiskAlert or None.
-    """
-    from zoneinfo import ZoneInfo as _ZI
-    from app.models.behavior_event import BehaviorEvent
-    from app.models.risk_alert import RiskAlert
-    from app.services.behavior_scores_service import evaluate_death_spiral
-    from app.services.behavior_engine import ENGINE_VERSION
-    from uuid import uuid4 as _uuid4
-
-    now_utc = datetime.now(timezone.utc)
-    ist_now = now_utc.astimezone(_ZI("Asia/Kolkata"))
-    day_start = ist_now.replace(hour=0, minute=0, second=0, microsecond=0).astimezone(timezone.utc)
-
-    ev_result = await db.execute(
-        select(BehaviorEvent).where(and_(
-            BehaviorEvent.broker_account_id == broker_account_id,
-            BehaviorEvent.detected_at >= day_start,
-            # Shadow detector events never contribute to the death-spiral verdict.
-            BehaviorEvent.shadow.is_(False),
-        ))
-    )
-    events = list(ev_result.scalars().all())
-    verdict = evaluate_death_spiral(events, now_utc)
-    if not verdict:
-        return None
-
-    prior_result = await db.execute(
-        select(RiskAlert).where(and_(
-            RiskAlert.broker_account_id == broker_account_id,
-            RiskAlert.pattern_type == "death_spiral",
-            RiskAlert.detected_at >= day_start,
-        ))
-    )
-    prior = list(prior_result.scalars().all())
-    max_prior = max((_sev_rank(a.severity) for a in prior), default=-1)
-    if _sev_rank(verdict["severity"]) <= max_prior:
-        return None  # already fired at this level or higher today
-
-    detected_at = latest_trade_time or now_utc
-    alert = RiskAlert(
-        id=_uuid4(),
-        broker_account_id=broker_account_id,
-        pattern_type="death_spiral",
-        severity=verdict["severity"],
-        message=verdict["message"],
-        details=verdict["context"],
-        trigger_completed_trade_id=None,
-        detector_version="1.0.0",
-        confidence=90.0,  # multi-domain agreement IS the confidence
-        detected_at=detected_at,
-    )
-    db.add(alert)
-    await db.flush()
-    db.add(BehaviorEvent(
-        broker_account_id=broker_account_id,
-        detector="death_spiral",
-        detector_version="1.0.0",
-        severity=verdict["severity"],
-        confidence=90.0,
-        data_quality="GOOD",
-        message=verdict["message"],
-        evidence=verdict["context"],
-        input_snapshot={"source": "meta", "events_considered": len(events)},
-        risk_alert_id=alert.id,
-        detected_at=detected_at,
-    ))
-    await db.commit()
-    logger.warning(
-        f"[death_spiral] {broker_account_id}: {verdict['severity'].upper()} - "
-        f"domains={verdict['context'].get('domains')}"
-    )
-    return alert
+# `_run_death_spiral` was REMOVED 2026-09-02 with the meta-detector it ran.
+# It executed once per CompletedTrade, reloading every BehaviorEvent since IST
+# midnight each time - 912 invocations and 1,824 SELECTs over the reference
+# book - to produce an alert that measurement showed was a restatement of
+# alerts already delivered. The reasoning is recorded in full at the top of
+# `behavior_scores_service.py`; the evidence is under
+# docs/patterns/A1-death_spiral/.
+#
+# Historical `death_spiral` rows are deliberately NOT deleted.
 
 
 #: Release the lock only if we still hold it. Compared and deleted inside one
@@ -1207,17 +1139,6 @@ async def run_risk_detection_async(
             _mobserve("alert_e2e_lag_ms",
                       (now_utc - latest_ct.exit_time).total_seconds() * 1000)
 
-        # ── Death spiral meta-check (Phase 5) — after evidence persisted ──
-        try:
-            with _mtimer("death_spiral_ms"):
-                spiral_alert = await _run_death_spiral(
-                    broker_account_id, db, latest_ct.exit_time or now_utc
-                )
-            if spiral_alert:
-                new_alerts.append(spiral_alert)
-        except Exception as _ds_err:
-            logger.warning(f"[death_spiral] evaluation failed (non-fatal): {_ds_err}")
-
         # ── Alert consolidation (5-min bucket + hard cap) ─────────────
         # What was PERSISTED and what may INTERRUPT are two different lists.
         # They used to be the same variable, so a capped batch also suppressed
@@ -1251,10 +1172,14 @@ async def run_risk_detection_async(
             )
         _mincr("notifications_dispatched", len(pushable))
         from app.services.detector_registry import BY_NAME as _SPECS_N
+        # A hardcoded exception for the retired death-spiral pattern stood in
+        # this comprehension until 2026-09-02. That pattern had no DetectorSpec
+        # - it was an alias - so it reached the guardian channel by being named
+        # here rather than through `guardian_eligible` like everything else.
+        # Guardian routing for every REAL detector is unchanged and spec-driven.
         guardian_alerts = [a for a in pushable
                            if (_SPECS_N.get(a.pattern_type)
-                               and _SPECS_N[a.pattern_type].guardian_eligible)
-                           or a.pattern_type == "death_spiral"]
+                               and _SPECS_N[a.pattern_type].guardian_eligible)]
         other_alerts = [a for a in pushable if a not in guardian_alerts]
         for alert in guardian_alerts:
             send_danger_alert.delay(str(broker_account_id), str(alert.id))
@@ -1487,16 +1412,6 @@ async def run_behavior_engine_full_session(broker_account_id: UUID, db) -> int:
     # persist even when every notification was deduped.
     await db.commit()
 
-    # Death spiral meta-check (Phase 5). Staleness gate below keeps historical
-    # replays from pushing; the alert row itself is still valuable evidence.
-    try:
-        last_time = trades_today[-1].exit_time if trades_today else now_utc
-        spiral_alert = await _run_death_spiral(broker_account_id, db, last_time)
-        if spiral_alert:
-            all_new_alerts.append(spiral_alert)
-    except Exception as _ds_err:
-        logger.warning(f"[death_spiral] evaluation failed (non-fatal): {_ds_err}")
-
     if all_new_alerts:
         # Same split as the webhook path: what was persisted is what the
         # dashboard is told about, what survives consolidation is what may
@@ -1702,9 +1617,11 @@ async def _apply_alert_consolidation(
 
     # Past the cap. It governs INTERRUPTION, not visibility — and a critical is
     # the one thing that must never be dropped silently. A session that has
-    # already produced eight alerts is the definition of a day going wrong, and
-    # death_spiral is late by construction, so the alert most worth delivering
-    # arrives after the budget is spent.
+    # already produced eight alerts is the definition of a day going wrong.
+    #
+    # This paragraph used to justify itself by death_spiral arriving late. That
+    # detector was retired 2026-09-02; the rule stands on its own and is
+    # unchanged.
     survivors = [a for a in candidates if a.severity == "critical"]
     dropped = [f"{a.pattern_type}({a.severity})" for a in candidates
                if a.severity != "critical"]
@@ -1778,8 +1695,13 @@ def send_danger_alert(self, broker_account_id: str, alert_id: str):
             elif phone and user and user.guardian_confirmed:
                 from app.services.detector_registry import BY_NAME as _SPECS
                 spec = _SPECS.get(alert.pattern_type)
+                # This fell back to naming the retired death-spiral pattern when
+                # a row had no DetectorSpec. Removed 2026-09-02: no spec-less
+                # pattern may reach a guardian, so an unknown pattern now
+                # correctly resolves to False instead of being special-cased,
+                # and a stored historical row cannot be re-delivered.
                 guardian_ok = (
-                    (spec.guardian_eligible if spec else alert.pattern_type == "death_spiral")
+                    bool(spec and spec.guardian_eligible)
                     and is_notifiable(alert.severity)
                 )
                 if guardian_ok:

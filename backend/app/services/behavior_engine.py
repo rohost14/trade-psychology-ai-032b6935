@@ -893,22 +893,29 @@ class BehaviorEngine:
         )),
     )
 
-    #: Alerts that are summaries of other alerts. A composite firing ALONGSIDE
-    #: what it summarises is double-reporting by construction: it exists to say
-    #: "several things are going wrong at once", so the several things do not
-    #: also need to be said.
-    #: Only death_spiral. It is genuinely built FROM other detectors — it counts
-    #: how many behavioural domains are deteriorating — so firing it beside its
-    #: own inputs is double-reporting.
+    #: `_COMPOSITES` was REMOVED 2026-09-02, along with the branch of
+    #: `_consolidate` that read it.
     #:
-    #: session_meltdown was in this list and should never have been. It is a P&L
-    #: threshold ("83% of your daily limit used"), not a summary of anything, and
-    #: it fired on 41 of 61 real sessions. On every one of those days it absorbed
-    #: every other behavioural alert — same_symbol_obsession went from nine days
-    #: of behaviour in the tradebook to a single alert. A consolidation rule that
-    #: silences the product on exactly the days it matters most is worse than the
-    #: noise it was written to fix.
-    _COMPOSITES = ("death_spiral",)
+    #: IT WAS DEAD CODE, AND THE DOCUMENTATION BUILT ON IT WAS FALSE. Its only
+    #: member was `death_spiral`, and the branch looked for that name among the
+    #: event types THIS ENGINE had just produced. The engine never produced it:
+    #: death_spiral was written afterwards by `trade_tasks._run_death_spiral`,
+    #: from BehaviorEvents, never through the detector loop. So the composite
+    #: was always None and nothing was ever absorbed.
+    #:
+    #: Measured, not inferred: zero `absorbed:` markers exist in the database,
+    #: and on a real critical death_spiral session (2026-07-29) fourteen
+    #: RiskAlerts were written across six pattern types, none suppressed. The
+    #: master pattern document asserted the opposite - "absorbs every other
+    #: alert when it fires" - for months.
+    #:
+    #: session_meltdown was in this list once and should never have been. It is
+    #: a P&L threshold ("83% of your daily limit used"), not a summary, and it
+    #: fired on 41 of 61 real sessions; on every one it would have silenced
+    #: every other behavioural alert. That removal was correct and is kept.
+    #:
+    #: No composite exists now. If one is ever added it must be produced BY the
+    #: engine, or it will be dead in exactly this way again.
 
     def _consolidate(self, events: List[DetectedEvent]) -> None:
         """
@@ -935,15 +942,11 @@ class BehaviorEngine:
 
         fired = {e.event_type for e in live}
 
-        # 1. A composite absorbs the alerts it summarises.
-        composite = next((c for c in self._COMPOSITES if c in fired), None)
-        if composite:
-            for e in live:
-                if e.event_type != composite and not e.suppressed_reason:
-                    e.suppressed_reason = f"absorbed:{composite}"
-            return
+        # Step 1 was "a composite absorbs the alerts it summarises". Removed
+        # 2026-09-02: it could never match - see the note on `_COMPOSITES`
+        # above - so this method's behaviour is UNCHANGED by its removal.
 
-        # 2. Within a family, the most specific description wins.
+        # 1. Within a family, the most specific description wins.
         for label, members in self._FAMILIES:
             present = [m for m in members if m in fired]
             if len(present) < 2:
@@ -956,7 +959,7 @@ class BehaviorEngine:
                 f"[BehaviorEngine] {label}: kept {winner}, folded {present[1:]}"
             )
 
-        # 3. Several rules broken on one trade is one alert, not one per rule.
+        # 2. Several rules broken on one trade is one alert, not one per rule.
         # The trader broke their constitution; which clauses is detail that
         # belongs inside that alert, not spread across several.
         breaches = [e for e in live

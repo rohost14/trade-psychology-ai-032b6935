@@ -123,25 +123,26 @@ def test_f22_the_unreachable_cross_underlying_branch_is_gone():
 
 # ── F21 / F24: classified, verified, NOT bugs ──────────────────────────────
 
-def test_f21_capital_mismatch_is_excluded_from_death_spiral_on_purpose():
+def test_f21_capital_mismatch_is_vocabulary_but_not_a_behaviour_detector():
     """
     Recorded as a fix candidate, verified as correct behaviour.
 
-    `capital_mismatch` is a housekeeping nudge from maintenance_tasks - the
-    registry says so - not a behaviour detector. death_spiral counts
-    BEHAVIOURAL domains, so a nudge must not contribute one. The consumer
-    already handles the absence safely (`if not nature: continue`), so this is
-    an intentional omission rather than a gap.
+    REWRITTEN 2026-09-02. It used to prove the point through death_spiral's
+    `_ALIAS_NATURE` map - capital_mismatch was deliberately absent from it, so
+    a housekeeping nudge could not contribute a behavioural domain. Both that
+    map and death_spiral are gone.
+
+    The underlying fact is unchanged and is now asserted directly: it writes a
+    `risk_alerts.pattern_type`, so it is part of the alert VOCABULARY, but it
+    has no DetectorSpec, so it is not a behaviour detector and carries no
+    `nature`. Anything that classifies detectors must therefore skip it.
     """
-    from app.services.behavior_scores_service import _ALIAS_NATURE
-    from app.services.detector_registry import ALIASES
+    from app.services.detector_registry import ALIASES, BY_NAME, all_pattern_types
 
     assert "capital_mismatch" in ALIASES, "it IS part of the alert vocabulary"
-    assert "capital_mismatch" not in _ALIAS_NATURE, (
-        "and it must NOT contribute a behavioural domain to death_spiral")
-
-    src = (APP / "services" / "behavior_scores_service.py").read_text(encoding="utf-8")
-    assert "if not nature:\n            continue" in src, "the absence is handled, not crashed on"
+    assert "capital_mismatch" in all_pattern_types()
+    assert BY_NAME.get("capital_mismatch") is None, (
+        "it must have no DetectorSpec - it is a maintenance nudge, not a detector")
 
 
 def test_f24_adding_to_adverse_position_runs_on_the_entry_path():

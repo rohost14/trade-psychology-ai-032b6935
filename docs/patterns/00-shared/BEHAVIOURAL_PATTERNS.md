@@ -88,7 +88,7 @@ mention, not proof of a behavioural test — see §13 of each entry).
 | ~~25~~ | ~~`time_of_day_bias`~~ | performance | — | — | — | — | **RETIRED 2026-09-01** | the learned danger hours do not survive into a second time period; the nightly learning is KEPT |
 | 26 | `win_rate_collapse` | performance | analytics | session | 0 | 0 | IMPLEMENTED, NEVER FIRED | hardcoded `0.4` and `0.5`, no keys |
 | 27 | `strategy_breakdown` | performance | analytics | session | 0 | 0 | IMPLEMENTED, NEVER FIRED | hardcoded `0.4`, `0.5`, `8`, no keys |
-| A1 | `death_spiral` (L2 meta) | emotional | alerting | session | 29 / 29 | 1 | IMPLEMENTED AND VERIFIED | absorbs every other alert when it fires |
+| ~~A1~~ | ~~`death_spiral`~~ (L2 meta) | emotional | — | — | — | — | **RETIRED 2026-09-02** | a summary of alerts already delivered, not a state; the "absorbs every other alert" claim was **false** — that branch never ran |
 | A2 | `overexposure` (monitor) | risk | alerting | entry | 0 | 3 | IMPLEMENTED, separate pipeline | `1.5×` multiplier hardcoded in the task |
 | A3 | `portfolio_concentration` (monitor) | risk | alerting | entry | 0 | 1 | IMPLEMENTED, separate pipeline | 40/60/80 levels in docstring only |
 | A4 | `holding_loser` (monitor) | risk | alerting | entry | 0 | 2 | IMPLEMENTED, separate pipeline | module-level constants, outside the ladder |
@@ -848,7 +848,7 @@ else outside `revenge_trade`.
 
 # The six alias pattern types
 
-## A1. `death_spiral` — L2 meta-detector
+## ~~A1.~~ `death_spiral` — L2 meta-detector — **RETIRED 2026-09-02**
 
 `behavior_scores_service.py:62-130`. A pure function over today's
 `BehaviorEvent`s, **suppressed included**. Groups danger+ events by the
@@ -862,16 +862,35 @@ Fires when ≥ `spiral_warning_domains` distinct domains are present; escalates 
 unclassified**, read directly from `COLD_START_DEFAULTS`, bypassing the
 resolution ladder entirely.
 
-**Evidence** 29 alerts / 29 sessions, **all danger**. The only `_COMPOSITES`
-member: when it fires, **every other live alert on that trade is suppressed as
-`absorbed:death_spiral`.**
+**Evidence — CORRECTED 2026-09-02, and both statements below were wrong.**
+
+*"29 alerts / 29 sessions"* predates eleven retirements. Measured against the
+current registry: **10 of 203 sessions** with no declared rules (all `danger`,
+all `emotional+risk`), and **79 of 203 — 38.9%** with one declared
+`daily_loss_limit`. The replay artifact's own contemporaneous figure was 16.
+
+*"every other live alert on that trade is suppressed as `absorbed:death_spiral`"*
+**never happened.** `_consolidate` matched `_COMPOSITES` against the event types
+the ENGINE produced, and death_spiral was written afterwards by `trade_tasks`,
+never through the detector loop — so the branch could not fire. Zero `absorbed:`
+markers exist in the database, and on a real `critical` session (2026-07-29)
+**14 RiskAlerts were written across 6 pattern types, none suppressed.**
 
 The surrounding code records that `compute_scores` and the four driver scores
 were removed 2026-08-13 because the weights did not rank with measured cost and
 the severity multiplier had the wrong sign; death_spiral itself was left
 unchanged and never read those scores.
 
-**Status: IMPLEMENTED AND VERIFIED.**
+**Status: RETIRED 2026-09-02.** Not distinct (100% of rules-on firings contain
+`constitution_violation`, which is `notification_level=4` and guardian-eligible
+alone; 61% derive both "independent" domains from two detectors reading the same
+declared limit), not additive (15% of danger firings incremental, 0% of
+caution), and sequential only at the margin (`caution` and `danger` carry no timestamp
+and are 91% of firings; `critical`'s 180-minute window did discriminate, but
+reached just 7 of 79 firing sessions).
+
+Historical rows are KEPT and still render. Full evidence:
+`docs/patterns/A1-death_spiral/death_spiral_review.md`.
 
 ## A2–A4. Position-monitor patterns — a separate pipeline
 
@@ -1029,8 +1048,11 @@ asserts it is not quietly reintroduced.
   from **alerting**-disposition detectors unless they carry `_suppressed` or
   `_verdict`. Analytics-disposition info is always kept.
 - **Notification routing.** Guardian-eligible alerts (`session_meltdown`,
-  `constitution_violation`, `death_spiral`) get their own push; other pushable
-  alerts are merged into one notification when there is more than one.
+  `constitution_violation`) get their own push; other pushable alerts are
+  merged into one notification when there is more than one. `death_spiral` was
+  in this list until 2026-09-02 and reached the guardian channel through a
+  hardcoded name check rather than through `guardian_eligible`, because as an
+  alias it had no spec. Routing is now spec-driven for every pattern.
 - **Hot path.** Per CompletedTrade, `_load_context` issues roughly four queries:
   `UserProfile`, active `Cooldown`s, `Trade.order_type` for exit types, plus
   session trades. Detectors themselves issue **no** DB queries and make **no**
@@ -1039,7 +1061,9 @@ asserts it is not quietly reintroduced.
 # D. Consolidation relationships
 
 ```
-COMPOSITE   death_spiral  ──absorbs──▶  every other live non-info alert
+(The COMPOSITE row said `death_spiral --absorbs--> every other live non-info
+alert`. It never did - the branch was unreachable - and both it and the
+detector were removed 2026-09-02. No composite exists.)
 
 FAMILY  "sizing after losses"
         martingale_behaviour  ▶  post_loss_recovery_bet  ▶  size_escalation
@@ -1382,8 +1406,10 @@ often, decide `danger`, and can actually be measured against the replay first.
 | 14+ | analytics-only and never-fired | `rapid_reentry`, `panic_exit`, `early_exit`, `opening_5min_trap`, `time_of_day_bias`, `win_rate_collapse`, `strategy_breakdown` |
 | last | `revenge_trade` | frozen by decision; revisit only with new data |
 
-`death_spiral` should be reviewed **after** at least 1-4, because it consumes
-their output and absorbs every other alert when it fires. The three
-position-monitor patterns are a separate pipeline and should be reviewed as a
-group, not interleaved.
+`death_spiral` was reviewed **last**, correctly - it consumed the others'
+output, so every earlier retirement moved its count as arithmetic. It was
+RETIRED 2026-09-02. The "absorbs every other alert when it fires" half of this
+paragraph was never true: that branch could not run. The three position-monitor
+patterns are a separate pipeline and should be reviewed as a group, not
+interleaved.
 

@@ -71,8 +71,10 @@ def test_the_engine_counts_are_what_the_retirement_left():
     from app.services.detector_registry import ALIASES, REGISTRY, all_pattern_types
 
     assert len(REGISTRY) == 15
-    assert len(ALIASES) == 5
-    assert len(all_pattern_types()) == 20
+    # 2026-09-02: 5 -> 4 aliases and 20 -> 19 pattern types. `death_spiral`
+    # was retired - a summary of alerts already delivered, not a state.
+    assert len(ALIASES) == 4
+    assert len(all_pattern_types()) == 19
 
 
 def test_it_is_recorded_as_retired():

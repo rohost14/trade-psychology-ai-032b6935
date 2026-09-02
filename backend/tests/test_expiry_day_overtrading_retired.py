@@ -103,8 +103,10 @@ def test_the_engine_counts_are_what_the_retirement_left():
 
     # 20 / 26 since `early_exit` was retired 2026-08-30 (Pattern 18).
     assert len(REGISTRY) == 15
-    assert len(ALIASES) == 5
-    assert len(all_pattern_types()) == 20
+    # 2026-09-02: 5 -> 4 aliases and 20 -> 19 pattern types. `death_spiral`
+    # was retired - a summary of alerts already delivered, not a state.
+    assert len(ALIASES) == 4
+    assert len(all_pattern_types()) == 19
 
 
 def test_it_is_recorded_as_retired():
@@ -311,17 +313,21 @@ def test_the_per_episode_dedup_keys_are_intact():
         "same_symbol_obsession:NIFTY"
 
 
-def test_death_spiral_keeps_every_domain_it_had():
+def test_the_nature_taxonomy_keeps_every_domain_it_had():
     """
-    Pattern 8 already showed death_spiral falls when a danger-domain contributor
-    stops emitting. That is arithmetic. What must NOT change is the set of
-    domains it counts over.
+    RENAMED 2026-09-02. This asserted that death_spiral kept the domains it
+    counted over; that detector is retired and nothing counts domains any more.
+
+    The invariant survives its consumer, and is worth more without it: `nature`
+    is how every detector is classified, and a retirement that emptied a whole
+    domain would mean an entire class of behaviour had stopped being watched.
+    That is what this now checks.
     """
     from app.services.detector_registry import REGISTRY
 
     domains = {d.nature for d in REGISTRY}
-    for expected in ("emotional", "risk", "discipline"):
-        assert expected in domains
+    for expected in ("emotional", "risk", "discipline", "performance"):
+        assert expected in domains, f"no detector remains with nature={expected}"
 
 
 def test_every_surviving_detector_still_resolves():

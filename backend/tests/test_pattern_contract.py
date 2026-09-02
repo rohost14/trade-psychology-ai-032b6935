@@ -198,6 +198,15 @@ RETIRED_PATTERN_NAMES = (
     # +0.071. Insufficient evidence, NOT proof that time-of-day effects do not
     # exist; the nightly learning and storage are kept for future research.
     "time_of_day_bias",
+    # Retired 2026-09-02 (Review A1): a summary of alerts the trader had
+    # already been sent, not a state. At `danger` it was set-identical to "a
+    # danger emotional alert and a danger risk alert happened today"; with one
+    # declared rule it fired on 38.9% of sessions, `constitution_violation`
+    # appeared in 100% of them, and in 61% BOTH domains were carried by two
+    # detectors reading the SAME declared daily_loss_limit. Order-independent
+    # at every tier that ever fired, and its 180-minute compression window
+    # never bound. Historical rows are KEPT and still render.
+    "death_spiral",
     # Retired 2026-08-30 (Pattern 21): the opening window was not a worse place
     # to trade - 39.4% win inside 09:15-09:25 against 39.5% for the rest of the
     # day, and BETTER on money (p = 0.274). It reached its finding by discarding

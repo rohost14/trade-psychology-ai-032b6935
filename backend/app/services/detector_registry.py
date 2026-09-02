@@ -308,9 +308,12 @@ REGISTRY: Tuple[DetectorSpec, ...] = (
 # (version lookup only — never iterated).
 ALIASES = {
     "daily_overtrading": "2.0.0",
-    # Meta-detector (L2, behavior_scores_service) — consumes BehaviorEvents,
-    # never iterated with the L1 detectors.
-    "death_spiral": "1.0.0",
+    # `death_spiral` RETIRED 2026-09-02. It was a summary of alerts the trader
+    # had already received, not a state: set-identical to a two-detector
+    # conjunction, 69% of firings preceded by a danger alert already delivered,
+    # 38.9% of sessions with one declared rule, and order-independent at the
+    # only tiers that ever fired. Its display name stays in the frontend's
+    # `formatPatternName` so stored rows still render.
     # Position-monitor (entry-time) patterns - Phase 6
     "overexposure": "2.0.0",
     # `portfolio_concentration` RETIRED 2026-09-01 - it measured how few
@@ -511,11 +514,6 @@ ALIAS_COPY: Dict[str, PatternCopy] = {
         "Positions opened today against the daily trade limit you declared, counting a "
         "multi-leg structure as one.",
         "You set a limit on how many positions you take in a day. This is where you reached it.",
-    ),
-    "death_spiral": PatternCopy(
-        "Multi-domain breakdown",
-        "Several different behaviour patterns firing together in one session.",
-        "One pattern is a moment. Several at once is a session that has stopped being managed.",
     ),
     "overexposure": PatternCopy(
         "Position too large",
