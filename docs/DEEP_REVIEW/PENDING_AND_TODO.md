@@ -1042,11 +1042,48 @@ its consumers. One-line fix in either direction; not taken here.
 Indian equity/F&O markets do not trade Sundays. Either these are a special
 session or there is a timestamp defect. **Not investigated.**
 
+## Recorded during the A1 `death_spiral` retirement (2026-09-02)
+
+Found while tracing that detector's consumers. **Neither belongs to A1** and
+neither was touched there — scope discipline, recorded for the consolidated
+pass instead.
+
+### `portfolio_concentration` leftovers — PENDING DECISION (Pattern 28)
+
+Retired 2026-09-01, and its `_ALIAS_NATURE` entry went with the A1 retirement.
+Three references survive in live code:
+
+- `BehaviorEngine._FAMILIES`, in the "the position is too big" family
+- a comment in `position_monitor_tasks.py`
+- `app/services/portfolio_concentration_service.py`, an entire module
+
+The family tuple is the one with behavioural weight: a family member that can
+never fire cannot win or be folded, so it is inert — but it is also a name in a
+consolidation rule that no longer means anything. Decide whether Pattern 28's
+retirement should have swept these, then do it in one pass.
+
+### `no_stoploss` writes events nothing judges — PENDING DECISION
+
+It is in the replay's `UNJUDGEABLE` set (a tradebook has no order type), so its
+alerts are excluded from every count — yet it still writes BehaviorEvents, and
+those events were counted as a `risk` domain contributor by `death_spiral` on
+35 sessions before that detector was retired. With the composite gone nothing
+reads them for that purpose. Not a defect; a question about whether an
+unjudgeable detector should produce evidence rows at all.
+
+### The `caution` tier is not notifiable, and 5 firings proved it silent
+
+`NOTIFIABLE = {danger, critical}`. During the A1 measurement, 5 sessions
+produced a `caution` death_spiral that wrote a RiskAlert row and pushed
+nothing. That is the documented INFO/EVIDENCE design and is **not** reopened
+here — noted only because it means "fired" and "was seen" differ by tier, which
+matters for any future firing-count comparison.
+
 ## Closed on this pass — recorded so they are not re-raised
 
 | # | verdict |
 |---|---|
-| **F21** | **Not a bug.** `capital_mismatch` is a housekeeping nudge, not a behaviour detector, and `death_spiral` counts behavioural domains. Its absence from `_ALIAS_NATURE` is correct and the consumer handles it safely. Pinned by a test. |
+| **F21** | **Not a bug.** `capital_mismatch` is a housekeeping nudge, not a behaviour detector. *Updated 2026-09-02:* the original wording justified this through `death_spiral`'s `_ALIAS_NATURE`; both are retired. The fact is unchanged and now asserted directly — it is in the alert vocabulary and has no `DetectorSpec`. Pinned by a test. |
 | **F24** | **Not a bug.** `adding_to_adverse_position` is the one `trigger="entry"` detector; the exit loop skips such specs deliberately and the entry-batch flush dispatches it. It runs. |
 
 Fixed 29 Aug: **F1, F10, F18, F19, F22, F23** (and earlier **F3, F7, F8, F9,

@@ -1,11 +1,11 @@
 # Next session — start here
 
-**1 Sep 2026.** Patterns **12 through 27 are CLOSED**. Engine is at **16
-detectors, 22 pattern types, 6 aliases** — `all_pattern_types()` is the
-authority and the retirement suites pin all three.
+**2 Sep 2026. THE PATTERN-BY-PATTERN REVIEW IS COMPLETE.** Every pattern has a
+verdict. Engine is at **15 detectors, 19 pattern types, 4 aliases** —
+`all_pattern_types()` is the authority and the retirement suites pin all three.
 
-**Twelve retirements** (4, 6, 9, 10, 11, 14, 15, 18, 19, 20, 21, 25), every one on
-measurement, never on taste. Since the last update to this file:
+**Fifteen retirements** (4, 6, 9, 10, 11, 14, 15, 18, 19, 20, 21, 25, 28 x2, A1),
+every one on measurement, never on taste. Since the last update to this file:
 
 | # | pattern | outcome |
 |---|---|---|
@@ -20,9 +20,42 @@ measurement, never on taste. Since the last update to this file:
 | 20 | `options_premium_avg_down` | RETIRED — **never an average-down**: 0 of 44 firings had an open position. Its copy described `adding_to_adverse_position`, which already covers the option case on 64 of 64 firings |
 | 21 | `opening_5min_trap` | RETIRED — the window was **not worse**: 39.4% win inside vs 39.5% outside, and it discarded 42% of window entries for winning |
 | 22 | `end_of_session_mis_panic` | **DEFERRED** — evidence absent, not contrary. Gates on `product`; the tradebook has no such column |
+| 24 | `constitution_violation` | reviewed within Patterns 24/28 — the rule ladder and `max_trade_risk` arm |
+| 25-27 | `time_of_day_bias` · `win_rate_collapse` · `strategy_breakdown` | RETIRED · KEEP AS-IS · DEFER |
+| 28 | exposure hierarchy | `excess_exposure` + `portfolio_concentration` RETIRED; no universal exposure threshold survives |
+| A1 | `death_spiral` | **RETIRED** — a summary of alerts already delivered. Set-identical to a two-detector conjunction without rules (10/203); with one declared rule it fired on **38.9%** of sessions with `constitution_violation` in **100%** of them, and **61%** derived both "independent" domains from two detectors reading the **same** limit. Its absorption branch was **dead code** — 0 `absorbed:` rows ever written |
 | 23 | `post_loss_recovery_bet` | **KEEP AS-IS** — first KEEP since 13. Not outcome-selected (4 of 7 won), gates withhold 76%, distinct from martingale on 4 of 7, shuffle p = 0.088. Not validated at n=7, not refuted |
 
-## Next: review 24 = source-list #23 `constitution_violation`
+## Next: THERE IS NO NEXT PATTERN
+
+The queue is empty. `death_spiral` (A1) was the last unreviewed entry and was
+RETIRED 2026-09-02. What remains is deferred on a **data gap**, not on time —
+starting one of these means reviewing a detector whose evidence is known to be
+missing:
+
+| pattern | blocked on |
+|---|---|
+| 5 `overtrading_burst` | deferred, untouched; the 30-min window is still hardcoded |
+| 22 `end_of_session_mis_panic` | tradebook has no `product` column, its first gate |
+| 27 `strategy_breakdown` | never fired; needs its unblock condition met |
+| 16 `excess_exposure` | RETIRED 2026-09-01 (Pattern 28) — closed, not pending |
+| 99 `revenge_trade` | FROZEN by decision; revisit only with new data |
+
+**The agreed next piece of work is the consolidated `PENDING_AND_TODO.md` pass**
+— the user's standing instruction was to collect items during the reviews and
+do one sweep at the end. That end has arrived.
+
+Two items were recorded during A1 and belong to that sweep, not to A1:
+
+- `portfolio_concentration` still appears in `BehaviorEngine._FAMILIES`, in a
+  comment in `position_monitor_tasks`, and as its own service module. It was
+  retired 2026-09-01 and these are Pattern 28's leftovers.
+- `no_stoploss` BehaviorEvents contribute to nothing now, but the detector is
+  excluded from replay judgement as UNJUDGEABLE while still writing events.
+
+---
+
+## Superseded: the old "next review" note
 
 **Review order is not the source-list numbering.** It walks
 `docs/patterns/00-shared/BEHAVIOURAL_PATTERNS.md` ascending and skips what is
