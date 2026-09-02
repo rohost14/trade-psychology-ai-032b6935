@@ -1199,7 +1199,7 @@
     "averaged_down_worse_money_smaller_pct": {
       "fired": {
         "no_stoploss": {
-          "message": "NIFTY25MAR25000CE: held 30min into a 38% loss of premium (₹4,500).",
+          "message": "NIFTY25MAR25000CE: held 30min into a 38% loss of the premium you paid (₹4,500).",
           "severity": "caution"
         }
       },
@@ -1230,7 +1230,7 @@
     "expiry_day_position": {
       "fired": {
         "no_stoploss": {
-          "message": "NIFTY2531225000CE: held 30min into a 67% loss of premium (₹3,000).",
+          "message": "NIFTY2531225000CE: held 30min into a 67% loss of the premium you paid (₹3,000).",
           "severity": "danger"
         },
         "premium_loss_event": {
@@ -1243,7 +1243,7 @@
     "f3_ce_long_half_premium_lost": {
       "fired": {
         "no_stoploss": {
-          "message": "NIFTY25MAR25000CE: held 30min into a 50% loss of premium (₹4,500).",
+          "message": "NIFTY25MAR25000CE: held 30min into a 50% loss of the premium you paid (₹4,500).",
           "severity": "danger"
         },
         "premium_loss_event": {
@@ -1254,12 +1254,7 @@
       "note": "long: premium paid is the loss ceiling"
     },
     "f3_ce_short_premium_doubled": {
-      "fired": {
-        "no_stoploss": {
-          "message": "NIFTY25MAR25000CE: held 30min into a 100% loss of premium (₹9,000).",
-          "severity": "danger"
-        }
-      },
+      "fired": {},
       "note": "writer: loss is unbounded; premium is not the denominator"
     },
     "f3_futures_long": {
@@ -1277,7 +1272,7 @@
     "f3_long_option_vs_capital": {
       "fired": {
         "no_stoploss": {
-          "message": "NIFTY25MAR25000CE: held 30min into a 50% loss of premium (₹4,500).",
+          "message": "NIFTY25MAR25000CE: held 30min into a 50% loss of the premium you paid (₹4,500).",
           "severity": "danger"
         },
         "premium_loss_event": {
@@ -1290,7 +1285,7 @@
     "f3_pe_long_half_premium_lost": {
       "fired": {
         "no_stoploss": {
-          "message": "NIFTY25MAR25000PE: held 30min into a 50% loss of premium (₹4,500).",
+          "message": "NIFTY25MAR25000PE: held 30min into a 50% loss of the premium you paid (₹4,500).",
           "severity": "danger"
         },
         "premium_loss_event": {
@@ -1301,48 +1296,23 @@
       "note": "long: premium paid is the loss ceiling"
     },
     "f3_pe_short_premium_doubled": {
-      "fired": {
-        "no_stoploss": {
-          "message": "NIFTY25MAR25000PE: held 30min into a 100% loss of premium (₹9,000).",
-          "severity": "danger"
-        }
-      },
+      "fired": {},
       "note": "writer: loss is unbounded; premium is not the denominator"
     },
     "f3_short_averaged_up": {
-      "fired": {
-        "no_stoploss": {
-          "message": "NIFTY25MAR25000CE: held 30min into a 67% loss of premium (₹18,000).",
-          "severity": "danger"
-        }
-      },
+      "fired": {},
       "note": "added to a losing short; blended entry rises"
     },
     "f3_short_deep_otm_blowup": {
-      "fired": {
-        "no_stoploss": {
-          "message": "NIFTY25MAR28000CE: held 30min into a 2900% loss of premium (₹4,350).",
-          "severity": "danger"
-        }
-      },
+      "fired": {},
       "note": "2 -> 60 is a 30x premium move; tiny premium, real risk"
     },
     "f3_short_inside_spread": {
-      "fired": {
-        "no_stoploss": {
-          "message": "NIFTY25MAR25000CE: held 30min into a 100% loss of premium (₹9,000).",
-          "severity": "danger"
-        }
-      },
+      "fired": {},
       "note": "spread leg — is_spread is set by strategy_group, absent here"
     },
     "f3_short_option_vs_capital": {
-      "fired": {
-        "no_stoploss": {
-          "message": "NIFTY25MAR25000CE: held 30min into a 100% loss of premium (₹9,000).",
-          "severity": "danger"
-        }
-      },
+      "fired": {},
       "note": "F3: 225,000 margin on 10L capital = 22.5%, not 0.1%"
     },
     "f3_zero_entry_price": {
@@ -1369,7 +1339,7 @@
     "long_option_50pct_loss": {
       "fired": {
         "no_stoploss": {
-          "message": "NIFTY25MAR25000CE: held 30min into a 50% loss of premium (₹4,500).",
+          "message": "NIFTY25MAR25000CE: held 30min into a 50% loss of the premium you paid (₹4,500).",
           "severity": "danger"
         },
         "premium_loss_event": {
@@ -1399,7 +1369,7 @@
     "no_add_50pct_loss": {
       "fired": {
         "no_stoploss": {
-          "message": "NIFTY25MAR25000CE: held 30min into a 50% loss of premium (₹3,750).",
+          "message": "NIFTY25MAR25000CE: held 30min into a 50% loss of the premium you paid (₹3,750).",
           "severity": "danger"
         },
         "premium_loss_event": {
@@ -1420,7 +1390,7 @@
     "other_account_priors_ignored": {
       "fired": {
         "no_stoploss": {
-          "message": "NIFTY25MAR25000CE: held 30min into a 30% loss of premium (₹2,250).",
+          "message": "NIFTY25MAR25000CE: held 30min into a 30% loss of the premium you paid (₹2,250).",
           "severity": "caution"
         }
       },
@@ -1431,12 +1401,7 @@
       "note": ""
     },
     "short_option_premium_tripled": {
-      "fired": {
-        "no_stoploss": {
-          "message": "NIFTY25MAR25000CE: held 30min into a 200% loss of premium (₹18,000).",
-          "severity": "danger"
-        }
-      },
+      "fired": {},
       "note": "writer's loss is 2x premium received; contract says risk != premium"
     },
     "two_unrelated_underlyings": {

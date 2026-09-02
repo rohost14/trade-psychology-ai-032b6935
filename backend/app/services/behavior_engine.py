@@ -849,13 +849,23 @@ class BehaviorEngine:
         flags = flags or {}
         events = []
         for spec in REGISTRY:
-            # trigger="entry" detectors fire on the fill, not when the position
-            # closes, and are dispatched from the entry-batch flush instead. The
-            # field was descriptive until 2026-08-24; this is the first detector
-            # that needed it to mean something. Every other spec says "exit", so
-            # nothing else changes.
+            # This loop is the `exit` dispatch path. `entry` detectors fire on
+            # the fill and are dispatched from the entry-batch flush instead.
+            #
+            # Written as an explicit match on the value rather than
+            # `if trigger == "entry": continue`, which is what it was until
+            # 2026-09-03. That form ran ANY unrecognised trigger here without
+            # saying so, and one spec — `win_rate_collapse`, declaring
+            # "session" — was being silently absorbed. The registry now
+            # validates the vocabulary at import, and this raises rather than
+            # guessing, so the two cannot drift apart again.
             if spec.trigger == "entry":
                 continue
+            if spec.trigger != "exit":
+                raise ValueError(
+                    f"[BehaviorEngine] {spec.name}: unknown trigger "
+                    f"{spec.trigger!r}; no dispatch path runs it."
+                )
             mode = detector_flags.resolve(spec.name, ctx.broker_account_id, flags)
             if mode == EFFECTIVE_OFF:
                 continue
@@ -1512,9 +1522,51 @@ class BehaviorEngine:
         declared_daily_limit = int(declared_daily_limit)
 
         all_session = list(ctx.session_trades) + [ct]
+
+        # OPENED today, not closed today (F14, resolved 2026-09-03).
+        #
+        # The copy says "positions opened today against the daily trade limit
+        # you declared", and that wording is right: a trade limit is a limit on
+        # decisions TAKEN, and a decision is taken when the position is opened.
+        # The count did not match it. `session_trades` is loaded on an EXIT
+        # bound, so a round opened yesterday and closed this morning counted
+        # toward today — a trader who opened nothing today and simply closed
+        # five overnight positions could be told "5 positions today, your limit
+        # is 5". Not hypothetical for NRML; it needs no unusual behaviour at
+        # all, just an overnight book.
+        #
+        # Filtering on entry_time fixes that direction. It does NOT count
+        # positions opened today that are still open — those have no
+        # CompletedTrade row yet — so this can only UNDER-count. That is the
+        # safe direction and it is already covered where it matters: the
+        # entry-time path counts opens directly, from opening ledger rows, via
+        # `entry_checks.count_entries_today`, and fires at the moment the
+        # decision is actually made. This exit-time check is the restatement at
+        # the close, and a restatement must not overclaim.
+        #
+        # Structure counting is unchanged and is applied AFTER the filter, so a
+        # four-leg condor opened today is still one decision.
+        # The comparison is on the IST calendar DAY, not on an absolute
+        # market-open instant. "Opened on an earlier day" is exactly the defect
+        # and nothing finer is needed; a market-open bound would additionally
+        # drop anything timestamped before 09:15 for any reason — a session row
+        # whose date was derived differently, a clock skew, another segment's
+        # hours — and silently silence a live alert. Filtering by day cannot.
+        session_day = getattr(ctx.session, "session_date", None) if ctx.session else None
+
+        def _opened_this_session(t) -> bool:
+            if session_day is None or t.entry_time is None:
+                return True          # cannot tell — count it, as before
+            try:
+                return t.entry_time.astimezone(IST).date() >= session_day
+            except (ValueError, TypeError, AttributeError):
+                return True
+
+        opened_today = [t for t in all_session if _opened_this_session(t)]
+
         # Structures, not legs — see the burst check above.
-        daily_count = count_structures_fn(all_session)
-        daily_legs = len(all_session)
+        daily_count = count_structures_fn(opened_today)
+        daily_legs = len(opened_today)
 
         if daily_count >= declared_daily_limit:
             pnls_today = [float(t.realized_pnl or 0) for t in all_session]
@@ -1525,7 +1577,7 @@ class BehaviorEngine:
                 event_type="daily_overtrading",
                 severity="caution",
                 message=(
-                    f"{daily_count} positions today — your limit is "
+                    f"{daily_count} positions opened today — your limit is "
                     f"{declared_daily_limit}"
                     + (f". Session P&L: ₹{session_pnl:+,.0f}." if session_pnl != 0 else ".")
                 ),
@@ -1537,8 +1589,13 @@ class BehaviorEngine:
                     "winning_count":     winning_today,
                     "losing_count":      losing_today,
                     "total_loss_today":  round(total_loss_today, 2),
+                    # The trades that were COUNTED, so the evidence list
+                    # and the number in the message cannot disagree. The P&L
+                    # fields above stay on `all_session` deliberately: realised
+                    # P&L today is a fact about what CLOSED today, which is a
+                    # different question from how many decisions were opened.
                     "daily_trades": [_trade_entry(t) for t in sorted(
-                        all_session,
+                        opened_today,
                         key=lambda t: t.entry_time or datetime.min.replace(tzinfo=timezone.utc)
                     )],
                 },
@@ -2484,11 +2541,86 @@ class BehaviorEngine:
         entry_price = Decimal(str(ct.avg_entry_price or 0))
         qty = ct.total_quantity or 1
 
+        # THE DENOMINATOR (F4, resolved 2026-09-03).
+        #
+        # This branched on `instrument_type in ("CE","PE")` and used premium
+        # paid, entry_price x qty, IGNORING DIRECTION. For a long option that
+        # is exact — premium paid is the most that can be lost. For a SHORT
+        # option it is the wrong quantity in the wrong direction: premium
+        # received is the maximum PROFIT, not the capital at risk, so a writer
+        # whose loss exceeded the premium they took in was shown a figure above
+        # 100% "of premium" and the ladder's 40/60/80 rungs meant nothing.
+        #
+        # Nothing new was invented for this. `risk_basis` already answers it —
+        # built for F3/F7 on 2026-08-29 — and returns the amount plus what the
+        # amount IS: premium paid for a long option, SPAN margin on strike x
+        # quantity for a short one, margin for futures. Crucially it also
+        # returns UNRELIABLE where the figure is known to be wrong: a short
+        # option whose strike will not parse, or an MCX/CDS contract with no
+        # lot multiplier. Those ABSTAIN here rather than divide by a number
+        # that is understated by a known factor of ~200x or ~5000x.
+        #
+        # The 40/60/80 ladder is untouched. A short option now sits on the same
+        # margin denominator as a future, which is the convention this detector
+        # already used for every non-option instrument.
+        from app.core.trading_defaults import (
+            _option_contract_notional,
+            estimate_capital_at_risk,
+        )
+
+        side = (ct.direction or "").upper()
+
         if instrument_type in ("CE", "PE"):
-            capital_at_risk = entry_price * qty
-            loss_label = "of premium"
+            # THE DENOMINATOR (F4, resolved 2026-09-03).
+            #
+            # This whole branch used to be one line — premium paid, entry_price
+            # x qty — applied to every option REGARDLESS OF DIRECTION. For a
+            # long option that is exact: premium paid is the most that can be
+            # lost. For a SHORT option it is the wrong quantity facing the
+            # wrong way. Premium RECEIVED is the maximum profit, not the
+            # capital at risk, so a writer whose loss exceeded what they took
+            # in was shown a figure above 100% "of premium" — and the 40/60/80
+            # ladder, which assumes a denominator a loss cannot exceed, meant
+            # nothing against it.
+            #
+            # The long path below is BYTE-IDENTICAL to what it replaced. Only
+            # the short and unknown-direction cases move, and the reference
+            # book is 911 LONG against 1 SHORT, so live firings are unaffected.
+            if side not in ("LONG", "SHORT"):
+                # An option's direction IS the denominator: the two differ by
+                # roughly 200x. The old code hid this behind
+                # `ct.direction or "LONG"`, and the comment on that fallback
+                # says deciding what an unknown direction means "is direction
+                # semantics (F4), not a denominator fix". This is F4, and the
+                # decision is to abstain — a wrong confident answer is worse
+                # than no answer.
+                return None
+
+            if side == "LONG":
+                capital_at_risk = entry_price * qty
+                loss_label = "of the premium you paid"
+            else:
+                # A short option's risk is the margin posted, which SPAN
+                # computes on CONTRACT notional — strike x quantity — not on
+                # the premium. `estimate_capital_at_risk` already does exactly
+                # this (F3, 2026-08-29); this detector was simply never routed
+                # through it for options. Nothing new is invented here.
+                if _option_contract_notional(
+                    ct.tradingsymbol or "", int(qty), ct.exchange
+                ) is None:
+                    # No readable strike, so no contract notional. The
+                    # remaining fallback is a percentage of premium received,
+                    # known to be ~200x too small. Abstain rather than divide
+                    # by a number that is wrong in a known direction.
+                    return None
+                capital_at_risk = Decimal(str(
+                    estimate_capital_at_risk(
+                        instrument_type, ct.tradingsymbol or "", "SHORT",
+                        float(entry_price), int(qty), exchange=ct.exchange,
+                    )
+                ))
+                loss_label = "of the margin you posted"
         else:
-            from app.core.trading_defaults import estimate_capital_at_risk
             capital_at_risk = Decimal(str(
                 estimate_capital_at_risk(
                     instrument_type, ct.tradingsymbol or "",

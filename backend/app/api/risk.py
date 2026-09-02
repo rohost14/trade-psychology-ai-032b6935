@@ -58,6 +58,10 @@ async def get_pattern_catalogue():
             "nature": spec.nature if spec else None,
             "disposition": spec.disposition if spec else "alerting",
             "trigger": spec.trigger if spec else "position",
+            # Split out of `trigger` on 2026-09-03: when it runs vs what it
+            # judges. `win_rate_collapse` reported trigger="session" here,
+            # which was never a dispatch path.
+            "scope": spec.scope if spec else "trade",
             "guardian_eligible": spec.guardian_eligible if spec else False,
             "version": spec.version if spec else ALIASES.get(name),
         })

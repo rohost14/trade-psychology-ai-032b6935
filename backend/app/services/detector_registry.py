@@ -71,7 +71,17 @@ class DetectorSpec:
     version: str
     nature: str                     # emotional | risk | discipline | performance
     disposition: str                # alerting | analytics
-    trigger: str                    # exit | session (entry arrives Phase 6)
+    #: WHEN the engine invokes this detector. `entry` runs on the fill, from
+    #: the entry-batch flush; `exit` runs when a position closes, from the
+    #: per-CompletedTrade loop. Those are the only two dispatch paths that
+    #: exist, and `TRIGGERS` below is enforced at import.
+    #:
+    #: `session` used to be a third value here and was SILENTLY IGNORED — the
+    #: engine branches on `entry` and runs everything else, so a detector
+    #: declaring `session` ran on the exit path anyway. It was not a dispatch
+    #: value at all: it answered a different question, "what is this
+    #: detector's subject", which is now `scope`. See that field.
+    trigger: str                    # entry | exit
     notification_level: int         # 0-4, max channel
     guardian_eligible: bool = False
     uses_baseline: bool = False
@@ -83,6 +93,17 @@ class DetectorSpec:
     # reworked detectors ship as "shadow" here, then promote to "on" once shadow
     # parity holds — the safe detector-by-detector migration path.
     default_mode: str = "on"
+    #: WHAT this detector's subject is, which is independent of when it runs.
+    #: `trade` judges the CompletedTrade in hand; `session` judges the day as a
+    #: whole and merely happens to be evaluated at a close, because a close is
+    #: when session state is next known. Splitting this out of `trigger` is
+    #: what makes the dispatch field enforceable — see `trigger`.
+    #:
+    #: This field is DESCRIPTIVE. Nothing branches on it, and nothing should
+    #: until an EOD evaluation path exists; a session-scoped detector reaching
+    #: the same verdict several times as a session progresses is the current
+    #: and intended behaviour.
+    scope: str = "trade"            # trade | session
     #: Which reference frame(s) this detector measures in. See ReferenceFrame.
     #:
     #: EMPTY ON EVERY ENTRY, deliberately. The frame is decided while reading the
@@ -296,9 +317,14 @@ REGISTRY: Tuple[DetectorSpec, ...] = (
     # the nightly learning and its storage are kept untouched.
     # See docs/patterns/25-27-performance-trio/.
     # Phase 7: performance analytics (info-only, feed the Strategy driver)
+    # trigger was "session" until 2026-09-03, which the engine ignored: it
+    # skips `entry` and runs everything else, so this has ALWAYS run on the
+    # exit path. The declaration now says so, and `scope` carries the fact it
+    # was really trying to express — the subject is the session, not the trade.
+    # No behaviour change; this detector runs exactly where it always did.
     DetectorSpec("win_rate_collapse", "_detect_win_rate_collapse",
-                 "1.0.0", "performance", "analytics", "session", 0,
-                 uses_baseline=True),
+                 "1.0.0", "performance", "analytics", "exit", 0,
+                 uses_baseline=True, scope="session"),
     # `strategy_breakdown` RETIRED 2026-09-02. It required a win-rate collapse
     # AND a profit-factor collapse together, and on the reference book the
     # profit-factor half NEVER bound: 4 firings, the identical set to
@@ -344,6 +370,27 @@ ALIASES = {
 }
 
 # Fast lookups
+#: The dispatch paths that exist. A spec declaring anything else is a bug the
+#: engine cannot act on, and until 2026-09-03 it was absorbed silently — the
+#: exit loop skips `entry` and runs the rest, so an unrecognised trigger meant
+#: "run on exit" with nobody told. Validated at import so it cannot recur.
+TRIGGERS = frozenset({"entry", "exit"})
+#: Subjects. Descriptive; see DetectorSpec.scope.
+SCOPES = frozenset({"trade", "session"})
+
+for _spec in REGISTRY:
+    if _spec.trigger not in TRIGGERS:
+        raise ValueError(
+            f"{_spec.name}: trigger={_spec.trigger!r} is not a dispatch path. "
+            f"Expected one of {sorted(TRIGGERS)}. If you meant 'this detector "
+            f"judges the whole session', that is scope='session'."
+        )
+    if _spec.scope not in SCOPES:
+        raise ValueError(
+            f"{_spec.name}: scope={_spec.scope!r} — expected one of {sorted(SCOPES)}."
+        )
+del _spec
+
 BY_NAME = {spec.name: spec for spec in REGISTRY}
 
 

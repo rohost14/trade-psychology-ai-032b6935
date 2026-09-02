@@ -153,19 +153,53 @@ def test_severity_ladder_is_unchanged():
     assert COLD_START_DEFAULTS["no_stoploss_loss_pct_danger"] == 50
 
 
-def test_f4_is_untouched():
+def test_f4_is_resolved_and_direction_now_enters_the_denominator():
     """
-    The direction-aware denominator stays on the Pending register. A short
-    option is still measured against premium RECEIVED, which is the defect - it
-    must not have been silently changed here.
+    INVERTED 2026-09-03. This test used to pin the DEFECT.
+
+    While F4 sat unapproved on the Pending register, the right thing was to
+    stop it being changed by accident, so this asserted that a long and a short
+    option shared a denominator - "direction still does not enter the
+    denominator, by design, pending F4". That freeze was lifted by an explicit
+    decision to resolve F4, so the assertion is now its opposite. The test was
+    not adjusted to make code pass; its subject was removed deliberately.
+
+    The long path is unchanged and is asserted to be so - it is 99.9% of the
+    book and no live firing may move. Full coverage of the new behaviour,
+    including both abstentions, is in tests/test_no_stoploss_denominator.py.
     """
     src = inspect.getsource(engine._detect_no_stoploss)
     assert "capital_at_risk = entry_price * qty" in src, (
-        "the CE/PE denominator changed - that is F4 and it is not approved")
+        "the LONG option denominator must stay byte-identical - premium paid "
+        "is exact and 99.9% of the book runs through it")
+
+    # Same trade, same loss, opposite side. The long fires at 40% of the 7,500
+    # premium it paid; the short does not, because 3,000 against the ~216,000
+    # margin it posted is 1.4% and is not a large loss. That divergence IS the
+    # fix - under the old shared denominator both read 40%.
     long_ev = engine._detect_no_stoploss(_ctx(_ct(direction="LONG")))
-    short_ev = engine._detect_no_stoploss(_ctx(_ct(direction="SHORT")))
-    assert long_ev.context["capital_at_risk"] == short_ev.context["capital_at_risk"], (
-        "direction still does not enter the denominator, by design, pending F4")
+    assert long_ev is not None
+    assert engine._detect_no_stoploss(_ctx(_ct(direction="SHORT"))) is None
+
+    # A loss that IS large against margin fires, and carries the larger
+    # denominator rather than the premium received.
+    big_short = engine._detect_no_stoploss(
+        _ctx(_ct(direction="SHORT", pnl=-120_000.0)))
+    assert big_short is not None
+    assert (big_short.context["capital_at_risk"]
+            > long_ev.context["capital_at_risk"] * 10), (
+        "a writer's capital at risk is the margin posted, not the premium received")
+
+
+def test_an_option_with_no_direction_abstains():
+    """
+    The remaining half of F4. `estimate_capital_at_risk` reads a missing
+    direction as LONG and `instrument_risk.classify` reads it as SHORT, and the
+    two denominators differ by roughly 200x. Neither guess is defensible, so
+    the detector returns nothing.
+    """
+    assert engine._detect_no_stoploss(_ctx(_ct(direction=None))) is None
+    assert engine._detect_no_stoploss(_ctx(_ct(direction=""))) is None
 
 
 def test_the_registry_copy_no_longer_asserts_absence():

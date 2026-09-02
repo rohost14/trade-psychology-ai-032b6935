@@ -286,9 +286,20 @@ COLD_START_DEFAULTS: Dict[str, Any] = {
     # neither endpoint of the cited range. Not replaced: the measurement said
     # the gate was aimed the wrong way, not that 1.3 was the wrong number.
 
-    # ── Early exit (disposition effect / cutting winners) ─────────────────
-    # SEBI FY2022: retail sold winning positions 2.7× faster than losing positions.
-    # Disposition effect is 2-3× stronger in Indian retail vs institutional.
+    # ── Early exit — SECTION REMOVED 2026-09-03 ───────────────────────────
+    # No constants remain here: `early_exit` was retired 2026-08-30 because a
+    # single session gives 3-5 trades per side and the shuffle null came back
+    # p = 0.610. What was left was an orphan header carrying two claims:
+    # "SEBI FY2022: retail sold winning positions 2.7x faster than losing
+    # positions" and "disposition effect is 2-3x stronger in Indian retail vs
+    # institutional". Neither is locatable in a SEBI publication; the nearest
+    # real finding is Odean (1998), US discount brokerage 1987-93, at roughly
+    # 1.5x. That 2.7x is also the figure that reached the Dashboard empty state
+    # and had to be removed from it (d26c994) - this comment is where it came
+    # from. Not replaced with another statistic. The disposition effect itself
+    # survives as a measurement in `baseline_service`'s history-scoped
+    # avg_winner_hold_min / avg_loser_hold_min, which claim nothing about
+    # anyone but the trader.
 
     # ── Options behavioral patterns ───────────────────────────────────────
     # Direction confusion: CE→PE flip on same underlying within 10 min.
