@@ -17,7 +17,7 @@ subagent's word.
 | **F2** | **Absence rendered as a behavioural claim.** Empty `exit_order_types` → *"No stop-loss order detected"*. `num_entries=1` stub → *"opened in a single fill"*, a **negative finding** rather than an abstention. `abstained()` exists and is used 6 times across 23 detectors. | verified | `no_stoploss`, `panic_exit`, `adding_to_adverse_position` |
 | **F3** | **Short option's capital at risk is a SPAN % of the premium *received*.** Measured: 9,000 premium → **1,080** "at risk", ratio 0.12. The class with unbounded downside gets the smallest number. `instrument_risk` classifies it correctly as `short_option`/`margin_posted` and passes the wrong amount through unchanged. | **measured** | `excess_exposure`, `constitution_violation`/`max_trade_risk`, `martingale_behaviour`, `revenge_trade`, `adding_to_adverse_position`, `baseline_service.own_position_risk` |
 | **F4** | **`no_stoploss` has no direction guard** — references `direction` zero times. Denominator `entry_price × qty` is premium paid for a buyer, premium received for a writer. Measured: a short option whose premium tripled fires `no_stoploss`. | **measured** | `no_stoploss`, `opening_5min_trap` |
-| **F5** | **Futures-hedge branch never reads the option leg's direction** (`strategy_detector.py:479-486`). Measured: FUT LONG + PE **SHORT** → `futures_hedge_bullish`; FUT SHORT + CE **SHORT** → `futures_hedge_bearish`. Risk-adding structures get the label and the suppression written for risk-reducing ones. | **measured** | the 5 detectors in `_STRATEGY_SUPPRESSED` |
+| **F5** ✅ **FIXED 2026-09-02 (`5844381`)** | **Futures-hedge branch never reads the option leg's direction** (`strategy_detector.py:479-486`). Measured: FUT LONG + PE **SHORT** → `futures_hedge_bullish`; FUT SHORT + CE **SHORT** → `futures_hedge_bearish`. Risk-adding structures get the label and the suppression written for risk-reducing ones. | **measured** | the 5 detectors in `_STRATEGY_SUPPRESSED` |
 | **F6** | **`MULTI_LEG_UNKNOWN` grants full hedge suppression.** Group built regardless of classification (`strategy_detector.py:90-98`); suppression tests presence, not type (`behavior_engine.py:748`). Contradicts `count_structures`, which refuses to collapse an unrecognised cluster. | verified | `revenge_trade`, `martingale_behaviour`, `rapid_reentry`, `no_stoploss`, `post_loss_recovery_bet` |
 | **F7** | **Contract multiplier is applied to P&L but to no denominator.** `realized_pnl` uses it (`pnl_calculator.py:315`); every risk/size denominator omits it. `get_lot_multiplier_or_none` exists and is never called from a sizing path. | verified | MCX/CDS: `no_stoploss`, `excess_exposure`, `_notional` consumers |
 | **F8** | **`is_comparable` contradicts its own docstring.** Documents False for *"an unclassifiable instrument"*; code is `kind not in (UNRELIABLE,)`. Measured: `unparseable_symbol` → `class=unknown`, **`is_comparable=True`**. | **measured** | `revenge_trade`, `martingale_behaviour`, `adding_to_adverse_position` |
@@ -123,6 +123,9 @@ hide F1.
 ### Stage 5 — suppression (independent, do last)
 
 **F5** read the option's direction → **F6** require a known structure type.
+**F5 is DONE (`5844381`); F6 is untouched and now has a concrete consequence:**
+the risk-adding structure F5 corrected falls to `MULTI_LEG_UNKNOWN`, which
+still earns the full suppression. See `PENDING_AND_TODO.md`.
 
 Last because both change which alerts survive, so their harness diff should not
 be entangled with denominator changes. F5 before F6: F5 corrects the

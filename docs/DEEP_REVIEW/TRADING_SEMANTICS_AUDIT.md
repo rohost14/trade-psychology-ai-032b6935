@@ -324,8 +324,8 @@ weekdays. `is_expiry_day` is wrong for every SENSEX/BANKEX monthly.
 | equity + option (covered call, protective put, collar) | **UNSUPPORTED** — EQ excluded from grouping entirely |
 | neutral structure (straddle/strangle) | **PASS** shape / **FALSE-POSITIVE RISK** on provenance — no test that legs were held simultaneously |
 | vertical spread | **GAP (safety)** — quantity never read, so a **1×2 ratio spread classifies as a defined-risk debit spread** |
-| iron condor | shape ✓, but **never forms a 4-leg group on the live path** |
-| iron butterfly | **dead code** — the branch is unreachable; every real one returns `iron_condor` first |
+| iron condor | ~~shape ✓~~ — the shape was NOT validated: any four mixed-direction CE/PE legs matched, including the inverted structure. **FIXED 2026-09-02 (`5844381`).** Still **never forms a 4-leg group on the live path** |
+| iron butterfly | ~~**dead code** — the branch is unreachable; every real one returns `iron_condor` first~~ **FIXED 2026-09-02 (`5844381`)** |
 | calendar / diagonal | direction never checked; diagonal → `calendar_spread`; unrepresentable on the counting path |
 | futures roll | **GAP** — `multi_leg_unknown`, no suppression |
 | strategy suppression reliability | **GAP both ways** — over-suppresses (`multi_leg_unknown`, revenge shape) and under-suppresses (needs the sibling to have *closed*; 4-leg structures starve; entry path has no group at all) |

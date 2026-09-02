@@ -13,6 +13,12 @@ counts. **Stale entries are struck through and kept, never deleted** — a
 register that quietly drops what it got wrong cannot be trusted about what it
 still holds.
 
+**Second pass 2 Sep 2026, after `5844381`:** F5 moved to FIXED and separated
+from F6, which stays open and is now sharper — see that entry. B1/B2/B3 closures
+are at the foot of the file. The `STRUCTURE_GAP_SECONDS` question was measured
+and the change **rejected on its evidence**; what remains is a shape-aware
+grouping investigation, recorded as an open question and not as a solution.
+
 Every open item, with the **actual reason** it is deferred rather than a label.
 Nothing here is resolved and nothing here is permanently deferred. Each entry
 records what must be **decided** or **tested**, so the item can be picked up
@@ -121,25 +127,93 @@ is told, not a defect with one correct answer.
 
 ---
 
-### F5 and F6 — hedge and structure semantics
+### ~~F5~~ **FIXED 2026-09-02** · F6 — hedge and structure semantics **STILL OPEN**
 
-F5: the futures-hedge branch reads the option leg's **type** and never its
-**direction**, so a FUT LONG + PE SHORT is labelled `futures_hedge_bullish` —
-a risk-**adding** structure classified as a hedge.
-F6: `MULTI_LEG_UNKNOWN` grants the **full** hedge suppression that was written
-for recognised structures. A cluster we could not classify silences five
-detectors.
+**These were filed as one item and have separated.** F5 was a wrong *reading* —
+a defect with one correct answer. F6 is a product decision about what a
+classification EARNS. Fixing the first does not answer the second, and the
+sequencing recorded in `PHASE0_CLASSIFICATION.md:125-129` held: *"F5 before F6:
+F5 corrects the classification, F6 then decides what an unknown classification
+earns."*
 
-**What must be decided:** a defined hedge/structure semantic — what ratio, what
-degree of simultaneity, and what an *unrecognised* cluster earns — **before**
-any classification or suppression changes.
+**F5 — FIXED (`5844381`).** The futures-hedge branch now requires the option leg
+to be `LONG`. `FUT LONG + PE SHORT` and `FUT SHORT + CE SHORT` no longer carry a
+protective-hedge label and fall to `MULTI_LEG_UNKNOWN`. No new strategy type was
+introduced — naming a shape we have not decided should receive any particular
+treatment would build a taxonomy to preserve a classification. The other six
+FUT+option combinations are unchanged and pinned by tests.
 
-**Why not now:** the margin work removed the urgency without removing the
-question. Scanning legs jointly reproduces the capital consequence of a hedge to
-−0.3% **with no hedge rule in the model at all**, so *capital* no longer needs
-this answered. Structure naming is still needed for **messaging** and for
-suppression, and both are product decisions. Changing suppression changes which
-alerts survive.
+**F6 — OPEN, and B1 sharpened it into a concrete consequence rather than a
+hypothetical.** The chain, all three links verified in code:
+
+1. A risk-adding `FUT LONG + PE SHORT` now classifies as `MULTI_LEG_UNKNOWN`
+   — correct, and it is what F5's fix produces.
+2. `strategy_detector.detect_and_save` builds the `StrategyGroup`
+   **unconditionally**, whatever the classification.
+3. `behavior_engine.py:822` tests `if ctx.strategy_group and …` — **presence,
+   never type** — so `MULTI_LEG_UNKNOWN` earns exactly the same suppression as
+   a recognised structure: `revenge_trade`, `martingale_behaviour`,
+   `rapid_reentry`, `no_stoploss` and `post_loss_recovery_bet` all go quiet.
+
+**So the structure has lost the wrong NAME and kept the wrong SILENCE.**
+Classification correctness is fixed; suppression semantics are not, and the two
+were never the same question.
+
+**What must be decided:** what an *unrecognised* cluster earns. That is the
+whole of F6 and it is a product decision, not a defect with one answer —
+`MULTI_LEG_UNKNOWN` is an intentional uncertainty state (*"these legs are one
+multi-leg decision and we cannot name it"*), so "suppress nothing" and
+"suppress everything" are both defensible readings of it.
+
+**NO SUPPRESSION RULE IS PROPOSED HERE, deliberately.** Writing one inside a
+classification fix is how the two questions got entangled in the first place.
+
+**Also still open, unchanged by the fix:** the hedge/structure semantic itself
+— what ratio and what degree of simultaneity constitute a hedge. The classifier
+still never reads quantity, so a 1×2 ratio spread classifies as a defined-risk
+vertical. This is D1 in `PHASE0_CLASSIFICATION.md`, deliberately out of scope of
+a correctness fix, and the margin work removed its urgency without removing it:
+scanning legs jointly reproduces the capital consequence of a hedge to −0.3%
+with no hedge rule in the model at all, so *capital* no longer needs it
+answered. **Structure naming is still needed for messaging and for
+suppression.**
+
+---
+
+### Shape-aware grouping — a separate investigation, not a chosen solution
+
+**Raised 2026-09-02 while verifying B1. Recorded because measuring it produced a
+result that argues AGAINST the obvious change.**
+
+Two grouping windows disagree about "entered together":
+`detect_and_save` uses `ENTRY_WINDOW_MINUTES = 15`; `cluster_legs` uses
+`STRUCTURE_GAP_SECONDS = 30`. The reference book's one real futures hedge —
+2025-12-31 `SOLARINDS26JAN12000PE` then `SOLARINDS26JANFUT`, **38 s apart** —
+falls between them: grouped by the first path, not clustered by the second.
+
+Raising the global window was measured over the whole book and **it does not
+cleanly capture hedges** — it trades a false negative for a false positive:
+
+| gap | sessions whose count changes | what changes |
+|---|---|---|
+| 30 → **60 s** | **2** | 2025-12-31, the real hedge, +38 s — **captured** ✓ · 2025-09-08 `24800PE` → `24900CE`, **+35 s** — two directional entries on a day of 11 that cycles the same two strikes, collapsed into one "strangle" ✗ |
+| 30 → **120 s** | **4** | the same two, plus INDHOTEL CE→PE +80 s and NIFTY CE→PE +104 s — both directional pairs ✗ |
+
+**This reproduces the reason the constant is 30 and not 120.** Its own comment
+records the earlier finding: *"buying a call and then a put a minute later
+classifies as a straddle and collapsed to one 'disciplined decision', which is
+the opposite of what that behaviour is."*
+
+**DECISION TAKEN: leave `STRUCTURE_GAP_SECONDS` at 30.** Not deferred for want
+of effort — measured, and the change was rejected on its own evidence.
+
+**What is open** is the question underneath: a FUT+option hedge is legged
+differently from an options structure, so one global seconds-window cannot serve
+both. A **shape-aware** grouping rule might, and that is what needs
+investigating. **It is not a chosen solution and nothing about it is designed
+yet** — recording the option is not adopting it. Any such rule changes
+`count_structures`, so it changes what the overtrading detectors see and must be
+measured before, not after.
 
 ---
 
@@ -1494,3 +1568,29 @@ withdrawn.
 
 Fixed 29 Aug: **F1, F10, F18, F19, F22, F23** (and earlier **F3, F7, F8, F9,
 F11, F15, F16, F17**). See `RISK_INFRA_PLAN.md`.
+
+## Closed 2026-09-02 — strategy-classifier correctness (`5844381`)
+
+Three defects of one shape: a structure was named without reading the property
+that defines it. All three fixed in one commit, verified on both grouping paths
+over the whole reference book.
+
+| # | verdict |
+|---|---|
+| **B1** — futures hedge asserted without the option leg's direction | **FIXED, NOT CLOSED.** The label is correct and the two risk-adding combinations fall to `MULTI_LEG_UNKNOWN`. **The downstream question is still open: `MULTI_LEG_UNKNOWN` earns the same full suppression as a recognised structure, so the structure lost the wrong name and kept the wrong silence.** See F6 above. B1 closes when F6 is decided. |
+| **B2** — `IRON_BUTTERFLY` unreachable, and the label only ever wrong | **CLOSED.** The branch sat below a condor test that every real butterfly also satisfies, so it never ran; the only shape that could reach it was four legs in one direction, which is not a butterfly. Butterfly and condor are now decided together by one ordering test, body width separating them. A real butterfly is named one; malformed and single-direction shapes cannot reach the label. |
+| **B3** — `iron_condor` was a catch-all, not a classification | **CLOSED.** It tested leg count and mixed direction only, so any four mixed-direction CE/PE legs matched — including the **inverted** structure whose risk runs the other way. It now requires 2 calls, 2 puts, four distinct strikes and both shorts strictly inside both longs. Everything else falls safely to `MULTI_LEG_UNKNOWN`. |
+
+**Standing caveat on B1 and B3:** every case needing a short leg is exercised
+only by synthetic tests. Exactly one symbol in the reference book ever goes net
+short, so this trader's data cannot reach those branches. The logic is proven;
+it is not proven against real data, and no book we hold can prove it.
+
+**Recorded for the principle, not as a backlog item:** `MULTI_LEG_UNKNOWN` is an
+**intentional uncertainty state** — *"these legs are one multi-leg decision and
+we cannot name the strategy"* — not a failed classification. TradeMentor names
+the small set of common structures whose semantics are unambiguous and is honest
+about the rest; ratio, calendar-diagonal, custom and exotic structures are not
+recognised by design. `classify_legs`' docstring now carries this. It matters
+because F6 is a decision about what that state earns, and reading it as
+"classification failed" would answer F6 by accident.
