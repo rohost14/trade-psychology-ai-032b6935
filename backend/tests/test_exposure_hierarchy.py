@@ -307,18 +307,29 @@ def test_the_entry_arm_never_falls_back_to_notional():
     assert "quantities_for_trade" in names
 
 
-def test_the_emotional_size_bump_survives():
+def test_the_emotional_size_bump_is_gone_and_must_not_return():
     """
-    KEPT through the rework by decision, and NOT claimed to be validated. A
-    danger/critical recovery-bet, martingale or revenge event in the last 12h
-    raises severity one rung.
+    Was `test_the_emotional_size_bump_survives`. It was kept through the
+    2026-09-01 rework by decision and never validated; it was REMOVED on
+    2026-09-02 as F20, and this test now pins the removal.
+
+    Why it went: it read `BehaviorEvent` rows for three other detectors and
+    escalated this rule danger -> critical, which is the one violation of the
+    registry's own "no detector may consume another detector's output" (A.10).
+    And the query never excluded SUPPRESSED events — suppression is
+    notification-only, so the rows exist — meaning a finding the trader was
+    never told about made a DIFFERENT alert critical.
+
+    Filtering suppressed rows out would have been a third patch on a forbidden
+    dependency, so the dependency is gone. Severity is now whatever this
+    rule's own ladder computed.
     """
     import app.tasks.position_monitor_tasks as pm
 
     consts = _consts(pm._overexposure_task)
     for token in ("post_loss_recovery_bet", "martingale_behaviour", "revenge_trade"):
-        assert token in consts, f"the emotional bump lost {token}"
-    assert "emotional_bump" in consts
+        assert token not in consts, f"the emotional bump is back via {token}"
+    assert "emotional_bump" not in consts
 
 
 # ══ 5. FUTURES AND NAKED SHORTS ABSTAIN ════════════════════════════════════

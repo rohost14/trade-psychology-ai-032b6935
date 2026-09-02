@@ -69,12 +69,21 @@ from app.models.completed_trade import CompletedTrade
 from app.models.trading_session import TradingSession
 from app.models.risk_alert import RiskAlert
 from app.models.behavior_event import BehaviorEvent as BehaviorEventRecord
-from app.models.strategy_group import StrategyGroup
+from app.models.strategy_group import StrategyGroup, StrategyType
 from app.services.detector_registry import REGISTRY, BY_NAME
 from app.services.trading_session_service import TradingSessionService
 from app.core.risk_quantities import quantities_for_trade
 
 logger = logging.getLogger(__name__)
+
+#: Every structure the classifier can actually NAME. Derived from the type
+#: constants rather than listed, so a new named structure joins it without a
+#: second edit — and `MULTI_LEG_UNKNOWN`, which names nothing, never can.
+_RECOGNISED_STRATEGY_TYPES = frozenset(
+    value
+    for attr, value in vars(StrategyType).items()
+    if not attr.startswith("_") and isinstance(value, str)
+) - {StrategyType.MULTI_LEG_UNKNOWN}
 IST = ZoneInfo("Asia/Kolkata")
 
 #: Exit order types meaning a stop-loss was resting on the position and fired.
@@ -739,18 +748,68 @@ class BehaviorEngine:
 
     # ── Run all detectors ──────────────────────────────────────────────────
 
-    # Patterns suppressed for strategy legs (hedge legs fire false positives on these)
+    #: Detectors whose SUBJECT cannot exist inside a recognised structure.
+    #:
+    #: Each of these three reads a SEQUENCE — a re-entry, a size escalation, a
+    #: sized-up bet after losses. Inside a named structure the legs are not a
+    #: sequence at all; they are one construction placed at once, so there is
+    #: no second decision for the detector to be about. That is the ONLY
+    #: justification for suppression, and it is why the set is this short.
+    #:
+    #: Suppression is not a volume control and not a reward for being grouped.
+    #:
+    #: REMOVED 2026-09-02 (F6), each for its own reason:
+    #:
+    #:   `revenge_trade`  — `revenge_window_caution_min` is 20 minutes and the
+    #:     sibling window that builds the group is 15, so the grouping window
+    #:     sits INSIDE the revenge window. A loss at 10:05 and a different
+    #:     strike at 10:08 grouped, and the revenge finding disappeared into
+    #:     the group that contained it. Suppression was eating the canonical
+    #:     shape rather than a false positive.
+    #:
+    #:   `no_stoploss`  — being a leg of a structure says nothing about whether
+    #:     a stop existed. Suppressing it asserted that the structure IS the
+    #:     risk management, which is a claim nobody made and no data supports.
+    #:
+    #: `rapid_reentry` is kept although it is hardcoded `info` and therefore
+    #: never alerts: the suppression still writes `_suppressed` into its
+    #: evidence, and evidence is the only thing an analytics detector produces.
+    #: Dropping it would remove the annotation, not dead configuration.
     _STRATEGY_SUPPRESSED = frozenset({
-        "revenge_trade",
-        "martingale_behaviour",
-        # Suppress for multi-leg hedges: buying a CE + PE simultaneously is
-        # not rapid re-entry, missing stop-loss, or a recovery bet — it is a
-        # defined strategy (straddle/strangle/spread). strategy_group is set by
-        # get_group_for_trade() when the trade is part of a detected structure.
         "rapid_reentry",
-        "no_stoploss",
+        "martingale_behaviour",
         "post_loss_recovery_bet",
     })
+
+    @staticmethod
+    def _structure_suppresses(strategy_group, event_type: str) -> bool:
+        """
+        May this structure silence this detector's notification?
+
+        **Only a RECOGNISED structure may.** The old rule tested
+        `ctx.strategy_group is not None` — presence, never classification — so
+        `MULTI_LEG_UNKNOWN` earned exactly what a named straddle earned. On the
+        reference book that was 71% of groups and 77% of suppressed legs, and
+        70% of those UNKNOWN groups were the same option type, all bought, at
+        adjacent strikes: a trader buying more of one directional view, which
+        is precisely what these detectors exist to see.
+
+        `MULTI_LEG_UNKNOWN` means *"these legs are one multi-leg decision and
+        we cannot name the strategy"*. It is an honest uncertainty state, and
+        it is not grounds to claim a detector's subject does not exist — we do
+        not know that, which is what UNKNOWN says. So it earns nothing.
+
+        Fails closed: an absent, empty or unreadable `strategy_type` is not a
+        recognition, so it suppresses nothing.
+        """
+        if strategy_group is None:
+            return False
+        strategy_type = getattr(strategy_group, "strategy_type", None)
+        if not strategy_type or strategy_type == StrategyType.MULTI_LEG_UNKNOWN:
+            return False
+        if strategy_type not in _RECOGNISED_STRATEGY_TYPES:
+            return False
+        return event_type in BehaviorEngine._STRATEGY_SUPPRESSED
 
     def _run_all_detectors(
         self, ctx: EngineContext, flags: Optional[Dict[str, tuple]] = None
@@ -819,7 +878,7 @@ class BehaviorEngine:
                         # Dark-launched detector: record evidence, but never alert
                         # or score. Tag every event this method produced.
                         event.shadow = True
-                    if ctx.strategy_group and event.event_type in self._STRATEGY_SUPPRESSED:
+                    if self._structure_suppresses(ctx.strategy_group, event.event_type):
                         event.suppressed_reason = f"strategy_group:{ctx.strategy_group.strategy_type}"
                         logger.debug(
                             f"[BehaviorEngine] suppressed {event.event_type} — "

@@ -495,32 +495,31 @@ async def _overexposure_task(broker_account_id: str, tradingsymbol: str) -> dict
         return {"symbol": tradingsymbol, "exposure_pct": round(exposure_pct, 1),
                 "alerted": False}
 
-    # Emotional multiplier (doc 4 P32): recent emotional danger events
-    # (recovery bet / martingale / revenge) bump severity one level -
-    # oversized AFTER losses is the "make it back" bet. PRESERVED VERBATIM
-    # through the 2026-09-01 rework. NOT statistically validated; it is kept
-    # because it is well motivated and removing it was never approved.
-    emotional_bump = False
-    async with SessionLocal() as ev_db:
-        from app.models.behavior_event import BehaviorEvent
-        from sqlalchemy import select as _sel, and_ as _and
-        ist_now = datetime.now(timezone.utc)
-        day_start = ist_now - timedelta(hours=12)
-        ev_res = await ev_db.execute(_sel(BehaviorEvent).where(_and(
-            BehaviorEvent.broker_account_id == UUID(broker_account_id),
-            BehaviorEvent.detected_at >= day_start,
-            BehaviorEvent.detector.in_(
-                ("post_loss_recovery_bet", "martingale_behaviour", "revenge_trade")),
-            BehaviorEvent.severity.in_(("danger", "critical")),
-        )))
-        if ev_res.scalars().first():
-            emotional_bump = True
-    # The bump used to have a caution -> danger step as well. With the
-    # pre-breach rung gone this rule can only be danger or critical, so that
-    # branch became unreachable and was removed rather than left as dead code
-    # that reads like a live path. danger -> critical is unchanged.
-    if emotional_bump and severity == "danger":
-        severity = "critical"
+    # ── The emotional multiplier was REMOVED 2026-09-02 (F20) ───────────────
+    #
+    # It queried `BehaviorEvent` for recent danger-or-worse `revenge_trade`,
+    # `martingale_behaviour` and `post_loss_recovery_bet` rows and escalated
+    # this rule's severity danger -> critical, on the reasoning that oversized
+    # AFTER losses is the "make it back" bet. Well motivated, and never
+    # statistically validated.
+    #
+    # Two things ended it, and the second is the one that mattered.
+    #
+    # 1. The registry states the rule verbatim: "no detector may consume
+    #    another detector's output" (A.10). This was the only violation.
+    #
+    # 2. The query filtered on detector and severity and NOTHING ELSE — it
+    #    never excluded SUPPRESSED events. Suppression is notification-only, so
+    #    a suppressed event still writes its row. A `revenge_trade` silenced by
+    #    a strategy group therefore sent the trader NO alert of its own and
+    #    still made a DIFFERENT alert critical. The trader was not told about
+    #    the finding, and was told about an unrelated breach more loudly
+    #    because of it.
+    #
+    # Adding "and not suppressed" would have been a third patch on a
+    # dependency the architecture forbids outright, so the dependency is gone
+    # instead. Severity is now whatever this rule's own ladder computed above.
+    # Pinned by `tests/test_strategy_suppression.py`.
 
     async with SessionLocal() as alert_db:
         await _fire_position_alert(
@@ -530,8 +529,7 @@ async def _overexposure_task(broker_account_id: str, tradingsymbol: str) -> dict
             message=(
                 f"Your per-trade risk rule breached while the position is open: "
                 f"{tradingsymbol} needs ₹{capital_required:,.0f} of capital "
-                f"— {exposure_pct:.1f}% against your {float(declared_limit):.0f}% limit"
-                + (" after recent loss-chasing behaviour." if emotional_bump else ".")
+                f"— {exposure_pct:.1f}% against your {float(declared_limit):.0f}% limit."
             ),
             details={
                 "rule": "max_trade_risk",
@@ -540,7 +538,6 @@ async def _overexposure_task(broker_account_id: str, tradingsymbol: str) -> dict
                 "current_pct": round(exposure_pct, 2),
                 "ratio": round(ratio, 2),
                 "capital_at_risk": round(capital_required, 2),
-                "emotional_bump": emotional_bump,
                 "at_entry": True,
                 "live": True,
                 "_confidence": 95.0,

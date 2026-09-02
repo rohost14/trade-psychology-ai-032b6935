@@ -252,12 +252,26 @@ def test_the_other_consolidation_families_are_untouched():
     assert "absorbed:" not in _inspect.getsource(BehaviorEngine._consolidate)
 
 
-def test_the_strategy_suppression_set_kept_its_other_members():
+def test_the_strategy_suppression_set_is_exactly_its_current_members():
+    """
+    Was `assert each of five is in _STRATEGY_SUPPRESSED`. Its point was that a
+    RETIREMENT must not silently change the set, and that still holds — but two
+    members left on 2026-09-02 by an approved F6 decision, not by accident:
+
+      `revenge_trade`  — the 15-minute grouping window sits INSIDE its own
+        20-minute window, so grouping was eating the canonical revenge shape.
+      `no_stoploss`    — being a leg of a structure says nothing about whether
+        a stop existed.
+
+    Asserting EQUALITY rather than membership is the stronger form: it catches
+    a member leaving *and* a member being added without a stated reason.
+    Suppression semantics are pinned in `tests/test_strategy_suppression.py`.
+    """
     from app.services.behavior_engine import BehaviorEngine
 
-    for name in ("revenge_trade", "martingale_behaviour", "rapid_reentry",
-                 "no_stoploss", "post_loss_recovery_bet"):
-        assert name in BehaviorEngine._STRATEGY_SUPPRESSED
+    assert BehaviorEngine._STRATEGY_SUPPRESSED == frozenset({
+        "rapid_reentry", "martingale_behaviour", "post_loss_recovery_bet",
+    })
 
 
 def test_every_surviving_detector_still_resolves():
