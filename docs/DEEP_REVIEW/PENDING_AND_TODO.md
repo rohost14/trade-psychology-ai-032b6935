@@ -1,6 +1,17 @@
 # Pending and To-Do
 
-**29 Aug 2026. Bookkeeping only — no audit, no code changes.**
+**Opened 29 Aug 2026. Bookkeeping only — no audit, no code changes.**
+
+**Last pass 2 Sep 2026, after the pattern review sequence closed.** That pass
+added the residue of four reviews that had never been carried across (5, 8, 17
+and §27 `strategy_breakdown`), promoted three recurring findings to
+**CROSS-CUTTING CLASSES**, and corrected five entries that had gone stale —
+`sl_percent_options` (fixed), Pattern 16 `excess_exposure` (retired, not
+validated), the `trading_capital` single point of failure (restated against a
+detector that still exists), the `panic_exit` claim (moot), and two detector
+counts. **Stale entries are struck through and kept, never deleted** — a
+register that quietly drops what it got wrong cannot be trusted about what it
+still holds.
 
 Every open item, with the **actual reason** it is deferred rather than a label.
 Nothing here is resolved and nothing here is permanently deferred. Each entry
@@ -18,6 +29,49 @@ Three states are used, and they are not interchangeable:
 
 ---
 
+## What this file owns, and where the rest lives
+
+**Updated 2 Sep 2026 after the pattern review sequence closed.** This file owns
+the **behavioural engine and pattern-review** register: detector verdicts still
+open, residue each review recorded rather than actioned, and the cross-cutting
+classes those reviews exposed. It is deliberately **not** the whole-project
+backlog, and nothing here is copied from another file.
+
+| what | lives in | not here because |
+|---|---|---|
+| engine/infra defects, dead API surfaces, migration tracking, dead functions, L3 remnants, parked threshold decisions, unverified claims | `docs/ENGINE_BACKLOG.md` §1-§6 | that file already carries them with its own evidence-of-verification rule |
+| Zerodha approval, Gate 3, MD account, business/legal, launch infra, mobile, monetisation | `docs/PENDING.md` | user/Zerodha/business actions, zero code-blocking |
+| design-system debt | `docs/DESIGN_MIGRATION.md` | disposable; delete when its status table is green |
+| per-pattern evidence, contracts and current behaviour | `docs/patterns/<n>-<name>/` | the review and the STATUS file are the primary record; this file carries only what was left **open** |
+| the live per-pattern verdict tracker | `docs/patterns/00-shared/BEHAVIOURAL_PATTERNS.md` → REVIEW STATUS | one row per pattern; the table below is the subset still open |
+
+**Standing caveat on everything below** (`ENGINE_BACKLOG.md` §7): every
+calibration in this register rests on **one trader's tradebook**. A second book
+from someone who trades differently is worth more than another year from the
+same person.
+
+---
+
+## OPEN DETECTOR QUEUE — 7, none reviewable today
+
+**The pattern review sequence is COMPLETE.** Every pattern has a verdict; there
+is no next review. What remains is open on a **data gap or a decision**, not on
+time — so starting one means reviewing a detector whose evidence is already
+known to be missing. Verified against `detector_registry` on 2 Sep 2026:
+**15 detectors, 19 pattern types, 4 aliases.**
+
+| # | detector | state | the exact unblock |
+|---|---|---|---|
+| Q1 | `overtrading_burst` | **DEFERRED** | more book. 12 alerts / 10 sessions and it **never fired alone**; n cannot move a threshold in either direction, and being rare is not a reason to delete something |
+| Q2 | `end_of_session_mis_panic` | **DEFERRED — data gap** | a dataset carrying **`product`**, its first gate. See the full entry under PENDING VALIDATION, which already records the four questions the deferred review must answer |
+| Q3 | `strategy_breakdown` | **DEFERRED — data gap + an unasked decision** | sessions where its two conditions disagree, **and** a decision about whether an `info`/`analytics` detector may ever reach a trader. See §27 below — the second half was never recorded |
+| Q4 | `revenge_trade` | **FROZEN by decision** | new data only. No new threshold, no episode rule, no score, no replacement, no global confidence gate. `docs/research/REVENGE_FINAL_EVIDENCE_REVIEW.md` |
+| Q5 | `holding_loser` | **RESEARCH FURTHER** | duration is measurable; the predicate is not. `28-position-monitor/review.md` |
+| Q6 | `overexposure` | **MODIFY, blocked** | live broker-margin validation (below). Its quantity is wrong on arithmetic — 100% of futures — not on the price substitution |
+| Q7 | `capital_mismatch` | **housekeeping, routed here** | excluded from the review group by decision: it never reads a position, trade, order, fill or P&L. It is a **precondition for the exposure detectors' correctness** — they divide by `trading_capital` and it asks whether that denominator is real. Pinned by `test_f21_capital_mismatch_is_excluded_from_death_spiral_on_purpose` |
+
+---
+
 ## PENDING DECISION
 
 ### F2 — absence is rendered as a behavioural claim
@@ -28,7 +82,7 @@ An empty `exit_order_types` produces *"No stop-loss order detected"*, and a
 
 **What must be decided:** what a detector says when the data it needs is
 unavailable. `abstained()` and `Insufficiency` already exist and are used by 6
-of 23 detectors, so the mechanism is there; the open question is per-detector —
+of what were then 23 detectors (**15 today**), so the mechanism is there; the open question is per-detector —
 does an unseen stop-loss become silence, a lower-confidence note, or a
 different message entirely?
 
@@ -233,10 +287,29 @@ What the deferred review must then answer, recorded so it is not re-derived:
 architecture — was modified.** It is the second detector deferred on a data gap
 rather than a decision.
 
-### Pattern 16 `excess_exposure` — review DEFERRED
+### ~~Pattern 16 `excess_exposure` — review DEFERRED~~ — **RETIRED 2026-09-01**
 
-**Deferred 29 Aug 2026, before review, by decision.** Not reviewed, not
-modified, not deleted.
+> **SUPERSEDED, and not by the validation this entry was waiting for.** The
+> detector was **retired** with the exposure hierarchy (`0602aa8`) on grounds
+> that hold at any margin number, so the deferral below was lifted from a
+> different direction than it anticipated.
+>
+> **No universal exposure threshold survives and none replaced its 5/10.** A
+> trader who DECLARED 40% was told DANGER at 35% — inside their own rule —
+> because `safety_bounds` clamps a declared value so it may only tighten, and
+> the alert could not tell 35% from 45%. Outcome evidence never supported it:
+> per round 0-5% won 40.2%, 5-10% 37.4%, 10-15% 43.1%, 15-25% 43.9% — no trend;
+> only 25%+ separated, at n=10 with 81% of that bucket from ONE position. At ₹1L
+> the removal drops **520 alerts on 724 rounds** that a trader declaring
+> NOTHING used to receive. Single-position exposure is now solely a breach of
+> the trader's own declared limit via `constitution_violation`'s
+> `max_trade_risk`. Evidence: `docs/patterns/28-position-monitor/`.
+>
+> **The live broker-margin validation immediately below is still open** — it now
+> unblocks `overexposure` (Q6) and `max_trade_risk`, not this detector.
+
+**Original entry, kept as the record. Deferred 29 Aug 2026, before review, by
+decision.** Not reviewed, not modified, not deleted at that time.
 
 **Why:** F17 changed its capital input two days earlier. It now takes the
 capital requirement from the canonical risk layer, and that layer **abstains on
@@ -300,6 +373,53 @@ Not to-do items. Each says what would change it.
 
 ---
 
+## Surfaced by the Pattern 5 review — NOT actioned. **Filed 2 Sep 2026.**
+
+**Seven limitations were recorded in `05-overtrading/STATUS.md` under
+"Limitations, recorded not closed" and none of them reached this register.**
+`daily_overtrading` was changed on 26 Aug (it now fires on the declared limit
+only); `overtrading_burst` was deferred and untouched. These are the leftovers
+of that change, not reasons to revisit it.
+
+| # | limitation | why it is still open |
+|---|---|---|
+| 5.1 | **Three surfaces read the declared daily trade limit** — `constitution_violation` (exit, engine), `position_monitor_tasks:1431` (entry, fires `constitution_violation` with rule `daily_trade_limit`), and now `daily_overtrading` | **No consolidation family covers them.** Two detectors now say the same sentence about the same declared number and the existing suppression picks the constitution one. This is the family decision arriving early; nothing in the Pattern 5 change pre-empted it |
+| 5.2 | **They do not count the same way.** `constitution_violation` counts **legs** (`len(ctx.session_trades) + 1`); `daily_overtrading` counts **structures** (`count_structures`) | Identical on this book — it collapses only **8 legs of 912** — but they **will disagree for a multi-leg trader against the same declared number**. The book cannot show the disagreement, which is why it was recorded rather than fixed |
+| 5.3 | `daily_trade_danger = 12` still exists in `trading_defaults.py` and is still resolved | It has **no detector reader** now. Not removed on purpose: `api/constitution.py` and `api/behavioral.py` surface it |
+| 5.4 | `daily_trade_limit` (p75-derived) still exists and is still resolved | Read by `/api/risk`, `/api/behavioral`, the Rules page and `rule_suggestion_service`. Only the **alerting** path stopped using it |
+| 5.5 | **The SEBI attribution is unsourced** — `daily_trade_limit 7 SEBI FY2023 (>6/day → 94% loss probability)` | **No source document for it exists in the repo.** Out of scope for that change; still wrong to leave. See the cross-cutting recount below |
+| 5.6 | **The burst check's silent fall-through** — ≥ caution, session flat or up, no losers — produces **no event and no record** | A suppression nobody can audit. Distinct from an abstention, which at least records itself |
+| 5.7 | **No replay re-run.** The expected delta was exactly −52 `daily_overtrading` alerts on a `--no-rules` book and nothing else | **That is an expectation, not a measurement.** PENDING VALIDATION in substance; recorded here with its pattern |
+
+**5.2 is the one with teeth.** Two detectors, one declared number, two counting
+units — and the trader sees one number in their rules.
+
+## Surfaced by the Pattern 8 review — NOT actioned. **Filed 2 Sep 2026.**
+
+`premium_loss_event` was **KEEP AS-IS**, then rebuilt at v3.0.0 as a real-time
+risk-state detector on the tick path. Seven limitations were recorded in
+`08-premium_loss_event/STATUS.md`; **one reached this register** (the resting
+order book, under Pattern 12). The other six are below.
+
+| # | limitation | state |
+|---|---|---|
+| 8.1 | **No ticker means no live premium alerts.** The 60-second beat is gone, so the tick stream is the only source | Same exposure that already exists for live prices, and the ticker has reconnect logic — but it is a **new dependency for this pattern and is not covered by a test** |
+| 8.2 | **No test drives a real Zerodha socket.** Frames are synthesised to the exact wire layout `_handle_binary` parses | The socket itself is never exercised. PENDING VALIDATION, and it needs a live session |
+| 8.3 | `sl_percent_futures` had the same unused-field problem | **Partly closed 2 Sep** — it was removed as a user input and no longer resolves to an invented `1.0` as `Source.FACT`. Nothing reads it; whether the field itself should exist is untouched |
+| 8.4 | **Pattern 8 and Pattern 12 are 92% duplicated on the same denominator with conflicting severities** | The resting-order-book half of this is filed (Pattern 12, RESEARCH FURTHER). **The duplication itself is not.** Until live stop-loss state exists, Pattern 8 cannot carry protection as context and the two overlap on nearly everything they see |
+| 8.5 | **Averaging down still quietens it** — `loss_pct` is measured against `avg_entry_price`, so an add lowers the percentage | The engine is not blind: `adding_to_adverse_position` fires on the add. But the interaction is unstated and untested |
+| 8.6 | The repeat rule's promotion is gone with the severity it operated on | The count survives in the evidence. Recorded so a future pass does not re-derive why the promotion vanished |
+| 8.7 | **40 / 60 / 80 remain unsourced round numbers** | They select the top 6% of outcomes and 35% of the losses on one trader's book. **Explicitly out of scope of the exposure work** — the `sl_percent_options` fix says the severe-loss ladder must not move — but "not now" is not "sourced". See the cross-cutting recount below |
+
+### Patterns 1, 2 and 3 — coverage caveats, pointer only
+
+Recorded in their own STATUS files and **not repeated here**, because each is an
+instance of the standing one-trader caveat rather than an open item: instrument
+coverage outside long options is synthetic (Pattern 1, book is 727 LONG / 15
+SHORT); cross-strike sequences are deliberately out of scope (Pattern 2, 53
+occurrences / 30 days, separate research); overlapping positions count as
+attempts (Pattern 3, 24 of 49 firings, recorded not excluded).
+
 ## Surfaced by the Pattern 13 review — NOT actioned
 
 ### ~~`danger_zone` INFO visibility~~ — **CLOSED 29 Aug 2026**
@@ -334,7 +454,15 @@ events still must not become alerts in the meantime.
 **That investigation PASSED on 1 Sep 2026 and the architecture is unchanged.**
 Neither item below is a code fault, and neither is a reason to modify a detector.
 
-### 1. `trading_capital` is a single point of failure for `excess_exposure`
+### 1. `trading_capital` is a single point of failure for exposure detection
+
+> **RESTATED 2026-09-02 — the finding survives, its subject does not.**
+> `excess_exposure` was retired on 1 Sep, so the measurement below describes a
+> detector that no longer exists. **The consequence is unchanged and now
+> attaches to `constitution_violation`'s `max_trade_risk`**, which divides by
+> the same field, and to `overexposure` (Q6) and `capital_mismatch` (Q7). The
+> product question is identical and still unanswered; only the name changed.
+> Do not read the 231-firing figure as a live number.
 
 Measured with no money rules set:
 
@@ -355,7 +483,8 @@ answer is worse than no answer. The consequence is what needs a decision:
 
 **State this precisely when it is picked up.** "Capital is required for
 *exposure detection*" is true. "Capital is required for *the behavioural
-engine*" is **false** — one detector of seventeen depends on it, and the
+engine*" is **false** — one detector of the seventeen then registered depended on it (**that detector,
+`excess_exposure`, is now retired — see the restatement above**), and the
 validation measured the other sixteen as unaffected.
 
 **The product question:** should onboarding require capital, or should the UI
@@ -640,6 +769,45 @@ This is the same class as `early_exit_winner_max_min` naming a metric nothing
 produces, already recorded above. **Two instances now.** The fix is one
 contract test over the spec declarations, not two corrections.
 
+## Surfaced by the Pattern 17 review — NOT actioned. **Filed 2 Sep 2026.**
+
+`session_meltdown` was **MODIFIED** on 30 Aug: the undocumented
+`trading_capital * 0.05` is gone from both the detector and `api/risk.py`, and
+with no declared `daily_loss_limit` it now abstains. **No replacement percentage
+was substituted** and tests forbid one. Two of that review's problems survived
+the change; only the stale-docstring half of one reached this file.
+
+### 1. Two constants drive a `notification_level=4` detector with no classification
+
+The **40 / 75** ladder was explicitly **not** part of the Pattern 17 change and
+is pinned separately. It remains what the review called it: two numbers deciding
+the tiers of the loudest detector in the engine, with no `THRESHOLD_SPECS`
+record, no `Kind`, no provenance and no maturity.
+
+**Distinct from the 5% that was removed.** The 5% was *invented and described to
+the trader as theirs*; the 40/75 is documented and was explicitly endorsed. That
+makes it a **bookkeeping gap, not a calibration one** — the same distinction
+drawn for `post_loss_recovery_bet`'s multipliers, and the same fix: a
+`THRESHOLD_SPECS` record, not a new number.
+
+### 2. `account_risk` vs Kite `opening_balance` — the denominator question
+
+The review recorded that `ctx.account_risk` is an account **SIZE**, not a limit,
+and that the canonical account-risk denominator is Kite's `opening_balance`
+rather than `equity_total` (which stores `live_balance` and moves with
+utilisation).
+
+**Why it was not swapped:** *"swapping the denominator moves every firing
+count."* That is a measurement plus a decision, not a refactor, and it was
+outside the approved scope of a change whose whole point was to stop inventing
+capital figures.
+
+**Related and already filed:** the stale `EngineContext.account_risk` docstring
+(under the money-rule validation), and `equity_utilization_pct`'s denominator
+(under Pattern 28). All three are the same question asked at three layers —
+**what is the account-risk denominator, and does every surface use the same
+one?** Worth deciding once rather than three times.
+
 ## Surfaced by the Pattern 18 review — NOT actioned
 
 **Both were found by the `early_exit` review and deliberately left. Neither is
@@ -685,7 +853,14 @@ half a product decision.**
 
 ## Surfaced by the Pattern 12 review — NOT actioned
 
-### `panic_exit` carries the identical unverifiable claim
+### ~~`panic_exit` carries the identical unverifiable claim~~ — **MOOT 2026-08-29**
+
+> `panic_exit` was **RETIRED** the same day this was filed, for an unrelated and
+> larger reason: its subject did not exist. The claim went with the detector, so
+> there is nothing left to fix. **Kept because the class is not moot** — the
+> same "asserted from the exit fill's order type" shape is what Pattern 12's own
+> message was corrected for, and it is what the resting-order-book item below
+> would finally close.
 
 Its message ends *"— no stop-loss order, quick manual exit."* and its registry
 copy reads *"A quick manual close at a loss with no stop-loss order on record."*
@@ -714,6 +889,83 @@ nothing can be backfilled.
 **Reviews 25-27 are CLOSED.** `time_of_day_bias` RETIRED, `win_rate_collapse`
 KEEP AS-IS, `strategy_breakdown` DEFERRED. Everything below is recorded, not
 actioned.
+
+### §27 `strategy_breakdown` — the DEFER's residue. **Filed 2 Sep 2026.**
+
+**This section is a correction of this file, not of the review.** Until now
+`strategy_breakdown` appeared here exactly once, as a status word inside the
+heading above. Its evidence and its contract were written into
+`docs/patterns/25-27-performance-trio/performance_trio_review.md` §27 and never
+carried across — so the only open detector with a recorded behavioural contract
+had no entry in the register that is supposed to hold them.
+
+| # | finding | numbers |
+|---|---|---|
+| P1 | **On this book it is EXACTLY `win_rate_collapse`. Zero unique firings** | both fire 4, **identical sets**, unique to `strategy_breakdown` = **0**. The profit-factor condition never excluded anything — a session winning 11% of its trades almost always has a wrecked profit factor |
+| P2 | **The redundancy cannot be settled at n = 2** | 2 sessions is not enough to conclude PF never binds. Enough to say the second signal **has not earned its place**; not enough to remove it. PF collapse is **not** vacuous in isolation — 6 of 26 qualifying sessions have it — but as the second half of an `AND` it added nothing |
+| P3 | shares §26's defects exactly | `trigger="session"` declared and not honoured; `info` with **no Strategy Health reader** |
+
+**Recommended behavioural contract, recorded:**
+
+> **Subject.** Two independent performance signals degrading together, which is
+> stronger evidence than either alone.
+>
+> **Must be able to differ from its own first signal.** A detector whose second
+> condition never binds is a copy of the first under another name, and should
+> either be shown to differ or be folded into it.
+
+**Why DEFER and not DELETE:** 100% overlap across 4 events on 2 sessions cannot
+carry a retirement — that would repeat the error of acting on evidence too thin
+to hold the conclusion. **Not KEEP either**: "keep" would imply it has been
+shown to add something, and it has not. Folding it into `win_rate_collapse` is
+the obvious consolidation and is **not justified on 2 sessions**.
+
+**Unblock — and it is in TWO parts, which the review recorded as one.**
+
+1. **Data.** Enough sessions reaching the 8-trade gate to observe whether the
+   profit-factor condition ever excludes a win-rate collapse. On this book only
+   **26 of 175** sessions reach that gate and **2** pass. That is a constraint of
+   data, not of method — no further analysis of these 175 sessions supplies it.
+2. **A decision that was never asked** — see the entry immediately below. Even
+   with those sessions, the detector cannot reach a trader.
+
+### The `performance` domain cannot produce a notifiable event — PENDING DECISION
+
+**Found by the A1 `death_spiral` measurement, stated in commit `f46c25f`'s
+message, and never filed until now.** The commit put it in one line: *"A whole
+domain could never contribute: both `performance` detectors hardcode
+`severity="info"` against a `>= danger` gate."*
+
+Verified in code 2 Sep 2026:
+
+```
+behavior_engine.py:3540   strategy_breakdown   severity="info"   hardcoded
+behavior_engine.py:3496   win_rate_collapse    severity="info"   hardcoded
+registry, both:  nature="performance", disposition="analytics",
+                 notification_level=0, trigger="session"
+```
+
+Combined with the **closed** INFO/EVIDENCE rule — `info` never becomes a
+`RiskAlert`, never influences `danger_zone` or severity escalation — this means
+**neither performance detector can reach a trader by any route**, at any sample
+size. `death_spiral` was the one consumer that read the domain at all, and it is
+retired.
+
+**What must be decided:** whether the `performance` domain is
+evidence-and-analytics forever, or whether one of these two is meant to become
+trader-facing. Both readings are defensible and the code states neither.
+
+**Why this is not a bug and must not be "fixed":** promoting an INFO pattern to
+a trader-facing alert is an **explicit product decision, never a bug fix** —
+that rule is closed and enforced by `test_info_evidence_visibility.py` (12
+tests). Hardcoding a higher severity to make the domain reachable would be
+exactly the change the rule exists to stop.
+
+**Why it matters for Q3:** it makes `strategy_breakdown`'s recorded unblock
+**necessary but not sufficient**. Collecting the disagreeing sessions answers
+"does the second condition bind"; it does not answer "and then what happens",
+because today the answer is *nothing*. Whoever picks up Q3 should take both
+halves or neither.
 
 ---
 
@@ -823,11 +1075,24 @@ is a recorded fact rather than a later surprise.
 
 ---
 
-# BLOCKING — `sl_percent_options` invents a USER RULE. Found 2026-09-01.
+# ~~BLOCKING~~ — `sl_percent_options` invents a USER RULE. **CLOSED 2026-09-02.**
+
+> **FIXED, and the section is kept as the record of what was wrong.**
+> `threshold_resolution.py:554-555` now reads
+> `_slo = getattr(profile, "sl_percent_options", None)` and puts
+> `_slo if _slo else None` — an undeclared rule resolves to **None**, not to an
+> invented 50.0 at `Source.FACT`. A trader who configured nothing is no longer
+> told they configured something, and the fabricated band no longer pre-empts
+> the universal 40/60/80 ladder. `sl_percent_futures` was removed as a user
+> input the same day. **The 40/60/80 thresholds did not move** — but they are
+> still unsourced, which is Pattern 8's limitation 8.7 and the recount below.
+>
+> Everything from here to the end of this section is the original finding,
+> preserved because the *class* it names is not closed.
 
 **Raised during the exposure-hierarchy verification, blocking that
-implementation. Not fixed — it needs approval, and it is not an exposure
-threshold.**
+implementation. Not fixed at the time — it needed approval, and it is not an
+exposure threshold.**
 
 `threshold_resolution.py:527`:
 
@@ -1048,6 +1313,13 @@ Found while tracing that detector's consumers. **Neither belongs to A1** and
 neither was touched there — scope discipline, recorded for the consolidated
 pass instead.
 
+> **A third A1 finding is filed under Reviews 25-27, not here:** *"a whole
+> domain could never contribute — both `performance` detectors hardcode
+> `severity="info"` against a `>= danger` gate"*. It was stated in commit
+> `f46c25f`'s message and never filed at all until 2 Sep. It sits with §27
+> because its live consequence is `strategy_breakdown`'s unblock, not
+> `death_spiral`'s retirement.
+
 ### `portfolio_concentration` leftovers — PENDING DECISION (Pattern 28)
 
 Retired 2026-09-01, and its `_ALIAS_NATURE` entry went with the A1 retirement.
@@ -1078,6 +1350,140 @@ produced a `caution` death_spiral that wrote a RiskAlert row and pushed
 nothing. That is the documented INFO/EVIDENCE design and is **not** reopened
 here — noted only because it means "fired" and "was seen" differ by tier, which
 matters for any future firing-count comparison.
+
+# CROSS-CUTTING CLASSES — filed 2026-09-02
+
+Each of these was recorded once per pattern as if it were that pattern's
+problem. Counted across the sequence they are **classes**, and each closes in
+one job rather than N.
+
+## 1. Unsourced statistics — the count in this file was wrong
+
+The Pattern 20 entry says *"Three instances is a pattern, not three accidents"*
+and recommends a sweep. **The sweep is more load-bearing than that reads.**
+Measured against `backend/app/core/trading_defaults.py` on 2 Sep 2026:
+
+| line | claim | status |
+|---|---|---|
+| **133** | *"SEBI: traders who averaged down on losing options lost 3× more"* | **LIVE**, justifying `martingale_caution_multiplier` / `_danger_multiplier` |
+| 270 | **the identical sentence**, recorded as *removed* with `premium_avg_down_loss_pct` and called *"third instance of that class"* | **a deletion note 137 lines below a surviving copy of the same claim.** It was deleted in one place and left in another |
+| 61 | *"SEBI FY2023: traders with >6 trades/day had 94% loss probability"* | **LIVE** — Pattern 5's limitation 5.5 |
+| 84 | *"SEBI data: 73% of trades within 15 min of a loss are also losing trades"* | **LIVE** |
+| 105 | already self-documents as having **no source** | LIVE, flagged in place |
+| 220 | *"SEBI/NSE data: 38% of retail intraday traders … give back"* | orphaned — its threshold went with `profit_giveaway` |
+| 261 | *"SEBI FY2022: retail sold winning positions 2.7× faster"* | orphaned — already filed as Pattern 19's item 4 |
+
+Plus the **40 / 60 / 80** severe-loss ladder (Pattern 8, limitation 8.7), which
+is unsourced but explicitly out of scope of the exposure work.
+
+**So: at least four live claims attached to live thresholds, two orphaned
+comment blocks, and one claim that outlived its own deletion note.** Two of them
+— `expiry_day_overtrading`'s and the hot-hand claim — **were shipped to traders**
+before being caught, which is why this is not cosmetic.
+
+**The job:** one sweep of every comment in `trading_defaults.py` and
+`threshold_registry.py` that cites evidence, keeping only what a reader can
+produce. **Do not delete a threshold to remove its comment** — the number and
+its justification are separate questions, and three retirements turned on
+exactly that distinction.
+
+## 2. Declarations nothing checks — one contract test closes three instances
+
+Three separate reviews found a spec field that claims something no producer
+delivers, each recorded as that pattern's finding:
+
+| instance | what was declared | what existed |
+|---|---|---|
+| Pattern 18 | `early_exit_winner_max_min`, `Source.HISTORY`, `metric="winner_hold_p50"` | `baseline_service` emits `avg_winner_hold_min`. **`winner_hold_p50` is never produced anywhere** |
+| Pattern 19 | `winning_streak_overconfidence`, `uses_baseline=True` | it read no baseline at all — its "baseline" was an inline average over today's session. The field has **zero readers** |
+| Pattern 23 | `recovery_bet_caution_mul` / `_danger_mul` | exist only in `COLD_START_DEFAULTS` with an inline comment — no `Kind`, no provenance, no maturity. **Seventh known instance** of a missing or dead threshold declaration |
+
+Add Pattern 17's 40/75 ladder (above) and it is four.
+
+**The fix is one contract test over `THRESHOLD_SPECS`**, not four corrections:
+assert that every spec's `metric` is a key some producer actually emits, and
+that `uses_baseline` matches whether the detector reads one. The H1 key-name
+mismatch was this same class, found and fixed once — **it recurred because the
+declaration is unchecked.**
+
+## 3. The `analytics` disposition has no consumer contract
+
+Four detectors are `disposition="analytics"` — `rapid_reentry`,
+`premium_loss_event`, `win_rate_collapse`, `strategy_breakdown` — and **nothing
+states what that disposition entitles them to.** The register already holds the
+symptoms as three separate entries: `rapid_reentry` has no trader-facing reader
+(Pattern 13); `danger_zone`'s pattern-driven CAUTION path is unreachable
+(Pattern 19); the `performance` domain cannot produce a notifiable event
+(§27 above). They are one question asked three times.
+
+**What must be decided:** whether `analytics` means *"evidence written for a
+surface that will exist"* or *"evidence written for nothing"*, and if the
+latter, whether it should be written at all. The closed INFO/EVIDENCE rule does
+**not** depend on the answer — INFO events must not become alerts either way.
+
+**Related, smaller:** the four **aliases** (`daily_overtrading`, `overexposure`,
+`holding_loser`, `capital_mismatch`) carry no `DetectorSpec` of their own, and
+`daily_overtrading` still has **zero test mentions** despite being the emitted
+half of a detector that was changed in August.
+
+---
+
+# REGISTER HYGIENE — filed 2026-09-02
+
+Not findings about the engine; findings about the record of it.
+
+## `STATUS.md` is missing for eight LIVE detectors
+
+`docs/patterns/README.md` admits the convention lapsed after Pattern 11 and
+names **two**. Measured: no `STATUS.md` exists for **12** `no_stoploss`
+(MODIFIED), **13** `rapid_reentry` (KEEP), **17** `session_meltdown` (MODIFIED),
+**23** `post_loss_recovery_bet` (KEEP), **24** `constitution_violation` (KEEP,
+and the largest alert source in the engine), **26** `win_rate_collapse` (KEEP),
+**27** `strategy_breakdown` (DEFER), **28** `overexposure` + `holding_loser`.
+
+For the **retirements** the gap is harmless — a retired detector has no "what it
+does NOW", and its suite under `backend/tests/test_*_retired.py` records the
+reasoning. For these eight it is not, because **a review is written before the
+change and therefore describes the old behaviour.** Anyone reading
+`12-no_stoploss/no_stoploss_review.md` today reads a detector that no longer
+says what it says.
+
+## `backend/docs/patterns/` is a shadow tree
+
+Six empty directories — `05-overtrading`, `06-profit_giveaway`,
+`20-options_premium_avg_down`, `21-session_windows`,
+`24-constitution_violation`, `25-27-performance-trio` — untracked, zero files,
+created by measurement scripts run with `backend/` as the working directory.
+Harmless, and it already caused one misreading of the real folder as empty.
+Delete, and give the measurement scripts a repo-root-relative output path.
+
+---
+
+# Landing page — VERIFIED LIVE 2026-09-02. Truthfulness, not design.
+
+**Filed here because nothing else owns the verified state.**
+`docs/LANDING_PAGE_AUDIT.md` predates the retirements and lists these as
+marketing copy; two of them are now also **factually about detectors that do not
+exist**. The landing-page *design* is a separate, paused track — **these must go
+regardless of visual direction.**
+
+| line | text | why it must go |
+|---|---|---|
+| `Welcome.tsx:454` | *"₹4.8Cr+ — Estimated losses prevented"* | Fabricated (zero real users) **and a counterfactual**. The project rule is that behaviour→money is the **realized P&L of flagged trades**, never an estimated saving. This is the exact claim the rule bans |
+| `Welcome.tsx:390` | *"₹46,000 leaked per trader this year. Mostly to themselves."* | Unsourced per-trader figure. Same class as the `trading_defaults.py` recount above, shipped to the public |
+| `Welcome.tsx:96` | showcases **`Early Exit`** with *"Cut winner at ₹1,800. It ran ₹4,100 more. 7× this week."* | **RETIRED 30 Aug.** Sells a detector that no longer exists, with invented numbers |
+| `Welcome.tsx:119` | *"Meltdown Cascade — Loss streak + increasing position sizes = exponential, not arithmetic damage."* | This is `death_spiral`, **RETIRED 2 Sep**. Same problem, plus a mechanism claim the retirement measurement contradicts |
+| `Welcome.tsx:237` | *"P&L Impact −₹18,400"* | Invented per-pattern cost |
+| `Welcome.tsx:341, 354` | *"Circuit breaker prompts suggesting a cooldown period"* · *"Proven pattern disruption to stop cascade losses"* | Charter-banned blocker language against "mirror, not blocker", plus **"proven"** for something with no live outcome data |
+
+**Not confirmed:** a grep for testimonials returned nothing, so that audit P0
+may already be gone. Verify rather than assume.
+
+**Every retirement from here on should check this file**, because a retired
+detector on the landing page is a claim about a product feature that was
+withdrawn.
+
+---
 
 ## Closed on this pass — recorded so they are not re-raised
 
