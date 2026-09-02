@@ -1,0 +1,35 @@
+{
+  "_doc": [
+    "Exceptions to the trader-facing claim provenance guard.",
+    "",
+    "Read src/test/claimProvenance.test.ts for the contract. In short: a literal",
+    "that matches a claim marker must appear here with a category and a real",
+    "answer to 'where did this come from'.",
+    "",
+    "  DERIVED - computed from this trader's own data; source names the producer",
+    "  CITED   - external claim with a primary source; source is the citation",
+    "  FIXTURE - demo data mirroring a real API field; source names the field",
+    "  LEGAL   - regulatory or policy text",
+    "",
+    "There is no UNSOURCED category. If a claim has no provenance the fix is to",
+    "DELETE it, not to describe it here. This file starting nearly empty is the",
+    "point: the 2026-09-03 audit found 26 claims and zero sources, and every one",
+    "of them was removed rather than written down.",
+    "",
+    "literal_sha256 is the first 16 hex chars of sha256 over the extracted",
+    "literal. The test prints the hash of anything it rejects."
+  ],
+  "_empty": [
+    "It is empty, and that is the correct state.",
+    "",
+    "The first draft carried one LEGAL entry for the SEBI references in",
+    "PrivacyPolicy.tsx. Narrowing the SEBI markers to require an attribution",
+    "verb or a data noun removed the need for it: naming the regulator is not a",
+    "claim about what the regulator has measured. Eight legal-disclaimer hits",
+    "went with it. A marker that forces honest text into an allowlist is a",
+    "broken marker, and fixing the marker beats writing the exception down.",
+    "",
+    "Everything the guard found on the way in was DELETED, not allowlisted."
+  ],
+  "entries": []
+}

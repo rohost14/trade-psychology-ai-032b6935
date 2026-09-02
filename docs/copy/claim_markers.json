@@ -1,0 +1,144 @@
+{
+  "_doc": [
+    "Marker vocabulary for the trader-facing claim provenance guard.",
+    "",
+    "ONE file, TWO readers: src/test/claimProvenance.test.ts and",
+    "backend/tests/test_claim_provenance.py. It is not duplicated per lane on",
+    "purpose - a vocabulary copied into two places is the exact failure this",
+    "repo has already paid for once (pattern names drifting across four copies).",
+    "",
+    "WHAT THIS GUARDS. A trader-facing assertion about the world that cannot be",
+    "derived from that trader's own trades and carries no citable source. It is",
+    "NOT a ban on numbers: %, rupees, multipliers and trader-specific metrics are",
+    "the product's whole job. Every pattern below is a CLAIM SHAPE, and not one",
+    "of them matches a bare numeral. The claim that started this guard -",
+    "'Proven pattern disruption to stop cascade losses' - contains no digit at",
+    "all, and two manual audits searching for numbers walked straight past it.",
+    "",
+    "Patterns must parse in BOTH JavaScript RegExp and Python re: no lookbehind,",
+    "no named groups, no possessives. Matching is case-insensitive, against",
+    "STRING LITERALS ONLY, with comments stripped first (quoting a removed claim",
+    "in a comment is a repo idiom and must not fail the build)."
+  ],
+  "version": 1,
+
+  "marker_groups": {
+    "population": {
+      "why": "A claim about traders in general. The product observes ONE trader and has no population to speak for.",
+      "patterns": [
+        "% of (?:traders|retail|all|them|users|people)",
+        "\\bmost traders\\b",
+        "\\btraders lose\\b",
+        "\\bretail traders\\b",
+        "\\baverage trader\\b",
+        "\\bevery trader\\b",
+        "\\bmost (?:people|users) (?:lose|fail)\\b"
+      ]
+    },
+    "authority": {
+      "why": "Borrowed credibility. Every such claim audited on 2026-09-03 (26 of them) resolved to no source; the SEBI attributions were measurably wrong about what SEBI publishes. Note the SEBI patterns require an ATTRIBUTION verb or a data noun - naming the regulator is legitimate and constant in this product ('Not SEBI registered', 'SEBI (Investment Advisers) Regulations, 2013'). A bare \\bSEBI\\b marker returned eight legal-disclaimer hits and would have forced them into the allowlist, which is how a guard like this rots.",
+      "patterns": [
+        "\\bresearch (?:shows|says|proves)\\b",
+        "\\bstudies show\\b",
+        "\\bhistorical(?:ly)? data (?:shows|says|proves|suggests|indicates)\\b",
+        "\\bdata (?:shows|says|proves)\\b",
+        "\\bSEBI\\s*(?:data|study|studies|report|research|survey|FY\\d|says|found|shows|finds)",
+        "\\baccording to SEBI\\b",
+        "\\bproven\\b",
+        "\\bshown to (?:reduce|improve|increase|lower|raise|help|work|cause|prevent|beat)\\b",
+        "\\bscientifically\\b"
+      ]
+    },
+    "counterfactual_money": {
+      "why": "Already banned by the product's own rule: behaviour-to-money is the REALISED P&L of flagged trades, never a saving that cannot be observed. This makes the rule executable.",
+      "patterns": [
+        "\\bwould have saved\\b",
+        "\\bsaved you\\b",
+        "\\blosses prevented\\b",
+        "\\bprevented an estimated\\b",
+        "\\bestimated (?:loss|losses|saving|savings|cost)\\b",
+        "\\bmoney saved\\b"
+      ]
+    },
+    "multiplier_or_correlation": {
+      "why": "A ratio or association asserted as established fact. The '2.7x faster' on the Dashboard was attributed to SEBI, is actually Odean 1998 at ~1.5x, and pointed the OPPOSITE way to this book's own measurement.",
+      "patterns": [
+        "\\d+(?:\\.\\d+)?x more\\b",
+        "\\d+(?:\\.\\d+)?x (?:faster|slower|likely|higher|lower|worse|better)\\b",
+        "\\bcorrelates? with\\b",
+        "\\bcorrelated with\\b",
+        "\\bcost you \\d"
+      ]
+    },
+    "prediction": {
+      "why": "The charter is explicit: an alert converts an automatic action into a deliberate one, it does NOT predict. Note there is deliberately no /predict/ pattern - honest copy says 'TradeMentor does not predict your next trade'.",
+      "patterns": [
+        "\\bat this pace\\b",
+        "\\bwon't recover\\b",
+        "\\bwill (?:lose|blow|keep losing)\\b",
+        "\\bgets? worse from here\\b",
+        "\\byou'll be surprised\\b"
+      ]
+    }
+  },
+
+  "retired_detector_labels": {
+    "_why": [
+      "Marketing surfaces must not sell a detector that no longer exists. The",
+      "landing page was demonstrating `Early Exit` and `Meltdown Cascade` a day",
+      "after both were retired. Checked ONLY on the surfaces listed under",
+      "scope.frontend.marketing_surfaces - several of these labels are ordinary",
+      "English ('Holding a loser') and are legitimate anywhere a stored alert",
+      "row is rendered."
+    ],
+    "labels": [
+      "Consecutive Loss Streak",
+      "Profit Giveaway",
+      "Expiry-day activity",
+      "Size Escalation",
+      "Direction flip-flop",
+      "Panic Exit",
+      "Cooldown ignored",
+      "Early Exit",
+      "Overconfidence (Win Streak)",
+      "Premium Averaging Down",
+      "Opening 5-Min Trap",
+      "Time-of-day pattern",
+      "Excess Exposure",
+      "Concentrated exposure",
+      "Strategy underperforming",
+      "Multi-domain breakdown",
+      "Holding a loser",
+      "Position too large",
+      "Meltdown Cascade"
+    ]
+  },
+
+  "scope": {
+    "frontend": {
+      "roots": ["src"],
+      "extensions": [".ts", ".tsx"],
+      "exclude_contains": [
+        "/_archive/",
+        "/components/ui/",
+        "/test/"
+      ],
+      "_exclude_why": "_archive is already outside typecheck and eslint. components/ui is vendored shadcn. /test/ is this guard and its neighbours, which quote claims in order to assert on them.",
+      "marketing_surfaces": [
+        "src/pages/Welcome.tsx",
+        "src/pages/_lab/"
+      ]
+    },
+    "backend": {
+      "_why": "Not all of backend/app. A broad scan returned 31 hits of which 28 were docstrings, log lines and 'saved to history' - a guard at 10% precision gets muted. These are the modules that emit text a trader can actually read.",
+      "files": [
+        "app/services/detector_registry.py",
+        "app/services/ai_service.py",
+        "app/services/ai_personalization_service.py",
+        "app/api/personalization.py",
+        "app/services/whatsapp_service.py",
+        "app/services/push_notification_service.py"
+      ]
+    }
+  }
+}
