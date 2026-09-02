@@ -28,14 +28,25 @@ OBSERVABILITY LIMIT, stated first: the reference book has NO USER PROFILE, so
 the replay recorded "0 (rules off)". This detector cannot fire without declared
 rules.
 
-To measure it at all, rules must be supplied. NO VALUES ARE INVENTED HERE - the
-three profiles below are `constitution_service.generate_defaults`, the product's
-own onboarding matrix, so every number measured is one a real trader could have
-been given on day one:
+To measure it at all, rules must be supplied. NO VALUES ARE INVENTED HERE: the
+three profiles are read from `constitution_service.generate_defaults`, the
+product's own onboarding matrix, so every number measured is one a real trader
+could have been given on day one.
 
-    beginner      loss 2%    trades 5    cooldown 15   consec 3   risk 1.0%
-    intermediate  loss 2%    trades 10   cooldown 10   consec 4   risk 2.0%
-    experienced   loss 2.5%  trades 15   cooldown 5    consec 5   risk 2.5%
+CORRECTED 2026-09-02: the configuration is now DERIVED from
+`constitution_service.generate_defaults` at run time, not copied into this
+file. The copy went stale within a day of being written and produced a
+708-of-740 artifact — see the note above `PROFILES`.
+
+What generate_defaults actually SETS today:
+
+    beginner      trades 5    consec 3
+    intermediate  trades 10   consec 4
+    experienced   trades 15   consec 5
+
+and NOTHING ELSE. `daily_loss_limit`, `max_position_size` and
+`per_trade_loss_limit` all come back None — suggested at most, never applied,
+so the rules that read them cannot fire until the trader declares a value.
 
 Capital is unknown for this book, so it is swept rather than picked.
 """
@@ -56,23 +67,74 @@ from app.core.trading_defaults import COLD_START_DEFAULTS   # noqa: E402
 
 CV = engine._detect_constitution_violation
 
-MATRIX = {
-    "beginner":     dict(loss_pct=0.02,  max_trades=5,  cooldown=15, consec=3, risk_pct=1.0),
-    "intermediate": dict(loss_pct=0.02,  max_trades=10, cooldown=10, consec=4, risk_pct=2.0),
-    "experienced":  dict(loss_pct=0.025, max_trades=15, cooldown=5,  consec=5, risk_pct=2.5),
-}
+# ── CORRECTED 2026-09-02. The matrix that used to live here was STALE. ──────
+#
+# It hardcoded loss_pct / risk_pct / cooldown copied from
+# `constitution_service.generate_defaults` as that function stood when this
+# script was written (41d507d, 1 Sep) — and generate_defaults changed the SAME
+# DAY (c606cc3) to stop suggesting a `max_position_size` at all.
+#
+# The consequence was not academic. Measuring with a stale `risk_pct=2.0`
+# against Rs 50,000 of capital gives a Rs 1,000 per-trade cap, which one option
+# lot exceeds on contact: `max_trade_risk` "fired" on 708 of 740 rounds, 703 of
+# them critical, and that number was reported as engine behaviour. It was the
+# harness measuring a value the product does not give anyone.
+#
+# So the configuration is now DERIVED, never copied. If onboarding changes
+# again this script changes with it, and cannot silently disagree.
+
+PROFILES = ("beginner", "intermediate", "experienced")
 
 
-def thresholds_for(profile, capital):
-    m = MATRIX[profile]
+def onboarded_rules(profile, capital):
+    """
+    Exactly what `generate_defaults` SETS — nothing more.
+
+    The distinction this function exists to preserve: onboarding SUGGESTS some
+    numbers and SETS others. A suggested-but-unconfirmed rule DOES NOT EXIST —
+    it arrives as None and nothing is enforced until the trader writes a value
+    themselves. Measuring a suggestion as though it were a rule is precisely
+    the error that produced the 708/740 artifact.
+    """
+    from app.services.constitution_service import constitution_service
+    return constitution_service.generate_defaults(profile, capital)
+
+
+def thresholds_for(profile, capital, accept_suggestions=False):
+    """
+    `accept_suggestions=False` -> AS ONBOARDED. The honest default: only rules
+    the product actually sets. Money rules are None, so `max_trade_risk`,
+    `daily_loss` and `per_trade_loss` cannot fire, which is correct — the
+    trader has not declared them.
+
+    `accept_suggestions=True` -> the trader accepted every number the UI
+    offered. Today that is the daily loss limit only; NO max_position_size is
+    suggested, so `max_trade_risk` stays silent in BOTH modes. That is the
+    product's own decision (c606cc3), not an omission here.
+    """
+    d = onboarded_rules(profile, capital)
     th = dict(COLD_START_DEFAULTS)
-    th["daily_loss_limit"] = round(capital * m["loss_pct"])
-    th["user_daily_trade_limit"] = m["max_trades"]
-    th["max_consecutive_losses"] = m["consec"]
-    th["user_cooldown_min"] = m["cooldown"]
-    th["max_position_size"] = m["risk_pct"]
+
+    # Rules generate_defaults SETS.
+    th["user_daily_trade_limit"] = d["daily_trade_limit"]
+    th["max_consecutive_losses"] = d["max_consecutive_losses"]
+    th["restricted_windows"] = d["restricted_windows"]
+
+    # Money rules: None unless the trader declared them. Reproduced from the
+    # returned dict rather than assumed, so this stays true if it changes.
+    th["daily_loss_limit"] = d["daily_loss_limit"]
+    th["max_position_size"] = d["max_position_size"]
+    th["per_trade_loss_limit"] = d["per_trade_loss_limit"]
+
+    # `cooldown_after_loss` is not in generate_defaults at all — onboarding
+    # does not set one. It was in the old hardcoded matrix, which is another
+    # thing that matrix claimed and the product does not do.
+    th["user_cooldown_min"] = None
+
+    if accept_suggestions:
+        th["daily_loss_limit"] = d.get("suggested_daily_loss_limit")
+
     th["trading_capital"] = capital
-    th["restricted_windows"] = []       # onboarding sets none by default
     return th
 
 
@@ -102,7 +164,7 @@ def main():
     print("=" * 74)
     print("2. VOLUME PER RULE, per onboarding profile (capital Rs 50,000)")
     print("=" * 74)
-    for prof in MATRIX:
+    for prof in PROFILES:
         evs = run(sessions, prof, 50_000)
         by_rule = Counter(e.context["rule"] for _d, _c, e in evs)
         by_sev = Counter(e.severity for _d, _c, e in evs)
@@ -170,7 +232,7 @@ def main():
     print("\n" + "=" * 74)
     print("3. DO THE THREE RETIREMENTS' BEHAVIOURS ACTUALLY LAND HERE?")
     print("=" * 74)
-    for prof in MATRIX:
+    for prof in PROFILES:
         evs = run(sessions, prof, 50_000)
         r = Counter(e.context["rule"] for _d, _c, e in evs)
         print(f"  {prof:<13} consecutive-loss rule {r['max_consecutive_losses']:>4}   "

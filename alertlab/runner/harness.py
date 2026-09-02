@@ -496,16 +496,57 @@ async def ensure_lab_account(db, capital: float = 500_000, **profile_overrides) 
         select(UserProfile).where(UserProfile.broker_account_id == account_id())
     )).scalar_one_or_none()
 
+    # ── CORRECTED 2026-09-03. These were HARDCODED and went STALE. ──────────
+    #
+    # The block used to read:
+    #
+    #     daily_loss_limit=round(capital * 0.02),
+    #     daily_trade_limit=10,
+    #     max_position_size=2.0,
+    #     cooldown_after_loss=15,
+    #     max_consecutive_losses=3,
+    #
+    # copied from `constitution_service.generate_defaults` as it stood when
+    # this was written. That function changed on 1 Sep 2026 (c606cc3) to stop
+    # suggesting `max_position_size` at all, and it never returned a cooldown.
+    # The copy kept going.
+    #
+    # The cost was not academic. Every replay run against this account judged
+    # `max_trade_risk` against 2% of capital — Rs 10,000 here, Rs 1,000 at the
+    # Rs 50,000 reference-book capital — while one option lot needs several
+    # thousand of margin. The rule breached on contact, and a full-book replay
+    # reported 801 constitution alerts, 83% of them critical, as the engine's
+    # behaviour. It was the harness measuring a rule the product does not set.
+    # `p24_constitution.py` carried the identical defect and was corrected the
+    # day before; this is the same fix in the instrument every scenario uses.
+    #
+    # So the configuration is DERIVED, never copied. A SUGGESTED rule is not a
+    # SET rule: `generate_defaults` returns None for every money rule, and None
+    # means the trader has not declared it, so the rule does not fire.
+    #
+    # Scenarios that need a rule still state it — `profile_overrides` is
+    # unchanged and is now the ONLY way a money rule gets a value, which is
+    # what keeps measurement configuration distinguishable from product
+    # defaults.
+    from app.services.constitution_service import constitution_service
+
+    onboarded = constitution_service.generate_defaults("intermediate", capital)
+
     defaults = dict(
         trading_capital=capital,
         experience_level="intermediate",
         onboarding_completed=True,
-        daily_loss_limit=round(capital * 0.02),
-        daily_trade_limit=10,
-        max_position_size=2.0,
-        cooldown_after_loss=15,
-        max_consecutive_losses=3,
-        restricted_windows=[],
+        # Rules the product SETS at onboarding.
+        daily_trade_limit=onboarded["daily_trade_limit"],
+        max_consecutive_losses=onboarded["max_consecutive_losses"],
+        restricted_windows=onboarded["restricted_windows"],
+        # Money rules. None unless a scenario declares one — read from the
+        # returned dict rather than assumed, so this follows the product.
+        daily_loss_limit=onboarded["daily_loss_limit"],
+        max_position_size=onboarded["max_position_size"],
+        per_trade_loss_limit=onboarded["per_trade_loss_limit"],
+        # `generate_defaults` does not return a cooldown; onboarding sets none.
+        cooldown_after_loss=None,
     )
     defaults.update(profile_overrides)
 
