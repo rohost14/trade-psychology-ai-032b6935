@@ -13,6 +13,12 @@ counts. **Stale entries are struck through and kept, never deleted** — a
 register that quietly drops what it got wrong cannot be trusted about what it
 still holds.
 
+**Fourth pass 2 Sep 2026, after `3f9f529`:** F7 **CLOSED** — at the cause, by
+no longer persisting unrecognised clusters as structures. That establishes a
+standing invariant (below) and makes `martingale_behaviour` a
+structure-level detector inside a recognised structure. The historical
+replay for it is **deferred as expensive, not blocked**.
+
 **Third pass 2 Sep 2026, after `c107300`:** F6 and F20 are **CLOSED** — see
 their entries. B1 closes with them. One new item was opened by the work:
 `is_spread` is a second presence-only suppression that F6 did not reach.
@@ -59,6 +65,60 @@ backlog, and nothing here is copied from another file.
 calibration in this register rests on **one trader's tradebook**. A second book
 from someone who trades differently is worth more than another year from the
 same person.
+
+---
+
+## STANDING INVARIANT — a persisted StrategyGroup means a RECOGNISED strategy
+
+**Established 2026-09-02 (`3f9f529`). Several things depend on it, so it is
+stated once, here, rather than re-derived.**
+
+> `detect_and_save` does not persist a `StrategyGroup` for a cluster it cannot
+> name. Proximity on one underlying is a CANDIDATE, not a strategy. Therefore
+> `ctx.strategy_group is not None` implies the structure is recognised.
+
+A multi-leg structure is legs of **different kinds placed together** — a call
+and a put, or a buy and a sell of one kind at different strikes. Two calls
+bought a minute apart are not that; they are two directional trades, and the
+second being near the first is the behaviour rather than an excuse for it. That
+shape was **70% of all UNKNOWN groups** on the reference book.
+
+`MULTI_LEG_UNKNOWN` is unchanged as a *classification* — `classify_legs` still
+returns it, and it still means "these legs are one decision and we cannot name
+the strategy". What changed is that we no longer write a row asserting the
+cluster was a structure.
+
+**What rests on this invariant, and would silently regress without it:**
+
+| | |
+|---|---|
+| `_structure_suppresses` | only a recognised structure may silence a detector (F6) |
+| `is_spread` → `risk_basis` | three presence-only call sites that are correct *because* presence now implies recognition (F7) |
+| `session_meltdown` | no longer excuses a losing leg by netting it against an unrelated trade |
+| `count_structures` | already refused to collapse unrecognised clusters — the two grouping paths now agree, where they previously held opposite conservatism |
+
+**Anyone reintroducing persistence of unrecognised groups must revisit all
+four.**
+
+---
+
+## DEFERRED VALIDATION — the Q2 replay, expensive not blocking
+
+**Not a code blocker.** Removing unrecognised groups un-blocks `is_spread` for
+those trades, so `martingale_behaviour` and `adding_to_adverse_position` can now
+fire where they previously abstained. The size of that on the reference book is
+**not measured**.
+
+- The semantic change is covered by `test_strategy_suppression.py` and
+  `test_structure_martingale.py`.
+- Baselines are banked for whenever a full historical validation is worth its
+  cost: **197 alerts** (blanket suppression) and **201** (F6 scoped), same book,
+  same rules, same harness.
+- One run is ~2 h. Deferred **because it is expensive, not because anything is
+  unfinished.**
+
+Run it when there is an independent reason to do a full historical pass, and
+diff against 201.
 
 ---
 
@@ -295,10 +355,26 @@ architecture contract**.
 
 ---
 
-### `is_spread` is a second presence-only suppression — OPEN, found closing F6
+### ~~F7 — `is_spread` is a second presence-only suppression~~ — **CLOSED 2026-09-02 (`3f9f529`)**
+
+> **CLOSED at the CAUSE, not at the predicate.** The semantic problem is gone
+> because the input that produced it is gone: `detect_and_save` no longer
+> persists a `StrategyGroup` for an unrecognised cluster, so `strategy_group`
+> can only be non-None for a RECOGNISED structure — and a presence test on a
+> field that can only hold recognised structures is a recognition test.
+>
+> `martingale_behaviour` was the one detector that abstained outright, and it
+> no longer reaches this path inside a structure at all: it compares STRUCTURE
+> DEPLOYMENT against the last comparable structure instead. See the
+> structure-level entry below.
+>
+> **The three `is_spread` call sites were deliberately NOT changed.** Altering
+> them would change what `revenge_trade` and `adding_to_adverse_position`
+> MEASURE, which is detector semantics, and there is no defect left to justify
+> it. Future-hardening is not a reason to move a live denominator.
 
 **Found 2026-09-02 while verifying F6, and it is why `martingale_behaviour` did
-not move in the ON/OFF replay.**
+not move in the ON/OFF replay. The finding is kept below as the record.**
 
 F6 fixed the *notification* suppression. A **second, independent** mechanism
 reads the same field the same way:
@@ -331,9 +407,22 @@ changes what a detector measures, which is detector semantics and was out of
 scope. `post_loss_recovery_bet` has no such path — its zero in the replay is
 genuine.
 
-**What must be decided:** whether a spread's denominator is incomparable
-because the legs are *grouped*, or because the structure is *recognised* — the
-same question F6 just answered for suppression, asked about risk basis.
+**What had to be decided:** whether a spread's denominator is incomparable
+because the legs are *grouped*, or because the structure is *recognised*.
+**Answered by removing the difference**: under the new invariant the two are
+the same set, so the question no longer has two answers.
+
+### Documented future-hardening — NOT an active blocker
+
+The predicate still *reads* `is not None` rather than "is recognised". It is
+functionally correct today only because of the invariant above. If a later
+change ever persists an unrecognised group again, the old behaviour returns
+silently and nothing fails.
+
+**This is recorded, not scheduled.** It is a latent coupling between two files,
+not a defect: there is no input today that makes it wrong. Anyone reintroducing
+persistence of unrecognised groups must revisit these three call sites — which
+is what this paragraph exists to tell them.
 
 ---
 
@@ -1658,6 +1747,44 @@ over the whole reference book.
 | **B1** — futures hedge asserted without the option leg's direction | **CLOSED 2026-09-02.** The label was corrected in `5844381`; the downstream half — `MULTI_LEG_UNKNOWN` earning a recognised structure's silence — was closed by F6 in `c107300`. A risk-adding FUT + short-option pair now both loses the hedge label **and** earns no suppression. |
 | **B2** — `IRON_BUTTERFLY` unreachable, and the label only ever wrong | **CLOSED.** The branch sat below a condor test that every real butterfly also satisfies, so it never ran; the only shape that could reach it was four legs in one direction, which is not a butterfly. Butterfly and condor are now decided together by one ordering test, body width separating them. A real butterfly is named one; malformed and single-direction shapes cannot reach the label. |
 | **B3** — `iron_condor` was a catch-all, not a classification | **CLOSED.** It tested leg count and mixed direction only, so any four mixed-direction CE/PE legs matched — including the **inverted** structure whose risk runs the other way. It now requires 2 calls, 2 puts, four distinct strikes and both shorts strictly inside both longs. Everything else falls safely to `MULTI_LEG_UNKNOWN`. |
+
+## Closed 2026-09-02 — structure-level martingale (`3f9f529`)
+
+`martingale_behaviour` left `_STRATEGY_SUPPRESSED`, which is now
+`rapid_reentry` and `post_loss_recovery_bet`. **F6's rule is unchanged** —
+suppress only where the detector's subject cannot exist inside the structure.
+Martingale left because its subject **changed**, not because the rule did:
+
+| claim | exists inside a straddle? |
+|---|---|
+| leg-level — "leg 2 is 2x leg 1" | **no**, the legs are one construction |
+| structure-level — "this straddle is 2x your last straddle" | **yes**, the structure is the unit being escalated |
+
+Keeping it suppressed would have made the new branch unreachable — dead on
+arrival — which is what forced the question.
+
+**Comparable is strict:** same underlying, same expiry, same recognised
+strategy type, most recent first. **Deployment is the NET DEBIT paid**, so a
+debit spread nets rather than summing its legs gross. Credit structures,
+futures hedges and calendars **abstain** — what they commit is margin, and
+broker margin is still not captured (the same limitation that governs
+`overexposure`). No new strategy types, no threshold change: 1.5×/2.0× and the
+run-of-losses precondition are the existing ones.
+
+`post_loss_recovery_bet` stays suppressed and leg-level, because nobody asked
+for structure-level sizing there and its original justification still holds.
+**The asymmetry is deliberate**, and it is recorded so it is not read as an
+oversight.
+
+> **SHIPS CORRECT BY CONSTRUCTION AND EMPIRICALLY UNVALIDATED.** The reference
+> book holds **11 recognised structures across 203 sessions** — 8 strangles, 1
+> straddle, 1 bull call spread, 1 futures hedge — so two *comparable*
+> structures in sequence after a run of losses occurs approximately never in
+> it. **No replay on this book can validate this branch**; it needs a trader
+> who repeats structures. Hence 25 deterministic synthetic tests and this
+> paragraph instead of a claim.
+
+---
 
 **Standing caveat on B1 and B3:** every case needing a short leg is exercised
 only by synthetic tests. Exactly one symbol in the reference book ever goes net
