@@ -178,6 +178,19 @@ def test_no_shipping_module_uses_a_severity_value_outside_the_vocabulary():
 #: against these is dead code that looks alive.
 RETIRED_PATTERN_NAMES = (
     "revenge_sizing",
+    # Retired 2026-09-02: a snapshot plus a stopwatch. Its predicate never
+    # observed the loss CHANGING, and the winner/loser hold substitute failed
+    # the persistence test - ratio 0.62 in the first half of the book against
+    # 2.54 in the second, intraday 1.04 at shuffle p = 0.343, median 0.98. Not
+    # replaced: no MTM capture, and the hold comparison was not promoted to
+    # analytics because it fails the same test.
+    "holding_loser",
+    # Retired 2026-09-02, and NOT on evidence about the behaviour - the alias
+    # was already dead. `_overexposure_task` emits constitution_violation with
+    # rule max_trade_risk, gates on the DECLARED limit and abstains without a
+    # capital requirement. The entry-time check is untouched; only the name is
+    # retired.
+    "overexposure",
     # Retired 2026-09-02 (Reviews 25-27 follow-up): it required a win-rate
     # collapse AND a profit-factor collapse together, and the profit-factor
     # half never bound - 4 firings, the IDENTICAL set to `win_rate_collapse`,

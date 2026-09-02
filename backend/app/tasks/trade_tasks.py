@@ -719,7 +719,6 @@ def process_webhook_trade(self, trade_data: Dict[str, Any], broker_account_id: s
                 # These are fire-and-forget — failures don't retry the trade task.
                 try:
                     from app.tasks.position_monitor_tasks import (
-                        check_holding_loser_scheduled,
                         flush_entry_batch,
                         _overexposure_task,
                         _entry_rules_task,
@@ -799,15 +798,12 @@ def process_webhook_trade(self, trade_data: Dict[str, Any], broker_account_id: s
                     # shorts never had the chain start at all.
                     # SETNX chain key so multiple fills don't spawn parallel
                     # chains — only one chain active per account.
-                    if _fill_entry_type in _POSITION_OPENING_FILLS:
-                        chain_key = f"holding_loser_chain:{broker_account_id}"
-                        if redis_client and redis_client.set(
-                            chain_key, 0, ex=1900, nx=True
-                        ):
-                            check_holding_loser_scheduled.apply_async(
-                                args=[broker_account_id, 0],
-                                countdown=1800,  # 30 minutes
-                            )
+                    # The `holding_loser` chain was started here until
+                    # 2026-09-02. The detector is retired: its predicate was a
+                    # snapshot plus a stopwatch, and the winner/loser hold
+                    # substitute failed the persistence test (ratio 0.62 in the
+                    # first half of the book, 2.54 in the second). Nothing
+                    # replaced it, so nothing is scheduled here.
                 except Exception as _pm_e:
                     logger.debug(f"Position monitor trigger skipped: {_pm_e}")
 

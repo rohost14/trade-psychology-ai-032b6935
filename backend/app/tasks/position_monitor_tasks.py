@@ -10,7 +10,7 @@ Tasks are triggered by trade fills, not a recurring beat:
 
   check_holding_loser_scheduled(account_id, check_number)
       Scheduled 30 min after a BUY fill that opens/increases a position.
-      Self-reschedules up to MAX_HOLDING_LOSER_CHECKS (= 4 hours of coverage).
+      RETIRED 2026-09-02 with `holding_loser`.
       Stops automatically when the position closes (no open positions found).
 
 The legacy monitor_open_positions beat task is kept in this file for
@@ -41,8 +41,10 @@ def _get_redis():
     return get_sync_redis()
 
 # How long (minutes) a losing position must be held before alerting
-HOLDING_LOSER_MIN_DURATION = 30   # 30 minutes of holding a loss
-HOLDING_LOSER_MIN_LOSS_PCT = 0.5  # Position down at least 0.5%
+# `HOLDING_LOSER_MIN_DURATION` (30) and `HOLDING_LOSER_MIN_LOSS_PCT` (0.5) were
+# removed 2026-09-02 with the detector. Neither was replaced: the retirement was
+# not that the numbers were wrong, but that a duration plus a snapshot cannot
+# establish the behaviour they were gating.
 
 # Size increase threshold for averaging-down detection
 AVERAGING_DOWN_SIZE_INCREASE_PCT = 50   # 50%+ size increase on a loser
@@ -158,182 +160,39 @@ async def _monitor_account(broker_account_id: UUID, db) -> int:
 
 
 async def _check_position(position, thresholds: dict, db) -> List[dict]:
-    """Check a single open position for behavioral patterns."""
-    events = []
-    symbol = position.tradingsymbol
-    qty = position.total_quantity or 0
-    avg_entry = float(position.average_entry_price or 0)
-    instrument_token = position.instrument_token
-
-    # Get current price from Redis LTP cache (set by KiteTicker)
-    current_price = get_cached_ltp(instrument_token) if instrument_token else None
-
-    if current_price is None or avg_entry <= 0:
-        # No live price available — KiteTicker not connected or instrument_token missing
-        # Skip without logging (common when API key not configured)
-        return events
-
-    # Calculate unrealized P&L
-    is_long = qty > 0
-    if is_long:
-        unrealized_pnl = (current_price - avg_entry) * abs(qty)
-        pnl_pct = (current_price - avg_entry) / avg_entry * 100
-    else:
-        unrealized_pnl = (avg_entry - current_price) * abs(qty)
-        pnl_pct = (avg_entry - current_price) / avg_entry * 100
-
-    # ── Holding loser ──────────────────────────────────────────────────
-    if unrealized_pnl < 0 and abs(pnl_pct) >= HOLDING_LOSER_MIN_LOSS_PCT:
-        # Check how long position has been open
-        if position.last_entry_time:
-            hold_min = (
-                datetime.now(timezone.utc) - position.last_entry_time
-            ).total_seconds() / 60
-            if hold_min >= HOLDING_LOSER_MIN_DURATION:
-                events.append({
-                    "pattern": "holding_loser",
-                    "symbol": symbol,
-                    "message": (
-                        f"{symbol}: down {abs(pnl_pct):.1f}% for {hold_min:.0f}min. "
-                        f"Unrealized loss: ₹{abs(unrealized_pnl):,.0f}"
-                    ),
-                    "context": {
-                        "symbol": symbol,
-                        "unrealized_pnl": round(unrealized_pnl),
-                        "pnl_pct": round(pnl_pct, 2),
-                        "hold_minutes": round(hold_min),
-                    }
-                })
-
-    # An overexposure block sat here until 2026-09-01, in the legacy
-    # `monitor_open_positions` beat that is no longer registered. It computed
-    # `current_price * abs(qty)` with NO contract multiplier and NO abstention -
-    # the exact defect F17 fixed in `_exposure_value`, whose docstring records
-    # it: "GOLDM is one lot of 100 grams quoted per 10 grams, so one lot at
-    # 155,999 is 15,59,990 of exposure and not 1,55,999 - a tenfold
-    # understatement." It also invented a 10% limit and had no severity ladder.
-    #
-    # Removed with the exposure rework rather than fixed: a second, divergent
-    # implementation of a pattern name is how the two threshold resolvers
-    # drifted, and exposure is now the trader's declared rule alone.
-
-    return events
-
-
-# ---------------------------------------------------------------------------
-# Event-driven tasks (triggered by trade fills, not a beat schedule)
-# ---------------------------------------------------------------------------
-
-# How many 30-min cycles to reschedule after a BUY fill (= 4 hours coverage)
-MAX_HOLDING_LOSER_CHECKS = 8
-
-
-@celery_app.task(name="app.tasks.position_monitor_tasks.check_holding_loser_scheduled")
-def check_holding_loser_scheduled(broker_account_id: str, check_number: int = 0):
     """
-    Deferred holding-loser check.  Scheduled 30 min after a BUY fill
-    (open or increase).  Self-reschedules up to MAX_HOLDING_LOSER_CHECKS
-    if the position is still open.  Stops automatically on position close.
+    Check a single open position for behavioural patterns. **Produces nothing.**
+
+    `holding_loser` was its last remaining check and was retired 2026-09-02 —
+    see the note below. Everything else this function used to do was moved or
+    retired earlier: `overexposure` to the entry path (`_overexposure_task`),
+    `portfolio_concentration` retired 2026-09-01.
+
+    Kept as an empty seam rather than deleted, because its only caller is
+    `monitor_open_positions` — a LEGACY BEAT THAT IS NO LONGER REGISTERED and
+    is deliberately retained in this file for reference. Deleting a live-looking
+    task from an unregistered path is a wider change than this retirement, and
+    an empty list is honest about what it now returns.
     """
-    import asyncio
-    return asyncio.run(
-        _holding_loser_task(broker_account_id, check_number)
-    )
+    return []
 
 
-async def _holding_loser_task(broker_account_id: str, check_number: int) -> dict:
-    now_ist = datetime.now(IST)
-    from datetime import time as dtime
-    if now_ist.weekday() >= 5 or not (dtime(9, 15) <= now_ist.time() <= dtime(15, 25)):
-        return {"skipped": "outside_market_hours"}
+# ── `holding_loser` scheduled chain — REMOVED 2026-09-02 ────────────────────
+#
+# `MAX_HOLDING_LOSER` checks, `check_holding_loser_scheduled` and
+# `_holding_loser_task` went with the detector. They existed only to re-check a
+# predicate that is retired: a Celery chain re-running every 30 minutes, up to
+# 8 times, to ask whether a position was still down — which is a stopwatch, not
+# an observation of the loss changing.
+#
+# The Redis chain key `holding_loser_chain:{account}` is still deleted by
+# `api/account_data.py` on account erasure. Harmless, and left alone: deleting
+# a key that is no longer written costs nothing and removing it would touch a
+# data-rights path for no reason.
+#
+# See the retirement note in `_position_events` above for the evidence.
 
-    from app.models.position import Position
-    from app.models.user_profile import UserProfile
-    from app.core.trading_defaults import get_thresholds
-    from sqlalchemy import select, and_
 
-    async with SessionLocal() as db:
-        pos_result = await db.execute(
-            select(Position).where(
-                and_(
-                    Position.broker_account_id == UUID(broker_account_id),
-                    Position.total_quantity != 0,
-                )
-            )
-        )
-        open_positions = pos_result.scalars().all()
-
-        if not open_positions:
-            # Chain ends — no open positions, release the chain key
-            _get_redis().delete(f"holding_loser_chain:{broker_account_id}")
-            return {"skipped": "no_open_positions", "check_number": check_number}
-
-        # A UserProfile query and a get_thresholds() call stood here until
-        # 2026-08-24. Neither result was ever read - holding_loser uses the
-        # module constants below, not the ladder - so this was one wasted DB
-        # round-trip per holding-loser check. Removed, not rewired: whether
-        # this pattern SHOULD read the ladder is a pattern-review question.
-
-    alerts_fired = 0
-    for pos in open_positions:
-        current_price = get_cached_ltp(pos.instrument_token) if pos.instrument_token else None
-        if current_price is None:
-            continue
-        avg_entry = float(pos.average_entry_price or 0)
-        qty = pos.total_quantity or 0
-        if avg_entry <= 0 or qty == 0:
-            continue
-
-        is_long = qty > 0
-        pnl_pct = ((current_price - avg_entry) / avg_entry * 100) if is_long \
-            else ((avg_entry - current_price) / avg_entry * 100)
-        unrealized_pnl = ((current_price - avg_entry) * abs(qty)) if is_long \
-            else ((avg_entry - current_price) * abs(qty))
-
-        if unrealized_pnl < 0 and abs(pnl_pct) >= HOLDING_LOSER_MIN_LOSS_PCT and pos.last_entry_time:
-            hold_min = (
-                datetime.now(timezone.utc) - pos.last_entry_time
-            ).total_seconds() / 60
-            if hold_min >= HOLDING_LOSER_MIN_DURATION:
-                async with SessionLocal() as alert_db:
-                    fired = await _fire_position_alert(
-                        broker_account_id=broker_account_id,
-                        pattern_type="holding_loser",
-                        severity="caution",
-                        message=(
-                            f"{pos.tradingsymbol}: down {abs(pnl_pct):.1f}% "
-                            f"for {hold_min:.0f}min. "
-                            f"Unrealized loss: ₹{abs(unrealized_pnl):,.0f}"
-                        ),
-                        details={
-                            "symbol": pos.tradingsymbol,
-                            "pnl_pct": round(pnl_pct, 2),
-                            "hold_minutes": round(hold_min),
-                            "unrealized_pnl": round(unrealized_pnl),
-                        },
-                        db=alert_db,
-                    )
-                    if fired:
-                        alerts_fired += 1
-
-    # Reschedule if still under the cap; renew the chain key TTL
-    if check_number < MAX_HOLDING_LOSER_CHECKS:
-        _get_redis().set(
-            f"holding_loser_chain:{broker_account_id}", check_number + 1, ex=1900
-        )
-        check_holding_loser_scheduled.apply_async(
-            args=[broker_account_id, check_number + 1],
-            countdown=1800,  # 30 minutes
-        )
-    else:
-        # Hit the cap — release chain key so a new fill can start a fresh chain
-        _get_redis().delete(f"holding_loser_chain:{broker_account_id}")
-
-    return {
-        "check_number": check_number,
-        "positions_checked": len(open_positions),
-        "alerts_fired": alerts_fired,
-    }
 
 
 def _exposure_value(tradingsymbol: str, exchange: str, price: float,

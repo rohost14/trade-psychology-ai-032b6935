@@ -122,23 +122,36 @@ diff against 201.
 
 ---
 
-## OPEN DETECTOR QUEUE — 6 open, 1 retired 2026-09-02
+## DETECTOR QUEUE — **CLOSED 2026-09-02. ZERO OPEN ITEMS.**
 
-**The pattern review sequence is COMPLETE.** Every pattern has a verdict; there
-is no next review. What remains is open on a **data gap or a decision**, not on
-time — so starting one means reviewing a detector whose evidence is already
-known to be missing. Verified against `detector_registry` on 2 Sep 2026:
-**15 detectors, 19 pattern types, 4 aliases.**
+Every detector reviewed has a final disposition. **Nothing here is DEFERRED,
+BLOCKED, RESEARCH FURTHER or NEEDS DECISION.** Where an item genuinely depends
+on something external, it is recorded below as a **closed data dependency** —
+not as an open detector task.
 
-| # | detector | state | the exact unblock |
-|---|---|---|---|
-| Q1 | `overtrading_burst` | **DEFERRED** | more book. 12 alerts / 10 sessions and it **never fired alone**; n cannot move a threshold in either direction, and being rare is not a reason to delete something |
-| Q2 | `end_of_session_mis_panic` | **DEFERRED — insufficient live evidence** | **CORRECTED 2026-09-02: the blocker is NOT missing product data.** `CompletedTrade.product` exists and is populated on both write paths; the reference CSV lacking it was never a production gap. What is missing is live sessions. See the corrected entry under PENDING VALIDATION |
-| ~~Q3~~ | ~~`strategy_breakdown`~~ | **RETIRED 2026-09-02 (`pending`)** | Closed by examining the unblock condition instead of waiting for it: the profit-factor half **never bound** — identical firing set to `win_rate_collapse`, zero unique. A second name for one finding. See the closure below |
-| Q4 | `revenge_trade` | **FROZEN by decision** | new data only. No new threshold, no episode rule, no score, no replacement, no global confidence gate. `docs/research/REVENGE_FINAL_EVIDENCE_REVIEW.md` |
-| Q5 | `holding_loser` | **RESEARCH FURTHER** | duration is measurable; the predicate is not. `28-position-monitor/review.md` |
-| Q6 | `overexposure` | **MODIFY, blocked** | live broker-margin validation (below). Its quantity is wrong on arithmetic — 100% of futures — not on the price substitution |
-| Q7 | `capital_mismatch` | **housekeeping, routed here** | excluded from the review group by decision: it never reads a position, trade, order, fill or P&L. It is a **precondition for the exposure detectors' correctness** — they divide by `trading_capital` and it asks whether that denominator is real. Pinned by `test_f21_capital_mismatch_is_excluded_from_death_spiral_on_purpose` |
+| detector | final status | reason |
+|---|---|---|
+| `overtrading_burst` | **CLOSED / KEEP AS-IS** | Its subject is a mechanically checkable fact, its threshold is the trader's own p75, and **its gate withholds**: 22 of 198 sessions contain a qualifying 30-min window and only 10 alerted — it declined on 12. It counts structures, not legs. Never fires alone, which is not disqualifying (`post_loss_recovery_bet` was kept on the same reasoning). Nothing was pending except more data, and no threshold was ever proposed to move |
+| `end_of_session_mis_panic` | **CLOSED / KEEP AS-IS — closed data dependency** | The blocker was never missing product data; that was a property of the Console CSV. `CompletedTrade.product` exists, both writers set it, ingestion rejects anything outside {MIS, NRML, MTF}, 100% populated. **No code change is justified by any evidence we hold**, so the detector stands as written. What remains is a live-session validation dependency, recorded under PENDING VALIDATION — it does not return to this queue |
+| `revenge_trade` | **FROZEN** | By decision. Not inspected, not modified. |
+| `holding_loser` | **RETIRED** | A snapshot plus a stopwatch — nothing in it observed the loss changing. The hold-duration substitute failed the persistence test: 0.62 first half vs 2.54 second, intraday 1.04 at p = 0.343, median 0.98. Not replaced |
+| `overexposure` | **RETIRED (name only)** | The alias was already dead — `_overexposure_task` emits `constitution_violation`/`max_trade_risk`, gates on the declared limit and abstains without a capital requirement. **The entry-time check is untouched and still runs** |
+| `capital_mismatch` | **CLOSED / KEEP AS-IS — not a behaviour detector** | Traced end to end: it never reads a position, trade, order, fill or P&L. It compares declared `trading_capital` against the latest `MarginSnapshot` on a real beat and nudges. It stays in the alert vocabulary because it writes `risk_alerts.pattern_type`, and it is **removed from the detector queue** because it was never a detector. No behavioural meaning was manufactured for it |
+
+**Counts after this pass: 14 detectors · 16 pattern types · 2 aliases**
+(`daily_overtrading`, `capital_mismatch`).
+
+### The one remaining external dependency, stated as closed
+
+`end_of_session_mis_panic` needs live sessions to answer four questions its
+review already recorded — is the danger tier reachable (0 sessions reached 3+
+late entries in 175, even under the inflating all-MIS assumption); does the
+effect survive (n = 13, p = 0.185); and the copy that says *"the exit is not
+yours to choose"* when **9 of 13 were closed by the trader**, median late hold
+2 minutes.
+
+**That is a data dependency, not an engineering task.** Nobody should open a
+branch for it. When live sessions exist, it is a measurement.
 
 ---
 
@@ -296,19 +309,34 @@ measured before, not after.
 
 ---
 
-### F12 — `duration_minutes` has two meanings in one column
+### ~~F12~~ — **CLOSED / FIXED 2026-09-02** — `duration_minutes` had two meanings
 
 The live ledger writes wall-clock minutes; the batch FIFO writes
 `market_minutes`. An overnight hold is ~1,440 from one writer and ~375 from the
 other, and a recompute can overwrite the value written by the first.
 
-**What must be decided:** the canonical meaning of `duration_minutes` — wall
-clock or market minutes — and then whether existing rows are migrated or the
-column is split in two.
-
-**Why not now:** every hold-time gate in the engine divides by this. Choosing
-market minutes is defensible and choosing wall clock is defensible; picking one
-without deciding is how the column came to hold both in the first place.
+> **FIXED. `market_minutes` is canonical, and that was not a preference —
+> three independent things already said so:**
+>
+> * the batch FIFO writer (`pnl_calculator.py:544`) used it;
+> * the admin backfill (`api/admin/tasks.py:184`) recomputes with it and counts
+>   anything else as needing correction;
+> * `market_hours.market_minutes`' own docstring states the intent — *"a 4-day
+>   NRML hold reports ~1,500 minutes (actual exposure) not ~5,760 minutes
+>   (wall-clock)"*.
+>
+> Only the live ledger disagreed, so the live ledger was the defect.
+> `position_ledger_service.py` now calls `market_minutes`, falling back to
+> wall-clock only if the calendar lookup raises — a CompletedTrade is never
+> lost over a holiday table.
+>
+> **Blast radius is smaller than it reads:** inside one session the two agree,
+> so intraday rounds are unchanged. Only overnight and multi-day holds move,
+> and they move to the number every other consumer already assumed.
+>
+> No migration was run. `POST /admin/tasks/backfill-duration-minutes` already
+> exists for that and is the right tool if historical rows need correcting —
+> it is a decision about existing data, not part of this fix.
 
 ---
 
@@ -651,7 +679,7 @@ of that change, not reasons to revisit it.
 | # | limitation | why it is still open |
 |---|---|---|
 | 5.1 | **Three surfaces read the declared daily trade limit** — `constitution_violation` (exit, engine), `position_monitor_tasks:1431` (entry, fires `constitution_violation` with rule `daily_trade_limit`), and now `daily_overtrading` | **No consolidation family covers them.** Two detectors now say the same sentence about the same declared number and the existing suppression picks the constitution one. This is the family decision arriving early; nothing in the Pattern 5 change pre-empted it |
-| 5.2 | **They do not count the same way.** `constitution_violation` counts **legs** (`len(ctx.session_trades) + 1`); `daily_overtrading` counts **structures** (`count_structures`) | Identical on this book — it collapses only **8 legs of 912** — but they **will disagree for a multi-leg trader against the same declared number**. The book cannot show the disagreement, which is why it was recorded rather than fixed |
+| ~~5.2~~ | ~~They do not count the same way~~ **CLOSED / FIXED 2026-09-02** | It was a genuine bug: ONE number the trader declared, TWO answers from the same engine — a trader putting on two iron condors was *8 of 10* to `constitution_violation` and *2 of 10* to `daily_overtrading`. A CompletedTrade is per tradingsymbol, so counting rows counts LEGS, and the trader declared DECISIONS. The constitution rule now uses `count_structures` too. Safe under the standing invariant: only recognised structures are grouped, so nothing collapses that should not. On this book the count moves 1,147 → 1,137, i.e. it fires very slightly LESS |
 | 5.3 | `daily_trade_danger = 12` still exists in `trading_defaults.py` and is still resolved | It has **no detector reader** now. Not removed on purpose: `api/constitution.py` and `api/behavioral.py` surface it |
 | 5.4 | `daily_trade_limit` (p75-derived) still exists and is still resolved | Read by `/api/risk`, `/api/behavioral`, the Rules page and `rule_suggestion_service`. Only the **alerting** path stopped using it |
 | 5.5 | **The SEBI attribution is unsourced** — `daily_trade_limit 7 SEBI FY2023 (>6/day → 94% loss probability)` | **No source document for it exists in the repo.** Out of scope for that change; still wrong to leave. See the cross-cutting recount below |
@@ -1674,7 +1702,29 @@ produce. **Do not delete a threshold to remove its comment** — the number and
 its justification are separate questions, and three retirements turned on
 exactly that distinction.
 
-## 2. Declarations nothing checks — one contract test closes three instances
+## 2. ~~Declarations nothing checks~~ — **CLOSED 2026-09-02**
+
+> **Closed by `tests/test_threshold_contract.py` (11 tests), which fails the
+> build for any spec declaring `Source.HISTORY` against a metric no producer
+> emits — and for the converse in both directions.**
+>
+> Enumerated first, as required: **6 specs declared a metric; 4 have real
+> producers** (`daily_trades_p75`, `burst_per_30min_p75`,
+> `reentry_after_loss_p25`, `loss_streak_p60`) and **2 did not** —
+> `late_mis_entries_p75` / `_p90`, which appear nowhere in the codebase except
+> their own declarations.
+>
+> Both were **reclassified to `Kind.FALLBACK`**, following the precedent set by
+> `fomo_symbols_in_window`: a correction to the CLASSIFICATION, not a decision
+> against personalising. **No producer was invented and the 2/3 fallbacks are
+> unchanged** — the correction was to the claim, not to the number.
+>
+> The `uses_baseline` instance (Pattern 19) is covered by the same file. The
+> Pattern 17 instance (the unclassified 40/75 ladder) is a MISSING record
+> rather than a false one, so this contract does not catch it — that is stated
+> here rather than left implied.
+
+The original finding follows.
 
 Three separate reviews found a spec field that claims something no producer
 delivers, each recorded as that pattern's finding:

@@ -77,12 +77,13 @@ def test_it_is_not_in_the_registry_or_the_vocabulary():
 
 
 def test_the_engine_counts_are_what_the_retirement_left():
-    """14 detectors, 18 pattern types. The 4 aliases are untouched."""
+    """14 detectors. Pattern types and aliases moved again the same day
+    with `holding_loser` and `overexposure` — 16 and 2."""
     from app.services.detector_registry import ALIASES, REGISTRY, all_pattern_types
 
     assert len(REGISTRY) == 14
-    assert len(all_pattern_types()) == 18
-    assert len(ALIASES) == 4
+    assert len(all_pattern_types()) == 16
+    assert len(ALIASES) == 2
 
 
 def test_it_is_recorded_as_retired():

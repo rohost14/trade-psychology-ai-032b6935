@@ -157,17 +157,29 @@ _GROUP_C = [
     # which made its clause unconditionally true.
     # See docs/patterns/09-expiry_day_overtrading/.
 
-    _spec(key="end_session_mis_caution_count", kind=Kind.PERSONAL_BASELINE, fallback=2,
+    # CLASSIFICATION CORRECTED 2026-09-02. Both declared Kind.PERSONAL_BASELINE
+    # with Source.HISTORY and metrics `late_mis_entries_p75` / `_p90` — and
+    # NOTHING PRODUCES THOSE METRICS. Verified: the names appear nowhere in the
+    # codebase except these two declarations. So both sat permanently at their
+    # 2 / 3 fallbacks while reporting themselves personalised, which is worse
+    # than being a fallback: it is a fallback claiming to be the trader's own
+    # number.
+    #
+    # Same correction, same reasoning, as `fomo_symbols_in_window` above. It is
+    # a correction to the CLASSIFICATION, not a decision against personalising
+    # late-entry counts. No producer was invented and the fallbacks are
+    # unchanged; if the metrics are ever produced, this is where that gets
+    # declared again. Caught by `test_threshold_contract.py`, which now fails
+    # the build for any spec declaring a metric no producer emits.
+    _spec(key="end_session_mis_caution_count", kind=Kind.FALLBACK, fallback=2,
           meaning="MIS entries after 15:00 IST, facing auto-square-off",
-          resolution_source=Source.HISTORY, metric="late_mis_entries_p75",
-          percentile=75, maturity=Maturity.SESSIONS_20,
-          provenance="some traders work the close deliberately; for others it is panic"),
+          provenance="unsourced. Declared PERSONAL_BASELINE until 2026-09-02 against a metric "
+                     "that has never been produced; reclassified rather than given a producer, "
+                     "because inventing one would manufacture personalisation"),
 
-    _spec(key="end_session_mis_danger_count", kind=Kind.PERSONAL_BASELINE, fallback=3,
+    _spec(key="end_session_mis_danger_count", kind=Kind.FALLBACK, fallback=3,
           meaning="late MIS entries, danger level",
-          resolution_source=Source.HISTORY, metric="late_mis_entries_p90",
-          percentile=90, maturity=Maturity.SESSIONS_20,
-          provenance="upper tail of the same distribution"),
+          provenance="unsourced, same correction as the caution tier above"),
 
     # The two `overconfidence_win_streak_*` specs went with their detector on
     # 2026-08-30. Their reasoning is kept here because it applies to ANY future

@@ -479,87 +479,21 @@ class TestEventBusReplay:
 # =============================================================================
 
 class TestPositionMonitorHoldingLoser:
+    """
+    RETIRED 2026-09-02 with `holding_loser`, and the tests went with the
+    subject rather than being weakened.
 
-    async def test_holding_loser_fires_after_threshold(self):
-        """
-        Position losing ≥0.5% for ≥30 minutes must generate a
-        'holding_loser' behavioral event.
-        """
-        from app.tasks.position_monitor_tasks import _check_position
-        from app.core.trading_defaults import COLD_START_DEFAULTS
-        from unittest.mock import MagicMock, AsyncMock, patch
+    They asserted the predicate fired at >= 0.5% down for >= 30 minutes and
+    stayed silent before 30. Both were true of the detector while it lived.
+    Neither is meaningful now: the detector was retired because a snapshot plus
+    a stopwatch cannot establish "holding a loser", and the winner/loser hold
+    substitute failed the persistence test (ratio 0.62 in the first half of the
+    book against 2.54 in the second, intraday 1.04 at shuffle p = 0.343).
 
-        mock_position = MagicMock()
-        mock_position.tradingsymbol = "NIFTY24JANFUT"
-        mock_position.total_quantity = 50
-        mock_position.average_entry_price = 22000.0
-        mock_position.instrument_token = 12345
-        mock_position.last_entry_time = (
-            datetime.now(timezone.utc) - timedelta(minutes=31)
-        )
-
-        thresholds = dict(COLD_START_DEFAULTS)
-
-        with patch("app.tasks.position_monitor_tasks.get_cached_ltp", return_value=21780.0):
-            db = AsyncMock()
-            events = await _check_position(mock_position, thresholds, db)
-
-        assert any(e["pattern"] == "holding_loser" for e in events), (
-            "Expected holding_loser event: position down 1% for 31 minutes"
-        )
-
-    async def test_holding_loser_does_not_fire_before_threshold(self):
-        """
-        Position held for only 10 minutes must NOT fire a holding_loser event
-        (threshold is 30 minutes).
-        """
-        from app.tasks.position_monitor_tasks import _check_position
-        from app.core.trading_defaults import COLD_START_DEFAULTS
-        from unittest.mock import MagicMock, AsyncMock, patch
-
-        mock_position = MagicMock()
-        mock_position.tradingsymbol = "BANKNIFTY24JANFUT"
-        mock_position.total_quantity = 25
-        mock_position.average_entry_price = 48000.0
-        mock_position.instrument_token = 99999
-        mock_position.last_entry_time = (
-            datetime.now(timezone.utc) - timedelta(minutes=10)
-        )
-
-        thresholds = dict(COLD_START_DEFAULTS)
-
-        with patch("app.tasks.position_monitor_tasks.get_cached_ltp", return_value=47520.0):
-            db = AsyncMock()
-            events = await _check_position(mock_position, thresholds, db)
-
-        assert not any(e["pattern"] == "holding_loser" for e in events), (
-            "Must NOT fire holding_loser after only 10 minutes (threshold: 30 min)"
-        )
-
-    async def test_holding_loser_no_price_no_event(self):
-        """No live price available → no event must fire."""
-        from app.tasks.position_monitor_tasks import _check_position
-        from app.core.trading_defaults import COLD_START_DEFAULTS
-        from unittest.mock import MagicMock, AsyncMock, patch
-
-        mock_position = MagicMock()
-        mock_position.tradingsymbol = "RELIANCE"
-        mock_position.total_quantity = 10
-        mock_position.average_entry_price = 2800.0
-        mock_position.instrument_token = 54321
-        mock_position.last_entry_time = (
-            datetime.now(timezone.utc) - timedelta(minutes=60)
-        )
-
-        thresholds = dict(COLD_START_DEFAULTS)
-
-        with patch("app.tasks.position_monitor_tasks.get_cached_ltp", return_value=None):
-            db = AsyncMock()
-            events = await _check_position(mock_position, thresholds, db)
-
-        assert events == [], (
-            "No live price → no event must fire (KiteTicker may not be running)"
-        )
+    `_check_position` now returns [] and is pinned by
+    `tests/test_holding_loser_retired.py`, which also asserts that no
+    replacement duration predicate appeared.
+    """
 
 
 # =============================================================================

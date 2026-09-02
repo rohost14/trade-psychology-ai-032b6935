@@ -101,8 +101,8 @@ def test_the_engine_counts_are_what_the_retirement_left():
     assert len(REGISTRY) == 14
     # 2026-09-02: 5 -> 4 aliases and 20 -> 19 pattern types. `death_spiral`
     # was retired - a summary of alerts already delivered, not a state.
-    assert len(ALIASES) == 4
-    assert len(all_pattern_types()) == 18
+    assert len(ALIASES) == 2
+    assert len(all_pattern_types()) == 16
 
 
 def test_it_is_recorded_as_retired():
@@ -240,9 +240,11 @@ def test_the_other_consolidation_families_are_untouched():
     fam = dict(BehaviorEngine._FAMILIES)
     assert fam["sizing after losses"] == (
         "martingale_behaviour", "post_loss_recovery_bet")
-    assert fam["the position is too big"] == (
-        "excess_exposure", "overexposure", "portfolio_concentration",
-        "capital_mismatch")
+    # "the position is too big" was REMOVED 2026-09-02: all four of its members
+    # were retired or are not behaviour detectors, so the family was inert.
+    # Asserting its ABSENCE is the stronger form - it cannot be reinstated with
+    # dead members without failing here.
+    assert "the position is too big" not in fam
     # Was `assert BehaviorEngine._COMPOSITES == ("death_spiral",)`. Both the
     # attribute and its consolidation branch were removed 2026-09-02, so this
     # asserts the STRONGER thing: no composite mechanism exists at all, and

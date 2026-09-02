@@ -125,8 +125,8 @@ def test_the_counts_are_what_the_retirement_left():
     from app.services.detector_registry import ALIASES, REGISTRY, all_pattern_types
 
     assert len(REGISTRY) == 14          # unchanged: it was never a detector
-    assert len(ALIASES) == 4            # was 5
-    assert len(all_pattern_types()) == 18   # was 20
+    assert len(ALIASES) == 2            # was 5
+    assert len(all_pattern_types()) == 16   # was 20
 
 
 # ══ 2. NO EXECUTION PATH REMAINS ═══════════════════════════════════════════

@@ -656,7 +656,29 @@ class PositionLedgerService:
         if fields is None:
             return None
 
-        duration = max(0, int((fields["exit_time"] - fields["entry_time"]).total_seconds() / 60))
+        # F12, fixed 2026-09-02. This wrote WALL-CLOCK minutes while the batch
+        # FIFO wrote MARKET minutes into the same column, so one overnight hold
+        # was ~1,440 from this writer and ~375 from the other — and a recompute
+        # overwrote whichever ran first. Every hold-time gate divides by this.
+        #
+        # `market_minutes` is canonical, and that was not a preference: the
+        # batch writer (`pnl_calculator.py:544`), the admin backfill
+        # (`api/admin/tasks.py:184`, which treats anything else as needing
+        # correction) and `market_hours.market_minutes`' own docstring all say
+        # the number means EXPOSURE — time the market could move against the
+        # position — not elapsed clock. A weekend is not exposure.
+        #
+        # Intraday rounds are unaffected: inside one session the two agree.
+        from app.core.market_hours import market_minutes
+        try:
+            duration = market_minutes(
+                fields["entry_time"], fields["exit_time"],
+                exchange=close_entry.exchange or "NFO",
+            )
+        except Exception:
+            # Never lose a CompletedTrade over a calendar lookup.
+            duration = max(
+                0, int((fields["exit_time"] - fields["entry_time"]).total_seconds() / 60))
 
         return CTModel(
             # Deterministic id shared with the batch FIFO builder so a later

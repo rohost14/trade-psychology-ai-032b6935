@@ -319,11 +319,24 @@ ALIASES = {
     # only tiers that ever fired. Its display name stays in the frontend's
     # `formatPatternName` so stored rows still render.
     # Position-monitor (entry-time) patterns - Phase 6
-    "overexposure": "2.0.0",
+    #
+    # `overexposure` RETIRED 2026-09-02. Not on evidence about the behaviour -
+    # the alias was already DEAD. `_overexposure_task` emits
+    # pattern_type="constitution_violation" with rule="max_trade_risk", gates
+    # on the trader's DECLARED limit and abstains when the capital requirement
+    # is unavailable. Nothing had emitted "overexposure" since the exposure
+    # hierarchy shipped (0602aa8); this map was the last thing keeping the name
+    # in the vocabulary.
+    #
     # `portfolio_concentration` RETIRED 2026-09-01 - it measured how few
     # positions were open, not concentration. A two-position book has a
     # 50% floor against a 40% cut and could never withhold.
-    "holding_loser": "1.0.0",
+    #
+    # `holding_loser` RETIRED 2026-09-02 - a snapshot plus a stopwatch. Its
+    # predicate never observed the loss CHANGING, and the winner/loser hold
+    # substitute failed the persistence test: ratio 0.62 in the first half of
+    # the book against 2.54 in the second, intraday 1.04 at shuffle p = 0.343,
+    # median 0.98. Not replaced.
     # Housekeeping nudge from maintenance_tasks, not a behaviour detector — but
     # it IS written to risk_alerts.pattern_type, so it is part of the vocabulary
     # and the contract test found it missing from this map.
@@ -514,19 +527,9 @@ ALIAS_COPY: Dict[str, PatternCopy] = {
         "multi-leg structure as one.",
         "You set a limit on how many positions you take in a day. This is where you reached it.",
     ),
-    "overexposure": PatternCopy(
-        "Position too large",
-        "The size of a position you have just opened against your capital.",
-        "Raised while the position is open, because that is while it can still be acted on.",
-    ),
-    # `portfolio_concentration` copy removed 2026-09-01 with the alias. Its
-    # display name stays in AlertContext.formatPatternName for stored rows.
-    "holding_loser": PatternCopy(
-        "Holding a loser",
-        "How long an open position has been held while down.",
-        "A position held well past the point it was working is being held for a reason that is no "
-        "longer about the trade.",
-    ),
+    # `overexposure`, `portfolio_concentration` and `holding_loser` copy removed
+    # with their aliases (2026-09-01 / 2026-09-02). Their display names stay in
+    # AlertContext.formatPatternName so stored rows still render.
     "capital_mismatch": PatternCopy(
         "Capital out of date",
         "The trading capital declared in your rules against what your account can actually deploy.",

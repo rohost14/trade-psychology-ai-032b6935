@@ -505,8 +505,8 @@ def test_the_engine_counts_are_what_this_retirement_left():
     # 19 -> 18 pattern types). Neither is this file's subject; the counts are
     # asserted here because a wrong one means a spec went missing silently.
     assert len(REGISTRY) == 14
-    assert len(ALIASES) == 4
-    assert len(all_pattern_types()) == 18
+    assert len(ALIASES) == 2
+    assert len(all_pattern_types()) == 16
 
 
 def test_the_surviving_detectors_are_exactly_these():

@@ -961,12 +961,16 @@ class BehaviorEngine:
             "revenge_trade",              # straight back in after a loss
             "rapid_reentry",              # info-tier anyway, but keeps the order honest
         )),
-        ("the position is too big", (
-            "excess_exposure",
-            "overexposure",
-            "portfolio_concentration",
-            "capital_mismatch",
-        )),
+        # "the position is too big" REMOVED 2026-09-02. All four members were
+        # retired or are not behaviour detectors: `excess_exposure` and
+        # `portfolio_concentration` 2026-09-01, `overexposure` 2026-09-02 (the
+        # entry path emits `constitution_violation`/`max_trade_risk` instead),
+        # and `capital_mismatch` is a housekeeping nudge from
+        # `maintenance_tasks` that was only ever in this tuple for
+        # presentation. A consolidation family whose every member is
+        # unemittable cannot win, fold or suppress anything - it was inert, and
+        # inert entries that read like live rules are how retired names come
+        # back.
     )
 
     #: `_COMPOSITES` was REMOVED 2026-09-02, along with the branch of
@@ -3319,7 +3323,14 @@ class BehaviorEngine:
         # ── Rule: max trades per day ──────────────────────────────────────
         trade_limit = th.get("user_daily_trade_limit")
         if trade_limit:
-            count = len(ctx.session_trades) + 1
+            # Structures, not legs. Fixed 2026-09-02: this counted
+            # CompletedTrade ROWS while `daily_overtrading` counted structures,
+            # so ONE declared number got TWO answers from the same engine — a
+            # trader who put on two iron condors was 8 of 10 here and 2 of 10
+            # there. A CompletedTrade is per tradingsymbol, so counting rows
+            # counts legs, and the trader declared decisions.
+            from app.services.strategy_detector import count_structures as _cs
+            count = _cs(list(ctx.session_trades) + [ct])
             ratio = count / float(trade_limit)
             sev = ladder(ratio)
             if sev:

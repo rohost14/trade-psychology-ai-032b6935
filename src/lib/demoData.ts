@@ -550,12 +550,6 @@ export const DEMO_BEHAVIORAL = {
       examples: ['NIFTY23000CE after SOLARINDS loss', 'NIFTY23200PE after BANKNIFTY loss'],
     },
     {
-      pattern_type: 'holding_loser', frequency: 2, severity: 'caution',
-      estimated_cost: 9200,
-      description: 'Held losing positions 2-4× longer than winners. Average loser held 185 min vs 97 min for winners.',
-      examples: ['SOLARINDS: 197 min', 'SENSEX75000PE: 165 min'],
-    },
-    {
       pattern_type: 'daily_overtrading', frequency: 1, severity: 'caution',
       estimated_cost: 3660,
       description: '5 trades on one day vs your average of 2.5. High-frequency days correlate with net losses.',
@@ -1011,11 +1005,6 @@ export const DEMO_BEHAVIORAL_ANALYSIS = {
       pattern_type: 'revenge_trade', count: 3, severity: 'danger',
       estimated_cost: 8400, last_seen: daysAgo(1, 14, 35),
       description: 'Quick re-entry after significant loss',
-    },
-    {
-      pattern_type: 'holding_loser', count: 2, severity: 'caution',
-      estimated_cost: 9200, last_seen: daysAgo(1, 14, 22),
-      description: 'Holding losers 2-4× longer than winners',
     },
     {
       pattern_type: 'daily_overtrading', count: 1, severity: 'caution',

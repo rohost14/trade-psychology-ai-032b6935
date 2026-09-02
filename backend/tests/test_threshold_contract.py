@@ -1,307 +1,189 @@
 """
-The threshold registry must describe what resolution actually does.
+A threshold may not claim to be personalised unless something produces it.
 
-WHY THIS FILE EXISTS
+THE CLASS THIS CLOSES
 
-Four consecutive pattern reviews (7, 9, 10, 11) each independently found a
-threshold "declared personal that can never personalise" and treated it as a
-local defect. It was one systemic question with local symptoms, and answering it
-properly turned up something the pattern reviews had not: a UNIVERSAL_SAFETY
-threshold that a trader could loosen by declaring a number.
+Four separate pattern reviews each found the same defect and each recorded it as
+that pattern's problem:
 
-These tests are the machinery for the parts of that contract that were only ever
-prose. Full findings in docs/contracts/PERSONAL_BASELINE_AUDIT.md.
+    Pattern 17  the 40/75 session-meltdown ladder had no THRESHOLD_SPECS record
+    Pattern 18  `early_exit_winner_max_min` declared metric `winner_hold_p50`,
+                which no producer emits
+    Pattern 19  `winning_streak_overconfidence` declared `uses_baseline=True`
+                and read no baseline at all
+    Pattern 21  `end_session_mis_caution_count` / `_danger_count` declared
+                metrics `late_mis_entries_p75` / `_p90`, which no producer emits
+
+Every one sat permanently at its fallback WHILE REPORTING ITSELF PERSONALISED.
+That is worse than being a fallback: a fallback is honest, and a fallback
+wearing the trader's own number is not. The H1 key-name mismatch was the same
+class, found and fixed once — and it recurred three more times, because nothing
+checked the declaration.
+
+So this file does not test a threshold. It tests that the REGISTRY CANNOT LIE,
+which is the only fix that closes a class rather than an instance.
+
+WHAT IT DOES NOT DO
+
+It does not require any threshold to be personalised, does not invent
+producers, and does not add fallback values. A spec is free to be
+`Kind.FALLBACK` with an unsourced number — several are, deliberately, and their
+provenance says so. What it may not do is declare `Source.HISTORY` against a
+metric nobody emits.
 """
-from types import SimpleNamespace
+import ast
+import inspect
+from pathlib import Path
 
 import pytest
 
-from app.core.safety_bounds import bound_for, clamp_to_bound
-from app.core.threshold_registry import (
-    THRESHOLD_SPECS,
-    Sensitivity,
-    kind_for,
-)
-from app.core.threshold_resolution import (
-    Kind,
-    Source,
-    resolve_thresholds,
-    violates_kind,
-)
+from app.core.threshold_registry import THRESHOLD_SPECS
 
 
-def _profile(**kw):
-    base = dict(detected_patterns={}, trading_capital=200000)
-    base.update(kw)
-    return SimpleNamespace(**base)
-
-
-BASELINE_V2 = {
-    "version": 2,
-    "computed_at": "2026-08-01T00:00:00Z",
-    "sessions_analyzed": 40,
-    "metrics": {
-        "daily_trades_p75": {"value": 7.0, "confidence": 0.9, "n": 40},
-        "burst_per_30min_p75": {"value": 4.0, "confidence": 0.8, "n": 40},
-        "reentry_after_loss_p25": {"value": 3.0, "confidence": 0.7, "n": 40},
-        "loss_streak_p60": {"value": 4.0, "confidence": 0.6, "n": 40},
-    },
-}
-
-#: The four thresholds that are actually personalised, and the metric each uses.
-#: Kept here rather than read from the registry so the test fails if either side
-#: drifts — reading the registry would make it agree with itself.
-ACTUALLY_PERSONALISED = {
-    "daily_trade_limit": "daily_trades_p75",
-    "burst_trades_per_30min_caution": "burst_per_30min_p75",
-    "revenge_window_caution_min": "reentry_after_loss_p25",
-    "consecutive_loss_caution": "loss_streak_p60",
-}
-
-
-# ── 1. safety cannot be loosened ───────────────────────────────────────────
-
-# `test_a_declared_size_cannot_loosen_the_universal_safety_line`,
-# `test_a_declared_size_may_still_tighten` and
-# `test_the_safety_line_is_monotone_and_capped` were DELETED 2026-09-01.
-#
-# THEIR SUBJECT WAS REMOVED, not their assertion weakened. All three keyed on
-# `max_position_pct_caution` / `_danger`, which went with `excess_exposure`:
-# there is no universal exposure threshold any more and none replaced it.
-#
-# `max_position_size` was the ONLY declared value that mapped onto a
-# UNIVERSAL_SAFETY key, so there is no surviving instance of that specific
-# interaction to repoint them at. What they protected is still protected in
-# general by `test_every_universal_safety_threshold_is_its_own_bound` below,
-# which iterates every UNIVERSAL_SAFETY spec and now covers the premium-loss
-# ladder - the severe-loss layer, which is deliberately unchanged.
-#
-# The `clamp_to_bound` mechanism itself is untouched.
-
-
-def test_every_universal_safety_threshold_is_its_own_bound():
+def _baseline_metric_keys() -> set:
     """
-    Definitional, not a tuning choice: the Kind means "objective danger, never
-    personalised", so the universal value IS the loosest it may become. This is
-    what makes the guarantee general instead of a patch on the one key that was
-    found to be reachable.
+    Every metric key `baseline_service` actually emits.
+
+    Read from the source by AST rather than by calling it — the producer needs
+    a database and a trader's history, and neither belongs in a contract test.
+    An AST walk over the dict literals is exact where a regex would guess.
     """
-    safety = [k for k, s in THRESHOLD_SPECS.items() if s.kind is Kind.UNIVERSAL_SAFETY]
-    assert safety, "no universal-safety thresholds — the audit's subject vanished"
-    for key in safety:
-        bound, why = bound_for(key)
-        assert bound is not None, f"{key} is UNIVERSAL_SAFETY with no bound"
-        assert bound == float(THRESHOLD_SPECS[key].fallback)
-        assert why, f"{key} has a bound with no reason"
+    from app.services import baseline_service
+
+    tree = ast.parse(inspect.getsource(baseline_service))
+    keys = set()
+    for node in ast.walk(tree):
+        if isinstance(node, ast.Dict):
+            for k in node.keys:
+                if isinstance(k, ast.Constant) and isinstance(k.value, str):
+                    keys.add(k.value)
+    return keys
+
+
+def _specs_declaring_a_metric():
+    out = []
+    for key, spec in THRESHOLD_SPECS.items():
+        metric = getattr(spec, "metric", None)
+        if metric:
+            out.append((key, metric))
+    return sorted(out)
+
+
+# ── The contract ────────────────────────────────────────────────────────────
+
+def test_every_declared_metric_has_a_producer():
+    """
+    THE ONE THAT MATTERS. A spec naming a metric no producer emits resolves to
+    its fallback forever while telling the trader the number is theirs.
+    """
+    produced = _baseline_metric_keys()
+    orphans = [(k, m) for k, m in _specs_declaring_a_metric() if m not in produced]
+    assert orphans == [], (
+        "threshold specs declare metrics nothing produces — they will sit at "
+        "their fallback while reporting themselves personalised: "
+        f"{orphans}. Fix the SPEC (reclassify it, as `fomo_symbols_in_window` "
+        "and the two `end_session_mis_*` keys were), or produce the metric. "
+        "Do NOT add a fake producer to silence this."
+    )
+
+
+def test_a_history_source_always_names_a_metric():
+    """
+    The mirror of the above: claiming HISTORY without naming what to read is
+    the same lie with a missing field instead of a wrong one.
+    """
+    offenders = []
+    for key, spec in THRESHOLD_SPECS.items():
+        source = str(getattr(spec, "resolution_source", "") or "")
+        if "HISTORY" in source and not getattr(spec, "metric", None):
+            offenders.append(key)
+    assert offenders == [], f"Source.HISTORY with no metric named: {offenders}"
+
+
+def test_a_metric_is_only_declared_with_a_history_source():
+    """
+    And the converse — a metric named without HISTORY resolution is a
+    declaration that nothing will act on.
+    """
+    offenders = []
+    for key, spec in THRESHOLD_SPECS.items():
+        if getattr(spec, "metric", None):
+            source = str(getattr(spec, "resolution_source", "") or "")
+            if "HISTORY" not in source:
+                offenders.append((key, source))
+    assert offenders == [], f"metric declared without Source.HISTORY: {offenders}"
+
+
+# ── The specific instances, pinned so they cannot come back ─────────────────
+
+@pytest.mark.parametrize("dead_metric", [
+    "late_mis_entries_p75",   # Pattern 21, reclassified 2026-09-02
+    "late_mis_entries_p90",   # Pattern 21, reclassified 2026-09-02
+    "winner_hold_p50",        # Pattern 18, went with `early_exit`
+])
+def test_the_known_orphans_are_not_declared_anywhere(dead_metric):
+    declared = {m for _, m in _specs_declaring_a_metric()}
+    assert dead_metric not in declared
 
 
 @pytest.mark.parametrize("key", [
-    k for k, s in THRESHOLD_SPECS.items() if s.kind is Kind.UNIVERSAL_SAFETY
+    "end_session_mis_caution_count",
+    "end_session_mis_danger_count",
 ])
-def test_no_safety_threshold_can_be_pushed_past_its_bound(key):
+def test_the_end_session_specs_no_longer_claim_to_be_personalised(key):
+    """
+    Reclassified 2026-09-02, not deleted and not given a producer. Their
+    fallbacks (2 and 3) are UNCHANGED — the correction was to the claim, not
+    to the number.
+    """
     spec = THRESHOLD_SPECS[key]
-    bound = float(spec.fallback)
-    looser = bound * 4 if spec.sensitivity is Sensitivity.HIGHER_IS_LOOSER else bound / 4
-    clamped, why = clamp_to_bound(key, looser)
-    assert clamped == bound, f"{key} accepted a looser value than its bound"
-    assert why is not None
+    assert not getattr(spec, "metric", None)
+    assert "HISTORY" not in str(getattr(spec, "resolution_source", "") or "")
 
 
-def test_learned_sources_are_still_refused_outright():
-    """The original invariant. The bound is a second line, not a replacement."""
-    for src in (Source.HISTORY, Source.SESSION, Source.POPULATION):
-        assert violates_kind(Kind.UNIVERSAL_SAFETY, src) is not None
-        assert violates_kind(Kind.USER_RULE, src) is not None
-        assert violates_kind(Kind.PRODUCT_POLICY, src) is not None
+def test_the_end_session_fallbacks_did_not_move():
+    assert THRESHOLD_SPECS["end_session_mis_caution_count"].fallback == 2
+    assert THRESHOLD_SPECS["end_session_mis_danger_count"].fallback == 3
 
 
-def test_the_declared_rule_is_not_lost_when_the_bound_holds():
+def test_the_surviving_declarations_are_the_four_that_are_real():
     """
-    Blocking the safety override must not remove the trader's rule. It is a
-    RULE_FIELD in constitution_service and is still enforced there.
+    Pinned by name. A new entry here is a claim that a producer exists, and
+    this list is where someone has to say so deliberately.
     """
-    from app.services.constitution_service import RULE_FIELDS
-
-    assert "max_position_size" in RULE_FIELDS
-    ts = resolve_thresholds(profile=_profile(max_position_size=40))
-    assert ts.get("max_position_size") == 40
-
-
-# ── 2. personalisation actually resolves ───────────────────────────────────
-
-@pytest.mark.parametrize("key,metric", sorted(ACTUALLY_PERSONALISED.items()))
-def test_personalised_thresholds_really_personalise(key, metric):
-    cold = resolve_thresholds()
-    warm = resolve_thresholds(profile=_profile(detected_patterns={"baseline": BASELINE_V2}))
-
-    r = warm.explain(key)
-    assert r is not None, f"{key} has no provenance"
-    assert r.source is Source.HISTORY, (
-        f"{key} did not resolve from history — personalisation is broken"
-    )
-    assert warm.get(key) != cold.get(key) or r.confidence > 0, (
-        f"{key} claims history but is indistinguishable from the default"
-    )
+    assert dict(_specs_declaring_a_metric()) == {
+        "burst_trades_per_30min_caution": "burst_per_30min_p75",
+        "consecutive_loss_caution": "loss_streak_p60",
+        "daily_trade_limit": "daily_trades_p75",
+        "revenge_window_caution_min": "reentry_after_loss_p25",
+    }
 
 
-def test_registry_classification_matches_reality():
+# ── uses_baseline: the same class in the detector registry ─────────────────
+
+def test_uses_baseline_is_not_declared_by_a_detector_that_reads_none():
     """
-    THE INVARIANT THAT REPLACES THE GUARD PATTERN 11 EMPTIED.
+    Pattern 19's instance. `winning_streak_overconfidence` declared
+    `uses_baseline=True` and its "baseline" was an inline average over today's
+    session. The field has no readers, so nothing broke — which is exactly why
+    it went unnoticed.
 
-    `test_declaring_direction_never_overwrites_an_existing_classification` named
-    specific keys and required them to keep their Kind. Its last key went with
-    `direction_instability`, leaving it looping over nothing.
-
-    This is the same guarantee stated as a property rather than a list, so it
-    cannot be emptied by a retirement: whatever the registry SAYS a threshold is,
-    resolution must be allowed to do. A Kind that forbids the source its own key
-    actually uses is the failure mode — it would silently refuse the resolution
-    at runtime and fall back, with only a log line.
+    Checked by source: a spec claiming a baseline must mention one.
     """
-    warm = resolve_thresholds(profile=_profile(detected_patterns={"baseline": BASELINE_V2}))
-    assert len(warm.meta) > 50, "nothing resolved — this test would pass vacuously"
+    from app.services.behavior_engine import BehaviorEngine
+    from app.services.detector_registry import REGISTRY
 
-    # 1. nothing that DID resolve is forbidden by its own Kind.
-    offenders = [
-        f"{key}: {kind_for(key).value} <- {r.source.value}"
-        for key, r in warm.meta.items()
-        if violates_kind(kind_for(key), r.source) is not None
-    ]
+    engine = BehaviorEngine()
+    offenders = []
+    for spec in REGISTRY:
+        if not getattr(spec, "uses_baseline", False):
+            continue
+        method = getattr(engine, spec.method, None)
+        if method is None:
+            continue
+        src = inspect.getsource(method)
+        if "baseline" not in src and "thresholds.get" not in src:
+            offenders.append(spec.name)
     assert offenders == [], (
-        "the registry forbids a resolution that actually happens: " + "; ".join(offenders)
+        f"specs declare uses_baseline but read no baseline: {offenders}"
     )
-
-    # 2. and nothing was REFUSED on the way.
-    #
-    # (1) alone is not enough, and a mutation proved it: giving a
-    # history-resolved key a Kind that forbids history makes `put()` refuse the
-    # resolution and keep the previous value, so the key ends up on GLOBAL —
-    # which (1) then reads as perfectly legal. The refusal is the failure, and
-    # `put()` records it in the detail string. This is the half that catches a
-    # Kind silently blocking its own wiring.
-    refused = [
-        f"{key}: {r.detail}" for key, r in warm.meta.items()
-        if r.detail and "refused a" in r.detail
-    ]
-    assert refused == [], (
-        "a resolution was refused because the registry's Kind forbade it, and "
-        "the threshold silently fell back: " + "; ".join(refused)
-    )
-
-
-def test_the_personalise_flag_still_governs_only_the_registry_path():
-    """
-    `personalise` means "the registry-driven path is switched on for this key,
-    behind a detector review and a replay". It does NOT mean "this threshold is
-    personalised somewhere".
-
-    The distinction is the whole finding. Four thresholds ARE personalised, by
-    hand-written `place()` calls in `_apply_history_v2` that predate the registry
-    and never consult it. Setting personalise=True on them was tried during this
-    change and reverted: it would have swapped one false statement for another,
-    and two existing tests correctly rejected it.
-
-    So the flag stays False everywhere, and the fact that hand-wiring exists
-    outside it is recorded here rather than hidden.
-    """
-    assert not [k for k, s in THRESHOLD_SPECS.items() if s.personalise], (
-        "personalise=True implies the registry drives resolution for that key, "
-        "and it does not — the resolver never reads spec.metric"
-    )
-    warm = resolve_thresholds(profile=_profile(detected_patterns={"baseline": BASELINE_V2}))
-    hand_wired = {k for k in ACTUALLY_PERSONALISED
-                  if (warm.explain(k) or SimpleNamespace(source=None)).source is Source.HISTORY}
-    assert hand_wired == set(ACTUALLY_PERSONALISED), (
-        "a threshold stopped being personalised by the hand-written wiring: "
-        f"{sorted(set(ACTUALLY_PERSONALISED) - hand_wired)}"
-    )
-
-
-def test_specs_that_only_declare_availability_resolve_globally():
-    """
-    The other PERSONAL_BASELINE specs mean "personalisation is available", not
-    "is enabled" — the module docstring is explicit. They must therefore resolve
-    from the repo constant, not from history.
-    """
-    warm = resolve_thresholds(profile=_profile(detected_patterns={"baseline": BASELINE_V2}))
-    for key, spec in THRESHOLD_SPECS.items():
-        if spec.kind is not Kind.PERSONAL_BASELINE:
-            continue
-        if key in ACTUALLY_PERSONALISED:
-            continue   # hand-wired outside the registry path; covered above
-        r = warm.explain(key)
-        if r is None:
-            continue
-        assert r.source is not Source.HISTORY, (
-            f"{key} has personalise=False but resolved from history"
-        )
-
-
-def test_every_personalised_key_names_a_metric_that_is_produced():
-    """
-    The defect four pattern reviews kept finding, as a test. A key that is
-    switched ON must name a metric something actually writes.
-    """
-    import inspect
-
-    from app.services import baseline_service
-
-    src = inspect.getsource(baseline_service)
-    for key, metric in ACTUALLY_PERSONALISED.items():
-        assert metric in src, (
-            f"{key} is personalise=True but nothing produces {metric}"
-        )
-
-
-# ── 3. cold start and fallbacks ────────────────────────────────────────────
-
-def test_cold_start_claims_nothing_personal():
-    cold = resolve_thresholds()
-    assert cold.personal_keys() == {}, "a cold start must not claim personal values"
-
-
-def test_cold_start_uses_the_declared_fallback_for_personalised_keys():
-    cold = resolve_thresholds()
-    for key in ACTUALLY_PERSONALISED:
-        assert cold.get(key) == THRESHOLD_SPECS[key].fallback, (
-            f"{key} cold-starts at something other than its declared fallback"
-        )
-
-
-def test_a_profile_without_a_baseline_still_falls_back():
-    ts = resolve_thresholds(profile=_profile())
-    for key in ACTUALLY_PERSONALISED:
-        r = ts.explain(key)
-        assert r is None or r.source is not Source.HISTORY
-
-
-def test_an_empty_baseline_does_not_personalise():
-    ts = resolve_thresholds(profile=_profile(
-        detected_patterns={"baseline": {"version": 2, "metrics": {}}}))
-    for key in ACTUALLY_PERSONALISED:
-        r = ts.explain(key)
-        assert r is None or r.source is not Source.HISTORY
-
-
-# ── 4. the registry describes the resolver ─────────────────────────────────
-
-def test_no_universal_safety_key_is_missing_from_the_registry():
-    """
-    `kind_for()` returns FALLBACK for an unregistered key, and FALLBACK permits
-    learned sources. So an unregistered safety-critical threshold would be
-    silently personalisable. Anything the resolver writes that is safety-shaped
-    must be declared.
-    """
-    import inspect
-    import re
-
-    import app.core.threshold_resolution as tr
-
-    written = set(re.findall(r'put\(\s*"([a-z_0-9]+)"', inspect.getsource(tr)))
-    written |= set(re.findall(r'place\(\s*"([a-z_0-9]+)"', inspect.getsource(tr)))
-    for key in written:
-        if key.startswith("max_position_pct") or key.startswith("premium_loss"):
-            assert key in THRESHOLD_SPECS, (
-                f"{key} looks safety-shaped and is not in the registry, so it "
-                f"defaults to the permissive FALLBACK kind"
-            )
