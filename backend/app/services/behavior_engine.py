@@ -1332,8 +1332,12 @@ class BehaviorEngine:
         # one four-leg condor is four rows — two condors read as eight trades
         # against a burst threshold of five and fired a danger alert for two
         # positions. count_structures collapses a cluster only when it
-        # classifies as a recognised strategy, so the count can only fall: a
-        # trader who never trades multi-leg sees exactly the old number.
+        # classifies as a recognised strategy, so a trader who never trades
+        # multi-leg sees exactly the old number. The invariant is
+        # `count <= legs` and nothing stronger — this comment used to claim the
+        # count "can only fall", which B1 (2026-09-02) disproved: correcting a
+        # misnamed structure to MULTI_LEG_UNKNOWN raises it. See
+        # `count_structures`' docstring.
         burst_count = count_structures_fn(burst_all)
 
         if burst_count >= burst_caution:

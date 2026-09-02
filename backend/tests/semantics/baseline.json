@@ -512,7 +512,7 @@
     },
     "fut_long_pe_SHORT_riskadd": {
       "legs": 2,
-      "structures": 1
+      "structures": 2
     },
     "fut_long_pe_long_hedge": {
       "legs": 2,
@@ -520,7 +520,7 @@
     },
     "fut_short_ce_SHORT_riskadd": {
       "legs": 2,
-      "structures": 1
+      "structures": 2
     },
     "fut_short_ce_long_hedge": {
       "legs": 2,
@@ -629,7 +629,7 @@
       "legs": 2
     },
     "fut_long_pe_SHORT_riskadd": {
-      "classified": "futures_hedge_bullish",
+      "classified": "multi_leg_unknown",
       "legs": 2
     },
     "fut_long_pe_long_hedge": {
@@ -637,7 +637,7 @@
       "legs": 2
     },
     "fut_short_ce_SHORT_riskadd": {
-      "classified": "futures_hedge_bearish",
+      "classified": "multi_leg_unknown",
       "legs": 2
     },
     "fut_short_ce_long_hedge": {
@@ -649,7 +649,7 @@
       "legs": 2
     },
     "iron_butterfly_4leg": {
-      "classified": "iron_condor",
+      "classified": "iron_butterfly",
       "legs": 4
     },
     "iron_condor_4leg": {

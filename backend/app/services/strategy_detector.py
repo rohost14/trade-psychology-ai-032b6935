@@ -223,10 +223,22 @@ def count_structures(trades: Sequence[Any], gap_seconds: int = STRUCTURE_GAP_SEC
     A cluster collapses to 1 only when it classifies as a *recognised* strategy.
     An unrecognised cluster stays as its individual legs — two directional
     trades on the same underlying a minute apart are two decisions, not a
-    mystery spread. That keeps the change strictly conservative: the count can
-    only fall, never rise, so thresholds can only fire less often. For a trader
-    who never trades multi-leg, this returns len(trades) exactly and nothing
-    about their alerts changes.
+    mystery spread. For a trader who never trades multi-leg, this returns
+    len(trades) exactly and nothing about their alerts changes.
+
+    **The invariant is `count <= len(trades)`, and that is the only one.** It
+    holds permanently, because a cluster contributes either 1 or its own leg
+    count and never more.
+
+    This docstring used to say something stronger and wrong — that "the count
+    can only fall, never rise, so thresholds can only fire less often". That is
+    true against a raw leg count. It is NOT true across a change to the
+    classifier, and B1 (2026-09-02) is the counter-example: FUT LONG + PE SHORT
+    was named `futures_hedge_bullish` and counted 1; it is a risk-adding
+    structure, not a hedge, so it now falls to MULTI_LEG_UNKNOWN and counts 2.
+    The count ROSE, correctly, and the overtrading detectors can fire more
+    often for a trader who does this. Any future classification change must be
+    measured against the previous behaviour rather than assumed conservative.
     """
     total = 0
     for cluster in cluster_legs(trades, gap_seconds):
@@ -453,6 +465,27 @@ def classify_legs(legs: List[LegView]) -> str:
     Pure: no DB, no P&L, no timestamps. Callers are responsible for having
     established that these legs belong together (same underlying, entered
     together) — this answers only "what shape is it".
+
+    **This is deliberately not a universal options-strategy classifier.** It
+    names the small set of common structures whose semantics are unambiguous,
+    and says so honestly about everything else. A trader can build a ratio,
+    a diagonal, a custom or an exotic structure that no rule here will
+    recognise, and that is the expected outcome rather than a shortfall.
+
+    There are three states, and they are not interchangeable:
+
+    * **a named type** — we are confident what this is
+    * **MULTI_LEG_UNKNOWN** — these legs are one multi-leg decision, and we
+      do not know which strategy. **An intentional uncertainty state, not a
+      failed classification.** What it should EARN — suppression, collapsing
+      to one decision — is a separate product question and is decided by the
+      callers, not here
+    * **not grouped at all** — the caller decided these entries were not
+      related enough to be one structure; this function never sees them
+
+    So a wrong name is a defect and MULTI_LEG_UNKNOWN is not. Every predicate
+    below is written to fail closed into it: a structure is named only when
+    the properties that DEFINE it are present, never on leg count alone.
     """
     all_trades = list(legs)
     all_parsed = [parse_symbol(t.tradingsymbol or "") for t in all_trades]
@@ -476,13 +509,24 @@ def classify_legs(legs: List[LegView]) -> str:
         return StrategyType.MULTI_LEG_UNKNOWN
 
     # ── Futures hedge ────────────────────────────────────────────────────────
+    # The option leg must be BOUGHT. A protective put is a put you own: it is
+    # the long option that caps the loss on a long future. Selling the put
+    # instead leaves the downside open and adds short-put risk underneath a
+    # long future — the opposite structure, and it was reaching this branch
+    # because only the option's TYPE was read, never its direction.
     if "FUT" in instrument_types and n == 2:
         other_type = (instrument_types - {"FUT"}).pop() if len(instrument_types) > 1 else None
         fut_trade = next(t for t, p in zip(all_trades, all_parsed) if p.instrument_type == "FUT")
-        if other_type == "PE" and fut_trade.direction == "LONG":
-            return StrategyType.FUTURES_HEDGE_BULLISH   # Long FUT + Buy PE hedge
-        if other_type == "CE" and fut_trade.direction == "SHORT":
-            return StrategyType.FUTURES_HEDGE_BEARISH   # Short FUT + Buy CE hedge
+        opt_trade = next(
+            (t for t, p in zip(all_trades, all_parsed) if p.instrument_type in ("CE", "PE")),
+            None,
+        )
+        option_is_bought = opt_trade is not None and opt_trade.direction == "LONG"
+        if option_is_bought:
+            if other_type == "PE" and fut_trade.direction == "LONG":
+                return StrategyType.FUTURES_HEDGE_BULLISH   # Long FUT + Buy PE hedge
+            if other_type == "CE" and fut_trade.direction == "SHORT":
+                return StrategyType.FUTURES_HEDGE_BEARISH   # Short FUT + Buy CE hedge
         return StrategyType.MULTI_LEG_UNKNOWN
 
     # From here all legs are options (CE/PE)
@@ -529,13 +573,43 @@ def classify_legs(legs: List[LegView]) -> str:
             # Bull put spread: sell higher PE, buy lower PE
             return StrategyType.BULL_PUT_SPREAD
 
-    # ── Iron condor (4 legs: short strangle + long strangle, wider) ──────────
-    if opt_types == {"CE", "PE"} and n == 4 and directions == {"LONG", "SHORT"}:
-        return StrategyType.IRON_CONDOR
-
-    # ── Iron butterfly (4 legs at 3 strikes: short ATM straddle + long OTM) ──
-    if opt_types == {"CE", "PE"} and n == 4 and len(strikes) == 3:
-        return StrategyType.IRON_BUTTERFLY
+    # ── Iron butterfly / iron condor ─────────────────────────────────────────
+    # Both are one shape: a SOLD body with BOUGHT wings outside it, two calls
+    # and two puts on one expiry. They differ only in how wide the body is —
+    # a butterfly sells a single strike (the CE and the PE together), a condor
+    # sells two. So one ordering test decides both:
+    #
+    #     long put  <  short put  <=  short call  <  long call
+    #
+    # and `short put == short call` is what makes it a butterfly.
+    #
+    # Tested as ONE branch because splitting them is what broke this before:
+    # the butterfly sat *below* a condor test written on leg count and mixed
+    # direction alone, which every real butterfly also satisfies — so it
+    # returned `iron_condor` first and the butterfly branch could only ever be
+    # reached by four legs in the SAME direction, which is not a butterfly.
+    # The condor test was also unvalidated: any four mixed-direction CE/PE
+    # legs matched it, including the inverted structure (bought body, sold
+    # wings) whose risk runs the other way.
+    #
+    # Anything that is not this shape falls to MULTI_LEG_UNKNOWN, which is
+    # what the function already does with every combination it cannot name.
+    if n == 4 and opt_types == {"CE", "PE"} and directions == {"LONG", "SHORT"}:
+        calls = [(p.strike, t.direction) for t, p in zip(all_trades, all_parsed)
+                 if p.instrument_type == "CE"]
+        puts = [(p.strike, t.direction) for t, p in zip(all_trades, all_parsed)
+                if p.instrument_type == "PE"]
+        if len(calls) == 2 and len(puts) == 2 and all(s is not None for s, _ in calls + puts):
+            short_call = [s for s, d in calls if d == "SHORT"]
+            long_call = [s for s, d in calls if d == "LONG"]
+            short_put = [s for s, d in puts if d == "SHORT"]
+            long_put = [s for s, d in puts if d == "LONG"]
+            if len(short_call) == len(long_call) == len(short_put) == len(long_put) == 1:
+                sc, lc, sp, lp = short_call[0], long_call[0], short_put[0], long_put[0]
+                if lp < sp <= sc < lc:
+                    return (StrategyType.IRON_BUTTERFLY if sp == sc
+                            else StrategyType.IRON_CONDOR)
+        return StrategyType.MULTI_LEG_UNKNOWN
 
     return StrategyType.MULTI_LEG_UNKNOWN
 

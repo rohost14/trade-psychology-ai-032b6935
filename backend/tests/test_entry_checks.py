@@ -200,9 +200,13 @@ def test_entries_are_counted_as_structures_not_legs():
     A four-leg condor is one decision against the trade limit. Counting legs
     would put a spread trader over their own limit after two positions.
     """
+    # Body sold, wings bought: buy 24100 PE, sell 24300 PE, sell 24500 CE,
+    # buy 24700 CE. The call side was inverted here until 2026-09-02 — the
+    # same wrong shape as in test_structure_counting.py, which is why no test
+    # caught the classifier accepting any four mixed-direction CE/PE legs.
     rows = [
-        ledger("NIFTY25AUG24700CE", "OPEN", 0, qty=-50),
-        ledger("NIFTY25AUG24500CE", "OPEN", 0, qty=50),
+        ledger("NIFTY25AUG24700CE", "OPEN", 0, qty=50),
+        ledger("NIFTY25AUG24500CE", "OPEN", 0, qty=-50),
         ledger("NIFTY25AUG24300PE", "OPEN", 0, qty=-50),
         ledger("NIFTY25AUG24100PE", "OPEN", 0, qty=50),
     ]
