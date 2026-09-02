@@ -365,7 +365,11 @@ export default function Welcome() {
       "What this exact setup did to your account the last five times",
       "WhatsApp dispatch to your accountability partner",
       "Threshold calculations based on your risk tolerance",
-      "Proven pattern disruption to stop cascade losses"
+      // Was: "Proven pattern disruption to stop cascade losses". Removed
+      // 2026-09-03 — "proven" claims evidence that does not exist, and
+      // "stop cascade losses" is the cascade-prediction claim the product
+      // charter bans. Replaced with what the product actually does.
+      "Nothing is blocked — the decision stays yours"
     ],
     reverse: true,
     visual: <ShieldMock />

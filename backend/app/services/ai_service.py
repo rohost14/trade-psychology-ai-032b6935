@@ -965,13 +965,19 @@ Remember: Your job is to hold up a mirror to this trader's behavior — what the
                 return f"Your recent trades are all tracked here — check your dashboard for the full breakdown. Your 7-day net P&L is {pnl_str or 'on the dashboard'}. Want me to dig into a specific trade or symbol?"
             return "No closed positions in the last 7 days. Once you make some trades, I'll have your full history right here."
 
+        # These replies go out when the model is unreachable, so they are the
+        # one place the coach speaks without having read anything. Until
+        # 2026-09-03 three of them asserted what "most traders" do and what
+        # would happen to the reader's win rate. A fallback has no observations
+        # and cannot make a claim about a population; it can only point at the
+        # trader's own record. Not replaced with other statistics.
         if 'mistake' in msg_lower or 'wrong' in msg_lower:
             if has_alerts:
-                return "I can see some behavioral patterns firing in your recent trading. The biggest thing most traders mess up is trading right after a loss — that revenge instinct kicks in fast. Take a look at your alerts on the dashboard."
-            return "The most common mistake I see is chasing trades right after a loss. That revenge instinct is real. Next time you take a loss, step away for 15 minutes before your next trade."
+                return "I can see some behavioural patterns firing in your recent trading. Take a look at your alerts — each one names the trade that set it off and what it cost."
+            return "Nothing has been flagged in your recent trading. When something is, the alert will name the trade behind it rather than guess at a reason."
 
         if 'improve' in msg_lower or 'better' in msg_lower:
-            return "The single biggest improvement for most traders? Fewer trades, better quality. Pick your best setup and only trade that for a week. You'll be surprised how much your win rate improves."
+            return "I can't reach my full analysis right now. Your Analytics page splits your P&L by behaviour rather than by scrip — that is the view worth starting from, because it is built from your own trades."
 
         if 'pattern' in msg_lower:
             if has_alerts:

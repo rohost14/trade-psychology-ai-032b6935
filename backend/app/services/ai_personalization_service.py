@@ -454,7 +454,14 @@ class AIPersonalizationService:
                 if gap < 30:  # Only count if within 30 min
                     revenge_windows.append(gap)
 
-        personal_revenge_window = round(statistics.median(revenge_windows), 1) if revenge_windows else 12
+        # None when nothing was measured. This used to fall back to a hardcoded
+        # 12, which three callers then presented as the trader's own number -
+        # "Your Revenge Window: 12 min", "Time you typically wait before revenge
+        # trading" - for a trader who had no measured gap at all. Every consumer
+        # already guards on truthiness (`if intervention.get(...)`,
+        # `if revenge_window and revenge_window > 0`) or documents the field as
+        # `float | null`, so None is the honest value and none of them break.
+        personal_revenge_window = round(statistics.median(revenge_windows), 1) if revenge_windows else None
 
         return {
             "optimal_cooldown_minutes": optimal_duration,
@@ -462,6 +469,12 @@ class AIPersonalizationService:
             "skip_vs_complete": {
                 "skipped_avg_pnl": round(skipped_avg_pnl, 2),
                 "completed_avg_pnl": round(completed_avg_pnl, 2),
+                # Counts travel with the means so a caller can tell a real
+                # comparison from one arm being empty: both averages default to
+                # 0 above, so "completed > skipped" was true for a trader who
+                # had never skipped a cooldown in their life.
+                "skipped_n": len(skipped_outcomes),
+                "completed_n": len(completed_outcomes),
                 "recommendation": "complete" if completed_avg_pnl > skipped_avg_pnl else "skip_cautiously"
             },
             "confidence": "high" if len(cooldowns) >= 10 else "medium",

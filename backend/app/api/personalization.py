@@ -216,7 +216,7 @@ async def get_intervention_timing(
     return {
         "has_data": True,
         "optimal_cooldown_minutes": timing.get("optimal_cooldown_minutes", 15),
-        "personal_revenge_window_minutes": timing.get("personal_revenge_window_minutes", 12),
+        "personal_revenge_window_minutes": timing.get("personal_revenge_window_minutes"),
         "skip_vs_complete": timing.get("skip_vs_complete", {}),
         "confidence": timing.get("confidence", "low"),
         "recommendation": _generate_timing_recommendation(timing)
@@ -226,21 +226,37 @@ async def get_intervention_timing(
 def _generate_timing_recommendation(timing: dict) -> str:
     """Generate human-readable recommendation."""
     optimal = timing.get("optimal_cooldown_minutes", 15)
-    revenge_window = timing.get("personal_revenge_window_minutes", 12)
+    revenge_window = timing.get("personal_revenge_window_minutes")
     skip_data = timing.get("skip_vs_complete", {})
 
     parts = []
 
-    # Cooldown recommendation
+    # Cooldown recommendation. `revenge_window` is None when nothing was
+    # measured; until 2026-09-03 it fell back to a hardcoded 12 and this line
+    # called that "your typical" window.
     if revenge_window:
         suggested = int(revenge_window * 1.5)
         parts.append(f"Your typical revenge window is {revenge_window} minutes.")
         parts.append(f"Set your cooldown to at least {suggested} minutes to break the pattern.")
 
-    # Skip vs complete
-    if skip_data.get("recommendation") == "complete":
-        parts.append("Data shows you perform better when you complete cooldowns rather than skipping them.")
-    elif skip_data.get("recommendation") == "skip_cautiously":
-        parts.append("You can sometimes skip cooldowns if you feel mentally ready, but use caution.")
+    # Skip vs complete. Only a claim when BOTH arms were actually observed:
+    # `skipped_avg_pnl` and `completed_avg_pnl` both default to 0 for an empty
+    # list, so "Data shows you perform better when you complete cooldowns" used
+    # to be emitted to traders who had never skipped one - a real average
+    # compared against a placeholder. Reworded too: it now states the
+    # comparison that was measured instead of citing "data".
+    skipped_n = skip_data.get("skipped_n", 0)
+    completed_n = skip_data.get("completed_n", 0)
+    if skipped_n and completed_n:
+        if skip_data.get("recommendation") == "complete":
+            parts.append(
+                f"Across {completed_n} cooldowns you sat out and {skipped_n} you skipped, "
+                "the two hours afterwards went better when you sat them out."
+            )
+        else:
+            parts.append(
+                f"Across {completed_n} cooldowns you sat out and {skipped_n} you skipped, "
+                "the two hours afterwards were not better for sitting them out."
+            )
 
     return " ".join(parts) if parts else "Keep trading to build more data for personalized recommendations."
