@@ -324,9 +324,13 @@ class TestPostLossRecoveryBet:
 
 class TestPerformanceDetectorGuards:
     """
-    win_rate_collapse and strategy_breakdown have never fired in 203 sessions.
-    These pin the GUARDS — why they stay silent — rather than the tiers, so the
-    pattern review can tell "correctly silent" from "unreachable".
+    `win_rate_collapse` has never fired in 203 sessions. These pin the GUARDS —
+    why it stays silent — rather than the tiers, so the pattern review can tell
+    "correctly silent" from "unreachable". The review reached its answer: the
+    guards are sound and the silence is an artefact of a CSV book carrying no
+    profile.
+
+    `strategy_breakdown` was covered here too until it was retired 2026-09-02.
     """
 
     def _ctx(self, n_trades, thresholds):
@@ -350,19 +354,11 @@ class TestPerformanceDetectorGuards:
         ev = engine._detect_win_rate_collapse(self._ctx(10, th))
         assert ev is not None and ev.severity == "info"
 
-    def test_strategy_breakdown_needs_both_baselines(self):
-        th = {"baseline_win_rate": {"value": 60.0, "confidence": 0.9}}
-        assert engine._detect_strategy_breakdown(self._ctx(10, th)) is None
-
-    def test_strategy_breakdown_confidence_is_the_weaker_of_the_two(self):
-        th = {"baseline_win_rate": {"value": 60.0, "confidence": 0.9},
-              "baseline_profit_factor": {"value": 2.0, "confidence": 0.6}}
-        priors = _loss_run(9)
-        ct = make_ct(pnl=200.0, entry_offset_min=-5)
-        ev = engine._detect_strategy_breakdown(
-            make_ctx(completed_trade=ct, session_trades=priors, thresholds=th))
-        if ev is not None:
-            assert ev.confidence == pytest.approx(60.0)
+    # Two `strategy_breakdown` guard tests were DELETED 2026-09-02 with their
+    # subject: `_detect_strategy_breakdown` no longer exists. They asserted it
+    # needed both baselines and took the weaker confidence — both true of the
+    # detector while it lived, and neither meaningful now. The retirement and
+    # its reasoning are pinned by `test_strategy_breakdown_retired.py`.
 
 
 class TestMartingaleAcrossInstrumentClasses:

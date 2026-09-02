@@ -152,6 +152,9 @@ const BACKEND_TO_FRONTEND_TYPE: Record<string, string> = {
   // below stays so stored alert rows still render.
   'end_of_session_mis_panic':    'end_of_session_mis_panic',
   'post_loss_recovery_bet':      'post_loss_recovery_bet',
+  // 'strategy_breakdown' RETIRED 2026-09-02. It was never in this routing map
+  // (analytics disposition, info only), so nothing had to be removed; the
+  // display name below stays so stored alert rows still render.
 };
 
 /**
@@ -255,6 +258,8 @@ export function formatPatternName(patternType: string): string {
     'portfolio_concentration': 'Concentrated exposure',
     'premium_loss_event': 'Premium destruction',
     'same_symbol_obsession': 'Repeated same instrument',
+    // Retired 2026-09-02. Kept here because stored alert rows still carry it
+    // and a missing key renders as a title-cased raw key.
     'strategy_breakdown': 'Strategy underperforming',
     // Retired 2026-09-01 (Reviews 25-27). Never in the routing map above, so
     // nothing had to be removed there. Kept here because stored alert rows

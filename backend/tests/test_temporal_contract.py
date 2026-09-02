@@ -283,7 +283,10 @@ def test_rapid_reentry_keeps_its_own_zero_guard():
 @pytest.mark.parametrize("method", [
     "_detect_overtrading_burst", "_detect_fomo_entry",
     "_detect_same_symbol_obsession", "_detect_end_of_session_mis_panic",
-    "_detect_win_rate_collapse", "_detect_strategy_breakdown",
+    # `_detect_strategy_breakdown` was in this list until it was retired
+    # 2026-09-02. Its exclusion from the CONCLUDED migration was correct and
+    # is now moot.
+    "_detect_win_rate_collapse",
 ])
 def test_existence_detectors_were_not_migrated(method):
     """

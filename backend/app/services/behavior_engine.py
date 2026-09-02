@@ -3645,52 +3645,24 @@ class BehaviorEngine:
                      "deterioration_pct": round(deterioration * 100, 1), "trades_today": n},
         )
 
-    # ── Strategy breakdown (Phase 7, doc 4 P30 — ANALYTICS-ONLY) ────────────
+    # ── Strategy breakdown — RETIRED 2026-09-02 ─────────────────────────────
     #
-    # Multi-signal degradation: win rate collapse AND profit factor collapse
-    # together. Statistically sounder than either alone. info → Strategy driver.
-
-    def _detect_strategy_breakdown(self, ctx: EngineContext) -> Optional[DetectedEvent]:
-        wr_base = ctx.thresholds.get("baseline_win_rate")
-        pf_base = ctx.thresholds.get("baseline_profit_factor")
-        if not wr_base or not pf_base:
-            return None
-        if (wr_base.get("confidence") or 0) < 0.5 or (pf_base.get("confidence") or 0) < 0.5:
-            return None
-        trades = list(ctx.session_trades) + [ctx.completed_trade]
-        n = len(trades)
-        if n < 8:
-            return None
-        pnls = [float(t.realized_pnl or 0) for t in trades]
-        wins = sum(1 for p in pnls if p > 0)
-        gross_win = sum(p for p in pnls if p > 0)
-        gross_loss = abs(sum(p for p in pnls if p < 0))
-        if gross_loss <= 0:
-            return None
-        today_wr = wins / n * 100
-        today_pf = gross_win / gross_loss
-        base_wr = float(wr_base["value"])
-        base_pf = float(pf_base["value"])
-        if base_wr <= 0 or base_pf <= 0:
-            return None
-        wr_collapsed = (base_wr - today_wr) / base_wr >= 0.4
-        pf_collapsed = today_pf <= base_pf * 0.5
-        if not (wr_collapsed and pf_collapsed):
-            return None
-        return DetectedEvent(
-            event_type="strategy_breakdown",
-            severity="info",
-            confidence=min(100.0, min(float(wr_base.get("confidence", 0.5)),
-                                      float(pf_base.get("confidence", 0.5))) * 100),
-            message=(
-                f"Multiple performance signals degrading: win rate "
-                f"{today_wr:.0f}% (baseline {base_wr:.0f}%) and profit factor "
-                f"{today_pf:.2f} (baseline {base_pf:.2f}) over {n} trades today."
-            ),
-            context={"today_win_rate": round(today_wr, 1), "baseline_win_rate": base_wr,
-                     "today_profit_factor": round(today_pf, 2),
-                     "baseline_profit_factor": base_pf, "trades_today": n},
-        )
+    # It fired only when a win-rate collapse AND a profit-factor collapse
+    # happened together, on the reasoning that two independent degradation
+    # signals are stronger evidence than either alone. Sound on its face, and
+    # the second signal never bound.
+    #
+    # Measured on the 203-session book: 4 firings, the IDENTICAL set to
+    # `win_rate_collapse`, ZERO unique. Profit-factor collapse is not rare on
+    # its own (6 of 26 qualifying sessions) but as the second half of an AND it
+    # excluded nothing — a session winning 11% of its trades almost always has
+    # a wrecked profit factor, so the two conditions are not independent.
+    #
+    # Not retired for firing rarely. Retired because it was a second name for
+    # one finding. `win_rate_collapse` is untouched and keeps both baselines;
+    # `baseline_profit_factor` still has other readers.
+    #
+    # Evidence: docs/patterns/25-27-performance-trio/.
 
 
 # Singleton

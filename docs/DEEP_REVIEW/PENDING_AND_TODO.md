@@ -122,7 +122,7 @@ diff against 201.
 
 ---
 
-## OPEN DETECTOR QUEUE — 7, none reviewable today
+## OPEN DETECTOR QUEUE — 6 open, 1 retired 2026-09-02
 
 **The pattern review sequence is COMPLETE.** Every pattern has a verdict; there
 is no next review. What remains is open on a **data gap or a decision**, not on
@@ -133,8 +133,8 @@ known to be missing. Verified against `detector_registry` on 2 Sep 2026:
 | # | detector | state | the exact unblock |
 |---|---|---|---|
 | Q1 | `overtrading_burst` | **DEFERRED** | more book. 12 alerts / 10 sessions and it **never fired alone**; n cannot move a threshold in either direction, and being rare is not a reason to delete something |
-| Q2 | `end_of_session_mis_panic` | **DEFERRED — data gap** | a dataset carrying **`product`**, its first gate. See the full entry under PENDING VALIDATION, which already records the four questions the deferred review must answer |
-| Q3 | `strategy_breakdown` | **DEFERRED — data gap + an unasked decision** | sessions where its two conditions disagree, **and** a decision about whether an `info`/`analytics` detector may ever reach a trader. See §27 below — the second half was never recorded |
+| Q2 | `end_of_session_mis_panic` | **DEFERRED — insufficient live evidence** | **CORRECTED 2026-09-02: the blocker is NOT missing product data.** `CompletedTrade.product` exists and is populated on both write paths; the reference CSV lacking it was never a production gap. What is missing is live sessions. See the corrected entry under PENDING VALIDATION |
+| ~~Q3~~ | ~~`strategy_breakdown`~~ | **RETIRED 2026-09-02 (`pending`)** | Closed by examining the unblock condition instead of waiting for it: the profit-factor half **never bound** — identical firing set to `win_rate_collapse`, zero unique. A second name for one finding. See the closure below |
 | Q4 | `revenge_trade` | **FROZEN by decision** | new data only. No new threshold, no episode rule, no score, no replacement, no global confidence gate. `docs/research/REVENGE_FINAL_EVIDENCE_REVIEW.md` |
 | Q5 | `holding_loser` | **RESEARCH FURTHER** | duration is measurable; the predicate is not. `28-position-monitor/review.md` |
 | Q6 | `overexposure` | **MODIFY, blocked** | live broker-margin validation (below). Its quantity is wrong on arithmetic — 100% of futures — not on the price substitution |
@@ -477,6 +477,32 @@ an arithmetic identity, a shuffle null or an outcome comparison, none of which
 instrument typing can reach.
 
 ### Pattern 21 `end_of_session_mis_panic` — review DEFERRED
+
+> **BLOCKER CORRECTED 2026-09-02. It is NOT missing product data.**
+>
+> The entry below says the unblock is "a dataset that carries `product`". That
+> was true of the Console CSV and **was never true of production**. Traced:
+>
+> | layer | field | where |
+> |---|---|---|
+> | raw fill | `Trade.product` | `models/trade.py:21`, **non-nullable** |
+> | ledger | `PositionLedger.product` | set from `fill.product` at six sites |
+> | round | **`CompletedTrade.product`** | `models/completed_trade.py:30` |
+> | live writer | `position_ledger_service.py:674` | `product=close_entry.product` |
+> | batch writer | `pnl_calculator.py:561` | from the entry fill |
+> | ingestion | `trade_tasks.py:356-358` | **rejects anything outside {MIS, NRML, MTF}** before the engine sees it |
+>
+> DB: **5,333 CompletedTrades, `product` NOT NULL on 100%** (MIS 5,224 /
+> NRML 109). **The first gate is already production-valid. Do NOT add a field.**
+>
+> **Read that 100% carefully** — `alertlab/runner/inject.py:44` defaults
+> `product="MIS"`, so the distribution is fixture, not observation. It shows the
+> field is populated, not what a real book looks like.
+>
+> **The real blocker is INSUFFICIENT LIVE-SESSION EVIDENCE.** The four questions
+> below are unchanged and still need real rows to answer. This is a data-volume
+> wait, not a schema gap — which matters, because the old wording invited
+> someone to add a column that already exists.
 
 **Reviewed 30 Aug 2026 alongside `opening_5min_trap`, which was retired. This
 one was NOT, and the distinction is the point: its evidence is ABSENT, not
@@ -1592,6 +1618,26 @@ nothing. That is the documented INFO/EVIDENCE design and is **not** reopened
 here — noted only because it means "fired" and "was seen" differ by tier, which
 matters for any future firing-count comparison.
 
+### Orphaned threshold declarations — `late_mis_entries_p75` / `_p90`
+
+**Filed 2026-09-02 while correcting the blocker above. Not a new class — a new
+instance of a recorded one, and the reason it is filed separately is that it is
+fixable NOW, independent of the live data the detector is waiting for.**
+
+`end_session_mis_caution_count` and `end_session_mis_danger_count` declare
+`resolution_source=Source.HISTORY` with metrics `late_mis_entries_p75` and
+`late_mis_entries_p90` (`threshold_registry.py:162,168`). **Verified: those two
+metric names appear nowhere else in the codebase except a comment naming the
+class.** No producer emits them, so both thresholds sit permanently at their
+2/3 fallbacks while reporting themselves personalised.
+
+Same class as `winner_hold_p50` (Pattern 18) and `uses_baseline` (Pattern 19).
+**Do NOT add producers and do NOT invent fallback values** — the fix is the
+`THRESHOLD_SPECS` contract test under "Declarations nothing checks" below, which
+closes every instance at once.
+
+---
+
 # CROSS-CUTTING CLASSES — filed 2026-09-02
 
 Each of these was recorded once per pattern as if it were that pattern's
@@ -1747,6 +1793,48 @@ over the whole reference book.
 | **B1** — futures hedge asserted without the option leg's direction | **CLOSED 2026-09-02.** The label was corrected in `5844381`; the downstream half — `MULTI_LEG_UNKNOWN` earning a recognised structure's silence — was closed by F6 in `c107300`. A risk-adding FUT + short-option pair now both loses the hedge label **and** earns no suppression. |
 | **B2** — `IRON_BUTTERFLY` unreachable, and the label only ever wrong | **CLOSED.** The branch sat below a condor test that every real butterfly also satisfies, so it never ran; the only shape that could reach it was four legs in one direction, which is not a butterfly. Butterfly and condor are now decided together by one ordering test, body width separating them. A real butterfly is named one; malformed and single-direction shapes cannot reach the label. |
 | **B3** — `iron_condor` was a catch-all, not a classification | **CLOSED.** It tested leg count and mixed direction only, so any four mixed-direction CE/PE legs matched — including the **inverted** structure whose risk runs the other way. It now requires 2 calls, 2 puts, four distinct strikes and both shorts strictly inside both longs. Everything else falls safely to `MULTI_LEG_UNKNOWN`. |
+
+## Closed 2026-09-02 — `strategy_breakdown` RETIRED
+
+**Deferred 1 Sep, retired 2 Sep — by examining the deferral's own unblock
+condition instead of waiting for it.** The deferral read: *"unblock = sessions
+where its two conditions disagree."* Asking why they never disagree answered the
+question without the data.
+
+It fired only on a win-rate collapse **AND** a profit-factor collapse together —
+two independent degradation signals being stronger than either alone. Sound
+reasoning; the second signal never bound:
+
+| | |
+|---|---|
+| `win_rate_collapse` firings | 4 |
+| `strategy_breakdown` firings | 4 |
+| identical firing sets | **True** |
+| unique to `strategy_breakdown` | **0** |
+
+PF collapse is **not** rare on its own — 6 of the 26 sessions reaching the
+8-trade gate have one — but as the second half of an `AND` it excluded nothing,
+because a session winning 11% of its trades almost always has a wrecked profit
+factor. **The two conditions are not independent in the way the design
+assumed**, so more sessions would not have separated them.
+
+**Not retired for firing rarely.** Retired for being a second name for one
+finding — the same standard applied to every retirement in this sequence.
+
+**What was deliberately NOT done:** `win_rate_collapse` keeps the subject, both
+baselines, and its `analytics` / `notification_level=0` / `info` shape. Removing
+a duplicate must not be cover for promoting the survivor, and
+`test_win_rate_collapse_was_not_made_louder_by_the_retirement` pins that.
+
+**The `performance` domain still cannot reach a trader** — that question is
+recorded above and is unchanged. A retirement may not answer it.
+
+Counts: **15 → 14 detectors, 19 → 18 pattern types**, 4 aliases unchanged. It
+owned no threshold keys (its 0.40/0.50 were inline), so nothing was cleaned up
+and nothing was cleaned up by accident. 15 tests in
+`test_strategy_breakdown_retired.py`.
+
+---
 
 ## Closed 2026-09-02 — structure-level martingale (`3f9f529`)
 

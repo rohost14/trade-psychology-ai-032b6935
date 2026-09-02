@@ -44,7 +44,7 @@ logger = logging.getLogger(__name__)
 #: Not listed, deliberately — these need the outcome and would be answering a
 #: question they cannot see:
 #: premium_loss_event (live variant already ships separately, E4),
-#: win_rate_collapse, strategy_breakdown, no_stoploss.
+#: win_rate_collapse, no_stoploss. (`strategy_breakdown` retired 2026-09-02.)
 #: (`opening_5min_trap` was in this list until it was retired 2026-08-30, and
 #: `time_of_day_bias` until it was retired 2026-09-01.)
 ENTRY_DECIDABLE = (

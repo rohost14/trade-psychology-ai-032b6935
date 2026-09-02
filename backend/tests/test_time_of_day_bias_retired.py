@@ -126,11 +126,11 @@ def test_no_registry_spec_points_at_the_deleted_method():
 def test_the_engine_counts_are_what_the_retirement_left():
     from app.services.detector_registry import ALIASES, REGISTRY, all_pattern_types
 
-    assert len(REGISTRY) == 15
+    assert len(REGISTRY) == 14
     # 2026-09-02: 5 -> 4 aliases and 20 -> 19 pattern types. `death_spiral`
     # was retired - a summary of alerts already delivered, not a state.
     assert len(ALIASES) == 4
-    assert len(all_pattern_types()) == 19
+    assert len(all_pattern_types()) == 18
 
 
 def test_it_is_recorded_as_retired():
@@ -581,8 +581,11 @@ def test_win_rate_collapse_and_strategy_breakdown_were_not_modified():
     from app.services.behavior_engine import BehaviorEngine
     from app.services.detector_registry import BY_NAME, PATTERN_COPY
 
-    for name, method in (("win_rate_collapse", "_detect_win_rate_collapse"),
-                         ("strategy_breakdown", "_detect_strategy_breakdown")):
+    # `strategy_breakdown` was checked here too until it was retired
+    # 2026-09-02 for a reason unrelated to this one: its profit-factor half
+    # never bound. This assertion is about THIS retirement not touching the
+    # performance detectors, and `win_rate_collapse` is the one that survives.
+    for name, method in (("win_rate_collapse", "_detect_win_rate_collapse"),):
         assert name in BY_NAME
         assert name in PATTERN_COPY
         assert hasattr(BehaviorEngine(), method)

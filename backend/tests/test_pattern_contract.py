@@ -178,6 +178,13 @@ def test_no_shipping_module_uses_a_severity_value_outside_the_vocabulary():
 #: against these is dead code that looks alive.
 RETIRED_PATTERN_NAMES = (
     "revenge_sizing",
+    # Retired 2026-09-02 (Reviews 25-27 follow-up): it required a win-rate
+    # collapse AND a profit-factor collapse together, and the profit-factor
+    # half never bound - 4 firings, the IDENTICAL set to `win_rate_collapse`,
+    # ZERO unique. A session winning 11% of its trades almost always has a
+    # wrecked profit factor, so the two conditions were not independent and it
+    # was a second name for one finding. `win_rate_collapse` keeps the subject.
+    "strategy_breakdown",
     # Retired 2026-09-01 (Pattern 28): there is no universal exposure threshold
     # any more and none replaced its 5/10. A trader who DECLARED 40% was told
     # DANGER at 35% - inside their own rule - because safety_bounds clamps a

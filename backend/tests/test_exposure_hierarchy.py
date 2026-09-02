@@ -500,11 +500,13 @@ def test_the_constitution_ladder_is_untouched():
 def test_the_engine_counts_are_what_this_retirement_left():
     from app.services.detector_registry import ALIASES, REGISTRY, all_pattern_types
 
-    assert len(REGISTRY) == 15
-    # 2026-09-02: 5 -> 4 aliases and 20 -> 19 pattern types. `death_spiral`
-    # was retired - a summary of alerts already delivered, not a state.
+    # 2026-09-02, two retirements on one day: `death_spiral` (5 -> 4 aliases,
+    # 20 -> 19 pattern types) and `strategy_breakdown` (15 -> 14 detectors,
+    # 19 -> 18 pattern types). Neither is this file's subject; the counts are
+    # asserted here because a wrong one means a spec went missing silently.
+    assert len(REGISTRY) == 14
     assert len(ALIASES) == 4
-    assert len(all_pattern_types()) == 19
+    assert len(all_pattern_types()) == 18
 
 
 def test_the_surviving_detectors_are_exactly_these():
@@ -516,7 +518,10 @@ def test_the_surviving_detectors_are_exactly_these():
         "session_meltdown", "fomo_entry", "no_stoploss", "premium_loss_event",
         "end_of_session_mis_panic", "post_loss_recovery_bet",
         "constitution_violation", "same_symbol_obsession",
-        "win_rate_collapse", "strategy_breakdown",
+        # `strategy_breakdown` retired 2026-09-02 - it required a win-rate AND
+        # a profit-factor collapse together, and the profit-factor half never
+        # bound: identical firing set to `win_rate_collapse`, zero unique.
+        "win_rate_collapse",
     }
 
 

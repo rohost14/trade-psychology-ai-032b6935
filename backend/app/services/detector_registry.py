@@ -299,9 +299,13 @@ REGISTRY: Tuple[DetectorSpec, ...] = (
     DetectorSpec("win_rate_collapse", "_detect_win_rate_collapse",
                  "1.0.0", "performance", "analytics", "session", 0,
                  uses_baseline=True),
-    DetectorSpec("strategy_breakdown", "_detect_strategy_breakdown",
-                 "1.0.0", "performance", "analytics", "session", 0,
-                 uses_baseline=True),
+    # `strategy_breakdown` RETIRED 2026-09-02. It required a win-rate collapse
+    # AND a profit-factor collapse together, and on the reference book the
+    # profit-factor half NEVER bound: 4 firings, the identical set to
+    # `win_rate_collapse`, ZERO unique. A session that wins 11% of its trades
+    # almost always has a wrecked profit factor, so the second condition
+    # restated the first. `win_rate_collapse` keeps the subject and both
+    # baselines.
 )
 
 # Event types emitted by a detector under a different name than its spec
@@ -490,11 +494,6 @@ PATTERN_COPY: Dict[str, PatternCopy] = {
         "Today's win rate against your own longer-run baseline.",
         "A sharp drop against your own history is a change in conditions or in execution — worth "
         "knowing which.",
-    ),
-    "strategy_breakdown": PatternCopy(
-        "Strategy underperforming",
-        "Results grouped by the strategy structure you traded.",
-        "Separates a losing day from a structure that has stopped working.",
     ),
     # `time_of_day_bias` copy removed 2026-09-01 with the detector. Its
     # display name stays in AlertContext.formatPatternName so stored rows
