@@ -155,7 +155,7 @@ paths**: Redis/Celery degraded (the inline fallback runs three other checks and
 not this one), bulk sync, and CSV import. **Coverage of the engine's most-cited
 failure mode depends on Redis being up.**
 
-## 2. `multi_leg_unknown` grants full hedge suppression — VERIFIED
+## 2. ~~`multi_leg_unknown` grants full hedge suppression~~ — VERIFIED, **FIXED 2026-09-02 (`c107300`)**
 
 `strategy_detector.py:90-98` classifies, then builds the `StrategyGroup`
 **unconditionally** — `MULTI_LEG_UNKNOWN` is stored like any other type. The

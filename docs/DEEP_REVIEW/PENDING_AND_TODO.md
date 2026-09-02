@@ -13,6 +13,10 @@ counts. **Stale entries are struck through and kept, never deleted** — a
 register that quietly drops what it got wrong cannot be trusted about what it
 still holds.
 
+**Third pass 2 Sep 2026, after `c107300`:** F6 and F20 are **CLOSED** — see
+their entries. B1 closes with them. One new item was opened by the work:
+`is_spread` is a second presence-only suppression that F6 did not reach.
+
 **Second pass 2 Sep 2026, after `5844381`:** F5 moved to FIXED and separated
 from F6, which stays open and is now sharper — see that entry. B1/B2/B3 closures
 are at the foot of the file. The `STRUCTURE_GAP_SECONDS` question was measured
@@ -127,7 +131,7 @@ is told, not a defect with one correct answer.
 
 ---
 
-### ~~F5~~ **FIXED 2026-09-02** · F6 — hedge and structure semantics **STILL OPEN**
+### ~~F5~~ **FIXED** · ~~F6~~ **CLOSED 2026-09-02 (`c107300`)** — hedge and structure semantics
 
 **These were filed as one item and have separated.** F5 was a wrong *reading* —
 a defect with one correct answer. F6 is a product decision about what a
@@ -143,8 +147,23 @@ introduced — naming a shape we have not decided should receive any particular
 treatment would build a taxonomy to preserve a classification. The other six
 FUT+option combinations are unchanged and pinned by tests.
 
-**F6 — OPEN, and B1 sharpened it into a concrete consequence rather than a
-hypothetical.** The chain, all three links verified in code:
+> **F6 CLOSED 2026-09-02 (`c107300`).** `_structure_suppresses` replaces the
+> presence test: **only a RECOGNISED structure may suppress, and the set is
+> three detectors, not five.** `MULTI_LEG_UNKNOWN` earns nothing; an absent,
+> empty or unreadable `strategy_type` fails closed. `revenge_trade` and
+> `no_stoploss` were removed from the set entirely. Measured ON vs OFF over the
+> reference book: **197 -> 201 alerts, +4, all `revenge_trade`**, every other
+> detector unchanged, P&L and trade count identical. Pinned by
+> `tests/test_strategy_suppression.py` (40 tests).
+>
+> **One thing did NOT close, and it is recorded as its own item below:**
+> `martingale_behaviour` is still silent inside a `MULTI_LEG_UNKNOWN` group,
+> through a second presence-only mechanism this change did not touch.
+>
+> The original finding is kept below, because the reasoning is what justifies
+> the shape of the fix.
+
+**F6 — the finding, as recorded before the fix.** The chain, all three links verified in code:
 
 1. A risk-adding `FUT LONG + PE SHORT` now classifies as `MULTI_LEG_UNKNOWN`
    — correct, and it is what F5's fix produces.
@@ -159,14 +178,14 @@ hypothetical.** The chain, all three links verified in code:
 Classification correctness is fixed; suppression semantics are not, and the two
 were never the same question.
 
-**What must be decided:** what an *unrecognised* cluster earns. That is the
-whole of F6 and it is a product decision, not a defect with one answer —
-`MULTI_LEG_UNKNOWN` is an intentional uncertainty state (*"these legs are one
-multi-leg decision and we cannot name it"*), so "suppress nothing" and
-"suppress everything" are both defensible readings of it.
-
-**NO SUPPRESSION RULE IS PROPOSED HERE, deliberately.** Writing one inside a
-classification fix is how the two questions got entangled in the first place.
+**DECIDED 2026-09-02: an unrecognised cluster earns NOTHING.** Both readings
+were defensible in the abstract; the book decided it. 70% of the UNKNOWN
+groups are the same option type, all bought, at adjacent strikes — a second
+helping of one directional view, not a structure — so granting them
+hedge-grade silence suppressed exactly the behaviour the detectors exist to
+show. The rule adopted is narrower than "suppress recognised structures":
+suppression is a claim that **the detector's subject does not exist**, which
+is why only three of the five qualified.
 
 **Also still open, unchanged by the fix:** the hedge/structure semantic itself
 — what ratio and what degree of simultaneity constitute a hedge. The classifier
@@ -247,17 +266,76 @@ writing it twice. **Blocked on D5, not on effort.**
 
 ---
 
-### F20 — `overexposure` consumes other detectors' output
+### ~~F20~~ **CLOSED 2026-09-02 (`c107300`)** — `overexposure` consumed other detectors' output
 
-It queries `BehaviorEvent` for `revenge_trade`, `martingale_behaviour` and
-`post_loss_recovery_bet` at danger+ and promotes its own severity. The registry
-states the rule verbatim: *"Dependency rule (A.10): no detector may consume
-another detector's output."*
+> **Removed, not filtered.** The emotional multiplier is gone; `overexposure`'s
+> severity is now whatever its own ladder computed. Pinned by
+> `test_the_emotional_size_bump_is_gone_and_must_not_return` and by two source
+> assertions in `tests/test_strategy_suppression.py`. Zero effect on the
+> reference replay — the entry path it lives on is not exercised there.
+>
+> **What decided it was not A.10 on its own.** The query filtered on detector
+> and severity and **nothing else** — it never excluded SUPPRESSED events, and
+> suppression is notification-only, so those rows exist. A `revenge_trade`
+> silenced by a strategy group therefore sent the trader **no alert of its own
+> and still made a different alert critical**. Not told about the finding, told
+> about an unrelated breach more loudly because of it. Adding *"and not
+> suppressed"* would have been a third patch on a dependency the architecture
+> forbids outright, so the dependency went instead.
 
-**What must be decided:** whether this cross-detector dependency is
-**intentional** — it is documented in the code as the "Emotional multiplier
-(doc 4 P32)", i.e. a deliberate product feature — or whether it **violates the
-architecture contract** and the code must change.
+**The finding, as recorded before the fix.** It queried `BehaviorEvent` for
+`revenge_trade`, `martingale_behaviour` and `post_loss_recovery_bet` at danger+
+and promoted its own severity. The registry states the rule verbatim:
+*"Dependency rule (A.10): no detector may consume another detector's output."*
+
+**What had to be decided:** whether this cross-detector dependency was
+**intentional** — it was documented in the code as the "Emotional multiplier
+(doc 4 P32)", i.e. a deliberate product feature — or whether it **violated the
+architecture contract**.
+
+---
+
+### `is_spread` is a second presence-only suppression — OPEN, found closing F6
+
+**Found 2026-09-02 while verifying F6, and it is why `martingale_behaviour` did
+not move in the ON/OFF replay.**
+
+F6 fixed the *notification* suppression. A **second, independent** mechanism
+reads the same field the same way:
+
+```
+behavior_engine.py   is_spread = ctx.strategy_group is not None   -> risk_basis(...)
+```
+
+`risk_basis` then reports the denominator incomparable for a "spread", and the
+detector **abstains before suppression is ever consulted**. It is presence-only,
+exactly as F6 was, so `MULTI_LEG_UNKNOWN` silences the detector through this
+path even now.
+
+**Measured directly** (`_detect_martingale_behaviour`, same inputs, varying only
+the group):
+
+| `strategy_group` | F6 suppresses? | detector result |
+|---|---|---|
+| none | no | **fires** |
+| `MULTI_LEG_UNKNOWN` | **no** (fixed) | **still abstains** |
+| `iron_condor` | yes | abstains |
+
+Three call sites: `revenge_trade`, `adding_to_adverse_position`,
+`martingale_behaviour`. Only martingale abstains outright — for the other two it
+narrows one frame.
+
+**Why it was not fixed with F6:** it is marked `# F7` in the code and it is a
+*denominator comparability* question, not a notification one. Changing it
+changes what a detector measures, which is detector semantics and was out of
+scope. `post_loss_recovery_bet` has no such path — its zero in the replay is
+genuine.
+
+**What must be decided:** whether a spread's denominator is incomparable
+because the legs are *grouped*, or because the structure is *recognised* — the
+same question F6 just answered for suppression, asked about risk basis.
+
+---
 
 **Why not now:** it is a conflict between two things we wrote, not a bug with
 one correct answer. Exactly one of them has to give: either A.10 gains a stated
@@ -1577,7 +1655,7 @@ over the whole reference book.
 
 | # | verdict |
 |---|---|
-| **B1** — futures hedge asserted without the option leg's direction | **FIXED, NOT CLOSED.** The label is correct and the two risk-adding combinations fall to `MULTI_LEG_UNKNOWN`. **The downstream question is still open: `MULTI_LEG_UNKNOWN` earns the same full suppression as a recognised structure, so the structure lost the wrong name and kept the wrong silence.** See F6 above. B1 closes when F6 is decided. |
+| **B1** — futures hedge asserted without the option leg's direction | **CLOSED 2026-09-02.** The label was corrected in `5844381`; the downstream half — `MULTI_LEG_UNKNOWN` earning a recognised structure's silence — was closed by F6 in `c107300`. A risk-adding FUT + short-option pair now both loses the hedge label **and** earns no suppression. |
 | **B2** — `IRON_BUTTERFLY` unreachable, and the label only ever wrong | **CLOSED.** The branch sat below a condor test that every real butterfly also satisfies, so it never ran; the only shape that could reach it was four legs in one direction, which is not a butterfly. Butterfly and condor are now decided together by one ordering test, body width separating them. A real butterfly is named one; malformed and single-direction shapes cannot reach the label. |
 | **B3** — `iron_condor` was a catch-all, not a classification | **CLOSED.** It tested leg count and mixed direction only, so any four mixed-direction CE/PE legs matched — including the **inverted** structure whose risk runs the other way. It now requires 2 calls, 2 puts, four distinct strikes and both shorts strictly inside both longs. Everything else falls safely to `MULTI_LEG_UNKNOWN`. |
 
