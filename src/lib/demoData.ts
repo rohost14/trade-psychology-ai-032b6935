@@ -552,7 +552,10 @@ export const DEMO_BEHAVIORAL = {
     {
       pattern_type: 'daily_overtrading', frequency: 1, severity: 'caution',
       estimated_cost: 3660,
-      description: '5 trades on one day vs your average of 2.5. High-frequency days correlate with net losses.',
+      // The trailing "High-frequency days correlate with net losses" was cut
+      // 2026-09-03: an asserted correlation, and guest fixtures are shown to
+      // real visitors. The count against the trader's own average stays.
+      description: '5 trades on one day vs your average of 2.5.',
       examples: ['Day 6: 3 rapid-fire losses'],
     },
   ],
@@ -1009,7 +1012,8 @@ export const DEMO_BEHAVIORAL_ANALYSIS = {
     {
       pattern_type: 'daily_overtrading', count: 1, severity: 'caution',
       estimated_cost: 3660, last_seen: daysAgo(6, 11, 50),
-      description: 'High-frequency trading day correlated with net loss',
+      // Was: 'High-frequency trading day correlated with net loss'. Same cut.
+      description: '5 trades against a 2.5 average, and the day closed red',
     },
     {
       pattern_type: 'martingale_behaviour', count: 2, severity: 'danger',

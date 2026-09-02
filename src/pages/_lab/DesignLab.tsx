@@ -34,11 +34,14 @@ const VARIANTS: { id: Variant; name: string; ref: string }[] = [
 ];
 
 /* ── data (the demo session used throughout the design work) ───────────── */
+// `Size Escalation` (retired 2026-08-27) and `Early Exit` (retired 2026-08-30)
+// were the first two mocks here until 2026-09-03. A design lab is where the
+// next screen gets copied from, so a retired detector sitting in it ships.
 const ALERTS = [
-  { t: 'Size Escalation', sev: 'danger' as const, when: 'now',
+  { t: 'Martingale / Averaging Down', sev: 'danger' as const, when: 'now',
     b: 'BANKNIFTY 45500 PE entry at 100 lots — 4× your average size — 8 min after ₹2,600 loss. Win rate on oversized entries: 28% vs 60% baseline.' },
-  { t: 'Early Exit', sev: 'caution' as const, when: 'now',
-    b: 'NIFTY CE exited at +₹820 after 8 min. Position continued to +₹2,100. You exit 42% early on average.' },
+  { t: 'Added to a Losing Position', sev: 'caution' as const, when: 'now',
+    b: 'NIFTY CE averaged down twice while 18% under water. Position now 3× the size you opened it at.' },
   { t: 'No Stop-Loss', sev: 'danger' as const, when: 'now',
     b: 'FINNIFTY 19800 CE open 47 min with no stop-loss. Unrealised loss: ₹3,200. Positions without stop-loss average 3× larger final loss for you.' },
 ];

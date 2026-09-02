@@ -46,14 +46,17 @@ const EVER_DONE: string[] = [
 ];
 
 const HOW: [string, string][] = [
-  ['It learns how you trade', 'Your last 90 days of orders, read once. Average size, usual pace, how you behave after a stop-out. Your normal, not an average trader’s.'],
+  // "not an average trader's" and "the line most traders have never seen"
+  // were cut 2026-09-03. Both speak for a population this product has never
+  // observed - it reads one trader's orders.
+  ['It learns how you trade', 'Your last 90 days of orders, read once. Average size, usual pace, how you behave after a stop-out. Your normal, measured rather than assumed.'],
   ['It watches the fills', 'Every order that completes is checked against that baseline, in the session, not at the end of the month.'],
   ['It tells you what just happened', 'On screen and on WhatsApp: the behaviour, the money it has already cost you, and your record with it.'],
 ];
 
 const GET: [string, string][] = [
   ['Live behaviour alerts', 'Size spikes, fast re-entries, missing stops, loss streaks. Each alert carries the rupee figure that habit has already charged you.'],
-  ['Cost leaks', 'Your P&L split by behaviour instead of by scrip. The line most traders have never seen.'],
+  ['Cost leaks', 'Your P&L split by behaviour instead of by scrip. Your broker shows you the second; nothing shows you the first.'],
   ['Your own record', 'Before you size up after a loss, what happened the last six times you did.'],
   ['Your rules, enforced honestly', 'Set a limit and the app tells you when your own trading is already tighter than it.'],
   ['A journal that fills itself', 'Every trade already logged. Add a mood in one tap, or nothing at all.'],

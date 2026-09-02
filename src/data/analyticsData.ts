@@ -184,7 +184,10 @@ export const expandablePatterns: ExpandablePattern[] = [
     description: 'Occasionally exceeding recommended position sizes.',
     lastDetected: '3 hours ago',
     frequency: 4,
-    aiAdvice: 'Keep positions under 3% of capital. Large positions correlate with 2x more emotional decisions.',
+    // Was: "... Large positions correlate with 2x more emotional decisions."
+    // Removed 2026-09-03 - an asserted correlation with no measurement
+    // behind it. The 3% is the trader's own declared limit and stays.
+    aiAdvice: 'Keep positions under 3% of capital, as you set it.',
     icon: 'Scale',
   },
 ];
