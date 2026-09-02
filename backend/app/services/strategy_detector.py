@@ -89,6 +89,43 @@ async def detect_and_save(
     # Classify strategy
     strategy_type = _classify(completed_trade, parsed, siblings)
 
+    # ── An unrecognised cluster is NOT a structure ──────────────────────────
+    #
+    # Proximity on one underlying is a CANDIDATE, not a strategy. A multi-leg
+    # structure is legs of different kinds placed together — a call and a put,
+    # or a buy and a sell of the same kind at different strikes. Two calls
+    # bought a minute apart are not that. They are two directional trades, and
+    # the second one being near the first is the behaviour, not an excuse for
+    # it.
+    #
+    # Persisting a MULTI_LEG_UNKNOWN group made the engine treat them as one
+    # decision in three separate places, all keyed on the group merely
+    # EXISTING:
+    #
+    #   * `_structure_suppresses` withheld notifications (fixed 2026-09-02),
+    #   * `is_spread` marked the risk denominator UNRELIABLE, so
+    #     `martingale_behaviour` abstained before suppression was consulted,
+    #   * `session_meltdown` excused a losing leg inside a net-profitable
+    #     "structure" — netting two unrelated trades.
+    #
+    # Not creating the group closes all three at the source instead of teaching
+    # each consumer to re-check the classification. It also makes this path
+    # agree with `count_structures`, which has always refused to collapse an
+    # unrecognised cluster: "two directional trades on the same underlying a
+    # minute apart are two decisions, not a mystery spread." The two grouping
+    # paths had opposite conservatism; now they do not.
+    #
+    # The classification itself is unchanged, and MULTI_LEG_UNKNOWN remains a
+    # meaningful answer from `classify_legs` for callers that ask about a set
+    # of legs directly.
+    if strategy_type == StrategyType.MULTI_LEG_UNKNOWN:
+        logger.debug(
+            f"[strategy_detector] not a structure — {parsed.underlying} "
+            f"{parsed.expiry_key}, {len(siblings) + 1} legs, unrecognised shape; "
+            f"treated as separate trades"
+        )
+        return None
+
     # Build StrategyGroup
     all_trades = [completed_trade] + siblings
     net_pnl = sum(Decimal(str(t.realized_pnl or 0)) for t in all_trades)
@@ -127,6 +164,80 @@ async def detect_and_save(
         f"legs={len(all_trades)} | net_pnl={float(net_pnl):+,.0f}"
     )
     return group
+
+
+class StructureSizing(NamedTuple):
+    """
+    One structure's deployment against the last comparable one.
+
+    "Comparable" is deliberately strict — same underlying, same expiry, same
+    recognised strategy type. A straddle is not comparable to a strangle and
+    NIFTY is not comparable to BANKNIFTY, so the ratio is like-for-like or it
+    does not exist.
+    """
+    strategy_type: str
+    current: float
+    previous: float
+    previous_opened_at: Optional[datetime]
+
+
+async def _deployment_for_group(group: StrategyGroup,
+                                db: AsyncSession) -> Optional[float]:
+    """Net debit of a stored structure, from its legs' CompletedTrades."""
+    rows = (await db.execute(
+        select(CompletedTrade)
+        .join(StrategyGroupLeg,
+              StrategyGroupLeg.completed_trade_id == CompletedTrade.id)
+        .where(StrategyGroupLeg.strategy_group_id == group.id)
+    )).scalars().all()
+    if not rows:
+        return None
+    return structure_deployment(group.strategy_type, [
+        DeploymentLeg(t.instrument_type, t.direction,
+                      float(t.avg_entry_price or 0), int(t.total_quantity or 0))
+        for t in rows
+    ])
+
+
+async def structure_sizing(group: Optional[StrategyGroup],
+                           db: AsyncSession) -> Optional[StructureSizing]:
+    """
+    This structure's deployment and the most recent comparable one's.
+
+    Returns None — and the caller abstains — whenever the comparison would not
+    be like-for-like: an unmeasurable structure type, a leg without a usable
+    price, or no earlier structure of the same shape on the same underlying and
+    expiry to compare against. A first straddle has nothing to be 2x of.
+    """
+    if group is None or group.strategy_type not in DEPLOYMENT_MEASURABLE:
+        return None
+    current = await _deployment_for_group(group, db)
+    if current is None:
+        return None
+    previous_group = (await db.execute(
+        select(StrategyGroup)
+        .where(and_(
+            StrategyGroup.broker_account_id == group.broker_account_id,
+            StrategyGroup.strategy_type == group.strategy_type,
+            StrategyGroup.underlying == group.underlying,
+            StrategyGroup.expiry_key == group.expiry_key,
+            StrategyGroup.id != group.id,
+            StrategyGroup.opened_at < group.opened_at,
+        ))
+        .order_by(StrategyGroup.opened_at.desc())
+        .limit(1)
+    )).scalars().first()
+    if previous_group is None:
+        return None
+    previous = await _deployment_for_group(previous_group, db)
+    if not previous or previous <= 0:
+        return None
+    return StructureSizing(
+        strategy_type=group.strategy_type,
+        current=current,
+        previous=previous,
+        previous_opened_at=previous_group.opened_at,
+    )
 
 
 async def get_group_for_trade(
@@ -250,6 +361,72 @@ def count_structures(trades: Sequence[Any], gap_seconds: int = STRUCTURE_GAP_SEC
         else:
             total += len(cluster)
     return total
+
+
+# ---------------------------------------------------------------------------
+# Structure-level deployment (Q1, 2026-09-02)
+# ---------------------------------------------------------------------------
+#
+# What a trader COMMITTED to open a structure, as one figure. It exists so
+# `martingale_behaviour` can ask its question at the level the decision was
+# actually made: "this straddle is 2x your last straddle" rather than "leg 2 is
+# 2x leg 1", which inside a structure is not a sequence at all.
+#
+# ONLY where entry cost is economically meaningful. A debit structure is bought
+# and the debit IS the commitment. A credit structure is sold: the cash
+# received is not what is at risk, the margin is, and we do not capture broker
+# margin yet. Futures hedges and calendars are excluded for the same reason —
+# a future's entry cost is notional, not deployment.
+#
+# So this is an ALLOW-LIST, not an inference. Anything not named here returns
+# None and the caller abstains.
+
+#: Structures whose net debit is a real deployment figure.
+DEPLOYMENT_MEASURABLE = frozenset({
+    StrategyType.STRADDLE_BUY,
+    StrategyType.STRANGLE_BUY,
+    StrategyType.BULL_CALL_SPREAD,
+    StrategyType.BEAR_PUT_SPREAD,
+})
+
+
+class DeploymentLeg(NamedTuple):
+    """One leg, reduced to what a deployment figure needs."""
+    instrument_type: Optional[str]
+    direction: Optional[str]
+    avg_entry_price: Optional[float]
+    total_quantity: Optional[int]
+
+
+def structure_deployment(strategy_type: str,
+                         legs: Sequence[DeploymentLeg]) -> Optional[float]:
+    """
+    Net debit paid to open this structure, or None when it is not measurable.
+
+    Long legs are money out, short legs money in, so a debit spread nets to the
+    debit rather than the gross sum of its legs — buying the 25000 CE and
+    selling the 25200 CE commits the difference, not both premiums.
+
+    Returns None — never a guess — when:
+      * the structure is not on the allow-list (credit, futures, calendar),
+      * any leg is not an option, so "premium" has no meaning,
+      * any leg has no usable price or quantity,
+      * the legs net to a credit or to zero, which means the allow-list and the
+        actual directions disagree and the shape is not what it was named.
+    """
+    if strategy_type not in DEPLOYMENT_MEASURABLE:
+        return None
+    total = 0.0
+    for leg in legs:
+        if (leg.instrument_type or "").upper() not in ("CE", "PE"):
+            return None
+        price = float(leg.avg_entry_price or 0)
+        qty = abs(int(leg.total_quantity or 0))
+        if price <= 0 or qty <= 0:
+            return None
+        cost = price * qty
+        total += cost if (leg.direction or "").upper() == "LONG" else -cost
+    return total if total > 0 else None
 
 
 #: How each structure is named to a trader. Lives here, beside the values it

@@ -262,6 +262,10 @@ def test_the_strategy_suppression_set_is_exactly_its_current_members():
         20-minute window, so grouping was eating the canonical revenge shape.
       `no_stoploss`    — being a leg of a structure says nothing about whether
         a stop existed.
+      `martingale_behaviour` (Q1, same day) — its SUBJECT changed rather than
+        disappearing: inside a recognised structure it now compares the
+        structure's deployment against the last comparable structure, and
+        suppressing it would have made that branch unreachable.
 
     Asserting EQUALITY rather than membership is the stronger form: it catches
     a member leaving *and* a member being added without a stated reason.
@@ -270,7 +274,7 @@ def test_the_strategy_suppression_set_is_exactly_its_current_members():
     from app.services.behavior_engine import BehaviorEngine
 
     assert BehaviorEngine._STRATEGY_SUPPRESSED == frozenset({
-        "rapid_reentry", "martingale_behaviour", "post_loss_recovery_bet",
+        "rapid_reentry", "post_loss_recovery_bet",
     })
 
 

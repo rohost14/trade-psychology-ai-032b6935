@@ -43,12 +43,18 @@ engine = BehaviorEngine()
 
 SUPPRESSED_IN_A_RECOGNISED_STRUCTURE = {
     "rapid_reentry",
-    "martingale_behaviour",
     "post_loss_recovery_bet",
 }
 NEVER_SUPPRESSED_BY_STRUCTURE = {
     "revenge_trade",
     "no_stoploss",
+    # `martingale_behaviour` left the set on 2026-09-02 (Q1). Not because
+    # suppression was wrong for it, but because its SUBJECT CHANGED: inside a
+    # recognised structure it now compares the structure's deployment against
+    # the last comparable structure, and that claim is not defeated by the
+    # legs being one construction. Suppressing it would have made the
+    # structure-level branch unreachable — dead on arrival.
+    "martingale_behaviour",
 }
 
 
@@ -72,7 +78,7 @@ def legs(*pairs):
     StrategyType.FUTURES_HEDGE_BULLISH,
 ])
 @pytest.mark.parametrize("detector", sorted(SUPPRESSED_IN_A_RECOGNISED_STRUCTURE))
-def test_a_recognised_structure_suppresses_the_three_construction_detectors(
+def test_a_recognised_structure_suppresses_the_construction_detectors(
     strategy_type, detector
 ):
     """
@@ -182,12 +188,15 @@ def test_an_unset_or_malformed_strategy_type_is_treated_as_unknown():
 
 # ── The suppression set itself ───────────────────────────────────────────────
 
-def test_the_suppressed_set_is_exactly_the_three_construction_detectors():
+def test_the_suppressed_set_is_exactly_its_two_members():
     """
     Pinned so a detector cannot be added to the set without someone stating
-    why its subject cannot exist inside a structure.
+    why its subject cannot exist inside a structure — and so martingale cannot
+    be added back without someone noticing it would kill the structure-level
+    branch.
     """
     assert engine._STRATEGY_SUPPRESSED == SUPPRESSED_IN_A_RECOGNISED_STRUCTURE
+    assert "martingale_behaviour" not in engine._STRATEGY_SUPPRESSED
 
 
 def test_revenge_and_no_stoploss_are_not_in_the_set():
@@ -255,3 +264,69 @@ def test_behavior_event_is_not_imported_for_severity_decisions():
 
     source = Path(pmt.__file__).read_text(encoding="utf-8")
     assert "BehaviorEvent.detector.in_" not in source
+
+
+# ── An unrecognised cluster is not persisted as a structure at all ───────────
+#
+# The deeper fix, 2026-09-02. F6 stopped MULTI_LEG_UNKNOWN from EARNING
+# suppression; this stops it from being a group in the first place, which is
+# what it always was: two calls bought a minute apart are two directional
+# trades, not a mystery spread.
+#
+# It closes three presence-only consumers at the source rather than teaching
+# each of them to re-check the classification.
+
+def test_two_calls_are_not_a_structure_and_never_were():
+    """
+    The shape that made 70% of the book's UNKNOWN groups. A multi-leg structure
+    is legs of different kinds placed together — a call and a put, or a buy and
+    a sell of one kind. Two long calls at adjacent strikes is neither.
+    """
+    assert classify_legs(legs(("NIFTY25MAR24600CE", "LONG"),
+                              ("NIFTY25MAR24700CE", "LONG"))) == \
+        StrategyType.MULTI_LEG_UNKNOWN
+
+
+def test_detect_and_save_returns_none_for_an_unrecognised_cluster():
+    """
+    Asserted on the source because the alternative is a full DB fixture for a
+    path whose whole content is one early return. The guard must sit BEFORE the
+    StrategyGroup is constructed — after it, the row exists and every
+    presence-only consumer has already been misled.
+    """
+    import inspect
+
+    from app.services import strategy_detector
+
+    src = inspect.getsource(strategy_detector.detect_and_save)
+    guard = src.index("MULTI_LEG_UNKNOWN")
+    build = src.index("group = StrategyGroup(")
+    assert guard < build, (
+        "the unrecognised-cluster guard must run before the group is built"
+    )
+    assert "return None" in src[guard:build]
+
+
+def test_the_two_grouping_paths_now_agree():
+    """
+    `count_structures` has always refused to collapse an unrecognised cluster;
+    `detect_and_save` used to group one anyway. That was the same input read
+    with opposite conservatism by two halves of one engine.
+    """
+    import inspect
+
+    from app.services import strategy_detector
+
+    for fn in (strategy_detector.detect_and_save, strategy_detector.count_structures):
+        assert "MULTI_LEG_UNKNOWN" in inspect.getsource(fn)
+
+
+def test_a_recognised_structure_is_still_grouped():
+    """The guard must not swallow the case grouping exists for."""
+    import inspect
+
+    from app.services import strategy_detector
+
+    src = inspect.getsource(strategy_detector.detect_and_save)
+    assert "group = StrategyGroup(" in src
+    assert "await db.commit()" in src

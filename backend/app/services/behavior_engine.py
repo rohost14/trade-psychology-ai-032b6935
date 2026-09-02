@@ -273,6 +273,10 @@ class EngineContext:
     session_trades: List[CompletedTrade]
     thresholds: Dict[str, Any]
     strategy_group: Optional[StrategyGroup] = None
+    #: This structure's deployment against the last comparable one, when
+    #: both are measurable. Loaded in `build_context` because it needs the
+    #: DB; `martingale_behaviour` is its only reader.
+    structure_sizing: Optional[Any] = None
     # order_type values of the exit fills for the current completed_trade
     # (e.g. ["MKT"], ["SL"], ["SL-M", "MKT"]).  Empty when exit_trade_ids unknown.
     exit_order_types: List[str] = None  # type: ignore[assignment]
@@ -598,6 +602,19 @@ class BehaviorEngine:
         except Exception as _sg_e:
             logger.debug(f"Strategy group lookup skipped: {_sg_e}")
 
+        # Q1: this structure's deployment against the last comparable one, for
+        # `martingale_behaviour`'s structure-level branch. Only a recognised,
+        # debit-measurable structure with an earlier comparable produces a
+        # value; everything else stays None and the detector falls back to its
+        # leg-level logic, or abstains if it is inside a structure.
+        structure_sizing = None
+        if strategy_group is not None:
+            try:
+                from app.services.strategy_detector import structure_sizing as _sizing
+                structure_sizing = await _sizing(strategy_group, db)
+            except Exception as _ss_e:
+                logger.debug(f"Structure sizing skipped: {_ss_e}")
+
         # Query 4: exit order types for the current trade (SL/SL-M detection)
         exit_order_types: List[str] = []
         if completed_trade.exit_trade_ids:
@@ -737,6 +754,7 @@ class BehaviorEngine:
             session_trades=session_trades,
             thresholds=thresholds,
             strategy_group=strategy_group,
+            structure_sizing=structure_sizing,
             exit_order_types=exit_order_types,
             position_fills=position_fills,
             session_state=shadow_state,
@@ -777,7 +795,6 @@ class BehaviorEngine:
     #: Dropping it would remove the annotation, not dead configuration.
     _STRATEGY_SUPPRESSED = frozenset({
         "rapid_reentry",
-        "martingale_behaviour",
         "post_loss_recovery_bet",
     })
 
@@ -1897,6 +1914,7 @@ class BehaviorEngine:
         """
         from app.core.evidence import Insufficiency, positive
         from app.core.instrument_risk import risk_basis
+        from app.services.strategy_detector import strategy_label
 
         ct = ctx.completed_trade
         # CONCLUDED, not OCCURRED. This detector's claim is causal - size
@@ -1924,6 +1942,67 @@ class BehaviorEngine:
             return not_detected(
                 "martingale_behaviour",
                 f"{run} consecutive losing trades before this one, not {min_losses}",
+            )
+
+        # ── Structure level, when this trade is a leg of a recognised one ───
+        #
+        # Inside a straddle, "leg 2 is 2x leg 1" is not a finding — the legs are
+        # one construction placed at once, which is why suppression used to
+        # silence this detector here. But the STRUCTURE is a unit that CAN be
+        # escalated, and that claim survives: "this straddle is 2x your last
+        # straddle" is the martingale question asked at the level the decision
+        # was actually made.
+        #
+        # The subject changes rather than disappearing, which is why
+        # `martingale_behaviour` left `_STRATEGY_SUPPRESSED` on 2026-09-02.
+        #
+        # Comparable is strict — same underlying, same expiry, same recognised
+        # type — and deployment is the NET DEBIT paid, which exists only for
+        # debit structures. A credit structure's commitment is margin, and
+        # broker margin is not captured yet, so it abstains rather than
+        # substituting a number it cannot source. See
+        # `strategy_detector.structure_sizing`.
+        #
+        # The run-of-losses precondition and both multipliers are UNCHANGED.
+        sizing = getattr(ctx, "structure_sizing", None)
+        if ctx.strategy_group is not None:
+            if sizing is None:
+                return abstained(
+                    "martingale_behaviour", Insufficiency.NOT_APPLICABLE,
+                    "no comparable earlier structure with a measurable deployment",
+                )
+            s_ratio = sizing.current / sizing.previous
+            s_caution = float(ctx.thresholds.get("martingale_caution_multiplier", 1.5))
+            s_danger = float(ctx.thresholds.get("martingale_danger_multiplier", 2.0))
+            if s_ratio < s_caution:
+                return not_detected(
+                    "martingale_behaviour",
+                    f"structure deployment went {sizing.previous:,.0f} to "
+                    f"{sizing.current:,.0f} ({s_ratio:.2f}x) after {run} losses",
+                )
+            s_severity = "danger" if s_ratio >= s_danger else "caution"
+            s_loss = sum(abs(float(t.realized_pnl or 0)) for t in prior[-run:])
+            label = strategy_label(sizing.strategy_type).lower()
+            return DetectorResult(
+                detector="martingale_behaviour",
+                evidence=positive("structure escalation after losses",
+                                  ratio=round(s_ratio, 2)),
+                layer=Layer.SAFETY if s_severity == "danger" else Layer.PERSONAL,
+                severity=s_severity,
+                message=(
+                    f"After {run} losing trades (Rs {s_loss:,.0f}), you opened a "
+                    f"{label} with {s_ratio:.1f}x the deployment of your last one "
+                    f"(Rs {sizing.previous:,.0f} to Rs {sizing.current:,.0f})."
+                ),
+                context={
+                    "consecutive_losses": run,
+                    "prior_total_loss": round(s_loss, 2),
+                    "risk_before": round(sizing.previous),
+                    "risk_after": round(sizing.current),
+                    "ratio": round(s_ratio, 2),
+                    "scope": "structure",
+                    "strategy_type": sizing.strategy_type,
+                },
             )
 
         previous = prior[-1]
