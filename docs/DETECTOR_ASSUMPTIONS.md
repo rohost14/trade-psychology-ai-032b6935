@@ -72,9 +72,9 @@ against the trader's own median losing trade.
 | `premium_loss_event` | long options only | a seller who loses badly is a different pattern, deliberately excluded | intended |
 | `options_premium_avg_down` | long options only | same | intended |
 | `opening_5min_trap` | 09:15–09:25 matters | analytics-only, never alerts | intended |
-| `time_of_day_bias` | enough history for a baseline | silent across 61 sessions — unknown whether clean or starved | **unresolved** |
-| `win_rate_collapse` | a stable prior win rate | silent across 61 sessions | **unresolved** |
-| `strategy_breakdown` | strategies are identifiable | silent across 61 sessions | **unresolved** |
+| `time_of_day_bias` | enough history for a baseline | it was **neither clean nor starved** — the silence was an artefact (a CSV book carries no profile) and it was LIVE for any trader with 30+ sessions. Its danger hours do not survive into a second period | **RESOLVED 1 Sep 2026 — RETIRED**, learning kept |
+| `win_rate_collapse` | a stable prior win rate | silent for the same artefact reason; its guards are sound (baseline confidence ≥ 0.5 **and** an 8-trade day) | **RESOLVED 1 Sep 2026 — KEEP AS-IS** |
+| `strategy_breakdown` | strategies are identifiable | its two conditions (win-rate drop, profit-factor drop) never disagree in this book, so there is nothing to separate | **RESOLVED 1 Sep 2026 — DEFERRED**; unblock = sessions where they disagree |
 | `expiry_day_overtrading` | expiry derived from symbol | a symbol/date mismatch makes every day non-expiry — this broke a scenario | fixed in tests, worth watching |
 | `fomo_entry` | 3 instruments in 30 min is chasing | on expiry day the threshold was 2, which flags ordinary sessions | raised to 4 |
 
@@ -89,6 +89,29 @@ They compare today against the trader's own baseline, so three months may simply
 be too little history. **The twelve-month tradebook resolves this**, and it is
 the clearest question that book can answer: if they stay silent across 250
 sessions, they are not earning their complexity.
+
+> **ANSWERED 1 Sep 2026 — Reviews 25-27, and the three answers differ.** Each was
+> measured twice: as the engine sees it today, and with the baseline supplied
+> from the book's own history, which is what a mature trader would present.
+>
+> The framing above was **wrong in one respect and it matters**: the silence was
+> not "too little history". A CSV tradebook carries **no `UserProfile`**, so the
+> baseline the three read was never written at all. Silence in replay was a
+> property of the harness. `time_of_day_bias` in particular was **LIVE in
+> production** for any trader with 30+ sessions, written on a nightly 18:15 IST
+> beat, the whole time it read as "never fired".
+>
+> - `time_of_day_bias` — **RETIRED.** Supplied with a baseline it fires the
+>   equivalent of ~81 alerts on a signal that does not survive into a second
+>   time period (danger hours: full book `[12, 15]`, first half `[11, 12, 15]`,
+>   second half **none**; rank correlation between halves rho = +0.071). The
+>   nightly learning and storage are **KEPT** — only the trader-facing
+>   interpretation is gone.
+> - `win_rate_collapse` — **KEEP AS-IS.** Same artefact, sound guards.
+> - `strategy_breakdown` — **DEFERRED.** Its two conditions never disagree in
+>   this book. Unblock = sessions where they do.
+>
+> Evidence: `docs/patterns/25-27-performance-trio/`.
 
 ---
 
