@@ -44,51 +44,42 @@ RULES = [
 SCOPED_FILES = [BACKEND / f for f in MARKERS["scope"]["backend"]["files"]]
 
 
-def _string_literals(src: str) -> list[str]:
+def _readable_text(src: str) -> str:
     """
-    Every single- or double-quoted string in a Python source file.
+    The file's text with `#` comments and docstrings removed.
 
-    Hand-rolled rather than regex or `ast` because `#` inside a string is not a
-    comment and a regex cannot tell the difference. Triple-quoted strings are
-    consumed and DISCARDED: they are docstrings here, never trader-facing copy.
-    f-strings need no special handling — the prefix is just an identifier
-    character before the quote, and the body is scanned as written.
+    REPLACED A LITERAL EXTRACTOR, 2026-09-03. The frontend half used the same
+    approach and had a proven blind spot: it tracked string state to pull out
+    literals, and an apostrophe in ordinary JSX prose read as an opening quote,
+    swallowing everything up to the next apostrophe. A claim planted in one of
+    those regions was invisible to it — demonstrated on Welcome.tsx, where the
+    scanner extracted 417 literals and none contained the planted claim.
+
+    Matching the whole text is strictly more sensitive, and the precision cost
+    is near zero because every marker is a long English phrase rather than a
+    token. Comments and docstrings still go, because this repo's idiom is to
+    QUOTE a removed claim in the comment that removes it, and a guard that
+    fails on its own removal notes gets switched off within a week.
     """
+    triples = ("'" * 3, '"' * 3)
     out: list[str] = []
     i, n = 0, len(src)
     while i < n:
-        c = src[i]
-        if c == "#":
+        ch = src[i]
+        if ch == "#":
             while i < n and src[i] != "\n":
                 i += 1
             continue
-        if c in "'\"":
-            triple = src[i : i + 3]
-            if triple in ("'''", '"""'):
-                i += 3
-                while i < n and src[i : i + 3] != triple:
-                    i += 1
-                i += 3
-                continue
-            quote = c
-            i += 1
-            buf: list[str] = []
-            while i < n and src[i] != quote:
-                if src[i] == "\\":
-                    i += 2
-                    buf.append(" ")
-                    continue
-                if src[i] == "\n":  # unterminated; bail rather than run away
-                    break
-                buf.append(src[i])
+        if src[i : i + 3] in triples:
+            closing = src[i : i + 3]
+            i += 3
+            while i < n and src[i : i + 3] != closing:
                 i += 1
-            i += 1
-            text = "".join(buf)
-            if len(text) >= 6:
-                out.append(text)
+            i += 3
             continue
+        out.append(ch)
         i += 1
-    return out
+    return "".join(out)
 
 
 def test_marker_vocabulary_loaded():
@@ -104,15 +95,18 @@ def test_no_unsourced_claims_in_trader_facing_modules():
     violations: list[str] = []
     for path in SCOPED_FILES:
         rel = path.relative_to(REPO).as_posix()
-        for text in _string_literals(path.read_text(encoding="utf-8")):
-            hit = next((g for g, rx in RULES if rx.search(text)), None)
+        for raw in _readable_text(path.read_text(encoding="utf-8")).splitlines():
+            line = raw.strip()
+            if not line:
+                continue
+            hit = next((g for g, rx in RULES if rx.search(line)), None)
             if hit is None:
                 continue
             allowed = any(
-                e["file"] == rel and e["literal_sha256"] == _sha(text) for e in ALLOWLIST
+                e["file"] == rel and e["literal_sha256"] == _sha(line) for e in ALLOWLIST
             )
             if not allowed:
-                violations.append(f"\n  {rel}\n    [{hit}] {text[:140]!r}\n    hash: {_sha(text)}")
+                violations.append(f"\n  {rel}\n    [{hit}] {line[:140]!r}\n    hash: {_sha(line)}")
 
     assert not violations, (
         "Unsourced trader-facing claim(s)."

@@ -38,15 +38,15 @@
  * deliberate: the audit found 26 claims and zero sources, so any escape hatch
  * reproduces the problem it was built to stop.
  *
- * Entries are keyed by a hash of the literal, not a line number, so
- * reformatting does not churn the allowlist but EDITING a claim sends it back
+ * Entries are keyed by a hash of the matched LINE, not a line number, so
+ * moving code does not churn the allowlist but EDITING a claim sends it back
  * for review.
  *
  * KNOWN GAPS, stated rather than hidden:
  *   - LLM output is uncoverable. The coach generates free text at runtime and
  *     no static test reaches it. Its offline FALLBACK strings are covered.
  *   - Claims assembled across lines (f-string fragments appended to a list)
- *     are scanned per fragment, not as the finished sentence.
+ *     are scanned per line, not as the finished sentence.
  *   - CITED cannot be verified here. A bad citation passes.
  */
 import { describe, it, expect } from 'vitest';
@@ -81,69 +81,37 @@ const RULES: Array<{ group: string; re: RegExp }> = Object.entries(
 const sha = (s: string) => createHash('sha256').update(s).digest('hex').slice(0, 16);
 
 /**
- * Pull the readable text out of a TS/TSX file: string literals plus, in TSX,
- * the text between JSX tags. Comments are skipped.
+ * The readable text of a file, with comments removed.
  *
- * A hand-rolled scanner rather than a regex because a regex cannot tell `//`
- * inside a URL from the start of a comment, and cannot tell a trailing comment
- * from a whole-line one. Skipping comments matters more than it sounds: this
- * repo's idiom is to QUOTE a removed claim in the comment that removes it, and
- * a guard that fails on its own removal notes gets switched off within a week.
+ * REPLACED A CHARACTER SCANNER, 2026-09-03, because that scanner had blind
+ * spots. It tracked string state to pull out literals, and in TSX an apostrophe
+ * in ordinary prose — `<p>Don't…</p>` — reads as an opening quote. Everything
+ * up to the next apostrophe was swallowed as if it were one string, so whole
+ * regions of a file were never scanned. Proved by planting the original
+ * "Circuit breaker prompts" claim in Welcome.tsx: the scanner extracted 417
+ * literals from that file and not one of them contained it.
+ *
+ * Matching whole text is strictly more sensitive and costs almost nothing in
+ * precision here, because every marker is a long English phrase rather than a
+ * token. Measured before switching: across 164 frontend files it produced ONE
+ * hit that the literal scanner would not have, and that hit was a marker bug
+ * (`% of them` matching a trader's own win rate), now fixed.
+ *
+ * Comments still go, and that still matters: this repo's idiom is to QUOTE a
+ * removed claim in the comment that removes it, and a guard that fails on its
+ * own removal notes gets switched off within a week. `//` is only treated as a
+ * comment when it is not part of a `://` URL.
  */
-function extractText(src: string, isTsx: boolean): string[] {
-  const out: string[] = [];
-  let i = 0;
-  const n = src.length;
-  while (i < n) {
-    const c = src[i];
-    const next = src[i + 1];
-
-    if (c === '/' && next === '/') {
-      while (i < n && src[i] !== '\n') i++;
-      continue;
-    }
-    if (c === '/' && next === '*') {
-      i += 2;
-      while (i < n && !(src[i] === '*' && src[i + 1] === '/')) i++;
-      i += 2;
-      continue;
-    }
-    if (c === "'" || c === '"' || c === '`') {
-      const quote = c;
-      i++;
-      let buf = '';
-      while (i < n && src[i] !== quote) {
-        if (src[i] === '\\') { i += 2; buf += ' '; continue; }
-        buf += src[i];
-        i++;
-      }
-      i++;
-      if (buf.length >= 6) out.push(buf);
-      continue;
-    }
-    // JSX text: the run between `>` and the next `<`. A lot of copy lives
-    // there rather than in a literal, so it is worth reading - but `>` is also
-    // an arrow, a generic and a comparison, so most runs caught this way are
-    // code. Prose is what survives the filter below: no statement punctuation,
-    // no braces, and short enough to be a sentence rather than a function body.
-    // Without it the scan returned multi-line slabs of JSX whose hash changed
-    // whenever any nearby code moved.
-    if (isTsx && c === '>') {
-      i++;
-      let buf = '';
-      while (i < n && src[i] !== '<') { buf += src[i]; i++; }
-      const t = buf.trim();
-      const looksLikeProse =
-        t.length >= 6 &&
-        t.length <= 300 &&
-        !/[{};=]/.test(t) &&
-        t.split('\n').length <= 2;
-      if (looksLikeProse) out.push(t.replace(/\s+/g, ' '));
-      continue;
-    }
-    i++;
-  }
-  return out;
+function readableText(src: string): string {
+  const noBlocks = src.replace(/\/\*[\s\S]*?\*\//g, ' ');
+  return noBlocks
+    .split('\n')
+    .map(line => {
+      let i = line.indexOf('//');
+      while (i > 0 && line[i - 1] === ':') i = line.indexOf('//', i + 2);
+      return i >= 0 ? line.slice(0, i) : line;
+    })
+    .join('\n');
 }
 
 function walk(dir: string, exts: string[], exclude: string[]): string[] {
@@ -186,18 +154,22 @@ describe('trader-facing claims have provenance', () => {
   it('no unallowlisted claim shape in src/', () => {
     const violations: string[] = [];
     for (const file of sourceFiles) {
-      const src = readFileSync(resolve(ROOT, file), 'utf-8');
-      for (const text of extractText(src, file.endsWith('.tsx'))) {
-        const hit = RULES.find(r => r.re.test(text));
-        if (!hit) continue;
-        const h = sha(text);
+      const text = readableText(readFileSync(resolve(ROOT, file), 'utf-8'));
+      text.split('\n').forEach(rawLine => {
+        const line = rawLine.trim();
+        if (!line) return;
+        const hit = RULES.find(r => r.re.test(line));
+        if (!hit) return;
+        // Keyed on the matched LINE rather than a parsed literal: editing the
+        // claim sends it back for review, which is what we want anyway.
+        const h = sha(line);
         const allowed = allowlist.some(e => e.file === file && e.literal_sha256 === h);
         if (!allowed) {
           violations.push(
-            `\n  ${file}\n    [${hit.group}] "${text.slice(0, 140)}"\n    hash: ${h}`,
+            `\n  ${file}\n    [${hit.group}] "${line.slice(0, 140)}"\n    hash: ${h}`,
           );
         }
-      }
+      });
     }
     expect(
       violations,
@@ -208,6 +180,38 @@ describe('trader-facing claims have provenance', () => {
     ).toEqual([]);
   });
 
+  it('marketing surfaces do not claim the product blocks or guarantees', () => {
+    // A DIFFERENT CLASS from the markers above, and the one they missed.
+    // "Circuit breaker prompts suggesting a cooldown period" was live on the
+    // landing page: no digit, no statistic, no borrowed authority — and false,
+    // because nothing here blocks a trade. Found by hand, not by this file.
+    //
+    // Scoped to marketing surfaces on evidence, not caution: repo-wide these
+    // markers returned 6 hits and all 6 were legitimate (a real Kite API
+    // circuit breaker, a "non-blocking" log line, accurate opt-in rule copy,
+    // two internal comments). Here they return zero.
+    const rules: RegExp[] = markers.capability_markers.patterns.map(
+      (p: string) => new RegExp(p, 'i'),
+    );
+    const violations: string[] = [];
+    for (const file of sourceFiles) {
+      if (!marketing_surfaces.some((s: string) => file.startsWith(s))) continue;
+      const text = readableText(readFileSync(resolve(ROOT, file), 'utf-8'));
+      text.split('\n').forEach(rawLine => {
+        const line = rawLine.trim();
+        if (!line) return;
+        const hit = rules.find(r => r.test(line));
+        if (hit) violations.push(`\n  ${file}\n    "${line.slice(0, 140)}"`);
+      });
+    }
+    expect(
+      violations,
+      `Marketing copy claims a capability this product does not have.${violations.join('')}\n\n` +
+        `Nothing here blocks, halts or places an order — the philosophy is\n` +
+        `"mirror, not blocker". Describe what it actually does.\n`,
+    ).toEqual([]);
+  });
+
   it('marketing surfaces do not sell a retired detector', () => {
     // The landing page was demonstrating `Early Exit` and `Meltdown Cascade`
     // the day after both detectors were retired.
@@ -215,8 +219,7 @@ describe('trader-facing claims have provenance', () => {
     const violations: string[] = [];
     for (const file of sourceFiles) {
       if (!marketing_surfaces.some((s: string) => file.startsWith(s))) continue;
-      const src = readFileSync(resolve(ROOT, file), 'utf-8');
-      const text = extractText(src, file.endsWith('.tsx')).join('\n');
+      const text = readableText(readFileSync(resolve(ROOT, file), 'utf-8'));
       for (const label of labels) {
         if (text.includes(label)) violations.push(`${file}: "${label}"`);
       }

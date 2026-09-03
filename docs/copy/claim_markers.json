@@ -16,17 +16,19 @@
     "all, and two manual audits searching for numbers walked straight past it.",
     "",
     "Patterns must parse in BOTH JavaScript RegExp and Python re: no lookbehind,",
-    "no named groups, no possessives. Matching is case-insensitive, against",
-    "STRING LITERALS ONLY, with comments stripped first (quoting a removed claim",
-    "in a comment is a repo idiom and must not fail the build)."
+    "no named groups, no possessives. Matching is case-insensitive, LINE BY LINE",
+    "over the file with comments stripped first (quoting a removed claim in a",
+    "comment is a repo idiom and must not fail the build). It matched string",
+    "literals only until 2026-09-03, when that extractor was found to go blind",
+    "after an apostrophe in JSX prose - see the test docstring."
   ],
   "version": 1,
 
   "marker_groups": {
     "population": {
-      "why": "A claim about traders in general. The product observes ONE trader and has no population to speak for.",
+      "why": "A claim about traders in general. The product observes ONE trader and has no population to speak for. Note `them` was removed from the alternation on 2026-09-03: \"you won 62% of them\" is the trader's OWN record and is exactly the kind of derived figure this product exists to show.",
       "patterns": [
-        "% of (?:traders|retail|all|them|users|people)",
+        "% of (?:traders|retail|all traders|users|people)",
         "\\bmost traders\\b",
         "\\btraders lose\\b",
         "\\bretail traders\\b",
@@ -80,6 +82,49 @@
         "\\byou'll be surprised\\b"
       ]
     }
+  },
+
+  "capability_markers": {
+    "_why": [
+      "A DIFFERENT CLASS from marker_groups above. Those match claims about the",
+      "WORLD - statistics, borrowed authority, forecasts. These match claims",
+      "about the PRODUCT: that it blocks, enforces, guarantees, or acts on the",
+      "trader's behalf.",
+      "",
+      "Added 2026-09-03 after the guard missed one. 'Circuit breaker prompts",
+      "suggesting a cooldown period' sat live on the landing page: no digit, no",
+      "statistic, no authority - and flatly false, because nothing in this",
+      "product blocks a trade and the philosophy is mirror-not-blocker. It was",
+      "found by hand from an old backlog, not by this file.",
+      "",
+      "Checked ONLY on scope.frontend.marketing_surfaces, and that is a",
+      "measured decision rather than caution. Run repo-wide these markers",
+      "returned 6 hits and ALL SIX were legitimate: a real Kite API circuit",
+      "breaker and its log lines, a 'non-blocking' refresh message, accurate",
+      "opt-in rule copy in the onboarding wizard, and two internal comments. On",
+      "the marketing surfaces they return zero. A guard that is 100% noise",
+      "where it is broad and silent where it is narrow belongs in the narrow",
+      "place."
+    ],
+    "patterns": [
+      "\\bcircuit breaker",
+      "\\bprevents? you\\b",
+      "\\bstops? you\\b",
+      "\\bwon't let you\\b",
+      "\\bhalts?\\b",
+      "\\bfreezes?\\b",
+      "\\bforce[sd]? you\\b",
+      "\\brestricts? you\\b",
+      "\\bdisables? (?:your )?trading\\b",
+      "\\bautomatically (?:closes|exits|squares|cancels|places|stops)\\b",
+      "\\bintervenes?\\b",
+      "\\bcloses? your (?:position|trade)\\b",
+      "\\bplaces? (?:an? )?orders?\\b",
+      "\\bguarantee[sd]?\\b",
+      "\\bnever lose\\b",
+      "\\brisk-free\\b",
+      "\\bdoesn't just (?:display|show|warn)\\b"
+    ]
   },
 
   "retired_detector_labels": {

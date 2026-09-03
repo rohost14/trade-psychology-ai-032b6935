@@ -4,6 +4,7 @@ Which migrations have been applied, and applying the ones that have not.
     python -m scripts.migrate status
     python -m scripts.migrate adopt --through 084     # one-time backfill
     python -m scripts.migrate adopt 077_add_entry_price_source.sql
+    python -m scripts.migrate skip 012_x.sql --note 'why'
     python -m scripts.migrate apply                   # run everything pending
     python -m scripts.migrate apply 085_schema_migrations_ledger.sql
 
@@ -45,6 +46,8 @@ from app.core.config import settings
 
 MIGRATIONS = Path(__file__).resolve().parents[1] / "migrations"
 LEDGER_FILE = "085_schema_migrations_ledger.sql"
+#: applied_by value marking a migration that must NEVER be run.
+SKIP = "skip"
 
 
 def _files() -> List[Path]:
@@ -53,6 +56,20 @@ def _files() -> List[Path]:
 
 def _checksum(path: Path) -> str:
     return hashlib.sha256(path.read_bytes()).hexdigest()[:16]
+
+
+def _split_statements(sql: str) -> List[str]:
+    """
+    Split a plain-DDL migration into individual statements.
+
+    Deliberately naive - it strips comments and splits on `;`. That is correct
+    only for files with no function bodies or DO blocks, which is why it is used
+    ONLY on the CONCURRENTLY path and why a test asserts those files stay plain.
+    """
+    import re
+    body = re.sub(r"/\*.*?\*/", " ", sql, flags=re.S)
+    body = chr(10).join(line.split("--")[0] for line in body.splitlines())
+    return [st.strip() for st in body.split(";") if st.strip()]
 
 
 async def _ledger_exists(conn) -> bool:
@@ -69,16 +86,24 @@ async def _recorded(conn) -> Dict[str, Tuple[str, str, str]]:
 
 
 def _classify(recorded: Dict[str, Tuple[str, str, str]]):
-    applied, pending, changed = [], [], []
+    """
+    Four buckets, not three. `skipped` exists because "pending" used to mean
+    two different things - "not run yet, should be" and "deliberately never to
+    run" - and `apply` with no arguments could not tell them apart. On
+    2026-09-03 it ran 012 against the live database for exactly that reason.
+    """
+    applied, pending, changed, skipped = [], [], [], []
     for path in _files():
         row = recorded.get(path.name)
         if row is None:
             pending.append(path)
+        elif row[1] == SKIP:
+            skipped.append((path, row))
         elif row[0] != _checksum(path):
             changed.append((path, row))
         else:
             applied.append((path, row))
-    return applied, pending, changed
+    return applied, pending, changed, skipped
 
 
 async def cmd_status(engine) -> int:
@@ -90,9 +115,10 @@ async def cmd_status(engine) -> int:
             return 1
         recorded = await _recorded(conn)
 
-    applied, pending, changed = _classify(recorded)
+    applied, pending, changed, skipped = _classify(recorded)
     print(f"applied : {len(applied)}")
     print(f"pending : {len(pending)}")
+    print(f"skipped : {len(skipped)}   (deliberately never to run)")
     print(f"changed : {len(changed)}   (file edited after it was recorded)")
 
     adopted = [a for a in applied if a[1][1] == "adopt"]
@@ -148,6 +174,52 @@ async def cmd_adopt(engine, names: List[str], through: str | None, note: str) ->
     return 0
 
 
+async def cmd_skip(engine, names: List[str], note: str) -> int:
+    """
+    Record a migration as deliberately NEVER to run.
+
+    This exists because of an incident. Before 2026-09-03 the ledger had one
+    word for two states: 012 and 043 were left "pending" as a decision - one is
+    a feature nobody has chosen to enable, the other would add a single index to
+    a frozen table - and a bare `apply` could not tell that from a backlog. It
+    ran 012 against the live database, installing pgvector and two tables that
+    had to be dropped again.
+
+    A skip needs a reason. A migration recorded as never-to-run without one is
+    indistinguishable from a migration somebody forgot.
+    """
+    if not names:
+        print("skip needs one or more filenames.")
+        return 1
+    if not note.strip():
+        print("skip needs --note explaining why this must never run.")
+        print("Without one, a skipped migration is indistinguishable from a")
+        print("forgotten one, which is the confusion this verb exists to end.")
+        return 1
+
+    by_name = {p.name: p for p in _files()}
+    missing = [n for n in names if n not in by_name]
+    if missing:
+        print("no such migration file: " + ", ".join(missing))
+        return 1
+
+    async with engine.begin() as conn:
+        if not await _ledger_exists(conn):
+            print(f"schema_migrations does not exist. Run: apply {LEDGER_FILE}")
+            return 1
+        for name in names:
+            await conn.execute(
+                text("INSERT INTO schema_migrations "
+                     "(filename, checksum, applied_by, note) "
+                     "VALUES (:f, :c, :s, :n) "
+                     "ON CONFLICT (filename) DO UPDATE SET "
+                     "applied_by = EXCLUDED.applied_by, note = EXCLUDED.note"),
+                {"f": name, "c": _checksum(by_name[name]), "s": SKIP, "n": note},
+            )
+    print(f"marked {len(names)} migration(s) as SKIP - `apply` will not run them.")
+    return 0
+
+
 async def cmd_apply(engine, names: List[str]) -> int:
     async with engine.connect() as conn:
         ledger = await _ledger_exists(conn)
@@ -160,6 +232,16 @@ async def cmd_apply(engine, names: List[str]) -> int:
         if missing:
             print("no such migration file: " + ", ".join(missing))
             return 1
+        # A skip is a decision, and naming the file explicitly does not override
+        # it. Un-skip first, deliberately, if that decision has changed.
+        blocked = [n for n in names
+                   if n in recorded and recorded[n][1] == SKIP]
+        if blocked:
+            print("REFUSING: recorded as SKIP - deliberately never to run:")
+            for n in blocked:
+                print(f"  {n}   ({recorded[n][2]})")
+            print("If that decision has changed, remove the ledger row first.")
+            return 1
         targets = [by_name[n] for n in names if n not in recorded]
     else:
         if not ledger or not recorded:
@@ -168,7 +250,7 @@ async def cmd_apply(engine, names: List[str]) -> int:
             print("Decide what is already live against the real schema, then:")
             print("  python -m scripts.migrate adopt --through <last known good>")
             return 1
-        _, targets, _ = _classify(recorded)
+        _, targets, _, _ = _classify(recorded)
 
     if not targets:
         print("nothing to apply.")
@@ -194,7 +276,19 @@ async def cmd_apply(engine, names: List[str]) -> int:
                 # into a prepared statement"), so the file goes to the raw
                 # driver connection, which uses the simple query protocol.
                 raw = await conn.get_raw_connection()
-                await raw.driver_connection.execute(sql)
+                if concurrent:
+                    # asyncpg's simple-query protocol wraps a multi-statement
+                    # script in an IMPLICIT transaction, so sending the whole
+                    # file still fails with "CREATE INDEX CONCURRENTLY cannot
+                    # run inside a transaction block" no matter what isolation
+                    # level the connection carries. Statements go one at a time
+                    # instead. Splitting on `;` is only safe because these files
+                    # are plain DDL - no functions, no DO blocks - which is
+                    # asserted in tests/test_migration_ledger.py.
+                    for stmt in _split_statements(sql):
+                        await raw.driver_connection.execute(stmt)
+                else:
+                    await raw.driver_connection.execute(sql)
                 await conn.execute(
                     text("INSERT INTO schema_migrations "
                          "(filename, checksum, applied_by) "
@@ -220,6 +314,9 @@ async def main() -> int:
     ad.add_argument("names", nargs="*")
     ad.add_argument("--through", help="adopt every file with a number <= this")
     ad.add_argument("--note", default="", help="why you believe these are applied")
+    sk = sub.add_parser("skip")
+    sk.add_argument("names", nargs="+")
+    sk.add_argument("--note", default="", help="why this must never run")
     ap_ = sub.add_parser("apply")
     ap_.add_argument("names", nargs="*")
     args = ap.parse_args()
@@ -241,6 +338,8 @@ async def main() -> int:
             return await cmd_status(engine)
         if args.cmd == "adopt":
             return await cmd_adopt(engine, args.names, args.through, args.note)
+        if args.cmd == "skip":
+            return await cmd_skip(engine, args.names, args.note)
         return await cmd_apply(engine, args.names)
     finally:
         await engine.dispose()
