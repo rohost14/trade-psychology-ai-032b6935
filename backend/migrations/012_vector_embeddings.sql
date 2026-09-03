@@ -1,3 +1,21 @@
+-- DELIBERATELY PENDING — NOT part of production readiness (2026-09-03).
+--
+-- Verified against the live database: the `vector` extension is not installed,
+-- and neither `embeddings` nor `knowledge_base` exists. This migration has
+-- never been applied.
+--
+-- That is being left alone rather than fixed. `rag_service.py` is imported by
+-- api/coach.py and api/journal.py, so the code path is reachable, but every
+-- call site wraps it in try/except and logs a warning — coach.py:598 is
+-- "RAG context fetch failed (non-critical)". RAG therefore degrades silently
+-- and has never worked in production. Nothing else depends on these tables.
+--
+-- Turning RAG on is a feature decision with a cost attached (pgvector on
+-- Supabase, an embedding provider, a backfill), not a migration that was
+-- forgotten. Applying this schema without that decision would create two empty
+-- tables and change nothing. It stays PENDING in `schema_migrations` on
+-- purpose, and `migrate status` will keep saying so.
+--
 -- =============================================
 -- Migration: Vector Embeddings for RAG
 -- Description: Enable pgvector and create embeddings table for semantic search
