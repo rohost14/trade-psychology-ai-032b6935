@@ -14,7 +14,7 @@ Two kinds of test live here:
      baseline to change deliberately. They are NOT endorsements of the numbers.
 """
 import re
-from datetime import timedelta
+from datetime import date, datetime, timedelta, timezone
 from decimal import Decimal
 from pathlib import Path
 
@@ -107,10 +107,12 @@ def test_stop_order_types_defined_once():
 # 4. Detectors that fire often in the replay and had no test at all
 # ---------------------------------------------------------------------------
 
-def _loss_run(n, *, symbol="NIFTY25AUGFUT", qtys=None, start=-240, pnl=-500.0):
+def _loss_run(n, *, symbol="NIFTY25AUGFUT", qtys=None, start=-240, pnl=-500.0,
+              anchor=None):
     out = []
     for i in range(n):
-        t = make_ct(symbol=symbol, pnl=pnl, entry_offset_min=start + i * 20, duration_min=10)
+        t = make_ct(symbol=symbol, pnl=pnl, entry_offset_min=start + i * 20,
+                    duration_min=10, anchor=anchor)
         if qtys:
             t.total_quantity = qtys[i]
         out.append(t)
@@ -133,14 +135,32 @@ class TestDailyOvertrading:
     Full evidence in docs/patterns/05-overtrading/overtrading_review.md.
     """
 
+    #: A fixed instant inside one IST trading day: 14:30 on Thursday 15 Jan
+    #: 2026, expressed in UTC.
+    #:
+    #: These tests count "positions opened today", which is decided by
+    #: comparing each trade's IST date against the session's. Measuring the
+    #: offsets from `now` made that a property of the wall clock: `_loss_run`
+    #: places its earliest prior four hours back, so between 00:00 and 04:00
+    #: IST those trades belonged to YESTERDAY, the detector correctly excluded
+    #: them, and the assertions failed for four hours a night.
+    #:
+    #: The anchor is chosen so every synthetic trade lands inside one session
+    #: and inside market hours: the earliest prior is 10:30 IST and the trade
+    #: under test is 14:25, well within 09:15-15:30. Nothing here reads the
+    #: real clock or real market activity.
+    ANCHOR = datetime(2026, 1, 15, 9, 0, tzinfo=timezone.utc)      # 14:30 IST
+    SESSION_DATE = date(2026, 1, 15)
+
     def _run(self, n_prior, declared=7, thresholds=None):
-        priors = _loss_run(n_prior)
-        ct = make_ct(pnl=-100.0, entry_offset_min=-5)
+        priors = _loss_run(n_prior, anchor=self.ANCHOR)
+        ct = make_ct(pnl=-100.0, entry_offset_min=-5, anchor=self.ANCHOR)
         th = {"user_daily_trade_limit": declared,
               "burst_trades_per_30min_caution": 5, "burst_trades_per_30min_danger": 8}
         th.update(thresholds or {})
         return engine._detect_overtrading_burst(
-            make_ctx(completed_trade=ct, session_trades=priors, thresholds=th))
+            make_ctx(completed_trade=ct, session_trades=priors, thresholds=th,
+                     session=make_session(session_date=self.SESSION_DATE)))
 
     def test_under_the_limit_is_silent(self):
         assert self._run(3) is None

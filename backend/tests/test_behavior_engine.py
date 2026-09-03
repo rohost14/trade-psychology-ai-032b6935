@@ -40,8 +40,17 @@ def make_ct(
     entry_offset_min=-30,
     duration_min=25,
     qty=50,
+    anchor=None,
 ):
-    """Build a mock CompletedTrade for testing."""
+    """
+    Build a mock CompletedTrade for testing.
+
+    `anchor` is the instant the offsets are measured from. It defaults to now,
+    which is what almost every caller wants and what every existing caller
+    got. Pass a fixed instant when the test asserts on something the calendar
+    can move - "opened today", session boundaries - so the result does not
+    depend on what time the suite happens to run.
+    """
     ct = MagicMock(spec=CompletedTrade)
     ct.id = uuid4()
     ct.broker_account_id = broker_id or uuid4()
@@ -53,19 +62,25 @@ def make_ct(
     ct.total_quantity = qty
     ct.avg_entry_price = Decimal("22000")
     ct.avg_exit_price = Decimal("22100")
-    now = now_utc()
+    now = anchor or now_utc()
     ct.entry_time = now + timedelta(minutes=entry_offset_min)
     ct.exit_time = now + timedelta(minutes=entry_offset_min + duration_min)
     return ct
 
 
-def make_session(risk_score=0.0, peak_risk_score=0.0, session_pnl=0.0):
+def make_session(risk_score=0.0, peak_risk_score=0.0, session_pnl=0.0,
+                 session_date=None):
+    """
+    `session_date` defaults to today. Pass it explicitly alongside a fixed
+    `anchor` on the trades, or the two disagree the moment the suite runs
+    across a day boundary.
+    """
     s = MagicMock(spec=TradingSession)
     s.id = uuid4()
     s.risk_score = Decimal(str(risk_score))
     s.peak_risk_score = Decimal(str(peak_risk_score))
     s.session_pnl = Decimal(str(session_pnl))
-    s.session_date = date.today()
+    s.session_date = session_date or date.today()
     s.market_open = None
     return s
 
