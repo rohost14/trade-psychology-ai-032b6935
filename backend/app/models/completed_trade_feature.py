@@ -12,7 +12,8 @@ class CompletedTradeFeature(Base):
     Computed post-FIFO as a separate step (not during FIFO matching).
     One-to-one with CompletedTrade. Rebuildable from completed_trades data.
 
-    Used by: pattern_prediction_service, ai_personalization_service, clustering.
+    Used by: ai_personalization_service, clustering. (`pattern_prediction_service`
+    was archived 2026-09-03 - it predicted, which this product does not do.)
     """
     __tablename__ = "completed_trade_features"
 

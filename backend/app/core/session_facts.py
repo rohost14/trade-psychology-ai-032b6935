@@ -8,7 +8,6 @@ and they disagreed by design rather than by accident:
 
   * `behavior_engine`            — within today's session, over CompletedTrades
   * `danger_zone_service`        — the last 10 CompletedTrades, ACROSS DAYS
-  * `pattern_prediction_service` — today's raw `Trade` fills
   * `pnl_calculator._build_feature` — every prior round-trip, across days
 
 None was wrong by its own definition. That is the problem: the definition was

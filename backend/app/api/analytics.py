@@ -1091,18 +1091,11 @@ async def get_ai_insights(
         max_daily_trades = max(daily_counts.values()) if daily_counts else 0
         overtrade_days = sum(1 for c in daily_counts.values() if c > avg_daily_trades * 1.5) if daily_counts else 0
 
-        # 4. Get real-time pattern predictions
-        from app.services.pattern_prediction_service import pattern_prediction_service
-        try:
-            prediction_data = await pattern_prediction_service.predict_patterns(
-                broker_account_id, db
-            )
-            predictions = prediction_data.get("predictions", {})
-            risk_assessment = prediction_data.get("risk_assessment", {})
-        except Exception as pred_err:
-            logger.warning(f"Pattern prediction failed (non-fatal): {pred_err}")
-            predictions = {}
-            risk_assessment = {}
+        # The `predictions` and `risk_assessment` keys were dropped from this
+        # response on 2026-09-03 with `pattern_prediction_service` (now in
+        # services/_archive/). They carried a per-pattern `probability` summed
+        # from hardcoded literals, keyed on five retired names. This product
+        # does not predict, and nothing read either key.
 
         return {
             "has_data": True,
@@ -1115,8 +1108,6 @@ async def get_ai_insights(
                 "active_days": len(daily_counts),
                 "overtrade_days": overtrade_days,
             },
-            "predictions": predictions,
-            "risk_assessment": risk_assessment,
         }
     except Exception as e:
         logger.error(f"Failed to get AI insights: {e}")

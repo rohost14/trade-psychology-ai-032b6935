@@ -59,13 +59,17 @@ The live queue for every remaining pattern is the **REVIEW STATUS** table in
 `STATUS.md` is the one to read first and the one to keep current. The review and
 contract are historical once a pattern ships; STATUS is not.
 
-**The convention lapsed after Pattern 11.** Folders 12-18 carry a review and no
-`STATUS.md`. For the four of those that ended in retirement the gap is harmless -
-a retired detector has no "what it does NOW", and its retirement suite under
-`backend/tests/test_*_retired.py` records the reasoning and enforces it. For the
-ones that shipped changes - **12 `no_stoploss` and 17 `session_meltdown`** - the
-STATUS file is genuinely missing and the review is doing its job badly, because a
-review is written before the change and describes the old behaviour.
+**The convention lapsed after Pattern 11 and was restored on 2026-09-03**, for
+live detectors only. The gap was also wider than this file used to admit: it
+named 12 and 17, and the real count was eight - 12, 13, 17, 23, 24, 26, 28 and
+99. All eight now carry a `STATUS.md`.
+
+A retired detector still has none, deliberately. It has no "what it does NOW",
+and its retirement suite under `backend/tests/test_*_retired.py` records the
+reasoning and enforces it - reconstructing a status document for something that
+no longer runs would be writing history, not documentation. `21-session_windows`
+is the one live detector left without one: `end_of_session_mis_panic` is parked
+on a data gap and nothing about it has changed since its review.
 
 Extra documents are added when a pattern needs them — Pattern 2 has `_evidence`,
 `_validation` and `_datapath` because its contract took four rounds — but the

@@ -347,12 +347,22 @@ export default function Welcome() {
   const alertStory: Story = {
     eyebrow: "Behavioral safety net",
     title: "Real-time alerts that interrupt the spiral",
-    body: "TradeMentor runs quiet in the background, matching your live executions against your historical blind spots. When it detects a pattern, it doesn't just display a warning — it interrupts the loop.",
+    // "it doesn't just display a warning — it interrupts the loop" went with
+    // the circuit-breaker bullet below, and for the same reason: displaying and
+    // notifying is exactly what it does, and claiming more than that is a
+    // promise the product does not keep.
+    body: "TradeMentor runs quiet in the background, matching your live executions against your historical blind spots. When it detects a pattern it tells you, while the decision is still in front of you.",
     bullets: [
       "Revenge trading alerts within seconds of a stop-out",
       "Overtrading notifications when pace exceeds limits",
       "Adding-to-a-loser flags based on behavioral data",
-      "Circuit breaker prompts suggesting a cooldown period"
+      // Was: "Circuit breaker prompts suggesting a cooldown period". Removed
+      // 2026-09-03. There is no circuit breaker — the product's philosophy is
+      // "mirror, not blocker", and nothing here blocks or halts a trade. It
+      // survived the 2026-09-03 claim sweep because that guard matches claims
+      // about the WORLD (statistics, authority, forecasts) and this is a false
+      // claim about the PRODUCT.
+      "The trade that set it off, named, with what it cost you"
     ],
     visual: <AlertFeedMock />
   };

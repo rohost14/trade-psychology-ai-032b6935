@@ -3,7 +3,6 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, func, desc
 from datetime import datetime, timedelta, date, timezone
 from typing import Optional
-from pydantic import BaseModel
 import logging
 
 from app.models.generated_report import GeneratedReport
@@ -16,7 +15,6 @@ from app.models.user import User
 from app.services.ai_service import ai_service
 from app.services.whatsapp_service import whatsapp_service
 from app.services.daily_reports_service import daily_reports_service
-from app.services.pattern_prediction_service import pattern_prediction_service
 from app.models.trade import Trade
 from app.core.config import settings
 from uuid import UUID
@@ -152,93 +150,28 @@ async def get_morning_briefing(
 
 
 # =============================================================================
-# PATTERN PREDICTIONS (Real-time)
+# PATTERN PREDICTIONS — REMOVED 2026-09-03
 # =============================================================================
+#
+# `GET /predictions` and `POST /predictions/simulate` are gone with
+# `pattern_prediction_service`, now in services/_archive/.
+#
+# It emitted a `probability` percentage per pattern, built by summing
+# hardcoded literals (+10 here, +15 there, base 5, capped at 95) with an
+# unsourced 2000-rupee threshold among them, and keyed the result on five
+# names no detector has emitted for weeks: revenge_trading, tilt_loss_spiral,
+# overtrading, fomo, recovery_chase.
+#
+# Two reasons, either sufficient. It PREDICTED, which this product does not do
+# - the charter is that an alert converts an automatic action into a
+# deliberate one, and `time_of_day_bias` and `death_spiral` were both retired
+# for less. And the number it predicted with was fabricated precision: a
+# summed set of literals presented to a trader as "65%".
+#
+# Nothing consumed it. No frontend call, and the service wrote nothing, so no
+# stored record depends on it. Historical alert rows are untouched - they
+# carry their own pattern_type and render through the existing label maps.
 
-@router.get("/predictions")
-async def get_pattern_predictions(
-    broker_account_id: UUID = Depends(get_verified_broker_account_id),
-    db: AsyncSession = Depends(get_db)
-):
-    """
-    Get real-time pattern predictions based on current state.
-
-    Returns probability of:
-    - Revenge trading
-    - Tilt / Loss spiral
-    - Overtrading
-    - FOMO
-    - Recovery chasing
-
-    Plus:
-    - Overall risk assessment
-    - Actionable recommendations
-
-    Call this:
-    - After each trade
-    - Before placing a new trade
-    - Periodically during trading session
-    """
-    try:
-        predictions = await pattern_prediction_service.predict_patterns(
-            broker_account_id=broker_account_id,
-            db=db
-        )
-
-        return predictions
-
-    except Exception as e:
-        logger.error(f"Failed to get pattern predictions: {e}")
-        raise HTTPException(status_code=500, detail="Internal server error")
-
-
-class PredictionContext(BaseModel):
-    consecutive_losses: Optional[int] = None
-    session_pnl: Optional[float] = None
-    trades_today: Optional[int] = None
-    last_trade_pnl: Optional[float] = None
-    minutes_since_last_trade: Optional[float] = None
-
-
-@router.post("/predictions/simulate")
-async def simulate_prediction(
-    context: PredictionContext,
-    broker_account_id: UUID = Depends(get_verified_broker_account_id),
-    db: AsyncSession = Depends(get_db)
-):
-    """
-    Simulate pattern predictions with custom context.
-    Useful for testing different scenarios.
-    """
-    try:
-        now = datetime.now(timezone.utc)
-        ctx = {
-            "consecutive_losses": context.consecutive_losses or 0,
-            "session_pnl": context.session_pnl or 0,
-            "trades_today": context.trades_today or 0,
-            "last_trade_pnl": context.last_trade_pnl or 0,
-            "minutes_since_last_trade": context.minutes_since_last_trade or 999,
-            "time_of_day": now.hour,
-            "day_of_week": now.strftime("%A"),
-            "is_first_hour": now.hour == 9,
-            "is_last_hour": now.hour >= 15,
-            "drawdown_from_peak": 0
-        }
-
-        predictions = await pattern_prediction_service.predict_patterns(
-            broker_account_id=broker_account_id,
-            db=db,
-            current_context=ctx
-        )
-
-        return predictions
-
-    except Exception as e:
-        logger.error(f"Failed to simulate predictions: {e}")
-        raise HTTPException(status_code=500, detail="Internal server error")
-
-
-# =============================================================================
 # WEEKLY SUMMARY (Call on weekends)
 # =============================================================================
 

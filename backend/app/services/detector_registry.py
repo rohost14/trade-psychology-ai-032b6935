@@ -389,6 +389,31 @@ for _spec in REGISTRY:
         raise ValueError(
             f"{_spec.name}: scope={_spec.scope!r} — expected one of {sorted(SCOPES)}."
         )
+    # ANALYTICS IS EVIDENCE, NOT A CHANNEL.
+    #
+    # `disposition="analytics"` means the detector's output is a row — journal,
+    # daily report, strategy view — not an interruption. The engine enforces
+    # that at the alert gate; this enforces it at the DECLARATION, so a spec
+    # cannot claim a notification channel it may never use and read as though
+    # somebody had decided it should reach a trader.
+    #
+    # Until 2026-09-03 the rule held only because all three analytics detectors
+    # happened to hardcode severity="info". That is a coincidence, not a
+    # contract.
+    if _spec.disposition == "analytics":
+        if _spec.notification_level != 0:
+            raise ValueError(
+                f"{_spec.name}: disposition=analytics with "
+                f"notification_level={_spec.notification_level}. Analytics is "
+                f"evidence and never notifies; use disposition='alerting' if "
+                f"this detector is meant to reach a trader."
+            )
+        if _spec.guardian_eligible:
+            raise ValueError(
+                f"{_spec.name}: disposition=analytics cannot be "
+                f"guardian_eligible — the guardian channel is the loudest one "
+                f"there is."
+            )
 del _spec
 
 BY_NAME = {spec.name: spec for spec in REGISTRY}

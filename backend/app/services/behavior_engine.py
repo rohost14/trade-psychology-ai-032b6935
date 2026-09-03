@@ -425,6 +425,31 @@ class BehaviorEngine:
                 # shadow = dark-launched detector — none of these alert.
                 if e.severity == "info" or e.suppressed_reason or e.shadow:
                     continue
+                # ANALYTICS NEVER ALERTS, whatever severity it carries.
+                #
+                # Until 2026-09-03 this gate read severity alone, and the three
+                # analytics detectors happened to hardcode "info", so the rule
+                # held by coincidence rather than by construction. A detector
+                # declaring disposition="analytics" while emitting caution or
+                # danger would have raised a RiskAlert and reached a trader,
+                # and nothing anywhere said it must not.
+                #
+                # `analytics` means the detector produces EVIDENCE: rows for
+                # the journal, the daily report and the strategy view. Being
+                # evidence does not entitle it to interrupt anyone.
+                #
+                # Aliases (`daily_overtrading`, `capital_mismatch`) carry no
+                # spec of their own, so an unknown name falls through as
+                # alerting — `daily_overtrading` is emitted by the alerting
+                # `overtrading_burst` and must keep raising its caution alert.
+                _spec = BY_NAME.get(e.event_type)
+                if _spec is not None and _spec.disposition == "analytics":
+                    logger.warning(
+                        "[BehaviorEngine] %s is disposition=analytics and emitted "
+                        "severity=%s; recorded as evidence, not alerted.",
+                        e.event_type, e.severity,
+                    )
+                    continue
                 alerts.append(RiskAlert(
                     id=uuid4(),  # explicit id so events can link pre-flush
                     broker_account_id=broker_account_id,
