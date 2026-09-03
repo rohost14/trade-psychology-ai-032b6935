@@ -216,6 +216,13 @@ celery_app.conf.update(
             "task": "app.tasks.maintenance_tasks.ensure_behavior_event_partitions",
             "schedule": crontab(hour=2, minute=0, day_of_month="1,15"),
         },
+        # Monthly snapshot (2nd and 16th, 01:30 IST - BEFORE the partition beat
+        # at 02:00 so a month is always summarised before anything can drop it).
+        # Idempotent, so the second run is a verified no-op.
+        "snapshot-previous-month": {
+            "task": "app.tasks.maintenance_tasks.snapshot_previous_month",
+            "schedule": crontab(hour=1, minute=30, day_of_month="2,16"),
+        },
         # Capital-vs-margin reality check (nightly 17:45 IST, after EOD sync):
         # nudges when declared capital persistently exceeds 1.5x the account.
         "check-capital-reality": {

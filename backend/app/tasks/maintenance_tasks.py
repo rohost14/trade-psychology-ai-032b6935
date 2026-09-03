@@ -13,6 +13,10 @@ from datetime import date
 
 from app.core.celery_app import celery_app
 from app.core.database import SessionLocal
+from app.services.monthly_snapshot_service import (
+    mark_pruned,
+    snapshots_complete_for_month,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -30,16 +34,18 @@ MONTHS_AHEAD = 12
 #: DELETE that bloats and needs a full vacuum to give anything back.
 #:
 #: `orders` is EVIDENCE, not history. F4 reads protective orders only within a
-#: position's own lifetime, and the order-book snapshot marker is day-scoped, so
-#: nothing behavioural can reach back past a year. 13 months keeps a full year
-#: plus the current month.
+#: position's own lifetime, so six months is already far past anything a
+#: detector can reach. Nothing is lost silently: a month's summary is written
+#: and VERIFIED before its partition may be dropped (see the gate below), so
+#: the trader keeps the shape of every month forever and loses only the
+#: order-by-order detail.
 #:
 #: `behavior_events` is deliberately None. It is the trader's own behavioural
 #: history and what analytics renders back to them; silently deleting it is a
 #: PRODUCT decision, not a maintenance one, and turning it on is a one-line
 #: change once somebody decides what a trader is entitled to keep.
 RETENTION_MONTHS = {
-    "orders": 13,
+    "orders": 6,
     "behavior_events": None,
 }
 
@@ -67,7 +73,7 @@ def ensure_behavior_event_partitions(self):
 
     async def _run():
         from sqlalchemy import text
-        created, dropped = [], []
+        created, dropped, skipped = [], [], []
         async with SessionLocal() as db:
             # `orders` joined behavior_events as a partitioned table in
             # migration 090. Both roll on the same beat: a partitioned table
@@ -126,21 +132,109 @@ def ensure_behavior_event_partitions(self):
                     )
                     continue
                 for name in doomed:
+                    # ── THE GATE ───────────────────────────────────────────
+                    #
+                    # A month is never traded away for storage on the
+                    # assumption its summary probably worked. The snapshot for
+                    # every account with orders in that month must exist AND
+                    # verify; anything short of that and the partition simply
+                    # stays and is retried on the next run. Retention that
+                    # cannot prove what it preserved is just deletion.
+                    m = re.fullmatch(rf"{parent}_y(\d{{4}})m(\d{{2}})", name)
+                    month = date(int(m.group(1)), int(m.group(2)), 1)
+                    if parent == "orders":
+                        try:
+                            ok = await snapshots_complete_for_month(db, month)
+                        except Exception as err:   # noqa: BLE001 - retained
+                            logger.error(
+                                f"[partitions] snapshot check failed for {month}: "
+                                f"{err} — {name} retained"
+                            )
+                            ok = False
+                        if not ok:
+                            skipped.append(name)
+                            continue
+                        # Commit the snapshots BEFORE the drop. If the drop then
+                        # fails we still hold both the summaries and the data;
+                        # sharing one transaction would roll the snapshots back
+                        # with the failed drop and lose the work.
+                        await db.commit()
+
                     await db.execute(text(f"DROP TABLE IF EXISTS {name}"))
+                    if parent == "orders":
+                        # AFTER the drop, in the drop's own transaction: the flag
+                        # says "the raw orders are gone", so it must not be able
+                        # to survive a drop that did not happen.
+                        await mark_pruned(db, month)
                     dropped.append(name)
 
+            if skipped:
+                logger.warning(
+                    f"[partitions] retained pending snapshots: {skipped}"
+                )
             if created or dropped:
                 await db.commit()
                 if created:
                     logger.info(f"[partitions] created: {created}")
                 if dropped:
                     logger.warning(f"[partitions] dropped past retention: {dropped}")
-        return {"created": created, "dropped": dropped}
+        return {"created": created, "dropped": dropped, "skipped": skipped}
 
     try:
         return asyncio.run(_run())
     except Exception as exc:
         logger.error(f"[partitions] creation failed: {exc}")
+        raise self.retry(exc=exc)
+
+
+@celery_app.task(name="app.tasks.maintenance_tasks.snapshot_previous_month",
+                 bind=True, max_retries=2, default_retry_delay=600)
+def snapshot_previous_month(self):
+    """
+    Write last month's summary for every account that traded in it.
+
+    WHY THIS RUNS MONTHLY AND NOT AT DELETION TIME
+
+    The deletion gate would build a snapshot on demand, six months late. Two
+    reasons not to rely on that. First, a trader should be able to see "August:
+    147 orders, 12 cancelled" in September, not only once August is being
+    deleted. Second, building six months of snapshots for every account inside
+    the partition-drop run turns a fast maintenance task into a long one, and a
+    long one that fails halfway leaves the gate closed for reasons nobody can
+    see.
+
+    Idempotent: an existing valid snapshot is returned untouched, never
+    rewritten. Re-running is a no-op, which is what makes it safe to schedule
+    twice for redundancy.
+    """
+    import asyncio
+
+    async def _run():
+        from app.services.monthly_snapshot_service import (
+            accounts_with_orders_in_month, ensure_snapshot,
+        )
+        month, _ = _month_bounds(date.today(), -1)
+        written, failed = [], []
+        async with SessionLocal() as db:
+            for account_id in await accounts_with_orders_in_month(db, month):
+                snap = await ensure_snapshot(db, account_id, month)
+                (written if snap is not None else failed).append(str(account_id))
+            await db.commit()
+        if failed:
+            # Not fatal: the gate will refuse to drop the month, which is the
+            # correct outcome. Loud because a persistent failure means a month
+            # is being retained indefinitely and someone should know why.
+            logger.error(
+                f"[snapshot] {month}: {len(failed)} accounts could not be "
+                f"snapshotted: {failed}"
+            )
+        logger.info(f"[snapshot] {month}: wrote/verified {len(written)} accounts")
+        return {"month": month.isoformat(), "written": written, "failed": failed}
+
+    try:
+        return asyncio.run(_run())
+    except Exception as exc:
+        logger.error(f"[snapshot] monthly run failed: {exc}")
         raise self.retry(exc=exc)
 
 

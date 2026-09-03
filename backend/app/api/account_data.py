@@ -22,12 +22,17 @@ Deletion safety notes:
     stops existing afterwards) and records no personal data.
 """
 
+import csv
+import io
+import json
 import logging
+import zipfile
 from datetime import datetime, timezone
 from typing import Any
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, File, HTTPException, UploadFile
+from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
 from sqlalchemy import select, delete as sa_delete
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -39,6 +44,8 @@ from app.core.rate_limiter import RateLimiter
 from app.models.broker_account import BrokerAccount
 from app.models.completed_trade import CompletedTrade
 from app.models.journal_entry import JournalEntry
+from app.models.monthly_snapshot import MonthlySnapshot
+from app.models.order import Order
 from app.models.risk_alert import RiskAlert
 from app.models.trade import Trade
 from app.models.trading_session import TradingSession
@@ -131,10 +138,17 @@ async def export_account_data(
         journal,    j_trunc = await _dump(db, JournalEntry, broker_account_id)
         alerts,     a_trunc = await _dump(db, RiskAlert, broker_account_id)
         sessions,   s_trunc = await _dump(db, TradingSession, broker_account_id)
+        # `orders` is the one section under retention (6 months, see
+        # maintenance_tasks.RETENTION_MONTHS). Including it is what makes the
+        # export a real answer to "get my data before it ages out" rather than
+        # a formality - everything else here is kept indefinitely.
+        orders,     o_trunc = await _dump(db, Order, broker_account_id)
+        snapshots,  _n_trunc = await _dump(db, MonthlySnapshot, broker_account_id)
 
         truncated = {
             "trades": t_trunc, "completed_trades": c_trunc, "journal_entries": j_trunc,
             "risk_alerts": a_trunc, "trading_sessions": s_trunc,
+            "orders": o_trunc,
         }
 
         return {
@@ -143,7 +157,9 @@ async def export_account_data(
             "notice": (
                 "Complete copy of the data TradeMentor holds about you. Broker "
                 "credentials (access token, API secret) are intentionally excluded. "
-                "Your authoritative trade records remain with Zerodha."
+                "Your authoritative trade records remain with Zerodha. "
+                f"Order-level detail is kept for {_RETENTION_MONTHS_ORDERS} months; "
+                "older months appear only as monthly_snapshots."
             ),
             "row_cap_per_section": MAX_ROWS_PER_TABLE,
             "truncated": truncated,
@@ -163,12 +179,20 @@ async def export_account_data(
             "journal_entries": journal,
             "risk_alerts": alerts,
             "trading_sessions": sessions,
+            "orders": orders,
+            # Kept forever, and the only record of a month whose orders have
+            # already been dropped. `orders_pruned_at` says which months those
+            # are, so the export never implies detail it no longer holds.
+            "monthly_snapshots": snapshots,
+            "orders_retention_months": _RETENTION_MONTHS_ORDERS,
             "counts": {
                 "trades": len(trades),
                 "completed_trades": len(completed),
                 "journal_entries": len(journal),
                 "risk_alerts": len(alerts),
                 "trading_sessions": len(sessions),
+                "orders": len(orders),
+                "monthly_snapshots": len(snapshots),
             },
         }
     except HTTPException:
@@ -176,6 +200,145 @@ async def export_account_data(
     except Exception as e:
         logger.error(f"Account export failed: {e}", exc_info=True)
         raise HTTPException(status_code=500, detail="Internal server error")
+
+
+#: Mirrored from maintenance_tasks so the export can state the window without
+#: importing a Celery module into the request path.
+_RETENTION_MONTHS_ORDERS = 6
+
+#: Sections written into the ZIP, in the order a person would open them.
+_CSV_SECTIONS = [
+    ("orders", Order, {"id", "broker_account_id"}),
+    ("trades", Trade, {"id", "broker_account_id"}),
+    ("completed_trades", CompletedTrade, {"id", "broker_account_id"}),
+    ("risk_alerts", RiskAlert, {"id", "broker_account_id"}),
+    ("journal_entries", JournalEntry, {"id", "broker_account_id"}),
+    ("trading_sessions", TradingSession, {"id", "broker_account_id"}),
+    ("monthly_snapshots", MonthlySnapshot, {"id", "broker_account_id"}),
+]
+
+
+def _rows_to_csv(rows: list[dict]) -> str:
+    """
+    One section as CSV.
+
+    An empty section still gets a file in the ZIP: a missing file reads as an
+    error, an empty one reads as "nothing happened", and those are different
+    facts about the account.
+    """
+    if not rows:
+        return ""
+    buf = io.StringIO()
+    writer = csv.DictWriter(buf, fieldnames=list(rows[0].keys()),
+                            extrasaction="ignore")
+    writer.writeheader()
+    for row in rows:
+        writer.writerow({
+            # `default=str` is load-bearing, not defensive. _jsonable converts
+            # the COLUMN value; it does not walk inside a JSONB payload, and
+            # alert `details` really does carry nested UUIDs and datetimes.
+            # Without it a live export raises and the user gets a 500.
+            k: (json.dumps(v, default=str) if isinstance(v, (dict, list)) else v)
+            for k, v in row.items()
+        })
+    return buf.getvalue()
+
+
+@router.get("/export/download")
+async def download_account_data(
+    user_id: UUID = Depends(get_current_user_id),
+    broker_account_id: UUID = Depends(get_verified_broker_account_id),
+    db: AsyncSession = Depends(get_db),
+    _limiter: None = Depends(export_limiter),
+):
+    """
+    The same data as /export, as a ZIP of CSVs - the form a trader can actually
+    open in a spreadsheet.
+
+    Access control is identical to /export and that is not incidental: the
+    account id comes from `get_verified_broker_account_id`, never from the query
+    string, so a user cannot name someone else's account. Credentials are
+    excluded by the same rule, and the rate limiter is SHARED with /export so
+    the friendlier format is not a way around the 3/hour cap.
+
+    Exists because `orders` is dropped after six months. Every other section is
+    kept indefinitely, so this endpoint's real job is to let someone take the
+    order-level detail before it ages out.
+    """
+    try:
+        account = await db.get(BrokerAccount, broker_account_id)
+        if not account:
+            raise HTTPException(status_code=404, detail="Broker account not found")
+
+        manifest = {
+            "export_version": 1,
+            "generated_at": datetime.now(timezone.utc).isoformat(),
+            "row_cap_per_section": MAX_ROWS_PER_TABLE,
+            "orders_retention_months": _RETENTION_MONTHS_ORDERS,
+            "notice": (
+                "Broker credentials are intentionally excluded. Order-level "
+                f"detail is retained for {_RETENTION_MONTHS_ORDERS} months; "
+                "months older than that survive as monthly_snapshots.csv."
+            ),
+            "counts": {},
+            "truncated": {},
+        }
+
+        buf = io.BytesIO()
+        with zipfile.ZipFile(buf, "w", zipfile.ZIP_DEFLATED) as zf:
+            for name, model, exclude in _CSV_SECTIONS:
+                rows, truncated = await _dump(db, model, broker_account_id, exclude)
+                manifest["counts"][name] = len(rows)
+                manifest["truncated"][name] = truncated
+                zf.writestr(f"{name}.csv", _rows_to_csv(rows))
+            zf.writestr("manifest.json", json.dumps(manifest, indent=2))
+        buf.seek(0)
+
+        stamp = datetime.now(timezone.utc).strftime("%Y%m%d")
+        return StreamingResponse(
+            buf,
+            media_type="application/zip",
+            headers={
+                "Content-Disposition":
+                    f'attachment; filename="tradementor-data-{stamp}.zip"',
+                # The file names the user's own trades; a shared cache holding
+                # it would be a disclosure bug, not a performance win.
+                "Cache-Control": "no-store",
+            },
+        )
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Account export download failed: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail="Internal server error")
+
+
+@router.get("/monthly-summary")
+async def monthly_summary(
+    broker_account_id: UUID = Depends(get_verified_broker_account_id),
+    db: AsyncSession = Depends(get_db),
+):
+    """
+    Per-month summaries, newest first - what a trader still has of a month whose
+    order detail has aged out.
+
+    `orders_available` is the honest half: false once the month's partition has
+    been dropped, so the UI can say the detail is gone rather than leaving
+    someone to wonder why an old month will not open.
+    """
+    rows = (await db.execute(
+        select(MonthlySnapshot)
+        .where(MonthlySnapshot.broker_account_id == broker_account_id)
+        .order_by(MonthlySnapshot.month.desc())
+    )).scalars().all()
+
+    return {
+        "orders_retention_months": _RETENTION_MONTHS_ORDERS,
+        "months": [
+            {**r.to_dict(), "orders_available": r.orders_pruned_at is None}
+            for r in rows
+        ],
+    }
 
 
 def _twin_key(symbol, txn_type, qty, price, ts):

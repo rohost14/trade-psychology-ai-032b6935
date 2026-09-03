@@ -176,9 +176,16 @@ def test_orders_has_a_default_partition_so_inserts_cannot_fail():
 # safety rails.
 
 def test_retention_is_configured_per_table_not_globally():
+    """
+    The window itself moved 13 -> 6 as a product decision, and the safety
+    argument moved with it: a month is now summarised into `monthly_snapshots`
+    and VERIFIED before its partition may be dropped, so a shorter window costs
+    order-level detail rather than the month. The gate is covered in
+    test_monthly_snapshots_and_retention.py.
+    """
     from app.tasks.maintenance_tasks import RETENTION_MONTHS
 
-    assert RETENTION_MONTHS["orders"] == 13
+    assert RETENTION_MONTHS["orders"] == 6
     # behavior_events is the trader's own history. Deleting it is a PRODUCT
     # decision, so the maintenance job must not take it by default.
     assert RETENTION_MONTHS["behavior_events"] is None

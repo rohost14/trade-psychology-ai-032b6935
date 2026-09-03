@@ -10,6 +10,7 @@ from app.models.user_profile import UserProfile
 from app.models.cooldown import Cooldown
 from app.models.instrument import Instrument
 from app.models.order import Order
+from app.models.monthly_snapshot import MonthlySnapshot
 from app.models.holding import Holding
 from app.models.completed_trade import CompletedTrade
 from app.models.completed_trade_feature import CompletedTradeFeature
