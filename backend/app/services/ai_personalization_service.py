@@ -583,6 +583,82 @@ class AIPersonalizationService:
 
         return alerts[0] if alerts else None
 
+
+    async def _repeated_limit_breach_insight(
+        self, broker_account_id: UUID, db: AsyncSession, profile
+    ) -> Optional[Dict]:
+        """
+        The behavioural half of the daily trade rule.
+
+        TWO CLAIMS, AND ONLY ONE OF THEM BELONGS HERE.
+
+        A single breach is a FACT about one day and is already delivered as it
+        happens, by `daily_overtrading`: "6 positions opened today - you set
+        your maximum at 5." That alert deliberately never says "overtrading",
+        because one day is not a habit and calling it one would be an
+        interpretation the evidence does not carry.
+
+        This is the other claim: that the breaches REPEAT. It needs history, so
+        it lives here rather than in the engine, and it is an observation on the
+        insights surface rather than an alert - it describes a pattern in what
+        the trader has already been told, and does not need to interrupt them
+        again.
+
+        Counted from the alerts the detector already wrote, not from a second
+        derivation of the daily count. The trader was shown those alerts; a
+        recomputation could disagree with them.
+
+        The 3-in-5 line is a PRODUCT DECISION, defined and labelled as one in
+        `entry_checks`. It is not measured, and nothing here implies it is.
+        """
+        from app.models.completed_trade import CompletedTrade
+        from app.services.entry_checks import (
+            REPEATED_BREACH_DAYS,
+            REPEATED_BREACH_WINDOW,
+            breach_days_in_window,
+            is_repeated_breach,
+        )
+
+        declared_max = getattr(profile, "daily_trade_limit", None)
+        if not declared_max:
+            return None          # nothing declared, so nothing to exceed
+
+        breaches = await db.execute(
+            select(RiskAlert.detected_at).where(
+                RiskAlert.broker_account_id == broker_account_id,
+                RiskAlert.pattern_type == "daily_overtrading",
+            )
+        )
+        breach_dates = {d.astimezone(IST).date() for (d,) in breaches if d}
+
+        actives = await db.execute(
+            select(CompletedTrade.exit_time).where(
+                CompletedTrade.broker_account_id == broker_account_id,
+                CompletedTrade.exit_time.isnot(None),
+            )
+        )
+        active_dates = {d.astimezone(IST).date() for (d,) in actives if d}
+
+        if not is_repeated_breach(breach_dates, active_dates):
+            return None
+
+        hits, window = breach_days_in_window(breach_dates, active_dates)
+        return {
+            "type": "repeated_daily_limit_breach",
+            "icon": "📊",
+            "title": "Repeated limit breaches",
+            "value": f"{hits} of last {window} days",
+            "detail": (
+                f"You've exceeded your self-set daily trading limit on {hits} "
+                f"of your last {window} trading days."
+            ),
+            "recommendation": (
+                f"Your declared maximum is {int(declared_max)} trades a day. "
+                f"If that number no longer matches how you intend to trade, "
+                f"change it in My Rules."
+            ),
+        }
+
     async def get_personalized_insights(
         self,
         broker_account_id: UUID,
@@ -642,6 +718,15 @@ class AIPersonalizationService:
                 "detail": f"{best['win_rate']}% win rate",
                 "recommendation": f"Focus more on {best['symbol']}"
             })
+
+        # Repeated breach of the trader's own declared daily maximum. An
+        # observation about a habit, distinct from the per-day breach alert the
+        # engine already sends. Returns None until the evidence repeats.
+        breach_insight = await self._repeated_limit_breach_insight(
+            broker_account_id, db, profile
+        )
+        if breach_insight:
+            insights.append(breach_insight)
 
         # Intervention timing
         intervention = patterns.get("intervention_timing", {})

@@ -81,7 +81,7 @@ def _session():
     return s
 
 
-def _ctx(trades, declared_limit=3):
+def _ctx(trades, declared_limit=2):
     return EngineContext(
         broker_account_id=BROKER,
         session=_session(),
@@ -94,7 +94,7 @@ def _ctx(trades, declared_limit=3):
     )
 
 
-def _fire(trades, declared_limit=3):
+def _fire(trades, declared_limit=2):
     """The daily arm of the overtrading detector, or None."""
     ev = engine._detect_overtrading_burst(_ctx(trades, declared_limit))
     if ev is None or getattr(ev, "event_type", None) != "daily_overtrading":
@@ -102,13 +102,21 @@ def _fire(trades, declared_limit=3):
     return ev
 
 
+
+# NOTE on the declared limit used below. The breach point is `count > maximum`
+# (see tests/test_daily_trade_range.py): reaching the declared maximum is
+# compliance, exceeding it is the breach. These tests are about WHICH trades are
+# counted - opened today versus closed today - so they declare a maximum of 2
+# and open 3, which breaches under the correct semantics. Every scoping
+# assertion below is unchanged.
+
 # ── the defect ─────────────────────────────────────────────────────────────
 
 def test_positions_opened_yesterday_and_closed_today_do_not_count():
     """The overnight book. Five closes, zero decisions taken today."""
     yesterday = OPEN_UTC - timedelta(days=1)
     trades = [_ct(f"NIFTY25SEP{i}FUT", opened=yesterday) for i in range(5)]
-    assert _fire(trades, declared_limit=3) is None
+    assert _fire(trades, declared_limit=2) is None
 
 
 def test_positions_opened_today_do_count():
@@ -116,7 +124,7 @@ def test_positions_opened_today_do_count():
         _ct(f"NIFTY25SEP{i}FUT", opened=OPEN_UTC + timedelta(minutes=10 * i))
         for i in range(3)
     ]
-    ev = _fire(trades, declared_limit=3)
+    ev = _fire(trades, declared_limit=2)
     assert ev is not None
     assert ev.context["daily_count"] == 3
 
@@ -130,10 +138,10 @@ def test_a_mixed_book_counts_only_todays_opens():
         _ct("NIFTY25SEP4FUT", opened=OPEN_UTC + timedelta(minutes=15)),
     ]
     # Two opened today, limit 3 — must not fire on a count of four.
-    assert _fire(trades, declared_limit=3) is None
+    assert _fire(trades, declared_limit=2) is None
 
     trades.append(_ct("NIFTY25SEP5FUT", opened=OPEN_UTC + timedelta(minutes=25)))
-    ev = _fire(trades, declared_limit=3)
+    ev = _fire(trades, declared_limit=2)
     assert ev is not None
     assert ev.context["daily_count"] == 3
 
@@ -151,7 +159,7 @@ def test_a_trade_opened_at_the_first_instant_of_the_session_day_counts():
         _ct("NIFTY25SEP2FUT", opened=OPEN_UTC + timedelta(minutes=1)),
         _ct("NIFTY25SEP3FUT", opened=OPEN_UTC + timedelta(minutes=2)),
     ]
-    ev = _fire(trades, declared_limit=3)
+    ev = _fire(trades, declared_limit=2)
     assert ev is not None
     assert ev.context["daily_count"] == 3
 
@@ -168,7 +176,7 @@ def test_a_trade_opened_one_second_before_the_session_day_does_not_count():
         _ct("NIFTY25SEP2FUT", opened=OPEN_UTC + timedelta(minutes=1)),
         _ct("NIFTY25SEP3FUT", opened=OPEN_UTC + timedelta(minutes=2)),
     ]
-    assert _fire(trades, declared_limit=3) is None
+    assert _fire(trades, declared_limit=2) is None
 
 
 def test_a_trade_opened_before_market_open_still_counts():
@@ -183,7 +191,7 @@ def test_a_trade_opened_before_market_open_still_counts():
         _ct("NIFTY25SEP2FUT", opened=OPEN_UTC + timedelta(minutes=1)),
         _ct("NIFTY25SEP3FUT", opened=OPEN_UTC + timedelta(minutes=2)),
     ]
-    ev = _fire(trades, declared_limit=3)
+    ev = _fire(trades, declared_limit=2)
     assert ev is not None
     assert ev.context["daily_count"] == 3
 
@@ -195,7 +203,7 @@ def test_a_trade_with_no_entry_time_is_counted_not_dropped():
         _ct("NIFTY25SEP2FUT", opened=OPEN_UTC + timedelta(minutes=1)),
         _ct("NIFTY25SEP3FUT", opened=OPEN_UTC + timedelta(minutes=2)),
     ]
-    ev = _fire(trades, declared_limit=3)
+    ev = _fire(trades, declared_limit=2)
     assert ev is not None
     assert ev.context["daily_count"] == 3
 
@@ -214,7 +222,7 @@ def test_a_multi_leg_structure_opened_today_is_one_decision():
         _ct("NIFTY25SEP24100CE", opened=t0, direction="SHORT", itype="CE"),
         _ct("NIFTY25SEP24200CE", opened=t0, direction="LONG", itype="CE"),
     ]
-    ev = _fire(legs, declared_limit=3)
+    ev = _fire(legs, declared_limit=2)
     assert ev is None, "a single four-leg structure is one decision, not four"
 
 
@@ -228,7 +236,7 @@ def test_legs_are_still_reported_alongside_the_structure_count():
         _ct("NIFTY25SEP23800PE", opened=t0, direction="LONG", itype="PE"),
         _ct("NIFTY25SEP23900PE", opened=t0, direction="SHORT", itype="PE"),
     ]
-    ev = _fire(legs + singles, declared_limit=3)
+    ev = _fire(legs + singles, declared_limit=2)
     assert ev is not None
     assert ev.context["daily_legs"] == 5
     assert ev.context["daily_count"] < ev.context["daily_legs"]
@@ -244,7 +252,7 @@ def test_the_message_says_opened_and_the_evidence_list_matches_the_count():
         _ct("NIFTY25SEP2FUT", opened=OPEN_UTC + timedelta(minutes=15)),
         _ct("NIFTY25SEP3FUT", opened=OPEN_UTC + timedelta(minutes=25)),
     ]
-    ev = _fire(trades, declared_limit=3)
+    ev = _fire(trades, declared_limit=2)
     assert ev is not None
     assert "opened today" in ev.message
     assert ev.context["daily_count"] == 3
@@ -265,7 +273,7 @@ def test_realised_pnl_stays_scoped_to_what_closed_today():
         _ct("NIFTY25SEP2FUT", opened=OPEN_UTC + timedelta(minutes=15), pnl=-100.0),
         _ct("NIFTY25SEP3FUT", opened=OPEN_UTC + timedelta(minutes=25), pnl=-100.0),
     ]
-    ev = _fire(trades, declared_limit=3)
+    ev = _fire(trades, declared_limit=2)
     assert ev is not None
     assert ev.context["daily_count"] == 3
     assert ev.context["losing_count"] == 4

@@ -855,6 +855,21 @@ def sync_trades_for_account(self, broker_account_id: str):
                 account_id = UUID(broker_account_id)
                 result = await TradeSyncService.sync_trades_for_broker_account(account_id, db)
 
+                # RECOVERY, and the only one available. The order stream lives
+                # only while the user's browser is connected, so any order
+                # placed while they were offline - or during a reconnect gap -
+                # was never seen. Kite's orders() is TODAY-only, so this 15:35
+                # sweep is the last moment that day's order book can be
+                # recovered at all; by tomorrow it is gone for good.
+                #
+                # One extra REST call per account per day, on a job that
+                # already runs. NOT polling: it does not scale with trades and
+                # adds nothing during market hours.
+                try:
+                    await TradeSyncService.sync_orders_to_db(account_id, db)
+                except Exception as _oe:
+                    logger.error(f"EOD order sync failed for {account_id}: {_oe}")
+
                 logger.info(f"Sync complete for {broker_account_id}: {result}")
                 return result
 
@@ -1886,3 +1901,43 @@ def run_behavior_detection_retry(self, broker_account_id: str):
                     f"lost after {self.max_retries} retries"
                 )
             raise
+
+
+@celery_app.task(name="app.tasks.trade_tasks.persist_order_event", bind=True, max_retries=3)
+def persist_order_event(self, order_data: Dict[str, Any], broker_account_id: str):
+    """
+    Record one order-lifecycle event. NOT a fill, and never becomes a trade.
+
+    The order-stream WebSocket delivers every status change for every order the
+    user places, wherever they place it. Until 2026-09-03 everything that was
+    not COMPLETE was dropped at the callback, so a resting stop-loss was
+    received and discarded several times a second.
+
+    F4 needs those states. A stop that is TRIGGER PENDING is protection; the
+    same stop CANCELLED thirty seconds before the loss ran is not; a REJECTED
+    one never was. None of that is knowable from fills.
+
+    Deliberately a SEPARATE task from `process_webhook_trade`. The two pipelines
+    stay apart - order events into `orders`, fills into `trades` -> ledger ->
+    CompletedTrade -> engine - so that persisting a resting order can never
+    manufacture a position.
+    """
+    async def _persist():
+        async with SessionLocal() as db:
+            try:
+                await TradeSyncService.upsert_order(
+                    db, order_data, UUID(broker_account_id)
+                )
+                await db.commit()
+                return {"success": True, "order_id": order_data.get("order_id")}
+            except Exception as exc:
+                await db.rollback()
+                raise exc
+
+    try:
+        return asyncio.run(_persist())
+    except Exception as e:
+        logger.error(
+            f"persist_order_event failed for {order_data.get('order_id')}: {e}"
+        )
+        raise self.retry(exc=e, countdown=10)

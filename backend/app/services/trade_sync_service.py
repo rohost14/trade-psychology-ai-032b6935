@@ -30,6 +30,11 @@ logger = logging.getLogger(__name__)
 # Zerodha sends all timestamps in IST without timezone info
 IST = ZoneInfo("Asia/Kolkata")
 
+#: DataQualityEvent.kind marking "we hold the COMPLETE order book for this
+#: account on this date". F4 may only make a NEGATIVE stop-loss claim for a
+#: position whose day carries this marker - see behavior_engine._load_stop_evidence.
+ORDER_SNAPSHOT_KIND = "order_book_snapshot"
+
 # Only sync these product types (user trades MIS/NRML/MTF, not CNC/delivery)
 TRACKED_PRODUCTS = {"MIS", "NRML", "MTF"}
 
@@ -681,6 +686,36 @@ class TradeSyncService:
                     logger.error(f"Error syncing order {order_data.get('order_id')}: {e}")
                     errors.append(str(e))
 
+            # COVERAGE MARKER. kite.orders() returns the WHOLE order book for
+            # today, so once this has run we hold every order this account
+            # placed on this date - including ones the browser-driven stream
+            # never saw. That, and only that, is what licenses F4 to say "no
+            # stop-loss was on this position": absence is evidence only against
+            # a complete list.
+            #
+            # Recorded on DataQualityEvent rather than a new table - it is
+            # exactly a statement about data completeness, and migration 070
+            # already gives it a per-account/kind/day unique index, so the
+            # write is idempotent when a user syncs repeatedly.
+            try:
+                from app.models.data_quality_event import DataQualityEvent
+                from sqlalchemy.dialects.postgresql import insert as _pgi
+                _now = datetime.now(timezone.utc)
+                _day = _now.astimezone(IST).date()
+                await db.execute(
+                    _pgi(DataQualityEvent)
+                    .values(
+                        broker_account_id=broker_account_id,
+                        kind=ORDER_SNAPSHOT_KIND,
+                        details={"session_date": _day.isoformat(),
+                                 "orders_synced": synced},
+                        detected_at=_now,
+                    )
+                    .on_conflict_do_nothing()
+                )
+            except Exception as _mk:
+                logger.warning(f"Order-book coverage marker not written: {_mk}")
+
             await db.commit()
 
             return {
@@ -692,6 +727,54 @@ class TradeSyncService:
         except Exception as e:
             logger.error(f"Orders sync error: {e}")
             return {"success": False, "error": str(e)}
+
+    @classmethod
+    async def upsert_order(cls, db, order_data: Dict[str, Any],
+                           broker_account_id: uuid.UUID) -> None:
+        """
+        Record ONE order-lifecycle event, at whatever status it arrived in.
+
+        Extracted from `sync_orders_to_db` so the realtime paths can write the
+        same row the EOD sync writes. Before 2026-09-03 only the EOD/manual
+        sync ever populated `orders`, so a resting stop-loss existed in our
+        system for exactly as long as nobody looked.
+
+        THIS DOES NOT CREATE A TRADE. An order is not a fill: a TRIGGER PENDING
+        stop has filled nothing, and turning one into a CompletedTrade would
+        fabricate a position. Fills continue to reach the trade pipeline only
+        through `process_webhook_trade`, gated on COMPLETE, exactly as before.
+
+        Idempotent on (broker_account_id, kite_order_id) — the table's own
+        unique constraint - so a postback and an order-stream update for the
+        same order collapse into one row, and a later status overwrites an
+        earlier one.
+        """
+        from sqlalchemy.dialects.postgresql import insert as _pg_insert
+
+        order_dict = cls._map_order_to_model(order_data, broker_account_id)
+        if not order_dict.get("kite_order_id"):
+            return
+
+        stmt = _pg_insert(Order).values(**order_dict)
+        stmt = stmt.on_conflict_do_update(
+            index_elements=["broker_account_id", "kite_order_id"],
+            set_={
+                "status": order_dict["status"],
+                "status_message": order_dict["status_message"],
+                "order_type": order_dict["order_type"],
+                "trigger_price": order_dict["trigger_price"],
+                "price": order_dict["price"],
+                "quantity": order_dict["quantity"],
+                "filled_quantity": order_dict["filled_quantity"],
+                "pending_quantity": order_dict["pending_quantity"],
+                "cancelled_quantity": order_dict["cancelled_quantity"],
+                "average_price": order_dict["average_price"],
+                "exchange_timestamp": order_dict["exchange_timestamp"],
+                "exchange_update_timestamp": order_dict["exchange_update_timestamp"],
+                "updated_at": datetime.now(timezone.utc),
+            },
+        )
+        await db.execute(stmt)
 
     @classmethod
     def _map_order_to_model(cls, order_data: Dict[str, Any], broker_account_id: uuid.UUID) -> Dict[str, Any]:

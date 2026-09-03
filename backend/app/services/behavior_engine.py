@@ -62,7 +62,7 @@ from app.core.account_risk import AccountRisk, freeze_for_session, resolve_accou
 from uuid import UUID, uuid4
 from zoneinfo import ZoneInfo
 
-from sqlalchemy import select, and_
+from sqlalchemy import select, and_, func
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.completed_trade import CompletedTrade
@@ -280,6 +280,10 @@ class EngineContext:
     # order_type values of the exit fills for the current completed_trade
     # (e.g. ["MKT"], ["SL"], ["SL-M", "MKT"]).  Empty when exit_trade_ids unknown.
     exit_order_types: List[str] = None  # type: ignore[assignment]
+    #: Protective-stop evidence for THIS position, from the `orders` table.
+    #: None means NOT LOADED / no coverage — which is not the same as "no stop
+    #: was placed" and must never be read as one. See `_load_stop_evidence`.
+    stop_evidence: Optional[Dict[str, Any]] = None
     # P2 shadow (Runtime Architecture Migration): fold-derived session state,
     # computed alongside the legacy recompute and compared per trade. Detectors
     # do NOT read this yet - cutover happens detector-by-detector once shadow
@@ -372,6 +376,168 @@ class EngineContext:
 # ---------------------------------------------------------------------------
 # BehaviorEngine
 # ---------------------------------------------------------------------------
+
+
+async def _load_stop_evidence(completed_trade, db) -> Optional[Dict[str, Any]]:
+    """
+    What the order book says about protective stops on THIS position.
+
+    THE ASYMMETRY THIS IS BUILT ON. Seeing a stop PROVES one existed, whatever
+    our coverage was. NOT seeing one proves nothing unless we hold the complete
+    list. So positive findings need no coverage gate and negative ones need a
+    complete order-book snapshot for the position's day.
+
+    An earlier version of this gated on "we hold order rows for the position's
+    own entry and exit". That is NOT a proof of continuous observation and the
+    code shows why: `order_stream.stop_account` runs on browser disconnect
+    (api/websocket.py:369), so a trader can place a stop and cancel it entirely
+    inside a gap while both endpoint orders are present. That model would have
+    called it coverage and reported "No stop-loss order was on this position"
+    about a position that had one.
+
+    The only thing that licenses the negative claim is `kite.orders()`, which
+    returns the WHOLE order book for the day. `sync_orders_to_db` records an
+    `order_book_snapshot` DataQualityEvent when it completes, and that marker -
+    not the presence of two orders - is the coverage test here.
+
+    ASSOCIATION. Kite gives no linkage: `parent_order_id` is null on every row
+    and every order is variety='regular', so there are no bracket or cover
+    orders. A protective order is identified structurally - same account,
+    symbol and exchange; order_type SL or SL-M; transaction_type OPPOSITE the
+    position; alive within the position's life. A LIMIT order is never counted:
+    a limit exit and a limit entry are indistinguishable here, so treating one
+    as a target would be a guess.
+
+    AMBIGUITY. "Same symbol" is not "same position". If another round on the
+    same symbol overlapped this one, a stop cannot be attributed to either with
+    confidence, so the negative claim is withheld.
+    """
+    from app.models.order import Order as _Order
+    from app.models.completed_trade import CompletedTrade as _CT
+    from app.models.data_quality_event import DataQualityEvent as _DQE
+    from app.services.trade_sync_service import ORDER_SNAPSHOT_KIND
+
+    direction = (completed_trade.direction or "").upper()
+    if direction not in ("LONG", "SHORT"):
+        return None
+    protective_side = "SELL" if direction == "LONG" else "BUY"
+
+    entry_time = completed_trade.entry_time
+    exit_time = completed_trade.exit_time
+    if not entry_time or not exit_time:
+        return None
+    position_qty = abs(int(completed_trade.total_quantity or 0))
+    if not position_qty:
+        return None
+
+    try:
+        rows = await db.execute(
+            select(_Order).where(
+                _Order.broker_account_id == completed_trade.broker_account_id,
+                _Order.tradingsymbol == completed_trade.tradingsymbol,
+                _Order.exchange == completed_trade.exchange,
+                _Order.order_type.in_(("SL", "SL-M")),
+                _Order.transaction_type == protective_side,
+                _Order.order_timestamp <= exit_time,
+            )
+        )
+        candidates = list(rows.scalars().all())
+
+        # Does another round on this symbol overlap? If so we cannot say which
+        # position a stop belonged to.
+        overlap = await db.execute(
+            select(func.count()).select_from(_CT).where(
+                _CT.broker_account_id == completed_trade.broker_account_id,
+                _CT.tradingsymbol == completed_trade.tradingsymbol,
+                _CT.id != completed_trade.id,
+                _CT.entry_time < exit_time,
+                _CT.exit_time > entry_time,
+            )
+        )
+        ambiguous = (overlap.scalar() or 0) > 0
+
+        snap = await db.execute(
+            select(func.count()).select_from(_DQE).where(
+                _DQE.broker_account_id == completed_trade.broker_account_id,
+                _DQE.kind == ORDER_SNAPSHOT_KIND,
+                _DQE.detected_at >= exit_time,
+            )
+        )
+        snapshot_complete = (snap.scalar() or 0) > 0
+    except Exception as err:                       # noqa: BLE001 - abstain
+        logger.debug(f"stop-evidence lookup skipped: {err}")
+        return None
+
+    # A GTT IS A STOP THIS QUERY CANNOT SEE.
+    #
+    # The snapshot marker certifies that we hold the whole ORDER BOOK, and a
+    # GTT is not in it: it lives at Kite behind a different endpoint
+    # (/gtt/triggers) and produces no order at all until it fires. So a trader
+    # holding an active GTT sell, who exits manually before it triggers, has
+    # every appearance of an unprotected position - no SL row, snapshot
+    # complete - and case A would tell them they had no stop while a live GTT
+    # sat in our own database.
+    #
+    # `gtt_tracking` is seeded once at connect and never reconciled against
+    # Kite, so its ABSENCES are not trustworthy either. It is used one way
+    # only: a GTT we can see withholds the negative claim. It is never used to
+    # assert protection.
+    gtt_active = False
+    try:
+        from app.services.gtt_service import has_active_gtt
+        gtt_active = await has_active_gtt(
+            completed_trade.broker_account_id, completed_trade.tradingsymbol, db
+        )
+    except Exception as err:                       # noqa: BLE001
+        # Cannot tell -> must not claim absence.
+        logger.debug(f"GTT visibility check failed: {err}")
+        gtt_active = True
+
+    try:
+        pass
+    except Exception:                              # noqa: BLE001
+        pass
+
+    protecting, cancelled_early, rejected, modified = [], [], [], 0
+    for o in candidates:
+        placed = o.order_timestamp
+        if placed and placed < entry_time:
+            continue                               # belonged to an earlier round
+        status = (o.status or "").upper()
+        if status == "REJECTED":
+            rejected.append(o)
+            continue
+        # A trigger that moved after placement is a modification. Kite rewrites
+        # the same order row, so the count is what survives - the fact THAT it
+        # was modified, not every intermediate price.
+        if o.exchange_update_timestamp and o.order_timestamp and                 o.exchange_update_timestamp > o.order_timestamp and                 status not in ("CANCELLED", "REJECTED"):
+            modified += 1
+        if status == "CANCELLED":
+            removed = o.exchange_update_timestamp or o.updated_at
+            if removed and removed < exit_time:
+                cancelled_early.append(o)
+                continue
+        protecting.append(o)
+
+    covered = sum(abs(int(o.quantity or 0)) for o in protecting)
+    return {
+        # Licenses the NEGATIVE claim only. False whenever we cannot see the
+        # whole picture - no order-book snapshot, or a GTT we cannot rule out.
+        "snapshot_complete": snapshot_complete and not gtt_active,
+        "gtt_active": gtt_active,
+        "ambiguous": ambiguous,
+        "position_qty": position_qty,
+        "covered_qty": covered,
+        "covered_ratio": covered / position_qty,
+        "protective_orders": len(protecting),
+        "cancelled_before_exit": len(cancelled_early),
+        "rejected": len(rejected),
+        "modified": modified,
+        "replaced": len(cancelled_early) > 0 and len(protecting) > 0,
+        "trigger_prices": [float(o.trigger_price) for o in protecting
+                           if o.trigger_price is not None],
+    }
+
 
 class BehaviorEngine:
     """
@@ -641,6 +807,8 @@ class BehaviorEngine:
                 logger.debug(f"Structure sizing skipped: {_ss_e}")
 
         # Query 4: exit order types for the current trade (SL/SL-M detection)
+        stop_evidence = await _load_stop_evidence(completed_trade, db)
+
         exit_order_types: List[str] = []
         if completed_trade.exit_trade_ids:
             from app.models.trade import Trade as _Trade
@@ -781,6 +949,7 @@ class BehaviorEngine:
             strategy_group=strategy_group,
             structure_sizing=structure_sizing,
             exit_order_types=exit_order_types,
+            stop_evidence=stop_evidence,
             position_fills=position_fills,
             session_state=shadow_state,
             facts=facts,
@@ -1593,7 +1762,18 @@ class BehaviorEngine:
         daily_count = count_structures_fn(opened_today)
         daily_legs = len(opened_today)
 
-        if daily_count >= declared_daily_limit:
+        # THE BREACH POINT IS ABOVE THE MAXIMUM, NOT AT IT.
+        #
+        # This read `>=` while `daily_trade_limit` was a lone number called
+        # "Max Trades Per Day". A trader who declared 5 was told they had
+        # exceeded their limit on their FIFTH trade - the last one their own
+        # rule allows. Reaching a maximum is not breaching it.
+        #
+        # The rule is now the top of a declared RANGE (3-5 trades/day, say), so
+        # the semantics are unambiguous: 5 is permitted, 6 is a breach. There is
+        # no tolerance band around the number. The trader's range is what they
+        # intended, not a statistical interval to be widened.
+        if daily_count > declared_daily_limit:
             pnls_today = [float(t.realized_pnl or 0) for t in all_session]
             winning_today = sum(1 for p in pnls_today if p > 0)
             losing_today  = sum(1 for p in pnls_today if p < 0)
@@ -1602,8 +1782,8 @@ class BehaviorEngine:
                 event_type="daily_overtrading",
                 severity="caution",
                 message=(
-                    f"{daily_count} positions opened today — your limit is "
-                    f"{declared_daily_limit}"
+                    f"{daily_count} positions opened today — you set your "
+                    f"maximum at {declared_daily_limit}"
                     + (f". Session P&L: ₹{session_pnl:+,.0f}." if session_pnl != 0 else ".")
                 ),
                 context={
@@ -2741,12 +2921,66 @@ class BehaviorEngine:
         else:
             exit_note = ""
 
+        # ── F4: what the ORDER BOOK says about protection ──────────────────
+        #
+        # EIGHT distinct states, not one. "No stop was ever placed" and "a stop
+        # was placed and then removed" are materially different behavioural
+        # facts and must never collapse into a generic "no stop".
+        #
+        #   A no protective order, and we hold the complete order book
+        #   B a stop covered the position and stood until the exit
+        #   C a stop was placed and cancelled before the exit
+        #   D a stop was rejected - it never protected anything
+        #   E a stop covered only part of the position
+        #   F the stop's trigger was modified during the position
+        #   G one stop was cancelled and another was standing at the exit
+        #   H coverage unknown -> SAY NOTHING ABOUT STOPS
+        #
+        # The asymmetry: seeing a stop proves one existed whatever our coverage
+        # was, so B/C/D/E/F/G are always safe. Only A is a claim about ABSENCE,
+        # and it needs the complete order book plus an unambiguous association.
+        ev = ctx.stop_evidence
+        stop_note = ""
+        stop_case = "H"
+        if ev:
+            ratio = ev["covered_ratio"]
+            if ratio >= 1.0:
+                # Fully protected for the whole position. The loss ran anyway -
+                # the stop sat wider than the loss, or was never reached - but
+                # this position was not unprotected and must not be called so.
+                return None
+            if ratio > 0:
+                stop_case = "G" if ev["replaced"] else "E"
+                stop_note = (
+                    f" A stop covered {ratio * 100:.0f}% of the position "
+                    f"({ev['covered_qty']} of {ev['position_qty']})."
+                )
+                if ev["modified"]:
+                    stop_case = "F"
+                    stop_note += " Its trigger was modified during the position."
+            elif ev["cancelled_before_exit"]:
+                stop_case = "C"
+                n = ev["cancelled_before_exit"]
+                stop_note = (
+                    f" A stop was placed and cancelled before the exit"
+                    f"{f' ({n} of them)' if n > 1 else ''}."
+                )
+            elif ev["rejected"]:
+                stop_case = "D"
+                stop_note = " A stop order was rejected and never took effect."
+            elif ev["snapshot_complete"] and not ev["ambiguous"]:
+                stop_case = "A"
+                stop_note = " No stop-loss order was placed on this position."
+            # else: nothing observed and no complete order book -> case H,
+            # stop_note stays empty. The detector still reports the loss.
+
         return DetectedEvent(
             event_type="no_stoploss",
             severity=severity,
             message=(
                 f"{ct.tradingsymbol}{expiry_note}: held {duration}min into a "
-                f"{loss_pct:.0f}% loss {loss_label} (₹{abs(pnl):,.0f}).{exit_note}"
+                f"{loss_pct:.0f}% loss {loss_label} (₹{abs(pnl):,.0f})."
+                f"{stop_note}{exit_note}"
             ),
             context={
                 "duration_minutes": duration,
@@ -2759,6 +2993,20 @@ class BehaviorEngine:
                 # Whether the exit mechanism was observable at all. False means
                 # the message deliberately says nothing about how it was closed.
                 "exit_mechanism_observed": mechanism_observed,
+                # F4 evidence. `stop_coverage` False means WE WERE NOT WATCHING
+                # the order book across this position, not that no stop existed.
+                # F4. `stop_case` is one of A-H; H means COVERAGE UNKNOWN and
+                # the message deliberately says nothing about stops.
+                "stop_case": stop_case,
+                "stop_snapshot_complete": bool(ev and ev.get("snapshot_complete")),
+                "stop_association_ambiguous": bool(ev and ev.get("ambiguous")),
+                "stop_covered_qty": (ev or {}).get("covered_qty"),
+                "stop_covered_ratio": (ev or {}).get("covered_ratio"),
+                "stop_orders": (ev or {}).get("protective_orders"),
+                "stop_cancelled_before_exit": (ev or {}).get("cancelled_before_exit"),
+                "stop_rejected": (ev or {}).get("rejected"),
+                "stop_modified": (ev or {}).get("modified"),
+                "stop_trigger_prices": (ev or {}).get("trigger_prices"),
             },
         )
 
@@ -3491,9 +3739,22 @@ class BehaviorEngine:
             ratio = count / float(trade_limit)
             sev = ladder(ratio)
             if sev:
-                verb = "breached" if ratio >= 1.0 else "approaching"
+                # THREE states, because the maximum is not a breach.
+                #
+                # This said "breached" at ratio >= 1.0, so a trader who declared
+                # 5 was told they had breached their limit on their fifth trade
+                # - the last one their own rule allows. `daily_overtrading` now
+                # treats the declared number as the top of a RANGE (5 permitted,
+                # 6 a breach) and this is the same number in the constitution's
+                # voice, so the two must agree. One declared number, one answer.
+                if ratio > 1.0:
+                    phrase = f"breached: {count} of {int(trade_limit)} trades"
+                elif count >= int(trade_limit):
+                    phrase = f"reached: {count} of {int(trade_limit)} trades"
+                else:
+                    phrase = f"approaching: {count} of {int(trade_limit)} trades"
                 add("daily_trades", sev,
-                    f"Your daily trade limit {verb}: {count} of {int(trade_limit)} trades.",
+                    f"Your daily trade limit {phrase}.",
                     {"limit": int(trade_limit), "current": count, "ratio": round(ratio, 2)})
 
         # ── Rule: max consecutive losses ──────────────────────────────────

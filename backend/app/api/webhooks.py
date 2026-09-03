@@ -229,7 +229,24 @@ async def zerodha_postback(
         "raw_payload": form_dict,
     }
 
-    # 6. Dispatch to processing — infrastructure failures return 500 so Zerodha retries
+    # 6a. Record the order-lifecycle event, at whatever status it arrived in.
+    #     The postback carries order_type and trigger_price for every state, so
+    #     a resting stop-loss is evidence here exactly as it is on the order
+    #     stream. This does NOT create a trade — step 6b does that, and only
+    #     for COMPLETE.
+    try:
+        if CELERY_ENABLED:
+            from app.tasks.trade_tasks import persist_order_event
+            persist_order_event.delay(trade_data, str(broker_account_id))
+        else:
+            from app.services.trade_sync_service import TradeSyncService as _TSS
+            await _TSS.upsert_order(db, trade_data, broker_account_id)
+            await db.commit()
+    except Exception as e:
+        # An order-event write must never cost us the fill behind it.
+        logger.error(f"Order-event persistence failed (non-fatal): {e}")
+
+    # 6b. Dispatch to processing — infrastructure failures return 500 so Zerodha retries
     try:
         if CELERY_ENABLED:
             request_id = getattr(request.state, "request_id", "-")

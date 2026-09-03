@@ -58,10 +58,10 @@ from uuid import UUID
 
 logger = logging.getLogger(__name__)
 
-# Terminal order statuses that carry a completed fill and must drive the pipeline.
-# Intermediate updates (OPEN, TRIGGER PENDING, PUT ORDER REQ RECEIVED, …) carry no
-# new fill and are ignored. CANCELLED/REJECTED order-flow analytics are handled by
-# the separate EOD sync_orders_to_db path, so only COMPLETE is routed here.
+# The status that carries a completed fill and drives the TRADE pipeline.
+# Every OTHER status is still persisted as an order-lifecycle event (see
+# _on_order_update) - it is only the trade/ledger/detector path that is gated,
+# because an order that has filled nothing is not a position.
 _FILL_STATUS = "COMPLETE"
 
 # Products TradeMentor tracks (matches TRACKED_PRODUCTS in trade_sync_service).
@@ -182,8 +182,6 @@ class ZerodhaOrderTicker:
         """
         try:
             status = (data.get("status") or "").upper()
-            if status != _FILL_STATUS:
-                return
 
             product = (data.get("product") or "").upper()
             if product and product not in _TRACKED_PRODUCTS:
@@ -193,15 +191,37 @@ class ZerodhaOrderTicker:
             if not order_id:
                 return
 
-            # Dedup: Kite may resend the same COMPLETE update. Key on the fill
-            # identity (order_id + filled_quantity) so genuine re-fills still pass.
-            filled = _safe_int(data.get("filled_quantity"))
-            dedup_key = f"{order_id}:{filled}"
-            if not self._dedup.add(dedup_key):
+            order_data = self._build_trade_data(data)
+
+            # ── 1. EVERY lifecycle state is recorded ───────────────────────
+            #
+            # This used to `return` on anything that was not COMPLETE, so a
+            # resting stop-loss arrived here several times and was discarded
+            # every time. TRIGGER PENDING is protection; the same order
+            # CANCELLED before the loss ran is not; REJECTED never was. None of
+            # that is recoverable from fills, and Kite's orders() is today-only
+            # so it cannot be backfilled later either.
+            #
+            # Deduped on (order_id, status, filled_quantity): a status that has
+            # not moved is a resend, a status that HAS moved is new evidence.
+            state_key = f"{order_id}:{status}:{_safe_int(data.get('filled_quantity'))}"
+            if self._dedup.add(state_key):
+                self._enqueue_order_event(order_data)
+
+            # ── 2. Only a FILL drives the trade pipeline ───────────────────
+            #
+            # An order is not a position. Routing a TRIGGER PENDING stop into
+            # process_webhook_trade would manufacture a CompletedTrade out of
+            # something that has filled nothing.
+            if status != _FILL_STATUS:
                 return
 
-            trade_data = self._build_trade_data(data)
-            self._enqueue(trade_data)
+            filled = _safe_int(data.get("filled_quantity"))
+            fill_key = f"fill:{order_id}:{filled}"
+            if not self._dedup.add(fill_key):
+                return
+
+            self._enqueue(order_data)
 
         except Exception as e:
             logger.error(
@@ -241,6 +261,22 @@ class ZerodhaOrderTicker:
             "instrument_token": _safe_int(data.get("instrument_token")) or None,
             "raw_payload": _json_safe(dict(data)),
         }
+
+    def _enqueue_order_event(self, order_data: dict):
+        """Order-lifecycle event -> `orders` table. Never creates a trade."""
+        try:
+            from app.tasks.trade_tasks import persist_order_event
+            persist_order_event.delay(order_data, str(self.broker_account_id))
+            try:
+                from app.core.metrics import incr
+                incr("order_stream_events")
+            except Exception:
+                pass
+        except Exception as e:
+            logger.error(
+                f"[order_ticker:{self.broker_account_id}] order-event enqueue "
+                f"failed for {order_data.get('order_id')}: {e}"
+            )
 
     def _enqueue(self, trade_data: dict):
         """Hand the fill to the Celery pipeline (same path as the postback webhook)."""

@@ -80,7 +80,12 @@ class UserProfile(Base):
     # Opt-in, never suggested — see migration 082 and
     # docs/patterns/24-constitution_violation/per_trade_loss_limit_semantics.md
     per_trade_loss_limit = Column(Float, nullable=True)
-    daily_trade_limit = Column(Integer, nullable=True)    # Max trades per day
+    # The trader's declared daily trade RANGE. `daily_trade_limit` is the
+    # MAXIMUM and the only half that can be breached, so it keeps its name
+    # and its place in RULE_FIELDS. `daily_trade_min` is informational -
+    # what a normal day looks like to them - and nothing alerts on it.
+    daily_trade_min = Column(Integer, nullable=True)     # Normal-day floor (no alert)
+    daily_trade_limit = Column(Integer, nullable=True)   # Max trades per day = breach point
     max_position_size = Column(Float, nullable=True)      # Max capital-at-risk per trade (% of capital, e.g. 10.0)
     cooldown_after_loss = Column(Integer, default=15)     # Minutes to wait after loss
     max_consecutive_losses = Column(Integer, nullable=True)  # Stop after N losses in a row
@@ -148,6 +153,7 @@ class UserProfile(Base):
             "trading_hours_end": self.trading_hours_end,
             "daily_loss_limit": self.daily_loss_limit,
             "per_trade_loss_limit": self.per_trade_loss_limit,
+            "daily_trade_min": self.daily_trade_min,
             "daily_trade_limit": self.daily_trade_limit,
             "max_position_size": self.max_position_size,
             "cooldown_after_loss": self.cooldown_after_loss,

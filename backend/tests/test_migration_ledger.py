@@ -87,10 +87,13 @@ def test_apply_records_what_it_ran_as_runner_not_adopt():
 
 
 def test_checksums_are_stable_and_content_addressed():
+    """Content-addressed, on line-ending-normalised content — see
+    test_checksums_ignore_line_endings for why the normalisation exists."""
     from scripts import migrate
 
     path = MIGRATIONS / "085_schema_migrations_ledger.sql"
-    expected = hashlib.sha256(path.read_bytes()).hexdigest()[:16]
+    normalised = path.read_bytes().replace(b"\r\n", b"\n")
+    expected = hashlib.sha256(normalised).hexdigest()[:16]
     assert migrate._checksum(path) == expected
 
 
@@ -147,3 +150,39 @@ def test_migrate_is_not_a_framework():
             continue
         code += 1
     assert code < 300, f"the runner is growing into a framework ({code} code lines)"
+
+
+def test_checksums_ignore_line_endings():
+    """
+    A CRLF checkout must not report every migration as CHANGED.
+
+    It hashed raw bytes until 2026-09-03. On the first commit after the ledger
+    was populated, git's autocrlf rewrote every migration LF -> CRLF and three
+    files the runner had just applied immediately reported CHANGED — identical
+    content, different bytes. `changed` is the one signal worth acting on, and
+    an alarm that fires on a checkout gets ignored.
+    """
+    import hashlib
+    from scripts import migrate
+
+    path = MIGRATIONS / "085_schema_migrations_ledger.sql"
+    lf = path.read_bytes().replace(b"\r\n", b"\n")
+    crlf = lf.replace(b"\n", b"\r\n")
+    assert lf != crlf, "fixture is not exercising both conventions"
+
+    expected = hashlib.sha256(lf).hexdigest()[:16]
+    assert migrate._checksum(path) == expected
+
+    import tempfile
+    from pathlib import Path as _P
+    with tempfile.TemporaryDirectory() as d:
+        a, b = _P(d) / "a.sql", _P(d) / "b.sql"
+        a.write_bytes(lf)
+        b.write_bytes(crlf)
+        assert migrate._checksum(a) == migrate._checksum(b)
+
+    # ...but a real content change still moves it.
+    with tempfile.TemporaryDirectory() as d:
+        c = _P(d) / "c.sql"
+        c.write_bytes(lf + b"\nSELECT 1;\n")
+        assert migrate._checksum(c) != expected

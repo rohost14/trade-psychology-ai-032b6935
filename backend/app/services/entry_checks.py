@@ -243,3 +243,69 @@ def count_entries_today(ledger_rows: Sequence[Any]) -> int:
         if getattr(r, "entry_type", None) in POSITION_OPENING_FILLS
     ]
     return count_structures(legs)
+
+
+# ── Repeated breach of the declared daily range ────────────────────────────
+#
+# TWO DIFFERENT CLAIMS, kept apart on purpose.
+#
+#   "You exceeded your daily limit"                  — a FACT about one day.
+#       Emitted by `daily_overtrading` at the moment the count passes the
+#       declared maximum. Needs no history and makes no interpretation.
+#
+#   "Repeatedly exceeding your limit may indicate overtrading"
+#       — an OBSERVATION about a habit, and only defensible once there is
+#       repetition to point at. That is what this function measures.
+#
+# It counts BREACH DAYS from the alerts the detector already wrote, rather than
+# recomputing daily counts from trades. Two reasons: the detector's count is the
+# one the trader was actually shown, so a second derivation could disagree with
+# it; and one alert per breach day already exists, so counting them is exact.
+
+#: How many of the recent active days must be breaches before the habit claim is
+#: made, and how far back "recent" reaches.
+#:
+#: A PRODUCT DECISION, stated as one. It is not derived from any population and
+#: it is not a statistical threshold - there is no evidence base for "three in
+#: five means overtrading", and pretending otherwise would be the exact class of
+#: unsourced claim this codebase has spent days removing. It is simply where we
+#: draw the line between "a day that got away" and "a pattern", chosen to need
+#: real repetition while still being reachable inside a working week.
+REPEATED_BREACH_DAYS = 3
+REPEATED_BREACH_WINDOW = 5
+
+
+def breach_days_in_window(breach_dates, active_dates, window: int = REPEATED_BREACH_WINDOW):
+    """
+    How many of the last `window` ACTIVE days breached the declared maximum.
+
+    `active_dates` is every day the trader traded; `breach_dates` the subset
+    that breached. The window is over ACTIVE days, not calendar days, so a week
+    off does not dilute the count and a trader who trades twice a month is
+    judged on their own last five sessions rather than on the calendar.
+
+    Returns (breaches_in_window, window_size). The caller decides what to say.
+    """
+    active = sorted({d for d in active_dates})
+    if not active:
+        return 0, 0
+    recent = active[-window:]
+    breached = {d for d in breach_dates}
+    return sum(1 for d in recent if d in breached), len(recent)
+
+
+def is_repeated_breach(breach_dates, active_dates,
+                       threshold: int = REPEATED_BREACH_DAYS,
+                       window: int = REPEATED_BREACH_WINDOW) -> bool:
+    """
+    Whether the habit claim is defensible yet.
+
+    False until there are enough active days to fill the window. Calling three
+    breaches in three sessions "repeated" would be true but useless - the
+    trader has no normal for it to depart from, and the observation would fire
+    on a trader's first week.
+    """
+    hits, size = breach_days_in_window(breach_dates, active_dates, window)
+    if size < window:
+        return False
+    return hits >= threshold

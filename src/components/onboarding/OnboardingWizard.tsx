@@ -62,6 +62,7 @@ interface OnboardingData {
   daily_loss_limit: number | null;
   //: Max RAW realised loss on ONE position, in rupees. Opt-in, never suggested.
   per_trade_loss_limit: number | null;
+  daily_trade_min: number;
   daily_trade_limit: number;
   max_position_size: number | null;
   max_consecutive_losses: number;
@@ -139,6 +140,7 @@ export default function OnboardingWizard({ brokerAccountId, onComplete, onSkip }
     trading_hours_end: '15:30',
     daily_loss_limit: null,          // off until the trader opts in
     per_trade_loss_limit: null,      // off until the trader opts in
+    daily_trade_min: 3,
     daily_trade_limit: 10,
     max_position_size: null,         // off until the trader opts in
     max_consecutive_losses: 3,
@@ -203,6 +205,7 @@ export default function OnboardingWizard({ brokerAccountId, onComplete, onSkip }
           // Count and time rules are enforced defaults — they are not shares of
           // capital, so "more than 10 trades today" means the same at any
           // account size and the server ships them set.
+          daily_trade_min: d.daily_trade_min,
           daily_trade_limit: rec.daily_trade_limit ?? d.daily_trade_limit,
           max_consecutive_losses: rec.max_consecutive_losses ?? d.max_consecutive_losses,
           // daily_loss_limit and max_position_size are deliberately NOT taken
@@ -288,6 +291,7 @@ export default function OnboardingWizard({ brokerAccountId, onComplete, onSkip }
           // abstains on it.
           daily_loss_limit: data.enable_daily_loss_limit ? data.daily_loss_limit : null,
           per_trade_loss_limit: data.enable_per_trade_loss_limit ? data.per_trade_loss_limit : null,
+          daily_trade_min: data.daily_trade_min,
           daily_trade_limit: data.daily_trade_limit,
           // Enabled AND filled in. A ticked box with an empty field enforces
           // nothing - the rule needs a number, and we do not supply one.
@@ -746,21 +750,36 @@ export default function OnboardingWizard({ brokerAccountId, onComplete, onSkip }
                     </p>
                   </div>
 
+                  {/* A RANGE, not one number. "Max Trades Per Day" asked for a
+                      ceiling in isolation; what a trader actually has in mind is
+                      a normal band - "three to five on a normal day". Only the
+                      upper end can be breached, and it is breached ABOVE it:
+                      declare 3-5 and the fifth trade is within the rule, the
+                      sixth is not. There is no tolerance around it. */}
                   <div className="space-y-3">
                     <div className="flex justify-between">
                       <Label className="flex items-center gap-2">
                         <Target className="h-4 w-4" />
-                        Max Trades Per Day
+                        Trades Per Day
                       </Label>
-                      <span className="text-sm font-medium">{data.daily_trade_limit} trades</span>
+                      <span className="text-sm font-medium">
+                        {data.daily_trade_min}–{data.daily_trade_limit} trades
+                      </span>
                     </div>
                     <Slider
-                      value={[data.daily_trade_limit]}
-                      onValueChange={([value]) => setData({ ...data, daily_trade_limit: value })}
+                      value={[data.daily_trade_min, data.daily_trade_limit]}
+                      onValueChange={([min, max]) =>
+                        setData({ ...data, daily_trade_min: min, daily_trade_limit: max })
+                      }
                       min={1}
                       max={50}
                       step={1}
+                      minStepsBetweenThumbs={0}
                     />
+                    <p className="text-xs text-muted-foreground">
+                      Your normal day. Only the upper number is a limit — going above{' '}
+                      {data.daily_trade_limit} is what gets flagged.
+                    </p>
                   </div>
 
                   <div className="space-y-3">

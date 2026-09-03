@@ -1,0 +1,40 @@
+-- 089: an access path for the stop-evidence query
+--
+-- WHY
+--
+-- `behavior_engine._load_stop_evidence` filters `orders` on
+-- (broker_account_id, tradingsymbol, exchange, order_type, transaction_type)
+-- with an upper bound on order_timestamp. Nothing indexed that combination:
+--
+--   uq_orders_account_kite_id     (broker_account_id, kite_order_id)
+--   idx_orders_account_date       (broker_account_id, order_timestamp)
+--   idx_orders_status             (broker_account_id, status)
+--   idx_orders_symbol             (tradingsymbol)          <- GLOBAL, all accounts
+--   idx_orders_broker_account_id  (broker_account_id)
+--
+-- The only symbol-selective option was `idx_orders_symbol`, which for a liquid
+-- symbol matches EVERY account's orders on it and filters the account out
+-- afterwards. That was harmless while `orders` was written once a day by the
+-- EOD sync. It is not harmless now: since 2026-09-03 every order lifecycle
+-- state is persisted, so a stop trailed through a session writes on each move
+-- and the table grows roughly twenty times faster.
+--
+-- The query also has no lower time bound in SQL — "belonged to an earlier
+-- round" is decided in Python — so the scan reaches back to the account's
+-- first ever order on that symbol.
+--
+-- WHAT
+--
+-- One composite index, leading with the two columns that actually select:
+-- account then symbol, then the timestamp the query bounds on. exchange,
+-- order_type and transaction_type are left out deliberately: they are
+-- low-cardinality, and adding them widens the index for little gain once
+-- (account, symbol) has already cut the set to one trader's orders on one
+-- instrument.
+--
+-- Idempotent. CONCURRENTLY so it cannot lock writes on a live table — which is
+-- why this file must be applied outside a transaction; scripts/migrate.py
+-- detects CONCURRENTLY and runs it in autocommit, one statement at a time.
+
+CREATE INDEX CONCURRENTLY IF NOT EXISTS idx_orders_account_symbol_time
+    ON orders (broker_account_id, tradingsymbol, order_timestamp);

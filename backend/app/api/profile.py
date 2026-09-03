@@ -7,7 +7,7 @@ Handles user preferences, onboarding wizard, and adaptive settings.
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
-from pydantic import BaseModel, field_validator
+from pydantic import BaseModel, field_validator, model_validator
 from uuid import UUID
 from typing import Optional, List
 from datetime import datetime, timezone
@@ -62,6 +62,7 @@ class OnboardingStep4(BaseModel):
     """Risk management — the constitution review step (Engine v2 Q24)"""
     daily_loss_limit: Optional[float] = None
     per_trade_loss_limit: Optional[float] = None
+    daily_trade_min: Optional[int] = None
     daily_trade_limit: Optional[int] = None
     max_position_size: Optional[float] = None
     max_consecutive_losses: Optional[int] = None
@@ -114,6 +115,7 @@ class ProfileUpdate(BaseModel):
     trading_hours_end: Optional[str] = None
     daily_loss_limit: Optional[float] = None
     per_trade_loss_limit: Optional[float] = None
+    daily_trade_min: Optional[int] = None
     daily_trade_limit: Optional[int] = None
     max_position_size: Optional[float] = None
     trading_capital: Optional[float] = None
@@ -212,6 +214,28 @@ class ProfileUpdate(BaseModel):
         if v is not None and not (1 <= v <= 500):
             raise ValueError("Daily trade limit must be 1–500")
         return v
+
+    @field_validator("daily_trade_min")
+    @classmethod
+    def validate_daily_trade_min(cls, v: Optional[int]) -> Optional[int]:
+        if v is not None and not (1 <= v <= 500):
+            raise ValueError("Daily trade minimum must be 1–500")
+        return v
+
+    @model_validator(mode="after")
+    def validate_daily_trade_range(self):
+        """
+        A range whose floor is above its ceiling is not a range. Rejected rather
+        than silently reordered: the trader typed both numbers, and quietly
+        swapping them would store something they did not say.
+        """
+        lo, hi = self.daily_trade_min, self.daily_trade_limit
+        if lo is not None and hi is not None and lo > hi:
+            raise ValueError(
+                "Daily trade range is inverted: the minimum "
+                f"({lo}) is above the maximum ({hi})"
+            )
+        return self
 
     @field_validator("trading_since")
     @classmethod
@@ -397,6 +421,12 @@ async def onboarding_step4(
             profile.trading_capital = data.trading_capital
         profile.known_weaknesses = data.known_weaknesses
         profile.onboarding_step = max(profile.onboarding_step, 4)
+
+        # The lower half of the declared daily range. NOT a constitution rule:
+        # it cannot be breached, so it has no tighten/loosen semantics and does
+        # not belong in `rules` below. Written directly, like trading_capital.
+        if data.daily_trade_min is not None:
+            profile.daily_trade_min = data.daily_trade_min
 
         from app.services.constitution_service import ConstitutionService
         rules = {

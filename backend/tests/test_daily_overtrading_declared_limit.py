@@ -19,9 +19,18 @@ trader's own `daily_trades_p75`. Two problems, either fatal on its own:
     and the 141 positions past the line made Rs 1,265 net.
 
 What survives is the version that is true by construction: you said you stop at
-N, and you are at N. No declaration means no alert — the daily count is still
-visible to analytics, which computes it from the trades and never read this
-event.
+N, and you have gone past N. No declaration means no alert — the daily count is
+still visible to analytics, which computes it from the trades and never read
+this event.
+
+SUPERSEDED 2026-09-03, deliberately. This file asserted that REACHING the
+declared number alerts (`count >= limit`). The rule is now the top of a
+declared RANGE — "3-5 trades/day" — so the maximum is the last trade the rule
+PERMITS and the breach is the one above it. A trader who declared 5 was
+previously told they had exceeded their limit on their fifth trade. The
+assertions below move from `>=` to `>`; nothing else about them changes, and
+the point they were written to make — that the line is the trader's number and
+not one the engine picked — is untouched. See tests/test_daily_trade_range.py.
 
 Deliberately NOT here: any replacement default, the `daily_trade_danger` = 12
 tier (its own definition file records "no source"), and any change to
@@ -121,14 +130,23 @@ def test_the_derived_line_does_not_win_when_a_declared_one_exists():
 
 # ── declared limit → alert at that limit ───────────────────────────────────
 
-def test_reaching_the_declared_limit_alerts():
-    ev = _run(5, {"user_daily_trade_limit": 5})
+def test_reaching_the_declared_maximum_is_silent():
+    """
+    INVERTED 2026-09-03. This asserted that reaching the number alerts. The
+    declared number is now the top of a range, so the fifth trade against a
+    declared 5 is the last one the rule permits — compliance, not a breach.
+    """
+    assert _run(5, {"user_daily_trade_limit": 5}) is None
+
+
+def test_exceeding_the_declared_maximum_alerts():
+    ev = _run(6, {"user_daily_trade_limit": 5})
     assert ev is not None
     assert ev.event_type == "daily_overtrading"
     assert ev.severity == "caution"
     assert ev.context["declared_limit"] == 5
-    assert ev.context["daily_count"] == 5
-    assert "your limit is 5" in ev.message
+    assert ev.context["daily_count"] == 6
+    assert "you set your maximum at 5" in ev.message
 
 
 def test_one_below_the_declared_limit_is_silent():
@@ -149,10 +167,11 @@ def test_no_tier_above_the_declared_limit():
 # ── the threshold follows each trader's own number ─────────────────────────
 
 @pytest.mark.parametrize("limit,count,should_fire", [
-    (3, 2, False), (3, 3, True),
-    (5, 4, False), (5, 5, True),
-    (10, 9, False), (10, 10, True),
-    (20, 19, False), (20, 20, True),
+    # At the maximum = compliance. Above it = breach. No tolerance band.
+    (3, 3, False), (3, 4, True),
+    (5, 5, False), (5, 6, True),
+    (10, 10, False), (10, 11, True),
+    (20, 20, False), (20, 21, True),
 ])
 def test_the_line_is_wherever_the_trader_put_it(limit, count, should_fire):
     ev = _run(count, {"user_daily_trade_limit": limit})

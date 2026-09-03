@@ -55,7 +55,22 @@ def _files() -> List[Path]:
 
 
 def _checksum(path: Path) -> str:
-    return hashlib.sha256(path.read_bytes()).hexdigest()[:16]
+    """
+    Content hash, insensitive to line endings.
+
+    It hashed raw bytes until 2026-09-03, and on the first commit after the
+    ledger was populated git's autocrlf rewrote every migration LF -> CRLF.
+    Three files the runner had just applied immediately reported CHANGED. The
+    content was identical; only the bytes were not.
+
+    That matters because `changed` is supposed to mean "the file no longer
+    describes the database" - the one signal worth acting on. A checksum that
+    also fires on a checkout on a different platform turns that signal into
+    noise, and a noisy alarm gets ignored. Normalising restores the recorded
+    values exactly, so no row needed rewriting.
+    """
+    normalised = path.read_bytes().replace(b"\r\n", b"\n")
+    return hashlib.sha256(normalised).hexdigest()[:16]
 
 
 def _split_statements(sql: str) -> List[str]:
