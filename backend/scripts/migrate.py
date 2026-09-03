@@ -176,20 +176,34 @@ async def cmd_apply(engine, names: List[str]) -> int:
 
     for path in targets:
         sql = path.read_text(encoding="utf-8")
-        print(f"applying {path.name} ...", flush=True)
+        # CREATE INDEX CONCURRENTLY cannot run inside a transaction block, and
+        # several index migrations use it. Those files run in autocommit; every
+        # other file gets one transaction, so a failure leaves the schema and
+        # the ledger agreeing rather than half a migration recorded as done.
+        concurrent = "CONCURRENTLY" in sql.upper()
+        print(f"applying {path.name} ..."
+              f"{' (autocommit: CONCURRENTLY)' if concurrent else ''}", flush=True)
         try:
-            # One transaction per file: a failure leaves the ledger and the
-            # schema agreeing, rather than half a migration recorded as done.
-            async with engine.begin() as conn:
-                await conn.execute(text(sql))
-                if path.name != LEDGER_FILE or await _ledger_exists(conn):
-                    await conn.execute(
-                        text("INSERT INTO schema_migrations "
-                             "(filename, checksum, applied_by) "
-                             "VALUES (:f, :c, 'runner') "
-                             "ON CONFLICT (filename) DO NOTHING"),
-                        {"f": path.name, "c": _checksum(path)},
-                    )
+            async with engine.connect() as conn:
+                if concurrent:
+                    conn = await conn.execution_options(isolation_level="AUTOCOMMIT")
+                else:
+                    await conn.begin()
+                # A migration file holds MANY statements. asyncpg's prepared
+                # statement path refuses that ("cannot insert multiple commands
+                # into a prepared statement"), so the file goes to the raw
+                # driver connection, which uses the simple query protocol.
+                raw = await conn.get_raw_connection()
+                await raw.driver_connection.execute(sql)
+                await conn.execute(
+                    text("INSERT INTO schema_migrations "
+                         "(filename, checksum, applied_by) "
+                         "VALUES (:f, :c, 'runner') "
+                         "ON CONFLICT (filename) DO NOTHING"),
+                    {"f": path.name, "c": _checksum(path)},
+                )
+                if not concurrent:
+                    await conn.commit()
         except Exception as exc:                       # noqa: BLE001 - reported
             print(f"  FAILED: {exc}")
             print("  stopped. Nothing after this file was attempted.")
