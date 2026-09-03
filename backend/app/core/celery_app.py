@@ -43,7 +43,6 @@ celery_app = Celery(
         "app.tasks.alert_tasks",
         "app.tasks.report_tasks",
         "app.tasks.retention_tasks",
-        "app.tasks.checkpoint_tasks",
         "app.tasks.reconciliation_tasks",
         "app.tasks.position_monitor_tasks",
         "app.tasks.guardrail_tasks",
@@ -92,7 +91,10 @@ celery_app.conf.update(
         "app.tasks.trade_tasks.*": {"queue": "trades"},
         "app.tasks.alert_tasks.*": {"queue": "alerts"},
         "app.tasks.report_tasks.*": {"queue": "reports"},
-        "app.tasks.checkpoint_tasks.*": {"queue": "alerts"},
+        # checkpoint_tasks archived 2026-09-03: nothing invoked it. It took
+        # required (alert_id, broker_account_id) args so it could not be put
+        # on beat, but it made 2 Kite REST calls per alert plus one at T+30
+        # and had no caller at all. Preserved in tasks/_archive/.
         "app.tasks.reconciliation_tasks.*": {"queue": "trades"},
         "app.tasks.position_monitor_tasks.*": {"queue": "trades"},
         "app.tasks.guardrail_tasks.*": {"queue": "alerts"},

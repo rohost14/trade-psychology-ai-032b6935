@@ -38,19 +38,26 @@ def ensure_behavior_event_partitions(self):
         from sqlalchemy import text
         created = []
         async with SessionLocal() as db:
-            for offset in range(MONTHS_AHEAD + 1):  # current month + N ahead
-                start, end = _month_bounds(date.today(), offset)
-                name = f"behavior_events_y{start.year}m{start.month:02d}"
-                exists = await db.execute(text(
-                    "SELECT 1 FROM pg_tables WHERE schemaname='public' AND tablename=:t"
-                ), {"t": name})
-                if exists.scalar_one_or_none():
-                    continue
-                await db.execute(text(
-                    f"CREATE TABLE {name} PARTITION OF behavior_events "
-                    f"FOR VALUES FROM ('{start.isoformat()}') TO ('{end.isoformat()}')"
-                ))
-                created.append(name)
+            # `orders` joined behavior_events as a partitioned table in
+            # migration 090. Both roll on the same beat: a partitioned table
+            # whose window runs out does not error, it silently routes
+            # everything into the DEFAULT partition and stops being
+            # partitioned in practice - which is how the behavior_events
+            # window came within eight weeks of expiring unnoticed.
+            for parent in ("behavior_events", "orders"):
+                for offset in range(MONTHS_AHEAD + 1):  # current month + N ahead
+                    start, end = _month_bounds(date.today(), offset)
+                    name = f"{parent}_y{start.year}m{start.month:02d}"
+                    exists = await db.execute(text(
+                        "SELECT 1 FROM pg_tables WHERE schemaname='public' AND tablename=:t"
+                    ), {"t": name})
+                    if exists.scalar_one_or_none():
+                        continue
+                    await db.execute(text(
+                        f"CREATE TABLE {name} PARTITION OF {parent} "
+                        f"FOR VALUES FROM ('{start.isoformat()}') TO ('{end.isoformat()}')"
+                    ))
+                    created.append(name)
             if created:
                 await db.commit()
                 logger.info(f"[partitions] created: {created}")

@@ -663,11 +663,17 @@ class TradeSyncService:
                 try:
                     async with db.begin_nested():
                         order_dict = cls._map_order_to_model(order_data, broker_account_id)
+                        # Partition key must be present — see upsert_order.
+                        if not order_dict.get("order_timestamp"):
+                            order_dict["order_timestamp"] = (
+                                order_dict.get("exchange_timestamp")
+                                or datetime.now(timezone.utc)
+                            )
 
                         # Upsert order
                         stmt = insert(Order).values(**order_dict)
                         stmt = stmt.on_conflict_do_update(
-                            index_elements=['broker_account_id', 'kite_order_id'],
+                            index_elements=['broker_account_id', 'kite_order_id', 'order_timestamp'],
                             set_={
                                 "status": order_dict["status"],
                                 "status_message": order_dict["status_message"],
@@ -755,9 +761,20 @@ class TradeSyncService:
         if not order_dict.get("kite_order_id"):
             return
 
+        # `orders` is partitioned on order_timestamp (migration 090), so the
+        # column is NOT NULL and is part of the uniqueness key. Kite resends the
+        # same placement time on every update for an order, which is what keeps
+        # a modify on the same row - but a payload that omitted it would fail
+        # the insert, so fall back rather than drop the event.
+        if not order_dict.get("order_timestamp"):
+            order_dict["order_timestamp"] = (
+                order_dict.get("exchange_timestamp")
+                or datetime.now(timezone.utc)
+            )
+
         stmt = _pg_insert(Order).values(**order_dict)
         stmt = stmt.on_conflict_do_update(
-            index_elements=["broker_account_id", "kite_order_id"],
+            index_elements=["broker_account_id", "kite_order_id", "order_timestamp"],
             set_={
                 "status": order_dict["status"],
                 "status_message": order_dict["status_message"],

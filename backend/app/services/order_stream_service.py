@@ -70,13 +70,27 @@ _TRACKED_PRODUCTS = {"MIS", "NRML", "MTF"}
 # Bound the per-connection dedup set so a long session cannot grow it without limit.
 _DEDUP_MAX = 2000
 
-# Zerodha permits at most 3 KiteTicker connections per api_key. With per-user
-# api_keys (current tester phase / future publisher flow) each user has their own
-# budget, so this is not hit. If the deployment ever shares ONE global api_key
-# across users, opening a 4th connection on that key gets all of them dropped —
-# so we cap and fall back to sync-only ingestion for the overflow users instead of
-# thrashing connections. Kept at 2 to leave headroom for the market-data fallback
-# ticker, which may also consume a connection on a user's key.
+# CONFIRMED against Zerodha's own documentation (kite.trade/docs/connect/v3/
+# websocket/, checked 2026-09-03): "Single API key can have upto 3 websocket
+# connections." The limit is PER API KEY, not per authenticated user or
+# access_token. This was an open question for a long time and the pessimistic
+# branch is the true one.
+#
+# WHAT THAT MEANS HERE. Every account resolves to one platform api_key
+# (`account.api_key or settings.ZERODHA_API_KEY`), so the realtime order stream
+# has THREE connection slots for the entire deployment - not three per user.
+# Beyond that, `start_account` skips and the account falls back to sync-only
+# ingestion. More users do not get more slots; only more api_keys would.
+#
+# F4 IS NOT BROKEN BY THIS, and that is worth stating because it looks fatal.
+# The absence claim is licensed by the daily `sync_orders_to_db` order-book
+# snapshot, not by the stream. Every user therefore gets correct stop-loss
+# evidence once a day at EOD; the stream only makes it same-minute for whoever
+# holds a slot. Overflow users abstain until the snapshot, which is the honest
+# behaviour rather than a degraded one.
+#
+# Kept at 2, one below the documented 3, to leave headroom for the market-data
+# fallback ticker which may also consume a connection on the same key.
 _MAX_CONN_PER_API_KEY = 2
 
 

@@ -195,3 +195,70 @@ def test_login_sync_is_a_safety_net_not_the_primary_mechanism():
     celery_src = (APP / "core" / "celery_app.py").read_text(encoding="utf-8")
     assert "eod_sync_all_accounts" in celery_src
     assert "reconciliation_tasks.reconcile_trades" in celery_src
+
+
+# ── the test database must never be the production one ─────────────────────
+
+def test_the_suite_refuses_an_unrecognised_database(monkeypatch):
+    """
+    The suite writes and deletes rows using `settings.DATABASE_URL` — the same
+    URL the application runs on. A bad DELETE in a test could destroy real
+    trader data and nothing stopped it.
+
+    FAIL CLOSED: anything not recognisable as a test database is treated as
+    production. Guessing wrong in that direction is recoverable; the other way
+    is not.
+    """
+    from tests.conftest import _assert_safe_test_database
+
+    # The escape hatch may be set for this very run; the guard itself must
+    # still refuse without it.
+    monkeypatch.delenv("ALLOW_TESTS_ON_THIS_DB", raising=False)
+    with pytest.raises(RuntimeError, match="REFUSING"):
+        _assert_safe_test_database(
+            "postgresql://u:p@db.abcdefghijkl.supabase.co:5432/postgres"
+        )
+
+
+@pytest.mark.parametrize("url", [
+    "postgresql://u:p@localhost:5432/app",
+    "postgresql://u:p@127.0.0.1:5432/app",
+    "postgresql://u:p@host:5432/tradementor_test",
+])
+def test_recognisable_test_databases_are_allowed(url, monkeypatch):
+    from tests.conftest import _assert_safe_test_database
+
+    monkeypatch.delenv("ALLOW_TESTS_ON_THIS_DB", raising=False)
+    _assert_safe_test_database(url)
+
+
+def test_the_escape_hatch_is_explicit(monkeypatch):
+    """
+    Running against the current database must be a deliberate act, not a
+    default. It is opt-in per invocation.
+    """
+    from tests.conftest import _assert_safe_test_database
+
+    prod = "postgresql://u:p@db.abcdefghijkl.supabase.co:5432/postgres"
+    monkeypatch.setenv("ALLOW_TESTS_ON_THIS_DB", "1")
+    _assert_safe_test_database(prod)
+    monkeypatch.setenv("ALLOW_TESTS_ON_THIS_DB", "0")
+    with pytest.raises(RuntimeError):
+        _assert_safe_test_database(prod)
+
+
+def test_checkpoint_tasks_is_archived_and_unscheduled():
+    """
+    It made 2 Kite REST calls per alert plus one at T+30 and had no caller at
+    all. Archived rather than deleted, per the project rule.
+    """
+    assert not (APP / "tasks" / "checkpoint_tasks.py").exists()
+    assert (APP / "tasks" / "_archive" / "checkpoint_tasks.py").exists()
+
+    celery_src = (APP / "core" / "celery_app.py").read_text(encoding="utf-8")
+    for line in celery_src.splitlines():
+        if line.strip().startswith("#"):
+            continue
+        assert "checkpoint_tasks" not in line, (
+            "checkpoint_tasks is registered or routed again"
+        )

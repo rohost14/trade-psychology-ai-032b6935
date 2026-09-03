@@ -26,10 +26,58 @@ import app.models  # noqa: F401
 from tests.helpers import now_utc, make_email
 
 
+#: Hosts/databases the suite must NEVER be pointed at. A test that issues a bad
+#: DELETE or UPDATE against the real application database destroys real trader
+#: data, and nothing in the suite currently prevents that - the tests use
+#: `settings.DATABASE_URL`, the same URL the application runs on.
+#:
+#: FAIL CLOSED. This refuses to build an engine unless the target is explicitly
+#: marked as a test database, rather than trying to enumerate every production
+#: host. An unrecognised database is treated as production, because the failure
+#: mode of guessing wrong in the other direction is unrecoverable.
+#:
+#: Opt in either by pointing TEST_DATABASE_URL at a dedicated database, or by
+#: setting ALLOW_TESTS_ON_THIS_DB=1 when you genuinely mean the current one.
+_TEST_DB_MARKERS = ("test", "_test", "localhost", "127.0.0.1")
+
+
+def _assert_safe_test_database(url: str) -> None:
+    import os
+
+    if os.getenv("ALLOW_TESTS_ON_THIS_DB") == "1":
+        return
+    lowered = (url or "").lower()
+    if any(marker in lowered for marker in _TEST_DB_MARKERS):
+        return
+    raise RuntimeError(
+        chr(10).join((
+            "REFUSING to run tests against this database.",
+            "",
+            "  The suite writes and deletes rows. The configured DATABASE_URL",
+            "  is not recognisable as a test database, so it is treated as",
+            "  production.",
+            "",
+            "  Fix one of:",
+            "    * set TEST_DATABASE_URL to a dedicated test database",
+            "    * name the database with a 'test' marker",
+            "    * export ALLOW_TESTS_ON_THIS_DB=1 if you really mean this one",
+        ))
+    )
+
+
+def test_database_url() -> str:
+    """The URL the suite runs against — TEST_DATABASE_URL wins when present."""
+    import os
+
+    url = os.getenv("TEST_DATABASE_URL") or settings.DATABASE_URL
+    _assert_safe_test_database(url)
+    return url
+
+
 def make_engine():
     """Fresh engine per test. NullPool = no connection reuse across async contexts."""
     return create_async_engine(
-        settings.DATABASE_URL,
+        test_database_url(),
         poolclass=NullPool,
         connect_args={"statement_cache_size": 0},
         echo=False,
@@ -53,7 +101,7 @@ async def create_tables():
         return
 
     engine = create_async_engine(
-        settings.DATABASE_URL,
+        test_database_url(),
         poolclass=NullPool,
         connect_args={"statement_cache_size": 0},
         echo=False,
