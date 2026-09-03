@@ -62,7 +62,7 @@ from app.core.account_risk import AccountRisk, freeze_for_session, resolve_accou
 from uuid import UUID, uuid4
 from zoneinfo import ZoneInfo
 
-from sqlalchemy import select, and_, func
+from sqlalchemy import select, and_, func, text
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.completed_trade import CompletedTrade
@@ -443,60 +443,56 @@ async def _load_stop_evidence(completed_trade, db) -> Optional[Dict[str, Any]]:
         )
         candidates = list(rows.scalars().all())
 
-        # Does another round on this symbol overlap? If so we cannot say which
-        # position a stop belonged to.
-        overlap = await db.execute(
-            select(func.count()).select_from(_CT).where(
-                _CT.broker_account_id == completed_trade.broker_account_id,
-                _CT.tradingsymbol == completed_trade.tradingsymbol,
-                _CT.id != completed_trade.id,
-                _CT.entry_time < exit_time,
-                _CT.exit_time > entry_time,
-            )
+        # ONE round trip for all three scalar checks.
+        #
+        # These were three separate awaits - overlap COUNT, snapshot COUNT, GTT
+        # EXISTS - which with the candidate SELECT made FOUR round trips per
+        # CompletedTrade. They are independent scalars against three tables, so
+        # they combine into a single SELECT with identical semantics. At a
+        # million trades a day that is two million fewer round trips.
+        #
+        # Written as one explicit statement rather than assembled from ORM
+        # scalar subqueries: `gtt_tracking` has no model (raw SQL table), and
+        # TextClause has no .label(), so mixing the two forms does not compose.
+        combined = await db.execute(
+            text(
+                "SELECT "
+                " (SELECT count(*) FROM completed_trades"
+                "   WHERE broker_account_id = :bid AND tradingsymbol = :sym"
+                "     AND id <> :ctid AND entry_time < :exit_t"
+                "     AND exit_time > :entry_t) AS overlaps,"
+                " (SELECT count(*) FROM data_quality_events"
+                "   WHERE broker_account_id = :bid AND kind = :snap_kind"
+                "     AND detected_at >= :exit_t) AS snapshots,"
+                " (SELECT count(*) FROM gtt_tracking"
+                "   WHERE broker_account_id = :bid AND tradingsymbol = :sym"
+                "     AND gtt_status = 'active' AND outcome IS NULL) AS gtts"
+            ),
+            {
+                "bid": str(completed_trade.broker_account_id),
+                "sym": completed_trade.tradingsymbol,
+                "ctid": str(completed_trade.id),
+                "entry_t": entry_time,
+                "exit_t": exit_time,
+                "snap_kind": ORDER_SNAPSHOT_KIND,
+            },
         )
-        ambiguous = (overlap.scalar() or 0) > 0
-
-        snap = await db.execute(
-            select(func.count()).select_from(_DQE).where(
-                _DQE.broker_account_id == completed_trade.broker_account_id,
-                _DQE.kind == ORDER_SNAPSHOT_KIND,
-                _DQE.detected_at >= exit_time,
-            )
-        )
-        snapshot_complete = (snap.scalar() or 0) > 0
-    except Exception as err:                       # noqa: BLE001 - abstain
+        overlaps, snapshots, gtts = combined.one()
+        ambiguous = (overlaps or 0) > 0
+        snapshot_complete = (snapshots or 0) > 0
+        # A GTT is a stop this query cannot see: it lives at Kite behind
+        # /gtt/triggers and produces no order until it fires, so the order-book
+        # snapshot certifies completeness over a set that excludes it. Used ONE
+        # WAY only - a GTT we can see withholds the absence claim and never
+        # asserts protection, because `gtt_tracking` is seeded once at connect
+        # and never reconciled, so its absences are not trustworthy.
+        gtt_active = (gtts or 0) > 0
+    except Exception as err:                       # noqa: BLE001 - fail closed
+        # Cannot tell. Every one of these gates the NEGATIVE claim, so an
+        # unreadable table (gtt_tracking may not even exist) must withhold it
+        # rather than wave it through.
         logger.debug(f"stop-evidence lookup skipped: {err}")
         return None
-
-    # A GTT IS A STOP THIS QUERY CANNOT SEE.
-    #
-    # The snapshot marker certifies that we hold the whole ORDER BOOK, and a
-    # GTT is not in it: it lives at Kite behind a different endpoint
-    # (/gtt/triggers) and produces no order at all until it fires. So a trader
-    # holding an active GTT sell, who exits manually before it triggers, has
-    # every appearance of an unprotected position - no SL row, snapshot
-    # complete - and case A would tell them they had no stop while a live GTT
-    # sat in our own database.
-    #
-    # `gtt_tracking` is seeded once at connect and never reconciled against
-    # Kite, so its ABSENCES are not trustworthy either. It is used one way
-    # only: a GTT we can see withholds the negative claim. It is never used to
-    # assert protection.
-    gtt_active = False
-    try:
-        from app.services.gtt_service import has_active_gtt
-        gtt_active = await has_active_gtt(
-            completed_trade.broker_account_id, completed_trade.tradingsymbol, db
-        )
-    except Exception as err:                       # noqa: BLE001
-        # Cannot tell -> must not claim absence.
-        logger.debug(f"GTT visibility check failed: {err}")
-        gtt_active = True
-
-    try:
-        pass
-    except Exception:                              # noqa: BLE001
-        pass
 
     protecting, cancelled_early, rejected, modified = [], [], [], 0
     for o in candidates:

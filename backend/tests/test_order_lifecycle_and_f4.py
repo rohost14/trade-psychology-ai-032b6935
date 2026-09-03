@@ -165,31 +165,34 @@ def _order(qty=75, status="TRIGGER PENDING", otype="SL", side="SELL",
 
 
 class _DB:
-    """In order: protective orders, overlap count, snapshot count, GTT probe."""
+    """
+    TWO round trips, matching the code: the candidate SELECT, then ONE combined
+    SELECT returning (overlaps, snapshots, gtts). If this fake ever needs a
+    third call, the query count regressed.
+    """
 
     def __init__(self, orders, overlapping=0, snapshot=1, gtt=False):
         self._orders = orders
-        self._scalars = [overlapping, snapshot]
-        self._gtt = gtt
+        self._scalars = (overlapping, 1 if snapshot else 0, 1 if gtt else 0)
+        self.calls = 0
 
     async def execute(self, *_a, **_k):
-        if self._orders is not None:
-            payload, self._orders = self._orders, None
+        self.calls += 1
+        if self.calls == 1:
             return SimpleNamespace(scalars=lambda: SimpleNamespace(
-                all=lambda: payload))
-        if self._scalars:
-            val = self._scalars.pop(0)
-            return SimpleNamespace(scalar=lambda: val)
-        return SimpleNamespace(fetchone=lambda: (1,) if self._gtt else None)
+                all=lambda: self._orders))
+        return SimpleNamespace(one=lambda: self._scalars)
 
 
-class _DBNoGtt(_DB):
-    """A database where the GTT table cannot be read at all."""
+class _DBUnreadable(_DB):
+    """A database where the combined check fails — e.g. no gtt_tracking table."""
 
     async def execute(self, *a, **k):
-        if self._orders is None and not self._scalars:
-            raise RuntimeError("relation gtt_tracking does not exist")
-        return await super().execute(*a, **k)
+        self.calls += 1
+        if self.calls == 1:
+            return SimpleNamespace(scalars=lambda: SimpleNamespace(
+                all=lambda: self._orders))
+        raise RuntimeError("relation gtt_tracking does not exist")
 
 
 async def _evidence(orders, ct=None, overlapping=0, snapshot=1, gtt=False,
@@ -197,6 +200,21 @@ async def _evidence(orders, ct=None, overlapping=0, snapshot=1, gtt=False,
     from app.services.behavior_engine import _load_stop_evidence
     return await _load_stop_evidence(
         ct or _ct(), db_cls(orders, overlapping, snapshot, gtt))
+
+
+@pytest.mark.asyncio
+async def test_f4_context_costs_exactly_two_round_trips():
+    """
+    It was FOUR — candidates, overlap COUNT, snapshot COUNT, GTT EXISTS. The
+    three scalars are independent checks against three tables and combine into
+    one SELECT of scalar subqueries. At a million trades a day that is two
+    million fewer round trips for identical semantics.
+    """
+    from app.services.behavior_engine import _load_stop_evidence
+
+    db = _DB([_order(qty=75)])
+    await _load_stop_evidence(_ct(), db)
+    assert db.calls == 2, f"F4 context now costs {db.calls} round trips"
 
 
 @pytest.mark.asyncio
@@ -213,11 +231,14 @@ async def test_an_active_gtt_withholds_the_absence_claim():
 
 
 @pytest.mark.asyncio
-async def test_an_unreadable_gtt_table_also_withholds_the_claim():
-    """Cannot tell is not the same as no. `gtt_tracking` may not even exist."""
-    ev = await _evidence([], db_cls=_DBNoGtt)
-    assert ev["gtt_active"] is True
-    assert ev["snapshot_complete"] is False
+async def test_an_unreadable_check_fails_closed():
+    """
+    Cannot tell is not the same as no. `gtt_tracking` is a raw-SQL table with
+    no model and may not exist at all; the combined check also carries the
+    snapshot and ambiguity gates. If it throws, EVERY gate on the negative
+    claim is unknown, so the whole evidence is withheld.
+    """
+    assert await _evidence([], db_cls=_DBUnreadable) is None
 
 
 @pytest.mark.asyncio
