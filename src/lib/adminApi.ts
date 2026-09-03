@@ -116,6 +116,19 @@ export const adminApi = {
   broadcastLogs:     (limit = 20) => req(`/broadcast/logs?limit=${limit}`),
   broadcastReceipts: (id: string)  => req(`/broadcast/logs/${id}/receipts`),
 
+  // ── Partitions & retention ────────────────────────────────────────────────
+  // No deletePartition here on purpose: the only path that drops anything is
+  // the maintenance job, behind the snapshot gate.
+  partitions:          () => req('/partitions'),
+  partitionSnapshots:  (months = 18) => req(`/partitions/snapshots?months=${months}`),
+  ensurePartitions:    () => req('/partitions/ensure', { method: 'POST' }),
+  snapshotMonth:       (month: string) =>
+    req('/partitions/snapshot-month', { method: 'POST', body: JSON.stringify({ month }) }),
+  runPartitionMaintenance: (dry_run: boolean, confirm?: string) =>
+    req('/partitions/maintenance', { method: 'POST', body: JSON.stringify({ dry_run, confirm }) }),
+  setPartitionRetention: (body: { table: string; months?: number | null; reset?: boolean; confirm?: string }) =>
+    req('/partitions/retention', { method: 'PUT', body: JSON.stringify(body) }),
+
   // ── Admin IAM (superadmin only) ───────────────────────────────────────────
   admins:            () => req('/admins'),
   createAdmin:       (body: { email: string; name: string; role: string }) =>

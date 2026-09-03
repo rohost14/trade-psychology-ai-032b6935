@@ -2,7 +2,7 @@ import { useEffect } from 'react';
 import { Outlet, NavLink, useNavigate, useLocation } from 'react-router-dom';
 import {
   LayoutDashboard, Users, Activity, BarChart3, Gauge, Settings,
-  LogOut, ScrollText, Megaphone, Shield, ShieldCheck,
+  LogOut, ScrollText, Megaphone, Shield, ShieldCheck, Database,
 } from 'lucide-react';
 import { useAdminAuth } from '@/contexts/AdminAuthContext';
 import { adminApi } from '@/lib/adminApi';
@@ -26,6 +26,7 @@ const NAV_GROUPS = [
     items: [
       { to: '/admin/broadcast', icon: Megaphone,  label: 'Broadcast', roles: ['superadmin','ops'] },
       { to: '/admin/audit-log', icon: ScrollText, label: 'Audit Log', roles: ['superadmin','ops','support'] },
+      { to: '/admin/partitions', icon: Database, label: 'Partitions', roles: ['superadmin','ops'] },
     ],
   },
   {

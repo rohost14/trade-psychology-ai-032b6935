@@ -53,6 +53,7 @@ const AdminConfig     = lazy(() => import("./pages/admin/AdminConfig"));
 const AdminAuditLog   = lazy(() => import("./pages/admin/AdminAuditLog"));
 const AdminBroadcast  = lazy(() => import("./pages/admin/AdminBroadcast"));
 const AdminAdmins     = lazy(() => import("./pages/admin/AdminAdmins"));
+const AdminPartitions = lazy(() => import("./pages/admin/AdminPartitions"));
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -152,6 +153,7 @@ const App = () => (
                     <Route path="broadcast"     element={<AdminBroadcast />} />
                     <Route path="audit-log"     element={<AdminAuditLog />} />
                     <Route path="admins"        element={<AdminAdmins />} />
+                    <Route path="partitions"    element={<AdminPartitions />} />
                     <Route path="config"        element={<AdminConfig />} />
                   </Route>
                   <Route path="admin/login" element={<ErrorBoundary><AdminAuthProvider><AdminLogin /></AdminAuthProvider></ErrorBoundary>} />

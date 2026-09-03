@@ -237,3 +237,45 @@ async def mark_pruned(db: AsyncSession, month: date) -> None:
         "UPDATE monthly_snapshots SET orders_pruned_at = now()"
         " WHERE month = :m AND orders_pruned_at IS NULL"
     ), {"m": month})
+
+
+async def snapshot_status_for_month(db: AsyncSession, month: date) -> Dict[str, Any]:
+    """
+    READ-ONLY report of where a month stands. Never writes.
+
+    `snapshots_complete_for_month` is the deletion gate and BUILDS what is
+    missing as a side effect, which is right for the job and wrong for an admin
+    looking at a screen: inspecting a system must not change it. This answers
+    the same question without touching anything.
+    """
+    account_ids = await accounts_with_orders_in_month(db, month)
+    rows = (await db.execute(
+        select(MonthlySnapshot).where(MonthlySnapshot.month == month)
+    )).scalars().all()
+
+    by_account = {r.broker_account_id: r for r in rows}
+    verified = [a for a in account_ids if _is_valid(getattr(by_account.get(a), "metrics", None))]
+    missing = [str(a) for a in account_ids if a not in by_account]
+    invalid = [
+        str(a) for a in account_ids
+        if a in by_account and not _is_valid(by_account[a].metrics)
+    ]
+
+    return {
+        "month": month.isoformat(),
+        "accounts_with_orders": len(account_ids),
+        "snapshots_present": len([a for a in account_ids if a in by_account]),
+        "snapshots_verified": len(verified),
+        "missing_accounts": missing,
+        "invalid_accounts": invalid,
+        # The gate's answer, computed without invoking the gate. A month nobody
+        # traded in is complete: there is nothing to preserve, and treating it
+        # as blocked would retain empty partitions forever.
+        "complete": not missing and not invalid,
+        "pruned_at": next(
+            (r.orders_pruned_at.isoformat() for r in rows if r.orders_pruned_at), None
+        ),
+        # Rows can outlive the accounts that produced them being re-snapshotted
+        # for other months, so this counts the table, not just this month's set.
+        "snapshot_rows": len(rows),
+    }

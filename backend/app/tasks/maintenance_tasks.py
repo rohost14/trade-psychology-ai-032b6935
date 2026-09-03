@@ -17,6 +17,9 @@ from app.services.monthly_snapshot_service import (
     mark_pruned,
     snapshots_complete_for_month,
 )
+from app.services.retention_policy_service import (  # noqa: F401 - re-exported
+    RETENTION_MONTHS,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -28,6 +31,11 @@ logger = logging.getLogger(__name__)
 MONTHS_AHEAD = 12
 
 #: Automatic retention, per partitioned parent. None = never drop.
+#:
+#: The values themselves now live in `retention_policy_service`, because an
+#: admin may lengthen a window (or deliberately shorten one) without a
+#: redeploy. Imported under the original name so this stays the obvious place
+#: to look, and so the CODE value is what any caller without a DB session gets.
 #:
 #: Dropping a partition is instantaneous and reclaims the space outright, which
 #: is the entire reason the tables are partitioned - the alternative is a mass
@@ -42,17 +50,16 @@ MONTHS_AHEAD = 12
 #:
 #: `behavior_events` is deliberately None. It is the trader's own behavioural
 #: history and what analytics renders back to them; silently deleting it is a
-#: PRODUCT decision, not a maintenance one, and turning it on is a one-line
-#: change once somebody decides what a trader is entitled to keep.
-RETENTION_MONTHS = {
-    "orders": 6,
-    "behavior_events": None,
-}
+#: PRODUCT decision, not a maintenance one, and an admin turning it on is a
+#: separate explicit act guarded in the policy service.
 
 #: Refuse to drop more than this many partitions in a single run. A wrong clock,
 #: a bad timezone or a mistyped retention value should cost one month of data at
 #: worst, not the whole table. Hitting the cap logs loudly and drops nothing.
 MAX_DROPS_PER_RUN = 3
+
+#: Where the last maintenance outcome is recorded for the admin panel.
+PARTITION_RUN_KEY = "partitions:last_run"
 
 
 def _month_bounds(anchor: date, offset: int):
@@ -66,112 +73,215 @@ def _month_bounds(anchor: date, offset: int):
     return start, end
 
 
+#: The partitioned parents this job manages, in the order it walks them.
+PARTITIONED_PARENTS = ("behavior_events", "orders")
+
+
+def partition_name_pattern(parent: str) -> str:
+    """The regex a partition of `parent` must match to be considered for a drop.
+
+    Deliberately anchored and parent-scoped: DEFAULT must never match, and one
+    parent's regex must never reach another parent's partitions.
+    """
+    return rf"{parent}_y(\d{{4}})m(\d{{2}})"
+
+
+def partition_month(parent: str, name: str):
+    """The month a partition covers, or None if the name is not one of ours."""
+    m = re.fullmatch(partition_name_pattern(parent), name)
+    return date(int(m.group(1)), int(m.group(2)), 1) if m else None
+
+
+async def list_partitions(db, parent: str) -> list[str]:
+    """Every attached partition of `parent`, DEFAULT included, name-ordered."""
+    from sqlalchemy import text
+
+    rows = await db.execute(text(
+        "SELECT c.relname FROM pg_class c "
+        " JOIN pg_inherits i ON i.inhrelid = c.oid "
+        " JOIN pg_class p ON p.oid = i.inhparent "
+        " WHERE p.relname = :parent ORDER BY c.relname"
+    ), {"parent": parent})
+    return [r[0] for r in rows]
+
+
+async def missing_partition_months(db, parent: str) -> list[date]:
+    """Months inside the forward window that have no partition yet."""
+    existing = set(await list_partitions(db, parent))
+    missing = []
+    for offset in range(MONTHS_AHEAD + 1):
+        start, _ = _month_bounds(date.today(), offset)
+        if f"{parent}_y{start.year}m{start.month:02d}" not in existing:
+            missing.append(start)
+    return missing
+
+
+async def expired_partitions(db, parent: str, keep_months) -> list[str]:
+    """
+    Partitions whose ENTIRE range is older than the cutoff.
+
+    Comparing the START would delete the month a trader is still trading in.
+    Read-only: this is what both the job and the admin preview ask.
+    """
+    if not keep_months:
+        return []                          # None = never drop
+    cutoff, _ = _month_bounds(date.today(), -keep_months)
+    doomed = []
+    for name in await list_partitions(db, parent):
+        month = partition_month(parent, name)
+        if month is None:
+            continue                       # DEFAULT and anything odd
+        _, end = _month_bounds(month, 0)
+        if end <= cutoff:
+            doomed.append(name)
+    return doomed
+
+
+async def _ensure_partitions(db) -> list[str]:
+    """
+    Create any missing partition inside the forward window.
+
+    A partitioned table whose window runs out does not error - it silently
+    routes everything into the DEFAULT partition and stops being partitioned in
+    practice, which is how the behavior_events window came within eight weeks
+    of expiring unnoticed.
+    """
+    from sqlalchemy import text
+
+    created = []
+    for parent in PARTITIONED_PARENTS:
+        for offset in range(MONTHS_AHEAD + 1):     # current month + N ahead
+            start, end = _month_bounds(date.today(), offset)
+            name = f"{parent}_y{start.year}m{start.month:02d}"
+            exists = await db.execute(text(
+                "SELECT 1 FROM pg_tables WHERE schemaname='public' AND tablename=:t"
+            ), {"t": name})
+            if exists.scalar_one_or_none():
+                continue
+            await db.execute(text(
+                f"CREATE TABLE {name} PARTITION OF {parent} "
+                f"FOR VALUES FROM ('{start.isoformat()}') TO ('{end.isoformat()}')"
+            ))
+            created.append(name)
+    return created
+
+
+async def _apply_retention(db, retention: dict) -> tuple[list[str], list[str]]:
+    """
+    Drop partitions wholly older than the window. Returns (dropped, skipped).
+
+    This is the half that was never automated. Creating partitions forever
+    without ever dropping one just means the table grows and someone deals with
+    it later, by hand, under pressure.
+
+    Safe by construction: a partition is only ever dropped when its ENTIRE
+    range is older than the cutoff, the DEFAULT partition is never touched, no
+    run may drop more than MAX_DROPS_PER_RUN, and for `orders` the month must
+    already be summarised and verified.
+    """
+    from sqlalchemy import text
+
+    dropped, skipped = [], []
+    for parent, keep_months in retention.items():
+        if not keep_months:
+            continue                       # None = never drop
+        doomed = await expired_partitions(db, parent, keep_months)
+
+        if len(doomed) > MAX_DROPS_PER_RUN:
+            logger.error(
+                f"[partitions] REFUSING to drop {len(doomed)} {parent} "
+                f"partitions in one run (cap {MAX_DROPS_PER_RUN}): "
+                f"{doomed}. Check the clock and RETENTION_MONTHS."
+            )
+            continue
+        for name in doomed:
+            # ── THE GATE ───────────────────────────────────────────────────
+            #
+            # A month is never traded away for storage on the assumption its
+            # summary probably worked. The snapshot for every account with
+            # orders in that month must exist AND verify; anything short of
+            # that and the partition simply stays and is retried on the next
+            # run. Retention that cannot prove what it preserved is just
+            # deletion.
+            month = partition_month(parent, name)
+            if parent == "orders":
+                try:
+                    ok = await snapshots_complete_for_month(db, month)
+                except Exception as err:   # noqa: BLE001 - retained
+                    logger.error(
+                        f"[partitions] snapshot check failed for {month}: "
+                        f"{err} - {name} retained"
+                    )
+                    ok = False
+                if not ok:
+                    skipped.append(name)
+                    continue
+                # Commit the snapshots BEFORE the drop. If the drop then fails
+                # we still hold both the summaries and the data; sharing one
+                # transaction would roll the snapshots back with the failed
+                # drop and lose the work.
+                await db.commit()
+
+            await db.execute(text(f"DROP TABLE IF EXISTS {name}"))
+            if parent == "orders":
+                # AFTER the drop, in the drop's own transaction: the flag says
+                # "the raw orders are gone", so it must not be able to survive
+                # a drop that did not happen.
+                await mark_pruned(db, month)
+            dropped.append(name)
+
+    if skipped:
+        logger.warning(f"[partitions] retained pending snapshots: {skipped}")
+    return dropped, skipped
+
+
+def record_last_run(result: dict) -> None:
+    """
+    Best-effort record of the last maintenance outcome, for the admin panel.
+
+    Redis, not a table: it is a health signal, not a fact about a trader, and
+    losing it costs a status badge rather than any data. The admin view says
+    "unknown" if it is not there rather than implying the job ran cleanly.
+    """
+    import json
+    from datetime import datetime, timezone
+
+    try:
+        _get_redis().set(
+            PARTITION_RUN_KEY,
+            json.dumps({**result, "at": datetime.now(timezone.utc).isoformat()}),
+        )
+    except Exception as err:                       # noqa: BLE001 - best effort
+        logger.warning(f"[partitions] could not record last run: {err}")
+
+
+def read_last_run() -> dict | None:
+    import json
+
+    try:
+        raw = _get_redis().get(PARTITION_RUN_KEY)
+        return json.loads(raw) if raw else None
+    except Exception as err:                       # noqa: BLE001 - best effort
+        logger.warning(f"[partitions] could not read last run: {err}")
+        return None
+
+
 @celery_app.task(name="app.tasks.maintenance_tasks.ensure_behavior_event_partitions",
                  bind=True, max_retries=2, default_retry_delay=300)
 def ensure_behavior_event_partitions(self):
     import asyncio
 
     async def _run():
-        from sqlalchemy import text
-        created, dropped, skipped = [], [], []
+        from app.services.retention_policy_service import get_effective_months
+
         async with SessionLocal() as db:
-            # `orders` joined behavior_events as a partitioned table in
-            # migration 090. Both roll on the same beat: a partitioned table
-            # whose window runs out does not error, it silently routes
-            # everything into the DEFAULT partition and stops being
-            # partitioned in practice - which is how the behavior_events
-            # window came within eight weeks of expiring unnoticed.
-            for parent in ("behavior_events", "orders"):
-                for offset in range(MONTHS_AHEAD + 1):  # current month + N ahead
-                    start, end = _month_bounds(date.today(), offset)
-                    name = f"{parent}_y{start.year}m{start.month:02d}"
-                    exists = await db.execute(text(
-                        "SELECT 1 FROM pg_tables WHERE schemaname='public' AND tablename=:t"
-                    ), {"t": name})
-                    if exists.scalar_one_or_none():
-                        continue
-                    await db.execute(text(
-                        f"CREATE TABLE {name} PARTITION OF {parent} "
-                        f"FOR VALUES FROM ('{start.isoformat()}') TO ('{end.isoformat()}')"
-                    ))
-                    created.append(name)
-            # ── retention: drop partitions wholly older than the window ────
-            #
-            # This is the half that was never automated. Creating partitions
-            # forever without ever dropping one just means the table grows at
-            # ~1.75 GB/day at target scale and someone deals with it later, by
-            # hand, under pressure.
-            #
-            # Safe by construction: a partition is only ever dropped when its
-            # ENTIRE range is older than the cutoff, the DEFAULT partition is
-            # never touched, and no run may drop more than MAX_DROPS_PER_RUN.
-            for parent, keep_months in RETENTION_MONTHS.items():
-                if not keep_months:
-                    continue                       # None = never drop
-                cutoff, _ = _month_bounds(date.today(), -keep_months)
-                doomed = []
-                rows = await db.execute(text(
-                    "SELECT c.relname FROM pg_class c "
-                    " JOIN pg_inherits i ON i.inhrelid = c.oid "
-                    " JOIN pg_class p ON p.oid = i.inhparent "
-                    " WHERE p.relname = :parent ORDER BY c.relname"
-                ), {"parent": parent})
-                for (name,) in rows:
-                    m = re.fullmatch(rf"{parent}_y(\d{{4}})m(\d{{2}})", name)
-                    if not m:
-                        continue                   # DEFAULT and anything odd
-                    _, end = _month_bounds(date(int(m.group(1)), int(m.group(2)), 1), 0)
-                    if end <= cutoff:
-                        doomed.append(name)
+            created = await _ensure_partitions(db)
+            # The window is read per run, so an admin lengthening it takes
+            # effect on the next beat without a redeploy. Fail-safe: an
+            # unreadable settings store resolves to the code values.
+            retention = await get_effective_months(db)
+            dropped, skipped = await _apply_retention(db, retention)
 
-                if len(doomed) > MAX_DROPS_PER_RUN:
-                    logger.error(
-                        f"[partitions] REFUSING to drop {len(doomed)} {parent} "
-                        f"partitions in one run (cap {MAX_DROPS_PER_RUN}): "
-                        f"{doomed}. Check the clock and RETENTION_MONTHS."
-                    )
-                    continue
-                for name in doomed:
-                    # ── THE GATE ───────────────────────────────────────────
-                    #
-                    # A month is never traded away for storage on the
-                    # assumption its summary probably worked. The snapshot for
-                    # every account with orders in that month must exist AND
-                    # verify; anything short of that and the partition simply
-                    # stays and is retried on the next run. Retention that
-                    # cannot prove what it preserved is just deletion.
-                    m = re.fullmatch(rf"{parent}_y(\d{{4}})m(\d{{2}})", name)
-                    month = date(int(m.group(1)), int(m.group(2)), 1)
-                    if parent == "orders":
-                        try:
-                            ok = await snapshots_complete_for_month(db, month)
-                        except Exception as err:   # noqa: BLE001 - retained
-                            logger.error(
-                                f"[partitions] snapshot check failed for {month}: "
-                                f"{err} — {name} retained"
-                            )
-                            ok = False
-                        if not ok:
-                            skipped.append(name)
-                            continue
-                        # Commit the snapshots BEFORE the drop. If the drop then
-                        # fails we still hold both the summaries and the data;
-                        # sharing one transaction would roll the snapshots back
-                        # with the failed drop and lose the work.
-                        await db.commit()
-
-                    await db.execute(text(f"DROP TABLE IF EXISTS {name}"))
-                    if parent == "orders":
-                        # AFTER the drop, in the drop's own transaction: the flag
-                        # says "the raw orders are gone", so it must not be able
-                        # to survive a drop that did not happen.
-                        await mark_pruned(db, month)
-                    dropped.append(name)
-
-            if skipped:
-                logger.warning(
-                    f"[partitions] retained pending snapshots: {skipped}"
-                )
             if created or dropped:
                 await db.commit()
                 if created:
@@ -181,9 +291,12 @@ def ensure_behavior_event_partitions(self):
         return {"created": created, "dropped": dropped, "skipped": skipped}
 
     try:
-        return asyncio.run(_run())
+        result = asyncio.run(_run())
+        record_last_run({**result, "ok": True})
+        return result
     except Exception as exc:
         logger.error(f"[partitions] creation failed: {exc}")
+        record_last_run({"ok": False, "error": str(exc)})
         raise self.retry(exc=exc)
 
 
