@@ -166,3 +166,84 @@ def test_the_orders_unique_key_includes_the_partition_key():
 def test_orders_has_a_default_partition_so_inserts_cannot_fail():
     sql = (MIGRATIONS / "090_partition_orders.sql").read_text(encoding="utf-8")
     assert "PARTITION OF orders DEFAULT" in sql
+
+
+# ── automated retention ────────────────────────────────────────────────────
+#
+# Creating partitions forever without ever dropping one just means the table
+# grows at ~1.75 GB/day at target scale and somebody deals with it later, by
+# hand, under pressure. These pin the automation and, more importantly, its
+# safety rails.
+
+def test_retention_is_configured_per_table_not_globally():
+    from app.tasks.maintenance_tasks import RETENTION_MONTHS
+
+    assert RETENTION_MONTHS["orders"] == 13
+    # behavior_events is the trader's own history. Deleting it is a PRODUCT
+    # decision, so the maintenance job must not take it by default.
+    assert RETENTION_MONTHS["behavior_events"] is None
+
+
+def test_a_none_retention_never_drops():
+    from app.tasks.maintenance_tasks import RETENTION_MONTHS
+    import inspect
+    from app.tasks import maintenance_tasks
+
+    src = inspect.getsource(maintenance_tasks)
+    assert "if not keep_months:" in src and "continue" in src
+    assert any(v is None for v in RETENTION_MONTHS.values())
+
+
+def test_only_wholly_expired_partitions_are_eligible():
+    """
+    A partition is dropped only when its ENTIRE range is older than the cutoff.
+    Comparing the START would delete the month a trader is still trading in.
+    """
+    from app.tasks.maintenance_tasks import _month_bounds
+
+    cutoff, _ = _month_bounds(date(2026, 9, 1), -13)      # 2025-08-01
+    # the month ending exactly at the cutoff is expired
+    _, end_jul25 = _month_bounds(date(2025, 7, 1), 0)
+    assert end_jul25 <= cutoff
+    # the cutoff month itself is NOT
+    _, end_aug25 = _month_bounds(date(2025, 8, 1), 0)
+    assert not (end_aug25 <= cutoff)
+
+
+def test_there_is_a_hard_cap_on_drops_per_run():
+    """
+    A wrong clock or a mistyped retention value must cost one month at worst,
+    not the table. Over the cap the run drops NOTHING and logs loudly.
+    """
+    import inspect
+    from app.tasks import maintenance_tasks
+    from app.tasks.maintenance_tasks import MAX_DROPS_PER_RUN
+
+    assert MAX_DROPS_PER_RUN <= 3
+    src = inspect.getsource(maintenance_tasks)
+    assert "REFUSING to drop" in src
+    assert "len(doomed) > MAX_DROPS_PER_RUN" in src
+
+
+def test_the_default_partition_can_never_be_dropped():
+    """
+    DEFAULT is the safety net that stops an insert failing when the window
+    lapses. The name regex must not match it.
+    """
+    import re
+
+    pattern = r"orders_y(\d{4})m(\d{2})"
+    assert re.fullmatch(pattern, "orders_y2025m01")
+    assert not re.fullmatch(pattern, "orders_default")
+    # and a parent's regex must not reach another parent's partitions
+    assert not re.fullmatch(pattern, "behavior_events_y2026m07")
+
+
+def test_the_creation_runway_survives_a_worker_outage():
+    """
+    Was 3 months with a twice-monthly beat, so a quarter of worker downtime
+    was enough to fall into DEFAULT silently. Empty partitions cost nothing.
+    """
+    from app.tasks.maintenance_tasks import MONTHS_AHEAD
+
+    assert MONTHS_AHEAD >= 12

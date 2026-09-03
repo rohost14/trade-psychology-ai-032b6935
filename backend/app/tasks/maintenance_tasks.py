@@ -8,6 +8,7 @@ hand, ever. The DEFAULT partition remains only as a safety net if this
 task somehow fails for months in a row (its rows can be re-homed later).
 """
 import logging
+import re
 from datetime import date
 
 from app.core.celery_app import celery_app
@@ -15,7 +16,37 @@ from app.core.database import SessionLocal
 
 logger = logging.getLogger(__name__)
 
-MONTHS_AHEAD = 3
+#: How far ahead partitions are pre-created. Was 3, which is thin: the beat
+#: runs on the 1st and 15th, so three months of runway means a worker outage of
+#: about a quarter is enough to fall into the DEFAULT partition silently. Empty
+#: monthly partitions cost essentially nothing, so a year of runway turns a
+#: three-month failure window into a twelve-month one for no storage.
+MONTHS_AHEAD = 12
+
+#: Automatic retention, per partitioned parent. None = never drop.
+#:
+#: Dropping a partition is instantaneous and reclaims the space outright, which
+#: is the entire reason the tables are partitioned - the alternative is a mass
+#: DELETE that bloats and needs a full vacuum to give anything back.
+#:
+#: `orders` is EVIDENCE, not history. F4 reads protective orders only within a
+#: position's own lifetime, and the order-book snapshot marker is day-scoped, so
+#: nothing behavioural can reach back past a year. 13 months keeps a full year
+#: plus the current month.
+#:
+#: `behavior_events` is deliberately None. It is the trader's own behavioural
+#: history and what analytics renders back to them; silently deleting it is a
+#: PRODUCT decision, not a maintenance one, and turning it on is a one-line
+#: change once somebody decides what a trader is entitled to keep.
+RETENTION_MONTHS = {
+    "orders": 13,
+    "behavior_events": None,
+}
+
+#: Refuse to drop more than this many partitions in a single run. A wrong clock,
+#: a bad timezone or a mistyped retention value should cost one month of data at
+#: worst, not the whole table. Hitting the cap logs loudly and drops nothing.
+MAX_DROPS_PER_RUN = 3
 
 
 def _month_bounds(anchor: date, offset: int):
@@ -36,7 +67,7 @@ def ensure_behavior_event_partitions(self):
 
     async def _run():
         from sqlalchemy import text
-        created = []
+        created, dropped = [], []
         async with SessionLocal() as db:
             # `orders` joined behavior_events as a partitioned table in
             # migration 090. Both roll on the same beat: a partitioned table
@@ -58,13 +89,56 @@ def ensure_behavior_event_partitions(self):
                         f"FOR VALUES FROM ('{start.isoformat()}') TO ('{end.isoformat()}')"
                     ))
                     created.append(name)
-            if created:
+            # ── retention: drop partitions wholly older than the window ────
+            #
+            # This is the half that was never automated. Creating partitions
+            # forever without ever dropping one just means the table grows at
+            # ~1.75 GB/day at target scale and someone deals with it later, by
+            # hand, under pressure.
+            #
+            # Safe by construction: a partition is only ever dropped when its
+            # ENTIRE range is older than the cutoff, the DEFAULT partition is
+            # never touched, and no run may drop more than MAX_DROPS_PER_RUN.
+            for parent, keep_months in RETENTION_MONTHS.items():
+                if not keep_months:
+                    continue                       # None = never drop
+                cutoff, _ = _month_bounds(date.today(), -keep_months)
+                doomed = []
+                rows = await db.execute(text(
+                    "SELECT c.relname FROM pg_class c "
+                    " JOIN pg_inherits i ON i.inhrelid = c.oid "
+                    " JOIN pg_class p ON p.oid = i.inhparent "
+                    " WHERE p.relname = :parent ORDER BY c.relname"
+                ), {"parent": parent})
+                for (name,) in rows:
+                    m = re.fullmatch(rf"{parent}_y(\d{{4}})m(\d{{2}})", name)
+                    if not m:
+                        continue                   # DEFAULT and anything odd
+                    _, end = _month_bounds(date(int(m.group(1)), int(m.group(2)), 1), 0)
+                    if end <= cutoff:
+                        doomed.append(name)
+
+                if len(doomed) > MAX_DROPS_PER_RUN:
+                    logger.error(
+                        f"[partitions] REFUSING to drop {len(doomed)} {parent} "
+                        f"partitions in one run (cap {MAX_DROPS_PER_RUN}): "
+                        f"{doomed}. Check the clock and RETENTION_MONTHS."
+                    )
+                    continue
+                for name in doomed:
+                    await db.execute(text(f"DROP TABLE IF EXISTS {name}"))
+                    dropped.append(name)
+
+            if created or dropped:
                 await db.commit()
-                logger.info(f"[partitions] created: {created}")
-        return created
+                if created:
+                    logger.info(f"[partitions] created: {created}")
+                if dropped:
+                    logger.warning(f"[partitions] dropped past retention: {dropped}")
+        return {"created": created, "dropped": dropped}
 
     try:
-        return {"created": asyncio.run(_run())}
+        return asyncio.run(_run())
     except Exception as exc:
         logger.error(f"[partitions] creation failed: {exc}")
         raise self.retry(exc=exc)
