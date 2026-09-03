@@ -23,7 +23,7 @@ from app.models.user import User
 from app.models.trade import Trade
 from app.models.broker_account import BrokerAccount
 from app.utils.trade_classifier import classify_trade
-from sqlalchemy import select, update, and_
+from sqlalchemy import select, update, and_, or_
 
 # RiskDetector + BehavioralEvaluator — DEPRECATED (Phase 3 cutover)
 # Kept in codebase for reference, no longer called from pipeline.
@@ -1810,7 +1810,43 @@ async def eod_dispatch_chunk(after_id: str | None = None, queued_so_far: int = 0
             select(Trade.broker_account_id)
             .where(Trade.order_timestamp >= today_start_utc)
             .distinct()
-            .scalar_subquery()
+        )
+
+        # ACCOUNTS HOLDING AN OPEN POSITION MUST BE SYNCED TOO, even with no
+        # trade recorded today.
+        #
+        # "Traded today" was the whole selection until 2026-09-03, and it
+        # excluded exactly the accounts that needed the sync most. A user who
+        # opened a position yesterday, closed the browser, and exited today
+        # from the Kite app produces NO trade row here: the order stream runs
+        # only while their browser is connected, and the postback fires only
+        # for orders placed through our own app. Their account therefore had no
+        # trades "today", was skipped by this fan-out, and the one same-day
+        # chance to reconstruct that exit was lost.
+        #
+        # That chance is genuinely same-day only. `_backfill_overnight_completed_trades`
+        # rebuilds the CompletedTrade from Zerodha's own position fields -
+        # `realised`, `day_sell_price`, carry-forward `average_price` - and
+        # those exist only while the position is still in today's book. By
+        # tomorrow the position is gone from the response and the exit can
+        # never be reconstructed: kite.trades() is today-only too.
+        #
+        # The open-position row itself was never the problem; sync_positions
+        # already marks anything absent from the broker response as closed
+        # (trade_sync_service.py). What was lost was the CompletedTrade, the
+        # realised P&L and every behavioural input derived from them.
+        #
+        # This widens a job that already runs once a day. It is not polling and
+        # does not scale with trades - an account appears at most once either way.
+        from app.models.position import Position as _Position
+
+        holds_open_position = (
+            select(_Position.broker_account_id)
+            .where(
+                _Position.status != "closed",
+                _Position.total_quantity != 0,
+            )
+            .distinct()
         )
 
         stmt = (
@@ -1818,7 +1854,10 @@ async def eod_dispatch_chunk(after_id: str | None = None, queued_so_far: int = 0
             .where(
                 BrokerAccount.status == "connected",
                 BrokerAccount.access_token.isnot(None),
-                BrokerAccount.id.in_(traded_today),
+                or_(
+                    BrokerAccount.id.in_(traded_today.scalar_subquery()),
+                    BrokerAccount.id.in_(holds_open_position.scalar_subquery()),
+                ),
             )
             .order_by(BrokerAccount.id)
             .limit(EOD_CHUNK_SIZE)
