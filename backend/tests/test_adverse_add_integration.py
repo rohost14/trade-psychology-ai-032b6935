@@ -17,6 +17,7 @@ Nothing is monkeypatched. Fills go in; a RiskAlert row is asserted.
 from datetime import datetime, timedelta
 
 import pytest
+import pytest_asyncio
 from sqlalchemy import select
 
 from app.models.risk_alert import RiskAlert
@@ -100,6 +101,39 @@ async def _inject(account_id, symbol, fills, day):
             return outcome.result
 
         await asyncio.to_thread(_run)
+
+
+@pytest_asyncio.fixture
+async def db():
+    """
+    A REAL, committing session — the deliberate exception to the suite's
+    savepoint isolation.
+
+    The shared `db` fixture in conftest binds to an outer transaction with
+    `join_transaction_mode="create_savepoint"`, so a `commit()` releases a
+    savepoint and never becomes visible to another connection. That is exactly
+    what stops tests leaking rows into the application database, and it is
+    fatal here: this file drives the REAL pipeline, and
+    `process_webhook_trade` opens its own session on its own connection in
+    another thread. It has to be able to see the broker account.
+
+    So this file opts out, and pays for it by cleaning up explicitly — see
+    `_cleanup`, which deletes every row this test commits, deepest dependency
+    first. That is why this file was never part of the 12k-row leak.
+
+    Overriding `db` locally keeps the exception to this file. Anything that
+    does not genuinely need cross-connection visibility must use the isolated
+    fixture and stay unable to leak.
+    """
+    from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
+    from tests.conftest import make_engine
+
+    engine = make_engine()
+    Session = async_sessionmaker(engine, class_=AsyncSession, expire_on_commit=False)
+    async with Session() as session:
+        yield session
+        await session.rollback()
+    await engine.dispose()
 
 
 async def _publish(db):

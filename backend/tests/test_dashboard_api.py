@@ -73,11 +73,46 @@ def make_engine():
 
 @pytest_asyncio.fixture
 async def db():
+    """
+    A session whose writes can NEVER reach the database permanently.
+
+    The old fixture opened a plain session and rolled back at teardown. That
+    holds only while nothing commits — and things do commit. `test_dashboard_api`
+    hands this very session to the FastAPI app via a `get_db` override, and
+    endpoints like the journal routes call `db.commit()`; other test files
+    commit directly. Every one of those commits made the fixture's own user and
+    broker rows permanent, and the closing rollback then had nothing left to
+    undo.
+
+    That leaked 12,010 users and 10,848 broker accounts into the application
+    database between 2026-03-05 and 2026-09-04 — 91% of the users table.
+
+    THE FIX: bind the session to a connection that is already inside a
+    transaction, and set `join_transaction_mode="create_savepoint"`. A
+    `commit()` then releases a SAVEPOINT instead of committing the outer
+    transaction, so it behaves normally from the caller's point of view and
+    still cannot outlive the test. The outer transaction is rolled back
+    unconditionally at teardown.
+
+    Isolation is now structural rather than a promise not to commit.
+    """
     engine = make_engine()
-    Session = async_sessionmaker(engine, class_=AsyncSession, expire_on_commit=False)
+    conn = await engine.connect()
+    outer = await conn.begin()          # rolled back below, always
+    Session = async_sessionmaker(
+        bind=conn,
+        class_=AsyncSession,
+        expire_on_commit=False,
+        join_transaction_mode="create_savepoint",
+    )
     async with Session() as session:
-        yield session
-        await session.rollback()
+        try:
+            yield session
+        finally:
+            await session.close()
+    if outer.is_active:
+        await outer.rollback()
+    await conn.close()
     await engine.dispose()
 
 

@@ -32,12 +32,35 @@ from typing import Optional
 from uuid import UUID
 
 from sqlalchemy import select, update
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.trading_session import TradingSession
 from app.core.market_hours import get_session_boundaries, MarketSegment
 
 logger = logging.getLogger(__name__)
+
+#: Postgres SQLSTATE for a unique-constraint violation. The ONLY error that
+#: means "someone else created this session first".
+_UNIQUE_VIOLATION = "23505"
+
+
+def _is_duplicate(err: Exception) -> bool:
+    """
+    True only for a genuine unique-constraint violation.
+
+    A foreign-key violation is also an IntegrityError and is emphatically not a
+    race — it means the caller handed us an account that does not exist, and
+    swallowing it would hide a real bug.
+    """
+    orig = getattr(err, "orig", None)
+    code = getattr(orig, "sqlstate", None) or getattr(orig, "pgcode", None)
+    if code:
+        return str(code) == _UNIQUE_VIOLATION
+    # No SQLSTATE (a driver we do not recognise): fall back to the text, and
+    # err towards RE-RAISING rather than treating an unknown error as a race.
+    return "duplicate key" in str(err).lower()
+
 
 class TradingSessionService:
 
@@ -82,13 +105,39 @@ class TradingSessionService:
             market_open=market_open,
             market_close=market_close,
         )
-        db.add(session)
 
+        # SAVEPOINT, not the whole transaction.
+        #
+        # This used to be a bare `db.flush()` in a `try`, with `except
+        # Exception: await db.rollback()` on the theory that any failure meant
+        # another request had inserted the row first. Two things were wrong
+        # with that, and both were reproduced:
+        #
+        #   1. `flush()` flushes EVERYTHING pending on the session, not just
+        #      this row. The failure it caught was often nothing to do with
+        #      TradingSession.
+        #   2. `db.rollback()` discards the CALLER'S transaction. This service
+        #      does not own that session. On the engine path it holds the
+        #      CompletedTrade being analysed and whatever else the caller had
+        #      staged; a statement timeout here silently threw all of it away.
+        #      Forcing one flush failure produced a ForeignKeyViolationError on
+        #      the NEXT insert, because the broker account had been rolled
+        #      back out from under it.
+        #
+        # A nested transaction confines the damage to a SAVEPOINT: if the
+        # insert fails, only the insert is undone and the caller's work
+        # survives. Anything that is not a duplicate — a timeout, a dead
+        # connection, a foreign-key violation — now propagates as itself
+        # instead of being silently reinterpreted as a race.
         try:
-            await db.flush()
-        except Exception:
-            # Race condition: another request already inserted this row.
-            await db.rollback()
+            async with db.begin_nested():
+                db.add(session)
+                await db.flush()
+        except IntegrityError as err:
+            if not _is_duplicate(err):
+                raise                      # not a race; the caller must see it
+            # A concurrent insert won. The savepoint is gone, the outer
+            # transaction is intact, so re-reading is safe.
             result = await db.execute(
                 select(TradingSession).where(
                     TradingSession.broker_account_id == broker_account_id,
@@ -98,7 +147,7 @@ class TradingSessionService:
             existing = result.scalar_one_or_none()
             if existing:
                 return existing
-            raise  # Unexpected error — re-raise
+            raise                          # unique violation on something else
 
         return session
 
