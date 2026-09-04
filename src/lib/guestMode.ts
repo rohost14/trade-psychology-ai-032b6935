@@ -119,9 +119,20 @@ export function getGuestResponse(url: string, method = 'GET'): unknown | undefin
   if (path === '/api/analytics/ai-insights') return DEMO_AI_INSIGHTS;
   if (path === '/api/analytics/ai-summary') return DEMO_AI_SUMMARY;
   if (path === '/api/analytics/dashboard-stats') {
+    // Mirrors the real endpoint, which returns ONLY { risk_score }.
+    // It previously returned five fields the API has never produced —
+    // including `money_saved`, left over from the counterfactual
+    // money-saved feature that /api/analytics/behaviour-cost replaced with a
+    // factual measure. Nothing rendered it, but a demo value for a field the
+    // real API cannot return is exactly what gets wired up later and ships a
+    // fabricated number to a real user.
     return {
-      total_pnl: 7990, win_rate: 60, trade_count: 15,
-      money_saved: 45840, behavioral_alerts: 7,
+      risk_score: {
+        current_score: 7.5,
+        previous_score: 6.8,
+        trend: 'improving',
+        factors: { danger_alerts: 2, caution_alerts: 5, clean_days: 4 },
+      },
     };
   }
   if (path === '/api/analytics/unrealized-pnl') {
