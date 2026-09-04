@@ -352,7 +352,14 @@ class TestBehaviorEngineDB:
         assert result.session_id is not None
 
     async def test_analyze_creates_session(self, db, broker):
-        """analyze() creates a TradingSession for today if none exists."""
+        """
+        analyze() creates a TradingSession for today if none exists.
+
+        On a wholesale failure analyze() returns
+        DetectionResult(alerts=[], events=[], session_id=None) and logs — so a
+        transient database failure looks identical to "no session was needed".
+        The assertion below checks session_id explicitly for that reason.
+        """
         from app.models.trading_session import TradingSession
         from sqlalchemy import select
 

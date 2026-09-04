@@ -144,6 +144,19 @@ class DetectionResult:
     events: List["BehaviorEventRecord"]  # ALL detections incl. info/suppressed — caller persists
     session_id: Optional[UUID]
 
+    #: Detectors that RAISED on this trade, by spec method name.
+    #:
+    #: A detector failure is swallowed on purpose — a crash in one detector must
+    #: never cost the fill behind it — but "it abstained" and "it blew up" then
+    #: look identical to every caller: both produce no event. That is fine for
+    #: the postback path and wrong for anything trying to reason about the
+    #: result, which is how four tests once failed with "the detector did not
+    #: fire" when the real answer was "the database timed out".
+    #:
+    #: Empty on the happy path. Additive and defaulted, so no existing caller
+    #: changes behaviour.
+    failed_detectors: List[str] = field(default_factory=list)
+
 
 def _as_events(detector: str, result) -> Optional[List["DetectedEvent"]]:
     """
@@ -272,6 +285,11 @@ class EngineContext:
     completed_trade: CompletedTrade
     session_trades: List[CompletedTrade]
     thresholds: Dict[str, Any]
+    #: Detectors that RAISED during this run, by spec method name. The failure
+    #: itself is swallowed on purpose - one detector must never cost the fill
+    #: behind it - but a crash and an abstention both produce no event, so
+    #: without this they are indistinguishable to every caller.
+    failed_detectors: List[str] = field(default_factory=list)
     strategy_group: Optional[StrategyGroup] = None
     #: This structure's deployment against the last comparable one, when
     #: both are measurable. Loaded in `build_context` because it needs the
@@ -688,6 +706,7 @@ class BehaviorEngine:
                 alerts=alerts,
                 events=behavior_events,
                 session_id=session.id,
+                failed_detectors=list(ctx.failed_detectors),
             )
 
         except Exception as e:
@@ -1105,7 +1124,10 @@ class BehaviorEngine:
                         event.thresholds_used = used
                     events.append(event)
             except Exception as e:
+                # Swallowed deliberately: one detector must not cost the fill.
+                # Recorded, so the caller can tell a crash from an abstention.
                 logger.warning(f"[BehaviorEngine] {spec.method} failed: {e}")
+                ctx.failed_detectors.append(spec.method)
 
         # (Phase 4: the old iv_crush/premium_destruction overlap dedup is gone —
         # they are one pattern now: premium_loss_event.)

@@ -29,6 +29,30 @@ from app.services.behavior_engine import BehaviorEngine
 engine = BehaviorEngine()
 
 
+def _assert_engine_was_healthy(result):
+    """
+    Distinguish "the detector abstained" from "the detector blew up".
+
+    The engine swallows a detector exception on purpose — one detector must
+    never cost the fill behind it — so both cases produce no event, and a test
+    asserting "it fired" reports the same failure for either. These three tests
+    once failed in a slow full-suite run with "same_symbol_obsession did not
+    fire", when the real cause was a transient database failure under
+    connection pressure. Reproduced by forcing the detector to raise: identical
+    output, completely different problem.
+
+    Checking this FIRST means the message names the actual cause.
+    """
+    assert result is not None, (
+        "analyze() was never reached - the fixture failed before the engine ran"
+    )
+    assert not result.failed_detectors, (
+        f"detectors raised during this run: {result.failed_detectors}. "
+        f"This is an engine or database failure, NOT a statement about "
+        f"whether the behaviour was present."
+    )
+
+
 async def _loss(db, broker, minute, pnl=-2000):
     exit_at = session_facts.session_start(session_facts.session_date_now()) + timedelta(
         minutes=minute
@@ -145,6 +169,7 @@ async def test_a_stored_event_carries_the_thresholds_it_was_judged_against(db, b
             broker_account_id=broker.id, completed_trade=ct, db=db
         )
 
+    _assert_engine_was_healthy(result)
     events = [e for e in result.events if e.detector == "same_symbol_obsession"]
     assert events, "same_symbol_obsession did not fire on five losses"
 
@@ -172,6 +197,12 @@ async def test_the_thresholds_recorded_belong_to_that_detector(db, broker):
             broker_account_id=broker.id, completed_trade=ct, db=db
         )
 
+    _assert_engine_was_healthy(result)
+    # Without this the test passes VACUOUSLY whenever nothing fired: the loop
+    # body never runs, and an engine that detected nothing at all looks exactly
+    # like an engine recording thresholds correctly.
+    assert result.events, "nothing fired, so this asserts nothing"
+
     for event in result.events:
         recorded = (event.evidence or {}).get("_thresholds") or {}
         assert len(recorded) < 20, (
@@ -190,7 +221,10 @@ async def test_evidence_still_carries_the_detector_context(db, broker):
             broker_account_id=broker.id, completed_trade=ct, db=db
         )
 
-    event = [e for e in result.events if e.detector == "same_symbol_obsession"][0]
+    _assert_engine_was_healthy(result)
+    matching = [e for e in result.events if e.detector == "same_symbol_obsession"]
+    assert matching, "same_symbol_obsession did not fire on five losses"
+    event = matching[0]
     evidence = event.evidence or {}
     assert any(k for k in evidence if not k.startswith("_")), (
         "detector context was lost when the thresholds were added"

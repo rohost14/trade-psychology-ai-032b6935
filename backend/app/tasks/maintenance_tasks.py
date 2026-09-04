@@ -222,6 +222,11 @@ async def _apply_retention(db, retention: dict) -> tuple[list[str], list[str]]:
                 # drop and lose the work.
                 await db.commit()
 
+            # Announce the drop to the event-trigger guard from migration 093,
+            # which otherwise refuses any DROP on these tables. SET LOCAL dies
+            # with the transaction, so the permission cannot leak past this
+            # statement. This is the ONLY place in the codebase that sets it.
+            await db.execute(text("SET LOCAL tm.allow_drop = 'on'"))
             await db.execute(text(f"DROP TABLE IF EXISTS {name}"))
             if parent == "orders":
                 # AFTER the drop, in the drop's own transaction: the flag says

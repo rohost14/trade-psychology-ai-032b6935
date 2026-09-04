@@ -387,3 +387,97 @@ async def test_indexes_are_attached_to_every_partition():
         f"{sample} carries {child_count} indexes but the parent declares "
         f"{parent_count} — queries against that month are unindexed"
     )
+
+
+# ── the drop guard (migration 093) ─────────────────────────────────────────
+#
+# 344 order rows were destroyed by a single unguarded `DROP TABLE
+# orders_legacy` run by hand. Nothing we had could have stopped it: the runner
+# was bypassed, 090's BEGIN/COMMIT was defeated by statement-by-statement
+# execution, the retention gate was not involved, and the suite only reads
+# migration file text. An event trigger is the only layer that sees the
+# statement itself, whatever tool issued it.
+
+async def test_the_drop_guard_is_installed_and_enabled():
+    rows = await _fetch(
+        "SELECT evtname, evtenabled, evtevent FROM pg_event_trigger "
+        " WHERE evtname = 'tm_protect_partitioned_tables'"
+    )
+    assert rows, "the drop guard from migration 093 is not installed"
+    name, enabled, event = rows[0]
+    enabled = enabled.decode() if isinstance(enabled, bytes) else enabled
+    assert enabled == "O", f"guard is disabled (evtenabled={enabled!r})"
+    assert event == "sql_drop"
+
+
+@pytest.mark.parametrize("target", [
+    "orders",                      # the parent
+    "orders_y2026m02",             # a monthly partition
+    "orders_default",              # the safety net itself
+    "behavior_events_y2026m07",    # behaviour history, which has no retention
+])
+async def test_dropping_a_protected_table_is_refused(target):
+    """
+    Every one of these is unrecoverable on this plan. The guard must refuse
+    without the transaction announcing itself, whatever the caller is.
+    """
+    engine = _engine()
+    try:
+        async with engine.connect() as conn:
+            with pytest.raises(Exception) as exc:
+                await conn.execute(text(f"DROP TABLE {target}"))
+            assert "REFUSING to drop protected table" in str(exc.value)
+            await conn.rollback()
+    finally:
+        await engine.dispose()
+
+
+async def test_an_announced_drop_is_allowed():
+    """
+    Retention drops a partition a month and must keep working. The escape hatch
+    is SET LOCAL, so it dies with the transaction and cannot leak into the next
+    statement — proven here by dropping and rolling back.
+    """
+    engine = _engine()
+    try:
+        async with engine.connect() as conn:
+            await conn.execute(text("SET LOCAL tm.allow_drop = 'on'"))
+            await conn.execute(text("DROP TABLE orders_y2026m02"))
+            await conn.rollback()
+    finally:
+        await engine.dispose()
+
+    # and it is still there, because the transaction rolled back
+    assert "orders_y2026m02" in await _partitions("orders")
+
+
+async def test_the_guard_does_not_touch_unrelated_tables():
+    """A guard that blocked every drop would be turned off within a week."""
+    engine = _engine()
+    try:
+        async with engine.connect() as conn:
+            await conn.execute(text("CREATE TABLE zz_guard_probe (id int)"))
+            await conn.execute(text("DROP TABLE zz_guard_probe"))
+            await conn.rollback()
+    finally:
+        await engine.dispose()
+
+
+@pytest.mark.filterwarnings("ignore")
+async def test_only_the_retention_job_announces_a_drop():
+    """
+    The escape hatch is only as good as how rarely it is used. If a second
+    caller ever sets it, the guard has quietly become advisory.
+    """
+    from pathlib import Path
+
+    app_dir = Path(__file__).resolve().parents[1] / "app"
+    setters = [
+        p.relative_to(app_dir).as_posix()
+        for p in app_dir.rglob("*.py")
+        if "_archive" not in p.parts and "tm.allow_drop" in p.read_text(
+            encoding="utf-8", errors="ignore")
+    ]
+    assert setters == ["tasks/maintenance_tasks.py"], (
+        f"tm.allow_drop is set in {setters} — it must be the retention job only"
+    )
