@@ -1,0 +1,428 @@
+# gathered 2026-09-04T10:45:39.919826+00:00
+table|index|definition|scans|tup_read|bytes
+admin_audit_log|admin_audit_log_pkey|CREATE UNIQUE INDEX admin_audit_log_pkey ON public.admin_audit_log USING btree (id)|0|0|16384
+admin_audit_log|idx_admin_audit_log_action|CREATE INDEX idx_admin_audit_log_action ON public.admin_audit_log USING btree (action)|0|0|16384
+admin_audit_log|idx_admin_audit_log_admin|CREATE INDEX idx_admin_audit_log_admin ON public.admin_audit_log USING btree (admin_email)|0|0|16384
+admin_audit_log|idx_admin_audit_log_created|CREATE INDEX idx_admin_audit_log_created ON public.admin_audit_log USING btree (created_at DESC)|2|2|16384
+admin_login_events|admin_login_events_pkey|CREATE UNIQUE INDEX admin_login_events_pkey ON public.admin_login_events USING btree (id)|0|0|8192
+admin_login_events|idx_admin_login_events_admin_time|CREATE INDEX idx_admin_login_events_admin_time ON public.admin_login_events USING btree (admin_id, created_at DESC)|0|0|8192
+admin_settings|admin_settings_pkey|CREATE UNIQUE INDEX admin_settings_pkey ON public.admin_settings USING btree (key)|30|33|16384
+admin_users|admin_users_email_key|CREATE UNIQUE INDEX admin_users_email_key ON public.admin_users USING btree (email)|0|0|16384
+admin_users|admin_users_pkey|CREATE UNIQUE INDEX admin_users_pkey ON public.admin_users USING btree (id)|0|0|16384
+admin_users|idx_admin_users_email|CREATE INDEX idx_admin_users_email ON public.admin_users USING btree (email)|0|0|16384
+admin_users|idx_admin_users_role|CREATE INDEX idx_admin_users_role ON public.admin_users USING btree (role)|0|0|16384
+alert_checkpoints|alert_checkpoints_pkey|CREATE UNIQUE INDEX alert_checkpoints_pkey ON public.alert_checkpoints USING btree (id)|0|0|16384
+alert_checkpoints|idx_ac_alert_id|CREATE INDEX idx_ac_alert_id ON public.alert_checkpoints USING btree (alert_id)|0|0|16384
+alert_checkpoints|idx_ac_broker|CREATE INDEX idx_ac_broker ON public.alert_checkpoints USING btree (broker_account_id)|0|0|16384
+alert_checkpoints|idx_ac_broker_created|CREATE INDEX idx_ac_broker_created ON public.alert_checkpoints USING btree (broker_account_id, created_at DESC)|0|0|16384
+alert_checkpoints|idx_alert_checkpoints_alert_id|CREATE INDEX idx_alert_checkpoints_alert_id ON public.alert_checkpoints USING btree (alert_id)|0|0|16384
+alert_checkpoints|idx_alert_checkpoints_alert_unique|CREATE UNIQUE INDEX idx_alert_checkpoints_alert_unique ON public.alert_checkpoints USING btree (alert_id)|0|0|16384
+alert_checkpoints|idx_alert_checkpoints_broker_account|CREATE INDEX idx_alert_checkpoints_broker_account ON public.alert_checkpoints USING btree (broker_account_id)|0|0|16384
+alert_checkpoints|idx_alert_checkpoints_status|CREATE INDEX idx_alert_checkpoints_status ON public.alert_checkpoints USING btree (checkpoint_status) WHERE ((checkpoint_status)::text <> ALL ((ARRAY['completed'::character varying, 'no_position'::character varying, 'expired'::character varying, 'market_closed'::character varying])::text[]))|0|0|16384
+alert_mutes|alert_mutes_pkey|CREATE UNIQUE INDEX alert_mutes_pkey ON public.alert_mutes USING btree (broker_account_id, pattern_type)|57750|0|16384
+behavior_events|idx_behavior_events_broker_detected|CREATE INDEX idx_behavior_events_broker_detected ON ONLY public.behavior_events USING btree (broker_account_id, detected_at)|0|0|0
+behavior_events|idx_behavior_events_detector|CREATE INDEX idx_behavior_events_detector ON ONLY public.behavior_events USING btree (detector, detected_at)|0|0|0
+behavior_events|idx_behavior_events_id|CREATE INDEX idx_behavior_events_id ON ONLY public.behavior_events USING btree (id)|0|0|0
+behavior_events|uq_behavior_events_idem|CREATE UNIQUE INDEX uq_behavior_events_idem ON ONLY public.behavior_events USING btree (broker_account_id, idempotency_key, detected_at) WHERE (idempotency_key IS NOT NULL)|0|0|0
+behavior_events_default|behavior_events_default_broker_account_id_detected_at_idx|CREATE INDEX behavior_events_default_broker_account_id_detected_at_idx ON public.behavior_events_default USING btree (broker_account_id, detected_at)|28725|423468|16384
+behavior_events_default|behavior_events_default_broker_account_id_idempotency_key_d_idx|CREATE UNIQUE INDEX behavior_events_default_broker_account_id_idempotency_key_d_idx ON public.behavior_events_default USING btree (broker_account_id, idempotency_key, detected_at) WHERE (idempotency_key IS NOT NULL)|60993|31335|57344
+behavior_events_default|behavior_events_default_detector_detected_at_idx|CREATE INDEX behavior_events_default_detector_detected_at_idx ON public.behavior_events_default USING btree (detector, detected_at)|6951|75446|16384
+behavior_events_default|behavior_events_default_id_idx|CREATE INDEX behavior_events_default_id_idx ON public.behavior_events_default USING btree (id)|4|72|16384
+behavior_events_legacy|behavior_events_legacy_pkey|CREATE UNIQUE INDEX behavior_events_legacy_pkey ON public.behavior_events_legacy USING btree (id)|0|0|16384
+behavior_events_legacy|idx_be_legacy_broker_detected|CREATE INDEX idx_be_legacy_broker_detected ON public.behavior_events_legacy USING btree (broker_account_id, detected_at)|13691|0|16384
+behavior_events_legacy|idx_be_legacy_detector|CREATE INDEX idx_be_legacy_detector ON public.behavior_events_legacy USING btree (detector, detected_at)|0|0|16384
+behavior_events_legacy|uq_be_legacy_idem|CREATE UNIQUE INDEX uq_be_legacy_idem ON public.behavior_events_legacy USING btree (broker_account_id, idempotency_key) WHERE (idempotency_key IS NOT NULL)|0|0|8192
+behavior_events_y2026m07|behavior_events_y2026m07_broker_account_id_detected_at_idx|CREATE INDEX behavior_events_y2026m07_broker_account_id_detected_at_idx ON public.behavior_events_y2026m07 USING btree (broker_account_id, detected_at)|48434|4205|40960
+behavior_events_y2026m07|behavior_events_y2026m07_broker_account_id_idempotency_key__idx|CREATE UNIQUE INDEX behavior_events_y2026m07_broker_account_id_idempotency_key__idx ON public.behavior_events_y2026m07 USING btree (broker_account_id, idempotency_key, detected_at) WHERE (idempotency_key IS NOT NULL)|0|0|245760
+behavior_events_y2026m07|behavior_events_y2026m07_detector_detected_at_idx|CREATE INDEX behavior_events_y2026m07_detector_detected_at_idx ON public.behavior_events_y2026m07 USING btree (detector, detected_at)|0|0|65536
+behavior_events_y2026m07|behavior_events_y2026m07_id_idx|CREATE INDEX behavior_events_y2026m07_id_idx ON public.behavior_events_y2026m07 USING btree (id)|0|0|57344
+behavior_events_y2026m08|behavior_events_y2026m08_broker_account_id_detected_at_idx|CREATE INDEX behavior_events_y2026m08_broker_account_id_detected_at_idx ON public.behavior_events_y2026m08 USING btree (broker_account_id, detected_at)|393|82|40960
+behavior_events_y2026m08|behavior_events_y2026m08_broker_account_id_idempotency_key__idx|CREATE UNIQUE INDEX behavior_events_y2026m08_broker_account_id_idempotency_key__idx ON public.behavior_events_y2026m08 USING btree (broker_account_id, idempotency_key, detected_at) WHERE (idempotency_key IS NOT NULL)|0|0|98304
+behavior_events_y2026m08|behavior_events_y2026m08_detector_detected_at_idx|CREATE INDEX behavior_events_y2026m08_detector_detected_at_idx ON public.behavior_events_y2026m08 USING btree (detector, detected_at)|0|0|57344
+behavior_events_y2026m08|behavior_events_y2026m08_id_idx|CREATE INDEX behavior_events_y2026m08_id_idx ON public.behavior_events_y2026m08 USING btree (id)|0|0|57344
+behavior_events_y2026m09|behavior_events_y2026m09_broker_account_id_detected_at_idx|CREATE INDEX behavior_events_y2026m09_broker_account_id_detected_at_idx ON public.behavior_events_y2026m09 USING btree (broker_account_id, detected_at)|36571|88|16384
+behavior_events_y2026m09|behavior_events_y2026m09_broker_account_id_idempotency_key__idx|CREATE UNIQUE INDEX behavior_events_y2026m09_broker_account_id_idempotency_key__idx ON public.behavior_events_y2026m09 USING btree (broker_account_id, idempotency_key, detected_at) WHERE (idempotency_key IS NOT NULL)|0|0|8192
+behavior_events_y2026m09|behavior_events_y2026m09_detector_detected_at_idx|CREATE INDEX behavior_events_y2026m09_detector_detected_at_idx ON public.behavior_events_y2026m09 USING btree (detector, detected_at)|34|0|16384
+behavior_events_y2026m09|behavior_events_y2026m09_id_idx|CREATE INDEX behavior_events_y2026m09_id_idx ON public.behavior_events_y2026m09 USING btree (id)|0|0|16384
+behavior_events_y2026m10|behavior_events_y2026m10_broker_account_id_detected_at_idx|CREATE INDEX behavior_events_y2026m10_broker_account_id_detected_at_idx ON public.behavior_events_y2026m10 USING btree (broker_account_id, detected_at)|59956|0|8192
+behavior_events_y2026m10|behavior_events_y2026m10_broker_account_id_idempotency_key__idx|CREATE UNIQUE INDEX behavior_events_y2026m10_broker_account_id_idempotency_key__idx ON public.behavior_events_y2026m10 USING btree (broker_account_id, idempotency_key, detected_at) WHERE (idempotency_key IS NOT NULL)|0|0|8192
+behavior_events_y2026m10|behavior_events_y2026m10_detector_detected_at_idx|CREATE INDEX behavior_events_y2026m10_detector_detected_at_idx ON public.behavior_events_y2026m10 USING btree (detector, detected_at)|34|0|8192
+behavior_events_y2026m10|behavior_events_y2026m10_id_idx|CREATE INDEX behavior_events_y2026m10_id_idx ON public.behavior_events_y2026m10 USING btree (id)|0|0|8192
+behavior_events_y2026m11|behavior_events_y2026m11_broker_account_id_detected_at_idx|CREATE INDEX behavior_events_y2026m11_broker_account_id_detected_at_idx ON public.behavior_events_y2026m11 USING btree (broker_account_id, detected_at)|13600|0|8192
+behavior_events_y2026m11|behavior_events_y2026m11_broker_account_id_idempotency_key__idx|CREATE UNIQUE INDEX behavior_events_y2026m11_broker_account_id_idempotency_key__idx ON public.behavior_events_y2026m11 USING btree (broker_account_id, idempotency_key, detected_at) WHERE (idempotency_key IS NOT NULL)|0|0|8192
+behavior_events_y2026m11|behavior_events_y2026m11_detector_detected_at_idx|CREATE INDEX behavior_events_y2026m11_detector_detected_at_idx ON public.behavior_events_y2026m11 USING btree (detector, detected_at)|0|0|8192
+behavior_events_y2026m11|behavior_events_y2026m11_id_idx|CREATE INDEX behavior_events_y2026m11_id_idx ON public.behavior_events_y2026m11 USING btree (id)|0|0|8192
+behavior_events_y2026m12|behavior_events_y2026m12_broker_account_id_detected_at_idx|CREATE INDEX behavior_events_y2026m12_broker_account_id_detected_at_idx ON public.behavior_events_y2026m12 USING btree (broker_account_id, detected_at)|13600|0|8192
+behavior_events_y2026m12|behavior_events_y2026m12_broker_account_id_idempotency_key__idx|CREATE UNIQUE INDEX behavior_events_y2026m12_broker_account_id_idempotency_key__idx ON public.behavior_events_y2026m12 USING btree (broker_account_id, idempotency_key, detected_at) WHERE (idempotency_key IS NOT NULL)|0|0|8192
+behavior_events_y2026m12|behavior_events_y2026m12_detector_detected_at_idx|CREATE INDEX behavior_events_y2026m12_detector_detected_at_idx ON public.behavior_events_y2026m12 USING btree (detector, detected_at)|0|0|8192
+behavior_events_y2026m12|behavior_events_y2026m12_id_idx|CREATE INDEX behavior_events_y2026m12_id_idx ON public.behavior_events_y2026m12 USING btree (id)|0|0|8192
+behavior_events_y2027m01|behavior_events_y2027m01_broker_account_id_detected_at_idx|CREATE INDEX behavior_events_y2027m01_broker_account_id_detected_at_idx ON public.behavior_events_y2027m01 USING btree (broker_account_id, detected_at)|13600|0|8192
+behavior_events_y2027m01|behavior_events_y2027m01_broker_account_id_idempotency_key__idx|CREATE UNIQUE INDEX behavior_events_y2027m01_broker_account_id_idempotency_key__idx ON public.behavior_events_y2027m01 USING btree (broker_account_id, idempotency_key, detected_at) WHERE (idempotency_key IS NOT NULL)|0|0|8192
+behavior_events_y2027m01|behavior_events_y2027m01_detector_detected_at_idx|CREATE INDEX behavior_events_y2027m01_detector_detected_at_idx ON public.behavior_events_y2027m01 USING btree (detector, detected_at)|0|0|8192
+behavior_events_y2027m01|behavior_events_y2027m01_id_idx|CREATE INDEX behavior_events_y2027m01_id_idx ON public.behavior_events_y2027m01 USING btree (id)|0|0|8192
+behavior_events_y2027m02|behavior_events_y2027m02_broker_account_id_detected_at_idx|CREATE INDEX behavior_events_y2027m02_broker_account_id_detected_at_idx ON public.behavior_events_y2027m02 USING btree (broker_account_id, detected_at)|13600|0|8192
+behavior_events_y2027m02|behavior_events_y2027m02_broker_account_id_idempotency_key__idx|CREATE UNIQUE INDEX behavior_events_y2027m02_broker_account_id_idempotency_key__idx ON public.behavior_events_y2027m02 USING btree (broker_account_id, idempotency_key, detected_at) WHERE (idempotency_key IS NOT NULL)|0|0|8192
+behavior_events_y2027m02|behavior_events_y2027m02_detector_detected_at_idx|CREATE INDEX behavior_events_y2027m02_detector_detected_at_idx ON public.behavior_events_y2027m02 USING btree (detector, detected_at)|0|0|8192
+behavior_events_y2027m02|behavior_events_y2027m02_id_idx|CREATE INDEX behavior_events_y2027m02_id_idx ON public.behavior_events_y2027m02 USING btree (id)|0|0|8192
+behavior_events_y2027m03|behavior_events_y2027m03_broker_account_id_detected_at_idx|CREATE INDEX behavior_events_y2027m03_broker_account_id_detected_at_idx ON public.behavior_events_y2027m03 USING btree (broker_account_id, detected_at)|13600|0|8192
+behavior_events_y2027m03|behavior_events_y2027m03_broker_account_id_idempotency_key__idx|CREATE UNIQUE INDEX behavior_events_y2027m03_broker_account_id_idempotency_key__idx ON public.behavior_events_y2027m03 USING btree (broker_account_id, idempotency_key, detected_at) WHERE (idempotency_key IS NOT NULL)|0|0|8192
+behavior_events_y2027m03|behavior_events_y2027m03_detector_detected_at_idx|CREATE INDEX behavior_events_y2027m03_detector_detected_at_idx ON public.behavior_events_y2027m03 USING btree (detector, detected_at)|0|0|8192
+behavior_events_y2027m03|behavior_events_y2027m03_id_idx|CREATE INDEX behavior_events_y2027m03_id_idx ON public.behavior_events_y2027m03 USING btree (id)|0|0|8192
+behavior_events_y2027m04|behavior_events_y2027m04_broker_account_id_detected_at_idx|CREATE INDEX behavior_events_y2027m04_broker_account_id_detected_at_idx ON public.behavior_events_y2027m04 USING btree (broker_account_id, detected_at)|13600|0|8192
+behavior_events_y2027m04|behavior_events_y2027m04_broker_account_id_idempotency_key__idx|CREATE UNIQUE INDEX behavior_events_y2027m04_broker_account_id_idempotency_key__idx ON public.behavior_events_y2027m04 USING btree (broker_account_id, idempotency_key, detected_at) WHERE (idempotency_key IS NOT NULL)|0|0|8192
+behavior_events_y2027m04|behavior_events_y2027m04_detector_detected_at_idx|CREATE INDEX behavior_events_y2027m04_detector_detected_at_idx ON public.behavior_events_y2027m04 USING btree (detector, detected_at)|0|0|8192
+behavior_events_y2027m04|behavior_events_y2027m04_id_idx|CREATE INDEX behavior_events_y2027m04_id_idx ON public.behavior_events_y2027m04 USING btree (id)|0|0|8192
+behavior_events_y2027m05|behavior_events_y2027m05_broker_account_id_detected_at_idx|CREATE INDEX behavior_events_y2027m05_broker_account_id_detected_at_idx ON public.behavior_events_y2027m05 USING btree (broker_account_id, detected_at)|13600|0|8192
+behavior_events_y2027m05|behavior_events_y2027m05_broker_account_id_idempotency_key__idx|CREATE UNIQUE INDEX behavior_events_y2027m05_broker_account_id_idempotency_key__idx ON public.behavior_events_y2027m05 USING btree (broker_account_id, idempotency_key, detected_at) WHERE (idempotency_key IS NOT NULL)|0|0|8192
+behavior_events_y2027m05|behavior_events_y2027m05_detector_detected_at_idx|CREATE INDEX behavior_events_y2027m05_detector_detected_at_idx ON public.behavior_events_y2027m05 USING btree (detector, detected_at)|0|0|8192
+behavior_events_y2027m05|behavior_events_y2027m05_id_idx|CREATE INDEX behavior_events_y2027m05_id_idx ON public.behavior_events_y2027m05 USING btree (id)|0|0|8192
+behavior_events_y2027m06|behavior_events_y2027m06_broker_account_id_detected_at_idx|CREATE INDEX behavior_events_y2027m06_broker_account_id_detected_at_idx ON public.behavior_events_y2027m06 USING btree (broker_account_id, detected_at)|13600|0|8192
+behavior_events_y2027m06|behavior_events_y2027m06_broker_account_id_idempotency_key__idx|CREATE UNIQUE INDEX behavior_events_y2027m06_broker_account_id_idempotency_key__idx ON public.behavior_events_y2027m06 USING btree (broker_account_id, idempotency_key, detected_at) WHERE (idempotency_key IS NOT NULL)|0|0|8192
+behavior_events_y2027m06|behavior_events_y2027m06_detector_detected_at_idx|CREATE INDEX behavior_events_y2027m06_detector_detected_at_idx ON public.behavior_events_y2027m06 USING btree (detector, detected_at)|0|0|8192
+behavior_events_y2027m06|behavior_events_y2027m06_id_idx|CREATE INDEX behavior_events_y2027m06_id_idx ON public.behavior_events_y2027m06 USING btree (id)|0|0|8192
+behavior_events_y2027m07|behavior_events_y2027m07_broker_account_id_detected_at_idx|CREATE INDEX behavior_events_y2027m07_broker_account_id_detected_at_idx ON public.behavior_events_y2027m07 USING btree (broker_account_id, detected_at)|13600|0|8192
+behavior_events_y2027m07|behavior_events_y2027m07_broker_account_id_idempotency_key__idx|CREATE UNIQUE INDEX behavior_events_y2027m07_broker_account_id_idempotency_key__idx ON public.behavior_events_y2027m07 USING btree (broker_account_id, idempotency_key, detected_at) WHERE (idempotency_key IS NOT NULL)|0|0|8192
+behavior_events_y2027m07|behavior_events_y2027m07_detector_detected_at_idx|CREATE INDEX behavior_events_y2027m07_detector_detected_at_idx ON public.behavior_events_y2027m07 USING btree (detector, detected_at)|0|0|8192
+behavior_events_y2027m07|behavior_events_y2027m07_id_idx|CREATE INDEX behavior_events_y2027m07_id_idx ON public.behavior_events_y2027m07 USING btree (id)|0|0|8192
+behavior_events_y2027m08|behavior_events_y2027m08_broker_account_id_detected_at_idx|CREATE INDEX behavior_events_y2027m08_broker_account_id_detected_at_idx ON public.behavior_events_y2027m08 USING btree (broker_account_id, detected_at)|13600|0|8192
+behavior_events_y2027m08|behavior_events_y2027m08_broker_account_id_idempotency_key__idx|CREATE UNIQUE INDEX behavior_events_y2027m08_broker_account_id_idempotency_key__idx ON public.behavior_events_y2027m08 USING btree (broker_account_id, idempotency_key, detected_at) WHERE (idempotency_key IS NOT NULL)|0|0|8192
+behavior_events_y2027m08|behavior_events_y2027m08_detector_detected_at_idx|CREATE INDEX behavior_events_y2027m08_detector_detected_at_idx ON public.behavior_events_y2027m08 USING btree (detector, detected_at)|0|0|8192
+behavior_events_y2027m08|behavior_events_y2027m08_id_idx|CREATE INDEX behavior_events_y2027m08_id_idx ON public.behavior_events_y2027m08 USING btree (id)|0|0|8192
+behavior_events_y2027m09|behavior_events_y2027m09_broker_account_id_detected_at_idx|CREATE INDEX behavior_events_y2027m09_broker_account_id_detected_at_idx ON public.behavior_events_y2027m09 USING btree (broker_account_id, detected_at)|13600|0|8192
+behavior_events_y2027m09|behavior_events_y2027m09_broker_account_id_idempotency_key__idx|CREATE UNIQUE INDEX behavior_events_y2027m09_broker_account_id_idempotency_key__idx ON public.behavior_events_y2027m09 USING btree (broker_account_id, idempotency_key, detected_at) WHERE (idempotency_key IS NOT NULL)|0|0|8192
+behavior_events_y2027m09|behavior_events_y2027m09_detector_detected_at_idx|CREATE INDEX behavior_events_y2027m09_detector_detected_at_idx ON public.behavior_events_y2027m09 USING btree (detector, detected_at)|0|0|8192
+behavior_events_y2027m09|behavior_events_y2027m09_id_idx|CREATE INDEX behavior_events_y2027m09_id_idx ON public.behavior_events_y2027m09 USING btree (id)|0|0|8192
+behavior_events_y2027m10|behavior_events_y2027m10_broker_account_id_detected_at_idx|CREATE INDEX behavior_events_y2027m10_broker_account_id_detected_at_idx ON public.behavior_events_y2027m10 USING btree (broker_account_id, detected_at)|13600|0|8192
+behavior_events_y2027m10|behavior_events_y2027m10_broker_account_id_idempotency_key__idx|CREATE UNIQUE INDEX behavior_events_y2027m10_broker_account_id_idempotency_key__idx ON public.behavior_events_y2027m10 USING btree (broker_account_id, idempotency_key, detected_at) WHERE (idempotency_key IS NOT NULL)|0|0|8192
+behavior_events_y2027m10|behavior_events_y2027m10_detector_detected_at_idx|CREATE INDEX behavior_events_y2027m10_detector_detected_at_idx ON public.behavior_events_y2027m10 USING btree (detector, detected_at)|0|0|8192
+behavior_events_y2027m10|behavior_events_y2027m10_id_idx|CREATE INDEX behavior_events_y2027m10_id_idx ON public.behavior_events_y2027m10 USING btree (id)|0|0|8192
+behavior_events_y2027m11|behavior_events_y2027m11_broker_account_id_detected_at_idx|CREATE INDEX behavior_events_y2027m11_broker_account_id_detected_at_idx ON public.behavior_events_y2027m11 USING btree (broker_account_id, detected_at)|13600|0|8192
+behavior_events_y2027m11|behavior_events_y2027m11_broker_account_id_idempotency_key__idx|CREATE UNIQUE INDEX behavior_events_y2027m11_broker_account_id_idempotency_key__idx ON public.behavior_events_y2027m11 USING btree (broker_account_id, idempotency_key, detected_at) WHERE (idempotency_key IS NOT NULL)|0|0|8192
+behavior_events_y2027m11|behavior_events_y2027m11_detector_detected_at_idx|CREATE INDEX behavior_events_y2027m11_detector_detected_at_idx ON public.behavior_events_y2027m11 USING btree (detector, detected_at)|0|0|8192
+behavior_events_y2027m11|behavior_events_y2027m11_id_idx|CREATE INDEX behavior_events_y2027m11_id_idx ON public.behavior_events_y2027m11 USING btree (id)|0|0|8192
+behavior_events_y2027m12|behavior_events_y2027m12_broker_account_id_detected_at_idx|CREATE INDEX behavior_events_y2027m12_broker_account_id_detected_at_idx ON public.behavior_events_y2027m12 USING btree (broker_account_id, detected_at)|13600|0|8192
+behavior_events_y2027m12|behavior_events_y2027m12_broker_account_id_idempotency_key__idx|CREATE UNIQUE INDEX behavior_events_y2027m12_broker_account_id_idempotency_key__idx ON public.behavior_events_y2027m12 USING btree (broker_account_id, idempotency_key, detected_at) WHERE (idempotency_key IS NOT NULL)|0|0|8192
+behavior_events_y2027m12|behavior_events_y2027m12_detector_detected_at_idx|CREATE INDEX behavior_events_y2027m12_detector_detected_at_idx ON public.behavior_events_y2027m12 USING btree (detector, detected_at)|0|0|8192
+behavior_events_y2027m12|behavior_events_y2027m12_id_idx|CREATE INDEX behavior_events_y2027m12_id_idx ON public.behavior_events_y2027m12 USING btree (id)|0|0|8192
+behavioral_events|behavioral_events_pkey|CREATE UNIQUE INDEX behavioral_events_pkey ON public.behavioral_events USING btree (id)|215|215|16384
+behavioral_events|idx_be_broker|CREATE INDEX idx_be_broker ON public.behavioral_events USING btree (broker_account_id)|0|0|16384
+behavioral_events|idx_be_broker_type_recent|CREATE INDEX idx_be_broker_type_recent ON public.behavioral_events USING btree (broker_account_id, event_type, detected_at DESC)|0|0|49152
+behavioral_events|idx_be_delivery|CREATE INDEX idx_be_delivery ON public.behavioral_events USING btree (delivery_status) WHERE ((delivery_status)::text = 'PENDING'::text)|0|0|16384
+behavioral_events|idx_be_detected|CREATE INDEX idx_be_detected ON public.behavioral_events USING btree (detected_at DESC)|3|65|16384
+behavioral_events|idx_be_type|CREATE INDEX idx_be_type ON public.behavioral_events USING btree (event_type)|0|0|16384
+behavioral_events|idx_behavioral_events_broker_account_id|CREATE INDEX idx_behavioral_events_broker_account_id ON public.behavioral_events USING btree (broker_account_id)|13838|19690|16384
+behavioral_events|idx_behavioral_events_session|CREATE INDEX idx_behavioral_events_session ON public.behavioral_events USING btree (broker_account_id, session_id, detected_at) WHERE (session_id IS NOT NULL)|3426|0|8192
+broadcast_logs|broadcast_logs_pkey|CREATE UNIQUE INDEX broadcast_logs_pkey ON public.broadcast_logs USING btree (id)|0|0|8192
+broadcast_logs|idx_broadcast_logs_created_at|CREATE INDEX idx_broadcast_logs_created_at ON public.broadcast_logs USING btree (created_at DESC)|0|0|8192
+broadcast_receipts|broadcast_receipts_pkey|CREATE UNIQUE INDEX broadcast_receipts_pkey ON public.broadcast_receipts USING btree (id)|0|0|8192
+broadcast_receipts|idx_broadcast_receipts_broadcast_id|CREATE INDEX idx_broadcast_receipts_broadcast_id ON public.broadcast_receipts USING btree (broadcast_id)|0|0|8192
+broadcast_receipts|idx_broadcast_receipts_status|CREATE INDEX idx_broadcast_receipts_status ON public.broadcast_receipts USING btree (status)|0|0|8192
+broker_accounts|broker_accounts_pkey|CREATE UNIQUE INDEX broker_accounts_pkey ON public.broker_accounts USING btree (id)|368934|407171|614400
+broker_accounts|idx_broker_account_status|CREATE INDEX idx_broker_account_status ON public.broker_accounts USING btree (status, token_revoked_at)|28|134202|188416
+broker_accounts|idx_broker_accounts_active|CREATE INDEX idx_broker_accounts_active ON public.broker_accounts USING btree (status, token_revoked_at)|207|1561725|180224
+broker_accounts|idx_broker_accounts_user_id|CREATE INDEX idx_broker_accounts_user_id ON public.broker_accounts USING btree (user_id)|15179|70741|565248
+coach_sessions|coach_sessions_pkey|CREATE UNIQUE INDEX coach_sessions_pkey ON public.coach_sessions USING btree (id)|0|0|16384
+coach_sessions|idx_coach_sessions_account_started|CREATE INDEX idx_coach_sessions_account_started ON public.coach_sessions USING btree (broker_account_id, started_at DESC)|13691|0|16384
+commitment_logs|commitment_logs_pkey|CREATE UNIQUE INDEX commitment_logs_pkey ON public.commitment_logs USING btree (id)|0|0|8192
+commitment_logs|idx_commitment_logs_broker|CREATE INDEX idx_commitment_logs_broker ON public.commitment_logs USING btree (broker_account_id)|13691|0|8192
+commitment_logs|idx_commitment_logs_timestamp|CREATE INDEX idx_commitment_logs_timestamp ON public.commitment_logs USING btree ("timestamp" DESC)|0|0|8192
+completed_trade_features|completed_trade_features_pkey|CREATE UNIQUE INDEX completed_trade_features_pkey ON public.completed_trade_features USING btree (id)|0|0|16384
+completed_trade_features|idx_completed_trade_features_broker_account_id|CREATE INDEX idx_completed_trade_features_broker_account_id ON public.completed_trade_features USING btree (broker_account_id)|66|0|16384
+completed_trade_features|idx_ctf_broker|CREATE INDEX idx_ctf_broker ON public.completed_trade_features USING btree (broker_account_id)|0|0|16384
+completed_trade_features|idx_ctf_one_per_trade|CREATE UNIQUE INDEX idx_ctf_one_per_trade ON public.completed_trade_features USING btree (completed_trade_id)|0|0|16384
+completed_trades|completed_trades_pkey|CREATE UNIQUE INDEX completed_trades_pkey ON public.completed_trades USING btree (id)|59699|63189|319488
+completed_trades|idx_completed_trade_account_exit|CREATE INDEX idx_completed_trade_account_exit ON public.completed_trades USING btree (broker_account_id, exit_time DESC)|172725|425491|548864
+completed_trades|idx_completed_trades_broker_account_id|CREATE INDEX idx_completed_trades_broker_account_id ON public.completed_trades USING btree (broker_account_id)|9481|135056|278528
+completed_trades|idx_completed_trades_broker_exit|CREATE INDEX idx_completed_trades_broker_exit ON public.completed_trades USING btree (broker_account_id, exit_time DESC)|0|0|557056
+completed_trades|idx_completed_trades_btst|CREATE INDEX idx_completed_trades_btst ON public.completed_trades USING btree (broker_account_id, entry_time, exit_time) WHERE (overnight_close_price IS NOT NULL)|0|0|8192
+completed_trades|idx_completed_trades_pnl_pct|CREATE INDEX idx_completed_trades_pnl_pct ON public.completed_trades USING btree (broker_account_id, pnl_pct) WHERE (pnl_pct IS NOT NULL)|0|0|98304
+completed_trades|idx_completed_trades_quality|CREATE INDEX idx_completed_trades_quality ON public.completed_trades USING btree (broker_account_id, quality_score) WHERE (quality_score IS NOT NULL)|0|0|8192
+completed_trades|idx_ct_broker|CREATE INDEX idx_ct_broker ON public.completed_trades USING btree (broker_account_id)|11|23310|286720
+completed_trades|idx_ct_broker_exit|CREATE INDEX idx_ct_broker_exit ON public.completed_trades USING btree (broker_account_id, exit_time DESC)|0|0|557056
+completed_trades|idx_ct_exit_time|CREATE INDEX idx_ct_exit_time ON public.completed_trades USING btree (exit_time DESC)|118239|147279|294912
+completed_trades|idx_ct_symbol|CREATE INDEX idx_ct_symbol ON public.completed_trades USING btree (tradingsymbol, exchange)|213|914890|172032
+constitution_history|constitution_history_pkey|CREATE UNIQUE INDEX constitution_history_pkey ON public.constitution_history USING btree (id)|2|4|16384
+constitution_history|idx_constitution_history_broker|CREATE INDEX idx_constitution_history_broker ON public.constitution_history USING btree (broker_account_id, changed_at)|13700|28|16384
+cooldowns|cooldowns_pkey|CREATE UNIQUE INDEX cooldowns_pkey ON public.cooldowns USING btree (id)|215|215|40960
+cooldowns|idx_cooldowns_active|CREATE INDEX idx_cooldowns_active ON public.cooldowns USING btree (broker_account_id, expires_at) WHERE (skipped = false)|0|0|40960
+cooldowns|idx_cooldowns_broker_account|CREATE INDEX idx_cooldowns_broker_account ON public.cooldowns USING btree (broker_account_id)|37609|215|16384
+cooldowns|idx_cooldowns_expires|CREATE INDEX idx_cooldowns_expires ON public.cooldowns USING btree (expires_at)|27165|54412|16384
+data_quality_events|data_quality_events_pkey|CREATE UNIQUE INDEX data_quality_events_pkey ON public.data_quality_events USING btree (id)|0|0|16384
+data_quality_events|idx_dq_events_account_time|CREATE INDEX idx_dq_events_account_time ON public.data_quality_events USING btree (broker_account_id, detected_at DESC)|0|0|16384
+data_quality_events|idx_dq_events_kind_time|CREATE INDEX idx_dq_events_kind_time ON public.data_quality_events USING btree (kind, detected_at DESC)|0|0|16384
+data_quality_events|uq_dq_events_daily|CREATE UNIQUE INDEX uq_dq_events_daily ON public.data_quality_events USING btree (broker_account_id, kind, tradingsymbol, (((detected_at AT TIME ZONE 'Asia/Kolkata'::text))::date))|15036|0|16384
+detector_flags|detector_flags_pkey|CREATE UNIQUE INDEX detector_flags_pkey ON public.detector_flags USING btree (detector)|0|0|8192
+discipline_scores|discipline_scores_broker_account_id_week_start_key|CREATE UNIQUE INDEX discipline_scores_broker_account_id_week_start_key ON public.discipline_scores USING btree (broker_account_id, week_start)|0|0|8192
+discipline_scores|discipline_scores_pkey|CREATE UNIQUE INDEX discipline_scores_pkey ON public.discipline_scores USING btree (id)|0|0|8192
+discipline_scores|idx_discipline_scores_account_week|CREATE INDEX idx_discipline_scores_account_week ON public.discipline_scores USING btree (broker_account_id, week_start DESC)|13691|0|8192
+discipline_streaks|discipline_streaks_broker_account_id_streak_type_key|CREATE UNIQUE INDEX discipline_streaks_broker_account_id_streak_type_key ON public.discipline_streaks USING btree (broker_account_id, streak_type)|0|0|8192
+discipline_streaks|discipline_streaks_pkey|CREATE UNIQUE INDEX discipline_streaks_pkey ON public.discipline_streaks USING btree (id)|0|0|8192
+discipline_streaks|idx_discipline_streaks_account|CREATE INDEX idx_discipline_streaks_account ON public.discipline_streaks USING btree (broker_account_id)|13691|0|8192
+generated_reports|generated_reports_pkey|CREATE UNIQUE INDEX generated_reports_pkey ON public.generated_reports USING btree (id)|0|0|8192
+generated_reports|idx_generated_reports_account_date|CREATE INDEX idx_generated_reports_account_date ON public.generated_reports USING btree (broker_account_id, report_date DESC)|0|0|8192
+generated_reports|idx_generated_reports_type|CREATE INDEX idx_generated_reports_type ON public.generated_reports USING btree (broker_account_id, report_type, report_date DESC)|13691|0|8192
+gtt_tracking|gtt_tracking_broker_account_id_gtt_id_key|CREATE UNIQUE INDEX gtt_tracking_broker_account_id_gtt_id_key ON public.gtt_tracking USING btree (broker_account_id, gtt_id)|0|0|8192
+gtt_tracking|gtt_tracking_pkey|CREATE UNIQUE INDEX gtt_tracking_pkey ON public.gtt_tracking USING btree (id)|0|0|8192
+gtt_tracking|idx_gtt_tracking_account|CREATE INDEX idx_gtt_tracking_account ON public.gtt_tracking USING btree (broker_account_id, gtt_status)|30871|0|8192
+guardrail_rules|guardrail_rules_pkey|CREATE UNIQUE INDEX guardrail_rules_pkey ON public.guardrail_rules USING btree (id)|0|0|16384
+guardrail_rules|idx_guardrail_rules_account|CREATE INDEX idx_guardrail_rules_account ON public.guardrail_rules USING btree (broker_account_id)|13691|0|16384
+guardrail_rules|idx_guardrail_rules_active|CREATE INDEX idx_guardrail_rules_active ON public.guardrail_rules USING btree (broker_account_id, status, expires_at) WHERE ((status)::text = 'active'::text)|0|0|16384
+holdings|holdings_pkey|CREATE UNIQUE INDEX holdings_pkey ON public.holdings USING btree (id)|0|0|8192
+holdings|idx_holdings_account|CREATE INDEX idx_holdings_account ON public.holdings USING btree (broker_account_id)|13691|0|8192
+holdings|idx_holdings_symbol|CREATE INDEX idx_holdings_symbol ON public.holdings USING btree (tradingsymbol)|0|0|8192
+holdings|uq_holdings_account_symbol|CREATE UNIQUE INDEX uq_holdings_account_symbol ON public.holdings USING btree (broker_account_id, tradingsymbol, exchange)|0|0|8192
+incomplete_positions|idx_incomplete_positions_broker_account_id|CREATE INDEX idx_incomplete_positions_broker_account_id ON public.incomplete_positions USING btree (broker_account_id)|0|0|16384
+incomplete_positions|idx_ip_broker|CREATE INDEX idx_ip_broker ON public.incomplete_positions USING btree (broker_account_id)|0|0|16384
+incomplete_positions|idx_ip_status|CREATE INDEX idx_ip_status ON public.incomplete_positions USING btree (resolution_status)|0|0|16384
+incomplete_positions|incomplete_positions_pkey|CREATE UNIQUE INDEX incomplete_positions_pkey ON public.incomplete_positions USING btree (id)|0|0|16384
+instruments|idx_instruments_expiry|CREATE INDEX idx_instruments_expiry ON public.instruments USING btree (expiry) WHERE (expiry IS NOT NULL)|0|0|2260992
+instruments|idx_instruments_symbol|CREATE INDEX idx_instruments_symbol ON public.instruments USING btree (tradingsymbol)|0|0|11657216
+instruments|idx_instruments_token|CREATE INDEX idx_instruments_token ON public.instruments USING btree (instrument_token)|0|0|6832128
+instruments|instruments_instrument_token_key|CREATE UNIQUE INDEX instruments_instrument_token_key ON public.instruments USING btree (instrument_token)|219|36402618|6397952
+instruments|instruments_pkey|CREATE UNIQUE INDEX instruments_pkey ON public.instruments USING btree (id)|0|0|9306112
+instruments|uq_instruments_exchange_symbol|CREATE UNIQUE INDEX uq_instruments_exchange_symbol ON public.instruments USING btree (exchange, tradingsymbol)|0|0|12419072
+journal_entries|idx_journal_entries_broker_account|CREATE INDEX idx_journal_entries_broker_account ON public.journal_entries USING btree (broker_account_id)|53|889|90112
+journal_entries|idx_journal_entries_created|CREATE INDEX idx_journal_entries_created ON public.journal_entries USING btree (broker_account_id, created_at DESC)|14039|20263|90112
+journal_entries|idx_journal_entries_emotion_tags|CREATE INDEX idx_journal_entries_emotion_tags ON public.journal_entries USING gin (emotion_tags)|0|0|32768
+journal_entries|idx_journal_entries_trade|CREATE INDEX idx_journal_entries_trade ON public.journal_entries USING btree (trade_id) WHERE (trade_id IS NOT NULL)|142|35|57344
+journal_entries|idx_journal_entries_type|CREATE INDEX idx_journal_entries_type ON public.journal_entries USING btree (broker_account_id, entry_type)|0|0|90112
+journal_entries|idx_journal_entries_unique_trade|CREATE UNIQUE INDEX idx_journal_entries_unique_trade ON public.journal_entries USING btree (broker_account_id, trade_id) WHERE (trade_id IS NOT NULL)|564|141|81920
+journal_entries|idx_journal_followed_plan|CREATE INDEX idx_journal_followed_plan ON public.journal_entries USING btree (broker_account_id, followed_plan) WHERE (followed_plan IS NOT NULL)|0|0|16384
+journal_entries|idx_journal_setup_quality|CREATE INDEX idx_journal_setup_quality ON public.journal_entries USING btree (broker_account_id, setup_quality) WHERE (setup_quality IS NOT NULL)|0|0|16384
+journal_entries|journal_entries_pkey|CREATE UNIQUE INDEX journal_entries_pkey ON public.journal_entries USING btree (id)|1284|1284|90112
+margin_snapshots|idx_margin_snapshots_account_time|CREATE INDEX idx_margin_snapshots_account_time ON public.margin_snapshots USING btree (broker_account_id, snapshot_at DESC)|0|0|49152
+margin_snapshots|idx_margin_snapshots_broker_account_id|CREATE INDEX idx_margin_snapshots_broker_account_id ON public.margin_snapshots USING btree (broker_account_id)|24809|32195|16384
+margin_snapshots|idx_margin_snapshots_risk|CREATE INDEX idx_margin_snapshots_risk ON public.margin_snapshots USING btree (broker_account_id, risk_level)|0|0|32768
+margin_snapshots|margin_snapshots_pkey|CREATE UNIQUE INDEX margin_snapshots_pkey ON public.margin_snapshots USING btree (id)|215|215|40960
+monthly_snapshots|idx_monthly_snapshots_account_month|CREATE INDEX idx_monthly_snapshots_account_month ON public.monthly_snapshots USING btree (broker_account_id, month DESC)|11548|12|16384
+monthly_snapshots|monthly_snapshots_pkey|CREATE UNIQUE INDEX monthly_snapshots_pkey ON public.monthly_snapshots USING btree (id)|0|0|16384
+monthly_snapshots|uq_monthly_snapshot_account_month|CREATE UNIQUE INDEX uq_monthly_snapshot_account_month ON public.monthly_snapshots USING btree (broker_account_id, month)|1|0|16384
+oauth_temp_store|oauth_temp_store_expires_at_idx|CREATE INDEX oauth_temp_store_expires_at_idx ON public.oauth_temp_store USING btree (expires_at)|0|0|16384
+oauth_temp_store|oauth_temp_store_pkey|CREATE UNIQUE INDEX oauth_temp_store_pkey ON public.oauth_temp_store USING btree (key)|0|0|16384
+orders|idx_orders_account_date|CREATE INDEX idx_orders_account_date ON ONLY public.orders USING btree (broker_account_id, order_timestamp)|0|0|0
+orders|idx_orders_account_symbol_time|CREATE INDEX idx_orders_account_symbol_time ON ONLY public.orders USING btree (broker_account_id, tradingsymbol, order_timestamp)|0|0|0
+orders|idx_orders_status|CREATE INDEX idx_orders_status ON ONLY public.orders USING btree (broker_account_id, status)|0|0|0
+orders|idx_orders_symbol|CREATE INDEX idx_orders_symbol ON ONLY public.orders USING btree (tradingsymbol)|0|0|0
+orders|orders_pkey|CREATE UNIQUE INDEX orders_pkey ON ONLY public.orders USING btree (id, order_timestamp)|0|0|0
+orders|uq_orders_account_kite_id|CREATE UNIQUE INDEX uq_orders_account_kite_id ON ONLY public.orders USING btree (broker_account_id, kite_order_id, order_timestamp)|0|0|0
+orders_default|orders_default_broker_account_id_kite_order_id_order_timest_key|CREATE UNIQUE INDEX orders_default_broker_account_id_kite_order_id_order_timest_key ON public.orders_default USING btree (broker_account_id, kite_order_id, order_timestamp)|1|0|8192
+orders_default|orders_default_broker_account_id_order_timestamp_idx|CREATE INDEX orders_default_broker_account_id_order_timestamp_idx ON public.orders_default USING btree (broker_account_id, order_timestamp)|0|0|8192
+orders_default|orders_default_broker_account_id_status_idx|CREATE INDEX orders_default_broker_account_id_status_idx ON public.orders_default USING btree (broker_account_id, status)|11457|0|8192
+orders_default|orders_default_broker_account_id_tradingsymbol_order_timest_idx|CREATE INDEX orders_default_broker_account_id_tradingsymbol_order_timest_idx ON public.orders_default USING btree (broker_account_id, tradingsymbol, order_timestamp)|0|0|8192
+orders_default|orders_default_pkey|CREATE UNIQUE INDEX orders_default_pkey ON public.orders_default USING btree (id, order_timestamp)|0|0|8192
+orders_default|orders_default_tradingsymbol_idx|CREATE INDEX orders_default_tradingsymbol_idx ON public.orders_default USING btree (tradingsymbol)|343|0|8192
+orders_y2026m02|orders_y2026m02_broker_account_id_kite_order_id_order_times_key|CREATE UNIQUE INDEX orders_y2026m02_broker_account_id_kite_order_id_order_times_key ON public.orders_y2026m02 USING btree (broker_account_id, kite_order_id, order_timestamp)|1|0|8192
+orders_y2026m02|orders_y2026m02_broker_account_id_order_timestamp_idx|CREATE INDEX orders_y2026m02_broker_account_id_order_timestamp_idx ON public.orders_y2026m02 USING btree (broker_account_id, order_timestamp)|2|0|8192
+orders_y2026m02|orders_y2026m02_broker_account_id_status_idx|CREATE INDEX orders_y2026m02_broker_account_id_status_idx ON public.orders_y2026m02 USING btree (broker_account_id, status)|11457|0|8192
+orders_y2026m02|orders_y2026m02_broker_account_id_tradingsymbol_order_times_idx|CREATE INDEX orders_y2026m02_broker_account_id_tradingsymbol_order_times_idx ON public.orders_y2026m02 USING btree (broker_account_id, tradingsymbol, order_timestamp)|0|0|8192
+orders_y2026m02|orders_y2026m02_pkey|CREATE UNIQUE INDEX orders_y2026m02_pkey ON public.orders_y2026m02 USING btree (id, order_timestamp)|0|0|8192
+orders_y2026m02|orders_y2026m02_tradingsymbol_idx|CREATE INDEX orders_y2026m02_tradingsymbol_idx ON public.orders_y2026m02 USING btree (tradingsymbol)|343|0|8192
+orders_y2026m03|orders_y2026m03_broker_account_id_kite_order_id_order_times_key|CREATE UNIQUE INDEX orders_y2026m03_broker_account_id_kite_order_id_order_times_key ON public.orders_y2026m03 USING btree (broker_account_id, kite_order_id, order_timestamp)|1|0|8192
+orders_y2026m03|orders_y2026m03_broker_account_id_order_timestamp_idx|CREATE INDEX orders_y2026m03_broker_account_id_order_timestamp_idx ON public.orders_y2026m03 USING btree (broker_account_id, order_timestamp)|0|0|8192
+orders_y2026m03|orders_y2026m03_broker_account_id_status_idx|CREATE INDEX orders_y2026m03_broker_account_id_status_idx ON public.orders_y2026m03 USING btree (broker_account_id, status)|11457|0|8192
+orders_y2026m03|orders_y2026m03_broker_account_id_tradingsymbol_order_times_idx|CREATE INDEX orders_y2026m03_broker_account_id_tradingsymbol_order_times_idx ON public.orders_y2026m03 USING btree (broker_account_id, tradingsymbol, order_timestamp)|0|0|8192
+orders_y2026m03|orders_y2026m03_pkey|CREATE UNIQUE INDEX orders_y2026m03_pkey ON public.orders_y2026m03 USING btree (id, order_timestamp)|0|0|8192
+orders_y2026m03|orders_y2026m03_tradingsymbol_idx|CREATE INDEX orders_y2026m03_tradingsymbol_idx ON public.orders_y2026m03 USING btree (tradingsymbol)|343|0|8192
+orders_y2026m04|orders_y2026m04_broker_account_id_kite_order_id_order_times_key|CREATE UNIQUE INDEX orders_y2026m04_broker_account_id_kite_order_id_order_times_key ON public.orders_y2026m04 USING btree (broker_account_id, kite_order_id, order_timestamp)|1|0|8192
+orders_y2026m04|orders_y2026m04_broker_account_id_order_timestamp_idx|CREATE INDEX orders_y2026m04_broker_account_id_order_timestamp_idx ON public.orders_y2026m04 USING btree (broker_account_id, order_timestamp)|0|0|8192
+orders_y2026m04|orders_y2026m04_broker_account_id_status_idx|CREATE INDEX orders_y2026m04_broker_account_id_status_idx ON public.orders_y2026m04 USING btree (broker_account_id, status)|11457|0|8192
+orders_y2026m04|orders_y2026m04_broker_account_id_tradingsymbol_order_times_idx|CREATE INDEX orders_y2026m04_broker_account_id_tradingsymbol_order_times_idx ON public.orders_y2026m04 USING btree (broker_account_id, tradingsymbol, order_timestamp)|0|0|8192
+orders_y2026m04|orders_y2026m04_pkey|CREATE UNIQUE INDEX orders_y2026m04_pkey ON public.orders_y2026m04 USING btree (id, order_timestamp)|0|0|8192
+orders_y2026m04|orders_y2026m04_tradingsymbol_idx|CREATE INDEX orders_y2026m04_tradingsymbol_idx ON public.orders_y2026m04 USING btree (tradingsymbol)|343|0|8192
+orders_y2026m05|orders_y2026m05_broker_account_id_kite_order_id_order_times_key|CREATE UNIQUE INDEX orders_y2026m05_broker_account_id_kite_order_id_order_times_key ON public.orders_y2026m05 USING btree (broker_account_id, kite_order_id, order_timestamp)|1|0|8192
+orders_y2026m05|orders_y2026m05_broker_account_id_order_timestamp_idx|CREATE INDEX orders_y2026m05_broker_account_id_order_timestamp_idx ON public.orders_y2026m05 USING btree (broker_account_id, order_timestamp)|0|0|8192
+orders_y2026m05|orders_y2026m05_broker_account_id_status_idx|CREATE INDEX orders_y2026m05_broker_account_id_status_idx ON public.orders_y2026m05 USING btree (broker_account_id, status)|11457|0|8192
+orders_y2026m05|orders_y2026m05_broker_account_id_tradingsymbol_order_times_idx|CREATE INDEX orders_y2026m05_broker_account_id_tradingsymbol_order_times_idx ON public.orders_y2026m05 USING btree (broker_account_id, tradingsymbol, order_timestamp)|0|0|8192
+orders_y2026m05|orders_y2026m05_pkey|CREATE UNIQUE INDEX orders_y2026m05_pkey ON public.orders_y2026m05 USING btree (id, order_timestamp)|0|0|8192
+orders_y2026m05|orders_y2026m05_tradingsymbol_idx|CREATE INDEX orders_y2026m05_tradingsymbol_idx ON public.orders_y2026m05 USING btree (tradingsymbol)|343|0|8192
+orders_y2026m06|orders_y2026m06_broker_account_id_kite_order_id_order_times_key|CREATE UNIQUE INDEX orders_y2026m06_broker_account_id_kite_order_id_order_times_key ON public.orders_y2026m06 USING btree (broker_account_id, kite_order_id, order_timestamp)|1|0|8192
+orders_y2026m06|orders_y2026m06_broker_account_id_order_timestamp_idx|CREATE INDEX orders_y2026m06_broker_account_id_order_timestamp_idx ON public.orders_y2026m06 USING btree (broker_account_id, order_timestamp)|0|0|8192
+orders_y2026m06|orders_y2026m06_broker_account_id_status_idx|CREATE INDEX orders_y2026m06_broker_account_id_status_idx ON public.orders_y2026m06 USING btree (broker_account_id, status)|11457|0|8192
+orders_y2026m06|orders_y2026m06_broker_account_id_tradingsymbol_order_times_idx|CREATE INDEX orders_y2026m06_broker_account_id_tradingsymbol_order_times_idx ON public.orders_y2026m06 USING btree (broker_account_id, tradingsymbol, order_timestamp)|0|0|8192
+orders_y2026m06|orders_y2026m06_pkey|CREATE UNIQUE INDEX orders_y2026m06_pkey ON public.orders_y2026m06 USING btree (id, order_timestamp)|0|0|8192
+orders_y2026m06|orders_y2026m06_tradingsymbol_idx|CREATE INDEX orders_y2026m06_tradingsymbol_idx ON public.orders_y2026m06 USING btree (tradingsymbol)|343|0|8192
+orders_y2026m07|orders_y2026m07_broker_account_id_kite_order_id_order_times_key|CREATE UNIQUE INDEX orders_y2026m07_broker_account_id_kite_order_id_order_times_key ON public.orders_y2026m07 USING btree (broker_account_id, kite_order_id, order_timestamp)|1|0|8192
+orders_y2026m07|orders_y2026m07_broker_account_id_order_timestamp_idx|CREATE INDEX orders_y2026m07_broker_account_id_order_timestamp_idx ON public.orders_y2026m07 USING btree (broker_account_id, order_timestamp)|0|0|8192
+orders_y2026m07|orders_y2026m07_broker_account_id_status_idx|CREATE INDEX orders_y2026m07_broker_account_id_status_idx ON public.orders_y2026m07 USING btree (broker_account_id, status)|11457|0|8192
+orders_y2026m07|orders_y2026m07_broker_account_id_tradingsymbol_order_times_idx|CREATE INDEX orders_y2026m07_broker_account_id_tradingsymbol_order_times_idx ON public.orders_y2026m07 USING btree (broker_account_id, tradingsymbol, order_timestamp)|0|0|8192
+orders_y2026m07|orders_y2026m07_pkey|CREATE UNIQUE INDEX orders_y2026m07_pkey ON public.orders_y2026m07 USING btree (id, order_timestamp)|0|0|8192
+orders_y2026m07|orders_y2026m07_tradingsymbol_idx|CREATE INDEX orders_y2026m07_tradingsymbol_idx ON public.orders_y2026m07 USING btree (tradingsymbol)|343|0|8192
+orders_y2026m08|orders_y2026m08_broker_account_id_kite_order_id_order_times_key|CREATE UNIQUE INDEX orders_y2026m08_broker_account_id_kite_order_id_order_times_key ON public.orders_y2026m08 USING btree (broker_account_id, kite_order_id, order_timestamp)|1|0|8192
+orders_y2026m08|orders_y2026m08_broker_account_id_order_timestamp_idx|CREATE INDEX orders_y2026m08_broker_account_id_order_timestamp_idx ON public.orders_y2026m08 USING btree (broker_account_id, order_timestamp)|0|0|8192
+orders_y2026m08|orders_y2026m08_broker_account_id_status_idx|CREATE INDEX orders_y2026m08_broker_account_id_status_idx ON public.orders_y2026m08 USING btree (broker_account_id, status)|11457|0|8192
+orders_y2026m08|orders_y2026m08_broker_account_id_tradingsymbol_order_times_idx|CREATE INDEX orders_y2026m08_broker_account_id_tradingsymbol_order_times_idx ON public.orders_y2026m08 USING btree (broker_account_id, tradingsymbol, order_timestamp)|0|0|8192
+orders_y2026m08|orders_y2026m08_pkey|CREATE UNIQUE INDEX orders_y2026m08_pkey ON public.orders_y2026m08 USING btree (id, order_timestamp)|0|0|8192
+orders_y2026m08|orders_y2026m08_tradingsymbol_idx|CREATE INDEX orders_y2026m08_tradingsymbol_idx ON public.orders_y2026m08 USING btree (tradingsymbol)|343|0|8192
+orders_y2026m09|orders_y2026m09_broker_account_id_kite_order_id_order_times_key|CREATE UNIQUE INDEX orders_y2026m09_broker_account_id_kite_order_id_order_times_key ON public.orders_y2026m09 USING btree (broker_account_id, kite_order_id, order_timestamp)|1|1|16384
+orders_y2026m09|orders_y2026m09_broker_account_id_order_timestamp_idx|CREATE INDEX orders_y2026m09_broker_account_id_order_timestamp_idx ON public.orders_y2026m09 USING btree (broker_account_id, order_timestamp)|0|0|16384
+orders_y2026m09|orders_y2026m09_broker_account_id_status_idx|CREATE INDEX orders_y2026m09_broker_account_id_status_idx ON public.orders_y2026m09 USING btree (broker_account_id, status)|11457|1|16384
+orders_y2026m09|orders_y2026m09_broker_account_id_tradingsymbol_order_times_idx|CREATE INDEX orders_y2026m09_broker_account_id_tradingsymbol_order_times_idx ON public.orders_y2026m09 USING btree (broker_account_id, tradingsymbol, order_timestamp)|0|0|16384
+orders_y2026m09|orders_y2026m09_pkey|CREATE UNIQUE INDEX orders_y2026m09_pkey ON public.orders_y2026m09 USING btree (id, order_timestamp)|0|0|16384
+orders_y2026m09|orders_y2026m09_tradingsymbol_idx|CREATE INDEX orders_y2026m09_tradingsymbol_idx ON public.orders_y2026m09 USING btree (tradingsymbol)|343|0|16384
+orders_y2026m10|orders_y2026m10_broker_account_id_kite_order_id_order_times_key|CREATE UNIQUE INDEX orders_y2026m10_broker_account_id_kite_order_id_order_times_key ON public.orders_y2026m10 USING btree (broker_account_id, kite_order_id, order_timestamp)|1|0|8192
+orders_y2026m10|orders_y2026m10_broker_account_id_order_timestamp_idx|CREATE INDEX orders_y2026m10_broker_account_id_order_timestamp_idx ON public.orders_y2026m10 USING btree (broker_account_id, order_timestamp)|0|0|8192
+orders_y2026m10|orders_y2026m10_broker_account_id_status_idx|CREATE INDEX orders_y2026m10_broker_account_id_status_idx ON public.orders_y2026m10 USING btree (broker_account_id, status)|11457|0|8192
+orders_y2026m10|orders_y2026m10_broker_account_id_tradingsymbol_order_times_idx|CREATE INDEX orders_y2026m10_broker_account_id_tradingsymbol_order_times_idx ON public.orders_y2026m10 USING btree (broker_account_id, tradingsymbol, order_timestamp)|0|0|8192
+orders_y2026m10|orders_y2026m10_pkey|CREATE UNIQUE INDEX orders_y2026m10_pkey ON public.orders_y2026m10 USING btree (id, order_timestamp)|0|0|8192
+orders_y2026m10|orders_y2026m10_tradingsymbol_idx|CREATE INDEX orders_y2026m10_tradingsymbol_idx ON public.orders_y2026m10 USING btree (tradingsymbol)|0|0|8192
+orders_y2026m11|orders_y2026m11_broker_account_id_kite_order_id_order_times_key|CREATE UNIQUE INDEX orders_y2026m11_broker_account_id_kite_order_id_order_times_key ON public.orders_y2026m11 USING btree (broker_account_id, kite_order_id, order_timestamp)|1|0|8192
+orders_y2026m11|orders_y2026m11_broker_account_id_order_timestamp_idx|CREATE INDEX orders_y2026m11_broker_account_id_order_timestamp_idx ON public.orders_y2026m11 USING btree (broker_account_id, order_timestamp)|0|0|8192
+orders_y2026m11|orders_y2026m11_broker_account_id_status_idx|CREATE INDEX orders_y2026m11_broker_account_id_status_idx ON public.orders_y2026m11 USING btree (broker_account_id, status)|11457|0|8192
+orders_y2026m11|orders_y2026m11_broker_account_id_tradingsymbol_order_times_idx|CREATE INDEX orders_y2026m11_broker_account_id_tradingsymbol_order_times_idx ON public.orders_y2026m11 USING btree (broker_account_id, tradingsymbol, order_timestamp)|0|0|8192
+orders_y2026m11|orders_y2026m11_pkey|CREATE UNIQUE INDEX orders_y2026m11_pkey ON public.orders_y2026m11 USING btree (id, order_timestamp)|0|0|8192
+orders_y2026m11|orders_y2026m11_tradingsymbol_idx|CREATE INDEX orders_y2026m11_tradingsymbol_idx ON public.orders_y2026m11 USING btree (tradingsymbol)|0|0|8192
+orders_y2026m12|orders_y2026m12_broker_account_id_kite_order_id_order_times_key|CREATE UNIQUE INDEX orders_y2026m12_broker_account_id_kite_order_id_order_times_key ON public.orders_y2026m12 USING btree (broker_account_id, kite_order_id, order_timestamp)|1|0|8192
+orders_y2026m12|orders_y2026m12_broker_account_id_order_timestamp_idx|CREATE INDEX orders_y2026m12_broker_account_id_order_timestamp_idx ON public.orders_y2026m12 USING btree (broker_account_id, order_timestamp)|0|0|8192
+orders_y2026m12|orders_y2026m12_broker_account_id_status_idx|CREATE INDEX orders_y2026m12_broker_account_id_status_idx ON public.orders_y2026m12 USING btree (broker_account_id, status)|11457|0|8192
+orders_y2026m12|orders_y2026m12_broker_account_id_tradingsymbol_order_times_idx|CREATE INDEX orders_y2026m12_broker_account_id_tradingsymbol_order_times_idx ON public.orders_y2026m12 USING btree (broker_account_id, tradingsymbol, order_timestamp)|0|0|8192
+orders_y2026m12|orders_y2026m12_pkey|CREATE UNIQUE INDEX orders_y2026m12_pkey ON public.orders_y2026m12 USING btree (id, order_timestamp)|0|0|8192
+orders_y2026m12|orders_y2026m12_tradingsymbol_idx|CREATE INDEX orders_y2026m12_tradingsymbol_idx ON public.orders_y2026m12 USING btree (tradingsymbol)|0|0|8192
+orders_y2027m01|orders_y2027m01_broker_account_id_kite_order_id_order_times_key|CREATE UNIQUE INDEX orders_y2027m01_broker_account_id_kite_order_id_order_times_key ON public.orders_y2027m01 USING btree (broker_account_id, kite_order_id, order_timestamp)|1|0|8192
+orders_y2027m01|orders_y2027m01_broker_account_id_order_timestamp_idx|CREATE INDEX orders_y2027m01_broker_account_id_order_timestamp_idx ON public.orders_y2027m01 USING btree (broker_account_id, order_timestamp)|0|0|8192
+orders_y2027m01|orders_y2027m01_broker_account_id_status_idx|CREATE INDEX orders_y2027m01_broker_account_id_status_idx ON public.orders_y2027m01 USING btree (broker_account_id, status)|11457|0|8192
+orders_y2027m01|orders_y2027m01_broker_account_id_tradingsymbol_order_times_idx|CREATE INDEX orders_y2027m01_broker_account_id_tradingsymbol_order_times_idx ON public.orders_y2027m01 USING btree (broker_account_id, tradingsymbol, order_timestamp)|0|0|8192
+orders_y2027m01|orders_y2027m01_pkey|CREATE UNIQUE INDEX orders_y2027m01_pkey ON public.orders_y2027m01 USING btree (id, order_timestamp)|0|0|8192
+orders_y2027m01|orders_y2027m01_tradingsymbol_idx|CREATE INDEX orders_y2027m01_tradingsymbol_idx ON public.orders_y2027m01 USING btree (tradingsymbol)|0|0|8192
+orders_y2027m02|orders_y2027m02_broker_account_id_kite_order_id_order_times_key|CREATE UNIQUE INDEX orders_y2027m02_broker_account_id_kite_order_id_order_times_key ON public.orders_y2027m02 USING btree (broker_account_id, kite_order_id, order_timestamp)|1|0|8192
+orders_y2027m02|orders_y2027m02_broker_account_id_order_timestamp_idx|CREATE INDEX orders_y2027m02_broker_account_id_order_timestamp_idx ON public.orders_y2027m02 USING btree (broker_account_id, order_timestamp)|0|0|8192
+orders_y2027m02|orders_y2027m02_broker_account_id_status_idx|CREATE INDEX orders_y2027m02_broker_account_id_status_idx ON public.orders_y2027m02 USING btree (broker_account_id, status)|11457|0|8192
+orders_y2027m02|orders_y2027m02_broker_account_id_tradingsymbol_order_times_idx|CREATE INDEX orders_y2027m02_broker_account_id_tradingsymbol_order_times_idx ON public.orders_y2027m02 USING btree (broker_account_id, tradingsymbol, order_timestamp)|0|0|8192
+orders_y2027m02|orders_y2027m02_pkey|CREATE UNIQUE INDEX orders_y2027m02_pkey ON public.orders_y2027m02 USING btree (id, order_timestamp)|0|0|8192
+orders_y2027m02|orders_y2027m02_tradingsymbol_idx|CREATE INDEX orders_y2027m02_tradingsymbol_idx ON public.orders_y2027m02 USING btree (tradingsymbol)|0|0|8192
+orders_y2027m03|orders_y2027m03_broker_account_id_kite_order_id_order_times_key|CREATE UNIQUE INDEX orders_y2027m03_broker_account_id_kite_order_id_order_times_key ON public.orders_y2027m03 USING btree (broker_account_id, kite_order_id, order_timestamp)|1|0|8192
+orders_y2027m03|orders_y2027m03_broker_account_id_order_timestamp_idx|CREATE INDEX orders_y2027m03_broker_account_id_order_timestamp_idx ON public.orders_y2027m03 USING btree (broker_account_id, order_timestamp)|0|0|8192
+orders_y2027m03|orders_y2027m03_broker_account_id_status_idx|CREATE INDEX orders_y2027m03_broker_account_id_status_idx ON public.orders_y2027m03 USING btree (broker_account_id, status)|11457|0|8192
+orders_y2027m03|orders_y2027m03_broker_account_id_tradingsymbol_order_times_idx|CREATE INDEX orders_y2027m03_broker_account_id_tradingsymbol_order_times_idx ON public.orders_y2027m03 USING btree (broker_account_id, tradingsymbol, order_timestamp)|0|0|8192
+orders_y2027m03|orders_y2027m03_pkey|CREATE UNIQUE INDEX orders_y2027m03_pkey ON public.orders_y2027m03 USING btree (id, order_timestamp)|0|0|8192
+orders_y2027m03|orders_y2027m03_tradingsymbol_idx|CREATE INDEX orders_y2027m03_tradingsymbol_idx ON public.orders_y2027m03 USING btree (tradingsymbol)|0|0|8192
+orders_y2027m04|orders_y2027m04_broker_account_id_kite_order_id_order_times_key|CREATE UNIQUE INDEX orders_y2027m04_broker_account_id_kite_order_id_order_times_key ON public.orders_y2027m04 USING btree (broker_account_id, kite_order_id, order_timestamp)|1|0|8192
+orders_y2027m04|orders_y2027m04_broker_account_id_order_timestamp_idx|CREATE INDEX orders_y2027m04_broker_account_id_order_timestamp_idx ON public.orders_y2027m04 USING btree (broker_account_id, order_timestamp)|0|0|8192
+orders_y2027m04|orders_y2027m04_broker_account_id_status_idx|CREATE INDEX orders_y2027m04_broker_account_id_status_idx ON public.orders_y2027m04 USING btree (broker_account_id, status)|11457|0|8192
+orders_y2027m04|orders_y2027m04_broker_account_id_tradingsymbol_order_times_idx|CREATE INDEX orders_y2027m04_broker_account_id_tradingsymbol_order_times_idx ON public.orders_y2027m04 USING btree (broker_account_id, tradingsymbol, order_timestamp)|0|0|8192
+orders_y2027m04|orders_y2027m04_pkey|CREATE UNIQUE INDEX orders_y2027m04_pkey ON public.orders_y2027m04 USING btree (id, order_timestamp)|0|0|8192
+orders_y2027m04|orders_y2027m04_tradingsymbol_idx|CREATE INDEX orders_y2027m04_tradingsymbol_idx ON public.orders_y2027m04 USING btree (tradingsymbol)|0|0|8192
+orders_y2027m05|orders_y2027m05_broker_account_id_kite_order_id_order_times_key|CREATE UNIQUE INDEX orders_y2027m05_broker_account_id_kite_order_id_order_times_key ON public.orders_y2027m05 USING btree (broker_account_id, kite_order_id, order_timestamp)|1|0|8192
+orders_y2027m05|orders_y2027m05_broker_account_id_order_timestamp_idx|CREATE INDEX orders_y2027m05_broker_account_id_order_timestamp_idx ON public.orders_y2027m05 USING btree (broker_account_id, order_timestamp)|0|0|8192
+orders_y2027m05|orders_y2027m05_broker_account_id_status_idx|CREATE INDEX orders_y2027m05_broker_account_id_status_idx ON public.orders_y2027m05 USING btree (broker_account_id, status)|11457|0|8192
+orders_y2027m05|orders_y2027m05_broker_account_id_tradingsymbol_order_times_idx|CREATE INDEX orders_y2027m05_broker_account_id_tradingsymbol_order_times_idx ON public.orders_y2027m05 USING btree (broker_account_id, tradingsymbol, order_timestamp)|0|0|8192
+orders_y2027m05|orders_y2027m05_pkey|CREATE UNIQUE INDEX orders_y2027m05_pkey ON public.orders_y2027m05 USING btree (id, order_timestamp)|0|0|8192
+orders_y2027m05|orders_y2027m05_tradingsymbol_idx|CREATE INDEX orders_y2027m05_tradingsymbol_idx ON public.orders_y2027m05 USING btree (tradingsymbol)|0|0|8192
+orders_y2027m06|orders_y2027m06_broker_account_id_kite_order_id_order_times_key|CREATE UNIQUE INDEX orders_y2027m06_broker_account_id_kite_order_id_order_times_key ON public.orders_y2027m06 USING btree (broker_account_id, kite_order_id, order_timestamp)|1|0|8192
+orders_y2027m06|orders_y2027m06_broker_account_id_order_timestamp_idx|CREATE INDEX orders_y2027m06_broker_account_id_order_timestamp_idx ON public.orders_y2027m06 USING btree (broker_account_id, order_timestamp)|0|0|8192
+orders_y2027m06|orders_y2027m06_broker_account_id_status_idx|CREATE INDEX orders_y2027m06_broker_account_id_status_idx ON public.orders_y2027m06 USING btree (broker_account_id, status)|11457|0|8192
+orders_y2027m06|orders_y2027m06_broker_account_id_tradingsymbol_order_times_idx|CREATE INDEX orders_y2027m06_broker_account_id_tradingsymbol_order_times_idx ON public.orders_y2027m06 USING btree (broker_account_id, tradingsymbol, order_timestamp)|0|0|8192
+orders_y2027m06|orders_y2027m06_pkey|CREATE UNIQUE INDEX orders_y2027m06_pkey ON public.orders_y2027m06 USING btree (id, order_timestamp)|0|0|8192
+orders_y2027m06|orders_y2027m06_tradingsymbol_idx|CREATE INDEX orders_y2027m06_tradingsymbol_idx ON public.orders_y2027m06 USING btree (tradingsymbol)|0|0|8192
+orders_y2027m07|orders_y2027m07_broker_account_id_kite_order_id_order_times_key|CREATE UNIQUE INDEX orders_y2027m07_broker_account_id_kite_order_id_order_times_key ON public.orders_y2027m07 USING btree (broker_account_id, kite_order_id, order_timestamp)|1|0|8192
+orders_y2027m07|orders_y2027m07_broker_account_id_order_timestamp_idx|CREATE INDEX orders_y2027m07_broker_account_id_order_timestamp_idx ON public.orders_y2027m07 USING btree (broker_account_id, order_timestamp)|0|0|8192
+orders_y2027m07|orders_y2027m07_broker_account_id_status_idx|CREATE INDEX orders_y2027m07_broker_account_id_status_idx ON public.orders_y2027m07 USING btree (broker_account_id, status)|11457|0|8192
+orders_y2027m07|orders_y2027m07_broker_account_id_tradingsymbol_order_times_idx|CREATE INDEX orders_y2027m07_broker_account_id_tradingsymbol_order_times_idx ON public.orders_y2027m07 USING btree (broker_account_id, tradingsymbol, order_timestamp)|0|0|8192
+orders_y2027m07|orders_y2027m07_pkey|CREATE UNIQUE INDEX orders_y2027m07_pkey ON public.orders_y2027m07 USING btree (id, order_timestamp)|0|0|8192
+orders_y2027m07|orders_y2027m07_tradingsymbol_idx|CREATE INDEX orders_y2027m07_tradingsymbol_idx ON public.orders_y2027m07 USING btree (tradingsymbol)|0|0|8192
+orders_y2027m08|orders_y2027m08_broker_account_id_kite_order_id_order_times_key|CREATE UNIQUE INDEX orders_y2027m08_broker_account_id_kite_order_id_order_times_key ON public.orders_y2027m08 USING btree (broker_account_id, kite_order_id, order_timestamp)|1|0|8192
+orders_y2027m08|orders_y2027m08_broker_account_id_order_timestamp_idx|CREATE INDEX orders_y2027m08_broker_account_id_order_timestamp_idx ON public.orders_y2027m08 USING btree (broker_account_id, order_timestamp)|0|0|8192
+orders_y2027m08|orders_y2027m08_broker_account_id_status_idx|CREATE INDEX orders_y2027m08_broker_account_id_status_idx ON public.orders_y2027m08 USING btree (broker_account_id, status)|11457|0|8192
+orders_y2027m08|orders_y2027m08_broker_account_id_tradingsymbol_order_times_idx|CREATE INDEX orders_y2027m08_broker_account_id_tradingsymbol_order_times_idx ON public.orders_y2027m08 USING btree (broker_account_id, tradingsymbol, order_timestamp)|0|0|8192
+orders_y2027m08|orders_y2027m08_pkey|CREATE UNIQUE INDEX orders_y2027m08_pkey ON public.orders_y2027m08 USING btree (id, order_timestamp)|0|0|8192
+orders_y2027m08|orders_y2027m08_tradingsymbol_idx|CREATE INDEX orders_y2027m08_tradingsymbol_idx ON public.orders_y2027m08 USING btree (tradingsymbol)|0|0|8192
+orders_y2027m09|orders_y2027m09_broker_account_id_kite_order_id_order_times_key|CREATE UNIQUE INDEX orders_y2027m09_broker_account_id_kite_order_id_order_times_key ON public.orders_y2027m09 USING btree (broker_account_id, kite_order_id, order_timestamp)|1|0|8192
+orders_y2027m09|orders_y2027m09_broker_account_id_order_timestamp_idx|CREATE INDEX orders_y2027m09_broker_account_id_order_timestamp_idx ON public.orders_y2027m09 USING btree (broker_account_id, order_timestamp)|0|0|8192
+orders_y2027m09|orders_y2027m09_broker_account_id_status_idx|CREATE INDEX orders_y2027m09_broker_account_id_status_idx ON public.orders_y2027m09 USING btree (broker_account_id, status)|11457|0|8192
+orders_y2027m09|orders_y2027m09_broker_account_id_tradingsymbol_order_times_idx|CREATE INDEX orders_y2027m09_broker_account_id_tradingsymbol_order_times_idx ON public.orders_y2027m09 USING btree (broker_account_id, tradingsymbol, order_timestamp)|0|0|8192
+orders_y2027m09|orders_y2027m09_pkey|CREATE UNIQUE INDEX orders_y2027m09_pkey ON public.orders_y2027m09 USING btree (id, order_timestamp)|0|0|8192
+orders_y2027m09|orders_y2027m09_tradingsymbol_idx|CREATE INDEX orders_y2027m09_tradingsymbol_idx ON public.orders_y2027m09 USING btree (tradingsymbol)|0|0|8192
+orders_y2027m10|orders_y2027m10_broker_account_id_kite_order_id_order_times_key|CREATE UNIQUE INDEX orders_y2027m10_broker_account_id_kite_order_id_order_times_key ON public.orders_y2027m10 USING btree (broker_account_id, kite_order_id, order_timestamp)|1|0|8192
+orders_y2027m10|orders_y2027m10_broker_account_id_order_timestamp_idx|CREATE INDEX orders_y2027m10_broker_account_id_order_timestamp_idx ON public.orders_y2027m10 USING btree (broker_account_id, order_timestamp)|0|0|8192
+orders_y2027m10|orders_y2027m10_broker_account_id_status_idx|CREATE INDEX orders_y2027m10_broker_account_id_status_idx ON public.orders_y2027m10 USING btree (broker_account_id, status)|11457|0|8192
+orders_y2027m10|orders_y2027m10_broker_account_id_tradingsymbol_order_times_idx|CREATE INDEX orders_y2027m10_broker_account_id_tradingsymbol_order_times_idx ON public.orders_y2027m10 USING btree (broker_account_id, tradingsymbol, order_timestamp)|0|0|8192
+orders_y2027m10|orders_y2027m10_pkey|CREATE UNIQUE INDEX orders_y2027m10_pkey ON public.orders_y2027m10 USING btree (id, order_timestamp)|0|0|8192
+orders_y2027m10|orders_y2027m10_tradingsymbol_idx|CREATE INDEX orders_y2027m10_tradingsymbol_idx ON public.orders_y2027m10 USING btree (tradingsymbol)|0|0|8192
+orders_y2027m11|orders_y2027m11_broker_account_id_kite_order_id_order_times_key|CREATE UNIQUE INDEX orders_y2027m11_broker_account_id_kite_order_id_order_times_key ON public.orders_y2027m11 USING btree (broker_account_id, kite_order_id, order_timestamp)|1|0|8192
+orders_y2027m11|orders_y2027m11_broker_account_id_order_timestamp_idx|CREATE INDEX orders_y2027m11_broker_account_id_order_timestamp_idx ON public.orders_y2027m11 USING btree (broker_account_id, order_timestamp)|0|0|8192
+orders_y2027m11|orders_y2027m11_broker_account_id_status_idx|CREATE INDEX orders_y2027m11_broker_account_id_status_idx ON public.orders_y2027m11 USING btree (broker_account_id, status)|11457|0|8192
+orders_y2027m11|orders_y2027m11_broker_account_id_tradingsymbol_order_times_idx|CREATE INDEX orders_y2027m11_broker_account_id_tradingsymbol_order_times_idx ON public.orders_y2027m11 USING btree (broker_account_id, tradingsymbol, order_timestamp)|0|0|8192
+orders_y2027m11|orders_y2027m11_pkey|CREATE UNIQUE INDEX orders_y2027m11_pkey ON public.orders_y2027m11 USING btree (id, order_timestamp)|0|0|8192
+orders_y2027m11|orders_y2027m11_tradingsymbol_idx|CREATE INDEX orders_y2027m11_tradingsymbol_idx ON public.orders_y2027m11 USING btree (tradingsymbol)|0|0|8192
+orders_y2027m12|orders_y2027m12_broker_account_id_kite_order_id_order_times_key|CREATE UNIQUE INDEX orders_y2027m12_broker_account_id_kite_order_id_order_times_key ON public.orders_y2027m12 USING btree (broker_account_id, kite_order_id, order_timestamp)|1|0|8192
+orders_y2027m12|orders_y2027m12_broker_account_id_order_timestamp_idx|CREATE INDEX orders_y2027m12_broker_account_id_order_timestamp_idx ON public.orders_y2027m12 USING btree (broker_account_id, order_timestamp)|0|0|8192
+orders_y2027m12|orders_y2027m12_broker_account_id_status_idx|CREATE INDEX orders_y2027m12_broker_account_id_status_idx ON public.orders_y2027m12 USING btree (broker_account_id, status)|11457|0|8192
+orders_y2027m12|orders_y2027m12_broker_account_id_tradingsymbol_order_times_idx|CREATE INDEX orders_y2027m12_broker_account_id_tradingsymbol_order_times_idx ON public.orders_y2027m12 USING btree (broker_account_id, tradingsymbol, order_timestamp)|0|0|8192
+orders_y2027m12|orders_y2027m12_pkey|CREATE UNIQUE INDEX orders_y2027m12_pkey ON public.orders_y2027m12 USING btree (id, order_timestamp)|0|0|8192
+orders_y2027m12|orders_y2027m12_tradingsymbol_idx|CREATE INDEX orders_y2027m12_tradingsymbol_idx ON public.orders_y2027m12 USING btree (tradingsymbol)|0|0|8192
+portfolio_chat_sessions|idx_portfolio_chat_sessions_account|CREATE INDEX idx_portfolio_chat_sessions_account ON public.portfolio_chat_sessions USING btree (broker_account_id, started_at DESC)|13691|0|16384
+portfolio_chat_sessions|portfolio_chat_sessions_pkey|CREATE UNIQUE INDEX portfolio_chat_sessions_pkey ON public.portfolio_chat_sessions USING btree (id)|0|0|16384
+position_alerts_sent|idx_position_alerts_lookup|CREATE INDEX idx_position_alerts_lookup ON public.position_alerts_sent USING btree (broker_account_id, alert_type, cooldown_until)|13691|0|8192
+position_alerts_sent|position_alerts_sent_pkey|CREATE UNIQUE INDEX position_alerts_sent_pkey ON public.position_alerts_sent USING btree (id)|0|0|8192
+position_ledger|idx_position_ledger_account_symbol|CREATE INDEX idx_position_ledger_account_symbol ON public.position_ledger USING btree (broker_account_id, tradingsymbol, occurred_at)|1405|5237|106496
+position_ledger|idx_position_ledger_account_time|CREATE INDEX idx_position_ledger_account_time ON public.position_ledger USING btree (broker_account_id, occurred_at DESC)|16517|66517|81920
+position_ledger|idx_position_ledger_idempotency|CREATE INDEX idx_position_ledger_idempotency ON public.position_ledger USING btree (idempotency_key)|50276|2305|303104
+position_ledger|idx_position_ledger_key|CREATE INDEX idx_position_ledger_key ON public.position_ledger USING btree (broker_account_id, tradingsymbol, exchange, product, occurred_at DESC)|171724|540949|73728
+position_ledger|position_ledger_idempotency_key_key|CREATE UNIQUE INDEX position_ledger_idempotency_key_key ON public.position_ledger USING btree (idempotency_key)|0|0|303104
+position_ledger|position_ledger_pkey|CREATE UNIQUE INDEX position_ledger_pkey ON public.position_ledger USING btree (id)|2535|2535|262144
+position_margin_observations|idx_pmo_account_time|CREATE INDEX idx_pmo_account_time ON public.position_margin_observations USING btree (broker_account_id, captured_at DESC)|30304|0|8192
+position_margin_observations|idx_pmo_account_underlying_time|CREATE INDEX idx_pmo_account_underlying_time ON public.position_margin_observations USING btree (broker_account_id, underlying, captured_at DESC)|0|0|8192
+position_margin_observations|position_margin_observations_pkey|CREATE UNIQUE INDEX position_margin_observations_pkey ON public.position_margin_observations USING btree (id)|0|0|8192
+positions|idx_position_open|CREATE INDEX idx_position_open ON public.positions USING btree (broker_account_id, total_quantity) WHERE (total_quantity <> 0)|15454|0|90112
+positions|idx_positions_broker|CREATE INDEX idx_positions_broker ON public.positions USING btree (broker_account_id)|0|0|90112
+positions|idx_positions_broker_account_id|CREATE INDEX idx_positions_broker_account_id ON public.positions USING btree (broker_account_id)|37|7748|90112
+positions|idx_positions_instrument_token|CREATE INDEX idx_positions_instrument_token ON public.positions USING btree (instrument_token)|156|122449|40960
+positions|idx_positions_open|CREATE INDEX idx_positions_open ON public.positions USING btree (broker_account_id) WHERE (total_quantity <> 0)|83318|16676|73728
+positions|idx_positions_segment|CREATE INDEX idx_positions_segment ON public.positions USING btree (segment)|66|85086|32768
+positions|positions_pkey|CREATE UNIQUE INDEX positions_pkey ON public.positions USING btree (id)|1104|1086|90112
+positions|uq_position_account_symbol_exchange_product|CREATE UNIQUE INDEX uq_position_account_symbol_exchange_product ON public.positions USING btree (broker_account_id, tradingsymbol, exchange, product)|28552|3878|139264
+push_subscriptions|idx_push_subscriptions_active|CREATE INDEX idx_push_subscriptions_active ON public.push_subscriptions USING btree (broker_account_id, is_active) WHERE (is_active = true)|0|0|16384
+push_subscriptions|idx_push_subscriptions_broker_account|CREATE INDEX idx_push_subscriptions_broker_account ON public.push_subscriptions USING btree (broker_account_id)|0|0|16384
+push_subscriptions|push_subscriptions_endpoint_key|CREATE UNIQUE INDEX push_subscriptions_endpoint_key ON public.push_subscriptions USING btree (endpoint)|0|0|16384
+push_subscriptions|push_subscriptions_pkey|CREATE UNIQUE INDEX push_subscriptions_pkey ON public.push_subscriptions USING btree (id)|0|0|16384
+risk_alerts|idx_risk_alert_account_detected|CREATE INDEX idx_risk_alert_account_detected ON public.risk_alerts USING btree (broker_account_id, detected_at DESC)|57168|233036|131072
+risk_alerts|idx_risk_alerts_broker|CREATE INDEX idx_risk_alerts_broker ON public.risk_alerts USING btree (broker_account_id)|0|0|90112
+risk_alerts|idx_risk_alerts_broker_account_id|CREATE INDEX idx_risk_alerts_broker_account_id ON public.risk_alerts USING btree (broker_account_id)|20261|332848|90112
+risk_alerts|idx_risk_alerts_broker_detected|CREATE INDEX idx_risk_alerts_broker_detected ON public.risk_alerts USING btree (broker_account_id, detected_at DESC)|0|0|139264
+risk_alerts|idx_risk_alerts_created_at|CREATE INDEX idx_risk_alerts_created_at ON public.risk_alerts USING btree (created_at DESC)|4|57|122880
+risk_alerts|idx_risk_alerts_detected|CREATE INDEX idx_risk_alerts_detected ON public.risk_alerts USING btree (detected_at)|48642|238228|65536
+risk_alerts|idx_risk_alerts_live_dedupe|CREATE INDEX idx_risk_alerts_live_dedupe ON public.risk_alerts USING btree (broker_account_id, trigger_position_id, pattern_type) WHERE (lifecycle = 'live'::text)|0|0|16384
+risk_alerts|idx_risk_alerts_trigger_ct|CREATE INDEX idx_risk_alerts_trigger_ct ON public.risk_alerts USING btree (trigger_completed_trade_id) WHERE (trigger_completed_trade_id IS NOT NULL)|22498|11630|57344
+risk_alerts|idx_risk_alerts_undelivered|CREATE INDEX idx_risk_alerts_undelivered ON public.risk_alerts USING btree (broker_account_id, detected_at) WHERE ((delivered_push_at IS NULL) AND (expired_at IS NULL))|0|0|131072
+risk_alerts|risk_alerts_pkey|CREATE UNIQUE INDEX risk_alerts_pkey ON public.risk_alerts USING btree (id)|24644|24643|98304
+schema_migrations|schema_migrations_pkey|CREATE UNIQUE INDEX schema_migrations_pkey ON public.schema_migrations USING btree (filename)|0|0|16384
+schema_migrations|schema_migrations_pkey|CREATE UNIQUE INDEX schema_migrations_pkey ON public.schema_migrations USING btree (filename)|332|584|16384
+schema_migrations|schema_migrations_pkey|CREATE UNIQUE INDEX schema_migrations_pkey ON public.schema_migrations USING btree (filename)|0|0|16384
+shadow_behavioral_events|idx_shadow_events_account_detected|CREATE INDEX idx_shadow_events_account_detected ON public.shadow_behavioral_events USING btree (broker_account_id, detected_at DESC)|13691|0|8192
+shadow_behavioral_events|idx_shadow_events_session|CREATE INDEX idx_shadow_events_session ON public.shadow_behavioral_events USING btree (trigger_session_id, detected_at) WHERE (trigger_session_id IS NOT NULL)|3426|0|8192
+shadow_behavioral_events|shadow_behavioral_events_pkey|CREATE UNIQUE INDEX shadow_behavioral_events_pkey ON public.shadow_behavioral_events USING btree (id)|0|0|8192
+strategy_group_legs|idx_strategy_group_legs_group|CREATE INDEX idx_strategy_group_legs_group ON public.strategy_group_legs USING btree (strategy_group_id)|139|302|16384
+strategy_group_legs|idx_strategy_group_legs_trade|CREATE INDEX idx_strategy_group_legs_trade ON public.strategy_group_legs USING btree (completed_trade_id)|314|419|16384
+strategy_group_legs|strategy_group_legs_completed_trade_id_key|CREATE UNIQUE INDEX strategy_group_legs_completed_trade_id_key ON public.strategy_group_legs USING btree (completed_trade_id)|0|0|16384
+strategy_group_legs|strategy_group_legs_pkey|CREATE UNIQUE INDEX strategy_group_legs_pkey ON public.strategy_group_legs USING btree (id)|0|0|16384
+strategy_groups|idx_strategy_groups_broker|CREATE INDEX idx_strategy_groups_broker ON public.strategy_groups USING btree (broker_account_id)|131|50|16384
+strategy_groups|strategy_groups_pkey|CREATE UNIQUE INDEX strategy_groups_pkey ON public.strategy_groups USING btree (id)|0|0|16384
+streak_data|streak_data_broker_account_id_key|CREATE UNIQUE INDEX streak_data_broker_account_id_key ON public.streak_data USING btree (broker_account_id)|0|0|16384
+streak_data|streak_data_pkey|CREATE UNIQUE INDEX streak_data_pkey ON public.streak_data USING btree (id)|0|0|16384
+trades|idx_trades_account_order_unique|CREATE UNIQUE INDEX idx_trades_account_order_unique ON public.trades USING btree (broker_account_id, order_id)|32456|280|417792
+trades|idx_trades_broker|CREATE INDEX idx_trades_broker ON public.trades USING btree (broker_account_id)|0|0|57344
+trades|idx_trades_broker_account_id|CREATE INDEX idx_trades_broker_account_id ON public.trades USING btree (broker_account_id)|33904|310031|49152
+trades|idx_trades_broker_status|CREATE INDEX idx_trades_broker_status ON public.trades USING btree (broker_account_id, status)|2|850|57344
+trades|idx_trades_broker_symbol_timestamp|CREATE INDEX idx_trades_broker_symbol_timestamp ON public.trades USING btree (broker_account_id, tradingsymbol, order_timestamp)|85|3892|98304
+trades|idx_trades_broker_timestamp|CREATE INDEX idx_trades_broker_timestamp ON public.trades USING btree (broker_account_id, order_timestamp DESC)|1141|4400|73728
+trades|idx_trades_effective_ts|CREATE INDEX idx_trades_effective_ts ON public.trades USING btree (COALESCE(order_timestamp, created_at))|0|0|57344
+trades|idx_trades_instrument_token|CREATE INDEX idx_trades_instrument_token ON public.trades USING btree (instrument_token)|0|0|57344
+trades|idx_trades_kite_order_id|CREATE INDEX idx_trades_kite_order_id ON public.trades USING btree (kite_order_id)|2|800|212992
+trades|idx_trades_order_id|CREATE INDEX idx_trades_order_id ON public.trades USING btree (order_id)|0|0|221184
+trades|idx_trades_processed_at|CREATE INDEX idx_trades_processed_at ON public.trades USING btree (broker_account_id, processed_at) WHERE (processed_at IS NULL)|0|0|32768
+trades|idx_trades_segment|CREATE INDEX idx_trades_segment ON public.trades USING btree (segment)|30|13461|49152
+trades|idx_trades_tag|CREATE INDEX idx_trades_tag ON public.trades USING btree (tag)|0|0|57344
+trades|trades_pkey|CREATE UNIQUE INDEX trades_pkey ON public.trades USING btree (id)|101621|141194|172032
+trading_goals|trading_goals_broker_account_id_key|CREATE UNIQUE INDEX trading_goals_broker_account_id_key ON public.trading_goals USING btree (broker_account_id)|0|0|16384
+trading_goals|trading_goals_pkey|CREATE UNIQUE INDEX trading_goals_pkey ON public.trading_goals USING btree (id)|0|0|16384
+trading_sessions|idx_trading_session_account_date|CREATE INDEX idx_trading_session_account_date ON public.trading_sessions USING btree (broker_account_id, session_date)|0|0|16384
+trading_sessions|idx_trading_sessions_account_date|CREATE INDEX idx_trading_sessions_account_date ON public.trading_sessions USING btree (broker_account_id, session_date DESC)|0|0|16384
+trading_sessions|trading_sessions_broker_account_id_session_date_key|CREATE UNIQUE INDEX trading_sessions_broker_account_id_session_date_key ON public.trading_sessions USING btree (broker_account_id, session_date)|0|0|16384
+trading_sessions|trading_sessions_pkey|CREATE UNIQUE INDEX trading_sessions_pkey ON public.trading_sessions USING btree (id)|0|0|16384
+trading_sessions|uq_trading_session_account_date|CREATE UNIQUE INDEX uq_trading_session_account_date ON public.trading_sessions USING btree (broker_account_id, session_date)|1|9|16384
+user_profiles|idx_user_profiles_broker_account|CREATE INDEX idx_user_profiles_broker_account ON public.user_profiles USING btree (broker_account_id)|2|8|16384
+user_profiles|user_profiles_broker_account_id_key|CREATE UNIQUE INDEX user_profiles_broker_account_id_key ON public.user_profiles USING btree (broker_account_id)|0|0|16384
+user_profiles|user_profiles_pkey|CREATE UNIQUE INDEX user_profiles_pkey ON public.user_profiles USING btree (id)|198|198|16384
+users|idx_users_email|CREATE INDEX idx_users_email ON public.users USING btree (email)|63|134231|1196032
+users|users_email_key|CREATE UNIQUE INDEX users_email_key ON public.users USING btree (email)|0|0|1204224
+users|users_pkey|CREATE UNIQUE INDEX users_pkey ON public.users USING btree (id)|1|0|614400
+users|users_pkey|CREATE UNIQUE INDEX users_pkey ON public.users USING btree (id)|72413|1725183|614400

@@ -1,0 +1,55 @@
+child|constraint|definition|parent|on_delete|on_update
+admin_login_events|admin_login_events_admin_id_fkey|FOREIGN KEY (admin_id) REFERENCES admin_users(id) ON DELETE CASCADE|admin_users|CASCADE|NO ACTION
+alert_checkpoints|alert_checkpoints_alert_id_fkey|FOREIGN KEY (alert_id) REFERENCES risk_alerts(id) ON DELETE CASCADE|risk_alerts|CASCADE|NO ACTION
+alert_checkpoints|alert_checkpoints_broker_account_id_fkey|FOREIGN KEY (broker_account_id) REFERENCES broker_accounts(id) ON DELETE CASCADE|broker_accounts|CASCADE|NO ACTION
+alert_mutes|alert_mutes_broker_account_id_fkey|FOREIGN KEY (broker_account_id) REFERENCES broker_accounts(id) ON DELETE CASCADE|broker_accounts|CASCADE|NO ACTION
+behavior_events|behavior_events_broker_account_id_fkey1|FOREIGN KEY (broker_account_id) REFERENCES broker_accounts(id) ON DELETE CASCADE|broker_accounts|CASCADE|NO ACTION
+behavior_events|behavior_events_risk_alert_id_fkey1|FOREIGN KEY (risk_alert_id) REFERENCES risk_alerts(id) ON DELETE SET NULL|risk_alerts|SET NULL|NO ACTION
+behavior_events|behavior_events_trigger_completed_trade_id_fkey1|FOREIGN KEY (trigger_completed_trade_id) REFERENCES completed_trades(id) ON DELETE SET NULL|completed_trades|SET NULL|NO ACTION
+behavior_events_legacy|behavior_events_broker_account_id_fkey|FOREIGN KEY (broker_account_id) REFERENCES broker_accounts(id) ON DELETE CASCADE|broker_accounts|CASCADE|NO ACTION
+behavior_events_legacy|behavior_events_risk_alert_id_fkey|FOREIGN KEY (risk_alert_id) REFERENCES risk_alerts(id) ON DELETE SET NULL|risk_alerts|SET NULL|NO ACTION
+behavior_events_legacy|behavior_events_trigger_completed_trade_id_fkey|FOREIGN KEY (trigger_completed_trade_id) REFERENCES completed_trades(id) ON DELETE SET NULL|completed_trades|SET NULL|NO ACTION
+behavioral_events|behavioral_events_broker_account_id_fkey|FOREIGN KEY (broker_account_id) REFERENCES broker_accounts(id) ON DELETE CASCADE|broker_accounts|CASCADE|NO ACTION
+behavioral_events|behavioral_events_session_id_fkey|FOREIGN KEY (session_id) REFERENCES trading_sessions(id) ON DELETE SET NULL|trading_sessions|SET NULL|NO ACTION
+behavioral_events|behavioral_events_trigger_trade_id_fkey|FOREIGN KEY (trigger_trade_id) REFERENCES trades(id)|trades|NO ACTION|NO ACTION
+broadcast_receipts|broadcast_receipts_broadcast_id_fkey|FOREIGN KEY (broadcast_id) REFERENCES broadcast_logs(id) ON DELETE CASCADE|broadcast_logs|CASCADE|NO ACTION
+broker_accounts|fk_broker_accounts_user|FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE|users|CASCADE|NO ACTION
+coach_sessions|coach_sessions_broker_account_id_fkey|FOREIGN KEY (broker_account_id) REFERENCES broker_accounts(id) ON DELETE CASCADE|broker_accounts|CASCADE|NO ACTION
+commitment_logs|commitment_logs_broker_account_id_fkey|FOREIGN KEY (broker_account_id) REFERENCES broker_accounts(id) ON DELETE CASCADE|broker_accounts|CASCADE|NO ACTION
+completed_trade_features|completed_trade_features_broker_account_id_fkey|FOREIGN KEY (broker_account_id) REFERENCES broker_accounts(id) ON DELETE CASCADE|broker_accounts|CASCADE|NO ACTION
+completed_trade_features|completed_trade_features_completed_trade_id_fkey|FOREIGN KEY (completed_trade_id) REFERENCES completed_trades(id) ON DELETE CASCADE|completed_trades|CASCADE|NO ACTION
+completed_trades|completed_trades_broker_account_id_fkey|FOREIGN KEY (broker_account_id) REFERENCES broker_accounts(id) ON DELETE CASCADE|broker_accounts|CASCADE|NO ACTION
+constitution_history|constitution_history_broker_fk|FOREIGN KEY (broker_account_id) REFERENCES broker_accounts(id) ON DELETE CASCADE|broker_accounts|CASCADE|NO ACTION
+cooldowns|cooldowns_broker_account_id_fkey|FOREIGN KEY (broker_account_id) REFERENCES broker_accounts(id) ON DELETE CASCADE|broker_accounts|CASCADE|NO ACTION
+data_quality_events|data_quality_events_broker_account_id_fkey|FOREIGN KEY (broker_account_id) REFERENCES broker_accounts(id) ON DELETE CASCADE|broker_accounts|CASCADE|NO ACTION
+discipline_scores|discipline_scores_broker_account_id_fkey|FOREIGN KEY (broker_account_id) REFERENCES broker_accounts(id) ON DELETE CASCADE|broker_accounts|CASCADE|NO ACTION
+discipline_streaks|discipline_streaks_broker_account_id_fkey|FOREIGN KEY (broker_account_id) REFERENCES broker_accounts(id) ON DELETE CASCADE|broker_accounts|CASCADE|NO ACTION
+generated_reports|generated_reports_broker_account_id_fkey|FOREIGN KEY (broker_account_id) REFERENCES broker_accounts(id) ON DELETE CASCADE|broker_accounts|CASCADE|NO ACTION
+gtt_tracking|gtt_tracking_broker_account_id_fkey|FOREIGN KEY (broker_account_id) REFERENCES broker_accounts(id) ON DELETE CASCADE|broker_accounts|CASCADE|NO ACTION
+guardrail_rules|guardrail_rules_broker_account_id_fkey|FOREIGN KEY (broker_account_id) REFERENCES broker_accounts(id) ON DELETE CASCADE|broker_accounts|CASCADE|NO ACTION
+holdings|holdings_broker_account_id_fkey|FOREIGN KEY (broker_account_id) REFERENCES broker_accounts(id) ON DELETE CASCADE|broker_accounts|CASCADE|NO ACTION
+incomplete_positions|incomplete_positions_broker_account_id_fkey|FOREIGN KEY (broker_account_id) REFERENCES broker_accounts(id) ON DELETE CASCADE|broker_accounts|CASCADE|NO ACTION
+journal_entries|journal_entries_broker_account_id_fkey|FOREIGN KEY (broker_account_id) REFERENCES broker_accounts(id) ON DELETE CASCADE|broker_accounts|CASCADE|NO ACTION
+margin_snapshots|margin_snapshots_broker_account_id_fkey|FOREIGN KEY (broker_account_id) REFERENCES broker_accounts(id) ON DELETE CASCADE|broker_accounts|CASCADE|NO ACTION
+monthly_snapshots|monthly_snapshots_broker_account_id_fkey|FOREIGN KEY (broker_account_id) REFERENCES broker_accounts(id) ON DELETE CASCADE|broker_accounts|CASCADE|NO ACTION
+orders|orders_broker_account_id_fkey|FOREIGN KEY (broker_account_id) REFERENCES broker_accounts(id) ON DELETE CASCADE|broker_accounts|CASCADE|NO ACTION
+portfolio_chat_sessions|portfolio_chat_sessions_broker_account_id_fkey|FOREIGN KEY (broker_account_id) REFERENCES broker_accounts(id) ON DELETE CASCADE|broker_accounts|CASCADE|NO ACTION
+position_alerts_sent|position_alerts_sent_broker_account_id_fkey|FOREIGN KEY (broker_account_id) REFERENCES broker_accounts(id) ON DELETE CASCADE|broker_accounts|CASCADE|NO ACTION
+position_ledger|fk_position_ledger_session|FOREIGN KEY (session_id) REFERENCES trading_sessions(id) ON DELETE SET NULL|trading_sessions|SET NULL|NO ACTION
+position_ledger|position_ledger_broker_account_id_fkey|FOREIGN KEY (broker_account_id) REFERENCES broker_accounts(id) ON DELETE CASCADE|broker_accounts|CASCADE|NO ACTION
+position_margin_observations|position_margin_observations_broker_account_id_fkey|FOREIGN KEY (broker_account_id) REFERENCES broker_accounts(id) ON DELETE CASCADE|broker_accounts|CASCADE|NO ACTION
+positions|positions_broker_account_id_fkey|FOREIGN KEY (broker_account_id) REFERENCES broker_accounts(id) ON DELETE CASCADE|broker_accounts|CASCADE|NO ACTION
+push_subscriptions|push_subscriptions_broker_account_id_fkey|FOREIGN KEY (broker_account_id) REFERENCES broker_accounts(id) ON DELETE CASCADE|broker_accounts|CASCADE|NO ACTION
+risk_alerts|fk_risk_alerts_trigger_trade|FOREIGN KEY (trigger_trade_id) REFERENCES trades(id) ON DELETE SET NULL|trades|SET NULL|NO ACTION
+risk_alerts|risk_alerts_broker_account_id_fkey|FOREIGN KEY (broker_account_id) REFERENCES broker_accounts(id) ON DELETE CASCADE|broker_accounts|CASCADE|NO ACTION
+risk_alerts|risk_alerts_trigger_completed_trade_id_fkey|FOREIGN KEY (trigger_completed_trade_id) REFERENCES completed_trades(id) ON DELETE SET NULL|completed_trades|SET NULL|NO ACTION
+shadow_behavioral_events|shadow_behavioral_events_broker_account_id_fkey|FOREIGN KEY (broker_account_id) REFERENCES broker_accounts(id) ON DELETE CASCADE|broker_accounts|CASCADE|NO ACTION
+shadow_behavioral_events|shadow_behavioral_events_trigger_session_id_fkey|FOREIGN KEY (trigger_session_id) REFERENCES trading_sessions(id) ON DELETE SET NULL|trading_sessions|SET NULL|NO ACTION
+strategy_group_legs|strategy_group_legs_completed_trade_id_fkey|FOREIGN KEY (completed_trade_id) REFERENCES completed_trades(id) ON DELETE CASCADE|completed_trades|CASCADE|NO ACTION
+strategy_group_legs|strategy_group_legs_strategy_group_id_fkey|FOREIGN KEY (strategy_group_id) REFERENCES strategy_groups(id) ON DELETE CASCADE|strategy_groups|CASCADE|NO ACTION
+strategy_groups|strategy_groups_broker_account_id_fkey|FOREIGN KEY (broker_account_id) REFERENCES broker_accounts(id) ON DELETE CASCADE|broker_accounts|CASCADE|NO ACTION
+streak_data|streak_data_broker_account_id_fkey|FOREIGN KEY (broker_account_id) REFERENCES broker_accounts(id) ON DELETE CASCADE|broker_accounts|CASCADE|NO ACTION
+trades|trades_broker_account_id_fkey|FOREIGN KEY (broker_account_id) REFERENCES broker_accounts(id) ON DELETE CASCADE|broker_accounts|CASCADE|NO ACTION
+trading_goals|trading_goals_broker_account_id_fkey|FOREIGN KEY (broker_account_id) REFERENCES broker_accounts(id) ON DELETE CASCADE|broker_accounts|CASCADE|NO ACTION
+trading_sessions|trading_sessions_broker_account_id_fkey|FOREIGN KEY (broker_account_id) REFERENCES broker_accounts(id) ON DELETE CASCADE|broker_accounts|CASCADE|NO ACTION
+user_profiles|user_profiles_broker_account_id_fkey|FOREIGN KEY (broker_account_id) REFERENCES broker_accounts(id) ON DELETE CASCADE|broker_accounts|CASCADE|NO ACTION

@@ -1,0 +1,23 @@
+# gathered 2026-09-04T10:45:40.075975+00:00
+kind|name|detail|extra
+event_trigger|graphql_watch_ddl|ddl_command_end|O
+event_trigger|graphql_watch_drop|sql_drop|O
+event_trigger|issue_graphql_placeholder|sql_drop|O
+event_trigger|issue_pg_cron_access|ddl_command_end|O
+event_trigger|issue_pg_graphql_access|ddl_command_end|O
+event_trigger|issue_pg_net_access|ddl_command_end|O
+event_trigger|pgrst_ddl_watch|ddl_command_end|O
+event_trigger|pgrst_drop_watch|sql_drop|O
+event_trigger|tm_protect_partitioned_tables|sql_drop|O
+extension|pg_graphql|1.5.11|
+extension|pg_stat_statements|1.11|
+extension|pgcrypto|1.3|
+extension|plpgsql|1.0|
+extension|supabase_vault|0.3.1|
+extension|uuid-ossp|1.1|
+function|tm_block_protected_drops||
+function|update_embeddings_timestamp||
+function|update_journal_entries_updated_at||
+function|update_push_subscriptions_updated_at||
+function|update_updated_at_column||
+function|update_user_profiles_updated_at||

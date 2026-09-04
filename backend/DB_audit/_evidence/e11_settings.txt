@@ -1,0 +1,17 @@
+# gathered 2026-09-04T10:45:42.087435+00:00
+server_version|17.6
+statement_timeout|2min
+idle_in_transaction_session_timeout|0
+max_connections|60
+shared_buffers|224MB
+work_mem|2184kB
+wal_level|logical
+archive_mode|on
+timezone|Asia/Kolkata
+default_transaction_isolation|read committed
+log_min_duration_statement|-1
+track_io_timing|off
+current_user|postgres
+current_database|postgres
+is_superuser|False
+now|2026-09-04 10:45:39.241596+00:00

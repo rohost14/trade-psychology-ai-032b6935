@@ -1,0 +1,262 @@
+# gathered 2026-09-04T10:45:39.851483+00:00
+table|name|type|definition|ondelete|onupdate|references
+admin_audit_log|admin_audit_log_pkey|b'p'|PRIMARY KEY (id)|b' '|b' '|-
+admin_login_events|admin_login_events_admin_id_fkey|b'f'|FOREIGN KEY (admin_id) REFERENCES admin_users(id) ON DELETE CASCADE|b'c'|b'a'|admin_users
+admin_login_events|admin_login_events_pkey|b'p'|PRIMARY KEY (id)|b' '|b' '|-
+admin_settings|admin_settings_pkey|b'p'|PRIMARY KEY (key)|b' '|b' '|-
+admin_users|admin_users_pkey|b'p'|PRIMARY KEY (id)|b' '|b' '|-
+admin_users|admin_users_email_key|b'u'|UNIQUE (email)|b' '|b' '|-
+alert_checkpoints|alert_checkpoints_alert_id_fkey|b'f'|FOREIGN KEY (alert_id) REFERENCES risk_alerts(id) ON DELETE CASCADE|b'c'|b'a'|risk_alerts
+alert_checkpoints|alert_checkpoints_broker_account_id_fkey|b'f'|FOREIGN KEY (broker_account_id) REFERENCES broker_accounts(id) ON DELETE CASCADE|b'c'|b'a'|broker_accounts
+alert_checkpoints|alert_checkpoints_pkey|b'p'|PRIMARY KEY (id)|b' '|b' '|-
+alert_mutes|alert_mutes_broker_account_id_fkey|b'f'|FOREIGN KEY (broker_account_id) REFERENCES broker_accounts(id) ON DELETE CASCADE|b'c'|b'a'|broker_accounts
+alert_mutes|alert_mutes_pkey|b'p'|PRIMARY KEY (broker_account_id, pattern_type)|b' '|b' '|-
+behavior_events|behavior_events_broker_account_id_fkey1|b'f'|FOREIGN KEY (broker_account_id) REFERENCES broker_accounts(id) ON DELETE CASCADE|b'c'|b'a'|broker_accounts
+behavior_events|behavior_events_risk_alert_id_fkey1|b'f'|FOREIGN KEY (risk_alert_id) REFERENCES risk_alerts(id) ON DELETE SET NULL|b'n'|b'a'|risk_alerts
+behavior_events|behavior_events_trigger_completed_trade_id_fkey1|b'f'|FOREIGN KEY (trigger_completed_trade_id) REFERENCES completed_trades(id) ON DELETE SET NULL|b'n'|b'a'|completed_trades
+behavior_events_default|behavior_events_broker_account_id_fkey1|b'f'|FOREIGN KEY (broker_account_id) REFERENCES broker_accounts(id) ON DELETE CASCADE|b'c'|b'a'|broker_accounts
+behavior_events_default|behavior_events_risk_alert_id_fkey1|b'f'|FOREIGN KEY (risk_alert_id) REFERENCES risk_alerts(id) ON DELETE SET NULL|b'n'|b'a'|risk_alerts
+behavior_events_default|behavior_events_trigger_completed_trade_id_fkey1|b'f'|FOREIGN KEY (trigger_completed_trade_id) REFERENCES completed_trades(id) ON DELETE SET NULL|b'n'|b'a'|completed_trades
+behavior_events_legacy|behavior_events_broker_account_id_fkey|b'f'|FOREIGN KEY (broker_account_id) REFERENCES broker_accounts(id) ON DELETE CASCADE|b'c'|b'a'|broker_accounts
+behavior_events_legacy|behavior_events_risk_alert_id_fkey|b'f'|FOREIGN KEY (risk_alert_id) REFERENCES risk_alerts(id) ON DELETE SET NULL|b'n'|b'a'|risk_alerts
+behavior_events_legacy|behavior_events_trigger_completed_trade_id_fkey|b'f'|FOREIGN KEY (trigger_completed_trade_id) REFERENCES completed_trades(id) ON DELETE SET NULL|b'n'|b'a'|completed_trades
+behavior_events_legacy|behavior_events_legacy_pkey|b'p'|PRIMARY KEY (id)|b' '|b' '|-
+behavior_events_y2026m07|behavior_events_broker_account_id_fkey1|b'f'|FOREIGN KEY (broker_account_id) REFERENCES broker_accounts(id) ON DELETE CASCADE|b'c'|b'a'|broker_accounts
+behavior_events_y2026m07|behavior_events_risk_alert_id_fkey1|b'f'|FOREIGN KEY (risk_alert_id) REFERENCES risk_alerts(id) ON DELETE SET NULL|b'n'|b'a'|risk_alerts
+behavior_events_y2026m07|behavior_events_trigger_completed_trade_id_fkey1|b'f'|FOREIGN KEY (trigger_completed_trade_id) REFERENCES completed_trades(id) ON DELETE SET NULL|b'n'|b'a'|completed_trades
+behavior_events_y2026m08|behavior_events_broker_account_id_fkey1|b'f'|FOREIGN KEY (broker_account_id) REFERENCES broker_accounts(id) ON DELETE CASCADE|b'c'|b'a'|broker_accounts
+behavior_events_y2026m08|behavior_events_risk_alert_id_fkey1|b'f'|FOREIGN KEY (risk_alert_id) REFERENCES risk_alerts(id) ON DELETE SET NULL|b'n'|b'a'|risk_alerts
+behavior_events_y2026m08|behavior_events_trigger_completed_trade_id_fkey1|b'f'|FOREIGN KEY (trigger_completed_trade_id) REFERENCES completed_trades(id) ON DELETE SET NULL|b'n'|b'a'|completed_trades
+behavior_events_y2026m09|behavior_events_broker_account_id_fkey1|b'f'|FOREIGN KEY (broker_account_id) REFERENCES broker_accounts(id) ON DELETE CASCADE|b'c'|b'a'|broker_accounts
+behavior_events_y2026m09|behavior_events_risk_alert_id_fkey1|b'f'|FOREIGN KEY (risk_alert_id) REFERENCES risk_alerts(id) ON DELETE SET NULL|b'n'|b'a'|risk_alerts
+behavior_events_y2026m09|behavior_events_trigger_completed_trade_id_fkey1|b'f'|FOREIGN KEY (trigger_completed_trade_id) REFERENCES completed_trades(id) ON DELETE SET NULL|b'n'|b'a'|completed_trades
+behavior_events_y2026m10|behavior_events_broker_account_id_fkey1|b'f'|FOREIGN KEY (broker_account_id) REFERENCES broker_accounts(id) ON DELETE CASCADE|b'c'|b'a'|broker_accounts
+behavior_events_y2026m10|behavior_events_risk_alert_id_fkey1|b'f'|FOREIGN KEY (risk_alert_id) REFERENCES risk_alerts(id) ON DELETE SET NULL|b'n'|b'a'|risk_alerts
+behavior_events_y2026m10|behavior_events_trigger_completed_trade_id_fkey1|b'f'|FOREIGN KEY (trigger_completed_trade_id) REFERENCES completed_trades(id) ON DELETE SET NULL|b'n'|b'a'|completed_trades
+behavior_events_y2026m11|behavior_events_broker_account_id_fkey1|b'f'|FOREIGN KEY (broker_account_id) REFERENCES broker_accounts(id) ON DELETE CASCADE|b'c'|b'a'|broker_accounts
+behavior_events_y2026m11|behavior_events_risk_alert_id_fkey1|b'f'|FOREIGN KEY (risk_alert_id) REFERENCES risk_alerts(id) ON DELETE SET NULL|b'n'|b'a'|risk_alerts
+behavior_events_y2026m11|behavior_events_trigger_completed_trade_id_fkey1|b'f'|FOREIGN KEY (trigger_completed_trade_id) REFERENCES completed_trades(id) ON DELETE SET NULL|b'n'|b'a'|completed_trades
+behavior_events_y2026m12|behavior_events_broker_account_id_fkey1|b'f'|FOREIGN KEY (broker_account_id) REFERENCES broker_accounts(id) ON DELETE CASCADE|b'c'|b'a'|broker_accounts
+behavior_events_y2026m12|behavior_events_risk_alert_id_fkey1|b'f'|FOREIGN KEY (risk_alert_id) REFERENCES risk_alerts(id) ON DELETE SET NULL|b'n'|b'a'|risk_alerts
+behavior_events_y2026m12|behavior_events_trigger_completed_trade_id_fkey1|b'f'|FOREIGN KEY (trigger_completed_trade_id) REFERENCES completed_trades(id) ON DELETE SET NULL|b'n'|b'a'|completed_trades
+behavior_events_y2027m01|behavior_events_broker_account_id_fkey1|b'f'|FOREIGN KEY (broker_account_id) REFERENCES broker_accounts(id) ON DELETE CASCADE|b'c'|b'a'|broker_accounts
+behavior_events_y2027m01|behavior_events_risk_alert_id_fkey1|b'f'|FOREIGN KEY (risk_alert_id) REFERENCES risk_alerts(id) ON DELETE SET NULL|b'n'|b'a'|risk_alerts
+behavior_events_y2027m01|behavior_events_trigger_completed_trade_id_fkey1|b'f'|FOREIGN KEY (trigger_completed_trade_id) REFERENCES completed_trades(id) ON DELETE SET NULL|b'n'|b'a'|completed_trades
+behavior_events_y2027m02|behavior_events_broker_account_id_fkey1|b'f'|FOREIGN KEY (broker_account_id) REFERENCES broker_accounts(id) ON DELETE CASCADE|b'c'|b'a'|broker_accounts
+behavior_events_y2027m02|behavior_events_risk_alert_id_fkey1|b'f'|FOREIGN KEY (risk_alert_id) REFERENCES risk_alerts(id) ON DELETE SET NULL|b'n'|b'a'|risk_alerts
+behavior_events_y2027m02|behavior_events_trigger_completed_trade_id_fkey1|b'f'|FOREIGN KEY (trigger_completed_trade_id) REFERENCES completed_trades(id) ON DELETE SET NULL|b'n'|b'a'|completed_trades
+behavior_events_y2027m03|behavior_events_broker_account_id_fkey1|b'f'|FOREIGN KEY (broker_account_id) REFERENCES broker_accounts(id) ON DELETE CASCADE|b'c'|b'a'|broker_accounts
+behavior_events_y2027m03|behavior_events_risk_alert_id_fkey1|b'f'|FOREIGN KEY (risk_alert_id) REFERENCES risk_alerts(id) ON DELETE SET NULL|b'n'|b'a'|risk_alerts
+behavior_events_y2027m03|behavior_events_trigger_completed_trade_id_fkey1|b'f'|FOREIGN KEY (trigger_completed_trade_id) REFERENCES completed_trades(id) ON DELETE SET NULL|b'n'|b'a'|completed_trades
+behavior_events_y2027m04|behavior_events_broker_account_id_fkey1|b'f'|FOREIGN KEY (broker_account_id) REFERENCES broker_accounts(id) ON DELETE CASCADE|b'c'|b'a'|broker_accounts
+behavior_events_y2027m04|behavior_events_risk_alert_id_fkey1|b'f'|FOREIGN KEY (risk_alert_id) REFERENCES risk_alerts(id) ON DELETE SET NULL|b'n'|b'a'|risk_alerts
+behavior_events_y2027m04|behavior_events_trigger_completed_trade_id_fkey1|b'f'|FOREIGN KEY (trigger_completed_trade_id) REFERENCES completed_trades(id) ON DELETE SET NULL|b'n'|b'a'|completed_trades
+behavior_events_y2027m05|behavior_events_broker_account_id_fkey1|b'f'|FOREIGN KEY (broker_account_id) REFERENCES broker_accounts(id) ON DELETE CASCADE|b'c'|b'a'|broker_accounts
+behavior_events_y2027m05|behavior_events_risk_alert_id_fkey1|b'f'|FOREIGN KEY (risk_alert_id) REFERENCES risk_alerts(id) ON DELETE SET NULL|b'n'|b'a'|risk_alerts
+behavior_events_y2027m05|behavior_events_trigger_completed_trade_id_fkey1|b'f'|FOREIGN KEY (trigger_completed_trade_id) REFERENCES completed_trades(id) ON DELETE SET NULL|b'n'|b'a'|completed_trades
+behavior_events_y2027m06|behavior_events_broker_account_id_fkey1|b'f'|FOREIGN KEY (broker_account_id) REFERENCES broker_accounts(id) ON DELETE CASCADE|b'c'|b'a'|broker_accounts
+behavior_events_y2027m06|behavior_events_risk_alert_id_fkey1|b'f'|FOREIGN KEY (risk_alert_id) REFERENCES risk_alerts(id) ON DELETE SET NULL|b'n'|b'a'|risk_alerts
+behavior_events_y2027m06|behavior_events_trigger_completed_trade_id_fkey1|b'f'|FOREIGN KEY (trigger_completed_trade_id) REFERENCES completed_trades(id) ON DELETE SET NULL|b'n'|b'a'|completed_trades
+behavior_events_y2027m07|behavior_events_broker_account_id_fkey1|b'f'|FOREIGN KEY (broker_account_id) REFERENCES broker_accounts(id) ON DELETE CASCADE|b'c'|b'a'|broker_accounts
+behavior_events_y2027m07|behavior_events_risk_alert_id_fkey1|b'f'|FOREIGN KEY (risk_alert_id) REFERENCES risk_alerts(id) ON DELETE SET NULL|b'n'|b'a'|risk_alerts
+behavior_events_y2027m07|behavior_events_trigger_completed_trade_id_fkey1|b'f'|FOREIGN KEY (trigger_completed_trade_id) REFERENCES completed_trades(id) ON DELETE SET NULL|b'n'|b'a'|completed_trades
+behavior_events_y2027m08|behavior_events_broker_account_id_fkey1|b'f'|FOREIGN KEY (broker_account_id) REFERENCES broker_accounts(id) ON DELETE CASCADE|b'c'|b'a'|broker_accounts
+behavior_events_y2027m08|behavior_events_risk_alert_id_fkey1|b'f'|FOREIGN KEY (risk_alert_id) REFERENCES risk_alerts(id) ON DELETE SET NULL|b'n'|b'a'|risk_alerts
+behavior_events_y2027m08|behavior_events_trigger_completed_trade_id_fkey1|b'f'|FOREIGN KEY (trigger_completed_trade_id) REFERENCES completed_trades(id) ON DELETE SET NULL|b'n'|b'a'|completed_trades
+behavior_events_y2027m09|behavior_events_broker_account_id_fkey1|b'f'|FOREIGN KEY (broker_account_id) REFERENCES broker_accounts(id) ON DELETE CASCADE|b'c'|b'a'|broker_accounts
+behavior_events_y2027m09|behavior_events_risk_alert_id_fkey1|b'f'|FOREIGN KEY (risk_alert_id) REFERENCES risk_alerts(id) ON DELETE SET NULL|b'n'|b'a'|risk_alerts
+behavior_events_y2027m09|behavior_events_trigger_completed_trade_id_fkey1|b'f'|FOREIGN KEY (trigger_completed_trade_id) REFERENCES completed_trades(id) ON DELETE SET NULL|b'n'|b'a'|completed_trades
+behavior_events_y2027m10|behavior_events_broker_account_id_fkey1|b'f'|FOREIGN KEY (broker_account_id) REFERENCES broker_accounts(id) ON DELETE CASCADE|b'c'|b'a'|broker_accounts
+behavior_events_y2027m10|behavior_events_risk_alert_id_fkey1|b'f'|FOREIGN KEY (risk_alert_id) REFERENCES risk_alerts(id) ON DELETE SET NULL|b'n'|b'a'|risk_alerts
+behavior_events_y2027m10|behavior_events_trigger_completed_trade_id_fkey1|b'f'|FOREIGN KEY (trigger_completed_trade_id) REFERENCES completed_trades(id) ON DELETE SET NULL|b'n'|b'a'|completed_trades
+behavior_events_y2027m11|behavior_events_broker_account_id_fkey1|b'f'|FOREIGN KEY (broker_account_id) REFERENCES broker_accounts(id) ON DELETE CASCADE|b'c'|b'a'|broker_accounts
+behavior_events_y2027m11|behavior_events_risk_alert_id_fkey1|b'f'|FOREIGN KEY (risk_alert_id) REFERENCES risk_alerts(id) ON DELETE SET NULL|b'n'|b'a'|risk_alerts
+behavior_events_y2027m11|behavior_events_trigger_completed_trade_id_fkey1|b'f'|FOREIGN KEY (trigger_completed_trade_id) REFERENCES completed_trades(id) ON DELETE SET NULL|b'n'|b'a'|completed_trades
+behavior_events_y2027m12|behavior_events_broker_account_id_fkey1|b'f'|FOREIGN KEY (broker_account_id) REFERENCES broker_accounts(id) ON DELETE CASCADE|b'c'|b'a'|broker_accounts
+behavior_events_y2027m12|behavior_events_risk_alert_id_fkey1|b'f'|FOREIGN KEY (risk_alert_id) REFERENCES risk_alerts(id) ON DELETE SET NULL|b'n'|b'a'|risk_alerts
+behavior_events_y2027m12|behavior_events_trigger_completed_trade_id_fkey1|b'f'|FOREIGN KEY (trigger_completed_trade_id) REFERENCES completed_trades(id) ON DELETE SET NULL|b'n'|b'a'|completed_trades
+behavioral_events|behavioral_events_confidence_check|b'c'|CHECK ((confidence >= 0.70))|b' '|b' '|-
+behavioral_events|behavioral_events_broker_account_id_fkey|b'f'|FOREIGN KEY (broker_account_id) REFERENCES broker_accounts(id) ON DELETE CASCADE|b'c'|b'a'|broker_accounts
+behavioral_events|behavioral_events_session_id_fkey|b'f'|FOREIGN KEY (session_id) REFERENCES trading_sessions(id) ON DELETE SET NULL|b'n'|b'a'|trading_sessions
+behavioral_events|behavioral_events_trigger_trade_id_fkey|b'f'|FOREIGN KEY (trigger_trade_id) REFERENCES trades(id)|b'a'|b'a'|trades
+behavioral_events|behavioral_events_pkey|b'p'|PRIMARY KEY (id)|b' '|b' '|-
+broadcast_logs|broadcast_logs_pkey|b'p'|PRIMARY KEY (id)|b' '|b' '|-
+broadcast_receipts|broadcast_receipts_broadcast_id_fkey|b'f'|FOREIGN KEY (broadcast_id) REFERENCES broadcast_logs(id) ON DELETE CASCADE|b'c'|b'a'|broadcast_logs
+broadcast_receipts|broadcast_receipts_pkey|b'p'|PRIMARY KEY (id)|b' '|b' '|-
+broker_accounts|fk_broker_accounts_user|b'f'|FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE|b'c'|b'a'|users
+broker_accounts|broker_accounts_pkey|b'p'|PRIMARY KEY (id)|b' '|b' '|-
+coach_sessions|coach_sessions_broker_account_id_fkey|b'f'|FOREIGN KEY (broker_account_id) REFERENCES broker_accounts(id) ON DELETE CASCADE|b'c'|b'a'|broker_accounts
+coach_sessions|coach_sessions_pkey|b'p'|PRIMARY KEY (id)|b' '|b' '|-
+commitment_logs|commitment_logs_broker_account_id_fkey|b'f'|FOREIGN KEY (broker_account_id) REFERENCES broker_accounts(id) ON DELETE CASCADE|b'c'|b'a'|broker_accounts
+commitment_logs|commitment_logs_pkey|b'p'|PRIMARY KEY (id)|b' '|b' '|-
+completed_trade_features|completed_trade_features_broker_account_id_fkey|b'f'|FOREIGN KEY (broker_account_id) REFERENCES broker_accounts(id) ON DELETE CASCADE|b'c'|b'a'|broker_accounts
+completed_trade_features|completed_trade_features_completed_trade_id_fkey|b'f'|FOREIGN KEY (completed_trade_id) REFERENCES completed_trades(id) ON DELETE CASCADE|b'c'|b'a'|completed_trades
+completed_trade_features|completed_trade_features_pkey|b'p'|PRIMARY KEY (id)|b' '|b' '|-
+completed_trades|completed_trades_broker_account_id_fkey|b'f'|FOREIGN KEY (broker_account_id) REFERENCES broker_accounts(id) ON DELETE CASCADE|b'c'|b'a'|broker_accounts
+completed_trades|completed_trades_pkey|b'p'|PRIMARY KEY (id)|b' '|b' '|-
+constitution_history|constitution_history_broker_fk|b'f'|FOREIGN KEY (broker_account_id) REFERENCES broker_accounts(id) ON DELETE CASCADE|b'c'|b'a'|broker_accounts
+constitution_history|constitution_history_pkey|b'p'|PRIMARY KEY (id)|b' '|b' '|-
+cooldowns|cooldowns_broker_account_id_fkey|b'f'|FOREIGN KEY (broker_account_id) REFERENCES broker_accounts(id) ON DELETE CASCADE|b'c'|b'a'|broker_accounts
+cooldowns|cooldowns_pkey|b'p'|PRIMARY KEY (id)|b' '|b' '|-
+data_quality_events|data_quality_events_broker_account_id_fkey|b'f'|FOREIGN KEY (broker_account_id) REFERENCES broker_accounts(id) ON DELETE CASCADE|b'c'|b'a'|broker_accounts
+data_quality_events|data_quality_events_pkey|b'p'|PRIMARY KEY (id)|b' '|b' '|-
+detector_flags|detector_flags_mode_chk|b'c'|CHECK ((mode = ANY (ARRAY['off'::text, 'shadow'::text, 'canary'::text, 'on'::text])))|b' '|b' '|-
+detector_flags|detector_flags_rollout_chk|b'c'|CHECK (((rollout_pct >= 0) AND (rollout_pct <= 100)))|b' '|b' '|-
+detector_flags|detector_flags_pkey|b'p'|PRIMARY KEY (detector)|b' '|b' '|-
+discipline_scores|discipline_scores_broker_account_id_fkey|b'f'|FOREIGN KEY (broker_account_id) REFERENCES broker_accounts(id) ON DELETE CASCADE|b'c'|b'a'|broker_accounts
+discipline_scores|discipline_scores_pkey|b'p'|PRIMARY KEY (id)|b' '|b' '|-
+discipline_scores|discipline_scores_broker_account_id_week_start_key|b'u'|UNIQUE (broker_account_id, week_start)|b' '|b' '|-
+discipline_streaks|discipline_streaks_broker_account_id_fkey|b'f'|FOREIGN KEY (broker_account_id) REFERENCES broker_accounts(id) ON DELETE CASCADE|b'c'|b'a'|broker_accounts
+discipline_streaks|discipline_streaks_pkey|b'p'|PRIMARY KEY (id)|b' '|b' '|-
+discipline_streaks|discipline_streaks_broker_account_id_streak_type_key|b'u'|UNIQUE (broker_account_id, streak_type)|b' '|b' '|-
+generated_reports|generated_reports_broker_account_id_fkey|b'f'|FOREIGN KEY (broker_account_id) REFERENCES broker_accounts(id) ON DELETE CASCADE|b'c'|b'a'|broker_accounts
+generated_reports|generated_reports_pkey|b'p'|PRIMARY KEY (id)|b' '|b' '|-
+gtt_tracking|gtt_tracking_broker_account_id_fkey|b'f'|FOREIGN KEY (broker_account_id) REFERENCES broker_accounts(id) ON DELETE CASCADE|b'c'|b'a'|broker_accounts
+gtt_tracking|gtt_tracking_pkey|b'p'|PRIMARY KEY (id)|b' '|b' '|-
+gtt_tracking|gtt_tracking_broker_account_id_gtt_id_key|b'u'|UNIQUE (broker_account_id, gtt_id)|b' '|b' '|-
+guardrail_rules|guardrail_rules_broker_account_id_fkey|b'f'|FOREIGN KEY (broker_account_id) REFERENCES broker_accounts(id) ON DELETE CASCADE|b'c'|b'a'|broker_accounts
+guardrail_rules|guardrail_rules_pkey|b'p'|PRIMARY KEY (id)|b' '|b' '|-
+holdings|holdings_broker_account_id_fkey|b'f'|FOREIGN KEY (broker_account_id) REFERENCES broker_accounts(id) ON DELETE CASCADE|b'c'|b'a'|broker_accounts
+holdings|holdings_pkey|b'p'|PRIMARY KEY (id)|b' '|b' '|-
+holdings|uq_holdings_account_symbol|b'u'|UNIQUE (broker_account_id, tradingsymbol, exchange)|b' '|b' '|-
+incomplete_positions|incomplete_positions_broker_account_id_fkey|b'f'|FOREIGN KEY (broker_account_id) REFERENCES broker_accounts(id) ON DELETE CASCADE|b'c'|b'a'|broker_accounts
+incomplete_positions|incomplete_positions_pkey|b'p'|PRIMARY KEY (id)|b' '|b' '|-
+instruments|instruments_pkey|b'p'|PRIMARY KEY (id)|b' '|b' '|-
+instruments|instruments_instrument_token_key|b'u'|UNIQUE (instrument_token)|b' '|b' '|-
+instruments|uq_instruments_exchange_symbol|b'u'|UNIQUE (exchange, tradingsymbol)|b' '|b' '|-
+journal_entries|journal_entries_setup_quality_check|b'c'|CHECK (((setup_quality >= 1) AND (setup_quality <= 5)))|b' '|b' '|-
+journal_entries|journal_entries_broker_account_id_fkey|b'f'|FOREIGN KEY (broker_account_id) REFERENCES broker_accounts(id) ON DELETE CASCADE|b'c'|b'a'|broker_accounts
+journal_entries|journal_entries_pkey|b'p'|PRIMARY KEY (id)|b' '|b' '|-
+margin_snapshots|margin_snapshots_broker_account_id_fkey|b'f'|FOREIGN KEY (broker_account_id) REFERENCES broker_accounts(id) ON DELETE CASCADE|b'c'|b'a'|broker_accounts
+margin_snapshots|margin_snapshots_pkey|b'p'|PRIMARY KEY (id)|b' '|b' '|-
+monthly_snapshots|monthly_snapshots_broker_account_id_fkey|b'f'|FOREIGN KEY (broker_account_id) REFERENCES broker_accounts(id) ON DELETE CASCADE|b'c'|b'a'|broker_accounts
+monthly_snapshots|monthly_snapshots_pkey|b'p'|PRIMARY KEY (id)|b' '|b' '|-
+monthly_snapshots|uq_monthly_snapshot_account_month|b'u'|UNIQUE (broker_account_id, month)|b' '|b' '|-
+oauth_temp_store|oauth_temp_store_pkey|b'p'|PRIMARY KEY (key)|b' '|b' '|-
+orders|orders_broker_account_id_fkey|b'f'|FOREIGN KEY (broker_account_id) REFERENCES broker_accounts(id) ON DELETE CASCADE|b'c'|b'a'|broker_accounts
+orders|orders_pkey|b'p'|PRIMARY KEY (id, order_timestamp)|b' '|b' '|-
+orders|uq_orders_account_kite_id|b'u'|UNIQUE (broker_account_id, kite_order_id, order_timestamp)|b' '|b' '|-
+orders_default|orders_broker_account_id_fkey|b'f'|FOREIGN KEY (broker_account_id) REFERENCES broker_accounts(id) ON DELETE CASCADE|b'c'|b'a'|broker_accounts
+orders_default|orders_default_pkey|b'p'|PRIMARY KEY (id, order_timestamp)|b' '|b' '|-
+orders_default|orders_default_broker_account_id_kite_order_id_order_timest_key|b'u'|UNIQUE (broker_account_id, kite_order_id, order_timestamp)|b' '|b' '|-
+orders_y2026m02|orders_broker_account_id_fkey|b'f'|FOREIGN KEY (broker_account_id) REFERENCES broker_accounts(id) ON DELETE CASCADE|b'c'|b'a'|broker_accounts
+orders_y2026m02|orders_y2026m02_pkey|b'p'|PRIMARY KEY (id, order_timestamp)|b' '|b' '|-
+orders_y2026m02|orders_y2026m02_broker_account_id_kite_order_id_order_times_key|b'u'|UNIQUE (broker_account_id, kite_order_id, order_timestamp)|b' '|b' '|-
+orders_y2026m03|orders_broker_account_id_fkey|b'f'|FOREIGN KEY (broker_account_id) REFERENCES broker_accounts(id) ON DELETE CASCADE|b'c'|b'a'|broker_accounts
+orders_y2026m03|orders_y2026m03_pkey|b'p'|PRIMARY KEY (id, order_timestamp)|b' '|b' '|-
+orders_y2026m03|orders_y2026m03_broker_account_id_kite_order_id_order_times_key|b'u'|UNIQUE (broker_account_id, kite_order_id, order_timestamp)|b' '|b' '|-
+orders_y2026m04|orders_broker_account_id_fkey|b'f'|FOREIGN KEY (broker_account_id) REFERENCES broker_accounts(id) ON DELETE CASCADE|b'c'|b'a'|broker_accounts
+orders_y2026m04|orders_y2026m04_pkey|b'p'|PRIMARY KEY (id, order_timestamp)|b' '|b' '|-
+orders_y2026m04|orders_y2026m04_broker_account_id_kite_order_id_order_times_key|b'u'|UNIQUE (broker_account_id, kite_order_id, order_timestamp)|b' '|b' '|-
+orders_y2026m05|orders_broker_account_id_fkey|b'f'|FOREIGN KEY (broker_account_id) REFERENCES broker_accounts(id) ON DELETE CASCADE|b'c'|b'a'|broker_accounts
+orders_y2026m05|orders_y2026m05_pkey|b'p'|PRIMARY KEY (id, order_timestamp)|b' '|b' '|-
+orders_y2026m05|orders_y2026m05_broker_account_id_kite_order_id_order_times_key|b'u'|UNIQUE (broker_account_id, kite_order_id, order_timestamp)|b' '|b' '|-
+orders_y2026m06|orders_broker_account_id_fkey|b'f'|FOREIGN KEY (broker_account_id) REFERENCES broker_accounts(id) ON DELETE CASCADE|b'c'|b'a'|broker_accounts
+orders_y2026m06|orders_y2026m06_pkey|b'p'|PRIMARY KEY (id, order_timestamp)|b' '|b' '|-
+orders_y2026m06|orders_y2026m06_broker_account_id_kite_order_id_order_times_key|b'u'|UNIQUE (broker_account_id, kite_order_id, order_timestamp)|b' '|b' '|-
+orders_y2026m07|orders_broker_account_id_fkey|b'f'|FOREIGN KEY (broker_account_id) REFERENCES broker_accounts(id) ON DELETE CASCADE|b'c'|b'a'|broker_accounts
+orders_y2026m07|orders_y2026m07_pkey|b'p'|PRIMARY KEY (id, order_timestamp)|b' '|b' '|-
+orders_y2026m07|orders_y2026m07_broker_account_id_kite_order_id_order_times_key|b'u'|UNIQUE (broker_account_id, kite_order_id, order_timestamp)|b' '|b' '|-
+orders_y2026m08|orders_broker_account_id_fkey|b'f'|FOREIGN KEY (broker_account_id) REFERENCES broker_accounts(id) ON DELETE CASCADE|b'c'|b'a'|broker_accounts
+orders_y2026m08|orders_y2026m08_pkey|b'p'|PRIMARY KEY (id, order_timestamp)|b' '|b' '|-
+orders_y2026m08|orders_y2026m08_broker_account_id_kite_order_id_order_times_key|b'u'|UNIQUE (broker_account_id, kite_order_id, order_timestamp)|b' '|b' '|-
+orders_y2026m09|orders_broker_account_id_fkey|b'f'|FOREIGN KEY (broker_account_id) REFERENCES broker_accounts(id) ON DELETE CASCADE|b'c'|b'a'|broker_accounts
+orders_y2026m09|orders_y2026m09_pkey|b'p'|PRIMARY KEY (id, order_timestamp)|b' '|b' '|-
+orders_y2026m09|orders_y2026m09_broker_account_id_kite_order_id_order_times_key|b'u'|UNIQUE (broker_account_id, kite_order_id, order_timestamp)|b' '|b' '|-
+orders_y2026m10|orders_broker_account_id_fkey|b'f'|FOREIGN KEY (broker_account_id) REFERENCES broker_accounts(id) ON DELETE CASCADE|b'c'|b'a'|broker_accounts
+orders_y2026m10|orders_y2026m10_pkey|b'p'|PRIMARY KEY (id, order_timestamp)|b' '|b' '|-
+orders_y2026m10|orders_y2026m10_broker_account_id_kite_order_id_order_times_key|b'u'|UNIQUE (broker_account_id, kite_order_id, order_timestamp)|b' '|b' '|-
+orders_y2026m11|orders_broker_account_id_fkey|b'f'|FOREIGN KEY (broker_account_id) REFERENCES broker_accounts(id) ON DELETE CASCADE|b'c'|b'a'|broker_accounts
+orders_y2026m11|orders_y2026m11_pkey|b'p'|PRIMARY KEY (id, order_timestamp)|b' '|b' '|-
+orders_y2026m11|orders_y2026m11_broker_account_id_kite_order_id_order_times_key|b'u'|UNIQUE (broker_account_id, kite_order_id, order_timestamp)|b' '|b' '|-
+orders_y2026m12|orders_broker_account_id_fkey|b'f'|FOREIGN KEY (broker_account_id) REFERENCES broker_accounts(id) ON DELETE CASCADE|b'c'|b'a'|broker_accounts
+orders_y2026m12|orders_y2026m12_pkey|b'p'|PRIMARY KEY (id, order_timestamp)|b' '|b' '|-
+orders_y2026m12|orders_y2026m12_broker_account_id_kite_order_id_order_times_key|b'u'|UNIQUE (broker_account_id, kite_order_id, order_timestamp)|b' '|b' '|-
+orders_y2027m01|orders_broker_account_id_fkey|b'f'|FOREIGN KEY (broker_account_id) REFERENCES broker_accounts(id) ON DELETE CASCADE|b'c'|b'a'|broker_accounts
+orders_y2027m01|orders_y2027m01_pkey|b'p'|PRIMARY KEY (id, order_timestamp)|b' '|b' '|-
+orders_y2027m01|orders_y2027m01_broker_account_id_kite_order_id_order_times_key|b'u'|UNIQUE (broker_account_id, kite_order_id, order_timestamp)|b' '|b' '|-
+orders_y2027m02|orders_broker_account_id_fkey|b'f'|FOREIGN KEY (broker_account_id) REFERENCES broker_accounts(id) ON DELETE CASCADE|b'c'|b'a'|broker_accounts
+orders_y2027m02|orders_y2027m02_pkey|b'p'|PRIMARY KEY (id, order_timestamp)|b' '|b' '|-
+orders_y2027m02|orders_y2027m02_broker_account_id_kite_order_id_order_times_key|b'u'|UNIQUE (broker_account_id, kite_order_id, order_timestamp)|b' '|b' '|-
+orders_y2027m03|orders_broker_account_id_fkey|b'f'|FOREIGN KEY (broker_account_id) REFERENCES broker_accounts(id) ON DELETE CASCADE|b'c'|b'a'|broker_accounts
+orders_y2027m03|orders_y2027m03_pkey|b'p'|PRIMARY KEY (id, order_timestamp)|b' '|b' '|-
+orders_y2027m03|orders_y2027m03_broker_account_id_kite_order_id_order_times_key|b'u'|UNIQUE (broker_account_id, kite_order_id, order_timestamp)|b' '|b' '|-
+orders_y2027m04|orders_broker_account_id_fkey|b'f'|FOREIGN KEY (broker_account_id) REFERENCES broker_accounts(id) ON DELETE CASCADE|b'c'|b'a'|broker_accounts
+orders_y2027m04|orders_y2027m04_pkey|b'p'|PRIMARY KEY (id, order_timestamp)|b' '|b' '|-
+orders_y2027m04|orders_y2027m04_broker_account_id_kite_order_id_order_times_key|b'u'|UNIQUE (broker_account_id, kite_order_id, order_timestamp)|b' '|b' '|-
+orders_y2027m05|orders_broker_account_id_fkey|b'f'|FOREIGN KEY (broker_account_id) REFERENCES broker_accounts(id) ON DELETE CASCADE|b'c'|b'a'|broker_accounts
+orders_y2027m05|orders_y2027m05_pkey|b'p'|PRIMARY KEY (id, order_timestamp)|b' '|b' '|-
+orders_y2027m05|orders_y2027m05_broker_account_id_kite_order_id_order_times_key|b'u'|UNIQUE (broker_account_id, kite_order_id, order_timestamp)|b' '|b' '|-
+orders_y2027m06|orders_broker_account_id_fkey|b'f'|FOREIGN KEY (broker_account_id) REFERENCES broker_accounts(id) ON DELETE CASCADE|b'c'|b'a'|broker_accounts
+orders_y2027m06|orders_y2027m06_pkey|b'p'|PRIMARY KEY (id, order_timestamp)|b' '|b' '|-
+orders_y2027m06|orders_y2027m06_broker_account_id_kite_order_id_order_times_key|b'u'|UNIQUE (broker_account_id, kite_order_id, order_timestamp)|b' '|b' '|-
+orders_y2027m07|orders_broker_account_id_fkey|b'f'|FOREIGN KEY (broker_account_id) REFERENCES broker_accounts(id) ON DELETE CASCADE|b'c'|b'a'|broker_accounts
+orders_y2027m07|orders_y2027m07_pkey|b'p'|PRIMARY KEY (id, order_timestamp)|b' '|b' '|-
+orders_y2027m07|orders_y2027m07_broker_account_id_kite_order_id_order_times_key|b'u'|UNIQUE (broker_account_id, kite_order_id, order_timestamp)|b' '|b' '|-
+orders_y2027m08|orders_broker_account_id_fkey|b'f'|FOREIGN KEY (broker_account_id) REFERENCES broker_accounts(id) ON DELETE CASCADE|b'c'|b'a'|broker_accounts
+orders_y2027m08|orders_y2027m08_pkey|b'p'|PRIMARY KEY (id, order_timestamp)|b' '|b' '|-
+orders_y2027m08|orders_y2027m08_broker_account_id_kite_order_id_order_times_key|b'u'|UNIQUE (broker_account_id, kite_order_id, order_timestamp)|b' '|b' '|-
+orders_y2027m09|orders_broker_account_id_fkey|b'f'|FOREIGN KEY (broker_account_id) REFERENCES broker_accounts(id) ON DELETE CASCADE|b'c'|b'a'|broker_accounts
+orders_y2027m09|orders_y2027m09_pkey|b'p'|PRIMARY KEY (id, order_timestamp)|b' '|b' '|-
+orders_y2027m09|orders_y2027m09_broker_account_id_kite_order_id_order_times_key|b'u'|UNIQUE (broker_account_id, kite_order_id, order_timestamp)|b' '|b' '|-
+orders_y2027m10|orders_broker_account_id_fkey|b'f'|FOREIGN KEY (broker_account_id) REFERENCES broker_accounts(id) ON DELETE CASCADE|b'c'|b'a'|broker_accounts
+orders_y2027m10|orders_y2027m10_pkey|b'p'|PRIMARY KEY (id, order_timestamp)|b' '|b' '|-
+orders_y2027m10|orders_y2027m10_broker_account_id_kite_order_id_order_times_key|b'u'|UNIQUE (broker_account_id, kite_order_id, order_timestamp)|b' '|b' '|-
+orders_y2027m11|orders_broker_account_id_fkey|b'f'|FOREIGN KEY (broker_account_id) REFERENCES broker_accounts(id) ON DELETE CASCADE|b'c'|b'a'|broker_accounts
+orders_y2027m11|orders_y2027m11_pkey|b'p'|PRIMARY KEY (id, order_timestamp)|b' '|b' '|-
+orders_y2027m11|orders_y2027m11_broker_account_id_kite_order_id_order_times_key|b'u'|UNIQUE (broker_account_id, kite_order_id, order_timestamp)|b' '|b' '|-
+orders_y2027m12|orders_broker_account_id_fkey|b'f'|FOREIGN KEY (broker_account_id) REFERENCES broker_accounts(id) ON DELETE CASCADE|b'c'|b'a'|broker_accounts
+orders_y2027m12|orders_y2027m12_pkey|b'p'|PRIMARY KEY (id, order_timestamp)|b' '|b' '|-
+orders_y2027m12|orders_y2027m12_broker_account_id_kite_order_id_order_times_key|b'u'|UNIQUE (broker_account_id, kite_order_id, order_timestamp)|b' '|b' '|-
+portfolio_chat_sessions|portfolio_chat_sessions_broker_account_id_fkey|b'f'|FOREIGN KEY (broker_account_id) REFERENCES broker_accounts(id) ON DELETE CASCADE|b'c'|b'a'|broker_accounts
+portfolio_chat_sessions|portfolio_chat_sessions_pkey|b'p'|PRIMARY KEY (id)|b' '|b' '|-
+position_alerts_sent|position_alerts_sent_broker_account_id_fkey|b'f'|FOREIGN KEY (broker_account_id) REFERENCES broker_accounts(id) ON DELETE CASCADE|b'c'|b'a'|broker_accounts
+position_alerts_sent|position_alerts_sent_pkey|b'p'|PRIMARY KEY (id)|b' '|b' '|-
+position_ledger|fk_position_ledger_session|b'f'|FOREIGN KEY (session_id) REFERENCES trading_sessions(id) ON DELETE SET NULL|b'n'|b'a'|trading_sessions
+position_ledger|position_ledger_broker_account_id_fkey|b'f'|FOREIGN KEY (broker_account_id) REFERENCES broker_accounts(id) ON DELETE CASCADE|b'c'|b'a'|broker_accounts
+position_ledger|position_ledger_pkey|b'p'|PRIMARY KEY (id)|b' '|b' '|-
+position_ledger|position_ledger_idempotency_key_key|b'u'|UNIQUE (idempotency_key)|b' '|b' '|-
+position_margin_observations|position_margin_observations_broker_account_id_fkey|b'f'|FOREIGN KEY (broker_account_id) REFERENCES broker_accounts(id) ON DELETE CASCADE|b'c'|b'a'|broker_accounts
+position_margin_observations|position_margin_observations_pkey|b'p'|PRIMARY KEY (id)|b' '|b' '|-
+positions|positions_broker_account_id_fkey|b'f'|FOREIGN KEY (broker_account_id) REFERENCES broker_accounts(id) ON DELETE CASCADE|b'c'|b'a'|broker_accounts
+positions|positions_pkey|b'p'|PRIMARY KEY (id)|b' '|b' '|-
+positions|uq_position_account_symbol_exchange_product|b'u'|UNIQUE (broker_account_id, tradingsymbol, exchange, product)|b' '|b' '|-
+push_subscriptions|push_subscriptions_broker_account_id_fkey|b'f'|FOREIGN KEY (broker_account_id) REFERENCES broker_accounts(id) ON DELETE CASCADE|b'c'|b'a'|broker_accounts
+push_subscriptions|push_subscriptions_pkey|b'p'|PRIMARY KEY (id)|b' '|b' '|-
+push_subscriptions|push_subscriptions_endpoint_key|b'u'|UNIQUE (endpoint)|b' '|b' '|-
+risk_alerts|risk_alerts_lifecycle_check|b'c'|CHECK ((lifecycle = ANY (ARRAY['live'::text, 'post'::text])))|b' '|b' '|-
+risk_alerts|risk_alerts_outcome_chk|b'c'|CHECK (((outcome IS NULL) OR (outcome = ANY (ARRAY['stopped'::text, 'took_anyway'::text, 'not_useful'::text, 'planned'::text]))))|b' '|b' '|-
+risk_alerts|fk_risk_alerts_trigger_trade|b'f'|FOREIGN KEY (trigger_trade_id) REFERENCES trades(id) ON DELETE SET NULL|b'n'|b'a'|trades
+risk_alerts|risk_alerts_broker_account_id_fkey|b'f'|FOREIGN KEY (broker_account_id) REFERENCES broker_accounts(id) ON DELETE CASCADE|b'c'|b'a'|broker_accounts
+risk_alerts|risk_alerts_trigger_completed_trade_id_fkey|b'f'|FOREIGN KEY (trigger_completed_trade_id) REFERENCES completed_trades(id) ON DELETE SET NULL|b'n'|b'a'|completed_trades
+risk_alerts|risk_alerts_pkey|b'p'|PRIMARY KEY (id)|b' '|b' '|-
+schema_migrations|schema_migrations_pkey|b'p'|PRIMARY KEY (filename)|b' '|b' '|-
+shadow_behavioral_events|shadow_behavioral_events_broker_account_id_fkey|b'f'|FOREIGN KEY (broker_account_id) REFERENCES broker_accounts(id) ON DELETE CASCADE|b'c'|b'a'|broker_accounts
+shadow_behavioral_events|shadow_behavioral_events_trigger_session_id_fkey|b'f'|FOREIGN KEY (trigger_session_id) REFERENCES trading_sessions(id) ON DELETE SET NULL|b'n'|b'a'|trading_sessions
+shadow_behavioral_events|shadow_behavioral_events_pkey|b'p'|PRIMARY KEY (id)|b' '|b' '|-
+strategy_group_legs|strategy_group_legs_completed_trade_id_fkey|b'f'|FOREIGN KEY (completed_trade_id) REFERENCES completed_trades(id) ON DELETE CASCADE|b'c'|b'a'|completed_trades
+strategy_group_legs|strategy_group_legs_strategy_group_id_fkey|b'f'|FOREIGN KEY (strategy_group_id) REFERENCES strategy_groups(id) ON DELETE CASCADE|b'c'|b'a'|strategy_groups
+strategy_group_legs|strategy_group_legs_pkey|b'p'|PRIMARY KEY (id)|b' '|b' '|-
+strategy_group_legs|strategy_group_legs_completed_trade_id_key|b'u'|UNIQUE (completed_trade_id)|b' '|b' '|-
+strategy_groups|strategy_groups_broker_account_id_fkey|b'f'|FOREIGN KEY (broker_account_id) REFERENCES broker_accounts(id) ON DELETE CASCADE|b'c'|b'a'|broker_accounts
+strategy_groups|strategy_groups_pkey|b'p'|PRIMARY KEY (id)|b' '|b' '|-
+streak_data|streak_data_broker_account_id_fkey|b'f'|FOREIGN KEY (broker_account_id) REFERENCES broker_accounts(id) ON DELETE CASCADE|b'c'|b'a'|broker_accounts
+streak_data|streak_data_pkey|b'p'|PRIMARY KEY (id)|b' '|b' '|-
+streak_data|streak_data_broker_account_id_key|b'u'|UNIQUE (broker_account_id)|b' '|b' '|-
+trades|trades_broker_account_id_fkey|b'f'|FOREIGN KEY (broker_account_id) REFERENCES broker_accounts(id) ON DELETE CASCADE|b'c'|b'a'|broker_accounts
+trades|trades_pkey|b'p'|PRIMARY KEY (id)|b' '|b' '|-
+trading_goals|trading_goals_broker_account_id_fkey|b'f'|FOREIGN KEY (broker_account_id) REFERENCES broker_accounts(id) ON DELETE CASCADE|b'c'|b'a'|broker_accounts
+trading_goals|trading_goals_pkey|b'p'|PRIMARY KEY (id)|b' '|b' '|-
+trading_goals|trading_goals_broker_account_id_key|b'u'|UNIQUE (broker_account_id)|b' '|b' '|-
+trading_sessions|chk_session_state|b'c'|CHECK ((session_state = ANY (ARRAY['normal'::text, 'caution'::text, 'danger'::text, 'blowup'::text])))|b' '|b' '|-
+trading_sessions|ck_trading_sessions_risk_denominator_quality|b'c'|CHECK (((risk_denominator_quality IS NULL) OR (risk_denominator_quality = ANY (ARRAY['GOOD'::text, 'PARTIAL'::text, 'UNKNOWN'::text]))))|b' '|b' '|-
+trading_sessions|ck_trading_sessions_risk_denominator_source|b'c'|CHECK (((risk_denominator_source IS NULL) OR (risk_denominator_source = ANY (ARRAY['opening_balance'::text, 'opening_balance_stale'::text, 'declared_capital'::text]))))|b' '|b' '|-
+trading_sessions|trading_sessions_broker_account_id_fkey|b'f'|FOREIGN KEY (broker_account_id) REFERENCES broker_accounts(id) ON DELETE CASCADE|b'c'|b'a'|broker_accounts
+trading_sessions|trading_sessions_pkey|b'p'|PRIMARY KEY (id)|b' '|b' '|-
+trading_sessions|trading_sessions_broker_account_id_session_date_key|b'u'|UNIQUE (broker_account_id, session_date)|b' '|b' '|-
+trading_sessions|uq_trading_session_account_date|b'u'|UNIQUE (broker_account_id, session_date)|b' '|b' '|-
+user_profiles|user_profiles_broker_account_id_fkey|b'f'|FOREIGN KEY (broker_account_id) REFERENCES broker_accounts(id) ON DELETE CASCADE|b'c'|b'a'|broker_accounts
+user_profiles|user_profiles_pkey|b'p'|PRIMARY KEY (id)|b' '|b' '|-
+user_profiles|user_profiles_broker_account_id_key|b'u'|UNIQUE (broker_account_id)|b' '|b' '|-
+users|users_pkey|b'p'|PRIMARY KEY (id)|b' '|b' '|-
+users|users_email_key|b'u'|UNIQUE (email)|b' '|b' '|-

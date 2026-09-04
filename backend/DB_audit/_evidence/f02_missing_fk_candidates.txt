@@ -1,0 +1,17 @@
+table|column
+admin_audit_log|target_id
+broker_accounts|broker_user_id
+cooldowns|trigger_alert_id
+gtt_tracking|gtt_id
+gtt_tracking|outcome_order_id
+journal_entries|trade_id
+orders|exchange_order_id
+orders|kite_order_id
+orders|parent_order_id
+position_ledger|fill_order_id
+risk_alerts|trigger_position_id
+shadow_behavioral_events|trigger_completed_trade_id
+trades|exchange_order_id
+trades|kite_order_id
+trades|order_id
+trades|parent_order_id

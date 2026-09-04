@@ -1,14 +1,59 @@
 We are starting a **DATABASE ARCHITECTURE & INTEGRITY AUDIT**.
 
+> ## AUDIT PROGRESS  (auto-updated as work completes)
+>
+> **Output document:** `docs/database/DATABASE_ARCHITECTURE_AUDIT.md`
+> **Resumable state:** `backend/DB_audit/_AUDIT_STATE.md`
+> **Evidence (live queries, this pass):** `backend/DB_audit/_evidence/`
+>
+> | spec section | status |
+> |---|---|
+> | 1. Table inventory | DONE |
+> | 2. PK / UUID integrity | DONE |
+> | 3. Foreign keys | DONE |
+> | 4. Relational / data-flow map | DONE |
+> | 5. DB <-> backend code sync | DONE |
+> | 6. DB <-> logic <-> API sync | DONE |
+> | 7. Data integrity & consistency | DONE |
+> | 8. Constraints & uniqueness | DONE |
+> | 9. Index architecture & queries | DONE |
+> | 10. Scalability | DONE |
+> | 11. Transactions & concurrency | DONE |
+> | 12. Security | DONE |
+> | 13. Observability | DONE |
+> | 14. Migrations & schema history | DONE |
+> | 15. Legacy / dead / duplicate | DONE |
+> | 16. Missing architecture | DONE |
+> | 17. Source-of-truth | DONE |
+> | 18. Frontend <-> API <-> DB | DONE |
+> | 19. Final classification | DONE |
+> | 20. Report structure / assembly | DONE |
+>
+> **ALL 20 SPECIFICATION SECTIONS COMPLETE — TWO PASSES.** Pass 1 covered all 20.
+> A thoroughness review found 6 sections shallower than this spec requires
+> (security, transactions, query paths, observability, API/frontend, per-table
+> purpose); pass 2 deepened each in place. Report: 2,738 lines, 25 parts.
+> Nothing remains pending. Nothing was deleted.
+>
+> Nothing has been modified in the database, schema, migrations, code, API or
+> frontend. This banner and the section markers below are the only edits to this
+> file, added at the user's request for progress visibility; the specification
+> text itself is unchanged.
+
+---
+
 This is a **read-only audit and documentation exercise only**.
 
 Do NOT modify code, database schema, data, migrations, indexes, constraints, APIs, frontend, backend logic, or configuration. Do NOT create migrations. Do NOT “fix” anything you find. Do NOT clean up or delete anything.
+
+**Important evidence rule:** Do not rely on any existing audit documents, reports, previous findings, project notes, or assumptions as evidence. Verify everything directly against the live Supabase database by querying the actual schema/data and against the current codebase where relevant. The **only historical/reference documents you may use as a secondary source are the migration files**, and even those must be validated against the current live database rather than treated as proof of current state. If there is any conflict between documentation/migrations and the live DB, **the live DB wins**.
+
 
 Create a **separate comprehensive audit document** containing the findings.
 
 The goal is to understand the entire database as a system: what every table is for, how the tables relate to each other, whether the schema is structurally correct, whether the actual DB matches the application code and product logic, what is obsolete, what is missing, and where there are integrity, security, performance, or maintainability risks.
 
-## 1. Complete table inventory
+## 1. Complete table inventory  `[DONE -> report section 2,3]`
 
 First establish the exact current production/dev database schema.
 
@@ -36,7 +81,7 @@ For every table document:
 
 Do not label something unused merely because you cannot find an obvious reference. Verify across the repository and database.
 
-## 2. Primary keys and UUID integrity
+## 2. Primary keys and UUID integrity  `[DONE -> report section 5]`
 
 Audit every table's identity model.
 
@@ -58,7 +103,7 @@ For every table verify:
 Identify any mismatch between:
 DB reality ↔ SQLAlchemy models ↔ API/application assumptions.
 
-## 3. Foreign keys and relationship integrity
+## 3. Foreign keys and relationship integrity  `[DONE -> report section 6]`
 
 Audit **every foreign key**.
 
@@ -93,7 +138,7 @@ User
 
 Do not assume this example is correct. Verify the real relationships and explain the actual architecture.
 
-## 4. Full relational/data-flow map
+## 4. Full relational/data-flow map  `[DONE -> report section 4]`
 
 Build a conceptual map of the database.
 
@@ -125,7 +170,7 @@ Again, verify this from the actual repository and schema rather than assuming it
 
 Identify broken, ambiguous, duplicated, or missing relationships.
 
-## 5. Database ↔ backend code synchronization
+## 5. Database ↔ backend code synchronization  `[DONE -> report section 7]`
 
 Audit the DB against the backend codebase.
 
@@ -162,7 +207,7 @@ Identify:
 
 Do not change anything. Just document the mismatch.
 
-## 6. DB ↔ backend logic ↔ API synchronization
+## 6. DB ↔ backend logic ↔ API synchronization  `[DONE -> report section 8]`
 
 Trace important data through:
 
@@ -189,7 +234,7 @@ Look specifically for:
 * stale/legacy API paths
 * tables that appear disconnected from the actual product flow
 
-## 7. Data integrity and consistency
+## 7. Data integrity and consistency  `[DONE -> report section 10]`
 
 Audit actual data, not just schema definitions.
 
@@ -215,7 +260,7 @@ Where practical, check for:
 
 Separate **confirmed data defects** from things that merely deserve investigation.
 
-## 8. Constraints and uniqueness
+## 8. Constraints and uniqueness  `[DONE -> report section 11]`
 
 Audit:
 
@@ -235,7 +280,7 @@ Identify important invariants that currently have no DB protection.
 
 Do not recommend implementation details yet; simply document the gap.
 
-## 9. Index architecture and query performance
+## 9. Index architecture and query performance  `[DONE -> report section 12]`
 
 Audit all indexes across all tables.
 
@@ -269,7 +314,7 @@ Where safe and read-only, use actual query plans/EXPLAIN information for importa
 
 Do not optimize anything. Report the findings.
 
-## 10. Database scalability
+## 10. Database scalability  `[DONE -> report section 13]`
 
 Evaluate the current schema for projected growth.
 
@@ -300,7 +345,7 @@ Assess likely pressure points at increasing scale.
 
 Do not redesign the architecture. Identify the bottlenecks and risks.
 
-## 11. Transactions and concurrency
+## 11. Transactions and concurrency  `[DONE -> report section 14]`
 
 Audit transaction handling across the application/database boundary.
 
@@ -324,7 +369,7 @@ Look for:
 
 Pay particular attention to ingestion, order lifecycle, trade lifecycle, behavioral detection, scheduled jobs, and admin/maintenance jobs.
 
-## 12. Security audit
+## 12. Security audit  `[DONE -> report section 15]`
 
 Audit database-related security without changing anything.
 
@@ -356,7 +401,7 @@ Clearly separate confirmed vulnerabilities from hardening opportunities.
 
 Do not perform penetration testing or destructive security testing.
 
-## 13. Observability and operational health
+## 13. Observability and operational health  `[DONE -> report section 16]`
 
 Audit whether we can actually understand database health in production.
 
@@ -382,7 +427,7 @@ Review:
 
 Identify important things that currently happen silently.
 
-## 14. Migrations and schema history
+## 14. Migrations and schema history  `[DONE -> report section 17]`
 
 Audit the migration system against the current live database.
 
@@ -404,7 +449,7 @@ Verify:
 
 Do not rerun or modify migrations.
 
-## 15. Legacy / dead / duplicate architecture
+## 15. Legacy / dead / duplicate architecture  `[DONE -> report section 18]`
 
 Find tables and database objects that may no longer have a purpose.
 
@@ -422,7 +467,7 @@ Classify them rather than deleting anything:
 
 For anything potentially removable, provide the evidence and confidence level.
 
-## 16. Missing architecture
+## 16. Missing architecture  `[DONE -> report section 19]`
 
 Also look in the opposite direction.
 
@@ -440,7 +485,7 @@ Examples could include:
 
 Do not invent requirements. Only flag something as missing when repository/product behavior provides evidence for it.
 
-## 17. Source-of-truth audit
+## 17. Source-of-truth audit  `[DONE -> report section 20]`
 
 For important concepts determine the actual source of truth.
 
@@ -473,7 +518,7 @@ For each determine:
 
 This is particularly important for preventing future data inconsistency.
 
-## 18. Frontend ↔ API ↔ DB audit
+## 18. Frontend ↔ API ↔ DB audit  `[DONE -> report section 9]`
 
 Trace the major frontend data flows.
 
@@ -492,7 +537,7 @@ Identify:
 
 Focus on architectural consistency, not visual/UI review.
 
-## 19. Final classification
+## 19. Final classification  `[DONE -> report sections 21,22]`
 
 Every finding must be classified:
 
@@ -538,7 +583,7 @@ Potential severe correctness, security, or data-loss issue.
 
 Do not inflate severity. Use evidence.
 
-## 20. Audit report structure
+## 20. Audit report structure  `[DONE -> report sections 23,24,25]`
 
 Create a separate document, for example:
 

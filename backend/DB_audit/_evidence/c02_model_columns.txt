@@ -1,0 +1,620 @@
+# gathered 2026-09-04T10:46:16.525779+00:00
+table|column|type|nullable|pk|default|server_default|fk_targets
+admin_audit_log|id|UUID|False|True|<function uuid4 at 0x00000289B995FA00>||
+admin_audit_log|admin_email|VARCHAR(255)|False|False|||
+admin_audit_log|action|VARCHAR(100)|False|False|||
+admin_audit_log|target_type|VARCHAR(50)|True|False|||
+admin_audit_log|target_id|VARCHAR(255)|True|False|||
+admin_audit_log|details|JSONB|True|False|||
+admin_audit_log|created_at|DATETIME|True|False||now()|
+admin_users|id|UUID|False|True|<function uuid4 at 0x00000289B995F5E0>||
+admin_users|email|VARCHAR(255)|False|False|||
+admin_users|password_hash|VARCHAR(255)|False|False|||
+admin_users|name|VARCHAR(255)|False|False|||
+admin_users|role|VARCHAR(50)|False|False|superadmin||
+admin_users|is_active|BOOLEAN|True|False|True||
+admin_users|totp_secret_enc|TEXT|True|False|||
+admin_users|created_at|DATETIME|True|False|||
+admin_users|last_login_at|DATETIME|True|False|||
+admin_users|session_epoch|INTEGER|False|False|0|0|
+admin_users|must_change_password|BOOLEAN|False|False|False|false|
+admin_users|totp_required|BOOLEAN|False|False|False|false|
+admin_users|created_by|VARCHAR(255)|True|False|||
+alert_checkpoints|id|UUID|False|True|<function uuid4 at 0x00000289B98A3B60>||
+alert_checkpoints|alert_id|UUID|False|False|||risk_alerts.id
+alert_checkpoints|broker_account_id|UUID|False|False|||broker_accounts.id
+alert_checkpoints|positions_snapshot|JSONB|True|False|<function list at 0x00000289B98A3AB0>||
+alert_checkpoints|total_unrealized_pnl|NUMERIC(15, 4)|True|False|0||
+alert_checkpoints|prices_at_t5|JSONB|True|False|||
+alert_checkpoints|pnl_at_t5|NUMERIC(15, 4)|True|False|||
+alert_checkpoints|checked_at_t5|DATETIME|True|False|||
+alert_checkpoints|prices_at_t30|JSONB|True|False|||
+alert_checkpoints|pnl_at_t30|NUMERIC(15, 4)|True|False|||
+alert_checkpoints|checked_at_t30|DATETIME|True|False|||
+alert_checkpoints|prices_at_t60|JSONB|True|False|||
+alert_checkpoints|pnl_at_t60|NUMERIC(15, 4)|True|False|||
+alert_checkpoints|checked_at_t60|DATETIME|True|False|||
+alert_checkpoints|user_actual_pnl|NUMERIC(15, 4)|True|False|||
+alert_checkpoints|money_saved|NUMERIC(15, 4)|True|False|||
+alert_checkpoints|calculation_status|VARCHAR(20)|False|False|pending||
+alert_checkpoints|created_at|DATETIME|False|False|<function AlertCheckpoint.<lambda> at 0x||
+alert_mutes|broker_account_id|UUID|False|True|||broker_accounts.id
+alert_mutes|pattern_type|VARCHAR|False|True|||
+alert_mutes|created_at|DATETIME|True|False|<function AlertMute.<lambda> at 0x000002||
+behavior_events|id|UUID|False|True|<function uuid4 at 0x00000289B98A2CF0>||
+behavior_events|broker_account_id|UUID|False|False|||broker_accounts.id
+behavior_events|detector|VARCHAR(60)|False|False|||
+behavior_events|detector_version|VARCHAR(20)|False|False|||
+behavior_events|severity|VARCHAR(10)|False|False|||
+behavior_events|confidence|NUMERIC(5, 2)|True|False|||
+behavior_events|data_quality|VARCHAR(10)|False|False|GOOD||
+behavior_events|message|TEXT|False|False|||
+behavior_events|evidence|JSONB|True|False|||
+behavior_events|input_snapshot|JSONB|True|False|||
+behavior_events|trigger_completed_trade_id|UUID|True|False|||completed_trades.id
+behavior_events|risk_alert_id|UUID|True|False|||risk_alerts.id
+behavior_events|idempotency_key|TEXT|True|False|||
+behavior_events|shadow|BOOLEAN|False|False|False|false|
+behavior_events|detected_at|TIMESTAMP|False|False|||
+behavior_events|created_at|TIMESTAMP|True|False||now()|
+behavioral_events|id|UUID|False|True|<function uuid4 at 0x00000289B98A2400>||
+behavioral_events|broker_account_id|UUID|False|False|||broker_accounts.id
+behavioral_events|event_type|VARCHAR(50)|False|False|||
+behavioral_events|severity|VARCHAR(10)|False|False|||
+behavioral_events|confidence|NUMERIC(3, 2)|False|False|||
+behavioral_events|trigger_trade_id|UUID|True|False|||trades.id
+behavioral_events|trigger_position_key|VARCHAR(200)|True|False|||
+behavioral_events|message|TEXT|False|False|||
+behavioral_events|context|JSONB|True|False|||
+behavioral_events|session_id|UUID|True|False|||trading_sessions.id
+behavioral_events|risk_score_at_event|NUMERIC(5, 2)|True|False|||
+behavioral_events|account_equity_at_event|NUMERIC(15, 4)|True|False|||
+behavioral_events|position_exposure_at_event|NUMERIC(15, 4)|True|False|||
+behavioral_events|detected_at|TIMESTAMP|False|False||now()|
+behavioral_events|delivery_status|VARCHAR(20)|True|False|PENDING||
+behavioral_events|acknowledged_at|TIMESTAMP|True|False|||
+behavioral_events|created_at|TIMESTAMP|True|False||now()|
+broadcast_logs|id|UUID|False|True|<function uuid4 at 0x00000289B99FDB10>||
+broadcast_logs|created_by|VARCHAR(255)|False|False|||
+broadcast_logs|segment|VARCHAR(50)|False|False|||
+broadcast_logs|message|TEXT|False|False|||
+broadcast_logs|total|INTEGER|False|False|0||
+broadcast_logs|sent|INTEGER|False|False|0||
+broadcast_logs|failed|INTEGER|False|False|0||
+broadcast_logs|created_at|DATETIME|True|False|||
+broadcast_receipts|id|UUID|False|True|<function uuid4 at 0x00000289B99FE350>||
+broadcast_receipts|broadcast_id|UUID|False|False|||
+broadcast_receipts|phone|VARCHAR(20)|False|False|||
+broadcast_receipts|status|VARCHAR(20)|False|False|queued||
+broadcast_receipts|error|TEXT|True|False|||
+broadcast_receipts|sent_at|DATETIME|True|False|||
+broker_accounts|id|UUID|False|True|<function uuid4 at 0x00000289B86D7CC0>||
+broker_accounts|user_id|UUID|False|False|||users.id
+broker_accounts|broker_name|VARCHAR|False|False|zerodha||
+broker_accounts|access_token|VARCHAR|True|False|||
+broker_accounts|refresh_token|VARCHAR|True|False|||
+broker_accounts|api_key|VARCHAR|True|False|||
+broker_accounts|api_secret_enc|VARCHAR|True|False|||
+broker_accounts|status|VARCHAR|False|False|||
+broker_accounts|connected_at|TIMESTAMP|True|False|||
+broker_accounts|last_sync_at|TIMESTAMP|True|False|||
+broker_accounts|broker_user_id|VARCHAR|True|False|||
+broker_accounts|broker_email|VARCHAR|True|False|||
+broker_accounts|user_type|VARCHAR(20)|True|False|||
+broker_accounts|exchanges|ARRAY|True|False|||
+broker_accounts|products|ARRAY|True|False|||
+broker_accounts|order_types|ARRAY|True|False|||
+broker_accounts|meta|JSONB|True|False|{}||
+broker_accounts|avatar_url|VARCHAR|True|False|||
+broker_accounts|demat_consent|BOOLEAN|False|False|False||
+broker_accounts|sync_status|VARCHAR(20)|False|False|pending||
+broker_accounts|token_revoked_at|TIMESTAMP|True|False|||
+broker_accounts|created_at|TIMESTAMP|False|False||now()|
+broker_accounts|updated_at|TIMESTAMP|False|False||now()|
+coach_sessions|id|UUID|False|True|<function uuid4 at 0x00000289B995D2D0>||
+coach_sessions|broker_account_id|UUID|False|False|||broker_accounts.id
+coach_sessions|messages|JSONB|False|False|<function list at 0x00000289B995D430>||
+coach_sessions|summary|VARCHAR|True|False|||
+coach_sessions|started_at|TIMESTAMP|False|False||now()|
+coach_sessions|ended_at|TIMESTAMP|True|False|||
+coach_sessions|created_at|TIMESTAMP|False|False||now()|
+commitment_logs|id|UUID|False|True|<function uuid4 at 0x00000289B976F950>||
+commitment_logs|broker_account_id|UUID|False|False|||broker_accounts.id
+commitment_logs|log_type|VARCHAR(50)|False|False|||
+commitment_logs|description|TEXT|False|False|||
+commitment_logs|reason|TEXT|True|False|||
+commitment_logs|cost|FLOAT|True|False|||
+commitment_logs|timestamp|DATETIME|True|False|<function CommitmentLog.<lambda> at 0x00||
+completed_trade_features|id|UUID|False|True|<function uuid4 at 0x00000289B98A1640>||
+completed_trade_features|completed_trade_id|UUID|False|False|||completed_trades.id
+completed_trade_features|broker_account_id|UUID|False|False|||broker_accounts.id
+completed_trade_features|holding_duration_minutes|INTEGER|True|False|||
+completed_trade_features|entry_hour_ist|INTEGER|True|False|||
+completed_trade_features|exit_hour_ist|INTEGER|True|False|||
+completed_trade_features|entry_day_of_week|INTEGER|True|False|||
+completed_trade_features|is_expiry_day|BOOLEAN|True|False|False||
+completed_trade_features|size_relative_to_avg|NUMERIC(10, 4)|True|False|||
+completed_trade_features|is_scaled_entry|BOOLEAN|True|False|False||
+completed_trade_features|is_scaled_exit|BOOLEAN|True|False|False||
+completed_trade_features|entry_after_loss|BOOLEAN|True|False|False||
+completed_trade_features|consecutive_loss_count|INTEGER|True|False|0||
+completed_trade_features|session_pnl_at_entry|NUMERIC(15, 4)|True|False|0||
+completed_trade_features|minutes_since_last_round|INTEGER|True|False|||
+completed_trade_features|is_winner|BOOLEAN|True|False|False||
+completed_trade_features|pnl_per_unit|NUMERIC(15, 4)|True|False|||
+completed_trade_features|created_at|TIMESTAMP|True|False||now()|
+completed_trades|id|UUID|False|True|<function uuid4 at 0x00000289B98A1220>||
+completed_trades|broker_account_id|UUID|False|False|||broker_accounts.id
+completed_trades|tradingsymbol|VARCHAR(100)|False|False|||
+completed_trades|exchange|VARCHAR(20)|False|False|||
+completed_trades|instrument_type|VARCHAR(20)|True|False|||
+completed_trades|product|VARCHAR(20)|True|False|||
+completed_trades|direction|VARCHAR(10)|True|False|||
+completed_trades|total_quantity|INTEGER|True|False|||
+completed_trades|num_entries|INTEGER|True|False|1||
+completed_trades|num_exits|INTEGER|True|False|1||
+completed_trades|avg_entry_price|NUMERIC(15, 4)|True|False|||
+completed_trades|avg_exit_price|NUMERIC(15, 4)|True|False|||
+completed_trades|realized_pnl|NUMERIC(15, 4)|True|False|||
+completed_trades|pnl_pct|NUMERIC(8, 2)|True|False|||
+completed_trades|quality_score|INTEGER|True|False|||
+completed_trades|entry_time|TIMESTAMP|True|False|||
+completed_trades|exit_time|TIMESTAMP|True|False|||
+completed_trades|duration_minutes|INTEGER|True|False|||
+completed_trades|closed_by_flip|BOOLEAN|True|False|False||
+completed_trades|entry_trade_ids|ARRAY|True|False|||
+completed_trades|exit_trade_ids|ARRAY|True|False|||
+completed_trades|overnight_close_price|NUMERIC(15, 4)|True|False|||
+completed_trades|status|VARCHAR(20)|True|False|closed||
+completed_trades|created_at|TIMESTAMP|True|False||now()|
+completed_trades|updated_at|TIMESTAMP|True|False||now()|
+constitution_history|id|UUID|False|True|<function uuid4 at 0x00000289B98A3270>||
+constitution_history|broker_account_id|UUID|False|False|||broker_accounts.id
+constitution_history|changed_at|TIMESTAMP|False|False||now()|
+constitution_history|change_type|VARCHAR(20)|False|False|||
+constitution_history|changes|JSONB|False|False|||
+constitution_history|effective_at|TIMESTAMP|False|False|||
+constitution_history|during_market_hours|BOOLEAN|False|False|False||
+constitution_history|override_flag|BOOLEAN|False|False|False||
+cooldowns|id|UUID|False|True|<function uuid4 at 0x00000289B981A560>||
+cooldowns|broker_account_id|UUID|False|False|||broker_accounts.id
+cooldowns|reason|VARCHAR(50)|False|False|||
+cooldowns|duration_minutes|INTEGER|False|False|15||
+cooldowns|started_at|DATETIME|False|False|<function Cooldown.<lambda> at 0x0000028||
+cooldowns|expires_at|DATETIME|False|False|||
+cooldowns|can_skip|BOOLEAN|True|False|True||
+cooldowns|skipped|BOOLEAN|True|False|False||
+cooldowns|skipped_at|DATETIME|True|False|||
+cooldowns|acknowledged|BOOLEAN|True|False|False||
+cooldowns|acknowledged_at|DATETIME|True|False|||
+cooldowns|trigger_alert_id|UUID|True|False|||
+cooldowns|message|VARCHAR(500)|True|False|||
+cooldowns|meta_data|JSONB|True|False|<function dict at 0x00000289B981A6C0>||
+cooldowns|created_at|DATETIME|False|False|<function Cooldown.<lambda> at 0x0000028||
+data_quality_events|id|UUID|False|True|<function uuid4 at 0x00000289B99FEE50>||
+data_quality_events|broker_account_id|UUID|False|False|||broker_accounts.id
+data_quality_events|kind|VARCHAR(50)|False|False|||
+data_quality_events|tradingsymbol|VARCHAR(100)|True|False|||
+data_quality_events|exchange|VARCHAR(10)|True|False|||
+data_quality_events|fifo_pnl|NUMERIC(15, 4)|True|False|||
+data_quality_events|broker_pnl|NUMERIC(15, 4)|True|False|||
+data_quality_events|ratio|NUMERIC(10, 4)|True|False|||
+data_quality_events|details|JSONB|True|False|<function dict at 0x00000289B99FF060>||
+data_quality_events|detected_at|DATETIME|False|False|<function DataQualityEvent.<lambda> at 0||
+generated_reports|id|UUID|False|True|<function uuid4 at 0x00000289B99FC300>||
+generated_reports|broker_account_id|UUID|False|False|||broker_accounts.id
+generated_reports|report_type|VARCHAR(30)|False|False|||
+generated_reports|report_date|DATE|False|False|||
+generated_reports|report_data|JSONB|False|False|<function dict at 0x00000289B99FC460>||
+generated_reports|generated_at|TIMESTAMP|False|False||now()|
+generated_reports|sent_via|VARCHAR(20)|True|False|||
+guardrail_rules|id|UUID|False|True|<function uuid4 at 0x00000289B995E6C0>||
+guardrail_rules|broker_account_id|UUID|False|False|||broker_accounts.id
+guardrail_rules|name|VARCHAR(100)|False|False|||
+guardrail_rules|target_symbols|ARRAY|True|False|||
+guardrail_rules|condition_type|VARCHAR(50)|False|False|||
+guardrail_rules|condition_value|NUMERIC(15, 2)|False|False|||
+guardrail_rules|notify_whatsapp|BOOLEAN|False|False|True||
+guardrail_rules|notify_push|BOOLEAN|False|False|True||
+guardrail_rules|status|VARCHAR(20)|False|False|active||
+guardrail_rules|triggered_at|TIMESTAMP|True|False|||
+guardrail_rules|trigger_count|INTEGER|False|False|0||
+guardrail_rules|expires_at|TIMESTAMP|False|False|||
+guardrail_rules|created_at|TIMESTAMP|True|False||now()|
+guardrail_rules|updated_at|TIMESTAMP|True|False||now()|
+holdings|id|UUID|False|True|<function uuid4 at 0x00000289B98A0A90>||
+holdings|broker_account_id|UUID|False|False|||broker_accounts.id
+holdings|tradingsymbol|VARCHAR(50)|False|False|||
+holdings|exchange|VARCHAR(10)|False|False|||
+holdings|isin|VARCHAR(20)|True|False|||
+holdings|quantity|INTEGER|False|False|||
+holdings|authorised_quantity|INTEGER|False|False|0||
+holdings|t1_quantity|INTEGER|False|False|0||
+holdings|collateral_quantity|INTEGER|False|False|0||
+holdings|collateral_type|VARCHAR(20)|True|False|||
+holdings|average_price|NUMERIC(15, 4)|True|False|||
+holdings|last_price|NUMERIC(15, 4)|True|False|||
+holdings|close_price|NUMERIC(15, 4)|True|False|||
+holdings|pnl|NUMERIC(15, 4)|True|False|||
+holdings|day_change|NUMERIC(15, 4)|True|False|||
+holdings|day_change_percentage|NUMERIC(10, 4)|True|False|||
+holdings|instrument_token|BIGINT|True|False|||
+holdings|product|VARCHAR(10)|False|False|CNC||
+holdings|created_at|TIMESTAMP|False|False||now()|
+holdings|updated_at|TIMESTAMP|False|False||now()|
+incomplete_positions|id|UUID|False|True|<function uuid4 at 0x00000289B98A1DD0>||
+incomplete_positions|broker_account_id|UUID|False|False|||broker_accounts.id
+incomplete_positions|tradingsymbol|VARCHAR(100)|False|False|||
+incomplete_positions|exchange|VARCHAR(20)|False|False|||
+incomplete_positions|product|VARCHAR(20)|True|False|||
+incomplete_positions|direction|VARCHAR(10)|True|False|||
+incomplete_positions|unmatched_quantity|INTEGER|True|False|||
+incomplete_positions|avg_entry_price|NUMERIC(15, 4)|True|False|||
+incomplete_positions|entry_time|TIMESTAMP|True|False|||
+incomplete_positions|reason|VARCHAR(50)|False|False|||
+incomplete_positions|detected_at|TIMESTAMP|True|False||now()|
+incomplete_positions|details|TEXT|True|False|||
+incomplete_positions|resolution_status|VARCHAR(20)|True|False|PENDING||
+incomplete_positions|resolved_at|TIMESTAMP|True|False|||
+incomplete_positions|resolution_method|VARCHAR(50)|True|False|||
+incomplete_positions|created_at|TIMESTAMP|True|False||now()|
+incomplete_positions|updated_at|TIMESTAMP|True|False||now()|
+instruments|id|UUID|False|True|<function uuid4 at 0x00000289B981B690>||
+instruments|instrument_token|BIGINT|False|False|||
+instruments|exchange_token|BIGINT|True|False|||
+instruments|tradingsymbol|VARCHAR(50)|False|False|||
+instruments|name|VARCHAR(100)|True|False|||
+instruments|last_price|NUMERIC(15, 4)|True|False|||
+instruments|expiry|DATE|True|False|||
+instruments|strike|NUMERIC(15, 4)|True|False|||
+instruments|tick_size|NUMERIC(10, 4)|False|False|0.05||
+instruments|lot_size|INTEGER|False|False|1||
+instruments|instrument_type|VARCHAR(20)|True|False|||
+instruments|segment|VARCHAR(20)|True|False|||
+instruments|exchange|VARCHAR(10)|True|False|||
+instruments|created_at|TIMESTAMP|False|False||now()|
+instruments|updated_at|TIMESTAMP|False|False||now()|
+journal_entries|id|UUID|False|True|<function uuid4 at 0x00000289B976E2A0>||
+journal_entries|broker_account_id|UUID|False|False|||broker_accounts.id
+journal_entries|trade_id|UUID|True|False|||
+journal_entries|emotion_tags|JSONB|True|False|<function list at 0x00000289B976E4B0>||
+journal_entries|followed_plan|VARCHAR(20)|True|False|||
+journal_entries|deviation_reason|VARCHAR(50)|True|False|||
+journal_entries|exit_reason|VARCHAR(50)|True|False|||
+journal_entries|setup_quality|SMALLINT|True|False|||
+journal_entries|would_repeat|VARCHAR(10)|True|False|||
+journal_entries|market_condition|VARCHAR(20)|True|False|||
+journal_entries|notes|TEXT|True|False|||
+journal_entries|trade_symbol|VARCHAR(100)|True|False|||
+journal_entries|trade_type|VARCHAR(10)|True|False|||
+journal_entries|trade_pnl|VARCHAR(50)|True|False|||
+journal_entries|entry_type|VARCHAR(20)|False|False|trade||
+journal_entries|created_at|DATETIME|False|False|<function JournalEntry.<lambda> at 0x000||
+journal_entries|updated_at|DATETIME|True|False|<function JournalEntry.<lambda> at 0x000||
+margin_snapshots|id|UUID|False|True|<function uuid4 at 0x00000289B99FCE00>||
+margin_snapshots|broker_account_id|UUID|False|False|||broker_accounts.id
+margin_snapshots|snapshot_at|TIMESTAMP|False|False||now()|
+margin_snapshots|equity_available|NUMERIC(15, 4)|True|False|||
+margin_snapshots|equity_used|NUMERIC(15, 4)|True|False|||
+margin_snapshots|equity_total|NUMERIC(15, 4)|True|False|||
+margin_snapshots|equity_opening_balance|NUMERIC(18, 2)|True|False|||
+margin_snapshots|equity_utilization_pct|NUMERIC(5, 2)|True|False|||
+margin_snapshots|commodity_available|NUMERIC(15, 4)|True|False|||
+margin_snapshots|commodity_used|NUMERIC(15, 4)|True|False|||
+margin_snapshots|commodity_total|NUMERIC(15, 4)|True|False|||
+margin_snapshots|commodity_utilization_pct|NUMERIC(5, 2)|True|False|||
+margin_snapshots|max_utilization_pct|NUMERIC(5, 2)|True|False|||
+margin_snapshots|risk_level|VARCHAR(20)|True|False|||
+margin_snapshots|equity_breakdown|JSONB|True|False|{}||
+margin_snapshots|commodity_breakdown|JSONB|True|False|{}||
+margin_snapshots|created_at|TIMESTAMP|False|False||now()|
+monthly_snapshots|id|UUID|False|True|<function uuid4 at 0x00000289B98A0300>||
+monthly_snapshots|broker_account_id|UUID|False|False|||broker_accounts.id
+monthly_snapshots|month|DATE|False|False|||
+monthly_snapshots|metrics|JSONB|False|False|<function dict at 0x00000289B98A05C0>||
+monthly_snapshots|snapshot_version|INTEGER|False|False|1||
+monthly_snapshots|detector_version|VARCHAR|True|False|||
+monthly_snapshots|orders_pruned_at|DATETIME|True|False|||
+monthly_snapshots|created_at|DATETIME|True|False||now()|
+orders|id|UUID|False|True|<function uuid4 at 0x00000289B981BB60>||
+orders|broker_account_id|UUID|False|False|||broker_accounts.id
+orders|kite_order_id|VARCHAR(50)|False|False|||
+orders|exchange_order_id|VARCHAR(50)|True|False|||
+orders|status|VARCHAR(20)|False|False|||
+orders|status_message|VARCHAR|True|False|||
+orders|status_message_raw|VARCHAR|True|False|||
+orders|tradingsymbol|VARCHAR(50)|False|False|||
+orders|exchange|VARCHAR(10)|False|False|||
+orders|transaction_type|VARCHAR(10)|False|False|||
+orders|order_type|VARCHAR(10)|False|False|||
+orders|product|VARCHAR(10)|False|False|||
+orders|variety|VARCHAR(20)|False|False|||
+orders|validity|VARCHAR(10)|False|False|DAY||
+orders|quantity|INTEGER|False|False|||
+orders|disclosed_quantity|INTEGER|True|False|0||
+orders|pending_quantity|INTEGER|True|False|0||
+orders|cancelled_quantity|INTEGER|True|False|0||
+orders|filled_quantity|INTEGER|True|False|0||
+orders|price|NUMERIC(15, 4)|True|False|||
+orders|trigger_price|NUMERIC(15, 4)|True|False|||
+orders|average_price|NUMERIC(15, 4)|True|False|||
+orders|order_timestamp|TIMESTAMP|False|True|||
+orders|exchange_timestamp|TIMESTAMP|True|False|||
+orders|exchange_update_timestamp|TIMESTAMP|True|False|||
+orders|tag|VARCHAR(20)|True|False|||
+orders|guid|VARCHAR(100)|True|False|||
+orders|parent_order_id|VARCHAR(50)|True|False|||
+orders|meta|JSONB|True|False|{}||
+orders|created_at|TIMESTAMP|True|False||now()|
+orders|updated_at|TIMESTAMP|True|False||now()|
+portfolio_chat_sessions|id|UUID|False|True|<function uuid4 at 0x00000289B995EDA0>||
+portfolio_chat_sessions|broker_account_id|UUID|False|False|||broker_accounts.id
+portfolio_chat_sessions|summary|VARCHAR(500)|True|False|||
+portfolio_chat_sessions|messages|JSONB|False|False|<function list at 0x00000289B995EFB0>||
+portfolio_chat_sessions|message_count|INTEGER|False|False|0||
+portfolio_chat_sessions|started_at|TIMESTAMP|True|False||now()|
+portfolio_chat_sessions|ended_at|TIMESTAMP|True|False|||
+portfolio_chat_sessions|created_at|TIMESTAMP|True|False||now()|
+portfolio_chat_sessions|updated_at|TIMESTAMP|True|False||now()|
+position_ledger|id|UUID|False|True|<function uuid4 at 0x00000289B995C880>||
+position_ledger|broker_account_id|UUID|False|False|||broker_accounts.id
+position_ledger|tradingsymbol|VARCHAR|False|False|||
+position_ledger|exchange|VARCHAR|False|False|||
+position_ledger|product|VARCHAR(20)|True|False|||
+position_ledger|entry_type|VARCHAR(10)|False|False|||
+position_ledger|fill_order_id|VARCHAR|False|False|||
+position_ledger|fill_qty|INTEGER|False|False|||
+position_ledger|fill_price|NUMERIC(15, 4)|False|False|||
+position_ledger|position_qty_after|INTEGER|False|False|||
+position_ledger|avg_entry_price_after|NUMERIC(15, 4)|True|False|||
+position_ledger|realized_pnl|NUMERIC(15, 4)|False|False|0||
+position_ledger|session_id|UUID|True|False|||trading_sessions.id
+position_ledger|occurred_at|TIMESTAMP|False|False|||
+position_ledger|created_at|TIMESTAMP|False|False||now()|
+position_ledger|idempotency_key|VARCHAR|False|False|||
+position_margin_observations|id|UUID|False|True|<function uuid4 at 0x00000289B99FD2D0>||
+position_margin_observations|broker_account_id|UUID|False|False|||broker_accounts.id
+position_margin_observations|captured_at|TIMESTAMP|False|False||now()|
+position_margin_observations|exchange|VARCHAR(20)|True|False|||
+position_margin_observations|underlying|VARCHAR(100)|True|False|||
+position_margin_observations|product|VARCHAR(20)|True|False|||
+position_margin_observations|leg_count|INTEGER|False|False|1||
+position_margin_observations|legs|JSONB|False|False|<function list at 0x00000289B99FD640>||
+position_margin_observations|span|NUMERIC(18, 4)|True|False|||
+position_margin_observations|exposure|NUMERIC(18, 4)|True|False|||
+position_margin_observations|option_premium|NUMERIC(18, 4)|True|False|||
+position_margin_observations|additional|NUMERIC(18, 4)|True|False|||
+position_margin_observations|total|NUMERIC(18, 4)|True|False|||
+position_margin_observations|per_leg|JSONB|False|False|<function dict at 0x00000289B99FD6F0>||
+position_margin_observations|basis|VARCHAR(16)|False|False|basket||
+position_margin_observations|margin_source|VARCHAR(16)|False|False|broker||
+position_margin_observations|created_at|TIMESTAMP|False|False||now()|
+positions|id|UUID|False|True|<function uuid4 at 0x00000289B976CE00>||
+positions|broker_account_id|UUID|False|False|||broker_accounts.id
+positions|tradingsymbol|VARCHAR(100)|False|False|||
+positions|exchange|VARCHAR(20)|True|False|||
+positions|instrument_type|VARCHAR(20)|True|False|||
+positions|product|VARCHAR(20)|True|False|||
+positions|segment|VARCHAR(20)|True|False|||
+positions|total_quantity|INTEGER|True|False|||
+positions|average_entry_price|NUMERIC(10, 2)|True|False|||
+positions|average_exit_price|NUMERIC(10, 2)|True|False|||
+positions|entry_price_source|VARCHAR(10)|True|False|||
+positions|instrument_token|BIGINT|True|False|||
+positions|overnight_quantity|INTEGER|True|False|0||
+positions|multiplier|NUMERIC(10, 4)|True|False|1||
+positions|realized_pnl|NUMERIC(12, 2)|True|False|||
+positions|unrealized_pnl|NUMERIC(12, 2)|True|False|||
+positions|pnl|NUMERIC(12, 2)|True|False|||
+positions|day_pnl|NUMERIC(12, 2)|True|False|||
+positions|m2m|NUMERIC(15, 4)|True|False|||
+positions|last_price|NUMERIC(12, 2)|True|False|||
+positions|close_price|NUMERIC(12, 2)|True|False|||
+positions|value|NUMERIC(14, 2)|True|False|||
+positions|buy_value|NUMERIC(14, 2)|True|False|||
+positions|sell_value|NUMERIC(14, 2)|True|False|||
+positions|day_buy_quantity|INTEGER|True|False|0||
+positions|day_sell_quantity|INTEGER|True|False|0||
+positions|day_buy_price|NUMERIC(15, 4)|True|False|||
+positions|day_sell_price|NUMERIC(15, 4)|True|False|||
+positions|day_buy_value|NUMERIC(15, 4)|True|False|||
+positions|day_sell_value|NUMERIC(15, 4)|True|False|||
+positions|first_entry_time|DATETIME|True|False|||
+positions|last_entry_time|DATETIME|True|False|||
+positions|last_exit_time|DATETIME|True|False|||
+positions|holding_duration_minutes|INTEGER|True|False|||
+positions|order_ids|ARRAY|True|False|||
+positions|status|VARCHAR(20)|True|False|open||
+positions|synced_at|DATETIME|True|False|||
+positions|created_at|DATETIME|True|False|<function Position.<lambda> at 0x0000028||
+positions|updated_at|DATETIME|True|False|<function Position.<lambda> at 0x0000028||
+push_subscriptions|id|UUID|False|True|<function uuid4 at 0x00000289B9818B40>||
+push_subscriptions|broker_account_id|UUID|False|False|||broker_accounts.id
+push_subscriptions|endpoint|TEXT|False|False|||
+push_subscriptions|p256dh_key|VARCHAR(255)|False|False|||
+push_subscriptions|auth_key|VARCHAR(255)|False|False|||
+push_subscriptions|user_agent|VARCHAR(500)|True|False|||
+push_subscriptions|device_type|VARCHAR(50)|True|False|||
+push_subscriptions|is_active|BOOLEAN|False|False|True||
+push_subscriptions|last_used_at|DATETIME|True|False|||
+push_subscriptions|failed_count|INTEGER|True|False|0||
+push_subscriptions|created_at|DATETIME|False|False|<function PushSubscription.<lambda> at 0||
+push_subscriptions|updated_at|DATETIME|True|False|<function PushSubscription.<lambda> at 0||
+risk_alerts|id|UUID|False|True|<function uuid4 at 0x00000289B976D9B0>||
+risk_alerts|broker_account_id|UUID|False|False|||broker_accounts.id
+risk_alerts|pattern_type|VARCHAR|False|False|||
+risk_alerts|severity|VARCHAR|False|False|||
+risk_alerts|message|VARCHAR|False|False|||
+risk_alerts|details|JSONB|True|False|||
+risk_alerts|trigger_trade_id|UUID|True|False|||trades.id
+risk_alerts|related_trade_ids|ARRAY|True|False|||
+risk_alerts|trigger_completed_trade_id|UUID|True|False|||completed_trades.id
+risk_alerts|detector_version|VARCHAR(20)|False|False|1.0.0||
+risk_alerts|confidence|NUMERIC(5, 2)|True|False|||
+risk_alerts|detected_at|DATETIME|True|False|<function RiskAlert.<lambda> at 0x000002||
+risk_alerts|acknowledged_at|DATETIME|True|False|||
+risk_alerts|lifecycle|VARCHAR|False|False|post|post|
+risk_alerts|trigger_position_id|UUID|True|False|||
+risk_alerts|outcome|VARCHAR|True|False|||
+risk_alerts|outcome_at|DATETIME|True|False|||
+risk_alerts|delivered_push_at|DATETIME|True|False|||
+risk_alerts|delivered_whatsapp_at|DATETIME|True|False|||
+risk_alerts|expired_at|DATETIME|True|False|||
+risk_alerts|resolved_at|DATETIME|True|False|||
+risk_alerts|created_at|DATETIME|True|False|<function RiskAlert.<lambda> at 0x000002||
+strategy_group_legs|id|UUID|False|True|<function uuid4 at 0x00000289B995E1F0>||
+strategy_group_legs|strategy_group_id|UUID|False|False|||strategy_groups.id
+strategy_group_legs|completed_trade_id|UUID|False|False|||completed_trades.id
+strategy_group_legs|leg_role|VARCHAR(30)|True|False|||
+strategy_group_legs|leg_pnl|NUMERIC(15, 4)|True|False|||
+strategy_group_legs|created_at|TIMESTAMP|True|False||now()|
+strategy_groups|id|UUID|False|True|<function uuid4 at 0x00000289B995DB10>||
+strategy_groups|broker_account_id|UUID|False|False|||broker_accounts.id
+strategy_groups|strategy_type|VARCHAR(50)|False|False|||
+strategy_groups|underlying|VARCHAR(50)|False|False|||
+strategy_groups|expiry_key|VARCHAR(20)|True|False|||
+strategy_groups|status|VARCHAR(20)|True|False|open||
+strategy_groups|net_pnl|NUMERIC(15, 4)|True|False|||
+strategy_groups|opened_at|TIMESTAMP|True|False|||
+strategy_groups|closed_at|TIMESTAMP|True|False|||
+strategy_groups|created_at|TIMESTAMP|True|False||now()|
+streak_data|id|UUID|False|True|<function uuid4 at 0x00000289B9818300>||
+streak_data|broker_account_id|UUID|False|False|||broker_accounts.id
+streak_data|current_streak_days|INTEGER|True|False|0||
+streak_data|longest_streak_days|INTEGER|True|False|0||
+streak_data|streak_start_date|DATETIME|True|False|||
+streak_data|daily_status|JSONB|True|False|<function list at 0x00000289B98183B0>||
+streak_data|milestones_achieved|JSONB|True|False|<function list at 0x00000289B98181A0>||
+streak_data|updated_at|DATETIME|True|False|<function StreakData.<lambda> at 0x00000||
+trades|id|UUID|False|True|<function uuid4 at 0x00000289B976C930>||
+trades|broker_account_id|UUID|False|False|||broker_accounts.id
+trades|order_id|VARCHAR|False|False|||
+trades|tradingsymbol|VARCHAR|False|False|||
+trades|exchange|VARCHAR|False|False|||
+trades|transaction_type|VARCHAR|False|False|||
+trades|order_type|VARCHAR|False|False|||
+trades|product|VARCHAR|False|False|||
+trades|kite_order_id|VARCHAR(50)|True|False|||
+trades|exchange_order_id|VARCHAR(50)|True|False|||
+trades|instrument_token|BIGINT|True|False|||
+trades|validity|VARCHAR(10)|True|False|DAY||
+trades|variety|VARCHAR(20)|True|False|regular||
+trades|disclosed_quantity|INTEGER|False|False|0||
+trades|parent_order_id|VARCHAR(50)|True|False|||
+trades|tag|VARCHAR(20)|True|False|||
+trades|guid|VARCHAR(100)|True|False|||
+trades|quantity|INTEGER|False|False|||
+trades|filled_quantity|INTEGER|False|False|0||
+trades|pending_quantity|INTEGER|False|False|0||
+trades|cancelled_quantity|INTEGER|False|False|0||
+trades|price|NUMERIC(10, 2)|True|False|||
+trades|trigger_price|NUMERIC(10, 2)|True|False|||
+trades|average_price|NUMERIC(10, 2)|True|False|||
+trades|market_protection|NUMERIC(10, 2)|True|False|||
+trades|status|VARCHAR|False|False|||
+trades|status_message|VARCHAR|True|False|||
+trades|asset_class|VARCHAR|False|False|UNKNOWN||
+trades|instrument_type|VARCHAR|False|False|UNKNOWN||
+trades|product_type|VARCHAR|False|False|NRML||
+trades|segment|VARCHAR(20)|True|False|||
+trades|pnl|NUMERIC(10, 2)|True|False|||
+trades|order_timestamp|TIMESTAMP|True|False|||
+trades|exchange_timestamp|TIMESTAMP|True|False|||
+trades|fill_timestamp|TIMESTAMP|True|False|||
+trades|raw_payload|JSON|True|False|||
+trades|processed_at|TIMESTAMP|True|False|||
+trades|created_at|TIMESTAMP|False|False||now()|
+trades|updated_at|TIMESTAMP|False|False||now()|
+trading_goals|id|UUID|False|True|<function uuid4 at 0x00000289B976EDA0>||
+trading_goals|broker_account_id|UUID|False|False|||broker_accounts.id
+trading_goals|max_risk_per_trade_percent|FLOAT|True|False|2.0||
+trading_goals|max_daily_loss|FLOAT|True|False|5000.0||
+trading_goals|max_trades_per_day|INTEGER|True|False|10||
+trading_goals|require_stoploss|BOOLEAN|True|False|True||
+trading_goals|min_time_between_trades_minutes|INTEGER|True|False|5||
+trading_goals|max_position_size_percent|FLOAT|True|False|5.0||
+trading_goals|primary_segment|VARCHAR(20)|True|False|EQUITY||
+trading_goals|allowed_trading_start|VARCHAR(10)|True|False|09:15||
+trading_goals|allowed_trading_end|VARCHAR(10)|True|False|15:30||
+trading_goals|segment_hours|JSONB|True|False|<function dict at 0x00000289B976ECF0>||
+trading_goals|starting_capital|FLOAT|True|False|100000.0||
+trading_goals|current_capital|FLOAT|True|False|100000.0||
+trading_goals|created_at|DATETIME|True|False|<function Goal.<lambda> at 0x00000289B97||
+trading_goals|last_modified_at|DATETIME|True|False|<function Goal.<lambda> at 0x00000289B97||
+trading_sessions|id|UUID|False|True|<function uuid4 at 0x00000289B995C3B0>||
+trading_sessions|broker_account_id|UUID|False|False|||broker_accounts.id
+trading_sessions|session_date|DATE|False|False|||
+trading_sessions|market_open|TIMESTAMP|True|False|||
+trading_sessions|market_close|TIMESTAMP|True|False|||
+trading_sessions|opening_equity|NUMERIC(15, 4)|True|False|||
+trading_sessions|closing_equity|NUMERIC(15, 4)|True|False|||
+trading_sessions|session_pnl|NUMERIC(15, 4)|False|False|0||
+trading_sessions|trade_count|INTEGER|False|False|0||
+trading_sessions|alerts_fired|INTEGER|False|False|0||
+trading_sessions|risk_denominator|NUMERIC(18, 2)|True|False|||
+trading_sessions|risk_denominator_source|VARCHAR|True|False|||
+trading_sessions|risk_denominator_as_of|TIMESTAMP|True|False|||
+trading_sessions|risk_denominator_quality|VARCHAR|True|False|||
+trading_sessions|risk_score|NUMERIC(5, 2)|False|False|0||
+trading_sessions|peak_risk_score|NUMERIC(5, 2)|False|False|0||
+trading_sessions|session_state|VARCHAR(10)|False|False|normal||
+trading_sessions|intent_acknowledged|BOOLEAN|False|False|False||
+trading_sessions|intent_max_trades|INTEGER|True|False|||
+trading_sessions|intent_max_loss|NUMERIC(15, 4)|True|False|||
+trading_sessions|intent_time|TIMESTAMP|True|False|||
+trading_sessions|created_at|TIMESTAMP|False|False||now()|
+trading_sessions|updated_at|TIMESTAMP|False|False||now()|
+user_profiles|id|UUID|False|True|<function uuid4 at 0x00000289B98196F0>||
+user_profiles|broker_account_id|UUID|False|False|||broker_accounts.id
+user_profiles|onboarding_completed|BOOLEAN|True|False|False||
+user_profiles|onboarding_step|INTEGER|True|False|0||
+user_profiles|display_name|VARCHAR(100)|True|False|||
+user_profiles|trading_since|INTEGER|True|False|||
+user_profiles|experience_level|VARCHAR(20)|True|False|beginner||
+user_profiles|trading_style|VARCHAR(20)|True|False|intraday||
+user_profiles|risk_tolerance|VARCHAR(20)|True|False|moderate||
+user_profiles|preferred_instruments|JSONB|True|False|<function list at 0x00000289B9819590>||
+user_profiles|preferred_segments|JSONB|True|False|<function list at 0x00000289B9819900>||
+user_profiles|trading_hours_start|VARCHAR(5)|True|False|09:15||
+user_profiles|trading_hours_end|VARCHAR(5)|True|False|15:30||
+user_profiles|daily_loss_limit|FLOAT|True|False|||
+user_profiles|per_trade_loss_limit|FLOAT|True|False|||
+user_profiles|daily_trade_min|INTEGER|True|False|||
+user_profiles|daily_trade_limit|INTEGER|True|False|||
+user_profiles|max_position_size|FLOAT|True|False|||
+user_profiles|cooldown_after_loss|INTEGER|True|False|15||
+user_profiles|max_consecutive_losses|INTEGER|True|False|||
+user_profiles|restricted_windows|JSONB|True|False|<function list at 0x00000289B9819850>||
+user_profiles|trading_capital|FLOAT|True|False|||
+user_profiles|sl_percent_options|FLOAT|True|False|||
+user_profiles|constitution_accepted_at|DATETIME|True|False|||
+user_profiles|constitution_locked_until|DATETIME|True|False|||
+user_profiles|constitution_pending|JSONB|True|False|||
+user_profiles|known_weaknesses|JSONB|True|False|<function list at 0x00000289B9819A60>||
+user_profiles|push_enabled|BOOLEAN|True|False|True||
+user_profiles|whatsapp_enabled|BOOLEAN|True|False|False||
+user_profiles|email_enabled|BOOLEAN|True|False|False||
+user_profiles|alert_sensitivity|VARCHAR(20)|True|False|medium||
+user_profiles|guardian_enabled|BOOLEAN|True|False|False||
+user_profiles|guardian_alert_threshold|VARCHAR(20)|True|False|danger||
+user_profiles|guardian_daily_summary|BOOLEAN|True|False|False||
+user_profiles|eod_report_time|VARCHAR(5)|True|False|16:00||
+user_profiles|morning_brief_time|VARCHAR(5)|True|False|08:30||
+user_profiles|ai_persona|VARCHAR(50)|True|False|coach||
+user_profiles|detected_patterns|JSONB|True|False|<function dict at 0x00000289B9819BC0>||
+user_profiles|ai_cache|JSONB|True|False|<function dict at 0x00000289B98199B0>||
+user_profiles|created_at|DATETIME|False|False|<function UserProfile.<lambda> at 0x0000||
+user_profiles|updated_at|DATETIME|True|False|<function UserProfile.<lambda> at 0x0000||
+users|id|UUID|False|True|<function uuid4 at 0x00000289B86D7480>||
+users|email|VARCHAR|False|False|||
+users|display_name|VARCHAR|True|False|||
+users|avatar_url|VARCHAR|True|False|||
+users|guardian_phone|VARCHAR|True|False|||
+users|guardian_name|VARCHAR|True|False|||
+users|guardian_confirmed|BOOLEAN|True|False|False||
+users|guardian_confirmed_at|TIMESTAMP|True|False|||
+users|guardian_loss_limit|NUMERIC(15, 4)|True|False|||
+users|terms_accepted_at|TIMESTAMP|True|False|||
+users|terms_version|VARCHAR(20)|True|False|||
+users|created_at|TIMESTAMP|False|False||now()|
+users|updated_at|TIMESTAMP|False|False||now()|

@@ -1,0 +1,1789 @@
+# gathered 2026-09-04T10:45:39.802009+00:00
+table|pos|column|type|nullable|default|charlen|numprec|numscale|dtprec
+admin_audit_log|1|id|uuid|NO|gen_random_uuid()||||
+admin_audit_log|2|admin_email|character varying|NO||255|||
+admin_audit_log|3|action|character varying|NO||100|||
+admin_audit_log|4|target_type|character varying|YES||50|||
+admin_audit_log|5|target_id|character varying|YES||255|||
+admin_audit_log|6|details|jsonb|YES|||||
+admin_audit_log|7|created_at|timestamp with time zone|YES|now()||||6
+admin_login_events|1|id|uuid|NO|gen_random_uuid()||||
+admin_login_events|2|admin_id|uuid|NO|||||
+admin_login_events|3|admin_email|text|NO|||||
+admin_login_events|4|ip|text|YES|||||
+admin_login_events|5|user_agent|text|YES|||||
+admin_login_events|6|method|text|NO|||||
+admin_login_events|7|created_at|timestamp with time zone|NO|now()||||6
+admin_settings|1|key|text|NO|||||
+admin_settings|2|value|jsonb|NO|||||
+admin_settings|3|updated_by|text|YES|||||
+admin_settings|4|updated_at|timestamp with time zone|NO|now()||||6
+admin_users|1|id|uuid|NO|gen_random_uuid()||||
+admin_users|2|email|character varying|NO||255|||
+admin_users|3|password_hash|character varying|NO||255|||
+admin_users|4|name|character varying|NO||255|||
+admin_users|5|is_active|boolean|YES|true||||
+admin_users|6|created_at|timestamp with time zone|YES|now()||||6
+admin_users|7|last_login_at|timestamp with time zone|YES|||||6
+admin_users|8|role|character varying|NO|'superadmin'::character varying|50|||
+admin_users|9|totp_secret_enc|text|YES|||||
+admin_users|10|session_epoch|integer|NO|0||32|0|
+admin_users|11|must_change_password|boolean|NO|false||||
+admin_users|12|totp_required|boolean|NO|false||||
+admin_users|13|created_by|character varying|YES||255|||
+alert_checkpoints|1|id|uuid|NO|gen_random_uuid()||||
+alert_checkpoints|2|alert_id|uuid|NO|||||
+alert_checkpoints|3|broker_account_id|uuid|NO|||||
+alert_checkpoints|4|trigger_symbol|character varying|YES||100|||
+alert_checkpoints|5|trigger_exchange|character varying|YES||20|||
+alert_checkpoints|6|trigger_instrument_type|character varying|YES||20|||
+alert_checkpoints|7|trigger_quantity|integer|YES|||32|0|
+alert_checkpoints|8|trigger_direction|character varying|YES||10|||
+alert_checkpoints|9|trigger_avg_entry_price|numeric|YES|||15|4|
+alert_checkpoints|10|trigger_capital_at_risk|numeric|YES|||15|4|
+alert_checkpoints|11|trigger_instrument_token|bigint|YES|||64|0|
+alert_checkpoints|12|user_exited_quantity|integer|YES|0||32|0|
+alert_checkpoints|13|user_exit_price|numeric|YES|||15|4|
+alert_checkpoints|14|user_exit_time|timestamp with time zone|YES|||||6
+alert_checkpoints|15|user_exit_pnl|numeric|YES|||15|4|
+alert_checkpoints|16|minutes_to_exit|numeric|YES|||8|2|
+alert_checkpoints|17|price_at_t5|numeric|YES|||15|4|
+alert_checkpoints|18|price_at_t30|numeric|YES|||15|4|
+alert_checkpoints|19|price_at_t60|numeric|YES|||15|4|
+alert_checkpoints|20|outcome|character varying|YES||30|||
+alert_checkpoints|21|counterfactual_pnl_t30|numeric|YES|||15|4|
+alert_checkpoints|22|counterfactual_pnl_t60|numeric|YES|||15|4|
+alert_checkpoints|23|money_saved|numeric|YES|||15|4|
+alert_checkpoints|24|money_saved_basis|character varying|YES||10|||
+alert_checkpoints|25|confidence|character varying|YES|'low'::character varying|10|||
+alert_checkpoints|26|checkpoint_status|character varying|YES|'pending'::character varying|20|||
+alert_checkpoints|27|created_at|timestamp with time zone|YES|now()||||6
+alert_checkpoints|28|completed_at|timestamp with time zone|YES|||||6
+alert_checkpoints|29|positions_snapshot|jsonb|YES|'[]'::jsonb||||
+alert_checkpoints|30|total_unrealized_pnl|numeric|YES|0||15|4|
+alert_checkpoints|31|prices_at_t5|jsonb|YES|||||
+alert_checkpoints|32|pnl_at_t5|numeric|YES|||15|4|
+alert_checkpoints|33|checked_at_t5|timestamp with time zone|YES|||||6
+alert_checkpoints|34|prices_at_t30|jsonb|YES|||||
+alert_checkpoints|35|pnl_at_t30|numeric|YES|||15|4|
+alert_checkpoints|36|checked_at_t30|timestamp with time zone|YES|||||6
+alert_checkpoints|37|prices_at_t60|jsonb|YES|||||
+alert_checkpoints|38|pnl_at_t60|numeric|YES|||15|4|
+alert_checkpoints|39|checked_at_t60|timestamp with time zone|YES|||||6
+alert_checkpoints|40|user_actual_pnl|numeric|YES|||15|4|
+alert_checkpoints|41|calculation_status|text|YES|'pending'::text||||
+alert_mutes|1|broker_account_id|uuid|NO|||||
+alert_mutes|2|pattern_type|text|NO|||||
+alert_mutes|3|created_at|timestamp with time zone|NO|now()||||6
+behavior_events|1|id|uuid|NO|gen_random_uuid()||||
+behavior_events|2|broker_account_id|uuid|NO|||||
+behavior_events|3|detector|character varying|NO||60|||
+behavior_events|4|detector_version|character varying|NO||20|||
+behavior_events|5|severity|character varying|NO||10|||
+behavior_events|6|confidence|numeric|YES|||5|2|
+behavior_events|7|data_quality|character varying|NO|'GOOD'::character varying|10|||
+behavior_events|8|message|text|NO|||||
+behavior_events|9|evidence|jsonb|YES|||||
+behavior_events|10|input_snapshot|jsonb|YES|||||
+behavior_events|11|trigger_completed_trade_id|uuid|YES|||||
+behavior_events|12|risk_alert_id|uuid|YES|||||
+behavior_events|13|idempotency_key|text|YES|||||
+behavior_events|14|detected_at|timestamp with time zone|NO|||||6
+behavior_events|15|created_at|timestamp with time zone|NO|now()||||6
+behavior_events|16|shadow|boolean|NO|false||||
+behavior_events_default|1|id|uuid|NO|gen_random_uuid()||||
+behavior_events_default|2|broker_account_id|uuid|NO|||||
+behavior_events_default|3|detector|character varying|NO||60|||
+behavior_events_default|4|detector_version|character varying|NO||20|||
+behavior_events_default|5|severity|character varying|NO||10|||
+behavior_events_default|6|confidence|numeric|YES|||5|2|
+behavior_events_default|7|data_quality|character varying|NO|'GOOD'::character varying|10|||
+behavior_events_default|8|message|text|NO|||||
+behavior_events_default|9|evidence|jsonb|YES|||||
+behavior_events_default|10|input_snapshot|jsonb|YES|||||
+behavior_events_default|11|trigger_completed_trade_id|uuid|YES|||||
+behavior_events_default|12|risk_alert_id|uuid|YES|||||
+behavior_events_default|13|idempotency_key|text|YES|||||
+behavior_events_default|14|detected_at|timestamp with time zone|NO|||||6
+behavior_events_default|15|created_at|timestamp with time zone|NO|now()||||6
+behavior_events_default|16|shadow|boolean|NO|false||||
+behavior_events_legacy|1|id|uuid|NO|gen_random_uuid()||||
+behavior_events_legacy|2|broker_account_id|uuid|NO|||||
+behavior_events_legacy|3|detector|character varying|NO||60|||
+behavior_events_legacy|4|detector_version|character varying|NO||20|||
+behavior_events_legacy|5|severity|character varying|NO||10|||
+behavior_events_legacy|6|confidence|numeric|YES|||5|2|
+behavior_events_legacy|7|data_quality|character varying|NO|'GOOD'::character varying|10|||
+behavior_events_legacy|8|message|text|NO|||||
+behavior_events_legacy|9|evidence|jsonb|YES|||||
+behavior_events_legacy|10|input_snapshot|jsonb|YES|||||
+behavior_events_legacy|11|trigger_completed_trade_id|uuid|YES|||||
+behavior_events_legacy|12|risk_alert_id|uuid|YES|||||
+behavior_events_legacy|13|detected_at|timestamp with time zone|NO|||||6
+behavior_events_legacy|14|created_at|timestamp with time zone|NO|now()||||6
+behavior_events_legacy|15|idempotency_key|text|YES|||||
+behavior_events_y2026m07|1|id|uuid|NO|gen_random_uuid()||||
+behavior_events_y2026m07|2|broker_account_id|uuid|NO|||||
+behavior_events_y2026m07|3|detector|character varying|NO||60|||
+behavior_events_y2026m07|4|detector_version|character varying|NO||20|||
+behavior_events_y2026m07|5|severity|character varying|NO||10|||
+behavior_events_y2026m07|6|confidence|numeric|YES|||5|2|
+behavior_events_y2026m07|7|data_quality|character varying|NO|'GOOD'::character varying|10|||
+behavior_events_y2026m07|8|message|text|NO|||||
+behavior_events_y2026m07|9|evidence|jsonb|YES|||||
+behavior_events_y2026m07|10|input_snapshot|jsonb|YES|||||
+behavior_events_y2026m07|11|trigger_completed_trade_id|uuid|YES|||||
+behavior_events_y2026m07|12|risk_alert_id|uuid|YES|||||
+behavior_events_y2026m07|13|idempotency_key|text|YES|||||
+behavior_events_y2026m07|14|detected_at|timestamp with time zone|NO|||||6
+behavior_events_y2026m07|15|created_at|timestamp with time zone|NO|now()||||6
+behavior_events_y2026m07|16|shadow|boolean|NO|false||||
+behavior_events_y2026m08|1|id|uuid|NO|gen_random_uuid()||||
+behavior_events_y2026m08|2|broker_account_id|uuid|NO|||||
+behavior_events_y2026m08|3|detector|character varying|NO||60|||
+behavior_events_y2026m08|4|detector_version|character varying|NO||20|||
+behavior_events_y2026m08|5|severity|character varying|NO||10|||
+behavior_events_y2026m08|6|confidence|numeric|YES|||5|2|
+behavior_events_y2026m08|7|data_quality|character varying|NO|'GOOD'::character varying|10|||
+behavior_events_y2026m08|8|message|text|NO|||||
+behavior_events_y2026m08|9|evidence|jsonb|YES|||||
+behavior_events_y2026m08|10|input_snapshot|jsonb|YES|||||
+behavior_events_y2026m08|11|trigger_completed_trade_id|uuid|YES|||||
+behavior_events_y2026m08|12|risk_alert_id|uuid|YES|||||
+behavior_events_y2026m08|13|idempotency_key|text|YES|||||
+behavior_events_y2026m08|14|detected_at|timestamp with time zone|NO|||||6
+behavior_events_y2026m08|15|created_at|timestamp with time zone|NO|now()||||6
+behavior_events_y2026m08|16|shadow|boolean|NO|false||||
+behavior_events_y2026m09|1|id|uuid|NO|gen_random_uuid()||||
+behavior_events_y2026m09|2|broker_account_id|uuid|NO|||||
+behavior_events_y2026m09|3|detector|character varying|NO||60|||
+behavior_events_y2026m09|4|detector_version|character varying|NO||20|||
+behavior_events_y2026m09|5|severity|character varying|NO||10|||
+behavior_events_y2026m09|6|confidence|numeric|YES|||5|2|
+behavior_events_y2026m09|7|data_quality|character varying|NO|'GOOD'::character varying|10|||
+behavior_events_y2026m09|8|message|text|NO|||||
+behavior_events_y2026m09|9|evidence|jsonb|YES|||||
+behavior_events_y2026m09|10|input_snapshot|jsonb|YES|||||
+behavior_events_y2026m09|11|trigger_completed_trade_id|uuid|YES|||||
+behavior_events_y2026m09|12|risk_alert_id|uuid|YES|||||
+behavior_events_y2026m09|13|idempotency_key|text|YES|||||
+behavior_events_y2026m09|14|detected_at|timestamp with time zone|NO|||||6
+behavior_events_y2026m09|15|created_at|timestamp with time zone|NO|now()||||6
+behavior_events_y2026m09|16|shadow|boolean|NO|false||||
+behavior_events_y2026m10|1|id|uuid|NO|gen_random_uuid()||||
+behavior_events_y2026m10|2|broker_account_id|uuid|NO|||||
+behavior_events_y2026m10|3|detector|character varying|NO||60|||
+behavior_events_y2026m10|4|detector_version|character varying|NO||20|||
+behavior_events_y2026m10|5|severity|character varying|NO||10|||
+behavior_events_y2026m10|6|confidence|numeric|YES|||5|2|
+behavior_events_y2026m10|7|data_quality|character varying|NO|'GOOD'::character varying|10|||
+behavior_events_y2026m10|8|message|text|NO|||||
+behavior_events_y2026m10|9|evidence|jsonb|YES|||||
+behavior_events_y2026m10|10|input_snapshot|jsonb|YES|||||
+behavior_events_y2026m10|11|trigger_completed_trade_id|uuid|YES|||||
+behavior_events_y2026m10|12|risk_alert_id|uuid|YES|||||
+behavior_events_y2026m10|13|idempotency_key|text|YES|||||
+behavior_events_y2026m10|14|detected_at|timestamp with time zone|NO|||||6
+behavior_events_y2026m10|15|created_at|timestamp with time zone|NO|now()||||6
+behavior_events_y2026m10|16|shadow|boolean|NO|false||||
+behavior_events_y2026m11|1|id|uuid|NO|gen_random_uuid()||||
+behavior_events_y2026m11|2|broker_account_id|uuid|NO|||||
+behavior_events_y2026m11|3|detector|character varying|NO||60|||
+behavior_events_y2026m11|4|detector_version|character varying|NO||20|||
+behavior_events_y2026m11|5|severity|character varying|NO||10|||
+behavior_events_y2026m11|6|confidence|numeric|YES|||5|2|
+behavior_events_y2026m11|7|data_quality|character varying|NO|'GOOD'::character varying|10|||
+behavior_events_y2026m11|8|message|text|NO|||||
+behavior_events_y2026m11|9|evidence|jsonb|YES|||||
+behavior_events_y2026m11|10|input_snapshot|jsonb|YES|||||
+behavior_events_y2026m11|11|trigger_completed_trade_id|uuid|YES|||||
+behavior_events_y2026m11|12|risk_alert_id|uuid|YES|||||
+behavior_events_y2026m11|13|idempotency_key|text|YES|||||
+behavior_events_y2026m11|14|detected_at|timestamp with time zone|NO|||||6
+behavior_events_y2026m11|15|created_at|timestamp with time zone|NO|now()||||6
+behavior_events_y2026m11|16|shadow|boolean|NO|false||||
+behavior_events_y2026m12|1|id|uuid|NO|gen_random_uuid()||||
+behavior_events_y2026m12|2|broker_account_id|uuid|NO|||||
+behavior_events_y2026m12|3|detector|character varying|NO||60|||
+behavior_events_y2026m12|4|detector_version|character varying|NO||20|||
+behavior_events_y2026m12|5|severity|character varying|NO||10|||
+behavior_events_y2026m12|6|confidence|numeric|YES|||5|2|
+behavior_events_y2026m12|7|data_quality|character varying|NO|'GOOD'::character varying|10|||
+behavior_events_y2026m12|8|message|text|NO|||||
+behavior_events_y2026m12|9|evidence|jsonb|YES|||||
+behavior_events_y2026m12|10|input_snapshot|jsonb|YES|||||
+behavior_events_y2026m12|11|trigger_completed_trade_id|uuid|YES|||||
+behavior_events_y2026m12|12|risk_alert_id|uuid|YES|||||
+behavior_events_y2026m12|13|idempotency_key|text|YES|||||
+behavior_events_y2026m12|14|detected_at|timestamp with time zone|NO|||||6
+behavior_events_y2026m12|15|created_at|timestamp with time zone|NO|now()||||6
+behavior_events_y2026m12|16|shadow|boolean|NO|false||||
+behavior_events_y2027m01|1|id|uuid|NO|gen_random_uuid()||||
+behavior_events_y2027m01|2|broker_account_id|uuid|NO|||||
+behavior_events_y2027m01|3|detector|character varying|NO||60|||
+behavior_events_y2027m01|4|detector_version|character varying|NO||20|||
+behavior_events_y2027m01|5|severity|character varying|NO||10|||
+behavior_events_y2027m01|6|confidence|numeric|YES|||5|2|
+behavior_events_y2027m01|7|data_quality|character varying|NO|'GOOD'::character varying|10|||
+behavior_events_y2027m01|8|message|text|NO|||||
+behavior_events_y2027m01|9|evidence|jsonb|YES|||||
+behavior_events_y2027m01|10|input_snapshot|jsonb|YES|||||
+behavior_events_y2027m01|11|trigger_completed_trade_id|uuid|YES|||||
+behavior_events_y2027m01|12|risk_alert_id|uuid|YES|||||
+behavior_events_y2027m01|13|idempotency_key|text|YES|||||
+behavior_events_y2027m01|14|detected_at|timestamp with time zone|NO|||||6
+behavior_events_y2027m01|15|created_at|timestamp with time zone|NO|now()||||6
+behavior_events_y2027m01|16|shadow|boolean|NO|false||||
+behavior_events_y2027m02|1|id|uuid|NO|gen_random_uuid()||||
+behavior_events_y2027m02|2|broker_account_id|uuid|NO|||||
+behavior_events_y2027m02|3|detector|character varying|NO||60|||
+behavior_events_y2027m02|4|detector_version|character varying|NO||20|||
+behavior_events_y2027m02|5|severity|character varying|NO||10|||
+behavior_events_y2027m02|6|confidence|numeric|YES|||5|2|
+behavior_events_y2027m02|7|data_quality|character varying|NO|'GOOD'::character varying|10|||
+behavior_events_y2027m02|8|message|text|NO|||||
+behavior_events_y2027m02|9|evidence|jsonb|YES|||||
+behavior_events_y2027m02|10|input_snapshot|jsonb|YES|||||
+behavior_events_y2027m02|11|trigger_completed_trade_id|uuid|YES|||||
+behavior_events_y2027m02|12|risk_alert_id|uuid|YES|||||
+behavior_events_y2027m02|13|idempotency_key|text|YES|||||
+behavior_events_y2027m02|14|detected_at|timestamp with time zone|NO|||||6
+behavior_events_y2027m02|15|created_at|timestamp with time zone|NO|now()||||6
+behavior_events_y2027m02|16|shadow|boolean|NO|false||||
+behavior_events_y2027m03|1|id|uuid|NO|gen_random_uuid()||||
+behavior_events_y2027m03|2|broker_account_id|uuid|NO|||||
+behavior_events_y2027m03|3|detector|character varying|NO||60|||
+behavior_events_y2027m03|4|detector_version|character varying|NO||20|||
+behavior_events_y2027m03|5|severity|character varying|NO||10|||
+behavior_events_y2027m03|6|confidence|numeric|YES|||5|2|
+behavior_events_y2027m03|7|data_quality|character varying|NO|'GOOD'::character varying|10|||
+behavior_events_y2027m03|8|message|text|NO|||||
+behavior_events_y2027m03|9|evidence|jsonb|YES|||||
+behavior_events_y2027m03|10|input_snapshot|jsonb|YES|||||
+behavior_events_y2027m03|11|trigger_completed_trade_id|uuid|YES|||||
+behavior_events_y2027m03|12|risk_alert_id|uuid|YES|||||
+behavior_events_y2027m03|13|idempotency_key|text|YES|||||
+behavior_events_y2027m03|14|detected_at|timestamp with time zone|NO|||||6
+behavior_events_y2027m03|15|created_at|timestamp with time zone|NO|now()||||6
+behavior_events_y2027m03|16|shadow|boolean|NO|false||||
+behavior_events_y2027m04|1|id|uuid|NO|gen_random_uuid()||||
+behavior_events_y2027m04|2|broker_account_id|uuid|NO|||||
+behavior_events_y2027m04|3|detector|character varying|NO||60|||
+behavior_events_y2027m04|4|detector_version|character varying|NO||20|||
+behavior_events_y2027m04|5|severity|character varying|NO||10|||
+behavior_events_y2027m04|6|confidence|numeric|YES|||5|2|
+behavior_events_y2027m04|7|data_quality|character varying|NO|'GOOD'::character varying|10|||
+behavior_events_y2027m04|8|message|text|NO|||||
+behavior_events_y2027m04|9|evidence|jsonb|YES|||||
+behavior_events_y2027m04|10|input_snapshot|jsonb|YES|||||
+behavior_events_y2027m04|11|trigger_completed_trade_id|uuid|YES|||||
+behavior_events_y2027m04|12|risk_alert_id|uuid|YES|||||
+behavior_events_y2027m04|13|idempotency_key|text|YES|||||
+behavior_events_y2027m04|14|detected_at|timestamp with time zone|NO|||||6
+behavior_events_y2027m04|15|created_at|timestamp with time zone|NO|now()||||6
+behavior_events_y2027m04|16|shadow|boolean|NO|false||||
+behavior_events_y2027m05|1|id|uuid|NO|gen_random_uuid()||||
+behavior_events_y2027m05|2|broker_account_id|uuid|NO|||||
+behavior_events_y2027m05|3|detector|character varying|NO||60|||
+behavior_events_y2027m05|4|detector_version|character varying|NO||20|||
+behavior_events_y2027m05|5|severity|character varying|NO||10|||
+behavior_events_y2027m05|6|confidence|numeric|YES|||5|2|
+behavior_events_y2027m05|7|data_quality|character varying|NO|'GOOD'::character varying|10|||
+behavior_events_y2027m05|8|message|text|NO|||||
+behavior_events_y2027m05|9|evidence|jsonb|YES|||||
+behavior_events_y2027m05|10|input_snapshot|jsonb|YES|||||
+behavior_events_y2027m05|11|trigger_completed_trade_id|uuid|YES|||||
+behavior_events_y2027m05|12|risk_alert_id|uuid|YES|||||
+behavior_events_y2027m05|13|idempotency_key|text|YES|||||
+behavior_events_y2027m05|14|detected_at|timestamp with time zone|NO|||||6
+behavior_events_y2027m05|15|created_at|timestamp with time zone|NO|now()||||6
+behavior_events_y2027m05|16|shadow|boolean|NO|false||||
+behavior_events_y2027m06|1|id|uuid|NO|gen_random_uuid()||||
+behavior_events_y2027m06|2|broker_account_id|uuid|NO|||||
+behavior_events_y2027m06|3|detector|character varying|NO||60|||
+behavior_events_y2027m06|4|detector_version|character varying|NO||20|||
+behavior_events_y2027m06|5|severity|character varying|NO||10|||
+behavior_events_y2027m06|6|confidence|numeric|YES|||5|2|
+behavior_events_y2027m06|7|data_quality|character varying|NO|'GOOD'::character varying|10|||
+behavior_events_y2027m06|8|message|text|NO|||||
+behavior_events_y2027m06|9|evidence|jsonb|YES|||||
+behavior_events_y2027m06|10|input_snapshot|jsonb|YES|||||
+behavior_events_y2027m06|11|trigger_completed_trade_id|uuid|YES|||||
+behavior_events_y2027m06|12|risk_alert_id|uuid|YES|||||
+behavior_events_y2027m06|13|idempotency_key|text|YES|||||
+behavior_events_y2027m06|14|detected_at|timestamp with time zone|NO|||||6
+behavior_events_y2027m06|15|created_at|timestamp with time zone|NO|now()||||6
+behavior_events_y2027m06|16|shadow|boolean|NO|false||||
+behavior_events_y2027m07|1|id|uuid|NO|gen_random_uuid()||||
+behavior_events_y2027m07|2|broker_account_id|uuid|NO|||||
+behavior_events_y2027m07|3|detector|character varying|NO||60|||
+behavior_events_y2027m07|4|detector_version|character varying|NO||20|||
+behavior_events_y2027m07|5|severity|character varying|NO||10|||
+behavior_events_y2027m07|6|confidence|numeric|YES|||5|2|
+behavior_events_y2027m07|7|data_quality|character varying|NO|'GOOD'::character varying|10|||
+behavior_events_y2027m07|8|message|text|NO|||||
+behavior_events_y2027m07|9|evidence|jsonb|YES|||||
+behavior_events_y2027m07|10|input_snapshot|jsonb|YES|||||
+behavior_events_y2027m07|11|trigger_completed_trade_id|uuid|YES|||||
+behavior_events_y2027m07|12|risk_alert_id|uuid|YES|||||
+behavior_events_y2027m07|13|idempotency_key|text|YES|||||
+behavior_events_y2027m07|14|detected_at|timestamp with time zone|NO|||||6
+behavior_events_y2027m07|15|created_at|timestamp with time zone|NO|now()||||6
+behavior_events_y2027m07|16|shadow|boolean|NO|false||||
+behavior_events_y2027m08|1|id|uuid|NO|gen_random_uuid()||||
+behavior_events_y2027m08|2|broker_account_id|uuid|NO|||||
+behavior_events_y2027m08|3|detector|character varying|NO||60|||
+behavior_events_y2027m08|4|detector_version|character varying|NO||20|||
+behavior_events_y2027m08|5|severity|character varying|NO||10|||
+behavior_events_y2027m08|6|confidence|numeric|YES|||5|2|
+behavior_events_y2027m08|7|data_quality|character varying|NO|'GOOD'::character varying|10|||
+behavior_events_y2027m08|8|message|text|NO|||||
+behavior_events_y2027m08|9|evidence|jsonb|YES|||||
+behavior_events_y2027m08|10|input_snapshot|jsonb|YES|||||
+behavior_events_y2027m08|11|trigger_completed_trade_id|uuid|YES|||||
+behavior_events_y2027m08|12|risk_alert_id|uuid|YES|||||
+behavior_events_y2027m08|13|idempotency_key|text|YES|||||
+behavior_events_y2027m08|14|detected_at|timestamp with time zone|NO|||||6
+behavior_events_y2027m08|15|created_at|timestamp with time zone|NO|now()||||6
+behavior_events_y2027m08|16|shadow|boolean|NO|false||||
+behavior_events_y2027m09|1|id|uuid|NO|gen_random_uuid()||||
+behavior_events_y2027m09|2|broker_account_id|uuid|NO|||||
+behavior_events_y2027m09|3|detector|character varying|NO||60|||
+behavior_events_y2027m09|4|detector_version|character varying|NO||20|||
+behavior_events_y2027m09|5|severity|character varying|NO||10|||
+behavior_events_y2027m09|6|confidence|numeric|YES|||5|2|
+behavior_events_y2027m09|7|data_quality|character varying|NO|'GOOD'::character varying|10|||
+behavior_events_y2027m09|8|message|text|NO|||||
+behavior_events_y2027m09|9|evidence|jsonb|YES|||||
+behavior_events_y2027m09|10|input_snapshot|jsonb|YES|||||
+behavior_events_y2027m09|11|trigger_completed_trade_id|uuid|YES|||||
+behavior_events_y2027m09|12|risk_alert_id|uuid|YES|||||
+behavior_events_y2027m09|13|idempotency_key|text|YES|||||
+behavior_events_y2027m09|14|detected_at|timestamp with time zone|NO|||||6
+behavior_events_y2027m09|15|created_at|timestamp with time zone|NO|now()||||6
+behavior_events_y2027m09|16|shadow|boolean|NO|false||||
+behavior_events_y2027m10|1|id|uuid|NO|gen_random_uuid()||||
+behavior_events_y2027m10|2|broker_account_id|uuid|NO|||||
+behavior_events_y2027m10|3|detector|character varying|NO||60|||
+behavior_events_y2027m10|4|detector_version|character varying|NO||20|||
+behavior_events_y2027m10|5|severity|character varying|NO||10|||
+behavior_events_y2027m10|6|confidence|numeric|YES|||5|2|
+behavior_events_y2027m10|7|data_quality|character varying|NO|'GOOD'::character varying|10|||
+behavior_events_y2027m10|8|message|text|NO|||||
+behavior_events_y2027m10|9|evidence|jsonb|YES|||||
+behavior_events_y2027m10|10|input_snapshot|jsonb|YES|||||
+behavior_events_y2027m10|11|trigger_completed_trade_id|uuid|YES|||||
+behavior_events_y2027m10|12|risk_alert_id|uuid|YES|||||
+behavior_events_y2027m10|13|idempotency_key|text|YES|||||
+behavior_events_y2027m10|14|detected_at|timestamp with time zone|NO|||||6
+behavior_events_y2027m10|15|created_at|timestamp with time zone|NO|now()||||6
+behavior_events_y2027m10|16|shadow|boolean|NO|false||||
+behavior_events_y2027m11|1|id|uuid|NO|gen_random_uuid()||||
+behavior_events_y2027m11|2|broker_account_id|uuid|NO|||||
+behavior_events_y2027m11|3|detector|character varying|NO||60|||
+behavior_events_y2027m11|4|detector_version|character varying|NO||20|||
+behavior_events_y2027m11|5|severity|character varying|NO||10|||
+behavior_events_y2027m11|6|confidence|numeric|YES|||5|2|
+behavior_events_y2027m11|7|data_quality|character varying|NO|'GOOD'::character varying|10|||
+behavior_events_y2027m11|8|message|text|NO|||||
+behavior_events_y2027m11|9|evidence|jsonb|YES|||||
+behavior_events_y2027m11|10|input_snapshot|jsonb|YES|||||
+behavior_events_y2027m11|11|trigger_completed_trade_id|uuid|YES|||||
+behavior_events_y2027m11|12|risk_alert_id|uuid|YES|||||
+behavior_events_y2027m11|13|idempotency_key|text|YES|||||
+behavior_events_y2027m11|14|detected_at|timestamp with time zone|NO|||||6
+behavior_events_y2027m11|15|created_at|timestamp with time zone|NO|now()||||6
+behavior_events_y2027m11|16|shadow|boolean|NO|false||||
+behavior_events_y2027m12|1|id|uuid|NO|gen_random_uuid()||||
+behavior_events_y2027m12|2|broker_account_id|uuid|NO|||||
+behavior_events_y2027m12|3|detector|character varying|NO||60|||
+behavior_events_y2027m12|4|detector_version|character varying|NO||20|||
+behavior_events_y2027m12|5|severity|character varying|NO||10|||
+behavior_events_y2027m12|6|confidence|numeric|YES|||5|2|
+behavior_events_y2027m12|7|data_quality|character varying|NO|'GOOD'::character varying|10|||
+behavior_events_y2027m12|8|message|text|NO|||||
+behavior_events_y2027m12|9|evidence|jsonb|YES|||||
+behavior_events_y2027m12|10|input_snapshot|jsonb|YES|||||
+behavior_events_y2027m12|11|trigger_completed_trade_id|uuid|YES|||||
+behavior_events_y2027m12|12|risk_alert_id|uuid|YES|||||
+behavior_events_y2027m12|13|idempotency_key|text|YES|||||
+behavior_events_y2027m12|14|detected_at|timestamp with time zone|NO|||||6
+behavior_events_y2027m12|15|created_at|timestamp with time zone|NO|now()||||6
+behavior_events_y2027m12|16|shadow|boolean|NO|false||||
+behavioral_events|1|id|uuid|NO|gen_random_uuid()||||
+behavioral_events|2|broker_account_id|uuid|NO|||||
+behavioral_events|3|event_type|character varying|NO||50|||
+behavioral_events|4|severity|character varying|NO||10|||
+behavioral_events|5|confidence|numeric|NO|||3|2|
+behavioral_events|6|trigger_trade_id|uuid|YES|||||
+behavioral_events|7|trigger_position_key|character varying|YES||200|||
+behavioral_events|8|message|text|NO|||||
+behavioral_events|9|context|jsonb|YES|||||
+behavioral_events|10|detected_at|timestamp with time zone|NO|now()||||6
+behavioral_events|11|delivery_status|character varying|YES|'PENDING'::character varying|20|||
+behavioral_events|12|acknowledged_at|timestamp with time zone|YES|||||6
+behavioral_events|13|created_at|timestamp with time zone|YES|now()||||6
+behavioral_events|14|session_id|uuid|YES|||||
+behavioral_events|15|risk_score_at_event|numeric|YES|||5|2|
+behavioral_events|16|account_equity_at_event|numeric|YES|||15|4|
+behavioral_events|17|position_exposure_at_event|numeric|YES|||15|4|
+broadcast_logs|1|id|uuid|NO|gen_random_uuid()||||
+broadcast_logs|2|created_by|character varying|NO||255|||
+broadcast_logs|3|segment|character varying|NO||50|||
+broadcast_logs|4|message|text|NO|||||
+broadcast_logs|5|total|integer|NO|0||32|0|
+broadcast_logs|6|sent|integer|NO|0||32|0|
+broadcast_logs|7|failed|integer|NO|0||32|0|
+broadcast_logs|8|created_at|timestamp with time zone|NO|now()||||6
+broadcast_receipts|1|id|uuid|NO|gen_random_uuid()||||
+broadcast_receipts|2|broadcast_id|uuid|NO|||||
+broadcast_receipts|3|phone|character varying|NO||20|||
+broadcast_receipts|4|status|character varying|NO|'queued'::character varying|20|||
+broadcast_receipts|5|error|text|YES|||||
+broadcast_receipts|6|sent_at|timestamp with time zone|YES|||||6
+broker_accounts|1|id|uuid|NO|gen_random_uuid()||||
+broker_accounts|2|user_id|uuid|NO|||||
+broker_accounts|3|broker_name|text|YES|'zerodha'::text||||
+broker_accounts|4|access_token|text|YES|||||
+broker_accounts|5|refresh_token|text|YES|||||
+broker_accounts|6|api_key|text|YES|||||
+broker_accounts|7|status|text|NO|||||
+broker_accounts|8|connected_at|timestamp with time zone|YES|||||6
+broker_accounts|9|last_sync_at|timestamp with time zone|YES|||||6
+broker_accounts|10|broker_user_id|text|YES|||||
+broker_accounts|11|broker_email|text|YES|||||
+broker_accounts|14|created_at|timestamp with time zone|YES|now()||||6
+broker_accounts|15|updated_at|timestamp with time zone|YES|now()||||6
+broker_accounts|16|user_type|character varying|YES||20|||
+broker_accounts|17|exchanges|ARRAY|YES|||||
+broker_accounts|18|products|ARRAY|YES|||||
+broker_accounts|19|order_types|ARRAY|YES|||||
+broker_accounts|20|meta|jsonb|YES|'{}'::jsonb||||
+broker_accounts|21|avatar_url|text|YES|||||
+broker_accounts|22|demat_consent|boolean|YES|false||||
+broker_accounts|23|sync_status|character varying|YES|'pending'::character varying|20|||
+broker_accounts|24|token_revoked_at|timestamp with time zone|YES|||||6
+broker_accounts|25|api_secret_enc|character varying|YES|||||
+coach_sessions|1|id|uuid|NO|gen_random_uuid()||||
+coach_sessions|2|broker_account_id|uuid|NO|||||
+coach_sessions|3|messages|jsonb|NO|'[]'::jsonb||||
+coach_sessions|4|summary|text|YES|||||
+coach_sessions|5|started_at|timestamp with time zone|NO|now()||||6
+coach_sessions|6|ended_at|timestamp with time zone|YES|||||6
+coach_sessions|7|created_at|timestamp with time zone|NO|now()||||6
+commitment_logs|1|id|uuid|NO|gen_random_uuid()||||
+commitment_logs|2|broker_account_id|uuid|NO|||||
+commitment_logs|3|log_type|character varying|NO||50|||
+commitment_logs|4|description|text|NO|||||
+commitment_logs|5|reason|text|YES|||||
+commitment_logs|6|cost|double precision|YES|||53||
+commitment_logs|7|timestamp|timestamp with time zone|YES|now()||||6
+completed_trade_features|1|id|uuid|NO|gen_random_uuid()||||
+completed_trade_features|2|completed_trade_id|uuid|NO|||||
+completed_trade_features|3|broker_account_id|uuid|NO|||||
+completed_trade_features|4|holding_duration_minutes|integer|YES|||32|0|
+completed_trade_features|5|entry_hour_ist|integer|YES|||32|0|
+completed_trade_features|6|exit_hour_ist|integer|YES|||32|0|
+completed_trade_features|7|entry_day_of_week|integer|YES|||32|0|
+completed_trade_features|8|is_expiry_day|boolean|YES|false||||
+completed_trade_features|9|size_relative_to_avg|numeric|YES|||10|4|
+completed_trade_features|10|is_scaled_entry|boolean|YES|false||||
+completed_trade_features|11|is_scaled_exit|boolean|YES|false||||
+completed_trade_features|12|entry_after_loss|boolean|YES|false||||
+completed_trade_features|13|consecutive_loss_count|integer|YES|0||32|0|
+completed_trade_features|14|session_pnl_at_entry|numeric|YES|0||15|4|
+completed_trade_features|15|minutes_since_last_round|integer|YES|||32|0|
+completed_trade_features|16|is_winner|boolean|YES|false||||
+completed_trade_features|17|pnl_per_unit|numeric|YES|||15|4|
+completed_trade_features|18|created_at|timestamp with time zone|YES|now()||||6
+completed_trades|1|id|uuid|NO|gen_random_uuid()||||
+completed_trades|2|broker_account_id|uuid|NO|||||
+completed_trades|3|tradingsymbol|character varying|NO||100|||
+completed_trades|4|exchange|character varying|NO||20|||
+completed_trades|5|instrument_type|character varying|YES||20|||
+completed_trades|6|product|character varying|YES||20|||
+completed_trades|7|direction|character varying|YES||10|||
+completed_trades|8|total_quantity|integer|YES|||32|0|
+completed_trades|9|num_entries|integer|YES|1||32|0|
+completed_trades|10|num_exits|integer|YES|1||32|0|
+completed_trades|11|avg_entry_price|numeric|YES|||15|4|
+completed_trades|12|avg_exit_price|numeric|YES|||15|4|
+completed_trades|13|realized_pnl|numeric|YES|||15|4|
+completed_trades|14|entry_time|timestamp with time zone|YES|||||6
+completed_trades|15|exit_time|timestamp with time zone|YES|||||6
+completed_trades|16|duration_minutes|integer|YES|||32|0|
+completed_trades|17|closed_by_flip|boolean|YES|false||||
+completed_trades|18|entry_trade_ids|ARRAY|YES|||||
+completed_trades|19|exit_trade_ids|ARRAY|YES|||||
+completed_trades|20|status|character varying|YES|'closed'::character varying|20|||
+completed_trades|21|created_at|timestamp with time zone|YES|now()||||6
+completed_trades|22|updated_at|timestamp with time zone|YES|now()||||6
+completed_trades|23|overnight_close_price|numeric|YES|||15|4|
+completed_trades|24|pnl_pct|double precision|YES|||53||
+completed_trades|25|quality_score|smallint|YES|||16|0|
+constitution_history|1|id|uuid|NO|gen_random_uuid()||||
+constitution_history|2|broker_account_id|uuid|NO|||||
+constitution_history|3|changed_at|timestamp with time zone|NO|now()||||6
+constitution_history|4|change_type|character varying|NO||20|||
+constitution_history|5|changes|jsonb|NO|||||
+constitution_history|6|effective_at|timestamp with time zone|NO|||||6
+constitution_history|7|during_market_hours|boolean|NO|false||||
+constitution_history|8|override_flag|boolean|NO|false||||
+cooldowns|1|id|uuid|NO|gen_random_uuid()||||
+cooldowns|2|broker_account_id|uuid|NO|||||
+cooldowns|3|reason|character varying|NO||50|||
+cooldowns|4|duration_minutes|integer|NO|15||32|0|
+cooldowns|5|started_at|timestamp with time zone|NO|now()||||6
+cooldowns|6|expires_at|timestamp with time zone|NO|||||6
+cooldowns|7|can_skip|boolean|YES|true||||
+cooldowns|8|skipped|boolean|YES|false||||
+cooldowns|9|skipped_at|timestamp with time zone|YES|||||6
+cooldowns|10|acknowledged|boolean|YES|false||||
+cooldowns|11|acknowledged_at|timestamp with time zone|YES|||||6
+cooldowns|12|trigger_alert_id|uuid|YES|||||
+cooldowns|13|message|character varying|YES||500|||
+cooldowns|14|metadata|jsonb|YES|'{}'::jsonb||||
+cooldowns|15|created_at|timestamp with time zone|NO|now()||||6
+cooldowns|16|meta_data|jsonb|YES|'{}'::jsonb||||
+data_quality_events|1|id|uuid|NO|gen_random_uuid()||||
+data_quality_events|2|broker_account_id|uuid|NO|||||
+data_quality_events|3|kind|text|NO|||||
+data_quality_events|4|tradingsymbol|text|YES|||||
+data_quality_events|5|exchange|text|YES|||||
+data_quality_events|6|fifo_pnl|numeric|YES|||15|4|
+data_quality_events|7|broker_pnl|numeric|YES|||15|4|
+data_quality_events|8|ratio|numeric|YES|||10|4|
+data_quality_events|9|details|jsonb|NO|'{}'::jsonb||||
+data_quality_events|10|detected_at|timestamp with time zone|NO|now()||||6
+detector_flags|1|detector|text|NO|||||
+detector_flags|2|mode|text|NO|'on'::text||||
+detector_flags|3|rollout_pct|integer|NO|100||32|0|
+detector_flags|4|updated_at|timestamp with time zone|NO|now()||||6
+detector_flags|5|updated_by|text|YES|||||
+discipline_scores|1|id|uuid|NO|gen_random_uuid()||||
+discipline_scores|2|broker_account_id|uuid|NO|||||
+discipline_scores|3|week_start|date|NO|||||0
+discipline_scores|4|score|smallint|NO|0||16|0|
+discipline_scores|5|max_score|smallint|NO|100||16|0|
+discipline_scores|6|danger_alerts|smallint|NO|0||16|0|
+discipline_scores|7|caution_alerts|smallint|NO|0||16|0|
+discipline_scores|8|trades_count|smallint|NO|0||16|0|
+discipline_scores|9|avg_quality|numeric|YES|||4|2|
+discipline_scores|10|breakdown|jsonb|YES|'{}'::jsonb||||
+discipline_scores|11|computed_at|timestamp with time zone|NO|now()||||6
+discipline_streaks|1|id|uuid|NO|gen_random_uuid()||||
+discipline_streaks|2|broker_account_id|uuid|NO|||||
+discipline_streaks|3|streak_type|character varying|NO||60|||
+discipline_streaks|4|current_count|smallint|NO|0||16|0|
+discipline_streaks|5|best_count|smallint|NO|0||16|0|
+discipline_streaks|6|last_updated|date|NO|CURRENT_DATE||||0
+discipline_streaks|7|last_broken_at|timestamp with time zone|YES|||||6
+generated_reports|1|id|uuid|NO|gen_random_uuid()||||
+generated_reports|2|broker_account_id|uuid|NO|||||
+generated_reports|3|report_type|character varying|NO||30|||
+generated_reports|4|report_date|date|NO|||||0
+generated_reports|5|report_data|jsonb|NO|'{}'::jsonb||||
+generated_reports|6|generated_at|timestamp with time zone|NO|now()||||6
+generated_reports|7|sent_via|character varying|YES||20|||
+gtt_tracking|1|id|uuid|NO|gen_random_uuid()||||
+gtt_tracking|2|broker_account_id|uuid|NO|||||
+gtt_tracking|3|gtt_id|integer|NO|||32|0|
+gtt_tracking|4|tradingsymbol|character varying|NO||100|||
+gtt_tracking|5|exchange|character varying|YES||20|||
+gtt_tracking|6|trigger_price|numeric|YES|||15|4|
+gtt_tracking|7|order_type|character varying|YES||20|||
+gtt_tracking|8|quantity|integer|YES|||32|0|
+gtt_tracking|9|gtt_status|character varying|YES|'active'::character varying|20|||
+gtt_tracking|10|outcome|character varying|YES||20|||
+gtt_tracking|11|outcome_order_id|character varying|YES||50|||
+gtt_tracking|12|created_at|timestamp with time zone|YES|now()||||6
+gtt_tracking|13|triggered_at|timestamp with time zone|YES|||||6
+gtt_tracking|14|updated_at|timestamp with time zone|YES|now()||||6
+guardrail_rules|1|id|uuid|NO|gen_random_uuid()||||
+guardrail_rules|2|broker_account_id|uuid|NO|||||
+guardrail_rules|3|name|character varying|NO||100|||
+guardrail_rules|4|target_symbols|ARRAY|YES|||||
+guardrail_rules|5|condition_type|character varying|NO||50|||
+guardrail_rules|6|condition_value|numeric|NO|||15|2|
+guardrail_rules|7|notify_whatsapp|boolean|NO|true||||
+guardrail_rules|8|notify_push|boolean|NO|true||||
+guardrail_rules|9|status|character varying|NO|'active'::character varying|20|||
+guardrail_rules|10|triggered_at|timestamp with time zone|YES|||||6
+guardrail_rules|11|trigger_count|integer|NO|0||32|0|
+guardrail_rules|12|expires_at|timestamp with time zone|NO|||||6
+guardrail_rules|13|created_at|timestamp with time zone|NO|now()||||6
+guardrail_rules|14|updated_at|timestamp with time zone|NO|now()||||6
+holdings|1|id|uuid|NO|gen_random_uuid()||||
+holdings|2|broker_account_id|uuid|NO|||||
+holdings|3|tradingsymbol|character varying|NO||50|||
+holdings|4|exchange|character varying|NO||10|||
+holdings|5|isin|character varying|YES||20|||
+holdings|6|quantity|integer|NO|||32|0|
+holdings|7|authorised_quantity|integer|YES|0||32|0|
+holdings|8|t1_quantity|integer|YES|0||32|0|
+holdings|9|collateral_quantity|integer|YES|0||32|0|
+holdings|10|collateral_type|character varying|YES||20|||
+holdings|11|average_price|numeric|YES|||15|4|
+holdings|12|last_price|numeric|YES|||15|4|
+holdings|13|close_price|numeric|YES|||15|4|
+holdings|14|pnl|numeric|YES|||15|4|
+holdings|15|day_change|numeric|YES|||15|4|
+holdings|16|day_change_percentage|numeric|YES|||10|4|
+holdings|17|instrument_token|bigint|YES|||64|0|
+holdings|18|product|character varying|YES|'CNC'::character varying|10|||
+holdings|19|created_at|timestamp with time zone|YES|now()||||6
+holdings|20|updated_at|timestamp with time zone|YES|now()||||6
+incomplete_positions|1|id|uuid|NO|gen_random_uuid()||||
+incomplete_positions|2|broker_account_id|uuid|NO|||||
+incomplete_positions|3|tradingsymbol|character varying|NO||100|||
+incomplete_positions|4|exchange|character varying|NO||20|||
+incomplete_positions|5|product|character varying|YES||20|||
+incomplete_positions|6|direction|character varying|YES||10|||
+incomplete_positions|7|unmatched_quantity|integer|YES|||32|0|
+incomplete_positions|8|avg_entry_price|numeric|YES|||15|4|
+incomplete_positions|9|entry_time|timestamp with time zone|YES|||||6
+incomplete_positions|10|reason|character varying|NO||50|||
+incomplete_positions|11|detected_at|timestamp with time zone|YES|now()||||6
+incomplete_positions|12|details|text|YES|||||
+incomplete_positions|13|resolution_status|character varying|YES|'PENDING'::character varying|20|||
+incomplete_positions|14|resolved_at|timestamp with time zone|YES|||||6
+incomplete_positions|15|resolution_method|character varying|YES||50|||
+incomplete_positions|16|created_at|timestamp with time zone|YES|now()||||6
+incomplete_positions|17|updated_at|timestamp with time zone|YES|now()||||6
+instruments|1|id|uuid|NO|gen_random_uuid()||||
+instruments|2|instrument_token|bigint|NO|||64|0|
+instruments|3|exchange_token|bigint|YES|||64|0|
+instruments|4|tradingsymbol|character varying|NO||50|||
+instruments|5|name|character varying|YES||100|||
+instruments|6|last_price|numeric|YES|||15|4|
+instruments|7|expiry|date|YES|||||0
+instruments|8|strike|numeric|YES|||15|4|
+instruments|9|tick_size|numeric|YES|0.05||10|4|
+instruments|10|lot_size|integer|YES|1||32|0|
+instruments|11|instrument_type|character varying|YES||20|||
+instruments|12|segment|character varying|YES||20|||
+instruments|13|exchange|character varying|YES||10|||
+instruments|14|created_at|timestamp with time zone|YES|now()||||6
+instruments|15|updated_at|timestamp with time zone|YES|now()||||6
+journal_entries|1|id|uuid|NO|gen_random_uuid()||||
+journal_entries|2|broker_account_id|uuid|NO|||||
+journal_entries|3|trade_id|uuid|YES|||||
+journal_entries|4|notes|text|YES|||||
+journal_entries|5|emotions|text|YES|||||
+journal_entries|6|lessons|text|YES|||||
+journal_entries|7|emotion_tags|jsonb|YES|'[]'::jsonb||||
+journal_entries|8|trade_symbol|character varying|YES||100|||
+journal_entries|9|trade_type|character varying|YES||10|||
+journal_entries|10|trade_pnl|character varying|YES||50|||
+journal_entries|11|entry_type|character varying|NO|'trade'::character varying|20|||
+journal_entries|12|created_at|timestamp with time zone|NO|now()||||6
+journal_entries|13|updated_at|timestamp with time zone|YES|now()||||6
+journal_entries|14|followed_plan|character varying|YES||20|||
+journal_entries|15|deviation_reason|character varying|YES||50|||
+journal_entries|16|exit_reason|character varying|YES||50|||
+journal_entries|17|setup_quality|smallint|YES|||16|0|
+journal_entries|18|would_repeat|character varying|YES||10|||
+journal_entries|19|market_condition|character varying|YES||20|||
+margin_snapshots|1|id|uuid|NO|gen_random_uuid()||||
+margin_snapshots|2|broker_account_id|uuid|NO|||||
+margin_snapshots|3|snapshot_at|timestamp with time zone|YES|now()||||6
+margin_snapshots|4|equity_available|numeric|YES|||15|4|
+margin_snapshots|5|equity_used|numeric|YES|||15|4|
+margin_snapshots|6|equity_total|numeric|YES|||15|4|
+margin_snapshots|7|equity_utilization_pct|numeric|YES|||5|2|
+margin_snapshots|8|commodity_available|numeric|YES|||15|4|
+margin_snapshots|9|commodity_used|numeric|YES|||15|4|
+margin_snapshots|10|commodity_total|numeric|YES|||15|4|
+margin_snapshots|11|commodity_utilization_pct|numeric|YES|||5|2|
+margin_snapshots|12|max_utilization_pct|numeric|YES|||5|2|
+margin_snapshots|13|risk_level|character varying|YES||20|||
+margin_snapshots|14|equity_breakdown|jsonb|YES|'{}'::jsonb||||
+margin_snapshots|15|commodity_breakdown|jsonb|YES|'{}'::jsonb||||
+margin_snapshots|16|created_at|timestamp with time zone|YES|now()||||6
+margin_snapshots|17|equity_opening_balance|numeric|YES|||18|2|
+monthly_snapshots|1|id|uuid|NO|gen_random_uuid()||||
+monthly_snapshots|2|broker_account_id|uuid|NO|||||
+monthly_snapshots|3|month|date|NO|||||0
+monthly_snapshots|4|metrics|jsonb|NO|'{}'::jsonb||||
+monthly_snapshots|5|snapshot_version|integer|NO|1||32|0|
+monthly_snapshots|6|detector_version|text|YES|||||
+monthly_snapshots|7|orders_pruned_at|timestamp with time zone|YES|||||6
+monthly_snapshots|8|created_at|timestamp with time zone|NO|now()||||6
+oauth_temp_store|1|key|text|NO|||||
+oauth_temp_store|2|value|text|NO|||||
+oauth_temp_store|3|expires_at|timestamp with time zone|NO|||||6
+orders|1|id|uuid|NO|gen_random_uuid()||||
+orders|2|broker_account_id|uuid|NO|||||
+orders|3|kite_order_id|character varying|NO||50|||
+orders|4|exchange_order_id|character varying|YES||50|||
+orders|5|status|character varying|NO||20|||
+orders|6|status_message|text|YES|||||
+orders|7|status_message_raw|text|YES|||||
+orders|8|tradingsymbol|character varying|NO||50|||
+orders|9|exchange|character varying|NO||10|||
+orders|10|transaction_type|character varying|NO||10|||
+orders|11|order_type|character varying|NO||10|||
+orders|12|product|character varying|NO||10|||
+orders|13|variety|character varying|NO||20|||
+orders|14|validity|character varying|NO|'DAY'::character varying|10|||
+orders|15|quantity|integer|NO|||32|0|
+orders|16|disclosed_quantity|integer|YES|0||32|0|
+orders|17|pending_quantity|integer|YES|0||32|0|
+orders|18|cancelled_quantity|integer|YES|0||32|0|
+orders|19|filled_quantity|integer|YES|0||32|0|
+orders|20|price|numeric|YES|||15|4|
+orders|21|trigger_price|numeric|YES|||15|4|
+orders|22|average_price|numeric|YES|||15|4|
+orders|23|order_timestamp|timestamp with time zone|NO|||||6
+orders|24|exchange_timestamp|timestamp with time zone|YES|||||6
+orders|25|exchange_update_timestamp|timestamp with time zone|YES|||||6
+orders|26|tag|character varying|YES||20|||
+orders|27|guid|character varying|YES||100|||
+orders|28|parent_order_id|character varying|YES||50|||
+orders|29|meta|jsonb|YES|'{}'::jsonb||||
+orders|30|created_at|timestamp with time zone|YES|now()||||6
+orders|31|updated_at|timestamp with time zone|YES|now()||||6
+orders_default|1|id|uuid|NO|gen_random_uuid()||||
+orders_default|2|broker_account_id|uuid|NO|||||
+orders_default|3|kite_order_id|character varying|NO||50|||
+orders_default|4|exchange_order_id|character varying|YES||50|||
+orders_default|5|status|character varying|NO||20|||
+orders_default|6|status_message|text|YES|||||
+orders_default|7|status_message_raw|text|YES|||||
+orders_default|8|tradingsymbol|character varying|NO||50|||
+orders_default|9|exchange|character varying|NO||10|||
+orders_default|10|transaction_type|character varying|NO||10|||
+orders_default|11|order_type|character varying|NO||10|||
+orders_default|12|product|character varying|NO||10|||
+orders_default|13|variety|character varying|NO||20|||
+orders_default|14|validity|character varying|NO|'DAY'::character varying|10|||
+orders_default|15|quantity|integer|NO|||32|0|
+orders_default|16|disclosed_quantity|integer|YES|0||32|0|
+orders_default|17|pending_quantity|integer|YES|0||32|0|
+orders_default|18|cancelled_quantity|integer|YES|0||32|0|
+orders_default|19|filled_quantity|integer|YES|0||32|0|
+orders_default|20|price|numeric|YES|||15|4|
+orders_default|21|trigger_price|numeric|YES|||15|4|
+orders_default|22|average_price|numeric|YES|||15|4|
+orders_default|23|order_timestamp|timestamp with time zone|NO|||||6
+orders_default|24|exchange_timestamp|timestamp with time zone|YES|||||6
+orders_default|25|exchange_update_timestamp|timestamp with time zone|YES|||||6
+orders_default|26|tag|character varying|YES||20|||
+orders_default|27|guid|character varying|YES||100|||
+orders_default|28|parent_order_id|character varying|YES||50|||
+orders_default|29|meta|jsonb|YES|'{}'::jsonb||||
+orders_default|30|created_at|timestamp with time zone|YES|now()||||6
+orders_default|31|updated_at|timestamp with time zone|YES|now()||||6
+orders_y2026m02|1|id|uuid|NO|gen_random_uuid()||||
+orders_y2026m02|2|broker_account_id|uuid|NO|||||
+orders_y2026m02|3|kite_order_id|character varying|NO||50|||
+orders_y2026m02|4|exchange_order_id|character varying|YES||50|||
+orders_y2026m02|5|status|character varying|NO||20|||
+orders_y2026m02|6|status_message|text|YES|||||
+orders_y2026m02|7|status_message_raw|text|YES|||||
+orders_y2026m02|8|tradingsymbol|character varying|NO||50|||
+orders_y2026m02|9|exchange|character varying|NO||10|||
+orders_y2026m02|10|transaction_type|character varying|NO||10|||
+orders_y2026m02|11|order_type|character varying|NO||10|||
+orders_y2026m02|12|product|character varying|NO||10|||
+orders_y2026m02|13|variety|character varying|NO||20|||
+orders_y2026m02|14|validity|character varying|NO|'DAY'::character varying|10|||
+orders_y2026m02|15|quantity|integer|NO|||32|0|
+orders_y2026m02|16|disclosed_quantity|integer|YES|0||32|0|
+orders_y2026m02|17|pending_quantity|integer|YES|0||32|0|
+orders_y2026m02|18|cancelled_quantity|integer|YES|0||32|0|
+orders_y2026m02|19|filled_quantity|integer|YES|0||32|0|
+orders_y2026m02|20|price|numeric|YES|||15|4|
+orders_y2026m02|21|trigger_price|numeric|YES|||15|4|
+orders_y2026m02|22|average_price|numeric|YES|||15|4|
+orders_y2026m02|23|order_timestamp|timestamp with time zone|NO|||||6
+orders_y2026m02|24|exchange_timestamp|timestamp with time zone|YES|||||6
+orders_y2026m02|25|exchange_update_timestamp|timestamp with time zone|YES|||||6
+orders_y2026m02|26|tag|character varying|YES||20|||
+orders_y2026m02|27|guid|character varying|YES||100|||
+orders_y2026m02|28|parent_order_id|character varying|YES||50|||
+orders_y2026m02|29|meta|jsonb|YES|'{}'::jsonb||||
+orders_y2026m02|30|created_at|timestamp with time zone|YES|now()||||6
+orders_y2026m02|31|updated_at|timestamp with time zone|YES|now()||||6
+orders_y2026m03|1|id|uuid|NO|gen_random_uuid()||||
+orders_y2026m03|2|broker_account_id|uuid|NO|||||
+orders_y2026m03|3|kite_order_id|character varying|NO||50|||
+orders_y2026m03|4|exchange_order_id|character varying|YES||50|||
+orders_y2026m03|5|status|character varying|NO||20|||
+orders_y2026m03|6|status_message|text|YES|||||
+orders_y2026m03|7|status_message_raw|text|YES|||||
+orders_y2026m03|8|tradingsymbol|character varying|NO||50|||
+orders_y2026m03|9|exchange|character varying|NO||10|||
+orders_y2026m03|10|transaction_type|character varying|NO||10|||
+orders_y2026m03|11|order_type|character varying|NO||10|||
+orders_y2026m03|12|product|character varying|NO||10|||
+orders_y2026m03|13|variety|character varying|NO||20|||
+orders_y2026m03|14|validity|character varying|NO|'DAY'::character varying|10|||
+orders_y2026m03|15|quantity|integer|NO|||32|0|
+orders_y2026m03|16|disclosed_quantity|integer|YES|0||32|0|
+orders_y2026m03|17|pending_quantity|integer|YES|0||32|0|
+orders_y2026m03|18|cancelled_quantity|integer|YES|0||32|0|
+orders_y2026m03|19|filled_quantity|integer|YES|0||32|0|
+orders_y2026m03|20|price|numeric|YES|||15|4|
+orders_y2026m03|21|trigger_price|numeric|YES|||15|4|
+orders_y2026m03|22|average_price|numeric|YES|||15|4|
+orders_y2026m03|23|order_timestamp|timestamp with time zone|NO|||||6
+orders_y2026m03|24|exchange_timestamp|timestamp with time zone|YES|||||6
+orders_y2026m03|25|exchange_update_timestamp|timestamp with time zone|YES|||||6
+orders_y2026m03|26|tag|character varying|YES||20|||
+orders_y2026m03|27|guid|character varying|YES||100|||
+orders_y2026m03|28|parent_order_id|character varying|YES||50|||
+orders_y2026m03|29|meta|jsonb|YES|'{}'::jsonb||||
+orders_y2026m03|30|created_at|timestamp with time zone|YES|now()||||6
+orders_y2026m03|31|updated_at|timestamp with time zone|YES|now()||||6
+orders_y2026m04|1|id|uuid|NO|gen_random_uuid()||||
+orders_y2026m04|2|broker_account_id|uuid|NO|||||
+orders_y2026m04|3|kite_order_id|character varying|NO||50|||
+orders_y2026m04|4|exchange_order_id|character varying|YES||50|||
+orders_y2026m04|5|status|character varying|NO||20|||
+orders_y2026m04|6|status_message|text|YES|||||
+orders_y2026m04|7|status_message_raw|text|YES|||||
+orders_y2026m04|8|tradingsymbol|character varying|NO||50|||
+orders_y2026m04|9|exchange|character varying|NO||10|||
+orders_y2026m04|10|transaction_type|character varying|NO||10|||
+orders_y2026m04|11|order_type|character varying|NO||10|||
+orders_y2026m04|12|product|character varying|NO||10|||
+orders_y2026m04|13|variety|character varying|NO||20|||
+orders_y2026m04|14|validity|character varying|NO|'DAY'::character varying|10|||
+orders_y2026m04|15|quantity|integer|NO|||32|0|
+orders_y2026m04|16|disclosed_quantity|integer|YES|0||32|0|
+orders_y2026m04|17|pending_quantity|integer|YES|0||32|0|
+orders_y2026m04|18|cancelled_quantity|integer|YES|0||32|0|
+orders_y2026m04|19|filled_quantity|integer|YES|0||32|0|
+orders_y2026m04|20|price|numeric|YES|||15|4|
+orders_y2026m04|21|trigger_price|numeric|YES|||15|4|
+orders_y2026m04|22|average_price|numeric|YES|||15|4|
+orders_y2026m04|23|order_timestamp|timestamp with time zone|NO|||||6
+orders_y2026m04|24|exchange_timestamp|timestamp with time zone|YES|||||6
+orders_y2026m04|25|exchange_update_timestamp|timestamp with time zone|YES|||||6
+orders_y2026m04|26|tag|character varying|YES||20|||
+orders_y2026m04|27|guid|character varying|YES||100|||
+orders_y2026m04|28|parent_order_id|character varying|YES||50|||
+orders_y2026m04|29|meta|jsonb|YES|'{}'::jsonb||||
+orders_y2026m04|30|created_at|timestamp with time zone|YES|now()||||6
+orders_y2026m04|31|updated_at|timestamp with time zone|YES|now()||||6
+orders_y2026m05|1|id|uuid|NO|gen_random_uuid()||||
+orders_y2026m05|2|broker_account_id|uuid|NO|||||
+orders_y2026m05|3|kite_order_id|character varying|NO||50|||
+orders_y2026m05|4|exchange_order_id|character varying|YES||50|||
+orders_y2026m05|5|status|character varying|NO||20|||
+orders_y2026m05|6|status_message|text|YES|||||
+orders_y2026m05|7|status_message_raw|text|YES|||||
+orders_y2026m05|8|tradingsymbol|character varying|NO||50|||
+orders_y2026m05|9|exchange|character varying|NO||10|||
+orders_y2026m05|10|transaction_type|character varying|NO||10|||
+orders_y2026m05|11|order_type|character varying|NO||10|||
+orders_y2026m05|12|product|character varying|NO||10|||
+orders_y2026m05|13|variety|character varying|NO||20|||
+orders_y2026m05|14|validity|character varying|NO|'DAY'::character varying|10|||
+orders_y2026m05|15|quantity|integer|NO|||32|0|
+orders_y2026m05|16|disclosed_quantity|integer|YES|0||32|0|
+orders_y2026m05|17|pending_quantity|integer|YES|0||32|0|
+orders_y2026m05|18|cancelled_quantity|integer|YES|0||32|0|
+orders_y2026m05|19|filled_quantity|integer|YES|0||32|0|
+orders_y2026m05|20|price|numeric|YES|||15|4|
+orders_y2026m05|21|trigger_price|numeric|YES|||15|4|
+orders_y2026m05|22|average_price|numeric|YES|||15|4|
+orders_y2026m05|23|order_timestamp|timestamp with time zone|NO|||||6
+orders_y2026m05|24|exchange_timestamp|timestamp with time zone|YES|||||6
+orders_y2026m05|25|exchange_update_timestamp|timestamp with time zone|YES|||||6
+orders_y2026m05|26|tag|character varying|YES||20|||
+orders_y2026m05|27|guid|character varying|YES||100|||
+orders_y2026m05|28|parent_order_id|character varying|YES||50|||
+orders_y2026m05|29|meta|jsonb|YES|'{}'::jsonb||||
+orders_y2026m05|30|created_at|timestamp with time zone|YES|now()||||6
+orders_y2026m05|31|updated_at|timestamp with time zone|YES|now()||||6
+orders_y2026m06|1|id|uuid|NO|gen_random_uuid()||||
+orders_y2026m06|2|broker_account_id|uuid|NO|||||
+orders_y2026m06|3|kite_order_id|character varying|NO||50|||
+orders_y2026m06|4|exchange_order_id|character varying|YES||50|||
+orders_y2026m06|5|status|character varying|NO||20|||
+orders_y2026m06|6|status_message|text|YES|||||
+orders_y2026m06|7|status_message_raw|text|YES|||||
+orders_y2026m06|8|tradingsymbol|character varying|NO||50|||
+orders_y2026m06|9|exchange|character varying|NO||10|||
+orders_y2026m06|10|transaction_type|character varying|NO||10|||
+orders_y2026m06|11|order_type|character varying|NO||10|||
+orders_y2026m06|12|product|character varying|NO||10|||
+orders_y2026m06|13|variety|character varying|NO||20|||
+orders_y2026m06|14|validity|character varying|NO|'DAY'::character varying|10|||
+orders_y2026m06|15|quantity|integer|NO|||32|0|
+orders_y2026m06|16|disclosed_quantity|integer|YES|0||32|0|
+orders_y2026m06|17|pending_quantity|integer|YES|0||32|0|
+orders_y2026m06|18|cancelled_quantity|integer|YES|0||32|0|
+orders_y2026m06|19|filled_quantity|integer|YES|0||32|0|
+orders_y2026m06|20|price|numeric|YES|||15|4|
+orders_y2026m06|21|trigger_price|numeric|YES|||15|4|
+orders_y2026m06|22|average_price|numeric|YES|||15|4|
+orders_y2026m06|23|order_timestamp|timestamp with time zone|NO|||||6
+orders_y2026m06|24|exchange_timestamp|timestamp with time zone|YES|||||6
+orders_y2026m06|25|exchange_update_timestamp|timestamp with time zone|YES|||||6
+orders_y2026m06|26|tag|character varying|YES||20|||
+orders_y2026m06|27|guid|character varying|YES||100|||
+orders_y2026m06|28|parent_order_id|character varying|YES||50|||
+orders_y2026m06|29|meta|jsonb|YES|'{}'::jsonb||||
+orders_y2026m06|30|created_at|timestamp with time zone|YES|now()||||6
+orders_y2026m06|31|updated_at|timestamp with time zone|YES|now()||||6
+orders_y2026m07|1|id|uuid|NO|gen_random_uuid()||||
+orders_y2026m07|2|broker_account_id|uuid|NO|||||
+orders_y2026m07|3|kite_order_id|character varying|NO||50|||
+orders_y2026m07|4|exchange_order_id|character varying|YES||50|||
+orders_y2026m07|5|status|character varying|NO||20|||
+orders_y2026m07|6|status_message|text|YES|||||
+orders_y2026m07|7|status_message_raw|text|YES|||||
+orders_y2026m07|8|tradingsymbol|character varying|NO||50|||
+orders_y2026m07|9|exchange|character varying|NO||10|||
+orders_y2026m07|10|transaction_type|character varying|NO||10|||
+orders_y2026m07|11|order_type|character varying|NO||10|||
+orders_y2026m07|12|product|character varying|NO||10|||
+orders_y2026m07|13|variety|character varying|NO||20|||
+orders_y2026m07|14|validity|character varying|NO|'DAY'::character varying|10|||
+orders_y2026m07|15|quantity|integer|NO|||32|0|
+orders_y2026m07|16|disclosed_quantity|integer|YES|0||32|0|
+orders_y2026m07|17|pending_quantity|integer|YES|0||32|0|
+orders_y2026m07|18|cancelled_quantity|integer|YES|0||32|0|
+orders_y2026m07|19|filled_quantity|integer|YES|0||32|0|
+orders_y2026m07|20|price|numeric|YES|||15|4|
+orders_y2026m07|21|trigger_price|numeric|YES|||15|4|
+orders_y2026m07|22|average_price|numeric|YES|||15|4|
+orders_y2026m07|23|order_timestamp|timestamp with time zone|NO|||||6
+orders_y2026m07|24|exchange_timestamp|timestamp with time zone|YES|||||6
+orders_y2026m07|25|exchange_update_timestamp|timestamp with time zone|YES|||||6
+orders_y2026m07|26|tag|character varying|YES||20|||
+orders_y2026m07|27|guid|character varying|YES||100|||
+orders_y2026m07|28|parent_order_id|character varying|YES||50|||
+orders_y2026m07|29|meta|jsonb|YES|'{}'::jsonb||||
+orders_y2026m07|30|created_at|timestamp with time zone|YES|now()||||6
+orders_y2026m07|31|updated_at|timestamp with time zone|YES|now()||||6
+orders_y2026m08|1|id|uuid|NO|gen_random_uuid()||||
+orders_y2026m08|2|broker_account_id|uuid|NO|||||
+orders_y2026m08|3|kite_order_id|character varying|NO||50|||
+orders_y2026m08|4|exchange_order_id|character varying|YES||50|||
+orders_y2026m08|5|status|character varying|NO||20|||
+orders_y2026m08|6|status_message|text|YES|||||
+orders_y2026m08|7|status_message_raw|text|YES|||||
+orders_y2026m08|8|tradingsymbol|character varying|NO||50|||
+orders_y2026m08|9|exchange|character varying|NO||10|||
+orders_y2026m08|10|transaction_type|character varying|NO||10|||
+orders_y2026m08|11|order_type|character varying|NO||10|||
+orders_y2026m08|12|product|character varying|NO||10|||
+orders_y2026m08|13|variety|character varying|NO||20|||
+orders_y2026m08|14|validity|character varying|NO|'DAY'::character varying|10|||
+orders_y2026m08|15|quantity|integer|NO|||32|0|
+orders_y2026m08|16|disclosed_quantity|integer|YES|0||32|0|
+orders_y2026m08|17|pending_quantity|integer|YES|0||32|0|
+orders_y2026m08|18|cancelled_quantity|integer|YES|0||32|0|
+orders_y2026m08|19|filled_quantity|integer|YES|0||32|0|
+orders_y2026m08|20|price|numeric|YES|||15|4|
+orders_y2026m08|21|trigger_price|numeric|YES|||15|4|
+orders_y2026m08|22|average_price|numeric|YES|||15|4|
+orders_y2026m08|23|order_timestamp|timestamp with time zone|NO|||||6
+orders_y2026m08|24|exchange_timestamp|timestamp with time zone|YES|||||6
+orders_y2026m08|25|exchange_update_timestamp|timestamp with time zone|YES|||||6
+orders_y2026m08|26|tag|character varying|YES||20|||
+orders_y2026m08|27|guid|character varying|YES||100|||
+orders_y2026m08|28|parent_order_id|character varying|YES||50|||
+orders_y2026m08|29|meta|jsonb|YES|'{}'::jsonb||||
+orders_y2026m08|30|created_at|timestamp with time zone|YES|now()||||6
+orders_y2026m08|31|updated_at|timestamp with time zone|YES|now()||||6
+orders_y2026m09|1|id|uuid|NO|gen_random_uuid()||||
+orders_y2026m09|2|broker_account_id|uuid|NO|||||
+orders_y2026m09|3|kite_order_id|character varying|NO||50|||
+orders_y2026m09|4|exchange_order_id|character varying|YES||50|||
+orders_y2026m09|5|status|character varying|NO||20|||
+orders_y2026m09|6|status_message|text|YES|||||
+orders_y2026m09|7|status_message_raw|text|YES|||||
+orders_y2026m09|8|tradingsymbol|character varying|NO||50|||
+orders_y2026m09|9|exchange|character varying|NO||10|||
+orders_y2026m09|10|transaction_type|character varying|NO||10|||
+orders_y2026m09|11|order_type|character varying|NO||10|||
+orders_y2026m09|12|product|character varying|NO||10|||
+orders_y2026m09|13|variety|character varying|NO||20|||
+orders_y2026m09|14|validity|character varying|NO|'DAY'::character varying|10|||
+orders_y2026m09|15|quantity|integer|NO|||32|0|
+orders_y2026m09|16|disclosed_quantity|integer|YES|0||32|0|
+orders_y2026m09|17|pending_quantity|integer|YES|0||32|0|
+orders_y2026m09|18|cancelled_quantity|integer|YES|0||32|0|
+orders_y2026m09|19|filled_quantity|integer|YES|0||32|0|
+orders_y2026m09|20|price|numeric|YES|||15|4|
+orders_y2026m09|21|trigger_price|numeric|YES|||15|4|
+orders_y2026m09|22|average_price|numeric|YES|||15|4|
+orders_y2026m09|23|order_timestamp|timestamp with time zone|NO|||||6
+orders_y2026m09|24|exchange_timestamp|timestamp with time zone|YES|||||6
+orders_y2026m09|25|exchange_update_timestamp|timestamp with time zone|YES|||||6
+orders_y2026m09|26|tag|character varying|YES||20|||
+orders_y2026m09|27|guid|character varying|YES||100|||
+orders_y2026m09|28|parent_order_id|character varying|YES||50|||
+orders_y2026m09|29|meta|jsonb|YES|'{}'::jsonb||||
+orders_y2026m09|30|created_at|timestamp with time zone|YES|now()||||6
+orders_y2026m09|31|updated_at|timestamp with time zone|YES|now()||||6
+orders_y2026m10|1|id|uuid|NO|gen_random_uuid()||||
+orders_y2026m10|2|broker_account_id|uuid|NO|||||
+orders_y2026m10|3|kite_order_id|character varying|NO||50|||
+orders_y2026m10|4|exchange_order_id|character varying|YES||50|||
+orders_y2026m10|5|status|character varying|NO||20|||
+orders_y2026m10|6|status_message|text|YES|||||
+orders_y2026m10|7|status_message_raw|text|YES|||||
+orders_y2026m10|8|tradingsymbol|character varying|NO||50|||
+orders_y2026m10|9|exchange|character varying|NO||10|||
+orders_y2026m10|10|transaction_type|character varying|NO||10|||
+orders_y2026m10|11|order_type|character varying|NO||10|||
+orders_y2026m10|12|product|character varying|NO||10|||
+orders_y2026m10|13|variety|character varying|NO||20|||
+orders_y2026m10|14|validity|character varying|NO|'DAY'::character varying|10|||
+orders_y2026m10|15|quantity|integer|NO|||32|0|
+orders_y2026m10|16|disclosed_quantity|integer|YES|0||32|0|
+orders_y2026m10|17|pending_quantity|integer|YES|0||32|0|
+orders_y2026m10|18|cancelled_quantity|integer|YES|0||32|0|
+orders_y2026m10|19|filled_quantity|integer|YES|0||32|0|
+orders_y2026m10|20|price|numeric|YES|||15|4|
+orders_y2026m10|21|trigger_price|numeric|YES|||15|4|
+orders_y2026m10|22|average_price|numeric|YES|||15|4|
+orders_y2026m10|23|order_timestamp|timestamp with time zone|NO|||||6
+orders_y2026m10|24|exchange_timestamp|timestamp with time zone|YES|||||6
+orders_y2026m10|25|exchange_update_timestamp|timestamp with time zone|YES|||||6
+orders_y2026m10|26|tag|character varying|YES||20|||
+orders_y2026m10|27|guid|character varying|YES||100|||
+orders_y2026m10|28|parent_order_id|character varying|YES||50|||
+orders_y2026m10|29|meta|jsonb|YES|'{}'::jsonb||||
+orders_y2026m10|30|created_at|timestamp with time zone|YES|now()||||6
+orders_y2026m10|31|updated_at|timestamp with time zone|YES|now()||||6
+orders_y2026m11|1|id|uuid|NO|gen_random_uuid()||||
+orders_y2026m11|2|broker_account_id|uuid|NO|||||
+orders_y2026m11|3|kite_order_id|character varying|NO||50|||
+orders_y2026m11|4|exchange_order_id|character varying|YES||50|||
+orders_y2026m11|5|status|character varying|NO||20|||
+orders_y2026m11|6|status_message|text|YES|||||
+orders_y2026m11|7|status_message_raw|text|YES|||||
+orders_y2026m11|8|tradingsymbol|character varying|NO||50|||
+orders_y2026m11|9|exchange|character varying|NO||10|||
+orders_y2026m11|10|transaction_type|character varying|NO||10|||
+orders_y2026m11|11|order_type|character varying|NO||10|||
+orders_y2026m11|12|product|character varying|NO||10|||
+orders_y2026m11|13|variety|character varying|NO||20|||
+orders_y2026m11|14|validity|character varying|NO|'DAY'::character varying|10|||
+orders_y2026m11|15|quantity|integer|NO|||32|0|
+orders_y2026m11|16|disclosed_quantity|integer|YES|0||32|0|
+orders_y2026m11|17|pending_quantity|integer|YES|0||32|0|
+orders_y2026m11|18|cancelled_quantity|integer|YES|0||32|0|
+orders_y2026m11|19|filled_quantity|integer|YES|0||32|0|
+orders_y2026m11|20|price|numeric|YES|||15|4|
+orders_y2026m11|21|trigger_price|numeric|YES|||15|4|
+orders_y2026m11|22|average_price|numeric|YES|||15|4|
+orders_y2026m11|23|order_timestamp|timestamp with time zone|NO|||||6
+orders_y2026m11|24|exchange_timestamp|timestamp with time zone|YES|||||6
+orders_y2026m11|25|exchange_update_timestamp|timestamp with time zone|YES|||||6
+orders_y2026m11|26|tag|character varying|YES||20|||
+orders_y2026m11|27|guid|character varying|YES||100|||
+orders_y2026m11|28|parent_order_id|character varying|YES||50|||
+orders_y2026m11|29|meta|jsonb|YES|'{}'::jsonb||||
+orders_y2026m11|30|created_at|timestamp with time zone|YES|now()||||6
+orders_y2026m11|31|updated_at|timestamp with time zone|YES|now()||||6
+orders_y2026m12|1|id|uuid|NO|gen_random_uuid()||||
+orders_y2026m12|2|broker_account_id|uuid|NO|||||
+orders_y2026m12|3|kite_order_id|character varying|NO||50|||
+orders_y2026m12|4|exchange_order_id|character varying|YES||50|||
+orders_y2026m12|5|status|character varying|NO||20|||
+orders_y2026m12|6|status_message|text|YES|||||
+orders_y2026m12|7|status_message_raw|text|YES|||||
+orders_y2026m12|8|tradingsymbol|character varying|NO||50|||
+orders_y2026m12|9|exchange|character varying|NO||10|||
+orders_y2026m12|10|transaction_type|character varying|NO||10|||
+orders_y2026m12|11|order_type|character varying|NO||10|||
+orders_y2026m12|12|product|character varying|NO||10|||
+orders_y2026m12|13|variety|character varying|NO||20|||
+orders_y2026m12|14|validity|character varying|NO|'DAY'::character varying|10|||
+orders_y2026m12|15|quantity|integer|NO|||32|0|
+orders_y2026m12|16|disclosed_quantity|integer|YES|0||32|0|
+orders_y2026m12|17|pending_quantity|integer|YES|0||32|0|
+orders_y2026m12|18|cancelled_quantity|integer|YES|0||32|0|
+orders_y2026m12|19|filled_quantity|integer|YES|0||32|0|
+orders_y2026m12|20|price|numeric|YES|||15|4|
+orders_y2026m12|21|trigger_price|numeric|YES|||15|4|
+orders_y2026m12|22|average_price|numeric|YES|||15|4|
+orders_y2026m12|23|order_timestamp|timestamp with time zone|NO|||||6
+orders_y2026m12|24|exchange_timestamp|timestamp with time zone|YES|||||6
+orders_y2026m12|25|exchange_update_timestamp|timestamp with time zone|YES|||||6
+orders_y2026m12|26|tag|character varying|YES||20|||
+orders_y2026m12|27|guid|character varying|YES||100|||
+orders_y2026m12|28|parent_order_id|character varying|YES||50|||
+orders_y2026m12|29|meta|jsonb|YES|'{}'::jsonb||||
+orders_y2026m12|30|created_at|timestamp with time zone|YES|now()||||6
+orders_y2026m12|31|updated_at|timestamp with time zone|YES|now()||||6
+orders_y2027m01|1|id|uuid|NO|gen_random_uuid()||||
+orders_y2027m01|2|broker_account_id|uuid|NO|||||
+orders_y2027m01|3|kite_order_id|character varying|NO||50|||
+orders_y2027m01|4|exchange_order_id|character varying|YES||50|||
+orders_y2027m01|5|status|character varying|NO||20|||
+orders_y2027m01|6|status_message|text|YES|||||
+orders_y2027m01|7|status_message_raw|text|YES|||||
+orders_y2027m01|8|tradingsymbol|character varying|NO||50|||
+orders_y2027m01|9|exchange|character varying|NO||10|||
+orders_y2027m01|10|transaction_type|character varying|NO||10|||
+orders_y2027m01|11|order_type|character varying|NO||10|||
+orders_y2027m01|12|product|character varying|NO||10|||
+orders_y2027m01|13|variety|character varying|NO||20|||
+orders_y2027m01|14|validity|character varying|NO|'DAY'::character varying|10|||
+orders_y2027m01|15|quantity|integer|NO|||32|0|
+orders_y2027m01|16|disclosed_quantity|integer|YES|0||32|0|
+orders_y2027m01|17|pending_quantity|integer|YES|0||32|0|
+orders_y2027m01|18|cancelled_quantity|integer|YES|0||32|0|
+orders_y2027m01|19|filled_quantity|integer|YES|0||32|0|
+orders_y2027m01|20|price|numeric|YES|||15|4|
+orders_y2027m01|21|trigger_price|numeric|YES|||15|4|
+orders_y2027m01|22|average_price|numeric|YES|||15|4|
+orders_y2027m01|23|order_timestamp|timestamp with time zone|NO|||||6
+orders_y2027m01|24|exchange_timestamp|timestamp with time zone|YES|||||6
+orders_y2027m01|25|exchange_update_timestamp|timestamp with time zone|YES|||||6
+orders_y2027m01|26|tag|character varying|YES||20|||
+orders_y2027m01|27|guid|character varying|YES||100|||
+orders_y2027m01|28|parent_order_id|character varying|YES||50|||
+orders_y2027m01|29|meta|jsonb|YES|'{}'::jsonb||||
+orders_y2027m01|30|created_at|timestamp with time zone|YES|now()||||6
+orders_y2027m01|31|updated_at|timestamp with time zone|YES|now()||||6
+orders_y2027m02|1|id|uuid|NO|gen_random_uuid()||||
+orders_y2027m02|2|broker_account_id|uuid|NO|||||
+orders_y2027m02|3|kite_order_id|character varying|NO||50|||
+orders_y2027m02|4|exchange_order_id|character varying|YES||50|||
+orders_y2027m02|5|status|character varying|NO||20|||
+orders_y2027m02|6|status_message|text|YES|||||
+orders_y2027m02|7|status_message_raw|text|YES|||||
+orders_y2027m02|8|tradingsymbol|character varying|NO||50|||
+orders_y2027m02|9|exchange|character varying|NO||10|||
+orders_y2027m02|10|transaction_type|character varying|NO||10|||
+orders_y2027m02|11|order_type|character varying|NO||10|||
+orders_y2027m02|12|product|character varying|NO||10|||
+orders_y2027m02|13|variety|character varying|NO||20|||
+orders_y2027m02|14|validity|character varying|NO|'DAY'::character varying|10|||
+orders_y2027m02|15|quantity|integer|NO|||32|0|
+orders_y2027m02|16|disclosed_quantity|integer|YES|0||32|0|
+orders_y2027m02|17|pending_quantity|integer|YES|0||32|0|
+orders_y2027m02|18|cancelled_quantity|integer|YES|0||32|0|
+orders_y2027m02|19|filled_quantity|integer|YES|0||32|0|
+orders_y2027m02|20|price|numeric|YES|||15|4|
+orders_y2027m02|21|trigger_price|numeric|YES|||15|4|
+orders_y2027m02|22|average_price|numeric|YES|||15|4|
+orders_y2027m02|23|order_timestamp|timestamp with time zone|NO|||||6
+orders_y2027m02|24|exchange_timestamp|timestamp with time zone|YES|||||6
+orders_y2027m02|25|exchange_update_timestamp|timestamp with time zone|YES|||||6
+orders_y2027m02|26|tag|character varying|YES||20|||
+orders_y2027m02|27|guid|character varying|YES||100|||
+orders_y2027m02|28|parent_order_id|character varying|YES||50|||
+orders_y2027m02|29|meta|jsonb|YES|'{}'::jsonb||||
+orders_y2027m02|30|created_at|timestamp with time zone|YES|now()||||6
+orders_y2027m02|31|updated_at|timestamp with time zone|YES|now()||||6
+orders_y2027m03|1|id|uuid|NO|gen_random_uuid()||||
+orders_y2027m03|2|broker_account_id|uuid|NO|||||
+orders_y2027m03|3|kite_order_id|character varying|NO||50|||
+orders_y2027m03|4|exchange_order_id|character varying|YES||50|||
+orders_y2027m03|5|status|character varying|NO||20|||
+orders_y2027m03|6|status_message|text|YES|||||
+orders_y2027m03|7|status_message_raw|text|YES|||||
+orders_y2027m03|8|tradingsymbol|character varying|NO||50|||
+orders_y2027m03|9|exchange|character varying|NO||10|||
+orders_y2027m03|10|transaction_type|character varying|NO||10|||
+orders_y2027m03|11|order_type|character varying|NO||10|||
+orders_y2027m03|12|product|character varying|NO||10|||
+orders_y2027m03|13|variety|character varying|NO||20|||
+orders_y2027m03|14|validity|character varying|NO|'DAY'::character varying|10|||
+orders_y2027m03|15|quantity|integer|NO|||32|0|
+orders_y2027m03|16|disclosed_quantity|integer|YES|0||32|0|
+orders_y2027m03|17|pending_quantity|integer|YES|0||32|0|
+orders_y2027m03|18|cancelled_quantity|integer|YES|0||32|0|
+orders_y2027m03|19|filled_quantity|integer|YES|0||32|0|
+orders_y2027m03|20|price|numeric|YES|||15|4|
+orders_y2027m03|21|trigger_price|numeric|YES|||15|4|
+orders_y2027m03|22|average_price|numeric|YES|||15|4|
+orders_y2027m03|23|order_timestamp|timestamp with time zone|NO|||||6
+orders_y2027m03|24|exchange_timestamp|timestamp with time zone|YES|||||6
+orders_y2027m03|25|exchange_update_timestamp|timestamp with time zone|YES|||||6
+orders_y2027m03|26|tag|character varying|YES||20|||
+orders_y2027m03|27|guid|character varying|YES||100|||
+orders_y2027m03|28|parent_order_id|character varying|YES||50|||
+orders_y2027m03|29|meta|jsonb|YES|'{}'::jsonb||||
+orders_y2027m03|30|created_at|timestamp with time zone|YES|now()||||6
+orders_y2027m03|31|updated_at|timestamp with time zone|YES|now()||||6
+orders_y2027m04|1|id|uuid|NO|gen_random_uuid()||||
+orders_y2027m04|2|broker_account_id|uuid|NO|||||
+orders_y2027m04|3|kite_order_id|character varying|NO||50|||
+orders_y2027m04|4|exchange_order_id|character varying|YES||50|||
+orders_y2027m04|5|status|character varying|NO||20|||
+orders_y2027m04|6|status_message|text|YES|||||
+orders_y2027m04|7|status_message_raw|text|YES|||||
+orders_y2027m04|8|tradingsymbol|character varying|NO||50|||
+orders_y2027m04|9|exchange|character varying|NO||10|||
+orders_y2027m04|10|transaction_type|character varying|NO||10|||
+orders_y2027m04|11|order_type|character varying|NO||10|||
+orders_y2027m04|12|product|character varying|NO||10|||
+orders_y2027m04|13|variety|character varying|NO||20|||
+orders_y2027m04|14|validity|character varying|NO|'DAY'::character varying|10|||
+orders_y2027m04|15|quantity|integer|NO|||32|0|
+orders_y2027m04|16|disclosed_quantity|integer|YES|0||32|0|
+orders_y2027m04|17|pending_quantity|integer|YES|0||32|0|
+orders_y2027m04|18|cancelled_quantity|integer|YES|0||32|0|
+orders_y2027m04|19|filled_quantity|integer|YES|0||32|0|
+orders_y2027m04|20|price|numeric|YES|||15|4|
+orders_y2027m04|21|trigger_price|numeric|YES|||15|4|
+orders_y2027m04|22|average_price|numeric|YES|||15|4|
+orders_y2027m04|23|order_timestamp|timestamp with time zone|NO|||||6
+orders_y2027m04|24|exchange_timestamp|timestamp with time zone|YES|||||6
+orders_y2027m04|25|exchange_update_timestamp|timestamp with time zone|YES|||||6
+orders_y2027m04|26|tag|character varying|YES||20|||
+orders_y2027m04|27|guid|character varying|YES||100|||
+orders_y2027m04|28|parent_order_id|character varying|YES||50|||
+orders_y2027m04|29|meta|jsonb|YES|'{}'::jsonb||||
+orders_y2027m04|30|created_at|timestamp with time zone|YES|now()||||6
+orders_y2027m04|31|updated_at|timestamp with time zone|YES|now()||||6
+orders_y2027m05|1|id|uuid|NO|gen_random_uuid()||||
+orders_y2027m05|2|broker_account_id|uuid|NO|||||
+orders_y2027m05|3|kite_order_id|character varying|NO||50|||
+orders_y2027m05|4|exchange_order_id|character varying|YES||50|||
+orders_y2027m05|5|status|character varying|NO||20|||
+orders_y2027m05|6|status_message|text|YES|||||
+orders_y2027m05|7|status_message_raw|text|YES|||||
+orders_y2027m05|8|tradingsymbol|character varying|NO||50|||
+orders_y2027m05|9|exchange|character varying|NO||10|||
+orders_y2027m05|10|transaction_type|character varying|NO||10|||
+orders_y2027m05|11|order_type|character varying|NO||10|||
+orders_y2027m05|12|product|character varying|NO||10|||
+orders_y2027m05|13|variety|character varying|NO||20|||
+orders_y2027m05|14|validity|character varying|NO|'DAY'::character varying|10|||
+orders_y2027m05|15|quantity|integer|NO|||32|0|
+orders_y2027m05|16|disclosed_quantity|integer|YES|0||32|0|
+orders_y2027m05|17|pending_quantity|integer|YES|0||32|0|
+orders_y2027m05|18|cancelled_quantity|integer|YES|0||32|0|
+orders_y2027m05|19|filled_quantity|integer|YES|0||32|0|
+orders_y2027m05|20|price|numeric|YES|||15|4|
+orders_y2027m05|21|trigger_price|numeric|YES|||15|4|
+orders_y2027m05|22|average_price|numeric|YES|||15|4|
+orders_y2027m05|23|order_timestamp|timestamp with time zone|NO|||||6
+orders_y2027m05|24|exchange_timestamp|timestamp with time zone|YES|||||6
+orders_y2027m05|25|exchange_update_timestamp|timestamp with time zone|YES|||||6
+orders_y2027m05|26|tag|character varying|YES||20|||
+orders_y2027m05|27|guid|character varying|YES||100|||
+orders_y2027m05|28|parent_order_id|character varying|YES||50|||
+orders_y2027m05|29|meta|jsonb|YES|'{}'::jsonb||||
+orders_y2027m05|30|created_at|timestamp with time zone|YES|now()||||6
+orders_y2027m05|31|updated_at|timestamp with time zone|YES|now()||||6
+orders_y2027m06|1|id|uuid|NO|gen_random_uuid()||||
+orders_y2027m06|2|broker_account_id|uuid|NO|||||
+orders_y2027m06|3|kite_order_id|character varying|NO||50|||
+orders_y2027m06|4|exchange_order_id|character varying|YES||50|||
+orders_y2027m06|5|status|character varying|NO||20|||
+orders_y2027m06|6|status_message|text|YES|||||
+orders_y2027m06|7|status_message_raw|text|YES|||||
+orders_y2027m06|8|tradingsymbol|character varying|NO||50|||
+orders_y2027m06|9|exchange|character varying|NO||10|||
+orders_y2027m06|10|transaction_type|character varying|NO||10|||
+orders_y2027m06|11|order_type|character varying|NO||10|||
+orders_y2027m06|12|product|character varying|NO||10|||
+orders_y2027m06|13|variety|character varying|NO||20|||
+orders_y2027m06|14|validity|character varying|NO|'DAY'::character varying|10|||
+orders_y2027m06|15|quantity|integer|NO|||32|0|
+orders_y2027m06|16|disclosed_quantity|integer|YES|0||32|0|
+orders_y2027m06|17|pending_quantity|integer|YES|0||32|0|
+orders_y2027m06|18|cancelled_quantity|integer|YES|0||32|0|
+orders_y2027m06|19|filled_quantity|integer|YES|0||32|0|
+orders_y2027m06|20|price|numeric|YES|||15|4|
+orders_y2027m06|21|trigger_price|numeric|YES|||15|4|
+orders_y2027m06|22|average_price|numeric|YES|||15|4|
+orders_y2027m06|23|order_timestamp|timestamp with time zone|NO|||||6
+orders_y2027m06|24|exchange_timestamp|timestamp with time zone|YES|||||6
+orders_y2027m06|25|exchange_update_timestamp|timestamp with time zone|YES|||||6
+orders_y2027m06|26|tag|character varying|YES||20|||
+orders_y2027m06|27|guid|character varying|YES||100|||
+orders_y2027m06|28|parent_order_id|character varying|YES||50|||
+orders_y2027m06|29|meta|jsonb|YES|'{}'::jsonb||||
+orders_y2027m06|30|created_at|timestamp with time zone|YES|now()||||6
+orders_y2027m06|31|updated_at|timestamp with time zone|YES|now()||||6
+orders_y2027m07|1|id|uuid|NO|gen_random_uuid()||||
+orders_y2027m07|2|broker_account_id|uuid|NO|||||
+orders_y2027m07|3|kite_order_id|character varying|NO||50|||
+orders_y2027m07|4|exchange_order_id|character varying|YES||50|||
+orders_y2027m07|5|status|character varying|NO||20|||
+orders_y2027m07|6|status_message|text|YES|||||
+orders_y2027m07|7|status_message_raw|text|YES|||||
+orders_y2027m07|8|tradingsymbol|character varying|NO||50|||
+orders_y2027m07|9|exchange|character varying|NO||10|||
+orders_y2027m07|10|transaction_type|character varying|NO||10|||
+orders_y2027m07|11|order_type|character varying|NO||10|||
+orders_y2027m07|12|product|character varying|NO||10|||
+orders_y2027m07|13|variety|character varying|NO||20|||
+orders_y2027m07|14|validity|character varying|NO|'DAY'::character varying|10|||
+orders_y2027m07|15|quantity|integer|NO|||32|0|
+orders_y2027m07|16|disclosed_quantity|integer|YES|0||32|0|
+orders_y2027m07|17|pending_quantity|integer|YES|0||32|0|
+orders_y2027m07|18|cancelled_quantity|integer|YES|0||32|0|
+orders_y2027m07|19|filled_quantity|integer|YES|0||32|0|
+orders_y2027m07|20|price|numeric|YES|||15|4|
+orders_y2027m07|21|trigger_price|numeric|YES|||15|4|
+orders_y2027m07|22|average_price|numeric|YES|||15|4|
+orders_y2027m07|23|order_timestamp|timestamp with time zone|NO|||||6
+orders_y2027m07|24|exchange_timestamp|timestamp with time zone|YES|||||6
+orders_y2027m07|25|exchange_update_timestamp|timestamp with time zone|YES|||||6
+orders_y2027m07|26|tag|character varying|YES||20|||
+orders_y2027m07|27|guid|character varying|YES||100|||
+orders_y2027m07|28|parent_order_id|character varying|YES||50|||
+orders_y2027m07|29|meta|jsonb|YES|'{}'::jsonb||||
+orders_y2027m07|30|created_at|timestamp with time zone|YES|now()||||6
+orders_y2027m07|31|updated_at|timestamp with time zone|YES|now()||||6
+orders_y2027m08|1|id|uuid|NO|gen_random_uuid()||||
+orders_y2027m08|2|broker_account_id|uuid|NO|||||
+orders_y2027m08|3|kite_order_id|character varying|NO||50|||
+orders_y2027m08|4|exchange_order_id|character varying|YES||50|||
+orders_y2027m08|5|status|character varying|NO||20|||
+orders_y2027m08|6|status_message|text|YES|||||
+orders_y2027m08|7|status_message_raw|text|YES|||||
+orders_y2027m08|8|tradingsymbol|character varying|NO||50|||
+orders_y2027m08|9|exchange|character varying|NO||10|||
+orders_y2027m08|10|transaction_type|character varying|NO||10|||
+orders_y2027m08|11|order_type|character varying|NO||10|||
+orders_y2027m08|12|product|character varying|NO||10|||
+orders_y2027m08|13|variety|character varying|NO||20|||
+orders_y2027m08|14|validity|character varying|NO|'DAY'::character varying|10|||
+orders_y2027m08|15|quantity|integer|NO|||32|0|
+orders_y2027m08|16|disclosed_quantity|integer|YES|0||32|0|
+orders_y2027m08|17|pending_quantity|integer|YES|0||32|0|
+orders_y2027m08|18|cancelled_quantity|integer|YES|0||32|0|
+orders_y2027m08|19|filled_quantity|integer|YES|0||32|0|
+orders_y2027m08|20|price|numeric|YES|||15|4|
+orders_y2027m08|21|trigger_price|numeric|YES|||15|4|
+orders_y2027m08|22|average_price|numeric|YES|||15|4|
+orders_y2027m08|23|order_timestamp|timestamp with time zone|NO|||||6
+orders_y2027m08|24|exchange_timestamp|timestamp with time zone|YES|||||6
+orders_y2027m08|25|exchange_update_timestamp|timestamp with time zone|YES|||||6
+orders_y2027m08|26|tag|character varying|YES||20|||
+orders_y2027m08|27|guid|character varying|YES||100|||
+orders_y2027m08|28|parent_order_id|character varying|YES||50|||
+orders_y2027m08|29|meta|jsonb|YES|'{}'::jsonb||||
+orders_y2027m08|30|created_at|timestamp with time zone|YES|now()||||6
+orders_y2027m08|31|updated_at|timestamp with time zone|YES|now()||||6
+orders_y2027m09|1|id|uuid|NO|gen_random_uuid()||||
+orders_y2027m09|2|broker_account_id|uuid|NO|||||
+orders_y2027m09|3|kite_order_id|character varying|NO||50|||
+orders_y2027m09|4|exchange_order_id|character varying|YES||50|||
+orders_y2027m09|5|status|character varying|NO||20|||
+orders_y2027m09|6|status_message|text|YES|||||
+orders_y2027m09|7|status_message_raw|text|YES|||||
+orders_y2027m09|8|tradingsymbol|character varying|NO||50|||
+orders_y2027m09|9|exchange|character varying|NO||10|||
+orders_y2027m09|10|transaction_type|character varying|NO||10|||
+orders_y2027m09|11|order_type|character varying|NO||10|||
+orders_y2027m09|12|product|character varying|NO||10|||
+orders_y2027m09|13|variety|character varying|NO||20|||
+orders_y2027m09|14|validity|character varying|NO|'DAY'::character varying|10|||
+orders_y2027m09|15|quantity|integer|NO|||32|0|
+orders_y2027m09|16|disclosed_quantity|integer|YES|0||32|0|
+orders_y2027m09|17|pending_quantity|integer|YES|0||32|0|
+orders_y2027m09|18|cancelled_quantity|integer|YES|0||32|0|
+orders_y2027m09|19|filled_quantity|integer|YES|0||32|0|
+orders_y2027m09|20|price|numeric|YES|||15|4|
+orders_y2027m09|21|trigger_price|numeric|YES|||15|4|
+orders_y2027m09|22|average_price|numeric|YES|||15|4|
+orders_y2027m09|23|order_timestamp|timestamp with time zone|NO|||||6
+orders_y2027m09|24|exchange_timestamp|timestamp with time zone|YES|||||6
+orders_y2027m09|25|exchange_update_timestamp|timestamp with time zone|YES|||||6
+orders_y2027m09|26|tag|character varying|YES||20|||
+orders_y2027m09|27|guid|character varying|YES||100|||
+orders_y2027m09|28|parent_order_id|character varying|YES||50|||
+orders_y2027m09|29|meta|jsonb|YES|'{}'::jsonb||||
+orders_y2027m09|30|created_at|timestamp with time zone|YES|now()||||6
+orders_y2027m09|31|updated_at|timestamp with time zone|YES|now()||||6
+orders_y2027m10|1|id|uuid|NO|gen_random_uuid()||||
+orders_y2027m10|2|broker_account_id|uuid|NO|||||
+orders_y2027m10|3|kite_order_id|character varying|NO||50|||
+orders_y2027m10|4|exchange_order_id|character varying|YES||50|||
+orders_y2027m10|5|status|character varying|NO||20|||
+orders_y2027m10|6|status_message|text|YES|||||
+orders_y2027m10|7|status_message_raw|text|YES|||||
+orders_y2027m10|8|tradingsymbol|character varying|NO||50|||
+orders_y2027m10|9|exchange|character varying|NO||10|||
+orders_y2027m10|10|transaction_type|character varying|NO||10|||
+orders_y2027m10|11|order_type|character varying|NO||10|||
+orders_y2027m10|12|product|character varying|NO||10|||
+orders_y2027m10|13|variety|character varying|NO||20|||
+orders_y2027m10|14|validity|character varying|NO|'DAY'::character varying|10|||
+orders_y2027m10|15|quantity|integer|NO|||32|0|
+orders_y2027m10|16|disclosed_quantity|integer|YES|0||32|0|
+orders_y2027m10|17|pending_quantity|integer|YES|0||32|0|
+orders_y2027m10|18|cancelled_quantity|integer|YES|0||32|0|
+orders_y2027m10|19|filled_quantity|integer|YES|0||32|0|
+orders_y2027m10|20|price|numeric|YES|||15|4|
+orders_y2027m10|21|trigger_price|numeric|YES|||15|4|
+orders_y2027m10|22|average_price|numeric|YES|||15|4|
+orders_y2027m10|23|order_timestamp|timestamp with time zone|NO|||||6
+orders_y2027m10|24|exchange_timestamp|timestamp with time zone|YES|||||6
+orders_y2027m10|25|exchange_update_timestamp|timestamp with time zone|YES|||||6
+orders_y2027m10|26|tag|character varying|YES||20|||
+orders_y2027m10|27|guid|character varying|YES||100|||
+orders_y2027m10|28|parent_order_id|character varying|YES||50|||
+orders_y2027m10|29|meta|jsonb|YES|'{}'::jsonb||||
+orders_y2027m10|30|created_at|timestamp with time zone|YES|now()||||6
+orders_y2027m10|31|updated_at|timestamp with time zone|YES|now()||||6
+orders_y2027m11|1|id|uuid|NO|gen_random_uuid()||||
+orders_y2027m11|2|broker_account_id|uuid|NO|||||
+orders_y2027m11|3|kite_order_id|character varying|NO||50|||
+orders_y2027m11|4|exchange_order_id|character varying|YES||50|||
+orders_y2027m11|5|status|character varying|NO||20|||
+orders_y2027m11|6|status_message|text|YES|||||
+orders_y2027m11|7|status_message_raw|text|YES|||||
+orders_y2027m11|8|tradingsymbol|character varying|NO||50|||
+orders_y2027m11|9|exchange|character varying|NO||10|||
+orders_y2027m11|10|transaction_type|character varying|NO||10|||
+orders_y2027m11|11|order_type|character varying|NO||10|||
+orders_y2027m11|12|product|character varying|NO||10|||
+orders_y2027m11|13|variety|character varying|NO||20|||
+orders_y2027m11|14|validity|character varying|NO|'DAY'::character varying|10|||
+orders_y2027m11|15|quantity|integer|NO|||32|0|
+orders_y2027m11|16|disclosed_quantity|integer|YES|0||32|0|
+orders_y2027m11|17|pending_quantity|integer|YES|0||32|0|
+orders_y2027m11|18|cancelled_quantity|integer|YES|0||32|0|
+orders_y2027m11|19|filled_quantity|integer|YES|0||32|0|
+orders_y2027m11|20|price|numeric|YES|||15|4|
+orders_y2027m11|21|trigger_price|numeric|YES|||15|4|
+orders_y2027m11|22|average_price|numeric|YES|||15|4|
+orders_y2027m11|23|order_timestamp|timestamp with time zone|NO|||||6
+orders_y2027m11|24|exchange_timestamp|timestamp with time zone|YES|||||6
+orders_y2027m11|25|exchange_update_timestamp|timestamp with time zone|YES|||||6
+orders_y2027m11|26|tag|character varying|YES||20|||
+orders_y2027m11|27|guid|character varying|YES||100|||
+orders_y2027m11|28|parent_order_id|character varying|YES||50|||
+orders_y2027m11|29|meta|jsonb|YES|'{}'::jsonb||||
+orders_y2027m11|30|created_at|timestamp with time zone|YES|now()||||6
+orders_y2027m11|31|updated_at|timestamp with time zone|YES|now()||||6
+orders_y2027m12|1|id|uuid|NO|gen_random_uuid()||||
+orders_y2027m12|2|broker_account_id|uuid|NO|||||
+orders_y2027m12|3|kite_order_id|character varying|NO||50|||
+orders_y2027m12|4|exchange_order_id|character varying|YES||50|||
+orders_y2027m12|5|status|character varying|NO||20|||
+orders_y2027m12|6|status_message|text|YES|||||
+orders_y2027m12|7|status_message_raw|text|YES|||||
+orders_y2027m12|8|tradingsymbol|character varying|NO||50|||
+orders_y2027m12|9|exchange|character varying|NO||10|||
+orders_y2027m12|10|transaction_type|character varying|NO||10|||
+orders_y2027m12|11|order_type|character varying|NO||10|||
+orders_y2027m12|12|product|character varying|NO||10|||
+orders_y2027m12|13|variety|character varying|NO||20|||
+orders_y2027m12|14|validity|character varying|NO|'DAY'::character varying|10|||
+orders_y2027m12|15|quantity|integer|NO|||32|0|
+orders_y2027m12|16|disclosed_quantity|integer|YES|0||32|0|
+orders_y2027m12|17|pending_quantity|integer|YES|0||32|0|
+orders_y2027m12|18|cancelled_quantity|integer|YES|0||32|0|
+orders_y2027m12|19|filled_quantity|integer|YES|0||32|0|
+orders_y2027m12|20|price|numeric|YES|||15|4|
+orders_y2027m12|21|trigger_price|numeric|YES|||15|4|
+orders_y2027m12|22|average_price|numeric|YES|||15|4|
+orders_y2027m12|23|order_timestamp|timestamp with time zone|NO|||||6
+orders_y2027m12|24|exchange_timestamp|timestamp with time zone|YES|||||6
+orders_y2027m12|25|exchange_update_timestamp|timestamp with time zone|YES|||||6
+orders_y2027m12|26|tag|character varying|YES||20|||
+orders_y2027m12|27|guid|character varying|YES||100|||
+orders_y2027m12|28|parent_order_id|character varying|YES||50|||
+orders_y2027m12|29|meta|jsonb|YES|'{}'::jsonb||||
+orders_y2027m12|30|created_at|timestamp with time zone|YES|now()||||6
+orders_y2027m12|31|updated_at|timestamp with time zone|YES|now()||||6
+portfolio_chat_sessions|1|id|uuid|NO|gen_random_uuid()||||
+portfolio_chat_sessions|2|broker_account_id|uuid|NO|||||
+portfolio_chat_sessions|3|summary|character varying|YES||500|||
+portfolio_chat_sessions|4|messages|jsonb|NO|'[]'::jsonb||||
+portfolio_chat_sessions|5|started_at|timestamp with time zone|NO|now()||||6
+portfolio_chat_sessions|6|ended_at|timestamp with time zone|YES|||||6
+portfolio_chat_sessions|7|message_count|integer|NO|0||32|0|
+portfolio_chat_sessions|8|created_at|timestamp with time zone|NO|now()||||6
+portfolio_chat_sessions|9|updated_at|timestamp with time zone|NO|now()||||6
+position_alerts_sent|1|id|uuid|NO|gen_random_uuid()||||
+position_alerts_sent|2|broker_account_id|uuid|NO|||||
+position_alerts_sent|3|alert_type|character varying|NO||50|||
+position_alerts_sent|4|alert_key|character varying|NO||200|||
+position_alerts_sent|5|fired_at|timestamp with time zone|YES|now()||||6
+position_alerts_sent|6|cooldown_until|timestamp with time zone|NO|||||6
+position_ledger|1|id|uuid|NO|gen_random_uuid()||||
+position_ledger|2|broker_account_id|uuid|NO|||||
+position_ledger|3|tradingsymbol|text|NO|||||
+position_ledger|4|exchange|text|NO|||||
+position_ledger|5|entry_type|text|NO|||||
+position_ledger|6|fill_order_id|text|NO|||||
+position_ledger|7|fill_qty|integer|NO|||32|0|
+position_ledger|8|fill_price|numeric|NO|||15|4|
+position_ledger|9|position_qty_after|integer|NO|||32|0|
+position_ledger|10|avg_entry_price_after|numeric|YES|||15|4|
+position_ledger|11|realized_pnl|numeric|NO|0||15|4|
+position_ledger|12|session_id|uuid|YES|||||
+position_ledger|13|occurred_at|timestamp with time zone|NO|||||6
+position_ledger|14|created_at|timestamp with time zone|NO|now()||||6
+position_ledger|15|idempotency_key|text|NO|||||
+position_ledger|16|product|character varying|YES||20|||
+position_margin_observations|1|id|uuid|NO|gen_random_uuid()||||
+position_margin_observations|2|broker_account_id|uuid|NO|||||
+position_margin_observations|3|captured_at|timestamp with time zone|NO|now()||||6
+position_margin_observations|4|exchange|character varying|YES||20|||
+position_margin_observations|5|underlying|character varying|YES||100|||
+position_margin_observations|6|product|character varying|YES||20|||
+position_margin_observations|7|leg_count|integer|NO|1||32|0|
+position_margin_observations|8|legs|jsonb|NO|'[]'::jsonb||||
+position_margin_observations|9|span|numeric|YES|||18|4|
+position_margin_observations|10|exposure|numeric|YES|||18|4|
+position_margin_observations|11|option_premium|numeric|YES|||18|4|
+position_margin_observations|12|additional|numeric|YES|||18|4|
+position_margin_observations|13|total|numeric|YES|||18|4|
+position_margin_observations|14|per_leg|jsonb|NO|'{}'::jsonb||||
+position_margin_observations|15|basis|character varying|NO|'basket'::character varying|16|||
+position_margin_observations|16|margin_source|character varying|NO|'broker'::character varying|16|||
+position_margin_observations|17|created_at|timestamp with time zone|NO|now()||||6
+positions|1|id|uuid|NO|gen_random_uuid()||||
+positions|2|broker_account_id|uuid|NO|||||
+positions|3|tradingsymbol|text|NO|||||
+positions|4|exchange|text|YES|||||
+positions|5|instrument_type|text|YES|||||
+positions|6|product|text|YES|||||
+positions|7|total_quantity|integer|YES|||32|0|
+positions|8|average_entry_price|numeric|YES|||10|2|
+positions|9|average_exit_price|numeric|YES|||10|2|
+positions|10|realized_pnl|numeric|YES|||12|2|
+positions|11|first_entry_time|timestamp with time zone|YES|||||6
+positions|12|last_exit_time|timestamp with time zone|YES|||||6
+positions|13|holding_duration_minutes|integer|YES|||32|0|
+positions|14|order_ids|ARRAY|YES|||||
+positions|15|status|text|YES|'open'::text||||
+positions|16|created_at|timestamp with time zone|YES|now()||||6
+positions|17|updated_at|timestamp with time zone|YES|now()||||6
+positions|18|pnl|numeric|YES|||12|2|
+positions|19|unrealized_pnl|numeric|YES|||12|2|
+positions|20|day_pnl|numeric|YES|||12|2|
+positions|21|last_price|numeric|YES|||12|2|
+positions|22|close_price|numeric|YES|||12|2|
+positions|23|value|numeric|YES|||14|2|
+positions|24|buy_value|numeric|YES|||14|2|
+positions|25|sell_value|numeric|YES|||14|2|
+positions|26|synced_at|timestamp with time zone|YES|||||6
+positions|27|segment|character varying|YES||20|||
+positions|28|instrument_token|bigint|YES|||64|0|
+positions|29|overnight_quantity|integer|YES|0||32|0|
+positions|30|multiplier|numeric|YES|1||10|4|
+positions|31|m2m|numeric|YES|||15|4|
+positions|32|day_buy_quantity|integer|YES|0||32|0|
+positions|33|day_sell_quantity|integer|YES|0||32|0|
+positions|34|day_buy_price|numeric|YES|||15|4|
+positions|35|day_sell_price|numeric|YES|||15|4|
+positions|36|day_buy_value|numeric|YES|||15|4|
+positions|37|day_sell_value|numeric|YES|||15|4|
+positions|38|last_entry_time|timestamp with time zone|YES|||||6
+positions|39|entry_price_source|character varying|YES||10|||
+push_subscriptions|1|id|uuid|NO|gen_random_uuid()||||
+push_subscriptions|2|broker_account_id|uuid|NO|||||
+push_subscriptions|3|endpoint|text|NO|||||
+push_subscriptions|4|p256dh_key|character varying|NO||255|||
+push_subscriptions|5|auth_key|character varying|NO||255|||
+push_subscriptions|6|user_agent|character varying|YES||500|||
+push_subscriptions|7|device_type|character varying|YES||50|||
+push_subscriptions|8|is_active|boolean|NO|true||||
+push_subscriptions|9|last_used_at|timestamp with time zone|YES|||||6
+push_subscriptions|10|failed_count|integer|YES|0||32|0|
+push_subscriptions|11|created_at|timestamp with time zone|NO|now()||||6
+push_subscriptions|12|updated_at|timestamp with time zone|YES|now()||||6
+risk_alerts|1|id|uuid|NO|gen_random_uuid()||||
+risk_alerts|3|broker_account_id|uuid|NO|||||
+risk_alerts|4|pattern_type|text|NO|||||
+risk_alerts|5|severity|text|NO|||||
+risk_alerts|6|message|text|NO|||||
+risk_alerts|7|details|jsonb|YES|||||
+risk_alerts|8|trigger_trade_id|uuid|YES|||||
+risk_alerts|9|related_trade_ids|ARRAY|YES|||||
+risk_alerts|10|detected_at|timestamp with time zone|YES|now()||||6
+risk_alerts|11|acknowledged_at|timestamp with time zone|YES|||||6
+risk_alerts|12|created_at|timestamp with time zone|YES|now()||||6
+risk_alerts|13|delivered_push_at|timestamp with time zone|YES|||||6
+risk_alerts|14|delivered_whatsapp_at|timestamp with time zone|YES|||||6
+risk_alerts|15|expired_at|timestamp with time zone|YES|||||6
+risk_alerts|16|resolved_at|timestamp with time zone|YES|||||6
+risk_alerts|17|trigger_completed_trade_id|uuid|YES|||||
+risk_alerts|18|detector_version|character varying|NO|'1.0.0'::character varying|20|||
+risk_alerts|19|confidence|numeric|YES|||5|2|
+risk_alerts|20|outcome|text|YES|||||
+risk_alerts|21|outcome_at|timestamp with time zone|YES|||||6
+risk_alerts|22|lifecycle|text|NO|'post'::text||||
+risk_alerts|23|trigger_position_id|uuid|YES|||||
+schema_migrations|1|filename|text|NO|||||
+schema_migrations|2|checksum|text|NO|||||
+schema_migrations|3|applied_at|timestamp with time zone|NO|now()||||6
+schema_migrations|4|applied_by|text|NO|'runner'::text||||
+schema_migrations|5|note|text|YES|||||
+shadow_behavioral_events|1|id|uuid|NO|gen_random_uuid()||||
+shadow_behavioral_events|2|broker_account_id|uuid|NO|||||
+shadow_behavioral_events|3|trigger_completed_trade_id|uuid|YES|||||
+shadow_behavioral_events|4|trigger_session_id|uuid|YES|||||
+shadow_behavioral_events|5|event_type|text|NO|||||
+shadow_behavioral_events|6|severity|text|NO|||||
+shadow_behavioral_events|7|confidence|numeric|NO|||3|2|
+shadow_behavioral_events|8|message|text|NO|||||
+shadow_behavioral_events|9|context|jsonb|YES|||||
+shadow_behavioral_events|10|risk_score_before|numeric|NO|0||5|2|
+shadow_behavioral_events|11|risk_score_delta|numeric|NO|0||5|2|
+shadow_behavioral_events|12|risk_score_after|numeric|NO|0||5|2|
+shadow_behavioral_events|13|behavior_state|text|NO|||||
+shadow_behavioral_events|14|trajectory|text|NO|||||
+shadow_behavioral_events|15|matched_production|boolean|YES|||||
+shadow_behavioral_events|16|divergence_notes|text|YES|||||
+shadow_behavioral_events|17|detected_at|timestamp with time zone|NO|now()||||6
+shadow_behavioral_events|18|created_at|timestamp with time zone|NO|now()||||6
+strategy_group_legs|1|id|uuid|NO|gen_random_uuid()||||
+strategy_group_legs|2|strategy_group_id|uuid|NO|||||
+strategy_group_legs|3|completed_trade_id|uuid|NO|||||
+strategy_group_legs|4|leg_role|character varying|YES||30|||
+strategy_group_legs|5|leg_pnl|numeric|YES|||15|4|
+strategy_group_legs|6|created_at|timestamp with time zone|NO|now()||||6
+strategy_groups|1|id|uuid|NO|gen_random_uuid()||||
+strategy_groups|2|broker_account_id|uuid|NO|||||
+strategy_groups|3|strategy_type|character varying|NO||50|||
+strategy_groups|4|underlying|character varying|NO||50|||
+strategy_groups|5|expiry_key|character varying|YES||20|||
+strategy_groups|6|status|character varying|NO|'open'::character varying|20|||
+strategy_groups|7|net_pnl|numeric|YES|||15|4|
+strategy_groups|8|opened_at|timestamp with time zone|YES|||||6
+strategy_groups|9|closed_at|timestamp with time zone|YES|||||6
+strategy_groups|10|created_at|timestamp with time zone|NO|now()||||6
+streak_data|1|id|uuid|NO|gen_random_uuid()||||
+streak_data|2|broker_account_id|uuid|NO|||||
+streak_data|3|current_streak_days|integer|YES|0||32|0|
+streak_data|4|longest_streak_days|integer|YES|0||32|0|
+streak_data|5|streak_start_date|timestamp with time zone|YES|||||6
+streak_data|6|daily_status|jsonb|YES|'[]'::jsonb||||
+streak_data|7|milestones_achieved|jsonb|YES|'[]'::jsonb||||
+streak_data|8|updated_at|timestamp with time zone|YES|now()||||6
+trades|1|id|uuid|NO|gen_random_uuid()||||
+trades|3|broker_account_id|uuid|NO|||||
+trades|4|order_id|text|YES|||||
+trades|5|tradingsymbol|text|NO|||||
+trades|6|exchange|text|NO|||||
+trades|7|transaction_type|text|NO|||||
+trades|8|order_type|text|YES|||||
+trades|9|product|text|YES|||||
+trades|10|quantity|integer|NO|||32|0|
+trades|11|filled_quantity|integer|YES|0||32|0|
+trades|12|pending_quantity|integer|YES|0||32|0|
+trades|13|cancelled_quantity|integer|YES|0||32|0|
+trades|14|price|numeric|YES|||10|2|
+trades|15|trigger_price|numeric|YES|||10|2|
+trades|16|average_price|numeric|YES|||10|2|
+trades|17|status|text|YES|||||
+trades|18|status_message|text|YES|||||
+trades|19|asset_class|text|YES|||||
+trades|20|instrument_type|text|YES|||||
+trades|21|product_type|text|YES|||||
+trades|22|pnl|numeric|YES|||10|2|
+trades|23|order_timestamp|timestamp with time zone|YES|||||6
+trades|24|exchange_timestamp|timestamp with time zone|YES|||||6
+trades|25|raw_payload|jsonb|YES|||||
+trades|26|created_at|timestamp with time zone|YES|now()||||6
+trades|27|updated_at|timestamp with time zone|YES|now()||||6
+trades|28|segment|character varying|YES||20|||
+trades|29|kite_order_id|character varying|YES||50|||
+trades|30|exchange_order_id|character varying|YES||50|||
+trades|31|fill_timestamp|timestamp with time zone|YES|||||6
+trades|32|validity|character varying|YES|'DAY'::character varying|10|||
+trades|33|variety|character varying|YES|'regular'::character varying|20|||
+trades|34|disclosed_quantity|integer|YES|0||32|0|
+trades|35|parent_order_id|character varying|YES||50|||
+trades|36|tag|character varying|YES||20|||
+trades|37|guid|character varying|YES||100|||
+trades|38|instrument_token|bigint|YES|||64|0|
+trades|39|market_protection|numeric|YES|||10|2|
+trades|40|processed_at|timestamp with time zone|YES|||||6
+trading_goals|1|id|uuid|NO|gen_random_uuid()||||
+trading_goals|2|broker_account_id|uuid|NO|||||
+trading_goals|3|max_risk_per_trade_percent|double precision|YES|5.0||53||
+trading_goals|4|max_daily_loss|double precision|YES|5000.0||53||
+trading_goals|5|max_trades_per_day|integer|YES|10||32|0|
+trading_goals|6|require_stoploss|boolean|YES|true||||
+trading_goals|7|min_time_between_trades_minutes|integer|YES|5||32|0|
+trading_goals|8|max_position_size_percent|double precision|YES|5.0||53||
+trading_goals|9|allowed_trading_start|character varying|YES|'09:15'::character varying|10|||
+trading_goals|10|allowed_trading_end|character varying|YES|'15:30'::character varying|10|||
+trading_goals|11|starting_capital|double precision|YES|50000.0||53||
+trading_goals|12|current_capital|double precision|YES|50000.0||53||
+trading_goals|13|created_at|timestamp with time zone|YES|now()||||6
+trading_goals|14|last_modified_at|timestamp with time zone|YES|now()||||6
+trading_goals|15|primary_segment|character varying|YES|'EQUITY'::character varying|20|||
+trading_goals|16|segment_hours|jsonb|YES|'{}'::jsonb||||
+trading_sessions|1|id|uuid|NO|gen_random_uuid()||||
+trading_sessions|2|broker_account_id|uuid|NO|||||
+trading_sessions|3|session_date|date|NO|||||0
+trading_sessions|4|market_open|timestamp with time zone|YES|||||6
+trading_sessions|5|market_close|timestamp with time zone|YES|||||6
+trading_sessions|6|opening_equity|numeric|YES|||15|4|
+trading_sessions|7|closing_equity|numeric|YES|||15|4|
+trading_sessions|8|session_pnl|numeric|NO|0||15|4|
+trading_sessions|9|trade_count|integer|NO|0||32|0|
+trading_sessions|10|alerts_fired|integer|NO|0||32|0|
+trading_sessions|11|risk_score|numeric|NO|0||5|2|
+trading_sessions|12|peak_risk_score|numeric|NO|0||5|2|
+trading_sessions|13|session_state|text|NO|'normal'::text||||
+trading_sessions|14|created_at|timestamp with time zone|NO|now()||||6
+trading_sessions|15|updated_at|timestamp with time zone|NO|now()||||6
+trading_sessions|16|intent_acknowledged|boolean|NO|false||||
+trading_sessions|17|intent_max_trades|integer|YES|||32|0|
+trading_sessions|18|intent_max_loss|numeric|YES|||15|4|
+trading_sessions|19|intent_time|timestamp with time zone|YES|||||6
+trading_sessions|20|risk_denominator|numeric|YES|||18|2|
+trading_sessions|21|risk_denominator_source|text|YES|||||
+trading_sessions|22|risk_denominator_as_of|timestamp with time zone|YES|||||6
+trading_sessions|23|risk_denominator_quality|text|YES|||||
+user_profiles|1|id|uuid|NO|gen_random_uuid()||||
+user_profiles|2|broker_account_id|uuid|NO|||||
+user_profiles|3|onboarding_completed|boolean|YES|false||||
+user_profiles|4|onboarding_step|integer|YES|0||32|0|
+user_profiles|5|display_name|character varying|YES||100|||
+user_profiles|6|trading_since|integer|YES|||32|0|
+user_profiles|7|experience_level|character varying|YES|'beginner'::character varying|20|||
+user_profiles|8|trading_style|character varying|YES|'intraday'::character varying|20|||
+user_profiles|9|risk_tolerance|character varying|YES|'moderate'::character varying|20|||
+user_profiles|10|preferred_instruments|jsonb|YES|'[]'::jsonb||||
+user_profiles|11|preferred_segments|jsonb|YES|'[]'::jsonb||||
+user_profiles|12|trading_hours_start|character varying|YES|'09:15'::character varying|5|||
+user_profiles|13|trading_hours_end|character varying|YES|'15:30'::character varying|5|||
+user_profiles|14|daily_loss_limit|double precision|YES|||53||
+user_profiles|15|daily_trade_limit|integer|YES|||32|0|
+user_profiles|16|max_position_size|double precision|YES|||53||
+user_profiles|17|cooldown_after_loss|integer|YES|15||32|0|
+user_profiles|18|known_weaknesses|jsonb|YES|'[]'::jsonb||||
+user_profiles|19|push_enabled|boolean|YES|true||||
+user_profiles|20|whatsapp_enabled|boolean|YES|false||||
+user_profiles|21|email_enabled|boolean|YES|false||||
+user_profiles|22|alert_sensitivity|character varying|YES|'medium'::character varying|20|||
+user_profiles|23|guardian_enabled|boolean|YES|false||||
+user_profiles|24|guardian_alert_threshold|character varying|YES|'danger'::character varying|20|||
+user_profiles|25|ai_persona|character varying|YES|'coach'::character varying|50|||
+user_profiles|26|detected_patterns|jsonb|YES|'{}'::jsonb||||
+user_profiles|27|created_at|timestamp with time zone|NO|now()||||6
+user_profiles|28|updated_at|timestamp with time zone|YES|now()||||6
+user_profiles|29|guardian_daily_summary|boolean|YES|false||||
+user_profiles|30|ai_cache|jsonb|YES|'{}'::jsonb||||
+user_profiles|31|eod_report_time|character varying|YES|'16:00'::character varying|5|||
+user_profiles|32|morning_brief_time|character varying|YES|'08:30'::character varying|5|||
+user_profiles|33|trading_capital|double precision|YES|||53||
+user_profiles|35|sl_percent_options|double precision|YES|||53||
+user_profiles|36|max_consecutive_losses|integer|YES|||32|0|
+user_profiles|37|restricted_windows|jsonb|YES|'[]'::jsonb||||
+user_profiles|38|constitution_accepted_at|timestamp with time zone|YES|||||6
+user_profiles|39|constitution_locked_until|timestamp with time zone|YES|||||6
+user_profiles|40|constitution_pending|jsonb|YES|||||
+user_profiles|41|per_trade_loss_limit|double precision|YES|||53||
+user_profiles|42|daily_trade_min|integer|YES|||32|0|
+users|1|id|uuid|NO|gen_random_uuid()||||
+users|2|email|text|NO|||||
+users|3|display_name|text|YES|||||
+users|4|avatar_url|text|YES|||||
+users|5|guardian_phone|text|YES|||||
+users|6|guardian_name|text|YES|||||
+users|7|created_at|timestamp with time zone|NO|now()||||6
+users|8|updated_at|timestamp with time zone|NO|now()||||6
+users|9|guardian_confirmed|boolean|YES|false||||
+users|10|guardian_confirmed_at|timestamp with time zone|YES|||||6
+users|11|guardian_loss_limit|numeric|YES|||15|4|
+users|12|terms_accepted_at|timestamp with time zone|YES|||||6
+users|13|terms_version|character varying|YES||20|||

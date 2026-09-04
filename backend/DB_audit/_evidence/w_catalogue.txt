@@ -1,0 +1,51 @@
+table|rows|size_bytes|model|app|scripts|tests|fe|comment
+admin_audit_log|3|81920|AdminAuditLog|6|0|0|0|Immutable log of every admin panel action. Never delete rows from this table.
+admin_login_events|0|24576|NONE|2|0|0|0|
+admin_settings|0|32768|NONE|16|0|6|0|
+admin_users|1|81920|AdminUser|3|0|1|0|Admin panel users — separate from trader accounts. Password-based auth + email OTP.
+alert_checkpoints|1|180224|AlertCheckpoint|1|0|12|0|
+alert_mutes|1|32768|AlertMute|1|0|1|0|
+behavior_events|0|0|BehaviorEvent|22|11|30|2|
+behavior_events_legacy|0|73728|NONE|0|1|0|0|
+behavioral_events|133|278528|BehavioralEvent|7|5|3|0|
+broadcast_logs|0|24576|BroadcastLog|3|0|0|0|
+broadcast_receipts|0|32768|BroadcastReceipt|3|0|0|0|
+broker_accounts|3|1933312|BrokerAccount|38|25|31|0|
+coach_sessions|5|221184|CoachSession|1|0|0|0|
+commitment_logs|0|32768|CommitmentLog|1|0|2|0|
+completed_trade_features|0|90112|CompletedTradeFeature|2|1|6|0|
+completed_trades|112|4358144|CompletedTrade|52|25|25|1|
+constitution_history|3|49152|ConstitutionHistory|10|0|0|1|
+cooldowns|215|229376|Cooldown|36|24|9|2|Active and historical cooling-off periods after risky behavior
+data_quality_events|0|81920|DataQualityEvent|10|0|1|0|
+detector_flags|0|16384|NONE|22|0|2|0|
+discipline_scores|0|32768|NONE|0|0|0|0|
+discipline_streaks|0|24576|NONE|2|0|0|0|
+generated_reports|0|32768|GeneratedReport|1|0|0|0|Saved copies of all generated reports for the Reports Hub
+gtt_tracking|0|24576|NONE|13|0|4|0|
+guardrail_rules|2|65536|GuardrailRule|4|0|0|0|User-defined alert rules on open positions. Fire once (status→triggered), never re-arm.
+holdings|0|32768|Holding|92|0|3|28|CNC/delivery holdings separate from intraday positions
+incomplete_positions|10|114688|IncompletePosition|2|0|2|0|
+instruments|166222|79437824|Instrument|127|5|13|58|Kite instrument master cache for symbol lookups and WebSocket subscriptions
+journal_entries|20|647168|JournalEntry|10|1|3|1|Trade journal entries - optional notes, emotions, and lessons for trades
+margin_snapshots|279|327680|MarginSnapshot|4|0|5|0|Historical margin utilization for trend analysis
+monthly_snapshots|0|65536|MonthlySnapshot|8|0|6|0|Immutable per-account monthly summary. Written and verified BEFORE the corresponding orders partition may be dropped; kept indefinitely.
+oauth_temp_store|1|49152|NONE|6|0|0|0|
+orders|0|0|Order|211|16|137|25|All orders including cancelled/rejected for order flow analysis
+portfolio_chat_sessions|1|139264|PortfolioChatSession|2|0|0|0|Portfolio AI Chat conversation history. Shows flashback card on next visit.
+position_alerts_sent|0|16384|NONE|2|0|0|0|
+position_ledger|100|2015232|PositionLedger|22|12|20|0|
+position_margin_observations|0|32768|PositionMarginObservation|5|0|2|0|Append-only broker margin observations per position/structure. Never updated, never recomputed. A COMPUTED estimate must not overwrite one.
+positions|99|729088|Position|462|150|163|129|
+push_subscriptions|1|114688|PushSubscription|3|0|5|0|
+risk_alerts|57|1228800|RiskAlert|17|17|24|6|
+schema_migrations|91|81920|NONE|0|15|9|0|Which files in backend/migrations/ have been applied. Written by scripts/migrate.py. applied_by=adopt means recorded as already-applied without being executed here.
+shadow_behavioral_events|0|32768|NONE|0|5|0|0|
+strategy_group_legs|0|90112|StrategyGroupLeg|2|0|0|0|
+strategy_groups|0|57344|StrategyGroup|2|2|0|0|
+streak_data|1|81920|StreakData|1|0|3|0|
+trades|318|4833280|Trade|1680|372|740|867|
+trading_goals|1|81920|Goal|1|0|3|0|
+trading_sessions|9|131072|TradingSession|10|5|2|1|
+user_profiles|3|270336|UserProfile|4|4|3|0|User preferences, trading style, and personalization settings
+users|3|3620864|User|102|32|43|65|

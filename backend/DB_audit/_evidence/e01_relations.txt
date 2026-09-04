@@ -1,0 +1,95 @@
+# gathered 2026-09-04T10:45:39.506676+00:00
+relname|relkind|partkey|est_rows|total_bytes|parent|comment
+admin_audit_log|b'r'||-1|81920||Immutable log of every admin panel action. Never delete rows from this table.
+admin_login_events|b'r'||-1|24576||
+admin_settings|b'r'||-1|32768||
+admin_users|b'r'||-1|81920||Admin panel users — separate from trader accounts. Password-based auth + email OTP.
+alert_checkpoints|b'r'||1|180224||
+alert_mutes|b'r'||-1|32768||
+behavior_events|b'p'|RANGE (detected_at)|-1|0||
+behavior_events_default|b'r'||0|155648|behavior_events|
+behavior_events_legacy|b'r'||-1|73728||
+behavior_events_y2026m07|b'r'||145|753664|behavior_events|
+behavior_events_y2026m08|b'r'||0|409600|behavior_events|
+behavior_events_y2026m09|b'r'||0|90112|behavior_events|
+behavior_events_y2026m10|b'r'||-1|40960|behavior_events|
+behavior_events_y2026m11|b'r'||-1|40960|behavior_events|
+behavior_events_y2026m12|b'r'||-1|40960|behavior_events|
+behavior_events_y2027m01|b'r'||-1|40960|behavior_events|
+behavior_events_y2027m02|b'r'||-1|40960|behavior_events|
+behavior_events_y2027m03|b'r'||-1|40960|behavior_events|
+behavior_events_y2027m04|b'r'||-1|40960|behavior_events|
+behavior_events_y2027m05|b'r'||-1|40960|behavior_events|
+behavior_events_y2027m06|b'r'||-1|40960|behavior_events|
+behavior_events_y2027m07|b'r'||-1|40960|behavior_events|
+behavior_events_y2027m08|b'r'||-1|40960|behavior_events|
+behavior_events_y2027m09|b'r'||-1|40960|behavior_events|
+behavior_events_y2027m10|b'r'||-1|40960|behavior_events|
+behavior_events_y2027m11|b'r'||-1|40960|behavior_events|
+behavior_events_y2027m12|b'r'||-1|40960|behavior_events|
+behavioral_events|b'r'||133|278528||
+broadcast_logs|b'r'||-1|24576||
+broadcast_receipts|b'r'||-1|32768||
+broker_accounts|b'r'||3|1933312||
+coach_sessions|b'r'||-1|221184||
+commitment_logs|b'r'||-1|32768||
+completed_trade_features|b'r'||0|90112||
+completed_trades|b'r'||202|4358144||
+constitution_history|b'r'||-1|49152||
+cooldowns|b'r'||215|229376||Active and historical cooling-off periods after risky behavior
+data_quality_events|b'r'||-1|81920||
+detector_flags|b'r'||-1|16384||
+discipline_scores|b'r'||-1|32768||
+discipline_streaks|b'r'||-1|24576||
+generated_reports|b'r'||-1|32768||Saved copies of all generated reports for the Reports Hub
+gtt_tracking|b'r'||-1|24576||
+guardrail_rules|b'r'||-1|65536||User-defined alert rules on open positions. Fire once (status→triggered), never re-arm.
+holdings|b'r'||-1|32768||CNC/delivery holdings separate from intraday positions
+incomplete_positions|b'r'||10|114688||
+instruments|b'r'||166222|79437824||Kite instrument master cache for symbol lookups and WebSocket subscriptions
+journal_entries|b'r'||20|647168||Trade journal entries - optional notes, emotions, and lessons for trades
+margin_snapshots|b'r'||279|327680||Historical margin utilization for trend analysis
+monthly_snapshots|b'r'||-1|65536||Immutable per-account monthly summary. Written and verified BEFORE the corresponding orders partition may be dropped; kept indefinitely.
+oauth_temp_store|b'r'||2|49152||
+orders|b'p'|RANGE (order_timestamp)|-1|0||All orders including cancelled/rejected for order flow analysis
+orders_default|b'r'||-1|57344|orders|
+orders_y2026m02|b'r'||-1|57344|orders|
+orders_y2026m03|b'r'||-1|57344|orders|
+orders_y2026m04|b'r'||-1|57344|orders|
+orders_y2026m05|b'r'||-1|57344|orders|
+orders_y2026m06|b'r'||-1|57344|orders|
+orders_y2026m07|b'r'||-1|57344|orders|
+orders_y2026m08|b'r'||-1|57344|orders|
+orders_y2026m09|b'r'||-1|114688|orders|
+orders_y2026m10|b'r'||-1|57344|orders|
+orders_y2026m11|b'r'||-1|57344|orders|
+orders_y2026m12|b'r'||-1|57344|orders|
+orders_y2027m01|b'r'||-1|57344|orders|
+orders_y2027m02|b'r'||-1|57344|orders|
+orders_y2027m03|b'r'||-1|57344|orders|
+orders_y2027m04|b'r'||-1|57344|orders|
+orders_y2027m05|b'r'||-1|57344|orders|
+orders_y2027m06|b'r'||-1|57344|orders|
+orders_y2027m07|b'r'||-1|57344|orders|
+orders_y2027m08|b'r'||-1|57344|orders|
+orders_y2027m09|b'r'||-1|57344|orders|
+orders_y2027m10|b'r'||-1|57344|orders|
+orders_y2027m11|b'r'||-1|57344|orders|
+orders_y2027m12|b'r'||-1|57344|orders|
+portfolio_chat_sessions|b'r'||-1|139264||Portfolio AI Chat conversation history. Shows flashback card on next visit.
+position_alerts_sent|b'r'||-1|16384||
+position_ledger|b'r'||215|2015232||
+position_margin_observations|b'r'||-1|32768||Append-only broker margin observations per position/structure. Never updated, never recomputed. A COMPUTED estimate must not overwrite one.
+positions|b'r'||99|729088||
+push_subscriptions|b'r'||1|114688||
+risk_alerts|b'r'||57|1228800||
+schema_migrations|b'r'||91|81920||Which files in backend/migrations/ have been applied. Written by scripts/migrate.py. applied_by=adopt means recorded as already-applied without being executed here.
+shadow_behavioral_events|b'r'||-1|32768||
+strategy_group_legs|b'r'||0|90112||
+strategy_groups|b'r'||0|57344||
+streak_data|b'r'||1|81920||
+trades|b'r'||589|4833280||
+trading_goals|b'r'||1|81920||
+trading_sessions|b'r'||9|131072||
+user_profiles|b'r'||3|270336||User preferences, trading style, and personalization settings
+users|b'r'||6|3620864||

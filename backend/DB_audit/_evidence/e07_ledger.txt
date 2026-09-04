@@ -1,0 +1,93 @@
+# gathered 2026-09-04T10:45:40.013318+00:00
+filename|checksum|applied_by|applied_at|note
+003_goals_tables.sql|7d684fb2be3b12a5|adopt|2026-09-03 06:55:25.749051+00:00|verified against live schema 2026-09-03: tables, columns, indexes and constraints all present
+004_push_subscriptions.sql|7f69a6473b771b66|adopt|2026-09-03 06:55:25.749051+00:00|verified against live schema 2026-09-03: tables, columns, indexes and constraints all present
+004b_update_positions_table.sql|0b5c27b9bc9c1e86|adopt|2026-09-03 06:55:25.749051+00:00|verified against live schema 2026-09-03: tables, columns, indexes and constraints all present
+005_add_segment_support.sql|2b4444b7a1f5257c|adopt|2026-09-03 06:55:25.749051+00:00|verified against live schema 2026-09-03: tables, columns, indexes and constraints all present
+006_journal_entries.sql|8c9ce131cb453768|adopt|2026-09-03 06:55:25.749051+00:00|verified against live schema 2026-09-03: tables, columns, indexes and constraints all present
+007_user_profiles.sql|7a722121f889465d|adopt|2026-09-03 06:55:25.749051+00:00|verified against live schema 2026-09-03: tables, columns, indexes and constraints all present
+008_cooldowns.sql|eff6eb965750b00d|adopt|2026-09-03 06:55:25.749051+00:00|verified against live schema 2026-09-03: tables, columns, indexes and constraints all present
+009_kite_api_alignment.sql|a954d44872458c69|adopt|2026-09-03 06:55:25.749051+00:00|verified against live schema 2026-09-03: tables, columns, indexes and constraints all present
+010_new_kite_tables.sql|96177d7a498e8066|adopt|2026-09-03 06:55:25.749051+00:00|verified against live schema 2026-09-03: tables, columns, indexes and constraints all present
+011_margin_history.sql|dffa57a776c80c2c|adopt|2026-09-03 06:55:25.749051+00:00|verified against live schema 2026-09-03: tables, columns, indexes and constraints all present
+012_vector_embeddings.sql|cfb04d533854a960|skip|2026-09-03 09:02:56.561726+00:00|RAG is not part of production readiness: rag_service is reachable but every call site try/excepts, so RAG has never worked. Enabling it is a feature decision (pgvector, an embedding provider, a backfill), not a forgotten migration.
+013_add_broker_account_id_to_holdings.sql|16cf749f6049a15f|adopt|2026-09-03 06:55:25.749051+00:00|verified against live schema 2026-09-03: tables, columns, indexes and constraints all present
+014_add_guardian_daily_summary_to_user_profiles.sql|1b18eb3b7695c0c7|adopt|2026-09-03 06:55:25.749051+00:00|verified against live schema 2026-09-03: tables, columns, indexes and constraints all present
+016_fix_all_missing_columns.sql|41068edf275a0e06|adopt|2026-09-03 06:55:25.749051+00:00|verified against live schema 2026-09-03: tables, columns, indexes and constraints all present
+017_add_cascade_delete.sql|67b242256dd14377|adopt|2026-09-03 06:55:25.749051+00:00|verified against live schema 2026-09-03: tables, columns, indexes and constraints all present
+018_fix_data_types.sql|68ef962430590915|skip|2026-09-03 09:07:40.470175+00:00|NOT APPLIED (verified 2026-09-03: trades.price is numeric(10,2), 018 wants (15,4)). Its widening was ABANDONED - the SQLAlchemy models declare Numeric(10,2), which the live DB matches, so applying 018 would make the database disagree with the ORM. The one part still diverging, push_subscriptions.failed_count being varchar where the model says Integer, is fixed by 087 instead.
+019_standardize_symbols.sql|7a453b050fd9eaeb|adopt|2026-09-03 06:55:25.749051+00:00|verified against live schema 2026-09-03: tables, columns, indexes and constraints all present
+020_trade_architecture_overhaul.sql|81ee129d677a873c|adopt|2026-09-03 06:55:25.749051+00:00|verified against live schema 2026-09-03: tables, columns, indexes and constraints all present
+021_add_missing_indexes.sql|d724e6801336bb5d|adopt|2026-09-03 06:55:25.749051+00:00|verified against live schema 2026-09-03: tables, columns, indexes and constraints all present
+022_cascade_indexes_datetime.sql|a942f9174bffac57|adopt|2026-09-03 06:55:25.749051+00:00|verified against live schema 2026-09-03: tables, columns, indexes and constraints all present
+023_add_segment_column.sql|12b5ed073d688009|adopt|2026-09-03 06:55:25.749051+00:00|verified against live schema 2026-09-03: tables, columns, indexes and constraints all present
+024_token_revocation.sql|da201ecd09625aee|adopt|2026-09-03 06:55:25.749051+00:00|verified against live schema 2026-09-03: tables, columns, indexes and constraints all present
+025_add_ai_cache.sql|831c3fda76986cb8|adopt|2026-09-03 06:55:25.749051+00:00|verified against live schema 2026-09-03: tables, columns, indexes and constraints all present
+027_add_report_timing_columns.sql|9dc66133494858a0|adopt|2026-09-03 06:55:25.749051+00:00|verified against live schema 2026-09-03: tables, columns, indexes and constraints all present
+028_add_threshold_fields.sql|982a6f13187920b1|adopt|2026-09-03 06:55:25.749051+00:00|verified against live schema 2026-09-03: tables, columns, indexes and constraints all present
+029_alert_checkpoints.sql|86bfb6b9263cd5f8|adopt|2026-09-03 06:55:25.749051+00:00|verified against live schema 2026-09-03: tables, columns, indexes and constraints all present
+030_fix_journal_trade_fk.sql|a1afeae751bf5c7b|adopt|2026-09-03 06:55:25.749051+00:00|verified against live schema 2026-09-03: tables, columns, indexes and constraints all present
+031_add_timestamp_indexes.sql|1261c9400dda8717|adopt|2026-09-03 06:55:25.749051+00:00|verified against live schema 2026-09-03: tables, columns, indexes and constraints all present
+032_users_table.sql|e6cdaeb944f0d61b|adopt|2026-09-03 06:55:25.749051+00:00|verified against live schema 2026-09-03: tables, columns, indexes and constraints all present
+033_fix_schema_issues.sql|14dfceb42131e0ef|adopt|2026-09-03 06:55:25.749051+00:00|verified against live schema 2026-09-03: tables, columns, indexes and constraints all present
+034_fix_alert_checkpoints_columns.sql|5119d2b57e525dac|adopt|2026-09-03 06:55:25.749051+00:00|verified against live schema 2026-09-03: tables, columns, indexes and constraints all present
+035_data_integrity.sql|c5c1df9cfa131a41|adopt|2026-09-03 06:55:25.749051+00:00|verified against live schema 2026-09-03: tables, columns, indexes and constraints all present
+036_position_ledger.sql|6337a2c7f486f084|adopt|2026-09-03 06:55:25.749051+00:00|verified against live schema 2026-09-03: tables, columns, indexes and constraints all present
+037_trading_sessions.sql|3e57047c4de59348|adopt|2026-09-03 06:55:25.749051+00:00|verified against live schema 2026-09-03: tables, columns, indexes and constraints all present
+038_alert_state_machine.sql|4d967f6a5e6a3afe|adopt|2026-09-03 06:55:25.749051+00:00|verified against live schema 2026-09-03: tables, columns, indexes and constraints all present
+039_behavioral_event_context.sql|480b360265b12d65|adopt|2026-09-03 06:55:25.749051+00:00|verified against live schema 2026-09-03: tables, columns, indexes and constraints all present
+040_shadow_behavioral_events.sql|763fcfa142acc01a|adopt|2026-09-03 06:55:25.749051+00:00|verified against live schema 2026-09-03: tables, columns, indexes and constraints all present
+041_coach_sessions.sql|3f4f65a50e8af693|adopt|2026-09-03 06:55:25.749051+00:00|verified against live schema 2026-09-03: tables, columns, indexes and constraints all present
+042_portfolio_radar.sql|f5940e40785436d6|adopt|2026-09-03 06:55:25.749051+00:00|verified against live schema 2026-09-03: tables, columns, indexes and constraints all present
+043_performance_indexes.sql|8a36b116e2e172a2|skip|2026-09-03 09:02:58.605173+00:00|Superseded except for one index on behavioral_events, which is frozen (133 rows, last write 2026-04-15, no live reader or writer). 4 of 5 missing indexes are covered by equivalents under other names.
+044_missing_indexes.sql|2fa48ace64a38aa1|adopt|2026-09-03 06:55:25.749051+00:00|verified against live schema 2026-09-03: tables, columns, indexes and constraints all present
+045_journal_structured_fields.sql|1d20ae276169802c|adopt|2026-09-03 06:55:25.749051+00:00|verified against live schema 2026-09-03: tables, columns, indexes and constraints all present
+046_strategy_groups.sql|3d4e9168681d30cb|adopt|2026-09-03 06:55:25.749051+00:00|verified against live schema 2026-09-03: tables, columns, indexes and constraints all present
+047_generated_reports.sql|3ea427b1f2af9297|adopt|2026-09-03 06:55:25.749051+00:00|verified against live schema 2026-09-03: tables, columns, indexes and constraints all present
+048_admin_users.sql|a982f9610be3d877|adopt|2026-09-03 06:55:25.749051+00:00|verified against live schema 2026-09-03: tables, columns, indexes and constraints all present
+049_admin_audit_log.sql|eb573e3323db51a3|adopt|2026-09-03 06:55:25.749051+00:00|verified against live schema 2026-09-03: tables, columns, indexes and constraints all present
+050_btst_analytics.sql|0de2604de73257e6|adopt|2026-09-03 06:55:25.749051+00:00|verified against live schema 2026-09-03: tables, columns, indexes and constraints all present
+051_guardrail_rules.sql|512239d4dd024c8c|adopt|2026-09-03 06:55:25.749051+00:00|verified against live schema 2026-09-03: tables, columns, indexes and constraints all present
+052_portfolio_chat_sessions.sql|67ca7f5f8538c0b6|adopt|2026-09-03 06:55:25.749051+00:00|verified against live schema 2026-09-03: tables, columns, indexes and constraints all present
+053_api_secret.sql|6056a196f7706f7f|adopt|2026-09-03 06:55:25.749051+00:00|verified against live schema 2026-09-03: tables, columns, indexes and constraints all present
+054_position_last_entry_time.sql|9f279a403d3ce477|adopt|2026-09-03 06:55:25.749051+00:00|verified against live schema 2026-09-03: tables, columns, indexes and constraints all present
+055_pnl_pct.sql|613b092fd5c869f1|adopt|2026-09-03 06:55:25.749051+00:00|verified against live schema 2026-09-03: tables, columns, indexes and constraints all present
+056_quality_score_guardian.sql|b604f8625ed62252|adopt|2026-09-03 06:55:25.749051+00:00|verified against live schema 2026-09-03: tables, columns, indexes and constraints all present
+057_discipline.sql|bcf5ef8e7fe0f80b|adopt|2026-09-03 06:55:25.749051+00:00|verified against live schema 2026-09-03: tables, columns, indexes and constraints all present
+058_trading_session_unique_constraint.sql|a57cbfffc3511f98|adopt|2026-09-03 06:55:25.749051+00:00|verified against live schema 2026-09-03: tables, columns, indexes and constraints all present
+059_position_unique_constraint.sql|39ca0a2e6bc9bff7|adopt|2026-09-03 06:55:25.749051+00:00|verified against live schema 2026-09-03: tables, columns, indexes and constraints all present
+060_session_intent.sql|03f886266527c67e|adopt|2026-09-03 06:55:25.749051+00:00|verified against live schema 2026-09-03: tables, columns, indexes and constraints all present
+061_admin_roles_totp.sql|a098c68a2373163c|adopt|2026-09-03 06:55:25.749051+00:00|verified against live schema 2026-09-03: tables, columns, indexes and constraints all present
+062_broadcast_receipts.sql|d1866a8c0d81634a|adopt|2026-09-03 06:55:25.749051+00:00|verified against live schema 2026-09-03: tables, columns, indexes and constraints all present
+063_engine_v2_phase0.sql|547d2d5663defd4d|adopt|2026-09-03 06:55:25.749051+00:00|verified against live schema 2026-09-03: tables, columns, indexes and constraints all present
+064_behavior_events.sql|8d7dc2acae215ae0|adopt|2026-09-03 06:55:25.749051+00:00|verified against live schema 2026-09-03: tables, columns, indexes and constraints all present
+065_constitution.sql|a4c5a734006c8653|adopt|2026-09-03 06:55:25.749051+00:00|verified against live schema 2026-09-03: tables, columns, indexes and constraints all present
+065b_constitution_history_fix.sql|47ee54ca8bbc6702|adopt|2026-09-03 06:55:25.749051+00:00|verified against live schema 2026-09-03: tables, columns, indexes and constraints all present
+066_event_idempotency.sql|2ab63616ca502fdb|adopt|2026-09-03 06:55:25.749051+00:00|verified against live schema 2026-09-03: tables, columns, indexes and constraints all present
+067_partition_behavior_events.sql|a0e955fca1f599f9|adopt|2026-09-03 07:44:43.305281+00:00|structure applied originally; its 10 uncreated partitions were completed by 086 on 2026-09-03 - all 14 declared partitions now exist
+068_detector_flags_and_shadow.sql|04966a20e92359b5|adopt|2026-09-03 06:55:25.749051+00:00|verified against live schema 2026-09-03: tables, columns, indexes and constraints all present
+069_alert_feedback_and_mutes.sql|0d8e2aeea0420fec|adopt|2026-09-03 06:55:25.749051+00:00|verified against live schema 2026-09-03: tables, columns, indexes and constraints all present
+070_data_quality_events.sql|2ce85e777e7097f0|adopt|2026-09-03 06:55:25.749051+00:00|verified against live schema 2026-09-03: tables, columns, indexes and constraints all present
+071_admin_iam.sql|23964f5cd4544eeb|adopt|2026-09-03 06:55:25.749051+00:00|verified against live schema 2026-09-03: tables, columns, indexes and constraints all present
+072_admin_login_events.sql|5e62940afd3833ca|adopt|2026-09-03 06:55:25.749051+00:00|verified against live schema 2026-09-03: tables, columns, indexes and constraints all present
+073_admin_aggregate_indexes.sql|0fea54dee093ced5|adopt|2026-09-03 06:55:25.749051+00:00|verified against live schema 2026-09-03: tables, columns, indexes and constraints all present
+074_admin_settings.sql|7bbb7216b0d9a81f|adopt|2026-09-03 06:55:25.749051+00:00|verified against live schema 2026-09-03: tables, columns, indexes and constraints all present
+075_position_ledger_product.sql|005fce8d7cff0aef|adopt|2026-09-03 06:55:25.749051+00:00|verified against live schema 2026-09-03: tables, columns, indexes and constraints all present
+076_live_alerts.sql|b49071d527e924cc|adopt|2026-09-03 06:55:25.749051+00:00|verified against live schema 2026-09-03: tables, columns, indexes and constraints all present
+077_position_entry_price_source.sql|e5497f9a63fa57e9|adopt|2026-09-03 06:55:25.749051+00:00|verified against live schema 2026-09-03: tables, columns, indexes and constraints all present
+078_terms_acceptance.sql|d8235a1ddbb5120d|adopt|2026-09-03 06:55:25.749051+00:00|verified against live schema 2026-09-03: tables, columns, indexes and constraints all present
+079_alert_outcome_planned.sql|e665f999ff85ce68|adopt|2026-09-03 06:55:25.749051+00:00|verified against live schema 2026-09-03: tables, columns, indexes and constraints all present
+080_account_risk_denominator.sql|dbf8b91b9491bf46|adopt|2026-09-03 06:55:25.749051+00:00|verified against live schema 2026-09-03: tables, columns, indexes and constraints all present
+081_position_margin_observations.sql|846b2b09f7add598|adopt|2026-09-03 06:55:25.749051+00:00|verified against live schema 2026-09-03: tables, columns, indexes and constraints all present
+082_per_trade_loss_limit.sql|3b028d7f9470bd73|adopt|2026-09-03 06:55:25.749051+00:00|verified against live schema 2026-09-03: tables, columns, indexes and constraints all present
+083_drop_sl_percent_defaults.sql|05072affccdee986|adopt|2026-09-03 06:55:25.749051+00:00|verified against live schema 2026-09-03: tables, columns, indexes and constraints all present
+084_drop_sl_percent_futures.sql|e20d762b8be6edb2|adopt|2026-09-03 06:55:25.749051+00:00|verified against live schema 2026-09-03: tables, columns, indexes and constraints all present
+085_schema_migrations_ledger.sql|cc84b11d5d332cfc|runner|2026-09-03 06:55:03.185105+00:00|
+086_extend_behavior_events_partitions.sql|b1be82eee62968f8|runner|2026-09-03 07:44:12.161364+00:00|
+087_push_subscriptions_failed_count_integer.sql|e9932843d1a061e5|runner|2026-09-03 09:08:37.488574+00:00|
+088_daily_trade_range.sql|a9b572717986fa1a|runner|2026-09-03 10:39:46.749556+00:00|
+089_orders_stop_evidence_index.sql|be3869b018c3911a|runner|2026-09-03 12:27:17.696341+00:00|
+090_partition_orders.sql|4efc08b3d151c3c4|runner|2026-09-03 16:55:49.904541+00:00|
+091_monthly_snapshots.sql|69aa95a29a74c23e|runner|2026-09-03 17:40:10.518966+00:00|
+092_repair_orders_partitions.sql|46477d8883f38c1e|runner|2026-09-04 05:51:47.771703+00:00|
+093_protect_partitioned_tables.sql|6a614a279f323981|runner|2026-09-04 06:48:12.846038+00:00|
