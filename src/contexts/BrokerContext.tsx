@@ -186,6 +186,34 @@ export function BrokerProvider({ children }: { children: ReactNode }) {
       setLastSyncResult(syncResult);
       setSyncStatus('success');
 
+      // A sync can succeed as a REQUEST and still have failed on individual
+      // positions or orders. The backend records those in stats["errors"] and
+      // logs them, but until now nothing here read them: the user saw a green
+      // "sync successful" over a positions table that was short, and because
+      // OpenPositionsTable computes P&L client-side from those rows, displayed
+      // exposure was understated too. Adding to a book you believe is smaller
+      // than it is, is the worst decision this app could quietly encourage.
+      //
+      // Deliberately NOT a new SyncStatus value: `syncStatus === 'success'` is
+      // a gate in OnboardingGate.tsx and Dashboard.tsx, and adding a state
+      // would silently stop both from firing. The sync did complete; what is
+      // new is that some of it did not land, and the user is told so.
+      const syncErrors: string[] = Array.isArray(result.errors) ? result.errors : [];
+      if (result.partial || syncErrors.length > 0) {
+        const detail = syncErrors.slice(0, 2).join('; ');
+        toast.warning(
+          syncErrors.length === 1
+            ? 'Sync finished, but one item could not be saved.'
+            : `Sync finished, but ${syncErrors.length} items could not be saved.`,
+          {
+            description: detail
+              ? `${detail}${syncErrors.length > 2 ? ` (+${syncErrors.length - 2} more)` : ''} — your positions may be incomplete.`
+              : 'Your positions may be incomplete.',
+            duration: 10000,
+          },
+        );
+      }
+
       // Refresh account to update last_sync_at without re-triggering sync
       const accResponse = await api.get('/api/zerodha/accounts');
       const accounts: BrokerAccount[] = accResponse.data.accounts || [];

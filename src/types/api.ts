@@ -207,7 +207,8 @@ export interface BrokerConnection {
   order_types?: string[];
   avatar_url?: string;
   demat_consent?: boolean;
-  sync_status?: 'pending' | 'syncing' | 'complete' | 'error';
+  // 'partial' = the sync completed but some positions/orders failed to save.
+  sync_status?: 'pending' | 'syncing' | 'complete' | 'partial' | 'error';
 }
 
 export interface Order {

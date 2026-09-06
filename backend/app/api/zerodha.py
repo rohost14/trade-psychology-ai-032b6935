@@ -935,8 +935,25 @@ async def sync_all_data(
                 logger.error(f"Baseline computation failed (non-fatal): {e}")
                 results["baseline_error"] = str(e)
 
+            # Initialised OUTSIDE the `if account:` below, because the return
+            # at the end of this function reads it unconditionally. Assigning it
+            # only inside the branch would raise NameError whenever `account` is
+            # falsy - the same shape as the two runtime bugs fixed earlier today,
+            # and it would be caught by the same broad `except` that hid those.
+            _sync_errors: list[str] = []
+
             if account:
-                account.sync_status = "complete"
+                # Per-item failures the individual syncs recorded rather than
+                # raised. Each one is a position, order or trade that is NOT in
+                # the database despite this call returning normally.
+                for _part in ("trades", "orders"):
+                    _r = results.get(_part)
+                    if isinstance(_r, dict):
+                        _sync_errors.extend(
+                            f"{_part}: {m}" for m in (_r.get("errors") or [])
+                        )
+
+                account.sync_status = "partial" if _sync_errors else "complete"
                 account.last_sync_at = datetime.now(timezone.utc)
                 await db.commit()
 
@@ -953,8 +970,20 @@ async def sync_all_data(
             except Exception as e:
                 logger.warning(f"Subscription refresh failed (non-fatal): {e}")
 
+            # A sync that failed on SOME positions used to return exactly what a
+            # clean one returned. The per-item failures were appended to
+            # stats["errors"] and logged at ERROR, but nothing above this point
+            # looked at them and the client had no way to tell the difference -
+            # it showed a green "sync successful" over a positions table that
+            # was short, and OpenPositionsTable computes P&L client-side from
+            # those rows, so displayed exposure was understated too.
+            #
+            # `success` stays True because the request DID complete; `partial`
+            # is the honest extra bit, and the errors travel with it.
             return {
                 "success": True,
+                "partial": bool(_sync_errors),
+                "errors": _sync_errors,
                 "results": results
             }
 
