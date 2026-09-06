@@ -308,7 +308,11 @@ class TradeSyncService:
                     "error": "Invalid access token - please reconnect Zerodha"
                 }
 
-            stats = {
+            # Annotated because the values are heterogeneous: without it mypy
+            # infers dict[str, object] from the literal and every later
+            # `stats["errors"].append(...)` is an error on `object`. Nine of
+            # them, all reported and all ignored while mypy was non-blocking.
+            stats: Dict[str, Any] = {
                 "trades_synced": 0,
                 "positions_synced": 0,
                 "orders_synced": 0,

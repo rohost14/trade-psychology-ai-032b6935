@@ -42,7 +42,7 @@ Migration from PerUserPriceStream (legacy):
 import asyncio
 import logging
 from abc import ABC, abstractmethod
-from typing import Dict, Set, Optional
+from typing import Any, Dict, Set, Optional
 from uuid import UUID
 
 logger = logging.getLogger(__name__)
@@ -206,7 +206,12 @@ class ZerodhaTicker:
         self.on_tick_callback = on_tick_callback
         self.on_noreconnect_callback = on_noreconnect_callback
 
-        self.kws = None
+        # Annotated: without it mypy infers the attribute's type as `None`
+        # from this assignment alone, and then every `self.kws.on_*`
+        # below is an attribute error on None - twelve findings across
+        # the two stream services. `Any` rather than KiteTicker because
+        # kiteconnect is an optional import guarded by ImportError.
+        self.kws: Optional[Any] = None
         self.subscribed_tokens: Set[int] = set()
         self._token_to_symbol: Dict[int, str] = {}     # instrument_token → tradingsymbol
         self._connected = False
@@ -588,7 +593,12 @@ class SharedPriceStream(PriceStreamProvider):
     """
 
     def __init__(self):
-        self._ticker: Optional[ZerodhaTicker] = None
+        # AsyncKiteTicker, not ZerodhaTicker: `_build_ticker` constructs an
+        # AsyncKiteTicker and nothing else is ever assigned here.
+        # ZerodhaTicker is PerUserPriceStream's, and it has no
+        # subscribe_async/unsubscribe_async - which is what the wrong
+        # annotation made every call to those look like an error.
+        self._ticker: Optional["AsyncKiteTicker"] = None
         # Serializes ticker creation/teardown only
         self._ticker_lock = asyncio.Lock()
         # Serializes the registration dicts
@@ -690,7 +700,7 @@ class SharedPriceStream(PriceStreamProvider):
         logger.warning("[shared_ticker] No connected account yielded a usable (api_key, token) pair.")
         return None
 
-    async def _build_ticker(self, db) -> Optional[ZerodhaTicker]:
+    async def _build_ticker(self, db) -> Optional["AsyncKiteTicker"]:
         """
         Create and start the aiohttp AsyncKiteTicker.
         The ticker's token_provider re-reads the CURRENT token on every (re)connect, so
@@ -832,7 +842,7 @@ class SharedPriceStream(PriceStreamProvider):
         except Exception:
             pass
 
-    async def _ensure_ticker(self, db) -> Optional[ZerodhaTicker]:
+    async def _ensure_ticker(self, db) -> Optional["AsyncKiteTicker"]:
         """
         Return existing connected ticker, or build a new one.
         Caller must NOT hold _ticker_lock.

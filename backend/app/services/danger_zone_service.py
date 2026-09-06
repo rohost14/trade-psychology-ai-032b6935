@@ -633,7 +633,7 @@ class DangerZoneService:
                 )
             )
         )
-        return result.scalars().all()
+        return list(result.scalars().all())
 
 
 # Global service instance

@@ -6,7 +6,7 @@ import csv
 from io import StringIO
 import logging
 from functools import wraps
-from typing import Dict, Any, List, Optional
+from typing import Dict, Any, List, Optional, Union
 from urllib.parse import urlencode
 from app.core.config import settings
 from app.services.broker_interface import BrokerInterface, BrokerType, BrokerFactory
@@ -20,7 +20,8 @@ logger = logging.getLogger(__name__)
 
 class KiteAPIError(Exception):
     """Base exception for Kite API errors"""
-    def __init__(self, message: str, status_code: int = None, error_type: str = None):
+    def __init__(self, message: str, status_code: Optional[int] = None,
+                 error_type: Optional[str] = None):
         self.message = message
         self.status_code = status_code
         self.error_type = error_type
@@ -491,7 +492,8 @@ class ZerodhaClient(BrokerInterface):
         result = await self._request("GET", url, access_token)
         return result.get("data", [])
 
-    async def get_margins(self, access_token: str, segment: str = None) -> Dict[str, Any]:
+    async def get_margins(self, access_token: str,
+                          segment: Optional[str] = None) -> Dict[str, Any]:
         """
         Fetch account margins.
 
@@ -521,7 +523,7 @@ class ZerodhaClient(BrokerInterface):
         orders: List[Dict[str, Any]],
         mode: str = "orders",
         broker_account_id=None,
-    ) -> List[Dict[str, Any]]:
+    ) -> Union[Dict[str, Any], List[Dict[str, Any]]]:
         """
         Broker margin for prospective orders — the ONLY exact margin Kite gives.
 
@@ -563,7 +565,8 @@ class ZerodhaClient(BrokerInterface):
                     "orders": data.get("orders", [])}
         return data
 
-    async def get_instruments(self, exchange: str = None, access_token: str = None) -> List[Dict[str, Any]]:
+    async def get_instruments(self, exchange: Optional[str] = None,
+                              access_token: Optional[str] = None) -> List[Dict[str, Any]]:
         """
         Fetch instrument master (CSV format).
 

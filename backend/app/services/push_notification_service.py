@@ -307,7 +307,7 @@ class PushNotificationService:
         self,
         subscription: PushSubscription,
         payload: Dict[str, Any]
-    ) -> bool:
+    ) -> Optional[bool]:
         """
         Send notification to a single subscription.
 
@@ -337,6 +337,11 @@ class PushNotificationService:
 
             await asyncio.to_thread(_do_webpush)
             return True
+        # Optional[bool], not bool: this is a THREE-state result and the caller
+        # depends on it — True sent, False failed-and-retryable, None the
+        # endpoint is gone and the subscription must be deactivated. The caller
+        # branches on `is True` / `is None` / else at :236-247. Annotating it
+        # `bool` made the None branch look like a mistake.
         except WebPushException as e:
             logger.error(f"WebPush error for {subscription.endpoint[:50]}...: {e}")
             if e.response and e.response.status_code in [404, 410]:

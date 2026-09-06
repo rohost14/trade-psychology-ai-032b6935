@@ -9,7 +9,7 @@ Learns individual trader patterns and provides personalized insights:
 """
 
 from datetime import datetime, timedelta, timezone
-from typing import Dict, List, Optional, Tuple
+from typing import Any, Dict, List, Optional, Tuple
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, func
 from uuid import UUID
@@ -195,26 +195,26 @@ class AIPersonalizationService:
             stats["win_rate"] = round((stats["wins"] / total) * 100, 1) if total > 0 else 50
 
         # Find danger windows (win rate < 35% with at least 5 trades)
-        danger_hours = [
+        danger_hours: List[Dict[str, Any]] = [
             {"hour": h, "win_rate": s["win_rate"], "trades": s["trades"], "avg_pnl": round(s["total_pnl"] / s["trades"], 2)}
             for h, s in hourly_stats.items()
             if s["win_rate"] < 35 and s["trades"] >= 5
         ]
 
-        danger_days = [
+        danger_days: List[Dict[str, Any]] = [
             {"day": d, "win_rate": s["win_rate"], "trades": s["trades"], "avg_pnl": round(s["total_pnl"] / s["trades"], 2)}
             for d, s in daily_stats.items()
             if s["win_rate"] < 35 and s["trades"] >= 5
         ]
 
         # Find best windows (win rate > 55% with at least 5 trades)
-        best_hours = [
+        best_hours: List[Dict[str, Any]] = [
             {"hour": h, "win_rate": s["win_rate"], "trades": s["trades"], "avg_pnl": round(s["total_pnl"] / s["trades"], 2)}
             for h, s in hourly_stats.items()
             if s["win_rate"] > 55 and s["trades"] >= 5
         ]
 
-        best_days = [
+        best_days: List[Dict[str, Any]] = [
             {"day": d, "win_rate": s["win_rate"], "trades": s["trades"], "avg_pnl": round(s["total_pnl"] / s["trades"], 2)}
             for d, s in daily_stats.items()
             if s["win_rate"] > 55 and s["trades"] >= 5
@@ -286,7 +286,7 @@ class AIPersonalizationService:
             stats["variants"] = len(stats["variants"])
 
         # Find problem symbols (win rate < 35% with at least 5 trades)
-        problem_symbols = [
+        problem_symbols: List[Dict[str, Any]] = [
             {
                 "symbol": s,
                 "win_rate": stats["win_rate"],
@@ -299,7 +299,7 @@ class AIPersonalizationService:
         ]
 
         # Find strong symbols (win rate > 55% with at least 5 trades)
-        strong_symbols = [
+        strong_symbols: List[Dict[str, Any]] = [
             {
                 "symbol": s,
                 "win_rate": stats["win_rate"],

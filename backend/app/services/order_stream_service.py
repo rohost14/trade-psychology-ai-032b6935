@@ -53,7 +53,7 @@ import asyncio
 import logging
 import threading
 import time
-from typing import Dict, Optional, Set
+from typing import Any, Dict, Optional, Set
 from uuid import UUID
 
 logger = logging.getLogger(__name__)
@@ -151,7 +151,12 @@ class ZerodhaOrderTicker:
         self.api_key = api_key
         self.access_token = access_token
         self.broker_account_id = broker_account_id
-        self.kws = None
+        # Annotated: without it mypy infers the attribute's type as `None`
+        # from this assignment alone, and then every `self.kws.on_*`
+        # below is an attribute error on None - twelve findings across
+        # the two stream services. `Any` rather than KiteTicker because
+        # kiteconnect is an optional import guarded by ImportError.
+        self.kws: Optional[Any] = None
         self._connected = False
         self._dead = False  # set on noreconnect (token expiry) — triggers rebuild
         self._dedup: "OrderedDedup" = OrderedDedup(_DEDUP_MAX)
