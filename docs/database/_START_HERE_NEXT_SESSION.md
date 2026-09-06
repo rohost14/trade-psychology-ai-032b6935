@@ -1,6 +1,8 @@
 # START HERE — resuming the database remediation
 
-**Last session:** 2026-09-04. **Next step: Phase 1.**
+**Last session:** 2026-09-06. **Next step: Phase 2 — but read "Phase 1 found
+two live defects" below first; one of them is a one-line production fix that
+Phase 1 was not allowed to make.**
 
 ---
 
@@ -12,8 +14,42 @@
 | Findings | 48 catalogued (H1–H2, M1–M27, L1–L17, N1–N2), every one assigned to a phase |
 | Phase 0 | **COMPLETE** — all 8 decisions made and approved |
 | Phase 0a | **COMMITTED** — `cd0cb4e`, the zero-risk subset |
-| Phase 1 | **PLANNED, NOT STARTED** — blocked on 3 design decisions (below) |
+| Phase 1 | **COMPLETE** — 45 tests, no production code changed. Write-up in `phase-1-safety-net/README.md` under "BUILT" |
 | Phases 2–8 | not started |
+
+---
+
+## 1b. Phase 1 found three live defects — read before starting Phase 2
+
+All three surfaced only because things were RUN rather than read. The audit
+found none of them.
+
+**1. `persist_order_event` has never executed successfully.** One line, Phase 3
+owns it, detail in section 4 below. It invalidates a "fact" this file used to
+assert.
+
+**2. The drift census is 88, not 127.** The audit's 127 counted rendered type
+strings; 41 of them were never differences (`timestamptz` vs `TIMESTAMP` is the
+same type, `text` vs an unbounded `String()` is the same storage). The 88 are
+in `backend/tests/_schema_baseline.json`, each with the phase that owns it:
+**1 for Phase 2, 61 for Phase 6, 26 for Phase 8.**
+
+**3. `app/models/__init__.py` exports 35 of 37 model modules.**
+`admin_login_event` and `admin_setting` are missing, so `Base.metadata` is
+incomplete unless something else imports them. This made the drift check pass
+alone and fail in the full suite; it now walks `app/models/*.py` itself and
+does not depend on the package. The `__init__` gap is production code and was
+NOT fixed here.
+
+Two audit figures were also corrected by measurement: FKs into
+`broker_accounts` is 37 **only when partition children are excluded** (80 with
+them), and duplicate index groups is **14**, not 21 — a partial index is not a
+duplicate of a full one on the same column.
+
+**Method note, since it happened twice:** a reasonable-looking assumption was
+contradicted by execution both times. Reading the code said `orders` was simply
+never exercised; running it showed the writer crashes. Reading `app/models`
+said every model was registered; running the suite showed two were not.
 
 Everything is committed and pushed on branch `dashboard-production-readiness`.
 
@@ -21,26 +57,51 @@ Everything is committed and pushed on branch `dashboard-production-readiness`.
 
 ## 2. The immediate next action
 
-**Phase 1 needs three answers before any code is written.** They are written up
-in full in `phase-1-safety-net/README.md`; the short form:
+Phase 1's three decisions were answered (JSON baseline, fail CI, fixture in
+`backend/tests/`) and it is built. **Next is Phase 2 — the two HIGH findings,
+H1 and H2 — which is the first phase that changes the schema.**
 
-1. **Schema-drift baseline format** — recommended: a JSON file
-   (`backend/tests/_schema_baseline.json`), so Phase 6's progress shows as the
-   file shrinking. *Explicitly warned against:* a count-only threshold, because
-   one drift disappearing while a new one appears nets to zero and passes
-   silently.
-2. **Does the drift check fail CI or warn?** — recommended: **fail**. With a
-   correct baseline it is green on day one, so red means genuinely new drift.
-3. **Where the synthetic fixture lives** — recommended: `backend/tests/`,
-   self-contained. **The backend suite deliberately does not import
-   `alertlab/`** (`test_adverse_add_integration.py:43` states why), so importing
-   it would break a real architectural boundary.
+Two things to settle before touching it:
 
-Once answered, Phase 1 order of work is in that same file.
+1. **The `persist_order_event` fix.** It is one line and it unblocks the only
+   table in the pipeline that has never received a row. It belongs to Phase 3
+   by theme but nothing downstream depends on Phase 3, so it can go first.
+2. **H1's ordering.** `behavior_events` has no primary key in the database.
+   Adding one requires the existing rows to be duplicate-free first — check
+   before writing the migration, not after.
+
+Phase 1 gives Phase 2 its proof: `tests/synthetic_pipeline.py` can drive fills
+through the real path and snapshot every table, and
+`tests/test_live_schema_invariants.py` already asserts the primary-key
+invariant H1 violates.
 
 ---
 
-## 3. What was done this session
+## 3a. What was done 2026-09-06 (Phase 1)
+
+Test-only. No production code, no schema change, no migration. Eight files, 45
+tests, full write-up in `phase-1-safety-net/README.md` under "BUILT".
+
+```
+tests/schema_diff.py                    the model-vs-database comparator
+tests/_schema_baseline.json             88 accepted divergences, each owned
+tests/generate_schema_baseline.py       writes the initial baseline; refuses to overwrite
+tests/test_schema_drift.py              F1, live drift check              (3)
+tests/test_schema_diff_rules.py         the rules + their counter-examples (31)
+tests/test_live_schema_invariants.py    F2, dangling refs / FK / indexes   (4)
+tests/synthetic_pipeline.py             F3, the fixture
+tests/test_synthetic_pipeline.py        F3 proved + boundary guard         (9)
+
+47 tests.
+```
+
+The drift check was proved to go red three ways against the live database - a
+flipped nullability, a changed type, and an added column - then restored green
+each time. A check that cannot fail on the defect it describes is worthless.
+
+---
+
+## 3b. What was done 2026-09-04
 
 Nine commits. The database work, in order:
 
@@ -78,10 +139,20 @@ verification. The full suite now adds **zero** rows.
   (`last_sync_at = 2026-07-31`, `status = token_expired`). It explains `orders`
   being empty despite 211 code references, and `behavior_events` covering only
   two days.
-- **`orders` has 0 rows and that is expected.** Order-lifecycle persistence
+- ~~**`orders` has 0 rows and that is expected.** Order-lifecycle persistence
   shipped after the last trading session, so it has never seen a live order.
   **This is the one finding whose resolution is inferred, not observed** — when
-  the account reconnects, a single live order should produce rows. Re-verify then.
+  the account reconnects, a single live order should produce rows. Re-verify then.~~
+  **WRONG — corrected 2026-09-06 by running the real path.** `orders` is empty
+  because its writer has never worked. `persist_order_event` in
+  `app/tasks/trade_tasks.py` calls `asyncio.run()`, the module has no
+  `import asyncio`, and that function — alone among the nine in the file that
+  call it — has no function-local one either. **Every invocation raises
+  `NameError: name 'asyncio' is not defined`**, retries three times and is
+  swallowed at both call sites. Shipped in `492f73a`. Reconnecting the account
+  would not have produced a single row. This is the exact reason inference is
+  not evidence. One-line fix, Phase 3 owns it, pinned by
+  `tests/test_synthetic_pipeline.py::test_known_broken_steps_are_still_broken`.
 - **The replay reference book is a FILE, not database rows** —
   `docs/tradebook-CY6001-FO2025-26.csv`, 2,175 fills, 203 sessions. It is
   **gitignored**; one copy exists, backed up to

@@ -274,9 +274,213 @@ live connection and are listed in `../REMEDIATION_INDEX.md` §3.
 
 ---
 
-## Three decisions needed before I start
+# BUILT — 2026-09-06
 
-1. **Baseline as a JSON file** (recommended) — or inline?
-2. **Drift check fails CI** (recommended) — or warns?
-3. **Fixture in `backend/tests/`, self-contained** (recommended) — or import
-   alertlab and drop the boundary?
+All three decisions were answered as recommended: a JSON baseline, the drift
+check **fails** CI, and the fixture is self-contained under `backend/tests/`
+with no `alertlab` import. The user added one constraint: test and demo
+scaffolding must stay clearly separable from production code, and remediation
+fixes must land in the real production code — enforced by a test, not a
+convention (`test_no_production_code_imports_the_test_package`).
+
+## What shipped
+
+| file | what it is |
+|---|---|
+| `backend/tests/schema_diff.py` | the comparator. Pure functions over a schema snapshot, no database, so the rules are unit-testable |
+| `backend/tests/_schema_baseline.json` | 88 accepted divergences, each with `db`, `model`, `phase` and `why` |
+| `backend/tests/generate_schema_baseline.py` | writes the initial baseline. **Refuses to overwrite an existing one** |
+| `backend/tests/test_schema_drift.py` | F1 — the live-database drift check (3 tests) |
+| `backend/tests/test_schema_diff_rules.py` | the normalisation rules, each with its counter-example, plus the model-loading guard (31 tests) |
+| `backend/tests/test_live_schema_invariants.py` | F2 — dangling references, FK topology, duplicate indexes (4 tests) |
+| `backend/tests/synthetic_pipeline.py` | F3 — the fixture |
+| `backend/tests/test_synthetic_pipeline.py` | F3 proved, plus the production/test boundary guard (9 tests) |
+
+**47 new tests.** No production code changed, no schema changed, no migration.
+
+## The 127 was not 127 real differences
+
+The audit's figure counted rendered type strings. Re-measured with the
+normalisation rules written down:
+
+```
+                                    audit    measured    what changed
+DB columns missing from the model      26          26    -
+model columns missing from the DB       0           0    -
+nullability mismatches                 45          47    +2, see below
+type / precision mismatches            55          14    see below
+primary-key mismatches                  1           1    -
+                                      ---         ---
+                                      127          88
+```
+
+The 41 that disappeared were never differences:
+
+```
+ 69  timestamptz vs TIMESTAMP     the same type. str(DateTime(timezone=True))
+ 46  timestamptz vs DATETIME      prints DATETIME and drops the flag entirely
+ 40  text vs VARCHAR              String() with no length IS text in Postgres
+  8  ARRAY vs ARRAY               the generic sqlalchemy.ARRAY was not resolved
+```
+
+So the comparator reads the type OBJECT, never `str(type_)`, and every
+equivalence rule is pinned by two tests — one proving it treats an equivalent
+pair as equal, one proving the neighbouring non-equivalent pair still fails.
+`text` equals `String()`; `text` does **not** equal `String(20)`.
+
+## The 86, by owning phase
+
+| phase | count | what |
+|---|---|---|
+| **2** | 1 | H1 — `behavior_events` has no primary key in the database |
+| **6** | 61 | schema hygiene: nullability and type drift |
+| **8** | 26 | `alert_checkpoints`, retired by Phase 0 decision D3 |
+
+### The 26 are one dead table
+
+`alert_checkpoints` has two generations of columns stacked in the database: 18
+the model declares, and 23 it does not. Those 23 (`trigger_*`, `user_exit*`,
+`counterfactual_pnl_t30`, `money_saved`, `money_saved_basis`, `confidence`,
+`checkpoint_status`) are the first-generation money-saved design, and searching
+the whole repo for `trigger_avg_entry_price` across `.sql` and `.py` returns
+nothing.
+
+**No migration and no code anywhere in the repo creates them.** They were
+applied out-of-band and the source is gone — the same shape as the 090
+incident. The table holds 1 row and D3 already retires it, so they are
+baselined to Phase 8 rather than synced into the model.
+
+### The 45 nullability mismatches split by direction, and the direction matters
+
+| direction | count | risk |
+|---|---|---|
+| DB nullable, model `NOT NULL` | 32 | model stricter. No ORM write can corrupt anything; a migration, script or console write can leave a NULL the app then breaks on |
+| DB `NOT NULL`, model nullable | 15 | **model looser.** The app believes NULL is fine and the database rejects the INSERT at runtime |
+
+The 15 are mostly `created_at`/`updated_at` on eleven tables that have a
+`server_default` and no `nullable=False`; `strategy_groups.status` and
+`data_quality_events.details` need a look. The 32 concentrate in `trades` (13)
+and `holdings` (6) — built early by migration, tightened later in the models
+only.
+
+### The 14 genuine type mismatches
+
+```
+completed_trades.pnl_pct        double precision  vs  Numeric(8,2)   <- correctness
+completed_trades.quality_score  smallint          vs  Integer
+trades.raw_payload              jsonb             vs  JSON           <- not equivalent
+positions.tradingsymbol/status/product/exchange/instrument_type
+position_ledger.entry_type
+trading_sessions.session_state
+data_quality_events.tradingsymbol/exchange/kind
+alert_checkpoints.calculation_status                text vs VARCHAR(n)
+```
+
+`pnl_pct` is the correctness one. The `text` vs `String(n)` group is a length
+ceiling the model believes in and the database does not enforce.
+
+## F2 — two audit figures corrected by measurement
+
+| | audit prose | measured 2026-09-06 | why |
+|---|---|---|---|
+| FKs into `broker_accounts` | 37, all CASCADE | **37, all CASCADE** | confirmed — but only when partition children are excluded. Counting them gives 80, because each `orders` partition carries its own copy |
+| duplicate index groups | 21 | **14** | grouped by (table, columns, uniqueness, partial predicate, expression), which is when two indexes are genuinely interchangeable. A partial index is not a duplicate of a full one on the same column, and three tables have exactly that pair |
+| dangling `journal_entries.trade_id` | 7 of 20 | **7 of 20** | confirmed |
+| `*_id` uuid columns with no FK | — | **4** | `cooldowns.trigger_alert_id`, `journal_entries.trade_id`, `risk_alerts.trigger_position_id`, `shadow_behavioral_events.trigger_completed_trade_id` |
+
+Each is asserted in **both** directions. A count going down because a phase
+fixed something must update the file, or the improvement is invisible and the
+next regression re-hides it. The unprotected-uuid list is asserted as a SET,
+not a count, so a new one appearing while an old one is fixed cannot net to
+zero.
+
+## F3 — the fixture, and what building it found
+
+`synthetic_account()` is an async context manager that commits a throwaway
+user + broker account, drives the real webhook tasks, snapshots eight tables,
+and deletes everything in a `finally`. Cleanup runs even when the body raises,
+which is asserted directly.
+
+Two things surfaced only because the fixture ran the real path:
+
+**1. `trading_capital` is on `UserProfile`, not `User`.** Setting it on the
+user succeeds silently — assigning an undeclared attribute to a mapped instance
+is just a Python attribute set — and the value never reaches the database.
+Every capital-relative detector then abstains while appearing to have been
+given a capital.
+
+**2. `persist_order_event` has never worked. Not once.**
+
+```
+app/tasks/trade_tasks.py::persist_order_event   calls asyncio.run()
+app/tasks/trade_tasks.py                        has NO module-level import asyncio
+persist_order_event                             has NO function-local one either
+```
+
+Eight of the nine tasks in that file that call `asyncio.run()` import it
+locally. This one does not, so **every invocation raises
+`NameError: name 'asyncio' is not defined`**, retries three times, and is
+swallowed at both call sites. Shipped in `492f73a`.
+
+This corrects a fact recorded in `_START_HERE_NEXT_SESSION.md`:
+
+> *"`orders` has 0 rows and that is expected — order-lifecycle persistence
+> shipped after the last trading session, so it has never seen a live order.
+> This is the one finding whose resolution is inferred, not observed."*
+
+The inference was wrong. `orders` is empty because **the writer crashes on
+every call**, and reconnecting the account would not have produced a single
+row. The fix is one line; it is production code and therefore outside this
+phase, recorded in `KNOWN_BROKEN_STEPS` with
+`test_known_broken_steps_are_still_broken` failing the moment it starts
+working, so the fixture cannot go on quietly excusing it.
+
+## A third defect, in this phase's own work
+
+The drift check passed on its own and **failed in the full suite**, reporting
+two differences that had not been there minutes earlier:
+
+```
+admin_login_events.created_at : nullable_db_strict
+admin_settings.updated_at     : nullable_db_strict
+```
+
+Cause: it did `import app.models` and trusted the package to register every
+model. It does not. `app/models/__init__.py` imports **35 of the 37** model
+modules — `admin_login_event` and `admin_setting` are missing from it — so
+`Base.metadata` held two fewer tables when the check ran alone than when it ran
+after some other test happened to import them.
+
+A check whose result depends on what else ran in the same process is not a
+check. Fixed by `load_all_models()`, which walks `app/models/*.py` and imports
+every module, so the model set is the same whatever else has run and a model
+added tomorrow is covered whether or not anyone remembers to export it. Pinned
+by `test_every_model_module_is_loaded_not_just_the_exported_ones`, and the
+specific two-module gap is named in
+`test_loading_every_model_registers_more_tables_than_the_package_alone` so
+closing it in `__init__.py` shows up as a deliberate change rather than
+silently making the test vacuous.
+
+The baseline is therefore **88**, not the 86 first generated: the two extra are
+both `nullable_db_strict` on tables that were previously invisible to it.
+
+Worth recording as a method note: **this is the second time in this phase that
+running the real thing contradicted a reasonable-looking assumption.** The
+first was `orders` being empty for a completely different reason than the audit
+inferred. Both were found by executing, not by reading.
+
+Separately, `app/models/__init__.py` not exporting two of its models is a real
+tidiness defect in production code. It is not fixed here — Phase 1 changes no
+production code — and it is harmless today only because the drift check no
+longer depends on it.
+
+## How this behaves from here
+
+| event | what happens |
+|---|---|
+| a model changes without a migration | `test_no_new_schema_drift` fails, naming the column |
+| the schema changes without a model | same test, same message |
+| the change was intentional | add a baseline entry in the same commit, with a `why` and a phase. A reviewer sees the line |
+| Phase 6 fixes a drift | `test_no_stale_baseline_entries` fails until the entry is removed — the file must shrink |
+| someone tries to silence a drift | a bare name is rejected; `db`, `model`, `phase` and `why` are all required, and an empty `why` fails |
+| someone regenerates the baseline | the generator refuses to overwrite |

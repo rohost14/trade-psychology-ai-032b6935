@@ -1,0 +1,536 @@
+{
+  "_what_this_is": "Divergences between the SQLAlchemy models and the live database that were already found by the database audit and assigned to a remediation phase. tests/test_schema_drift.py subtracts these, so it is green today and red only for a difference nobody recorded.",
+  "_how_to_add_an_entry": "By hand, in the commit that causes the change, with a 'why' and the phase that owns it. Never by regenerating this file.",
+  "_this_file_must_shrink": "Phase 6 fixes these. test_no_stale_baseline_entries fails if an entry is fixed and left here, so the burn-down stays measurable.",
+  "generated": "2026-09-06",
+  "accepted": {
+    "admin_login_events.created_at:nullable_db_strict": {
+      "db": "NOT NULL",
+      "model": "NULL allowed",
+      "phase": 6,
+      "why": "The model is LOOSER than the database: it believes NULL is acceptable where the database rejects it, so the failure surfaces at runtime as a failed INSERT. Phase 6 tightens the model, which is a model-only change with no schema risk."
+    },
+    "admin_settings.updated_at:nullable_db_strict": {
+      "db": "NOT NULL",
+      "model": "NULL allowed",
+      "phase": 6,
+      "why": "The model is LOOSER than the database: it believes NULL is acceptable where the database rejects it, so the failure surfaces at runtime as a failed INSERT. Phase 6 tightens the model, which is a model-only change with no schema risk."
+    },
+    "alert_checkpoints.calculation_status:nullable_db_permissive": {
+      "db": "NULL allowed",
+      "model": "NOT NULL",
+      "phase": 8,
+      "why": "Phase 0 decision D3: alert_checkpoints is RETIRED."
+    },
+    "alert_checkpoints.calculation_status:type_mismatch": {
+      "db": "text -> ('string', None)",
+      "model": "VARCHAR(20) -> ('string', 20)",
+      "phase": 8,
+      "why": "Phase 0 decision D3: alert_checkpoints is RETIRED. Not worth a migration on a table scheduled for removal."
+    },
+    "alert_checkpoints.checkpoint_status:column_missing_from_model": {
+      "db": "character varying(20)",
+      "model": "absent",
+      "phase": 8,
+      "why": "Phase 0 decision D3: alert_checkpoints is RETIRED - table, model and service. These 23 columns are the first-generation money-saved design; no migration or code anywhere in the repo creates them, and the counterfactual measure they encode was replaced by the factual behaviour-cost endpoint. Fixing the model would preserve a table that is being removed."
+    },
+    "alert_checkpoints.completed_at:column_missing_from_model": {
+      "db": "timestamp with time zone",
+      "model": "absent",
+      "phase": 8,
+      "why": "Phase 0 decision D3: alert_checkpoints is RETIRED - table, model and service. These 23 columns are the first-generation money-saved design; no migration or code anywhere in the repo creates them, and the counterfactual measure they encode was replaced by the factual behaviour-cost endpoint. Fixing the model would preserve a table that is being removed."
+    },
+    "alert_checkpoints.confidence:column_missing_from_model": {
+      "db": "character varying(10)",
+      "model": "absent",
+      "phase": 8,
+      "why": "Phase 0 decision D3: alert_checkpoints is RETIRED - table, model and service. These 23 columns are the first-generation money-saved design; no migration or code anywhere in the repo creates them, and the counterfactual measure they encode was replaced by the factual behaviour-cost endpoint. Fixing the model would preserve a table that is being removed."
+    },
+    "alert_checkpoints.counterfactual_pnl_t30:column_missing_from_model": {
+      "db": "numeric(15,4)",
+      "model": "absent",
+      "phase": 8,
+      "why": "Phase 0 decision D3: alert_checkpoints is RETIRED - table, model and service. These 23 columns are the first-generation money-saved design; no migration or code anywhere in the repo creates them, and the counterfactual measure they encode was replaced by the factual behaviour-cost endpoint. Fixing the model would preserve a table that is being removed."
+    },
+    "alert_checkpoints.counterfactual_pnl_t60:column_missing_from_model": {
+      "db": "numeric(15,4)",
+      "model": "absent",
+      "phase": 8,
+      "why": "Phase 0 decision D3: alert_checkpoints is RETIRED - table, model and service. These 23 columns are the first-generation money-saved design; no migration or code anywhere in the repo creates them, and the counterfactual measure they encode was replaced by the factual behaviour-cost endpoint. Fixing the model would preserve a table that is being removed."
+    },
+    "alert_checkpoints.created_at:nullable_db_permissive": {
+      "db": "NULL allowed",
+      "model": "NOT NULL",
+      "phase": 8,
+      "why": "Phase 0 decision D3: alert_checkpoints is RETIRED."
+    },
+    "alert_checkpoints.minutes_to_exit:column_missing_from_model": {
+      "db": "numeric(8,2)",
+      "model": "absent",
+      "phase": 8,
+      "why": "Phase 0 decision D3: alert_checkpoints is RETIRED - table, model and service. These 23 columns are the first-generation money-saved design; no migration or code anywhere in the repo creates them, and the counterfactual measure they encode was replaced by the factual behaviour-cost endpoint. Fixing the model would preserve a table that is being removed."
+    },
+    "alert_checkpoints.money_saved_basis:column_missing_from_model": {
+      "db": "character varying(10)",
+      "model": "absent",
+      "phase": 8,
+      "why": "Phase 0 decision D3: alert_checkpoints is RETIRED - table, model and service. These 23 columns are the first-generation money-saved design; no migration or code anywhere in the repo creates them, and the counterfactual measure they encode was replaced by the factual behaviour-cost endpoint. Fixing the model would preserve a table that is being removed."
+    },
+    "alert_checkpoints.outcome:column_missing_from_model": {
+      "db": "character varying(30)",
+      "model": "absent",
+      "phase": 8,
+      "why": "Phase 0 decision D3: alert_checkpoints is RETIRED - table, model and service. These 23 columns are the first-generation money-saved design; no migration or code anywhere in the repo creates them, and the counterfactual measure they encode was replaced by the factual behaviour-cost endpoint. Fixing the model would preserve a table that is being removed."
+    },
+    "alert_checkpoints.price_at_t30:column_missing_from_model": {
+      "db": "numeric(15,4)",
+      "model": "absent",
+      "phase": 8,
+      "why": "Phase 0 decision D3: alert_checkpoints is RETIRED - table, model and service. These 23 columns are the first-generation money-saved design; no migration or code anywhere in the repo creates them, and the counterfactual measure they encode was replaced by the factual behaviour-cost endpoint. Fixing the model would preserve a table that is being removed."
+    },
+    "alert_checkpoints.price_at_t5:column_missing_from_model": {
+      "db": "numeric(15,4)",
+      "model": "absent",
+      "phase": 8,
+      "why": "Phase 0 decision D3: alert_checkpoints is RETIRED - table, model and service. These 23 columns are the first-generation money-saved design; no migration or code anywhere in the repo creates them, and the counterfactual measure they encode was replaced by the factual behaviour-cost endpoint. Fixing the model would preserve a table that is being removed."
+    },
+    "alert_checkpoints.price_at_t60:column_missing_from_model": {
+      "db": "numeric(15,4)",
+      "model": "absent",
+      "phase": 8,
+      "why": "Phase 0 decision D3: alert_checkpoints is RETIRED - table, model and service. These 23 columns are the first-generation money-saved design; no migration or code anywhere in the repo creates them, and the counterfactual measure they encode was replaced by the factual behaviour-cost endpoint. Fixing the model would preserve a table that is being removed."
+    },
+    "alert_checkpoints.trigger_avg_entry_price:column_missing_from_model": {
+      "db": "numeric(15,4)",
+      "model": "absent",
+      "phase": 8,
+      "why": "Phase 0 decision D3: alert_checkpoints is RETIRED - table, model and service. These 23 columns are the first-generation money-saved design; no migration or code anywhere in the repo creates them, and the counterfactual measure they encode was replaced by the factual behaviour-cost endpoint. Fixing the model would preserve a table that is being removed."
+    },
+    "alert_checkpoints.trigger_capital_at_risk:column_missing_from_model": {
+      "db": "numeric(15,4)",
+      "model": "absent",
+      "phase": 8,
+      "why": "Phase 0 decision D3: alert_checkpoints is RETIRED - table, model and service. These 23 columns are the first-generation money-saved design; no migration or code anywhere in the repo creates them, and the counterfactual measure they encode was replaced by the factual behaviour-cost endpoint. Fixing the model would preserve a table that is being removed."
+    },
+    "alert_checkpoints.trigger_direction:column_missing_from_model": {
+      "db": "character varying(10)",
+      "model": "absent",
+      "phase": 8,
+      "why": "Phase 0 decision D3: alert_checkpoints is RETIRED - table, model and service. These 23 columns are the first-generation money-saved design; no migration or code anywhere in the repo creates them, and the counterfactual measure they encode was replaced by the factual behaviour-cost endpoint. Fixing the model would preserve a table that is being removed."
+    },
+    "alert_checkpoints.trigger_exchange:column_missing_from_model": {
+      "db": "character varying(20)",
+      "model": "absent",
+      "phase": 8,
+      "why": "Phase 0 decision D3: alert_checkpoints is RETIRED - table, model and service. These 23 columns are the first-generation money-saved design; no migration or code anywhere in the repo creates them, and the counterfactual measure they encode was replaced by the factual behaviour-cost endpoint. Fixing the model would preserve a table that is being removed."
+    },
+    "alert_checkpoints.trigger_instrument_token:column_missing_from_model": {
+      "db": "bigint",
+      "model": "absent",
+      "phase": 8,
+      "why": "Phase 0 decision D3: alert_checkpoints is RETIRED - table, model and service. These 23 columns are the first-generation money-saved design; no migration or code anywhere in the repo creates them, and the counterfactual measure they encode was replaced by the factual behaviour-cost endpoint. Fixing the model would preserve a table that is being removed."
+    },
+    "alert_checkpoints.trigger_instrument_type:column_missing_from_model": {
+      "db": "character varying(20)",
+      "model": "absent",
+      "phase": 8,
+      "why": "Phase 0 decision D3: alert_checkpoints is RETIRED - table, model and service. These 23 columns are the first-generation money-saved design; no migration or code anywhere in the repo creates them, and the counterfactual measure they encode was replaced by the factual behaviour-cost endpoint. Fixing the model would preserve a table that is being removed."
+    },
+    "alert_checkpoints.trigger_quantity:column_missing_from_model": {
+      "db": "integer",
+      "model": "absent",
+      "phase": 8,
+      "why": "Phase 0 decision D3: alert_checkpoints is RETIRED - table, model and service. These 23 columns are the first-generation money-saved design; no migration or code anywhere in the repo creates them, and the counterfactual measure they encode was replaced by the factual behaviour-cost endpoint. Fixing the model would preserve a table that is being removed."
+    },
+    "alert_checkpoints.trigger_symbol:column_missing_from_model": {
+      "db": "character varying(100)",
+      "model": "absent",
+      "phase": 8,
+      "why": "Phase 0 decision D3: alert_checkpoints is RETIRED - table, model and service. These 23 columns are the first-generation money-saved design; no migration or code anywhere in the repo creates them, and the counterfactual measure they encode was replaced by the factual behaviour-cost endpoint. Fixing the model would preserve a table that is being removed."
+    },
+    "alert_checkpoints.user_exit_pnl:column_missing_from_model": {
+      "db": "numeric(15,4)",
+      "model": "absent",
+      "phase": 8,
+      "why": "Phase 0 decision D3: alert_checkpoints is RETIRED - table, model and service. These 23 columns are the first-generation money-saved design; no migration or code anywhere in the repo creates them, and the counterfactual measure they encode was replaced by the factual behaviour-cost endpoint. Fixing the model would preserve a table that is being removed."
+    },
+    "alert_checkpoints.user_exit_price:column_missing_from_model": {
+      "db": "numeric(15,4)",
+      "model": "absent",
+      "phase": 8,
+      "why": "Phase 0 decision D3: alert_checkpoints is RETIRED - table, model and service. These 23 columns are the first-generation money-saved design; no migration or code anywhere in the repo creates them, and the counterfactual measure they encode was replaced by the factual behaviour-cost endpoint. Fixing the model would preserve a table that is being removed."
+    },
+    "alert_checkpoints.user_exit_time:column_missing_from_model": {
+      "db": "timestamp with time zone",
+      "model": "absent",
+      "phase": 8,
+      "why": "Phase 0 decision D3: alert_checkpoints is RETIRED - table, model and service. These 23 columns are the first-generation money-saved design; no migration or code anywhere in the repo creates them, and the counterfactual measure they encode was replaced by the factual behaviour-cost endpoint. Fixing the model would preserve a table that is being removed."
+    },
+    "alert_checkpoints.user_exited_quantity:column_missing_from_model": {
+      "db": "integer",
+      "model": "absent",
+      "phase": 8,
+      "why": "Phase 0 decision D3: alert_checkpoints is RETIRED - table, model and service. These 23 columns are the first-generation money-saved design; no migration or code anywhere in the repo creates them, and the counterfactual measure they encode was replaced by the factual behaviour-cost endpoint. Fixing the model would preserve a table that is being removed."
+    },
+    "alert_mutes.created_at:nullable_db_strict": {
+      "db": "NOT NULL",
+      "model": "NULL allowed",
+      "phase": 6,
+      "why": "The model is LOOSER than the database: it believes NULL is acceptable where the database rejects it, so the failure surfaces at runtime as a failed INSERT. Phase 6 tightens the model, which is a model-only change with no schema risk."
+    },
+    "behavior_events.-:primary_key_mismatch": {
+      "db": "NONE",
+      "model": "['id']",
+      "phase": 2,
+      "why": "Audit finding H1. The database has no primary key where the model declares one, so nothing rejects a duplicate row. Phase 2 adds it after de-duplicating the existing rows."
+    },
+    "behavior_events.created_at:nullable_db_strict": {
+      "db": "NOT NULL",
+      "model": "NULL allowed",
+      "phase": 6,
+      "why": "The model is LOOSER than the database: it believes NULL is acceptable where the database rejects it, so the failure surfaces at runtime as a failed INSERT. Phase 6 tightens the model, which is a model-only change with no schema risk."
+    },
+    "broadcast_logs.created_at:nullable_db_strict": {
+      "db": "NOT NULL",
+      "model": "NULL allowed",
+      "phase": 6,
+      "why": "The model is LOOSER than the database: it believes NULL is acceptable where the database rejects it, so the failure surfaces at runtime as a failed INSERT. Phase 6 tightens the model, which is a model-only change with no schema risk."
+    },
+    "broker_accounts.broker_name:nullable_db_permissive": {
+      "db": "NULL allowed",
+      "model": "NOT NULL",
+      "phase": 6,
+      "why": "The database is LOOSER than the model: the ORM refuses a NULL the database would accept, so no ORM write can corrupt anything - but a migration, script or console write can leave a NULL the application then breaks on. Phase 6 adds NOT NULL after checking for existing NULLs."
+    },
+    "broker_accounts.created_at:nullable_db_permissive": {
+      "db": "NULL allowed",
+      "model": "NOT NULL",
+      "phase": 6,
+      "why": "The database is LOOSER than the model: the ORM refuses a NULL the database would accept, so no ORM write can corrupt anything - but a migration, script or console write can leave a NULL the application then breaks on. Phase 6 adds NOT NULL after checking for existing NULLs."
+    },
+    "broker_accounts.demat_consent:nullable_db_permissive": {
+      "db": "NULL allowed",
+      "model": "NOT NULL",
+      "phase": 6,
+      "why": "The database is LOOSER than the model: the ORM refuses a NULL the database would accept, so no ORM write can corrupt anything - but a migration, script or console write can leave a NULL the application then breaks on. Phase 6 adds NOT NULL after checking for existing NULLs."
+    },
+    "broker_accounts.sync_status:nullable_db_permissive": {
+      "db": "NULL allowed",
+      "model": "NOT NULL",
+      "phase": 6,
+      "why": "The database is LOOSER than the model: the ORM refuses a NULL the database would accept, so no ORM write can corrupt anything - but a migration, script or console write can leave a NULL the application then breaks on. Phase 6 adds NOT NULL after checking for existing NULLs."
+    },
+    "broker_accounts.updated_at:nullable_db_permissive": {
+      "db": "NULL allowed",
+      "model": "NOT NULL",
+      "phase": 6,
+      "why": "The database is LOOSER than the model: the ORM refuses a NULL the database would accept, so no ORM write can corrupt anything - but a migration, script or console write can leave a NULL the application then breaks on. Phase 6 adds NOT NULL after checking for existing NULLs."
+    },
+    "completed_trades.pnl_pct:type_mismatch": {
+      "db": "double precision -> ('float', 53)",
+      "model": "NUMERIC(8, 2) -> ('numeric', (8, 2))",
+      "phase": 6,
+      "why": "Audit finding M11. Phase 6 resolves each one individually: the text-versus-String(n) group is a length ceiling the model believes in and the database does not enforce."
+    },
+    "completed_trades.quality_score:type_mismatch": {
+      "db": "smallint -> ('int', 16)",
+      "model": "INTEGER -> ('int', 32)",
+      "phase": 6,
+      "why": "Audit finding M11. Phase 6 resolves each one individually: the text-versus-String(n) group is a length ceiling the model believes in and the database does not enforce."
+    },
+    "cooldowns.metadata:column_missing_from_model": {
+      "db": "jsonb",
+      "model": "absent",
+      "phase": 6,
+      "why": "Audit finding M11 - a live column the model does not know about. Phase 6 either adds it to the model or drops it, once its consumers are established."
+    },
+    "data_quality_events.details:nullable_db_strict": {
+      "db": "NOT NULL",
+      "model": "NULL allowed",
+      "phase": 6,
+      "why": "The model is LOOSER than the database: it believes NULL is acceptable where the database rejects it, so the failure surfaces at runtime as a failed INSERT. Phase 6 tightens the model, which is a model-only change with no schema risk."
+    },
+    "data_quality_events.exchange:type_mismatch": {
+      "db": "text -> ('string', None)",
+      "model": "VARCHAR(10) -> ('string', 10)",
+      "phase": 6,
+      "why": "Audit finding M11. Phase 6 resolves each one individually: the text-versus-String(n) group is a length ceiling the model believes in and the database does not enforce."
+    },
+    "data_quality_events.kind:type_mismatch": {
+      "db": "text -> ('string', None)",
+      "model": "VARCHAR(50) -> ('string', 50)",
+      "phase": 6,
+      "why": "Audit finding M11. Phase 6 resolves each one individually: the text-versus-String(n) group is a length ceiling the model believes in and the database does not enforce."
+    },
+    "data_quality_events.tradingsymbol:type_mismatch": {
+      "db": "text -> ('string', None)",
+      "model": "VARCHAR(100) -> ('string', 100)",
+      "phase": 6,
+      "why": "Audit finding M11. Phase 6 resolves each one individually: the text-versus-String(n) group is a length ceiling the model believes in and the database does not enforce."
+    },
+    "guardrail_rules.created_at:nullable_db_strict": {
+      "db": "NOT NULL",
+      "model": "NULL allowed",
+      "phase": 6,
+      "why": "The model is LOOSER than the database: it believes NULL is acceptable where the database rejects it, so the failure surfaces at runtime as a failed INSERT. Phase 6 tightens the model, which is a model-only change with no schema risk."
+    },
+    "guardrail_rules.updated_at:nullable_db_strict": {
+      "db": "NOT NULL",
+      "model": "NULL allowed",
+      "phase": 6,
+      "why": "The model is LOOSER than the database: it believes NULL is acceptable where the database rejects it, so the failure surfaces at runtime as a failed INSERT. Phase 6 tightens the model, which is a model-only change with no schema risk."
+    },
+    "holdings.authorised_quantity:nullable_db_permissive": {
+      "db": "NULL allowed",
+      "model": "NOT NULL",
+      "phase": 6,
+      "why": "The database is LOOSER than the model: the ORM refuses a NULL the database would accept, so no ORM write can corrupt anything - but a migration, script or console write can leave a NULL the application then breaks on. Phase 6 adds NOT NULL after checking for existing NULLs."
+    },
+    "holdings.collateral_quantity:nullable_db_permissive": {
+      "db": "NULL allowed",
+      "model": "NOT NULL",
+      "phase": 6,
+      "why": "The database is LOOSER than the model: the ORM refuses a NULL the database would accept, so no ORM write can corrupt anything - but a migration, script or console write can leave a NULL the application then breaks on. Phase 6 adds NOT NULL after checking for existing NULLs."
+    },
+    "holdings.created_at:nullable_db_permissive": {
+      "db": "NULL allowed",
+      "model": "NOT NULL",
+      "phase": 6,
+      "why": "The database is LOOSER than the model: the ORM refuses a NULL the database would accept, so no ORM write can corrupt anything - but a migration, script or console write can leave a NULL the application then breaks on. Phase 6 adds NOT NULL after checking for existing NULLs."
+    },
+    "holdings.product:nullable_db_permissive": {
+      "db": "NULL allowed",
+      "model": "NOT NULL",
+      "phase": 6,
+      "why": "The database is LOOSER than the model: the ORM refuses a NULL the database would accept, so no ORM write can corrupt anything - but a migration, script or console write can leave a NULL the application then breaks on. Phase 6 adds NOT NULL after checking for existing NULLs."
+    },
+    "holdings.t1_quantity:nullable_db_permissive": {
+      "db": "NULL allowed",
+      "model": "NOT NULL",
+      "phase": 6,
+      "why": "The database is LOOSER than the model: the ORM refuses a NULL the database would accept, so no ORM write can corrupt anything - but a migration, script or console write can leave a NULL the application then breaks on. Phase 6 adds NOT NULL after checking for existing NULLs."
+    },
+    "holdings.updated_at:nullable_db_permissive": {
+      "db": "NULL allowed",
+      "model": "NOT NULL",
+      "phase": 6,
+      "why": "The database is LOOSER than the model: the ORM refuses a NULL the database would accept, so no ORM write can corrupt anything - but a migration, script or console write can leave a NULL the application then breaks on. Phase 6 adds NOT NULL after checking for existing NULLs."
+    },
+    "instruments.created_at:nullable_db_permissive": {
+      "db": "NULL allowed",
+      "model": "NOT NULL",
+      "phase": 6,
+      "why": "The database is LOOSER than the model: the ORM refuses a NULL the database would accept, so no ORM write can corrupt anything - but a migration, script or console write can leave a NULL the application then breaks on. Phase 6 adds NOT NULL after checking for existing NULLs."
+    },
+    "instruments.lot_size:nullable_db_permissive": {
+      "db": "NULL allowed",
+      "model": "NOT NULL",
+      "phase": 6,
+      "why": "The database is LOOSER than the model: the ORM refuses a NULL the database would accept, so no ORM write can corrupt anything - but a migration, script or console write can leave a NULL the application then breaks on. Phase 6 adds NOT NULL after checking for existing NULLs."
+    },
+    "instruments.tick_size:nullable_db_permissive": {
+      "db": "NULL allowed",
+      "model": "NOT NULL",
+      "phase": 6,
+      "why": "The database is LOOSER than the model: the ORM refuses a NULL the database would accept, so no ORM write can corrupt anything - but a migration, script or console write can leave a NULL the application then breaks on. Phase 6 adds NOT NULL after checking for existing NULLs."
+    },
+    "instruments.updated_at:nullable_db_permissive": {
+      "db": "NULL allowed",
+      "model": "NOT NULL",
+      "phase": 6,
+      "why": "The database is LOOSER than the model: the ORM refuses a NULL the database would accept, so no ORM write can corrupt anything - but a migration, script or console write can leave a NULL the application then breaks on. Phase 6 adds NOT NULL after checking for existing NULLs."
+    },
+    "journal_entries.emotions:column_missing_from_model": {
+      "db": "text",
+      "model": "absent",
+      "phase": 6,
+      "why": "Audit finding M11 - a live column the model does not know about. Phase 6 either adds it to the model or drops it, once its consumers are established."
+    },
+    "journal_entries.lessons:column_missing_from_model": {
+      "db": "text",
+      "model": "absent",
+      "phase": 6,
+      "why": "Audit finding M11 - a live column the model does not know about. Phase 6 either adds it to the model or drops it, once its consumers are established."
+    },
+    "margin_snapshots.created_at:nullable_db_permissive": {
+      "db": "NULL allowed",
+      "model": "NOT NULL",
+      "phase": 6,
+      "why": "The database is LOOSER than the model: the ORM refuses a NULL the database would accept, so no ORM write can corrupt anything - but a migration, script or console write can leave a NULL the application then breaks on. Phase 6 adds NOT NULL after checking for existing NULLs."
+    },
+    "margin_snapshots.snapshot_at:nullable_db_permissive": {
+      "db": "NULL allowed",
+      "model": "NOT NULL",
+      "phase": 6,
+      "why": "The database is LOOSER than the model: the ORM refuses a NULL the database would accept, so no ORM write can corrupt anything - but a migration, script or console write can leave a NULL the application then breaks on. Phase 6 adds NOT NULL after checking for existing NULLs."
+    },
+    "monthly_snapshots.created_at:nullable_db_strict": {
+      "db": "NOT NULL",
+      "model": "NULL allowed",
+      "phase": 6,
+      "why": "The model is LOOSER than the database: it believes NULL is acceptable where the database rejects it, so the failure surfaces at runtime as a failed INSERT. Phase 6 tightens the model, which is a model-only change with no schema risk."
+    },
+    "portfolio_chat_sessions.created_at:nullable_db_strict": {
+      "db": "NOT NULL",
+      "model": "NULL allowed",
+      "phase": 6,
+      "why": "The model is LOOSER than the database: it believes NULL is acceptable where the database rejects it, so the failure surfaces at runtime as a failed INSERT. Phase 6 tightens the model, which is a model-only change with no schema risk."
+    },
+    "portfolio_chat_sessions.started_at:nullable_db_strict": {
+      "db": "NOT NULL",
+      "model": "NULL allowed",
+      "phase": 6,
+      "why": "The model is LOOSER than the database: it believes NULL is acceptable where the database rejects it, so the failure surfaces at runtime as a failed INSERT. Phase 6 tightens the model, which is a model-only change with no schema risk."
+    },
+    "portfolio_chat_sessions.updated_at:nullable_db_strict": {
+      "db": "NOT NULL",
+      "model": "NULL allowed",
+      "phase": 6,
+      "why": "The model is LOOSER than the database: it believes NULL is acceptable where the database rejects it, so the failure surfaces at runtime as a failed INSERT. Phase 6 tightens the model, which is a model-only change with no schema risk."
+    },
+    "position_ledger.entry_type:type_mismatch": {
+      "db": "text -> ('string', None)",
+      "model": "VARCHAR(10) -> ('string', 10)",
+      "phase": 6,
+      "why": "Audit finding M11. Phase 6 resolves each one individually: the text-versus-String(n) group is a length ceiling the model believes in and the database does not enforce."
+    },
+    "positions.exchange:type_mismatch": {
+      "db": "text -> ('string', None)",
+      "model": "VARCHAR(20) -> ('string', 20)",
+      "phase": 6,
+      "why": "Audit finding M11. Phase 6 resolves each one individually: the text-versus-String(n) group is a length ceiling the model believes in and the database does not enforce."
+    },
+    "positions.instrument_type:type_mismatch": {
+      "db": "text -> ('string', None)",
+      "model": "VARCHAR(20) -> ('string', 20)",
+      "phase": 6,
+      "why": "Audit finding M11. Phase 6 resolves each one individually: the text-versus-String(n) group is a length ceiling the model believes in and the database does not enforce."
+    },
+    "positions.product:type_mismatch": {
+      "db": "text -> ('string', None)",
+      "model": "VARCHAR(20) -> ('string', 20)",
+      "phase": 6,
+      "why": "Audit finding M11. Phase 6 resolves each one individually: the text-versus-String(n) group is a length ceiling the model believes in and the database does not enforce."
+    },
+    "positions.status:type_mismatch": {
+      "db": "text -> ('string', None)",
+      "model": "VARCHAR(20) -> ('string', 20)",
+      "phase": 6,
+      "why": "Audit finding M11. Phase 6 resolves each one individually: the text-versus-String(n) group is a length ceiling the model believes in and the database does not enforce."
+    },
+    "positions.tradingsymbol:type_mismatch": {
+      "db": "text -> ('string', None)",
+      "model": "VARCHAR(100) -> ('string', 100)",
+      "phase": 6,
+      "why": "Audit finding M11. Phase 6 resolves each one individually: the text-versus-String(n) group is a length ceiling the model believes in and the database does not enforce."
+    },
+    "strategy_group_legs.created_at:nullable_db_strict": {
+      "db": "NOT NULL",
+      "model": "NULL allowed",
+      "phase": 6,
+      "why": "The model is LOOSER than the database: it believes NULL is acceptable where the database rejects it, so the failure surfaces at runtime as a failed INSERT. Phase 6 tightens the model, which is a model-only change with no schema risk."
+    },
+    "strategy_groups.created_at:nullable_db_strict": {
+      "db": "NOT NULL",
+      "model": "NULL allowed",
+      "phase": 6,
+      "why": "The model is LOOSER than the database: it believes NULL is acceptable where the database rejects it, so the failure surfaces at runtime as a failed INSERT. Phase 6 tightens the model, which is a model-only change with no schema risk."
+    },
+    "strategy_groups.status:nullable_db_strict": {
+      "db": "NOT NULL",
+      "model": "NULL allowed",
+      "phase": 6,
+      "why": "The model is LOOSER than the database: it believes NULL is acceptable where the database rejects it, so the failure surfaces at runtime as a failed INSERT. Phase 6 tightens the model, which is a model-only change with no schema risk."
+    },
+    "trades.asset_class:nullable_db_permissive": {
+      "db": "NULL allowed",
+      "model": "NOT NULL",
+      "phase": 6,
+      "why": "The database is LOOSER than the model: the ORM refuses a NULL the database would accept, so no ORM write can corrupt anything - but a migration, script or console write can leave a NULL the application then breaks on. Phase 6 adds NOT NULL after checking for existing NULLs."
+    },
+    "trades.cancelled_quantity:nullable_db_permissive": {
+      "db": "NULL allowed",
+      "model": "NOT NULL",
+      "phase": 6,
+      "why": "The database is LOOSER than the model: the ORM refuses a NULL the database would accept, so no ORM write can corrupt anything - but a migration, script or console write can leave a NULL the application then breaks on. Phase 6 adds NOT NULL after checking for existing NULLs."
+    },
+    "trades.created_at:nullable_db_permissive": {
+      "db": "NULL allowed",
+      "model": "NOT NULL",
+      "phase": 6,
+      "why": "The database is LOOSER than the model: the ORM refuses a NULL the database would accept, so no ORM write can corrupt anything - but a migration, script or console write can leave a NULL the application then breaks on. Phase 6 adds NOT NULL after checking for existing NULLs."
+    },
+    "trades.disclosed_quantity:nullable_db_permissive": {
+      "db": "NULL allowed",
+      "model": "NOT NULL",
+      "phase": 6,
+      "why": "The database is LOOSER than the model: the ORM refuses a NULL the database would accept, so no ORM write can corrupt anything - but a migration, script or console write can leave a NULL the application then breaks on. Phase 6 adds NOT NULL after checking for existing NULLs."
+    },
+    "trades.filled_quantity:nullable_db_permissive": {
+      "db": "NULL allowed",
+      "model": "NOT NULL",
+      "phase": 6,
+      "why": "The database is LOOSER than the model: the ORM refuses a NULL the database would accept, so no ORM write can corrupt anything - but a migration, script or console write can leave a NULL the application then breaks on. Phase 6 adds NOT NULL after checking for existing NULLs."
+    },
+    "trades.instrument_type:nullable_db_permissive": {
+      "db": "NULL allowed",
+      "model": "NOT NULL",
+      "phase": 6,
+      "why": "The database is LOOSER than the model: the ORM refuses a NULL the database would accept, so no ORM write can corrupt anything - but a migration, script or console write can leave a NULL the application then breaks on. Phase 6 adds NOT NULL after checking for existing NULLs."
+    },
+    "trades.order_id:nullable_db_permissive": {
+      "db": "NULL allowed",
+      "model": "NOT NULL",
+      "phase": 6,
+      "why": "The database is LOOSER than the model: the ORM refuses a NULL the database would accept, so no ORM write can corrupt anything - but a migration, script or console write can leave a NULL the application then breaks on. Phase 6 adds NOT NULL after checking for existing NULLs."
+    },
+    "trades.order_type:nullable_db_permissive": {
+      "db": "NULL allowed",
+      "model": "NOT NULL",
+      "phase": 6,
+      "why": "The database is LOOSER than the model: the ORM refuses a NULL the database would accept, so no ORM write can corrupt anything - but a migration, script or console write can leave a NULL the application then breaks on. Phase 6 adds NOT NULL after checking for existing NULLs."
+    },
+    "trades.pending_quantity:nullable_db_permissive": {
+      "db": "NULL allowed",
+      "model": "NOT NULL",
+      "phase": 6,
+      "why": "The database is LOOSER than the model: the ORM refuses a NULL the database would accept, so no ORM write can corrupt anything - but a migration, script or console write can leave a NULL the application then breaks on. Phase 6 adds NOT NULL after checking for existing NULLs."
+    },
+    "trades.product:nullable_db_permissive": {
+      "db": "NULL allowed",
+      "model": "NOT NULL",
+      "phase": 6,
+      "why": "The database is LOOSER than the model: the ORM refuses a NULL the database would accept, so no ORM write can corrupt anything - but a migration, script or console write can leave a NULL the application then breaks on. Phase 6 adds NOT NULL after checking for existing NULLs."
+    },
+    "trades.product_type:nullable_db_permissive": {
+      "db": "NULL allowed",
+      "model": "NOT NULL",
+      "phase": 6,
+      "why": "The database is LOOSER than the model: the ORM refuses a NULL the database would accept, so no ORM write can corrupt anything - but a migration, script or console write can leave a NULL the application then breaks on. Phase 6 adds NOT NULL after checking for existing NULLs."
+    },
+    "trades.raw_payload:type_mismatch": {
+      "db": "jsonb -> ('json', 'b')",
+      "model": "JSON -> ('json', '')",
+      "phase": 6,
+      "why": "Audit finding M11. Phase 6 resolves each one individually: the text-versus-String(n) group is a length ceiling the model believes in and the database does not enforce."
+    },
+    "trades.status:nullable_db_permissive": {
+      "db": "NULL allowed",
+      "model": "NOT NULL",
+      "phase": 6,
+      "why": "The database is LOOSER than the model: the ORM refuses a NULL the database would accept, so no ORM write can corrupt anything - but a migration, script or console write can leave a NULL the application then breaks on. Phase 6 adds NOT NULL after checking for existing NULLs."
+    },
+    "trades.updated_at:nullable_db_permissive": {
+      "db": "NULL allowed",
+      "model": "NOT NULL",
+      "phase": 6,
+      "why": "The database is LOOSER than the model: the ORM refuses a NULL the database would accept, so no ORM write can corrupt anything - but a migration, script or console write can leave a NULL the application then breaks on. Phase 6 adds NOT NULL after checking for existing NULLs."
+    },
+    "trading_sessions.session_state:type_mismatch": {
+      "db": "text -> ('string', None)",
+      "model": "VARCHAR(10) -> ('string', 10)",
+      "phase": 6,
+      "why": "Audit finding M11. Phase 6 resolves each one individually: the text-versus-String(n) group is a length ceiling the model believes in and the database does not enforce."
+    }
+  }
+}

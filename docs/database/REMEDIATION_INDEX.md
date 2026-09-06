@@ -205,13 +205,26 @@ is carried in `phase-9-no-action-register.md`.
 | phase | state |
 |---|---|
 | 0 | **COMPLETE** — all 8 decided and approved 2026-09-04 |
-| 1 | **PLANNED** — awaiting 3 design decisions |
+| 1 | **COMPLETE 2026-09-06** — 45 tests, test-only. See `phase-1-safety-net/README.md` under BUILT |
 | 2 | NOT STARTED |
-| 3 | NOT STARTED |
+| 3 | NOT STARTED — **carries one live defect found by Phase 1**: `persist_order_event` raises `NameError` on every call, so `orders` has never received a row. One line |
 | 4 | NOT STARTED |
 | 5 | NOT STARTED |
 | 6 | NOT STARTED |
 | 7 | NOT STARTED |
 | 8 | READY — all retirement decisions recorded |
 
-Nothing has been implemented. The audit remains frozen.
+Phase 1 is implemented; it changed no production code, no schema and no data.
+Everything else is unimplemented and the audit remains frozen.
+
+**Three audit figures were corrected by re-measurement during Phase 1**, and the
+measured value is what later phases should use:
+
+| figure | audit | measured 2026-09-06 |
+|---|---|---|
+| model/DB drift items | 127 | **88** — 41 of the audit's "type mismatches" were rendered-string artefacts, not differences |
+| FKs into `broker_accounts` | 37 | **37**, confirmed — but only excluding partition children; 80 with them |
+| duplicate index groups | 21 | **14** — a partial index is not a duplicate of a full one on the same column |
+
+The 88 live in `backend/tests/_schema_baseline.json`, each tagged with the phase
+that owns it: **1 to Phase 2, 61 to Phase 6, 26 to Phase 8.**
