@@ -373,12 +373,22 @@ def test_every_model_module_is_loaded_not_just_the_exported_ones():
     assert loaded, "no model modules were found at all - MODELS_DIR is wrong"
 
 
-def test_loading_every_model_registers_more_tables_than_the_package_alone():
+def test_the_models_package_exports_every_model_module():
     """
-    Names the specific gap, so closing it in `app/models/__init__.py` shows up
-    here as a deliberate change rather than silently making this test vacuous.
+    `app/models/__init__.py` must import every model module.
+
+    It imported 35 of 37 — `admin_login_event` and `admin_setting` were
+    missing — so `Base.metadata` built from the package contained neither
+    `admin_settings` nor `admin_login_events`. Runtime was unaffected because
+    both are imported directly by their consumers, but anything building a
+    schema from the models, `create_all` against a fresh database included,
+    would have omitted both tables silently.
+
+    Fixed 2026-09-06. This keeps it fixed: a model added without an import
+    line fails here instead of quietly going missing from the metadata.
     """
     import app.models
+    from app.core.database import Base
 
     from tests.schema_diff import MODELS_DIR
 
@@ -389,10 +399,14 @@ def test_loading_every_model_registers_more_tables_than_the_package_alone():
         and f"from app.models.{p.stem} import" not in exported
     )
 
-    assert unexported == ["admin_login_event", "admin_setting"], (
-        "the set of model modules missing from app/models/__init__.py changed: "
-        f"{unexported}. That is fine, but the drift check's loader and this "
-        "test both assume it, so update them together."
+    assert not unexported, (
+        f"model module(s) not imported by app/models/__init__.py: {unexported}. "
+        "Base.metadata built from the package will not contain their tables, "
+        "so create_all against a fresh database omits them silently."
+    )
+    assert {"admin_settings", "admin_login_events"} <= set(Base.metadata.tables), (
+        "the two tables this test was written for are missing from the "
+        "metadata again"
     )
     assert app.models is not None  # the package still imports
 

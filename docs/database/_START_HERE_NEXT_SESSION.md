@@ -37,15 +37,16 @@ same type, `text` vs an unbounded `String()` is the same storage). The 88 are
 in `backend/tests/_schema_baseline.json`, each with the phase that owns it:
 **1 for Phase 2, 61 for Phase 6, 26 for Phase 8.**
 
-**3. `app/models/__init__.py` exports 35 of 37 model modules — STILL OPEN.**
-`admin_login_event` and `admin_setting` are missing, so `Base.metadata` built
-from the package **does not contain `admin_settings` or `admin_login_events`**
-(verified). Runtime is unaffected — every consumer imports those two straight
-from their own module — but anything building a schema from the models, such as
-`create_all` against a fresh database, would silently omit both tables. This
-made the drift check pass alone and fail in the full suite; the check now walks
-`app/models/*.py` itself. **The two-line `__init__` fix is production code and
-was not made.**
+**3. `app/models/__init__.py` exported 35 of 37 model modules — FIXED.**
+`admin_login_event` and `admin_setting` were missing, so `Base.metadata` built
+from the package contained neither `admin_settings` nor `admin_login_events`.
+Runtime was unaffected — every consumer imports those two straight from their
+own module — but `create_all` against a fresh database would have omitted both
+tables silently. Fixed by adding the two imports; kept fixed by
+`test_the_models_package_exports_every_model_module`, which now fails for ANY
+model module the package does not import. The drift check separately walks
+`app/models/*.py` via `load_all_models()`, so it no longer depends on the
+package either way.
 
 Two audit figures were also corrected by measurement: FKs into
 `broker_accounts` is 37 **only when partition children are excluded** (80 with

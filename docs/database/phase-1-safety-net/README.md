@@ -482,8 +482,9 @@ running the real thing contradicted a reasonable-looking assumption.** The
 first was `orders` being empty for a completely different reason than the audit
 inferred. Both were found by executing, not by reading.
 
-Separately, `app/models/__init__.py` not exporting two of its models is a real
-defect in production code and is **not fixed**. Measured consequence:
+Separately, `app/models/__init__.py` not importing two of its models was a real
+defect in production code. **Fixed on approval**, two lines. Measured
+consequence before the fix:
 
 ```
 import app.models
@@ -494,7 +495,13 @@ import app.models
 Runtime is unaffected — every consumer imports those two straight from their
 own module (`app/api/admin/admins.py:33`, `app/services/admin_settings_service.py:95`)
 — but anything that builds a schema from the models, `create_all` against a
-fresh database included, would silently omit both tables. Two lines to fix.
+fresh database included, would have omitted both tables silently.
+
+Both tables are now in the metadata, and
+`test_the_models_package_exports_every_model_module` fails for any model module
+the package does not import, so the next one added cannot go missing quietly.
+The drift check does not depend on this — it walks `app/models/*.py` itself —
+so the baseline is unchanged at 88.
 
 ## How this behaves from here
 

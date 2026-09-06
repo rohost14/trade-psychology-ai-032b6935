@@ -27,6 +27,8 @@ from app.models.guardrail_rule import GuardrailRule
 from app.models.portfolio_chat_session import PortfolioChatSession
 from app.models.admin_user import AdminUser
 from app.models.admin_audit_log import AdminAuditLog
+from app.models.admin_login_event import AdminLoginEvent
+from app.models.admin_setting import AdminSetting
 from app.models.generated_report import GeneratedReport
 from app.models.margin_snapshot import MarginSnapshot
 from app.models.position_margin_observation import PositionMarginObservation
@@ -63,6 +65,8 @@ __all__ = [
     "PortfolioChatSession",
     "AdminUser",
     "AdminAuditLog",
+    "AdminLoginEvent",
+    "AdminSetting",
     "GeneratedReport",
     "MarginSnapshot",
     "PositionMarginObservation",

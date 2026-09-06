@@ -214,17 +214,18 @@ is carried in `phase-9-no-action-register.md`.
 | 7 | NOT STARTED |
 | 8 | READY — all retirement decisions recorded |
 
-Phase 1 is implemented. It changed no schema and no data. **One production
-line** was changed after it, on approval and outside its scope: the
-`persist_order_event` import fix. **None of the 88 drift items, neither HIGH
-finding, and no other defect has been repaired** — Phase 1 built detection, not
-repair. Everything else is unimplemented and the audit remains frozen.
+Phase 1 is implemented. It changed no schema and no data. **Three production
+lines** were changed after it, on approval and outside its scope: the
+`persist_order_event` import, and the two missing model imports. **None of the
+88 drift items and neither HIGH finding has been repaired** — Phase 1 built
+detection, not repair. Everything else is unimplemented and the audit remains
+frozen.
 
-**Still open, found by Phase 1, not owned by any existing finding:**
-`app/models/__init__.py` exports 35 of 37 model modules, so a `Base.metadata`
-built from the package omits `admin_settings` and `admin_login_events`. Runtime
-is fine (both are imported directly by their consumers); `create_all` against a
-fresh database is not. Two lines.
+**Found by Phase 1, outside every existing finding, both now FIXED:**
+`persist_order_event` raised `NameError` on every call (one missing import), and
+`app/models/__init__.py` imported 35 of 37 model modules so a `Base.metadata`
+built from the package omitted `admin_settings` and `admin_login_events`. Both
+are production changes made on explicit approval after Phase 1 closed.
 
 **Three audit figures were corrected by re-measurement during Phase 1**, and the
 measured value is what later phases should use:
