@@ -1,0 +1,59 @@
+# mypy findings accepted as of the last deliberate update.
+# Keyed `path|code|message` WITHOUT a line number, so an edit above
+# a finding does not make it look new.
+# Regenerate ONLY on purpose: `python scripts/mypy_gate.py --update`.
+# Shrinking this file is progress; growing it needs a reason.
+1	app/api/account_data.py|attr-defined|"Result[Any]" has no attribute "rowcount"
+1	app/api/admin/system.py|attr-defined|"Pool" has no attribute "checkedin"
+1	app/api/admin/system.py|attr-defined|"Pool" has no attribute "checkedout"
+1	app/api/admin/system.py|attr-defined|"Pool" has no attribute "overflow"
+1	app/api/admin/system.py|attr-defined|"Pool" has no attribute "size"
+1	app/api/analytics.py|attr-defined|"list[tuple[str, Column[str] | str]]" has no attribute "items"
+1	app/api/analytics.py|return-value|Incompatible return value type (got "object", expected "SupportsDunderLT[Any] | SupportsDunderGT[Any]")
+1	app/api/coach.py|return-value|Incompatible return value type (got "tuple[str, Column[str] | str, str | None]", expected "tuple[str, str, str | None]")
+1	app/api/journal.py|attr-defined|"Result[Any]" has no attribute "rowcount"
+1	app/api/risk.py|attr-defined|"Result[Any]" has no attribute "rowcount"
+1	app/core/config.py|call-arg|Missing named argument "DATABASE_URL" for "Settings"
+1	app/core/config.py|call-arg|Missing named argument "ENCRYPTION_KEY" for "Settings"
+1	app/core/config.py|call-arg|Missing named argument "SECRET_KEY" for "Settings"
+1	app/models/cooldown.py|return-value|Incompatible return value type (got "ColumnElement[bool]", expected "bool")
+1	app/services/ai_personalization_service.py|attr-defined|"object" has no attribute "add"
+4	app/services/ai_personalization_service.py|return-value|Incompatible return value type (got "object", expected "SupportsDunderLT[Any] | SupportsDunderGT[Any]")
+1	app/services/alert_outcome_service.py|return-value|Incompatible return value type (got "datetime | None", expected "SupportsDunderLT[Any] | SupportsDunderGT[Any]")
+1	app/services/baseline_service.py|attr-defined|"object" has no attribute "keys"
+1	app/services/behavior_engine.py|attr-defined|"dict[str, Any]" has no attribute "provenance"
+1	app/services/behavior_engine.py|attr-defined|"dict[str, Any]" has no attribute "start_recording"
+1	app/services/daily_reports_service.py|return-value|Incompatible return value type (got "object", expected "SupportsDunderLT[Any] | SupportsDunderGT[Any]")
+1	app/services/danger_zone_service.py|return-value|Incompatible return value type (got "Sequence[RiskAlert]", expected "list[RiskAlert]")
+2	app/services/gtt_service.py|attr-defined|"Result[Any]" has no attribute "rowcount"
+1	app/services/instrument_service.py|attr-defined|"Result[Any]" has no attribute "rowcount"
+1	app/services/order_stream_service.py|attr-defined|"None" has no attribute "connect"
+1	app/services/order_stream_service.py|attr-defined|"None" has no attribute "on_close"
+1	app/services/order_stream_service.py|attr-defined|"None" has no attribute "on_connect"
+1	app/services/order_stream_service.py|attr-defined|"None" has no attribute "on_error"
+1	app/services/order_stream_service.py|attr-defined|"None" has no attribute "on_noreconnect"
+1	app/services/order_stream_service.py|attr-defined|"None" has no attribute "on_order_update"
+1	app/services/pnl_calculator.py|return-value|Incompatible return value type (got "dict[Column[str], Decimal]", expected "dict[str, Decimal]")
+1	app/services/price_stream_service.py|attr-defined|"None" has no attribute "connect"
+1	app/services/price_stream_service.py|attr-defined|"None" has no attribute "on_close"
+1	app/services/price_stream_service.py|attr-defined|"None" has no attribute "on_connect"
+1	app/services/price_stream_service.py|attr-defined|"None" has no attribute "on_error"
+1	app/services/price_stream_service.py|attr-defined|"None" has no attribute "on_noreconnect"
+1	app/services/price_stream_service.py|attr-defined|"None" has no attribute "on_reconnect"
+1	app/services/price_stream_service.py|attr-defined|"None" has no attribute "on_ticks"
+1	app/services/price_stream_service.py|attr-defined|"ZerodhaTicker" has no attribute "subscribe_async"
+1	app/services/price_stream_service.py|attr-defined|"ZerodhaTicker" has no attribute "unsubscribe_async"; maybe "unsubscribe"?
+1	app/services/price_stream_service.py|return-value|Incompatible return value type (got "AsyncKiteTicker", expected "ZerodhaTicker | None")
+1	app/services/push_notification_service.py|attr-defined|"Result[Any]" has no attribute "rowcount"
+1	app/services/push_notification_service.py|return-value|Incompatible return value type (got "None", expected "bool")
+1	app/services/ticker_lease.py|attr-defined|"PriceStreamProvider" has no attribute "deliver_ltp_locally"
+1	app/services/token_manager.py|attr-defined|"object" has no attribute "append"
+8	app/services/trade_sync_service.py|attr-defined|"object" has no attribute "append"
+1	app/services/trade_sync_service.py|attr-defined|"object" has no attribute "extend"
+1	app/services/zerodha_service.py|override|Argument 1 of "get_instruments" is incompatible with supertype "app.services.broker_interface.BrokerInterface"; supertype defines the argument type as "str | None"
+1	app/services/zerodha_service.py|override|Argument 2 of "get_instruments" is incompatible with supertype "app.services.broker_interface.BrokerInterface"; supertype defines the argument type as "str | None"
+1	app/services/zerodha_service.py|override|Return type "Coroutine[Any, Any, dict[str, Any]]" of "get_positions" incompatible with return type "Coroutine[Any, Any, list[NormalizedPosition]]" in supertype "app.services.broker_interface.BrokerInterface"
+1	app/services/zerodha_service.py|override|Return type "Coroutine[Any, Any, dict[str, Any]]" of "get_profile" incompatible with return type "Coroutine[Any, Any, NormalizedProfile]" in supertype "app.services.broker_interface.BrokerInterface"
+1	app/services/zerodha_service.py|override|Return type "Coroutine[Any, Any, list[dict[str, Any]]]" of "get_holdings" incompatible with return type "Coroutine[Any, Any, list[NormalizedHolding]]" in supertype "app.services.broker_interface.BrokerInterface"
+1	app/services/zerodha_service.py|override|Return type "Coroutine[Any, Any, list[dict[str, Any]]]" of "get_trades" incompatible with return type "Coroutine[Any, Any, list[NormalizedTrade]]" in supertype "app.services.broker_interface.BrokerInterface"
+1	app/services/zerodha_service.py|return-value|Incompatible return value type (got "dict[str, Any]", expected "list[dict[str, Any]]")

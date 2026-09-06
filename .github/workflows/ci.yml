@@ -106,12 +106,24 @@ jobs:
           python -m pytest -q -p no:cacheprovider
           --ignore=tests/production
           --ignore=tests/test_db_schema.py
-      - name: mypy (type / attr-defined)
-        # Catches the "wrong method / attribute that doesn't exist" class
-        # (e.g. account.get_decrypted_token()) that only surfaced at runtime.
-        # Non-blocking until the untyped-code noise is triaged; see backend/mypy.ini.
-        run: pip install mypy && mypy --config-file mypy.ini app
-        continue-on-error: true
+      - name: mypy gate (BLOCKING - fails only on findings not in the baseline)
+        # Catches the "wrong method / attribute that doesn't exist" class that
+        # only surfaces at runtime. This step was `continue-on-error: true`
+        # until 2026-09-06, and in that state it correctly reported TWO bugs
+        # that had been live for months and that nobody read:
+        #   * profile.py imported a symbol that exists nowhere, so both
+        #     guardian endpoints raised ImportError on every call and the
+        #     trader's nominated guardian could never be confirmed or notified
+        #   * danger_zone.py called get_escalation_status with the wrong
+        #     argument name - TypeError on every call
+        # A non-blocking check is a check nobody reads.
+        #
+        # It is blocking against a BASELINE, not against zero: 65 pre-existing
+        # findings (Result[Any].rowcount, untyped-dict attrs, Sequence-vs-list
+        # returns) are recorded in backend/mypy_baseline.txt. Turning it on
+        # against zero would put CI red on day one, which is precisely the
+        # state that let all of the above through.
+        run: pip install mypy && python scripts/mypy_gate.py
       - name: pip-audit
         run: pip install pip-audit && pip-audit
         continue-on-error: true   # baseline; flip to blocking once triaged

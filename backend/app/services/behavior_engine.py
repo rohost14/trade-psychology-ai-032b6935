@@ -921,8 +921,22 @@ class BehaviorEngine:
             )
             await freeze_for_session(session, account_risk, db)
         except Exception as _ar_err:
-            # Never let the denominator take the analysis down with it.
-            logger.warning(f"[BehaviorEngine] account risk unresolved: {_ar_err}")
+            # Never let the denominator take the analysis down with it. But
+            # LOG IT AS AN ERROR: `logger.warning` is below the level the Redis
+            # error feed captures, so this was invisible, and on 2026-09-06
+            # that invisibility cost eighteen CI failures across four unrelated
+            # files. The cause was a missing `gtt_tracking` table; the only
+            # trace was this line, and no failing test mentioned it.
+            #
+            # When this fires, every account-relative claim is withheld for the
+            # trade - `max_trade_risk` and the whole account family abstain -
+            # so a silent occurrence means the trader's exposure guard is off
+            # and nothing says so.
+            logger.error(
+                f"[BehaviorEngine] account risk unresolved, account-relative "
+                f"detectors will abstain for this trade: {_ar_err}",
+                exc_info=True,
+            )
             account_risk = None
 
         # ── P2 shadow: SessionState fold vs legacy recompute ──────────────

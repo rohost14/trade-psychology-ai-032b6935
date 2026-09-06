@@ -60,6 +60,39 @@ _CAPTURE_ON = {"OPEN", "INCREASE", "FLIP"}
 _TABLE_AVAILABLE: Optional[bool] = None
 
 
+def _is_missing_table(exc: BaseException) -> bool:
+    """
+    True only when Postgres said the relation does not exist (SQLSTATE 42P01).
+
+    `_TABLE_AVAILABLE = False` is a permanent, process-lifetime latch with no
+    recovery path: once set, both readers return before their `try` and margin
+    capture stays off until the process restarts. That is the right behaviour
+    for "migration 081 was never applied" and the wrong behaviour for anything
+    else.
+
+    It used to be decided by `"position_margin_observations" in str(exc)`,
+    which is true of a great deal more than a missing table - a unique or
+    not-null violation on that table, a serialization failure, a connection
+    dropped mid-statement. Any one transient error permanently disabled margin
+    capture, and downstream that is not cosmetic: `max_trade_risk` abstains
+    when the capital requirement is unavailable, and since `excess_exposure`
+    was retired it is the only exposure guard left. The trader would be told
+    nothing, at `logger.debug`, for the rest of the process's life.
+
+    SQLSTATE is the exact question. asyncpg exposes it on the wrapped original
+    exception; the string fallback is kept only for drivers that do not.
+    """
+    for err in (getattr(exc, "orig", None), exc):
+        code = getattr(err, "sqlstate", None) or getattr(err, "pgcode", None)
+        if code:
+            return str(code) == "42P01"          # undefined_table
+    text = str(exc).lower()
+    return "position_margin_observations" in text and (
+        "does not exist" in text or "undefinedtable" in text
+    )
+
+
+
 def should_capture(entry_type: Optional[str], product: Optional[str]) -> bool:
     """The whole lifecycle policy, in one testable place."""
     return ((entry_type or "").upper() in _CAPTURE_ON
@@ -223,9 +256,18 @@ async def _persist(db, broker_account_id, underlying, legs_pos, payload, figures
             await db.flush()
         _TABLE_AVAILABLE = True
     except Exception as exc:                                   # noqa: BLE001
-        if "position_margin_observations" in str(exc):
+        if _is_missing_table(exc):
             _TABLE_AVAILABLE = False
-        logger.warning("margin observation not stored (migration 081 applied?): %s", exc)
+            logger.warning(
+                "margin observation not stored: position_margin_observations "
+                "does not exist (migration 081 not applied). Capture is now "
+                "off for this process; capital-relative detectors will abstain."
+            )
+        else:
+            # NOT a missing table, so NOT a reason to latch. Raised to error so
+            # it reaches the Redis error feed and Sentry: a repeated failure
+            # here silently removes the only remaining exposure guard.
+            logger.error("margin observation not stored: %s", exc)
         return None
 
     logger.info("captured BROKER margin %s for %s (%d leg(s))",
@@ -284,7 +326,7 @@ async def resolve_for_trade(trade, db) -> Optional["object"]:
             obs = (await db.execute(stmt)).scalars().first()
         _TABLE_AVAILABLE = True
     except Exception as exc:                                   # noqa: BLE001
-        if "position_margin_observations" in str(exc):
+        if _is_missing_table(exc):
             # Migration 081 not applied. Say so once, then stop asking.
             if _TABLE_AVAILABLE is None:
                 logger.info(
@@ -293,7 +335,9 @@ async def resolve_for_trade(trade, db) -> Optional["object"]:
                     "detectors will abstain on futures and short options")
             _TABLE_AVAILABLE = False
         else:
-            logger.debug("no broker margin available (%s)", exc)
+            # A real failure reading a table that exists. Not a latch, and not
+            # debug: this is the read that feeds max_trade_risk.
+            logger.error("broker margin lookup failed: %s", exc)
         return None
 
     if obs is None or not obs.total:

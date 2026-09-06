@@ -83,7 +83,11 @@ async def get_post_market_report(
                     ))
                     await db.commit()
             except Exception as save_err:
-                logger.warning(f"Could not persist post-market report: {save_err}")
+                # ERROR, not warning: the trader is reading this report right
+                # now and it will not be in Reports Hub tomorrow. Below ERROR
+                # the Redis error feed does not capture it, so the only symptom
+                # is a user saying the app lost their report.
+                logger.error(f"Could not persist post-market report: {save_err}", exc_info=True)
 
         return report
 
@@ -140,7 +144,7 @@ async def get_morning_briefing(
                 ))
                 await db.commit()
         except Exception as save_err:
-            logger.warning(f"Could not persist morning briefing: {save_err}")
+            logger.error(f"Could not persist morning briefing: {save_err}", exc_info=True)
 
         return briefing
 
