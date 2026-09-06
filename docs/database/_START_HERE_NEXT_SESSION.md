@@ -1,8 +1,11 @@
 # START HERE — resuming the database remediation
 
-**Last session:** 2026-09-06. **Next step: Phase 2 — but read "Phase 1 found
-two live defects" below first; one of them is a one-line production fix that
-Phase 1 was not allowed to make.**
+**Last session:** 2026-09-06. **Phases 1 and 2 are done. Next step: Phase 6
+(61 drift items) or Phase 3.**
+
+**Read "Phase 1 found three live defects" and Phase 2's RESOLVED section before
+trusting any audit figure — the audit's H1 and M18 descriptions were both
+wrong in ways that changed the remedy.**
 
 ---
 
@@ -15,7 +18,8 @@ Phase 1 was not allowed to make.**
 | Phase 0 | **COMPLETE** — all 8 decisions made and approved |
 | Phase 0a | **COMMITTED** — `cd0cb4e`, the zero-risk subset |
 | Phase 1 | **COMPLETE** — 45 tests, no production code changed. Write-up in `phase-1-safety-net/README.md` under "BUILT" |
-| Phases 2–8 | not started |
+| Phase 2 | **COMPLETE** — no primary key added (the omission was deliberate); migration 094 fixes the real H2 defect. Write-up in `phase-2-data-integrity/README.md` under RESOLVED |
+| Phases 3–8 | not started |
 
 ---
 

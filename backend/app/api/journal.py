@@ -257,6 +257,10 @@ async def create_journal_entry(
         # For open positions, trade_id is a synthetic per-episode id (does not exist
         # in any table) — ownership is verified against the real position id passed in
         # source_id. For closed trades, trade_id itself is checked.
+        # The real position this entry is about, when we can establish it.
+        # Set by the positions branch of the ownership check below.
+        source_position_id = None
+
         if trade_uuid:
             owned = False
             source_uuid = None
@@ -288,6 +292,12 @@ async def create_journal_entry(
                 )
                 if pos_check.scalar_one_or_none():
                     owned = True
+                    # Migration 094: KEEP it. Until then this id was verified
+                    # here and then dropped, so an open-position entry was left
+                    # holding only the synthetic per-episode trade_id — which
+                    # resolves to nothing by design — and could not be joined
+                    # back to the position it was written about.
+                    source_position_id = check_id
 
             # Check raw trades table (individual fills)
             if not owned:
@@ -318,6 +328,11 @@ async def create_journal_entry(
 
             if existing:
                 _apply_fields(existing, data)
+                # Fill it in if this request established it and the stored row
+                # predates migration 094. Never overwrite a known id with None:
+                # a later edit that omits source_id must not erase the link.
+                if source_position_id is not None:
+                    existing.source_position_id = source_position_id
                 existing.updated_at = datetime.now(timezone.utc)
                 await db.commit()
                 await db.refresh(existing)
@@ -334,6 +349,7 @@ async def create_journal_entry(
         entry = JournalEntry(
             broker_account_id=broker_account_id,
             trade_id=trade_uuid,
+            source_position_id=source_position_id,
             emotion_tags=data.emotion_tags or [],
             followed_plan=data.followed_plan,
             deviation_reason=data.deviation_reason,

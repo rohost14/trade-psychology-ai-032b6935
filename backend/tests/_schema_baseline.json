@@ -181,8 +181,8 @@
     "behavior_events.-:primary_key_mismatch": {
       "db": "NONE",
       "model": "['id']",
-      "phase": 2,
-      "why": "Audit finding H1. The database has no primary key where the model declares one, so nothing rejects a duplicate row. Phase 2 adds it after de-duplicating the existing rows."
+      "phase": 0,
+      "why": "PERMANENT, NOT A PENDING FIX. The omission is deliberate and is documented in migrations/067_partition_behavior_events.sql lines 6-17: 'No PK on the partitioned table. The table is append-only evidence; nothing joins INTO it by id. The ORM keeps its declarative id pk (mapper-only); the DB keeps id as an indexed uuid column.' Verified 2026-09-06: 0 foreign keys point INTO behavior_events, and the only two uses of BehaviorEvent.id are a count() aggregate (prometheus_metrics.py:225) and an existence probe filtered on other columns (trade_tasks.py:212) - nothing looks a row up by id. A partitioned table's PK must include the partition key, so the model's PRIMARY KEY (id) is unreachable in the database by construction and this entry can never be removed. Uniqueness for keyed rows is carried by uq_behavior_events_idem (broker_account_id, idempotency_key, detected_at) WHERE idempotency_key IS NOT NULL, asserted by tests/test_live_schema_invariants.py. CORRECTION: this entry previously read 'Phase 2 adds it after de-duplicating the existing rows', which was the audit's conclusion copied without reading migration 067. No primary key is being added."
     },
     "behavior_events.created_at:nullable_db_strict": {
       "db": "NOT NULL",

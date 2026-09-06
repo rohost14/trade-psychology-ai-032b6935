@@ -221,6 +221,101 @@ async def test_every_foreign_key_into_broker_accounts_still_cascades():
     )
 
 
+# ── the only uniqueness guarantee behavior_events has ──────────────────────
+
+async def test_the_behavior_events_idempotency_index_exists_and_covers_the_partition_key():
+    """
+    `behavior_events` has NO primary key, deliberately.
+    `migrations/067_partition_behavior_events.sql:6-17` records the decision and
+    the reason: the table is append-only evidence, nothing joins into it by id
+    (verified - 0 foreign keys point at it), and a partitioned table's primary
+    key would have to include the partition key.
+
+    So this index is the ONLY uniqueness guarantee the table has, and until now
+    nothing checked that it exists. Dropping it would raise no error and change
+    no behaviour that any test could see - the table would simply stop
+    rejecting duplicate events.
+
+    The partition key must be in it. Postgres refuses a unique index on a
+    partitioned table without one, so a rewrite that dropped `detected_at`
+    could only be committed by dropping the uniqueness too.
+    """
+    rows = await _fetch("""
+        SELECT ic.relname, pg_get_indexdef(i.indexrelid) AS def, i.indisunique
+          FROM pg_index i
+          JOIN pg_class ic ON ic.oid = i.indexrelid
+          JOIN pg_class t  ON t.oid = i.indrelid
+          JOIN pg_namespace n ON n.oid = t.relnamespace AND n.nspname = 'public'
+         WHERE t.relname = 'behavior_events' AND i.indisunique
+    """)
+
+    assert rows, (
+        "behavior_events has NO unique index. It also has no primary key, by "
+        "design - so nothing at all now prevents a duplicate event."
+    )
+
+    definitions = [definition for _name, definition, _u in rows]
+    idem = [d for d in definitions if "idempotency_key" in d]
+    assert idem, (
+        f"no unique index on idempotency_key remains. Found: {definitions}"
+    )
+    assert any("detected_at" in d for d in idem), (
+        "the idempotency index no longer includes detected_at, the partition "
+        f"key. Postgres cannot maintain it in that form: {idem}"
+    )
+
+
+async def test_keyed_behavior_events_use_the_trigger_trades_exit_time():
+    """
+    The assumption the idempotency guarantee actually rests on.
+
+    `migrations/067` states it and never tested it: *"detected_at is
+    deterministic for keyed events (always the trigger trade's exit time), so a
+    retry/re-sync produces the identical tuple and still conflicts."*
+
+    That is load-bearing. The unique index is on (broker_account_id,
+    idempotency_key, detected_at). If `detected_at` ever became the processing
+    clock for a keyed event, a retry would write a DIFFERENT tuple, the index
+    would not object, and the duplicate would land - with no primary key behind
+    it to catch what the index missed. The failure is silent in both places.
+
+    There is a real path to that: `behavior_engine.py:587` reads
+    `completed_trade.exit_time or now`, and `exit_time` is nullable. A keyed
+    event built from a trade with no exit time takes the processing clock and
+    loses its determinism. No such trade exists today; the fallback does.
+
+    Scoped to keyed events on purpose - the three unkeyed writers documented in
+    `test_behavior_event_writers.py` legitimately use the observation time, and
+    migration 067 never claimed otherwise.
+    """
+    rows = await _fetch("""
+        SELECT count(*) AS keyed_with_trigger,
+               count(*) FILTER (WHERE be.detected_at <> ct.exit_time) AS mismatched,
+               count(*) FILTER (WHERE ct.exit_time IS NULL) AS trigger_without_exit
+          FROM behavior_events be
+          JOIN completed_trades ct ON ct.id = be.trigger_completed_trade_id
+         WHERE be.idempotency_key IS NOT NULL
+    """)
+    keyed, mismatched, no_exit = rows[0]
+
+    assert keyed, (
+        "no keyed events with a trigger trade to check - either the table was "
+        "cleared or the join stopped matching. This test passes vacuously in "
+        "that state, so it fails instead."
+    )
+    assert not mismatched, (
+        f"{mismatched} of {keyed} keyed events have a detected_at that is NOT "
+        "the trigger trade's exit time. Migration 067's idempotency guarantee "
+        "assumes they are equal; where they are not, a retry writes a new "
+        "tuple and the unique index does not object."
+    )
+    assert not no_exit, (
+        f"{no_exit} keyed event(s) were built from a trade with no exit_time, "
+        "so behavior_engine.py:587 fell back to the processing clock and those "
+        "rows are no longer deduplicable."
+    )
+
+
 # ── write cost nobody is paying attention to ───────────────────────────────
 
 async def test_no_new_duplicate_index_groups():

@@ -754,6 +754,74 @@ class TestJournalEndpoint:
         assert resp.status_code in (200, 201), f"Journal create failed: {resp.text}"
 
     @pytest.mark.asyncio
+    async def test_open_position_journal_keeps_the_real_position_id(
+        self, client, db, auth_headers, broker
+    ):
+        """
+        Migration 094. An open-position journal entry must record WHICH
+        position it was about.
+
+        `trade_id` here is a synthetic per-episode id - built in
+        `src/lib/journalKey.ts` from (position id + IST date) and deliberately
+        resolving to no row, because a Position is reused across episodes and
+        keying by its raw id would let a later, unrelated position on the same
+        contract inherit an old entry.
+
+        The client sends the real position id as `source_id`. Before 094 the
+        API verified ownership with it and then dropped it, so the stored entry
+        held only a key that resolves to nothing and could not be joined back
+        to anything. This asserts it is kept.
+        """
+        position = Position(
+            broker_account_id=broker.id,
+            tradingsymbol="NIFTY25NOV26000CE",
+        )
+        db.add(position)
+        await db.flush()
+        await db.commit()
+
+        synthetic_trade_id = str(uuid4())   # resolves to nothing, by design
+        resp = await client.post("/api/journal/", json={
+            "trade_id": synthetic_trade_id,
+            "source_id": str(position.id),
+            "notes": "Held through the drawdown.",
+            "entry_type": "trade",
+            "trade_symbol": "NIFTY25NOV26000CE",
+        }, headers=auth_headers)
+
+        assert resp.status_code in (200, 201), f"create failed: {resp.text}"
+        entry = resp.json()["entry"]
+
+        assert entry["source_position_id"] == str(position.id), (
+            "the real position id was not stored. The entry is keyed only by a "
+            "synthetic id that resolves to nothing, so nothing can tell which "
+            f"position it was about: {entry}"
+        )
+        assert entry["trade_id"] == synthetic_trade_id, (
+            "the synthetic episode key must be preserved as-is - it is what "
+            "GET /api/journal/trade/{id} looks the entry up by"
+        )
+
+    @pytest.mark.asyncio
+    async def test_closed_trade_journal_has_no_source_position(
+        self, client, db, auth_headers, completed_trade
+    ):
+        """
+        The counter-case. For a CLOSED trade, `trade_id` is the real
+        CompletedTrade id and no `source_id` is sent, so `source_position_id`
+        must stay NULL rather than being filled with something plausible.
+        """
+        await db.commit()
+        resp = await client.post("/api/journal/", json={
+            "trade_id": str(completed_trade.id),
+            "notes": "Took the target.",
+            "entry_type": "trade",
+        }, headers=auth_headers)
+
+        assert resp.status_code in (200, 201), f"create failed: {resp.text}"
+        assert resp.json()["entry"]["source_position_id"] is None
+
+    @pytest.mark.asyncio
     async def test_journal_entry_without_trade_link(self, client, db, auth_headers):
         """A journal entry can be created with no trade_id (daily note).
 

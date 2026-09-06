@@ -35,7 +35,7 @@ class JournalEntry(Base):
 
     Can be attached to:
     - A specific trade (trade_id)
-    - A specific position (position_id)
+    - A specific position (source_position_id, added in migration 094)
     - Or stand-alone (daily reflection)
 
     Structured fields (migration 045) replace the old 3-textarea approach.
@@ -51,10 +51,36 @@ class JournalEntry(Base):
         index=True
     )
 
-    # Links to completed_trades.id (or trades.id for legacy entries).
-    # Stored as a plain UUID — no FK constraint so either table's ID works.
+    # The journal KEY, not a foreign key — and deliberately so.
+    #
+    # For a CLOSED trade this is the CompletedTrade id. For an OPEN position it
+    # is a SYNTHETIC per-episode id that exists in no table, derived in
+    # src/lib/journalKey.ts from (position id + IST trading date): a Position
+    # row is reused across episodes and keeps its id, so keying by the raw
+    # position id would let a future unrelated position on the same contract
+    # inherit an old entry.
+    #
+    # An FK here is therefore impossible, not merely absent. Use
+    # source_position_id to reach the real position.
     trade_id = Column(
         UUID(as_uuid=True),
+        nullable=True,
+        index=True
+    )
+
+    # The real position an open-position entry was written about (migration
+    # 094). The client sends it as `source_id` and the API already verified
+    # ownership with it; before 094 it was then discarded, leaving the entry
+    # joinable to nothing.
+    #
+    # ON DELETE SET NULL, never CASCADE: a journal entry is the trader's own
+    # writing and deleting a position must not delete what they wrote about it.
+    #
+    # NULL for closed-trade entries and for everything written before 094 — the
+    # value was never stored, so it cannot be recovered.
+    source_position_id = Column(
+        UUID(as_uuid=True),
+        ForeignKey("positions.id", ondelete="SET NULL"),
         nullable=True,
         index=True
     )
@@ -105,6 +131,8 @@ class JournalEntry(Base):
             "id": str(self.id),
             "broker_account_id": str(self.broker_account_id),
             "trade_id": str(self.trade_id) if self.trade_id else None,
+            "source_position_id": (str(self.source_position_id)
+                                   if self.source_position_id else None),
             "emotion_tags": self.emotion_tags or [],
             "followed_plan": self.followed_plan,
             "deviation_reason": self.deviation_reason,

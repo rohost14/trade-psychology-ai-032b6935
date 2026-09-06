@@ -206,7 +206,7 @@ is carried in `phase-9-no-action-register.md`.
 |---|---|
 | 0 | **COMPLETE** — all 8 decided and approved 2026-09-04 |
 | 1 | **COMPLETE 2026-09-06** — 45 tests, test-only. See `phase-1-safety-net/README.md` under BUILT |
-| 2 | NOT STARTED |
+| 2 | **COMPLETE 2026-09-06** — H1 GOOD WITH NOTE (deliberate, per migration 067), M18 real but unfixable by a key and guarded instead, H2 fixed by migration 094. See `phase-2-data-integrity/README.md` under RESOLVED |
 | 3 | NOT STARTED — one item pulled forward and **DONE**: `persist_order_event` raised `NameError` on every call, so `orders` had never received a row. Fixed 2026-09-06 with a module-level `import asyncio` |
 | 4 | NOT STARTED |
 | 5 | NOT STARTED |
