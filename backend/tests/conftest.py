@@ -8,6 +8,7 @@ All writes are rolled back after each test.
 
 import pytest
 import pytest_asyncio
+from sqlalchemy import text
 from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession, async_sessionmaker
 from sqlalchemy.pool import NullPool
 from decimal import Decimal
@@ -84,6 +85,68 @@ def make_engine():
     )
 
 
+#: Tables the application QUERIES that no SQLAlchemy model declares.
+#:
+#: `create_all` only builds what the models describe, so these are absent from
+#: the CI schema and every query against them fails. That is not theoretical:
+#: `behavior_engine._load_context` reads `gtt_tracking` in a scalar subquery,
+#: the failure was swallowed at behavior_engine.py:923 with a `logger.warning`,
+#: and the poisoned session then produced 13 PendingRollbackError failures in
+#: four unrelated test files plus 5 assertion failures - 18 of the 20 CI
+#: failures on 2026-09-06, from one missing table nobody could see.
+#:
+#: The DDL is copied from the migration that owns each table so the test schema
+#: matches production rather than approximating it:
+#:   gtt_tracking      migrations/042_portfolio_radar.sql
+#:   detector_flags    migrations/068_detector_flags_and_shadow.sql
+#:   oauth_temp_store  read from the live schema (its migration predates the ledger)
+#:
+#: `tests/test_unmodelled_tables.py` fails if a FOURTH such table appears, so
+#: the next one is caught by a named test instead of a cascade.
+UNMODELLED_TABLES = {
+    "gtt_tracking": """
+        CREATE TABLE IF NOT EXISTS gtt_tracking (
+            id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+            broker_account_id UUID NOT NULL
+                REFERENCES broker_accounts(id) ON DELETE CASCADE,
+            gtt_id INTEGER NOT NULL,
+            tradingsymbol VARCHAR(100) NOT NULL,
+            exchange VARCHAR(20),
+            trigger_price NUMERIC(15, 4),
+            order_type VARCHAR(20),
+            quantity INTEGER,
+            gtt_status VARCHAR(20) DEFAULT 'active',
+            outcome VARCHAR(20),
+            outcome_order_id VARCHAR(50),
+            created_at TIMESTAMPTZ DEFAULT now(),
+            triggered_at TIMESTAMPTZ,
+            updated_at TIMESTAMPTZ DEFAULT now(),
+            UNIQUE (broker_account_id, gtt_id)
+        )
+    """,
+    "detector_flags": """
+        CREATE TABLE IF NOT EXISTS detector_flags (
+            detector    TEXT PRIMARY KEY,
+            mode        TEXT NOT NULL DEFAULT 'on',
+            rollout_pct INTEGER NOT NULL DEFAULT 100,
+            updated_at  TIMESTAMPTZ NOT NULL DEFAULT now(),
+            updated_by  TEXT,
+            CONSTRAINT detector_flags_mode_chk
+                CHECK (mode IN ('off', 'shadow', 'canary', 'on')),
+            CONSTRAINT detector_flags_rollout_chk
+                CHECK (rollout_pct BETWEEN 0 AND 100)
+        )
+    """,
+    "oauth_temp_store": """
+        CREATE TABLE IF NOT EXISTS oauth_temp_store (
+            key        TEXT PRIMARY KEY,
+            value      TEXT NOT NULL,
+            expires_at TIMESTAMPTZ NOT NULL
+        )
+    """,
+}
+
+
 @pytest_asyncio.fixture(scope="session", autouse=True)
 async def create_tables():
     """Create all tables once per test session from SQLAlchemy models.
@@ -108,6 +171,8 @@ async def create_tables():
     )
     async with engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)
+        for ddl in UNMODELLED_TABLES.values():
+            await conn.execute(text(ddl))
     await engine.dispose()
 
 
