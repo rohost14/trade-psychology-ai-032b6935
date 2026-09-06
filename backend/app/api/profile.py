@@ -930,6 +930,7 @@ async def get_behavioral_insights(
 
 @router.post("/guardian/send-consent")
 async def guardian_send_consent(
+    user_id: UUID = Depends(get_current_user_id),
     broker_account_id: UUID = Depends(get_verified_broker_account_id),
     db: AsyncSession = Depends(get_db),
 ):
@@ -939,9 +940,13 @@ async def guardian_send_consent(
     """
     try:
         from app.services.whatsapp_service import whatsapp_service
-        from app.api.zerodha import _get_user_id_from_broker_account
 
-        user_id = await _get_user_id_from_broker_account(broker_account_id, db)
+        # `user_id` arrives as a dependency, the way every other endpoint in
+        # this file resolves it. Until 2026-09-06 both guardian endpoints
+        # instead did `from app.api.zerodha import
+        # _get_user_id_from_broker_account` - a symbol that does not exist
+        # anywhere in the codebase - so every call raised ImportError, was
+        # caught by the handler below, and returned "Internal server error".
         user = await db.get(User, user_id)
 
         if not user or not user.guardian_phone:
@@ -977,6 +982,7 @@ async def guardian_send_consent(
 
 @router.post("/guardian/confirm")
 async def guardian_confirm(
+    user_id: UUID = Depends(get_current_user_id),
     broker_account_id: UUID = Depends(get_verified_broker_account_id),
     db: AsyncSession = Depends(get_db),
 ):
@@ -985,10 +991,12 @@ async def guardian_confirm(
     or for testing/admin override).
     """
     try:
-        from datetime import timezone as _tz
-        from app.api.zerodha import _get_user_id_from_broker_account
-
-        user_id = await _get_user_id_from_broker_account(broker_account_id, db)
+        # See guardian_send_consent: this endpoint carried the same
+        # non-existent import. `user.guardian_confirmed = True` below is the
+        # ONLY place in the codebase that sets that flag, so while the import
+        # failed the guardian could never be confirmed - and the four consumers
+        # that gate on it (alert_service.py, trade_tasks.py, reports.py) could
+        # never fire.
         user = await db.get(User, user_id)
 
         if not user:

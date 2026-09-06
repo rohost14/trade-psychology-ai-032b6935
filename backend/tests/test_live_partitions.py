@@ -42,6 +42,7 @@ from __future__ import annotations
 from datetime import date, datetime, timedelta, timezone
 
 import pytest
+import pytest_asyncio
 from sqlalchemy import text
 from sqlalchemy.exc import (
     DBAPIError, InterfaceError, OperationalError, ProgrammingError,
@@ -51,7 +52,21 @@ from sqlalchemy.pool import NullPool
 
 from app.core.config import settings
 
+from tests.live_db import skip_unless_migrated
+
 pytestmark = pytest.mark.asyncio
+
+
+@pytest_asyncio.fixture(autouse=True)
+async def _require_a_migrated_database():
+    """
+    Skip every test in this file unless the database was built by migrations.
+
+    CI runs against a throwaway Postgres built by `Base.metadata.create_all`,
+    where none of the objects asserted here exist. See `tests/live_db.py`.
+    """
+    await skip_unless_migrated()
+
 
 #: Every RANGE-partitioned parent, with the key it is partitioned on.
 PARTITIONED = {

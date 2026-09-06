@@ -36,6 +36,7 @@ hours. And it never writes: every query here reads a catalog.
 from __future__ import annotations
 
 import pytest
+import pytest_asyncio
 from sqlalchemy import text
 from sqlalchemy.exc import (
     DBAPIError, InterfaceError, OperationalError, ProgrammingError,
@@ -54,7 +55,21 @@ from tests.schema_diff import (
 # and fail in the full suite - see `load_all_models`.
 load_all_models()
 
+from tests.live_db import skip_unless_migrated
+
 pytestmark = pytest.mark.asyncio
+
+
+@pytest_asyncio.fixture(autouse=True)
+async def _require_a_migrated_database():
+    """
+    Skip every test in this file unless the database was built by migrations.
+
+    CI runs against a throwaway Postgres built by `Base.metadata.create_all`,
+    where none of the objects asserted here exist. See `tests/live_db.py`.
+    """
+    await skip_unless_migrated()
+
 
 
 def _engine():

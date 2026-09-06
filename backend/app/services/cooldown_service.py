@@ -288,11 +288,11 @@ class CooldownService:
 
     async def get_escalation_status(
         self,
-        user_id: int,
+        account_id: str,
         trigger_reason: str
     ) -> Dict:
         """Get current escalation status for a trigger type."""
-        count = self._get_violation_count(user_id, trigger_reason)
+        count = self._get_violation_count(account_id, trigger_reason)
         level = min(count, len(self.ESCALATION_LADDER) - 1)
         current_duration = self.ESCALATION_LADDER[level]
         next_duration = self.ESCALATION_LADDER[min(level + 1, len(self.ESCALATION_LADDER) - 1)]
@@ -335,13 +335,13 @@ class CooldownService:
             count = 0
         return min(count, len(self.ESCALATION_LADDER) - 1)
 
-    def _calculate_duration(self, user_id: int, trigger_reason: str) -> int:
+    def _calculate_duration(self, account_id: str, trigger_reason: str) -> int:
         """Calculate cooldown duration based on strategy."""
         if self.config.strategy == CooldownStrategy.FIXED:
             return self.config.base_duration_minutes
 
         elif self.config.strategy == CooldownStrategy.GRADUATED:
-            level = self._get_escalation_level(user_id, trigger_reason)
+            level = self._get_escalation_level(account_id, trigger_reason)
             if level < len(self.ESCALATION_LADDER):
                 return self.ESCALATION_LADDER[level]
             return self.ESCALATION_LADDER[-1]  # Max duration
@@ -349,7 +349,7 @@ class CooldownService:
         elif self.config.strategy == CooldownStrategy.SMART:
             # Handled by _calculate_smart_duration (async) in start_cooldown.
             # This sync path is only reached if called directly outside start_cooldown.
-            level = self._get_escalation_level(user_id, trigger_reason)
+            level = self._get_escalation_level(account_id, trigger_reason)
             if level < len(self.ESCALATION_LADDER):
                 return self.ESCALATION_LADDER[level]
             return self.ESCALATION_LADDER[-1]
@@ -428,14 +428,14 @@ class CooldownService:
         # ── 4: Plain graduated ─────────────────────────────────────────────
         return graduated
 
-    def _get_escalation_level(self, user_id: int, trigger_reason: str) -> int:
+    def _get_escalation_level(self, account_id: str, trigger_reason: str) -> int:
         """Get current escalation level based on recent violations."""
-        count = self._get_violation_count(user_id, trigger_reason)
+        count = self._get_violation_count(account_id, trigger_reason)
         return min(count, len(self.ESCALATION_LADDER) - 1)
 
-    def _get_violation_count(self, user_id: int, trigger_reason: str) -> int:
+    def _get_violation_count(self, account_id: str, trigger_reason: str) -> int:
         """Get violation count in the reset window."""
-        key = (user_id, trigger_reason)
+        key = (account_id, trigger_reason)
 
         # Check if we need to reset (violations older than reset window)
         if key in self._last_violation:
@@ -445,32 +445,32 @@ class CooldownService:
 
         return self._violation_counts.get(key, 0)
 
-    def _record_violation(self, user_id: int, trigger_reason: str):
+    def _record_violation(self, account_id: str, trigger_reason: str):
         """Record a violation for escalation tracking."""
-        key = (user_id, trigger_reason)
+        key = (account_id, trigger_reason)
         self._violation_counts[key] = self._violation_counts.get(key, 0) + 1
         self._last_violation[key] = datetime.now(timezone.utc)
 
-    def reset_violations(self, user_id: int, trigger_reason: Optional[str] = None):
+    def reset_violations(self, account_id: str, trigger_reason: Optional[str] = None):
         """
         Reset violation counts for a user.
 
         Args:
-            user_id: User to reset
+            account_id: Broker account to reset
             trigger_reason: Specific trigger to reset, or None for all
         """
         if trigger_reason:
-            key = (user_id, trigger_reason)
+            key = (account_id, trigger_reason)
             self._violation_counts.pop(key, None)
             self._last_violation.pop(key, None)
         else:
             # Reset all for this user
-            keys_to_remove = [k for k in self._violation_counts if k[0] == user_id]
+            keys_to_remove = [k for k in self._violation_counts if k[0] == account_id]
             for key in keys_to_remove:
                 del self._violation_counts[key]
                 self._last_violation.pop(key, None)
 
-        logger.info(f"Reset violations for user {user_id}, trigger: {trigger_reason or 'all'}")
+        logger.info(f"Reset violations for account {account_id}, trigger: {trigger_reason or 'all'}")
 
     async def _send_cooldown_notification(
         self,
