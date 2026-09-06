@@ -401,7 +401,67 @@ missing PK look careless.
   `completed_trade.exit_time or now`, and `exit_time` is nullable. No such
   trade exists today; the fallback does.
 
-## M18 — real, and left as-is deliberately
+## M18 — FIXED with an advisory lock (superseding the section below)
+
+The section that follows argued for documenting the gap rather than closing
+it, on the grounds that the only two options were an idempotency key (useless
+here) or a deterministic `detected_at` (a semantic change). **That framing
+missed the standard third option and the argument was wrong.**
+
+The correct tool for a check-then-insert race is a **transaction-scoped
+advisory lock**. No schema change, no change to what these events mean, and no
+key needed. `app/core/locks.py` provides `advisory_xact_lock`, applied at the
+two writers that actually do a check-then-insert:
+
+```
+_tilt_recovery         lock ('tilt_recovery', account)
+_fire_position_alert   lock ('position_alert', account, pattern_type)
+```
+
+The lock key is deliberately COARSER than the dedup scope it protects, which
+also separates on `rule` and `symbol`. A lock finer than its check is no
+protection: two racers would take different locks and both proceed.
+
+`_persist_shadow_events` gets no lock on purpose — it does no check-then-insert,
+writing one row per detected event unconditionally, so there is no read to race.
+
+**`pg_advisory_xact_lock`, never `pg_advisory_lock`.** This database is reached
+through the Supabase transaction pooler (port 6543, PgBouncer transaction
+mode). A session-scoped lock would be returned to the pool at COMMIT while
+still held and later inherited by an unrelated client. The transaction-scoped
+call is released by the server at COMMIT — the same boundary PgBouncer recycles
+on — so the two agree exactly.
+
+**Proved by racing it, not asserted.** `tests/test_advisory_locks.py` runs two
+real transactions on two real connections and interleaves them:
+
+| test | result |
+|---|---|
+| the race WITHOUT the lock, on `behavior_events` | **duplicate reproduced**, 2 rows |
+| the same race WITH the lock | B blocks, then sees A's row and declines — 1 row |
+| ROLLBACK between lock and write | lock released; a crashed task cannot strand it |
+| the same key hashes identically | two callers naming one thing actually contend |
+
+The first test matters as much as the second: a guard whose failure mode has
+never been observed is one nobody can trust.
+
+**A finding from building it.** The race was first attempted on
+`data_quality_events` and could not be reproduced there at all — that table
+carries `uq_dq_events_daily`, so the database rejects the second insert itself.
+That is the rule worth keeping: **where a unique constraint is possible, use
+it.** On a partitioned table keyed by an observation timestamp it is not
+possible, and that is the only reason a lock is the answer here.
+
+**The guard caught its own flaw.** `UNKEYED_WRITERS_ALLOWED` was keyed on
+`file:line`, so adding the lock shifted every line and the allowlist began
+excusing lines that had moved — worse than no allowlist. It is now keyed on the
+enclosing FUNCTION, which survives edits and says what the writer is. Re-keying
+also corrected a name I had guessed: the shadow writer is
+`_persist_shadow_events`.
+
+---
+
+## M18 — the original analysis, kept because the reasoning is still half right
 
 **Adding keys to the three writers would not protect them.** The unique index
 is on `(broker_account_id, idempotency_key, detected_at)` and all three set

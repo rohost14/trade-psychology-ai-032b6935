@@ -481,6 +481,7 @@ async def _tilt_recovery():
     from app.models.risk_alert import RiskAlert
     from app.models.completed_trade import CompletedTrade
     from app.models.behavior_event import BehaviorEvent
+    from app.core.locks import advisory_xact_lock
     from app.core.metrics import incr
 
     IST = ZoneInfo("Asia/Kolkata")
@@ -516,6 +517,18 @@ async def _tilt_recovery():
             )).scalar()
             if after and after > 0:
                 continue  # kept trading - no recognition
+
+            # Serialise this check against the insert below - both are in one
+            # transaction, so the lock covers the whole window and releases at
+            # the commit. Without it two workers could both read "no recovery
+            # recorded yet" and both write one.
+            #
+            # A unique constraint cannot do this job: behavior_events is
+            # partitioned on detected_at and Postgres requires the partition
+            # key in a unique index, so no constraint can express "one
+            # tilt_recovery per account per day" when the timestamp is the
+            # observation time.
+            await advisory_xact_lock(db, "tilt_recovery", acc)
 
             already = (await db.execute(
                 select(BehaviorEvent).where(and_(

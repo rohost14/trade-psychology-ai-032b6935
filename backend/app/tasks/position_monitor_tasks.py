@@ -426,8 +426,25 @@ async def _fire_position_alert(
     from app.models.risk_alert import RiskAlert
     from app.models.behavior_event import BehaviorEvent
     from app.core.event_bus import publish_event
+    from app.core.locks import advisory_xact_lock
     from sqlalchemy import select, and_
     from uuid import uuid4 as _uuid4
+
+    # Serialise the dedup read against the write below. Everything from here to
+    # the commit is one transaction, so this covers the whole check-then-insert
+    # window: a second worker reaching this line waits, and its read then sees
+    # the first one's committed alert instead of racing past it.
+    #
+    # Deliberately COARSER than the dedup scope, which also separates on
+    # `rule` and `symbol`. A lock finer than the check it protects is no
+    # protection - two racers would take different locks and both proceed.
+    # Account+pattern costs a little concurrency and cannot be wrong.
+    #
+    # The BehaviorEvent written alongside the alert cannot be protected by a
+    # unique constraint: behavior_events is partitioned on detected_at, and
+    # Postgres requires the partition key in any unique index, so a constraint
+    # there could never express "one per alert".
+    await advisory_xact_lock(db, "position_alert", broker_account_id, pattern_type)
 
     # 30-min dedup window; rule-aware for constitution (Q15) and
     # escalation-aware (Phase 6): a higher severity always passes.

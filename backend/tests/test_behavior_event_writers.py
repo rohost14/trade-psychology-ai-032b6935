@@ -59,28 +59,39 @@ APP_ROOT = Path(__file__).resolve().parents[1] / "app"
 #: these events mean - they record a moment of observation, not a trade's exit -
 #: and that is a product decision, not a constraint fix.
 #:
-#: Each is instead protected in application code, verified by reading it.
+#: Each is instead protected in application code, and the two that do a
+#: check-then-insert are serialised by a transaction-scoped advisory lock
+#: (app/core/locks.py) so two workers cannot both pass the check. That race is
+#: reproduced and then prevented, on this very table, in
+#: tests/test_advisory_locks.py.
 UNKEYED_WRITERS_ALLOWED: dict[str, str] = {
-    "app/tasks/maintenance_tasks.py:533": (
+    "app/tasks/maintenance_tasks.py::_tilt_recovery": (
         "tilt_recovery. Guarded by an explicit read-before-write immediately "
         "above the insert: it selects any existing tilt_recovery event for the "
-        "same account since the IST day start and skips if one exists "
-        "(maintenance_tasks.py:518-527). A Celery retry re-runs the whole "
-        "function and sees the committed row, so retries are handled. The "
-        "residual exposure is two workers racing the same beat, which Celery "
-        "beat does not normally produce."
+        "same account since the IST day start and skips if one exists. A "
+        "Celery retry re-runs the whole function and sees the committed row. "
+        "The concurrent-worker window is closed by advisory_xact_lock on "
+        "('tilt_recovery', account) taken before that read, in the same "
+        "transaction as the insert - so a second worker waits and then sees "
+        "the committed row rather than racing past it."
     ),
-    "app/tasks/position_monitor_tasks.py:508": (
+    "app/tasks/position_monitor_tasks.py::_fire_position_alert": (
         "Written inside _fire_position_alert, which returns False without "
         "writing when a 30-minute, escalation-aware dedup window already "
-        "covers the alert (position_monitor_tasks.py:424-448). The event is "
-        "only written when a genuinely new RiskAlert was created, and it "
-        "carries that alert's id in risk_alert_id."
+        "covers the alert. The event is only written when a genuinely new "
+        "RiskAlert was created, and carries that alert's id. The dedup read "
+        "and the insert are serialised by advisory_xact_lock on "
+        "('position_alert', account, pattern_type) - deliberately coarser "
+        "than the dedup's own (rule, symbol) scope, because a lock finer than "
+        "the check it protects is no protection at all."
     ),
-    "app/tasks/position_monitor_tasks.py:722": (
+    "app/tasks/position_monitor_tasks.py::_persist_shadow_events": (
         "The entry-shadow writer, shadow=True and data_quality=PARTIAL. Shadow "
         "rows are evidence about an unresolved position and are excluded from "
-        "every trader-facing surface, so a duplicate misleads nobody."
+        "every trader-facing surface, so a duplicate misleads nobody. No lock "
+        "here on purpose: this path does no check-then-insert - it writes one "
+        "row per detected event unconditionally, so there is no read for two "
+        "workers to race against."
     ),
 }
 
@@ -110,7 +121,15 @@ def _behavior_event_names(tree: ast.Module) -> set[str]:
 
 
 def _writers() -> list[tuple[str, int, list[str]]]:
-    """`(file:line, keyword names)` for every BehaviorEvent construction."""
+    """
+    `(file::function, line, keyword names)` for every BehaviorEvent construction.
+
+    Identified by the ENCLOSING FUNCTION, not by line number. The first version
+    of this file keyed the allowlist on `file:line` and every entry went stale
+    the moment a line was added above one of them - the allowlist then excused
+    a line that had moved, which is worse than not having it. A function name
+    survives edits and says what the writer IS.
+    """
     found: list[tuple[str, int, list[str]]] = []
 
     for path in sorted(APP_ROOT.rglob("*.py")):
@@ -123,24 +142,37 @@ def _writers() -> list[tuple[str, int, list[str]]]:
         if not names:
             continue
 
-        for node in ast.walk(tree):
-            if not isinstance(node, ast.Call):
-                continue
-            func = node.func
-            if isinstance(func, ast.Name):
-                called = func.id
-            elif isinstance(func, ast.Attribute):
-                called = func.attr
-            else:
-                continue
-            if called not in names and called != "BehaviorEvent":
-                continue
-            keywords = [kw.arg for kw in node.keywords if kw.arg]
-            found.append((
-                f"{path.relative_to(APP_ROOT.parent).as_posix()}:{node.lineno}",
-                node.lineno,
-                keywords,
-            ))
+        rel = path.relative_to(APP_ROOT.parent).as_posix()
+
+        def _scan(body, enclosing: str):
+            for node in body:
+                if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)):
+                    _scan(node.body, node.name)
+                    continue
+                if isinstance(node, ast.ClassDef):
+                    _scan(node.body, enclosing)
+                    continue
+                for inner in ast.walk(node):
+                    if isinstance(inner, (ast.FunctionDef, ast.AsyncFunctionDef)):
+                        _scan(inner.body, inner.name)
+                        continue
+                    if not isinstance(inner, ast.Call):
+                        continue
+                    func = inner.func
+                    called = (func.id if isinstance(func, ast.Name)
+                              else func.attr if isinstance(func, ast.Attribute)
+                              else None)
+                    if called is None:
+                        continue
+                    if called not in names and called != "BehaviorEvent":
+                        continue
+                    found.append((
+                        f"{rel}::{enclosing}",
+                        inner.lineno,
+                        [kw.arg for kw in inner.keywords if kw.arg],
+                    ))
+
+        _scan(tree.body, "<module>")
 
     return found
 
