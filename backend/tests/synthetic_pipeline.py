@@ -103,18 +103,14 @@ PIPELINE_TABLES = (
 #: defect that has been confirmed against the running code, and
 #: `test_known_broken_steps_are_still_broken` fails the moment one starts
 #: working - so a fix cannot land while the fixture quietly keeps excusing it.
-KNOWN_BROKEN_STEPS = {
-    "6a order-event": (
-        "app/tasks/trade_tasks.py::persist_order_event calls asyncio.run() but "
-        "the module has no `import asyncio` and this function - alone among "
-        "the nine tasks that call it - has no function-local import either. "
-        "Every invocation raises NameError, retries three times and gives up, "
-        "logged and swallowed. Shipped in 492f73a. This is why `orders` has "
-        "zero rows: the writer has never worked, which is NOT what the audit "
-        "recorded (it inferred the table was simply never exercised). "
-        "Phase 3 owns the one-line fix."
-    ),
-}
+#: EMPTY, and it should stay that way. The one entry it held -
+#: `persist_order_event`, which raised NameError on every call because
+#: `trade_tasks.py` had no `import asyncio` - was fixed the same day it was
+#: found, and this test suite is what forced the entry out again:
+#: `test_known_broken_steps_are_still_broken` failed the moment the task
+#: started working. Add an entry only for a defect confirmed against running
+#: code, never to quiet an inconvenient failure.
+KNOWN_BROKEN_STEPS: dict[str, str] = {}
 
 #: Tables that `snapshot()` returns as named attributes. A subset of the above:
 #: the rest are cleaned but rarely asserted on.

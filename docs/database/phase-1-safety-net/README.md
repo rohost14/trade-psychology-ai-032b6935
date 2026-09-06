@@ -403,11 +403,15 @@ which is asserted directly.
 
 Two things surfaced only because the fixture ran the real path:
 
-**1. `trading_capital` is on `UserProfile`, not `User`.** Setting it on the
-user succeeds silently — assigning an undeclared attribute to a mapped instance
-is just a Python attribute set — and the value never reaches the database.
-Every capital-relative detector then abstains while appearing to have been
-given a capital.
+**1. `trading_capital` is on `UserProfile`, not `User` — a trap, not a
+production defect.** Setting it on the user succeeds silently, because
+assigning an undeclared attribute to a mapped instance is just a Python
+attribute set, and the value never reaches the database. The first version of
+this fixture did that and every capital-relative detector abstained while
+looking configured. **Production does not make this mistake** — checked: both
+`app/api/constitution.py:220` and `app/tasks/maintenance_tasks.py:398` go
+through the profile. Recorded because the silence is the dangerous part, not
+because anything is broken.
 
 **2. `persist_order_event` has never worked. Not once.**
 
@@ -434,6 +438,15 @@ row. The fix is one line; it is production code and therefore outside this
 phase, recorded in `KNOWN_BROKEN_STEPS` with
 `test_known_broken_steps_are_still_broken` failing the moment it starts
 working, so the fixture cannot go on quietly excusing it.
+
+**FIXED the same day, on approval.** One line: `import asyncio` at module scope
+in `app/tasks/trade_tasks.py`. The guard did exactly its job — it went red the
+moment the task started succeeding, forcing the entry out of
+`KNOWN_BROKEN_STEPS`, which is now empty. A synthetic postback writes an
+`orders` row, asserted by `test_an_order_event_reaches_the_orders_table`.
+
+`orders` remains at 0 rows in production, and that is now genuinely expected:
+no order has arrived since the account disconnected on 2026-07-31.
 
 ## A third defect, in this phase's own work
 
@@ -470,9 +483,18 @@ first was `orders` being empty for a completely different reason than the audit
 inferred. Both were found by executing, not by reading.
 
 Separately, `app/models/__init__.py` not exporting two of its models is a real
-tidiness defect in production code. It is not fixed here — Phase 1 changes no
-production code — and it is harmless today only because the drift check no
-longer depends on it.
+defect in production code and is **not fixed**. Measured consequence:
+
+```
+import app.models
+'admin_settings'      in Base.metadata.tables  ->  False
+'admin_login_events'  in Base.metadata.tables  ->  False
+```
+
+Runtime is unaffected — every consumer imports those two straight from their
+own module (`app/api/admin/admins.py:33`, `app/services/admin_settings_service.py:95`)
+— but anything that builds a schema from the models, `create_all` against a
+fresh database included, would silently omit both tables. Two lines to fix.
 
 ## How this behaves from here
 

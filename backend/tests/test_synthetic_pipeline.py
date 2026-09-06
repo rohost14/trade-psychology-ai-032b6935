@@ -235,39 +235,58 @@ async def test_a_losing_ladder_reaches_the_behaviour_engine(committing_session):
         )
 
 
-async def test_known_broken_steps_are_still_broken(committing_session):
+async def test_an_order_event_reaches_the_orders_table(committing_session):
     """
-    `KNOWN_BROKEN_STEPS` lets the fixture keep working around a confirmed
-    production defect. This is what stops it becoming a permanent excuse: the
-    moment a listed step starts succeeding, this fails and demands the entry
-    be removed.
+    THE REGRESSION, and the reason `orders` was empty.
 
-    Right now that step is `persist_order_event`, which calls `asyncio.run()`
-    in a module with no `import asyncio` and no function-local one - alone
-    among the nine tasks in that file that call it. Every invocation raises
-    NameError, retries three times, and is swallowed. It is why `orders` holds
-    zero rows, which the audit recorded as "expected, never exercised".
+    `persist_order_event` called `asyncio.run()` in a module with no
+    `import asyncio` and had no function-local one either - alone among the
+    nine tasks in that file that call it. Every invocation raised NameError,
+    retried three times and was swallowed at both call sites, so the table
+    took zero rows and nothing said so. The audit read that emptiness as "the
+    feature shipped after the last trading session and was never exercised".
+
+    Nothing detected it because nothing ran the task. This does.
     """
     _redis_or_skip()
 
     async with synthetic_account(committing_session) as account:
         await account.submit([Fill("BUY", "NIFTY25NOV26000CE", 75, 59.00)])
 
-        fixed = sorted(set(KNOWN_BROKEN_STEPS) - set(account.step_failures))
-        assert not fixed, (
-            f"{fixed} no longer fails - the defect was fixed. Remove it from "
-            "KNOWN_BROKEN_STEPS so the fixture stops excusing it, and assert "
-            "on the rows it now writes."
+        rows = await account.snapshot()
+        assert rows.orders, (
+            "a postback produced no orders row. persist_order_event is "
+            f"failing again and both call sites swallow it. Counts: "
+            f"{rows.counts()}"
         )
+        assert rows.orders[0]["status"] == "COMPLETE"
+        assert rows.orders[0]["tradingsymbol"] == "NIFTY25NOV26000CE"
 
-        for label, failure in account.step_failures.items():
-            assert label in KNOWN_BROKEN_STEPS, (
-                f"{label} failed but is not a documented known-broken step"
-            )
-            assert "NameError" in failure or "not defined" in failure, (
-                f"{label} is failing for a DIFFERENT reason than the one "
-                f"KNOWN_BROKEN_STEPS documents: {failure}"
-            )
+
+async def test_known_broken_steps_is_empty(committing_session):
+    """
+    `KNOWN_BROKEN_STEPS` lets the fixture work around a confirmed production
+    defect instead of going red on it. This is what stops it becoming a
+    permanent excuse: a listed step that starts succeeding fails here and the
+    entry has to come out.
+
+    It is empty, and that is the desired state. The one entry it ever held was
+    `persist_order_event`, and this test is what evicted it - it went red the
+    moment the one-line fix landed.
+    """
+    _redis_or_skip()
+
+    assert KNOWN_BROKEN_STEPS == {}, (
+        "a pipeline step is being excused: "
+        f"{sorted(KNOWN_BROKEN_STEPS)}. That is allowed, but only for a defect "
+        "confirmed against running code and only while it is unfixed."
+    )
+
+    async with synthetic_account(committing_session) as account:
+        await account.submit([Fill("BUY", "NIFTY25NOV26000CE", 75, 59.00)])
+        assert account.step_failures == {}, (
+            f"pipeline steps failed: {account.step_failures}"
+        )
 
 
 # ── it must leave nothing behind ───────────────────────────────────────────

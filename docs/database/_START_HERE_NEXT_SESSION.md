@@ -24,22 +24,28 @@ Phase 1 was not allowed to make.**
 All three surfaced only because things were RUN rather than read. The audit
 found none of them.
 
-**1. `persist_order_event` has never executed successfully.** One line, Phase 3
-owns it, detail in section 4 below. It invalidates a "fact" this file used to
-assert.
+**1. `persist_order_event` had never executed successfully — FIXED.** Detail in
+section 4 below. It invalidated a "fact" this file used to assert.
 
-**2. The drift census is 88, not 127.** The audit's 127 counted rendered type
+**2. The drift census is 88, not 127 — catalogued, NOT fixed.** Every one of
+the 88 is still present in the database; Phase 1 recorded and pinned them, it
+repaired nothing.
+
+Original note: The audit's 127 counted rendered type
 strings; 41 of them were never differences (`timestamptz` vs `TIMESTAMP` is the
 same type, `text` vs an unbounded `String()` is the same storage). The 88 are
 in `backend/tests/_schema_baseline.json`, each with the phase that owns it:
 **1 for Phase 2, 61 for Phase 6, 26 for Phase 8.**
 
-**3. `app/models/__init__.py` exports 35 of 37 model modules.**
-`admin_login_event` and `admin_setting` are missing, so `Base.metadata` is
-incomplete unless something else imports them. This made the drift check pass
-alone and fail in the full suite; it now walks `app/models/*.py` itself and
-does not depend on the package. The `__init__` gap is production code and was
-NOT fixed here.
+**3. `app/models/__init__.py` exports 35 of 37 model modules — STILL OPEN.**
+`admin_login_event` and `admin_setting` are missing, so `Base.metadata` built
+from the package **does not contain `admin_settings` or `admin_login_events`**
+(verified). Runtime is unaffected — every consumer imports those two straight
+from their own module — but anything building a schema from the models, such as
+`create_all` against a fresh database, would silently omit both tables. This
+made the drift check pass alone and fail in the full suite; the check now walks
+`app/models/*.py` itself. **The two-line `__init__` fix is production code and
+was not made.**
 
 Two audit figures were also corrected by measurement: FKs into
 `broker_accounts` is 37 **only when partition children are excluded** (80 with
@@ -143,16 +149,21 @@ verification. The full suite now adds **zero** rows.
   shipped after the last trading session, so it has never seen a live order.
   **This is the one finding whose resolution is inferred, not observed** — when
   the account reconnects, a single live order should produce rows. Re-verify then.~~
-  **WRONG — corrected 2026-09-06 by running the real path.** `orders` is empty
-  because its writer has never worked. `persist_order_event` in
-  `app/tasks/trade_tasks.py` calls `asyncio.run()`, the module has no
+  **WRONG — corrected 2026-09-06 by running the real path, and now FIXED.**
+  `orders` was empty because its writer had never worked. `persist_order_event`
+  in `app/tasks/trade_tasks.py` calls `asyncio.run()`, the module had no
   `import asyncio`, and that function — alone among the nine in the file that
-  call it — has no function-local one either. **Every invocation raises
-  `NameError: name 'asyncio' is not defined`**, retries three times and is
-  swallowed at both call sites. Shipped in `492f73a`. Reconnecting the account
-  would not have produced a single row. This is the exact reason inference is
-  not evidence. One-line fix, Phase 3 owns it, pinned by
-  `tests/test_synthetic_pipeline.py::test_known_broken_steps_are_still_broken`.
+  call it — had no function-local one either. **Every invocation raised
+  `NameError: name 'asyncio' is not defined`**, retried three times and was
+  swallowed at both call sites. Shipped broken in `492f73a`. Reconnecting the
+  account would not have produced a single row.
+
+  Fixed by adding the module-level import. A synthetic postback now writes an
+  `orders` row, asserted by
+  `tests/test_synthetic_pipeline.py::test_an_order_event_reaches_the_orders_table`.
+  **`orders` is still 0 rows in production and that is now genuinely expected**
+  — no order has arrived since the account disconnected. This is the exact
+  reason inference is not evidence.
 - **The replay reference book is a FILE, not database rows** —
   `docs/tradebook-CY6001-FO2025-26.csv`, 2,175 fills, 203 sessions. It is
   **gitignored**; one copy exists, backed up to

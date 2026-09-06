@@ -207,15 +207,24 @@ is carried in `phase-9-no-action-register.md`.
 | 0 | **COMPLETE** — all 8 decided and approved 2026-09-04 |
 | 1 | **COMPLETE 2026-09-06** — 45 tests, test-only. See `phase-1-safety-net/README.md` under BUILT |
 | 2 | NOT STARTED |
-| 3 | NOT STARTED — **carries one live defect found by Phase 1**: `persist_order_event` raises `NameError` on every call, so `orders` has never received a row. One line |
+| 3 | NOT STARTED — one item pulled forward and **DONE**: `persist_order_event` raised `NameError` on every call, so `orders` had never received a row. Fixed 2026-09-06 with a module-level `import asyncio` |
 | 4 | NOT STARTED |
 | 5 | NOT STARTED |
 | 6 | NOT STARTED |
 | 7 | NOT STARTED |
 | 8 | READY — all retirement decisions recorded |
 
-Phase 1 is implemented; it changed no production code, no schema and no data.
-Everything else is unimplemented and the audit remains frozen.
+Phase 1 is implemented. It changed no schema and no data. **One production
+line** was changed after it, on approval and outside its scope: the
+`persist_order_event` import fix. **None of the 88 drift items, neither HIGH
+finding, and no other defect has been repaired** — Phase 1 built detection, not
+repair. Everything else is unimplemented and the audit remains frozen.
+
+**Still open, found by Phase 1, not owned by any existing finding:**
+`app/models/__init__.py` exports 35 of 37 model modules, so a `Base.metadata`
+built from the package omits `admin_settings` and `admin_login_events`. Runtime
+is fine (both are imported directly by their consumers); `create_all` against a
+fresh database is not. Two lines.
 
 **Three audit figures were corrected by re-measurement during Phase 1**, and the
 measured value is what later phases should use:
